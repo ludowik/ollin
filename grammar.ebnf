@@ -1,0 +1,36 @@
+(* Tau — grammaire formelle
+   Source de vérité : syntax.tau
+   Maintenu par : Claude — mettre à jour après chaque évolution de syntax.tau *)
+
+program        = { stmt } EOF ;
+
+stmt           = varDecl
+               | whileStmt
+               | ifStmt
+               | assignStmt
+               | exprStmt ;
+
+varDecl        = "var" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
+whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
+ifStmt         = "if" expr stmt ;
+assignStmt     = IDENT "+=" expr NEWLINE ;
+exprStmt       = expr NEWLINE ;
+
+expr           = comparison ;
+comparison     = additive { ( ">" | "<" ) additive } ;
+additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
+multiplicative = primary { ( "*" | "/" ) primary } ;
+primary        = NUMBER
+               | BOOL
+               | IDENT
+               | call
+               | "(" expr ")" ;
+
+call           = IDENT "(" [ expr { "," expr } ] ")" ;
+
+NUMBER         = digit+ [ "." digit+ ] ;
+BOOL           = "true" | "false" ;
+IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
+
+digit          = "0" | ... | "9" ;
+letter         = "a" | ... | "z" | "A" | ... | "Z" ;

@@ -38,8 +38,11 @@ tau/
 
 ## Syntaxe
 
-La syntaxe du langage est déclarée et maintenue dans **`syntax.tau`** (source de vérité).  
-Ne documenter ici que ce qui y figure explicitement.
+| Fichier | Propriétaire | Rôle |
+|---|---|---|
+| `syntax.tau` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
+| `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.tau` — à maintenir à chaque évolution |
+| `test.tau` | Claude | fichier de tests libres — modifiable à volonté |
 
 ## Versionning
 
@@ -60,5 +63,8 @@ Ne pas documenter ce qui n'est pas encore implémenté.
 | LOAD_VAR    | idx (uint16)    | push vars[identifiers[idx]]        |
 | STORE_VAR   | idx (uint16)    | pop → vars[identifiers[idx]]       |
 | ADD/SUB/MUL/DIV |             | pop 2, push résultat               |
+| GT / LT     |                 | pop 2, push 1.0 si vrai sinon 0.0  |
+| JUMP        | addr (uint16)   | saut inconditionnel                |
+| JUMP_IF_FALSE | addr (uint16) | pop cond ; saute si 0.0            |
 | CALL        | idx, argc (u8)  | appel builtin identifiers[idx]     |
 | HALT        |                 | arrêt                              |

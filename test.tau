@@ -1,0 +1,39 @@
+% ── arithmétique ─────────────────────────────────────────────────────────────
+var x = 2 + 3 * 4
+print(x)              % 14  (priorité * avant +)
+
+var a, b = 10, 3
+var q = a - b
+print(q)              % 7
+
+% ── déclaration multiple ─────────────────────────────────────────────────────
+var p, q2 = 6, 7
+print(p)              % 6
+print(q2)             % 7
+
+% ── while + break ────────────────────────────────────────────────────────────
+var i = 0
+while true
+    i += 1
+    if i > 4 break
+end
+print(i)              % 5
+
+% ── while avec condition booléenne ───────────────────────────────────────────
+var n = 10
+var sum = 0
+var k = 1
+while k < n
+    sum += k
+    k += 1
+end
+print(sum)            % 45  (1+2+…+9)
+
+% ── booleans ─────────────────────────────────────────────────────────────────
+var t = true
+var f = false
+print(t)              % 1
+print(f)              % 0
+
+% ── appel builtin ────────────────────────────────────────────────────────────
+print(2 * (3 + 4))    % 14

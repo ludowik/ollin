@@ -20,25 +20,44 @@ Token Parser::expect(TokenType t) {
     return advance();
 }
 
+TokenType Parser::peekNextType() const {
+    if (pos + 1 < static_cast<int>(tokens.size()))
+        return tokens[pos + 1].type;
+    return TokenType::EOF_T;
+}
+
 void Parser::skipNewlines() {
     while (check(TokenType::NEWLINE)) advance();
 }
+
+// ── entrée principale ────────────────────────────────────────────────────────
 
 Program Parser::parse() {
     Program prog;
     while (true) {
         skipNewlines();
         if (check(TokenType::EOF_T)) break;
-        if (check(TokenType::VAR))
-            prog.stmts.push_back(varDecl());
-        else
-            prog.stmts.push_back(exprStmt());
+        prog.stmts.push_back(parseOneStmt());
     }
     return prog;
 }
 
+// ── dispatch ─────────────────────────────────────────────────────────────────
+
+std::unique_ptr<Stmt> Parser::parseOneStmt() {
+    if (check(TokenType::WHILE))   return whileStmt();
+    if (check(TokenType::IF))      return ifStmt();
+    if (check(TokenType::BREAK))   return breakStmt();
+    if (check(TokenType::VAR))     return varDecl();
+    if (check(TokenType::IDENTIFIER) && peekNextType() == TokenType::PLUS_EQUAL)
+        return assignStmt();
+    return exprStmt();
+}
+
+// ── instructions ─────────────────────────────────────────────────────────────
+
 std::unique_ptr<Stmt> Parser::varDecl() {
-    advance(); // consume VAR
+    advance(); // consomme VAR
     auto s = std::make_unique<VarDeclStmt>();
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
@@ -51,22 +70,69 @@ std::unique_ptr<Stmt> Parser::varDecl() {
     return s;
 }
 
+std::unique_ptr<Stmt> Parser::whileStmt() {
+    advance(); // consomme WHILE
+    auto s = std::make_unique<WhileStmt>();
+    s->cond = expr();
+    match(TokenType::NEWLINE);
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->body.push_back(parseOneStmt());
+    }
+    expect(TokenType::END);
+    match(TokenType::NEWLINE);
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::ifStmt() {
+    advance(); // consomme IF
+    auto s = std::make_unique<IfStmt>();
+    s->cond = expr();
+    s->then = parseOneStmt(); // instruction inline, pas de saut de ligne
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::breakStmt() {
+    advance(); // consomme BREAK
+    match(TokenType::NEWLINE);
+    return std::make_unique<BreakStmt>();
+}
+
+std::unique_ptr<Stmt> Parser::assignStmt() {
+    auto s = std::make_unique<AssignStmt>();
+    s->name = advance().lexeme; // IDENTIFIER
+    if (match(TokenType::PLUS_EQUAL)) s->op = '+';
+    else { advance(); s->op = '\0'; } // EQUALS
+    s->value = expr();
+    match(TokenType::NEWLINE);
+    return s;
+}
+
 std::unique_ptr<Stmt> Parser::exprStmt() {
     auto e = expr();
     match(TokenType::NEWLINE);
     return std::make_unique<ExprStmt>(std::move(e));
 }
 
-std::unique_ptr<Expr> Parser::expr() {
-    return additive();
+// ── expressions ──────────────────────────────────────────────────────────────
+
+std::unique_ptr<Expr> Parser::expr() { return comparison(); }
+
+std::unique_ptr<Expr> Parser::comparison() {
+    auto left = additive();
+    while (check(TokenType::GREATER) || check(TokenType::LESS)) {
+        char op = advance().lexeme[0];
+        left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
+    }
+    return left;
 }
 
 std::unique_ptr<Expr> Parser::additive() {
     auto left = multiplicative();
     while (check(TokenType::PLUS) || check(TokenType::MINUS)) {
         char op = advance().lexeme[0];
-        auto right = multiplicative();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), std::move(right));
+        left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
     }
     return left;
 }
@@ -75,17 +141,16 @@ std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = primary();
     while (check(TokenType::STAR) || check(TokenType::SLASH)) {
         char op = advance().lexeme[0];
-        auto right = primary();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), std::move(right));
+        left = std::make_unique<BinaryExpr>(op, std::move(left), primary());
     }
     return left;
 }
 
 std::unique_ptr<Expr> Parser::primary() {
-    if (check(TokenType::NUMBER)) {
-        double v = std::stod(advance().lexeme);
-        return std::make_unique<NumberExpr>(v);
-    }
+    if (check(TokenType::NUMBER))
+        return std::make_unique<NumberExpr>(std::stod(advance().lexeme));
+    if (check(TokenType::TRUE))  { advance(); return std::make_unique<BoolExpr>(true);  }
+    if (check(TokenType::FALSE)) { advance(); return std::make_unique<BoolExpr>(false); }
     if (check(TokenType::IDENTIFIER)) {
         std::string name = advance().lexeme;
         if (match(TokenType::LPAREN)) {

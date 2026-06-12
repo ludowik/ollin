@@ -41,9 +41,19 @@ void VM::execute(const Chunk& chunk) {
                 break;
             }
 
-            case Op::ADD: { double b = pop(), a = pop(); stack.push(a + b); break; }
-            case Op::SUB: { double b = pop(), a = pop(); stack.push(a - b); break; }
-            case Op::MUL: { double b = pop(), a = pop(); stack.push(a * b); break; }
+            case Op::ADD: { double b = pop(), a = pop(); stack.push(a + b);        break; }
+            case Op::SUB: { double b = pop(), a = pop(); stack.push(a - b);        break; }
+            case Op::MUL: { double b = pop(), a = pop(); stack.push(a * b);        break; }
+            case Op::GT:  { double b = pop(), a = pop(); stack.push(a > b ? 1.0 : 0.0); break; }
+            case Op::LT:  { double b = pop(), a = pop(); stack.push(a < b ? 1.0 : 0.0); break; }
+            case Op::JUMP:
+                ip = readU16();
+                break;
+            case Op::JUMP_IF_FALSE: {
+                uint16_t target = readU16();
+                if (pop() == 0.0) ip = target;
+                break;
+            }
             case Op::DIV: {
                 double b = pop(), a = pop();
                 if (b == 0.0) throw std::runtime_error("division by zero");

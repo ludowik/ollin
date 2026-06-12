@@ -1,5 +1,16 @@
 #include "lexer.h"
 #include <stdexcept>
+#include <unordered_map>
+
+static const std::unordered_map<std::string, TokenType> s_keywords = {
+    {"var",   TokenType::VAR},
+    {"while", TokenType::WHILE},
+    {"if",    TokenType::IF},
+    {"end",   TokenType::END},
+    {"break", TokenType::BREAK},
+    {"true",  TokenType::TRUE},
+    {"false", TokenType::FALSE},
+};
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}
 
@@ -24,8 +35,8 @@ Token Lexer::identifier() {
     while (!atEnd() && (std::isalnum(peek()) || peek() == '_'))
         advance();
     std::string lex = src.substr(start, pos - start);
-    TokenType type = (lex == "var") ? TokenType::VAR : TokenType::IDENTIFIER;
-    return {type, lex, line};
+    auto it = s_keywords.find(lex);
+    return {it != s_keywords.end() ? it->second : TokenType::IDENTIFIER, lex, line};
 }
 
 std::vector<Token> Lexer::tokenize() {
@@ -36,20 +47,29 @@ std::vector<Token> Lexer::tokenize() {
 
         char c = advance();
         switch (c) {
-            case '\n': tokens.push_back({TokenType::NEWLINE, "\\n", line++}); break;
-            case '=':  tokens.push_back({TokenType::EQUALS,  "=",   line});   break;
-            case ',':  tokens.push_back({TokenType::COMMA,   ",",   line});   break;
-            case '(':  tokens.push_back({TokenType::LPAREN,  "(",   line});   break;
-            case ')':  tokens.push_back({TokenType::RPAREN,  ")",   line});   break;
-            case '+':  tokens.push_back({TokenType::PLUS,    "+",   line});   break;
-            case '-':  tokens.push_back({TokenType::MINUS,   "-",   line});   break;
-            case '*':  tokens.push_back({TokenType::STAR,    "*",   line});   break;
-            case '/':  tokens.push_back({TokenType::SLASH,   "/",   line});   break;
+            case '\n': tokens.push_back({TokenType::NEWLINE,     "\\n", line++}); break;
+            case '=':  tokens.push_back({TokenType::EQUALS,      "=",   line});   break;
+            case ',':  tokens.push_back({TokenType::COMMA,       ",",   line});   break;
+            case '(':  tokens.push_back({TokenType::LPAREN,      "(",   line});   break;
+            case ')':  tokens.push_back({TokenType::RPAREN,      ")",   line});   break;
+            case '-':  tokens.push_back({TokenType::MINUS,       "-",   line});   break;
+            case '*':  tokens.push_back({TokenType::STAR,        "*",   line});   break;
+            case '/':  tokens.push_back({TokenType::SLASH,       "/",   line});   break;
+            case '>':  tokens.push_back({TokenType::GREATER,     ">",   line});   break;
+            case '<':  tokens.push_back({TokenType::LESS,        "<",   line});   break;
+            case '+':
+                if (!atEnd() && peek() == '=') {
+                    advance();
+                    tokens.push_back({TokenType::PLUS_EQUAL, "+=", line});
+                } else {
+                    tokens.push_back({TokenType::PLUS, "+", line});
+                }
+                break;
             case '%':
                 while (!atEnd() && peek() != '\n') advance();
                 break;
             default:
-                if (std::isdigit(c)) { tokens.push_back(number()); break; }
+                if (std::isdigit(c)) { tokens.push_back(number());     break; }
                 if (std::isalpha(c) || c == '_') { tokens.push_back(identifier()); break; }
                 throw std::runtime_error(std::string("unexpected character: ") + c);
         }

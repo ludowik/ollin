@@ -1,4 +1,12 @@
 var a = 12.12
-var b, c = 1, 2      % déclaration multiple
+var b, c = 1, 2
 var res = a + b
-print(res)           % builtin
+print(res)
+
+while true 
+    a += 1
+    if a > 40 break
+end
+
+print(a)
+
