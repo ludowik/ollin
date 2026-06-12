@@ -184,6 +184,10 @@ assert(r1 == 1, "varargs r1")
 assert(r2 == 2, "varargs r2")
 assert(r3 == 3, "varargs r3")
 
+## ── séparateurs de milliers ───────────────────────────────────────────────────
+assert(1000.12 == 1_000.12, "underscore float")
+assert(1000000 == 1_000_000, "underscore int")
+
 ## ── nil ───────────────────────────────────────────────────────────────────────
 var undef
 assert(undef == nil, "var sans valeur → nil")

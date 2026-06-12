@@ -35,13 +35,14 @@ void Lexer::skipWhitespace() {
 
 Token Lexer::number(bool leading_dot) {
     int start = pos - 1;
-    if (leading_dot) {
-        // déjà consommé '.', pos-1 pointe sur le '.'
-        // le chiffre suivant sera absorbé ci-dessous
+    std::string digits;
+    if (leading_dot) digits += '.';
+    else             digits += src[start];
+    while (!atEnd() && (std::isdigit(peek()) || peek() == '.' || peek() == '_')) {
+        char c = advance();
+        if (c != '_') digits += c; // underscores ignorés
     }
-    while (!atEnd() && (std::isdigit(peek()) || peek() == '.'))
-        advance();
-    return {TokenType::NUMBER, src.substr(start, pos - start), line};
+    return {TokenType::NUMBER, digits, line};
 }
 
 Token Lexer::string() {
