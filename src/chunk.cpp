@@ -1,8 +1,9 @@
 #include "chunk.h"
 #include <algorithm>
+#include <utility>
 
-uint16_t Chunk::addConstant(double v) {
-    constants.push_back(v);
+uint16_t Chunk::addConstant(Value v) {
+    constants.push_back(std::move(v));
     return static_cast<uint16_t>(constants.size() - 1);
 }
 

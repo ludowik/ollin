@@ -18,5 +18,8 @@ private:
     bool atEnd() const;
     void skipWhitespace();
     Token number();
+    Token string();
     Token identifier();
+    void  skipLineComment();
+    void  skipBlockComment();
 };

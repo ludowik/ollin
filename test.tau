@@ -1,39 +1,43 @@
-% ── arithmétique ─────────────────────────────────────────────────────────────
+### test.tau — fichier de tests libres (Claude)
+    Couvre toutes les constructions de syntax.tau
+###
+
+## ── strings ──────────────────────────────────────────────────────────────────
+print("hello world!")        ## hello world!
+print("tau v0.1")            ## tau v0.1
+
+## ── arithmétique ─────────────────────────────────────────────────────────────
 var x = 2 + 3 * 4
-print(x)              % 14  (priorité * avant +)
+print(x)                     ## 14  (priorité * avant +)
 
 var a, b = 10, 3
-var q = a - b
-print(q)              % 7
+print(a - b)                 ## 7
 
-% ── déclaration multiple ─────────────────────────────────────────────────────
-var p, q2 = 6, 7
-print(p)              % 6
-print(q2)             % 7
+## ── déclaration multiple ─────────────────────────────────────────────────────
+var p, q = 6, 7
+print(p)                     ## 6
+print(q)                     ## 7
 
-% ── while + break ────────────────────────────────────────────────────────────
+## ── while + break ────────────────────────────────────────────────────────────
 var i = 0
 while true
     i += 1
     if i > 4 break
 end
-print(i)              % 5
+print(i)                     ## 5
 
-% ── while avec condition booléenne ───────────────────────────────────────────
-var n = 10
+## ── while avec condition ─────────────────────────────────────────────────────
 var sum = 0
 var k = 1
-while k < n
+while k < 10
     sum += k
     k += 1
 end
-print(sum)            % 45  (1+2+…+9)
+print(sum)                   ## 45  (1+2+…+9)
 
-% ── booleans ─────────────────────────────────────────────────────────────────
-var t = true
-var f = false
-print(t)              % 1
-print(f)              % 0
+## ── booleans ─────────────────────────────────────────────────────────────────
+print(true)                  ## 1
+print(false)                 ## 0
 
-% ── appel builtin ────────────────────────────────────────────────────────────
-print(2 * (3 + 4))    % 14
+## ── expression parenthésée ───────────────────────────────────────────────────
+print(2 * (3 + 4))           ## 14

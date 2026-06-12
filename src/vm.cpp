@@ -12,11 +12,20 @@ void VM::execute(const Chunk& chunk) {
         return v;
     };
 
-    auto pop = [&]() -> double {
+    auto pop = [&]() -> Value {
         if (stack.empty()) throw std::runtime_error("stack underflow");
-        double v = stack.top();
+        Value v = stack.top();
         stack.pop();
         return v;
+    };
+
+    auto asDouble = [](const Value& v) -> double {
+        if (auto* d = std::get_if<double>(&v)) return *d;
+        throw std::runtime_error("expected number, got string");
+    };
+
+    auto printValue = [](const Value& v) {
+        std::visit([](auto&& x) { std::cout << x; }, v);
     };
 
     while (true) {
@@ -41,23 +50,27 @@ void VM::execute(const Chunk& chunk) {
                 break;
             }
 
-            case Op::ADD: { double b = pop(), a = pop(); stack.push(a + b);        break; }
-            case Op::SUB: { double b = pop(), a = pop(); stack.push(a - b);        break; }
-            case Op::MUL: { double b = pop(), a = pop(); stack.push(a * b);        break; }
-            case Op::GT:  { double b = pop(), a = pop(); stack.push(a > b ? 1.0 : 0.0); break; }
-            case Op::LT:  { double b = pop(), a = pop(); stack.push(a < b ? 1.0 : 0.0); break; }
+            case Op::ADD: { auto b = pop(), a = pop(); stack.push(asDouble(a) + asDouble(b)); break; }
+            case Op::SUB: { auto b = pop(), a = pop(); stack.push(asDouble(a) - asDouble(b)); break; }
+            case Op::MUL: { auto b = pop(), a = pop(); stack.push(asDouble(a) * asDouble(b)); break; }
+            case Op::DIV: {
+                auto b = pop(), a = pop();
+                double bd = asDouble(b);
+                if (bd == 0.0) throw std::runtime_error("division by zero");
+                stack.push(asDouble(a) / bd);
+                break;
+            }
+
+            case Op::GT:  { auto b = pop(), a = pop(); stack.push(asDouble(a) > asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::LT:  { auto b = pop(), a = pop(); stack.push(asDouble(a) < asDouble(b) ? 1.0 : 0.0); break; }
+
             case Op::JUMP:
                 ip = readU16();
                 break;
+
             case Op::JUMP_IF_FALSE: {
                 uint16_t target = readU16();
-                if (pop() == 0.0) ip = target;
-                break;
-            }
-            case Op::DIV: {
-                double b = pop(), a = pop();
-                if (b == 0.0) throw std::runtime_error("division by zero");
-                stack.push(a / b);
+                if (asDouble(pop()) == 0.0) ip = target;
                 break;
             }
 
@@ -67,12 +80,12 @@ void VM::execute(const Chunk& chunk) {
                 const std::string& name = chunk.identifiers[name_idx];
 
                 if (name == "print") {
-                    std::vector<double> args(argc);
+                    std::vector<Value> args(argc);
                     for (int i = argc - 1; i >= 0; --i)
                         args[i] = pop();
                     for (int i = 0; i < argc; ++i) {
                         if (i) std::cout << ' ';
-                        std::cout << args[i];
+                        printValue(args[i]);
                     }
                     std::cout << '\n';
                 } else {

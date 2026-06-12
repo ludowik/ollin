@@ -2,7 +2,7 @@
 #include <string>
 
 enum class TokenType {
-    NUMBER, IDENTIFIER,
+    NUMBER, STRING, IDENTIFIER,
     VAR, WHILE, IF, END, BREAK, TRUE, FALSE,
     EQUALS, COMMA, LPAREN, RPAREN,
     PLUS, MINUS, STAR, SLASH,

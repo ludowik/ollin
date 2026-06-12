@@ -1,7 +1,10 @@
 #pragma once
 #include <cstdint>
 #include <string>
+#include <variant>
 #include <vector>
+
+using Value = std::variant<double, std::string>;
 
 enum class Op : uint8_t {
     LOAD_CONST,      // uint16 index → constants
@@ -17,16 +20,16 @@ enum class Op : uint8_t {
 
 struct Chunk {
     std::vector<uint8_t>   code;
-    std::vector<double>    constants;
+    std::vector<Value>     constants;
     std::vector<std::string> identifiers;
 
-    uint16_t addConstant(double v);
+    uint16_t addConstant(Value v);
     uint16_t addIdentifier(const std::string& name);
 
     void   emit(Op op);
     void   emitU16(Op op, uint16_t arg);
     void   emitCall(uint16_t name_idx, uint8_t argc);
-    size_t emitJump(Op op);                        // émet un jump avec placeholder, retourne la position
-    void   patchJump(size_t pos, uint16_t target); // corrige le placeholder
+    size_t emitJump(Op op);
+    void   patchJump(size_t pos, uint16_t target);
     size_t currentPos() const { return code.size(); }
 };

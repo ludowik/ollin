@@ -9,6 +9,6 @@ public:
     void execute(const Chunk& chunk);
 
 private:
-    std::stack<double> stack;
-    std::unordered_map<std::string, double> vars;
+    std::stack<Value>                    stack;
+    std::unordered_map<std::string, Value> vars;
 };

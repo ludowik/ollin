@@ -81,6 +81,8 @@ void Compiler::compileExprStmt(const ExprStmt& s) {
 void Compiler::compileExpr(const Expr& e) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
         chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(n->value));
+    } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
+        chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(s->value));
     } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
         chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(b->value ? 1.0 : 0.0));
     } else if (auto* v = dynamic_cast<const VarExpr*>(&e)) {

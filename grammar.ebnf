@@ -21,6 +21,7 @@ comparison     = additive { ( ">" | "<" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
 multiplicative = primary { ( "*" | "/" ) primary } ;
 primary        = NUMBER
+               | STRING
                | BOOL
                | IDENT
                | call
@@ -28,7 +29,11 @@ primary        = NUMBER
 
 call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
+line_comment   = "##" { any \ newline } ;
+block_comment  = "###" { any } "###" ;
+
 NUMBER         = digit+ [ "." digit+ ] ;
+STRING         = '"' { any \ '"' } '"' ;
 BOOL           = "true" | "false" ;
 IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
 

@@ -5,6 +5,11 @@
 
 struct Expr { virtual ~Expr() = default; };
 
+struct StringExpr : Expr {
+    std::string value;
+    explicit StringExpr(std::string v) : value(std::move(v)) {}
+};
+
 struct BoolExpr : Expr {
     bool value;
     explicit BoolExpr(bool v) : value(v) {}
