@@ -235,6 +235,14 @@ assert(-3 + 3 == 0, "-3 + 3")
 ## ── leading decimal ──────────────────────────────────────────────────────────
 assert(.5 + .5 == 1, ".5 literal")
 
+## ── not ──────────────────────────────────────────────────────────────────────
+assert(not false,      "not false")
+assert(not false == 1, "not false == 1")
+assert(not true  == 0, "not true == 0")
+assert(not nil   == 1, "not nil")
+assert(not 0     == 1, "not 0")
+assert(not ""    == 1, "not vide")
+
 ## ── or / and ─────────────────────────────────────────────────────────────────
 assert(true or false, "true or false")
 assert(false or true, "false or true")

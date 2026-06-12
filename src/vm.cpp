@@ -108,6 +108,7 @@ void VM::execute(const Chunk& chunk) {
                 break;
             }
             case Op::NEGATE: { auto a = pop(); stack.push(-asDouble(a)); break; }
+            case Op::NOT_OP: { auto a = pop(); stack.push(isFalsy(a) ? 1.0 : 0.0); break; }
             case Op::OR_OP:  { auto b = pop(), a = pop(); stack.push(!isFalsy(a) || !isFalsy(b) ? 1.0 : 0.0); break; }
             case Op::AND_OP: { auto b = pop(), a = pop(); stack.push(!isFalsy(a) && !isFalsy(b) ? 1.0 : 0.0); break; }
 

@@ -312,10 +312,8 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 }
 
 std::unique_ptr<Expr> Parser::unary() {
-    if (check(TokenType::MINUS)) {
-        advance();
-        return std::make_unique<UnaryExpr>('-', unary());
-    }
+    if (check(TokenType::MINUS)) { advance(); return std::make_unique<UnaryExpr>('-', unary()); }
+    if (check(TokenType::NOT))   { advance(); return std::make_unique<UnaryExpr>('!', unary()); }
     return primary();
 }
 

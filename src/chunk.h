@@ -61,7 +61,7 @@ enum class Op : uint8_t {
     LOAD_VAR,        // uint16 index → identifiers
     STORE_VAR,       // uint16 index → identifiers
     ADD, SUB, MUL, DIV, MOD,
-    NEGATE,
+    NEGATE, NOT_OP,
     OR_OP, AND_OP,
     GT, LT, GE, LE, NEQ,  // pop b,a → push résultat (1.0 ou 0.0)
     EQ,              // pop b,a → push a==b (1.0 ou 0.0)

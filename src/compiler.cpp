@@ -258,7 +258,8 @@ void Compiler::visit(const ReturnStmt& s) {
 
 void Compiler::visit(const UnaryExpr& e) {
     e.operand->accept(*this);
-    if (e.op == '-') chunk.emit(Op::NEGATE);
+    if      (e.op == '-') chunk.emit(Op::NEGATE);
+    else if (e.op == '!') chunk.emit(Op::NOT_OP);
     else throw std::runtime_error(std::string("unknown unary op: ") + e.op);
 }
 

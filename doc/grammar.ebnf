@@ -37,7 +37,7 @@ logicalAnd     = comparison { "and" comparison } ;
 comparison     = additive { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
 multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
-unary          = [ "-" ] primary ;
+unary          = ( "-" | "not" ) unary | primary ;
 primary        = NUMBER
                | STRING
                | BOOL
