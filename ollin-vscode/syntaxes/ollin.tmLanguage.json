@@ -32,7 +32,7 @@
         },
         "builtin": {
             "name": "support.function.builtin.ollin",
-            "match": "\\b(print|time)\\b"
+            "match": "\\b(print|time|assert)\\b"
         },
         "number": {
             "name": "constant.numeric.ollin",

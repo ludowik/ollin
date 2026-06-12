@@ -71,7 +71,15 @@ void VM::execute(const Chunk& chunk) {
                 uint8_t  argc     = ch->code[ip++];
                 const std::string& name = ch->identifiers[name_idx];
 
-                if (name == "time") {
+                if (name == "assert") {
+                    std::vector<Value> args(argc);
+                    for (int i = argc - 1; i >= 0; --i) args[i] = pop();
+                    if (asDouble(args[0]) == 0.0) {
+                        std::string msg = (argc >= 2 && args[1].isString())
+                            ? args[1].asString() : "assertion failed";
+                        throw std::runtime_error(msg);
+                    }
+                } else if (name == "time") {
                     auto now = std::chrono::system_clock::now();
                     double t = std::chrono::duration<double>(now.time_since_epoch()).count();
                     stack.push(t);

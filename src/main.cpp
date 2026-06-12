@@ -5,27 +5,47 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <string>
+
+static Program parseFile(const std::string& path) {
+    std::ifstream f(path);
+    if (!f) return {};
+    std::ostringstream ss;
+    ss << f.rdbuf();
+    return Parser(Lexer(ss.str()).tokenize()).parse();
+}
+
+static void appendProgram(Program& dst, Program src) {
+    for (auto& s : src.stmts)
+        dst.stmts.push_back(std::move(s));
+}
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cerr << "usage: ollin <file.ol>\n";
         return 1;
     }
-    std::ifstream file(argv[1]);
-    if (!file) {
-        std::cerr << "cannot open: " << argv[1] << '\n';
-        return 1;
-    }
-    std::ostringstream ss;
-    ss << file.rdbuf();
+
+    std::string scriptPath(argv[1]);
+    auto sep = scriptPath.find_last_of("/\\");
+    std::string dir = (sep != std::string::npos) ? scriptPath.substr(0, sep + 1) : "";
 
     try {
-        auto tokens  = Lexer(ss.str()).tokenize();
-        auto program = Parser(std::move(tokens)).parse();
-        auto chunk   = Compiler().compile(program);
-        VM().execute(chunk);
+        Program program;
+        appendProgram(program, parseFile(dir + "prelude.ol"));
+
+        std::ifstream main_file(scriptPath);
+        if (!main_file) {
+            std::cerr << "cannot open: " << scriptPath << '\n';
+            return 1;
+        }
+        std::ostringstream ss;
+        ss << main_file.rdbuf();
+        appendProgram(program, Parser(Lexer(ss.str()).tokenize()).parse());
+
+        VM().execute(Compiler().compile(program));
     } catch (const std::exception& e) {
-        std::cerr << argv[1] << ": " << e.what() << '\n';
+        std::cerr << scriptPath << ": " << e.what() << '\n';
         return 1;
     }
     return 0;
