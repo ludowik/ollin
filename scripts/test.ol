@@ -122,9 +122,9 @@ try
 catch err
 end
 
-## ── print format ─────────────────────────────────────────────────────────────
-print("{} + {} = {}", 1, 2, 3)         ## 1 + 2 = 3
-print("a={0} b={1} a={0}", 10, 20)     ## a=10 b=20 a=10
+## ── printf format ────────────────────────────────────────────────────────────
+printf("{} + {} = {}", 1, 2, 3)        ## 1 + 2 = 3
+printf("a={0} b={1} a={0}", 10, 20)    ## a=10 b=20 a=10
 
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
@@ -133,4 +133,4 @@ while count < 1000000
     count += 1
 end
 var t1 = time()
-print("benchmark: {} s", t1 - t0)
+printf("benchmark: {} s", t1 - t0)

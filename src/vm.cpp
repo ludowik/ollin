@@ -4,6 +4,29 @@
 #include <stdexcept>
 #include <vector>
 
+static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
+    std::string out;
+    int auto_idx = 0;
+    for (size_t i = 0; i < fmt.size(); ++i) {
+        if (fmt[i] == '{') {
+            size_t j = fmt.find('}', i + 1);
+            if (j != std::string::npos) {
+                std::string spec = fmt.substr(i + 1, j - i - 1);
+                int idx = spec.empty() ? auto_idx++ : std::stoi(spec);
+                int ai  = idx + offset;
+                if (ai < (int)args.size()) {
+                    if (args[ai].isString()) out += args[ai].asString();
+                    else { std::ostringstream os; os << args[ai].n; out += os.str(); }
+                }
+                i = j;
+                continue;
+            }
+        }
+        out += fmt[i];
+    }
+    return out;
+}
+
 // ── boucle d'exécution ────────────────────────────────────────────────────────
 
 void VM::execute(const Chunk& chunk) {
@@ -87,39 +110,17 @@ void VM::execute(const Chunk& chunk) {
                 } else if (name == "print") {
                     std::vector<Value> args(argc);
                     for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-                    if (argc >= 1 && args[0].isString()) {
-                        const std::string& fmt = args[0].asString();
-                        std::string result;
-                        int auto_idx = 0;
-                        for (size_t fi = 0; fi < fmt.size(); ++fi) {
-                            if (fmt[fi] == '{') {
-                                size_t close = fmt.find('}', fi + 1);
-                                if (close != std::string::npos) {
-                                    std::string spec = fmt.substr(fi + 1, close - fi - 1);
-                                    int idx = spec.empty() ? auto_idx++ : std::stoi(spec);
-                                    int ai  = idx + 1; // args[0] est le format
-                                    if (ai < argc) {
-                                        if (args[ai].isString()) {
-                                            result += args[ai].asString();
-                                        } else {
-                                            std::ostringstream os; os << args[ai].n;
-                                            result += os.str();
-                                        }
-                                    }
-                                    fi = close;
-                                    continue;
-                                }
-                            }
-                            result += fmt[fi];
-                        }
-                        std::cout << result << '\n';
-                    } else {
-                        for (int i = 0; i < argc; ++i) {
-                            if (i) std::cout << ' ';
-                            printValue(args[i]);
-                        }
-                        std::cout << '\n';
+                    for (int i = 0; i < argc; ++i) {
+                        if (i) std::cout << ' ';
+                        printValue(args[i]);
                     }
+                    std::cout << '\n';
+                } else if (name == "printf") {
+                    std::vector<Value> args(argc);
+                    for (int i = argc - 1; i >= 0; --i) args[i] = pop();
+                    if (argc < 1 || !args[0].isString())
+                        throw std::runtime_error("printf: premier argument doit être une chaîne");
+                    std::cout << applyFormat(args[0].asString(), args, 1) << '\n';
                 } else {
                     throw std::runtime_error("unknown function: " + name);
                 }
