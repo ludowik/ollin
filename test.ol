@@ -76,3 +76,12 @@ end
 try
 catch err
 end
+
+## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
+var t0 = time()
+var count = 0
+while count < 1000000
+    count += 1
+end
+var t1 = time()
+print(t1 - t0)

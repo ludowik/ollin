@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/tau.dir/src/main.cpp.o CMakeFiles/tau.dir/src/chunk.cpp.o CMakeFiles/tau.dir/src/lexer.cpp.o CMakeFiles/tau.dir/src/parser.cpp.o CMakeFiles/tau.dir/src/compiler.cpp.o CMakeFiles/tau.dir/src/vm.cpp.o -o tau

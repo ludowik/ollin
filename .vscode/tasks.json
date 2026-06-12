@@ -18,9 +18,9 @@
             "problemMatcher": ["$gcc"]
         },
         {
-            "label": "tau: run",
+            "label": "ollin: run",
             "type": "shell",
-            "command": "${workspaceFolder}/build/tau \"${file}\"",
+            "command": "${workspaceFolder}/build/ollin \"${file}\"",
             "dependsOn": ["cmake: build"],
             "group": { "kind": "test", "isDefault": true },
             "presentation": { "reveal": "always", "panel": "shared", "clear": true }

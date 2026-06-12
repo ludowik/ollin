@@ -1,0 +1,3 @@
+/Users/lca/Dev/tau/build_rel/CMakeFiles/tau.dir
+/Users/lca/Dev/tau/build_rel/CMakeFiles/edit_cache.dir
+/Users/lca/Dev/tau/build_rel/CMakeFiles/rebuild_cache.dir

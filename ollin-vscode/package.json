@@ -1,0 +1,20 @@
+{
+    "name": "ollin-language",
+    "displayName": "Ollin Language",
+    "description": "Syntax highlighting for the Ollin scripting language",
+    "version": "0.0.1",
+    "engines": { "vscode": "^1.70.0" },
+    "contributes": {
+        "languages": [{
+            "id": "ollin",
+            "aliases": ["Ollin", "ollin"],
+            "extensions": [".ol"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "ollin",
+            "scopeName": "source.ollin",
+            "path": "./syntaxes/ollin.tmLanguage.json"
+        }]
+    }
+}

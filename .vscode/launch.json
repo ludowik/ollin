@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug tau (test.tau)",
+            "name": "Debug ollin (test.ollin)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/tau",
-            "args": ["${workspaceFolder}/test.tau"],
+            "program": "${workspaceFolder}/build/ollin",
+            "args": ["${workspaceFolder}/test.ollin"],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "cmake: build",
             "terminal": "integrated",

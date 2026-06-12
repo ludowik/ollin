@@ -8,7 +8,7 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        std::cerr << "usage: tau <file.tau>\n";
+        std::cerr << "usage: ollin <file.ol>\n";
         return 1;
     }
     std::ifstream file(argv[1]);

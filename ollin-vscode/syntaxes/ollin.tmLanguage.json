@@ -1,7 +1,7 @@
 {
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-    "name": "Tau",
-    "scopeName": "source.tau",
+    "name": "Ollin",
+    "scopeName": "source.ollin",
     "patterns": [
         { "include": "#block_comment" },
         { "include": "#line_comment" },
@@ -13,33 +13,33 @@
     ],
     "repository": {
         "block_comment": {
-            "name": "comment.block.tau",
+            "name": "comment.block.ollin",
             "begin": "###",
             "end": "###"
         },
         "line_comment": {
-            "name": "comment.line.tau",
+            "name": "comment.line.ollin",
             "match": "##(?!#).*$"
         },
         "string": {
-            "name": "string.quoted.double.tau",
+            "name": "string.quoted.double.ollin",
             "begin": "\"",
             "end": "\""
         },
         "keyword": {
-            "name": "keyword.control.tau",
+            "name": "keyword.control.ollin",
             "match": "\\b(var|while|if|then|end|break|true|false|try|catch|throw|else)\\b"
         },
         "builtin": {
-            "name": "support.function.builtin.tau",
+            "name": "support.function.builtin.ollin",
             "match": "\\b(print|time)\\b"
         },
         "number": {
-            "name": "constant.numeric.tau",
+            "name": "constant.numeric.ollin",
             "match": "\\b\\d+(\\.\\d+)?\\b"
         },
         "operator": {
-            "name": "keyword.operator.tau",
+            "name": "keyword.operator.ollin",
             "match": "\\+=|[+\\-*/><]"
         }
     }

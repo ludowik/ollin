@@ -4,7 +4,7 @@ project(tau VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(tau
+add_executable(ollin
     src/main.cpp
     src/chunk.cpp
     src/lexer.cpp
@@ -13,12 +13,12 @@ add_executable(tau
     src/vm.cpp
 )
 
-target_include_directories(tau PRIVATE src)
+target_include_directories(ollin PRIVATE src)
 
 if(MSVC)
-    target_compile_options(tau PRIVATE /W4)
+    target_compile_options(ollin PRIVATE /W4)
 else()
-    target_compile_options(tau PRIVATE -Wall -Wextra)
+    target_compile_options(ollin PRIVATE -Wall -Wextra)
     # -Og uniquement sur vm.cpp : boucle d'exécution rapide sans casser
     # les breakpoints des autres modules (compiler, parser, lexer…)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")

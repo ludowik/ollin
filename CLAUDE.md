@@ -1,4 +1,4 @@
-# Tau — Scripting Language
+# Ollin — Scripting Language
 
 ## Stack
 - Implémentation : **C++17**
@@ -9,7 +9,7 @@
 ## Architecture (pipeline strict, modules indépendants)
 
 ```
-source .tau
+source .ol
   → Lexer     → std::vector<Token>          (token.h)
   → Parser    → Program (AST)               (ast.h)
   → Compiler  → Chunk (bytecode)            (chunk.h)
@@ -40,10 +40,10 @@ tau/
 
 | Fichier | Propriétaire | Rôle |
 |---|---|---|
-| `syntax.tau` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
-| `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.tau` — à maintenir à chaque évolution |
-| `test.tau` | Claude | fichier de tests libres — modifiable à volonté |
-| `tau-vscode/` | Claude | extension VS Code (colorisation) — à maintenir à chaque évolution du langage |
+| `syntax.ol` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
+| `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.ol` — à maintenir à chaque évolution |
+| `test.ol` | Claude | fichier de tests libres — modifiable à volonté |
+| `ollin-vscode/` | Claude | extension VS Code (colorisation) — à maintenir à chaque évolution du langage |
 
 ## Versionning
 
