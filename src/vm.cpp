@@ -6,6 +6,8 @@
 
 void VM::execute(const Chunk& chunk) {
     int ip = 0;
+    vars.assign(chunk.identifiers.size(), 0.0);
+    vars_init.assign(chunk.identifiers.size(), false);
 
     auto readU16 = [&]() -> uint16_t {
         uint16_t v = (static_cast<uint16_t>(chunk.code[ip]) << 8) | chunk.code[ip + 1];
@@ -37,17 +39,17 @@ void VM::execute(const Chunk& chunk) {
                 break;
 
             case Op::LOAD_VAR: {
-                const std::string& name = chunk.identifiers[readU16()];
-                auto it = vars.find(name);
-                if (it == vars.end())
-                    throw std::runtime_error("runtime: undefined variable '" + name + "'");
-                stack.push(it->second);
+                uint16_t idx = readU16();
+                if (!vars_init[idx])
+                    throw std::runtime_error("runtime: undefined variable '" + chunk.identifiers[idx] + "'");
+                stack.push(vars[idx]);
                 break;
             }
 
             case Op::STORE_VAR: {
-                const std::string& name = chunk.identifiers[readU16()];
-                vars[name] = pop();
+                uint16_t idx = readU16();
+                vars[idx] = pop();
+                vars_init[idx] = true;
                 break;
             }
 

@@ -1,8 +1,6 @@
 #pragma once
 #include "chunk.h"
 #include <stack>
-#include <string>
-#include <unordered_map>
 #include <vector>
 
 class VM {
@@ -15,7 +13,8 @@ private:
         size_t   stack_size;
     };
 
-    std::stack<Value>                    stack;
-    std::unordered_map<std::string, Value> vars;
-    std::vector<Handler>                 handler_stack;
+    std::stack<Value, std::vector<Value>> stack;
+    std::vector<Value>   vars;
+    std::vector<bool>    vars_init;
+    std::vector<Handler> handler_stack;
 };
