@@ -25,8 +25,17 @@ assert(faux == 0, "false == 0")
 
 ## ── comparaisons ──────────────────────────────────────────────────────────────
 var n = 5
-assert(n > 3, "n > 3")
+assert(n > 3,  "n > 3")
 assert(n < 10, "n < 10")
+assert(n >= 5, "n >= 5")
+assert(n >= 4, "n >= 4")
+assert(n <= 5, "n <= 5")
+assert(n <= 6, "n <= 6")
+var no = false
+if n >= 6 then no = true end
+assert(no == false, "n >= 6 faux")
+if n <= 4 then no = true end
+assert(no == false, "n <= 4 faux")
 
 var c = 2
 assert(c == 2, "c == 2")

@@ -188,8 +188,10 @@ void Compiler::visit(const BinaryExpr& e) {
         case '*': chunk.emit(Op::MUL);    break;
         case '/': chunk.emit(Op::DIV);    break;
         case '%': chunk.emit(Op::MOD);    break;
-        case '>': chunk.emit(Op::GT);     break;
-        case '<': chunk.emit(Op::LT);     break;
+        case '>': chunk.emit(Op::GT);  break;
+        case '<': chunk.emit(Op::LT);  break;
+        case 'G': chunk.emit(Op::GE);  break;
+        case 'L': chunk.emit(Op::LE);  break;
         case '=': chunk.emit(Op::EQ);     break;
         case '|': chunk.emit(Op::OR_OP);  break;
         case '&': chunk.emit(Op::AND_OP); break;

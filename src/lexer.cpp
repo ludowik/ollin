@@ -127,8 +127,14 @@ std::vector<Token> Lexer::tokenize() {
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::PERCENT_EQUAL, "%=", line}); }
                 else tokens.push_back({TokenType::PERCENT, "%", line});
                 break;
-            case '>':  tokens.push_back({TokenType::GREATER,     ">",   line});   break;
-            case '<':  tokens.push_back({TokenType::LESS,        "<",   line});   break;
+            case '>':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::GREATER_EQUAL, ">=", line}); }
+                else tokens.push_back({TokenType::GREATER, ">", line});
+                break;
+            case '<':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::LESS_EQUAL, "<=", line}); }
+                else tokens.push_back({TokenType::LESS, "<", line});
+                break;
             case '"':  tokens.push_back(string());                                break;
             case '+':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::PLUS_EQUAL, "+=", line}); }
