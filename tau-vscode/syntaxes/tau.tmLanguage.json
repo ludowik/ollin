@@ -1,0 +1,46 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "Tau",
+    "scopeName": "source.tau",
+    "patterns": [
+        { "include": "#block_comment" },
+        { "include": "#line_comment" },
+        { "include": "#string" },
+        { "include": "#keyword" },
+        { "include": "#builtin" },
+        { "include": "#number" },
+        { "include": "#operator" }
+    ],
+    "repository": {
+        "block_comment": {
+            "name": "comment.block.tau",
+            "begin": "###",
+            "end": "###"
+        },
+        "line_comment": {
+            "name": "comment.line.tau",
+            "match": "##(?!#).*$"
+        },
+        "string": {
+            "name": "string.quoted.double.tau",
+            "begin": "\"",
+            "end": "\""
+        },
+        "keyword": {
+            "name": "keyword.control.tau",
+            "match": "\\b(var|while|if|end|break|true|false)\\b"
+        },
+        "builtin": {
+            "name": "support.function.builtin.tau",
+            "match": "\\b(print)\\b"
+        },
+        "number": {
+            "name": "constant.numeric.tau",
+            "match": "\\b\\d+(\\.\\d+)?\\b"
+        },
+        "operator": {
+            "name": "keyword.operator.tau",
+            "match": "\\+=|[+\\-*/><]"
+        }
+    }
+}
