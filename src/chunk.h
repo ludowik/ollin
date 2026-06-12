@@ -52,6 +52,7 @@ enum class Op : uint8_t {
     STORE_VAR,       // uint16 index → identifiers
     ADD, SUB, MUL, DIV,
     GT, LT,          // pop b,a → push a>b (1.0 ou 0.0)
+    EQ,              // pop b,a → push a==b (1.0 ou 0.0)
     JUMP,            // uint16 addr absolu
     JUMP_IF_FALSE,   // uint16 addr absolu ; pop cond
     CALL,            // uint16 name_index, uint8 argc

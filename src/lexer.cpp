@@ -83,7 +83,10 @@ std::vector<Token> Lexer::tokenize() {
         char c = advance();
         switch (c) {
             case '\n': tokens.push_back({TokenType::NEWLINE,     "\\n", line++}); break;
-            case '=':  tokens.push_back({TokenType::EQUALS,      "=",   line});   break;
+            case '=':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::EQUAL_EQUAL, "==", line}); }
+                else tokens.push_back({TokenType::EQUALS, "=", line});
+                break;
             case ',':  tokens.push_back({TokenType::COMMA,       ",",   line});   break;
             case '(':  tokens.push_back({TokenType::LPAREN,      "(",   line});   break;
             case ')':  tokens.push_back({TokenType::RPAREN,      ")",   line});   break;

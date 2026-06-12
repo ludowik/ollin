@@ -103,10 +103,35 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
     auto s = std::make_unique<IfStmt>();
     s->cond = expr();
     expect(TokenType::THEN);
+    consumeLineEnd();
     while (true) {
         skipNewlines();
-        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
-        s->body.push_back(parseOneStmt());
+        if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->then_body.push_back(parseOneStmt());
+    }
+    while (check(TokenType::ELSE)) {
+        advance(); // ELSE
+        if (check(TokenType::IF)) {
+            advance(); // IF
+            ElseIfClause ei;
+            ei.cond = expr();
+            expect(TokenType::THEN);
+            consumeLineEnd();
+            while (true) {
+                skipNewlines();
+                if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
+                ei.body.push_back(parseOneStmt());
+            }
+            s->else_ifs.push_back(std::move(ei));
+        } else {
+            consumeLineEnd();
+            while (true) {
+                skipNewlines();
+                if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+                s->else_body.push_back(parseOneStmt());
+            }
+            break;
+        }
     }
     expect(TokenType::END);
     consumeLineEnd();
@@ -178,8 +203,10 @@ std::unique_ptr<Expr> Parser::expr() { return comparison(); }
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto left = additive();
-    while (check(TokenType::GREATER) || check(TokenType::LESS)) {
-        char op = advance().lexeme[0];
+    while (check(TokenType::GREATER) || check(TokenType::LESS) || check(TokenType::EQUAL_EQUAL)) {
+        char op;
+        if (check(TokenType::EQUAL_EQUAL)) { advance(); op = '='; }
+        else op = advance().lexeme[0];
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }
     return left;

@@ -14,14 +14,17 @@ stmt           = varDecl
 
 varDecl        = "var" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
-ifStmt         = "if" expr "then" { stmt } "end" NEWLINE ;
+ifStmt         = "if" expr "then" NEWLINE { stmt }
+                 { "else" "if" expr "then" NEWLINE { stmt } }
+                 [ "else" NEWLINE { stmt } ]
+                 "end" NEWLINE ;
 tryStmt        = "try" NEWLINE { stmt } "catch" IDENT NEWLINE { stmt } [ "else" NEWLINE { stmt } ] "end" NEWLINE ;
 throwStmt      = "throw" expr NEWLINE ;
 assignStmt     = IDENT "+=" expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 
 expr           = comparison ;
-comparison     = additive { ( ">" | "<" ) additive } ;
+comparison     = additive { ( ">" | "<" | "==" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
 multiplicative = primary { ( "*" | "/" ) primary } ;
 primary        = NUMBER

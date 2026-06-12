@@ -38,11 +38,22 @@ void Compiler::visit(const WhileStmt& s) {
 }
 
 void Compiler::visit(const IfStmt& s) {
+    std::vector<size_t> end_patches;
     s.cond->accept(*this);
-    size_t skip_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
-    for (auto& stmt : s.body)
-        stmt->accept(*this);
-    chunk.patchJump(skip_patch, static_cast<uint16_t>(chunk.currentPos()));
+    size_t next_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
+    for (auto& stmt : s.then_body) stmt->accept(*this);
+    end_patches.push_back(chunk.emitJump(Op::JUMP));
+    for (auto& ei : s.else_ifs) {
+        chunk.patchJump(next_patch, static_cast<uint16_t>(chunk.currentPos()));
+        ei.cond->accept(*this);
+        next_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
+        for (auto& stmt : ei.body) stmt->accept(*this);
+        end_patches.push_back(chunk.emitJump(Op::JUMP));
+    }
+    chunk.patchJump(next_patch, static_cast<uint16_t>(chunk.currentPos()));
+    for (auto& stmt : s.else_body) stmt->accept(*this);
+    uint16_t end_addr = static_cast<uint16_t>(chunk.currentPos());
+    for (size_t p : end_patches) chunk.patchJump(p, end_addr);
 }
 
 void Compiler::visit(const BreakStmt&) {
@@ -122,6 +133,7 @@ void Compiler::visit(const BinaryExpr& e) {
         case '/': chunk.emit(Op::DIV); break;
         case '>': chunk.emit(Op::GT);  break;
         case '<': chunk.emit(Op::LT);  break;
+        case '=': chunk.emit(Op::EQ);  break;
         default:  throw std::runtime_error(std::string("unknown operator: ") + e.op);
     }
 }

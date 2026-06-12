@@ -108,9 +108,19 @@ struct BreakStmt : Stmt {
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-struct IfStmt : Stmt {
+struct ElseIfClause {
     std::unique_ptr<Expr> cond;
     std::vector<std::unique_ptr<Stmt>> body;
+    ElseIfClause() = default;
+    ElseIfClause(ElseIfClause&&) = default;
+    ElseIfClause& operator=(ElseIfClause&&) = default;
+};
+
+struct IfStmt : Stmt {
+    std::unique_ptr<Expr> cond;
+    std::vector<std::unique_ptr<Stmt>> then_body;
+    std::vector<ElseIfClause>          else_ifs;
+    std::vector<std::unique_ptr<Stmt>> else_body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

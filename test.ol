@@ -33,6 +33,39 @@ if faux then
     print("jamais")
 end
 
+## ── == égalité ───────────────────────────────────────────────────────────────
+var c = 2
+if c == 2 then
+    print("c == 2")          ## c == 2
+end
+
+var s1 = "hello"
+var s2 = "hello"
+if s1 == s2 then
+    print("strings égales")  ## strings égales
+end
+
+## ── else if / else ───────────────────────────────────────────────────────────
+var score = 75
+if score > 90 then
+    print("excellent")
+else if score > 70 then
+    print("bien")            ## bien
+else if score > 50 then
+    print("moyen")
+else
+    print("insuffisant")
+end
+
+var z = 0
+if z == 1 then
+    print("un")
+else if z == 2 then
+    print("deux")
+else
+    print("autre")           ## autre
+end
+
 ## ── while + if + break ───────────────────────────────────────────────────────
 var i = 0
 while vrai

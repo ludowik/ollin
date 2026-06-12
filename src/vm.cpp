@@ -46,6 +46,15 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::GT: { auto b = pop(), a = pop(); stack.push(asDouble(a) > asDouble(b) ? 1.0 : 0.0); break; }
             case Op::LT: { auto b = pop(), a = pop(); stack.push(asDouble(a) < asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::EQ: {
+                auto b = pop(), a = pop();
+                bool eq;
+                if (a.isNumber() && b.isNumber()) eq = (a.n == b.n);
+                else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
+                else eq = false;
+                stack.push(eq ? 1.0 : 0.0);
+                break;
+            }
 
             case Op::JUMP:
                 ip = readU16();
