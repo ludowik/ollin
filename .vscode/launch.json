@@ -9,7 +9,8 @@
             "args": ["${file}"],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "cmake: build",
-            "terminal": "integrated"
+            "terminal": "integrated",
+            "internalConsoleOptions": "neverOpen"
         }
     ]
 }
