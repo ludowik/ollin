@@ -1,5 +1,6 @@
 #include "vm.h"
 #include <chrono>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -85,13 +86,40 @@ void VM::execute(const Chunk& chunk) {
                     stack.push(t);
                 } else if (name == "print") {
                     std::vector<Value> args(argc);
-                    for (int i = argc - 1; i >= 0; --i)
-                        args[i] = pop();
-                    for (int i = 0; i < argc; ++i) {
-                        if (i) std::cout << ' ';
-                        printValue(args[i]);
+                    for (int i = argc - 1; i >= 0; --i) args[i] = pop();
+                    if (argc >= 1 && args[0].isString()) {
+                        const std::string& fmt = args[0].asString();
+                        std::string result;
+                        int auto_idx = 0;
+                        for (size_t fi = 0; fi < fmt.size(); ++fi) {
+                            if (fmt[fi] == '{') {
+                                size_t close = fmt.find('}', fi + 1);
+                                if (close != std::string::npos) {
+                                    std::string spec = fmt.substr(fi + 1, close - fi - 1);
+                                    int idx = spec.empty() ? auto_idx++ : std::stoi(spec);
+                                    int ai  = idx + 1; // args[0] est le format
+                                    if (ai < argc) {
+                                        if (args[ai].isString()) {
+                                            result += args[ai].asString();
+                                        } else {
+                                            std::ostringstream os; os << args[ai].n;
+                                            result += os.str();
+                                        }
+                                    }
+                                    fi = close;
+                                    continue;
+                                }
+                            }
+                            result += fmt[fi];
+                        }
+                        std::cout << result << '\n';
+                    } else {
+                        for (int i = 0; i < argc; ++i) {
+                            if (i) std::cout << ' ';
+                            printValue(args[i]);
+                        }
+                        std::cout << '\n';
                     }
-                    std::cout << '\n';
                 } else {
                     throw std::runtime_error("unknown function: " + name);
                 }
