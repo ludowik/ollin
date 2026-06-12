@@ -1,0 +1,4 @@
+var a = 12.12
+var b, c = 1, 2      % déclaration multiple
+var res = a + b
+print(res)           % builtin
