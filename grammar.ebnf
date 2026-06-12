@@ -1,6 +1,6 @@
 (* Ollin — grammaire formelle
-   Source de vérité : syntax.tau
-   Maintenu par : Claude — mettre à jour après chaque évolution de syntax.tau *)
+   Source de vérité : syntax.ol
+   Maintenu par : Claude — mettre à jour après chaque évolution de syntax.ol *)
 
 program        = { stmt } EOF ;
 

@@ -22,7 +22,7 @@ Les types partagés (`token.h`, `ast.h`, `chunk.h`) n'ont aucune dépendance ent
 ## Structure des fichiers
 
 ```
-tau/
+ollin/
 ├── CLAUDE.md
 ├── CMakeLists.txt
 └── src/

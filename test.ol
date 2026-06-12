@@ -1,5 +1,5 @@
-### test.tau — fichier de tests libres (Claude)
-    Couvre toutes les constructions de syntax.tau
+### test.ol — fichier de tests libres (Claude)
+    Couvre toutes les constructions de syntax.ol
 ###
 
 ## ── strings ──────────────────────────────────────────────────────────────────
