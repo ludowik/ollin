@@ -8,7 +8,8 @@
             "program": "${workspaceFolder}/build/tau",
             "args": ["${file}"],
             "cwd": "${workspaceFolder}",
-            "preLaunchTask": "cmake: build"
+            "preLaunchTask": "cmake: build",
+            "terminal": "integrated"
         }
     ]
 }
