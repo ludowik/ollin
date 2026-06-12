@@ -30,13 +30,20 @@ void Chunk::emitU8(Op op, uint8_t arg) {
     code.push_back(arg);
 }
 
-void Chunk::emitCallFunc(uint16_t addr, uint8_t n_fixed, uint8_t argc, bool variadic) {
+uint16_t Chunk::addFuncDefaults(std::vector<Value> defs) {
+    func_defaults.push_back(std::move(defs));
+    return static_cast<uint16_t>(func_defaults.size() - 1);
+}
+
+void Chunk::emitCallFunc(uint16_t addr, uint8_t n_fixed, uint8_t argc, bool variadic, uint16_t defaults_idx) {
     code.push_back(static_cast<uint8_t>(Op::CALL_FUNC));
     code.push_back(static_cast<uint8_t>(addr >> 8));
     code.push_back(static_cast<uint8_t>(addr & 0xFF));
     code.push_back(n_fixed);
     code.push_back(argc);
     code.push_back(variadic ? 1 : 0);
+    code.push_back(static_cast<uint8_t>(defaults_idx >> 8));
+    code.push_back(static_cast<uint8_t>(defaults_idx & 0xFF));
 }
 
 void Chunk::emitCall(uint16_t name_idx, uint8_t argc) {

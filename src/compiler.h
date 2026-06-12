@@ -15,9 +15,10 @@ private:
 
     // ── portée des fonctions ────────────────────────────────────────────────
     struct FuncInfo {
-        int  addr;
-        int  n_fixed;
-        bool variadic;
+        int      addr;
+        int      n_fixed;
+        bool     variadic;
+        uint16_t defaults_idx;
         std::unordered_map<std::string, int> local_ids;
     };
     std::unordered_map<std::string, FuncInfo> func_table;
@@ -46,5 +47,7 @@ private:
     void visit(const VarExpr&)    override;
     void visit(const BinaryExpr&) override;
     void visit(const CallExpr&)   override;
+    void visit(const UnaryExpr&)  override;
     void visit(const VarArgExpr&) override;
+    void visit(const NilExpr&)    override;
 };

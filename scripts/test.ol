@@ -184,6 +184,68 @@ assert(r1 == 1, "varargs r1")
 assert(r2 == 2, "varargs r2")
 assert(r3 == 3, "varargs r3")
 
+## ── nil ───────────────────────────────────────────────────────────────────────
+var undef
+assert(undef == nil, "var sans valeur → nil")
+assert(nil == nil, "nil == nil")
+
+## ── plain assignment ──────────────────────────────────────────────────────────
+var pa = 1
+pa = 42
+assert(pa == 42, "plain assign")
+
+## ── compound assignments ──────────────────────────────────────────────────────
+var ca = 10
+ca -= 3
+assert(ca == 7, "-=")
+ca *= 2
+assert(ca == 14, "*=")
+ca /= 7
+assert(ca == 2, "/=")
+ca %= 3
+assert(ca == 2, "%=")
+
+## ── modulo ────────────────────────────────────────────────────────────────────
+assert(10 % 3 == 1, "10 % 3")
+assert(7 % 7 == 0, "7 % 7")
+
+## ── unary minus ───────────────────────────────────────────────────────────────
+var neg = -5
+assert(neg == -5 + 0, "unary minus var")
+assert(-3 + 3 == 0, "-3 + 3")
+
+## ── leading decimal ──────────────────────────────────────────────────────────
+assert(.5 + .5 == 1, ".5 literal")
+
+## ── or / and ─────────────────────────────────────────────────────────────────
+assert(true or false, "true or false")
+assert(false or true, "false or true")
+assert(true and true, "true and true")
+var fa = false and true
+assert(fa == 0, "false and true == 0")
+var fo = false or false
+assert(fo == 0, "false or false == 0")
+assert(true or false and false, "or/and precedence")
+
+## ── string truthy/falsy ───────────────────────────────────────────────────────
+assert("non vide" == true, "non-empty string == true")
+assert("" == false, "empty string == false")
+
+## ── default parameter values ─────────────────────────────────────────────────
+func f2(arg1, arg2=1)
+    assert(arg1 == nil, "arg1 nil par défaut")
+    assert(arg2 == 1,   "arg2 défaut = 1")
+end
+f2()
+f2(nil)
+
+func fwith_defaults(x=10, y=20)
+    return x + y
+end
+assert(fwith_defaults() == 30, "defaults x+y")
+assert(fwith_defaults(5) == 25, "partial default")
+assert(fwith_defaults(5, 5) == 10, "no default")
+
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0

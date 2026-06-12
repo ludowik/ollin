@@ -17,7 +17,7 @@ private:
     char advance();
     bool atEnd() const;
     void skipWhitespace();
-    Token number();
+    Token number(bool leading_dot = false);
     Token string();
     Token identifier();
     Token comment();

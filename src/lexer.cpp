@@ -17,6 +17,9 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"else",   TokenType::ELSE},
     {"func",   TokenType::FUNC},
     {"return", TokenType::RETURN},
+    {"nil",    TokenType::NIL},
+    {"or",     TokenType::OR},
+    {"and",    TokenType::AND},
 };
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}
@@ -30,8 +33,12 @@ void Lexer::skipWhitespace() {
         advance();
 }
 
-Token Lexer::number() {
+Token Lexer::number(bool leading_dot) {
     int start = pos - 1;
+    if (leading_dot) {
+        // déjà consommé '.', pos-1 pointe sur le '.'
+        // le chiffre suivant sera absorbé ci-dessous
+    }
     while (!atEnd() && (std::isdigit(peek()) || peek() == '.'))
         advance();
     return {TokenType::NUMBER, src.substr(start, pos - start), line};
@@ -97,13 +104,28 @@ std::vector<Token> Lexer::tokenize() {
                     advance();
                     if (!atEnd() && peek() == '.') { advance(); tokens.push_back({TokenType::DOT_DOT_DOT, "...", line}); }
                     else throw std::runtime_error("line " + std::to_string(line) + ": unexpected '..'");
+                } else if (!atEnd() && std::isdigit(peek())) {
+                    tokens.push_back(number(true)); // .5 → nombre à virgule
                 } else {
                     throw std::runtime_error("line " + std::to_string(line) + ": unexpected '.'");
                 }
                 break;
-            case '-':  tokens.push_back({TokenType::MINUS,       "-",   line});   break;
-            case '*':  tokens.push_back({TokenType::STAR,        "*",   line});   break;
-            case '/':  tokens.push_back({TokenType::SLASH,       "/",   line});   break;
+            case '-':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::MINUS_EQUAL, "-=", line}); }
+                else tokens.push_back({TokenType::MINUS, "-", line});
+                break;
+            case '*':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::STAR_EQUAL, "*=", line}); }
+                else tokens.push_back({TokenType::STAR, "*", line});
+                break;
+            case '/':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::SLASH_EQUAL, "/=", line}); }
+                else tokens.push_back({TokenType::SLASH, "/", line});
+                break;
+            case '%':
+                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::PERCENT_EQUAL, "%=", line}); }
+                else tokens.push_back({TokenType::PERCENT, "%", line});
+                break;
             case '>':  tokens.push_back({TokenType::GREATER,     ">",   line});   break;
             case '<':  tokens.push_back({TokenType::LESS,        "<",   line});   break;
             case '"':  tokens.push_back(string());                                break;
@@ -121,7 +143,7 @@ std::vector<Token> Lexer::tokenize() {
                 }
                 break;
             default:
-                if (std::isdigit(c)) { tokens.push_back(number());     break; }
+                if (std::isdigit(c)) { tokens.push_back(number(false)); break; }
                 if (std::isalpha(c) || c == '_') { tokens.push_back(identifier()); break; }
                 throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
         }

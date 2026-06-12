@@ -1,5 +1,6 @@
 #include "vm.h"
 #include <chrono>
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -73,12 +74,27 @@ void VM::execute(const Chunk& chunk) {
             case Op::EQ: {
                 auto b = pop(), a = pop();
                 bool eq;
-                if (a.isNumber() && b.isNumber()) eq = (a.n == b.n);
+                if (a.isNil() && b.isNil())           eq = true;
+                else if (a.isNil() || b.isNil())       eq = false;
+                else if (a.isNumber() && b.isNumber()) eq = (a.n == b.n);
                 else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
+                // string == number : comparer la valeur de vérité de la chaîne
+                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.n;
+                else if (a.isNumber() && b.isString()) eq = a.n == (isFalsy(b) ? 0.0 : 1.0);
                 else eq = false;
                 stack.push(eq ? 1.0 : 0.0);
                 break;
             }
+            case Op::MOD: {
+                auto b = pop(), a = pop();
+                double bd = asDouble(b);
+                if (bd == 0.0) throw std::runtime_error("runtime: modulo by zero");
+                stack.push(std::fmod(asDouble(a), bd));
+                break;
+            }
+            case Op::NEGATE: { auto a = pop(); stack.push(-asDouble(a)); break; }
+            case Op::OR_OP:  { auto b = pop(), a = pop(); stack.push(!isFalsy(a) || !isFalsy(b) ? 1.0 : 0.0); break; }
+            case Op::AND_OP: { auto b = pop(), a = pop(); stack.push(!isFalsy(a) && !isFalsy(b) ? 1.0 : 0.0); break; }
 
             case Op::JUMP:
                 ip = readU16();
@@ -86,7 +102,7 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::JUMP_IF_FALSE: {
                 uint16_t target = readU16();
-                if (asDouble(pop()) == 0.0) ip = target;
+                if (isFalsy(pop())) ip = target;
                 break;
             }
 
@@ -98,7 +114,7 @@ void VM::execute(const Chunk& chunk) {
                 if (name == "assert") {
                     std::vector<Value> args(argc);
                     for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-                    if (asDouble(args[0]) == 0.0) {
+                    if (isFalsy(args[0])) {
                         std::string msg = (argc >= 2 && args[1].isString())
                             ? args[1].asString() : "assertion failed";
                         throw std::runtime_error(msg);
@@ -173,10 +189,11 @@ void VM::execute(const Chunk& chunk) {
             }
 
             case Op::CALL_FUNC: {
-                uint16_t addr    = readU16();
-                uint8_t  n_fixed = ch->code[ip++];
-                uint8_t  argc    = ch->code[ip++];
-                bool     variadic = ch->code[ip++] != 0;
+                uint16_t addr         = readU16();
+                uint8_t  n_fixed      = ch->code[ip++];
+                uint8_t  argc         = ch->code[ip++];
+                bool     variadic     = ch->code[ip++] != 0;
+                uint16_t defaults_idx = readU16();
 
                 std::vector<Value> args(argc);
                 for (int i = argc - 1; i >= 0; --i) args[i] = pop();
@@ -194,6 +211,14 @@ void VM::execute(const Chunk& chunk) {
                 for (int i = 0; i < n_init; ++i) {
                     frame.locals[i]      = args[i];
                     frame.locals_init[i] = true;
+                }
+                // Params manquants → valeur par défaut ou nil
+                if ((int)argc < n_fixed) {
+                    auto& defs = ch->func_defaults[defaults_idx];
+                    for (int i = n_init; i < n_fixed; ++i) {
+                        frame.locals[i]      = (i < (int)defs.size()) ? defs[i] : Value{};
+                        frame.locals_init[i] = true;
+                    }
                 }
                 if (variadic) {
                     for (int i = n_fixed; i < (int)argc; ++i)

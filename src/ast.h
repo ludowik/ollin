@@ -8,8 +8,8 @@ struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
 
-struct BoolExpr; struct NumberExpr; struct StringExpr;
-struct VarExpr; struct BinaryExpr; struct CallExpr; struct VarArgExpr;
+struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
+struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -34,7 +34,9 @@ struct ExprVisitor {
     virtual void visit(const VarExpr&)    = 0;
     virtual void visit(const BinaryExpr&) = 0;
     virtual void visit(const CallExpr&)   = 0;
+    virtual void visit(const UnaryExpr&)  = 0;
     virtual void visit(const VarArgExpr&) = 0;
+    virtual void visit(const NilExpr&)    = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -72,6 +74,13 @@ struct BinaryExpr : Expr {
     std::unique_ptr<Expr> left, right;
     BinaryExpr(char o, std::unique_ptr<Expr> l, std::unique_ptr<Expr> r)
         : op(o), left(std::move(l)), right(std::move(r)) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct UnaryExpr : Expr {
+    char op;
+    std::unique_ptr<Expr> operand;
+    UnaryExpr(char o, std::unique_ptr<Expr> e) : op(o), operand(std::move(e)) {}
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
@@ -150,6 +159,7 @@ struct TryCatchStmt : Stmt {
 struct FuncDeclStmt : Stmt {
     std::string name;
     std::vector<std::string> params;
+    std::vector<std::unique_ptr<Expr>> defaults; // nullptr = pas de défaut
     bool variadic = false;
     std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
@@ -162,6 +172,10 @@ struct ReturnStmt : Stmt {
 };
 
 struct VarArgExpr : Expr {
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct NilExpr : Expr {
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

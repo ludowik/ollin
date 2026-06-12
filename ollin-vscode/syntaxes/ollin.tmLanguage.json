@@ -28,7 +28,7 @@
         },
         "keyword": {
             "name": "keyword.control.ollin",
-            "match": "\\b(var|while|if|then|end|break|true|false|try|catch|throw|else|func|return)\\b"
+            "match": "\\b(var|while|if|then|end|break|true|false|nil|try|catch|throw|else|func|return|or|and)\\b"
         },
         "builtin": {
             "name": "support.function.builtin.ollin",
@@ -36,11 +36,11 @@
         },
         "number": {
             "name": "constant.numeric.ollin",
-            "match": "\\b\\d+(\\.\\d+)?\\b"
+            "match": "(\\.\\d+|\\b\\d+(\\.\\d*)?)\\b"
         },
         "operator": {
             "name": "keyword.operator.ollin",
-            "match": "\\+=|==|[+\\-*/><]"
+            "match": "\\+=|-=|\\*=|/=|%=|==|[+\\-*/%><]"
         }
     }
 }

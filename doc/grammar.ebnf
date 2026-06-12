@@ -14,7 +14,7 @@ stmt           = varDecl
                | assignStmt
                | exprStmt ;
 
-varDecl        = "var" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
+varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
@@ -23,20 +23,25 @@ ifStmt         = "if" expr "then" NEWLINE { stmt }
 tryStmt        = "try" NEWLINE { stmt } "catch" IDENT NEWLINE { stmt } [ "else" NEWLINE { stmt } ] "end" NEWLINE ;
 throwStmt      = "throw" expr NEWLINE ;
 funcDecl       = "func" IDENT "(" [ params ] ")" NEWLINE { stmt } "end" NEWLINE ;
-params         = IDENT { "," IDENT } [ "," "..." ] | "..." ;
+params         = param { "," param } [ "," "..." ] | "..." ;
+param          = IDENT [ "=" literal ] ;
 returnStmt     = "return" [ retvals ] NEWLINE ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
-assignStmt     = IDENT "+=" expr NEWLINE ;
+assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 
-expr           = comparison ;
+expr           = logical ;
+logical        = logicalAnd { "or" logicalAnd } ;
+logicalAnd     = comparison { "and" comparison } ;
 comparison     = additive { ( ">" | "<" | "==" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
-multiplicative = primary { ( "*" | "/" ) primary } ;
+multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
+unary          = [ "-" ] primary ;
 primary        = NUMBER
                | STRING
                | BOOL
+               | NIL
                | IDENT
                | call
                | "..."
@@ -47,9 +52,10 @@ call           = IDENT "(" [ expr { "," expr } ] ")" ;
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
 
-NUMBER         = digit+ [ "." digit+ ] ;
+NUMBER         = ( digit+ [ "." digit* ] ) | ( "." digit+ ) ;
 STRING         = '"' { any \ '"' } '"' ;
 BOOL           = "true" | "false" ;
+NIL            = "nil" ;
 IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
 
 digit          = "0" | ... | "9" ;

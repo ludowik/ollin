@@ -1,6 +1,16 @@
 #include "compiler.h"
 #include <stdexcept>
 
+// ── évaluation constante (pour les valeurs par défaut) ───────────────────────
+
+static Value evalConstant(const Expr& e) {
+    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return Value(n->value);
+    if (auto* s = dynamic_cast<const StringExpr*>(&e)) return Value(s->value);
+    if (auto* b = dynamic_cast<const BoolExpr*>(&e))   return Value(b->value ? 1.0 : 0.0);
+    if (dynamic_cast<const NilExpr*>(&e))               return Value{};
+    throw std::runtime_error("les valeurs par défaut doivent être des constantes littérales");
+}
+
 // ── helpers portée ────────────────────────────────────────────────────────────
 
 void Compiler::emitLoadVar(const std::string& name) {
@@ -55,7 +65,7 @@ void Compiler::visit(const VarDeclStmt& s) {
         if (i < s.values.size())
             s.values[i]->accept(*this);
         else
-            chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(0.0));
+            chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(Value{})); // nil
         emitStoreVar(s.names[i]);
     }
 }
@@ -110,6 +120,7 @@ void Compiler::visit(const AssignStmt& s) {
         case '-': chunk.emit(Op::SUB); break;
         case '*': chunk.emit(Op::MUL); break;
         case '/': chunk.emit(Op::DIV); break;
+        case '%': chunk.emit(Op::MOD); break;
         case '\0': break;
         default: throw std::runtime_error(std::string("unknown assign op: ") + s.op);
     }
@@ -172,13 +183,16 @@ void Compiler::visit(const BinaryExpr& e) {
     e.left->accept(*this);
     e.right->accept(*this);
     switch (e.op) {
-        case '+': chunk.emit(Op::ADD); break;
-        case '-': chunk.emit(Op::SUB); break;
-        case '*': chunk.emit(Op::MUL); break;
-        case '/': chunk.emit(Op::DIV); break;
-        case '>': chunk.emit(Op::GT);  break;
-        case '<': chunk.emit(Op::LT);  break;
-        case '=': chunk.emit(Op::EQ);  break;
+        case '+': chunk.emit(Op::ADD);    break;
+        case '-': chunk.emit(Op::SUB);    break;
+        case '*': chunk.emit(Op::MUL);    break;
+        case '/': chunk.emit(Op::DIV);    break;
+        case '%': chunk.emit(Op::MOD);    break;
+        case '>': chunk.emit(Op::GT);     break;
+        case '<': chunk.emit(Op::LT);     break;
+        case '=': chunk.emit(Op::EQ);     break;
+        case '|': chunk.emit(Op::OR_OP);  break;
+        case '&': chunk.emit(Op::AND_OP); break;
         default:  throw std::runtime_error(std::string("unknown operator: ") + e.op);
     }
 }
@@ -192,19 +206,26 @@ void Compiler::visit(const CallExpr& e) {
         chunk.emitCallFunc(static_cast<uint16_t>(f.addr),
                            static_cast<uint8_t>(f.n_fixed),
                            static_cast<uint8_t>(e.args.size()),
-                           f.variadic);
+                           f.variadic,
+                           f.defaults_idx);
     } else {
         chunk.emitCall(chunk.addIdentifier(e.callee), static_cast<uint8_t>(e.args.size()));
     }
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
-    // Enregistre la fonction et saute par-dessus le corps
     FuncInfo info;
     info.n_fixed  = static_cast<int>(s.params.size());
     info.variadic = s.variadic;
     for (int i = 0; i < info.n_fixed; ++i)
         info.local_ids[s.params[i]] = i;
+
+    // Valeurs par défaut (évaluées à la compilation)
+    std::vector<Value> defs(info.n_fixed);
+    for (int i = 0; i < info.n_fixed; ++i)
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i])
+                  ? evalConstant(*s.defaults[i]) : Value{};
+    info.defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     size_t jump_patch = chunk.emitJump(Op::JUMP);
     info.addr = static_cast<int>(chunk.currentPos());
@@ -230,6 +251,16 @@ void Compiler::visit(const ReturnStmt& s) {
     } else {
         chunk.emitU8(Op::RETURN_N, static_cast<uint8_t>(s.values.size()));
     }
+}
+
+void Compiler::visit(const UnaryExpr& e) {
+    e.operand->accept(*this);
+    if (e.op == '-') chunk.emit(Op::NEGATE);
+    else throw std::runtime_error(std::string("unknown unary op: ") + e.op);
+}
+
+void Compiler::visit(const NilExpr&) {
+    chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(Value{}));
 }
 
 void Compiler::visit(const VarArgExpr&) {

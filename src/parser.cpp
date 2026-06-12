@@ -64,8 +64,13 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::FUNC))    return funcDeclStmt();
     if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))     return varDecl();
-    if (check(TokenType::IDENTIFIER) && peekNextType() == TokenType::PLUS_EQUAL)
-        return assignStmt();
+    if (check(TokenType::IDENTIFIER)) {
+        TokenType nx = peekNextType();
+        if (nx == TokenType::EQUALS      || nx == TokenType::PLUS_EQUAL  ||
+            nx == TokenType::MINUS_EQUAL || nx == TokenType::STAR_EQUAL  ||
+            nx == TokenType::SLASH_EQUAL || nx == TokenType::PERCENT_EQUAL)
+            return assignStmt();
+    }
     return exprStmt();
 }
 
@@ -77,10 +82,12 @@ std::unique_ptr<Stmt> Parser::varDecl() {
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    expect(TokenType::EQUALS);
-    s->values.push_back(expr());
-    while (match(TokenType::COMMA))
+    if (match(TokenType::EQUALS)) {
         s->values.push_back(expr());
+        while (match(TokenType::COMMA))
+            s->values.push_back(expr());
+    }
+    // sans '=' → valeurs absentes → nil dans le compilateur
     consumeLineEnd();
     return s;
 }
@@ -191,6 +198,10 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
     while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
         if (check(TokenType::DOT_DOT_DOT)) { advance(); s->variadic = true; break; }
         s->params.push_back(expect(TokenType::IDENTIFIER).lexeme);
+        if (match(TokenType::EQUALS))
+            s->defaults.push_back(expr());
+        else
+            s->defaults.push_back(nullptr);
         if (!check(TokenType::RPAREN)) expect(TokenType::COMMA);
     }
     expect(TokenType::RPAREN);
@@ -226,8 +237,12 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
 std::unique_ptr<Stmt> Parser::assignStmt() {
     auto s = std::make_unique<AssignStmt>();
     s->name = advance().lexeme;
-    if (match(TokenType::PLUS_EQUAL)) s->op = '+';
-    else { advance(); s->op = '\0'; }
+    if      (match(TokenType::PLUS_EQUAL))    s->op = '+';
+    else if (match(TokenType::MINUS_EQUAL))   s->op = '-';
+    else if (match(TokenType::STAR_EQUAL))    s->op = '*';
+    else if (match(TokenType::SLASH_EQUAL))   s->op = '/';
+    else if (match(TokenType::PERCENT_EQUAL)) s->op = '%';
+    else                                    { advance(); s->op = '\0'; }
     s->value = expr();
     consumeLineEnd();
     return s;
@@ -241,7 +256,26 @@ std::unique_ptr<Stmt> Parser::exprStmt() {
 
 // ── expressions ──────────────────────────────────────────────────────────────
 
-std::unique_ptr<Expr> Parser::expr() { return comparison(); }
+std::unique_ptr<Expr> Parser::expr() { return logical(); }
+
+std::unique_ptr<Expr> Parser::logical() {
+    // or < and (and has higher precedence)
+    auto left = logicalAnd();
+    while (check(TokenType::OR)) {
+        advance();
+        left = std::make_unique<BinaryExpr>('|', std::move(left), logicalAnd());
+    }
+    return left;
+}
+
+std::unique_ptr<Expr> Parser::logicalAnd() {
+    auto left = comparison();
+    while (check(TokenType::AND)) {
+        advance();
+        left = std::make_unique<BinaryExpr>('&', std::move(left), comparison());
+    }
+    return left;
+}
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto left = additive();
@@ -264,12 +298,20 @@ std::unique_ptr<Expr> Parser::additive() {
 }
 
 std::unique_ptr<Expr> Parser::multiplicative() {
-    auto left = primary();
-    while (check(TokenType::STAR) || check(TokenType::SLASH)) {
+    auto left = unary();
+    while (check(TokenType::STAR) || check(TokenType::SLASH) || check(TokenType::PERCENT)) {
         char op = advance().lexeme[0];
-        left = std::make_unique<BinaryExpr>(op, std::move(left), primary());
+        left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
     }
     return left;
+}
+
+std::unique_ptr<Expr> Parser::unary() {
+    if (check(TokenType::MINUS)) {
+        advance();
+        return std::make_unique<UnaryExpr>('-', unary());
+    }
+    return primary();
 }
 
 std::unique_ptr<Expr> Parser::primary() {
@@ -294,10 +336,8 @@ std::unique_ptr<Expr> Parser::primary() {
         }
         return std::make_unique<VarExpr>(name);
     }
-    if (check(TokenType::DOT_DOT_DOT)) {
-        advance();
-        return std::make_unique<VarArgExpr>();
-    }
+    if (check(TokenType::NIL))       { advance(); return std::make_unique<NilExpr>(); }
+    if (check(TokenType::DOT_DOT_DOT)) { advance(); return std::make_unique<VarArgExpr>(); }
     if (match(TokenType::LPAREN)) {
         auto e = expr();
         expect(TokenType::RPAREN);

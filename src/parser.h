@@ -35,8 +35,11 @@ private:
     std::unique_ptr<Stmt> exprStmt();
 
     std::unique_ptr<Expr> expr();
+    std::unique_ptr<Expr> logical();
+    std::unique_ptr<Expr> logicalAnd();
     std::unique_ptr<Expr> comparison();
     std::unique_ptr<Expr> additive();
     std::unique_ptr<Expr> multiplicative();
+    std::unique_ptr<Expr> unary();
     std::unique_ptr<Expr> primary();
 };
