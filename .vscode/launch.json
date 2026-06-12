@@ -2,11 +2,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug tau (fichier courant)",
+            "name": "Debug tau (test.tau)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/tau",
-            "args": ["${file}"],
+            "args": ["${workspaceFolder}/test.tau"],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "cmake: build",
             "terminal": "integrated",
