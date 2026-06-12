@@ -281,11 +281,12 @@ std::unique_ptr<Expr> Parser::comparison() {
     auto left = additive();
     while (check(TokenType::GREATER) || check(TokenType::LESS) ||
            check(TokenType::GREATER_EQUAL) || check(TokenType::LESS_EQUAL) ||
-           check(TokenType::EQUAL_EQUAL)) {
+           check(TokenType::EQUAL_EQUAL) || check(TokenType::NOT_EQUAL)) {
         char op;
-        if      (check(TokenType::EQUAL_EQUAL))   { advance(); op = '='; }
-        else if (check(TokenType::GREATER_EQUAL))  { advance(); op = 'G'; }
-        else if (check(TokenType::LESS_EQUAL))     { advance(); op = 'L'; }
+        if      (check(TokenType::EQUAL_EQUAL))  { advance(); op = '='; }
+        else if (check(TokenType::GREATER_EQUAL)) { advance(); op = 'G'; }
+        else if (check(TokenType::LESS_EQUAL))    { advance(); op = 'L'; }
+        else if (check(TokenType::NOT_EQUAL))     { advance(); op = 'N'; }
         else op = advance().lexeme[0];
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }

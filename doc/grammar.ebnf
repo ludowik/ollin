@@ -34,7 +34,7 @@ exprStmt       = expr NEWLINE ;
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
 logicalAnd     = comparison { "and" comparison } ;
-comparison     = additive { ( ">" | "<" | ">=" | "<=" | "==" ) additive } ;
+comparison     = additive { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
 multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
 unary          = [ "-" ] primary ;

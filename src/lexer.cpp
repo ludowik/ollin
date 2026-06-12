@@ -133,6 +133,7 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case '<':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::LESS_EQUAL, "<=", line}); }
+                else if (!atEnd() && peek() == '>') { advance(); tokens.push_back({TokenType::NOT_EQUAL, "<>", line}); }
                 else tokens.push_back({TokenType::LESS, "<", line});
                 break;
             case '"':  tokens.push_back(string());                                break;

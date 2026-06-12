@@ -71,8 +71,21 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::GT: { auto b = pop(), a = pop(); stack.push(asDouble(a) >  asDouble(b) ? 1.0 : 0.0); break; }
             case Op::LT: { auto b = pop(), a = pop(); stack.push(asDouble(a) <  asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::GE: { auto b = pop(), a = pop(); stack.push(asDouble(a) >= asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::LE: { auto b = pop(), a = pop(); stack.push(asDouble(a) <= asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::GE:  { auto b = pop(), a = pop(); stack.push(asDouble(a) >= asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::LE:  { auto b = pop(), a = pop(); stack.push(asDouble(a) <= asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::NEQ: {
+                auto b = pop(), a = pop();
+                bool eq;
+                if (a.isNil() && b.isNil())           eq = true;
+                else if (a.isNil() || b.isNil())       eq = false;
+                else if (a.isNumber() && b.isNumber()) eq = (a.n == b.n);
+                else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
+                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.n;
+                else if (a.isNumber() && b.isString()) eq = a.n == (isFalsy(b) ? 0.0 : 1.0);
+                else eq = false;
+                stack.push(eq ? 0.0 : 1.0); // NEQ = inverse de EQ
+                break;
+            }
             case Op::EQ: {
                 auto b = pop(), a = pop();
                 bool eq;

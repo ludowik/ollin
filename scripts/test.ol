@@ -27,6 +27,11 @@ assert(faux == 0, "false == 0")
 var n = 5
 assert(n > 3,  "n > 3")
 assert(n < 10, "n < 10")
+assert(n <> 4, "n <> 4")
+assert(n <> 6, "n <> 6")
+var neq = false
+if n <> 5 then neq = true end
+assert(neq == false, "n <> 5 faux")
 assert(n >= 5, "n >= 5")
 assert(n >= 4, "n >= 4")
 assert(n <= 5, "n <= 5")
