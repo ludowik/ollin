@@ -36,18 +36,21 @@ tau/
     └── main.cpp       pipeline : Lexer | Parser | Compiler | VM
 ```
 
-## Syntaxe couverte (syntax.tau)
+## Syntaxe
 
-```
-var a = 12.12
-var b, c = 1, 2      % déclaration multiple
-var res = a + b
-print(res)           % builtin
-```
+La syntaxe du langage est déclarée et maintenue dans **`syntax.tau`** (source de vérité).  
+Ne documenter ici que ce qui y figure explicitement.
 
-Opérateurs : `+` `-` `*` `/`  
-Types : `double` (tout est double pour l'instant)  
-Commentaires : `%` (une ligne) — **pas encore implémenté**
+## Versionning
+
+- **Git** initialisé à la racine — utiliser `git restore <fichier>` pour annuler une modification
+- Committer après chaque changement significatif
+
+## Maintenance de CLAUDE.md
+
+Mettre à jour ce fichier dès qu'un point important doit être mémorisé :
+architecture, conventions, décisions, règles d'outillage.  
+Ne pas documenter ce qui n'est pas encore implémenté.
 
 ## Opcodes VM
 
