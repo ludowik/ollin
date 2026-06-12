@@ -15,8 +15,8 @@ bool Parser::match(TokenType t) {
 
 Token Parser::expect(TokenType t) {
     if (!check(t))
-        throw std::runtime_error("unexpected token: '" + tokens[pos].lexeme +
-                                 "' at line " + std::to_string(tokens[pos].line));
+        throw std::runtime_error("line " + std::to_string(tokens[pos].line) +
+                                 ": unexpected token '" + tokens[pos].lexeme + "'");
     return advance();
 }
 
@@ -184,6 +184,6 @@ std::unique_ptr<Expr> Parser::primary() {
         expect(TokenType::RPAREN);
         return e;
     }
-    throw std::runtime_error("unexpected token: '" + peek().lexeme +
-                             "' at line " + std::to_string(peek().line));
+    throw std::runtime_error("line " + std::to_string(peek().line) +
+                             ": unexpected token '" + peek().lexeme + "'");
 }

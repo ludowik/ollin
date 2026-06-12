@@ -10,7 +10,8 @@
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "cmake: build",
             "terminal": "integrated",
-            "internalConsoleOptions": "neverOpen"
+            "internalConsoleOptions": "neverOpen",
+            "postRunCommands": ["breakpoint delete --force 1", "breakpoint delete --force 2"]
         }
     ]
 }

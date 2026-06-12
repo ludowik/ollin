@@ -35,7 +35,7 @@ Token Lexer::string() {
     while (!atEnd() && peek() != '"' && peek() != '\n')
         advance();
     if (atEnd() || peek() == '\n')
-        throw std::runtime_error("chaîne non terminée à la ligne " + std::to_string(line));
+        throw std::runtime_error("line " + std::to_string(line) + ": unterminated string");
     std::string val = src.substr(start, pos - start);
     advance();
     return {TokenType::STRING, val, line};
@@ -65,7 +65,7 @@ Token Lexer::blockComment() {
         hashes = (c == '#') ? hashes + 1 : 0;
         if (hashes == 3) break;
     }
-    if (hashes < 3) throw std::runtime_error("commentaire bloc non terminé");
+    if (hashes < 3) throw std::runtime_error("line " + std::to_string(line) + ": unterminated block comment");
     return {TokenType::COMMENT, src.substr(start, pos - start - 3), line};
 }
 
@@ -98,13 +98,13 @@ std::vector<Token> Lexer::tokenize() {
                     if (!atEnd() && peek() == '#') { advance(); tokens.push_back(blockComment()); }
                     else tokens.push_back(comment());
                 } else {
-                    throw std::runtime_error(std::string("unexpected character: ") + c);
+                    throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
                 }
                 break;
             default:
                 if (std::isdigit(c)) { tokens.push_back(number());     break; }
                 if (std::isalpha(c) || c == '_') { tokens.push_back(identifier()); break; }
-                throw std::runtime_error(std::string("unexpected character: ") + c);
+                throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
         }
     }
     tokens.push_back({TokenType::EOF_T, "", line});

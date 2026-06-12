@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
         auto chunk   = Compiler().compile(program);
         VM().execute(chunk);
     } catch (const std::exception& e) {
-        std::cerr << "error: " << e.what() << '\n';
+        std::cerr << argv[1] << ": " << e.what() << '\n';
         return 1;
     }
     return 0;

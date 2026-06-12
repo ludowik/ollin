@@ -13,7 +13,7 @@ void VM::execute(const Chunk& chunk) {
     };
 
     auto pop = [&]() -> Value {
-        if (stack.empty()) throw std::runtime_error("stack underflow");
+        if (stack.empty()) throw std::runtime_error("runtime: stack underflow");
         Value v = stack.top();
         stack.pop();
         return v;
@@ -21,7 +21,7 @@ void VM::execute(const Chunk& chunk) {
 
     auto asDouble = [](const Value& v) -> double {
         if (auto* d = std::get_if<double>(&v)) return *d;
-        throw std::runtime_error("expected number, got string");
+        throw std::runtime_error("runtime: expected number, got string");
     };
 
     auto printValue = [](const Value& v) {
@@ -39,7 +39,7 @@ void VM::execute(const Chunk& chunk) {
                 const std::string& name = chunk.identifiers[readU16()];
                 auto it = vars.find(name);
                 if (it == vars.end())
-                    throw std::runtime_error("undefined variable: " + name);
+                    throw std::runtime_error("runtime: undefined variable '" + name + "'");
                 stack.push(it->second);
                 break;
             }
@@ -56,7 +56,7 @@ void VM::execute(const Chunk& chunk) {
             case Op::DIV: {
                 auto b = pop(), a = pop();
                 double bd = asDouble(b);
-                if (bd == 0.0) throw std::runtime_error("division by zero");
+                if (bd == 0.0) throw std::runtime_error("runtime: division by zero");
                 stack.push(asDouble(a) / bd);
                 break;
             }
