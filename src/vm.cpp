@@ -1,47 +1,27 @@
 #include "vm.h"
 #include <chrono>
-#include <iostream>
 #include <stdexcept>
 #include <vector>
 
+// ── boucle d'exécution ────────────────────────────────────────────────────────
+
 void VM::execute(const Chunk& chunk) {
-    int ip = 0;
+    ch = &chunk;
+    ip = 0;
     vars.assign(chunk.identifiers.size(), 0.0);
     vars_init.assign(chunk.identifiers.size(), false);
 
-    auto readU16 = [&]() -> uint16_t {
-        uint16_t v = (static_cast<uint16_t>(chunk.code[ip]) << 8) | chunk.code[ip + 1];
-        ip += 2;
-        return v;
-    };
-
-    auto pop = [&]() -> Value {
-        if (stack.empty()) throw std::runtime_error("runtime: stack underflow");
-        Value v = stack.top();
-        stack.pop();
-        return v;
-    };
-
-    auto asDouble = [](const Value& v) -> double {
-        if (v.isNumber()) return v.n;
-        throw std::runtime_error("runtime: expected number, got string");
-    };
-
-    auto printValue = [](const Value& v) {
-        if (v.isNumber()) std::cout << v.n; else std::cout << v.asString();
-    };
-
     while (true) {
-        Op op = static_cast<Op>(chunk.code[ip++]);
+        Op op = static_cast<Op>(ch->code[ip++]);
         switch (op) {
             case Op::LOAD_CONST:
-                stack.push(chunk.constants[readU16()]);
+                stack.push(ch->constants[readU16()]);
                 break;
 
             case Op::LOAD_VAR: {
                 uint16_t idx = readU16();
                 if (!vars_init[idx])
-                    throw std::runtime_error("runtime: undefined variable '" + chunk.identifiers[idx] + "'");
+                    throw std::runtime_error("runtime: undefined variable '" + ch->identifiers[idx] + "'");
                 stack.push(vars[idx]);
                 break;
             }
@@ -64,8 +44,8 @@ void VM::execute(const Chunk& chunk) {
                 break;
             }
 
-            case Op::GT:  { auto b = pop(), a = pop(); stack.push(asDouble(a) > asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::LT:  { auto b = pop(), a = pop(); stack.push(asDouble(a) < asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::GT: { auto b = pop(), a = pop(); stack.push(asDouble(a) > asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::LT: { auto b = pop(), a = pop(); stack.push(asDouble(a) < asDouble(b) ? 1.0 : 0.0); break; }
 
             case Op::JUMP:
                 ip = readU16();
@@ -79,8 +59,8 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::CALL: {
                 uint16_t name_idx = readU16();
-                uint8_t  argc     = chunk.code[ip++];
-                const std::string& name = chunk.identifiers[name_idx];
+                uint8_t  argc     = ch->code[ip++];
+                const std::string& name = ch->identifiers[name_idx];
 
                 if (name == "time") {
                     auto now = std::chrono::system_clock::now();
@@ -120,7 +100,7 @@ void VM::execute(const Chunk& chunk) {
                 Handler h = handler_stack.back();
                 handler_stack.pop_back();
                 while (stack.size() > h.stack_size) stack.pop();
-                stack.push(thrown);
+                stack.push(std::move(thrown));
                 ip = h.catch_addr;
                 break;
             }
