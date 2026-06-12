@@ -43,6 +43,7 @@ tau/
 | `syntax.tau` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
 | `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.tau` — à maintenir à chaque évolution |
 | `test.tau` | Claude | fichier de tests libres — modifiable à volonté |
+| `tau-vscode/` | Claude | extension VS Code (colorisation) — à maintenir à chaque évolution du langage |
 
 ## Versionning
 
