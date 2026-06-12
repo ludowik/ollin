@@ -1,111 +1,123 @@
-### test.ol — fichier de tests libres (Claude)
+### test.ol — tests (Claude)
     Couvre toutes les constructions de syntax.ol
 ###
 
-## ── strings ──────────────────────────────────────────────────────────────────
-print("hello world!")        ## hello world!
+## ── strings ───────────────────────────────────────────────────────────────────
+assert("hello" == "hello", "string literal ==")
 
-## ── arithmétique ─────────────────────────────────────────────────────────────
+## ── arithmétique ──────────────────────────────────────────────────────────────
 var x = 2 + 3 * 4
-print(x)                     ## 14
+assert(x == 14, "priorité opérateurs")
 
 var a, b = 10, 3
-print(a - b)                 ## 7
+assert(a - b == 7, "soustraction")
 
-## ── déclaration multiple ─────────────────────────────────────────────────────
+## ── déclaration multiple ──────────────────────────────────────────────────────
 var p, q = 6, 7
-print(p)                     ## 6
-print(q)                     ## 7
+assert(p == 6, "p == 6")
+assert(q == 7, "q == 7")
 
-## ── booleans via variables ───────────────────────────────────────────────────
+## ── booleans ──────────────────────────────────────────────────────────────────
 var vrai = true
 var faux = false
-print(vrai)                  ## 1
-print(faux)                  ## 0
+assert(vrai == 1, "true == 1")
+assert(faux == 0, "false == 0")
 
-## ── if then end ──────────────────────────────────────────────────────────────
+## ── comparaisons ──────────────────────────────────────────────────────────────
 var n = 5
-if n > 3 then
-    print("n > 3")           ## n > 3
-end
+assert(n > 3, "n > 3")
+assert(n < 10, "n < 10")
 
-if faux then
-    print("jamais")
-end
-
-## ── == égalité ───────────────────────────────────────────────────────────────
 var c = 2
-if c == 2 then
-    print("c == 2")          ## c == 2
-end
+assert(c == 2, "c == 2")
 
-var s1 = "hello"
-var s2 = "hello"
-if s1 == s2 then
-    print("strings égales")  ## strings égales
-end
+var s1, s2 = "hello", "hello"
+assert(s1 == s2, "string ==")
 
-## ── else if / else ───────────────────────────────────────────────────────────
+## ── if then end ───────────────────────────────────────────────────────────────
+var branch = 0
+if faux then
+    branch += 1
+end
+assert(branch == 0, "if false → non exécuté")
+
+if vrai then
+    branch += 1
+end
+assert(branch == 1, "if true → exécuté")
+
+## ── else if / else ────────────────────────────────────────────────────────────
 var score = 75
+var score_branch = 0
 if score > 90 then
-    print("excellent")
+    score_branch += 1
 else if score > 70 then
-    print("bien")            ## bien
+    score_branch += 2
 else if score > 50 then
-    print("moyen")
+    score_branch += 3
 else
-    print("insuffisant")
+    score_branch += 4
 end
+assert(score_branch == 2, "else if branch correcte")
 
 var z = 0
+var z_branch = 0
 if z == 1 then
-    print("un")
+    z_branch += 1
 else if z == 2 then
-    print("deux")
+    z_branch += 2
 else
-    print("autre")           ## autre
+    z_branch += 3
 end
+assert(z_branch == 3, "else branch correcte")
 
-## ── while + if + break ───────────────────────────────────────────────────────
+## ── while + break ─────────────────────────────────────────────────────────────
 var i = 0
 while vrai
     i += 1
     if i > 4 then break end
 end
-print(i)                     ## 5
+assert(i == 5, "while + break")
 
-## ── while avec condition ─────────────────────────────────────────────────────
+## ── while avec condition ──────────────────────────────────────────────────────
 var sum = 0
 var k = 1
 while k < 10
     sum += k
     k += 1
 end
-print(sum)                   ## 45
+assert(sum == 45, "somme 1..9")
 
-## ── time ────────────────────────────────────────────────────────────────────
+## ── time ──────────────────────────────────────────────────────────────────────
 var t = time()
-print(t)                     ## heure courante en secondes (Unix timestamp)
+assert(t > 0, "time() > 0")
 
-## ── try/catch/throw → catch exécuté ─────────────────────────────────────────
+## ── try/catch/throw → catch exécuté ──────────────────────────────────────────
+var try1 = 0
 try
+    try1 += 1
     throw "oulala"
+    try1 += 10
 catch err
-    print(err)               ## error
+    assert(err == "oulala", "valeur throwée")
+    try1 += 2
 else
-    print("no error")
+    try1 += 100
 end
+assert(try1 == 3, "try+catch exécutés")
 
-## ── try sans throw → else exécuté ───────────────────────────────────────────
+## ── try sans throw → else exécuté ────────────────────────────────────────────
+var try2 = 0
 try
-    var ok = true
+    try2 += 1
 catch err
-    print("caught")
+    try2 += 100
 else
-    print("all good")        ## all good
+    try2 += 2
 end
+assert(try2 == 3, "try sans throw → else")
 
-## ── try vide, catch vide, sans else ─────────────────────────────────────────
+## ── try vide, catch vide, sans else ──────────────────────────────────────────
 try
 catch err
 end
