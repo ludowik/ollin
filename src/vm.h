@@ -48,14 +48,14 @@ private:
     }
 
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
-        if (v.isNumber()) return v.n;
+        if (v.isNumber()) return v.asNum();
         if (v.isNil()) throw std::runtime_error("runtime: expected number, got nil");
         throw std::runtime_error("runtime: expected number, got string");
     }
 
     [[gnu::always_inline]] inline void printValue(const Value& v) {
         if (v.isNil()) std::cout << "nil";
-        else if (v.isNumber()) std::cout << v.n;
+        else if (v.isNumber()) std::cout << v.asNum();
         else std::cout << v.asString();
     }
 };

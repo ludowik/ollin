@@ -17,7 +17,7 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
                 int ai  = idx + offset;
                 if (ai < (int)args.size()) {
                     if (args[ai].isString()) out += args[ai].asString();
-                    else { std::ostringstream os; os << args[ai].n; out += os.str(); }
+                    else { std::ostringstream os; os << args[ai].asNum(); out += os.str(); }
                 }
                 i = j;
                 continue;
@@ -78,10 +78,10 @@ void VM::execute(const Chunk& chunk) {
                 bool eq;
                 if (a.isNil() && b.isNil())           eq = true;
                 else if (a.isNil() || b.isNil())       eq = false;
-                else if (a.isNumber() && b.isNumber()) eq = (a.n == b.n);
+                else if (a.isNumber() && b.isNumber()) eq = (a.asNum() == b.asNum());
                 else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
-                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.n;
-                else if (a.isNumber() && b.isString()) eq = a.n == (isFalsy(b) ? 0.0 : 1.0);
+                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.asNum();
+                else if (a.isNumber() && b.isString()) eq = a.asNum() == (isFalsy(b) ? 0.0 : 1.0);
                 else eq = false;
                 stack.push(eq ? 0.0 : 1.0); // NEQ = inverse de EQ
                 break;
@@ -91,11 +91,11 @@ void VM::execute(const Chunk& chunk) {
                 bool eq;
                 if (a.isNil() && b.isNil())           eq = true;
                 else if (a.isNil() || b.isNil())       eq = false;
-                else if (a.isNumber() && b.isNumber()) eq = (a.n == b.n);
+                else if (a.isNumber() && b.isNumber()) eq = (a.asNum() == b.asNum());
                 else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
                 // string == number : comparer la valeur de vérité de la chaîne
-                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.n;
-                else if (a.isNumber() && b.isString()) eq = a.n == (isFalsy(b) ? 0.0 : 1.0);
+                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.asNum();
+                else if (a.isNumber() && b.isString()) eq = a.asNum() == (isFalsy(b) ? 0.0 : 1.0);
                 else eq = false;
                 stack.push(eq ? 1.0 : 0.0);
                 break;
@@ -172,7 +172,7 @@ void VM::execute(const Chunk& chunk) {
             case Op::THROW: {
                 Value thrown = pop();
                 if (handler_stack.empty()) {
-                    std::string msg = thrown.isString() ? thrown.asString() : std::to_string(thrown.n);
+                    std::string msg = thrown.isString() ? thrown.asString() : std::to_string(thrown.asNum());
                     throw std::runtime_error("unhandled exception: " + msg);
                 }
                 Handler h = handler_stack.back();

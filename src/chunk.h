@@ -1,57 +1,68 @@
 #pragma once
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
-// Union taguée 16 octets (vs 32 pour std::variant<double,std::string>)
+// NaN-boxing : Value = 8 octets (un uint64_t).
+//
+// IEEE 754 quiet NaN : exposant=0x7FF + bit 51 (quiet) = 0x7FF8_0000_0000_0000
+// On réserve deux masques au-dessus de ce seuil pour nos types non-numériques :
+//
+//   Nombre   : tout double dont (bits & QNAN) != QNAN  (double normal ou NaN "nu")
+//   Nil      : NIL_BITS  = 0x7FFF_0000_0000_0001       (valeur sentinelle unique)
+//   String   : STAG      = 0xFFFF_0000_0000_0000 | ptr48
+//              (bit 63=1 garantit qu'aucun double positif ne collide)
+//
+// Les pointeurs heap macOS/Linux tiennent en 48 bits → ptr & PMSK est réversible.
+
 struct Value {
-    enum class Type : uint8_t { Nil, Number, String } type;
-    union {
-        double       n;
-        std::string* s;
-    };
+    uint64_t bits;
 
-    Value()                    : type(Type::Nil),    n(0.0) {}
-    Value(double v)            : type(Type::Number), n(v) {}
-    Value(std::string v)       : type(Type::String), s(new std::string(std::move(v))) {}
+private:
+    static constexpr uint64_t QNAN = 0x7FF8000000000000ULL;
+    static constexpr uint64_t NIL  = 0x7FFF000000000001ULL;
+    static constexpr uint64_t STAG = 0xFFFF000000000000ULL;
+    static constexpr uint64_t PMSK = 0x0000FFFFFFFFFFFFULL;
 
-    Value(const Value& o) : type(o.type) {
-        if (type == Type::String) s = new std::string(*o.s);
-        else if (type == Type::Number) n = o.n;
+    std::string* strPtr() const { return reinterpret_cast<std::string*>(bits & PMSK); }
+    static uint64_t mkStr(std::string* p) { return STAG | (reinterpret_cast<uint64_t>(p) & PMSK); }
+
+public:
+    Value()             : bits(NIL) {}
+    Value(double d)     { std::memcpy(&bits, &d, 8); }
+    Value(std::string v): bits(mkStr(new std::string(std::move(v)))) {}
+
+    Value(const Value& o) : bits(o.bits) {
+        if (isString()) bits = mkStr(new std::string(asString()));
     }
-    Value(Value&& o) noexcept : type(o.type) {
-        if (type == Type::String) { s = o.s; o.s = nullptr; }
-        else if (type == Type::Number) n = o.n;
-        o.type = Type::Nil;
-    }
+    Value(Value&& o) noexcept : bits(o.bits) { o.bits = NIL; }
     Value& operator=(const Value& o) {
         if (this == &o) return *this;
-        if (type == Type::String) delete s;
-        type = o.type;
-        if (type == Type::String) s = new std::string(*o.s);
-        else if (type == Type::Number) n = o.n;
+        if (isString()) delete strPtr();
+        bits = o.bits;
+        if (isString()) bits = mkStr(new std::string(asString()));
         return *this;
     }
     Value& operator=(Value&& o) noexcept {
         if (this == &o) return *this;
-        if (type == Type::String) delete s;
-        type = o.type;
-        if (type == Type::String) { s = o.s; o.s = nullptr; }
-        else if (type == Type::Number) n = o.n;
-        o.type = Type::Nil;
+        if (isString()) delete strPtr();
+        bits = o.bits; o.bits = NIL;
         return *this;
     }
-    ~Value() { if (type == Type::String) delete s; }
+    ~Value() { if (isString()) delete strPtr(); }
 
-    bool isNil()    const { return type == Type::Nil; }
-    bool isNumber() const { return type == Type::Number; }
-    bool isString() const { return type == Type::String; }
-    const std::string& asString() const { return *s; }
+    bool isNil()    const { return bits == NIL; }
+    bool isNumber() const { return (bits & QNAN) != QNAN; }
+    bool isString() const { return (bits & STAG) == STAG; }
+
+    double asNum()                const { double d; std::memcpy(&d, &bits, 8); return d; }
+    const std::string& asString() const { return *strPtr(); }
 };
 
 inline bool isFalsy(const Value& v) {
     if (v.isNil())    return true;
-    if (v.isNumber()) return v.n == 0.0;
+    if (v.isNumber()) return v.asNum() == 0.0;
     if (v.isString()) return v.asString().empty();
     return true;
 }
