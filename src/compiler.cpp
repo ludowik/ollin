@@ -15,6 +15,7 @@ void Compiler::compileStmt(const Stmt& s) {
     else if (dynamic_cast<const BreakStmt*>(&s))              compileBreakStmt();
     else if (auto* a = dynamic_cast<const AssignStmt*>(&s))   compileAssignStmt(*a);
     else if (auto* e = dynamic_cast<const ExprStmt*>(&s))    compileExprStmt(*e);
+    else if (dynamic_cast<const CommentStmt*>(&s))           { /* no-op */ }
     else throw std::runtime_error("unknown statement type");
 }
 

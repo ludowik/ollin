@@ -31,13 +31,13 @@ Token Lexer::number() {
 }
 
 Token Lexer::string() {
-    int start = pos; // après le guillemet ouvrant
+    int start = pos;
     while (!atEnd() && peek() != '"' && peek() != '\n')
         advance();
     if (atEnd() || peek() == '\n')
         throw std::runtime_error("chaîne non terminée à la ligne " + std::to_string(line));
     std::string val = src.substr(start, pos - start);
-    advance(); // guillemet fermant
+    advance();
     return {TokenType::STRING, val, line};
 }
 
@@ -50,19 +50,23 @@ Token Lexer::identifier() {
     return {it != s_keywords.end() ? it->second : TokenType::IDENTIFIER, lex, line};
 }
 
-void Lexer::skipLineComment() {
+Token Lexer::comment() {
+    int start = pos;
     while (!atEnd() && peek() != '\n') advance();
+    return {TokenType::COMMENT, src.substr(start, pos - start), line};
 }
 
-void Lexer::skipBlockComment() {
+Token Lexer::blockComment() {
+    int start = pos;
     int hashes = 0;
     while (!atEnd()) {
         char c = advance();
         if (c == '\n') line++;
         hashes = (c == '#') ? hashes + 1 : 0;
-        if (hashes == 3) return;
+        if (hashes == 3) break;
     }
-    throw std::runtime_error("commentaire bloc non terminé");
+    if (hashes < 3) throw std::runtime_error("commentaire bloc non terminé");
+    return {TokenType::COMMENT, src.substr(start, pos - start - 3), line};
 }
 
 std::vector<Token> Lexer::tokenize() {
@@ -91,8 +95,8 @@ std::vector<Token> Lexer::tokenize() {
             case '#':
                 if (!atEnd() && peek() == '#') {
                     advance(); // 2e #
-                    if (!atEnd() && peek() == '#') { advance(); skipBlockComment(); }
-                    else skipLineComment();
+                    if (!atEnd() && peek() == '#') { advance(); tokens.push_back(blockComment()); }
+                    else tokens.push_back(comment());
                 } else {
                     throw std::runtime_error(std::string("unexpected character: ") + c);
                 }

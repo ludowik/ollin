@@ -20,6 +20,6 @@ private:
     Token number();
     Token string();
     Token identifier();
-    void  skipLineComment();
-    void  skipBlockComment();
+    Token comment();
+    Token blockComment();
 };

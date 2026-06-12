@@ -49,6 +49,11 @@ struct ExprStmt : Stmt {
     explicit ExprStmt(std::unique_ptr<Expr> e) : expr(std::move(e)) {}
 };
 
+struct CommentStmt : Stmt {
+    std::string text;
+    explicit CommentStmt(std::string t) : text(std::move(t)) {}
+};
+
 struct WhileStmt : Stmt {
     std::unique_ptr<Expr> cond;
     std::vector<std::unique_ptr<Stmt>> body;

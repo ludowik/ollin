@@ -30,6 +30,12 @@ void Parser::skipNewlines() {
     while (check(TokenType::NEWLINE)) advance();
 }
 
+// absorbe un commentaire de fin de ligne optionnel puis le NEWLINE
+void Parser::consumeLineEnd() {
+    match(TokenType::COMMENT);
+    match(TokenType::NEWLINE);
+}
+
 // ── entrée principale ────────────────────────────────────────────────────────
 
 Program Parser::parse() {
@@ -45,6 +51,11 @@ Program Parser::parse() {
 // ── dispatch ─────────────────────────────────────────────────────────────────
 
 std::unique_ptr<Stmt> Parser::parseOneStmt() {
+    if (check(TokenType::COMMENT)) {
+        std::string text = advance().lexeme;
+        consumeLineEnd();
+        return std::make_unique<CommentStmt>(std::move(text));
+    }
     if (check(TokenType::WHILE))   return whileStmt();
     if (check(TokenType::IF))      return ifStmt();
     if (check(TokenType::BREAK))   return breakStmt();
@@ -57,7 +68,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
 // ── instructions ─────────────────────────────────────────────────────────────
 
 std::unique_ptr<Stmt> Parser::varDecl() {
-    advance(); // consomme VAR
+    advance();
     auto s = std::make_unique<VarDeclStmt>();
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
@@ -66,52 +77,52 @@ std::unique_ptr<Stmt> Parser::varDecl() {
     s->values.push_back(expr());
     while (match(TokenType::COMMA))
         s->values.push_back(expr());
-    match(TokenType::NEWLINE);
+    consumeLineEnd();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::whileStmt() {
-    advance(); // consomme WHILE
+    advance();
     auto s = std::make_unique<WhileStmt>();
     s->cond = expr();
-    match(TokenType::NEWLINE);
+    consumeLineEnd();
     while (true) {
         skipNewlines();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->body.push_back(parseOneStmt());
     }
     expect(TokenType::END);
-    match(TokenType::NEWLINE);
+    consumeLineEnd();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::ifStmt() {
-    advance(); // consomme IF
+    advance();
     auto s = std::make_unique<IfStmt>();
     s->cond = expr();
-    s->then = parseOneStmt(); // instruction inline, pas de saut de ligne
+    s->then = parseOneStmt();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::breakStmt() {
-    advance(); // consomme BREAK
-    match(TokenType::NEWLINE);
+    advance();
+    consumeLineEnd();
     return std::make_unique<BreakStmt>();
 }
 
 std::unique_ptr<Stmt> Parser::assignStmt() {
     auto s = std::make_unique<AssignStmt>();
-    s->name = advance().lexeme; // IDENTIFIER
+    s->name = advance().lexeme;
     if (match(TokenType::PLUS_EQUAL)) s->op = '+';
-    else { advance(); s->op = '\0'; } // EQUALS
+    else { advance(); s->op = '\0'; }
     s->value = expr();
-    match(TokenType::NEWLINE);
+    consumeLineEnd();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::exprStmt() {
     auto e = expr();
-    match(TokenType::NEWLINE);
+    consumeLineEnd();
     return std::make_unique<ExprStmt>(std::move(e));
 }
 

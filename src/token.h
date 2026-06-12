@@ -8,6 +8,7 @@ enum class TokenType {
     PLUS, MINUS, STAR, SLASH,
     PLUS_EQUAL,
     GREATER, LESS,
+    COMMENT,
     NEWLINE, EOF_T
 };
 
