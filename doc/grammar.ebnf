@@ -9,6 +9,8 @@ stmt           = varDecl
                | ifStmt
                | tryStmt
                | throwStmt
+               | funcDecl
+               | returnStmt
                | assignStmt
                | exprStmt ;
 
@@ -20,6 +22,11 @@ ifStmt         = "if" expr "then" NEWLINE { stmt }
                  "end" NEWLINE ;
 tryStmt        = "try" NEWLINE { stmt } "catch" IDENT NEWLINE { stmt } [ "else" NEWLINE { stmt } ] "end" NEWLINE ;
 throwStmt      = "throw" expr NEWLINE ;
+funcDecl       = "func" IDENT "(" [ params ] ")" NEWLINE { stmt } "end" NEWLINE ;
+params         = IDENT { "," IDENT } [ "," "..." ] | "..." ;
+returnStmt     = "return" [ retvals ] NEWLINE ;
+retvals        = "..."
+               | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT "+=" expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 
@@ -32,6 +39,7 @@ primary        = NUMBER
                | BOOL
                | IDENT
                | call
+               | "..."
                | "(" expr ")" ;
 
 call           = IDENT "(" [ expr { "," expr } ] ")" ;

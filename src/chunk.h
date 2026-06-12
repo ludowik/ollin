@@ -59,6 +59,13 @@ enum class Op : uint8_t {
     TRY,             // uint16 catch_addr  — empile un handler
     POP_TRY,         // dépile le handler  (try body terminé sans throw)
     THROW,           // pop value → saute vers le handler courant
+    LOAD_LOCAL,      // uint16 idx → frame.locals
+    STORE_LOCAL,     // uint16 idx → frame.locals
+    CALL_FUNC,       // uint16 addr, uint8 n_fixed, uint8 argc, uint8 variadic
+    RETURN_N,        // uint8 n — retourne n valeurs explicites
+    RETURN_V,        // uint8 n — n valeurs explicites + varargs
+    LOAD_VARARGS,    // push tous les varargs du frame courant
+    DISCARD_RETURNS, // pop ret_count valeurs
     HALT
 };
 
@@ -72,7 +79,9 @@ struct Chunk {
 
     void   emit(Op op);
     void   emitU16(Op op, uint16_t arg);
+    void   emitU8(Op op, uint8_t arg);
     void   emitCall(uint16_t name_idx, uint8_t argc);
+    void   emitCallFunc(uint16_t addr, uint8_t n_fixed, uint8_t argc, bool variadic);
     size_t emitJump(Op op);
     void   patchJump(size_t pos, uint16_t target);
     size_t currentPos() const { return code.size(); }

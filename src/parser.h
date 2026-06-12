@@ -29,6 +29,8 @@ private:
     std::unique_ptr<Stmt> breakStmt();
     std::unique_ptr<Stmt> tryCatchStmt();
     std::unique_ptr<Stmt> throwStmt();
+    std::unique_ptr<Stmt> funcDeclStmt();
+    std::unique_ptr<Stmt> returnStmt();
     std::unique_ptr<Stmt> assignStmt();
     std::unique_ptr<Stmt> exprStmt();
 

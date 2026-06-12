@@ -15,6 +15,15 @@ private:
         size_t   stack_size;
     };
 
+    struct Frame {
+        int    return_ip;
+        size_t stack_base;
+        int    n_fixed;
+        std::vector<Value> locals;
+        std::vector<bool>  locals_init;
+        std::vector<Value> varargs;
+    };
+
     const Chunk* ch = nullptr;
     int          ip = 0;
 
@@ -22,6 +31,8 @@ private:
     std::vector<Value>   vars;
     std::vector<bool>    vars_init;
     std::vector<Handler> handler_stack;
+    std::vector<Frame>   call_stack;
+    int                  ret_count = 0;
 
     [[gnu::always_inline]] inline uint16_t readU16() {
         uint16_t v = (static_cast<uint16_t>(ch->code[ip]) << 8) | ch->code[ip + 1];

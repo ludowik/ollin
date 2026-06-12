@@ -1,6 +1,35 @@
 #include "compiler.h"
 #include <stdexcept>
 
+// ── helpers portée ────────────────────────────────────────────────────────────
+
+void Compiler::emitLoadVar(const std::string& name) {
+    if (current_func) {
+        auto it = current_func->local_ids.find(name);
+        if (it != current_func->local_ids.end()) {
+            chunk.emitU16(Op::LOAD_LOCAL, it->second);
+            return;
+        }
+    }
+    chunk.emitU16(Op::LOAD_VAR, chunk.addIdentifier(name));
+}
+
+void Compiler::emitStoreVar(const std::string& name) {
+    if (current_func) {
+        auto it = current_func->local_ids.find(name);
+        int idx;
+        if (it == current_func->local_ids.end()) {
+            idx = static_cast<int>(current_func->local_ids.size());
+            current_func->local_ids[name] = idx;
+        } else {
+            idx = it->second;
+        }
+        chunk.emitU16(Op::STORE_LOCAL, idx);
+        return;
+    }
+    chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(name));
+}
+
 Chunk Compiler::compile(const Program& prog) {
     for (auto& s : prog.stmts)
         s->accept(*this);
@@ -11,12 +40,23 @@ Chunk Compiler::compile(const Program& prog) {
 // ── instructions ──────────────────────────────────────────────────────────────
 
 void Compiler::visit(const VarDeclStmt& s) {
+    // Cas spécial : appel de fonction utilisateur → multi-retour
+    if (s.names.size() > 1 && s.values.size() == 1) {
+        if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
+            if (func_table.count(call->callee)) {
+                s.values[0]->accept(*this);
+                for (int i = (int)s.names.size() - 1; i >= 0; --i)
+                    emitStoreVar(s.names[i]);
+                return;
+            }
+        }
+    }
     for (size_t i = 0; i < s.names.size(); ++i) {
         if (i < s.values.size())
             s.values[i]->accept(*this);
         else
             chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(0.0));
-        chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(s.names[i]));
+        emitStoreVar(s.names[i]);
     }
 }
 
@@ -63,8 +103,7 @@ void Compiler::visit(const BreakStmt&) {
 }
 
 void Compiler::visit(const AssignStmt& s) {
-    if (s.op != '\0')
-        chunk.emitU16(Op::LOAD_VAR, chunk.addIdentifier(s.name));
+    if (s.op != '\0') emitLoadVar(s.name);
     s.value->accept(*this);
     switch (s.op) {
         case '+': chunk.emit(Op::ADD); break;
@@ -74,10 +113,16 @@ void Compiler::visit(const AssignStmt& s) {
         case '\0': break;
         default: throw std::runtime_error(std::string("unknown assign op: ") + s.op);
     }
-    chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(s.name));
+    emitStoreVar(s.name);
 }
 
-void Compiler::visit(const ExprStmt& s) { s.expr->accept(*this); }
+void Compiler::visit(const ExprStmt& s) {
+    s.expr->accept(*this);
+    if (auto* call = dynamic_cast<const CallExpr*>(s.expr.get())) {
+        if (func_table.count(call->callee))
+            chunk.emit(Op::DISCARD_RETURNS);
+    }
+}
 
 void Compiler::visit(const ThrowStmt& s) {
     s.value->accept(*this);
@@ -121,7 +166,7 @@ void Compiler::visit(const TryCatchStmt& s) {
 void Compiler::visit(const NumberExpr& e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value)); }
 void Compiler::visit(const StringExpr& e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value)); }
 void Compiler::visit(const BoolExpr&   e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value ? 1.0 : 0.0)); }
-void Compiler::visit(const VarExpr&    e) { chunk.emitU16(Op::LOAD_VAR,   chunk.addIdentifier(e.name)); }
+void Compiler::visit(const VarExpr&    e) { emitLoadVar(e.name); }
 
 void Compiler::visit(const BinaryExpr& e) {
     e.left->accept(*this);
@@ -141,5 +186,54 @@ void Compiler::visit(const BinaryExpr& e) {
 void Compiler::visit(const CallExpr& e) {
     for (auto& arg : e.args)
         arg->accept(*this);
-    chunk.emitCall(chunk.addIdentifier(e.callee), static_cast<uint8_t>(e.args.size()));
+    auto it = func_table.find(e.callee);
+    if (it != func_table.end()) {
+        const FuncInfo& f = it->second;
+        chunk.emitCallFunc(static_cast<uint16_t>(f.addr),
+                           static_cast<uint8_t>(f.n_fixed),
+                           static_cast<uint8_t>(e.args.size()),
+                           f.variadic);
+    } else {
+        chunk.emitCall(chunk.addIdentifier(e.callee), static_cast<uint8_t>(e.args.size()));
+    }
+}
+
+void Compiler::visit(const FuncDeclStmt& s) {
+    // Enregistre la fonction et saute par-dessus le corps
+    FuncInfo info;
+    info.n_fixed  = static_cast<int>(s.params.size());
+    info.variadic = s.variadic;
+    for (int i = 0; i < info.n_fixed; ++i)
+        info.local_ids[s.params[i]] = i;
+
+    size_t jump_patch = chunk.emitJump(Op::JUMP);
+    info.addr = static_cast<int>(chunk.currentPos());
+    func_table[s.name] = info;
+    current_func = &func_table[s.name];
+
+    for (auto& stmt : s.body)
+        stmt->accept(*this);
+    chunk.emitU8(Op::RETURN_N, 0); // return implicite
+
+    current_func = nullptr;
+    chunk.patchJump(jump_patch, static_cast<uint16_t>(chunk.currentPos()));
+}
+
+void Compiler::visit(const ReturnStmt& s) {
+    if (!current_func)
+        throw std::runtime_error("return en dehors d'une fonction");
+    for (auto& v : s.values)
+        v->accept(*this);
+    if (s.spread_varargs) {
+        chunk.emit(Op::LOAD_VARARGS);
+        chunk.emitU8(Op::RETURN_V, static_cast<uint8_t>(s.values.size()));
+    } else {
+        chunk.emitU8(Op::RETURN_N, static_cast<uint8_t>(s.values.size()));
+    }
+}
+
+void Compiler::visit(const VarArgExpr&) {
+    if (!current_func || !current_func->variadic)
+        throw std::runtime_error("... hors d'une fonction variadique");
+    chunk.emit(Op::LOAD_VARARGS);
 }

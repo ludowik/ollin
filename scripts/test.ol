@@ -126,6 +126,64 @@ end
 printf("{} + {} = {}", 1, 2, 3)        ## 1 + 2 = 3
 printf("a={0} b={1} a={0}", 10, 20)    ## a=10 b=20 a=10
 
+## ── fonctions ─────────────────────────────────────────────────────────────────
+
+func add(a, b)
+    return a + b
+end
+
+func max2(a, b)
+    if a > b then
+        return a
+    else
+        return b
+    end
+end
+
+func swap(a, b)
+    return b, a
+end
+
+func sum_varargs(...)
+    var s = 0
+    var i = 0
+    while i < 3
+        i += 1
+    end
+    return ...
+end
+
+assert(add(3, 4) == 7, "add(3,4)")
+assert(add(0, 0) == 0, "add(0,0)")
+assert(max2(5, 3) == 5, "max2(5,3)")
+assert(max2(2, 9) == 9, "max2(2,9)")
+
+var x, y = swap(10, 20)
+assert(x == 20, "swap x")
+assert(y == 10, "swap y")
+
+## récursion
+func fact(n)
+    if n < 2 then
+        return 1
+    end
+    return n * fact(n - 1)
+end
+
+assert(fact(0) == 1, "fact(0)")
+assert(fact(1) == 1, "fact(1)")
+assert(fact(5) == 120, "fact(5)")
+
+## varargs passthrough
+func passthrough(a, ...)
+    return a, ...
+end
+
+var r1, r2, r3 = passthrough(1, 2, 3)
+assert(r1 == 1, "varargs r1")
+assert(r2 == 2, "varargs r2")
+assert(r3 == 3, "varargs r3")
+
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0

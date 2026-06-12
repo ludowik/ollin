@@ -13,8 +13,10 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"false", TokenType::FALSE},
     {"try",   TokenType::TRY},
     {"catch", TokenType::CATCH},
-    {"throw", TokenType::THROW},
-    {"else",  TokenType::ELSE},
+    {"throw",  TokenType::THROW},
+    {"else",   TokenType::ELSE},
+    {"func",   TokenType::FUNC},
+    {"return", TokenType::RETURN},
 };
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}
@@ -90,6 +92,15 @@ std::vector<Token> Lexer::tokenize() {
             case ',':  tokens.push_back({TokenType::COMMA,       ",",   line});   break;
             case '(':  tokens.push_back({TokenType::LPAREN,      "(",   line});   break;
             case ')':  tokens.push_back({TokenType::RPAREN,      ")",   line});   break;
+            case '.':
+                if (!atEnd() && peek() == '.') {
+                    advance();
+                    if (!atEnd() && peek() == '.') { advance(); tokens.push_back({TokenType::DOT_DOT_DOT, "...", line}); }
+                    else throw std::runtime_error("line " + std::to_string(line) + ": unexpected '..'");
+                } else {
+                    throw std::runtime_error("line " + std::to_string(line) + ": unexpected '.'");
+                }
+                break;
             case '-':  tokens.push_back({TokenType::MINUS,       "-",   line});   break;
             case '*':  tokens.push_back({TokenType::STAR,        "*",   line});   break;
             case '/':  tokens.push_back({TokenType::SLASH,       "/",   line});   break;

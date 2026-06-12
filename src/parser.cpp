@@ -61,6 +61,8 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::BREAK))   return breakStmt();
     if (check(TokenType::TRY))     return tryCatchStmt();
     if (check(TokenType::THROW))   return throwStmt();
+    if (check(TokenType::FUNC))    return funcDeclStmt();
+    if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))     return varDecl();
     if (check(TokenType::IDENTIFIER) && peekNextType() == TokenType::PLUS_EQUAL)
         return assignStmt();
@@ -181,6 +183,46 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
     return s;
 }
 
+std::unique_ptr<Stmt> Parser::funcDeclStmt() {
+    advance(); // FUNC
+    auto s = std::make_unique<FuncDeclStmt>();
+    s->name = expect(TokenType::IDENTIFIER).lexeme;
+    expect(TokenType::LPAREN);
+    while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
+        if (check(TokenType::DOT_DOT_DOT)) { advance(); s->variadic = true; break; }
+        s->params.push_back(expect(TokenType::IDENTIFIER).lexeme);
+        if (!check(TokenType::RPAREN)) expect(TokenType::COMMA);
+    }
+    expect(TokenType::RPAREN);
+    consumeLineEnd();
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->body.push_back(parseOneStmt());
+    }
+    expect(TokenType::END);
+    consumeLineEnd();
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::returnStmt() {
+    advance(); // RETURN
+    auto s = std::make_unique<ReturnStmt>();
+    if (!check(TokenType::NEWLINE) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)) {
+        if (check(TokenType::DOT_DOT_DOT)) {
+            advance(); s->spread_varargs = true;
+        } else {
+            s->values.push_back(expr());
+            while (match(TokenType::COMMA)) {
+                if (check(TokenType::DOT_DOT_DOT)) { advance(); s->spread_varargs = true; break; }
+                s->values.push_back(expr());
+            }
+        }
+    }
+    consumeLineEnd();
+    return s;
+}
+
 std::unique_ptr<Stmt> Parser::assignStmt() {
     auto s = std::make_unique<AssignStmt>();
     s->name = advance().lexeme;
@@ -251,6 +293,10 @@ std::unique_ptr<Expr> Parser::primary() {
             return call;
         }
         return std::make_unique<VarExpr>(name);
+    }
+    if (check(TokenType::DOT_DOT_DOT)) {
+        advance();
+        return std::make_unique<VarArgExpr>();
     }
     if (match(TokenType::LPAREN)) {
         auto e = expr();

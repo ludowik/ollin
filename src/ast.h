@@ -6,10 +6,10 @@
 // ── forward declarations ──────────────────────────────────────────────────────
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
-struct ThrowStmt; struct TryCatchStmt;
+struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr;
-struct VarExpr; struct BinaryExpr; struct CallExpr;
+struct VarExpr; struct BinaryExpr; struct CallExpr; struct VarArgExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -21,7 +21,9 @@ struct StmtVisitor {
     virtual void visit(const AssignStmt&)  = 0;
     virtual void visit(const ExprStmt&)    = 0;
     virtual void visit(const ThrowStmt&)   = 0;
-    virtual void visit(const TryCatchStmt&) = 0;
+    virtual void visit(const TryCatchStmt&)  = 0;
+    virtual void visit(const FuncDeclStmt&)  = 0;
+    virtual void visit(const ReturnStmt&)    = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -32,6 +34,7 @@ struct ExprVisitor {
     virtual void visit(const VarExpr&)    = 0;
     virtual void visit(const BinaryExpr&) = 0;
     virtual void visit(const CallExpr&)   = 0;
+    virtual void visit(const VarArgExpr&) = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -142,6 +145,24 @@ struct TryCatchStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> catch_body;
     std::vector<std::unique_ptr<Stmt>> else_body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct FuncDeclStmt : Stmt {
+    std::string name;
+    std::vector<std::string> params;
+    bool variadic = false;
+    std::vector<std::unique_ptr<Stmt>> body;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct ReturnStmt : Stmt {
+    std::vector<std::unique_ptr<Expr>> values;
+    bool spread_varargs = false;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct VarArgExpr : Expr {
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct Program {

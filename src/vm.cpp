@@ -151,6 +151,101 @@ void VM::execute(const Chunk& chunk) {
                 break;
             }
 
+            case Op::LOAD_LOCAL: {
+                uint16_t idx = readU16();
+                Frame& f = call_stack.back();
+                if (idx >= f.locals.size() || !f.locals_init[idx])
+                    throw std::runtime_error("runtime: variable locale non initialisée");
+                stack.push(f.locals[idx]);
+                break;
+            }
+
+            case Op::STORE_LOCAL: {
+                uint16_t idx = readU16();
+                Frame& f = call_stack.back();
+                if (idx >= f.locals.size()) {
+                    f.locals.resize(idx + 1);
+                    f.locals_init.resize(idx + 1, false);
+                }
+                f.locals[idx] = pop();
+                f.locals_init[idx] = true;
+                break;
+            }
+
+            case Op::CALL_FUNC: {
+                uint16_t addr    = readU16();
+                uint8_t  n_fixed = ch->code[ip++];
+                uint8_t  argc    = ch->code[ip++];
+                bool     variadic = ch->code[ip++] != 0;
+
+                std::vector<Value> args(argc);
+                for (int i = argc - 1; i >= 0; --i) args[i] = pop();
+
+                if (!variadic && argc > n_fixed)
+                    throw std::runtime_error("runtime: trop d'arguments");
+
+                Frame frame;
+                frame.return_ip  = ip;
+                frame.stack_base = stack.size();
+                frame.n_fixed    = n_fixed;
+                frame.locals.resize(n_fixed);
+                frame.locals_init.resize(n_fixed, false);
+                int n_init = (int)argc < n_fixed ? (int)argc : n_fixed;
+                for (int i = 0; i < n_init; ++i) {
+                    frame.locals[i]      = args[i];
+                    frame.locals_init[i] = true;
+                }
+                if (variadic) {
+                    for (int i = n_fixed; i < (int)argc; ++i)
+                        frame.varargs.push_back(std::move(args[i]));
+                }
+                call_stack.push_back(std::move(frame));
+                ip = addr;
+                break;
+            }
+
+            case Op::RETURN_N: {
+                uint8_t n = ch->code[ip++];
+                std::vector<Value> retvals(n);
+                for (int i = n - 1; i >= 0; --i) retvals[i] = pop();
+                int    rip  = call_stack.back().return_ip;
+                size_t base = call_stack.back().stack_base;
+                call_stack.pop_back();
+                while (stack.size() > base) stack.pop();
+                for (auto& v : retvals) stack.push(std::move(v));
+                ret_count = n;
+                ip = rip;
+                break;
+            }
+
+            case Op::RETURN_V: {
+                uint8_t n_explicit = ch->code[ip++];
+                int     n_varargs  = (int)call_stack.back().varargs.size();
+                int     total      = n_explicit + n_varargs;
+                std::vector<Value> retvals(total);
+                for (int i = total - 1; i >= 0; --i) retvals[i] = pop();
+                int    rip  = call_stack.back().return_ip;
+                size_t base = call_stack.back().stack_base;
+                call_stack.pop_back();
+                while (stack.size() > base) stack.pop();
+                for (auto& v : retvals) stack.push(std::move(v));
+                ret_count = total;
+                ip = rip;
+                break;
+            }
+
+            case Op::LOAD_VARARGS: {
+                for (auto& v : call_stack.back().varargs)
+                    stack.push(v);
+                break;
+            }
+
+            case Op::DISCARD_RETURNS: {
+                for (int i = 0; i < ret_count; ++i) pop();
+                ret_count = 0;
+                break;
+            }
+
             case Op::HALT:
                 return;
         }
