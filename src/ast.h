@@ -6,6 +6,7 @@
 // ── forward declarations ──────────────────────────────────────────────────────
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
+struct ThrowStmt; struct TryCatchStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr;
 struct VarExpr; struct BinaryExpr; struct CallExpr;
@@ -19,6 +20,8 @@ struct StmtVisitor {
     virtual void visit(const BreakStmt&)   = 0;
     virtual void visit(const AssignStmt&)  = 0;
     virtual void visit(const ExprStmt&)    = 0;
+    virtual void visit(const ThrowStmt&)   = 0;
+    virtual void visit(const TryCatchStmt&) = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -114,6 +117,20 @@ struct IfStmt : Stmt {
 struct WhileStmt : Stmt {
     std::unique_ptr<Expr> cond;
     std::vector<std::unique_ptr<Stmt>> body;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct ThrowStmt : Stmt {
+    std::unique_ptr<Expr> value;
+    explicit ThrowStmt(std::unique_ptr<Expr> v) : value(std::move(v)) {}
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct TryCatchStmt : Stmt {
+    std::vector<std::unique_ptr<Stmt>> try_body;
+    std::string                        catch_var;
+    std::vector<std::unique_ptr<Stmt>> catch_body;
+    std::vector<std::unique_ptr<Stmt>> else_body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

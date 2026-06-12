@@ -7,12 +7,16 @@ program        = { stmt } EOF ;
 stmt           = varDecl
                | whileStmt
                | ifStmt
+               | tryStmt
+               | throwStmt
                | assignStmt
                | exprStmt ;
 
 varDecl        = "var" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" { stmt } "end" NEWLINE ;
+tryStmt        = "try" NEWLINE { stmt } "catch" IDENT NEWLINE { stmt } [ "else" NEWLINE { stmt } ] "end" NEWLINE ;
+throwStmt      = "throw" expr NEWLINE ;
 assignStmt     = IDENT "+=" expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 

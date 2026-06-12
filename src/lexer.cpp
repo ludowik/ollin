@@ -11,6 +11,10 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"break", TokenType::BREAK},
     {"true",  TokenType::TRUE},
     {"false", TokenType::FALSE},
+    {"try",   TokenType::TRY},
+    {"catch", TokenType::CATCH},
+    {"throw", TokenType::THROW},
+    {"else",  TokenType::ELSE},
 };
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}

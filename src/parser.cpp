@@ -59,6 +59,8 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::WHILE))   return whileStmt();
     if (check(TokenType::IF))      return ifStmt();
     if (check(TokenType::BREAK))   return breakStmt();
+    if (check(TokenType::TRY))     return tryCatchStmt();
+    if (check(TokenType::THROW))   return throwStmt();
     if (check(TokenType::VAR))     return varDecl();
     if (check(TokenType::IDENTIFIER) && peekNextType() == TokenType::PLUS_EQUAL)
         return assignStmt();
@@ -115,6 +117,43 @@ std::unique_ptr<Stmt> Parser::breakStmt() {
     advance();
     consumeLineEnd();
     return std::make_unique<BreakStmt>();
+}
+
+std::unique_ptr<Stmt> Parser::throwStmt() {
+    advance(); // throw
+    auto s = std::make_unique<ThrowStmt>(expr());
+    consumeLineEnd();
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::tryCatchStmt() {
+    advance(); // try
+    auto s = std::make_unique<TryCatchStmt>();
+    consumeLineEnd();
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::CATCH) || check(TokenType::EOF_T)) break;
+        s->try_body.push_back(parseOneStmt());
+    }
+    expect(TokenType::CATCH);
+    s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
+    consumeLineEnd();
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->catch_body.push_back(parseOneStmt());
+    }
+    if (match(TokenType::ELSE)) {
+        consumeLineEnd();
+        while (true) {
+            skipNewlines();
+            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+            s->else_body.push_back(parseOneStmt());
+        }
+    }
+    expect(TokenType::END);
+    consumeLineEnd();
+    return s;
 }
 
 std::unique_ptr<Stmt> Parser::assignStmt() {

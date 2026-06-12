@@ -68,4 +68,7 @@ Ne pas documenter ce qui n'est pas encore implémenté.
 | JUMP        | addr (uint16)   | saut inconditionnel                |
 | JUMP_IF_FALSE | addr (uint16) | pop cond ; saute si 0.0            |
 | CALL        | idx, argc (u8)  | appel builtin identifiers[idx]     |
+| TRY         | addr (uint16)   | empile handler{addr, stack.size()} |
+| POP_TRY     |                 | dépile le handler (try ok)         |
+| THROW       |                 | pop value → restaure stack → jump handler |
 | HALT        |                 | arrêt                              |

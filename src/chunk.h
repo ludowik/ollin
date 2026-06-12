@@ -15,6 +15,9 @@ enum class Op : uint8_t {
     JUMP,            // uint16 addr absolu
     JUMP_IF_FALSE,   // uint16 addr absolu ; pop cond
     CALL,            // uint16 name_index, uint8 argc
+    TRY,             // uint16 catch_addr  — empile un handler
+    POP_TRY,         // dépile le handler  (try body terminé sans throw)
+    THROW,           // pop value → saute vers le handler courant
     HALT
 };
 

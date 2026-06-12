@@ -49,3 +49,26 @@ while k < 10
     k += 1
 end
 print(sum)                   ## 45
+
+## ── try/catch/throw → catch exécuté ─────────────────────────────────────────
+try
+    throw "error"
+catch err
+    print(err)               ## error
+else
+    print("no error")
+end
+
+## ── try sans throw → else exécuté ───────────────────────────────────────────
+try
+    var ok = true
+catch err
+    print("caught")
+else
+    print("all good")        ## all good
+end
+
+## ── try vide, catch vide, sans else ─────────────────────────────────────────
+try
+catch err
+end

@@ -94,6 +94,35 @@ void VM::execute(const Chunk& chunk) {
                 break;
             }
 
+            case Op::TRY: {
+                uint16_t catch_addr = readU16();
+                handler_stack.push_back({catch_addr, stack.size()});
+                break;
+            }
+
+            case Op::POP_TRY:
+                handler_stack.pop_back();
+                break;
+
+            case Op::THROW: {
+                Value thrown = pop();
+                if (handler_stack.empty()) {
+                    std::string msg = std::visit([](auto&& v) -> std::string {
+                        if constexpr (std::is_same_v<std::decay_t<decltype(v)>, std::string>)
+                            return v;
+                        else
+                            return std::to_string(v);
+                    }, thrown);
+                    throw std::runtime_error("unhandled exception: " + msg);
+                }
+                Handler h = handler_stack.back();
+                handler_stack.pop_back();
+                while (stack.size() > h.stack_size) stack.pop();
+                stack.push(thrown);
+                ip = h.catch_addr;
+                break;
+            }
+
             case Op::HALT:
                 return;
         }

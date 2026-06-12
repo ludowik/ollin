@@ -17,8 +17,10 @@ private:
     void visit(const WhileStmt&)   override;
     void visit(const IfStmt&)      override;
     void visit(const BreakStmt&)   override;
-    void visit(const AssignStmt&)  override;
-    void visit(const ExprStmt&)    override;
+    void visit(const AssignStmt&)   override;
+    void visit(const ExprStmt&)     override;
+    void visit(const ThrowStmt&)    override;
+    void visit(const TryCatchStmt&) override;
 
     // ExprVisitor
     void visit(const BoolExpr&)   override;

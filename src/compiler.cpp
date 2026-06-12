@@ -68,6 +68,43 @@ void Compiler::visit(const AssignStmt& s) {
 
 void Compiler::visit(const ExprStmt& s) { s.expr->accept(*this); }
 
+void Compiler::visit(const ThrowStmt& s) {
+    s.value->accept(*this);
+    chunk.emit(Op::THROW);
+}
+
+void Compiler::visit(const TryCatchStmt& s) {
+    // TRY  ← sera patché avec l'adresse du catch
+    size_t try_patch = chunk.emitJump(Op::TRY);
+
+    for (auto& stmt : s.try_body)
+        stmt->accept(*this);
+
+    // try body terminé sans throw : dépile le handler, saute vers else
+    chunk.emit(Op::POP_TRY);
+    size_t else_patch = chunk.emitJump(Op::JUMP);
+
+    // ── catch block ──
+    uint16_t catch_addr = static_cast<uint16_t>(chunk.currentPos());
+    chunk.patchJump(try_patch, catch_addr);
+
+    chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(s.catch_var));
+    for (auto& stmt : s.catch_body)
+        stmt->accept(*this);
+    size_t end_patch = chunk.emitJump(Op::JUMP);
+
+    // ── else block ──
+    uint16_t else_addr = static_cast<uint16_t>(chunk.currentPos());
+    chunk.patchJump(else_patch, else_addr);
+
+    for (auto& stmt : s.else_body)
+        stmt->accept(*this);
+
+    // ── end ──
+    uint16_t end_addr = static_cast<uint16_t>(chunk.currentPos());
+    chunk.patchJump(end_patch, end_addr);
+}
+
 // ── expressions ───────────────────────────────────────────────────────────────
 
 void Compiler::visit(const NumberExpr& e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value)); }

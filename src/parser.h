@@ -27,6 +27,8 @@ private:
     std::unique_ptr<Stmt> whileStmt();
     std::unique_ptr<Stmt> ifStmt();
     std::unique_ptr<Stmt> breakStmt();
+    std::unique_ptr<Stmt> tryCatchStmt();
+    std::unique_ptr<Stmt> throwStmt();
     std::unique_ptr<Stmt> assignStmt();
     std::unique_ptr<Stmt> exprStmt();
 
