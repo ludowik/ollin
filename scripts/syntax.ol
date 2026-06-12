@@ -6,6 +6,9 @@ multilignes
 
 print("hello world!")
 
+var def
+assert(def == nil)
+
 var a = 12.12
 var b, c = 1, 2
 var res = a + b
@@ -15,11 +18,32 @@ var vrai = true
 var faux = false
 
 while vrai
-    a += 1
+    a += 1 ## add
+    a -= .5 ## subtract
+    a *= 1.1 ## multiply
+    a /= 0.9 ## divide
     if a > 40 then break end
 end
 
+assert(1000.12 == 1_000.12)
+assert(1000000 == 1_000_000)
+
+while (not vrai)
+end
+
+a %= 2 ## modulo
+
+a  = -a + b * b + (a / a - 1)
+
+var exp = true or false and true or (not true)
+assert(1 == true)
+assert(0 == false)
+assert("non vide" == true)
+assert("" == false)
+
 print(a)
+
+a = 2
 
 if a == 2 then
     print("a == 2")
@@ -31,13 +55,12 @@ else
     print("le cas échéant")
 end
 
-
 try 
     throw "oulala"
 catch err
     print(err)
 else
-    ## le block else est optionnelle
+    ## le block else est optionnel
     print("all is good")
 end
 
@@ -51,3 +74,21 @@ end
 try 
 catch err
 end
+
+## déclaration d'une fonction
+
+a = 2
+func fname(arg1, arg2, ...)
+    print(arg1, arg2)
+    var a = 1 ## local, overload global a
+    return arg1, arg2, ...
+end
+fname(1, 2, 3)
+assert(a==2)
+
+
+func f2(arg1, arg2=1)
+    assert(arg1 == nil)
+    assert(arg2 == 1)
+end
+f2()

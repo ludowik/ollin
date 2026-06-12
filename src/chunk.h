@@ -39,9 +39,10 @@ public:
     Value(Value&& o) noexcept : bits(o.bits) { o.bits = NIL; }
     Value& operator=(const Value& o) {
         if (this == &o) return *this;
+        // Allouer d'abord pour être exception-safe (pas de delete avant succès)
+        std::string* new_ptr = o.isString() ? new std::string(o.asString()) : nullptr;
         if (isString()) delete strPtr();
-        bits = o.bits;
-        if (isString()) bits = mkStr(new std::string(asString()));
+        bits = new_ptr ? mkStr(new_ptr) : o.bits;
         return *this;
     }
     Value& operator=(Value&& o) noexcept {

@@ -28,8 +28,8 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
                         throw std::runtime_error("printf: index invalide '{" + spec + "}'");
                     }
                 }
-                int ai = idx + offset;
-                if (ai < (int)args.size()) out += valueToString(args[ai]);
+                long long ai = (long long)idx + offset;
+                if (ai >= 0 && ai < (long long)args.size()) out += valueToString(args[(int)ai]);
                 i = j;
                 continue;
             }
@@ -50,12 +50,18 @@ void VM::execute(const Chunk& chunk) {
     while (true) {
         Op op = static_cast<Op>(ch->code[ip++]);
         switch (op) {
-            case Op::LOAD_CONST:
-                stack.push(ch->constants[readU16()]);
+            case Op::LOAD_CONST: {
+                uint16_t idx = readU16();
+                if (idx >= ch->constants.size())
+                    throw std::runtime_error("runtime: constant index out of bounds");
+                stack.push(ch->constants[idx]);
                 break;
+            }
 
             case Op::LOAD_VAR: {
                 uint16_t idx = readU16();
+                if (idx >= ch->identifiers.size() || idx >= vars.size())
+                    throw std::runtime_error("runtime: variable index out of bounds");
                 if (!vars_init[idx])
                     throw std::runtime_error("runtime: undefined variable '" + ch->identifiers[idx] + "'");
                 stack.push(vars[idx]);
@@ -64,6 +70,8 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::STORE_VAR: {
                 uint16_t idx = readU16();
+                if (idx >= vars.size())
+                    throw std::runtime_error("runtime: variable index out of bounds");
                 vars[idx] = pop();
                 vars_init[idx] = true;
                 break;
@@ -245,6 +253,8 @@ void VM::execute(const Chunk& chunk) {
                 }
                 // Params manquants → valeur par défaut ou nil
                 if ((int)argc < n_fixed) {
+                    if (defaults_idx >= ch->func_defaults.size())
+                        throw std::runtime_error("runtime: defaults_idx hors bornes");
                     auto& defs = ch->func_defaults[defaults_idx];
                     for (int i = n_init; i < n_fixed; ++i) {
                         frame.locals[i]      = (i < (int)defs.size()) ? defs[i] : Value{};

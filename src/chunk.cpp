@@ -36,6 +36,8 @@ void Chunk::emitU8(Op op, uint8_t arg) {
 }
 
 uint16_t Chunk::addFuncDefaults(std::vector<Value> defs) {
+    if (func_defaults.size() >= 0xFFFF)
+        throw std::runtime_error("compile: trop de fonctions avec valeurs par défaut (max 65535)");
     func_defaults.push_back(std::move(defs));
     return static_cast<uint16_t>(func_defaults.size() - 1);
 }
