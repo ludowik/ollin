@@ -3,40 +3,31 @@
 
 Chunk Compiler::compile(const Program& prog) {
     for (auto& s : prog.stmts)
-        compileStmt(*s);
+        s->accept(*this);
     chunk.emit(Op::HALT);
     return std::move(chunk);
 }
 
-void Compiler::compileStmt(const Stmt& s) {
-    if      (auto* v = dynamic_cast<const VarDeclStmt*>(&s)) compileVarDecl(*v);
-    else if (auto* w = dynamic_cast<const WhileStmt*>(&s))   compileWhileStmt(*w);
-    else if (auto* i = dynamic_cast<const IfStmt*>(&s))      compileIfStmt(*i);
-    else if (dynamic_cast<const BreakStmt*>(&s))              compileBreakStmt();
-    else if (auto* a = dynamic_cast<const AssignStmt*>(&s))   compileAssignStmt(*a);
-    else if (auto* e = dynamic_cast<const ExprStmt*>(&s))    compileExprStmt(*e);
-    else if (dynamic_cast<const CommentStmt*>(&s))           { /* no-op */ }
-    else throw std::runtime_error("unknown statement type");
-}
+// ── instructions ──────────────────────────────────────────────────────────────
 
-void Compiler::compileVarDecl(const VarDeclStmt& s) {
+void Compiler::visit(const VarDeclStmt& s) {
     for (size_t i = 0; i < s.names.size(); ++i) {
         if (i < s.values.size())
-            compileExpr(*s.values[i]);
+            s.values[i]->accept(*this);
         else
             chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(0.0));
         chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(s.names[i]));
     }
 }
 
-void Compiler::compileWhileStmt(const WhileStmt& s) {
+void Compiler::visit(const WhileStmt& s) {
     auto loop_start = static_cast<uint16_t>(chunk.currentPos());
-    compileExpr(*s.cond);
+    s.cond->accept(*this);
     size_t exit_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
 
     break_patches.push_back({});
     for (auto& stmt : s.body)
-        compileStmt(*stmt);
+        stmt->accept(*this);
     chunk.emitU16(Op::JUMP, loop_start);
 
     auto exit_target = static_cast<uint16_t>(chunk.currentPos());
@@ -46,24 +37,23 @@ void Compiler::compileWhileStmt(const WhileStmt& s) {
     break_patches.pop_back();
 }
 
-void Compiler::compileIfStmt(const IfStmt& s) {
-    compileExpr(*s.cond);
+void Compiler::visit(const IfStmt& s) {
+    s.cond->accept(*this);
     size_t skip_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
-    compileStmt(*s.then);
+    s.then->accept(*this);
     chunk.patchJump(skip_patch, static_cast<uint16_t>(chunk.currentPos()));
 }
 
-void Compiler::compileBreakStmt() {
+void Compiler::visit(const BreakStmt&) {
     if (break_patches.empty())
-        throw std::runtime_error("break hors d'une boucle");
-    size_t pos = chunk.emitJump(Op::JUMP);
-    break_patches.back().push_back(pos);
+        throw std::runtime_error("line 0: break outside loop");
+    break_patches.back().push_back(chunk.emitJump(Op::JUMP));
 }
 
-void Compiler::compileAssignStmt(const AssignStmt& s) {
+void Compiler::visit(const AssignStmt& s) {
     if (s.op != '\0')
         chunk.emitU16(Op::LOAD_VAR, chunk.addIdentifier(s.name));
-    compileExpr(*s.value);
+    s.value->accept(*this);
     switch (s.op) {
         case '+': chunk.emit(Op::ADD); break;
         case '-': chunk.emit(Op::SUB); break;
@@ -75,37 +65,31 @@ void Compiler::compileAssignStmt(const AssignStmt& s) {
     chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(s.name));
 }
 
-void Compiler::compileExprStmt(const ExprStmt& s) {
-    compileExpr(*s.expr);
+void Compiler::visit(const ExprStmt& s) { s.expr->accept(*this); }
+
+// ── expressions ───────────────────────────────────────────────────────────────
+
+void Compiler::visit(const NumberExpr& e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value)); }
+void Compiler::visit(const StringExpr& e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value)); }
+void Compiler::visit(const BoolExpr&   e) { chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(e.value ? 1.0 : 0.0)); }
+void Compiler::visit(const VarExpr&    e) { chunk.emitU16(Op::LOAD_VAR,   chunk.addIdentifier(e.name)); }
+
+void Compiler::visit(const BinaryExpr& e) {
+    e.left->accept(*this);
+    e.right->accept(*this);
+    switch (e.op) {
+        case '+': chunk.emit(Op::ADD); break;
+        case '-': chunk.emit(Op::SUB); break;
+        case '*': chunk.emit(Op::MUL); break;
+        case '/': chunk.emit(Op::DIV); break;
+        case '>': chunk.emit(Op::GT);  break;
+        case '<': chunk.emit(Op::LT);  break;
+        default:  throw std::runtime_error(std::string("unknown operator: ") + e.op);
+    }
 }
 
-void Compiler::compileExpr(const Expr& e) {
-    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
-        chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(n->value));
-    } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
-        chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(s->value));
-    } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
-        chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(b->value ? 1.0 : 0.0));
-    } else if (auto* v = dynamic_cast<const VarExpr*>(&e)) {
-        chunk.emitU16(Op::LOAD_VAR, chunk.addIdentifier(v->name));
-    } else if (auto* b = dynamic_cast<const BinaryExpr*>(&e)) {
-        compileExpr(*b->left);
-        compileExpr(*b->right);
-        switch (b->op) {
-            case '+': chunk.emit(Op::ADD); break;
-            case '-': chunk.emit(Op::SUB); break;
-            case '*': chunk.emit(Op::MUL); break;
-            case '/': chunk.emit(Op::DIV); break;
-            case '>': chunk.emit(Op::GT);  break;
-            case '<': chunk.emit(Op::LT);  break;
-            default:  throw std::runtime_error(std::string("unknown operator: ") + b->op);
-        }
-    } else if (auto* c = dynamic_cast<const CallExpr*>(&e)) {
-        for (auto& arg : c->args)
-            compileExpr(*arg);
-        chunk.emitCall(chunk.addIdentifier(c->callee),
-                       static_cast<uint8_t>(c->args.size()));
-    } else {
-        throw std::runtime_error("unknown expression type");
-    }
+void Compiler::visit(const CallExpr& e) {
+    for (auto& arg : e.args)
+        arg->accept(*this);
+    chunk.emitCall(chunk.addIdentifier(e.callee), static_cast<uint8_t>(e.args.size()));
 }

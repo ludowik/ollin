@@ -3,26 +3,62 @@
 #include <string>
 #include <vector>
 
-struct Expr { virtual ~Expr() = default; };
+// ── forward declarations ──────────────────────────────────────────────────────
+struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
+struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
 
-struct StringExpr : Expr {
-    std::string value;
-    explicit StringExpr(std::string v) : value(std::move(v)) {}
+struct BoolExpr; struct NumberExpr; struct StringExpr;
+struct VarExpr; struct BinaryExpr; struct CallExpr;
+
+// ── interfaces visiteur ───────────────────────────────────────────────────────
+struct StmtVisitor {
+    virtual void visit(const CommentStmt&) = 0;
+    virtual void visit(const VarDeclStmt&) = 0;
+    virtual void visit(const WhileStmt&)   = 0;
+    virtual void visit(const IfStmt&)      = 0;
+    virtual void visit(const BreakStmt&)   = 0;
+    virtual void visit(const AssignStmt&)  = 0;
+    virtual void visit(const ExprStmt&)    = 0;
+    virtual ~StmtVisitor() = default;
 };
 
+struct ExprVisitor {
+    virtual void visit(const BoolExpr&)   = 0;
+    virtual void visit(const NumberExpr&) = 0;
+    virtual void visit(const StringExpr&) = 0;
+    virtual void visit(const VarExpr&)    = 0;
+    virtual void visit(const BinaryExpr&) = 0;
+    virtual void visit(const CallExpr&)   = 0;
+    virtual ~ExprVisitor() = default;
+};
+
+// ── classes de base ───────────────────────────────────────────────────────────
+struct Stmt { virtual void accept(StmtVisitor&) const = 0; virtual ~Stmt() = default; };
+struct Expr { virtual void accept(ExprVisitor&) const = 0; virtual ~Expr() = default; };
+
+// ── expressions ───────────────────────────────────────────────────────────────
 struct BoolExpr : Expr {
     bool value;
     explicit BoolExpr(bool v) : value(v) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct NumberExpr : Expr {
     double value;
     explicit NumberExpr(double v) : value(v) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct StringExpr : Expr {
+    std::string value;
+    explicit StringExpr(std::string v) : value(std::move(v)) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct VarExpr : Expr {
     std::string name;
     explicit VarExpr(std::string n) : name(std::move(n)) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct BinaryExpr : Expr {
@@ -30,46 +66,55 @@ struct BinaryExpr : Expr {
     std::unique_ptr<Expr> left, right;
     BinaryExpr(char o, std::unique_ptr<Expr> l, std::unique_ptr<Expr> r)
         : op(o), left(std::move(l)), right(std::move(r)) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct CallExpr : Expr {
     std::string callee;
     std::vector<std::unique_ptr<Expr>> args;
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
-struct Stmt { virtual ~Stmt() = default; };
+// ── instructions ──────────────────────────────────────────────────────────────
+struct CommentStmt : Stmt {
+    std::string text;
+    explicit CommentStmt(std::string t) : text(std::move(t)) {}
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
 
 struct VarDeclStmt : Stmt {
     std::vector<std::string> names;
     std::vector<std::unique_ptr<Expr>> values;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
 struct ExprStmt : Stmt {
     std::unique_ptr<Expr> expr;
     explicit ExprStmt(std::unique_ptr<Expr> e) : expr(std::move(e)) {}
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-struct CommentStmt : Stmt {
-    std::string text;
-    explicit CommentStmt(std::string t) : text(std::move(t)) {}
+struct AssignStmt : Stmt {
+    std::string name;
+    char        op;
+    std::unique_ptr<Expr> value;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-struct WhileStmt : Stmt {
-    std::unique_ptr<Expr> cond;
-    std::vector<std::unique_ptr<Stmt>> body;
+struct BreakStmt : Stmt {
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
 struct IfStmt : Stmt {
     std::unique_ptr<Expr> cond;
     std::unique_ptr<Stmt> then;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-struct BreakStmt : Stmt {};
-
-struct AssignStmt : Stmt {
-    std::string name;
-    char        op;   // '+' pour +=, '\0' pour =
-    std::unique_ptr<Expr> value;
+struct WhileStmt : Stmt {
+    std::unique_ptr<Expr> cond;
+    std::vector<std::unique_ptr<Stmt>> body;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
 struct Program {
