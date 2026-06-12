@@ -32,7 +32,7 @@
         },
         "builtin": {
             "name": "support.function.builtin.tau",
-            "match": "\\b(print)\\b"
+            "match": "\\b(print|time)\\b"
         },
         "number": {
             "name": "constant.numeric.tau",

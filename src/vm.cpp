@@ -1,4 +1,5 @@
 #include "vm.h"
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -79,7 +80,11 @@ void VM::execute(const Chunk& chunk) {
                 uint8_t  argc     = chunk.code[ip++];
                 const std::string& name = chunk.identifiers[name_idx];
 
-                if (name == "print") {
+                if (name == "time") {
+                    auto now = std::chrono::system_clock::now();
+                    double t = std::chrono::duration<double>(now.time_since_epoch()).count();
+                    stack.push(t);
+                } else if (name == "print") {
                     std::vector<Value> args(argc);
                     for (int i = argc - 1; i >= 0; --i)
                         args[i] = pop();

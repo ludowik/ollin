@@ -50,9 +50,13 @@ while k < 10
 end
 print(sum)                   ## 45
 
+## ── time ────────────────────────────────────────────────────────────────────
+var t = time()
+print(t)                     ## heure courante en secondes (Unix timestamp)
+
 ## ── try/catch/throw → catch exécuté ─────────────────────────────────────────
 try
-    throw "error"
+    throw "oulala"
 catch err
     print(err)               ## error
 else
