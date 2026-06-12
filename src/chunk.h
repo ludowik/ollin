@@ -1,10 +1,50 @@
 #pragma once
 #include <cstdint>
 #include <string>
-#include <variant>
 #include <vector>
 
-using Value = std::variant<double, std::string>;
+// Union taguée 16 octets (vs 32 pour std::variant<double,std::string>)
+struct Value {
+    enum class Type : uint8_t { Number, String } type;
+    union {
+        double       n;
+        std::string* s;
+    };
+
+    Value()                    : type(Type::Number), n(0.0) {}
+    Value(double v)            : type(Type::Number), n(v) {}
+    Value(std::string v)       : type(Type::String), s(new std::string(std::move(v))) {}
+
+    Value(const Value& o) : type(o.type) {
+        if (type == Type::String) s = new std::string(*o.s); else n = o.n;
+    }
+    Value(Value&& o) noexcept : type(o.type) {
+        if (type == Type::String) { s = o.s; o.s = nullptr; }
+        else n = o.n;
+        o.type = Type::Number; o.n = 0.0;
+    }
+    Value& operator=(const Value& o) {
+        if (this == &o) return *this;
+        if (type == Type::String) delete s;
+        type = o.type;
+        if (type == Type::String) s = new std::string(*o.s); else n = o.n;
+        return *this;
+    }
+    Value& operator=(Value&& o) noexcept {
+        if (this == &o) return *this;
+        if (type == Type::String) delete s;
+        type = o.type;
+        if (type == Type::String) { s = o.s; o.s = nullptr; }
+        else n = o.n;
+        o.type = Type::Number; o.n = 0.0;
+        return *this;
+    }
+    ~Value() { if (type == Type::String) delete s; }
+
+    bool isNumber() const { return type == Type::Number; }
+    bool isString() const { return type == Type::String; }
+    const std::string& asString() const { return *s; }
+};
 
 enum class Op : uint8_t {
     LOAD_CONST,      // uint16 index → constants

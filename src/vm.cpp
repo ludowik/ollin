@@ -23,12 +23,12 @@ void VM::execute(const Chunk& chunk) {
     };
 
     auto asDouble = [](const Value& v) -> double {
-        if (auto* d = std::get_if<double>(&v)) return *d;
+        if (v.isNumber()) return v.n;
         throw std::runtime_error("runtime: expected number, got string");
     };
 
     auto printValue = [](const Value& v) {
-        std::visit([](auto&& x) { std::cout << x; }, v);
+        if (v.isNumber()) std::cout << v.n; else std::cout << v.asString();
     };
 
     while (true) {
@@ -114,12 +114,7 @@ void VM::execute(const Chunk& chunk) {
             case Op::THROW: {
                 Value thrown = pop();
                 if (handler_stack.empty()) {
-                    std::string msg = std::visit([](auto&& v) -> std::string {
-                        if constexpr (std::is_same_v<std::decay_t<decltype(v)>, std::string>)
-                            return v;
-                        else
-                            return std::to_string(v);
-                    }, thrown);
+                    std::string msg = thrown.isString() ? thrown.asString() : std::to_string(thrown.n);
                     throw std::runtime_error("unhandled exception: " + msg);
                 }
                 Handler h = handler_stack.back();
