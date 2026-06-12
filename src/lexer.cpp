@@ -37,11 +37,21 @@ void Lexer::skipWhitespace() {
 Token Lexer::number(bool leading_dot) {
     int start = pos - 1;
     std::string digits;
+    bool dot_seen = leading_dot;
     if (leading_dot) digits += '.';
     else             digits += src[start];
-    while (!atEnd() && (std::isdigit(peek()) || peek() == '.' || peek() == '_')) {
-        char c = advance();
-        if (c != '_') digits += c; // underscores ignorés
+    while (!atEnd()) {
+        char c = peek();
+        if (std::isdigit(c) || c == '_') {
+            advance();
+            if (c != '_') digits += c;
+        } else if (c == '.' && !dot_seen) {
+            advance();
+            dot_seen = true;
+            digits += '.';
+        } else {
+            break;
+        }
     }
     return {TokenType::NUMBER, digits, line};
 }

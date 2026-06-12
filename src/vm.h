@@ -35,6 +35,8 @@ private:
     int                  ret_count = 0;
 
     [[gnu::always_inline]] inline uint16_t readU16() {
+        if (ip + 1 >= (int)ch->code.size())
+            throw std::runtime_error("runtime: bytecode tronqué");
         uint16_t v = (static_cast<uint16_t>(ch->code[ip]) << 8) | ch->code[ip + 1];
         ip += 2;
         return v;
@@ -42,7 +44,7 @@ private:
 
     [[gnu::always_inline]] inline Value pop() {
         if (stack.empty()) throw std::runtime_error("runtime: stack underflow");
-        Value v = std::move(const_cast<Value&>(stack.top()));
+        Value v = std::move(stack.top());
         stack.pop();
         return v;
     }
@@ -54,8 +56,8 @@ private:
     }
 
     [[gnu::always_inline]] inline void printValue(const Value& v) {
-        if (v.isNil()) std::cout << "nil";
-        else if (v.isNumber()) std::cout << v.asNum();
-        else std::cout << v.asString();
+        if (v.isNil())         std::cout << "nil";
+        else if (v.isString()) std::cout << v.asString();
+        else                   std::cout << v.asNum();
     }
 };

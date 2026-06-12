@@ -1,8 +1,11 @@
 #include "chunk.h"
 #include <algorithm>
+#include <stdexcept>
 #include <utility>
 
 uint16_t Chunk::addConstant(Value v) {
+    if (constants.size() >= 0xFFFF)
+        throw std::runtime_error("compile: trop de constantes (max 65535)");
     constants.push_back(std::move(v));
     return static_cast<uint16_t>(constants.size() - 1);
 }
@@ -11,6 +14,8 @@ uint16_t Chunk::addIdentifier(const std::string& name) {
     auto it = std::find(identifiers.begin(), identifiers.end(), name);
     if (it != identifiers.end())
         return static_cast<uint16_t>(it - identifiers.begin());
+    if (identifiers.size() >= 0xFFFF)
+        throw std::runtime_error("compile: trop d'identifiants (max 65535)");
     identifiers.push_back(name);
     return static_cast<uint16_t>(identifiers.size() - 1);
 }

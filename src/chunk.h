@@ -89,6 +89,7 @@ enum class Op : uint8_t {
     RETURN_V,        // uint8 n — n valeurs explicites + varargs
     LOAD_VARARGS,    // push tous les varargs du frame courant
     DISCARD_RETURNS, // pop ret_count valeurs
+    POP,             // dépile et jette la valeur du sommet
     HALT
 };
 

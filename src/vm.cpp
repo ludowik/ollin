@@ -5,6 +5,12 @@
 #include <stdexcept>
 #include <vector>
 
+static std::string valueToString(const Value& v) {
+    if (v.isNil())    return "nil";
+    if (v.isString()) return v.asString();
+    std::ostringstream os; os << v.asNum(); return os.str();
+}
+
 static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
     std::string out;
     int auto_idx = 0;
@@ -13,12 +19,17 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
             size_t j = fmt.find('}', i + 1);
             if (j != std::string::npos) {
                 std::string spec = fmt.substr(i + 1, j - i - 1);
-                int idx = spec.empty() ? auto_idx++ : std::stoi(spec);
-                int ai  = idx + offset;
-                if (ai < (int)args.size()) {
-                    if (args[ai].isString()) out += args[ai].asString();
-                    else { std::ostringstream os; os << args[ai].asNum(); out += os.str(); }
+                int idx;
+                if (spec.empty()) {
+                    idx = auto_idx++;
+                } else {
+                    try { idx = std::stoi(spec); }
+                    catch (...) {
+                        throw std::runtime_error("printf: index invalide '{" + spec + "}'");
+                    }
                 }
+                int ai = idx + offset;
+                if (ai < (int)args.size()) out += valueToString(args[ai]);
                 i = j;
                 continue;
             }
@@ -166,13 +177,15 @@ void VM::execute(const Chunk& chunk) {
             }
 
             case Op::POP_TRY:
+                if (handler_stack.empty())
+                    throw std::runtime_error("runtime: POP_TRY sans TRY correspondant");
                 handler_stack.pop_back();
                 break;
 
             case Op::THROW: {
                 Value thrown = pop();
                 if (handler_stack.empty()) {
-                    std::string msg = thrown.isString() ? thrown.asString() : std::to_string(thrown.asNum());
+                    std::string msg = valueToString(thrown);
                     throw std::runtime_error("unhandled exception: " + msg);
                 }
                 Handler h = handler_stack.back();
@@ -185,6 +198,7 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::LOAD_LOCAL: {
                 uint16_t idx = readU16();
+                if (call_stack.empty()) throw std::runtime_error("runtime: LOAD_LOCAL hors fonction");
                 Frame& f = call_stack.back();
                 if (idx >= f.locals.size() || !f.locals_init[idx])
                     throw std::runtime_error("runtime: variable locale non initialisée");
@@ -194,6 +208,7 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::STORE_LOCAL: {
                 uint16_t idx = readU16();
+                if (call_stack.empty()) throw std::runtime_error("runtime: STORE_LOCAL hors fonction");
                 Frame& f = call_stack.back();
                 if (idx >= f.locals.size()) {
                     f.locals.resize(idx + 1);
@@ -276,6 +291,7 @@ void VM::execute(const Chunk& chunk) {
             }
 
             case Op::LOAD_VARARGS: {
+                if (call_stack.empty()) throw std::runtime_error("runtime: LOAD_VARARGS hors fonction");
                 for (auto& v : call_stack.back().varargs)
                     stack.push(v);
                 break;
@@ -286,6 +302,10 @@ void VM::execute(const Chunk& chunk) {
                 ret_count = 0;
                 break;
             }
+
+            case Op::POP:
+                pop();
+                break;
 
             case Op::HALT:
                 return;

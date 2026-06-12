@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include <stdexcept>
+#include <unordered_set>
 
 // ── évaluation constante (pour les valeurs par défaut) ───────────────────────
 
@@ -14,9 +15,9 @@ static Value evalConstant(const Expr& e) {
 // ── helpers portée ────────────────────────────────────────────────────────────
 
 void Compiler::emitLoadVar(const std::string& name) {
-    if (current_func) {
-        auto it = current_func->local_ids.find(name);
-        if (it != current_func->local_ids.end()) {
+    if (currentFunc()) {
+        auto it = currentFunc()->local_ids.find(name);
+        if (it != currentFunc()->local_ids.end()) {
             chunk.emitU16(Op::LOAD_LOCAL, it->second);
             return;
         }
@@ -25,12 +26,12 @@ void Compiler::emitLoadVar(const std::string& name) {
 }
 
 void Compiler::emitStoreVar(const std::string& name) {
-    if (current_func) {
-        auto it = current_func->local_ids.find(name);
+    if (currentFunc()) {
+        auto it = currentFunc()->local_ids.find(name);
         int idx;
-        if (it == current_func->local_ids.end()) {
-            idx = static_cast<int>(current_func->local_ids.size());
-            current_func->local_ids[name] = idx;
+        if (it == currentFunc()->local_ids.end()) {
+            idx = static_cast<int>(currentFunc()->local_ids.size());
+            currentFunc()->local_ids[name] = idx;
         } else {
             idx = it->second;
         }
@@ -127,11 +128,19 @@ void Compiler::visit(const AssignStmt& s) {
     emitStoreVar(s.name);
 }
 
+// Builtins qui poussent une valeur de retour sur la stack
+static const std::unordered_set<std::string> s_returning_builtins = { "time" };
+
 void Compiler::visit(const ExprStmt& s) {
     s.expr->accept(*this);
     if (auto* call = dynamic_cast<const CallExpr*>(s.expr.get())) {
         if (func_table.count(call->callee))
-            chunk.emit(Op::DISCARD_RETURNS);
+            chunk.emit(Op::DISCARD_RETURNS);        // fonction utilisateur
+        else if (s_returning_builtins.count(call->callee))
+            chunk.emit(Op::POP);                    // builtin avec retour (time)
+        // print/printf/assert/… : CALL n'empile rien → rien à dépiler
+    } else {
+        chunk.emit(Op::POP); // expression pure en statement : résultat jeté
     }
 }
 
@@ -155,7 +164,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     uint16_t catch_addr = static_cast<uint16_t>(chunk.currentPos());
     chunk.patchJump(try_patch, catch_addr);
 
-    chunk.emitU16(Op::STORE_VAR, chunk.addIdentifier(s.catch_var));
+    emitStoreVar(s.catch_var);
     for (auto& stmt : s.catch_body)
         stmt->accept(*this);
     size_t end_patch = chunk.emitJump(Op::JUMP);
@@ -233,18 +242,19 @@ void Compiler::visit(const FuncDeclStmt& s) {
     size_t jump_patch = chunk.emitJump(Op::JUMP);
     info.addr = static_cast<int>(chunk.currentPos());
     func_table[s.name] = info;
-    current_func = &func_table[s.name];
+    auto outer_name    = current_func_name; // sauvegarde du contexte englobant
+    current_func_name  = s.name;
 
     for (auto& stmt : s.body)
         stmt->accept(*this);
     chunk.emitU8(Op::RETURN_N, 0); // return implicite
 
-    current_func = nullptr;
+    current_func_name = outer_name; // restauration
     chunk.patchJump(jump_patch, static_cast<uint16_t>(chunk.currentPos()));
 }
 
 void Compiler::visit(const ReturnStmt& s) {
-    if (!current_func)
+    if (!currentFunc())
         throw std::runtime_error("return en dehors d'une fonction");
     for (auto& v : s.values)
         v->accept(*this);
@@ -268,7 +278,7 @@ void Compiler::visit(const NilExpr&) {
 }
 
 void Compiler::visit(const VarArgExpr&) {
-    if (!current_func || !current_func->variadic)
+    if (!currentFunc() || !currentFunc()->variadic)
         throw std::runtime_error("... hors d'une fonction variadique");
     chunk.emit(Op::LOAD_VARARGS);
 }

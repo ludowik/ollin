@@ -22,7 +22,13 @@ private:
         std::unordered_map<std::string, int> local_ids;
     };
     std::unordered_map<std::string, FuncInfo> func_table;
-    FuncInfo* current_func = nullptr;
+    std::string current_func_name; // "" = portée globale
+
+    FuncInfo* currentFunc() {
+        if (current_func_name.empty()) return nullptr;
+        auto it = func_table.find(current_func_name);
+        return it != func_table.end() ? &it->second : nullptr;
+    }
 
     void emitLoadVar (const std::string& name);
     void emitStoreVar(const std::string& name);
