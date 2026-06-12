@@ -6,6 +6,7 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"var",   TokenType::VAR},
     {"while", TokenType::WHILE},
     {"if",    TokenType::IF},
+    {"then",  TokenType::THEN},
     {"end",   TokenType::END},
     {"break", TokenType::BREAK},
     {"true",  TokenType::TRUE},

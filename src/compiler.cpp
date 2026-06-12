@@ -40,7 +40,8 @@ void Compiler::visit(const WhileStmt& s) {
 void Compiler::visit(const IfStmt& s) {
     s.cond->accept(*this);
     size_t skip_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
-    s.then->accept(*this);
+    for (auto& stmt : s.body)
+        stmt->accept(*this);
     chunk.patchJump(skip_patch, static_cast<uint16_t>(chunk.currentPos()));
 }
 

@@ -4,11 +4,10 @@
 
 ## ── strings ──────────────────────────────────────────────────────────────────
 print("hello world!")        ## hello world!
-print("tau v0.1")            ## tau v0.1
 
 ## ── arithmétique ─────────────────────────────────────────────────────────────
 var x = 2 + 3 * 4
-print(x)                     ## 14  (priorité * avant +)
+print(x)                     ## 14
 
 var a, b = 10, 3
 print(a - b)                 ## 7
@@ -18,11 +17,27 @@ var p, q = 6, 7
 print(p)                     ## 6
 print(q)                     ## 7
 
-## ── while + break ────────────────────────────────────────────────────────────
+## ── booleans via variables ───────────────────────────────────────────────────
+var vrai = true
+var faux = false
+print(vrai)                  ## 1
+print(faux)                  ## 0
+
+## ── if then end ──────────────────────────────────────────────────────────────
+var n = 5
+if n > 3 then
+    print("n > 3")           ## n > 3
+end
+
+if faux then
+    print("jamais")
+end
+
+## ── while + if + break ───────────────────────────────────────────────────────
 var i = 0
-while true
+while vrai
     i += 1
-    if i > 4 break
+    if i > 4 then break end
 end
 print(i)                     ## 5
 
@@ -33,11 +48,4 @@ while k < 10
     sum += k
     k += 1
 end
-print(sum)                   ## 45  (1+2+…+9)
-
-## ── booleans ─────────────────────────────────────────────────────────────────
-print(true)                  ## 1
-print(false)                 ## 0
-
-## ── expression parenthésée ───────────────────────────────────────────────────
-print(2 * (3 + 4))           ## 14
+print(sum)                   ## 45

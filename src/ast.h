@@ -107,7 +107,7 @@ struct BreakStmt : Stmt {
 
 struct IfStmt : Stmt {
     std::unique_ptr<Expr> cond;
-    std::unique_ptr<Stmt> then;
+    std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

@@ -97,10 +97,17 @@ std::unique_ptr<Stmt> Parser::whileStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::ifStmt() {
-    advance();
+    advance(); // IF
     auto s = std::make_unique<IfStmt>();
     s->cond = expr();
-    s->then = parseOneStmt();
+    expect(TokenType::THEN);
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->body.push_back(parseOneStmt());
+    }
+    expect(TokenType::END);
+    consumeLineEnd();
     return s;
 }
 

@@ -11,9 +11,12 @@ var b, c = 1, 2
 var res = a + b
 print(res)
 
-while true 
+var vrai = true
+var faux = false
+
+while vrai
     a += 1
-    if a > 40 break
+    if a > 40 then break end
 end
 
 print(a)

@@ -12,7 +12,7 @@ stmt           = varDecl
 
 varDecl        = "var" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
-ifStmt         = "if" expr stmt ;
+ifStmt         = "if" expr "then" { stmt } "end" NEWLINE ;
 assignStmt     = IDENT "+=" expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 

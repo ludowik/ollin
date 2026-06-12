@@ -28,7 +28,7 @@
         },
         "keyword": {
             "name": "keyword.control.tau",
-            "match": "\\b(var|while|if|end|break|true|false)\\b"
+            "match": "\\b(var|while|if|then|end|break|true|false)\\b"
         },
         "builtin": {
             "name": "support.function.builtin.tau",
