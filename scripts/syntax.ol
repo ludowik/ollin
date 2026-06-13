@@ -92,3 +92,13 @@ func f2(arg1, arg2=1)
     assert(arg2 == 1)
 end
 f2()
+
+for i in 1..10
+		print(i)
+end
+
+for i=1,10
+		print(i)
+end
+
+
