@@ -5,6 +5,26 @@
 #include <stdexcept>
 #include <vector>
 
+// Taille des opérandes (octets hors opcode) par opcode, indexé par octet brut.
+// 0 pour les opcodes sans opérande et pour les valeurs inconnues (≥33).
+// Ordre : doit rester synchronisé avec enum class Op dans chunk.h.
+static constexpr uint8_t s_operand_sizes[256] = {
+    2, 2, 2,          // LOAD_CONST, LOAD_VAR, STORE_VAR
+    0, 0, 0, 0, 0,    // ADD, SUB, MUL, DIV, MOD
+    0, 0,             // NEGATE, NOT_OP
+    0, 0,             // OR_OP, AND_OP
+    0, 0, 0, 0, 0, 0, // GT, LT, GE, LE, NEQ, EQ
+    2, 2,             // JUMP, JUMP_IF_FALSE
+    3,                // CALL  (u16 name + u8 argc)
+    2,                // TRY   (u16 catch_addr)
+    0, 0,             // POP_TRY, THROW
+    2, 2,             // LOAD_LOCAL, STORE_LOCAL
+    7,                // CALL_FUNC (u16+u8+u8+u8+u16)
+    1, 1,             // RETURN_N, RETURN_V
+    0, 0, 0, 0,       // LOAD_VARARGS, DISCARD_RETURNS, POP, HALT
+    // [33..255] → 0 par zero-initialisation
+};
+
 static std::string valueToString(const Value& v) {
     if (v.isNil())    return "nil";
     if (v.isString()) return v.asString();
@@ -48,8 +68,13 @@ void VM::execute(const Chunk& chunk) {
     vars_init.assign(chunk.identifiers.size(), false);
 
     while (true) {
-        checkBounds(1);
-        Op op = static_cast<Op>(readU8());
+        if (ip >= (int)ch->code.size())
+            throw std::runtime_error("runtime: bytecode tronqué");
+        uint8_t raw = ch->code[ip];
+        if (ip + 1 + s_operand_sizes[raw] > (int)ch->code.size())
+            throw std::runtime_error("runtime: instruction tronquée");
+        Op op = static_cast<Op>(raw);
+        ip++;
         switch (op) {
             case Op::LOAD_CONST: {
                 uint16_t idx = readU16();
@@ -322,6 +347,9 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::HALT:
                 return;
+
+            default:
+                throw std::runtime_error("runtime: opcode inconnu (" + std::to_string(raw) + ")");
         }
     }
 }
