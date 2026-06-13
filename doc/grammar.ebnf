@@ -6,6 +6,7 @@ program        = { stmt } EOF ;
 
 stmt           = varDecl
                | whileStmt
+               | forStmt
                | ifStmt
                | tryStmt
                | throwStmt
@@ -16,6 +17,8 @@ stmt           = varDecl
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
+forStmt        = "for" IDENT "in" expr ".." expr NEWLINE { stmt } "end" NEWLINE
+               | "for" IDENT "=" expr "," expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]

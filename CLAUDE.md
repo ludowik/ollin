@@ -72,3 +72,16 @@ Ne pas documenter ce qui n'est pas encore implémenté.
 | POP_TRY     |                 | dépile le handler (try ok)         |
 | THROW       |                 | pop value → restaure stack → jump handler |
 | HALT        |                 | arrêt                              |
+
+## Boucle `for`
+
+Deux syntaxes, même sémantique (step = 1, bornes inclusives) :
+
+```
+for i in start..end   ## range avec opérateur ..
+for i=start,end       ## style numérique
+```
+
+Compilées en desugaring while dans `compiler.cpp::visit(ForStmt)`.  
+Variable de fin générée automatiquement : `__for_end_N` (N = compteur unique).  
+`break` fonctionne dans les deux formes.

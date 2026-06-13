@@ -33,6 +33,7 @@ private:
     std::unique_ptr<Stmt> returnStmt();
     std::unique_ptr<Stmt> assignStmt();
     std::unique_ptr<Stmt> exprStmt();
+    std::unique_ptr<Stmt> forStmt();
 
     std::unique_ptr<Expr> expr();
     std::unique_ptr<Expr> logical();

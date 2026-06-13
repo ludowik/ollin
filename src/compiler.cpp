@@ -273,6 +273,40 @@ void Compiler::visit(const UnaryExpr& e) {
     else throw std::runtime_error(std::string("unknown unary op: ") + e.op);
 }
 
+void Compiler::visit(const ForStmt& s) {
+    std::string end_var = "__for_end_" + std::to_string(for_counter_++);
+
+    s.start->accept(*this);
+    emitStoreVar(s.var);
+
+    s.end->accept(*this);
+    emitStoreVar(end_var);
+
+    auto loop_start = static_cast<uint16_t>(chunk.currentPos());
+
+    emitLoadVar(s.var);
+    emitLoadVar(end_var);
+    chunk.emit(Op::LE);
+    size_t exit_patch = chunk.emitJump(Op::JUMP_IF_FALSE);
+
+    break_patches.push_back({});
+    for (auto& stmt : s.body)
+        stmt->accept(*this);
+
+    emitLoadVar(s.var);
+    chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(Value(1.0)));
+    chunk.emit(Op::ADD);
+    emitStoreVar(s.var);
+
+    chunk.emitU16(Op::JUMP, loop_start);
+
+    auto exit_target = static_cast<uint16_t>(chunk.currentPos());
+    chunk.patchJump(exit_patch, exit_target);
+    for (size_t p : break_patches.back())
+        chunk.patchJump(p, exit_target);
+    break_patches.pop_back();
+}
+
 void Compiler::visit(const NilExpr&) {
     chunk.emitU16(Op::LOAD_CONST, chunk.addConstant(Value{}));
 }

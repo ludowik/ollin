@@ -21,6 +21,8 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"or",     TokenType::OR},
     {"and",    TokenType::AND},
     {"not",    TokenType::NOT},
+    {"for",    TokenType::FOR},
+    {"in",     TokenType::IN},
 };
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}
@@ -46,6 +48,8 @@ Token Lexer::number(bool leading_dot) {
             advance();
             if (c != '_') digits += c;
         } else if (c == '.' && !dot_seen) {
+            // Don't consume if it's a range operator (..)
+            if (pos + 1 < (int)src.size() && src[pos + 1] == '.') break;
             advance();
             dot_seen = true;
             digits += '.';
@@ -115,7 +119,7 @@ std::vector<Token> Lexer::tokenize() {
                 if (!atEnd() && peek() == '.') {
                     advance();
                     if (!atEnd() && peek() == '.') { advance(); tokens.push_back({TokenType::DOT_DOT_DOT, "...", line}); }
-                    else throw std::runtime_error("line " + std::to_string(line) + ": unexpected '..'");
+                    else tokens.push_back({TokenType::DOT_DOT, "..", line});
                 } else if (!atEnd() && std::isdigit(peek())) {
                     tokens.push_back(number(true)); // .5 → nombre à virgule
                 } else {

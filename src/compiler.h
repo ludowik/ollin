@@ -12,6 +12,7 @@ public:
 private:
     Chunk chunk;
     std::vector<std::vector<size_t>> break_patches;
+    int for_counter_ = 0;
 
     // ── portée des fonctions ────────────────────────────────────────────────
     struct FuncInfo {
@@ -44,7 +45,8 @@ private:
     void visit(const ThrowStmt&)    override;
     void visit(const TryCatchStmt&) override;
     void visit(const FuncDeclStmt&) override;
-    void visit(const ReturnStmt&)   override;
+    void visit(const ReturnStmt&)    override;
+    void visit(const ForStmt&)       override;
 
     // ExprVisitor
     void visit(const BoolExpr&)   override;
