@@ -275,7 +275,7 @@ assert(fwith_defaults(5, 5) == 10, "no default")
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0
-while count < 1000000
+while count < 1_000_000
     count += 1
 end
 var t1 = time()

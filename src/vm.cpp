@@ -48,7 +48,7 @@ void VM::execute(const Chunk& chunk) {
     vars_init.assign(chunk.identifiers.size(), false);
 
     while (true) {
-        Op op = static_cast<Op>(ch->code[ip++]);
+        Op op = static_cast<Op>(readU8());
         switch (op) {
             case Op::LOAD_CONST: {
                 uint16_t idx = readU16();
@@ -143,7 +143,7 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::CALL: {
                 uint16_t name_idx = readU16();
-                uint8_t  argc     = ch->code[ip++];
+                uint8_t  argc     = readU8();
                 const std::string& name = ch->identifiers[name_idx];
 
                 if (name == "assert") {
@@ -229,9 +229,9 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::CALL_FUNC: {
                 uint16_t addr         = readU16();
-                uint8_t  n_fixed      = ch->code[ip++];
-                uint8_t  argc         = ch->code[ip++];
-                bool     variadic     = ch->code[ip++] != 0;
+                uint8_t  n_fixed      = readU8();
+                uint8_t  argc         = readU8();
+                bool     variadic     = readU8() != 0;
                 uint16_t defaults_idx = readU16();
 
                 std::vector<Value> args(argc);
@@ -265,13 +265,15 @@ void VM::execute(const Chunk& chunk) {
                     for (int i = n_fixed; i < (int)argc; ++i)
                         frame.varargs.push_back(std::move(args[i]));
                 }
+                if (call_stack.size() >= 1000)
+                    throw std::runtime_error("runtime: stack overflow (profondeur max 1000)");
                 call_stack.push_back(std::move(frame));
                 ip = addr;
                 break;
             }
 
             case Op::RETURN_N: {
-                uint8_t n = ch->code[ip++];
+                uint8_t n = readU8();
                 std::vector<Value> retvals(n);
                 for (int i = n - 1; i >= 0; --i) retvals[i] = pop();
                 int    rip  = call_stack.back().return_ip;
@@ -285,7 +287,7 @@ void VM::execute(const Chunk& chunk) {
             }
 
             case Op::RETURN_V: {
-                uint8_t n_explicit = ch->code[ip++];
+                uint8_t n_explicit = readU8();
                 int     n_varargs  = (int)call_stack.back().varargs.size();
                 int     total      = n_explicit + n_varargs;
                 std::vector<Value> retvals(total);
