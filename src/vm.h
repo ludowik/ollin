@@ -34,18 +34,18 @@ private:
     std::vector<Frame>   call_stack;
     int                  ret_count = 0;
 
-    [[gnu::always_inline]] inline uint8_t readU8() {
-        if (ip >= (int)ch->code.size())
-            throw std::runtime_error("runtime: bytecode tronqué");
-        return ch->code[ip++];
-    }
-
+    // Lecture sans vérification — sûre uniquement après checkBounds(n)
+    [[gnu::always_inline]] inline uint8_t  readU8()  { return ch->code[ip++]; }
     [[gnu::always_inline]] inline uint16_t readU16() {
-        if (ip + 1 >= (int)ch->code.size())
-            throw std::runtime_error("runtime: bytecode tronqué");
         uint16_t v = (static_cast<uint16_t>(ch->code[ip]) << 8) | ch->code[ip + 1];
         ip += 2;
         return v;
+    }
+
+    // Vérifie qu'il reste au moins n octets à partir de ip
+    [[gnu::always_inline]] inline void checkBounds(int n) {
+        if (ip + n > (int)ch->code.size())
+            throw std::runtime_error("runtime: bytecode tronqué");
     }
 
     [[gnu::always_inline]] inline Value pop() {

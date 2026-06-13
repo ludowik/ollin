@@ -48,6 +48,7 @@ void VM::execute(const Chunk& chunk) {
     vars_init.assign(chunk.identifiers.size(), false);
 
     while (true) {
+        checkBounds(1);
         Op op = static_cast<Op>(readU8());
         switch (op) {
             case Op::LOAD_CONST: {
