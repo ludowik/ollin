@@ -272,6 +272,75 @@ assert(fwith_defaults() == 30, "defaults x+y")
 assert(fwith_defaults(5) == 25, "partial default")
 assert(fwith_defaults(5, 5) == 10, "no default")
 
+## ── for in (range) ──────────────────────────────────────────────────────────
+var for_sum = 0
+for i in 1..10
+    for_sum += i
+end
+assert(for_sum == 55, "for in 1..10")
+
+## ── for numérique sans step ──────────────────────────────────────────────────
+var for_sum2 = 0
+for j=1,10
+    for_sum2 += j
+end
+assert(for_sum2 == 55, "for j=1,10")
+
+## ── for avec step positif ────────────────────────────────────────────────────
+var for_step = 0
+for k=1,10,2
+    for_step += k
+end
+assert(for_step == 25, "for k=1,10,2 (1+3+5+7+9)")
+
+## ── for avec step négatif ────────────────────────────────────────────────────
+var for_rev = 0
+for m=5,1,-1
+    for_rev += m
+end
+assert(for_rev == 15, "for m=5,1,-1 (5+4+3+2+1)")
+
+## ── for break ────────────────────────────────────────────────────────────────
+var for_break = 0
+for i in 1..100
+    if i > 5 then break end
+    for_break += i
+end
+assert(for_break == 15, "for break at 5")
+
+## ── map : création et accès ──────────────────────────────────────────────────
+var m = {"a": 1, "b": 2}
+assert(m["a"] == 1, "map get a")
+assert(m["b"] == 2, "map get b")
+assert(m["x"] == nil, "clé absente → nil")
+
+## ── map : set index ──────────────────────────────────────────────────────────
+m["c"] = 3
+assert(m["c"] == 3, "map set c")
+
+## ── map : compound assignment ────────────────────────────────────────────────
+m["a"] += 10
+assert(m["a"] == 11, "map compound +=")
+m["b"] *= 3
+assert(m["b"] == 6, "map compound *=")
+
+## ── map : map vide ───────────────────────────────────────────────────────────
+var empty = {}
+assert(empty["x"] == nil, "map vide → nil")
+empty["x"] = 42
+assert(empty["x"] == 42, "map vide → set")
+
+## ── map : isFalsy ────────────────────────────────────────────────────────────
+assert(not (not {}) == 1, "map is truthy")
+
+## ── entiers natifs ───────────────────────────────────────────────────────────
+assert(1 + 2 == 3, "int + int → int")
+assert(10 - 3 == 7, "int - int → int")
+assert(6 * 7 == 42, "int * int → int")
+assert(10 % 3 == 1, "int % int → int")
+var fdiv = 7 / 2
+assert(fdiv == 3.5, "int / int → float")
+
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0
