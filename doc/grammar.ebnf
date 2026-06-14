@@ -32,6 +32,7 @@ returnStmt     = "return" [ retvals ] NEWLINE ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
+indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 
 expr           = logical ;
@@ -45,11 +46,13 @@ primary        = NUMBER
                | STRING
                | BOOL
                | NIL
-               | IDENT
-               | call
+               | IDENT { "[" expr "]" }
+               | call  { "[" expr "]" }
+               | mapLit { "[" expr "]" }
                | "..."
                | "(" expr ")" ;
 
+mapLit         = "{" [ STRING ":" expr { "," STRING ":" expr } ] "}" ;
 call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;

@@ -92,6 +92,9 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | TRY           | ABx    | A=catch_reg, Bx=catch_addr | empile handler{catch_addr, catch_reg}            |
 | POP_TRY       | —      |                            | dépile le handler (try body ok)                  |
 | THROW         | A      | A=value_reg                | lance R[A] → restaure frame → jump handler      |
+| NEW_MAP       | A      | A=dest                     | R[A] = nouvelle map vide                         |
+| GET_INDEX     | ABC    | A=dst, B=map, C=key        | R[A] = R[B][R[C]]  (B=map, C=key string)        |
+| SET_INDEX     | ABC    | A=map, B=key, C=val        | R[A][R[B]] = R[C]  (A=map, B=key string)        |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -118,6 +121,22 @@ Step présent → condition runtime `(end - i) * step >= 0` (valide dans les deu
 Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires au-dessus de `locals_top_`.  
 En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
 `break` fonctionne dans toutes les formes.
+
+## Type map
+
+Syntaxe JSON-like, clés toujours des chaînes :
+
+```
+var t = {}                      ## map vide
+var m = {"a": 1, "b": 2}       ## literal
+print(m["a"])                   ## GET_INDEX
+m["c"] = 3                      ## SET_INDEX
+m["a"] += 10                    ## compound : GET_INDEX + op + SET_INDEX
+```
+
+Implémentation : `OllinMap { unordered_map<string, Value> data; int refcount; }`, pointeur 48-bit dans le NaN-boxing (MTAG = 0x7FFE).  
+Sémantique de copie : référence comptée (partage de la même map, pas clone).  
+`isFalsy(map)` → toujours `false`.
 
 ## Type entier natif
 
