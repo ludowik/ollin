@@ -3,13 +3,14 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include "string_table.h"
 
 // Tagged union Value — 16 octets (tag + union 8 octets).
 //
 //   NIL     : tag == T_NIL
 //   Integer : tag == T_INTEGER  → int64_t  (range ±2^63)
 //   Float   : tag == T_FLOAT    → double IEEE 754
-//   String  : tag == T_STRING   → std::string*  (heap, owned)
+//   String  : tag == T_STRING   → const std::string*  (internée, non-owning)
 //   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
 //   Array   : tag == T_ARRAY    → OllinArray*   (heap, ref-counted, 1-based)
 
@@ -19,11 +20,11 @@ struct OllinArray;
 struct Value {
     uint8_t tag;
     union {
-        int64_t      ival;
-        double       dval;
-        std::string* sptr;
-        Map*         mptr;
-        OllinArray*  aptr;
+        int64_t            ival;
+        double             dval;
+        const std::string* sptr;  // pointe vers la string_table (non-owning)
+        Map*               mptr;
+        OllinArray*        aptr;
     };
 
     static constexpr uint8_t T_NIL     = 0;
@@ -41,7 +42,7 @@ public:
     Value()              : tag(T_NIL), ival(0) {}
     Value(double d)      : tag(T_FLOAT), dval(d) {}
     Value(int64_t v)     : tag(T_INTEGER), ival(v) {}
-    Value(std::string v) : tag(T_STRING), sptr(new std::string(std::move(v))) {}
+    Value(std::string v) : tag(T_STRING), sptr(intern(std::move(v))) {}
 
     Value(const Value& o);
     Value(Value&& o) noexcept : tag(o.tag), ival(o.ival) { o.tag = T_NIL; }
@@ -136,16 +137,23 @@ inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
         case T_NIL:     break;
         case T_INTEGER: ival = o.ival; break;
         case T_FLOAT:   dval = o.dval; break;
-        case T_STRING:  sptr = new std::string(*o.sptr); break;
+        case T_STRING:  sptr = o.sptr; string_table().retain(sptr); break;
         case T_MAP:     mptr = o.mptr; mptr->refcount++; break;
         case T_ARRAY:   aptr = o.aptr; aptr->refcount++; break;
     }
 }
 inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
-    std::string* new_s = (o.tag == T_STRING) ? new std::string(*o.sptr) : nullptr;
+    // Retain d'abord (protège si this et o partagent la même ressource)
+    switch (o.tag) {
+        case T_STRING: string_table().retain(o.sptr); break;
+        case T_MAP:    o.mptr->refcount++;             break;
+        case T_ARRAY:  o.aptr->refcount++;             break;
+        default: break;
+    }
+    // Release de l'ancienne valeur
     switch (tag) {
-        case T_STRING: delete sptr; break;
+        case T_STRING: string_table().release(sptr); break;
         case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
@@ -155,16 +163,17 @@ inline Value& Value::operator=(const Value& o) {
         case T_NIL:     break;
         case T_INTEGER: ival = o.ival; break;
         case T_FLOAT:   dval = o.dval; break;
-        case T_STRING:  sptr = new_s; break;
-        case T_MAP:     mptr = o.mptr; mptr->refcount++; break;
-        case T_ARRAY:   aptr = o.aptr; aptr->refcount++; break;
+        case T_STRING:  sptr = o.sptr; break;
+        case T_MAP:     mptr = o.mptr; break;
+        case T_ARRAY:   aptr = o.aptr; break;
     }
     return *this;
 }
 inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
+    // Release de l'ancienne valeur (on prend possession de la référence de o)
     switch (tag) {
-        case T_STRING: delete sptr; break;
+        case T_STRING: string_table().release(sptr); break;
         case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
@@ -174,7 +183,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
 }
 inline Value::~Value() {
     switch (tag) {
-        case T_STRING: delete sptr; break;
+        case T_STRING: string_table().release(sptr); break;
         case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;

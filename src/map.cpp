@@ -10,7 +10,7 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
             if (static_cast<double>(i) == d) return std::hash<int64_t>{}(i);
             return std::hash<double>{}(d);
         }
-        case Value::T_STRING:  return std::hash<std::string>{}(v.asString());
+        case Value::T_STRING:  return std::hash<const std::string*>{}(v.sptr);
         case Value::T_MAP:     return std::hash<void*>{}((void*)v.mptr);
         case Value::T_ARRAY:   return std::hash<void*>{}((void*)v.aptr);
         default:               return 0;
@@ -23,7 +23,7 @@ bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
             case Value::T_NIL:     return true;
             case Value::T_INTEGER: return a.asInt()    == b.asInt();
             case Value::T_FLOAT:   return a.asFloat()  == b.asFloat();
-            case Value::T_STRING:  return a.asString() == b.asString();
+            case Value::T_STRING:  return a.sptr == b.sptr;  // pointeurs identiques = même chaîne
             case Value::T_MAP:     return a.mptr == b.mptr;
             case Value::T_ARRAY:   return a.aptr == b.aptr;
             default:               return false;
