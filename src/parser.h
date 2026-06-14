@@ -11,6 +11,7 @@ public:
 private:
     std::vector<Token> tokens;
     int pos = 0;
+    int paren_depth_ = 0;
 
     Token peek() const;
     Token advance();

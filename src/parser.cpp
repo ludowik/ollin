@@ -366,10 +366,12 @@ std::unique_ptr<Stmt> Parser::exprStmt() {
 std::unique_ptr<Expr> Parser::expr() { return logical(); }
 
 std::unique_ptr<Expr> Parser::logical() {
-    // or < and (and has higher precedence)
     auto left = logicalAnd();
-    while (check(TokenType::OR)) {
+    while (true) {
+        if (paren_depth_ > 0) skipNewlines();
+        if (!check(TokenType::OR)) break;
         advance();
+        if (paren_depth_ > 0) skipNewlines();
         left = std::make_unique<BinaryExpr>('|', std::move(left), logicalAnd());
     }
     return left;
@@ -377,8 +379,11 @@ std::unique_ptr<Expr> Parser::logical() {
 
 std::unique_ptr<Expr> Parser::logicalAnd() {
     auto left = comparison();
-    while (check(TokenType::AND)) {
+    while (true) {
+        if (paren_depth_ > 0) skipNewlines();
+        if (!check(TokenType::AND)) break;
         advance();
+        if (paren_depth_ > 0) skipNewlines();
         left = std::make_unique<BinaryExpr>('&', std::move(left), comparison());
     }
     return left;
@@ -386,15 +391,18 @@ std::unique_ptr<Expr> Parser::logicalAnd() {
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto left = additive();
-    while (check(TokenType::GREATER) || check(TokenType::LESS) ||
-           check(TokenType::GREATER_EQUAL) || check(TokenType::LESS_EQUAL) ||
-           check(TokenType::EQUAL_EQUAL) || check(TokenType::NOT_EQUAL)) {
+    while (true) {
+        if (paren_depth_ > 0) skipNewlines();
+        if (!check(TokenType::GREATER) && !check(TokenType::LESS) &&
+            !check(TokenType::GREATER_EQUAL) && !check(TokenType::LESS_EQUAL) &&
+            !check(TokenType::EQUAL_EQUAL) && !check(TokenType::NOT_EQUAL)) break;
         char op;
-        if      (check(TokenType::EQUAL_EQUAL))  { advance(); op = '='; }
-        else if (check(TokenType::GREATER_EQUAL)) { advance(); op = 'G'; }
-        else if (check(TokenType::LESS_EQUAL))    { advance(); op = 'L'; }
-        else if (check(TokenType::NOT_EQUAL))     { advance(); op = 'N'; }
+        if      (check(TokenType::EQUAL_EQUAL))   { advance(); op = '='; }
+        else if (check(TokenType::GREATER_EQUAL))  { advance(); op = 'G'; }
+        else if (check(TokenType::LESS_EQUAL))     { advance(); op = 'L'; }
+        else if (check(TokenType::NOT_EQUAL))      { advance(); op = 'N'; }
         else op = advance().lexeme[0];
+        if (paren_depth_ > 0) skipNewlines();
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }
     return left;
@@ -402,8 +410,11 @@ std::unique_ptr<Expr> Parser::comparison() {
 
 std::unique_ptr<Expr> Parser::additive() {
     auto left = multiplicative();
-    while (check(TokenType::PLUS) || check(TokenType::MINUS)) {
+    while (true) {
+        if (paren_depth_ > 0) skipNewlines();
+        if (!check(TokenType::PLUS) && !check(TokenType::MINUS)) break;
         char op = advance().lexeme[0];
+        if (paren_depth_ > 0) skipNewlines();
         left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
     }
     return left;
@@ -411,8 +422,11 @@ std::unique_ptr<Expr> Parser::additive() {
 
 std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = unary();
-    while (check(TokenType::STAR) || check(TokenType::SLASH) || check(TokenType::PERCENT)) {
+    while (true) {
+        if (paren_depth_ > 0) skipNewlines();
+        if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::PERCENT)) break;
         char op = advance().lexeme[0];
+        if (paren_depth_ > 0) skipNewlines();
         left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
     }
     return left;
@@ -527,8 +541,12 @@ std::unique_ptr<Expr> Parser::primary() {
         return base;
     }
     if (match(TokenType::LPAREN)) {
+        paren_depth_++;
+        skipNewlines();
         auto e = expr();
+        skipNewlines();
         expect(TokenType::RPAREN);
+        paren_depth_--;
         return e;
     }
     throw std::runtime_error("line " + std::to_string(peek().line) +
