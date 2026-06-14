@@ -122,3 +122,7 @@ m["a"] += 10                 ## compound index assignment
 assert(m["a"] == 11)
 assert(m["c"] == 3)
 m.c = 4 ## équivalent a m["c"] 
+
+for k,v in m
+		print(k, v)
+end
