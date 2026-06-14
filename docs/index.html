@@ -224,11 +224,89 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
 .two-col pre { margin: 0; }
 .two-col .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+
+/* ── hamburger (mobile only) ─────────────────────────────────────────────── */
+.hamburger {
+  display: none;
+  position: fixed;
+  top: 14px; left: 14px;
+  z-index: 200;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 40px; height: 40px;
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-direction: column; gap: 5px;
+  padding: 8px;
+}
+.hamburger span {
+  display: block; width: 100%; height: 2px;
+  background: var(--text);
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+.hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.hamburger.open span:nth-child(2) { opacity: 0; }
+.hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+/* ── backdrop ────────────────────────────────────────────────────────────── */
+.backdrop {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 99;
+}
+.backdrop.visible { display: block; }
+
+/* ── responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  body { display: block; }
+
+  .hamburger { display: flex; }
+
+  nav {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 4px 0 24px rgba(0,0,0,0.4);
+  }
+  nav.open { transform: translateX(0); }
+
+  main {
+    max-width: 100%;
+    padding: 72px 20px 48px;
+  }
+
+  .hero { padding: 24px 20px; margin-bottom: 32px; }
+  .hero h1 { font-size: 30px; }
+  .hero .subtitle { font-size: 14px; }
+
+  h2 { font-size: 22px; }
+
+  section { margin-bottom: 52px; }
+
+  pre { font-size: 12.5px; padding: 16px; }
+
+  .two-col { grid-template-columns: 1fr; }
+
+  table { font-size: 13px; display: block; overflow-x: auto; }
+
+  td:first-child { white-space: normal; }
+}
 </style>
 </head>
 <body>
 
-<nav>
+<button class="hamburger" id="ham" aria-label="Menu">
+  <span></span><span></span><span></span>
+</button>
+<div class="backdrop" id="backdrop"></div>
+
+<nav id="nav">
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
@@ -741,7 +819,20 @@ b.x = <span class="num">99</span>
 </main>
 
 <script>
-// Active nav link on scroll
+// ── hamburger ────────────────────────────────────────────────────────────
+const ham = document.getElementById('ham');
+const nav = document.getElementById('nav');
+const backdrop = document.getElementById('backdrop');
+
+function openNav()  { nav.classList.add('open'); backdrop.classList.add('visible'); ham.classList.add('open'); }
+function closeNav() { nav.classList.remove('open'); backdrop.classList.remove('visible'); ham.classList.remove('open'); }
+function toggleNav() { nav.classList.contains('open') ? closeNav() : openNav(); }
+
+ham.addEventListener('click', toggleNav);
+backdrop.addEventListener('click', closeNav);
+nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeNav));
+
+// ── active nav link on scroll ────────────────────────────────────────────
 const sections = document.querySelectorAll('section[id]');
 const links = document.querySelectorAll('nav a[href^="#"]');
 const observer = new IntersectionObserver(entries => {
