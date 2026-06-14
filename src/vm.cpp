@@ -5,30 +5,17 @@
 #include <stdexcept>
 #include <vector>
 
-// Taille des opérandes (octets hors opcode) par opcode, indexé par octet brut.
-// 0 pour les opcodes sans opérande et pour les valeurs inconnues (≥33).
-// Ordre : doit rester synchronisé avec enum class Op dans chunk.h.
-static constexpr uint8_t s_operand_sizes[256] = {
-    2, 2, 2,          // LOAD_CONST, LOAD_VAR, STORE_VAR
-    0, 0, 0, 0, 0,    // ADD, SUB, MUL, DIV, MOD
-    0, 0,             // NEGATE, NOT_OP
-    0, 0,             // OR_OP, AND_OP
-    0, 0, 0, 0, 0, 0, // GT, LT, GE, LE, NEQ, EQ
-    2, 2,             // JUMP, JUMP_IF_FALSE
-    3,                // CALL  (u16 name + u8 argc)
-    2,                // TRY   (u16 catch_addr)
-    0, 0,             // POP_TRY, THROW
-    2, 2,             // LOAD_LOCAL, STORE_LOCAL
-    7,                // CALL_FUNC (u16+u8+u8+u8+u16)
-    1, 1,             // RETURN_N, RETURN_V
-    0, 0, 0, 0,       // LOAD_VARARGS, DISCARD_RETURNS, POP, HALT
-    // [33..255] → 0 par zero-initialisation
-};
-
 static std::string valueToString(const Value& v) {
-    if (v.isNil())    return "nil";
-    if (v.isString()) return v.asString();
-    std::ostringstream os; os << v.asNum(); return os.str();
+    if (v.isNil())     return "nil";
+    if (v.isString())  return v.asString();
+    if (v.isInteger()) return std::to_string(v.asInt());
+    std::ostringstream os;
+    double d = v.asFloat();
+    if (d == (long long)d && d >= -1e15 && d <= 1e15)
+        os << (long long)d;
+    else
+        os << d;
+    return os.str();
 }
 
 static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
@@ -45,7 +32,7 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
                 } else {
                     try { idx = std::stoi(spec); }
                     catch (...) {
-                        throw std::runtime_error("printf: index invalide '{" + spec + "}'");
+                        throw std::runtime_error("printf: invalid index '{" + spec + "}'");
                     }
                 }
                 long long ai = (long long)idx + offset;
@@ -59,297 +46,310 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
     return out;
 }
 
-// ── boucle d'exécution ────────────────────────────────────────────────────────
-
 void VM::execute(const Chunk& chunk) {
     ch = &chunk;
     ip = 0;
-    vars.assign(chunk.identifiers.size(), 0.0);
-    vars_init.assign(chunk.identifiers.size(), false);
+    globals.assign(chunk.identifiers.size(), Value{});
+    globals_init.assign(chunk.identifiers.size(), false);
+    regs.resize(chunk.top_reg_count);
+    call_stack.reserve(1000);
+    call_stack.push_back({0, 0, nullptr});
 
     while (true) {
-        if (ip >= (int)ch->code.size())
-            throw std::runtime_error("runtime: bytecode tronqué");
-        uint8_t raw = ch->code[ip];
-        if (ip + 1 + s_operand_sizes[raw] > (int)ch->code.size())
-            throw std::runtime_error("runtime: instruction tronquée");
-        Op op = static_cast<Op>(raw);
-        ip++;
+        Instr instr = ch->code[ip++];
+        Op    op    = static_cast<Op>(iOP(instr));
+        uint8_t  A  = iA(instr);
+        uint8_t  B  = iB(instr);
+        uint8_t  C  = iC(instr);
+        uint16_t Bx = iBx(instr);
+        int base = call_stack.back().reg_base;
+
         switch (op) {
-            case Op::LOAD_CONST: {
-                uint16_t idx = readU16();
-                if (idx >= ch->constants.size())
-                    throw std::runtime_error("runtime: constant index out of bounds");
-                stack.push(ch->constants[idx]);
-                break;
+        case Op::LOAD_K:
+            regs[base + A] = ch->constants[Bx];
+            break;
+
+        case Op::LOAD_NIL:
+            regs[base + A] = Value{};
+            break;
+
+        case Op::MOVE:
+            regs[base + A] = regs[base + B];
+            break;
+
+        case Op::LOAD_GLOBAL:
+            if (!globals_init[Bx])
+                throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
+            regs[base + A] = globals[Bx];
+            break;
+
+        case Op::STORE_GLOBAL:
+            globals[Bx] = regs[base + A];
+            globals_init[Bx] = true;
+            break;
+
+        case Op::ADD: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() + cv.asInt())
+                : Value(asDouble(bv) + asDouble(cv));
+            break;
+        }
+        case Op::SUB: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() - cv.asInt())
+                : Value(asDouble(bv) - asDouble(cv));
+            break;
+        }
+        case Op::MUL: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() * cv.asInt())
+                : Value(asDouble(bv) * asDouble(cv));
+            break;
+        }
+        case Op::DIV: {
+            double bv = asDouble(regs[base+C]);
+            if (bv == 0.0) throw std::runtime_error("runtime: division by zero");
+            regs[base+A] = Value(asDouble(regs[base+B]) / bv);
+            break;
+        }
+        case Op::MOD: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger()) {
+                if (cv.asInt() == 0) throw std::runtime_error("runtime: modulo by zero");
+                regs[base+A] = Value(bv.asInt() % cv.asInt());
+            } else {
+                double dv = asDouble(cv);
+                if (dv == 0.0) throw std::runtime_error("runtime: modulo by zero");
+                regs[base+A] = Value(std::fmod(asDouble(bv), dv));
+            }
+            break;
+        }
+        case Op::NEGATE: {
+            const Value& bv = regs[base+B];
+            regs[base+A] = bv.isInteger() ? Value(-bv.asInt()) : Value(-asDouble(bv));
+            break;
+        }
+        case Op::NOT:
+            regs[base+A] = Value((int64_t)(isFalsy(regs[base+B]) ? 1 : 0));
+            break;
+        case Op::AND:
+            regs[base+A] = Value((int64_t)(!isFalsy(regs[base+B]) && !isFalsy(regs[base+C]) ? 1 : 0));
+            break;
+        case Op::OR:
+            regs[base+A] = Value((int64_t)(!isFalsy(regs[base+B]) || !isFalsy(regs[base+C]) ? 1 : 0));
+            break;
+
+        case Op::GT: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() >  cv.asInt() : asDouble(bv) >  asDouble(cv)));
+            break;
+        }
+        case Op::LT: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() <  cv.asInt() : asDouble(bv) <  asDouble(cv)));
+            break;
+        }
+        case Op::GE: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() >= cv.asInt() : asDouble(bv) >= asDouble(cv)));
+            break;
+        }
+        case Op::LE: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() <= cv.asInt() : asDouble(bv) <= asDouble(cv)));
+            break;
+        }
+        case Op::EQ: {
+            const Value& av = regs[base+B];
+            const Value& bv = regs[base+C];
+            bool eq;
+            if (av.isNil() && bv.isNil())             eq = true;
+            else if (av.isNil() || bv.isNil())         eq = false;
+            else if (av.isInteger() && bv.isInteger()) eq = av.asInt() == bv.asInt();
+            else if (av.isNumber()  && bv.isNumber())  eq = av.asNum() == bv.asNum();
+            else if (av.isString()  && bv.isString())  eq = av.asString() == bv.asString();
+            else if (av.isString()  && bv.isNumber())  eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
+            else if (av.isNumber()  && bv.isString())  eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
+            else eq = false;
+            regs[base+A] = Value((int64_t)(eq ? 1 : 0));
+            break;
+        }
+        case Op::NEQ: {
+            const Value& av = regs[base+B];
+            const Value& bv = regs[base+C];
+            bool eq;
+            if (av.isNil() && bv.isNil())             eq = true;
+            else if (av.isNil() || bv.isNil())         eq = false;
+            else if (av.isInteger() && bv.isInteger()) eq = av.asInt() == bv.asInt();
+            else if (av.isNumber()  && bv.isNumber())  eq = av.asNum() == bv.asNum();
+            else if (av.isString()  && bv.isString())  eq = av.asString() == bv.asString();
+            else if (av.isString()  && bv.isNumber())  eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
+            else if (av.isNumber()  && bv.isString())  eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
+            else eq = false;
+            regs[base+A] = Value((int64_t)(eq ? 0 : 1));
+            break;
+        }
+
+        case Op::JUMP:
+            ip = Bx;
+            break;
+
+        case Op::JUMP_IF_FALSE:
+            if (isFalsy(regs[base + A])) ip = Bx;
+            break;
+
+        case Op::CALL_FUNC: {
+            // A=call_base, B=func_idx, C=argc
+            const FuncProto& fp = ch->funcs[B];
+            int new_base = base + A;
+            int argc = C;
+
+            // Grow regs if needed
+            size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
+            if (regs.size() < needed) regs.resize(needed);
+
+            // Fill missing args with defaults
+            if (argc < fp.n_fixed) {
+                auto& defs = ch->func_defaults[fp.defaults_idx];
+                for (int i = argc; i < fp.n_fixed; ++i)
+                    regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
 
-            case Op::LOAD_VAR: {
-                uint16_t idx = readU16();
-                if (idx >= ch->identifiers.size() || idx >= vars.size())
-                    throw std::runtime_error("runtime: variable index out of bounds");
-                if (!vars_init[idx])
-                    throw std::runtime_error("runtime: undefined variable '" + ch->identifiers[idx] + "'");
-                stack.push(vars[idx]);
-                break;
+            // Handle varargs
+            std::unique_ptr<std::vector<Value>> varargs;
+            if (fp.variadic && argc > fp.n_fixed) {
+                varargs = std::make_unique<std::vector<Value>>();
+                for (int i = fp.n_fixed; i < argc; ++i)
+                    varargs->push_back(std::move(regs[new_base + i]));
             }
 
-            case Op::STORE_VAR: {
-                uint16_t idx = readU16();
-                if (idx >= vars.size())
-                    throw std::runtime_error("runtime: variable index out of bounds");
-                vars[idx] = pop();
-                vars_init[idx] = true;
-                break;
+            // Grow regs to full frame size
+            size_t full_needed = (size_t)(new_base + fp.reg_count);
+            if (regs.size() < full_needed) regs.resize(full_needed);
+
+            call_stack.push_back({ip, new_base, std::move(varargs)});
+            ip = fp.addr;
+            break;
+        }
+
+        case Op::RETURN: {
+            // A=first_reg, B=count
+            int n = B;
+            if (n > 0 && A != 0) {
+                for (int i = 0; i < n; ++i)
+                    regs[base + i] = std::move(regs[base + A + i]);
             }
+            uint32_t rip = call_stack.back().return_ip;
+            call_stack.pop_back();
+            ip = rip;
+            break;
+        }
 
-            case Op::ADD: { auto b = pop(), a = pop(); stack.push(asDouble(a) + asDouble(b)); break; }
-            case Op::SUB: { auto b = pop(), a = pop(); stack.push(asDouble(a) - asDouble(b)); break; }
-            case Op::MUL: { auto b = pop(), a = pop(); stack.push(asDouble(a) * asDouble(b)); break; }
-            case Op::DIV: {
-                auto b = pop(), a = pop();
-                double bd = asDouble(b);
-                if (bd == 0.0) throw std::runtime_error("runtime: division by zero");
-                stack.push(asDouble(a) / bd);
-                break;
+        case Op::RETURN_V: {
+            // A=first_explicit, B=n_explicit; also append varargs
+            auto& va = call_stack.back().varargs;
+            int n_va       = va ? (int)va->size() : 0;
+            int n_explicit = B;
+            int total      = n_explicit + n_va;
+            std::vector<Value> rvs(total);
+            for (int i = 0; i < n_explicit; ++i) rvs[i] = std::move(regs[base + A + i]);
+            if (va) for (int i = 0; i < n_va; ++i) rvs[n_explicit + i] = std::move((*va)[i]);
+            uint32_t rip = call_stack.back().return_ip;
+            int      rbase = call_stack.back().reg_base;
+            call_stack.pop_back();
+            // Grow if needed
+            if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
+            for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
+            ip = rip;
+            break;
+        }
+
+        case Op::LOAD_VARARGS: {
+            auto& va = call_stack.back().varargs;
+            int count = B;  // 0 = all
+            if (va) {
+                int n = (count == 0) ? (int)va->size() : std::min(count, (int)va->size());
+                size_t needed = (size_t)(base + A + n);
+                if (regs.size() < needed) regs.resize(needed);
+                for (int i = 0; i < n; ++i) regs[base + A + i] = (*va)[i];
             }
+            break;
+        }
 
-            case Op::GT: { auto b = pop(), a = pop(); stack.push(asDouble(a) >  asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::LT: { auto b = pop(), a = pop(); stack.push(asDouble(a) <  asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::GE:  { auto b = pop(), a = pop(); stack.push(asDouble(a) >= asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::LE:  { auto b = pop(), a = pop(); stack.push(asDouble(a) <= asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::NEQ: {
-                auto b = pop(), a = pop();
-                bool eq;
-                if (a.isNil() && b.isNil())           eq = true;
-                else if (a.isNil() || b.isNil())       eq = false;
-                else if (a.isNumber() && b.isNumber()) eq = (a.asNum() == b.asNum());
-                else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
-                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.asNum();
-                else if (a.isNumber() && b.isString()) eq = a.asNum() == (isFalsy(b) ? 0.0 : 1.0);
-                else eq = false;
-                stack.push(eq ? 0.0 : 1.0); // NEQ = inverse de EQ
-                break;
+        case Op::TRY: {
+            // A=catch_reg, Bx=catch_addr
+            handler_stack.push_back({Bx, A, base, regs.size(), call_stack.size()});
+            break;
+        }
+
+        case Op::POP_TRY:
+            handler_stack.pop_back();
+            break;
+
+        case Op::THROW: {
+            Value thrown = regs[base + A];
+            if (handler_stack.empty())
+                throw std::runtime_error("unhandled exception: " + valueToString(thrown));
+            Handler h = handler_stack.back();
+            handler_stack.pop_back();
+            // Unwind call stack
+            while (call_stack.size() > h.call_depth) call_stack.pop_back();
+            // Restore regs size
+            if (regs.size() > h.regs_size) regs.resize(h.regs_size);
+            // Put caught value into catch_reg (relative to the frame that set up the TRY)
+            regs[h.reg_base + h.catch_reg] = std::move(thrown);
+            ip = h.catch_addr;
+            break;
+        }
+
+        case Op::CALL_PRINT: {
+            // A=first_arg, B=argc
+            for (int i = 0; i < B; ++i) {
+                if (i) std::cout << ' ';
+                printValue(regs[base + A + i]);
             }
-            case Op::EQ: {
-                auto b = pop(), a = pop();
-                bool eq;
-                if (a.isNil() && b.isNil())           eq = true;
-                else if (a.isNil() || b.isNil())       eq = false;
-                else if (a.isNumber() && b.isNumber()) eq = (a.asNum() == b.asNum());
-                else if (a.isString() && b.isString()) eq = (a.asString() == b.asString());
-                // string == number : comparer la valeur de vérité de la chaîne
-                else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.asNum();
-                else if (a.isNumber() && b.isString()) eq = a.asNum() == (isFalsy(b) ? 0.0 : 1.0);
-                else eq = false;
-                stack.push(eq ? 1.0 : 0.0);
-                break;
+            std::cout << '\n';
+            break;
+        }
+
+        case Op::CALL_PRINTF: {
+            // A=first_arg, B=argc; args[0]=format string
+            if (B < 1 || !regs[base + A].isString())
+                throw std::runtime_error("printf: first arg must be string");
+            std::vector<Value> args(B);
+            for (int i = 0; i < B; ++i) args[i] = regs[base + A + i];
+            std::cout << applyFormat(args[0].asString(), args, 1) << '\n';
+            break;
+        }
+
+        case Op::CALL_ASSERT: {
+            if (B == 0 || isFalsy(regs[base + A])) {
+                std::string msg = (B >= 2 && regs[base + A + 1].isString())
+                    ? regs[base + A + 1].asString() : "assertion failed";
+                throw std::runtime_error(msg);
             }
-            case Op::MOD: {
-                auto b = pop(), a = pop();
-                double bd = asDouble(b);
-                if (bd == 0.0) throw std::runtime_error("runtime: modulo by zero");
-                stack.push(std::fmod(asDouble(a), bd));
-                break;
-            }
-            case Op::NEGATE: { auto a = pop(); stack.push(-asDouble(a)); break; }
-            case Op::NOT_OP: { auto a = pop(); stack.push(isFalsy(a) ? 1.0 : 0.0); break; }
-            case Op::OR_OP:  { auto b = pop(), a = pop(); stack.push(!isFalsy(a) || !isFalsy(b) ? 1.0 : 0.0); break; }
-            case Op::AND_OP: { auto b = pop(), a = pop(); stack.push(!isFalsy(a) && !isFalsy(b) ? 1.0 : 0.0); break; }
+            break;
+        }
 
-            case Op::JUMP:
-                ip = readU16();
-                break;
+        case Op::CALL_TIME: {
+            auto now = std::chrono::system_clock::now();
+            regs[base + A] = Value(std::chrono::duration<double>(now.time_since_epoch()).count());
+            break;
+        }
 
-            case Op::JUMP_IF_FALSE: {
-                uint16_t target = readU16();
-                if (isFalsy(pop())) ip = target;
-                break;
-            }
+        case Op::HALT:
+            return;
 
-            case Op::CALL: {
-                uint16_t name_idx = readU16();
-                uint8_t  argc     = readU8();
-                const std::string& name = ch->identifiers[name_idx];
-
-                if (name == "assert") {
-                    std::vector<Value> args(argc);
-                    for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-                    if (isFalsy(args[0])) {
-                        std::string msg = (argc >= 2 && args[1].isString())
-                            ? args[1].asString() : "assertion failed";
-                        throw std::runtime_error(msg);
-                    }
-                } else if (name == "time") {
-                    auto now = std::chrono::system_clock::now();
-                    double t = std::chrono::duration<double>(now.time_since_epoch()).count();
-                    stack.push(t);
-                } else if (name == "print") {
-                    std::vector<Value> args(argc);
-                    for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-                    for (int i = 0; i < argc; ++i) {
-                        if (i) std::cout << ' ';
-                        printValue(args[i]);
-                    }
-                    std::cout << '\n';
-                } else if (name == "printf") {
-                    std::vector<Value> args(argc);
-                    for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-                    if (argc < 1 || !args[0].isString())
-                        throw std::runtime_error("printf: premier argument doit être une chaîne");
-                    std::cout << applyFormat(args[0].asString(), args, 1) << '\n';
-                } else {
-                    throw std::runtime_error("unknown function: " + name);
-                }
-                break;
-            }
-
-            case Op::TRY: {
-                uint16_t catch_addr = readU16();
-                handler_stack.push_back({catch_addr, stack.size()});
-                break;
-            }
-
-            case Op::POP_TRY:
-                if (handler_stack.empty())
-                    throw std::runtime_error("runtime: POP_TRY sans TRY correspondant");
-                handler_stack.pop_back();
-                break;
-
-            case Op::THROW: {
-                Value thrown = pop();
-                if (handler_stack.empty()) {
-                    std::string msg = valueToString(thrown);
-                    throw std::runtime_error("unhandled exception: " + msg);
-                }
-                Handler h = handler_stack.back();
-                handler_stack.pop_back();
-                while (stack.size() > h.stack_size) stack.pop();
-                stack.push(std::move(thrown));
-                ip = h.catch_addr;
-                break;
-            }
-
-            case Op::LOAD_LOCAL: {
-                uint16_t idx = readU16();
-                if (call_stack.empty()) throw std::runtime_error("runtime: LOAD_LOCAL hors fonction");
-                Frame& f = call_stack.back();
-                if (idx >= f.locals.size() || !f.locals_init[idx])
-                    throw std::runtime_error("runtime: variable locale non initialisée");
-                stack.push(f.locals[idx]);
-                break;
-            }
-
-            case Op::STORE_LOCAL: {
-                uint16_t idx = readU16();
-                if (call_stack.empty()) throw std::runtime_error("runtime: STORE_LOCAL hors fonction");
-                Frame& f = call_stack.back();
-                if (idx >= f.locals.size()) {
-                    f.locals.resize(idx + 1);
-                    f.locals_init.resize(idx + 1, false);
-                }
-                f.locals[idx] = pop();
-                f.locals_init[idx] = true;
-                break;
-            }
-
-            case Op::CALL_FUNC: {
-                uint16_t addr         = readU16();
-                uint8_t  n_fixed      = readU8();
-                uint8_t  argc         = readU8();
-                bool     variadic     = readU8() != 0;
-                uint16_t defaults_idx = readU16();
-
-                std::vector<Value> args(argc);
-                for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-
-                if (!variadic && argc > n_fixed)
-                    throw std::runtime_error("runtime: trop d'arguments");
-
-                Frame frame;
-                frame.return_ip  = ip;
-                frame.stack_base = stack.size();
-                frame.n_fixed    = n_fixed;
-                frame.locals.resize(n_fixed);
-                frame.locals_init.resize(n_fixed, false);
-                int n_init = (int)argc < n_fixed ? (int)argc : n_fixed;
-                for (int i = 0; i < n_init; ++i) {
-                    frame.locals[i]      = args[i];
-                    frame.locals_init[i] = true;
-                }
-                // Params manquants → valeur par défaut ou nil
-                if ((int)argc < n_fixed) {
-                    if (defaults_idx >= ch->func_defaults.size())
-                        throw std::runtime_error("runtime: defaults_idx hors bornes");
-                    auto& defs = ch->func_defaults[defaults_idx];
-                    for (int i = n_init; i < n_fixed; ++i) {
-                        frame.locals[i]      = (i < (int)defs.size()) ? defs[i] : Value{};
-                        frame.locals_init[i] = true;
-                    }
-                }
-                if (variadic) {
-                    for (int i = n_fixed; i < (int)argc; ++i)
-                        frame.varargs.push_back(std::move(args[i]));
-                }
-                if (call_stack.size() >= 1000)
-                    throw std::runtime_error("runtime: stack overflow (profondeur max 1000)");
-                call_stack.push_back(std::move(frame));
-                ip = addr;
-                break;
-            }
-
-            case Op::RETURN_N: {
-                uint8_t n = readU8();
-                std::vector<Value> retvals(n);
-                for (int i = n - 1; i >= 0; --i) retvals[i] = pop();
-                int    rip  = call_stack.back().return_ip;
-                size_t base = call_stack.back().stack_base;
-                call_stack.pop_back();
-                while (stack.size() > base) stack.pop();
-                for (auto& v : retvals) stack.push(std::move(v));
-                ret_count = n;
-                ip = rip;
-                break;
-            }
-
-            case Op::RETURN_V: {
-                uint8_t n_explicit = readU8();
-                int     n_varargs  = (int)call_stack.back().varargs.size();
-                int     total      = n_explicit + n_varargs;
-                std::vector<Value> retvals(total);
-                for (int i = total - 1; i >= 0; --i) retvals[i] = pop();
-                int    rip  = call_stack.back().return_ip;
-                size_t base = call_stack.back().stack_base;
-                call_stack.pop_back();
-                while (stack.size() > base) stack.pop();
-                for (auto& v : retvals) stack.push(std::move(v));
-                ret_count = total;
-                ip = rip;
-                break;
-            }
-
-            case Op::LOAD_VARARGS: {
-                if (call_stack.empty()) throw std::runtime_error("runtime: LOAD_VARARGS hors fonction");
-                for (auto& v : call_stack.back().varargs)
-                    stack.push(v);
-                break;
-            }
-
-            case Op::DISCARD_RETURNS: {
-                for (int i = 0; i < ret_count; ++i) pop();
-                ret_count = 0;
-                break;
-            }
-
-            case Op::POP:
-                pop();
-                break;
-
-            case Op::HALT:
-                return;
-
-            default:
-                throw std::runtime_error("runtime: opcode inconnu (" + std::to_string(raw) + ")");
+        default:
+            throw std::runtime_error("runtime: unknown opcode (" +
+                                     std::to_string((int)op) + ")");
         }
     }
 }

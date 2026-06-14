@@ -1,7 +1,7 @@
 #pragma once
 #include "chunk.h"
 #include <iostream>
-#include <stack>
+#include <memory>
 #include <stdexcept>
 #include <vector>
 
@@ -11,53 +11,44 @@ public:
 
 private:
     struct Handler {
-        uint16_t catch_addr;
-        size_t   stack_size;
+        uint32_t catch_addr;
+        uint8_t  catch_reg;
+        int      reg_base;
+        size_t   regs_size;
+        size_t   call_depth;
     };
 
     struct Frame {
-        int    return_ip;
-        size_t stack_base;
-        int    n_fixed;
-        std::vector<Value> locals;
-        std::vector<bool>  locals_init;
-        std::vector<Value> varargs;
+        uint32_t return_ip;
+        int      reg_base;
+        std::unique_ptr<std::vector<Value>> varargs;
     };
 
-    const Chunk* ch = nullptr;
-    int          ip = 0;
-
-    std::stack<Value, std::vector<Value>> stack;
-    std::vector<Value>   vars;
-    std::vector<bool>    vars_init;
-    std::vector<Handler> handler_stack;
+    const Chunk*         ch = nullptr;
+    uint32_t             ip = 0;
+    std::vector<Value>   globals;
+    std::vector<bool>    globals_init;
+    std::vector<Value>   regs;
     std::vector<Frame>   call_stack;
-    int                  ret_count = 0;
-
-    // Lecture sans vérification — sûre après le check s_operand_sizes en tête de boucle
-    [[gnu::always_inline]] inline uint8_t  readU8()  { return ch->code[ip++]; }
-    [[gnu::always_inline]] inline uint16_t readU16() {
-        uint16_t v = (static_cast<uint16_t>(ch->code[ip]) << 8) | ch->code[ip + 1];
-        ip += 2;
-        return v;
-    }
-
-    [[gnu::always_inline]] inline Value pop() {
-        if (stack.empty()) throw std::runtime_error("runtime: stack underflow");
-        Value v = std::move(stack.top());
-        stack.pop();
-        return v;
-    }
+    std::vector<Handler> handler_stack;
 
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
-        if (v.isNumber()) return v.asNum();
-        if (v.isNil()) throw std::runtime_error("runtime: expected number, got nil");
+        if (v.isInteger()) return (double)v.asInt();
+        if (v.isFloat())   return v.asFloat();
+        if (v.isNil())     throw std::runtime_error("runtime: expected number, got nil");
         throw std::runtime_error("runtime: expected number, got string");
     }
 
     [[gnu::always_inline]] inline void printValue(const Value& v) {
-        if (v.isNil())         std::cout << "nil";
-        else if (v.isString()) std::cout << v.asString();
-        else                   std::cout << v.asNum();
+        if (v.isNil())          std::cout << "nil";
+        else if (v.isString())  std::cout << v.asString();
+        else if (v.isInteger()) std::cout << v.asInt();
+        else {
+            double d = v.asFloat();
+            if (d == (long long)d && d >= -1e15 && d <= 1e15)
+                std::cout << (long long)d;
+            else
+                std::cout << d;
+        }
     }
 };

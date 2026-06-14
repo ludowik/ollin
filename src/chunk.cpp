@@ -1,11 +1,10 @@
 #include "chunk.h"
 #include <algorithm>
 #include <stdexcept>
-#include <utility>
 
 uint16_t Chunk::addConstant(Value v) {
     if (constants.size() >= 0xFFFF)
-        throw std::runtime_error("compile: trop de constantes (max 65535)");
+        throw std::runtime_error("compile: too many constants (max 65535)");
     constants.push_back(std::move(v));
     return static_cast<uint16_t>(constants.size() - 1);
 }
@@ -15,59 +14,37 @@ uint16_t Chunk::addIdentifier(const std::string& name) {
     if (it != identifiers.end())
         return static_cast<uint16_t>(it - identifiers.begin());
     if (identifiers.size() >= 0xFFFF)
-        throw std::runtime_error("compile: trop d'identifiants (max 65535)");
+        throw std::runtime_error("compile: too many identifiers (max 65535)");
     identifiers.push_back(name);
     return static_cast<uint16_t>(identifiers.size() - 1);
 }
 
-void Chunk::emit(Op op) {
-    code.push_back(static_cast<uint8_t>(op));
-}
-
-void Chunk::emitU16(Op op, uint16_t arg) {
-    code.push_back(static_cast<uint8_t>(op));
-    code.push_back(static_cast<uint8_t>(arg >> 8));
-    code.push_back(static_cast<uint8_t>(arg & 0xFF));
-}
-
-void Chunk::emitU8(Op op, uint8_t arg) {
-    code.push_back(static_cast<uint8_t>(op));
-    code.push_back(arg);
-}
-
 uint16_t Chunk::addFuncDefaults(std::vector<Value> defs) {
     if (func_defaults.size() >= 0xFFFF)
-        throw std::runtime_error("compile: trop de fonctions avec valeurs par défaut (max 65535)");
+        throw std::runtime_error("compile: too many functions with defaults (max 65535)");
     func_defaults.push_back(std::move(defs));
     return static_cast<uint16_t>(func_defaults.size() - 1);
 }
 
-void Chunk::emitCallFunc(uint16_t addr, uint8_t n_fixed, uint8_t argc, bool variadic, uint16_t defaults_idx) {
-    code.push_back(static_cast<uint8_t>(Op::CALL_FUNC));
-    code.push_back(static_cast<uint8_t>(addr >> 8));
-    code.push_back(static_cast<uint8_t>(addr & 0xFF));
-    code.push_back(n_fixed);
-    code.push_back(argc);
-    code.push_back(variadic ? 1 : 0);
-    code.push_back(static_cast<uint8_t>(defaults_idx >> 8));
-    code.push_back(static_cast<uint8_t>(defaults_idx & 0xFF));
+uint8_t Chunk::addFunc(FuncProto fp) {
+    if (funcs.size() >= 0xFF)
+        throw std::runtime_error("compile: too many functions (max 255)");
+    funcs.push_back(fp);
+    return static_cast<uint8_t>(funcs.size() - 1);
 }
 
-void Chunk::emitCall(uint16_t name_idx, uint8_t argc) {
-    code.push_back(static_cast<uint8_t>(Op::CALL));
-    code.push_back(static_cast<uint8_t>(name_idx >> 8));
-    code.push_back(static_cast<uint8_t>(name_idx & 0xFF));
-    code.push_back(argc);
+void Chunk::emit(Instr i) {
+    code.push_back(i);
 }
 
-size_t Chunk::emitJump(Op op) {
-    code.push_back(static_cast<uint8_t>(op));
-    code.push_back(0xFF);
-    code.push_back(0xFF);
-    return code.size() - 2;
+size_t Chunk::emitJump(Op op, uint8_t a) {
+    // emit placeholder with Bx=0xFFFF
+    code.push_back(makeABx((uint8_t)op, a, 0xFFFF));
+    return code.size() - 1;  // return index into code[] for patching
 }
 
 void Chunk::patchJump(size_t pos, uint16_t target) {
-    code[pos]     = static_cast<uint8_t>(target >> 8);
-    code[pos + 1] = static_cast<uint8_t>(target & 0xFF);
+    // patch the lower 16 bits (Bx) of the instruction at pos
+    Instr old = code[pos];
+    code[pos] = (old & 0xFFFF0000u) | target;
 }

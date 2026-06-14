@@ -61,6 +61,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::BREAK))   return breakStmt();
     if (check(TokenType::TRY))     return tryCatchStmt();
     if (check(TokenType::THROW))   return throwStmt();
+    if (check(TokenType::FOR))     return forStmt();
     if (check(TokenType::FUNC))    return funcDeclStmt();
     if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))     return varDecl();
@@ -244,6 +245,34 @@ std::unique_ptr<Stmt> Parser::assignStmt() {
     else if (match(TokenType::PERCENT_EQUAL)) s->op = '%';
     else                                    { advance(); s->op = '\0'; }
     s->value = expr();
+    consumeLineEnd();
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::forStmt() {
+    advance(); // FOR
+    auto s = std::make_unique<ForStmt>();
+    s->var = expect(TokenType::IDENTIFIER).lexeme;
+
+    if (match(TokenType::EQUALS)) {
+        // for i=start,end
+        s->start = expr();
+        expect(TokenType::COMMA);
+        s->end = expr();
+    } else {
+        // for i in start..end
+        expect(TokenType::IN);
+        s->start = expr();
+        expect(TokenType::DOT_DOT);
+        s->end = expr();
+    }
+    consumeLineEnd();
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->body.push_back(parseOneStmt());
+    }
+    expect(TokenType::END);
     consumeLineEnd();
     return s;
 }
