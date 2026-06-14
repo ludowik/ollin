@@ -10,10 +10,10 @@
 //   Integer : tag == T_INTEGER  → int64_t  (range ±2^63)
 //   Float   : tag == T_FLOAT    → double IEEE 754
 //   String  : tag == T_STRING   → std::string*  (heap, owned)
-//   Map     : tag == T_MAP      → OllinMap*     (heap, ref-counted)
+//   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
 //   Array   : tag == T_ARRAY    → OllinArray*   (heap, ref-counted, 1-based)
 
-struct OllinMap;
+struct Map;
 struct OllinArray;
 
 struct Value {
@@ -22,7 +22,7 @@ struct Value {
         int64_t      ival;
         double       dval;
         std::string* sptr;
-        OllinMap*    mptr;
+        Map*         mptr;
         OllinArray*  aptr;
     };
 
@@ -34,7 +34,7 @@ struct Value {
     static constexpr uint8_t T_ARRAY   = 5;
 
 private:
-    explicit Value(OllinMap*   p) : tag(T_MAP),   mptr(p) {}
+    explicit Value(Map*        p) : tag(T_MAP),   mptr(p) {}
     explicit Value(OllinArray* p) : tag(T_ARRAY), aptr(p) {}
 
 public:
@@ -57,17 +57,17 @@ public:
     bool isMap()     const { return tag == T_MAP; }
     bool isArray()   const { return tag == T_ARRAY; }
 
-    int64_t asInt()            const { return ival; }
-    double  asFloat()          const { return dval; }
-    double  asNum()            const { return isInteger() ? (double)ival : dval; }
+    int64_t asInt()               const { return ival; }
+    double  asFloat()             const { return dval; }
+    double  asNum()               const { return isInteger() ? (double)ival : dval; }
     const std::string& asString() const { return *sptr; }
 
     static Value makeMap();
-    Value       mapGet(const std::string& key) const;
-    void        mapSet(const std::string& key, const Value& val);
-    int         mapSize()           const;
-    std::string mapKeyAt(int idx)   const;
-    Value       mapValAt(int idx)   const;
+    Value        mapGet(const Value& key)              const;
+    void         mapSet(const Value& key, const Value& val);
+    int          mapSize()           const;
+    const Value& mapKeyAt(int idx)   const;
+    Value        mapValAt(int idx)   const;
 
     static Value makeArray();
     Value  arrayGet(int64_t idx)                    const; // 1-based
@@ -75,40 +75,6 @@ public:
     void   arrayPush(const Value& val);
     int    arraySize()                              const;
 };
-
-// ── OllinMap ──────────────────────────────────────────────────────────────────
-struct OllinMap {
-    std::vector<std::pair<std::string, Value>> entries;
-    int refcount = 1;
-
-    Value get(const std::string& k) const {
-        for (const auto& e : entries)
-            if (e.first == k) return e.second;
-        return Value{};
-    }
-    void set(const std::string& k, const Value& v) {
-        for (auto& e : entries)
-            if (e.first == k) { e.second = v; return; }
-        entries.emplace_back(k, v);
-    }
-};
-
-struct MapPool {
-    static constexpr int CAP = 64;
-    OllinMap* buf[CAP];
-    int       n = 0;
-
-    OllinMap* acquire() {
-        if (n) { OllinMap* m = buf[--n]; m->refcount = 1; return m; }
-        return new OllinMap();
-    }
-    void release(OllinMap* m) {
-        m->entries.clear();
-        if (n < CAP) buf[n++] = m;
-        else delete m;
-    }
-};
-inline MapPool& map_pool() { static MapPool p; return p; }
 
 // ── OllinArray ────────────────────────────────────────────────────────────────
 struct OllinArray {
@@ -146,16 +112,19 @@ struct ArrayPool {
 };
 inline ArrayPool& array_pool() { static ArrayPool p; return p; }
 
-// ── inline Value implementations (require complete OllinMap / OllinArray) ─────
+// ── Map (LinkedHashMap, clés Value) — définition complète ────────────────────
+#include "map.h"
+
+// ── inline Value implementations (nécessitent Map et OllinArray complets) ────
 
 inline Value Value::makeMap()   { return Value(map_pool().acquire()); }
 inline Value Value::makeArray() { return Value(array_pool().acquire()); }
 
-inline Value Value::mapGet(const std::string& k)                 const { return mptr->get(k); }
-inline void  Value::mapSet(const std::string& k, const Value& v)       { mptr->set(k, v); }
-inline int         Value::mapSize()          const { return (int)mptr->entries.size(); }
-inline std::string Value::mapKeyAt(int idx)  const { return mptr->entries[idx].first; }
-inline Value       Value::mapValAt(int idx)  const { return mptr->entries[idx].second; }
+inline Value        Value::mapGet(const Value& k)                  const { return mptr->get(k); }
+inline void         Value::mapSet(const Value& k, const Value& v)        { mptr->set(k, v); }
+inline int          Value::mapSize()          const { return mptr->size(); }
+inline const Value& Value::mapKeyAt(int idx)  const { return mptr->keyAt(idx); }
+inline Value        Value::mapValAt(int idx)  const { return mptr->valAt(idx); }
 
 inline Value Value::arrayGet(int64_t idx)                  const { return aptr->get(idx); }
 inline void  Value::arraySet(int64_t idx, const Value& v)        { aptr->set(idx, v); }
@@ -177,7 +146,7 @@ inline Value& Value::operator=(const Value& o) {
     std::string* new_s = (o.tag == T_STRING) ? new std::string(*o.sptr) : nullptr;
     switch (tag) {
         case T_STRING: delete sptr; break;
-        case T_MAP:   { OllinMap*   mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
     }
@@ -196,7 +165,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
     switch (tag) {
         case T_STRING: delete sptr; break;
-        case T_MAP:   { OllinMap*   mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
     }
@@ -206,7 +175,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
 inline Value::~Value() {
     switch (tag) {
         case T_STRING: delete sptr; break;
-        case T_MAP:   { OllinMap*   mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
     }
@@ -217,7 +186,7 @@ inline bool isFalsy(const Value& v) {
     if (v.isInteger()) return v.asInt() == 0;
     if (v.isFloat())   return v.asFloat() == 0.0;
     if (v.isString())  return v.asString().empty();
-    return false;  // map, array → always truthy
+    return false;  // map, array → toujours truthy
 }
 
 inline Value numValue(double d) {
@@ -273,8 +242,8 @@ enum class Op : uint8_t {
     POP_TRY,
     THROW,          // A: throw R[A]
     NEW_MAP,        // A: R[A] = {}
-    GET_INDEX,      // ABC: R[A] = R[B][R[C]]  (map→string key, array→int 1-based)
-    SET_INDEX,      // ABC: R[A][R[B]] = R[C]  (map→string key, array→int 1-based)
+    GET_INDEX,      // ABC: R[A] = R[B][R[C]]  (map→Value key, array→int 1-based)
+    SET_INDEX,      // ABC: R[A][R[B]] = R[C]  (map→Value key, array→int 1-based)
     FOR_MAP_STEP,   // ABx: block+3=obj block+2=iter; iter maps/arrays; key→A+0, val→A+1
     BAND, BOR, BXOR, BNOT, BLSHIFT, BRSHIFT,   // bitwise (integers)
     NEW_ARRAY,      // A: R[A] = []

@@ -363,8 +363,7 @@ op_GET_INDEX: {
     const Value& obj = regs[base + B];
     const Value& key = regs[base + C];
     if (obj.isMap()) {
-        if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
-        regs[base + A] = obj.mapGet(key.asString());
+        regs[base + A] = obj.mapGet(key);
     } else if (obj.isArray()) {
         if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
         regs[base + A] = obj.arrayGet(key.asInt());
@@ -378,8 +377,7 @@ op_SET_INDEX: {
     Value& obj = regs[base + A];
     const Value& key = regs[base + B];
     if (obj.isMap()) {
-        if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
-        obj.mapSet(key.asString(), regs[base + C]);
+        obj.mapSet(key, regs[base + C]);
     } else if (obj.isArray()) {
         if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
         obj.arraySet(key.asInt(), regs[base + C]);
@@ -396,7 +394,7 @@ op_FOR_MAP_STEP: {
     if (obj_v.isMap()) {
         int sz = obj_v.mapSize();
         if (iter >= sz) { ip = Bx; NEXT(); }
-        regs[base + A + 0] = Value(obj_v.mapKeyAt((int)iter));
+        regs[base + A + 0] = obj_v.mapKeyAt((int)iter);
         regs[base + A + 1] = obj_v.mapValAt((int)iter);
     } else if (obj_v.isArray()) {
         int sz = obj_v.arraySize();
@@ -593,7 +591,7 @@ op_HALT:
             int64_t iter=regs[base+A+2].isInteger()?regs[base+A+2].asInt():0;
             if(obj_v.isMap()){
                 int sz=obj_v.mapSize(); if(iter>=sz){ip=Bx;break;}
-                regs[base+A+0]=Value(obj_v.mapKeyAt((int)iter));
+                regs[base+A+0]=obj_v.mapKeyAt((int)iter);
                 regs[base+A+1]=obj_v.mapValAt((int)iter);
             } else if(obj_v.isArray()){
                 int sz=obj_v.arraySize(); if(iter>=sz){ip=Bx;break;}
@@ -605,8 +603,7 @@ op_HALT:
         case Op::GET_INDEX: {
             const Value& obj=regs[base+B]; const Value& key=regs[base+C];
             if(obj.isMap()){
-                if(!key.isString())throw std::runtime_error("runtime: map key must be string");
-                regs[base+A]=obj.mapGet(key.asString());
+                regs[base+A]=obj.mapGet(key);
             } else if(obj.isArray()){
                 if(!key.isInteger())throw std::runtime_error("runtime: array index must be integer");
                 regs[base+A]=obj.arrayGet(key.asInt());
@@ -615,8 +612,7 @@ op_HALT:
         case Op::SET_INDEX: {
             Value& obj=regs[base+A]; const Value& key=regs[base+B];
             if(obj.isMap()){
-                if(!key.isString())throw std::runtime_error("runtime: map key must be string");
-                obj.mapSet(key.asString(),regs[base+C]);
+                obj.mapSet(key,regs[base+C]);
             } else if(obj.isArray()){
                 if(!key.isInteger())throw std::runtime_error("runtime: array index must be integer");
                 obj.arraySet(key.asInt(),regs[base+C]);
