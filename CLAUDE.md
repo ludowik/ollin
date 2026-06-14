@@ -50,8 +50,10 @@ ollin/
 
 ## Versionning
 
-- **Git** initialisé à la racine — utiliser `git restore <fichier>` pour annuler une modification
-- Committer après chaque changement significatif
+- Branche unique : **`main`** — tout le développement se fait directement sur main
+- **Committer après chaque fonctionnalité complète** (feature atomique = 1 commit)
+- Pusher sur `origin/main` après chaque commit
+- `git restore <fichier>` pour annuler une modification non commitée
 
 ## Maintenance de CLAUDE.md
 
