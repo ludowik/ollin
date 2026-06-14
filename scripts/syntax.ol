@@ -110,5 +110,5 @@ for i=10,1,-1   ## step négatif
 		print(i)
 end
 
-
+var t = {} ## map : syntaxe identique a json / js
 
