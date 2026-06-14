@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ollin — Tutoriel</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d2e;
+  --surface2: #242742;
+  --border: #2e3150;
+  --text: #c9d1e0;
+  --text-dim: #7c85a2;
+  --accent: #7c83ff;
+  --accent2: #a78bfa;
+  --green: #4ade80;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --cyan: #67e8f9;
+  --orange: #fb923c;
+  --sidebar-w: 240px;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  --font: system-ui, -apple-system, sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.7;
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── sidebar ─────────────────────────────────────────────────────────────── */
+nav {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 32px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+nav .logo {
+  padding: 0 24px 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+nav .logo h1 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
+nav .logo p {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+nav a {
+  display: block;
+  padding: 5px 24px;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 13px;
+  transition: color 0.15s;
+  border-left: 2px solid transparent;
+}
+
+nav a:hover { color: var(--text); border-left-color: var(--border); }
+nav a.active { color: var(--accent); border-left-color: var(--accent); }
+
+nav .section-label {
+  padding: 16px 24px 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+/* ── main ────────────────────────────────────────────────────────────────── */
+main {
+  flex: 1;
+  max-width: 860px;
+  padding: 48px 56px;
+}
+
+section {
+  margin-bottom: 72px;
+  scroll-margin-top: 32px;
+}
+
+h2 {
+  font-size: 26px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: -0.4px;
+}
+
+h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin: 28px 0 10px;
+}
+
+p { margin: 10px 0; color: var(--text); }
+
+ul { margin: 10px 0 10px 24px; }
+li { margin: 4px 0; }
+
+a { color: var(--accent); }
+
+/* ── hero ────────────────────────────────────────────────────────────────── */
+.hero {
+  background: linear-gradient(135deg, #1a1d2e 0%, #0f1117 100%);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 40px 40px 32px;
+  margin-bottom: 48px;
+}
+
+.hero h1 {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  color: var(--accent);
+  line-height: 1.1;
+}
+
+.hero .subtitle {
+  font-size: 17px;
+  color: var(--text-dim);
+  margin-top: 10px;
+  margin-bottom: 24px;
+}
+
+.badges { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid;
+}
+.badge-blue  { color: var(--accent);  border-color: var(--accent);  background: #7c83ff18; }
+.badge-green { color: var(--green);   border-color: var(--green);   background: #4ade8018; }
+.badge-purple{ color: var(--accent2); border-color: var(--accent2); background: #a78bfa18; }
+
+/* ── code ────────────────────────────────────────────────────────────────── */
+pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 20px 22px;
+  overflow-x: auto;
+  margin: 14px 0;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 3px;
+  color: var(--cyan);
+}
+
+pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+
+/* syntax tokens */
+.kw   { color: var(--accent); font-weight: 600; }
+.bi   { color: var(--cyan); }
+.str  { color: var(--green); }
+.num  { color: var(--orange); }
+.cmt  { color: #4a5568; font-style: italic; }
+.op   { color: var(--text-dim); }
+.nil  { color: var(--red); }
+.bool { color: var(--yellow); }
+.var  { color: var(--text); }
+
+/* ── table ────────────────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+th { text-align: left; padding: 8px 14px; background: var(--surface2); color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cyan); white-space: nowrap; }
+
+/* ── callout ──────────────────────────────────────────────────────────────── */
+.callout {
+  border-left: 3px solid var(--accent);
+  background: #7c83ff0d;
+  border-radius: 0 6px 6px 0;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-size: 14px;
+}
+.callout.tip  { border-color: var(--green);  background: #4ade800d; }
+.callout.warn { border-color: var(--yellow); background: #fbbf240d; }
+
+/* ── two-col ──────────────────────────────────────────────────────────────── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
+.two-col pre { margin: 0; }
+.two-col .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">
+    <h1>Ollin</h1>
+    <p>Documentation</p>
+  </div>
+  <div class="section-label">Démarrage</div>
+  <a href="#intro">Introduction</a>
+  <a href="#types">Types</a>
+  <a href="#variables">Variables</a>
+  <a href="#comments">Commentaires</a>
+  <div class="section-label">Expressions</div>
+  <a href="#operators">Opérateurs</a>
+  <a href="#strings">Chaînes</a>
+  <a href="#multiline">Multi-lignes</a>
+  <div class="section-label">Contrôle</div>
+  <a href="#if">If / Else</a>
+  <a href="#while">While</a>
+  <a href="#for">For</a>
+  <div class="section-label">Fonctions</div>
+  <a href="#functions">Fonctions</a>
+  <a href="#varargs">Varargs</a>
+  <a href="#defaults">Défauts</a>
+  <div class="section-label">Maps</div>
+  <a href="#maps">Maps</a>
+  <a href="#map-iter">Itération</a>
+  <div class="section-label">Gestion d'erreurs</div>
+  <a href="#try">Try / Catch</a>
+  <div class="section-label">Builtins</div>
+  <a href="#builtins">Fonctions intégrées</a>
+</nav>
+
+<main>
+
+<div class="hero">
+  <h1>Ollin</h1>
+  <p class="subtitle">Langage de script minimaliste — VM register-based, NaN-boxing, bytecode 32-bit</p>
+  <div class="badges">
+    <span class="badge badge-blue">C++17</span>
+    <span class="badge badge-green">Register VM</span>
+    <span class="badge badge-purple">NaN-boxing</span>
+  </div>
+</div>
+
+<!-- ── Introduction ──────────────────────────────────────────────────────── -->
+<section id="intro">
+<h2>Introduction</h2>
+<p>Ollin est un langage de script dynamiquement typé compilé vers un bytecode 32-bit et exécuté par une VM register-based. La syntaxe est inspirée de Lua et Python : blocs délimités par <code>end</code>, newline comme terminateur d'instruction, typage implicite.</p>
+
+<h3>Pipeline d'exécution</h3>
+<pre><code>source .ol  →  Lexer  →  Parser  →  Compiler  →  VM</code></pre>
+
+<h3>Premier programme</h3>
+<pre><code><span class="bi">print</span>(<span class="str">"hello world!"</span>)
+
+<span class="kw">var</span> x = <span class="num">42</span>
+<span class="bi">print</span>(<span class="str">"x = "</span>, x)   <span class="cmt">## x = 42</span></code></pre>
+</section>
+
+<!-- ── Types ─────────────────────────────────────────────────────────────── -->
+<section id="types">
+<h2>Types</h2>
+<p>Ollin utilise le <strong>NaN-boxing</strong> : chaque valeur tient en 8 octets (<code>uint64_t</code>). Le type est encodé dans les bits de mantisse des NaN IEEE 754.</p>
+
+<table>
+<tr><th>Type</th><th>Littéral</th><th>Description</th></tr>
+<tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
+<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Stockés comme entiers 1 et 0.</td></tr>
+<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code></td><td>Entier signé 48-bit (≈ ±140 téra).</td></tr>
+<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Double IEEE 754.</td></tr>
+<tr><td>string</td><td><code class="str">"texte"</code></td><td>UTF-8, immuable, alloué sur le tas.</td></tr>
+<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur, clés toujours des chaînes.</td></tr>
+</table>
+
+<h3>Règles de vérité (truthy/falsy)</h3>
+<table>
+<tr><th>Valeur</th><th>Falsy si</th></tr>
+<tr><td>nil</td><td>toujours</td></tr>
+<tr><td>integer / bool</td><td>== 0</td></tr>
+<tr><td>float</td><td>== 0.0</td></tr>
+<tr><td>string</td><td>chaîne vide <code>""</code></td></tr>
+<tr><td>map</td><td>jamais (toujours truthy)</td></tr>
+</table>
+
+<pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)
+<span class="bi">assert</span>(<span class="num">0</span> == <span class="bool">false</span>)
+<span class="bi">assert</span>(<span class="str">"non vide"</span> == <span class="bool">true</span>)
+<span class="bi">assert</span>(<span class="str">""</span> == <span class="bool">false</span>)</code></pre>
+
+<h3>Arithmétique des types numériques</h3>
+<div class="callout">INT op INT → INT · INT / INT → FLOAT · INT op FLOAT → FLOAT</div>
+
+<pre><code><span class="bi">assert</span>(<span class="num">7</span> / <span class="num">2</span> == <span class="num">3.5</span>)   <span class="cmt">## division → toujours float</span>
+<span class="bi">assert</span>(<span class="num">7</span> % <span class="num">2</span> == <span class="num">1</span>)    <span class="cmt">## modulo → int si les deux sont int</span></code></pre>
+</section>
+
+<!-- ── Variables ──────────────────────────────────────────────────────────── -->
+<section id="variables">
+<h2>Variables</h2>
+<p>Toute variable est déclarée avec <code><span class="kw">var</span></code>. Hors d'une fonction, les variables sont globales. À l'intérieur d'une fonction, elles sont locales (registres).</p>
+
+<pre><code><span class="kw">var</span> a = <span class="num">10</span>
+<span class="kw">var</span> b = <span class="num">2.5</span>
+<span class="kw">var</span> s = <span class="str">"bonjour"</span>
+<span class="kw">var</span> undef        <span class="cmt">## pas d'initialisation → nil</span>
+<span class="bi">assert</span>(undef == <span class="nil">nil</span>)</code></pre>
+
+<h3>Déclaration multiple</h3>
+<pre><code><span class="kw">var</span> x, y = <span class="num">1</span>, <span class="num">2</span>
+<span class="kw">var</span> p, q, r = <span class="num">10</span>, <span class="num">20</span>   <span class="cmt">## r → nil (pas assez de valeurs)</span></code></pre>
+
+<h3>Affectation</h3>
+<pre><code>a = <span class="num">42</span>           <span class="cmt">## simple</span>
+a += <span class="num">1</span>           <span class="cmt">## compound : += -= *= /= %=</span>
+a *= <span class="num">2</span>
+<span class="bi">assert</span>(a == <span class="num">86</span>)</code></pre>
+
+<div class="callout tip">Les underscores dans les littéraux numériques sont ignorés : <code>1_000_000</code> == <code>1000000</code>.</div>
+</section>
+
+<!-- ── Commentaires ───────────────────────────────────────────────────────── -->
+<section id="comments">
+<h2>Commentaires</h2>
+<pre><code><span class="cmt">## commentaire de fin de ligne</span>
+
+<span class="kw">var</span> x = <span class="num">10</span>  <span class="cmt">## inline</span>
+
+<span class="cmt">###
+commentaire
+multi-lignes
+###</span></code></pre>
+</section>
+
+<!-- ── Opérateurs ─────────────────────────────────────────────────────────── -->
+<section id="operators">
+<h2>Opérateurs</h2>
+
+<h3>Arithmétiques</h3>
+<table>
+<tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
+<tr><td>+</td><td>Addition</td><td><code>3 + 4 == 7</code></td></tr>
+<tr><td>-</td><td>Soustraction / négation</td><td><code>10 - 3 == 7</code>, <code>-x</code></td></tr>
+<tr><td>*</td><td>Multiplication</td><td><code>6 * 7 == 42</code></td></tr>
+<tr><td>/</td><td>Division (toujours float)</td><td><code>7 / 2 == 3.5</code></td></tr>
+<tr><td>%</td><td>Modulo</td><td><code>10 % 3 == 1</code></td></tr>
+</table>
+
+<h3>Comparaisons</h3>
+<table>
+<tr><th>Op</th><th>Description</th></tr>
+<tr><td>==</td><td>Égalité</td></tr>
+<tr><td>&lt;&gt;</td><td>Inégalité</td></tr>
+<tr><td>&gt; &lt; &gt;= &lt;=</td><td>Ordre</td></tr>
+</table>
+
+<h3>Logiques</h3>
+<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span>   <span class="cmt">## 1</span>
+<span class="kw">var</span> b = <span class="bool">true</span> <span class="kw">and</span> <span class="bool">false</span>  <span class="cmt">## 0</span>
+<span class="kw">var</span> c = <span class="kw">not</span> <span class="bool">true</span>         <span class="cmt">## 0</span>
+
+<span class="cmt">## précédence : not > and > or</span>
+<span class="bi">assert</span>(<span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="kw">and</span> <span class="bool">false</span>)  <span class="cmt">## true or (false and false)</span></code></pre>
+</section>
+
+<!-- ── Chaînes ─────────────────────────────────────────────────────────────── -->
+<section id="strings">
+<h2>Chaînes</h2>
+<pre><code><span class="kw">var</span> s = <span class="str">"bonjour"</span>
+<span class="bi">assert</span>(s == <span class="str">"bonjour"</span>)
+<span class="bi">assert</span>(<span class="str">""</span> == <span class="bool">false</span>)          <span class="cmt">## chaîne vide est falsy</span>
+<span class="bi">assert</span>(<span class="str">"texte"</span> == <span class="bool">true</span>)    <span class="cmt">## non vide est truthy</span></code></pre>
+
+<div class="callout warn">Les chaînes sont immuables. Pas d'opérateur de concaténation pour l'instant — utiliser <code>printf</code> pour formater.</div>
+</section>
+
+<!-- ── Multi-lignes ───────────────────────────────────────────────────────── -->
+<section id="multiline">
+<h2>Expressions multi-lignes</h2>
+<p>À l'intérieur de parenthèses, les newlines sont ignorés. Cela permet de découper les longues expressions et conditions.</p>
+
+<pre><code><span class="kw">var</span> total = (
+    prix_ht
+    * ((<span class="num">1</span> + tva) / <span class="num">100</span>)
+    + frais_port
+)
+
+<span class="kw">if</span> (commande_valide
+    <span class="kw">and</span> stock_disponible
+    <span class="kw">and</span> paiement_ok) <span class="kw">then</span>
+    expédier()
+<span class="kw">end</span></code></pre>
+
+<div class="callout">Hors parenthèses, le newline termine l'instruction. <code>then</code> sert de délimiteur explicite pour <code>if</code> — les parenthèses ne sont donc pas obligatoires pour les conditions courtes.</div>
+</section>
+
+<!-- ── If ────────────────────────────────────────────────────────────────── -->
+<section id="if">
+<h2>If / Else</h2>
+<pre><code><span class="kw">if</span> condition <span class="kw">then</span>
+    <span class="cmt">## bloc then</span>
+<span class="kw">else if</span> autre_condition <span class="kw">then</span>
+    <span class="cmt">## else if (autant que nécessaire)</span>
+<span class="kw">else</span>
+    <span class="cmt">## else optionnel</span>
+<span class="kw">end</span></code></pre>
+
+<pre><code><span class="kw">var</span> score = <span class="num">75</span>
+<span class="kw">var</span> grade = <span class="str">"F"</span>
+
+<span class="kw">if</span> score >= <span class="num">90</span> <span class="kw">then</span>
+    grade = <span class="str">"A"</span>
+<span class="kw">else if</span> score >= <span class="num">80</span> <span class="kw">then</span>
+    grade = <span class="str">"B"</span>
+<span class="kw">else if</span> score >= <span class="num">70</span> <span class="kw">then</span>
+    grade = <span class="str">"C"</span>
+<span class="kw">else</span>
+    grade = <span class="str">"F"</span>
+<span class="kw">end</span>
+
+<span class="bi">assert</span>(grade == <span class="str">"C"</span>)</code></pre>
+</section>
+
+<!-- ── While ─────────────────────────────────────────────────────────────── -->
+<section id="while">
+<h2>While</h2>
+<pre><code><span class="kw">var</span> i = <span class="num">0</span>
+<span class="kw">while</span> i < <span class="num">10</span>
+    i += <span class="num">1</span>
+<span class="kw">end</span>
+<span class="bi">assert</span>(i == <span class="num">10</span>)
+
+<span class="cmt">## break quitte la boucle immédiatement</span>
+<span class="kw">var</span> k = <span class="num">0</span>
+<span class="kw">while</span> <span class="bool">true</span>
+    k += <span class="num">1</span>
+    <span class="kw">if</span> k >= <span class="num">5</span> <span class="kw">then</span> <span class="kw">break</span> <span class="kw">end</span>
+<span class="kw">end</span>
+<span class="bi">assert</span>(k == <span class="num">5</span>)</code></pre>
+</section>
+
+<!-- ── For ───────────────────────────────────────────────────────────────── -->
+<section id="for">
+<h2>For</h2>
+<p>Trois variantes pour les boucles numériques, plus l'itération sur les maps.</p>
+
+<h3>Range <code>i in start..end</code></h3>
+<p>Bornes inclusives, step = 1.</p>
+<pre><code><span class="kw">var</span> sum = <span class="num">0</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="num">1</span>..<span class="num">10</span>
+    sum += i
+<span class="kw">end</span>
+<span class="bi">assert</span>(sum == <span class="num">55</span>)   <span class="cmt">## 1+2+…+10</span></code></pre>
+
+<h3>Numérique <code>i=start,end[,step]</code></h3>
+<p>Step optionnel — positif ou négatif.</p>
+<pre><code><span class="cmt">## step implicite = 1</span>
+<span class="kw">for</span> i=<span class="num">1</span>,<span class="num">5</span>
+    <span class="bi">print</span>(i)   <span class="cmt">## 1 2 3 4 5</span>
+<span class="kw">end</span>
+
+<span class="cmt">## step positif (pairs)</span>
+<span class="kw">for</span> i=<span class="num">0</span>,<span class="num">10</span>,<span class="num">2</span>
+    <span class="bi">print</span>(i)   <span class="cmt">## 0 2 4 6 8 10</span>
+<span class="kw">end</span>
+
+<span class="cmt">## step négatif (compte à rebours)</span>
+<span class="kw">for</span> i=<span class="num">5</span>,<span class="num">1</span>,-<span class="num">1</span>
+    <span class="bi">print</span>(i)   <span class="cmt">## 5 4 3 2 1</span>
+<span class="kw">end</span></code></pre>
+
+<h3>Break dans for</h3>
+<pre><code><span class="kw">for</span> i <span class="kw">in</span> <span class="num">1</span>..<span class="num">100</span>
+    <span class="kw">if</span> i > <span class="num">3</span> <span class="kw">then</span> <span class="kw">break</span> <span class="kw">end</span>
+    <span class="bi">print</span>(i)   <span class="cmt">## 1 2 3</span>
+<span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── Functions ─────────────────────────────────────────────────────────── -->
+<section id="functions">
+<h2>Fonctions</h2>
+<pre><code><span class="kw">func</span> add(a, b)
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>
+
+<span class="bi">assert</span>(add(<span class="num">3</span>, <span class="num">4</span>) == <span class="num">7</span>)</code></pre>
+
+<h3>Retours multiples</h3>
+<pre><code><span class="kw">func</span> minmax(a, b)
+    <span class="kw">if</span> a < b <span class="kw">then</span>
+        <span class="kw">return</span> a, b
+    <span class="kw">end</span>
+    <span class="kw">return</span> b, a
+<span class="kw">end</span>
+
+<span class="kw">var</span> lo, hi = minmax(<span class="num">7</span>, <span class="num">3</span>)
+<span class="bi">assert</span>(lo == <span class="num">3</span> <span class="kw">and</span> hi == <span class="num">7</span>)</code></pre>
+
+<h3>Récursion</h3>
+<pre><code><span class="kw">func</span> fact(n)
+    <span class="kw">if</span> n < <span class="num">2</span> <span class="kw">then</span> <span class="kw">return</span> <span class="num">1</span> <span class="kw">end</span>
+    <span class="kw">return</span> n * fact(n - <span class="num">1</span>)
+<span class="kw">end</span>
+
+<span class="bi">assert</span>(fact(<span class="num">10</span>) == <span class="num">3628800</span>)</code></pre>
+</section>
+
+<!-- ── Varargs ───────────────────────────────────────────────────────────── -->
+<section id="varargs">
+<h2>Arguments variadiques</h2>
+<p><code>...</code> capture tous les arguments supplémentaires.</p>
+
+<pre><code><span class="kw">func</span> log(niveau, ...)
+    <span class="bi">printf</span>(<span class="str">"[{}] "</span>, niveau)
+    <span class="bi">print</span>(...)
+<span class="kw">end</span>
+
+log(<span class="str">"INFO"</span>, <span class="str">"démarrage"</span>, <span class="str">"ok"</span>)  <span class="cmt">## [INFO] démarrage ok</span></code></pre>
+
+<h3>Passer les varargs à une autre fonction</h3>
+<pre><code><span class="kw">func</span> wrapper(a, ...)
+    <span class="kw">return</span> a, ...   <span class="cmt">## propage les varargs</span>
+<span class="kw">end</span>
+
+<span class="kw">var</span> x, y, z = wrapper(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)
+<span class="bi">assert</span>(x == <span class="num">1</span> <span class="kw">and</span> y == <span class="num">2</span> <span class="kw">and</span> z == <span class="num">3</span>)</code></pre>
+</section>
+
+<!-- ── Défauts ───────────────────────────────────────────────────────────── -->
+<section id="defaults">
+<h2>Paramètres par défaut</h2>
+<p>Les valeurs par défaut doivent être des constantes littérales.</p>
+
+<pre><code><span class="kw">func</span> greet(name, greeting=<span class="str">"Bonjour"</span>)
+    <span class="bi">printf</span>(<span class="str">"{}, {} !"</span>, greeting, name)
+<span class="kw">end</span>
+
+greet(<span class="str">"Alice"</span>)             <span class="cmt">## Bonjour, Alice !</span>
+greet(<span class="str">"Bob"</span>, <span class="str">"Salut"</span>)    <span class="cmt">## Salut, Bob !</span></code></pre>
+
+<pre><code><span class="kw">func</span> connect(host=<span class="str">"localhost"</span>, port=<span class="num">8080</span>, debug=<span class="bool">false</span>)
+    <span class="bi">printf</span>(<span class="str">"{}:{} debug={}"</span>, host, port, debug)
+<span class="kw">end</span>
+
+connect()                       <span class="cmt">## localhost:8080 debug=0</span>
+connect(<span class="str">"prod.example.com"</span>)   <span class="cmt">## prod.example.com:8080 debug=0</span>
+connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <span class="cmt">## prod:443 debug=0</span></code></pre>
+</section>
+
+<!-- ── Maps ──────────────────────────────────────────────────────────────── -->
+<section id="maps">
+<h2>Maps</h2>
+<p>Dictionnaire clé→valeur. Les clés sont toujours des chaînes. La syntaxe s'inspire de JSON mais accepte aussi les identifiants sans guillemets.</p>
+
+<h3>Création</h3>
+<pre><code><span class="kw">var</span> vide = {}
+
+<span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
+
+<span class="cmt">## clés sans guillemets</span>
+<span class="kw">var</span> config = {
+    host:  <span class="str">"localhost"</span>,
+    port:  <span class="num">8080</span>,
+    debug: <span class="bool">false</span>,
+}</code></pre>
+
+<h3>Lecture</h3>
+<div class="two-col">
+<div><div class="label">Crochets</div>
+<pre><code>point[<span class="str">"x"</span>]   <span class="cmt">## 10</span>
+point[<span class="str">"z"</span>]   <span class="cmt">## nil</span></code></pre></div>
+<div><div class="label">Point (équivalent)</div>
+<pre><code>point.x     <span class="cmt">## 10</span>
+point.z     <span class="cmt">## nil</span></code></pre></div>
+</div>
+
+<h3>Écriture</h3>
+<pre><code>point[<span class="str">"z"</span>] = <span class="num">0</span>    <span class="cmt">## nouvelle clé</span>
+point.z = <span class="num">5</span>      <span class="cmt">## équivalent</span>
+
+point[<span class="str">"x"</span>] += <span class="num">1</span>  <span class="cmt">## compound via crochet</span>
+point.y *= <span class="num">2</span>     <span class="cmt">## compound via point</span>
+
+<span class="bi">assert</span>(point.x == <span class="num">11</span>)
+<span class="bi">assert</span>(point.y == <span class="num">40</span>)</code></pre>
+
+<h3>Maps imbriquées</h3>
+<pre><code><span class="kw">var</span> scene = {
+    camera: {fov: <span class="num">60</span>, near: <span class="num">0.1</span>, far: <span class="num">1000</span>},
+    light:  {x: <span class="num">0</span>, y: <span class="num">10</span>, z: <span class="num">0</span>, intensity: <span class="num">1</span>},
+}
+
+<span class="bi">assert</span>(scene[<span class="str">"camera"</span>][<span class="str">"fov"</span>] == <span class="num">60</span>)</code></pre>
+
+<h3>Sémantique de copie</h3>
+<div class="callout warn">Les maps sont <strong>partagées par référence</strong> (comptage de référence). Affecter une map à une autre variable ne la clone pas.</div>
+<pre><code><span class="kw">var</span> a = {x: <span class="num">1</span>}
+<span class="kw">var</span> b = a      <span class="cmt">## b pointe vers la même map</span>
+b.x = <span class="num">99</span>
+<span class="bi">assert</span>(a.x == <span class="num">99</span>)  <span class="cmt">## a est modifié aussi</span></code></pre>
+</section>
+
+<!-- ── Itération ──────────────────────────────────────────────────────────── -->
+<section id="map-iter">
+<h2>Itération sur une map</h2>
+<p>La syntaxe <code>for k, v in m</code> parcourt toutes les entrées dans l'ordre d'insertion.</p>
+
+<pre><code><span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
+
+<span class="kw">for</span> nom, score <span class="kw">in</span> scores
+    <span class="bi">printf</span>(<span class="str">"{} → {}"</span>, nom, score)
+<span class="kw">end</span>
+<span class="cmt">## Alice → 95
+## Bob → 82
+## Carol → 78</span></code></pre>
+
+<h3>Somme des valeurs</h3>
+<pre><code><span class="kw">var</span> total = <span class="num">0</span>
+<span class="kw">for</span> k, v <span class="kw">in</span> scores
+    total += v
+<span class="kw">end</span>
+<span class="bi">printf</span>(<span class="str">"moyenne : {}"</span>, total / <span class="num">3</span>)</code></pre>
+
+<h3>Dans une fonction</h3>
+<pre><code><span class="kw">func</span> sum_values(m)
+    <span class="kw">var</span> s = <span class="num">0</span>
+    <span class="kw">for</span> k, v <span class="kw">in</span> m
+        s += v
+    <span class="kw">end</span>
+    <span class="kw">return</span> s
+<span class="kw">end</span>
+
+<span class="bi">assert</span>(sum_values(scores) == <span class="num">255</span>)</code></pre>
+</section>
+
+<!-- ── Try / Catch ───────────────────────────────────────────────────────── -->
+<section id="try">
+<h2>Gestion d'erreurs</h2>
+<p>Ollin utilise <code>try / catch / else / end</code>. Le bloc <code>else</code> est exécuté si <em>aucune</em> exception n'est levée. Tous les blocs sont optionnels.</p>
+
+<pre><code><span class="kw">try</span>
+    <span class="kw">throw</span> <span class="str">"quelque chose s'est mal passé"</span>
+<span class="kw">catch</span> err
+    <span class="bi">print</span>(<span class="str">"erreur :"</span>, err)
+<span class="kw">else</span>
+    <span class="bi">print</span>(<span class="str">"tout s'est bien passé"</span>)
+<span class="kw">end</span></code></pre>
+
+<h3>Throw de n'importe quel type</h3>
+<pre><code><span class="kw">func</span> diviser(a, b)
+    <span class="kw">if</span> b == <span class="num">0</span> <span class="kw">then</span>
+        <span class="kw">throw</span> {code: <span class="num">42</span>, msg: <span class="str">"division par zéro"</span>}
+    <span class="kw">end</span>
+    <span class="kw">return</span> a / b
+<span class="kw">end</span>
+
+<span class="kw">try</span>
+    <span class="kw">var</span> r = diviser(<span class="num">10</span>, <span class="num">0</span>)
+<span class="kw">catch</span> e
+    <span class="bi">printf</span>(<span class="str">"erreur {}: {}"</span>, e[<span class="str">"code"</span>], e[<span class="str">"msg"</span>])
+<span class="kw">end</span></code></pre>
+
+<h3>Try sans corps</h3>
+<pre><code><span class="kw">try</span>
+<span class="kw">catch</span> err
+    <span class="bi">print</span>(err)
+<span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── Builtins ───────────────────────────────────────────────────────────── -->
+<section id="builtins">
+<h2>Fonctions intégrées</h2>
+
+<h3>print</h3>
+<p>Affiche tous les arguments séparés par des espaces, suivi d'un retour à la ligne.</p>
+<pre><code><span class="bi">print</span>(<span class="str">"a ="</span>, <span class="num">42</span>, <span class="bool">true</span>)   <span class="cmt">## a = 42 1</span>
+<span class="bi">print</span>()                    <span class="cmt">## ligne vide</span></code></pre>
+
+<h3>printf</h3>
+<p>Formatage avec <code>{}</code> pour substitution positionnelle ou <code>{n}</code> pour indexation explicite.</p>
+<pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)   <span class="cmt">## 1 + 2 = 3</span>
+<span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>)       <span class="cmt">## oui et oui</span>
+<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, x, y) <span class="cmt">## index explicite</span></code></pre>
+
+<h3>assert</h3>
+<p>Lève une exception si la condition est falsy. Message optionnel.</p>
+<pre><code><span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
+<span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x doit être positif"</span>)</code></pre>
+
+<h3>time</h3>
+<p>Retourne le temps UNIX en secondes (float). Utile pour les benchmarks.</p>
+<pre><code><span class="kw">var</span> t0 = <span class="bi">time</span>()
+
+<span class="cmt">## ... code à mesurer ...</span>
+
+<span class="kw">var</span> t1 = <span class="bi">time</span>()
+<span class="bi">printf</span>(<span class="str">"durée : {} s"</span>, t1 - t0)</code></pre>
+
+<h3>Exemple complet</h3>
+<pre><code><span class="cmt">## Benchmark : somme de 1 million d'itérations</span>
+<span class="kw">var</span> N = <span class="num">1_000_000</span>
+<span class="kw">var</span> t0 = <span class="bi">time</span>()
+
+<span class="kw">var</span> s = <span class="num">0</span>
+<span class="kw">for</span> i <span class="kw">in</span> <span class="num">1</span>..N
+    s += i
+<span class="kw">end</span>
+
+<span class="kw">var</span> t1 = <span class="bi">time</span>()
+<span class="bi">printf</span>(<span class="str">"somme = {}  temps = {} s"</span>, s, t1 - t0)</code></pre>
+</section>
+
+</main>
+
+<script>
+// Active nav link on scroll
+const sections = document.querySelectorAll('section[id]');
+const links = document.querySelectorAll('nav a[href^="#"]');
+const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+        if (e.isIntersecting) {
+            links.forEach(l => l.classList.remove('active'));
+            const l = document.querySelector(`nav a[href="#${e.target.id}"]`);
+            if (l) l.classList.add('active');
+        }
+    });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>
