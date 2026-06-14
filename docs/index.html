@@ -332,6 +332,8 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <div class="section-label">Maps</div>
   <a href="#maps">Maps</a>
   <a href="#map-iter">Itération</a>
+  <div class="section-label">Arrays</div>
+  <a href="#arrays">Arrays</a>
   <div class="section-label">Gestion d'erreurs</div>
   <a href="#try">Try / Catch</a>
   <div class="section-label">Builtins</div>
@@ -342,11 +344,11 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 
 <div class="hero">
   <h1>Ollin</h1>
-  <p class="subtitle">Langage de script minimaliste — VM register-based, NaN-boxing, bytecode 32-bit</p>
+  <p class="subtitle">Langage de script minimaliste — VM register-based, struct taguée, bytecode 32-bit</p>
   <div class="badges">
     <span class="badge badge-blue">C++17</span>
     <span class="badge badge-green">Register VM</span>
-    <span class="badge badge-purple">NaN-boxing</span>
+    <span class="badge badge-purple">Tagged struct</span>
   </div>
 </div>
 
@@ -378,6 +380,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 <tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Double IEEE 754.</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>UTF-8, immuable, alloué sur le tas.</td></tr>
 <tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur, clés toujours des chaînes.</td></tr>
+<tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1, poolé.</td></tr>
 </table>
 
 <h3>Règles de vérité (truthy/falsy)</h3>
@@ -388,6 +391,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 <tr><td>float</td><td>== 0.0</td></tr>
 <tr><td>string</td><td>chaîne vide <code>""</code></td></tr>
 <tr><td>map</td><td>jamais (toujours truthy)</td></tr>
+<tr><td>array</td><td>jamais (toujours truthy)</td></tr>
 </table>
 
 <pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)
@@ -594,7 +598,7 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 <!-- ── For ───────────────────────────────────────────────────────────────── -->
 <section id="for">
 <h2>For</h2>
-<p>Trois variantes pour les boucles numériques, plus l'itération sur les maps.</p>
+<p>Trois variantes pour les boucles numériques, plus l'itération sur les maps et les arrays.</p>
 
 <h3>Range <code>i in start..end</code></h3>
 <p>Bornes inclusives, step = 1.</p>
@@ -783,6 +787,48 @@ b.x = <span class="num">99</span>
 <span class="kw">end</span>
 
 <span class="bi">assert</span>(sum_values(scores) == <span class="num">255</span>)</code></pre>
+</section>
+
+<!-- ── Arrays ─────────────────────────────────────────────────────────────── -->
+<section id="arrays">
+<h2>Arrays</h2>
+<p>Tableau dynamique distinct des maps. Les indices commencent à <strong>1</strong>. Les arrays sont poolés et ref-comptés comme les maps.</p>
+
+<h3>Création</h3>
+<pre><code><span class="kw">var</span> vide = []
+
+<span class="kw">var</span> t = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]
+
+<span class="kw">var</span> calc = [<span class="num">1</span>+<span class="num">1</span>, <span class="num">2</span>*<span class="num">3</span>, <span class="num">10</span>-<span class="num">1</span>]   <span class="cmt">## expressions autorisées</span></code></pre>
+
+<h3>Lecture / Écriture</h3>
+<pre><code><span class="bi">print</span>(t[<span class="num">1</span>])      <span class="cmt">## 10  (indexé à 1)</span>
+<span class="bi">print</span>(t[<span class="num">4</span>])      <span class="cmt">## nil (hors bounds → nil)</span>
+
+t[<span class="num">2</span>] = <span class="num">99</span>        <span class="cmt">## set</span>
+t[<span class="num">2</span>] += <span class="num">1</span>        <span class="cmt">## compound : += -= *= /= %=</span>
+
+<span class="kw">var</span> a = []
+a[<span class="num">5</span>] = <span class="str">"x"</span>      <span class="cmt">## grossit automatiquement (indices 1..4 → nil)</span></code></pre>
+
+<h3>Itération — valeurs seules</h3>
+<pre><code><span class="kw">var</span> sum = <span class="num">0</span>
+<span class="kw">for</span> v <span class="kw">in</span> [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>]
+    sum += v
+<span class="kw">end</span>
+<span class="bi">assert</span>(sum == <span class="num">15</span>)</code></pre>
+
+<h3>Itération — index + valeur</h3>
+<pre><code><span class="kw">var</span> t = [<span class="str">"a"</span>, <span class="str">"b"</span>, <span class="str">"c"</span>]
+<span class="kw">for</span> i, v <span class="kw">in</span> t
+    <span class="bi">printf</span>(<span class="str">"{}: {}"</span>, i, v)
+<span class="kw">end</span>
+<span class="cmt">## 1: a
+## 2: b
+## 3: c</span></code></pre>
+
+<h3>Sémantique de copie</h3>
+<div class="callout warn">Les arrays sont <strong>partagés par référence</strong> (comptage de référence), comme les maps.</div>
 </section>
 
 <!-- ── Try / Catch ───────────────────────────────────────────────────────── -->

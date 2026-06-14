@@ -8,11 +8,11 @@
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
-struct ForStmt; struct IndexAssignStmt; struct ForMapStmt;
+struct ForStmt; struct IndexAssignStmt; struct ForMapStmt; struct ForInStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
-struct MapExpr; struct IndexExpr;
+struct MapExpr; struct IndexExpr; struct ArrayExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -30,6 +30,7 @@ struct StmtVisitor {
     virtual void visit(const ForStmt&)       = 0;
     virtual void visit(const IndexAssignStmt&) = 0;
     virtual void visit(const ForMapStmt&)    = 0;
+    virtual void visit(const ForInStmt&)     = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -45,6 +46,7 @@ struct ExprVisitor {
     virtual void visit(const NilExpr&)    = 0;
     virtual void visit(const MapExpr&)    = 0;
     virtual void visit(const IndexExpr&)  = 0;
+    virtual void visit(const ArrayExpr&)  = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -217,13 +219,26 @@ struct ForStmt : Stmt {
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-// for k,v in map_expr
+// for k,v in map_or_array  (map→(key,val), array→(1-based index, val))
 struct ForMapStmt : Stmt {
     std::string key_var;
     std::string val_var;
     std::unique_ptr<Expr> map_expr;
     std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+// for v in iterable_expr  (array: val only)
+struct ForInStmt : Stmt {
+    std::string val_var;
+    std::unique_ptr<Expr> iter_expr;
+    std::vector<std::unique_ptr<Stmt>> body;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct ArrayExpr : Expr {
+    std::vector<std::unique_ptr<Expr>> elements;
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct Program {

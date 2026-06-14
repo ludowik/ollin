@@ -329,30 +329,59 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         return s;
     }
 
-    auto s = std::make_unique<ForStmt>();
-    s->var = first_var;
     if (match(TokenType::EQUALS)) {
         // for i=start,end[,step]
+        auto s = std::make_unique<ForStmt>();
+        s->var = first_var;
         s->start = expr();
         expect(TokenType::COMMA);
         s->end = expr();
         if (match(TokenType::COMMA)) s->step = expr();
+        consumeLineEnd();
+        while (true) {
+            skipNewlines();
+            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+            s->body.push_back(parseOneStmt());
+        }
+        expect(TokenType::END);
+        consumeLineEnd();
+        return s;
+    }
+
+    // for i in ...
+    expect(TokenType::IN);
+    auto iter_expr = expr();
+    if (check(TokenType::DOT_DOT)) {
+        // for i in start..end  (range)
+        advance(); // consume ..
+        auto s = std::make_unique<ForStmt>();
+        s->var   = first_var;
+        s->start = std::move(iter_expr);
+        s->end   = expr();
+        consumeLineEnd();
+        while (true) {
+            skipNewlines();
+            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+            s->body.push_back(parseOneStmt());
+        }
+        expect(TokenType::END);
+        consumeLineEnd();
+        return s;
     } else {
-        // for i in start..end
-        expect(TokenType::IN);
-        s->start = expr();
-        expect(TokenType::DOT_DOT);
-        s->end = expr();
+        // for v in iterable_expr  (array or map values)
+        auto s = std::make_unique<ForInStmt>();
+        s->val_var   = first_var;
+        s->iter_expr = std::move(iter_expr);
+        consumeLineEnd();
+        while (true) {
+            skipNewlines();
+            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+            s->body.push_back(parseOneStmt());
+        }
+        expect(TokenType::END);
+        consumeLineEnd();
+        return s;
     }
-    consumeLineEnd();
-    while (true) {
-        skipNewlines();
-        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
-        s->body.push_back(parseOneStmt());
-    }
-    expect(TokenType::END);
-    consumeLineEnd();
-    return s;
 }
 
 std::unique_ptr<Stmt> Parser::exprStmt() {
@@ -570,6 +599,37 @@ std::unique_ptr<Expr> Parser::primary() {
         expect(TokenType::RBRACE);
         // index/dot chaining after map literal
         std::unique_ptr<Expr> base = std::move(map);
+        while (check(TokenType::LBRACKET) || check(TokenType::DOT)) {
+            if (check(TokenType::LBRACKET)) {
+                advance();
+                auto key = expr();
+                expect(TokenType::RBRACKET);
+                auto ie = std::make_unique<IndexExpr>();
+                ie->obj = std::move(base);
+                ie->key = std::move(key);
+                base = std::move(ie);
+            } else {
+                advance(); // consume .
+                std::string field = expect(TokenType::IDENTIFIER).lexeme;
+                auto ie = std::make_unique<IndexExpr>();
+                ie->obj = std::move(base);
+                ie->key = std::make_unique<StringExpr>(field);
+                base = std::move(ie);
+            }
+        }
+        return base;
+    }
+    if (check(TokenType::LBRACKET)) {
+        advance(); // consume [
+        skipNewlines();
+        auto arr = std::make_unique<ArrayExpr>();
+        while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
+            arr->elements.push_back(expr());
+            if (check(TokenType::COMMA)) advance();
+            skipNewlines();
+        }
+        expect(TokenType::RBRACKET);
+        std::unique_ptr<Expr> base = std::move(arr);
         while (check(TokenType::LBRACKET) || check(TokenType::DOT)) {
             if (check(TokenType::LBRACKET)) {
                 advance();

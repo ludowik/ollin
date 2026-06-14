@@ -9,6 +9,7 @@ static std::string valueToString(const Value& v) {
     if (v.isNil())     return "nil";
     if (v.isString())  return v.asString();
     if (v.isMap())     return "{map}";
+    if (v.isArray())   return "{array}";
     if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
     double d = v.asFloat();
@@ -83,6 +84,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_BAND, &&op_BOR, &&op_BXOR,
         &&op_BNOT,
         &&op_BLSHIFT, &&op_BRSHIFT,
+        &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_STEP,
         &&op_HALT,
     };
 
@@ -358,32 +360,52 @@ op_NEW_MAP:
     NEXT();
 
 op_GET_INDEX: {
-    const Value& map = regs[base + B];
+    const Value& obj = regs[base + B];
     const Value& key = regs[base + C];
-    if (!map.isMap())    throw std::runtime_error("runtime: [] on non-map");
-    if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
-    regs[base + A] = map.mapGet(key.asString());
+    if (obj.isMap()) {
+        if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
+        regs[base + A] = obj.mapGet(key.asString());
+    } else if (obj.isArray()) {
+        if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
+        regs[base + A] = obj.arrayGet(key.asInt());
+    } else {
+        throw std::runtime_error("runtime: [] on non-indexable");
+    }
     NEXT();
 }
 
 op_SET_INDEX: {
-    Value& map = regs[base + A];
+    Value& obj = regs[base + A];
     const Value& key = regs[base + B];
-    if (!map.isMap())    throw std::runtime_error("runtime: []= on non-map");
-    if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
-    map.mapSet(key.asString(), regs[base + C]);
+    if (obj.isMap()) {
+        if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
+        obj.mapSet(key.asString(), regs[base + C]);
+    } else if (obj.isArray()) {
+        if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
+        obj.arraySet(key.asInt(), regs[base + C]);
+    } else {
+        throw std::runtime_error("runtime: []= on non-indexable");
+    }
     NEXT();
 }
 
 op_FOR_MAP_STEP: {
-    // R[base+A+3]=map, R[base+A+2]=iter; if done→ip=Bx else fill R[A+0]=key R[A+1]=val, iter++
-    Value& map_v = regs[base + A + 3];
-    if (!map_v.isMap()) throw std::runtime_error("runtime: for-in on non-map");
+    // R[base+A+3]=obj, R[base+A+2]=iter; if done→ip=Bx else fill R[A+0]=key R[A+1]=val, iter++
+    Value& obj_v = regs[base + A + 3];
     int64_t iter = regs[base + A + 2].isInteger() ? regs[base + A + 2].asInt() : 0;
-    int sz = map_v.mapSize();
-    if (iter >= sz) { ip = Bx; NEXT(); }
-    regs[base + A + 0] = Value(map_v.mapKeyAt((int)iter));
-    regs[base + A + 1] = map_v.mapValAt((int)iter);
+    if (obj_v.isMap()) {
+        int sz = obj_v.mapSize();
+        if (iter >= sz) { ip = Bx; NEXT(); }
+        regs[base + A + 0] = Value(obj_v.mapKeyAt((int)iter));
+        regs[base + A + 1] = obj_v.mapValAt((int)iter);
+    } else if (obj_v.isArray()) {
+        int sz = obj_v.arraySize();
+        if (iter >= sz) { ip = Bx; NEXT(); }
+        regs[base + A + 0] = Value(iter + 1);          // 1-based index as key
+        regs[base + A + 1] = obj_v.arrayGet(iter + 1); // 1-based value
+    } else {
+        throw std::runtime_error("runtime: for-in on non-iterable");
+    }
     regs[base + A + 2] = Value(iter + 1);
     NEXT();
 }
@@ -422,6 +444,26 @@ op_BRSHIFT: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (!bv.isInteger() || !cv.isInteger()) throw std::runtime_error("runtime: >> requires integer operands");
     regs[base+A] = Value(bv.asInt() >> (cv.asInt() & 63));
+    NEXT();
+}
+
+op_NEW_ARRAY:
+    regs[base + A] = Value::makeArray();
+    NEXT();
+
+op_ARRAY_PUSH:
+    regs[base + A].arrayPush(regs[base + B]);
+    NEXT();
+
+op_FOR_ITER_STEP: {
+    // R[base+A+2]=array, R[base+A+1]=iter; if done→ip=Bx else R[A+0]=val, iter++
+    Value& arr_v = regs[base + A + 2];
+    if (!arr_v.isArray()) throw std::runtime_error("runtime: for-in on non-array");
+    int64_t iter = regs[base + A + 1].isInteger() ? regs[base + A + 1].asInt() : 0;
+    int sz = arr_v.arraySize();
+    if (iter >= sz) { ip = Bx; NEXT(); }
+    regs[base + A + 0] = arr_v.arrayGet(iter + 1);  // 1-based
+    regs[base + A + 1] = Value(iter + 1);
     NEXT();
 }
 
@@ -547,25 +589,39 @@ op_HALT:
             if(regs.size()>h.regs_size)regs.resize(h.regs_size);
             regs[h.reg_base+h.catch_reg]=std::move(thrown); ip=h.catch_addr; break; }
         case Op::FOR_MAP_STEP: {
-            Value& map_v=regs[base+A+3];
-            if(!map_v.isMap())throw std::runtime_error("runtime: for-in on non-map");
+            Value& obj_v=regs[base+A+3];
             int64_t iter=regs[base+A+2].isInteger()?regs[base+A+2].asInt():0;
-            int sz=map_v.mapSize();
-            if(iter>=sz){ip=Bx;break;}
-            regs[base+A+0]=Value(map_v.mapKeyAt((int)iter));
-            regs[base+A+1]=map_v.mapValAt((int)iter);
+            if(obj_v.isMap()){
+                int sz=obj_v.mapSize(); if(iter>=sz){ip=Bx;break;}
+                regs[base+A+0]=Value(obj_v.mapKeyAt((int)iter));
+                regs[base+A+1]=obj_v.mapValAt((int)iter);
+            } else if(obj_v.isArray()){
+                int sz=obj_v.arraySize(); if(iter>=sz){ip=Bx;break;}
+                regs[base+A+0]=Value(iter+1);
+                regs[base+A+1]=obj_v.arrayGet(iter+1);
+            } else { throw std::runtime_error("runtime: for-in on non-iterable"); }
             regs[base+A+2]=Value(iter+1); break; }
         case Op::NEW_MAP: regs[base+A]=Value::makeMap(); break;
         case Op::GET_INDEX: {
-            const Value& map=regs[base+B]; const Value& key=regs[base+C];
-            if(!map.isMap())throw std::runtime_error("runtime: [] on non-map");
-            if(!key.isString())throw std::runtime_error("runtime: map key must be string");
-            regs[base+A]=map.mapGet(key.asString()); break; }
+            const Value& obj=regs[base+B]; const Value& key=regs[base+C];
+            if(obj.isMap()){
+                if(!key.isString())throw std::runtime_error("runtime: map key must be string");
+                regs[base+A]=obj.mapGet(key.asString());
+            } else if(obj.isArray()){
+                if(!key.isInteger())throw std::runtime_error("runtime: array index must be integer");
+                regs[base+A]=obj.arrayGet(key.asInt());
+            } else { throw std::runtime_error("runtime: [] on non-indexable"); }
+            break; }
         case Op::SET_INDEX: {
-            Value& map=regs[base+A]; const Value& key=regs[base+B];
-            if(!map.isMap())throw std::runtime_error("runtime: []= on non-map");
-            if(!key.isString())throw std::runtime_error("runtime: map key must be string");
-            map.mapSet(key.asString(),regs[base+C]); break; }
+            Value& obj=regs[base+A]; const Value& key=regs[base+B];
+            if(obj.isMap()){
+                if(!key.isString())throw std::runtime_error("runtime: map key must be string");
+                obj.mapSet(key.asString(),regs[base+C]);
+            } else if(obj.isArray()){
+                if(!key.isInteger())throw std::runtime_error("runtime: array index must be integer");
+                obj.arraySet(key.asInt(),regs[base+C]);
+            } else { throw std::runtime_error("runtime: []= on non-indexable"); }
+            break; }
         case Op::BAND: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
             if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: & requires integer operands");
             regs[base+A]=Value(bv.asInt()&cv.asInt()); break; }
@@ -584,6 +640,15 @@ op_HALT:
         case Op::BRSHIFT: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
             if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: >> requires integer operands");
             regs[base+A]=Value(bv.asInt()>>(cv.asInt()&63)); break; }
+        case Op::NEW_ARRAY: regs[base+A]=Value::makeArray(); break;
+        case Op::ARRAY_PUSH: regs[base+A].arrayPush(regs[base+B]); break;
+        case Op::FOR_ITER_STEP: {
+            Value& arr_v=regs[base+A+2];
+            if(!arr_v.isArray())throw std::runtime_error("runtime: for-in on non-array");
+            int64_t iter=regs[base+A+1].isInteger()?regs[base+A+1].asInt():0;
+            int sz=arr_v.arraySize(); if(iter>=sz){ip=Bx;break;}
+            regs[base+A+0]=arr_v.arrayGet(iter+1);
+            regs[base+A+1]=Value(iter+1); break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }

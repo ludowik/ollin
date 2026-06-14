@@ -126,3 +126,20 @@ m.c = 4 ## équivalent a m["c"]
 for k,v in m
 		print(k, v)
 end
+
+## tableau (array) — indexé à 1
+var arr = [10, 20, 30]
+print(arr[1])       ## 10
+arr[2] = 99         ## set
+arr[3] += 1         ## compound
+
+for v in arr        ## itération valeurs seules
+    print(v)
+end
+
+for i,v in arr      ## itération index + valeur (1-based)
+    printf("{}: {}", i, v)
+end
+
+var a2 = []         ## tableau vide
+a2[1] = "x"        ## set (grossit si besoin)

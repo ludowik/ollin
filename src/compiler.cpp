@@ -31,6 +31,11 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
                 out.push_back(fm->val_var);
             collectLocals(fm->body, out);
         }
+        if (auto* fi = dynamic_cast<const ForInStmt*>(s.get())) {
+            if (std::find(out.begin(), out.end(), fi->val_var) == out.end())
+                out.push_back(fi->val_var);
+            collectLocals(fi->body, out);
+        }
         if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
             collectLocals(w->body, out);
         if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
@@ -848,6 +853,19 @@ void Compiler::visit(const IndexExpr& e) {
     (void)saved;
 }
 
+void Compiler::visit(const ArrayExpr& e) {
+    int dest = allocReg();
+    chunk.emit(makeABC((uint8_t)Op::NEW_ARRAY, (uint8_t)dest, 0, 0));
+    for (auto& elem : e.elements) {
+        int saved = reg_top_;
+        int val_r = allocReg();
+        compileInto(*elem, val_r);
+        chunk.emit(makeABC((uint8_t)Op::ARRAY_PUSH, (uint8_t)dest, (uint8_t)val_r, 0));
+        reg_top_ = saved;
+    }
+    last_reg_ = dest;
+}
+
 void Compiler::visit(const ForMapStmt& s) {
     // 4 consecutive temps above locals_top_:
     //   [block+0]=key_out, [block+1]=val_out, [block+2]=iter, [block+3]=map_ref
@@ -892,6 +910,45 @@ void Compiler::visit(const ForMapStmt& s) {
     break_patches.pop_back();
 
     reg_top_ = block; // free 4 temps
+}
+
+void Compiler::visit(const ForInStmt& s) {
+    // 3 consecutive temps above locals_top_:
+    //   [block+0]=val_out, [block+1]=iter, [block+2]=obj_ref
+    int block = reg_top_;
+    reg_top_ += 3;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+    compileInto(*s.iter_expr, block + 2);
+    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(block + 1),
+                       chunk.addConstant(Value((int64_t)0))));
+
+    auto loop_start = (uint16_t)chunk.currentPos();
+    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_STEP, (uint8_t)block);
+
+    if (inFunction()) {
+        int v_reg = local_regs_.at(s.val_var);
+        if (v_reg != block + 0)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 0), 0));
+    } else {
+        uint16_t v_gidx = chunk.addIdentifier(s.val_var);
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 0), v_gidx));
+    }
+
+    break_patches.push_back({});
+    for (auto& stmt : s.body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+    chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
+
+    uint16_t exit = (uint16_t)chunk.currentPos();
+    chunk.patchJump(exit_patch, exit);
+    for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
+    break_patches.pop_back();
+
+    reg_top_ = block;
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
