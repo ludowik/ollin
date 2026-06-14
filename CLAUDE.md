@@ -153,16 +153,29 @@ m["a"] += 10                    ## compound : GET_INDEX + op + SET_INDEX
 m.a += 10                       ## idem via point
 ```
 
-Implémentation : `OllinMap { vector<pair<string,Value>> entries; int refcount; }`, pointeur 48-bit dans le NaN-boxing (MTAG = 0x7FFE).  
+Implémentation : `OllinMap { vector<pair<string,Value>> entries; int refcount; }`, ref-counted.  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
 `isFalsy(map)` → toujours `false`.
 
 ## Type entier natif
 
-Les littéraux entiers (`42`, `1_000`) sont stockés comme `int48` dans le NaN-boxing (tag `0x7FFD_xxxx_xxxx_xxxx`).  
+Les littéraux entiers (`42`, `1_000`) sont stockés comme `int64_t` (struct taguée, T_INTEGER).  
 Les opérations arithmétiques et comparaisons dispatchent sur le type :  
 - INT op INT → INT (ADD, SUB, MUL, MOD, comparaisons)  
 - INT op FLOAT ou FLOAT op INT → FLOAT (promotion automatique)  
 - DIV → toujours FLOAT  
-- Overflow int48 → wrapping silencieux (à améliorer si besoin)  
-`Value` reste 8 octets (NaN-boxing inchangé).
+- Overflow int64 → wrapping silencieux (comportement x86-64)  
+`Value` = 16 octets (uint8_t tag + union int64_t/double/ptr).
+
+## Représentation de Value
+
+Struct taguée (16 octets) — remplace le NaN-boxing :
+
+| tag        | valeur (uint8_t) | union actif | plage              |
+|------------|-----------------|-------------|---------------------|
+| T_NIL      | 0               | —           | —                   |
+| T_INTEGER  | 1               | ival (int64_t) | ±2^63            |
+| T_FLOAT    | 2               | dval (double) | IEEE 754 double   |
+| T_STRING   | 3               | sptr (std::string*) | —          |
+| T_MAP      | 4               | mptr (OllinMap*) | —            |
+

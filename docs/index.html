@@ -368,13 +368,13 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 <!-- ── Types ─────────────────────────────────────────────────────────────── -->
 <section id="types">
 <h2>Types</h2>
-<p>Ollin utilise le <strong>NaN-boxing</strong> : chaque valeur tient en 8 octets (<code>uint64_t</code>). Le type est encodé dans les bits de mantisse des NaN IEEE 754.</p>
+<p>Ollin utilise une <strong>struct taguée</strong> : 1 octet de tag + union 8 octets = 16 octets par valeur. Ceci permet des entiers 64-bit complets.</p>
 
 <table>
 <tr><th>Type</th><th>Littéral</th><th>Description</th></tr>
 <tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
 <tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Stockés comme entiers 1 et 0.</td></tr>
-<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code></td><td>Entier signé 48-bit (≈ ±140 téra).</td></tr>
+<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>).</td></tr>
 <tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Double IEEE 754.</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>UTF-8, immuable, alloué sur le tas.</td></tr>
 <tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur, clés toujours des chaînes.</td></tr>

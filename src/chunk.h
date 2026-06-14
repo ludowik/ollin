@@ -1,76 +1,69 @@
 #pragma once
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <utility>
 #include <vector>
 
-// NaN-boxing with integer type : Value = 8 octets (uint64_t).
+// Tagged union Value — 16 octets (tag + union 8 octets).
 //
-//   Float   : IEEE 754 non-NaN double         → (bits & QNAN) != QNAN
-//   Integer : bits[63:48] == 0x7FFD           → int48 signed in bits[47:0]
-//   Nil     : 0x7FFF_0000_0000_0001
-//   String  : bits[63:48] == 0xFFFF           → pointer in bits[47:0]
-//   Map     : bits[63:48] == 0x7FFE           → OllinMap* in bits[47:0]
-//
-// Patterns are non-overlapping. Integer range: -2^47 … 2^47-1 (~140 trillion).
+//   NIL     : tag == T_NIL
+//   Integer : tag == T_INTEGER  → int64_t  (range ±2^63)
+//   Float   : tag == T_FLOAT    → double IEEE 754
+//   String  : tag == T_STRING   → std::string* (heap, owned)
+//   Map     : tag == T_MAP      → OllinMap*    (heap, ref-counted)
 
 // Forward declaration
 struct OllinMap;
 
 struct Value {
-    uint64_t bits;
+    uint8_t tag;
+    union {
+        int64_t      ival;
+        double       dval;
+        std::string* sptr;
+        OllinMap*    mptr;
+    };
+
+    static constexpr uint8_t T_NIL     = 0;
+    static constexpr uint8_t T_INTEGER = 1;
+    static constexpr uint8_t T_FLOAT   = 2;
+    static constexpr uint8_t T_STRING  = 3;
+    static constexpr uint8_t T_MAP     = 4;
 
 private:
-    static constexpr uint64_t QNAN = 0x7FF8000000000000ULL;
-    static constexpr uint64_t NIL  = 0x7FFF000000000001ULL;
-    static constexpr uint64_t STAG = 0xFFFF000000000000ULL;
-    static constexpr uint64_t ITAG = 0x7FFD000000000000ULL;
-    static constexpr uint64_t MTAG = 0x7FFE000000000000ULL;
-    static constexpr uint64_t PMSK = 0x0000FFFFFFFFFFFFULL;
-
-    std::string* strPtr() const { return reinterpret_cast<std::string*>(bits & PMSK); }
-    static uint64_t mkStr(std::string* p) { return STAG | (reinterpret_cast<uint64_t>(p) & PMSK); }
-
-    OllinMap* mapPtr() const { return reinterpret_cast<OllinMap*>(bits & PMSK); }
-    static uint64_t mkMap(OllinMap* p) { return MTAG | (reinterpret_cast<uint64_t>(p) & PMSK); }
-
-    explicit Value(OllinMap* p) : bits(mkMap(p)) {}
+    explicit Value(OllinMap* p) : tag(T_MAP), mptr(p) {}
 
 public:
-    Value()             : bits(NIL) {}
-    Value(double d)     { std::memcpy(&bits, &d, 8); }
-    Value(int64_t v)    : bits(ITAG | ((uint64_t)v & PMSK)) {}
-    Value(std::string v): bits(mkStr(new std::string(std::move(v)))) {}
+    Value()              : tag(T_NIL), ival(0) {}
+    Value(double d)      : tag(T_FLOAT), dval(d) {}
+    Value(int64_t v)     : tag(T_INTEGER), ival(v) {}
+    Value(std::string v) : tag(T_STRING), sptr(new std::string(std::move(v))) {}
 
     // Bodies defined after OllinMap (complete type required for refcount/delete)
     Value(const Value& o);
-    Value(Value&& o) noexcept : bits(o.bits) { o.bits = NIL; }
+    Value(Value&& o) noexcept : tag(o.tag), ival(o.ival) { o.tag = T_NIL; }
     Value& operator=(const Value& o);
     Value& operator=(Value&& o) noexcept;
     ~Value();
 
-    bool isNil()     const { return bits == NIL; }
-    bool isFloat()   const { return (bits & QNAN) != QNAN; }
-    bool isInteger() const { return (bits >> 48) == 0x7FFDu; }
-    bool isNumber()  const { return isFloat() || isInteger(); }
-    bool isString()  const { return (bits & STAG) == STAG; }
-    bool isMap()     const { return (bits >> 48) == 0x7FFEu; }
+    bool isNil()     const { return tag == T_NIL; }
+    bool isFloat()   const { return tag == T_FLOAT; }
+    bool isInteger() const { return tag == T_INTEGER; }
+    bool isNumber()  const { return tag == T_INTEGER || tag == T_FLOAT; }
+    bool isString()  const { return tag == T_STRING; }
+    bool isMap()     const { return tag == T_MAP; }
 
-    int64_t asInt()  const {
-        int64_t v = (int64_t)(bits & PMSK);
-        return (v & (1LL << 47)) ? (v | (int64_t)~PMSK) : v;
-    }
-    double  asFloat() const { double d; std::memcpy(&d, &bits, 8); return d; }
-    double  asNum()   const { return isInteger() ? (double)asInt() : asFloat(); }
-    const std::string& asString() const { return *strPtr(); }
+    int64_t asInt()            const { return ival; }
+    double  asFloat()          const { return dval; }
+    double  asNum()            const { return isInteger() ? (double)ival : dval; }
+    const std::string& asString() const { return *sptr; }
 
     static Value makeMap();
     Value       mapGet(const std::string& key) const;
     void        mapSet(const std::string& key, const Value& val);
-    int         mapSize()          const;
-    std::string mapKeyAt(int i)    const;
-    Value       mapValAt(int i)    const;
+    int         mapSize()           const;
+    std::string mapKeyAt(int idx)   const;
+    Value       mapValAt(int idx)   const;
 };
 
 struct OllinMap {
@@ -109,35 +102,55 @@ struct MapPool {
 inline MapPool& map_pool() { static MapPool p; return p; }
 
 inline Value Value::makeMap() { return Value(map_pool().acquire()); }
-inline Value Value::mapGet(const std::string& k)           const { return mapPtr()->get(k); }
-inline void  Value::mapSet(const std::string& k, const Value& v) { mapPtr()->set(k, v); }
-inline int         Value::mapSize()       const { return (int)mapPtr()->entries.size(); }
-inline std::string Value::mapKeyAt(int i) const { return mapPtr()->entries[i].first; }
-inline Value       Value::mapValAt(int i) const { return mapPtr()->entries[i].second; }
+inline Value Value::mapGet(const std::string& k)                 const { return mptr->get(k); }
+inline void  Value::mapSet(const std::string& k, const Value& v)       { mptr->set(k, v); }
+inline int         Value::mapSize()          const { return (int)mptr->entries.size(); }
+inline std::string Value::mapKeyAt(int idx)  const { return mptr->entries[idx].first; }
+inline Value       Value::mapValAt(int idx)  const { return mptr->entries[idx].second; }
 
-inline Value::Value(const Value& o) : bits(o.bits) {
-    if (isString()) bits = mkStr(new std::string(asString()));
-    else if (isMap()) mapPtr()->refcount++;
+inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
+    switch (tag) {
+        case T_NIL:     break;
+        case T_INTEGER: ival = o.ival; break;
+        case T_FLOAT:   dval = o.dval; break;
+        case T_STRING:  sptr = new std::string(*o.sptr); break;
+        case T_MAP:     mptr = o.mptr; mptr->refcount++; break;
+    }
 }
 inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
-    std::string* new_str = o.isString() ? new std::string(o.asString()) : nullptr;
-    if (isString()) delete strPtr();
-    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) map_pool().release(mp); }
-    if (new_str) bits = mkStr(new_str);
-    else { bits = o.bits; if (isMap()) mapPtr()->refcount++; }
+    std::string* new_s = (o.tag == T_STRING) ? new std::string(*o.sptr) : nullptr;
+    switch (tag) {
+        case T_STRING: delete sptr; break;
+        case T_MAP: { OllinMap* mp = mptr; if (--mp->refcount == 0) map_pool().release(mp); break; }
+        default: break;
+    }
+    tag = o.tag; ival = 0;
+    switch (tag) {
+        case T_NIL:     break;
+        case T_INTEGER: ival = o.ival; break;
+        case T_FLOAT:   dval = o.dval; break;
+        case T_STRING:  sptr = new_s; break;
+        case T_MAP:     mptr = o.mptr; mptr->refcount++; break;
+    }
     return *this;
 }
 inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
-    if (isString()) delete strPtr();
-    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) map_pool().release(mp); }
-    bits = o.bits; o.bits = NIL;
+    switch (tag) {
+        case T_STRING: delete sptr; break;
+        case T_MAP: { OllinMap* mp = mptr; if (--mp->refcount == 0) map_pool().release(mp); break; }
+        default: break;
+    }
+    tag = o.tag; ival = o.ival; o.tag = T_NIL;
     return *this;
 }
 inline Value::~Value() {
-    if (isString()) delete strPtr();
-    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) map_pool().release(mp); }
+    switch (tag) {
+        case T_STRING: delete sptr; break;
+        case T_MAP: { OllinMap* mp = mptr; if (--mp->refcount == 0) map_pool().release(mp); break; }
+        default: break;
+    }
 }
 
 inline bool isFalsy(const Value& v) {
