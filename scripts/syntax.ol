@@ -110,9 +110,15 @@ for i=10,1,-1   ## step négatif
 end
 
 var t = {} ## map : syntaxe identique a json / js
-var m = {"a": 1, "b": 2}   ## map literal with string keys
+var m = {
+	"a": 1,
+  "b": 2,
+	macle: true,
+	mamap: {)
+}   ## map literal with string keys
 print(m["a"])                ## index get → 1
 m["c"] = 3                   ## index set
 m["a"] += 10                 ## compound index assignment
 assert(m["a"] == 11)
 assert(m["c"] == 3)
+m.c = 4 ## équivalent a m["c"] 
