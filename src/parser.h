@@ -11,6 +11,7 @@ public:
 private:
     std::vector<Token> tokens;
     int pos = 0;
+    int paren_depth_ = 0;
 
     Token peek() const;
     Token advance();
@@ -20,6 +21,7 @@ private:
     void skipNewlines();
 
     TokenType peekNextType() const;
+    TokenType peekAt(int offset) const;
     void consumeLineEnd();   // absorbe un COMMENT de fin de ligne optionnel + NEWLINE
 
     std::unique_ptr<Stmt> parseOneStmt();
@@ -38,7 +40,11 @@ private:
     std::unique_ptr<Expr> expr();
     std::unique_ptr<Expr> logical();
     std::unique_ptr<Expr> logicalAnd();
+    std::unique_ptr<Expr> bitwiseOr();
+    std::unique_ptr<Expr> bitwiseXor();
+    std::unique_ptr<Expr> bitwiseAnd();
     std::unique_ptr<Expr> comparison();
+    std::unique_ptr<Expr> shift();
     std::unique_ptr<Expr> additive();
     std::unique_ptr<Expr> multiplicative();
     std::unique_ptr<Expr> unary();

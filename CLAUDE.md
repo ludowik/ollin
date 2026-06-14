@@ -43,7 +43,10 @@ ollin/
 | `syntax.ol` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
 | `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.ol` — à maintenir à chaque évolution |
 | `test.ol` | Claude | fichier de tests libres — modifiable à volonté |
+| `docs/index.html` | Claude | tutoriel HTML — à maintenir à chaque évolution du langage |
 | `ollin-vscode/` | Claude | extension VS Code (colorisation) — à maintenir à chaque évolution du langage |
+
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf`, `docs/index.html`, `ollin-vscode/` et `CLAUDE.md`.
 
 ## Versionning
 
@@ -92,6 +95,16 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | TRY           | ABx    | A=catch_reg, Bx=catch_addr | empile handler{catch_addr, catch_reg}            |
 | POP_TRY       | —      |                            | dépile le handler (try body ok)                  |
 | THROW         | A      | A=value_reg                | lance R[A] → restaure frame → jump handler      |
+| NEW_MAP       | A      | A=dest                     | R[A] = nouvelle map vide                         |
+| GET_INDEX     | ABC    | A=dst, B=map, C=key        | R[A] = R[B][R[C]]  (B=map, C=key string)        |
+| SET_INDEX     | ABC    | A=map, B=key, C=val        | R[A][R[B]] = R[C]  (A=map, B=key string)        |
+| FOR_MAP_STEP  | ABx    | A=block_base, Bx=end_addr  | R[A+3]=map R[A+2]=iter; si iter≥size→Bx sinon R[A]=key R[A+1]=val iter++ |
+| BAND          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] & R[C]  (entiers)                   |
+| BOR           | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] \| R[C]  (entiers)                  |
+| BXOR          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] ^ R[C]  (entiers)                   |
+| BNOT          | AB     | A=dst, B=src               | R[A] = ~R[B]  (entier)                          |
+| BLSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] << (R[C] & 63)  (entiers)           |
+| BRSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] >> (R[C] & 63)  (entiers)           |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -105,13 +118,64 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Boucle `for`
 
-Deux syntaxes, même sémantique (step = 1, bornes inclusives) :
+Trois syntaxes :
 
 ```
-for i in start..end   ## range avec opérateur ..
-for i=start,end       ## style numérique
+for i in start..end         ## range, step = 1 implicite (bornes inclusives)
+for i=start,end             ## numérique, step = 1 implicite
+for i=start,end,step        ## step positif ou négatif
+for k,v in map_expr         ## itération sur les entrées d'une map
 ```
 
-Dans une fonction : `i` = registre local, `end` = registre temporaire alloué au-dessus de locals_top_.  
-En portée globale : `i` et `__for_end_N` sont des globaux.  
-`break` fonctionne dans les deux formes.
+Step absent → step = 1 (condition `i <= end`).  
+Step présent → condition runtime `(end - i) * step >= 0` (valide dans les deux sens).  
+Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires au-dessus de `locals_top_`.  
+En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
+`break` fonctionne dans toutes les formes.
+
+`for k,v in m` : utilise 4 registres contigus au-dessus de `locals_top_` : `[block+0]`=key_out, `[block+1]`=val_out, `[block+2]`=iter, `[block+3]`=map_ref. Opcode `FOR_MAP_STEP`.
+
+## Type map
+
+Syntaxe JSON-like, clés toujours des chaînes :
+
+```
+var t = {}                      ## map vide
+var m = {                       ## literal multi-lignes
+    "a": 1,
+    b: 2,                       ## clé identifiant (sans guillemets)
+}
+print(m["a"])                   ## GET_INDEX via crochet
+print(m.a)                      ## GET_INDEX via point (syntaxe équivalente)
+m["c"] = 3                      ## SET_INDEX via crochet
+m.c = 3                         ## SET_INDEX via point
+m["a"] += 10                    ## compound : GET_INDEX + op + SET_INDEX
+m.a += 10                       ## idem via point
+```
+
+Implémentation : `OllinMap { vector<pair<string,Value>> entries; int refcount; }`, ref-counted.  
+Sémantique de copie : référence comptée (partage de la même map, pas clone).  
+`isFalsy(map)` → toujours `false`.
+
+## Type entier natif
+
+Les littéraux entiers (`42`, `1_000`) sont stockés comme `int64_t` (struct taguée, T_INTEGER).  
+Les opérations arithmétiques et comparaisons dispatchent sur le type :  
+- INT op INT → INT (ADD, SUB, MUL, MOD, comparaisons)  
+- INT op FLOAT ou FLOAT op INT → FLOAT (promotion automatique)  
+- DIV → toujours FLOAT  
+- Overflow int64 → wrapping silencieux (comportement x86-64)  
+`Value` = 16 octets (uint8_t tag + union int64_t/double/ptr).
+
+## Représentation de Value
+
+Struct taguée (16 octets) — remplace le NaN-boxing :
+
+| tag        | valeur (uint8_t) | union actif | plage              |
+|------------|-----------------|-------------|---------------------|
+| T_NIL      | 0               | —           | —                   |
+| T_INTEGER  | 1               | ival (int64_t) | ±2^63            |
+| T_FLOAT    | 2               | dval (double) | IEEE 754 double   |
+| T_STRING   | 3               | sptr (std::string*) | —          |
+| T_MAP      | 4               | mptr (OllinMap*) | —            |
+

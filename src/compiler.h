@@ -53,6 +53,8 @@ private:
     void visit(const FuncDeclStmt&)  override;
     void visit(const ReturnStmt&)    override;
     void visit(const ForStmt&)       override;
+    void visit(const ForMapStmt&)    override;
+    void visit(const ForInStmt&)     override;
 
     // ExprVisitor
     void visit(const BoolExpr&)    override;
@@ -66,6 +68,7 @@ private:
     void visit(const NilExpr&)     override;
     void visit(const MapExpr&)     override;
     void visit(const IndexExpr&)   override;
+    void visit(const ArrayExpr&)   override;
 
     // StmtVisitor (map)
     void visit(const IndexAssignStmt&) override;

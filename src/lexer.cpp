@@ -144,13 +144,19 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case '>':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::GREATER_EQUAL, ">=", line}); }
+                else if (!atEnd() && peek() == '>') { advance(); tokens.push_back({TokenType::RSHIFT, ">>", line}); }
                 else tokens.push_back({TokenType::GREATER, ">", line});
                 break;
             case '<':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::LESS_EQUAL, "<=", line}); }
                 else if (!atEnd() && peek() == '>') { advance(); tokens.push_back({TokenType::NOT_EQUAL, "<>", line}); }
+                else if (!atEnd() && peek() == '<') { advance(); tokens.push_back({TokenType::LSHIFT, "<<", line}); }
                 else tokens.push_back({TokenType::LESS, "<", line});
                 break;
+            case '&':  tokens.push_back({TokenType::AMP,   "&", line});   break;
+            case '|':  tokens.push_back({TokenType::PIPE,  "|", line});   break;
+            case '^':  tokens.push_back({TokenType::CARET, "^", line});   break;
+            case '~':  tokens.push_back({TokenType::TILDE, "~", line});   break;
             case '{':  tokens.push_back({TokenType::LBRACE,   "{", line});        break;
             case '}':  tokens.push_back({TokenType::RBRACE,   "}", line});        break;
             case '[':  tokens.push_back({TokenType::LBRACKET, "[", line});        break;

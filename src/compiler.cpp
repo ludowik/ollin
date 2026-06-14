@@ -24,6 +24,18 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
                 out.push_back(f->var);
             collectLocals(f->body, out);
         }
+        if (auto* fm = dynamic_cast<const ForMapStmt*>(s.get())) {
+            if (std::find(out.begin(), out.end(), fm->key_var) == out.end())
+                out.push_back(fm->key_var);
+            if (std::find(out.begin(), out.end(), fm->val_var) == out.end())
+                out.push_back(fm->val_var);
+            collectLocals(fm->body, out);
+        }
+        if (auto* fi = dynamic_cast<const ForInStmt*>(s.get())) {
+            if (std::find(out.begin(), out.end(), fi->val_var) == out.end())
+                out.push_back(fi->val_var);
+            collectLocals(fi->body, out);
+        }
         if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
             collectLocals(w->body, out);
         if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
@@ -249,23 +261,19 @@ void Compiler::visit(const AssignStmt& s) {
             if (s.op == '\0') {
                 compileInto(*s.value, dest);
             } else {
-                // Compound: load current value, compile rhs, apply op
+                // Compound: rhs is fully evaluated before writing back to dest
                 int saved = reg_top_;
-                // rhs in a temp
                 s.value->accept(*this);
                 int rhs = last_reg_;
-                // result reg
-                int res = allocReg();
-                if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                // Emit op directly into dest — safe: rhs is already in a register
                 switch (s.op) {
-                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
                     default:  throw std::runtime_error(std::string("unknown assign op: ") + s.op);
                 }
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)res, 0));
                 reg_top_ = saved;
             }
             return;
@@ -526,6 +534,15 @@ void Compiler::visit(const ForStmt& s) {
             compileInto(*s.step, step_reg);
         }
 
+        // Preallocate constant 1 before the loop (avoids LOAD_K every iteration)
+        int one_r = -1;
+        if (step_reg < 0) {
+            one_r = reg_top_++;
+            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
+                               chunk.addConstant(Value((int64_t)1))));
+        }
+
         auto loop_start = (uint16_t)chunk.currentPos();
 
         // Scratch registers for condition (never permanently allocated)
@@ -554,12 +571,8 @@ void Compiler::visit(const ForStmt& s) {
             reg_top_ = saved;
         }
 
-        // Increment
+        // Increment (one_r already loaded before the loop)
         if (step_reg < 0) {
-            int one_r = reg_top_;
-            if (reg_top_ + 1 > reg_count_) reg_count_ = reg_top_ + 1;
-            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
-                               chunk.addConstant(Value((int64_t)1))));
             chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)one_r));
         } else {
             chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)step_reg));
@@ -572,7 +585,7 @@ void Compiler::visit(const ForStmt& s) {
         for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
         break_patches.pop_back();
 
-        // Free temps: end_reg [+ step_reg]
+        // Free temps: end_reg [+ one_r] [+ step_reg]
         reg_top_ = end_reg;
     } else {
         // Global scope: loop var, end, and optional step are globals
@@ -719,8 +732,13 @@ void Compiler::visit(const BinaryExpr& e) {
         case 'L': chunk.emit(makeABC((uint8_t)Op::LE,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case 'N': chunk.emit(makeABC((uint8_t)Op::NEQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case '=': chunk.emit(makeABC((uint8_t)Op::EQ,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '|': chunk.emit(makeABC((uint8_t)Op::OR,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '&': chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case '|': chunk.emit(makeABC((uint8_t)Op::OR,      (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case '&': chunk.emit(makeABC((uint8_t)Op::AND,     (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'o': chunk.emit(makeABC((uint8_t)Op::BOR,     (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'b': chunk.emit(makeABC((uint8_t)Op::BAND,    (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'x': chunk.emit(makeABC((uint8_t)Op::BXOR,   (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'l': chunk.emit(makeABC((uint8_t)Op::BLSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'r': chunk.emit(makeABC((uint8_t)Op::BRSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         default:  throw std::runtime_error(std::string("unknown binary op: ") + e.op);
     }
     (void)saved_after_left;
@@ -734,6 +752,8 @@ void Compiler::visit(const UnaryExpr& e) {
         chunk.emit(makeABC((uint8_t)Op::NEGATE, (uint8_t)last_reg_, (uint8_t)rIn, 0));
     else if (e.op == '!')
         chunk.emit(makeABC((uint8_t)Op::NOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
+    else if (e.op == '~')
+        chunk.emit(makeABC((uint8_t)Op::BNOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
     else
         throw std::runtime_error(std::string("unknown unary op: ") + e.op);
 }
@@ -831,6 +851,104 @@ void Compiler::visit(const IndexExpr& e) {
     chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)dest, (uint8_t)obj_r, (uint8_t)key_r));
     last_reg_ = dest;
     (void)saved;
+}
+
+void Compiler::visit(const ArrayExpr& e) {
+    int dest = allocReg();
+    chunk.emit(makeABC((uint8_t)Op::NEW_ARRAY, (uint8_t)dest, 0, 0));
+    for (auto& elem : e.elements) {
+        int saved = reg_top_;
+        int val_r = allocReg();
+        compileInto(*elem, val_r);
+        chunk.emit(makeABC((uint8_t)Op::ARRAY_PUSH, (uint8_t)dest, (uint8_t)val_r, 0));
+        reg_top_ = saved;
+    }
+    last_reg_ = dest;
+}
+
+void Compiler::visit(const ForMapStmt& s) {
+    // 4 consecutive temps above locals_top_:
+    //   [block+0]=key_out, [block+1]=val_out, [block+2]=iter, [block+3]=map_ref
+    int block = reg_top_;
+    reg_top_ += 4;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+    // map into R[block+3]
+    compileInto(*s.map_expr, block + 3);
+    // iter = 0
+    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(block + 2),
+                       chunk.addConstant(Value((int64_t)0))));
+
+    auto loop_start = (uint16_t)chunk.currentPos();
+    size_t exit_patch = chunk.emitJump(Op::FOR_MAP_STEP, (uint8_t)block);
+
+    if (inFunction()) {
+        int k_reg = local_regs_.at(s.key_var);
+        int v_reg = local_regs_.at(s.val_var);
+        if (k_reg != block + 0)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)k_reg, (uint8_t)(block + 0), 0));
+        if (v_reg != block + 1)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 1), 0));
+    } else {
+        uint16_t k_gidx = chunk.addIdentifier(s.key_var);
+        uint16_t v_gidx = chunk.addIdentifier(s.val_var);
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 0), k_gidx));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 1), v_gidx));
+    }
+
+    break_patches.push_back({});
+    for (auto& stmt : s.body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+    chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
+
+    uint16_t exit = (uint16_t)chunk.currentPos();
+    chunk.patchJump(exit_patch, exit);
+    for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
+    break_patches.pop_back();
+
+    reg_top_ = block; // free 4 temps
+}
+
+void Compiler::visit(const ForInStmt& s) {
+    // 3 consecutive temps above locals_top_:
+    //   [block+0]=val_out, [block+1]=iter, [block+2]=obj_ref
+    int block = reg_top_;
+    reg_top_ += 3;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+    compileInto(*s.iter_expr, block + 2);
+    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(block + 1),
+                       chunk.addConstant(Value((int64_t)0))));
+
+    auto loop_start = (uint16_t)chunk.currentPos();
+    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_STEP, (uint8_t)block);
+
+    if (inFunction()) {
+        int v_reg = local_regs_.at(s.val_var);
+        if (v_reg != block + 0)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 0), 0));
+    } else {
+        uint16_t v_gidx = chunk.addIdentifier(s.val_var);
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 0), v_gidx));
+    }
+
+    break_patches.push_back({});
+    for (auto& stmt : s.body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+    chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
+
+    uint16_t exit = (uint16_t)chunk.currentPos();
+    chunk.patchJump(exit_patch, exit);
+    for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
+    break_patches.pop_back();
+
+    reg_top_ = block;
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {

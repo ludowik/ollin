@@ -18,7 +18,8 @@ stmt           = varDecl
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "in" expr ".." expr NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT "=" expr "," expr NEWLINE { stmt } "end" NEWLINE ;
+               | "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
+               | "for" IDENT "," IDENT "in" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]
@@ -32,32 +33,43 @@ returnStmt     = "return" [ retvals ] NEWLINE ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
+indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE
+               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
-logicalAnd     = comparison { "and" comparison } ;
-comparison     = additive { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) additive } ;
+logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
+bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
+bitwiseXor     = bitwiseAnd { "^" bitwiseAnd } ;
+bitwiseAnd     = comparison { "&" comparison } ;
+comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
+shift          = additive { ( "<<" | ">>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
 multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
-unary          = ( "-" | "not" ) unary | primary ;
+unary          = ( "-" | "not" | "~" ) unary | primary ;
 primary        = NUMBER
                | STRING
                | BOOL
                | NIL
-               | IDENT
-               | call
+               | IDENT { ( "[" expr "]" | "." IDENT ) }
+               | call  { ( "[" expr "]" | "." IDENT ) }
+               | mapLit { ( "[" expr "]" | "." IDENT ) }
                | "..."
                | "(" expr ")" ;
 
+mapLit         = "{" [ NEWLINE ]
+                   [ mapEntry { "," [ NEWLINE ] mapEntry } [ NEWLINE ] ]
+                 "}" ;
+mapEntry       = ( STRING | IDENT ) ":" expr ;
 call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
 
-NUMBER         = ( digit { [ "_" ] digit }* [ "." { digit | "_" }* ] )
-               | ( "." digit { [ "_" ] digit }* ) ;
-             (* les underscores sont ignorés : 1_000 == 1000 *)
+NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
+               | ( "." digit { [ "_" ] digit } ) ;
+             (* underscores ignorés : 1_000 == 1000 ; littéraux entiers → int48, sinon float *)
 STRING         = '"' { any \ '"' } '"' ;
 BOOL           = "true" | "false" ;
 NIL            = "nil" ;

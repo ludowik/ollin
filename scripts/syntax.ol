@@ -110,9 +110,36 @@ for i=10,1,-1   ## step négatif
 end
 
 var t = {} ## map : syntaxe identique a json / js
-var m = {"a": 1, "b": 2}   ## map literal with string keys
+var m = {
+	"a": 1,
+  "b": 2,
+	macle: true,
+	mamap: {}
+}   ## map literal with string keys
 print(m["a"])                ## index get → 1
 m["c"] = 3                   ## index set
 m["a"] += 10                 ## compound index assignment
 assert(m["a"] == 11)
 assert(m["c"] == 3)
+m.c = 4 ## équivalent a m["c"] 
+
+for k,v in m
+		print(k, v)
+end
+
+## tableau (array) — indexé à 1
+var arr = [10, 20, 30]
+print(arr[1])       ## 10
+arr[2] = 99         ## set
+arr[3] += 1         ## compound
+
+for v in arr        ## itération valeurs seules
+    print(v)
+end
+
+for i,v in arr      ## itération index + valeur (1-based)
+    printf("{}: {}", i, v)
+end
+
+var a2 = []         ## tableau vide
+a2[1] = "x"        ## set (grossit si besoin)
