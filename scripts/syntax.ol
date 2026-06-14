@@ -97,8 +97,10 @@ for i in 1..10
 		print(i)
 end
 
-for i=1,10
+var de, a, step = 1, 10, 2
+for i=de,a,step
 		print(i)
 end
+
 
 
