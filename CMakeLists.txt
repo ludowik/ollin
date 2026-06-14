@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(ollin
     src/main.cpp
     src/chunk.cpp
+    src/array.cpp
     src/map.cpp
     src/lexer.cpp
     src/parser.cpp

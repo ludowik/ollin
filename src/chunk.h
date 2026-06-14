@@ -12,10 +12,10 @@
 //   Float   : tag == T_FLOAT    → double IEEE 754
 //   String  : tag == T_STRING   → const std::string*  (internée, non-owning)
 //   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
-//   Array   : tag == T_ARRAY    → OllinArray*   (heap, ref-counted, 1-based)
+//   Array   : tag == T_ARRAY    → Array*   (heap, ref-counted, 1-based)
 
 struct Map;
-struct OllinArray;
+struct Array;
 
 struct Value {
     uint8_t tag;
@@ -24,7 +24,7 @@ struct Value {
         double             dval;
         const std::string* sptr;  // pointe vers la string_table (non-owning)
         Map*               mptr;
-        OllinArray*        aptr;
+        Array*             aptr;
     };
 
     static constexpr uint8_t T_NIL     = 0;
@@ -35,8 +35,8 @@ struct Value {
     static constexpr uint8_t T_ARRAY   = 5;
 
 private:
-    explicit Value(Map*        p) : tag(T_MAP),   mptr(p) {}
-    explicit Value(OllinArray* p) : tag(T_ARRAY), aptr(p) {}
+    explicit Value(Map*   p) : tag(T_MAP),   mptr(p) {}
+    explicit Value(Array* p) : tag(T_ARRAY), aptr(p) {}
 
 public:
     Value()              : tag(T_NIL), ival(0) {}
@@ -77,46 +77,13 @@ public:
     int    arraySize()                              const;
 };
 
-// ── OllinArray ────────────────────────────────────────────────────────────────
-struct OllinArray {
-    std::vector<Value> items;
-    int refcount = 1;
-
-    Value get(int64_t idx) const {          // 1-based externally
-        int64_t i = idx - 1;
-        if (i < 0 || i >= (int64_t)items.size()) return Value{};
-        return items[(size_t)i];
-    }
-    void set(int64_t idx, const Value& v) { // 1-based externally, grows if needed
-        int64_t i = idx - 1;
-        if (i < 0) return;
-        if (i >= (int64_t)items.size()) items.resize((size_t)(i + 1));
-        items[(size_t)i] = v;
-    }
-    void push(const Value& v) { items.push_back(v); }
-};
-
-struct ArrayPool {
-    static constexpr int CAP = 64;
-    OllinArray* buf[CAP];
-    int         n = 0;
-
-    OllinArray* acquire() {
-        if (n) { OllinArray* a = buf[--n]; a->refcount = 1; return a; }
-        return new OllinArray();
-    }
-    void release(OllinArray* a) {
-        a->items.clear();
-        if (n < CAP) buf[n++] = a;
-        else delete a;
-    }
-};
-inline ArrayPool& array_pool() { static ArrayPool p; return p; }
+// ── Array (1-based, ref-counted) — définition complète ───────────────────────
+#include "array.h"
 
 // ── Map (LinkedHashMap, clés Value) — définition complète ────────────────────
 #include "map.h"
 
-// ── inline Value implementations (nécessitent Map et OllinArray complets) ────
+// ── inline Value implementations (nécessitent Map et Array complets) ────
 
 inline Value Value::makeMap()   { return Value(map_pool().acquire()); }
 inline Value Value::makeArray() { return Value(array_pool().acquire()); }
@@ -155,7 +122,7 @@ inline Value& Value::operator=(const Value& o) {
     switch (tag) {
         case T_STRING: string_table().release(sptr); break;
         case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ARRAY: { Array* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
     }
     tag = o.tag; ival = 0;
@@ -175,7 +142,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
     switch (tag) {
         case T_STRING: string_table().release(sptr); break;
         case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ARRAY: { Array* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
     }
     tag = o.tag; ival = o.ival; o.tag = T_NIL;
@@ -185,7 +152,7 @@ inline Value::~Value() {
     switch (tag) {
         case T_STRING: string_table().release(sptr); break;
         case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY: { OllinArray* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ARRAY: { Array* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         default: break;
     }
 }
