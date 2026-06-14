@@ -123,7 +123,7 @@ std::vector<Token> Lexer::tokenize() {
                 } else if (!atEnd() && std::isdigit(peek())) {
                     tokens.push_back(number(true)); // .5 → nombre à virgule
                 } else {
-                    throw std::runtime_error("line " + std::to_string(line) + ": unexpected '.'");
+                    tokens.push_back({TokenType::DOT, ".", line});
                 }
                 break;
             case '-':
@@ -151,6 +151,11 @@ std::vector<Token> Lexer::tokenize() {
                 else if (!atEnd() && peek() == '>') { advance(); tokens.push_back({TokenType::NOT_EQUAL, "<>", line}); }
                 else tokens.push_back({TokenType::LESS, "<", line});
                 break;
+            case '{':  tokens.push_back({TokenType::LBRACE,   "{", line});        break;
+            case '}':  tokens.push_back({TokenType::RBRACE,   "}", line});        break;
+            case '[':  tokens.push_back({TokenType::LBRACKET, "[", line});        break;
+            case ']':  tokens.push_back({TokenType::RBRACKET, "]", line});        break;
+            case ':':  tokens.push_back({TokenType::COLON,    ":", line});        break;
             case '"':  tokens.push_back(string());                                break;
             case '+':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::PLUS_EQUAL, "+=", line}); }

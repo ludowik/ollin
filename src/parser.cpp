@@ -71,6 +71,30 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
             nx == TokenType::MINUS_EQUAL || nx == TokenType::STAR_EQUAL  ||
             nx == TokenType::SLASH_EQUAL || nx == TokenType::PERCENT_EQUAL)
             return assignStmt();
+        if (nx == TokenType::LBRACKET) {
+            // index assignment: obj["key"] op= val
+            std::string obj_name = advance().lexeme; // consume IDENTIFIER
+            advance(); // consume [
+            auto key = expr();
+            expect(TokenType::RBRACKET);
+            TokenType op = TokenType::EQUALS;
+            if (check(TokenType::EQUALS)        ) { advance(); op = TokenType::EQUALS;        }
+            else if (check(TokenType::PLUS_EQUAL)   ) { advance(); op = TokenType::PLUS_EQUAL;    }
+            else if (check(TokenType::MINUS_EQUAL)  ) { advance(); op = TokenType::MINUS_EQUAL;   }
+            else if (check(TokenType::STAR_EQUAL)   ) { advance(); op = TokenType::STAR_EQUAL;    }
+            else if (check(TokenType::SLASH_EQUAL)  ) { advance(); op = TokenType::SLASH_EQUAL;   }
+            else if (check(TokenType::PERCENT_EQUAL)) { advance(); op = TokenType::PERCENT_EQUAL; }
+            else throw std::runtime_error("line " + std::to_string(peek().line) +
+                                          ": expected assignment operator after index");
+            auto val = expr();
+            consumeLineEnd();
+            auto s = std::make_unique<IndexAssignStmt>();
+            s->obj = obj_name;
+            s->key = std::move(key);
+            s->op  = op;
+            s->value = std::move(val);
+            return s;
+        }
     }
     return exprStmt();
 }
@@ -365,12 +389,57 @@ std::unique_ptr<Expr> Parser::primary() {
                     call->args.push_back(expr());
             }
             expect(TokenType::RPAREN);
-            return call;
+            std::unique_ptr<Expr> base = std::move(call);
+            while (check(TokenType::LBRACKET)) {
+                advance(); // consume [
+                auto key = expr();
+                expect(TokenType::RBRACKET);
+                auto ie = std::make_unique<IndexExpr>();
+                ie->obj = std::move(base);
+                ie->key = std::move(key);
+                base = std::move(ie);
+            }
+            return base;
         }
-        return std::make_unique<VarExpr>(name);
+        // Plain variable — may be followed by index chaining
+        std::unique_ptr<Expr> base = std::make_unique<VarExpr>(name);
+        while (check(TokenType::LBRACKET)) {
+            advance(); // consume [
+            auto key = expr();
+            expect(TokenType::RBRACKET);
+            auto ie = std::make_unique<IndexExpr>();
+            ie->obj = std::move(base);
+            ie->key = std::move(key);
+            base = std::move(ie);
+        }
+        return base;
     }
     if (check(TokenType::NIL))       { advance(); return std::make_unique<NilExpr>(); }
     if (check(TokenType::DOT_DOT_DOT)) { advance(); return std::make_unique<VarArgExpr>(); }
+    if (check(TokenType::LBRACE)) {
+        advance(); // consume {
+        auto map = std::make_unique<MapExpr>();
+        while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
+            std::string key = expect(TokenType::STRING).lexeme;
+            expect(TokenType::COLON);
+            auto val = expr();
+            map->entries.push_back({key, std::move(val)});
+            if (check(TokenType::COMMA)) advance();
+        }
+        expect(TokenType::RBRACE);
+        // index chaining after map literal
+        std::unique_ptr<Expr> base = std::move(map);
+        while (check(TokenType::LBRACKET)) {
+            advance(); // consume [
+            auto key = expr();
+            expect(TokenType::RBRACKET);
+            auto ie = std::make_unique<IndexExpr>();
+            ie->obj = std::move(base);
+            ie->key = std::move(key);
+            base = std::move(ie);
+        }
+        return base;
+    }
     if (match(TokenType::LPAREN)) {
         auto e = expr();
         expect(TokenType::RPAREN);

@@ -8,6 +8,7 @@
 static std::string valueToString(const Value& v) {
     if (v.isNil())     return "nil";
     if (v.isString())  return v.asString();
+    if (v.isMap())     return "{map}";
     if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
     double d = v.asFloat();
@@ -341,6 +342,31 @@ void VM::execute(const Chunk& chunk) {
         case Op::CALL_TIME: {
             auto now = std::chrono::system_clock::now();
             regs[base + A] = Value(std::chrono::duration<double>(now.time_since_epoch()).count());
+            break;
+        }
+
+        case Op::NEW_MAP:
+            regs[base + A] = Value::makeMap();
+            break;
+
+        case Op::GET_INDEX: {
+            const Value& map = regs[base + B];
+            const Value& key = regs[base + C];
+            if (!map.isMap())    throw std::runtime_error("runtime: [] on non-map");
+            if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
+            auto& data = map.mapData();
+            auto it = data.find(key.asString());
+            regs[base + A] = (it != data.end()) ? it->second : Value{};
+            break;
+        }
+
+        case Op::SET_INDEX: {
+            // A=map_reg, B=key_reg, C=val_reg
+            Value& map = regs[base + A];
+            const Value& key = regs[base + B];
+            if (!map.isMap())    throw std::runtime_error("runtime: []= on non-map");
+            if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
+            map.mapData()[key.asString()] = regs[base + C];
             break;
         }
 
