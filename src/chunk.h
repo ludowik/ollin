@@ -43,37 +43,12 @@ public:
     Value(int64_t v)    : bits(ITAG | ((uint64_t)v & PMSK)) {}
     Value(std::string v): bits(mkStr(new std::string(std::move(v)))) {}
 
-    Value(const Value& o) : bits(o.bits) {
-        if (isString()) bits = mkStr(new std::string(asString()));
-        else if (isMap()) mapPtr()->refcount++;
-    }
+    // Bodies defined after OllinMap (complete type required for refcount/delete)
+    Value(const Value& o);
     Value(Value&& o) noexcept : bits(o.bits) { o.bits = NIL; }
-    Value& operator=(const Value& o) {
-        if (this == &o) return *this;
-        // Prepare new value first
-        std::string* new_str = o.isString() ? new std::string(o.asString()) : nullptr;
-        // Decrement/free old
-        if (isString()) delete strPtr();
-        else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
-        // Assign
-        if (new_str) bits = mkStr(new_str);
-        else {
-            bits = o.bits;
-            if (isMap()) mapPtr()->refcount++;
-        }
-        return *this;
-    }
-    Value& operator=(Value&& o) noexcept {
-        if (this == &o) return *this;
-        if (isString()) delete strPtr();
-        else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
-        bits = o.bits; o.bits = NIL;
-        return *this;
-    }
-    ~Value() {
-        if (isString()) delete strPtr();
-        else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
-    }
+    Value& operator=(const Value& o);
+    Value& operator=(Value&& o) noexcept;
+    ~Value();
 
     bool isNil()     const { return bits == NIL; }
     bool isFloat()   const { return (bits & QNAN) != QNAN; }
@@ -102,6 +77,31 @@ struct OllinMap {
 inline Value Value::makeMap() { return Value(new OllinMap()); }
 inline std::unordered_map<std::string, Value>& Value::mapData() const { return mapPtr()->data; }
 
+inline Value::Value(const Value& o) : bits(o.bits) {
+    if (isString()) bits = mkStr(new std::string(asString()));
+    else if (isMap()) mapPtr()->refcount++;
+}
+inline Value& Value::operator=(const Value& o) {
+    if (this == &o) return *this;
+    std::string* new_str = o.isString() ? new std::string(o.asString()) : nullptr;
+    if (isString()) delete strPtr();
+    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
+    if (new_str) bits = mkStr(new_str);
+    else { bits = o.bits; if (isMap()) mapPtr()->refcount++; }
+    return *this;
+}
+inline Value& Value::operator=(Value&& o) noexcept {
+    if (this == &o) return *this;
+    if (isString()) delete strPtr();
+    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
+    bits = o.bits; o.bits = NIL;
+    return *this;
+}
+inline Value::~Value() {
+    if (isString()) delete strPtr();
+    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
+}
+
 inline bool isFalsy(const Value& v) {
     if (v.isNil())     return true;
     if (v.isInteger()) return v.asInt() == 0;
@@ -110,8 +110,6 @@ inline bool isFalsy(const Value& v) {
     if (v.isMap())     return false;
     return true;
 }
-
-
 
 // Emit int64 if double is exact integer, float otherwise.
 inline Value numValue(double d) {

@@ -1,4 +1,5 @@
 #pragma once
+#include "token.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -195,6 +196,14 @@ struct IndexExpr : Expr {
     std::unique_ptr<Expr> obj;
     std::unique_ptr<Expr> key;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct IndexAssignStmt : Stmt {
+    std::string obj;       // the map variable name
+    std::unique_ptr<Expr> key;
+    TokenType op;          // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
+    std::unique_ptr<Expr> value;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
 // for i in start..end   /   for i=start,end

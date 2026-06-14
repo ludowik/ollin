@@ -802,3 +802,94 @@ void Compiler::visit(const VarArgExpr&) {
     chunk.emit(makeABC((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 0, 0));
     last_reg_ = base;
 }
+
+void Compiler::visit(const MapExpr& e) {
+    int dest = allocReg();
+    chunk.emit(makeABC((uint8_t)Op::NEW_MAP, (uint8_t)dest, 0, 0));
+    for (auto& entry : e.entries) {
+        int saved = reg_top_;
+        int key_reg = allocReg();
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_reg,
+                           chunk.addConstant(Value(entry.first))));
+        int val_reg = allocReg();
+        compileInto(*entry.second, val_reg);
+        chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_reg, (uint8_t)val_reg));
+        reg_top_ = saved;
+    }
+    last_reg_ = dest;
+}
+
+void Compiler::visit(const IndexExpr& e) {
+    int saved = reg_top_;
+    e.obj->accept(*this);
+    int obj_r = last_reg_;
+    int saved2 = reg_top_;
+    e.key->accept(*this);
+    int key_r = last_reg_;
+    reg_top_ = saved2;
+    int dest = allocReg();
+    chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)dest, (uint8_t)obj_r, (uint8_t)key_r));
+    last_reg_ = dest;
+    (void)saved;
+}
+
+void Compiler::visit(const IndexAssignStmt& s) {
+    int saved = reg_top_;
+
+    // Load the map object
+    int obj_r;
+    if (inFunction()) {
+        auto it = local_regs_.find(s.obj);
+        if (it != local_regs_.end()) {
+            obj_r = it->second;
+        } else {
+            obj_r = allocReg();
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
+                               chunk.addIdentifier(s.obj)));
+        }
+    } else {
+        obj_r = allocReg();
+        chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
+                           chunk.addIdentifier(s.obj)));
+    }
+
+    // Compile key
+    int key_r = allocReg();
+    compileInto(*s.key, key_r);
+
+    if (s.op == TokenType::EQUALS) {
+        // Simple assignment: SET_INDEX obj_r, key_r, val_r
+        int val_r = allocReg();
+        compileInto(*s.value, val_r);
+        chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
+    } else {
+        // Compound assignment: get current, apply op, store back
+        int cur_r = allocReg();
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)cur_r, (uint8_t)obj_r, (uint8_t)key_r));
+        int rhs_r = allocReg();
+        compileInto(*s.value, rhs_r);
+        int result_r = allocReg();
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        switch (s.op) {
+            case TokenType::PLUS_EQUAL:
+                chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
+                break;
+            case TokenType::MINUS_EQUAL:
+                chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
+                break;
+            case TokenType::STAR_EQUAL:
+                chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
+                break;
+            case TokenType::SLASH_EQUAL:
+                chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
+                break;
+            case TokenType::PERCENT_EQUAL:
+                chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
+                break;
+            default:
+                throw std::runtime_error("unknown compound index assign op");
+        }
+        chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
+    }
+    reg_top_ = saved;
+}

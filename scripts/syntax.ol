@@ -55,7 +55,7 @@ else
     print("le cas échéant")
 end
 
-try 
+try
     throw "oulala"
 catch err
     print(err)
@@ -64,14 +64,14 @@ else
     print("all is good")
 end
 
-try 
+try
 catch err
     print(err)
 else
     print("all is good")
 end
 
-try 
+try
 catch err
 end
 
@@ -97,8 +97,7 @@ for i in 1..10
 		print(i)
 end
 
-var de, a, step = 1, 10, 2
-for i=de,a,step
+for i=1,10
 		print(i)
 end
 
@@ -111,4 +110,9 @@ for i=10,1,-1   ## step négatif
 end
 
 var t = {} ## map : syntaxe identique a json / js
-
+var m = {"a": 1, "b": 2}   ## map literal with string keys
+print(m["a"])                ## index get → 1
+m["c"] = 3                   ## index set
+m["a"] += 10                 ## compound index assignment
+assert(m["a"] == 11)
+assert(m["c"] == 3)
