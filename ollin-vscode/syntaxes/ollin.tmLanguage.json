@@ -36,7 +36,7 @@
         },
         "number": {
             "name": "constant.numeric.ollin",
-            "match": "(\\.\\d+|\\b\\d+(\\.\\d*)?)\\b"
+            "match": "(\\.\\d[\\d_]*|\\b\\d[\\d_]*(\\.\\d[\\d_]*)?)\\b"
         },
         "operator": {
             "name": "keyword.operator.ollin",

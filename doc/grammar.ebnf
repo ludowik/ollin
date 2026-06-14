@@ -18,7 +18,7 @@ stmt           = varDecl
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "in" expr ".." expr NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT "=" expr "," expr NEWLINE { stmt } "end" NEWLINE ;
+               | "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]
@@ -55,9 +55,9 @@ call           = IDENT "(" [ expr { "," expr } ] ")" ;
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
 
-NUMBER         = ( digit { [ "_" ] digit }* [ "." { digit | "_" }* ] )
-               | ( "." digit { [ "_" ] digit }* ) ;
-             (* les underscores sont ignorés : 1_000 == 1000 *)
+NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
+               | ( "." digit { [ "_" ] digit } ) ;
+             (* underscores ignorés : 1_000 == 1000 ; littéraux entiers → int48, sinon float *)
 STRING         = '"' { any \ '"' } '"' ;
 BOOL           = "true" | "false" ;
 NIL            = "nil" ;

@@ -105,13 +105,26 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Boucle `for`
 
-Deux syntaxes, même sémantique (step = 1, bornes inclusives) :
+Deux syntaxes, bornes inclusives :
 
 ```
-for i in start..end   ## range avec opérateur ..
-for i=start,end       ## style numérique
+for i in start..end         ## range, step = 1 implicite
+for i=start,end             ## numérique, step = 1 implicite
+for i=start,end,step        ## step positif ou négatif
 ```
 
-Dans une fonction : `i` = registre local, `end` = registre temporaire alloué au-dessus de locals_top_.  
-En portée globale : `i` et `__for_end_N` sont des globaux.  
-`break` fonctionne dans les deux formes.
+Step absent → step = 1 (condition `i <= end`).  
+Step présent → condition runtime `(end - i) * step >= 0` (valide dans les deux sens).  
+Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires au-dessus de `locals_top_`.  
+En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
+`break` fonctionne dans toutes les formes.
+
+## Type entier natif
+
+Les littéraux entiers (`42`, `1_000`) sont stockés comme `int48` dans le NaN-boxing (tag `0x7FFD_xxxx_xxxx_xxxx`).  
+Les opérations arithmétiques et comparaisons dispatchent sur le type :  
+- INT op INT → INT (ADD, SUB, MUL, MOD, comparaisons)  
+- INT op FLOAT ou FLOAT op INT → FLOAT (promotion automatique)  
+- DIV → toujours FLOAT  
+- Overflow int48 → wrapping silencieux (à améliorer si besoin)  
+`Value` reste 8 octets (NaN-boxing inchangé).
