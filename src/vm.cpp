@@ -66,58 +66,53 @@ void VM::execute(const Chunk& chunk) {
     ip = 0;
     vars.assign(chunk.identifiers.size(), 0.0);
     vars_init.assign(chunk.identifiers.size(), false);
+    stack.reserve(1024);
+    call_stack.reserve(1000);
+    locals_pool.reserve(1000);
 
+    // Le bytecode émis par le compilateur termine toujours par HALT et ses
+    // opérandes sont correctement dimensionnés : on saute les bounds-checks
+    // dans la boucle chaude.
     while (true) {
-        if (ip >= (int)ch->code.size())
-            throw std::runtime_error("runtime: bytecode tronqué");
-        uint8_t raw = ch->code[ip];
-        if (ip + 1 + s_operand_sizes[raw] > (int)ch->code.size())
-            throw std::runtime_error("runtime: instruction tronquée");
-        Op op = static_cast<Op>(raw);
+        Op op = static_cast<Op>(ch->code[ip]);
         ip++;
         switch (op) {
             case Op::LOAD_CONST: {
                 uint16_t idx = readU16();
-                if (idx >= ch->constants.size())
-                    throw std::runtime_error("runtime: constant index out of bounds");
-                stack.push(ch->constants[idx]);
+                stack.push_back(ch->constants[idx]);
                 break;
             }
 
             case Op::LOAD_VAR: {
                 uint16_t idx = readU16();
-                if (idx >= ch->identifiers.size() || idx >= vars.size())
-                    throw std::runtime_error("runtime: variable index out of bounds");
                 if (!vars_init[idx])
                     throw std::runtime_error("runtime: undefined variable '" + ch->identifiers[idx] + "'");
-                stack.push(vars[idx]);
+                stack.push_back(vars[idx]);
                 break;
             }
 
             case Op::STORE_VAR: {
                 uint16_t idx = readU16();
-                if (idx >= vars.size())
-                    throw std::runtime_error("runtime: variable index out of bounds");
                 vars[idx] = pop();
                 vars_init[idx] = true;
                 break;
             }
 
-            case Op::ADD: { auto b = pop(), a = pop(); stack.push(asDouble(a) + asDouble(b)); break; }
-            case Op::SUB: { auto b = pop(), a = pop(); stack.push(asDouble(a) - asDouble(b)); break; }
-            case Op::MUL: { auto b = pop(), a = pop(); stack.push(asDouble(a) * asDouble(b)); break; }
+            case Op::ADD: { auto b = pop(), a = pop(); stack.push_back(asDouble(a) + asDouble(b)); break; }
+            case Op::SUB: { auto b = pop(), a = pop(); stack.push_back(asDouble(a) - asDouble(b)); break; }
+            case Op::MUL: { auto b = pop(), a = pop(); stack.push_back(asDouble(a) * asDouble(b)); break; }
             case Op::DIV: {
                 auto b = pop(), a = pop();
                 double bd = asDouble(b);
                 if (bd == 0.0) throw std::runtime_error("runtime: division by zero");
-                stack.push(asDouble(a) / bd);
+                stack.push_back(asDouble(a) / bd);
                 break;
             }
 
-            case Op::GT: { auto b = pop(), a = pop(); stack.push(asDouble(a) >  asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::LT: { auto b = pop(), a = pop(); stack.push(asDouble(a) <  asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::GE:  { auto b = pop(), a = pop(); stack.push(asDouble(a) >= asDouble(b) ? 1.0 : 0.0); break; }
-            case Op::LE:  { auto b = pop(), a = pop(); stack.push(asDouble(a) <= asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::GT: { auto b = pop(), a = pop(); stack.push_back(asDouble(a) >  asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::LT: { auto b = pop(), a = pop(); stack.push_back(asDouble(a) <  asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::GE:  { auto b = pop(), a = pop(); stack.push_back(asDouble(a) >= asDouble(b) ? 1.0 : 0.0); break; }
+            case Op::LE:  { auto b = pop(), a = pop(); stack.push_back(asDouble(a) <= asDouble(b) ? 1.0 : 0.0); break; }
             case Op::NEQ: {
                 auto b = pop(), a = pop();
                 bool eq;
@@ -128,7 +123,7 @@ void VM::execute(const Chunk& chunk) {
                 else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.asNum();
                 else if (a.isNumber() && b.isString()) eq = a.asNum() == (isFalsy(b) ? 0.0 : 1.0);
                 else eq = false;
-                stack.push(eq ? 0.0 : 1.0); // NEQ = inverse de EQ
+                stack.push_back(eq ? 0.0 : 1.0); // NEQ = inverse de EQ
                 break;
             }
             case Op::EQ: {
@@ -142,20 +137,20 @@ void VM::execute(const Chunk& chunk) {
                 else if (a.isString() && b.isNumber()) eq = (isFalsy(a) ? 0.0 : 1.0) == b.asNum();
                 else if (a.isNumber() && b.isString()) eq = a.asNum() == (isFalsy(b) ? 0.0 : 1.0);
                 else eq = false;
-                stack.push(eq ? 1.0 : 0.0);
+                stack.push_back(eq ? 1.0 : 0.0);
                 break;
             }
             case Op::MOD: {
                 auto b = pop(), a = pop();
                 double bd = asDouble(b);
                 if (bd == 0.0) throw std::runtime_error("runtime: modulo by zero");
-                stack.push(std::fmod(asDouble(a), bd));
+                stack.push_back(std::fmod(asDouble(a), bd));
                 break;
             }
-            case Op::NEGATE: { auto a = pop(); stack.push(-asDouble(a)); break; }
-            case Op::NOT_OP: { auto a = pop(); stack.push(isFalsy(a) ? 1.0 : 0.0); break; }
-            case Op::OR_OP:  { auto b = pop(), a = pop(); stack.push(!isFalsy(a) || !isFalsy(b) ? 1.0 : 0.0); break; }
-            case Op::AND_OP: { auto b = pop(), a = pop(); stack.push(!isFalsy(a) && !isFalsy(b) ? 1.0 : 0.0); break; }
+            case Op::NEGATE: { auto a = pop(); stack.push_back(-asDouble(a)); break; }
+            case Op::NOT_OP: { auto a = pop(); stack.push_back(isFalsy(a) ? 1.0 : 0.0); break; }
+            case Op::OR_OP:  { auto b = pop(), a = pop(); stack.push_back(!isFalsy(a) || !isFalsy(b) ? 1.0 : 0.0); break; }
+            case Op::AND_OP: { auto b = pop(), a = pop(); stack.push_back(!isFalsy(a) && !isFalsy(b) ? 1.0 : 0.0); break; }
 
             case Op::JUMP:
                 ip = readU16();
@@ -183,7 +178,7 @@ void VM::execute(const Chunk& chunk) {
                 } else if (name == "time") {
                     auto now = std::chrono::system_clock::now();
                     double t = std::chrono::duration<double>(now.time_since_epoch()).count();
-                    stack.push(t);
+                    stack.push_back(t);
                 } else if (name == "print") {
                     std::vector<Value> args(argc);
                     for (int i = argc - 1; i >= 0; --i) args[i] = pop();
@@ -224,32 +219,33 @@ void VM::execute(const Chunk& chunk) {
                 }
                 Handler h = handler_stack.back();
                 handler_stack.pop_back();
-                while (stack.size() > h.stack_size) stack.pop();
-                stack.push(std::move(thrown));
+                stack.resize(h.stack_size);
+                stack.push_back(std::move(thrown));
                 ip = h.catch_addr;
                 break;
             }
 
             case Op::LOAD_LOCAL: {
                 uint16_t idx = readU16();
-                if (call_stack.empty()) throw std::runtime_error("runtime: LOAD_LOCAL hors fonction");
                 Frame& f = call_stack.back();
-                if (idx >= f.locals.size() || !f.locals_init[idx])
+                if (idx >= (uint16_t)f.locals_count || !(f.init_mask >> idx & 1ULL))
                     throw std::runtime_error("runtime: variable locale non initialisée");
-                stack.push(f.locals[idx]);
+                stack.push_back(locals_pool[f.locals_base + idx]);
                 break;
             }
 
             case Op::STORE_LOCAL: {
                 uint16_t idx = readU16();
-                if (call_stack.empty()) throw std::runtime_error("runtime: STORE_LOCAL hors fonction");
                 Frame& f = call_stack.back();
-                if (idx >= f.locals.size()) {
-                    f.locals.resize(idx + 1);
-                    f.locals_init.resize(idx + 1, false);
+                int needed = f.locals_base + idx + 1;
+                if ((int)locals_pool.size() < needed) {
+                    locals_pool.resize(needed);
+                    f.locals_count = idx + 1;
+                } else if (idx >= (uint16_t)f.locals_count) {
+                    f.locals_count = idx + 1;
                 }
-                f.locals[idx] = pop();
-                f.locals_init[idx] = true;
+                locals_pool[f.locals_base + idx] = pop();
+                if (idx < 64) f.init_mask |= (1ULL << idx);
                 break;
             }
 
@@ -260,53 +256,75 @@ void VM::execute(const Chunk& chunk) {
                 bool     variadic     = readU8() != 0;
                 uint16_t defaults_idx = readU16();
 
-                std::vector<Value> args(argc);
-                for (int i = argc - 1; i >= 0; --i) args[i] = pop();
-
                 if (!variadic && argc > n_fixed)
                     throw std::runtime_error("runtime: trop d'arguments");
+                if (call_stack.size() >= 1000)
+                    throw std::runtime_error("runtime: stack overflow (profondeur max 1000)");
+
+                // Args sont en tête de stack : stack[sbase .. sbase+argc)
+                int sbase = (int)stack.size() - argc;
+                int n_from_stack = (int)argc < n_fixed ? (int)argc : n_fixed;
 
                 Frame frame;
-                frame.return_ip  = ip;
-                frame.stack_base = stack.size();
-                frame.n_fixed    = n_fixed;
-                frame.locals.resize(n_fixed);
-                frame.locals_init.resize(n_fixed, false);
-                int n_init = (int)argc < n_fixed ? (int)argc : n_fixed;
-                for (int i = 0; i < n_init; ++i) {
-                    frame.locals[i]      = args[i];
-                    frame.locals_init[i] = true;
+                frame.return_ip    = ip;
+                frame.stack_base   = sbase;
+                frame.n_fixed      = n_fixed;
+                frame.locals_base  = (int)locals_pool.size();
+                frame.locals_count = n_fixed;
+                frame.init_mask    = 0;
+
+                // push_back des args directement (évite default-construct + assign)
+                uint64_t mask = 0;
+                for (int i = 0; i < n_from_stack; ++i) {
+                    locals_pool.push_back(std::move(stack[sbase + i]));
+                    mask |= (1ULL << i);
                 }
-                // Params manquants → valeur par défaut ou nil
-                if ((int)argc < n_fixed) {
+                frame.init_mask = mask;
+
+                // Collect varargs before shrinking the operand stack
+                if (variadic && (int)argc > n_fixed) {
+                    frame.varargs = std::make_unique<std::vector<Value>>();
+                    for (int i = n_fixed; i < (int)argc; ++i)
+                        frame.varargs->push_back(std::move(stack[sbase + i]));
+                }
+                // Supprime tous les args de la stack d'opérandes
+                stack.resize(sbase);
+
+                // Params manquants → defaults ou nil
+                if (n_from_stack < n_fixed) {
                     if (defaults_idx >= ch->func_defaults.size())
                         throw std::runtime_error("runtime: defaults_idx hors bornes");
                     auto& defs = ch->func_defaults[defaults_idx];
-                    for (int i = n_init; i < n_fixed; ++i) {
-                        frame.locals[i]      = (i < (int)defs.size()) ? defs[i] : Value{};
-                        frame.locals_init[i] = true;
+                    for (int i = n_from_stack; i < n_fixed; ++i) {
+                        locals_pool.push_back(i < (int)defs.size() ? defs[i] : Value{});
+                        frame.init_mask |= (1ULL << i);
                     }
                 }
-                if (variadic) {
-                    for (int i = n_fixed; i < (int)argc; ++i)
-                        frame.varargs.push_back(std::move(args[i]));
-                }
-                if (call_stack.size() >= 1000)
-                    throw std::runtime_error("runtime: stack overflow (profondeur max 1000)");
                 call_stack.push_back(std::move(frame));
                 ip = addr;
                 break;
             }
 
             case Op::RETURN_N: {
-                uint8_t n = readU8();
-                std::vector<Value> retvals(n);
-                for (int i = n - 1; i >= 0; --i) retvals[i] = pop();
-                int    rip  = call_stack.back().return_ip;
-                size_t base = call_stack.back().stack_base;
+                uint8_t n  = readU8();
+                int rip    = call_stack.back().return_ip;
+                int sbase  = call_stack.back().stack_base;
+                int lbase  = call_stack.back().locals_base;
                 call_stack.pop_back();
-                while (stack.size() > base) stack.pop();
-                for (auto& v : retvals) stack.push(std::move(v));
+                locals_pool.resize(lbase);
+                if (n == 0) {
+                    stack.resize(sbase);
+                } else if (n == 1) {
+                    // fast path : pas d'allocation temporaire
+                    Value v = std::move(stack.back()); stack.pop_back();
+                    stack.resize(sbase);
+                    stack.push_back(std::move(v));
+                } else {
+                    std::vector<Value> rv(n);
+                    for (int i = n - 1; i >= 0; --i) rv[i] = pop();
+                    stack.resize(sbase);
+                    for (auto& v : rv) stack.push_back(std::move(v));
+                }
                 ret_count = n;
                 ip = rip;
                 break;
@@ -314,15 +332,18 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::RETURN_V: {
                 uint8_t n_explicit = readU8();
-                int     n_varargs  = (int)call_stack.back().varargs.size();
+                auto&   va         = call_stack.back().varargs;
+                int     n_varargs  = va ? (int)va->size() : 0;
                 int     total      = n_explicit + n_varargs;
                 std::vector<Value> retvals(total);
                 for (int i = total - 1; i >= 0; --i) retvals[i] = pop();
-                int    rip  = call_stack.back().return_ip;
-                size_t base = call_stack.back().stack_base;
+                int  rip   = call_stack.back().return_ip;
+                int  sbase = call_stack.back().stack_base;
+                int  lbase = call_stack.back().locals_base;
                 call_stack.pop_back();
-                while (stack.size() > base) stack.pop();
-                for (auto& v : retvals) stack.push(std::move(v));
+                locals_pool.resize(lbase);
+                stack.resize(sbase);
+                for (auto& v : retvals) stack.push_back(std::move(v));
                 ret_count = total;
                 ip = rip;
                 break;
@@ -330,8 +351,8 @@ void VM::execute(const Chunk& chunk) {
 
             case Op::LOAD_VARARGS: {
                 if (call_stack.empty()) throw std::runtime_error("runtime: LOAD_VARARGS hors fonction");
-                for (auto& v : call_stack.back().varargs)
-                    stack.push(v);
+                auto& va = call_stack.back().varargs;
+                if (va) for (auto& v : *va) stack.push_back(v);
                 break;
             }
 
@@ -349,7 +370,7 @@ void VM::execute(const Chunk& chunk) {
                 return;
 
             default:
-                throw std::runtime_error("runtime: opcode inconnu (" + std::to_string(raw) + ")");
+                throw std::runtime_error("runtime: opcode inconnu (" + std::to_string(static_cast<int>(op)) + ")");
         }
     }
 }
