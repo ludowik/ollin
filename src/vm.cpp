@@ -358,9 +358,7 @@ op_GET_INDEX: {
     const Value& key = regs[base + C];
     if (!map.isMap())    throw std::runtime_error("runtime: [] on non-map");
     if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
-    auto& data = map.mapData();
-    auto it = data.find(key.asString());
-    regs[base + A] = (it != data.end()) ? it->second : Value{};
+    regs[base + A] = map.mapGet(key.asString());
     NEXT();
 }
 
@@ -369,7 +367,7 @@ op_SET_INDEX: {
     const Value& key = regs[base + B];
     if (!map.isMap())    throw std::runtime_error("runtime: []= on non-map");
     if (!key.isString()) throw std::runtime_error("runtime: map key must be string");
-    map.mapData()[key.asString()] = regs[base + C];
+    map.mapSet(key.asString(), regs[base + C]);
     NEXT();
 }
 
@@ -499,13 +497,12 @@ op_HALT:
             const Value& map=regs[base+B]; const Value& key=regs[base+C];
             if(!map.isMap())throw std::runtime_error("runtime: [] on non-map");
             if(!key.isString())throw std::runtime_error("runtime: map key must be string");
-            auto& data=map.mapData(); auto it=data.find(key.asString());
-            regs[base+A]=(it!=data.end())?it->second:Value{}; break; }
+            regs[base+A]=map.mapGet(key.asString()); break; }
         case Op::SET_INDEX: {
             Value& map=regs[base+A]; const Value& key=regs[base+B];
             if(!map.isMap())throw std::runtime_error("runtime: []= on non-map");
             if(!key.isString())throw std::runtime_error("runtime: map key must be string");
-            map.mapData()[key.asString()]=regs[base+C]; break; }
+            map.mapSet(key.asString(),regs[base+C]); break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }

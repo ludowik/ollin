@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 // NaN-boxing with integer type : Value = 8 octets (uint64_t).
@@ -66,16 +66,29 @@ public:
     const std::string& asString() const { return *strPtr(); }
 
     static Value makeMap();
-    std::unordered_map<std::string, Value>& mapData() const;
+    Value       mapGet(const std::string& key) const;
+    void        mapSet(const std::string& key, const Value& val);
 };
 
 struct OllinMap {
-    std::unordered_map<std::string, Value> data;
+    std::vector<std::pair<std::string, Value>> entries;
     int refcount = 1;
+
+    Value get(const std::string& k) const {
+        for (const auto& e : entries)
+            if (e.first == k) return e.second;
+        return Value{};
+    }
+    void set(const std::string& k, const Value& v) {
+        for (auto& e : entries)
+            if (e.first == k) { e.second = v; return; }
+        entries.emplace_back(k, v);
+    }
 };
 
 inline Value Value::makeMap() { return Value(new OllinMap()); }
-inline std::unordered_map<std::string, Value>& Value::mapData() const { return mapPtr()->data; }
+inline Value Value::mapGet(const std::string& k)          const { return mapPtr()->get(k); }
+inline void  Value::mapSet(const std::string& k, const Value& v) { mapPtr()->set(k, v); }
 
 inline Value::Value(const Value& o) : bits(o.bits) {
     if (isString()) bits = mkStr(new std::string(asString()));
