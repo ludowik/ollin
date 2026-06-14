@@ -43,7 +43,10 @@ ollin/
 | `syntax.ol` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
 | `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.ol` — à maintenir à chaque évolution |
 | `test.ol` | Claude | fichier de tests libres — modifiable à volonté |
+| `docs/index.html` | Claude | tutoriel HTML — à maintenir à chaque évolution du langage |
 | `ollin-vscode/` | Claude | extension VS Code (colorisation) — à maintenir à chaque évolution du langage |
+
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf`, `docs/index.html`, `ollin-vscode/` et `CLAUDE.md`.
 
 ## Versionning
 
