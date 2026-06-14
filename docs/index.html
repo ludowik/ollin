@@ -318,6 +318,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <a href="#comments">Commentaires</a>
   <div class="section-label">Expressions</div>
   <a href="#operators">Opérateurs</a>
+  <a href="#bitwise">Opérateurs bits</a>
   <a href="#strings">Chaînes</a>
   <a href="#multiline">Multi-lignes</a>
   <div class="section-label">Contrôle</div>
@@ -467,6 +468,51 @@ multi-lignes
 
 <span class="cmt">## précédence : not > and > or</span>
 <span class="bi">assert</span>(<span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="kw">and</span> <span class="bool">false</span>)  <span class="cmt">## true or (false and false)</span></code></pre>
+</section>
+
+<!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
+<section id="bitwise">
+<h2>Opérateurs bits</h2>
+<p>Ollin supporte les opérateurs bit-à-bit style C. Ils opèrent uniquement sur des <strong>entiers</strong> (<code>int48</code>).</p>
+
+<h3>Binaires</h3>
+<table>
+<tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
+<tr><td>&amp;</td><td>ET bit-à-bit</td><td><code>12 &amp; 10 == 8</code></td></tr>
+<tr><td>|</td><td>OU bit-à-bit</td><td><code>12 | 10 == 14</code></td></tr>
+<tr><td>^</td><td>XOR bit-à-bit</td><td><code>12 ^ 10 == 6</code></td></tr>
+<tr><td>&lt;&lt;</td><td>Décalage gauche</td><td><code>1 &lt;&lt; 3 == 8</code></td></tr>
+<tr><td>&gt;&gt;</td><td>Décalage droit (arithmétique)</td><td><code>16 &gt;&gt; 2 == 4</code></td></tr>
+</table>
+
+<h3>Unaire</h3>
+<table>
+<tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
+<tr><td>~</td><td>Complément à 1</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
+</table>
+
+<h3>Précédence</h3>
+<p>De la plus basse à la plus haute :</p>
+<pre><code>or  →  and  →  |  →  ^  →  &  →  comparaisons  →  &lt;&lt; &gt;&gt;  →  + -  →  * / %  →  ~ - not</code></pre>
+
+<h3>Exemples</h3>
+<pre><code><span class="kw">var</span> flags = <span class="num">0</span>
+flags = flags <span class="op">|</span> <span class="num">1</span>   <span class="cmt">## activer bit 0</span>
+flags = flags <span class="op">|</span> <span class="num">4</span>   <span class="cmt">## activer bit 2</span>
+<span class="bi">assert</span>(flags == <span class="num">5</span>)   <span class="cmt">## 0101</span>
+
+<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">1</span>) == <span class="num">1</span>)  <span class="cmt">## tester bit 0</span>
+<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">2</span>) == <span class="num">0</span>)  <span class="cmt">## bit 1 absent</span>
+
+flags = flags <span class="op">^</span> <span class="num">1</span>   <span class="cmt">## basculer bit 0 → 4</span>
+<span class="bi">assert</span>(flags == <span class="num">4</span>)
+
+<span class="bi">assert</span>(<span class="num">1</span> <span class="op">&lt;&lt;</span> <span class="num">8</span> == <span class="num">256</span>)
+<span class="bi">assert</span>(<span class="num">256</span> <span class="op">&gt;&gt;</span> <span class="num">4</span> == <span class="num">16</span>)
+<span class="bi">assert</span>(<span class="op">~</span><span class="num">0</span> == -<span class="num">1</span>)
+<span class="bi">assert</span>(<span class="num">255</span> <span class="op">&amp;</span> <span class="num">15</span> == <span class="num">15</span>)</code></pre>
+
+<div class="callout warn">Les opérateurs bit-à-bit nécessitent des opérandes entiers (<code>integer</code>). Appliquer <code>&amp;</code>, <code>|</code>, <code>^</code>, <code>~</code>, <code>&lt;&lt;</code> ou <code>&gt;&gt;</code> à un float lèvera une erreur à l'exécution.</div>
 </section>
 
 <!-- ── Chaînes ─────────────────────────────────────────────────────────────── -->

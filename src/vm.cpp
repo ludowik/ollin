@@ -80,6 +80,9 @@ void VM::execute(const Chunk& chunk) {
         &&op_TRY, &&op_POP_TRY, &&op_THROW,
         &&op_NEW_MAP, &&op_GET_INDEX, &&op_SET_INDEX,
         &&op_FOR_MAP_STEP,
+        &&op_BAND, &&op_BOR, &&op_BXOR,
+        &&op_BNOT,
+        &&op_BLSHIFT, &&op_BRSHIFT,
         &&op_HALT,
     };
 
@@ -385,6 +388,43 @@ op_FOR_MAP_STEP: {
     NEXT();
 }
 
+op_BAND: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (!bv.isInteger() || !cv.isInteger()) throw std::runtime_error("runtime: & requires integer operands");
+    regs[base+A] = Value(bv.asInt() & cv.asInt());
+    NEXT();
+}
+op_BOR: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (!bv.isInteger() || !cv.isInteger()) throw std::runtime_error("runtime: | requires integer operands");
+    regs[base+A] = Value(bv.asInt() | cv.asInt());
+    NEXT();
+}
+op_BXOR: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (!bv.isInteger() || !cv.isInteger()) throw std::runtime_error("runtime: ^ requires integer operands");
+    regs[base+A] = Value(bv.asInt() ^ cv.asInt());
+    NEXT();
+}
+op_BNOT: {
+    const Value& bv = regs[base+B];
+    if (!bv.isInteger()) throw std::runtime_error("runtime: ~ requires integer operand");
+    regs[base+A] = Value(~bv.asInt());
+    NEXT();
+}
+op_BLSHIFT: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (!bv.isInteger() || !cv.isInteger()) throw std::runtime_error("runtime: << requires integer operands");
+    regs[base+A] = Value((int64_t)((uint64_t)bv.asInt() << (cv.asInt() & 63)));
+    NEXT();
+}
+op_BRSHIFT: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (!bv.isInteger() || !cv.isInteger()) throw std::runtime_error("runtime: >> requires integer operands");
+    regs[base+A] = Value(bv.asInt() >> (cv.asInt() & 63));
+    NEXT();
+}
+
 op_HALT:
     return;
 
@@ -526,6 +566,24 @@ op_HALT:
             if(!map.isMap())throw std::runtime_error("runtime: []= on non-map");
             if(!key.isString())throw std::runtime_error("runtime: map key must be string");
             map.mapSet(key.asString(),regs[base+C]); break; }
+        case Op::BAND: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
+            if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: & requires integer operands");
+            regs[base+A]=Value(bv.asInt()&cv.asInt()); break; }
+        case Op::BOR: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
+            if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: | requires integer operands");
+            regs[base+A]=Value(bv.asInt()|cv.asInt()); break; }
+        case Op::BXOR: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
+            if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: ^ requires integer operands");
+            regs[base+A]=Value(bv.asInt()^cv.asInt()); break; }
+        case Op::BNOT: { const Value& bv=regs[base+B];
+            if(!bv.isInteger())throw std::runtime_error("runtime: ~ requires integer operand");
+            regs[base+A]=Value(~bv.asInt()); break; }
+        case Op::BLSHIFT: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
+            if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: << requires integer operands");
+            regs[base+A]=Value((int64_t)((uint64_t)bv.asInt()<<(cv.asInt()&63))); break; }
+        case Op::BRSHIFT: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
+            if(!bv.isInteger()||!cv.isInteger())throw std::runtime_error("runtime: >> requires integer operands");
+            regs[base+A]=Value(bv.asInt()>>(cv.asInt()&63)); break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }

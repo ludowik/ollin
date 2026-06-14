@@ -39,11 +39,15 @@ exprStmt       = expr NEWLINE ;
 
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
-logicalAnd     = comparison { "and" comparison } ;
-comparison     = additive { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) additive } ;
+logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
+bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
+bitwiseXor     = bitwiseAnd { "^" bitwiseAnd } ;
+bitwiseAnd     = comparison { "&" comparison } ;
+comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
+shift          = additive { ( "<<" | ">>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
 multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
-unary          = ( "-" | "not" ) unary | primary ;
+unary          = ( "-" | "not" | "~" ) unary | primary ;
 primary        = NUMBER
                | STRING
                | BOOL

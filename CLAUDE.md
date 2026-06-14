@@ -99,6 +99,12 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | GET_INDEX     | ABC    | A=dst, B=map, C=key        | R[A] = R[B][R[C]]  (B=map, C=key string)        |
 | SET_INDEX     | ABC    | A=map, B=key, C=val        | R[A][R[B]] = R[C]  (A=map, B=key string)        |
 | FOR_MAP_STEP  | ABx    | A=block_base, Bx=end_addr  | R[A+3]=map R[A+2]=iter; si iter≥size→Bx sinon R[A]=key R[A+1]=val iter++ |
+| BAND          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] & R[C]  (entiers)                   |
+| BOR           | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] \| R[C]  (entiers)                  |
+| BXOR          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] ^ R[C]  (entiers)                   |
+| BNOT          | AB     | A=dst, B=src               | R[A] = ~R[B]  (entier)                          |
+| BLSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] << (R[C] & 63)  (entiers)           |
+| BRSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] >> (R[C] & 63)  (entiers)           |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)

@@ -726,8 +726,13 @@ void Compiler::visit(const BinaryExpr& e) {
         case 'L': chunk.emit(makeABC((uint8_t)Op::LE,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case 'N': chunk.emit(makeABC((uint8_t)Op::NEQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case '=': chunk.emit(makeABC((uint8_t)Op::EQ,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '|': chunk.emit(makeABC((uint8_t)Op::OR,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '&': chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case '|': chunk.emit(makeABC((uint8_t)Op::OR,      (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case '&': chunk.emit(makeABC((uint8_t)Op::AND,     (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'o': chunk.emit(makeABC((uint8_t)Op::BOR,     (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'b': chunk.emit(makeABC((uint8_t)Op::BAND,    (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'x': chunk.emit(makeABC((uint8_t)Op::BXOR,   (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'l': chunk.emit(makeABC((uint8_t)Op::BLSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'r': chunk.emit(makeABC((uint8_t)Op::BRSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         default:  throw std::runtime_error(std::string("unknown binary op: ") + e.op);
     }
     (void)saved_after_left;
@@ -741,6 +746,8 @@ void Compiler::visit(const UnaryExpr& e) {
         chunk.emit(makeABC((uint8_t)Op::NEGATE, (uint8_t)last_reg_, (uint8_t)rIn, 0));
     else if (e.op == '!')
         chunk.emit(makeABC((uint8_t)Op::NOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
+    else if (e.op == '~')
+        chunk.emit(makeABC((uint8_t)Op::BNOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
     else
         throw std::runtime_error(std::string("unknown unary op: ") + e.op);
 }

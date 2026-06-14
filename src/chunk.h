@@ -206,6 +206,9 @@ enum class Op : uint8_t {
     GET_INDEX,      // ABC: R[A] = R[B][R[C]]  (B=map, C=key)
     SET_INDEX,      // ABC: R[A][R[B]] = R[C]  (A=map, B=key, C=value)
     FOR_MAP_STEP,   // ABx: R[A+3]=map R[A+2]=iter; if done→Bx else R[A]=key R[A+1]=val iter++
+    BAND, BOR, BXOR,     // ABC: R[A] = R[B] bitop R[C]  (integers)
+    BNOT,                // AB:  R[A] = ~R[B]            (integer)
+    BLSHIFT, BRSHIFT,    // ABC: R[A] = R[B] shift R[C]  (integers)
     HALT,
 };
 
