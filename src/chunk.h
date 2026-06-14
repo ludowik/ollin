@@ -86,8 +86,27 @@ struct OllinMap {
     }
 };
 
-inline Value Value::makeMap() { return Value(new OllinMap()); }
-inline Value Value::mapGet(const std::string& k)          const { return mapPtr()->get(k); }
+// ── Pool de OllinMap ──────────────────────────────────────────────────────────
+// Évite new/delete à chaque création de map en réutilisant les objets libérés.
+struct MapPool {
+    static constexpr int CAP = 64;
+    OllinMap* buf[CAP];
+    int       n = 0;
+
+    OllinMap* acquire() {
+        if (n) { OllinMap* m = buf[--n]; m->refcount = 1; return m; }
+        return new OllinMap();
+    }
+    void release(OllinMap* m) {
+        m->entries.clear();   // détruit les Values enfants
+        if (n < CAP) buf[n++] = m;
+        else delete m;
+    }
+};
+inline MapPool& map_pool() { static MapPool p; return p; }
+
+inline Value Value::makeMap() { return Value(map_pool().acquire()); }
+inline Value Value::mapGet(const std::string& k)           const { return mapPtr()->get(k); }
 inline void  Value::mapSet(const std::string& k, const Value& v) { mapPtr()->set(k, v); }
 
 inline Value::Value(const Value& o) : bits(o.bits) {
@@ -98,7 +117,7 @@ inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
     std::string* new_str = o.isString() ? new std::string(o.asString()) : nullptr;
     if (isString()) delete strPtr();
-    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
+    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) map_pool().release(mp); }
     if (new_str) bits = mkStr(new_str);
     else { bits = o.bits; if (isMap()) mapPtr()->refcount++; }
     return *this;
@@ -106,13 +125,13 @@ inline Value& Value::operator=(const Value& o) {
 inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
     if (isString()) delete strPtr();
-    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
+    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) map_pool().release(mp); }
     bits = o.bits; o.bits = NIL;
     return *this;
 }
 inline Value::~Value() {
     if (isString()) delete strPtr();
-    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) delete mp; }
+    else if (isMap()) { OllinMap* mp = mapPtr(); if (--mp->refcount == 0) map_pool().release(mp); }
 }
 
 inline bool isFalsy(const Value& v) {
