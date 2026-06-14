@@ -114,7 +114,7 @@ var m = {
 	"a": 1,
   "b": 2,
 	macle: true,
-	mamap: {)
+	mamap: {}
 }   ## map literal with string keys
 print(m["a"])                ## index get → 1
 m["c"] = 3                   ## index set
