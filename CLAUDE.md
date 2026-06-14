@@ -55,6 +55,23 @@ ollin/
 - Pusher sur `origin/main` après chaque commit
 - `git restore <fichier>` pour annuler une modification non commitée
 
+## Commande `perf`
+
+Quand l'utilisateur dit **"perf"**, lancer les 5 benchmarks suivants et afficher les résultats dans un tableau **langages en colonnes, benchmarks en lignes** (Ollin | Lua | Python) :
+
+| # | Benchmark | Script Ollin | Équivalent Lua | Équivalent Python |
+|---|-----------|-------------|----------------|-------------------|
+| 1 | fib(35) récursif | `scripts/bench_fib.ol` | inline | inline |
+| 2 | Boucle numérique 10M | `scripts/bench_loop.ol` | inline | inline |
+| 3 | Création/accès map 100K | `scripts/bench_objects.ol` | inline | inline |
+| 4 | Accès array 1M | `scripts/bench_array.ol` | inline | inline |
+| 5 | Appels de fonctions 1M | `scripts/bench_calls.ol` | inline | inline |
+
+Procédure :
+1. Créer les scripts manquants (bench_loop, bench_array, bench_calls) pour Ollin + équivalents Lua/Python en `/tmp/`
+2. Mesurer chaque benchmark (`time` ou timer interne)
+3. Présenter le tableau final avec les temps en secondes
+
 ## Maintenance de CLAUDE.md
 
 Mettre à jour ce fichier dès qu'un point important doit être mémorisé :
