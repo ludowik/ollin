@@ -20,6 +20,7 @@ private:
     void skipNewlines();
 
     TokenType peekNextType() const;
+    TokenType peekAt(int offset) const;
     void consumeLineEnd();   // absorbe un COMMENT de fin de ligne optionnel + NEWLINE
 
     std::unique_ptr<Stmt> parseOneStmt();

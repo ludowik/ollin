@@ -53,6 +53,7 @@ private:
     void visit(const FuncDeclStmt&)  override;
     void visit(const ReturnStmt&)    override;
     void visit(const ForStmt&)       override;
+    void visit(const ForMapStmt&)    override;
 
     // ExprVisitor
     void visit(const BoolExpr&)    override;

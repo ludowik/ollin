@@ -79,6 +79,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_CALL_PRINT, &&op_CALL_PRINTF, &&op_CALL_ASSERT, &&op_CALL_TIME,
         &&op_TRY, &&op_POP_TRY, &&op_THROW,
         &&op_NEW_MAP, &&op_GET_INDEX, &&op_SET_INDEX,
+        &&op_FOR_MAP_STEP,
         &&op_HALT,
     };
 
@@ -371,6 +372,19 @@ op_SET_INDEX: {
     NEXT();
 }
 
+op_FOR_MAP_STEP: {
+    // R[base+A+3]=map, R[base+A+2]=iter; if done→ip=Bx else fill R[A+0]=key R[A+1]=val, iter++
+    Value& map_v = regs[base + A + 3];
+    if (!map_v.isMap()) throw std::runtime_error("runtime: for-in on non-map");
+    int64_t iter = regs[base + A + 2].isInteger() ? regs[base + A + 2].asInt() : 0;
+    int sz = map_v.mapSize();
+    if (iter >= sz) { ip = Bx; NEXT(); }
+    regs[base + A + 0] = Value(map_v.mapKeyAt((int)iter));
+    regs[base + A + 1] = map_v.mapValAt((int)iter);
+    regs[base + A + 2] = Value(iter + 1);
+    NEXT();
+}
+
 op_HALT:
     return;
 
@@ -492,6 +506,15 @@ op_HALT:
             while(call_stack.size()>h.call_depth)call_stack.pop_back();
             if(regs.size()>h.regs_size)regs.resize(h.regs_size);
             regs[h.reg_base+h.catch_reg]=std::move(thrown); ip=h.catch_addr; break; }
+        case Op::FOR_MAP_STEP: {
+            Value& map_v=regs[base+A+3];
+            if(!map_v.isMap())throw std::runtime_error("runtime: for-in on non-map");
+            int64_t iter=regs[base+A+2].isInteger()?regs[base+A+2].asInt():0;
+            int sz=map_v.mapSize();
+            if(iter>=sz){ip=Bx;break;}
+            regs[base+A+0]=Value(map_v.mapKeyAt((int)iter));
+            regs[base+A+1]=map_v.mapValAt((int)iter);
+            regs[base+A+2]=Value(iter+1); break; }
         case Op::NEW_MAP: regs[base+A]=Value::makeMap(); break;
         case Op::GET_INDEX: {
             const Value& map=regs[base+B]; const Value& key=regs[base+C];

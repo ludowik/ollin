@@ -18,7 +18,8 @@ stmt           = varDecl
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "in" expr ".." expr NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE ;
+               | "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
+               | "for" IDENT "," IDENT "in" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]
@@ -32,7 +33,8 @@ returnStmt     = "return" [ retvals ] NEWLINE ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
-indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
+indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE
+               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
 exprStmt       = expr NEWLINE ;
 
 expr           = logical ;
@@ -46,13 +48,16 @@ primary        = NUMBER
                | STRING
                | BOOL
                | NIL
-               | IDENT { "[" expr "]" }
-               | call  { "[" expr "]" }
-               | mapLit { "[" expr "]" }
+               | IDENT { ( "[" expr "]" | "." IDENT ) }
+               | call  { ( "[" expr "]" | "." IDENT ) }
+               | mapLit { ( "[" expr "]" | "." IDENT ) }
                | "..."
                | "(" expr ")" ;
 
-mapLit         = "{" [ STRING ":" expr { "," STRING ":" expr } ] "}" ;
+mapLit         = "{" [ NEWLINE ]
+                   [ mapEntry { "," [ NEWLINE ] mapEntry } [ NEWLINE ] ]
+                 "}" ;
+mapEntry       = ( STRING | IDENT ) ":" expr ;
 call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;

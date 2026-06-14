@@ -8,7 +8,7 @@
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
-struct ForStmt; struct IndexAssignStmt;
+struct ForStmt; struct IndexAssignStmt; struct ForMapStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
@@ -29,6 +29,7 @@ struct StmtVisitor {
     virtual void visit(const ReturnStmt&)    = 0;
     virtual void visit(const ForStmt&)       = 0;
     virtual void visit(const IndexAssignStmt&) = 0;
+    virtual void visit(const ForMapStmt&)    = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -212,6 +213,15 @@ struct ForStmt : Stmt {
     std::unique_ptr<Expr> start;
     std::unique_ptr<Expr> end;
     std::unique_ptr<Expr> step;  // nullptr = step of 1 (forward only)
+    std::vector<std::unique_ptr<Stmt>> body;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+// for k,v in map_expr
+struct ForMapStmt : Stmt {
+    std::string key_var;
+    std::string val_var;
+    std::unique_ptr<Expr> map_expr;
     std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };

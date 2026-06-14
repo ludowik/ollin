@@ -68,6 +68,9 @@ public:
     static Value makeMap();
     Value       mapGet(const std::string& key) const;
     void        mapSet(const std::string& key, const Value& val);
+    int         mapSize()          const;
+    std::string mapKeyAt(int i)    const;
+    Value       mapValAt(int i)    const;
 };
 
 struct OllinMap {
@@ -108,6 +111,9 @@ inline MapPool& map_pool() { static MapPool p; return p; }
 inline Value Value::makeMap() { return Value(map_pool().acquire()); }
 inline Value Value::mapGet(const std::string& k)           const { return mapPtr()->get(k); }
 inline void  Value::mapSet(const std::string& k, const Value& v) { mapPtr()->set(k, v); }
+inline int         Value::mapSize()       const { return (int)mapPtr()->entries.size(); }
+inline std::string Value::mapKeyAt(int i) const { return mapPtr()->entries[i].first; }
+inline Value       Value::mapValAt(int i) const { return mapPtr()->entries[i].second; }
 
 inline Value::Value(const Value& o) : bits(o.bits) {
     if (isString()) bits = mkStr(new std::string(asString()));
@@ -199,6 +205,7 @@ enum class Op : uint8_t {
     NEW_MAP,        // A: R[A] = new empty map
     GET_INDEX,      // ABC: R[A] = R[B][R[C]]  (B=map, C=key)
     SET_INDEX,      // ABC: R[A][R[B]] = R[C]  (A=map, B=key, C=value)
+    FOR_MAP_STEP,   // ABx: R[A+3]=map R[A+2]=iter; if done→Bx else R[A]=key R[A+1]=val iter++
     HALT,
 };
 

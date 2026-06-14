@@ -95,6 +95,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | NEW_MAP       | A      | A=dest                     | R[A] = nouvelle map vide                         |
 | GET_INDEX     | ABC    | A=dst, B=map, C=key        | R[A] = R[B][R[C]]  (B=map, C=key string)        |
 | SET_INDEX     | ABC    | A=map, B=key, C=val        | R[A][R[B]] = R[C]  (A=map, B=key string)        |
+| FOR_MAP_STEP  | ABx    | A=block_base, Bx=end_addr  | R[A+3]=map R[A+2]=iter; si iter≥size→Bx sinon R[A]=key R[A+1]=val iter++ |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -108,12 +109,13 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Boucle `for`
 
-Deux syntaxes, bornes inclusives :
+Trois syntaxes :
 
 ```
-for i in start..end         ## range, step = 1 implicite
+for i in start..end         ## range, step = 1 implicite (bornes inclusives)
 for i=start,end             ## numérique, step = 1 implicite
 for i=start,end,step        ## step positif ou négatif
+for k,v in map_expr         ## itération sur les entrées d'une map
 ```
 
 Step absent → step = 1 (condition `i <= end`).  
@@ -122,19 +124,27 @@ Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires a
 En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
 `break` fonctionne dans toutes les formes.
 
+`for k,v in m` : utilise 4 registres contigus au-dessus de `locals_top_` : `[block+0]`=key_out, `[block+1]`=val_out, `[block+2]`=iter, `[block+3]`=map_ref. Opcode `FOR_MAP_STEP`.
+
 ## Type map
 
 Syntaxe JSON-like, clés toujours des chaînes :
 
 ```
 var t = {}                      ## map vide
-var m = {"a": 1, "b": 2}       ## literal
-print(m["a"])                   ## GET_INDEX
-m["c"] = 3                      ## SET_INDEX
+var m = {                       ## literal multi-lignes
+    "a": 1,
+    b: 2,                       ## clé identifiant (sans guillemets)
+}
+print(m["a"])                   ## GET_INDEX via crochet
+print(m.a)                      ## GET_INDEX via point (syntaxe équivalente)
+m["c"] = 3                      ## SET_INDEX via crochet
+m.c = 3                         ## SET_INDEX via point
 m["a"] += 10                    ## compound : GET_INDEX + op + SET_INDEX
+m.a += 10                       ## idem via point
 ```
 
-Implémentation : `OllinMap { unordered_map<string, Value> data; int refcount; }`, pointeur 48-bit dans le NaN-boxing (MTAG = 0x7FFE).  
+Implémentation : `OllinMap { vector<pair<string,Value>> entries; int refcount; }`, pointeur 48-bit dans le NaN-boxing (MTAG = 0x7FFE).  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
 `isFalsy(map)` → toujours `false`.
 

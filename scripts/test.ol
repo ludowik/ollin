@@ -341,6 +341,49 @@ assert(10 % 3 == 1, "int % int → int")
 var fdiv = 7 / 2
 assert(fdiv == 3.5, "int / int → float")
 
+## ── map : multi-lignes et clés identifiants ─────────────────────────────────
+var ml = {
+    "x": 10,
+    y: 20,
+    z: 30
+}
+assert(ml["x"] == 10, "multiline map x")
+assert(ml["y"] == 20, "multiline map ident key y")
+assert(ml["z"] == 30, "multiline map ident key z")
+
+## ── map : accès par point (lecture) ─────────────────────────────────────────
+var dot = {"a": 1, "b": 2}
+assert(dot.a == 1, "dot read a")
+assert(dot.b == 2, "dot read b")
+assert(dot.x == nil, "dot read absent → nil")
+
+## ── map : affectation par point ──────────────────────────────────────────────
+dot.c = 99
+assert(dot["c"] == 99, "dot assign c")
+assert(dot.c == 99, "dot read c")
+dot.a += 9
+assert(dot.a == 10, "dot compound +=")
+dot.a *= 2
+assert(dot.a == 20, "dot compound *=")
+
+## ── for k,v in map ───────────────────────────────────────────────────────────
+var itm = {"a": 1, "b": 2, "c": 3}
+var for_map_sum = 0
+for k, v in itm
+    for_map_sum += v
+end
+assert(for_map_sum == 6, "for k,v sum values")
+
+## for k,v inside a function
+func sum_map(m)
+    var s = 0
+    for k, v in m
+        s += v
+    end
+    return s
+end
+assert(sum_map(itm) == 6, "for k,v in function")
+
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0
