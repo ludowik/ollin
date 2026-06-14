@@ -4,17 +4,14 @@
 #include <string>
 #include <vector>
 
-// NaN-boxing : Value = 8 octets (un uint64_t).
+// NaN-boxing with integer type : Value = 8 octets (uint64_t).
 //
-// IEEE 754 quiet NaN : exposant=0x7FF + bit 51 (quiet) = 0x7FF8_0000_0000_0000
-// On réserve deux masques au-dessus de ce seuil pour nos types non-numériques :
+//   Float   : IEEE 754 non-NaN double         → (bits & QNAN) != QNAN
+//   Integer : bits[63:48] == 0x7FFD           → int48 signed in bits[47:0]
+//   Nil     : 0x7FFF_0000_0000_0001
+//   String  : bits[63:48] == 0xFFFF           → pointer in bits[47:0]
 //
-//   Nombre   : tout double dont (bits & QNAN) != QNAN  (double normal ou NaN "nu")
-//   Nil      : NIL_BITS  = 0x7FFF_0000_0000_0001       (valeur sentinelle unique)
-//   String   : STAG      = 0xFFFF_0000_0000_0000 | ptr48
-//              (bit 63=1 garantit qu'aucun double positif ne collide)
-//
-// Les pointeurs heap macOS/Linux tiennent en 48 bits → ptr & PMSK est réversible.
+// Patterns are non-overlapping. Integer range: -2^47 … 2^47-1 (~140 trillion).
 
 struct Value {
     uint64_t bits;
@@ -23,6 +20,7 @@ private:
     static constexpr uint64_t QNAN = 0x7FF8000000000000ULL;
     static constexpr uint64_t NIL  = 0x7FFF000000000001ULL;
     static constexpr uint64_t STAG = 0xFFFF000000000000ULL;
+    static constexpr uint64_t ITAG = 0x7FFD000000000000ULL;
     static constexpr uint64_t PMSK = 0x0000FFFFFFFFFFFFULL;
 
     std::string* strPtr() const { return reinterpret_cast<std::string*>(bits & PMSK); }
@@ -31,6 +29,7 @@ private:
 public:
     Value()             : bits(NIL) {}
     Value(double d)     { std::memcpy(&bits, &d, 8); }
+    Value(int64_t v)    : bits(ITAG | ((uint64_t)v & PMSK)) {}
     Value(std::string v): bits(mkStr(new std::string(std::move(v)))) {}
 
     Value(const Value& o) : bits(o.bits) {
@@ -52,19 +51,36 @@ public:
     }
     ~Value() { if (isString()) delete strPtr(); }
 
-    bool isNil()    const { return bits == NIL; }
-    bool isNumber() const { return (bits & QNAN) != QNAN; }
-    bool isString() const { return (bits & STAG) == STAG; }
+    bool isNil()     const { return bits == NIL; }
+    bool isFloat()   const { return (bits & QNAN) != QNAN; }
+    bool isInteger() const { return (bits >> 48) == 0x7FFDu; }
+    bool isNumber()  const { return isFloat() || isInteger(); }
+    bool isString()  const { return (bits & STAG) == STAG; }
 
-    double asNum()                const { double d; std::memcpy(&d, &bits, 8); return d; }
+    int64_t asInt()  const {
+        int64_t v = (int64_t)(bits & PMSK);
+        return (v & (1LL << 47)) ? (v | (int64_t)~PMSK) : v;
+    }
+    double  asFloat() const { double d; std::memcpy(&d, &bits, 8); return d; }
+    double  asNum()   const { return isInteger() ? (double)asInt() : asFloat(); }
     const std::string& asString() const { return *strPtr(); }
 };
 
 inline bool isFalsy(const Value& v) {
-    if (v.isNil())    return true;
-    if (v.isNumber()) return v.asNum() == 0.0;
-    if (v.isString()) return v.asString().empty();
+    if (v.isNil())     return true;
+    if (v.isInteger()) return v.asInt() == 0;
+    if (v.isFloat())   return v.asFloat() == 0.0;
+    if (v.isString())  return v.asString().empty();
     return true;
+}
+
+
+
+// Emit int64 if double is exact integer, float otherwise.
+inline Value numValue(double d) {
+    auto i = static_cast<int64_t>(d);
+    if (static_cast<double>(i) == d) return Value(i);
+    return Value(d);
 }
 
 // ── 32-bit fixed-size instruction format ─────────────────────────────────────

@@ -4,9 +4,9 @@
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
 static Value evalConstant(const Expr& e) {
-    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return Value(n->value);
+    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return numValue(n->value);
     if (auto* s = dynamic_cast<const StringExpr*>(&e)) return Value(s->value);
-    if (auto* b = dynamic_cast<const BoolExpr*>(&e))   return Value(b->value ? 1.0 : 0.0);
+    if (auto* b = dynamic_cast<const BoolExpr*>(&e))   return Value((int64_t)(b->value ? 1 : 0));
     if (dynamic_cast<const NilExpr*>(&e))               return Value{};
     throw std::runtime_error("default values must be literal constants");
 }
@@ -46,13 +46,13 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
 void Compiler::compileInto(const Expr& e, int dest) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                           chunk.addConstant(Value(n->value))));
+                           chunk.addConstant(numValue(n->value))));
     } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
                            chunk.addConstant(Value(s->value))));
     } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                           chunk.addConstant(Value(b->value ? 1.0 : 0.0))));
+                           chunk.addConstant(Value((int64_t)(b->value ? 1 : 0)))));
     } else if (dynamic_cast<const NilExpr*>(&e)) {
         chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
     } else {
@@ -540,7 +540,7 @@ void Compiler::visit(const ForStmt& s) {
         int one_r = reg_top_;
         if (reg_top_ + 1 > reg_count_) reg_count_ = reg_top_ + 1;
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
-                           chunk.addConstant(Value(1.0))));
+                           chunk.addConstant(Value((int64_t)1))));
         chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)one_r));
 
         chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
@@ -600,7 +600,7 @@ void Compiler::visit(const ForStmt& s) {
                 chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)r0,
                                    chunk.addIdentifier(s.var)));
                 chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)r1,
-                                   chunk.addConstant(Value(1.0))));
+                                   chunk.addConstant(Value((int64_t)1))));
                 chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)r0, (uint8_t)r0, (uint8_t)r1));
                 chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)r0,
                                    chunk.addIdentifier(s.var)));
@@ -620,7 +620,7 @@ void Compiler::visit(const ForStmt& s) {
 void Compiler::visit(const NumberExpr& e) {
     last_reg_ = allocReg();
     chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                       chunk.addConstant(Value(e.value))));
+                       chunk.addConstant(numValue(e.value))));
 }
 
 void Compiler::visit(const StringExpr& e) {
@@ -632,7 +632,7 @@ void Compiler::visit(const StringExpr& e) {
 void Compiler::visit(const BoolExpr& e) {
     last_reg_ = allocReg();
     chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                       chunk.addConstant(Value(e.value ? 1.0 : 0.0))));
+                       chunk.addConstant(Value((int64_t)(e.value ? 1 : 0)))));
 }
 
 void Compiler::visit(const NilExpr&) {

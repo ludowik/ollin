@@ -6,10 +6,11 @@
 #include <vector>
 
 static std::string valueToString(const Value& v) {
-    if (v.isNil())    return "nil";
-    if (v.isString()) return v.asString();
+    if (v.isNil())     return "nil";
+    if (v.isString())  return v.asString();
+    if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
-    double d = v.asNum();
+    double d = v.asFloat();
     if (d == (long long)d && d >= -1e15 && d <= 1e15)
         os << (long long)d;
     else
@@ -87,15 +88,27 @@ void VM::execute(const Chunk& chunk) {
             globals_init[Bx] = true;
             break;
 
-        case Op::ADD:
-            regs[base+A] = Value(asDouble(regs[base+B]) + asDouble(regs[base+C]));
+        case Op::ADD: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() + cv.asInt())
+                : Value(asDouble(bv) + asDouble(cv));
             break;
-        case Op::SUB:
-            regs[base+A] = Value(asDouble(regs[base+B]) - asDouble(regs[base+C]));
+        }
+        case Op::SUB: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() - cv.asInt())
+                : Value(asDouble(bv) - asDouble(cv));
             break;
-        case Op::MUL:
-            regs[base+A] = Value(asDouble(regs[base+B]) * asDouble(regs[base+C]));
+        }
+        case Op::MUL: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() * cv.asInt())
+                : Value(asDouble(bv) * asDouble(cv));
             break;
+        }
         case Op::DIV: {
             double bv = asDouble(regs[base+C]);
             if (bv == 0.0) throw std::runtime_error("runtime: division by zero");
@@ -103,48 +116,69 @@ void VM::execute(const Chunk& chunk) {
             break;
         }
         case Op::MOD: {
-            double bv = asDouble(regs[base+C]);
-            if (bv == 0.0) throw std::runtime_error("runtime: modulo by zero");
-            regs[base+A] = Value(std::fmod(asDouble(regs[base+B]), bv));
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger()) {
+                if (cv.asInt() == 0) throw std::runtime_error("runtime: modulo by zero");
+                regs[base+A] = Value(bv.asInt() % cv.asInt());
+            } else {
+                double dv = asDouble(cv);
+                if (dv == 0.0) throw std::runtime_error("runtime: modulo by zero");
+                regs[base+A] = Value(std::fmod(asDouble(bv), dv));
+            }
             break;
         }
-        case Op::NEGATE:
-            regs[base+A] = Value(-asDouble(regs[base+B]));
+        case Op::NEGATE: {
+            const Value& bv = regs[base+B];
+            regs[base+A] = bv.isInteger() ? Value(-bv.asInt()) : Value(-asDouble(bv));
             break;
+        }
         case Op::NOT:
-            regs[base+A] = Value(isFalsy(regs[base+B]) ? 1.0 : 0.0);
+            regs[base+A] = Value((int64_t)(isFalsy(regs[base+B]) ? 1 : 0));
             break;
         case Op::AND:
-            regs[base+A] = Value(!isFalsy(regs[base+B]) && !isFalsy(regs[base+C]) ? 1.0 : 0.0);
+            regs[base+A] = Value((int64_t)(!isFalsy(regs[base+B]) && !isFalsy(regs[base+C]) ? 1 : 0));
             break;
         case Op::OR:
-            regs[base+A] = Value(!isFalsy(regs[base+B]) || !isFalsy(regs[base+C]) ? 1.0 : 0.0);
+            regs[base+A] = Value((int64_t)(!isFalsy(regs[base+B]) || !isFalsy(regs[base+C]) ? 1 : 0));
             break;
 
-        case Op::GT:
-            regs[base+A] = Value(asDouble(regs[base+B]) >  asDouble(regs[base+C]) ? 1.0 : 0.0);
+        case Op::GT: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() >  cv.asInt() : asDouble(bv) >  asDouble(cv)));
             break;
-        case Op::LT:
-            regs[base+A] = Value(asDouble(regs[base+B]) <  asDouble(regs[base+C]) ? 1.0 : 0.0);
+        }
+        case Op::LT: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() <  cv.asInt() : asDouble(bv) <  asDouble(cv)));
             break;
-        case Op::GE:
-            regs[base+A] = Value(asDouble(regs[base+B]) >= asDouble(regs[base+C]) ? 1.0 : 0.0);
+        }
+        case Op::GE: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() >= cv.asInt() : asDouble(bv) >= asDouble(cv)));
             break;
-        case Op::LE:
-            regs[base+A] = Value(asDouble(regs[base+B]) <= asDouble(regs[base+C]) ? 1.0 : 0.0);
+        }
+        case Op::LE: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt() <= cv.asInt() : asDouble(bv) <= asDouble(cv)));
             break;
+        }
         case Op::EQ: {
             const Value& av = regs[base+B];
             const Value& bv = regs[base+C];
             bool eq;
             if (av.isNil() && bv.isNil())             eq = true;
             else if (av.isNil() || bv.isNil())         eq = false;
-            else if (av.isNumber() && bv.isNumber())   eq = (av.asNum() == bv.asNum());
-            else if (av.isString() && bv.isString())   eq = (av.asString() == bv.asString());
-            else if (av.isString() && bv.isNumber())   eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
-            else if (av.isNumber() && bv.isString())   eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
+            else if (av.isInteger() && bv.isInteger()) eq = av.asInt() == bv.asInt();
+            else if (av.isNumber()  && bv.isNumber())  eq = av.asNum() == bv.asNum();
+            else if (av.isString()  && bv.isString())  eq = av.asString() == bv.asString();
+            else if (av.isString()  && bv.isNumber())  eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
+            else if (av.isNumber()  && bv.isString())  eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
             else eq = false;
-            regs[base+A] = Value(eq ? 1.0 : 0.0);
+            regs[base+A] = Value((int64_t)(eq ? 1 : 0));
             break;
         }
         case Op::NEQ: {
@@ -153,12 +187,13 @@ void VM::execute(const Chunk& chunk) {
             bool eq;
             if (av.isNil() && bv.isNil())             eq = true;
             else if (av.isNil() || bv.isNil())         eq = false;
-            else if (av.isNumber() && bv.isNumber())   eq = (av.asNum() == bv.asNum());
-            else if (av.isString() && bv.isString())   eq = (av.asString() == bv.asString());
-            else if (av.isString() && bv.isNumber())   eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
-            else if (av.isNumber() && bv.isString())   eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
+            else if (av.isInteger() && bv.isInteger()) eq = av.asInt() == bv.asInt();
+            else if (av.isNumber()  && bv.isNumber())  eq = av.asNum() == bv.asNum();
+            else if (av.isString()  && bv.isString())  eq = av.asString() == bv.asString();
+            else if (av.isString()  && bv.isNumber())  eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
+            else if (av.isNumber()  && bv.isString())  eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
             else eq = false;
-            regs[base+A] = Value(eq ? 0.0 : 1.0);  // NEQ = inverse of EQ
+            regs[base+A] = Value((int64_t)(eq ? 0 : 1));
             break;
         }
 
