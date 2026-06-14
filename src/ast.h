@@ -7,10 +7,11 @@
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
-struct ForStmt;
+struct ForStmt; struct IndexAssignStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
+struct MapExpr; struct IndexExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -26,6 +27,7 @@ struct StmtVisitor {
     virtual void visit(const FuncDeclStmt&)  = 0;
     virtual void visit(const ReturnStmt&)    = 0;
     virtual void visit(const ForStmt&)       = 0;
+    virtual void visit(const IndexAssignStmt&) = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -39,6 +41,8 @@ struct ExprVisitor {
     virtual void visit(const UnaryExpr&)  = 0;
     virtual void visit(const VarArgExpr&) = 0;
     virtual void visit(const NilExpr&)    = 0;
+    virtual void visit(const MapExpr&)    = 0;
+    virtual void visit(const IndexExpr&)  = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -178,6 +182,18 @@ struct VarArgExpr : Expr {
 };
 
 struct NilExpr : Expr {
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct MapExpr : Expr {
+    // keys are always strings (JSON-like)
+    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> entries;
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct IndexExpr : Expr {
+    std::unique_ptr<Expr> obj;
+    std::unique_ptr<Expr> key;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

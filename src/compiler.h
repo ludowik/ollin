@@ -64,4 +64,9 @@ private:
     void visit(const UnaryExpr&)   override;
     void visit(const VarArgExpr&)  override;
     void visit(const NilExpr&)     override;
+    void visit(const MapExpr&)     override;
+    void visit(const IndexExpr&)   override;
+
+    // StmtVisitor (map)
+    void visit(const IndexAssignStmt&) override;
 };
