@@ -193,15 +193,18 @@ void Compiler::visit(const WhileStmt& s) {
     reg_top_ = saved;
 
     break_patches.push_back({});
+    continue_patches.push_back({});
     for (auto& stmt : s.body) {
         int s2 = reg_top_;
         stmt->accept(*this);
         reg_top_ = s2;
     }
+    // continue → réévaluation de la condition
+    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
+    continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
     chunk.patchJump(exit_patch, (uint16_t)chunk.currentPos());
-    for (size_t p : break_patches.back())
-        chunk.patchJump(p, (uint16_t)chunk.currentPos());
+    for (size_t p : break_patches.back()) chunk.patchJump(p, (uint16_t)chunk.currentPos());
     break_patches.pop_back();
 }
 
@@ -251,6 +254,12 @@ void Compiler::visit(const BreakStmt&) {
     if (break_patches.empty())
         throw std::runtime_error("break outside loop");
     break_patches.back().push_back(chunk.emitJump(Op::JUMP));
+}
+
+void Compiler::visit(const ContinueStmt&) {
+    if (continue_patches.empty())
+        throw std::runtime_error("continue outside loop");
+    continue_patches.back().push_back(chunk.emitJump(Op::JUMP));
 }
 
 void Compiler::visit(const AssignStmt& s) {
@@ -565,11 +574,17 @@ void Compiler::visit(const ForStmt& s) {
         }
 
         break_patches.push_back({});
+        continue_patches.push_back({});
         for (auto& stmt : s.body) {
             int saved = reg_top_;
             stmt->accept(*this);
             reg_top_ = saved;
         }
+
+        // continue → incrément
+        uint16_t incr_addr = (uint16_t)chunk.currentPos();
+        for (size_t p : continue_patches.back()) chunk.patchJump(p, incr_addr);
+        continue_patches.pop_back();
 
         // Increment (one_r already loaded before the loop)
         if (step_reg < 0) {
@@ -641,11 +656,17 @@ void Compiler::visit(const ForStmt& s) {
             reg_top_ -= 5;  // free temporaries
 
             break_patches.push_back({});
+            continue_patches.push_back({});
             for (auto& stmt : s.body) {
                 int saved = reg_top_;
                 stmt->accept(*this);
                 reg_top_ = saved;
             }
+
+            // continue → incrément
+            uint16_t incr_addr = (uint16_t)chunk.currentPos();
+            for (size_t p : continue_patches.back()) chunk.patchJump(p, incr_addr);
+            continue_patches.pop_back();
 
             // Increment
             {
@@ -897,11 +918,15 @@ void Compiler::visit(const ForMapStmt& s) {
     }
 
     break_patches.push_back({});
+    continue_patches.push_back({});
     for (auto& stmt : s.body) {
         int saved = reg_top_;
         stmt->accept(*this);
         reg_top_ = saved;
     }
+    // continue → FOR_MAP_STEP (re-teste la condition)
+    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
+    continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit = (uint16_t)chunk.currentPos();
@@ -936,11 +961,15 @@ void Compiler::visit(const ForInStmt& s) {
     }
 
     break_patches.push_back({});
+    continue_patches.push_back({});
     for (auto& stmt : s.body) {
         int saved = reg_top_;
         stmt->accept(*this);
         reg_top_ = saved;
     }
+    // continue → FOR_ITER_STEP (re-teste la condition)
+    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
+    continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit = (uint16_t)chunk.currentPos();

@@ -64,7 +64,8 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     }
     if (check(TokenType::WHILE))   return whileStmt();
     if (check(TokenType::IF))      return ifStmt();
-    if (check(TokenType::BREAK))   return breakStmt();
+    if (check(TokenType::BREAK))    return breakStmt();
+    if (check(TokenType::CONTINUE)) return continueStmt();
     if (check(TokenType::TRY))     return tryCatchStmt();
     if (check(TokenType::THROW))   return throwStmt();
     if (check(TokenType::FOR))     return forStmt();
@@ -207,6 +208,12 @@ std::unique_ptr<Stmt> Parser::breakStmt() {
     advance();
     consumeLineEnd();
     return std::make_unique<BreakStmt>();
+}
+
+std::unique_ptr<Stmt> Parser::continueStmt() {
+    advance();
+    consumeLineEnd();
+    return std::make_unique<ContinueStmt>();
 }
 
 std::unique_ptr<Stmt> Parser::throwStmt() {

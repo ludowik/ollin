@@ -6,7 +6,7 @@
 
 // ── forward declarations ──────────────────────────────────────────────────────
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
-struct IfStmt; struct BreakStmt; struct AssignStmt; struct ExprStmt;
+struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
 struct ForStmt; struct IndexAssignStmt; struct ForMapStmt; struct ForInStmt;
 
@@ -20,7 +20,8 @@ struct StmtVisitor {
     virtual void visit(const VarDeclStmt&) = 0;
     virtual void visit(const WhileStmt&)   = 0;
     virtual void visit(const IfStmt&)      = 0;
-    virtual void visit(const BreakStmt&)   = 0;
+    virtual void visit(const BreakStmt&)    = 0;
+    virtual void visit(const ContinueStmt&) = 0;
     virtual void visit(const AssignStmt&)  = 0;
     virtual void visit(const ExprStmt&)    = 0;
     virtual void visit(const ThrowStmt&)   = 0;
@@ -127,6 +128,10 @@ struct AssignStmt : Stmt {
 };
 
 struct BreakStmt : Stmt {
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct ContinueStmt : Stmt {
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

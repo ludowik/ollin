@@ -12,6 +12,7 @@ public:
 private:
     Chunk chunk;
     std::vector<std::vector<size_t>> break_patches;
+    std::vector<std::vector<size_t>> continue_patches;
     int for_counter_ = 0;
 
     // ── register allocator ────────────────────────────────────────────────────
@@ -46,6 +47,7 @@ private:
     void visit(const WhileStmt&)     override;
     void visit(const IfStmt&)        override;
     void visit(const BreakStmt&)     override;
+    void visit(const ContinueStmt&)  override;
     void visit(const AssignStmt&)    override;
     void visit(const ExprStmt&)      override;
     void visit(const ThrowStmt&)     override;
