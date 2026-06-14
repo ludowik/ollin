@@ -101,4 +101,12 @@ for i=1,10
 		print(i)
 end
 
+for i=1,10,2    ## step optionnel
+		print(i)
+end
+
+for i=10,1,-1   ## step négatif
+		print(i)
+end
+
 

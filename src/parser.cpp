@@ -255,10 +255,11 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     s->var = expect(TokenType::IDENTIFIER).lexeme;
 
     if (match(TokenType::EQUALS)) {
-        // for i=start,end
+        // for i=start,end[,step]
         s->start = expr();
         expect(TokenType::COMMA);
         s->end = expr();
+        if (match(TokenType::COMMA)) s->step = expr();
     } else {
         // for i in start..end
         expect(TokenType::IN);

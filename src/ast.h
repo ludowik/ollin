@@ -186,6 +186,7 @@ struct ForStmt : Stmt {
     std::string var;
     std::unique_ptr<Expr> start;
     std::unique_ptr<Expr> end;
+    std::unique_ptr<Expr> step;  // nullptr = step of 1 (forward only)
     std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
