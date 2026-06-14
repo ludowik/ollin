@@ -256,23 +256,19 @@ void Compiler::visit(const AssignStmt& s) {
             if (s.op == '\0') {
                 compileInto(*s.value, dest);
             } else {
-                // Compound: load current value, compile rhs, apply op
+                // Compound: rhs is fully evaluated before writing back to dest
                 int saved = reg_top_;
-                // rhs in a temp
                 s.value->accept(*this);
                 int rhs = last_reg_;
-                // result reg
-                int res = allocReg();
-                if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                // Emit op directly into dest — safe: rhs is already in a register
                 switch (s.op) {
-                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)res, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
+                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
                     default:  throw std::runtime_error(std::string("unknown assign op: ") + s.op);
                 }
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)res, 0));
                 reg_top_ = saved;
             }
             return;
@@ -533,6 +529,15 @@ void Compiler::visit(const ForStmt& s) {
             compileInto(*s.step, step_reg);
         }
 
+        // Preallocate constant 1 before the loop (avoids LOAD_K every iteration)
+        int one_r = -1;
+        if (step_reg < 0) {
+            one_r = reg_top_++;
+            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
+                               chunk.addConstant(Value((int64_t)1))));
+        }
+
         auto loop_start = (uint16_t)chunk.currentPos();
 
         // Scratch registers for condition (never permanently allocated)
@@ -561,12 +566,8 @@ void Compiler::visit(const ForStmt& s) {
             reg_top_ = saved;
         }
 
-        // Increment
+        // Increment (one_r already loaded before the loop)
         if (step_reg < 0) {
-            int one_r = reg_top_;
-            if (reg_top_ + 1 > reg_count_) reg_count_ = reg_top_ + 1;
-            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
-                               chunk.addConstant(Value((int64_t)1))));
             chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)one_r));
         } else {
             chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)step_reg));
@@ -579,7 +580,7 @@ void Compiler::visit(const ForStmt& s) {
         for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
         break_patches.pop_back();
 
-        // Free temps: end_reg [+ step_reg]
+        // Free temps: end_reg [+ one_r] [+ step_reg]
         reg_top_ = end_reg;
     } else {
         // Global scope: loop var, end, and optional step are globals
