@@ -20,6 +20,7 @@
 struct Map;
 struct Array;
 struct Iterator;
+struct Closure;
 
 struct Value {
     uint8_t tag;
@@ -30,6 +31,7 @@ struct Value {
         Map*               mptr;
         Array*             aptr;
         Iterator*          iptr;
+        Closure*           cptr;
     };
 
     static constexpr uint8_t T_NIL      = 0;
@@ -40,11 +42,13 @@ struct Value {
     static constexpr uint8_t T_ARRAY    = 5;
     static constexpr uint8_t T_ITERATOR = 6;
     static constexpr uint8_t T_FUNCTION = 7;
+    static constexpr uint8_t T_CLOSURE  = 8;
 
 private:
     explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
     explicit Value(Array*    p) : tag(T_ARRAY),    aptr(p) {}
     explicit Value(Iterator* p) : tag(T_ITERATOR), iptr(p) {}
+    explicit Value(Closure*  p) : tag(T_CLOSURE),  cptr(p) {}
 
 public:
     Value()              : tag(T_NIL), ival(0) {}
@@ -67,8 +71,12 @@ public:
     bool isArray()    const { return tag == T_ARRAY; }
     bool isIterator() const { return tag == T_ITERATOR; }
     bool isFuncVal()  const { return tag == T_FUNCTION; }
+    bool isClosure()  const { return tag == T_CLOSURE; }
+
+    Closure* asClosure() const { return cptr; }
 
     static Value makeFunc(uint8_t idx) { Value v; v.tag = T_FUNCTION; v.ival = idx; return v; }
+    static Value makeClosure(Closure* p) { return Value(p); }
 
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
@@ -96,6 +104,9 @@ public:
 
 // ── Iterator (protocole d'itération — Map, Array) ────────────────────────────
 #include "iterator.h"
+
+// ── Closure / Upvalue ─────────────────────────────────────────────────────────
+#include "closure.h"
 
 // ── inline Value implementations (nécessitent Map, Array, Iterator complets) ─
 
@@ -126,6 +137,7 @@ inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
         case T_ARRAY:    aptr = o.aptr; aptr->refcount++; break;
         case T_ITERATOR: iptr = o.iptr; iptr->refcount++; break;
         case T_FUNCTION: ival = o.ival; break;
+        case T_CLOSURE:  cptr = o.cptr; cptr->refcount++; break;
     }
 }
 inline Value& Value::operator=(const Value& o) {
@@ -136,6 +148,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_MAP:      o.mptr->refcount++;             break;
         case T_ARRAY:    o.aptr->refcount++;             break;
         case T_ITERATOR: o.iptr->refcount++;             break;
+        case T_CLOSURE:  o.cptr->refcount++;             break;
         default: break;
     }
     // Release de l'ancienne valeur
@@ -144,6 +157,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
+        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         default: break;
     }
     tag = o.tag; ival = 0;
@@ -156,6 +170,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_ARRAY:    aptr = o.aptr; break;
         case T_ITERATOR: iptr = o.iptr; break;
         case T_FUNCTION: ival = o.ival; break;
+        case T_CLOSURE:  cptr = o.cptr; break;
     }
     return *this;
 }
@@ -167,6 +182,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
+        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         default: break;
     }
     tag = o.tag; ival = o.ival; o.tag = T_NIL;
@@ -178,6 +194,7 @@ inline Value::~Value() {
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
+        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         default: break;
     }
 }
@@ -252,7 +269,15 @@ enum class Op : uint8_t {
     FOR_ITER_NEXT,  // ABx: R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→ip=Bx
     LOAD_FUNC,      // ABx: R[A] = func_value(Bx)
     CALL_DYN,       // ABC: A=arg_base, B=func_val_reg, C=argc
+    MAKE_CLOSURE,   // ABx: A=dest, Bx=func_idx → create closure, capture upvals from current frame
+    GET_UPVAL,      // AB:  A=dest, B=upval_idx → R[A] = upval[B]
+    SET_UPVAL,      // AB:  A=src,  B=upval_idx → upval[B] = R[A]
     HALT,
+};
+
+struct UpvalDesc {
+    bool    is_local;  // true = capture local reg from enclosing frame; false = pass through upval
+    uint8_t idx;       // register index (is_local) or upvalue index of enclosing closure
 };
 
 struct FuncProto {
@@ -261,6 +286,7 @@ struct FuncProto {
     bool     variadic;
     uint16_t defaults_idx;
     uint8_t  reg_count;
+    std::vector<UpvalDesc> upvals;
 };
 
 struct Chunk {

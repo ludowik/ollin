@@ -12,6 +12,7 @@ static std::string valueToString(const Value& v) {
     if (v.isArray())    return "{array}";
     if (v.isIterator()) return "{iterator}";
     if (v.isFuncVal())  return "{function}";
+    if (v.isClosure())  return "{function}";
     if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
     double d = v.asFloat();
@@ -57,7 +58,7 @@ void VM::execute(const Chunk& chunk) {
     globals_init.assign(chunk.identifiers.size(), false);
     regs.resize(chunk.top_reg_count);
     call_stack.reserve(1000);
-    call_stack.push_back({0, 0, nullptr});
+    call_stack.push_back({0, 0, nullptr, {}, {}});
 
 #ifdef __GNUC__
 // ── Computed-goto dispatch ────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_BLSHIFT, &&op_BRSHIFT,
         &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_NEXT,
         &&op_LOAD_FUNC, &&op_CALL_DYN,
+        &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_HALT,
     };
 
@@ -248,22 +250,26 @@ op_CALL_FUNC: {
             regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
     }
 
-    std::unique_ptr<std::vector<Value>> varargs;
-    if (fp.variadic && argc > fp.n_fixed) {
-        varargs = std::make_unique<std::vector<Value>>();
-        for (int i = fp.n_fixed; i < argc; ++i)
-            varargs->push_back(std::move(regs[new_base + i]));
+    {
+        std::unique_ptr<std::vector<Value>> varargs;
+        if (fp.variadic && argc > fp.n_fixed) {
+            varargs = std::make_unique<std::vector<Value>>();
+            for (int i = fp.n_fixed; i < argc; ++i)
+                varargs->push_back(std::move(regs[new_base + i]));
+        }
+        size_t full_needed = (size_t)(new_base + fp.reg_count);
+        if (regs.size() < full_needed) regs.resize(full_needed);
+        call_stack.push_back({ip, new_base, std::move(varargs), {}, {}});
     }
-
-    size_t full_needed = (size_t)(new_base + fp.reg_count);
-    if (regs.size() < full_needed) regs.resize(full_needed);
-
-    call_stack.push_back({ip, new_base, std::move(varargs)});
     ip = fp.addr;
     NEXT();
 }
 
 op_RETURN: {
+    for (auto* uv : call_stack.back().open_upvals) {
+        if (!uv->closed) { uv->val = regs[uv->frame_base + uv->reg_idx]; uv->closed = true; }
+        if (--uv->refcount == 0) delete uv;
+    }
     int n = B;
     if (n > 0 && A != 0) {
         for (int i = 0; i < n; ++i)
@@ -288,18 +294,26 @@ op_LOAD_VARARGS: {
 }
 
 op_RETURN_V: {
-    auto& va = call_stack.back().varargs;
-    int n_va       = va ? (int)va->size() : 0;
-    int n_explicit = B;
-    int total      = n_explicit + n_va;
-    std::vector<Value> rvs(total);
-    for (int i = 0; i < n_explicit; ++i) rvs[i] = std::move(regs[base + A + i]);
-    if (va) for (int i = 0; i < n_va; ++i) rvs[n_explicit + i] = std::move((*va)[i]);
-    uint32_t rip   = call_stack.back().return_ip;
-    int      rbase = call_stack.back().reg_base;
-    call_stack.pop_back();
-    if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
-    for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
+    for (auto* uv : call_stack.back().open_upvals) {
+        if (!uv->closed) { uv->val = regs[uv->frame_base + uv->reg_idx]; uv->closed = true; }
+        if (--uv->refcount == 0) delete uv;
+    }
+    uint32_t rip;
+    int      rbase;
+    {
+        auto& va = call_stack.back().varargs;
+        int n_va       = va ? (int)va->size() : 0;
+        int n_explicit = B;
+        int total      = n_explicit + n_va;
+        std::vector<Value> rvs(total);
+        for (int i = 0; i < n_explicit; ++i) rvs[i] = std::move(regs[base + A + i]);
+        if (va) for (int i = 0; i < n_va; ++i) rvs[n_explicit + i] = std::move((*va)[i]);
+        rip   = call_stack.back().return_ip;
+        rbase = call_stack.back().reg_base;
+        call_stack.pop_back();
+        if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
+        for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
+    }
     ip = rip;
     NEXT();
 }
@@ -316,9 +330,11 @@ op_CALL_PRINT: {
 op_CALL_PRINTF: {
     if (B < 1 || !regs[base + A].isString())
         throw std::runtime_error("printf: first arg must be string");
-    std::vector<Value> args(B);
-    for (int i = 0; i < B; ++i) args[i] = regs[base + A + i];
-    std::cout << applyFormat(args[0].asString(), args, 1) << '\n';
+    {
+        std::vector<Value> args(B);
+        for (int i = 0; i < B; ++i) args[i] = regs[base + A + i];
+        std::cout << applyFormat(args[0].asString(), args, 1) << '\n';
+    }
     NEXT();
 }
 
@@ -346,15 +362,25 @@ op_POP_TRY:
     NEXT();
 
 op_THROW: {
-    Value thrown = regs[base + A];
-    if (handler_stack.empty())
-        throw std::runtime_error("unhandled exception: " + valueToString(thrown));
-    Handler h = handler_stack.back();
-    handler_stack.pop_back();
-    while (call_stack.size() > h.call_depth) call_stack.pop_back();
-    if (regs.size() > h.regs_size) regs.resize(h.regs_size);
-    regs[h.reg_base + h.catch_reg] = std::move(thrown);
-    ip = h.catch_addr;
+    uint32_t catch_addr;
+    {
+        Value thrown = regs[base + A];
+        if (handler_stack.empty())
+            throw std::runtime_error("unhandled exception: " + valueToString(thrown));
+        Handler h = handler_stack.back();
+        handler_stack.pop_back();
+        while (call_stack.size() > h.call_depth) {
+            for (auto* uv : call_stack.back().open_upvals) {
+                if (!uv->closed) { uv->val = regs[uv->frame_base + uv->reg_idx]; uv->closed = true; }
+                if (--uv->refcount == 0) delete uv;
+            }
+            call_stack.pop_back();
+        }
+        if (regs.size() > h.regs_size) regs.resize(h.regs_size);
+        regs[h.reg_base + h.catch_reg] = std::move(thrown);
+        catch_addr = h.catch_addr;
+    }
+    ip = catch_addr;
     NEXT();
 }
 
@@ -443,10 +469,16 @@ op_ARRAY_PUSH:
 
 op_FOR_ITER_NEXT: {
     // R[A+0]=iterator; next→R[A+1]=key, R[A+2]=val; épuisé→ip=Bx
-    Value key, val;
-    if (!regs[base + A].iptr->next(key, val)) { ip = Bx; NEXT(); }
-    regs[base + A + 1] = std::move(key);
-    regs[base + A + 2] = std::move(val);
+    bool exhausted;
+    {
+        Value key, val;
+        exhausted = !regs[base + A].iptr->next(key, val);
+        if (!exhausted) {
+            regs[base + A + 1] = std::move(key);
+            regs[base + A + 2] = std::move(val);
+        }
+    }
+    if (exhausted) ip = Bx;
     NEXT();
 }
 
@@ -457,9 +489,15 @@ op_LOAD_FUNC:
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
     const Value& fv = regs[base + B];
-    if (!fv.isFuncVal())
+    uint8_t fi;
+    if (fv.isFuncVal()) {
+        fi = (uint8_t)fv.asInt();
+    } else if (fv.isClosure()) {
+        fi = fv.asClosure()->func_idx;
+    } else {
         throw std::runtime_error("runtime: call on non-function value");
-    const FuncProto& fp = ch->funcs[(uint8_t)fv.asInt()];
+    }
+    const FuncProto& fp = ch->funcs[fi];
     int new_base = base + A;
     int argc = C;
     size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
@@ -469,16 +507,63 @@ op_CALL_DYN: {
         for (int i = argc; i < fp.n_fixed; ++i)
             regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
     }
-    std::unique_ptr<std::vector<Value>> varargs;
-    if (fp.variadic && argc > fp.n_fixed) {
-        varargs = std::make_unique<std::vector<Value>>();
-        for (int i = fp.n_fixed; i < argc; ++i)
-            varargs->push_back(std::move(regs[new_base + i]));
+    {
+        std::vector<Upvalue*> frame_upvals;
+        if (fv.isClosure()) frame_upvals = fv.asClosure()->upvals;
+        std::unique_ptr<std::vector<Value>> varargs;
+        if (fp.variadic && argc > fp.n_fixed) {
+            varargs = std::make_unique<std::vector<Value>>();
+            for (int i = fp.n_fixed; i < argc; ++i)
+                varargs->push_back(std::move(regs[new_base + i]));
+        }
+        size_t full_needed = (size_t)(new_base + fp.reg_count);
+        if (regs.size() < full_needed) regs.resize(full_needed);
+        call_stack.push_back({ip, new_base, std::move(varargs), std::move(frame_upvals), {}});
     }
-    size_t full_needed = (size_t)(new_base + fp.reg_count);
-    if (regs.size() < full_needed) regs.resize(full_needed);
-    call_stack.push_back({ip, new_base, std::move(varargs)});
     ip = fp.addr;
+    NEXT();
+}
+
+op_MAKE_CLOSURE: {
+    uint8_t fi = (uint8_t)Bx;
+    auto* cl = new Closure(fi);
+    for (auto& desc : ch->funcs[fi].upvals) {
+        Upvalue* uv;
+        if (desc.is_local) {
+            uv = nullptr;
+            for (auto* ou : call_stack.back().open_upvals) {
+                if (!ou->closed && ou->frame_base == base && ou->reg_idx == desc.idx) {
+                    uv = ou; break;
+                }
+            }
+            if (!uv) {
+                uv = new Upvalue;
+                uv->frame_base = base;
+                uv->reg_idx = desc.idx;
+                // refcount=1 for open_upvals
+                call_stack.back().open_upvals.push_back(uv);
+            }
+            uv->refcount++;  // for cl
+        } else {
+            uv = call_stack.back().upvals[desc.idx];
+            uv->refcount++;  // for cl
+        }
+        cl->upvals.push_back(uv);
+    }
+    regs[base + A] = Value::makeClosure(cl);
+    NEXT();
+}
+
+op_GET_UPVAL: {
+    Upvalue* uv = call_stack.back().upvals[B];
+    regs[base + A] = uv->closed ? uv->val : regs[uv->frame_base + uv->reg_idx];
+    NEXT();
+}
+
+op_SET_UPVAL: {
+    Upvalue* uv = call_stack.back().upvals[B];
+    if (uv->closed) uv->val = regs[base + A];
+    else regs[uv->frame_base + uv->reg_idx] = regs[base + A];
     NEXT();
 }
 
@@ -561,8 +646,9 @@ op_HALT:
             for(int i=fp.n_fixed;i<argc;++i)varargs->push_back(std::move(regs[new_base+i]));}
             size_t full_needed=(size_t)(new_base+fp.reg_count);
             if(regs.size()<full_needed)regs.resize(full_needed);
-            call_stack.push_back({ip,new_base,std::move(varargs)}); ip=fp.addr; break; }
+            call_stack.push_back({ip,new_base,std::move(varargs),{},{}}); ip=fp.addr; break; }
         case Op::RETURN: {
+            for(auto* uv:call_stack.back().open_upvals){if(!uv->closed){uv->val=regs[uv->frame_base+uv->reg_idx];uv->closed=true;}if(--uv->refcount==0)delete uv;}
             int n=B; if(n>0&&A!=0)for(int i=0;i<n;++i)regs[base+i]=std::move(regs[base+A+i]);
             uint32_t rip=call_stack.back().return_ip; call_stack.pop_back(); ip=rip; break; }
         case Op::LOAD_VARARGS: {
@@ -571,6 +657,7 @@ op_HALT:
             size_t needed=(size_t)(base+A+n); if(regs.size()<needed)regs.resize(needed);
             for(int i=0;i<n;++i)regs[base+A+i]=(*va)[i];} break; }
         case Op::RETURN_V: {
+            for(auto* uv:call_stack.back().open_upvals){if(!uv->closed){uv->val=regs[uv->frame_base+uv->reg_idx];uv->closed=true;}if(--uv->refcount==0)delete uv;}
             auto& va=call_stack.back().varargs; int n_va=va?(int)va->size():0;
             int n_explicit=B; int total=n_explicit+n_va;
             std::vector<Value> rvs(total);
@@ -600,7 +687,7 @@ op_HALT:
             Value thrown=regs[base+A];
             if(handler_stack.empty())throw std::runtime_error("unhandled exception: "+valueToString(thrown));
             Handler h=handler_stack.back(); handler_stack.pop_back();
-            while(call_stack.size()>h.call_depth)call_stack.pop_back();
+            while(call_stack.size()>h.call_depth){for(auto* uv:call_stack.back().open_upvals){if(!uv->closed){uv->val=regs[uv->frame_base+uv->reg_idx];uv->closed=true;}if(--uv->refcount==0)delete uv;}call_stack.pop_back();}
             if(regs.size()>h.regs_size)regs.resize(h.regs_size);
             regs[h.reg_base+h.catch_reg]=std::move(thrown); ip=h.catch_addr; break; }
         case Op::MAKE_ITER:
@@ -652,25 +739,37 @@ op_HALT:
         case Op::LOAD_FUNC:
             regs[base+A] = Value::makeFunc((uint8_t)Bx); break;
         case Op::CALL_DYN: {
-            const Value& fv = regs[base+B];
-            if (!fv.isFuncVal()) throw std::runtime_error("runtime: call on non-function value");
-            const FuncProto& fp = ch->funcs[(uint8_t)fv.asInt()];
-            int new_base = base+A; int argc = C;
-            size_t needed = (size_t)(new_base+std::max((int)fp.reg_count,argc));
-            if (regs.size()<needed) regs.resize(needed);
-            if (argc<fp.n_fixed) {
-                auto& defs=ch->func_defaults[fp.defaults_idx];
-                for(int i=argc;i<fp.n_fixed;++i) regs[new_base+i]=(i<(int)defs.size())?defs[i]:Value{};
-            }
+            const Value& fv=regs[base+B];
+            uint8_t fi; std::vector<Upvalue*> fuv;
+            if(fv.isFuncVal()){fi=(uint8_t)fv.asInt();}
+            else if(fv.isClosure()){fi=fv.asClosure()->func_idx;fuv=fv.asClosure()->upvals;}
+            else throw std::runtime_error("runtime: call on non-function value");
+            const FuncProto& fp=ch->funcs[fi];
+            int new_base=base+A; int argc=C;
+            size_t needed=(size_t)(new_base+std::max((int)fp.reg_count,argc));
+            if(regs.size()<needed)regs.resize(needed);
+            if(argc<fp.n_fixed){auto& defs=ch->func_defaults[fp.defaults_idx];
+            for(int i=argc;i<fp.n_fixed;++i)regs[new_base+i]=(i<(int)defs.size())?defs[i]:Value{};}
             std::unique_ptr<std::vector<Value>> varargs;
-            if(fp.variadic&&argc>fp.n_fixed){
-                varargs=std::make_unique<std::vector<Value>>();
-                for(int i=fp.n_fixed;i<argc;++i) varargs->push_back(std::move(regs[new_base+i]));
-            }
+            if(fp.variadic&&argc>fp.n_fixed){varargs=std::make_unique<std::vector<Value>>();
+            for(int i=fp.n_fixed;i<argc;++i)varargs->push_back(std::move(regs[new_base+i]));}
             size_t full_needed=(size_t)(new_base+fp.reg_count);
-            if(regs.size()<full_needed) regs.resize(full_needed);
-            call_stack.push_back({ip,new_base,std::move(varargs)});
-            ip=fp.addr; break; }
+            if(regs.size()<full_needed)regs.resize(full_needed);
+            call_stack.push_back({ip,new_base,std::move(varargs),std::move(fuv),{}}); ip=fp.addr; break; }
+        case Op::MAKE_CLOSURE: {
+            uint8_t fi=(uint8_t)Bx; auto* cl=new Closure(fi);
+            for(auto& desc:ch->funcs[fi].upvals){
+                Upvalue* uv=nullptr;
+                if(desc.is_local){for(auto* ou:call_stack.back().open_upvals)if(!ou->closed&&ou->frame_base==base&&ou->reg_idx==desc.idx){uv=ou;break;}
+                if(!uv){uv=new Upvalue;uv->frame_base=base;uv->reg_idx=desc.idx;call_stack.back().open_upvals.push_back(uv);}
+                uv->refcount++;}
+                else{uv=call_stack.back().upvals[desc.idx];uv->refcount++;}
+                cl->upvals.push_back(uv);}
+            regs[base+A]=Value::makeClosure(cl); break; }
+        case Op::GET_UPVAL: { Upvalue* uv=call_stack.back().upvals[B];
+            regs[base+A]=uv->closed?uv->val:regs[uv->frame_base+uv->reg_idx]; break; }
+        case Op::SET_UPVAL: { Upvalue* uv=call_stack.back().upvals[B];
+            if(uv->closed)uv->val=regs[base+A];else regs[uv->frame_base+uv->reg_idx]=regs[base+A]; break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }

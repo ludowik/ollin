@@ -22,6 +22,8 @@ private:
         uint32_t return_ip;
         int      reg_base;
         std::unique_ptr<std::vector<Value>> varargs;
+        std::vector<Upvalue*> upvals;       // upvalues from the closure that called us
+        std::vector<Upvalue*> open_upvals;  // upvalues we opened for inner closures
     };
 
     const Chunk*         ch = nullptr;

@@ -2,6 +2,61 @@
 #include <algorithm>
 #include <stdexcept>
 
+// ── upvalue resolution ────────────────────────────────────────────────────────
+
+int Compiler::resolveUpvalue(const std::string& name) {
+    auto it = cur_upval_idx_.find(name);
+    if (it != cur_upval_idx_.end()) return it->second;
+    if (outer_scopes_.empty()) return -1;
+    return resolveUpvalFrom((int)outer_scopes_.size() - 1, name);
+}
+
+int Compiler::resolveUpvalFrom(int scope_idx, const std::string& name) {
+    OuterScope& scope = outer_scopes_[scope_idx];
+    auto local_it = scope.regs.find(name);
+    if (local_it != scope.regs.end())
+        return captureUpvalChain(scope_idx, true, (uint8_t)local_it->second, name);
+    auto uv_it = scope.upval_idx.find(name);
+    if (uv_it != scope.upval_idx.end())
+        return captureUpvalChain(scope_idx, false, (uint8_t)uv_it->second, name);
+    if (scope_idx == 0) return -1;
+    int outer_uv = resolveUpvalFrom(scope_idx - 1, name);
+    if (outer_uv < 0) return -1;
+    return captureUpvalChain(scope_idx, false, (uint8_t)outer_uv, name);
+}
+
+int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name) {
+    bool cur_is_local = is_local;
+    uint8_t cur_idx   = idx;
+
+    // Propagate through intermediate function scopes
+    for (int i = scope_idx + 1; i < (int)outer_scopes_.size(); i++) {
+        OuterScope& s = outer_scopes_[i];
+        auto it = s.upval_idx.find(name);
+        if (it != s.upval_idx.end()) {
+            cur_idx = (uint8_t)it->second;
+            cur_is_local = false;
+        } else if (s.func_proto_idx >= 0) {
+            int uv_i = (int)chunk.funcs[s.func_proto_idx].upvals.size();
+            chunk.funcs[s.func_proto_idx].upvals.push_back({cur_is_local, cur_idx});
+            s.upval_idx[name] = uv_i;
+            cur_idx = (uint8_t)uv_i;
+            cur_is_local = false;
+        }
+    }
+
+    // Add to current function
+    {
+        auto it = cur_upval_idx_.find(name);
+        if (it != cur_upval_idx_.end()) return it->second;
+    }
+    if (current_func_idx_ < 0) return -1;  // in main chunk, no FuncProto
+    int uv_i = (int)chunk.funcs[current_func_idx_].upvals.size();
+    chunk.funcs[current_func_idx_].upvals.push_back({cur_is_local, cur_idx});
+    cur_upval_idx_[name] = uv_i;
+    return uv_i;
+}
+
 // ── constant evaluator (for default parameter values) ─────────────────────────
 static Value evalConstant(const Expr& e) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return numValue(n->value);
@@ -243,6 +298,35 @@ void Compiler::visit(const AssignStmt& s) {
             return;
         }
     }
+    // Upvalue
+    {
+        int uv = resolveUpvalue(s.name);
+        if (uv >= 0) {
+            int saved = reg_top_;
+            if (s.op == '\0') {
+                s.value->accept(*this);
+                chunk.emit(makeABC((uint8_t)Op::SET_UPVAL, (uint8_t)last_reg_, (uint8_t)uv, 0));
+            } else {
+                int cur = allocReg();
+                chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)cur, (uint8_t)uv, 0));
+                s.value->accept(*this);
+                int rhs = last_reg_;
+                int res = allocReg();
+                if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                switch (s.op) {
+                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
+                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
+                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
+                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
+                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
+                    default:  throw std::runtime_error(std::string("unknown assign op: ") + s.op);
+                }
+                chunk.emit(makeABC((uint8_t)Op::SET_UPVAL, (uint8_t)res, (uint8_t)uv, 0));
+            }
+            reg_top_ = saved;
+            return;
+        }
+    }
     // Global scope
     uint16_t gidx = chunk.addIdentifier(s.name);
     int saved = reg_top_;
@@ -325,12 +409,18 @@ void Compiler::visit(const TryCatchStmt& s) {
 void Compiler::visit(const FuncDeclStmt& s) {
     // Save outer context
     auto outer_regs    = std::move(local_regs_);
+    auto outer_upvals  = std::move(cur_upval_idx_);
     int  outer_top     = reg_top_;
     int  outer_count   = reg_count_;
     int  outer_locals  = locals_top_;
     auto outer_name    = current_func_name;
+    int  outer_fidx    = current_func_idx_;
+
+    // Push outer scope for upvalue resolution
+    outer_scopes_.push_back({outer_regs, outer_upvals, outer_fidx});
 
     current_func_name = s.name;
+    cur_upval_idx_.clear();
     local_regs_.clear();
     reg_top_ = 0;
     reg_count_ = 0;
@@ -363,9 +453,16 @@ void Compiler::visit(const FuncDeclStmt& s) {
                   ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0};
+    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0, {}};
     uint8_t func_idx = chunk.addFunc(fp);
-    func_table[s.name] = FuncInfo{func_idx, n_fixed, s.variadic};
+    current_func_idx_ = func_idx;
+
+    // Pre-mark as potential closure if the outer scope has variables.
+    // This ensures recursive self-calls inside the body use CALL_DYN (not CALL_FUNC),
+    // which correctly inherits the closure's upval array even when the upvalue access
+    // appears before the recursive call in source order.
+    bool outer_has_vars = !outer_scopes_.back().regs.empty();
+    func_table[s.name] = FuncInfo{func_idx, n_fixed, s.variadic, outer_has_vars};
 
     // Compile body
     for (auto& stmt : s.body) {
@@ -381,12 +478,36 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Patch jump over body
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
-    // Restore outer context
-    local_regs_   = std::move(outer_regs);
-    reg_top_      = outer_top;
-    reg_count_    = outer_count;
-    locals_top_   = outer_locals;
-    current_func_name = outer_name;
+    // Pop scope and restore outer context
+    outer_scopes_.pop_back();
+    local_regs_        = std::move(outer_regs);
+    cur_upval_idx_     = std::move(outer_upvals);
+    reg_top_           = outer_top;
+    reg_count_         = outer_count;
+    locals_top_        = outer_locals;
+    current_func_name  = outer_name;
+    current_func_idx_  = outer_fidx;
+
+    if (!chunk.funcs[func_idx].upvals.empty()) {
+        // True closure: emit MAKE_CLOSURE + STORE_GLOBAL
+        func_table[s.name].is_closure = true;
+        int tmp = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)tmp, func_idx));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp,
+                           chunk.addIdentifier(s.name)));
+        reg_top_--;
+    } else if (outer_has_vars) {
+        // Potentially-closure that captured nothing: emit LOAD_FUNC + STORE_GLOBAL
+        // so that LOAD_GLOBAL works for any recursive CALL_DYN emitted in the body.
+        func_table[s.name].is_closure = false;  // not a closure for external callers
+        int tmp = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)tmp, func_idx));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp,
+                           chunk.addIdentifier(s.name)));
+        reg_top_--;
+    }
 }
 
 void Compiler::visit(const ReturnStmt& s) {
@@ -528,18 +649,32 @@ void Compiler::visit(const NilExpr&) {
 }
 
 void Compiler::visit(const VarExpr& e) {
-    // Référence à une fonction → charge une valeur T_FUNCTION
+    // Référence à une fonction
     auto fit = func_table.find(e.name);
     if (fit != func_table.end()) {
         last_reg_ = allocReg();
-        chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)last_reg_,
-                           fit->second.func_idx));
+        if (fit->second.is_closure) {
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_,
+                               chunk.addIdentifier(e.name)));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)last_reg_,
+                               fit->second.func_idx));
+        }
         return;
     }
     {
         auto it = local_regs_.find(e.name);
         if (it != local_regs_.end()) {
             last_reg_ = it->second;
+            return;
+        }
+    }
+    // Upvalue
+    {
+        int uv = resolveUpvalue(e.name);
+        if (uv >= 0) {
+            last_reg_ = allocReg();
+            chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)last_reg_, (uint8_t)uv, 0));
             return;
         }
     }
@@ -610,10 +745,18 @@ void Compiler::visit(const CallExpr& e) {
             reg_top_ = target + 1;
             if (reg_top_ > reg_count_) reg_count_ = reg_top_;
         }
-        chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base,
-                           it->second.func_idx, (uint8_t)argc));
+        if (it->second.is_closure) {
+            int func_reg = reg_top_++;
+            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
+                               chunk.addIdentifier(e.callee)));
+            chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
+                               (uint8_t)func_reg, (uint8_t)argc));
+        } else {
+            chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base,
+                               it->second.func_idx, (uint8_t)argc));
+        }
         last_reg_ = call_base;
-        // reg_top_ stays at call_base + argc (will be reset by statement-level save/restore)
         return;
     }
 

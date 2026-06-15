@@ -27,11 +27,26 @@ private:
         uint8_t func_idx;
         int     n_fixed;
         bool    variadic;
+        bool    is_closure = false;  // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
     };
     std::unordered_map<std::string, FuncInfo> func_table;
     std::string current_func_name;  // "" = global scope
+    int         current_func_idx_ = -1;  // index in chunk.funcs (-1 = main chunk)
 
     bool inFunction() const { return !current_func_name.empty(); }
+
+    // ── upvalue resolution ────────────────────────────────────────────────────
+    struct OuterScope {
+        std::unordered_map<std::string, int> regs;
+        std::unordered_map<std::string, int> upval_idx;  // name → upvalue index in this scope's proto
+        int func_proto_idx;  // -1 = main chunk
+    };
+    std::vector<OuterScope>              outer_scopes_;
+    std::unordered_map<std::string, int> cur_upval_idx_;
+
+    int resolveUpvalue(const std::string& name);
+    int resolveUpvalFrom(int scope_idx, const std::string& name);
+    int captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
 
     int allocReg() {
         int r = reg_top_++;
