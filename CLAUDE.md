@@ -29,6 +29,8 @@ ollin/
     ├── token.h        types Token (partagé Lexer → Parser)
     ├── ast.h          nœuds AST  (partagé Parser → Compiler)
     ├── chunk.h/.cpp   bytecode   (partagé Compiler → VM)
+    ├── closure.h      Upvalue + Closure (inclus par chunk.h)
+    ├── map.h/.cpp     Map + ValueHash/ValueEqual (inclus par chunk.h)
     ├── lexer.h/.cpp
     ├── parser.h/.cpp
     ├── compiler.h/.cpp
@@ -115,8 +117,8 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | POP_TRY       | —      |                            | dépile le handler (try body ok)                  |
 | THROW         | A      | A=value_reg                | lance R[A] → restaure frame → jump handler      |
 | NEW_MAP       | A      | A=dest                     | R[A] = nouvelle map vide                         |
-| GET_INDEX     | ABC    | A=dst, B=map, C=key        | R[A] = R[B][R[C]]  (B=map, C=key string)        |
-| SET_INDEX     | ABC    | A=map, B=key, C=val        | R[A][R[B]] = R[C]  (A=map, B=key string)        |
+| GET_INDEX     | ABC    | A=dst, B=obj, C=key        | R[A] = R[B][R[C]]  (map: Value key, array: int 1-based) |
+| SET_INDEX     | ABC    | A=obj, B=key, C=val        | R[A][R[B]] = R[C]  (map: Value key, array: int 1-based) |
 | MAKE_ITER     | AB     | A=dest, B=src              | R[A] = iterator(R[B])  (Map ou Array)            |
 | BAND          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] & R[C]  (entiers)                   |
 | BOR           | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] \| R[C]  (entiers)                  |
@@ -124,9 +126,14 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | BNOT          | AB     | A=dst, B=src               | R[A] = ~R[B]  (entier)                          |
 | BLSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] << (R[C] & 63)  (entiers)           |
 | BRSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] >> (R[C] & 63)  (entiers)           |
+| NEW_ARRAY     | A      | A=dest                     | R[A] = []  (array vide)                          |
+| ARRAY_PUSH    | AB     | A=arr, B=val               | R[A].push(R[B])                                  |
 | FOR_ITER_NEXT | ABx    | A=block_base, Bx=end_addr  | R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→Bx |
 | LOAD_FUNC     | ABx    | A=dest, Bx=func_idx        | R[A] = T_FUNCTION (référence à funcs[Bx])        |
-| CALL_DYN      | ABC    | A=arg_base, B=func_reg, C=argc | appel via valeur T_FUNCTION dans R[B]        |
+| CALL_DYN      | ABC    | A=arg_base, B=func_reg, C=argc | appel via T_FUNCTION ou T_CLOSURE dans R[B]  |
+| MAKE_CLOSURE  | ABx    | A=dest, Bx=func_idx        | R[A] = Closure{func_idx, capture upvals depuis frame courant} |
+| GET_UPVAL     | AB     | A=dest, B=upval_idx        | R[A] = upval[B]  (ouverte: regs[base+idx], fermée: uv.val) |
+| SET_UPVAL     | AB     | A=src, B=upval_idx         | upval[B] = R[A]                                  |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -140,13 +147,14 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Boucle `for`
 
-Trois syntaxes :
+Cinq syntaxes :
 
 ```
 for i in start..end         ## range, step = 1 implicite (bornes inclusives)
 for i=start,end             ## numérique, step = 1 implicite
 for i=start,end,step        ## step positif ou négatif
-for k,v in map_expr         ## itération sur les entrées d'une map
+for v in arr_expr           ## itération valeurs d'un array
+for k,v in map_or_arr       ## itération clé/index + valeur (map ou array)
 ```
 
 Step absent → step = 1 (condition `i <= end`).  
@@ -159,7 +167,7 @@ En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.
 
 ## Type map
 
-Syntaxe JSON-like, clés toujours des chaînes :
+Syntaxe JSON-like ; littéral : clés string ou identifiant. À l'exécution, toute Value peut être clé :
 
 ```
 var t = {}                      ## map vide
@@ -205,4 +213,55 @@ Struct taguée (16 octets) — remplace le NaN-boxing :
 | T_ARRAY    | 5               | aptr (Array*) | —             |
 | T_ITERATOR | 6               | iptr (Iterator*) | —          |
 | T_FUNCTION | 7               | ival (int64_t, = func_idx) | index dans chunk.funcs |
+| T_CLOSURE  | 8               | cptr (Closure*) | ref-counted, holds func_idx + upvals |
 
+## Closures / Upvalues
+
+Une fonction qui référence une variable de la portée englobante capture un **upvalue**.
+
+### Structures (`closure.h`)
+
+```cpp
+struct Upvalue {
+    int refcount = 1;
+    bool closed  = false;   // false = ouverte (pointe dans les regs du frame parent)
+    int frame_base = 0;     // base du frame parent dans regs[]
+    int reg_idx    = 0;     // index dans ce frame
+    Value val;              // copie une fois le frame dépilé (upvalue fermée)
+};
+
+struct Closure {
+    int refcount = 1;
+    uint8_t func_idx;
+    std::vector<Upvalue*> upvals;
+};
+```
+
+### FuncProto (`chunk.h`)
+
+```cpp
+struct UpvalDesc { bool is_local; uint8_t idx; };
+// is_local=true : upval pointe dans les regs du frame direct parent (reg idx)
+// is_local=false: upval repris depuis les upvals du frame parent (upval idx)
+std::vector<UpvalDesc> upvals;  // dans FuncProto
+```
+
+### Frame (`vm.h`)
+
+```cpp
+std::vector<Upvalue*> upvals;       // upvals de la closure appelante (si T_CLOSURE)
+std::vector<Upvalue*> open_upvals;  // upvals ouvertes créées par ce frame
+```
+
+### Cycle de vie
+
+1. `MAKE_CLOSURE` — crée `Closure{func_idx}`, pour chaque `UpvalDesc` : si `is_local` → crée ou réutilise un `Upvalue*` pointant dans `regs[frame_base + reg_idx]`, si non local → reprend `frame.upvals[idx]`.
+2. Upvalue **ouverte** : `GET_UPVAL`/`SET_UPVAL` accèdent à `regs[frame_base + reg_idx]` du frame parent via le pointeur.
+3. `RETURN` / `THROW` — ferme toutes les `open_upvals` du frame : copie `regs[base+idx]` dans `uv->val`, pose `closed=true`.
+4. Upvalue **fermée** : accès via `uv->val` (le frame parent n'existe plus).
+
+### Fonctions imbriquées
+
+- `collectLocals` pré-alloue un registre pour chaque `FuncDeclStmt` trouvé dans le corps de la fonction englobante.
+- `visit(FuncDeclStmt)` : si `is_nested` (outer_name non vide) → émet `MAKE_CLOSURE` ou `LOAD_FUNC` dans ce registre local, pas de `STORE_GLOBAL`.
+- Appels récursifs à une fonction interne : `resolveUpvalue(callee)` remonte la chaîne de scopes → `GET_UPVAL + CALL_DYN`.
