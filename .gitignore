@@ -4,3 +4,4 @@ build_native/
 build_native2/
 build_reg/
 .claude/
+build_debug/
