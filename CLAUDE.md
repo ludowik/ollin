@@ -74,6 +74,11 @@ Procédure :
 2. Mesurer chaque benchmark (`time` ou timer interne)
 3. Présenter le tableau final avec les temps en secondes
 
+**Règles strictes pour les comparaisons :**
+- Comparer uniquement avec **Lua 5.4** (interpréteur standard, `lua -v` → 5.4.x). **Jamais LuaJIT** — projet figé sur Lua 5.1, hors sujet.
+- Lua 5.4 utilise `TValue` (struct taguée), **pas du NaN-boxing**. Même architecture de valeur qu'Ollin.
+- Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
+
 ## Maintenance de CLAUDE.md
 
 Mettre à jour ce fichier dès qu'un point important doit être mémorisé :
