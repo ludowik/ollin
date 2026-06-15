@@ -384,6 +384,69 @@ func sum_map(m)
 end
 assert(sum_map(itm) == 6, "for k,v in function")
 
+## ── closures / upvalues ──────────────────────────────────────────────────────
+
+## top-level var accessible depuis une fonction (upvalue)
+var upv_counter = 0
+func upv_inc()
+    upv_counter += 1
+end
+upv_inc()
+upv_inc()
+upv_inc()
+assert(upv_counter == 3, "upvalue counter")
+
+## deux fonctions partagent le même upvalue
+var upv_shared = 10
+func upv_add(x)  upv_shared += x  end
+func upv_get()   return upv_shared end
+upv_add(5)
+assert(upv_get() == 15, "upvalue partagé")
+
+## fonction récursive capturant un upvalue
+var upv_factor = 2
+func upv_fact(n)
+    if n < 1 then return upv_factor end
+    return n * upv_fact(n - 1)
+end
+assert(upv_fact(3) == 6 * upv_factor, "closure récursive")
+
+## ── clés de map : tous les types ─────────────────────────────────────────────
+var km = {}
+
+km[nil] = "nil"
+assert(km[nil] == "nil", "clé nil")
+
+km[42] = "int"
+assert(km[42] == "int", "clé int")
+
+km[3.14] = "float"
+assert(km[3.14] == "float", "clé float")
+
+## cross-type int/float
+km[1] = "one"
+assert(km[1.0] == "one", "clé int == clé float")
+
+km["str"] = "string"
+assert(km["str"] == "string", "clé string")
+
+km[true]  = "vrai"
+km[false] = "faux"
+assert(km[true]  == "vrai", "clé true")
+assert(km[false] == "faux", "clé false")
+
+var km_arr = [1, 2]
+km[km_arr] = "array"
+assert(km[km_arr] == "array", "clé array")
+
+var km_map = {"a": 1}
+km[km_map] = "map"
+assert(km[km_map] == "map", "clé map")
+
+func km_fn() end
+km[km_fn] = "func"
+assert(km[km_fn] == "func", "clé function")
+
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0
