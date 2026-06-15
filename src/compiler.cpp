@@ -67,50 +67,54 @@ static Value evalConstant(const Expr& e) {
 }
 
 // ── pre-scan locals in a block (for register pre-allocation) ─────────────────
+// collect_funcs=true inside function bodies (nested FuncDecls need a local register)
+// collect_funcs=false at top level (top-level funcs are accessed via func_table)
 static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
-                          std::vector<std::string>& out) {
+                          std::vector<std::string>& out, bool collect_funcs = true) {
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
             for (auto& n : v->names)
                 if (std::find(out.begin(), out.end(), n) == out.end())
                     out.push_back(n);
-        if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get())) {
-            if (std::find(out.begin(), out.end(), f->name) == out.end())
-                out.push_back(f->name);
-            // ne pas récurser dans le corps : portée séparée
+        if (collect_funcs) {
+            if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
+                if (std::find(out.begin(), out.end(), f->name) == out.end())
+                    out.push_back(f->name);
         }
         if (auto* f = dynamic_cast<const ForStmt*>(s.get())) {
             if (std::find(out.begin(), out.end(), f->var) == out.end())
                 out.push_back(f->var);
-            collectLocals(f->body, out);
+            collectLocals(f->body, out, collect_funcs);
         }
         if (auto* fm = dynamic_cast<const ForMapStmt*>(s.get())) {
             if (std::find(out.begin(), out.end(), fm->key_var) == out.end())
                 out.push_back(fm->key_var);
             if (std::find(out.begin(), out.end(), fm->val_var) == out.end())
                 out.push_back(fm->val_var);
-            collectLocals(fm->body, out);
+            collectLocals(fm->body, out, collect_funcs);
         }
         if (auto* fi = dynamic_cast<const ForInStmt*>(s.get())) {
             if (std::find(out.begin(), out.end(), fi->val_var) == out.end())
                 out.push_back(fi->val_var);
-            collectLocals(fi->body, out);
+            collectLocals(fi->body, out, collect_funcs);
         }
         if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
-            collectLocals(w->body, out);
+            collectLocals(w->body, out, collect_funcs);
         if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
-            collectLocals(i->then_body, out);
-            for (auto& ei : i->else_ifs) collectLocals(ei.body, out);
-            collectLocals(i->else_body, out);
+            collectLocals(i->then_body, out, collect_funcs);
+            for (auto& ei : i->else_ifs) collectLocals(ei.body, out, collect_funcs);
+            collectLocals(i->else_body, out, collect_funcs);
         }
         if (auto* t = dynamic_cast<const TryCatchStmt*>(s.get())) {
-            collectLocals(t->try_body, out);
+            collectLocals(t->try_body, out, collect_funcs);
             if (!t->catch_var.empty() &&
                 std::find(out.begin(), out.end(), t->catch_var) == out.end())
                 out.push_back(t->catch_var);
-            collectLocals(t->catch_body, out);
-            collectLocals(t->else_body, out);
+            collectLocals(t->catch_body, out, collect_funcs);
+            collectLocals(t->else_body, out, collect_funcs);
         }
+        if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
+            collectLocals(b->stmts, out, collect_funcs);
     }
 }
 
@@ -141,8 +145,9 @@ Chunk Compiler::compile(const Program& prog) {
     reg_top_ = 0;
     reg_count_ = 8;
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
+    // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
-    collectLocals(prog.stmts, top_locals);
+    collectLocals(prog.stmts, top_locals, false);
     for (auto& name : top_locals)
         local_regs_[name] = reg_top_++;
     locals_top_ = reg_top_;
@@ -1046,4 +1051,8 @@ void Compiler::visit(const IndexAssignStmt& s) {
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
     }
     reg_top_ = saved;
+}
+
+void Compiler::visit(const BlockStmt& s) {
+    for (auto& stmt : s.stmts) stmt->accept(*this);
 }

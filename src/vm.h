@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <stdexcept>
+#include <unordered_map>
 #include <vector>
 
 class VM {
@@ -19,11 +20,11 @@ private:
     };
 
     struct Frame {
-        uint32_t return_ip;
-        int      reg_base;
+        uint32_t    return_ip;
+        int         reg_base;
         std::unique_ptr<std::vector<Value>> varargs;
-        std::vector<Upvalue*> upvals;       // upvalues from the closure that called us
-        std::vector<Upvalue*> open_upvals;  // upvalues we opened for inner closures
+        std::vector<Upvalue*> upvals;
+        std::vector<Upvalue*> open_upvals;
     };
 
     const Chunk*         ch = nullptr;

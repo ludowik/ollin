@@ -77,6 +77,7 @@ public:
     bool isCallable() const { return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN; }
 
     Closure* asClosure() const { return cptr; }
+    Map*     asMap()     const { return mptr; }
 
     using BuiltinFn = Value(*)(Value*, int);
     BuiltinFn asBuiltin() const { return (BuiltinFn)(intptr_t)ival; }

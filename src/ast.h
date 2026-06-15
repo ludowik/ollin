@@ -9,6 +9,7 @@ struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
 struct ForStmt; struct IndexAssignStmt; struct ForMapStmt; struct ForInStmt;
+struct BlockStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
@@ -32,6 +33,7 @@ struct StmtVisitor {
     virtual void visit(const IndexAssignStmt&) = 0;
     virtual void visit(const ForMapStmt&)    = 0;
     virtual void visit(const ForInStmt&)     = 0;
+    virtual void visit(const BlockStmt&)     = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -239,6 +241,11 @@ struct ForInStmt : Stmt {
     std::string val_var;
     std::unique_ptr<Expr> iter_expr;
     std::vector<std::unique_ptr<Stmt>> body;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct BlockStmt : Stmt {
+    std::vector<std::unique_ptr<Stmt>> stmts;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

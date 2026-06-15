@@ -1,17 +1,23 @@
 #pragma once
 #include "token.h"
 #include "ast.h"
+#include <memory>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 class Parser {
 public:
-    explicit Parser(std::vector<Token> tokens);
+    explicit Parser(std::vector<Token> tokens, std::string base_dir = "",
+                    std::shared_ptr<std::unordered_set<std::string>> imported = nullptr);
     Program parse();
 
 private:
     std::vector<Token> tokens;
     int pos = 0;
     int paren_depth_ = 0;
+    std::string base_dir_;
+    std::shared_ptr<std::unordered_set<std::string>> imported_paths_;
 
     Token peek() const;
     Token advance();
@@ -37,6 +43,7 @@ private:
     std::unique_ptr<Stmt> assignStmt();
     std::unique_ptr<Stmt> exprStmt();
     std::unique_ptr<Stmt> forStmt();
+    std::unique_ptr<Stmt> importStmt();
 
     std::unique_ptr<Expr> parsePostfix(std::unique_ptr<Expr> base);
 

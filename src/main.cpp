@@ -4,8 +4,10 @@
 #include "vm.h"
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
 static Program parseFile(const std::string& path) {
     std::ifstream f(path);
@@ -31,6 +33,7 @@ int main(int argc, char* argv[]) {
     std::string dir = (sep != std::string::npos) ? scriptPath.substr(0, sep + 1) : "";
 
     try {
+        auto imported = std::make_shared<std::unordered_set<std::string>>();
         Program program;
         appendProgram(program, parseFile(dir + "prelude.ol"));
 
@@ -41,7 +44,7 @@ int main(int argc, char* argv[]) {
         }
         std::ostringstream ss;
         ss << main_file.rdbuf();
-        appendProgram(program, Parser(Lexer(ss.str()).tokenize()).parse());
+        appendProgram(program, Parser(Lexer(ss.str()).tokenize(), dir, imported).parse());
 
         VM().execute(Compiler().compile(program));
     } catch (const std::exception& e) {

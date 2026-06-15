@@ -124,7 +124,7 @@ void VM::execute(const Chunk& chunk) {
     }
     regs.resize(chunk.top_reg_count);
     call_stack.reserve(1000);
-    call_stack.push_back({0, 0, nullptr, {}, {}});
+    call_stack.push_back({0, 0, {}, {}, {}});
 
 #ifdef __GNUC__
 // ── Computed-goto dispatch ────────────────────────────────────────────────────
@@ -173,11 +173,12 @@ op_MOVE:
     regs[base + A] = regs[base + B];
     NEXT();
 
-op_LOAD_GLOBAL:
+op_LOAD_GLOBAL: {
     if (!globals_init[Bx])
         throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
     regs[base + A] = globals[Bx];
     NEXT();
+}
 
 op_STORE_GLOBAL:
     globals[Bx] = regs[base + A];
@@ -518,7 +519,6 @@ op_LOAD_FUNC:
 
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
-    // Builtin : appel direct sans frame (le pointeur est extrait avant toute modification)
     if (regs[base + B].isBuiltin()) {
         auto fn = regs[base + B].asBuiltin();   // intptr_t copy, trivial
         regs[base + A] = fn(&regs[base + A], C);
@@ -529,7 +529,6 @@ op_CALL_DYN: {
     int fp_n_fixed, fp_reg_count, fp_defaults_idx;
     bool fp_variadic;
     {
-        // Copie par valeur AVANT tout resize (une ref dans regs deviendrait dangling après realloc)
         Value fv = regs[base + B];
         if (fv.isFuncVal()) {
             fi = (uint8_t)fv.asInt();
@@ -539,11 +538,11 @@ op_CALL_DYN: {
             throw std::runtime_error("runtime: call on non-function value");
         }
         const FuncProto& fp = ch->funcs[fi];
-        fp_addr       = fp.addr;
-        fp_n_fixed    = fp.n_fixed;
-        fp_reg_count  = fp.reg_count;
+        fp_addr         = fp.addr;
+        fp_n_fixed      = fp.n_fixed;
+        fp_reg_count    = fp.reg_count;
         fp_defaults_idx = fp.defaults_idx;
-        fp_variadic   = fp.variadic;
+        fp_variadic     = fp.variadic;
         int new_base = base + A;
         int argc = C;
         size_t needed = (size_t)(new_base + std::max(fp_reg_count, argc));
@@ -564,7 +563,8 @@ op_CALL_DYN: {
             }
             size_t full_needed = (size_t)(new_base + fp_reg_count);
             if (regs.size() < full_needed) regs.resize(full_needed);
-            call_stack.push_back({ip, new_base, std::move(varargs), std::move(frame_upvals), {}});
+            call_stack.push_back({ip, new_base, std::move(varargs),
+                                  std::move(frame_upvals), {}});
         }
     }
     ip = fp_addr;
@@ -634,7 +634,8 @@ op_HALT:
         case Op::LOAD_NIL:     regs[base+A] = Value{}; break;
         case Op::MOVE:         regs[base+A] = regs[base+B]; break;
         case Op::LOAD_GLOBAL:
-            if (!globals_init[Bx]) throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
+            if (!globals_init[Bx])
+                throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
             regs[base+A] = globals[Bx]; break;
         case Op::STORE_GLOBAL: globals[Bx] = regs[base+A]; globals_init[Bx] = true; break;
         case Op::ADD: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
@@ -713,20 +714,6 @@ op_HALT:
             uint32_t rip=call_stack.back().return_ip; int rbase=call_stack.back().reg_base;
             call_stack.pop_back(); if((int)regs.size()<rbase+total)regs.resize(rbase+total);
             for(int i=0;i<total;++i)regs[rbase+i]=std::move(rvs[i]); ip=rip; break; }
-        case Op::CALL_PRINT: {
-            for(int i=0;i<B;++i){if(i)std::cout<<' ';printValue(regs[base+A+i]);}
-            std::cout<<'\n'; break; }
-        case Op::CALL_PRINTF: {
-            if(B<1||!regs[base+A].isString())throw std::runtime_error("printf: first arg must be string");
-            std::vector<Value> args(B); for(int i=0;i<B;++i)args[i]=regs[base+A+i];
-            std::cout<<applyFormat(args[0].asString(),args,1)<<'\n'; break; }
-        case Op::CALL_ASSERT: {
-            if(B==0||isFalsy(regs[base+A])){
-            std::string msg=(B>=2&&regs[base+A+1].isString())?regs[base+A+1].asString():"assertion failed";
-            throw std::runtime_error(msg);} break; }
-        case Op::CALL_TIME: {
-            auto now=std::chrono::system_clock::now();
-            regs[base+A]=Value(std::chrono::duration<double>(now.time_since_epoch()).count()); break; }
         case Op::TRY:
             handler_stack.push_back({Bx,A,base,regs.size(),call_stack.size()}); break;
         case Op::POP_TRY: handler_stack.pop_back(); break;

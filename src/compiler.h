@@ -72,6 +72,7 @@ private:
     void visit(const ForStmt&)       override;
     void visit(const ForMapStmt&)    override;
     void visit(const ForInStmt&)     override;
+    void visit(const BlockStmt&)     override;
 
     // ExprVisitor
     void visit(const BoolExpr&)    override;

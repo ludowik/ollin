@@ -1,7 +1,14 @@
 #include "parser.h"
+#include "lexer.h"
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
 
-Parser::Parser(std::vector<Token> tokens) : tokens(std::move(tokens)) {}
+Parser::Parser(std::vector<Token> tokens, std::string base_dir,
+               std::shared_ptr<std::unordered_set<std::string>> imported)
+    : tokens(std::move(tokens)), base_dir_(std::move(base_dir)),
+      imported_paths_(imported ? std::move(imported)
+                               : std::make_shared<std::unordered_set<std::string>>()) {}
 
 Token Parser::peek() const  { return tokens[pos]; }
 Token Parser::advance()     { return tokens[pos++]; }
@@ -69,6 +76,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::TRY))     return tryCatchStmt();
     if (check(TokenType::THROW))   return throwStmt();
     if (check(TokenType::FOR))     return forStmt();
+    if (check(TokenType::IMPORT))  return importStmt();
     if (check(TokenType::FUNC))    return funcDeclStmt();
     if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))     return varDecl();
@@ -624,4 +632,92 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     throw std::runtime_error("line " + std::to_string(peek().line) +
                              ": unexpected token '" + peek().lexeme + "'");
+}
+
+static std::vector<std::string> collectTopLevelNames(
+    const std::vector<std::unique_ptr<Stmt>>& stmts)
+{
+    std::vector<std::string> names;
+    for (auto& s : stmts) {
+        if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
+            for (auto& n : v->names) names.push_back(n);
+        else if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
+            names.push_back(f->name);
+    }
+    return names;
+}
+
+std::unique_ptr<Stmt> Parser::importStmt() {
+    advance();  // consomme 'import'
+    Token path_tok = expect(TokenType::STRING);
+    std::string path = path_tok.lexeme;
+    if (path.size() < 3 || path.substr(path.size() - 3) != ".ol")
+        path += ".ol";
+
+    std::string alias;
+    if (check(TokenType::AS)) {
+        advance();
+        alias = expect(TokenType::IDENTIFIER).lexeme;
+    }
+    consumeLineEnd();
+
+    // Résoudre le chemin par rapport au répertoire du script courant
+    std::string resolved = (!path.empty() && (path[0] == '/' ||
+                            (path.size() > 1 && path[1] == ':')))
+                           ? path : base_dir_ + path;
+
+    auto block = std::make_unique<BlockStmt>();
+
+    // Protection contre les imports circulaires
+    if (imported_paths_->count(resolved)) {
+        if (!alias.empty()) {
+            // Alias demandé mais déjà importé : créer une map vide
+            auto vd = std::make_unique<VarDeclStmt>();
+            vd->names.push_back(alias);
+            vd->values.push_back(std::make_unique<MapExpr>());
+            block->stmts.push_back(std::move(vd));
+        }
+        return block;
+    }
+    imported_paths_->insert(resolved);
+
+    // Lire et parser le fichier importé
+    std::ifstream f(resolved);
+    if (!f) throw std::runtime_error("import: cannot open '" + resolved + "'");
+    std::ostringstream ss;
+    ss << f.rdbuf();
+
+    auto sep2 = resolved.find_last_of("/\\");
+    std::string sub_dir = (sep2 != std::string::npos)
+                          ? resolved.substr(0, sep2 + 1) : base_dir_;
+
+    Parser sub_parser(Lexer(ss.str()).tokenize(), sub_dir, imported_paths_);
+    Program sub_prog = sub_parser.parse();
+
+    if (alias.empty()) {
+        // import flat : injecter directement toutes les instructions
+        for (auto& s : sub_prog.stmts)
+            block->stmts.push_back(std::move(s));
+    } else {
+        // import as name : var name = {}; <stmts>; name[k] = k pour chaque nom top-level
+        auto top_names = collectTopLevelNames(sub_prog.stmts);
+
+        auto vd = std::make_unique<VarDeclStmt>();
+        vd->names.push_back(alias);
+        vd->values.push_back(std::make_unique<MapExpr>());
+        block->stmts.push_back(std::move(vd));
+
+        for (auto& s : sub_prog.stmts)
+            block->stmts.push_back(std::move(s));
+
+        for (auto& tname : top_names) {
+            auto ia = std::make_unique<IndexAssignStmt>();
+            ia->obj   = alias;
+            ia->key   = std::make_unique<StringExpr>(tname);
+            ia->op    = TokenType::EQUALS;
+            ia->value = std::make_unique<VarExpr>(tname);
+            block->stmts.push_back(std::move(ia));
+        }
+    }
+    return block;
 }
