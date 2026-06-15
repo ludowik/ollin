@@ -46,8 +46,7 @@ private:
         else if (v.isString())              std::cout << v.asString();
         else if (v.isMap())                 std::cout << "{map}";
         else if (v.isArray())               std::cout << "{array}";
-        else if (v.isFuncVal())             std::cout << "{function}";
-        else if (v.isClosure())             std::cout << "{function}";
+        else if (v.isCallable())            std::cout << "{function}";
         else if (v.isInteger())             std::cout << v.asInt();
         else {
             double d = v.asFloat();

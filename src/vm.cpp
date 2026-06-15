@@ -13,6 +13,7 @@ static std::string valueToString(const Value& v) {
     if (v.isIterator()) return "{iterator}";
     if (v.isFuncVal())  return "{function}";
     if (v.isClosure())  return "{function}";
+    if (v.isBuiltin())  return "{function}";
     if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
     double d = v.asFloat();
@@ -51,11 +52,76 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
     return out;
 }
 
+// ── Builtin functions ─────────────────────────────────────────────────────────
+
+void printOneValue(const Value& v) {
+    if (v.isNil())             std::cout << "nil";
+    else if (v.isString())     std::cout << v.asString();
+    else if (v.isMap())        std::cout << "{map}";
+    else if (v.isArray())      std::cout << "{array}";
+    else if (v.isFuncVal() || v.isClosure() || v.isBuiltin())
+                               std::cout << "{function}";
+    else if (v.isInteger())    std::cout << v.asInt();
+    else {
+        double d = v.asFloat();
+        if (d == (long long)d && d >= -1e15 && d <= 1e15) std::cout << (long long)d;
+        else                                               std::cout << d;
+    }
+}
+
+static Value builtin_print(Value* args, int argc) {
+    for (int i = 0; i < argc; ++i) {
+        if (i) std::cout << ' ';
+        printOneValue(args[i]);
+    }
+    std::cout << '\n';
+    return Value{};
+}
+
+static Value builtin_printf(Value* args, int argc) {
+    if (argc < 1 || !args[0].isString())
+        throw std::runtime_error("printf: first arg must be string");
+    std::vector<Value> vargs(args, args + argc);
+    std::cout << applyFormat(args[0].asString(), vargs, 1) << '\n';
+    return Value{};
+}
+
+static Value builtin_assert(Value* args, int argc) {
+    if (argc == 0 || isFalsy(args[0])) {
+        std::string msg = (argc >= 2 && args[1].isString())
+                          ? args[1].asString() : "assertion failed";
+        throw std::runtime_error(msg);
+    }
+    return Value{};
+}
+
+static Value builtin_time(Value* args, int argc) {
+    (void)args; (void)argc;
+    auto now = std::chrono::system_clock::now();
+    return Value(std::chrono::duration<double>(now.time_since_epoch()).count());
+}
+
+static const struct { const char* name; Value::BuiltinFn fn; } k_builtins[] = {
+    { "print",   builtin_print   },
+    { "printf",  builtin_printf  },
+    { "assert",  builtin_assert  },
+    { "time",    builtin_time    },
+};
+
 void VM::execute(const Chunk& chunk) {
     ch = &chunk;
     ip = 0;
     globals.assign(chunk.identifiers.size(), Value{});
     globals_init.assign(chunk.identifiers.size(), false);
+    // Enregistrement des builtins dans les globaux (par nom)
+    for (int gi = 0; gi < (int)chunk.identifiers.size(); ++gi) {
+        for (auto& b : k_builtins) {
+            if (chunk.identifiers[gi] == b.name) {
+                globals[gi]      = Value::makeBuiltin(b.fn);
+                globals_init[gi] = true;
+            }
+        }
+    }
     regs.resize(chunk.top_reg_count);
     call_stack.reserve(1000);
     call_stack.push_back({0, 0, nullptr, {}, {}});
@@ -80,7 +146,6 @@ void VM::execute(const Chunk& chunk) {
         &&op_EQ, &&op_NEQ, &&op_GT, &&op_LT, &&op_GE, &&op_LE,
         &&op_JUMP, &&op_JUMP_IF_FALSE,
         &&op_CALL_FUNC, &&op_RETURN, &&op_LOAD_VARARGS, &&op_RETURN_V,
-        &&op_CALL_PRINT, &&op_CALL_PRINTF, &&op_CALL_ASSERT, &&op_CALL_TIME,
         &&op_TRY, &&op_POP_TRY, &&op_THROW,
         &&op_NEW_MAP, &&op_GET_INDEX, &&op_SET_INDEX,
         &&op_MAKE_ITER,
@@ -318,41 +383,6 @@ op_RETURN_V: {
     NEXT();
 }
 
-op_CALL_PRINT: {
-    for (int i = 0; i < B; ++i) {
-        if (i) std::cout << ' ';
-        printValue(regs[base + A + i]);
-    }
-    std::cout << '\n';
-    NEXT();
-}
-
-op_CALL_PRINTF: {
-    if (B < 1 || !regs[base + A].isString())
-        throw std::runtime_error("printf: first arg must be string");
-    {
-        std::vector<Value> args(B);
-        for (int i = 0; i < B; ++i) args[i] = regs[base + A + i];
-        std::cout << applyFormat(args[0].asString(), args, 1) << '\n';
-    }
-    NEXT();
-}
-
-op_CALL_ASSERT: {
-    if (B == 0 || isFalsy(regs[base + A])) {
-        std::string msg = (B >= 2 && regs[base + A + 1].isString())
-            ? regs[base + A + 1].asString() : "assertion failed";
-        throw std::runtime_error(msg);
-    }
-    NEXT();
-}
-
-op_CALL_TIME: {
-    auto now = std::chrono::system_clock::now();
-    regs[base + A] = Value(std::chrono::duration<double>(now.time_since_epoch()).count());
-    NEXT();
-}
-
 op_TRY:
     handler_stack.push_back({Bx, A, base, regs.size(), call_stack.size()});
     NEXT();
@@ -488,6 +518,12 @@ op_LOAD_FUNC:
 
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
+    // Builtin : appel direct sans frame (le pointeur est extrait avant toute modification)
+    if (regs[base + B].isBuiltin()) {
+        auto fn = regs[base + B].asBuiltin();   // intptr_t copy, trivial
+        regs[base + A] = fn(&regs[base + A], C);
+        NEXT();
+    }
     uint8_t fi;
     uint32_t fp_addr;
     int fp_n_fixed, fp_reg_count, fp_defaults_idx;
@@ -750,6 +786,9 @@ op_HALT:
         case Op::LOAD_FUNC:
             regs[base+A] = Value::makeFunc((uint8_t)Bx); break;
         case Op::CALL_DYN: {
+            if(regs[base+B].isBuiltin()){
+                int nb=base+A;
+                regs[nb]=regs[base+B].asBuiltin()(&regs[nb],C); break; }
             const Value& fv=regs[base+B];
             uint8_t fi; std::vector<Upvalue*> fuv;
             if(fv.isFuncVal()){fi=(uint8_t)fv.asInt();}

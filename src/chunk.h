@@ -43,6 +43,7 @@ struct Value {
     static constexpr uint8_t T_ITERATOR = 6;
     static constexpr uint8_t T_FUNCTION = 7;
     static constexpr uint8_t T_CLOSURE  = 8;
+    static constexpr uint8_t T_BUILTIN  = 9;
 
 private:
     explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
@@ -72,11 +73,17 @@ public:
     bool isIterator() const { return tag == T_ITERATOR; }
     bool isFuncVal()  const { return tag == T_FUNCTION; }
     bool isClosure()  const { return tag == T_CLOSURE; }
+    bool isBuiltin()  const { return tag == T_BUILTIN; }
+    bool isCallable() const { return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN; }
 
     Closure* asClosure() const { return cptr; }
 
+    using BuiltinFn = Value(*)(Value*, int);
+    BuiltinFn asBuiltin() const { return (BuiltinFn)(intptr_t)ival; }
+
     static Value makeFunc(uint8_t idx) { Value v; v.tag = T_FUNCTION; v.ival = idx; return v; }
     static Value makeClosure(Closure* p) { return Value(p); }
+    static Value makeBuiltin(BuiltinFn fn) { Value v; v.tag = T_BUILTIN; v.ival = (int64_t)(intptr_t)fn; return v; }
 
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
@@ -138,6 +145,7 @@ inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
         case T_ITERATOR: iptr = o.iptr; iptr->refcount++; break;
         case T_FUNCTION: ival = o.ival; break;
         case T_CLOSURE:  cptr = o.cptr; cptr->refcount++; break;
+        case T_BUILTIN:  ival = o.ival; break;
     }
 }
 inline Value& Value::operator=(const Value& o) {
@@ -171,6 +179,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_ITERATOR: iptr = o.iptr; break;
         case T_FUNCTION: ival = o.ival; break;
         case T_CLOSURE:  cptr = o.cptr; break;
+        case T_BUILTIN:  ival = o.ival; break;
     }
     return *this;
 }
@@ -252,10 +261,6 @@ enum class Op : uint8_t {
     RETURN,         // AB: copy R[A..A+B-1] → R[0..B-1], pop frame
     LOAD_VARARGS,   // AB: R[A..A+B-1] = varargs
     RETURN_V,       // AB: return B explicit + varargs
-    CALL_PRINT,     // AB: print B args from R[A]
-    CALL_PRINTF,    // AB: printf B args from R[A]
-    CALL_ASSERT,    // AB: assert B args from R[A]
-    CALL_TIME,      // A: R[A] = time()
     TRY,            // ABx: push handler{catch_addr=Bx, catch_reg=A}
     POP_TRY,
     THROW,          // A: throw R[A]

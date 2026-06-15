@@ -794,23 +794,8 @@ void Compiler::visit(const CallExpr& e) {
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     }
 
-    if (e.callee == "print") {
-        chunk.emit(makeABC((uint8_t)Op::CALL_PRINT, (uint8_t)call_base, (uint8_t)argc, 0));
-        last_reg_ = call_base;
-    } else if (e.callee == "printf") {
-        chunk.emit(makeABC((uint8_t)Op::CALL_PRINTF, (uint8_t)call_base, (uint8_t)argc, 0));
-        last_reg_ = call_base;
-    } else if (e.callee == "assert") {
-        chunk.emit(makeABC((uint8_t)Op::CALL_ASSERT, (uint8_t)call_base, (uint8_t)argc, 0));
-        last_reg_ = call_base;
-    } else if (e.callee == "time") {
-        // time() returns into call_base
-        chunk.emit(makeABC((uint8_t)Op::CALL_TIME, (uint8_t)call_base, 0, 0));
-        last_reg_ = call_base;
-        reg_top_ = call_base + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-    } else {
-        // Appel dynamique : variable locale, upvalue, ou globale
+    // Tous les appels passent par CALL_DYN — builtins sont des globaux T_BUILTIN
+    {
         int func_reg = reg_top_++;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
         {
