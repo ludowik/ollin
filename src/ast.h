@@ -9,11 +9,11 @@ struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
 struct ForStmt; struct IndexAssignStmt; struct ForMapStmt; struct ForInStmt;
-struct BlockStmt;
+struct BlockStmt; struct ClassDeclStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
-struct MapExpr; struct IndexExpr; struct ArrayExpr; struct ExprCallExpr;
+struct MapExpr; struct IndexExpr; struct ArrayExpr; struct ExprCallExpr; struct MethodCallExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -34,6 +34,7 @@ struct StmtVisitor {
     virtual void visit(const ForMapStmt&)    = 0;
     virtual void visit(const ForInStmt&)     = 0;
     virtual void visit(const BlockStmt&)     = 0;
+    virtual void visit(const ClassDeclStmt&) = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -51,6 +52,7 @@ struct ExprVisitor {
     virtual void visit(const IndexExpr&)   = 0;
     virtual void visit(const ArrayExpr&)   = 0;
     virtual void visit(const ExprCallExpr&) = 0;
+    virtual void visit(const MethodCallExpr&) = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -259,6 +261,23 @@ struct ExprCallExpr : Expr {
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+// Appel de méthode : receiver.method(args) — self auto-passé
+struct MethodCallExpr : Expr {
+    std::unique_ptr<Expr> receiver;  // nullptr si is_super
+    std::string method;
+    std::vector<std::unique_ptr<Expr>> args;
+    bool is_super = false;
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+// Déclaration de classe
+struct ClassDeclStmt : Stmt {
+    std::string name;
+    std::string parent;  // vide si pas d'extends
+    std::vector<std::unique_ptr<FuncDeclStmt>> methods;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
 struct Program {

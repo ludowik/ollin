@@ -47,6 +47,7 @@ private:
     int resolveUpvalue(const std::string& name);
     int resolveUpvalFrom(int scope_idx, const std::string& name);
     int captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
+    uint8_t compileMethodFunc(const FuncDeclStmt& s);  // compile method with implicit 'self' at R[0]
 
     int allocReg() {
         int r = reg_top_++;
@@ -73,6 +74,7 @@ private:
     void visit(const ForMapStmt&)    override;
     void visit(const ForInStmt&)     override;
     void visit(const BlockStmt&)     override;
+    void visit(const ClassDeclStmt&) override;
 
     // ExprVisitor
     void visit(const BoolExpr&)    override;
@@ -88,6 +90,7 @@ private:
     void visit(const IndexExpr&)   override;
     void visit(const ArrayExpr&)   override;
     void visit(const ExprCallExpr&) override;
+    void visit(const MethodCallExpr&) override;
 
     // StmtVisitor (map)
     void visit(const IndexAssignStmt&) override;

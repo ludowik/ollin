@@ -139,6 +139,8 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | MAKE_CLOSURE  | ABx    | A=dest, Bx=func_idx        | R[A] = Closure{func_idx, capture upvals depuis frame courant} |
 | GET_UPVAL     | AB     | A=dest, B=upval_idx        | R[A] = upval[B]  (ouverte: regs[base+idx], fermée: uv.val) |
 | SET_UPVAL     | AB     | A=src, B=upval_idx         | upval[B] = R[A]                                  |
+| NEW_CLASS     | A      | A=dest                     | R[A] = nouvelle classe vide (T_CLASS)            |
+| CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -219,6 +221,7 @@ Struct taguée (16 octets) — remplace le NaN-boxing :
 | T_ITERATOR | 6               | iptr (Iterator*) | —          |
 | T_FUNCTION | 7               | ival (int64_t, = func_idx) | index dans chunk.funcs |
 | T_CLOSURE  | 8               | cptr (Closure*) | ref-counted, holds func_idx + upvals |
+| T_CLASS    | 10              | mptr (Map*) | classe : même layout que T_MAP, mais distincte pour CALL_DYN |
 
 ## Closures / Upvalues
 
@@ -270,3 +273,54 @@ std::vector<Upvalue*> open_upvals;  // upvals ouvertes créées par ce frame
 - `collectLocals` pré-alloue un registre pour chaque `FuncDeclStmt` trouvé dans le corps de la fonction englobante.
 - `visit(FuncDeclStmt)` : si `is_nested` (outer_name non vide) → émet `MAKE_CLOSURE` ou `LOAD_FUNC` dans ce registre local, pas de `STORE_GLOBAL`.
 - Appels récursifs à une fonction interne : `resolveUpvalue(callee)` remonte la chaîne de scopes → `GET_UPVAL + CALL_DYN`.
+
+## Système de classes
+
+Syntaxe : `class Name [extends Parent] ... end`
+
+### Représentation
+
+- Une classe est une `T_CLASS` (= `T_MAP` à tag distinct) contenant : `__name__` (string), `__parent__` (T_CLASS, optionnel), et une entrée par méthode.
+- Une instance est un `T_MAP` normal avec une clé `__class__` pointant vers sa classe.
+- La recherche de propriété/méthode (`GET_INDEX`, `CALL_METHOD`) remonte la chaîne `instance → __class__ → __parent__` via `protoChainGet`.
+
+### Compilation
+
+- `visit(ClassDeclStmt)` : émet `NEW_CLASS`, initialise les métadonnées (`__name__`, `__parent__`), puis pour chaque méthode : `compileMethodFunc` + `LOAD_FUNC`/`MAKE_CLOSURE` + `SET_INDEX`.
+- `compileMethodFunc` : comme la compilation de `FuncDeclStmt` mais ajoute `local_regs_["self"] = 0`, les paramètres utilisateur commencent à R[1], `n_fixed = 1 + n_params`.
+- `visit(MethodCallExpr)` : émet CALL_METHOD avec `argc` = nombre d'arguments explicites.
+
+### Opcodes
+
+| Opcode | Format | Description |
+|--------|--------|-------------|
+| NEW_CLASS | A | R[A] = nouvelle classe vide (T_CLASS) |
+| CALL_METHOD | ABC | A=receiver_base, B=0, C=argc — R[A]=receiver, R[A+1]=method_fn, R[A+2..]=args |
+
+### CALL_DYN sur T_CLASS (instanciation)
+
+1. Crée une instance T_MAP, pose `__class__` = la classe.
+2. Cherche `init` via `protoChainGet`.
+3. Si trouvé : décale les args d'un cran pour insérer `self` en R[0], pousse un frame avec `ctor_result = instance`.
+4. À RETURN : si `ctor_result` non-nil, écrase R[0] avec l'instance (résultat = l'objet créé).
+
+### CALL_METHOD (appel de méthode)
+
+- Si R[cb] a `__class__` (instance) : garde `self` en R[cb], décale args → total = argc+1.
+- Sinon (map simple/module) : décale les args depuis R[cb+2], pas de self → total = argc.
+
+### Méta-méthodes (dispatch dans les opcodes arithmétiques)
+
+Quand un opérande gauche est une instance, les opcodes ADD/SUB/MUL/DIV/MOD/NEGATE/EQ/LT/LE cherchent `__add`/`__sub`/... via `protoChainGet`. Si trouvé :
+- Pousse un frame avec `return_dest = base+A` (registre résultat dans le frame appelant).
+- À RETURN : si `return_dest >= 0`, copie R[0] du callee dans `regs[return_dest]`.
+
+### Frame.ctor_result / Frame.return_dest
+
+```cpp
+struct Frame {
+    ...
+    Value ctor_result;   // non-nil = frame constructeur ; RETURN place l'instance dans R[0]
+    int   return_dest = -1; // >= 0 = frame méta-méthode ; RETURN copie R[0] dans regs[return_dest]
+};
+```

@@ -11,12 +11,21 @@ stmt           = varDecl
                | tryStmt
                | throwStmt
                | funcDecl
+               | classDecl
                | returnStmt
                | importStmt
                | assignStmt
                | exprStmt ;
 
 importStmt     = "import" STRING [ "as" IDENT ] NEWLINE ;
+
+classDecl      = "class" IDENT [ "extends" IDENT ] NEWLINE { method } "end" NEWLINE ;
+method         = "func" IDENT "(" [ params ] ")" NEWLINE { stmt } "end" NEWLINE ;
+                 (* le premier paramètre implicite est "self" ; "func init(...)" = constructeur *)
+                 (* méthodes spéciales : init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
+
+methodCall     = expr "." IDENT "(" [ expr { "," expr } ] ")" ;
+superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
@@ -57,12 +66,14 @@ primary        = NUMBER
                | STRING
                | BOOL
                | NIL
-               | IDENT { ( "[" expr "]" | "." IDENT ) }
-               | call  { ( "[" expr "]" | "." IDENT ) }
-               | mapLit { ( "[" expr "]" | "." IDENT ) }
+               | "super" "." IDENT "(" [ expr { "," expr } ] ")"
+               | IDENT { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
+               | call  { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
+               | mapLit { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
                | arrayLit { ( "[" expr "]" ) }
                | "..."
                | "(" expr ")" ;
+               (* "expr.method(args)" = appel de méthode avec self implicite *)
 
 mapLit         = "{" [ NEWLINE ]
                    [ mapEntry { "," [ NEWLINE ] mapEntry } [ NEWLINE ] ]

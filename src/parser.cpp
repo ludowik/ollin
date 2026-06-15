@@ -77,6 +77,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::THROW))   return throwStmt();
     if (check(TokenType::FOR))     return forStmt();
     if (check(TokenType::IMPORT))  return importStmt();
+    if (check(TokenType::CLASS))   return classDecl();
     if (check(TokenType::FUNC))    return funcDeclStmt();
     if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))     return varDecl();
@@ -545,10 +546,25 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
         } else if (check(TokenType::DOT)) {
             advance();
             std::string field = expect(TokenType::IDENTIFIER).lexeme;
-            auto ie = std::make_unique<IndexExpr>();
-            ie->obj = std::move(base);
-            ie->key = std::make_unique<StringExpr>(field);
-            base = std::move(ie);
+            if (check(TokenType::LPAREN)) {
+                advance(); // consume LPAREN
+                auto mc = std::make_unique<MethodCallExpr>();
+                mc->receiver = std::move(base);
+                mc->method = field;
+                mc->is_super = false;
+                if (!check(TokenType::RPAREN)) {
+                    mc->args.push_back(expr());
+                    while (match(TokenType::COMMA))
+                        mc->args.push_back(expr());
+                }
+                expect(TokenType::RPAREN);
+                base = std::move(mc);
+            } else {
+                auto ie = std::make_unique<IndexExpr>();
+                ie->obj = std::move(base);
+                ie->key = std::make_unique<StringExpr>(field);
+                base = std::move(ie);
+            }
         } else { // LPAREN
             advance();
             auto call = std::make_unique<ExprCallExpr>();
@@ -574,6 +590,26 @@ std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::FALSE)) { advance(); return std::make_unique<BoolExpr>(false); }
     if (check(TokenType::IDENTIFIER)) {
         std::string name = advance().lexeme;
+        // super.method(args) — appel de la méthode parente avec le self courant
+        if (name == "super") {
+            expect(TokenType::DOT);
+            std::string method_name = expect(TokenType::IDENTIFIER).lexeme;
+            if (!check(TokenType::LPAREN))
+                throw std::runtime_error("line " + std::to_string(peek().line) +
+                                         ": super: seuls les appels de méthode sont supportés");
+            advance(); // LPAREN
+            auto mc = std::make_unique<MethodCallExpr>();
+            mc->receiver = nullptr;
+            mc->method = method_name;
+            mc->is_super = true;
+            if (!check(TokenType::RPAREN)) {
+                mc->args.push_back(expr());
+                while (match(TokenType::COMMA))
+                    mc->args.push_back(expr());
+            }
+            expect(TokenType::RPAREN);
+            return parsePostfix(std::move(mc));
+        }
         if (match(TokenType::LPAREN)) {
             auto call = std::make_unique<CallExpr>();
             call->callee = name;
@@ -632,6 +668,29 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     throw std::runtime_error("line " + std::to_string(peek().line) +
                              ": unexpected token '" + peek().lexeme + "'");
+}
+
+std::unique_ptr<Stmt> Parser::classDecl() {
+    advance(); // CLASS
+    auto s = std::make_unique<ClassDeclStmt>();
+    s->name = expect(TokenType::IDENTIFIER).lexeme;
+    if (check(TokenType::EXTENDS)) {
+        advance();
+        s->parent = expect(TokenType::IDENTIFIER).lexeme;
+    }
+    consumeLineEnd();
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        if (!check(TokenType::FUNC))
+            throw std::runtime_error("line " + std::to_string(peek().line) +
+                                     ": expected 'func' inside class body");
+        s->methods.push_back(std::unique_ptr<FuncDeclStmt>(
+            static_cast<FuncDeclStmt*>(funcDeclStmt().release())));
+    }
+    expect(TokenType::END);
+    consumeLineEnd();
+    return s;
 }
 
 static std::vector<std::string> collectTopLevelNames(

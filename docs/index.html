@@ -341,6 +341,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <div class="section-label">Builtins</div>
   <a href="#builtins">Fonctions intégrées</a>
   <a href="#import">Import</a>
+  <a href="#classes">Classes</a>
 </nav>
 
 <main>
@@ -1026,6 +1027,86 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)          <span
   <li>Les imports circulaires sont détectés et ignorés (cache partagé).</li>
   <li>Un même fichier importé deux fois n'est exécuté qu'une fois.</li>
 </ul>
+</section>
+
+<section id="classes">
+<h2>Classes</h2>
+<p>Ollin supporte l'orienté-objet avec héritage simple, constructeur implicite et méta-méthodes.</p>
+
+<h3>Déclaration</h3>
+<pre><code>class Animal
+    func init(name, sound)
+        self.name = name
+        self.sound = sound
+    end
+    func speak()
+        return self.name + " says " + self.sound
+    end
+    func __str()
+        return "Animal(" + self.name + ")"
+    end
+end</code></pre>
+<ul>
+  <li><code>func init(...)</code> est le constructeur ; <code>self</code> est passé implicitement en premier paramètre.</li>
+  <li>Toutes les méthodes reçoivent <code>self</code> automatiquement.</li>
+</ul>
+
+<h3>Instanciation</h3>
+<pre><code>var a = Animal("Dog", "woof")
+print(a.speak())   ## Dog says woof
+print(a.name)      ## Dog</code></pre>
+
+<h3>Héritage</h3>
+<pre><code>class Dog extends Animal
+    func init(name)
+        super.init(name, "woof")   ## appel du constructeur parent
+    end
+    func fetch()
+        return self.name + " fetches!"
+    end
+end
+
+var d = Dog("Rex")
+print(d.speak())   ## Rex says woof  (méthode héritée)
+print(d.fetch())   ## Rex fetches!</code></pre>
+<p>Si un enfant n'a pas de <code>func init</code>, il hérite automatiquement de celui du parent.</p>
+
+<h3>super</h3>
+<p><code>super.method(args)</code> appelle la méthode du parent avec le <code>self</code> courant.</p>
+
+<h3>Méta-méthodes</h3>
+<table>
+<thead><tr><th>Méthode</th><th>Déclencheur</th></tr></thead>
+<tbody>
+<tr><td><code>__str</code></td><td><code>print(obj)</code>, <code>printf("{}", obj)</code></td></tr>
+<tr><td><code>__add</code></td><td><code>a + b</code></td></tr>
+<tr><td><code>__sub</code></td><td><code>a - b</code></td></tr>
+<tr><td><code>__mul</code></td><td><code>a * b</code></td></tr>
+<tr><td><code>__div</code></td><td><code>a / b</code></td></tr>
+<tr><td><code>__mod</code></td><td><code>a % b</code></td></tr>
+<tr><td><code>__neg</code></td><td><code>-a</code></td></tr>
+<tr><td><code>__eq</code></td><td><code>a == b</code></td></tr>
+<tr><td><code>__lt</code></td><td><code>a &lt; b</code> et <code>a &gt; b</code></td></tr>
+<tr><td><code>__le</code></td><td><code>a &lt;= b</code> et <code>a &gt;= b</code></td></tr>
+</tbody>
+</table>
+<pre><code>class Vec2
+    func init(x, y)
+        self.x = x
+        self.y = y
+    end
+    func __add(other)
+        return Vec2(self.x + other.x, self.y + other.y)
+    end
+    func __str()
+        return "Vec2(" + self.x + "," + self.y + ")"
+    end
+end
+
+var v1 = Vec2(1, 2)
+var v2 = Vec2(3, 4)
+var v3 = v1 + v2   ## appelle v1.__add(v2)
+print(v3)          ## Vec2(4,6)</code></pre>
 </section>
 
 </main>

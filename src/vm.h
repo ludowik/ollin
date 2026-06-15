@@ -9,6 +9,7 @@
 class VM {
 public:
     void execute(const Chunk& chunk);
+    std::string invokeStr(const Value& v);
 
 private:
     struct Handler {
@@ -25,6 +26,8 @@ private:
         std::unique_ptr<std::vector<Value>> varargs;
         std::vector<Upvalue*> upvals;
         std::vector<Upvalue*> open_upvals;
+        Value       ctor_result;   // non-nil = frame is a constructor; RETURN overrides R[0] with instance
+        int         return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
     };
 
     const Chunk*         ch = nullptr;
@@ -34,6 +37,8 @@ private:
     std::vector<Value>   regs;
     std::vector<Frame>   call_stack;
     std::vector<Handler> handler_stack;
+
+    static Value protoChainGet(const Value& obj, const Value& key);
 
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
         if (v.isInteger()) return (double)v.asInt();

@@ -24,8 +24,10 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"not",    TokenType::NOT},
     {"for",    TokenType::FOR},
     {"in",     TokenType::IN},
-    {"import", TokenType::IMPORT},
-    {"as",     TokenType::AS},
+    {"import",  TokenType::IMPORT},
+    {"as",      TokenType::AS},
+    {"class",   TokenType::CLASS},
+    {"extends", TokenType::EXTENDS},
 };
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}

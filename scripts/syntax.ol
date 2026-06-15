@@ -443,3 +443,91 @@ assert(u.VERSION == 2)
 ## import circulaire : ignoré silencieusement (déjà importé)
 import "utils_test"
 assert(CONST == 42)   ## toujours disponible
+
+## ── 18. Classes ──────────────────────────────────────────────────────────────
+
+## classe de base
+class Animal
+    func init(name, sound)
+        self.name = name
+        self.sound = sound
+    end
+    func speak()
+        return self.name + " says " + self.sound
+    end
+    func __str()
+        return "Animal(" + self.name + ")"
+    end
+end
+
+var a = Animal("Dog", "woof")
+assert(a.speak() == "Dog says woof")
+assert(a.name == "Dog")
+assert(a.sound == "woof")
+
+## héritage simple
+class Dog extends Animal
+    func init(name)
+        super.init(name, "woof")
+    end
+    func fetch()
+        return self.name + " fetches!"
+    end
+end
+
+var d = Dog("Rex")
+assert(d.speak() == "Rex says woof")
+assert(d.fetch() == "Rex fetches!")
+assert(d.name == "Rex")
+
+## héritage sans init propre (hérite du parent)
+class Cat extends Animal
+    func purr()
+        return self.name + " purrs"
+    end
+end
+
+var c = Cat("Whiskers", "meow")
+assert(c.speak() == "Whiskers says meow")
+assert(c.purr() == "Whiskers purrs")
+
+## méthode qui modifie self
+class Counter
+    func init(start)
+        self.n = start
+    end
+    func increment()
+        self.n = self.n + 1
+    end
+    func value()
+        return self.n
+    end
+end
+
+var ctr = Counter(0)
+ctr.increment()
+ctr.increment()
+ctr.increment()
+assert(ctr.value() == 3)
+
+## metaméthodes arithmétiques
+class Vec2
+    func init(x, y)
+        self.x = x
+        self.y = y
+    end
+    func __add(other)
+        return Vec2(self.x + other.x, self.y + other.y)
+    end
+    func __str()
+        return "Vec2(" + self.x + "," + self.y + ")"
+    end
+end
+
+var v1 = Vec2(1, 2)
+var v2 = Vec2(3, 4)
+var v3 = v1 + v2
+assert(v3.x == 4)
+assert(v3.y == 6)
+
+print("class tests ok")

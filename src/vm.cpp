@@ -5,10 +5,138 @@
 #include <stdexcept>
 #include <vector>
 
+static VM* s_current_vm = nullptr;
+
+// ── protoChainGet : recherche une clé dans la chaîne de prototypes ────────────
+Value VM::protoChainGet(const Value& obj, const Value& key) {
+    if (obj.isMap() || obj.isClass()) {
+        Value v = obj.mapGet(key);
+        if (!v.isNil()) return v;
+        if (obj.isMap()) {
+            // Instance : chercher dans __class__
+            Value cls = obj.mapGet(Value(std::string("__class__")));
+            if (!cls.isNil()) return protoChainGet(cls, key);
+        } else {
+            // Classe : chercher dans __parent__
+            Value par = obj.mapGet(Value(std::string("__parent__")));
+            if (!par.isNil()) return protoChainGet(par, key);
+        }
+    }
+    return Value{};
+}
+
+// ── invokeStr : appel du métaméthode __str synchrone ─────────────────────────
+std::string VM::invokeStr(const Value& obj) {
+    Value cls = obj.mapGet(Value(std::string("__class__")));
+    if (cls.isNil()) return "{map}";
+    Value str_fn = protoChainGet(cls, Value(std::string("__str")));
+    if (str_fn.isNil() || !str_fn.isCallable()) {
+        Value nm = cls.mapGet(Value(std::string("__name__")));
+        return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
+    }
+    uint8_t fi;
+    std::vector<Upvalue*> frame_upvals;
+    if (str_fn.isFuncVal()) {
+        fi = (uint8_t)str_fn.asInt();
+    } else if (str_fn.isClosure()) {
+        fi = str_fn.asClosure()->func_idx;
+        frame_upvals = str_fn.asClosure()->upvals;
+    } else {
+        Value nm = cls.mapGet(Value(std::string("__name__")));
+        return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
+    }
+    const FuncProto& fp = ch->funcs[fi];
+    int call_base = (int)regs.size();
+    size_t needed = call_base + (size_t)fp.reg_count;
+    regs.resize(needed > (size_t)(call_base + 1) ? needed : (size_t)(call_base + 1));
+    regs[call_base] = obj;   // R[0] = self
+    uint32_t saved_ip = ip;
+    size_t stop_depth = call_stack.size();
+    call_stack.push_back({0, call_base, {}, std::move(frame_upvals), {}, {}});
+    ip = fp.addr;
+    // Mini dispatch loop until frame returns
+    while (call_stack.size() > stop_depth) {
+        Instr instr = ch->code[ip++];
+        uint8_t op = iOP(instr), A = iA(instr), B = iB(instr), C = iC(instr);
+        uint16_t Bx = iBx(instr);
+        int base = call_stack.back().reg_base;
+        switch (static_cast<Op>(op)) {
+        case Op::LOAD_K:      regs[base+A] = ch->constants[Bx]; break;
+        case Op::LOAD_NIL:    regs[base+A] = Value{}; break;
+        case Op::MOVE:        regs[base+A] = regs[base+B]; break;
+        case Op::LOAD_GLOBAL: regs[base+A] = globals[Bx]; break;
+        case Op::STORE_GLOBAL: globals[Bx] = regs[base+A]; globals_init[Bx] = true; break;
+        case Op::ADD: { auto& bv=regs[base+B]; auto& cv=regs[base+C];
+            if (bv.isString()&&cv.isString()) regs[base+A]=Value(bv.asString()+cv.asString());
+            else regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()+cv.asInt()):Value(asDouble(bv)+asDouble(cv)); break; }
+        case Op::SUB: { auto& bv=regs[base+B]; auto& cv=regs[base+C];
+            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()-cv.asInt()):Value(asDouble(bv)-asDouble(cv)); break; }
+        case Op::MUL: { auto& bv=regs[base+B]; auto& cv=regs[base+C];
+            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()*cv.asInt()):Value(asDouble(bv)*asDouble(cv)); break; }
+        case Op::GET_INDEX: {
+            regs[base+A] = protoChainGet(regs[base+B], regs[base+C]); break; }
+        case Op::SET_INDEX: {
+            Value& obj2 = regs[base+A];
+            if (obj2.isMap() || obj2.isClass()) obj2.mapSet(regs[base+B], regs[base+C]);
+            break; }
+        case Op::RETURN: {
+            for (auto* uv : call_stack.back().open_upvals) {
+                if (!uv->closed) { uv->val = regs[uv->frame_base + uv->reg_idx]; uv->closed = true; }
+                if (--uv->refcount == 0) delete uv;
+            }
+            Value ctor = std::move(call_stack.back().ctor_result);
+            int ret_dest = call_stack.back().return_dest;
+            int n = B;
+            if (n > 0 && A != 0)
+                for (int i = 0; i < n; ++i)
+                    regs[base + i] = std::move(regs[base + A + i]);
+            uint32_t rip = call_stack.back().return_ip;
+            call_stack.pop_back();
+            if (!ctor.isNil()) regs[base + 0] = std::move(ctor);
+            if (ret_dest >= 0) regs[ret_dest] = regs[base + 0];
+            if (call_stack.size() <= stop_depth) goto mini_done;
+            ip = rip;
+            break; }
+        case Op::JUMP:         ip = Bx; break;
+        case Op::JUMP_IF_FALSE: if (isFalsy(regs[base+A])) ip = Bx; break;
+        default: goto mini_done;  // si opcode non-supporté, abandonne
+        }
+    }
+    mini_done:
+    std::string result;
+    if ((int)regs.size() > call_base) {
+        // valueToString without recursive __str to avoid infinite loop
+        const Value& rv = regs[call_base];
+        if (rv.isString()) result = rv.asString();
+        else {
+            std::ostringstream os;
+            if (rv.isNil()) os << "nil";
+            else if (rv.isInteger()) os << rv.asInt();
+            else if (rv.isFloat()) {
+                double d = rv.asFloat();
+                if (d == (long long)d && d >= -1e15 && d <= 1e15) os << (long long)d;
+                else os << d;
+            }
+            result = os.str();
+        }
+    }
+    regs.resize(call_base);
+    ip = saved_ip;
+    return result;
+}
+
 static std::string valueToString(const Value& v) {
     if (v.isNil())      return "nil";
     if (v.isString())   return v.asString();
-    if (v.isMap())      return "{map}";
+    if (v.isClass())    return "{class}";
+    if (v.isMap()) {
+        // Instance avec __str ?
+        if (s_current_vm) {
+            Value cls = v.mapGet(Value(std::string("__class__")));
+            if (!cls.isNil()) return s_current_vm->invokeStr(v);
+        }
+        return "{map}";
+    }
     if (v.isArray())    return "{array}";
     if (v.isIterator()) return "{iterator}";
     if (v.isFuncVal())  return "{function}";
@@ -57,8 +185,15 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
 void printOneValue(const Value& v) {
     if (v.isNil())             std::cout << "nil";
     else if (v.isString())     std::cout << v.asString();
-    else if (v.isMap())        std::cout << "{map}";
-    else if (v.isArray())      std::cout << "{array}";
+    else if (v.isClass())      std::cout << "{class}";
+    else if (v.isMap()) {
+        // Instance avec __str ?
+        if (s_current_vm) {
+            Value cls = v.mapGet(Value(std::string("__class__")));
+            if (!cls.isNil()) { std::cout << s_current_vm->invokeStr(v); return; }
+        }
+        std::cout << "{map}";
+    } else if (v.isArray())    std::cout << "{array}";
     else if (v.isFuncVal() || v.isClosure() || v.isBuiltin())
                                std::cout << "{function}";
     else if (v.isInteger())    std::cout << v.asInt();
@@ -111,6 +246,7 @@ static const struct { const char* name; Value::BuiltinFn fn; } k_builtins[] = {
 void VM::execute(const Chunk& chunk) {
     ch = &chunk;
     ip = 0;
+    s_current_vm = this;
     globals.assign(chunk.identifiers.size(), Value{});
     globals_init.assign(chunk.identifiers.size(), false);
     // Enregistrement des builtins dans les globaux (par nom)
@@ -155,6 +291,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_NEXT,
         &&op_LOAD_FUNC, &&op_CALL_DYN,
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
+        &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_HALT,
     };
 
@@ -186,50 +323,128 @@ op_STORE_GLOBAL:
     NEXT();
 
 op_ADD: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    if (bv.isString() && cv.isString())
-        regs[base+A] = Value(bv.asString() + cv.asString());
-    else
+    if (regs[base+B].isString() && regs[base+C].isString()) {
+        regs[base+A] = Value(regs[base+B].asString() + regs[base+C].asString());
+        NEXT();
+    }
+    {
+        bool dispatched = false;
+        uint32_t meta_addr = 0;
+        int meta_nb = 0, meta_dest = base+A;
+        if ((regs[base+B].isMap() || regs[base+B].isClass()) &&
+            !regs[base+B].mapGet(Value(std::string("__class__"))).isNil()) {
+            Value lhs = regs[base+B]; Value rhs = regs[base+C];
+            Value cls = lhs.mapGet(Value(std::string("__class__")));
+            Value fn = protoChainGet(cls, Value(std::string("__add")));
+            if (fn.isCallable()) {
+                uint8_t fi; std::vector<Upvalue*> fuv;
+                if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
+                else { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
+                const FuncProto& fp = ch->funcs[fi];
+                meta_nb = (int)regs.size();
+                regs.resize(meta_nb + std::max((int)fp.reg_count, 2));
+                regs[meta_nb] = std::move(lhs); regs[meta_nb+1] = std::move(rhs);
+                call_stack.push_back({ip, meta_nb, {}, std::move(fuv), {}, {}, meta_dest});
+                meta_addr = fp.addr;
+                dispatched = true;
+            }
+        }
+        if (dispatched) { ip = meta_addr; NEXT(); }
+    }
+    {
+        const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
         regs[base+A] = (bv.isInteger() && cv.isInteger())
             ? Value(bv.asInt() + cv.asInt())
             : Value(asDouble(bv) + asDouble(cv));
-    NEXT();
-}
-op_SUB: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = (bv.isInteger() && cv.isInteger())
-        ? Value(bv.asInt() - cv.asInt())
-        : Value(asDouble(bv) - asDouble(cv));
-    NEXT();
-}
-op_MUL: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = (bv.isInteger() && cv.isInteger())
-        ? Value(bv.asInt() * cv.asInt())
-        : Value(asDouble(bv) * asDouble(cv));
-    NEXT();
-}
-op_DIV: {
-    double dv = asDouble(regs[base+C]);
-    if (dv == 0.0) throw std::runtime_error("runtime: division by zero");
-    regs[base+A] = Value(asDouble(regs[base+B]) / dv);
-    NEXT();
-}
-op_MOD: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    if (bv.isInteger() && cv.isInteger()) {
-        if (cv.asInt() == 0) throw std::runtime_error("runtime: modulo by zero");
-        regs[base+A] = Value(bv.asInt() % cv.asInt());
-    } else {
-        double dv = asDouble(cv);
-        if (dv == 0.0) throw std::runtime_error("runtime: modulo by zero");
-        regs[base+A] = Value(std::fmod(asDouble(bv), dv));
     }
     NEXT();
 }
+op_SUB: {
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__sub")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()-cv.asInt()):Value(asDouble(bv)-asDouble(cv));}
+    NEXT();
+}
+op_MUL: {
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__mul")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()*cv.asInt()):Value(asDouble(bv)*asDouble(cv));}
+    NEXT();
+}
+op_DIV: {
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__div")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {double dv=asDouble(regs[base+C]);if(dv==0.0)throw std::runtime_error("runtime: division by zero");
+    regs[base+A]=Value(asDouble(regs[base+B])/dv);}
+    NEXT();
+}
+op_MOD: {
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__mod")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    if(bv.isInteger()&&cv.isInteger()){if(cv.asInt()==0)throw std::runtime_error("runtime: modulo by zero");
+        regs[base+A]=Value(bv.asInt()%cv.asInt());}
+    else{double dv=asDouble(cv);if(dv==0.0)throw std::runtime_error("runtime: modulo by zero");
+        regs[base+A]=Value(std::fmod(asDouble(bv),dv));}}
+    NEXT();
+}
 op_NEGATE: {
-    const Value& bv = regs[base+B];
-    regs[base+A] = bv.isInteger() ? Value(-bv.asInt()) : Value(-asDouble(bv));
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__neg")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,1));regs[mnb]=std::move(lhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];
+    regs[base+A]=bv.isInteger()?Value(-bv.asInt()):Value(-asDouble(bv));}
     NEXT();
 }
 op_NOT:
@@ -245,31 +460,89 @@ op_OR:
     NEXT();
 
 op_GT: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
-        ? bv.asInt() >  cv.asInt() : asDouble(bv) >  asDouble(cv)));
+    // GT(a,b) = LT(b,a) — try __lt on rhs
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+C].isMap()||regs[base+C].isClass())&&!regs[base+C].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+C],rhs=regs[base+B];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__lt")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    regs[base+A]=Value((int64_t)((bv.isInteger()&&cv.isInteger())?bv.asInt()>cv.asInt():asDouble(bv)>asDouble(cv)));}
     NEXT();
 }
 op_LT: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
-        ? bv.asInt() <  cv.asInt() : asDouble(bv) <  asDouble(cv)));
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__lt")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    regs[base+A]=Value((int64_t)((bv.isInteger()&&cv.isInteger())?bv.asInt()<cv.asInt():asDouble(bv)<asDouble(cv)));}
     NEXT();
 }
 op_GE: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
-        ? bv.asInt() >= cv.asInt() : asDouble(bv) >= asDouble(cv)));
+    // GE(a,b) = LE(b,a)
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+C].isMap()||regs[base+C].isClass())&&!regs[base+C].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+C],rhs=regs[base+B];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__le")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    regs[base+A]=Value((int64_t)((bv.isInteger()&&cv.isInteger())?bv.asInt()>=cv.asInt():asDouble(bv)>=asDouble(cv)));}
     NEXT();
 }
 op_LE: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
-        ? bv.asInt() <= cv.asInt() : asDouble(bv) <= asDouble(cv)));
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__le")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+    regs[base+A]=Value((int64_t)((bv.isInteger()&&cv.isInteger())?bv.asInt()<=cv.asInt():asDouble(bv)<=asDouble(cv)));}
     NEXT();
 }
 op_EQ: {
-    const Value& av = regs[base+B]; const Value& bv = regs[base+C];
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__eq")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;}}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& av=regs[base+B];const Value& bv=regs[base+C];
     bool eq;
     if (av.isNil() && bv.isNil())             eq = true;
     else if (av.isNil() || bv.isNil())         eq = false;
@@ -278,12 +551,30 @@ op_EQ: {
     else if (av.isString()  && bv.isString())  eq = av.asString() == bv.asString();
     else if (av.isString()  && bv.isNumber())  eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
     else if (av.isNumber()  && bv.isString())  eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
-    else eq = false;
-    regs[base+A] = Value((int64_t)(eq ? 1 : 0));
+    else eq = (av.isMap() && bv.isMap() && av.mptr == bv.mptr) ||
+              (av.isClass() && bv.isClass() && av.mptr == bv.mptr);
+    regs[base+A] = Value((int64_t)(eq ? 1 : 0));}
     NEXT();
 }
 op_NEQ: {
-    const Value& av = regs[base+B]; const Value& bv = regs[base+C];
+    {
+        bool disp=false; uint32_t maddr=0; int mnb=0,mdest=base+A;
+        if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+            Value lhs=regs[base+B],rhs=regs[base+C];
+            Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__eq")));
+            if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                const FuncProto&fp=ch->funcs[fi];mnb=(int)regs.size();
+                regs.resize(mnb+std::max((int)fp.reg_count,2));regs[mnb]=std::move(lhs);regs[mnb+1]=std::move(rhs);
+                call_stack.push_back({ip,mnb,{},std::move(fuv),{},{},mdest});maddr=fp.addr;disp=true;
+                // NEQ inverts: we store the result reg, but need to negate after
+                // Easiest: store in mdest then negate; handled in RETURN via ret_dest
+                // For NEQ we can't easily negate post-return, so fall through to numeric
+                disp=false; // disable meta dispatch for NEQ — use __eq=false fallback
+            }}
+        if(disp){ip=maddr;NEXT();}
+    }
+    {const Value& av=regs[base+B];const Value& bv=regs[base+C];
     bool eq;
     if (av.isNil() && bv.isNil())             eq = true;
     else if (av.isNil() || bv.isNil())         eq = false;
@@ -293,7 +584,7 @@ op_NEQ: {
     else if (av.isString()  && bv.isNumber())  eq = (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
     else if (av.isNumber()  && bv.isString())  eq = av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
     else eq = false;
-    regs[base+A] = Value((int64_t)(eq ? 0 : 1));
+    regs[base+A] = Value((int64_t)(eq ? 0 : 1));}
     NEXT();
 }
 
@@ -339,14 +630,20 @@ op_RETURN: {
         if (!uv->closed) { uv->val = regs[uv->frame_base + uv->reg_idx]; uv->closed = true; }
         if (--uv->refcount == 0) delete uv;
     }
-    int n = B;
-    if (n > 0 && A != 0) {
-        for (int i = 0; i < n; ++i)
-            regs[base + i] = std::move(regs[base + A + i]);
+    {
+        Value ctor = std::move(call_stack.back().ctor_result);
+        int ret_dest = call_stack.back().return_dest;
+        int n = B;
+        if (n > 0 && A != 0) {
+            for (int i = 0; i < n; ++i)
+                regs[base + i] = std::move(regs[base + A + i]);
+        }
+        uint32_t rip = call_stack.back().return_ip;
+        call_stack.pop_back();
+        if (!ctor.isNil()) regs[base + 0] = std::move(ctor);
+        if (ret_dest >= 0) regs[ret_dest] = regs[base + 0];
+        ip = rip;
     }
-    uint32_t rip = call_stack.back().return_ip;
-    call_stack.pop_back();
-    ip = rip;
     NEXT();
 }
 
@@ -425,8 +722,8 @@ op_NEW_MAP:
 op_GET_INDEX: {
     const Value& obj = regs[base + B];
     const Value& key = regs[base + C];
-    if (obj.isMap()) {
-        regs[base + A] = obj.mapGet(key);
+    if (obj.isMap() || obj.isClass()) {
+        regs[base + A] = protoChainGet(obj, key);
     } else if (obj.isArray()) {
         if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
         regs[base + A] = obj.arrayGet(key.asInt());
@@ -439,7 +736,7 @@ op_GET_INDEX: {
 op_SET_INDEX: {
     Value& obj = regs[base + A];
     const Value& key = regs[base + B];
-    if (obj.isMap()) {
+    if (obj.isMap() || obj.isClass()) {
         obj.mapSet(key, regs[base + C]);
     } else if (obj.isArray()) {
         if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
@@ -527,50 +824,96 @@ op_CALL_DYN: {
         regs[base + A] = fn(&regs[base + A], C);
         NEXT();
     }
-    uint8_t fi;
-    uint32_t fp_addr;
-    int fp_n_fixed, fp_reg_count, fp_defaults_idx;
-    bool fp_variadic;
+    // Instantiation de classe (T_CLASS)
     {
-        Value fv = regs[base + B];
-        if (fv.isFuncVal()) {
-            fi = (uint8_t)fv.asInt();
-        } else if (fv.isClosure()) {
-            fi = fv.asClosure()->func_idx;
-        } else {
-            throw std::runtime_error("runtime: call on non-function value");
-        }
-        const FuncProto& fp = ch->funcs[fi];
-        fp_addr         = fp.addr;
-        fp_n_fixed      = fp.n_fixed;
-        fp_reg_count    = fp.reg_count;
-        fp_defaults_idx = fp.defaults_idx;
-        fp_variadic     = fp.variadic;
-        int new_base = base + A;
-        int argc = C;
-        size_t needed = (size_t)(new_base + std::max(fp_reg_count, argc));
-        if (regs.size() < needed) regs.resize(needed);
-        if (argc < fp_n_fixed) {
-            auto& defs = ch->func_defaults[fp_defaults_idx];
-            for (int i = argc; i < fp_n_fixed; ++i)
-                regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
-        }
-        {
-            std::vector<Upvalue*> frame_upvals;
-            if (fv.isClosure()) frame_upvals = fv.asClosure()->upvals;
-            std::unique_ptr<std::vector<Value>> varargs;
-            if (fp_variadic && argc > fp_n_fixed) {
-                varargs = std::make_unique<std::vector<Value>>();
-                for (int i = fp_n_fixed; i < argc; ++i)
-                    varargs->push_back(std::move(regs[new_base + i]));
+        bool is_class = regs[base + B].isClass();
+        if (is_class) {
+            uint32_t ctor_addr;
+            int ctor_new_base;
+            {
+                Value cls = regs[base + B];
+                Value inst = Value::makeMap();
+                inst.mapSet(Value(std::string("__class__")), cls);
+                ctor_new_base = base + A;
+                int argc = C;
+                Value init_fn = protoChainGet(cls, Value(std::string("init")));
+                if (!init_fn.isCallable()) {
+                    regs[ctor_new_base] = std::move(inst);
+                    goto call_dyn_done;
+                }
+                uint8_t fi;
+                std::vector<Upvalue*> frame_upvals;
+                if (init_fn.isFuncVal()) {
+                    fi = (uint8_t)init_fn.asInt();
+                } else if (init_fn.isClosure()) {
+                    fi = init_fn.asClosure()->func_idx;
+                    frame_upvals = init_fn.asClosure()->upvals;
+                } else {
+                    regs[ctor_new_base] = std::move(inst);
+                    goto call_dyn_done;
+                }
+                const FuncProto& fp = ch->funcs[fi];
+                int total = argc + 1;
+                size_t needed = (size_t)(ctor_new_base + std::max((int)fp.reg_count, total));
+                if (regs.size() < needed) regs.resize(needed);
+                for (int i = argc - 1; i >= 0; --i)
+                    regs[ctor_new_base + 1 + i] = std::move(regs[ctor_new_base + i]);
+                regs[ctor_new_base + 0] = inst;
+                if (total < fp.n_fixed) {
+                    auto& defs = ch->func_defaults[fp.defaults_idx];
+                    for (int i = total; i < fp.n_fixed; ++i)
+                        regs[ctor_new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+                }
+                size_t full_needed = (size_t)(ctor_new_base + fp.reg_count);
+                if (regs.size() < full_needed) regs.resize(full_needed);
+                ctor_addr = fp.addr;
+                call_stack.push_back({ip, ctor_new_base, {}, std::move(frame_upvals), {}, inst});
             }
-            size_t full_needed = (size_t)(new_base + fp_reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
-            call_stack.push_back({ip, new_base, std::move(varargs),
-                                  std::move(frame_upvals), {}});
+            ip = ctor_addr;
+            NEXT();
         }
     }
-    ip = fp_addr;
+    {
+        uint32_t fp_addr;
+        {
+            Value fv = regs[base + B];
+            uint8_t fi;
+            if (fv.isFuncVal()) {
+                fi = (uint8_t)fv.asInt();
+            } else if (fv.isClosure()) {
+                fi = fv.asClosure()->func_idx;
+            } else {
+                throw std::runtime_error("runtime: call on non-function value");
+            }
+            const FuncProto& fp = ch->funcs[fi];
+            fp_addr = fp.addr;
+            int new_base = base + A;
+            int argc = C;
+            size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
+            if (regs.size() < needed) regs.resize(needed);
+            if (argc < fp.n_fixed) {
+                auto& defs = ch->func_defaults[fp.defaults_idx];
+                for (int i = argc; i < fp.n_fixed; ++i)
+                    regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+            }
+            {
+                std::vector<Upvalue*> frame_upvals;
+                if (fv.isClosure()) frame_upvals = fv.asClosure()->upvals;
+                std::unique_ptr<std::vector<Value>> varargs;
+                if (fp.variadic && argc > fp.n_fixed) {
+                    varargs = std::make_unique<std::vector<Value>>();
+                    for (int i = fp.n_fixed; i < argc; ++i)
+                        varargs->push_back(std::move(regs[new_base + i]));
+                }
+                size_t full_needed = (size_t)(new_base + fp.reg_count);
+                if (regs.size() < full_needed) regs.resize(full_needed);
+                call_stack.push_back({ip, new_base, std::move(varargs),
+                                      std::move(frame_upvals), {}, {}});
+            }
+        }
+        ip = fp_addr;
+    }
+    call_dyn_done:
     NEXT();
 }
 
@@ -617,6 +960,61 @@ op_SET_UPVAL: {
     NEXT();
 }
 
+op_NEW_CLASS:
+    regs[base + A] = Value::makeClass();
+    NEXT();
+
+op_CALL_METHOD: {
+    // A=call_base, C=argc
+    // Layout: R[A]=receiver, R[A+1]=method_fn, R[A+2..A+1+argc]=args
+    // If receiver is a class instance (has __class__), call with self prepended.
+    // Otherwise (plain map/module), call without self — receiver is discarded.
+    uint32_t method_addr;
+    {
+        int cb = base + A;
+        int argc = C;
+        bool is_instance = (regs[cb].isMap() || regs[cb].isClass()) &&
+                           !regs[cb].mapGet(Value(std::string("__class__"))).isNil();
+        Value fn = regs[cb + 1];  // save before shifting
+        int total;
+        if (is_instance) {
+            // self stays at cb+0, shift args to cb+1..cb+argc
+            for (int i = 0; i < argc; ++i)
+                regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);
+            total = argc + 1;
+        } else {
+            // Plain map: shift args to cb+0..cb+argc-1, no self
+            for (int i = 0; i < argc; ++i)
+                regs[cb + i] = std::move(regs[cb + 2 + i]);
+            total = argc;
+        }
+        uint8_t fi;
+        std::vector<Upvalue*> frame_upvals;
+        if (fn.isFuncVal()) {
+            fi = (uint8_t)fn.asInt();
+        } else if (fn.isClosure()) {
+            fi = fn.asClosure()->func_idx;
+            frame_upvals = fn.asClosure()->upvals;
+        } else {
+            throw std::runtime_error("runtime: method call on non-function value");
+        }
+        const FuncProto& fp = ch->funcs[fi];
+        method_addr = fp.addr;
+        size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
+        if (regs.size() < needed) regs.resize(needed);
+        if (total < fp.n_fixed) {
+            auto& defs = ch->func_defaults[fp.defaults_idx];
+            for (int i = total; i < fp.n_fixed; ++i)
+                regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+        }
+        size_t full_needed = (size_t)(cb + fp.reg_count);
+        if (regs.size() < full_needed) regs.resize(full_needed);
+        call_stack.push_back({ip, cb, {}, std::move(frame_upvals), {}, {}});
+    }
+    ip = method_addr;
+    NEXT();
+}
+
 op_HALT:
     return;
 
@@ -641,21 +1039,78 @@ op_HALT:
                 throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
             regs[base+A] = globals[Bx]; break;
         case Op::STORE_GLOBAL: globals[Bx] = regs[base+A]; globals_init[Bx] = true; break;
-        case Op::ADD: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
-            if(bv.isString()&&cv.isString()) regs[base+A]=Value(bv.asString()+cv.asString());
-            else regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()+cv.asInt()):Value(asDouble(bv)+asDouble(cv)); break; }
-        case Op::SUB: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
-            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()-cv.asInt()):Value(asDouble(bv)-asDouble(cv)); break; }
-        case Op::MUL: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
-            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()*cv.asInt()):Value(asDouble(bv)*asDouble(cv)); break; }
-        case Op::DIV: { double dv=asDouble(regs[base+C]); if(dv==0.0)throw std::runtime_error("runtime: division by zero");
-            regs[base+A]=Value(asDouble(regs[base+B])/dv); break; }
-        case Op::MOD: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
+        case Op::ADD: {
+            if(regs[base+B].isString()&&regs[base+C].isString()){regs[base+A]=Value(regs[base+B].asString()+regs[base+C].asString());break;}
+            if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+                Value lhs=regs[base+B],rhs=regs[base+C];
+                Value cls=lhs.mapGet(Value(std::string("__class__")));
+                Value fn=protoChainGet(cls,Value(std::string("__add")));
+                if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                    if(fn.isFuncVal())fi=(uint8_t)fn.asInt();
+                    else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                    const FuncProto&fp=ch->funcs[fi];int nb=(int)regs.size();
+                    regs.resize(nb+std::max((int)fp.reg_count,2));
+                    regs[nb]=std::move(lhs);regs[nb+1]=std::move(rhs);
+                    call_stack.push_back({ip,nb,{},std::move(fuv),{},{},base+A});ip=fp.addr;break;}}
+            {const Value&bv=regs[base+B];const Value&cv=regs[base+C];
+            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()+cv.asInt()):Value(asDouble(bv)+asDouble(cv));} break; }
+        case Op::SUB: {
+            if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+                Value lhs=regs[base+B],rhs=regs[base+C];int mdest=base+A;
+                Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__sub")));
+                if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                    if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                    const FuncProto&fp=ch->funcs[fi];int nb=(int)regs.size();
+                    regs.resize(nb+std::max((int)fp.reg_count,2));regs[nb]=std::move(lhs);regs[nb+1]=std::move(rhs);
+                    call_stack.push_back({ip,nb,{},std::move(fuv),{},{},mdest});ip=fp.addr;break;}}
+            {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()-cv.asInt()):Value(asDouble(bv)-asDouble(cv));} break; }
+        case Op::MUL: {
+            if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+                Value lhs=regs[base+B],rhs=regs[base+C];int mdest=base+A;
+                Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__mul")));
+                if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                    if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                    const FuncProto&fp=ch->funcs[fi];int nb=(int)regs.size();
+                    regs.resize(nb+std::max((int)fp.reg_count,2));regs[nb]=std::move(lhs);regs[nb+1]=std::move(rhs);
+                    call_stack.push_back({ip,nb,{},std::move(fuv),{},{},mdest});ip=fp.addr;break;}}
+            {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
+            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()*cv.asInt()):Value(asDouble(bv)*asDouble(cv));} break; }
+        case Op::DIV: {
+            if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+                Value lhs=regs[base+B],rhs=regs[base+C];int mdest=base+A;
+                Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__div")));
+                if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                    if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                    const FuncProto&fp=ch->funcs[fi];int nb=(int)regs.size();
+                    regs.resize(nb+std::max((int)fp.reg_count,2));regs[nb]=std::move(lhs);regs[nb+1]=std::move(rhs);
+                    call_stack.push_back({ip,nb,{},std::move(fuv),{},{},mdest});ip=fp.addr;break;}}
+            {double dv=asDouble(regs[base+C]);if(dv==0.0)throw std::runtime_error("runtime: division by zero");
+            regs[base+A]=Value(asDouble(regs[base+B])/dv);} break; }
+        case Op::MOD: {
+            if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+                Value lhs=regs[base+B],rhs=regs[base+C];int mdest=base+A;
+                Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__mod")));
+                if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                    if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                    const FuncProto&fp=ch->funcs[fi];int nb=(int)regs.size();
+                    regs.resize(nb+std::max((int)fp.reg_count,2));regs[nb]=std::move(lhs);regs[nb+1]=std::move(rhs);
+                    call_stack.push_back({ip,nb,{},std::move(fuv),{},{},mdest});ip=fp.addr;break;}}
+            {const Value& bv=regs[base+B];const Value& cv=regs[base+C];
             if(bv.isInteger()&&cv.isInteger()){if(cv.asInt()==0)throw std::runtime_error("runtime: modulo by zero");
             regs[base+A]=Value(bv.asInt()%cv.asInt());}else{double dv=asDouble(cv);
-            if(dv==0.0)throw std::runtime_error("runtime: modulo by zero");regs[base+A]=Value(std::fmod(asDouble(bv),dv));} break; }
-        case Op::NEGATE: { const Value& bv=regs[base+B];
-            regs[base+A]=bv.isInteger()?Value(-bv.asInt()):Value(-asDouble(bv)); break; }
+            if(dv==0.0)throw std::runtime_error("runtime: modulo by zero");regs[base+A]=Value(std::fmod(asDouble(bv),dv));}} break; }
+        case Op::NEGATE: {
+            if((regs[base+B].isMap()||regs[base+B].isClass())&&!regs[base+B].mapGet(Value(std::string("__class__"))).isNil()){
+                Value lhs=regs[base+B];int mdest=base+A;
+                Value fn=protoChainGet(lhs.mapGet(Value(std::string("__class__"))),Value(std::string("__neg")));
+                if(fn.isCallable()){uint8_t fi;std::vector<Upvalue*>fuv;
+                    if(fn.isFuncVal())fi=(uint8_t)fn.asInt();else{fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+                    const FuncProto&fp=ch->funcs[fi];int nb=(int)regs.size();
+                    regs.resize(nb+std::max((int)fp.reg_count,1));regs[nb]=std::move(lhs);
+                    call_stack.push_back({ip,nb,{},std::move(fuv),{},{},mdest});ip=fp.addr;break;}}
+            {const Value& bv=regs[base+B];
+            regs[base+A]=bv.isInteger()?Value(-bv.asInt()):Value(-asDouble(bv));} break; }
         case Op::NOT:  regs[base+A]=Value((int64_t)(isFalsy(regs[base+B])?1:0)); break;
         case Op::AND:  regs[base+A]=Value((int64_t)(!isFalsy(regs[base+B])&&!isFalsy(regs[base+C])?1:0)); break;
         case Op::OR:   regs[base+A]=Value((int64_t)(!isFalsy(regs[base+B])||!isFalsy(regs[base+C])?1:0)); break;
@@ -701,8 +1156,13 @@ op_HALT:
             call_stack.push_back({ip,new_base,std::move(varargs),{},{}}); ip=fp.addr; break; }
         case Op::RETURN: {
             for(auto* uv:call_stack.back().open_upvals){if(!uv->closed){uv->val=regs[uv->frame_base+uv->reg_idx];uv->closed=true;}if(--uv->refcount==0)delete uv;}
+            Value ctor=std::move(call_stack.back().ctor_result);
+            int ret_dest=call_stack.back().return_dest;
             int n=B; if(n>0&&A!=0)for(int i=0;i<n;++i)regs[base+i]=std::move(regs[base+A+i]);
-            uint32_t rip=call_stack.back().return_ip; call_stack.pop_back(); ip=rip; break; }
+            uint32_t rip=call_stack.back().return_ip; call_stack.pop_back();
+            if(!ctor.isNil())regs[base+0]=std::move(ctor);
+            if(ret_dest>=0)regs[ret_dest]=regs[base+0];
+            ip=rip; break; }
         case Op::LOAD_VARARGS: {
             auto& va=call_stack.back().varargs; int count=B;
             if(va){int n=(count==0)?(int)va->size():std::min(count,(int)va->size());
@@ -733,8 +1193,8 @@ op_HALT:
         case Op::NEW_MAP: regs[base+A]=Value::makeMap(); break;
         case Op::GET_INDEX: {
             const Value& obj=regs[base+B]; const Value& key=regs[base+C];
-            if(obj.isMap()){
-                regs[base+A]=obj.mapGet(key);
+            if(obj.isMap()||obj.isClass()){
+                regs[base+A]=protoChainGet(obj,key);
             } else if(obj.isArray()){
                 if(!key.isInteger())throw std::runtime_error("runtime: array index must be integer");
                 regs[base+A]=obj.arrayGet(key.asInt());
@@ -742,7 +1202,7 @@ op_HALT:
             break; }
         case Op::SET_INDEX: {
             Value& obj=regs[base+A]; const Value& key=regs[base+B];
-            if(obj.isMap()){
+            if(obj.isMap()||obj.isClass()){
                 obj.mapSet(key,regs[base+C]);
             } else if(obj.isArray()){
                 if(!key.isInteger())throw std::runtime_error("runtime: array index must be integer");
@@ -780,6 +1240,28 @@ op_HALT:
             if(regs[base+B].isBuiltin()){
                 int nb=base+A;
                 regs[nb]=regs[base+B].asBuiltin()(&regs[nb],C); break; }
+            if(regs[base+B].isClass()){
+                Value cls=regs[base+B];
+                Value inst=Value::makeMap();
+                inst.mapSet(Value(std::string("__class__")),cls);
+                int new_base=base+A; int argc=C;
+                Value init_fn=protoChainGet(cls,Value(std::string("init")));
+                if(!init_fn.isCallable()){regs[new_base]=std::move(inst);break;}
+                uint8_t fi; std::vector<Upvalue*> fuv;
+                if(init_fn.isFuncVal()){fi=(uint8_t)init_fn.asInt();}
+                else if(init_fn.isClosure()){fi=init_fn.asClosure()->func_idx;fuv=init_fn.asClosure()->upvals;}
+                else{regs[new_base]=std::move(inst);break;}
+                const FuncProto& fp=ch->funcs[fi];
+                int total=argc+1;
+                size_t needed=(size_t)(new_base+std::max((int)fp.reg_count,total));
+                if(regs.size()<needed)regs.resize(needed);
+                for(int i=argc-1;i>=0;--i)regs[new_base+1+i]=std::move(regs[new_base+i]);
+                regs[new_base+0]=inst;
+                if(total<fp.n_fixed){auto& defs=ch->func_defaults[fp.defaults_idx];
+                for(int i=total;i<fp.n_fixed;++i)regs[new_base+i]=(i<(int)defs.size())?defs[i]:Value{};}
+                size_t full_needed=(size_t)(new_base+fp.reg_count);
+                if(regs.size()<full_needed)regs.resize(full_needed);
+                call_stack.push_back({ip,new_base,{},std::move(fuv),{},inst}); ip=fp.addr; break; }
             const Value& fv=regs[base+B];
             uint8_t fi; std::vector<Upvalue*> fuv;
             if(fv.isFuncVal()){fi=(uint8_t)fv.asInt();}
@@ -796,7 +1278,7 @@ op_HALT:
             for(int i=fp.n_fixed;i<argc;++i)varargs->push_back(std::move(regs[new_base+i]));}
             size_t full_needed=(size_t)(new_base+fp.reg_count);
             if(regs.size()<full_needed)regs.resize(full_needed);
-            call_stack.push_back({ip,new_base,std::move(varargs),std::move(fuv),{}}); ip=fp.addr; break; }
+            call_stack.push_back({ip,new_base,std::move(varargs),std::move(fuv),{},{}}); ip=fp.addr; break; }
         case Op::MAKE_CLOSURE: {
             uint8_t fi=(uint8_t)Bx; auto* cl=new Closure(fi);
             for(auto& desc:ch->funcs[fi].upvals){
@@ -811,6 +1293,32 @@ op_HALT:
             regs[base+A]=uv->closed?uv->val:regs[uv->frame_base+uv->reg_idx]; break; }
         case Op::SET_UPVAL: { Upvalue* uv=call_stack.back().upvals[B];
             if(uv->closed)uv->val=regs[base+A];else regs[uv->frame_base+uv->reg_idx]=regs[base+A]; break; }
+        case Op::NEW_CLASS: regs[base+A]=Value::makeClass(); break;
+        case Op::CALL_METHOD: {
+            int cb=base+A; int argc=C;
+            bool is_instance=(regs[cb].isMap()||regs[cb].isClass())&&
+                             !regs[cb].mapGet(Value(std::string("__class__"))).isNil();
+            Value fn=regs[cb+1];
+            int total;
+            if(is_instance){
+                for(int i=0;i<argc;++i) regs[cb+1+i]=std::move(regs[cb+2+i]);
+                total=argc+1;
+            } else {
+                for(int i=0;i<argc;++i) regs[cb+i]=std::move(regs[cb+2+i]);
+                total=argc;
+            }
+            uint8_t fi; std::vector<Upvalue*> fuv;
+            if(fn.isFuncVal()){fi=(uint8_t)fn.asInt();}
+            else if(fn.isClosure()){fi=fn.asClosure()->func_idx;fuv=fn.asClosure()->upvals;}
+            else throw std::runtime_error("runtime: method call on non-function value");
+            const FuncProto& fp=ch->funcs[fi];
+            size_t needed=(size_t)(cb+std::max((int)fp.reg_count,total));
+            if(regs.size()<needed)regs.resize(needed);
+            if(total<fp.n_fixed){auto& defs=ch->func_defaults[fp.defaults_idx];
+            for(int i=total;i<fp.n_fixed;++i)regs[cb+i]=(i<(int)defs.size())?defs[i]:Value{};}
+            size_t full_needed=(size_t)(cb+fp.reg_count);
+            if(regs.size()<full_needed)regs.resize(full_needed);
+            call_stack.push_back({ip,cb,{},std::move(fuv),{},{}}); ip=fp.addr; break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }

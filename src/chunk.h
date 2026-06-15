@@ -44,6 +44,7 @@ struct Value {
     static constexpr uint8_t T_FUNCTION = 7;
     static constexpr uint8_t T_CLOSURE  = 8;
     static constexpr uint8_t T_BUILTIN  = 9;
+    static constexpr uint8_t T_CLASS    = 10;  // prototype de classe (Map* réutilisé)
 
 private:
     explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
@@ -74,7 +75,8 @@ public:
     bool isFuncVal()  const { return tag == T_FUNCTION; }
     bool isClosure()  const { return tag == T_CLOSURE; }
     bool isBuiltin()  const { return tag == T_BUILTIN; }
-    bool isCallable() const { return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN; }
+    bool isClass()    const { return tag == T_CLASS; }
+    bool isCallable() const { return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS; }
 
     Closure* asClosure() const { return cptr; }
     Map*     asMap()     const { return mptr; }
@@ -85,6 +87,7 @@ public:
     static Value makeFunc(uint8_t idx) { Value v; v.tag = T_FUNCTION; v.ival = idx; return v; }
     static Value makeClosure(Closure* p) { return Value(p); }
     static Value makeBuiltin(BuiltinFn fn) { Value v; v.tag = T_BUILTIN; v.ival = (int64_t)(intptr_t)fn; return v; }
+    static Value makeClass();
 
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
@@ -120,6 +123,7 @@ public:
 
 inline Value Value::makeMap()   { return Value(map_pool().acquire()); }
 inline Value Value::makeArray() { return Value(array_pool().acquire()); }
+inline Value Value::makeClass() { Value v; v.tag = T_CLASS; v.mptr = map_pool().acquire(); return v; }
 
 inline Value Value::mapGet(const Value& k)                  const { return mptr->get(k); }
 inline void  Value::mapSet(const Value& k, const Value& v)        { mptr->set(k, v); }
@@ -130,7 +134,7 @@ inline void  Value::arrayPush(const Value& v)                    { aptr->push(v)
 inline int   Value::arraySize()                            const { return (int)aptr->items.size(); }
 
 inline Value Value::makeIterFrom(const Value& src) {
-    if (src.isMap())   return Value(new MapIterator(src.mptr));
+    if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
     if (src.isArray()) return Value(new ArrayIterator(src.aptr));
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
@@ -142,6 +146,7 @@ inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
         case T_FLOAT:    dval = o.dval; break;
         case T_STRING:   sptr = o.sptr; string_table().retain(sptr); break;
         case T_MAP:      mptr = o.mptr; mptr->refcount++; break;
+        case T_CLASS:    mptr = o.mptr; mptr->refcount++; break;
         case T_ARRAY:    aptr = o.aptr; aptr->refcount++; break;
         case T_ITERATOR: iptr = o.iptr; iptr->refcount++; break;
         case T_FUNCTION: ival = o.ival; break;
@@ -155,6 +160,7 @@ inline Value& Value::operator=(const Value& o) {
     switch (o.tag) {
         case T_STRING:   string_table().retain(o.sptr); break;
         case T_MAP:      o.mptr->refcount++;             break;
+        case T_CLASS:    o.mptr->refcount++;             break;
         case T_ARRAY:    o.aptr->refcount++;             break;
         case T_ITERATOR: o.iptr->refcount++;             break;
         case T_CLOSURE:  o.cptr->refcount++;             break;
@@ -164,6 +170,7 @@ inline Value& Value::operator=(const Value& o) {
     switch (tag) {
         case T_STRING:   string_table().release(sptr); break;
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
@@ -176,6 +183,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_FLOAT:    dval = o.dval; break;
         case T_STRING:   sptr = o.sptr; break;
         case T_MAP:      mptr = o.mptr; break;
+        case T_CLASS:    mptr = o.mptr; break;
         case T_ARRAY:    aptr = o.aptr; break;
         case T_ITERATOR: iptr = o.iptr; break;
         case T_FUNCTION: ival = o.ival; break;
@@ -190,6 +198,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
     switch (tag) {
         case T_STRING:   string_table().release(sptr); break;
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
@@ -202,6 +211,7 @@ inline Value::~Value() {
     switch (tag) {
         case T_STRING:   string_table().release(sptr); break;
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
@@ -278,6 +288,8 @@ enum class Op : uint8_t {
     MAKE_CLOSURE,   // ABx: A=dest, Bx=func_idx → create closure, capture upvals from current frame
     GET_UPVAL,      // AB:  A=dest, B=upval_idx → R[A] = upval[B]
     SET_UPVAL,      // AB:  A=src,  B=upval_idx → upval[B] = R[A]
+    NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
+    CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     HALT,
 };
 

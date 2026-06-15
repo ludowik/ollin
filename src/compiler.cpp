@@ -1056,3 +1056,194 @@ void Compiler::visit(const IndexAssignStmt& s) {
 void Compiler::visit(const BlockStmt& s) {
     for (auto& stmt : s.stmts) stmt->accept(*this);
 }
+
+// ── compileMethodFunc : compile une méthode avec 'self' implicite en R[0] ──────
+uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
+    auto outer_regs   = std::move(local_regs_);
+    auto outer_upvals = std::move(cur_upval_idx_);
+    int  outer_top    = reg_top_;
+    int  outer_count  = reg_count_;
+    int  outer_locals = locals_top_;
+    auto outer_name   = current_func_name;
+    int  outer_fidx   = current_func_idx_;
+
+    outer_scopes_.push_back({outer_regs, outer_upvals, outer_fidx});
+
+    current_func_name = s.name;
+    cur_upval_idx_.clear();
+    local_regs_.clear();
+    reg_top_ = 0;
+    reg_count_ = 0;
+    locals_top_ = 0;
+
+    // 'self' en R[0], puis les paramètres déclarés en R[1..n]
+    local_regs_["self"] = 0;
+    int n_params = (int)s.params.size();
+    for (int i = 0; i < n_params; ++i)
+        local_regs_[s.params[i]] = i + 1;
+    int n_fixed = 1 + n_params;
+    reg_top_ = n_fixed;
+
+    std::vector<std::string> body_locals;
+    collectLocals(s.body, body_locals);
+    for (auto& name : body_locals)
+        if (!local_regs_.count(name))
+            local_regs_[name] = reg_top_++;
+    locals_top_ = reg_top_;
+    reg_count_  = reg_top_;
+
+    size_t jump_patch = chunk.emitJump(Op::JUMP);
+    uint32_t func_addr = (uint32_t)chunk.currentPos();
+
+    // defaults : index 0 = self (pas de défaut), puis les params
+    std::vector<Value> defs(n_fixed);
+    for (int i = 0; i < n_params; ++i)
+        defs[i+1] = (i < (int)s.defaults.size() && s.defaults[i])
+                    ? evalConstant(*s.defaults[i]) : Value{};
+    uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
+
+    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0, {}};
+    uint8_t func_idx = chunk.addFunc(fp);
+    current_func_idx_ = func_idx;
+
+    for (auto& stmt : s.body) {
+        int sv = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = sv;
+    }
+    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
+
+    chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
+    chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
+
+    outer_scopes_.pop_back();
+    local_regs_       = std::move(outer_regs);
+    cur_upval_idx_    = std::move(outer_upvals);
+    reg_top_          = outer_top;
+    reg_count_        = outer_count;
+    locals_top_       = outer_locals;
+    current_func_name = outer_name;
+    current_func_idx_ = outer_fidx;
+
+    return func_idx;
+}
+
+// ── visit(ClassDeclStmt) ──────────────────────────────────────────────────────
+void Compiler::visit(const ClassDeclStmt& s) {
+    int saved = reg_top_;
+
+    // Créer la valeur classe (T_CLASS = map vide)
+    int dest = reg_top_++;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    chunk.emit(makeABC((uint8_t)Op::NEW_CLASS, (uint8_t)dest, 0, 0));
+
+    // Stocker le nom de la classe comme __name__ (utile pour print/debug)
+    {
+        int key_r = reg_top_++, val_r = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(std::string("__name__")))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)val_r,
+                           chunk.addConstant(Value(s.name))));
+        chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
+        reg_top_ = dest + 1;
+    }
+
+    // Héritage : stocker la classe parente comme __parent__
+    if (!s.parent.empty()) {
+        int par_r = reg_top_++, key_r = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)par_r,
+                           chunk.addIdentifier(s.parent)));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(std::string("__parent__")))));
+        chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)par_r));
+        reg_top_ = dest + 1;
+    }
+
+    // Compiler chaque méthode et la stocker dans la map classe
+    for (auto& method : s.methods) {
+        uint8_t func_idx = compileMethodFunc(*method);
+        bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
+
+        int func_r = reg_top_++, key_r = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (has_upvals)
+            chunk.emit(makeABx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)func_r, func_idx));
+        else
+            chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)func_r, func_idx));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(method->name))));
+        chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)func_r));
+        reg_top_ = dest + 1;
+    }
+
+    // Stocker la classe comme global
+    chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest,
+                       chunk.addIdentifier(s.name)));
+
+    reg_top_ = saved;
+}
+
+// ── visit(MethodCallExpr) ─────────────────────────────────────────────────────
+// Layout : R[call_base+0]=self, R[call_base+1]=méthode, R[call_base+2..]=args
+// CALL_METHOD décale les args de 1 vers le bas (overwrite méthode) avant l'appel.
+void Compiler::visit(const MethodCallExpr& e) {
+    int call_base = reg_top_;
+    int argc = (int)e.args.size();
+
+    if (e.is_super) {
+        // self est en local_regs_["self"] — copier en call_base
+        int self_src = local_regs_.at("self");
+        reg_top_ = call_base + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)self_src, 0));
+
+        // Temporaires pour remonter la chaîne : tmp=class_chain, key_r=clé
+        int tmp = reg_top_++, key_r = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+        // tmp = self.__class__
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(std::string("__class__")))));
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)tmp, (uint8_t)call_base, (uint8_t)key_r));
+        // tmp = tmp.__parent__
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(std::string("__parent__")))));
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)tmp, (uint8_t)tmp, (uint8_t)key_r));
+        // R[call_base+1] = tmp.<method>
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(std::string(e.method)))));
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base+1), (uint8_t)tmp, (uint8_t)key_r));
+        reg_top_ = call_base + 2;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    } else {
+        // R[call_base] = receiver (self)
+        compileInto(*e.receiver, call_base);
+        reg_top_ = call_base + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+        // R[call_base+1] = GET_INDEX(receiver, method_name)
+        int key_r = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
+                           chunk.addConstant(Value(std::string(e.method)))));
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base+1), (uint8_t)call_base, (uint8_t)key_r));
+        reg_top_ = call_base + 2;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    }
+
+    // R[call_base+2..argc+1] = args
+    for (int i = 0; i < argc; ++i) {
+        int target = call_base + 2 + i;
+        reg_top_ = target;
+        e.args[i]->accept(*this);
+        if (last_reg_ != target)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
+        reg_top_ = target + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    }
+
+    chunk.emit(makeABC((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
+    last_reg_ = call_base;
+}
