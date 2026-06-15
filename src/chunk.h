@@ -14,6 +14,8 @@
 //   String  : tag == T_STRING   → const std::string*  (internée, non-owning)
 //   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
 //   Array   : tag == T_ARRAY    → Array*   (heap, ref-counted, 1-based)
+//   Iterator: tag == T_ITERATOR → Iterator* (heap, ref-counted)
+//   Function: tag == T_FUNCTION → func_idx (int64_t ival, index dans chunk.funcs)
 
 struct Map;
 struct Array;
@@ -37,6 +39,7 @@ struct Value {
     static constexpr uint8_t T_MAP      = 4;
     static constexpr uint8_t T_ARRAY    = 5;
     static constexpr uint8_t T_ITERATOR = 6;
+    static constexpr uint8_t T_FUNCTION = 7;
 
 private:
     explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
@@ -63,6 +66,9 @@ public:
     bool isMap()      const { return tag == T_MAP; }
     bool isArray()    const { return tag == T_ARRAY; }
     bool isIterator() const { return tag == T_ITERATOR; }
+    bool isFuncVal()  const { return tag == T_FUNCTION; }
+
+    static Value makeFunc(uint8_t idx) { Value v; v.tag = T_FUNCTION; v.ival = idx; return v; }
 
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
@@ -119,6 +125,7 @@ inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
         case T_MAP:      mptr = o.mptr; mptr->refcount++; break;
         case T_ARRAY:    aptr = o.aptr; aptr->refcount++; break;
         case T_ITERATOR: iptr = o.iptr; iptr->refcount++; break;
+        case T_FUNCTION: ival = o.ival; break;
     }
 }
 inline Value& Value::operator=(const Value& o) {
@@ -148,6 +155,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_MAP:      mptr = o.mptr; break;
         case T_ARRAY:    aptr = o.aptr; break;
         case T_ITERATOR: iptr = o.iptr; break;
+        case T_FUNCTION: ival = o.ival; break;
     }
     return *this;
 }
@@ -242,6 +250,8 @@ enum class Op : uint8_t {
     NEW_ARRAY,      // A: R[A] = []
     ARRAY_PUSH,     // AB: R[A].push(R[B])
     FOR_ITER_NEXT,  // ABx: R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→ip=Bx
+    LOAD_FUNC,      // ABx: R[A] = func_value(Bx)
+    CALL_DYN,       // ABC: A=arg_base, B=func_val_reg, C=argc
     HALT,
 };
 

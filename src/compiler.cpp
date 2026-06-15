@@ -721,6 +721,14 @@ void Compiler::visit(const NilExpr&) {
 }
 
 void Compiler::visit(const VarExpr& e) {
+    // Référence à une fonction → charge une valeur T_FUNCTION
+    auto fit = func_table.find(e.name);
+    if (fit != func_table.end()) {
+        last_reg_ = allocReg();
+        chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)last_reg_,
+                           fit->second.func_idx));
+        return;
+    }
     if (inFunction()) {
         auto it = local_regs_.find(e.name);
         if (it != local_regs_.end()) {
@@ -832,7 +840,25 @@ void Compiler::visit(const CallExpr& e) {
         reg_top_ = call_base + 1;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     } else {
-        throw std::runtime_error("unknown function: " + e.callee);
+        // Appel dynamique : e.callee est une variable contenant une T_FUNCTION
+        int func_reg = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (inFunction()) {
+            auto rit = local_regs_.find(e.callee);
+            if (rit != local_regs_.end()) {
+                func_reg = rit->second;
+                reg_top_--;
+            } else {
+                chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
+                                   chunk.addIdentifier(e.callee)));
+            }
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
+                               chunk.addIdentifier(e.callee)));
+        }
+        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
+                           (uint8_t)func_reg, (uint8_t)argc));
+        last_reg_ = call_base;
     }
 }
 

@@ -125,6 +125,8 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | BLSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] << (R[C] & 63)  (entiers)           |
 | BRSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] >> (R[C] & 63)  (entiers)           |
 | FOR_ITER_NEXT | ABx    | A=block_base, Bx=end_addr  | R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→Bx |
+| LOAD_FUNC     | ABx    | A=dest, Bx=func_idx        | R[A] = T_FUNCTION (référence à funcs[Bx])        |
+| CALL_DYN      | ABC    | A=arg_base, B=func_reg, C=argc | appel via valeur T_FUNCTION dans R[B]        |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -202,4 +204,5 @@ Struct taguée (16 octets) — remplace le NaN-boxing :
 | T_MAP      | 4               | mptr (Map*) | —               |
 | T_ARRAY    | 5               | aptr (Array*) | —             |
 | T_ITERATOR | 6               | iptr (Iterator*) | —          |
+| T_FUNCTION | 7               | ival (int64_t, = func_idx) | index dans chunk.funcs |
 

@@ -11,6 +11,7 @@ static std::string valueToString(const Value& v) {
     if (v.isMap())      return "{map}";
     if (v.isArray())    return "{array}";
     if (v.isIterator()) return "{iterator}";
+    if (v.isFuncVal())  return "{function}";
     if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
     double d = v.asFloat();
@@ -86,6 +87,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_BNOT,
         &&op_BLSHIFT, &&op_BRSHIFT,
         &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_NEXT,
+        &&op_LOAD_FUNC, &&op_CALL_DYN,
         &&op_HALT,
     };
 
@@ -448,6 +450,38 @@ op_FOR_ITER_NEXT: {
     NEXT();
 }
 
+op_LOAD_FUNC:
+    regs[base + A] = Value::makeFunc((uint8_t)Bx);
+    NEXT();
+
+op_CALL_DYN: {
+    // A=arg_base, B=func_val_reg, C=argc
+    const Value& fv = regs[base + B];
+    if (!fv.isFuncVal())
+        throw std::runtime_error("runtime: call on non-function value");
+    const FuncProto& fp = ch->funcs[(uint8_t)fv.asInt()];
+    int new_base = base + A;
+    int argc = C;
+    size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
+    if (regs.size() < needed) regs.resize(needed);
+    if (argc < fp.n_fixed) {
+        auto& defs = ch->func_defaults[fp.defaults_idx];
+        for (int i = argc; i < fp.n_fixed; ++i)
+            regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+    }
+    std::unique_ptr<std::vector<Value>> varargs;
+    if (fp.variadic && argc > fp.n_fixed) {
+        varargs = std::make_unique<std::vector<Value>>();
+        for (int i = fp.n_fixed; i < argc; ++i)
+            varargs->push_back(std::move(regs[new_base + i]));
+    }
+    size_t full_needed = (size_t)(new_base + fp.reg_count);
+    if (regs.size() < full_needed) regs.resize(full_needed);
+    call_stack.push_back({ip, new_base, std::move(varargs)});
+    ip = fp.addr;
+    NEXT();
+}
+
 op_HALT:
     return;
 
@@ -615,6 +649,28 @@ op_HALT:
             if (!regs[base+A].iptr->next(key, val)) { ip=Bx; break; }
             regs[base+A+1] = std::move(key);
             regs[base+A+2] = std::move(val); break; }
+        case Op::LOAD_FUNC:
+            regs[base+A] = Value::makeFunc((uint8_t)Bx); break;
+        case Op::CALL_DYN: {
+            const Value& fv = regs[base+B];
+            if (!fv.isFuncVal()) throw std::runtime_error("runtime: call on non-function value");
+            const FuncProto& fp = ch->funcs[(uint8_t)fv.asInt()];
+            int new_base = base+A; int argc = C;
+            size_t needed = (size_t)(new_base+std::max((int)fp.reg_count,argc));
+            if (regs.size()<needed) regs.resize(needed);
+            if (argc<fp.n_fixed) {
+                auto& defs=ch->func_defaults[fp.defaults_idx];
+                for(int i=argc;i<fp.n_fixed;++i) regs[new_base+i]=(i<(int)defs.size())?defs[i]:Value{};
+            }
+            std::unique_ptr<std::vector<Value>> varargs;
+            if(fp.variadic&&argc>fp.n_fixed){
+                varargs=std::make_unique<std::vector<Value>>();
+                for(int i=fp.n_fixed;i<argc;++i) varargs->push_back(std::move(regs[new_base+i]));
+            }
+            size_t full_needed=(size_t)(new_base+fp.reg_count);
+            if(regs.size()<full_needed) regs.resize(full_needed);
+            call_stack.push_back({ip,new_base,std::move(varargs)});
+            ip=fp.addr; break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }
