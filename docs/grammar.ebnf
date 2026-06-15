@@ -19,6 +19,7 @@ varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "in" expr ".." expr NEWLINE { stmt } "end" NEWLINE
                | "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
+               | "for" IDENT "in" expr NEWLINE { stmt } "end" NEWLINE
                | "for" IDENT "," IDENT "in" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
@@ -55,6 +56,7 @@ primary        = NUMBER
                | IDENT { ( "[" expr "]" | "." IDENT ) }
                | call  { ( "[" expr "]" | "." IDENT ) }
                | mapLit { ( "[" expr "]" | "." IDENT ) }
+               | arrayLit { ( "[" expr "]" ) }
                | "..."
                | "(" expr ")" ;
 
@@ -62,6 +64,7 @@ mapLit         = "{" [ NEWLINE ]
                    [ mapEntry { "," [ NEWLINE ] mapEntry } [ NEWLINE ] ]
                  "}" ;
 mapEntry       = ( STRING | IDENT ) ":" expr ;
+arrayLit       = "[" [ expr { "," expr } ] "]" ;
 call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;

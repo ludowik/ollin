@@ -322,6 +322,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <a href="#strings">Chaînes</a>
   <a href="#multiline">Multi-lignes</a>
   <div class="section-label">Contrôle</div>
+
   <a href="#if">If / Else</a>
   <a href="#while">While</a>
   <a href="#for">For</a>
@@ -329,6 +330,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <a href="#functions">Fonctions</a>
   <a href="#varargs">Varargs</a>
   <a href="#defaults">Défauts</a>
+  <a href="#closures">Closures</a>
   <div class="section-label">Maps</div>
   <a href="#maps">Maps</a>
   <a href="#map-iter">Itération</a>
@@ -379,7 +381,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 <tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>).</td></tr>
 <tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Double IEEE 754.</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>UTF-8, immuable, alloué sur le tas.</td></tr>
-<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur, clés toujours des chaînes.</td></tr>
+<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident).</td></tr>
 <tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1, poolé.</td></tr>
 </table>
 
@@ -703,10 +705,69 @@ connect(<span class="str">"prod.example.com"</span>)   <span class="cmt">## prod
 connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <span class="cmt">## prod:443 debug=0</span></code></pre>
 </section>
 
+<!-- ── Closures ───────────────────────────────────────────────────────────── -->
+<section id="closures">
+<h2>Closures</h2>
+<p>Une fonction peut capturer les variables de la portée qui l'entoure (<strong>upvalues</strong>). La valeur capturée reste vivante même après le retour de la fonction externe.</p>
+
+<h3>Compteur encapsulé</h3>
+<pre><code><span class="kw">func</span> make_counter()
+    <span class="kw">var</span> n = <span class="num">0</span>
+    <span class="kw">func</span> inc()
+        n += <span class="num">1</span>
+        <span class="kw">return</span> n
+    <span class="kw">end</span>
+    <span class="kw">return</span> inc
+<span class="kw">end</span>
+
+<span class="kw">var</span> c1 = make_counter()
+<span class="kw">var</span> c2 = make_counter()   <span class="cmt">## état indépendant</span>
+
+<span class="bi">assert</span>(c1() == <span class="num">1</span>)
+<span class="bi">assert</span>(c1() == <span class="num">2</span>)
+<span class="bi">assert</span>(c2() == <span class="num">1</span>)   <span class="cmt">## c2 repart de 0</span></code></pre>
+
+<h3>Fabrique de fonctions</h3>
+<pre><code><span class="kw">func</span> make_adder(x)
+    <span class="kw">func</span> add(y)
+        <span class="kw">return</span> x + y
+    <span class="kw">end</span>
+    <span class="kw">return</span> add
+<span class="kw">end</span>
+
+<span class="kw">var</span> add5  = make_adder(<span class="num">5</span>)
+<span class="kw">var</span> add10 = make_adder(<span class="num">10</span>)
+
+<span class="bi">assert</span>(add5(<span class="num">3</span>)  == <span class="num">8</span>)
+<span class="bi">assert</span>(add10(<span class="num">3</span>) == <span class="num">13</span>)</code></pre>
+
+<h3>Fonctions imbriquées</h3>
+<p>Une fonction déclarée à l'intérieur d'une autre reste locale — elle n'est pas ajoutée à l'environnement global.</p>
+<pre><code><span class="kw">func</span> process(data)
+    <span class="kw">func</span> helper(x)   <span class="cmt">## visible uniquement dans process</span>
+        <span class="kw">return</span> x * <span class="num">2</span>
+    <span class="kw">end</span>
+    <span class="kw">return</span> helper(data) + helper(data + <span class="num">1</span>)
+<span class="kw">end</span>
+
+<span class="bi">assert</span>(process(<span class="num">3</span>) == <span class="num">14</span>)   <span class="cmt">## 3*2 + 4*2</span></code></pre>
+
+<h3>Upvalue partagé entre fonctions</h3>
+<pre><code><span class="kw">var</span> count = <span class="num">0</span>
+
+<span class="kw">func</span> inc()  count += <span class="num">1</span>  <span class="kw">end</span>
+<span class="kw">func</span> get()  <span class="kw">return</span> count  <span class="kw">end</span>
+
+inc()
+inc()
+inc()
+<span class="bi">assert</span>(get() == <span class="num">3</span>)</code></pre>
+</section>
+
 <!-- ── Maps ──────────────────────────────────────────────────────────────── -->
 <section id="maps">
 <h2>Maps</h2>
-<p>Dictionnaire clé→valeur. Les clés sont toujours des chaînes. La syntaxe s'inspire de JSON mais accepte aussi les identifiants sans guillemets.</p>
+<p>Dictionnaire clé→valeur. La syntaxe de littéral accepte des chaînes ou des identifiants ; à l'exécution, toute valeur peut servir de clé (<code>nil</code>, entier, float, string, bool, array, map, fonction…).</p>
 
 <h3>Création</h3>
 <pre><code><span class="kw">var</span> vide = {}
@@ -747,6 +808,18 @@ point.y *= <span class="num">2</span>     <span class="cmt">## compound via poin
 }
 
 <span class="bi">assert</span>(scene[<span class="str">"camera"</span>][<span class="str">"fov"</span>] == <span class="num">60</span>)</code></pre>
+
+<h3>Clés de tout type (via crochets)</h3>
+<pre><code><span class="kw">var</span> m = {}
+
+m[<span class="nil">nil</span>]   = <span class="str">"nil key"</span>
+m[<span class="num">42</span>]    = <span class="str">"int key"</span>
+m[<span class="num">3.14</span>]  = <span class="str">"float key"</span>
+m[<span class="bool">true</span>]  = <span class="str">"bool key"</span>
+
+<span class="cmt">## INTEGER(1) et FLOAT(1.0) sont la même clé</span>
+m[<span class="num">1</span>] = <span class="str">"one"</span>
+<span class="bi">assert</span>(m[<span class="num">1.0</span>] == <span class="str">"one"</span>)</code></pre>
 
 <h3>Sémantique de copie</h3>
 <div class="callout warn">Les maps sont <strong>partagées par référence</strong> (comptage de référence). Affecter une map à une autre variable ne la clone pas.</div>
