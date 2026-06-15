@@ -74,6 +74,11 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
             for (auto& n : v->names)
                 if (std::find(out.begin(), out.end(), n) == out.end())
                     out.push_back(n);
+        if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get())) {
+            if (std::find(out.begin(), out.end(), f->name) == out.end())
+                out.push_back(f->name);
+            // ne pas récurser dans le corps : portée séparée
+        }
         if (auto* f = dynamic_cast<const ForStmt*>(s.get())) {
             if (std::find(out.begin(), out.end(), f->var) == out.end())
                 out.push_back(f->var);
@@ -415,6 +420,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     int  outer_locals  = locals_top_;
     auto outer_name    = current_func_name;
     int  outer_fidx    = current_func_idx_;
+    bool is_nested     = !outer_name.empty();  // déclarée dans une autre fonction
 
     // Push outer scope for upvalue resolution
     outer_scopes_.push_back({outer_regs, outer_upvals, outer_fidx});
@@ -457,12 +463,14 @@ void Compiler::visit(const FuncDeclStmt& s) {
     uint8_t func_idx = chunk.addFunc(fp);
     current_func_idx_ = func_idx;
 
-    // Pre-mark as potential closure if the outer scope has variables.
-    // This ensures recursive self-calls inside the body use CALL_DYN (not CALL_FUNC),
-    // which correctly inherits the closure's upval array even when the upvalue access
-    // appears before the recursive call in source order.
     bool outer_has_vars = !outer_scopes_.back().regs.empty();
-    func_table[s.name] = FuncInfo{func_idx, n_fixed, s.variadic, outer_has_vars};
+
+    if (!is_nested) {
+        // Fonction top-level : pré-marque dans func_table pour optimiser les appels
+        // récursifs (CALL_DYN au lieu de CALL_FUNC quand la fonction peut être closure)
+        func_table[s.name] = FuncInfo{func_idx, n_fixed, s.variadic, outer_has_vars};
+    }
+    // Fonctions imbriquées : pas de func_table — elles vivent dans un registre local
 
     // Compile body
     for (auto& stmt : s.body) {
@@ -488,8 +496,19 @@ void Compiler::visit(const FuncDeclStmt& s) {
     current_func_name  = outer_name;
     current_func_idx_  = outer_fidx;
 
-    if (!chunk.funcs[func_idx].upvals.empty()) {
-        // True closure: emit MAKE_CLOSURE + STORE_GLOBAL
+    bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
+
+    if (is_nested) {
+        // Fonction imbriquée : stockée dans le registre local pré-alloué par collectLocals.
+        // Aucune entrée dans func_table, aucun accès aux globaux.
+        int dest = local_regs_.at(s.name);
+        if (has_upvals) {
+            chunk.emit(makeABx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)dest, func_idx));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
+        }
+    } else if (has_upvals) {
+        // Fonction top-level closure : MAKE_CLOSURE + STORE_GLOBAL
         func_table[s.name].is_closure = true;
         int tmp = reg_top_++;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
@@ -498,9 +517,9 @@ void Compiler::visit(const FuncDeclStmt& s) {
                            chunk.addIdentifier(s.name)));
         reg_top_--;
     } else if (outer_has_vars) {
-        // Potentially-closure that captured nothing: emit LOAD_FUNC + STORE_GLOBAL
-        // so that LOAD_GLOBAL works for any recursive CALL_DYN emitted in the body.
-        func_table[s.name].is_closure = false;  // not a closure for external callers
+        // Fonction top-level non-closure dans un scope avec vars : LOAD_FUNC + STORE_GLOBAL
+        // pour que les appels récursifs via LOAD_GLOBAL (pré-marquage) trouvent la valeur.
+        func_table[s.name].is_closure = false;
         int tmp = reg_top_++;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
         chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)tmp, func_idx));
@@ -790,7 +809,7 @@ void Compiler::visit(const CallExpr& e) {
         reg_top_ = call_base + 1;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     } else {
-        // Appel dynamique : e.callee est une variable contenant une T_FUNCTION
+        // Appel dynamique : variable locale, upvalue, ou globale
         int func_reg = reg_top_++;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
         {
@@ -799,8 +818,13 @@ void Compiler::visit(const CallExpr& e) {
                 func_reg = rit->second;
                 reg_top_--;
             } else {
-                chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
-                                   chunk.addIdentifier(e.callee)));
+                int uv = resolveUpvalue(e.callee);
+                if (uv >= 0) {
+                    chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)func_reg, (uint8_t)uv, 0));
+                } else {
+                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
+                                       chunk.addIdentifier(e.callee)));
+                }
             }
         }
         chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
