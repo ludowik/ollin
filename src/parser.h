@@ -38,6 +38,8 @@ private:
     std::unique_ptr<Stmt> exprStmt();
     std::unique_ptr<Stmt> forStmt();
 
+    std::unique_ptr<Expr> parsePostfix(std::unique_ptr<Expr> base);
+
     std::unique_ptr<Expr> expr();
     std::unique_ptr<Expr> logical();
     std::unique_ptr<Expr> logicalAnd();

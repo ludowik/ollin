@@ -524,6 +524,39 @@ std::unique_ptr<Expr> Parser::unary() {
     return primary();
 }
 
+std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
+    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN)) {
+        if (check(TokenType::LBRACKET)) {
+            advance();
+            auto key = expr();
+            expect(TokenType::RBRACKET);
+            auto ie = std::make_unique<IndexExpr>();
+            ie->obj = std::move(base);
+            ie->key = std::move(key);
+            base = std::move(ie);
+        } else if (check(TokenType::DOT)) {
+            advance();
+            std::string field = expect(TokenType::IDENTIFIER).lexeme;
+            auto ie = std::make_unique<IndexExpr>();
+            ie->obj = std::move(base);
+            ie->key = std::make_unique<StringExpr>(field);
+            base = std::move(ie);
+        } else { // LPAREN
+            advance();
+            auto call = std::make_unique<ExprCallExpr>();
+            call->callee = std::move(base);
+            if (!check(TokenType::RPAREN)) {
+                call->args.push_back(expr());
+                while (match(TokenType::COMMA))
+                    call->args.push_back(expr());
+            }
+            expect(TokenType::RPAREN);
+            base = std::move(call);
+        }
+    }
+    return base;
+}
+
 std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::NUMBER))
         return std::make_unique<NumberExpr>(std::stod(advance().lexeme));
@@ -542,48 +575,10 @@ std::unique_ptr<Expr> Parser::primary() {
                     call->args.push_back(expr());
             }
             expect(TokenType::RPAREN);
-            std::unique_ptr<Expr> base = std::move(call);
-            while (check(TokenType::LBRACKET) || check(TokenType::DOT)) {
-                if (check(TokenType::LBRACKET)) {
-                    advance(); // consume [
-                    auto key = expr();
-                    expect(TokenType::RBRACKET);
-                    auto ie = std::make_unique<IndexExpr>();
-                    ie->obj = std::move(base);
-                    ie->key = std::move(key);
-                    base = std::move(ie);
-                } else {
-                    advance(); // consume .
-                    std::string field = expect(TokenType::IDENTIFIER).lexeme;
-                    auto ie = std::make_unique<IndexExpr>();
-                    ie->obj = std::move(base);
-                    ie->key = std::make_unique<StringExpr>(field);
-                    base = std::move(ie);
-                }
-            }
-            return base;
+            return parsePostfix(std::move(call));
         }
-        // Plain variable — may be followed by index/dot chaining
-        std::unique_ptr<Expr> base = std::make_unique<VarExpr>(name);
-        while (check(TokenType::LBRACKET) || check(TokenType::DOT)) {
-            if (check(TokenType::LBRACKET)) {
-                advance(); // consume [
-                auto key = expr();
-                expect(TokenType::RBRACKET);
-                auto ie = std::make_unique<IndexExpr>();
-                ie->obj = std::move(base);
-                ie->key = std::move(key);
-                base = std::move(ie);
-            } else {
-                advance(); // consume .
-                std::string field = expect(TokenType::IDENTIFIER).lexeme;
-                auto ie = std::make_unique<IndexExpr>();
-                ie->obj = std::move(base);
-                ie->key = std::make_unique<StringExpr>(field);
-                base = std::move(ie);
-            }
-        }
-        return base;
+        // Plain variable — may be followed by postfix chaining
+        return parsePostfix(std::make_unique<VarExpr>(name));
     }
     if (check(TokenType::NIL))       { advance(); return std::make_unique<NilExpr>(); }
     if (check(TokenType::DOT_DOT_DOT)) { advance(); return std::make_unique<VarArgExpr>(); }
@@ -604,27 +599,7 @@ std::unique_ptr<Expr> Parser::primary() {
             skipNewlines();
         }
         expect(TokenType::RBRACE);
-        // index/dot chaining after map literal
-        std::unique_ptr<Expr> base = std::move(map);
-        while (check(TokenType::LBRACKET) || check(TokenType::DOT)) {
-            if (check(TokenType::LBRACKET)) {
-                advance();
-                auto key = expr();
-                expect(TokenType::RBRACKET);
-                auto ie = std::make_unique<IndexExpr>();
-                ie->obj = std::move(base);
-                ie->key = std::move(key);
-                base = std::move(ie);
-            } else {
-                advance(); // consume .
-                std::string field = expect(TokenType::IDENTIFIER).lexeme;
-                auto ie = std::make_unique<IndexExpr>();
-                ie->obj = std::move(base);
-                ie->key = std::make_unique<StringExpr>(field);
-                base = std::move(ie);
-            }
-        }
-        return base;
+        return parsePostfix(std::move(map));
     }
     if (check(TokenType::LBRACKET)) {
         advance(); // consume [
@@ -636,26 +611,7 @@ std::unique_ptr<Expr> Parser::primary() {
             skipNewlines();
         }
         expect(TokenType::RBRACKET);
-        std::unique_ptr<Expr> base = std::move(arr);
-        while (check(TokenType::LBRACKET) || check(TokenType::DOT)) {
-            if (check(TokenType::LBRACKET)) {
-                advance();
-                auto key = expr();
-                expect(TokenType::RBRACKET);
-                auto ie = std::make_unique<IndexExpr>();
-                ie->obj = std::move(base);
-                ie->key = std::move(key);
-                base = std::move(ie);
-            } else {
-                advance(); // consume .
-                std::string field = expect(TokenType::IDENTIFIER).lexeme;
-                auto ie = std::make_unique<IndexExpr>();
-                ie->obj = std::move(base);
-                ie->key = std::make_unique<StringExpr>(field);
-                base = std::move(ie);
-            }
-        }
-        return base;
+        return parsePostfix(std::move(arr));
     }
     if (match(TokenType::LPAREN)) {
         paren_depth_++;

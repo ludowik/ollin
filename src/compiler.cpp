@@ -862,6 +862,31 @@ void Compiler::visit(const CallExpr& e) {
     }
 }
 
+void Compiler::visit(const ExprCallExpr& e) {
+    int call_base = reg_top_;
+    int argc = (int)e.args.size();
+
+    // Compile args into consecutive registers
+    for (int i = 0; i < argc; ++i) {
+        int target = call_base + i;
+        reg_top_ = target;
+        e.args[i]->accept(*this);
+        if (last_reg_ != target)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
+        reg_top_ = target + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    }
+
+    // Compile callee into a temp register after args
+    int func_reg = reg_top_++;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    compileInto(*e.callee, func_reg);
+
+    chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
+                       (uint8_t)func_reg, (uint8_t)argc));
+    last_reg_ = call_base;
+}
+
 void Compiler::visit(const VarArgExpr&) {
     if (!inFunction())
         throw std::runtime_error("... outside a variadic function");

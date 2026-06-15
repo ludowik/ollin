@@ -12,7 +12,7 @@ struct ForStmt; struct IndexAssignStmt; struct ForMapStmt; struct ForInStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
-struct MapExpr; struct IndexExpr; struct ArrayExpr;
+struct MapExpr; struct IndexExpr; struct ArrayExpr; struct ExprCallExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -45,9 +45,10 @@ struct ExprVisitor {
     virtual void visit(const UnaryExpr&)  = 0;
     virtual void visit(const VarArgExpr&) = 0;
     virtual void visit(const NilExpr&)    = 0;
-    virtual void visit(const MapExpr&)    = 0;
-    virtual void visit(const IndexExpr&)  = 0;
-    virtual void visit(const ArrayExpr&)  = 0;
+    virtual void visit(const MapExpr&)      = 0;
+    virtual void visit(const IndexExpr&)   = 0;
+    virtual void visit(const ArrayExpr&)   = 0;
+    virtual void visit(const ExprCallExpr&) = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -243,6 +244,13 @@ struct ForInStmt : Stmt {
 
 struct ArrayExpr : Expr {
     std::vector<std::unique_ptr<Expr>> elements;
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+// Appel via une expression (callee quelconque : IndexExpr, CallExpr, VarExpr…)
+struct ExprCallExpr : Expr {
+    std::unique_ptr<Expr> callee;
+    std::vector<std::unique_ptr<Expr>> args;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
