@@ -187,9 +187,12 @@ op_STORE_GLOBAL:
 
 op_ADD: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
-    regs[base+A] = (bv.isInteger() && cv.isInteger())
-        ? Value(bv.asInt() + cv.asInt())
-        : Value(asDouble(bv) + asDouble(cv));
+    if (bv.isString() && cv.isString())
+        regs[base+A] = Value(bv.asString() + cv.asString());
+    else
+        regs[base+A] = (bv.isInteger() && cv.isInteger())
+            ? Value(bv.asInt() + cv.asInt())
+            : Value(asDouble(bv) + asDouble(cv));
     NEXT();
 }
 op_SUB: {
@@ -639,7 +642,8 @@ op_HALT:
             regs[base+A] = globals[Bx]; break;
         case Op::STORE_GLOBAL: globals[Bx] = regs[base+A]; globals_init[Bx] = true; break;
         case Op::ADD: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
-            regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()+cv.asInt()):Value(asDouble(bv)+asDouble(cv)); break; }
+            if(bv.isString()&&cv.isString()) regs[base+A]=Value(bv.asString()+cv.asString());
+            else regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()+cv.asInt()):Value(asDouble(bv)+asDouble(cv)); break; }
         case Op::SUB: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];
             regs[base+A]=(bv.isInteger()&&cv.isInteger())?Value(bv.asInt()-cv.asInt()):Value(asDouble(bv)-asDouble(cv)); break; }
         case Op::MUL: { const Value& bv=regs[base+B]; const Value& cv=regs[base+C];

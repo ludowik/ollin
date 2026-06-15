@@ -20,6 +20,8 @@ var n_sep   = 1_000_000     ## underscores ignorés
 var n_fsep  = 1_000.12
 
 var s = "hello"             ## chaîne (immuable)
+var s2 = "hello" + ", " + "world"  ## concaténation avec +
+assert(s2 == "hello, world")
 var vrai  = true            ## booléen (stocké comme entier 1)
 var faux  = false           ## booléen (stocké comme entier 0)
 var rien  = nil             ## valeur absente
