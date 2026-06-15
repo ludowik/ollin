@@ -2,31 +2,37 @@
 
 std::size_t ValueHash::operator()(const Value& v) const noexcept {
     switch (v.tag) {
-        case Value::T_NIL:     return 0;
-        case Value::T_INTEGER: return std::hash<int64_t>{}(v.asInt());
+        case Value::T_NIL:      return 0;
+        case Value::T_INTEGER:  return std::hash<int64_t>{}(v.asInt());
         case Value::T_FLOAT: {
             double d = v.asFloat();
             auto   i = static_cast<int64_t>(d);
             if (static_cast<double>(i) == d) return std::hash<int64_t>{}(i);
             return std::hash<double>{}(d);
         }
-        case Value::T_STRING:  return std::hash<const std::string*>{}(v.sptr);
-        case Value::T_MAP:     return std::hash<void*>{}((void*)v.mptr);
-        case Value::T_ARRAY:   return std::hash<void*>{}((void*)v.aptr);
-        default:               return 0;
+        case Value::T_STRING:   return std::hash<const std::string*>{}(v.sptr);
+        case Value::T_MAP:      return std::hash<void*>{}((void*)v.mptr);
+        case Value::T_ARRAY:    return std::hash<void*>{}((void*)v.aptr);
+        case Value::T_ITERATOR: return std::hash<void*>{}((void*)v.iptr);
+        case Value::T_FUNCTION: return std::hash<int64_t>{}(v.ival);
+        case Value::T_CLOSURE:  return std::hash<void*>{}((void*)v.cptr);
+        default:                return 0;
     }
 }
 
 bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
     if (a.tag == b.tag) {
         switch (a.tag) {
-            case Value::T_NIL:     return true;
-            case Value::T_INTEGER: return a.asInt()    == b.asInt();
-            case Value::T_FLOAT:   return a.asFloat()  == b.asFloat();
-            case Value::T_STRING:  return a.sptr == b.sptr;  // pointeurs identiques = même chaîne
-            case Value::T_MAP:     return a.mptr == b.mptr;
-            case Value::T_ARRAY:   return a.aptr == b.aptr;
-            default:               return false;
+            case Value::T_NIL:      return true;
+            case Value::T_INTEGER:  return a.asInt()   == b.asInt();
+            case Value::T_FLOAT:    return a.asFloat() == b.asFloat();
+            case Value::T_STRING:   return a.sptr == b.sptr;
+            case Value::T_MAP:      return a.mptr == b.mptr;
+            case Value::T_ARRAY:    return a.aptr == b.aptr;
+            case Value::T_ITERATOR: return a.iptr == b.iptr;
+            case Value::T_FUNCTION: return a.ival == b.ival;
+            case Value::T_CLOSURE:  return a.cptr == b.cptr;
+            default:                return false;
         }
     }
     // Cross-type numérique : INTEGER(1) == FLOAT(1.0)
