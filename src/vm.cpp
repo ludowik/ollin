@@ -6,10 +6,11 @@
 #include <vector>
 
 static std::string valueToString(const Value& v) {
-    if (v.isNil())     return "nil";
-    if (v.isString())  return v.asString();
-    if (v.isMap())     return "{map}";
-    if (v.isArray())   return "{array}";
+    if (v.isNil())      return "nil";
+    if (v.isString())   return v.asString();
+    if (v.isMap())      return "{map}";
+    if (v.isArray())    return "{array}";
+    if (v.isIterator()) return "{iterator}";
     if (v.isInteger()) return std::to_string(v.asInt());
     std::ostringstream os;
     double d = v.asFloat();
@@ -80,11 +81,11 @@ void VM::execute(const Chunk& chunk) {
         &&op_CALL_PRINT, &&op_CALL_PRINTF, &&op_CALL_ASSERT, &&op_CALL_TIME,
         &&op_TRY, &&op_POP_TRY, &&op_THROW,
         &&op_NEW_MAP, &&op_GET_INDEX, &&op_SET_INDEX,
-        &&op_FOR_MAP_STEP,
+        &&op_MAKE_ITER,
         &&op_BAND, &&op_BOR, &&op_BXOR,
         &&op_BNOT,
         &&op_BLSHIFT, &&op_BRSHIFT,
-        &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_STEP,
+        &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_NEXT,
         &&op_HALT,
     };
 
@@ -387,24 +388,9 @@ op_SET_INDEX: {
     NEXT();
 }
 
-op_FOR_MAP_STEP: {
-    // R[base+A+3]=obj, R[base+A+2]=iter; if done→ip=Bx else fill R[A+0]=key R[A+1]=val, iter++
-    Value& obj_v = regs[base + A + 3];
-    int64_t iter = regs[base + A + 2].isInteger() ? regs[base + A + 2].asInt() : 0;
-    if (obj_v.isMap()) {
-        int sz = obj_v.mapSize();
-        if (iter >= sz) { ip = Bx; NEXT(); }
-        regs[base + A + 0] = obj_v.mapKeyAt((int)iter);
-        regs[base + A + 1] = obj_v.mapValAt((int)iter);
-    } else if (obj_v.isArray()) {
-        int sz = obj_v.arraySize();
-        if (iter >= sz) { ip = Bx; NEXT(); }
-        regs[base + A + 0] = Value(iter + 1);          // 1-based index as key
-        regs[base + A + 1] = obj_v.arrayGet(iter + 1); // 1-based value
-    } else {
-        throw std::runtime_error("runtime: for-in on non-iterable");
-    }
-    regs[base + A + 2] = Value(iter + 1);
+op_MAKE_ITER: {
+    // A=dest, B=src → R[A] = iterator(R[B])
+    regs[base + A] = Value::makeIterFrom(regs[base + B]);
     NEXT();
 }
 
@@ -453,15 +439,12 @@ op_ARRAY_PUSH:
     regs[base + A].arrayPush(regs[base + B]);
     NEXT();
 
-op_FOR_ITER_STEP: {
-    // R[base+A+2]=array, R[base+A+1]=iter; if done→ip=Bx else R[A+0]=val, iter++
-    Value& arr_v = regs[base + A + 2];
-    if (!arr_v.isArray()) throw std::runtime_error("runtime: for-in on non-array");
-    int64_t iter = regs[base + A + 1].isInteger() ? regs[base + A + 1].asInt() : 0;
-    int sz = arr_v.arraySize();
-    if (iter >= sz) { ip = Bx; NEXT(); }
-    regs[base + A + 0] = arr_v.arrayGet(iter + 1);  // 1-based
-    regs[base + A + 1] = Value(iter + 1);
+op_FOR_ITER_NEXT: {
+    // R[A+0]=iterator; next→R[A+1]=key, R[A+2]=val; épuisé→ip=Bx
+    Value key, val;
+    if (!regs[base + A].iptr->next(key, val)) { ip = Bx; NEXT(); }
+    regs[base + A + 1] = std::move(key);
+    regs[base + A + 2] = std::move(val);
     NEXT();
 }
 
@@ -586,19 +569,8 @@ op_HALT:
             while(call_stack.size()>h.call_depth)call_stack.pop_back();
             if(regs.size()>h.regs_size)regs.resize(h.regs_size);
             regs[h.reg_base+h.catch_reg]=std::move(thrown); ip=h.catch_addr; break; }
-        case Op::FOR_MAP_STEP: {
-            Value& obj_v=regs[base+A+3];
-            int64_t iter=regs[base+A+2].isInteger()?regs[base+A+2].asInt():0;
-            if(obj_v.isMap()){
-                int sz=obj_v.mapSize(); if(iter>=sz){ip=Bx;break;}
-                regs[base+A+0]=obj_v.mapKeyAt((int)iter);
-                regs[base+A+1]=obj_v.mapValAt((int)iter);
-            } else if(obj_v.isArray()){
-                int sz=obj_v.arraySize(); if(iter>=sz){ip=Bx;break;}
-                regs[base+A+0]=Value(iter+1);
-                regs[base+A+1]=obj_v.arrayGet(iter+1);
-            } else { throw std::runtime_error("runtime: for-in on non-iterable"); }
-            regs[base+A+2]=Value(iter+1); break; }
+        case Op::MAKE_ITER:
+            regs[base+A] = Value::makeIterFrom(regs[base+B]); break;
         case Op::NEW_MAP: regs[base+A]=Value::makeMap(); break;
         case Op::GET_INDEX: {
             const Value& obj=regs[base+B]; const Value& key=regs[base+C];
@@ -638,13 +610,11 @@ op_HALT:
             regs[base+A]=Value(bv.asInt()>>(cv.asInt()&63)); break; }
         case Op::NEW_ARRAY: regs[base+A]=Value::makeArray(); break;
         case Op::ARRAY_PUSH: regs[base+A].arrayPush(regs[base+B]); break;
-        case Op::FOR_ITER_STEP: {
-            Value& arr_v=regs[base+A+2];
-            if(!arr_v.isArray())throw std::runtime_error("runtime: for-in on non-array");
-            int64_t iter=regs[base+A+1].isInteger()?regs[base+A+1].asInt():0;
-            int sz=arr_v.arraySize(); if(iter>=sz){ip=Bx;break;}
-            regs[base+A+0]=arr_v.arrayGet(iter+1);
-            regs[base+A+1]=Value(iter+1); break; }
+        case Op::FOR_ITER_NEXT: {
+            Value key, val;
+            if (!regs[base+A].iptr->next(key, val)) { ip=Bx; break; }
+            regs[base+A+1] = std::move(key);
+            regs[base+A+2] = std::move(val); break; }
         case Op::HALT: return;
         default: throw std::runtime_error("runtime: unknown opcode ("+std::to_string((int)iOP(ch->code[ip-1]))+")");
         }

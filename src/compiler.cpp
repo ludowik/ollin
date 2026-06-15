@@ -888,33 +888,31 @@ void Compiler::visit(const ArrayExpr& e) {
 }
 
 void Compiler::visit(const ForMapStmt& s) {
-    // 4 consecutive temps above locals_top_:
-    //   [block+0]=key_out, [block+1]=val_out, [block+2]=iter, [block+3]=map_ref
+    // 4 temps consécutifs (3 persistants + 1 pour la source) :
+    //   [block+0]=iterator, [block+1]=key_out, [block+2]=val_out, [block+3]=map_src (temp)
     int block = reg_top_;
     reg_top_ += 4;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
-    // map into R[block+3]
     compileInto(*s.map_expr, block + 3);
-    // iter = 0
-    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(block + 2),
-                       chunk.addConstant(Value((int64_t)0))));
+    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)(block + 0), (uint8_t)(block + 3), 0));
+    reg_top_ = block + 3; // libère block+3
 
     auto loop_start = (uint16_t)chunk.currentPos();
-    size_t exit_patch = chunk.emitJump(Op::FOR_MAP_STEP, (uint8_t)block);
+    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
 
     if (inFunction()) {
         int k_reg = local_regs_.at(s.key_var);
         int v_reg = local_regs_.at(s.val_var);
-        if (k_reg != block + 0)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)k_reg, (uint8_t)(block + 0), 0));
-        if (v_reg != block + 1)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 1), 0));
+        if (k_reg != block + 1)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)k_reg, (uint8_t)(block + 1), 0));
+        if (v_reg != block + 2)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 2), 0));
     } else {
         uint16_t k_gidx = chunk.addIdentifier(s.key_var);
         uint16_t v_gidx = chunk.addIdentifier(s.val_var);
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 0), k_gidx));
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 1), v_gidx));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 1), k_gidx));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 2), v_gidx));
     }
 
     break_patches.push_back({});
@@ -924,7 +922,6 @@ void Compiler::visit(const ForMapStmt& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    // continue → FOR_MAP_STEP (re-teste la condition)
     for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
     continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
@@ -934,30 +931,30 @@ void Compiler::visit(const ForMapStmt& s) {
     for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
     break_patches.pop_back();
 
-    reg_top_ = block; // free 4 temps
+    reg_top_ = block;
 }
 
 void Compiler::visit(const ForInStmt& s) {
-    // 3 consecutive temps above locals_top_:
-    //   [block+0]=val_out, [block+1]=iter, [block+2]=obj_ref
+    // 4 temps (3 persistants + 1 source) :
+    //   [block+0]=iterator, [block+1]=key_tmp (ignoré), [block+2]=val_out, [block+3]=src (temp)
     int block = reg_top_;
-    reg_top_ += 3;
+    reg_top_ += 4;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
-    compileInto(*s.iter_expr, block + 2);
-    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(block + 1),
-                       chunk.addConstant(Value((int64_t)0))));
+    compileInto(*s.iter_expr, block + 3);
+    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)(block + 0), (uint8_t)(block + 3), 0));
+    reg_top_ = block + 3; // libère block+3
 
     auto loop_start = (uint16_t)chunk.currentPos();
-    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_STEP, (uint8_t)block);
+    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
 
     if (inFunction()) {
         int v_reg = local_regs_.at(s.val_var);
-        if (v_reg != block + 0)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 0), 0));
+        if (v_reg != block + 2)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 2), 0));
     } else {
         uint16_t v_gidx = chunk.addIdentifier(s.val_var);
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 0), v_gidx));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 2), v_gidx));
     }
 
     break_patches.push_back({});
@@ -967,7 +964,6 @@ void Compiler::visit(const ForInStmt& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    // continue → FOR_ITER_STEP (re-teste la condition)
     for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
     continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));

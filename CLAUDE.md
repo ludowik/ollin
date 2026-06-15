@@ -117,13 +117,14 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | NEW_MAP       | A      | A=dest                     | R[A] = nouvelle map vide                         |
 | GET_INDEX     | ABC    | A=dst, B=map, C=key        | R[A] = R[B][R[C]]  (B=map, C=key string)        |
 | SET_INDEX     | ABC    | A=map, B=key, C=val        | R[A][R[B]] = R[C]  (A=map, B=key string)        |
-| FOR_MAP_STEP  | ABx    | A=block_base, Bx=end_addr  | R[A+3]=map R[A+2]=iter; si iter≥size→Bx sinon R[A]=key R[A+1]=val iter++ |
+| MAKE_ITER     | AB     | A=dest, B=src              | R[A] = iterator(R[B])  (Map ou Array)            |
 | BAND          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] & R[C]  (entiers)                   |
 | BOR           | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] \| R[C]  (entiers)                  |
 | BXOR          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] ^ R[C]  (entiers)                   |
 | BNOT          | AB     | A=dst, B=src               | R[A] = ~R[B]  (entier)                          |
 | BLSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] << (R[C] & 63)  (entiers)           |
 | BRSHIFT       | ABC    | A=dst, B=lhs, C=rhs        | R[A] = R[B] >> (R[C] & 63)  (entiers)           |
+| FOR_ITER_NEXT | ABx    | A=block_base, Bx=end_addr  | R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→Bx |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Allocateur de registres (Compiler)
@@ -152,7 +153,7 @@ Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires a
 En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
 `break` fonctionne dans toutes les formes.
 
-`for k,v in m` : utilise 4 registres contigus au-dessus de `locals_top_` : `[block+0]`=key_out, `[block+1]`=val_out, `[block+2]`=iter, `[block+3]`=map_ref. Opcode `FOR_MAP_STEP`.
+`for k,v in m` et `for v in arr` : utilisent le protocole `Iterator` — `MAKE_ITER` crée l'itérateur (MapIterator snapshot ou ArrayIterator ref), stocké dans `[block+0]`. `FOR_ITER_NEXT` appelle `next(key,val)` → `[block+1]`=key, `[block+2]`=val. 3 registres persistants + 1 temp source (libéré après MAKE_ITER).
 
 ## Type map
 
@@ -172,9 +173,11 @@ m["a"] += 10                    ## compound : GET_INDEX + op + SET_INDEX
 m.a += 10                       ## idem via point
 ```
 
-Implémentation : `OllinMap { vector<pair<string,Value>> entries; int refcount; }`, ref-counted.  
+Implémentation : `Map { unordered_map<Value,Value,ValueHash,ValueEqual> data; int refcount; }` — pure hashmap, ref-counted.  
+Clés de tout type Value (ValueHash/ValueEqual : INTEGER(1)==FLOAT(1.0), strings par pointeur).  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
-`isFalsy(map)` → toujours `false`.
+`isFalsy(map)` → toujours `false`.  
+Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.
 
 ## Type entier natif
 
@@ -196,5 +199,7 @@ Struct taguée (16 octets) — remplace le NaN-boxing :
 | T_INTEGER  | 1               | ival (int64_t) | ±2^63            |
 | T_FLOAT    | 2               | dval (double) | IEEE 754 double   |
 | T_STRING   | 3               | sptr (std::string*) | —          |
-| T_MAP      | 4               | mptr (OllinMap*) | —            |
+| T_MAP      | 4               | mptr (Map*) | —               |
+| T_ARRAY    | 5               | aptr (Array*) | —             |
+| T_ITERATOR | 6               | iptr (Iterator*) | —          |
 

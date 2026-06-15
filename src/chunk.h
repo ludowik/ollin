@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,6 +17,7 @@
 
 struct Map;
 struct Array;
+struct Iterator;
 
 struct Value {
     uint8_t tag;
@@ -25,18 +27,21 @@ struct Value {
         const std::string* sptr;  // pointe vers la string_table (non-owning)
         Map*               mptr;
         Array*             aptr;
+        Iterator*          iptr;
     };
 
-    static constexpr uint8_t T_NIL     = 0;
-    static constexpr uint8_t T_INTEGER = 1;
-    static constexpr uint8_t T_FLOAT   = 2;
-    static constexpr uint8_t T_STRING  = 3;
-    static constexpr uint8_t T_MAP     = 4;
-    static constexpr uint8_t T_ARRAY   = 5;
+    static constexpr uint8_t T_NIL      = 0;
+    static constexpr uint8_t T_INTEGER  = 1;
+    static constexpr uint8_t T_FLOAT    = 2;
+    static constexpr uint8_t T_STRING   = 3;
+    static constexpr uint8_t T_MAP      = 4;
+    static constexpr uint8_t T_ARRAY    = 5;
+    static constexpr uint8_t T_ITERATOR = 6;
 
 private:
-    explicit Value(Map*   p) : tag(T_MAP),   mptr(p) {}
-    explicit Value(Array* p) : tag(T_ARRAY), aptr(p) {}
+    explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
+    explicit Value(Array*    p) : tag(T_ARRAY),    aptr(p) {}
+    explicit Value(Iterator* p) : tag(T_ITERATOR), iptr(p) {}
 
 public:
     Value()              : tag(T_NIL), ival(0) {}
@@ -50,13 +55,14 @@ public:
     Value& operator=(Value&& o) noexcept;
     ~Value();
 
-    bool isNil()     const { return tag == T_NIL; }
-    bool isFloat()   const { return tag == T_FLOAT; }
-    bool isInteger() const { return tag == T_INTEGER; }
-    bool isNumber()  const { return tag == T_INTEGER || tag == T_FLOAT; }
-    bool isString()  const { return tag == T_STRING; }
-    bool isMap()     const { return tag == T_MAP; }
-    bool isArray()   const { return tag == T_ARRAY; }
+    bool isNil()      const { return tag == T_NIL; }
+    bool isFloat()    const { return tag == T_FLOAT; }
+    bool isInteger()  const { return tag == T_INTEGER; }
+    bool isNumber()   const { return tag == T_INTEGER || tag == T_FLOAT; }
+    bool isString()   const { return tag == T_STRING; }
+    bool isMap()      const { return tag == T_MAP; }
+    bool isArray()    const { return tag == T_ARRAY; }
+    bool isIterator() const { return tag == T_ITERATOR; }
 
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
@@ -66,73 +72,82 @@ public:
     static Value makeMap();
     Value        mapGet(const Value& key)              const;
     void         mapSet(const Value& key, const Value& val);
-    int          mapSize()           const;
-    const Value& mapKeyAt(int idx)   const;
-    Value        mapValAt(int idx)   const;
 
     static Value makeArray();
     Value  arrayGet(int64_t idx)                    const; // 1-based
     void   arraySet(int64_t idx, const Value& val);        // 1-based, grows if needed
     void   arrayPush(const Value& val);
     int    arraySize()                              const;
+
+    static Value makeIterFrom(const Value& src);
 };
 
 // ── Array (1-based, ref-counted) — définition complète ───────────────────────
 #include "array.h"
 
-// ── Map (LinkedHashMap, clés Value) — définition complète ────────────────────
+// ── Map (pure hashmap, clés Value) — définition complète ─────────────────────
 #include "map.h"
 
-// ── inline Value implementations (nécessitent Map et Array complets) ────
+// ── Iterator (protocole d'itération — Map, Array) ────────────────────────────
+#include "iterator.h"
+
+// ── inline Value implementations (nécessitent Map, Array, Iterator complets) ─
 
 inline Value Value::makeMap()   { return Value(map_pool().acquire()); }
 inline Value Value::makeArray() { return Value(array_pool().acquire()); }
 
-inline Value        Value::mapGet(const Value& k)                  const { return mptr->get(k); }
-inline void         Value::mapSet(const Value& k, const Value& v)        { mptr->set(k, v); }
-inline int          Value::mapSize()          const { return mptr->size(); }
-inline const Value& Value::mapKeyAt(int idx)  const { return mptr->keyAt(idx); }
-inline Value        Value::mapValAt(int idx)  const { return mptr->valAt(idx); }
+inline Value Value::mapGet(const Value& k)                  const { return mptr->get(k); }
+inline void  Value::mapSet(const Value& k, const Value& v)        { mptr->set(k, v); }
 
 inline Value Value::arrayGet(int64_t idx)                  const { return aptr->get(idx); }
 inline void  Value::arraySet(int64_t idx, const Value& v)        { aptr->set(idx, v); }
 inline void  Value::arrayPush(const Value& v)                    { aptr->push(v); }
 inline int   Value::arraySize()                            const { return (int)aptr->items.size(); }
 
+inline Value Value::makeIterFrom(const Value& src) {
+    if (src.isMap())   return Value(new MapIterator(src.mptr));
+    if (src.isArray()) return Value(new ArrayIterator(src.aptr));
+    throw std::runtime_error("runtime: for-in on non-iterable");
+}
+
 inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
     switch (tag) {
-        case T_NIL:     break;
-        case T_INTEGER: ival = o.ival; break;
-        case T_FLOAT:   dval = o.dval; break;
-        case T_STRING:  sptr = o.sptr; string_table().retain(sptr); break;
-        case T_MAP:     mptr = o.mptr; mptr->refcount++; break;
-        case T_ARRAY:   aptr = o.aptr; aptr->refcount++; break;
+        case T_NIL:      break;
+        case T_INTEGER:  ival = o.ival; break;
+        case T_FLOAT:    dval = o.dval; break;
+        case T_STRING:   sptr = o.sptr; string_table().retain(sptr); break;
+        case T_MAP:      mptr = o.mptr; mptr->refcount++; break;
+        case T_ARRAY:    aptr = o.aptr; aptr->refcount++; break;
+        case T_ITERATOR: iptr = o.iptr; iptr->refcount++; break;
     }
 }
 inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
     // Retain d'abord (protège si this et o partagent la même ressource)
     switch (o.tag) {
-        case T_STRING: string_table().retain(o.sptr); break;
-        case T_MAP:    o.mptr->refcount++;             break;
-        case T_ARRAY:  o.aptr->refcount++;             break;
+        case T_STRING:   string_table().retain(o.sptr); break;
+        case T_MAP:      o.mptr->refcount++;             break;
+        case T_ARRAY:    o.aptr->refcount++;             break;
+        case T_ITERATOR: o.iptr->refcount++;             break;
         default: break;
     }
     // Release de l'ancienne valeur
     switch (tag) {
-        case T_STRING: string_table().release(sptr); break;
-        case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY: { Array* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_STRING:   string_table().release(sptr); break;
+        case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         default: break;
     }
     tag = o.tag; ival = 0;
     switch (tag) {
-        case T_NIL:     break;
-        case T_INTEGER: ival = o.ival; break;
-        case T_FLOAT:   dval = o.dval; break;
-        case T_STRING:  sptr = o.sptr; break;
-        case T_MAP:     mptr = o.mptr; break;
-        case T_ARRAY:   aptr = o.aptr; break;
+        case T_NIL:      break;
+        case T_INTEGER:  ival = o.ival; break;
+        case T_FLOAT:    dval = o.dval; break;
+        case T_STRING:   sptr = o.sptr; break;
+        case T_MAP:      mptr = o.mptr; break;
+        case T_ARRAY:    aptr = o.aptr; break;
+        case T_ITERATOR: iptr = o.iptr; break;
     }
     return *this;
 }
@@ -140,9 +155,10 @@ inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
     // Release de l'ancienne valeur (on prend possession de la référence de o)
     switch (tag) {
-        case T_STRING: string_table().release(sptr); break;
-        case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY: { Array* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_STRING:   string_table().release(sptr); break;
+        case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         default: break;
     }
     tag = o.tag; ival = o.ival; o.tag = T_NIL;
@@ -150,9 +166,10 @@ inline Value& Value::operator=(Value&& o) noexcept {
 }
 inline Value::~Value() {
     switch (tag) {
-        case T_STRING: string_table().release(sptr); break;
-        case T_MAP:   { Map*        mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY: { Array* ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_STRING:   string_table().release(sptr); break;
+        case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         default: break;
     }
 }
@@ -220,11 +237,11 @@ enum class Op : uint8_t {
     NEW_MAP,        // A: R[A] = {}
     GET_INDEX,      // ABC: R[A] = R[B][R[C]]  (map→Value key, array→int 1-based)
     SET_INDEX,      // ABC: R[A][R[B]] = R[C]  (map→Value key, array→int 1-based)
-    FOR_MAP_STEP,   // ABx: block+3=obj block+2=iter; iter maps/arrays; key→A+0, val→A+1
+    MAKE_ITER,      // AB: R[A] = iterator(R[B])  (Map ou Array)
     BAND, BOR, BXOR, BNOT, BLSHIFT, BRSHIFT,   // bitwise (integers)
     NEW_ARRAY,      // A: R[A] = []
     ARRAY_PUSH,     // AB: R[A].push(R[B])
-    FOR_ITER_STEP,  // ABx: block+2=array block+1=iter; val→A+0; exits to Bx when done
+    FOR_ITER_NEXT,  // ABx: R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→ip=Bx
     HALT,
 };
 

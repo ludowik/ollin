@@ -35,17 +35,11 @@ bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
 }
 
 Value Map::get(const Value& k) const {
-    auto it = index.find(k);
-    if (it == index.end()) return Value{};
-    return entries[it->second].second;
+    auto it = data.find(k);
+    if (it == data.end()) return Value{};
+    return it->second;
 }
 
 void Map::set(const Value& k, const Value& v) {
-    auto it = index.find(k);
-    if (it != index.end()) {
-        entries[it->second].second = v;
-    } else {
-        index.emplace(k, entries.size());
-        entries.emplace_back(k, v);
-    }
+    data.insert_or_assign(k, v);
 }
