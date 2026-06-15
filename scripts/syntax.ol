@@ -428,3 +428,18 @@ assert(true, "doit être vrai")
 var t0 = time()
 var t1 = time()
 assert(t1 >= t0)
+
+## ── 17. Import ───────────────────────────────────────────────────────────────
+
+## import plat : les symboles du fichier sont injectés dans le scope courant
+import "utils_test"
+assert(CONST == 42)
+
+## import modulaire (fichier différent) : symboles regroupés dans une map
+import "utils_test2" as u
+assert(u.mul(3, 4) == 12)
+assert(u.VERSION == 2)
+
+## import circulaire : ignoré silencieusement (déjà importé)
+import "utils_test"
+assert(CONST == 42)   ## toujours disponible

@@ -340,6 +340,7 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <a href="#try">Try / Catch</a>
   <div class="section-label">Builtins</div>
   <a href="#builtins">Fonctions intégrées</a>
+  <a href="#import">Import</a>
 </nav>
 
 <main>
@@ -529,7 +530,10 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 <span class="bi">assert</span>(<span class="str">""</span> == <span class="bool">false</span>)          <span class="cmt">## chaîne vide est falsy</span>
 <span class="bi">assert</span>(<span class="str">"texte"</span> == <span class="bool">true</span>)    <span class="cmt">## non vide est truthy</span></code></pre>
 
-<div class="callout warn">Les chaînes sont immuables. Pas d'opérateur de concaténation pour l'instant — utiliser <code>printf</code> pour formater.</div>
+<p>La concaténation se fait avec <code>+</code> :</p>
+<pre><code><span class="kw">var</span> greeting = <span class="str">"Hello, "</span> + <span class="str">"world"</span> + <span class="str">"!"</span>
+<span class="bi">assert</span>(greeting == <span class="str">"Hello, world!"</span>)</code></pre>
+<div class="callout warn">Les chaînes sont immuables. Seul <code>+</code> est surchargé pour les strings — les autres opérateurs (<code>-</code>, <code>*</code>…) restent réservés aux nombres.</div>
 </section>
 
 <!-- ── Multi-lignes ───────────────────────────────────────────────────────── -->
@@ -979,6 +983,49 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>      <span class="c
 
 <span class="kw">var</span> t1 = <span class="bi">time</span>()
 <span class="bi">printf</span>(<span class="str">"somme = {}  temps = {} s"</span>, s, t1 - t0)</code></pre>
+
+<h3>Fonctions intégrées comme valeurs</h3>
+<p><code>print</code>, <code>printf</code>, <code>assert</code> et <code>time</code> sont des valeurs de première classe — assignables, passables en argument :</p>
+<pre><code><span class="kw">var</span> f = <span class="bi">print</span>
+f(<span class="str">"hello"</span>)               <span class="cmt">## hello</span>
+
+<span class="kw">func</span> apply(fn, x)
+    fn(x)
+<span class="kw">end</span>
+apply(<span class="bi">print</span>, <span class="num">42</span>)          <span class="cmt">## 42</span></code></pre>
+</section>
+
+<!-- ── Import ─────────────────────────────────────────────────────────── -->
+<section id="import">
+<h2>Import</h2>
+<p>L'instruction <code>import</code> charge un fichier Ollin et injecte son contenu dans le programme courant au moment de la compilation (résolution statique, pas de sous-VM).</p>
+<p>Les chemins sont relatifs au répertoire du script courant. L'extension <code>.ol</code> est ajoutée automatiquement si absente.</p>
+
+<h3>Import plat</h3>
+<p>Toutes les définitions du fichier importé deviennent disponibles directement dans le scope courant.</p>
+<pre><code><span class="cmt">## utils.ol</span>
+<span class="kw">func</span> add(a, b)
+    <span class="kw">return</span> a + b
+<span class="kw">end</span>
+<span class="kw">var</span> PI = <span class="num">3.14159</span>
+
+<span class="cmt">## main.ol</span>
+<span class="kw">import</span> <span class="str">"utils"</span>
+<span class="bi">print</span>(add(<span class="num">2</span>, <span class="num">3</span>))    <span class="cmt">## 5</span>
+<span class="bi">print</span>(PI)           <span class="cmt">## 3.14159</span></code></pre>
+
+<h3>Import modulaire</h3>
+<p>Avec <code>as name</code>, toutes les définitions sont regroupées dans une map nommée.</p>
+<pre><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> math
+<span class="bi">print</span>(math.add(<span class="num">10</span>, <span class="num">20</span>))   <span class="cmt">## 30</span>
+<span class="bi">print</span>(math.PI)             <span class="cmt">## 3.14159</span></code></pre>
+
+<h3>Règles</h3>
+<ul>
+  <li>Chemins résolus relativement au répertoire du script courant (récursivement pour les imports imbriqués).</li>
+  <li>Les imports circulaires sont détectés et ignorés (cache partagé).</li>
+  <li>Un même fichier importé deux fois n'est exécuté qu'une fois.</li>
+</ul>
 </section>
 
 </main>

@@ -12,8 +12,11 @@ stmt           = varDecl
                | throwStmt
                | funcDecl
                | returnStmt
+               | importStmt
                | assignStmt
                | exprStmt ;
+
+importStmt     = "import" STRING [ "as" IDENT ] NEWLINE ;
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
@@ -47,6 +50,7 @@ bitwiseAnd     = comparison { "&" comparison } ;
 comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
 shift          = additive { ( "<<" | ">>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
+             (* "+" : addition numérique ou concaténation de strings *)
 multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
 unary          = ( "-" | "not" | "~" ) unary | primary ;
 primary        = NUMBER
