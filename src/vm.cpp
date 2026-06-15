@@ -488,39 +488,50 @@ op_LOAD_FUNC:
 
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
-    const Value& fv = regs[base + B];
     uint8_t fi;
-    if (fv.isFuncVal()) {
-        fi = (uint8_t)fv.asInt();
-    } else if (fv.isClosure()) {
-        fi = fv.asClosure()->func_idx;
-    } else {
-        throw std::runtime_error("runtime: call on non-function value");
-    }
-    const FuncProto& fp = ch->funcs[fi];
-    int new_base = base + A;
-    int argc = C;
-    size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-    if (regs.size() < needed) regs.resize(needed);
-    if (argc < fp.n_fixed) {
-        auto& defs = ch->func_defaults[fp.defaults_idx];
-        for (int i = argc; i < fp.n_fixed; ++i)
-            regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
-    }
+    uint32_t fp_addr;
+    int fp_n_fixed, fp_reg_count, fp_defaults_idx;
+    bool fp_variadic;
     {
-        std::vector<Upvalue*> frame_upvals;
-        if (fv.isClosure()) frame_upvals = fv.asClosure()->upvals;
-        std::unique_ptr<std::vector<Value>> varargs;
-        if (fp.variadic && argc > fp.n_fixed) {
-            varargs = std::make_unique<std::vector<Value>>();
-            for (int i = fp.n_fixed; i < argc; ++i)
-                varargs->push_back(std::move(regs[new_base + i]));
+        // Copie par valeur AVANT tout resize (une ref dans regs deviendrait dangling après realloc)
+        Value fv = regs[base + B];
+        if (fv.isFuncVal()) {
+            fi = (uint8_t)fv.asInt();
+        } else if (fv.isClosure()) {
+            fi = fv.asClosure()->func_idx;
+        } else {
+            throw std::runtime_error("runtime: call on non-function value");
         }
-        size_t full_needed = (size_t)(new_base + fp.reg_count);
-        if (regs.size() < full_needed) regs.resize(full_needed);
-        call_stack.push_back({ip, new_base, std::move(varargs), std::move(frame_upvals), {}});
+        const FuncProto& fp = ch->funcs[fi];
+        fp_addr       = fp.addr;
+        fp_n_fixed    = fp.n_fixed;
+        fp_reg_count  = fp.reg_count;
+        fp_defaults_idx = fp.defaults_idx;
+        fp_variadic   = fp.variadic;
+        int new_base = base + A;
+        int argc = C;
+        size_t needed = (size_t)(new_base + std::max(fp_reg_count, argc));
+        if (regs.size() < needed) regs.resize(needed);
+        if (argc < fp_n_fixed) {
+            auto& defs = ch->func_defaults[fp_defaults_idx];
+            for (int i = argc; i < fp_n_fixed; ++i)
+                regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+        }
+        {
+            std::vector<Upvalue*> frame_upvals;
+            if (fv.isClosure()) frame_upvals = fv.asClosure()->upvals;
+            std::unique_ptr<std::vector<Value>> varargs;
+            if (fp_variadic && argc > fp_n_fixed) {
+                varargs = std::make_unique<std::vector<Value>>();
+                for (int i = fp_n_fixed; i < argc; ++i)
+                    varargs->push_back(std::move(regs[new_base + i]));
+            }
+            size_t full_needed = (size_t)(new_base + fp_reg_count);
+            if (regs.size() < full_needed) regs.resize(full_needed);
+            call_stack.push_back({ip, new_base, std::move(varargs), std::move(frame_upvals), {}});
+        }
     }
-    ip = fp.addr;
+    ip = fp_addr;
     NEXT();
 }
 

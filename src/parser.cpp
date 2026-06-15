@@ -33,7 +33,7 @@ TokenType Parser::peekAt(int offset) const {
 }
 
 void Parser::skipNewlines() {
-    while (check(TokenType::NEWLINE)) advance();
+    while (check(TokenType::NEWLINE) || check(TokenType::COMMENT)) advance();
 }
 
 // absorbe un commentaire de fin de ligne optionnel puis le NEWLINE

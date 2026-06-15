@@ -668,7 +668,15 @@ void Compiler::visit(const NilExpr&) {
 }
 
 void Compiler::visit(const VarExpr& e) {
-    // Référence à une fonction
+    // Local variable shadows everything (including global functions of the same name)
+    {
+        auto it = local_regs_.find(e.name);
+        if (it != local_regs_.end()) {
+            last_reg_ = it->second;
+            return;
+        }
+    }
+    // Référence à une fonction globale
     auto fit = func_table.find(e.name);
     if (fit != func_table.end()) {
         last_reg_ = allocReg();
@@ -680,13 +688,6 @@ void Compiler::visit(const VarExpr& e) {
                                fit->second.func_idx));
         }
         return;
-    }
-    {
-        auto it = local_regs_.find(e.name);
-        if (it != local_regs_.end()) {
-            last_reg_ = it->second;
-            return;
-        }
     }
     // Upvalue
     {
