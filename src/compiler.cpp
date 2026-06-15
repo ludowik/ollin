@@ -78,10 +78,16 @@ void Compiler::compileInto(const Expr& e, int dest) {
 
 // ── top-level compile ─────────────────────────────────────────────────────────
 Chunk Compiler::compile(const Program& prog) {
-    // Pre-scan top-level locals to assign stable global registers
-    // (We don't do this at top-level since they're globals, not locals)
     reg_top_ = 0;
-    reg_count_ = 8;  // minimum
+    reg_count_ = 8;
+    // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
+    std::vector<std::string> top_locals;
+    collectLocals(prog.stmts, top_locals);
+    for (auto& name : top_locals)
+        local_regs_[name] = reg_top_++;
+    locals_top_ = reg_top_;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
     for (auto& s : prog.stmts)
         s->accept(*this);
     chunk.top_reg_count = (uint8_t)std::max(reg_count_, 8);
@@ -92,94 +98,43 @@ Chunk Compiler::compile(const Program& prog) {
 // ── statements ────────────────────────────────────────────────────────────────
 
 void Compiler::visit(const VarDeclStmt& s) {
-    if (inFunction()) {
-        // Multi-return from user function call
-        if (s.names.size() > 1 && s.values.size() == 1) {
-            if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
-                if (func_table.count(call->callee)) {
-                    // Compile the call, results start at call_base
-                    int call_base = reg_top_;
-                    int argc = (int)call->args.size();
-                    for (int i = 0; i < argc; ++i) {
-                        int target = call_base + i;
-                        reg_top_ = target;
-                        call->args[i]->accept(*this);
-                        if (last_reg_ != target)
-                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                                               (uint8_t)last_reg_, 0));
-                        reg_top_ = target + 1;
-                        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-                    }
-                    const FuncInfo& fi = func_table.at(call->callee);
-                    chunk.emit(makeABC((uint8_t)Op::CALL_FUNC,
-                                       (uint8_t)call_base,
-                                       fi.func_idx,
-                                       (uint8_t)argc));
-                    // Move results to their pre-allocated local registers
-                    for (int i = 0; i < (int)s.names.size(); ++i) {
-                        int dest = local_regs_.at(s.names[i]);
-                        if (call_base + i != dest)
-                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest,
-                                               (uint8_t)(call_base + i), 0));
-                    }
-                    reg_top_ = call_base;  // free temps
-                    return;
+    // Multi-return from user function call
+    if (s.names.size() > 1 && s.values.size() == 1) {
+        if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
+            if (func_table.count(call->callee)) {
+                int call_base = reg_top_;
+                int argc = (int)call->args.size();
+                for (int i = 0; i < argc; ++i) {
+                    int target = call_base + i;
+                    reg_top_ = target;
+                    call->args[i]->accept(*this);
+                    if (last_reg_ != target)
+                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
+                                           (uint8_t)last_reg_, 0));
+                    reg_top_ = target + 1;
+                    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
                 }
-            }
-        }
-        // Normal: compile each value into its pre-allocated local register
-        for (int i = 0; i < (int)s.names.size(); ++i) {
-            int dest = local_regs_.at(s.names[i]);
-            if (i < (int)s.values.size()) {
-                compileInto(*s.values[i], dest);
-            } else {
-                chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
-            }
-        }
-    } else {
-        // Global scope: multi-return from user function
-        if (s.names.size() > 1 && s.values.size() == 1) {
-            if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
-                if (func_table.count(call->callee)) {
-                    int call_base = reg_top_;
-                    int argc = (int)call->args.size();
-                    for (int i = 0; i < argc; ++i) {
-                        int target = call_base + i;
-                        reg_top_ = target;
-                        call->args[i]->accept(*this);
-                        if (last_reg_ != target)
-                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                                               (uint8_t)last_reg_, 0));
-                        reg_top_ = target + 1;
-                        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-                    }
-                    const FuncInfo& fi = func_table.at(call->callee);
-                    chunk.emit(makeABC((uint8_t)Op::CALL_FUNC,
-                                       (uint8_t)call_base,
-                                       fi.func_idx,
-                                       (uint8_t)argc));
-                    for (int i = 0; i < (int)s.names.size(); ++i) {
-                        uint16_t gidx = chunk.addIdentifier(s.names[i]);
-                        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
-                                           (uint8_t)(call_base + i), gidx));
-                    }
-                    reg_top_ = call_base;
-                    return;
+                const FuncInfo& fi = func_table.at(call->callee);
+                chunk.emit(makeABC((uint8_t)Op::CALL_FUNC,
+                                   (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
+                for (int i = 0; i < (int)s.names.size(); ++i) {
+                    int dest = local_regs_.at(s.names[i]);
+                    if (call_base + i != dest)
+                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest,
+                                           (uint8_t)(call_base + i), 0));
                 }
+                reg_top_ = call_base;
+                return;
             }
         }
-        // Normal global declarations
-        for (int i = 0; i < (int)s.names.size(); ++i) {
-            int saved = reg_top_;
-            uint16_t gidx = chunk.addIdentifier(s.names[i]);
-            if (i < (int)s.values.size()) {
-                s.values[i]->accept(*this);
-            } else {
-                last_reg_ = allocReg();
-                chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)last_reg_, 0, 0));
-            }
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)last_reg_, gidx));
-            reg_top_ = saved;
+    }
+    // Normal: compile each value into its pre-allocated local register
+    for (int i = 0; i < (int)s.names.size(); ++i) {
+        int dest = local_regs_.at(s.names[i]);
+        if (i < (int)s.values.size()) {
+            compileInto(*s.values[i], dest);
+        } else {
+            chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
         }
     }
 }
@@ -331,94 +286,40 @@ void Compiler::visit(const ThrowStmt& s) {
 }
 
 void Compiler::visit(const TryCatchStmt& s) {
-    if (inFunction()) {
-        // catch_var is a local register (pre-allocated by collectLocals)
-        int catch_r = s.catch_var.empty() ? 0 : local_regs_.at(s.catch_var);
+    int catch_r = s.catch_var.empty() ? 0 : local_regs_.at(s.catch_var);
 
-        // TRY: A=catch_reg, Bx=catch_addr (patched later)
-        size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
+    size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
 
-        for (auto& stmt : s.try_body) {
-            int s2 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s2;
-        }
-
-        chunk.emit(makeBx((uint8_t)Op::POP_TRY, 0));
-        size_t else_patch = chunk.emitJump(Op::JUMP);
-
-        // catch block
-        uint16_t catch_addr = (uint16_t)chunk.currentPos();
-        chunk.patchJump(try_patch, catch_addr);
-
-        for (auto& stmt : s.catch_body) {
-            int s2 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s2;
-        }
-        size_t end_patch = chunk.emitJump(Op::JUMP);
-
-        // else block
-        uint16_t else_addr = (uint16_t)chunk.currentPos();
-        chunk.patchJump(else_patch, else_addr);
-
-        for (auto& stmt : s.else_body) {
-            int s2 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s2;
-        }
-
-        uint16_t end_addr = (uint16_t)chunk.currentPos();
-        chunk.patchJump(end_patch, end_addr);
-    } else {
-        // Global scope: use a temp register for catch_var
-        int catch_r = 0;
-        uint16_t gidx = 0;
-        if (!s.catch_var.empty()) {
-            gidx = chunk.addIdentifier(s.catch_var);
-            catch_r = reg_top_;
-            if (reg_top_ + 1 > reg_count_) reg_count_ = reg_top_ + 1;
-        }
-
-        size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
-
-        for (auto& stmt : s.try_body) {
-            int s2 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s2;
-        }
-
-        chunk.emit(makeBx((uint8_t)Op::POP_TRY, 0));
-        size_t else_patch = chunk.emitJump(Op::JUMP);
-
-        // catch block
-        uint16_t catch_addr = (uint16_t)chunk.currentPos();
-        chunk.patchJump(try_patch, catch_addr);
-
-        // Store the caught value into the global
-        if (!s.catch_var.empty()) {
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)catch_r, gidx));
-        }
-        for (auto& stmt : s.catch_body) {
-            int s2 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s2;
-        }
-        size_t end_patch = chunk.emitJump(Op::JUMP);
-
-        // else block
-        uint16_t else_addr = (uint16_t)chunk.currentPos();
-        chunk.patchJump(else_patch, else_addr);
-
-        for (auto& stmt : s.else_body) {
-            int s2 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s2;
-        }
-
-        uint16_t end_addr = (uint16_t)chunk.currentPos();
-        chunk.patchJump(end_patch, end_addr);
+    for (auto& stmt : s.try_body) {
+        int s2 = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = s2;
     }
+
+    chunk.emit(makeBx((uint8_t)Op::POP_TRY, 0));
+    size_t else_patch = chunk.emitJump(Op::JUMP);
+
+    uint16_t catch_addr = (uint16_t)chunk.currentPos();
+    chunk.patchJump(try_patch, catch_addr);
+
+    for (auto& stmt : s.catch_body) {
+        int s2 = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = s2;
+    }
+    size_t end_patch = chunk.emitJump(Op::JUMP);
+
+    uint16_t else_addr = (uint16_t)chunk.currentPos();
+    chunk.patchJump(else_patch, else_addr);
+
+    for (auto& stmt : s.else_body) {
+        int s2 = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = s2;
+    }
+
+    uint16_t end_addr = (uint16_t)chunk.currentPos();
+    chunk.patchJump(end_patch, end_addr);
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
@@ -526,19 +427,14 @@ void Compiler::visit(const ReturnStmt& s) {
 }
 
 void Compiler::visit(const ForStmt& s) {
-    // Toujours utiliser des registres pour i, end, step — quelle que soit la portée.
-    // Au scope global : on inscrit temporairement i dans local_regs_ pour que le
-    // corps du for puisse y accéder directement sans LOAD_GLOBAL.
-    bool at_global = !inFunction();
     int base_reg = reg_top_;
 
     int i_reg;
-    if (!at_global && local_regs_.count(s.var)) {
+    if (local_regs_.count(s.var)) {
         i_reg = local_regs_.at(s.var);   // pré-alloué par collectLocals
     } else {
         i_reg = reg_top_++;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        if (at_global) local_regs_[s.var] = i_reg;
     }
     compileInto(*s.start, i_reg);
 
@@ -603,12 +499,7 @@ void Compiler::visit(const ForStmt& s) {
     for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
     break_patches.pop_back();
 
-    if (at_global) {
-        local_regs_.erase(s.var);
-        reg_top_ = base_reg;
-    } else {
-        reg_top_ = end_reg;  // libère end, step, one_r (i est pré-alloué, on le garde)
-    }
+    reg_top_ = base_reg;  // libère end/step/one_r ; i est pré-alloué, reste intact
 }
 
 // ── expressions ───────────────────────────────────────────────────────────────
@@ -865,18 +756,23 @@ void Compiler::visit(const ForMapStmt& s) {
     auto loop_start = (uint16_t)chunk.currentPos();
     size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
 
-    if (inFunction()) {
-        int k_reg = local_regs_.at(s.key_var);
-        int v_reg = local_regs_.at(s.val_var);
-        if (k_reg != block + 1)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)k_reg, (uint8_t)(block + 1), 0));
-        if (v_reg != block + 2)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 2), 0));
-    } else {
-        uint16_t k_gidx = chunk.addIdentifier(s.key_var);
-        uint16_t v_gidx = chunk.addIdentifier(s.val_var);
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 1), k_gidx));
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 2), v_gidx));
+    {
+        auto k_it = local_regs_.find(s.key_var);
+        if (k_it != local_regs_.end()) {
+            if (k_it->second != block + 1)
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)k_it->second, (uint8_t)(block + 1), 0));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
+                               (uint8_t)(block + 1), chunk.addIdentifier(s.key_var)));
+        }
+        auto v_it = local_regs_.find(s.val_var);
+        if (v_it != local_regs_.end()) {
+            if (v_it->second != block + 2)
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_it->second, (uint8_t)(block + 2), 0));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
+                               (uint8_t)(block + 2), chunk.addIdentifier(s.val_var)));
+        }
     }
 
     break_patches.push_back({});
@@ -912,13 +808,15 @@ void Compiler::visit(const ForInStmt& s) {
     auto loop_start = (uint16_t)chunk.currentPos();
     size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
 
-    if (inFunction()) {
-        int v_reg = local_regs_.at(s.val_var);
-        if (v_reg != block + 2)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_reg, (uint8_t)(block + 2), 0));
-    } else {
-        uint16_t v_gidx = chunk.addIdentifier(s.val_var);
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(block + 2), v_gidx));
+    {
+        auto v_it = local_regs_.find(s.val_var);
+        if (v_it != local_regs_.end()) {
+            if (v_it->second != block + 2)
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_it->second, (uint8_t)(block + 2), 0));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
+                               (uint8_t)(block + 2), chunk.addIdentifier(s.val_var)));
+        }
     }
 
     break_patches.push_back({});
