@@ -81,9 +81,7 @@ Procédure :
 
 ## Maintenance de CLAUDE.md
 
-Mettre à jour ce fichier dès qu'un point important doit être mémorisé :
-architecture, conventions, décisions, règles d'outillage.  
-Ne pas documenter ce qui n'est pas encore implémenté.
+Mettre à jour ce fichier dès qu'un point important doit être mémorisé : architecture, conventions, décisions, règles d'outillage.Ne pas documenter ce qui n'est pas encore implémenté.
 
 ## Format d'instruction (32-bit)
 
