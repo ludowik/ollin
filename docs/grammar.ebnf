@@ -44,6 +44,8 @@ returnStmt     = "return" [ retvals ] NEWLINE ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
+                 (* règle sémantique : IDENT doit avoir été déclaré par "var" — sinon erreur de compilation *)
+                 (* "var" ne crée que des variables locales ; pas de globales utilisateur *)
 indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE
                | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
 exprStmt       = expr NEWLINE ;

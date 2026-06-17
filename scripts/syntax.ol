@@ -27,6 +27,9 @@ var faux  = false           ## booléen (stocké comme entier 0)
 var rien  = nil             ## valeur absente
 
 ## ── 3. Variables ─────────────────────────────────────────────────────────────
+## Toute variable DOIT être déclarée avec `var` avant usage.
+## Lire/affecter un nom non déclaré = erreur de compilation.
+## `var` ne crée que des variables locales.
 
 var x           ## non initialisé → nil
 assert(x == nil)

@@ -160,6 +160,14 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
 | HALT          | —      |                            | arrêt                                            |
 
+## Déclaration de variables (règle sémantique)
+
+- Toute variable **doit** être déclarée avec `var` avant usage.
+- Lire ou affecter un identifiant non déclaré → **erreur de compilation** (`undeclared variable '<nom>' (use 'var')`).
+- `var` ne crée que des variables **locales** (registres) — il n'existe pas de variable globale créée par l'utilisateur.
+- Seuls les noms de fonctions (`func_table`) et de classes (`declared_globals_`) sont résolus en portée globale ; tout autre nom global déclenche l'erreur.
+- Garde-fous dans le compilateur : `visit(AssignStmt)`, `visit(VarExpr)` et `visit(IndexAssignStmt)` (fallthrough global).
+
 ## Allocateur de registres (Compiler)
 
 - Les paramètres de fonction occupent R[0..n_fixed-1]
