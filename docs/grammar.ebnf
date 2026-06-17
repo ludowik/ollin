@@ -29,8 +29,7 @@ superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
-forStmt        = "for" IDENT "in" expr ".." expr NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
+forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
                | "for" IDENT "in" expr NEWLINE { stmt } "end" NEWLINE
                | "for" IDENT "," IDENT "in" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
@@ -71,6 +70,7 @@ primary        = NUMBER
                | call  { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
                | mapLit { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
                | arrayLit { ( "[" expr "]" ) }
+               | rangeLit
                | "..."
                | "(" expr ")" ;
                (* "expr.method(args)" = appel de méthode avec self implicite *)
@@ -80,6 +80,9 @@ mapLit         = "{" [ NEWLINE ]
                  "}" ;
 mapEntry       = ( STRING | IDENT ) ":" expr ;
 arrayLit       = "[" [ expr { "," expr } ] "]" ;
+rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
+             (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)
+             (* step optionnel [a;b;step] ; les ranges sont first-class et itérables *)
 call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;

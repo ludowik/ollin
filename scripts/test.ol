@@ -274,10 +274,10 @@ assert(fwith_defaults(5, 5) == 10, "no default")
 
 ## ── for in (range) ──────────────────────────────────────────────────────────
 var for_sum = 0
-for i in 1..10
+for i in [1;10]
     for_sum += i
 end
-assert(for_sum == 55, "for in 1..10")
+assert(for_sum == 55, "for in [1;10]")
 
 ## ── for numérique sans step ──────────────────────────────────────────────────
 var for_sum2 = 0
@@ -302,7 +302,7 @@ assert(for_rev == 15, "for m=5,1,-1 (5+4+3+2+1)")
 
 ## ── for break ────────────────────────────────────────────────────────────────
 var for_break = 0
-for i in 1..100
+for i in [1;100]
     if i > 5 then break end
     for_break += i
 end
