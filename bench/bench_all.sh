@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run all 5 benchmarks for Ollin, Lua 5.5, and Python 3.
-# Usage: bash scripts/bench_all.sh  (from repo root)
+# Usage: bash bench/bench_all.sh  (from repo root)
 
 set -euo pipefail
 OLLIN=./build/ollin.exe
