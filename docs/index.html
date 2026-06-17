@@ -259,6 +259,59 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 }
 .backdrop.visible { display: block; }
 
+/* ── playground ─────────────────────────────────────────────────────────── */
+pre { position: relative; }
+.try-btn {
+  position: absolute; top: 8px; right: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--accent); font-family: var(--font);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+  padding: 3px 9px; border-radius: 4px; cursor: pointer;
+  opacity: 0; transition: opacity 0.15s;
+}
+pre:hover .try-btn { opacity: 1; }
+
+.pg-examples { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.pg-ex-btn {
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text-dim); font-size: 12px; font-weight: 500;
+  padding: 4px 12px; border-radius: 4px; cursor: pointer;
+  transition: color 0.15s, border-color 0.15s; font-family: var(--font);
+}
+.pg-ex-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.pg-editor {
+  display: block; width: 100%; min-height: 180px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px 18px;
+  color: var(--text); font-family: var(--font-mono);
+  font-size: 13.5px; line-height: 1.65;
+  resize: vertical; outline: none; tab-size: 4;
+}
+.pg-editor:focus { border-color: var(--accent); }
+
+.pg-toolbar { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+.pg-run {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 6px; padding: 8px 20px;
+  font-size: 14px; font-weight: 600; font-family: var(--font);
+  cursor: pointer; transition: opacity 0.15s;
+}
+.pg-run:hover { opacity: 0.85; }
+.pg-run:disabled { opacity: 0.4; cursor: default; }
+.pg-status { font-size: 12px; color: var(--text-dim); }
+
+.pg-output {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px 18px;
+  font-family: var(--font-mono); font-size: 13px;
+  line-height: 1.65; min-height: 80px;
+  white-space: pre-wrap; word-break: break-all;
+  color: var(--text-dim); font-style: italic;
+}
+.pg-output.has-output { color: var(--green); font-style: normal; }
+.pg-output.has-error  { color: var(--red);   font-style: normal; }
+
 /* ── responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   body { display: block; }
@@ -342,6 +395,8 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
   <a href="#builtins">Fonctions intégrées</a>
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
+  <div class="section-label">Interactif</div>
+  <a href="#playground">Playground</a>
 </nav>
 
 <main>
@@ -1125,6 +1180,23 @@ var v3 = v1 + v2   ## appelle v1.__add(v2)
 print(v3)          ## Vec2(4,6)</code></pre>
 </section>
 
+<!-- ── Playground ────────────────────────────────────────────────────────── -->
+<section id="playground">
+<h2>Playground</h2>
+<p>Essayez Ollin directement dans le navigateur. Le code est exécuté par la VM Ollin compilée en WebAssembly.</p>
+
+<div class="pg-examples" id="pg-examples"></div>
+
+<textarea class="pg-editor" id="pg-editor" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Entrez votre code Ollin ici…">print("hello world!")</textarea>
+
+<div class="pg-toolbar">
+  <button class="pg-run" id="pg-run" disabled>▶ Exécuter</button>
+  <span class="pg-status" id="pg-status">Chargement du runtime…</span>
+</div>
+
+<div class="pg-output" id="pg-output">La sortie apparaîtra ici.</div>
+</section>
+
 </main>
 
 <script>
@@ -1154,6 +1226,89 @@ const observer = new IntersectionObserver(entries => {
     });
 }, { rootMargin: '-20% 0px -70% 0px' });
 sections.forEach(s => observer.observe(s));
+
+// ── playground ────────────────────────────────────────────────────────────
+const pgExamples = [
+  { name: 'Hello world',  code: 'print("hello world!")' },
+  { name: 'Fibonacci',    code: 'func fib(n)\n  if n <= 1 then return n end\n  return fib(n-1) + fib(n-2)\nend\nprint(fib(10))' },
+  { name: 'FizzBuzz',     code: 'for i in [1;15]\n  if i % 15 == 0 then print("FizzBuzz")\n  elif i % 3 == 0 then print("Fizz")\n  elif i % 5 == 0 then print("Buzz")\n  else print(i)\n  end\nend' },
+  { name: 'Closure',      code: 'func counter()\n  var n = 0\n  return func()\n    n = n + 1\n    return n\n  end\nend\nvar c = counter()\nprint(c(), c(), c())' },
+  { name: 'Map',          code: 'var m = {name: "ollin", version: 1}\nfor k, v in m\n  print(k, "=", v)\nend' },
+  { name: 'Classe',       code: 'class Vec2\n  func init(x, y)\n    self.x = x\n    self.y = y\n  end\n  func __add(other)\n    return Vec2(self.x + other.x, self.y + other.y)\n  end\n  func __str()\n    return "Vec2(" + self.x + "," + self.y + ")"\n  end\nend\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
+];
+
+const pgEditor     = document.getElementById('pg-editor');
+const pgRunBtn     = document.getElementById('pg-run');
+const pgStatus     = document.getElementById('pg-status');
+const pgOutput     = document.getElementById('pg-output');
+const pgExamplesEl = document.getElementById('pg-examples');
+
+pgExamples.forEach(ex => {
+  const btn = document.createElement('button');
+  btn.className = 'pg-ex-btn';
+  btn.textContent = ex.name;
+  btn.addEventListener('click', () => { pgEditor.value = ex.code; pgEditor.focus(); });
+  pgExamplesEl.appendChild(btn);
+});
+
+pgEditor.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = pgEditor.selectionStart;
+    pgEditor.value = pgEditor.value.substring(0, s) + '  ' + pgEditor.value.substring(pgEditor.selectionEnd);
+    pgEditor.selectionStart = pgEditor.selectionEnd = s + 2;
+  }
+});
+
+let ollin = null;
+const wasmScript = document.createElement('script');
+wasmScript.src = 'wasm/ollin.js';
+wasmScript.onload = () => {
+  OllinModule().then(m => {
+    ollin = m;
+    pgRunBtn.disabled = false;
+    pgStatus.textContent = 'Runtime prêt';
+    setTimeout(() => { pgStatus.textContent = ''; }, 2000);
+  }).catch(() => { pgStatus.textContent = 'Erreur initialisation WASM'; });
+};
+wasmScript.onerror = () => { pgStatus.textContent = 'WASM non disponible'; };
+document.head.appendChild(wasmScript);
+
+function runCode() {
+  if (!ollin) return;
+  const out = ollin.run(pgEditor.value);
+  if (!out) {
+    pgOutput.textContent = '(aucune sortie)';
+    pgOutput.className = 'pg-output';
+  } else if (out.startsWith('error:')) {
+    pgOutput.textContent = out;
+    pgOutput.className = 'pg-output has-error';
+  } else {
+    pgOutput.textContent = out;
+    pgOutput.className = 'pg-output has-output';
+  }
+}
+
+pgRunBtn.addEventListener('click', runCode);
+pgEditor.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runCode();
+});
+
+// "▶ Essayer" buttons on existing code blocks
+document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
+  const code = pre.querySelector('code');
+  if (!code) return;
+  const text = code.textContent.trim();
+  if (text.length < 15 || text.includes('→') || text.includes('source .ol')) return;
+  const btn = document.createElement('button');
+  btn.className = 'try-btn';
+  btn.textContent = '▶ Essayer';
+  btn.addEventListener('click', () => {
+    pgEditor.value = text;
+    document.getElementById('playground').scrollIntoView({ behavior: 'smooth' });
+  });
+  pre.appendChild(btn);
+});
 </script>
 </body>
 </html>
