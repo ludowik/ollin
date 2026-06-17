@@ -6,6 +6,7 @@
 struct Iterator {
     int refcount = 1;
     virtual bool next(Value& key, Value& val) = 0;
+    virtual bool primary_is_val() const = 0;  // true=val (array/range), false=key (map)
     virtual ~Iterator() = default;
 };
 
@@ -23,6 +24,7 @@ struct MapIterator : Iterator {
         ++pos;
         return true;
     }
+    bool primary_is_val() const override { return false; }  // 1 var → key
 };
 
 struct ArrayIterator : Iterator {
@@ -39,4 +41,5 @@ struct ArrayIterator : Iterator {
         ++pos;
         return true;
     }
+    bool primary_is_val() const override { return true; }  // 1 var → element
 };

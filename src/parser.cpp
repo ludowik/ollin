@@ -347,28 +347,6 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     advance(); // FOR
     std::string first_var = expect(TokenType::IDENTIFIER).lexeme;
 
-    if (check(TokenType::COMMA)) {
-        // for k, v in map_expr
-        advance(); // consume COMMA
-        std::string val_var = expect(TokenType::IDENTIFIER).lexeme;
-        expect(TokenType::IN);
-        auto map_e = expr();
-        consumeLineEnd();
-        auto s = std::make_unique<ForMapStmt>();
-        s->line     = line;
-        s->key_var  = first_var;
-        s->val_var  = val_var;
-        s->map_expr = std::move(map_e);
-        while (true) {
-            skipNewlines();
-            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
-            s->body.push_back(parseOneStmt());
-        }
-        expect(TokenType::END);
-        consumeLineEnd();
-        return s;
-    }
-
     if (match(TokenType::EQUALS)) {
         // for i=start,end[,step]
         auto s = std::make_unique<ForStmt>();
@@ -389,25 +367,28 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         return s;
     }
 
-    // for i in ...
-    expect(TokenType::IN);
-    auto iter_expr = expr();
-    // for v in iterable_expr  (array, map, or range)
-    {
-        auto s = std::make_unique<ForInStmt>();
-        s->line      = line;
-        s->val_var   = first_var;
-        s->iter_expr = std::move(iter_expr);
-        consumeLineEnd();
-        while (true) {
-            skipNewlines();
-            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
-            s->body.push_back(parseOneStmt());
-        }
-        expect(TokenType::END);
-        consumeLineEnd();
-        return s;
+    // for var1[, var2] in expr
+    std::string var2;
+    if (check(TokenType::COMMA)) {
+        advance();
+        var2 = expect(TokenType::IDENTIFIER).lexeme;
     }
+    expect(TokenType::IN);
+    auto iter_e = expr();
+    consumeLineEnd();
+    auto s = std::make_unique<ForIterStmt>();
+    s->line      = line;
+    s->var1      = first_var;
+    s->var2      = var2;
+    s->iter_expr = std::move(iter_e);
+    while (true) {
+        skipNewlines();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        s->body.push_back(parseOneStmt());
+    }
+    expect(TokenType::END);
+    consumeLineEnd();
+    return s;
 }
 
 std::unique_ptr<Stmt> Parser::exprStmt() {

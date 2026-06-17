@@ -30,8 +30,7 @@ superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT "in" expr NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT "," IDENT "in" expr NEWLINE { stmt } "end" NEWLINE ;
+               | "for" IDENT [ "," IDENT ] "in" expr NEWLINE { stmt } "end" NEWLINE ;
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]

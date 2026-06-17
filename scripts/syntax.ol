@@ -406,12 +406,19 @@ assert(km[nil]   == "nil")
 assert(km[42]    == "int")
 assert(km[1.0]   == km[1])     ## int == float comme clé (si même valeur numérique)
 
-## itération
+## itération clé+valeur
 var total = 0
 for k, v in {x: 1, y: 2, z: 3}
     total += v
 end
 assert(total == 6)
+
+## itération clé seule (1 variable sur map → clé)
+var key_sum = 0
+for k in {a: 1, b: 2, c: 3}
+    key_sum += 1   ## on compte juste les itérations
+end
+assert(key_sum == 3)
 
 ## ── 15. Arrays ───────────────────────────────────────────────────────────────
 

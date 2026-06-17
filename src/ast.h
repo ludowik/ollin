@@ -8,7 +8,7 @@
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
-struct ForStmt; struct IndexAssignStmt; struct ForMapStmt; struct ForInStmt;
+struct ForStmt; struct IndexAssignStmt; struct ForIterStmt;
 struct BlockStmt; struct ClassDeclStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
@@ -32,8 +32,7 @@ struct StmtVisitor {
     virtual void visit(const ReturnStmt&)    = 0;
     virtual void visit(const ForStmt&)       = 0;
     virtual void visit(const IndexAssignStmt&) = 0;
-    virtual void visit(const ForMapStmt&)    = 0;
-    virtual void visit(const ForInStmt&)     = 0;
+    virtual void visit(const ForIterStmt&)   = 0;
     virtual void visit(const BlockStmt&)     = 0;
     virtual void visit(const ClassDeclStmt&) = 0;
     virtual ~StmtVisitor() = default;
@@ -231,18 +230,12 @@ struct ForStmt : Stmt {
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-// for k,v in map_or_array  (map→(key,val), array→(1-based index, val))
-struct ForMapStmt : Stmt {
-    std::string key_var;
-    std::string val_var;
-    std::unique_ptr<Expr> map_expr;
-    std::vector<std::unique_ptr<Stmt>> body;
-    void accept(StmtVisitor& v) const override { v.visit(*this); }
-};
-
-// for v in iterable_expr  (array: val only)
-struct ForInStmt : Stmt {
-    std::string val_var;
+// for [var1,] var2 in iterable_expr
+// 1 var  → var1 reçoit la valeur primaire (val pour array/range, key pour map)
+// 2 vars → var1=key/index, var2=val
+struct ForIterStmt : Stmt {
+    std::string var1;                    // toujours lié (key si 2 vars, primary si 1 var)
+    std::string var2;                    // vide = forme 1 var
     std::unique_ptr<Expr> iter_expr;
     std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }

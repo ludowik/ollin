@@ -49,8 +49,8 @@ private:
     int resolveUpvalFrom(int scope_idx, const std::string& name);
     int captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
     uint8_t compileMethodFunc(const FuncDeclStmt& s);
-    void    compileIteratorLoop(const Expr& src, const std::string& key_var,
-                                const std::string& val_var,
+    void    compileIteratorLoop(const Expr& src, const std::string& var1,
+                                const std::string& var2,
                                 const std::vector<std::unique_ptr<Stmt>>& body);
 
     int allocReg() {
@@ -75,8 +75,7 @@ private:
     void visit(const FuncDeclStmt&)  override;
     void visit(const ReturnStmt&)    override;
     void visit(const ForStmt&)       override;
-    void visit(const ForMapStmt&)    override;
-    void visit(const ForInStmt&)     override;
+    void visit(const ForIterStmt&)   override;
     void visit(const BlockStmt&)     override;
     void visit(const ClassDeclStmt&) override;
 

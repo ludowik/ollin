@@ -400,7 +400,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_BAND, &&op_BOR, &&op_BXOR,
         &&op_BNOT,
         &&op_BLSHIFT, &&op_BRSHIFT,
-        &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_NEXT,
+        &&op_NEW_ARRAY, &&op_ARRAY_PUSH, &&op_FOR_ITER_NEXT, &&op_FOR_ITER_NEXT1,
         &&op_LOAD_FUNC, &&op_CALL_DYN,
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
@@ -801,6 +801,19 @@ op_FOR_ITER_NEXT: {
         } else {
             regs[base + A + 1] = std::move(key);
             regs[base + A + 2] = std::move(val);
+        }
+    }
+    NEXT();
+}
+
+op_FOR_ITER_NEXT1: {
+    {
+        Value key, val;
+        if (!regs[base + A].iptr->next(key, val)) {
+            ip = Bx;
+        } else {
+            regs[base + A + 1] = regs[base + A].iptr->primary_is_val()
+                                  ? std::move(val) : std::move(key);
         }
     }
     NEXT();
@@ -1345,6 +1358,16 @@ op_HALT:
             } else {
                 regs[base+A+1] = std::move(key);
                 regs[base+A+2] = std::move(val);
+            }
+            break;
+        }
+        case Op::FOR_ITER_NEXT1: {
+            Value key, val;
+            if (!regs[base+A].iptr->next(key, val)) {
+                ip = Bx;
+            } else {
+                regs[base+A+1] = regs[base+A].iptr->primary_is_val()
+                                  ? std::move(val) : std::move(key);
             }
             break;
         }

@@ -28,4 +28,5 @@ struct RangeIterator : Iterator {
         current += step;
         return true;
     }
+    bool primary_is_val() const override { return true; }  // 1 var → valeur du range
 };

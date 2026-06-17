@@ -109,13 +109,9 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
             add(f->var);
             collectLocals(f->body, out, seen, collect_funcs);
         }
-        if (auto* fm = dynamic_cast<const ForMapStmt*>(s.get())) {
-            add(fm->key_var);
-            add(fm->val_var);
-            collectLocals(fm->body, out, seen, collect_funcs);
-        }
-        if (auto* fi = dynamic_cast<const ForInStmt*>(s.get())) {
-            add(fi->val_var);
+        if (auto* fi = dynamic_cast<const ForIterStmt*>(s.get())) {
+            add(fi->var1);
+            if (!fi->var2.empty()) add(fi->var2);
             collectLocals(fi->body, out, seen, collect_funcs);
         }
         if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
@@ -968,8 +964,8 @@ void Compiler::visit(const RangeExpr& e) {
 }
 
 void Compiler::compileIteratorLoop(const Expr& src,
-                                   const std::string& key_var,
-                                   const std::string& val_var,
+                                   const std::string& var1,
+                                   const std::string& var2,
                                    const std::vector<std::unique_ptr<Stmt>>& body) {
     auto bind = [&](const std::string& name, int src_reg) {
         auto it = local_regs_.find(name);
@@ -982,19 +978,26 @@ void Compiler::compileIteratorLoop(const Expr& src,
         }
     };
 
+    bool two_vars = !var2.empty();
     int block = reg_top_;
-    reg_top_ += 4;
+    int tmp_src = block + (two_vars ? 3 : 2);
+    reg_top_ = tmp_src + 1;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
-    compileInto(src, block + 3);
-    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)(block), (uint8_t)(block + 3), 0));
-    reg_top_ = block + 3;
+    compileInto(src, tmp_src);
+    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
+    reg_top_ = tmp_src;
 
     auto loop_start = (uint16_t)chunk.currentPos();
-    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
+    Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
+    size_t exit_patch = chunk.emitJump(iter_op, (uint8_t)block);
 
-    if (!key_var.empty()) bind(key_var, block + 1);
-    bind(val_var, block + 2);
+    if (two_vars) {
+        bind(var1, block + 1);   // key / index
+        bind(var2, block + 2);   // val
+    } else {
+        bind(var1, block + 1);   // primary (val pour array/range, key pour map)
+    }
 
     break_patches.push_back({});
     continue_patches.push_back({});
@@ -1015,14 +1018,9 @@ void Compiler::compileIteratorLoop(const Expr& src,
     reg_top_ = block;
 }
 
-void Compiler::visit(const ForMapStmt& s) {
+void Compiler::visit(const ForIterStmt& s) {
     if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
-    compileIteratorLoop(*s.map_expr, s.key_var, s.val_var, s.body);
-}
-
-void Compiler::visit(const ForInStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
-    compileIteratorLoop(*s.iter_expr, "", s.val_var, s.body);
+    compileIteratorLoop(*s.iter_expr, s.var1, s.var2, s.body);
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {

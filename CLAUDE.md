@@ -175,17 +175,21 @@ Trois syntaxes :
 
 ```
 for i=start,end[,step]      ## numérique (step optionnel, défaut = 1)
-for v in expr               ## itération valeurs (array, range)
-for k,v in expr             ## itération clé/index + valeur (map ou array)
+for v in expr               ## 1 var : valeur primaire de l'itérable
+for k,v in expr             ## 2 vars : clé/index + valeur
 ```
 
+**Valeur primaire (1 var)** : définie par l'itérateur — `ArrayIterator` et `RangeIterator` → val (l'élément) ; `MapIterator` → key (la clé).  
 Step absent → step = 1 (condition `i <= end`).  
 Step présent → condition runtime `(end - i) * step >= 0` (valide dans les deux sens).  
 Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires au-dessus de `locals_top_`.  
 En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
 `break` fonctionne dans toutes les formes.
 
-`for k,v in m` et `for v in arr/range` : utilisent le protocole `Iterator` — `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`. `FOR_ITER_NEXT` appelle `next(key,val)` → `[block+1]`=key, `[block+2]`=val. 3 registres persistants + 1 temp source (libéré après MAKE_ITER).
+`for [k,] v in expr` : `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`.  
+- 2 vars : `FOR_ITER_NEXT` → `[block+1]`=key, `[block+2]`=val. 3 registres + 1 temp source.  
+- 1 var  : `FOR_ITER_NEXT1` → `[block+1]`=primary (val si `primary_is_val()`, sinon key). 2 registres + 1 temp source.  
+`Iterator::primary_is_val()` : `ArrayIterator`=true, `RangeIterator`=true, `MapIterator`=false.
 
 ## Type range
 
