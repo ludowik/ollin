@@ -171,12 +171,11 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Boucle `for`
 
-Quatre syntaxes :
+Trois syntaxes :
 
 ```
-for i=start,end             ## numérique, step = 1 implicite
-for i=start,end,step        ## step positif ou négatif
-for v in expr               ## itération valeurs (array, range ou tout itérable)
+for i=start,end[,step]      ## numérique (step optionnel, défaut = 1)
+for v in expr               ## itération valeurs (array, range)
 for k,v in expr             ## itération clé/index + valeur (map ou array)
 ```
 
