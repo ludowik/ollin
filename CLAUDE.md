@@ -171,14 +171,13 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Boucle `for`
 
-Cinq syntaxes :
+Quatre syntaxes :
 
 ```
-for i in [start;end]        ## range intervalle (voir §Range)
 for i=start,end             ## numérique, step = 1 implicite
 for i=start,end,step        ## step positif ou négatif
-for v in arr_expr           ## itération valeurs d'un array ou range
-for k,v in map_or_arr       ## itération clé/index + valeur (map ou array)
+for v in expr               ## itération valeurs (array, range ou tout itérable)
+for k,v in expr             ## itération clé/index + valeur (map ou array)
 ```
 
 Step absent → step = 1 (condition `i <= end`).  
