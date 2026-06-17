@@ -105,10 +105,6 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
         if (collect_funcs)
             if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
                 add(f->name);
-        if (auto* f = dynamic_cast<const ForStmt*>(s.get())) {
-            add(f->var);
-            collectLocals(f->body, out, seen, collect_funcs);
-        }
         if (auto* fi = dynamic_cast<const ForIterStmt*>(s.get())) {
             add(fi->var1);
             if (!fi->var2.empty()) add(fi->var2);
@@ -579,82 +575,6 @@ void Compiler::visit(const ReturnStmt& s) {
     }
 }
 
-void Compiler::visit(const ForStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
-    int base_reg = reg_top_;
-
-    int i_reg;
-    if (local_regs_.count(s.var)) {
-        i_reg = local_regs_.at(s.var);   // pré-alloué par collectLocals
-    } else {
-        i_reg = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-    }
-    compileInto(*s.start, i_reg);
-
-    int end_reg = reg_top_++;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-    compileInto(*s.end, end_reg);
-
-    int step_reg = -1;
-    if (s.step) {
-        step_reg = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        compileInto(*s.step, step_reg);
-    }
-
-    int one_r = -1;
-    if (step_reg < 0) {
-        one_r = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
-                           chunk.addConstant(Value((int64_t)1))));
-    }
-
-    auto loop_start = (uint16_t)chunk.currentPos();
-
-    int sc0 = reg_top_, sc1 = reg_top_ + 1, cond_r = reg_top_ + 2;
-    if (reg_top_ + 3 > reg_count_) reg_count_ = reg_top_ + 3;
-
-    size_t exit_patch;
-    if (step_reg < 0) {
-        chunk.emit(makeABC((uint8_t)Op::LE, (uint8_t)cond_r, (uint8_t)i_reg, (uint8_t)end_reg));
-        exit_patch = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
-    } else {
-        chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)sc0, (uint8_t)end_reg, (uint8_t)i_reg));
-        chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)sc0, (uint8_t)sc0, (uint8_t)step_reg));
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)sc1,
-                           chunk.addConstant(Value((int64_t)0))));
-        chunk.emit(makeABC((uint8_t)Op::GE, (uint8_t)cond_r, (uint8_t)sc0, (uint8_t)sc1));
-        exit_patch = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
-    }
-
-    break_patches.push_back({});
-    continue_patches.push_back({});
-    for (auto& stmt : s.body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
-
-    uint16_t incr_addr = (uint16_t)chunk.currentPos();
-    for (size_t p : continue_patches.back()) chunk.patchJump(p, incr_addr);
-    continue_patches.pop_back();
-
-    if (step_reg < 0)
-        chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)one_r));
-    else
-        chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)i_reg, (uint8_t)i_reg, (uint8_t)step_reg));
-
-    chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
-
-    uint16_t exit = (uint16_t)chunk.currentPos();
-    chunk.patchJump(exit_patch, exit);
-    for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
-    break_patches.pop_back();
-
-    reg_top_ = base_reg;  // libère end/step/one_r ; i est pré-alloué, reste intact
-}
 
 // ── expressions ───────────────────────────────────────────────────────────────
 

@@ -348,15 +348,20 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     std::string first_var = expect(TokenType::IDENTIFIER).lexeme;
 
     if (match(TokenType::EQUALS)) {
-        // for i=start,end[,step]
-        auto s = std::make_unique<ForStmt>();
-        s->line = line;
-        s->var = first_var;
-        s->start = expr();
+        // for i=start,end[,step]  →  désucré en  for i in [start;end[;step]]
+        auto range = std::make_unique<RangeExpr>();
+        range->line      = line;
+        range->incl_left = true;
+        range->incl_right = true;
+        range->start = expr();
         expect(TokenType::COMMA);
-        s->end = expr();
-        if (match(TokenType::COMMA)) s->step = expr();
+        range->end = expr();
+        if (match(TokenType::COMMA)) range->step = expr();
         consumeLineEnd();
+        auto s = std::make_unique<ForIterStmt>();
+        s->line      = line;
+        s->var1      = first_var;
+        s->iter_expr = std::move(range);
         while (true) {
             skipNewlines();
             if (check(TokenType::END) || check(TokenType::EOF_T)) break;

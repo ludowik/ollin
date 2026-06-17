@@ -989,15 +989,15 @@ op_MAKE_RANGE: {
         bool has_step  = (C >> 1) & 1;
         bool incl_right = C & 1;
         int line_ = errLine();
-        auto toI64 = [&](const Value& v) -> int64_t {
-            if (v.isInteger()) return v.asInt();
-            if (v.isFloat())   return (int64_t)v.asFloat();
+        auto toDouble_ = [&](const Value& v) -> double {
+            if (v.isInteger()) return (double)v.asInt();
+            if (v.isFloat())   return v.asFloat();
             throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range bound must be a number");
         };
-        int64_t start = toI64(regs[base + B]);
-        int64_t end   = toI64(regs[base + B + 1]);
-        int64_t step  = has_step ? toI64(regs[base + B + 2]) : 1;
-        if (step == 0) throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range step cannot be zero");
+        double start = toDouble_(regs[base + B]);
+        double end   = toDouble_(regs[base + B + 1]);
+        double step  = has_step ? toDouble_(regs[base + B + 2]) : 1.0;
+        if (step == 0.0) throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range step cannot be zero");
         Range* r = new Range{1, start, end, step, incl_right};
         regs[base + A] = Value::makeRange(r);
     }
@@ -1512,15 +1512,15 @@ op_HALT:
             bool has_step   = (C >> 1) & 1;
             bool incl_right2 = C & 1;
             int line_s = errLine();
-            auto toI64s = [&](const Value& v) -> int64_t {
-                if (v.isInteger()) return v.asInt();
-                if (v.isFloat())   return (int64_t)v.asFloat();
+            auto toDouble_s = [&](const Value& v) -> double {
+                if (v.isInteger()) return (double)v.asInt();
+                if (v.isFloat())   return v.asFloat();
                 throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range bound must be a number");
             };
-            int64_t start2 = toI64s(regs[base + B]);
-            int64_t end2   = toI64s(regs[base + B + 1]);
-            int64_t step2  = has_step ? toI64s(regs[base + B + 2]) : 1;
-            if (step2 == 0) throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range step cannot be zero");
+            double start2 = toDouble_s(regs[base + B]);
+            double end2   = toDouble_s(regs[base + B + 1]);
+            double step2  = has_step ? toDouble_s(regs[base + B + 2]) : 1.0;
+            if (step2 == 0.0) throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range step cannot be zero");
             Range* r2 = new Range{1, start2, end2, step2, incl_right2};
             regs[base + A] = Value::makeRange(r2);
             break;

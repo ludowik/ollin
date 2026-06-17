@@ -8,7 +8,7 @@
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
-struct ForStmt; struct IndexAssignStmt; struct ForIterStmt;
+struct ForIterStmt; struct IndexAssignStmt;
 struct BlockStmt; struct ClassDeclStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
@@ -30,7 +30,7 @@ struct StmtVisitor {
     virtual void visit(const TryCatchStmt&)  = 0;
     virtual void visit(const FuncDeclStmt&)  = 0;
     virtual void visit(const ReturnStmt&)    = 0;
-    virtual void visit(const ForStmt&)       = 0;
+
     virtual void visit(const IndexAssignStmt&) = 0;
     virtual void visit(const ForIterStmt&)   = 0;
     virtual void visit(const BlockStmt&)     = 0;
@@ -220,15 +220,6 @@ struct IndexAssignStmt : Stmt {
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
-// for i in start..end   /   for i=start,end
-struct ForStmt : Stmt {
-    std::string var;
-    std::unique_ptr<Expr> start;
-    std::unique_ptr<Expr> end;
-    std::unique_ptr<Expr> step;  // nullptr = step of 1 (forward only)
-    std::vector<std::unique_ptr<Stmt>> body;
-    void accept(StmtVisitor& v) const override { v.visit(*this); }
-};
 
 // for [var1,] var2 in iterable_expr
 // 1 var  → var1 reçoit la valeur primaire (val pour array/range, key pour map)

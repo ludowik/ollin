@@ -74,7 +74,7 @@ private:
     void visit(const TryCatchStmt&)  override;
     void visit(const FuncDeclStmt&)  override;
     void visit(const ReturnStmt&)    override;
-    void visit(const ForStmt&)       override;
+
     void visit(const ForIterStmt&)   override;
     void visit(const BlockStmt&)     override;
     void visit(const ClassDeclStmt&) override;
