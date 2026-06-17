@@ -24,7 +24,7 @@ jobs:
 
           git clone "https://x-access-token:${DOCS_TOKEN}@github.com/ludowik/ollin-docs.git" /tmp/ollin-docs
 
-          rsync -a --delete docs/ /tmp/ollin-docs/
+          rsync -a --delete --exclude='.git' docs/ /tmp/ollin-docs/
 
           cd /tmp/ollin-docs
           git add -A
