@@ -57,6 +57,25 @@ ollin/
 - Pusher sur `origin/main` après chaque commit
 - `git restore <fichier>` pour annuler une modification non commitée
 
+## Règle computed-goto (vm.cpp)
+
+La VM utilise le **computed-goto dispatch** (`goto *dt[op]`) pour la performance (+15-25% vs switch).  
+gcc/clang sont **stricts** : toute variable avec destructeur non-trivial (`Value`, `std::vector`, `std::unique_ptr`…) doit être dans un bloc `{}` qui se ferme **avant** `NEXT()`.  
+MinGW/Windows accepte silencieusement ce code invalide — le CI Linux détecte l'erreur.
+
+**Règle** : dans chaque handler computed-goto, si des variables non-triviales sont nécessaires, les encapsuler :
+```cpp
+op_EXEMPLE: {
+    {                          // ← bloc interne
+        Value v = ...;         // destructeur non-trivial
+        call_stack.push_back(...);
+        fp_addr = fp.addr;
+    }                          // ← v détruite ici
+    ip = fp_addr;
+    NEXT();                    // ← goto sans variable en portée
+}
+```
+
 ## Commande `perf`
 
 Quand l'utilisateur dit **"perf"**, lancer : `bash bench/bench_all.sh`
