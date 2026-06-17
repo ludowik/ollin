@@ -35,12 +35,13 @@ uint8_t Chunk::addFunc(FuncProto fp) {
 
 void Chunk::emit(Instr i) {
     code.push_back(i);
+    lines.push_back(current_line_);
 }
 
 size_t Chunk::emitJump(Op op, uint8_t a) {
-    // emit placeholder with Bx=0xFFFF
     code.push_back(makeABx((uint8_t)op, a, 0xFFFF));
-    return code.size() - 1;  // return index into code[] for patching
+    lines.push_back(current_line_);
+    return code.size() - 1;
 }
 
 void Chunk::patchJump(size_t pos, uint16_t target) {

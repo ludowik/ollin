@@ -370,6 +370,11 @@ void VM::execute(const Chunk& chunk) {
     call_stack.reserve(1000);
     call_stack.push_back({0, 0, {}, {}, {}});
 
+    auto errLine = [&]() -> int {
+        uint32_t idx = ip > 0 ? ip - 1 : 0;
+        return (idx < (uint32_t)ch->lines.size()) ? ch->lines[idx] : 0;
+    };
+
 #ifdef __GNUC__
 // ── Computed-goto dispatch ────────────────────────────────────────────────────
 // Table in the exact order of enum Op (chunk.h).
@@ -420,7 +425,7 @@ op_MOVE:
 
 op_LOAD_GLOBAL:
     if (!globals_init[Bx])
-        throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": undefined: " + ch->identifiers[Bx]);
     regs[base + A] = globals[Bx];
     NEXT();
 
@@ -475,7 +480,7 @@ op_DIV: {
             { ip = addr; NEXT(); }
     }
     double dv = asDouble(regs[base+C]);
-    if (dv == 0.0) throw std::runtime_error("runtime: division by zero");
+    if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
     regs[base+A] = Value(asDouble(regs[base+B]) / dv);
     NEXT();
 }
@@ -487,11 +492,11 @@ op_MOD: {
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (bv.isInteger() && cv.isInteger()) {
-        if (cv.asInt() == 0) throw std::runtime_error("runtime: modulo by zero");
+        if (cv.asInt() == 0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
         regs[base+A] = Value(bv.asInt() % cv.asInt());
     } else {
         double dv = asDouble(cv);
-        if (dv == 0.0) throw std::runtime_error("runtime: modulo by zero");
+        if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
         regs[base+A] = Value(std::fmod(asDouble(bv), dv));
     }
     NEXT();
@@ -682,7 +687,7 @@ op_THROW: {
     {
         Value thrown = regs[base + A];
         if (handler_stack.empty())
-            throw std::runtime_error("unhandled exception: " + valueToString(thrown));
+            throw std::runtime_error("line " + std::to_string(errLine()) + ": unhandled exception: " + valueToString(thrown));
         Handler h = handler_stack.back();
         handler_stack.pop_back();
         while (call_stack.size() > h.call_depth) {
@@ -706,10 +711,10 @@ op_GET_INDEX: {
     if (obj.isMap() || obj.isClass()) {
         regs[base + A] = protoChainGet(obj, key);
     } else if (obj.isArray()) {
-        if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
+        if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
         regs[base + A] = obj.arrayGet(key.asInt());
     } else {
-        throw std::runtime_error("runtime: [] on non-indexable");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: [] on non-indexable");
     }
     NEXT();
 }
@@ -720,10 +725,10 @@ op_SET_INDEX: {
     if (obj.isMap() || obj.isClass()) {
         obj.mapSet(key, regs[base + C]);
     } else if (obj.isArray()) {
-        if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
+        if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
         obj.arraySet(key.asInt(), regs[base + C]);
     } else {
-        throw std::runtime_error("runtime: []= on non-indexable");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: []= on non-indexable");
     }
     NEXT();
 }
@@ -735,7 +740,7 @@ op_MAKE_ITER:
 op_BAND: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (!bv.isInteger() || !cv.isInteger())
-        throw std::runtime_error("runtime: & requires integer operands");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: & requires integer operands");
     regs[base+A] = Value(bv.asInt() & cv.asInt());
     NEXT();
 }
@@ -743,7 +748,7 @@ op_BAND: {
 op_BOR: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (!bv.isInteger() || !cv.isInteger())
-        throw std::runtime_error("runtime: | requires integer operands");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: | requires integer operands");
     regs[base+A] = Value(bv.asInt() | cv.asInt());
     NEXT();
 }
@@ -751,7 +756,7 @@ op_BOR: {
 op_BXOR: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (!bv.isInteger() || !cv.isInteger())
-        throw std::runtime_error("runtime: ^ requires integer operands");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ^ requires integer operands");
     regs[base+A] = Value(bv.asInt() ^ cv.asInt());
     NEXT();
 }
@@ -759,7 +764,7 @@ op_BXOR: {
 op_BNOT: {
     const Value& bv = regs[base+B];
     if (!bv.isInteger())
-        throw std::runtime_error("runtime: ~ requires integer operand");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ~ requires integer operand");
     regs[base+A] = Value(~bv.asInt());
     NEXT();
 }
@@ -767,7 +772,7 @@ op_BNOT: {
 op_BLSHIFT: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (!bv.isInteger() || !cv.isInteger())
-        throw std::runtime_error("runtime: << requires integer operands");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: << requires integer operands");
     regs[base+A] = Value((int64_t)((uint64_t)bv.asInt() << (cv.asInt() & 63)));
     NEXT();
 }
@@ -775,7 +780,7 @@ op_BLSHIFT: {
 op_BRSHIFT: {
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (!bv.isInteger() || !cv.isInteger())
-        throw std::runtime_error("runtime: >> requires integer operands");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: >> requires integer operands");
     regs[base+A] = Value(bv.asInt() >> (cv.asInt() & 63));
     NEXT();
 }
@@ -948,7 +953,7 @@ op_CALL_METHOD: {
         uint8_t fi;
         if (fn.isFuncVal())      fi = (uint8_t)fn.asInt();
         else if (fn.isClosure()) { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
-        else throw std::runtime_error("runtime: method call on non-function value");
+        else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
         const FuncProto& fp = ch->funcs[fi];
         size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
         if (regs.size() < needed) regs.resize(needed);
@@ -970,15 +975,16 @@ op_MAKE_RANGE: {
     {
         bool has_step  = (C >> 1) & 1;
         bool incl_right = C & 1;
-        auto toI64 = [](const Value& v) -> int64_t {
+        int line_ = errLine();
+        auto toI64 = [&](const Value& v) -> int64_t {
             if (v.isInteger()) return v.asInt();
             if (v.isFloat())   return (int64_t)v.asFloat();
-            throw std::runtime_error("runtime: range bound must be a number");
+            throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range bound must be a number");
         };
         int64_t start = toI64(regs[base + B]);
         int64_t end   = toI64(regs[base + B + 1]);
         int64_t step  = has_step ? toI64(regs[base + B + 2]) : 1;
-        if (step == 0) throw std::runtime_error("runtime: range step cannot be zero");
+        if (step == 0) throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range step cannot be zero");
         Range* r = new Range{1, start, end, step, incl_right};
         regs[base + A] = Value::makeRange(r);
     }
@@ -1011,7 +1017,7 @@ op_HALT:
             break;
         case Op::LOAD_GLOBAL:
             if (!globals_init[Bx])
-                throw std::runtime_error("undefined: " + ch->identifiers[Bx]);
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": undefined: " + ch->identifiers[Bx]);
             regs[base+A] = globals[Bx];
             break;
         case Op::STORE_GLOBAL:
@@ -1062,7 +1068,7 @@ op_HALT:
                     { ip = addr; break; }
             }
             double dv = asDouble(regs[base+C]);
-            if (dv == 0.0) throw std::runtime_error("runtime: division by zero");
+            if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
             regs[base+A] = Value(asDouble(regs[base+B]) / dv);
             break;
         }
@@ -1073,11 +1079,11 @@ op_HALT:
             }
             const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
             if (bv.isInteger() && cv.isInteger()) {
-                if (cv.asInt() == 0) throw std::runtime_error("runtime: modulo by zero");
+                if (cv.asInt() == 0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
                 regs[base+A] = Value(bv.asInt() % cv.asInt());
             } else {
                 double dv = asDouble(cv);
-                if (dv == 0.0) throw std::runtime_error("runtime: modulo by zero");
+                if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
                 regs[base+A] = Value(std::fmod(asDouble(bv), dv));
             }
             break;
@@ -1239,7 +1245,7 @@ op_HALT:
         case Op::THROW: {
             Value thrown = regs[base + A];
             if (handler_stack.empty())
-                throw std::runtime_error("unhandled exception: " + valueToString(thrown));
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": unhandled exception: " + valueToString(thrown));
             Handler h = handler_stack.back();
             handler_stack.pop_back();
             while (call_stack.size() > h.call_depth) {
@@ -1260,10 +1266,10 @@ op_HALT:
             if (obj.isMap() || obj.isClass()) {
                 regs[base+A] = protoChainGet(obj, key);
             } else if (obj.isArray()) {
-                if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
+                if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 regs[base+A] = obj.arrayGet(key.asInt());
             } else {
-                throw std::runtime_error("runtime: [] on non-indexable");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: [] on non-indexable");
             }
             break;
         }
@@ -1272,10 +1278,10 @@ op_HALT:
             if (obj.isMap() || obj.isClass()) {
                 obj.mapSet(key, regs[base+C]);
             } else if (obj.isArray()) {
-                if (!key.isInteger()) throw std::runtime_error("runtime: array index must be integer");
+                if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 obj.arraySet(key.asInt(), regs[base+C]);
             } else {
-                throw std::runtime_error("runtime: []= on non-indexable");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: []= on non-indexable");
             }
             break;
         }
@@ -1286,42 +1292,42 @@ op_HALT:
         case Op::BAND: {
             const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
             if (!bv.isInteger() || !cv.isInteger())
-                throw std::runtime_error("runtime: & requires integer operands");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: & requires integer operands");
             regs[base+A] = Value(bv.asInt() & cv.asInt());
             break;
         }
         case Op::BOR: {
             const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
             if (!bv.isInteger() || !cv.isInteger())
-                throw std::runtime_error("runtime: | requires integer operands");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: | requires integer operands");
             regs[base+A] = Value(bv.asInt() | cv.asInt());
             break;
         }
         case Op::BXOR: {
             const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
             if (!bv.isInteger() || !cv.isInteger())
-                throw std::runtime_error("runtime: ^ requires integer operands");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ^ requires integer operands");
             regs[base+A] = Value(bv.asInt() ^ cv.asInt());
             break;
         }
         case Op::BNOT: {
             const Value& bv = regs[base+B];
             if (!bv.isInteger())
-                throw std::runtime_error("runtime: ~ requires integer operand");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ~ requires integer operand");
             regs[base+A] = Value(~bv.asInt());
             break;
         }
         case Op::BLSHIFT: {
             const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
             if (!bv.isInteger() || !cv.isInteger())
-                throw std::runtime_error("runtime: << requires integer operands");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: << requires integer operands");
             regs[base+A] = Value((int64_t)((uint64_t)bv.asInt() << (cv.asInt() & 63)));
             break;
         }
         case Op::BRSHIFT: {
             const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
             if (!bv.isInteger() || !cv.isInteger())
-                throw std::runtime_error("runtime: >> requires integer operands");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: >> requires integer operands");
             regs[base+A] = Value(bv.asInt() >> (cv.asInt() & 63));
             break;
         }
@@ -1464,7 +1470,7 @@ op_HALT:
             uint8_t fi;
             if (fn.isFuncVal())       fi = (uint8_t)fn.asInt();
             else if (fn.isClosure())  { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
-            else throw std::runtime_error("runtime: method call on non-function value");
+            else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
             if (regs.size() < needed) regs.resize(needed);
@@ -1482,15 +1488,16 @@ op_HALT:
         case Op::MAKE_RANGE: {
             bool has_step   = (C >> 1) & 1;
             bool incl_right2 = C & 1;
-            auto toI64s = [](const Value& v) -> int64_t {
+            int line_s = errLine();
+            auto toI64s = [&](const Value& v) -> int64_t {
                 if (v.isInteger()) return v.asInt();
                 if (v.isFloat())   return (int64_t)v.asFloat();
-                throw std::runtime_error("runtime: range bound must be a number");
+                throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range bound must be a number");
             };
             int64_t start2 = toI64s(regs[base + B]);
             int64_t end2   = toI64s(regs[base + B + 1]);
             int64_t step2  = has_step ? toI64s(regs[base + B + 2]) : 1;
-            if (step2 == 0) throw std::runtime_error("runtime: range step cannot be zero");
+            if (step2 == 0) throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range step cannot be zero");
             Range* r2 = new Range{1, start2, end2, step2, incl_right2};
             regs[base + A] = Value::makeRange(r2);
             break;
@@ -1498,7 +1505,7 @@ op_HALT:
         case Op::HALT:
             return;
         default:
-            throw std::runtime_error("runtime: unknown opcode (" +
+            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: unknown opcode (" +
                 std::to_string((int)iOP(ch->code[ip-1])) + ")");
         }
     }

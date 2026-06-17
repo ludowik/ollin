@@ -59,8 +59,8 @@ struct ExprVisitor {
 };
 
 // ── classes de base ───────────────────────────────────────────────────────────
-struct Stmt { virtual void accept(StmtVisitor&) const = 0; virtual ~Stmt() = default; };
-struct Expr { virtual void accept(ExprVisitor&) const = 0; virtual ~Expr() = default; };
+struct Stmt { int line = 0; virtual void accept(StmtVisitor&) const = 0; virtual ~Stmt() = default; };
+struct Expr { int line = 0; virtual void accept(ExprVisitor&) const = 0; virtual ~Expr() = default; };
 
 // ── expressions ───────────────────────────────────────────────────────────────
 struct BoolExpr : Expr {

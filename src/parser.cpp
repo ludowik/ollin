@@ -143,8 +143,10 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
 // ── instructions ─────────────────────────────────────────────────────────────
 
 std::unique_ptr<Stmt> Parser::varDecl() {
+    int line = peek().line;
     advance();
     auto s = std::make_unique<VarDeclStmt>();
+    s->line = line;
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
@@ -159,8 +161,10 @@ std::unique_ptr<Stmt> Parser::varDecl() {
 }
 
 std::unique_ptr<Stmt> Parser::whileStmt() {
+    int line = peek().line;
     advance();
     auto s = std::make_unique<WhileStmt>();
+    s->line = line;
     s->cond = expr();
     consumeLineEnd();
     while (true) {
@@ -174,8 +178,10 @@ std::unique_ptr<Stmt> Parser::whileStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::ifStmt() {
+    int line = peek().line;
     advance(); // IF
     auto s = std::make_unique<IfStmt>();
+    s->line = line;
     s->cond = expr();
     expect(TokenType::THEN);
     consumeLineEnd();
@@ -214,27 +220,37 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::breakStmt() {
+    int line = peek().line;
     advance();
     consumeLineEnd();
-    return std::make_unique<BreakStmt>();
+    auto s = std::make_unique<BreakStmt>();
+    s->line = line;
+    return s;
 }
 
 std::unique_ptr<Stmt> Parser::continueStmt() {
+    int line = peek().line;
     advance();
     consumeLineEnd();
-    return std::make_unique<ContinueStmt>();
+    auto s = std::make_unique<ContinueStmt>();
+    s->line = line;
+    return s;
 }
 
 std::unique_ptr<Stmt> Parser::throwStmt() {
+    int line = peek().line;
     advance(); // throw
     auto s = std::make_unique<ThrowStmt>(expr());
+    s->line = line;
     consumeLineEnd();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::tryCatchStmt() {
+    int line = peek().line;
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
+    s->line = line;
     consumeLineEnd();
     while (true) {
         skipNewlines();
@@ -263,8 +279,10 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::funcDeclStmt() {
+    int line = peek().line;
     advance(); // FUNC
     auto s = std::make_unique<FuncDeclStmt>();
+    s->line = line;
     s->name = expect(TokenType::IDENTIFIER).lexeme;
     expect(TokenType::LPAREN);
     while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
@@ -289,8 +307,10 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::returnStmt() {
+    int line = peek().line;
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
+    s->line = line;
     if (!check(TokenType::NEWLINE) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)) {
         if (check(TokenType::DOT_DOT_DOT)) {
             advance(); s->spread_varargs = true;
@@ -307,7 +327,9 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::assignStmt() {
+    int line = peek().line;
     auto s = std::make_unique<AssignStmt>();
+    s->line = line;
     s->name = advance().lexeme;
     if      (match(TokenType::PLUS_EQUAL))    s->op = '+';
     else if (match(TokenType::MINUS_EQUAL))   s->op = '-';
@@ -321,6 +343,7 @@ std::unique_ptr<Stmt> Parser::assignStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::forStmt() {
+    int line = peek().line;
     advance(); // FOR
     std::string first_var = expect(TokenType::IDENTIFIER).lexeme;
 
@@ -332,6 +355,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         auto map_e = expr();
         consumeLineEnd();
         auto s = std::make_unique<ForMapStmt>();
+        s->line     = line;
         s->key_var  = first_var;
         s->val_var  = val_var;
         s->map_expr = std::move(map_e);
@@ -348,6 +372,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     if (match(TokenType::EQUALS)) {
         // for i=start,end[,step]
         auto s = std::make_unique<ForStmt>();
+        s->line = line;
         s->var = first_var;
         s->start = expr();
         expect(TokenType::COMMA);
@@ -370,6 +395,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     // for v in iterable_expr  (array, map, or range)
     {
         auto s = std::make_unique<ForInStmt>();
+        s->line      = line;
         s->val_var   = first_var;
         s->iter_expr = std::move(iter_expr);
         consumeLineEnd();
@@ -385,9 +411,12 @@ std::unique_ptr<Stmt> Parser::forStmt() {
 }
 
 std::unique_ptr<Stmt> Parser::exprStmt() {
+    int line = peek().line;
     auto e = expr();
     consumeLineEnd();
-    return std::make_unique<ExprStmt>(std::move(e));
+    auto s = std::make_unique<ExprStmt>(std::move(e));
+    s->line = line;
+    return s;
 }
 
 // ── expressions ──────────────────────────────────────────────────────────────
@@ -741,8 +770,10 @@ std::unique_ptr<Expr> Parser::primary() {
 }
 
 std::unique_ptr<Stmt> Parser::classDecl() {
+    int line = peek().line;
     advance(); // CLASS
     auto s = std::make_unique<ClassDeclStmt>();
+    s->line = line;
     s->name = expect(TokenType::IDENTIFIER).lexeme;
     if (check(TokenType::EXTENDS)) {
         advance();

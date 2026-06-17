@@ -13,7 +13,8 @@ private:
     Chunk chunk;
     std::vector<std::vector<size_t>> break_patches;
     std::vector<std::vector<size_t>> continue_patches;
-    int for_counter_ = 0;
+    int for_counter_  = 0;
+    int current_line_ = 0;
 
     // ── register allocator ────────────────────────────────────────────────────
     std::unordered_map<std::string, int> local_regs_;

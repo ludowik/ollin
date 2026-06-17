@@ -64,7 +64,7 @@ static Value evalConstant(const Expr& e) {
     if (auto* s = dynamic_cast<const StringExpr*>(&e)) return Value(s->value);
     if (auto* b = dynamic_cast<const BoolExpr*>(&e))   return Value((int64_t)(b->value ? 1 : 0));
     if (dynamic_cast<const NilExpr*>(&e))               return Value{};
-    throw std::runtime_error("default values must be literal constants");
+    throw std::runtime_error("default values must be literal constants (not a runtime expression)");
 }
 
 // ── arithmetic op helpers ─────────────────────────────────────────────────────
@@ -187,6 +187,7 @@ Chunk Compiler::compile(const Program& prog) {
 // ── statements ────────────────────────────────────────────────────────────────
 
 void Compiler::visit(const VarDeclStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     // Multi-return from user function call
     if (s.names.size() > 1 && s.values.size() == 1) {
         if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
@@ -229,6 +230,7 @@ void Compiler::visit(const VarDeclStmt& s) {
 }
 
 void Compiler::visit(const WhileStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     auto loop_start = (uint16_t)chunk.currentPos();
     int saved = reg_top_;
     s.cond->accept(*this);
@@ -253,6 +255,7 @@ void Compiler::visit(const WhileStmt& s) {
 }
 
 void Compiler::visit(const IfStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     std::vector<size_t> end_patches;
 
     int saved = reg_top_;
@@ -294,19 +297,20 @@ void Compiler::visit(const IfStmt& s) {
     for (size_t p : end_patches) chunk.patchJump(p, end_addr);
 }
 
-void Compiler::visit(const BreakStmt&) {
+void Compiler::visit(const BreakStmt& s) {
     if (break_patches.empty())
-        throw std::runtime_error("break outside loop");
+        throw std::runtime_error("line " + std::to_string(s.line) + ": break outside loop");
     break_patches.back().push_back(chunk.emitJump(Op::JUMP));
 }
 
-void Compiler::visit(const ContinueStmt&) {
+void Compiler::visit(const ContinueStmt& s) {
     if (continue_patches.empty())
-        throw std::runtime_error("continue outside loop");
+        throw std::runtime_error("line " + std::to_string(s.line) + ": continue outside loop");
     continue_patches.back().push_back(chunk.emitJump(Op::JUMP));
 }
 
 void Compiler::visit(const AssignStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     {
         auto it = local_regs_.find(s.name);
         if (it != local_regs_.end()) {
@@ -369,12 +373,14 @@ void Compiler::visit(const AssignStmt& s) {
 }
 
 void Compiler::visit(const ExprStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     int saved = reg_top_;
     s.expr->accept(*this);
     reg_top_ = saved;
 }
 
 void Compiler::visit(const ThrowStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     int saved = reg_top_;
     s.value->accept(*this);
     int r = last_reg_;
@@ -383,6 +389,7 @@ void Compiler::visit(const ThrowStmt& s) {
 }
 
 void Compiler::visit(const TryCatchStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     int catch_r = s.catch_var.empty() ? 0 : local_regs_.at(s.catch_var);
 
     size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
@@ -420,6 +427,7 @@ void Compiler::visit(const TryCatchStmt& s) {
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     // Save outer context
     auto outer_regs    = std::move(local_regs_);
     auto outer_upvals  = std::move(cur_upval_idx_);
@@ -538,8 +546,9 @@ void Compiler::visit(const FuncDeclStmt& s) {
 }
 
 void Compiler::visit(const ReturnStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     if (!inFunction())
-        throw std::runtime_error("return outside function");
+        throw std::runtime_error("line " + std::to_string(s.line) + ": return outside function");
     if (s.spread_varargs) {
         int base = reg_top_;
         for (int i = 0; i < (int)s.values.size(); ++i) {
@@ -575,6 +584,7 @@ void Compiler::visit(const ReturnStmt& s) {
 }
 
 void Compiler::visit(const ForStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     int base_reg = reg_top_;
 
     int i_reg;
@@ -854,7 +864,7 @@ void Compiler::visit(const ExprCallExpr& e) {
 
 void Compiler::visit(const VarArgExpr&) {
     if (!inFunction())
-        throw std::runtime_error("... outside a variadic function");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": ... outside a variadic function");
     int base = reg_top_;
     chunk.emit(makeABC((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 0, 0));
     last_reg_ = base;
@@ -1006,14 +1016,17 @@ void Compiler::compileIteratorLoop(const Expr& src,
 }
 
 void Compiler::visit(const ForMapStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     compileIteratorLoop(*s.map_expr, s.key_var, s.val_var, s.body);
 }
 
 void Compiler::visit(const ForInStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     compileIteratorLoop(*s.iter_expr, "", s.val_var, s.body);
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     int saved = reg_top_;
 
     // Load the map object
@@ -1129,6 +1142,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
 
 // ── visit(ClassDeclStmt) ──────────────────────────────────────────────────────
 void Compiler::visit(const ClassDeclStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     int saved = reg_top_;
 
     // Créer la valeur classe (T_CLASS = map vide)
