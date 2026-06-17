@@ -40,6 +40,12 @@ private:
 
     static Value protoChainGet(const Value& obj, const Value& key);
 
+    static bool isInstance(const Value& v);
+
+    uint32_t tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs);
+    uint32_t tryMetaUnary (const Value& name, int dest, Value lhs);
+    void     closeUpvals  ();   // closes & frees all open upvalues of the top frame
+
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
         if (v.isInteger()) return (double)v.asInt();
         if (v.isFloat())   return v.asFloat();

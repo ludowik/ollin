@@ -1,5 +1,4 @@
 #include "chunk.h"
-#include <algorithm>
 #include <stdexcept>
 
 uint16_t Chunk::addConstant(Value v) {
@@ -10,13 +9,14 @@ uint16_t Chunk::addConstant(Value v) {
 }
 
 uint16_t Chunk::addIdentifier(const std::string& name) {
-    auto it = std::find(identifiers.begin(), identifiers.end(), name);
-    if (it != identifiers.end())
-        return static_cast<uint16_t>(it - identifiers.begin());
+    auto it = identifier_map_.find(name);
+    if (it != identifier_map_.end()) return it->second;
     if (identifiers.size() >= 0xFFFF)
         throw std::runtime_error("compile: too many identifiers (max 65535)");
+    uint16_t idx = static_cast<uint16_t>(identifiers.size());
     identifiers.push_back(name);
-    return static_cast<uint16_t>(identifiers.size() - 1);
+    identifier_map_[name] = idx;
+    return idx;
 }
 
 uint16_t Chunk::addFuncDefaults(std::vector<Value> defs) {

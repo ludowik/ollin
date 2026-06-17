@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include "string_table.h"
@@ -311,6 +312,7 @@ struct Chunk {
     std::vector<Instr>       code;
     std::vector<Value>       constants;
     std::vector<std::string> identifiers;
+    std::unordered_map<std::string, uint16_t> identifier_map_;
     std::vector<std::vector<Value>> func_defaults;
     std::vector<FuncProto>   funcs;
     uint8_t                  top_reg_count = 8;

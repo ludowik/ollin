@@ -47,7 +47,10 @@ private:
     int resolveUpvalue(const std::string& name);
     int resolveUpvalFrom(int scope_idx, const std::string& name);
     int captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
-    uint8_t compileMethodFunc(const FuncDeclStmt& s);  // compile method with implicit 'self' at R[0]
+    uint8_t compileMethodFunc(const FuncDeclStmt& s);
+    void    compileIteratorLoop(const Expr& src, const std::string& key_var,
+                                const std::string& val_var,
+                                const std::vector<std::unique_ptr<Stmt>>& body);
 
     int allocReg() {
         int r = reg_top_++;

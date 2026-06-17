@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include <algorithm>
 #include <stdexcept>
+#include <unordered_set>
 
 // ── upvalue resolution ────────────────────────────────────────────────────────
 
@@ -66,56 +67,79 @@ static Value evalConstant(const Expr& e) {
     throw std::runtime_error("default values must be literal constants");
 }
 
+// ── arithmetic op helpers ─────────────────────────────────────────────────────
+static Op charToOp(char op) {
+    switch (op) {
+        case '+': return Op::ADD;
+        case '-': return Op::SUB;
+        case '*': return Op::MUL;
+        case '/': return Op::DIV;
+        case '%': return Op::MOD;
+        default:  throw std::runtime_error(std::string("unknown assign op: ") + op);
+    }
+}
+static Op tokenToOp(TokenType op) {
+    switch (op) {
+        case TokenType::PLUS_EQUAL:    return Op::ADD;
+        case TokenType::MINUS_EQUAL:   return Op::SUB;
+        case TokenType::STAR_EQUAL:    return Op::MUL;
+        case TokenType::SLASH_EQUAL:   return Op::DIV;
+        case TokenType::PERCENT_EQUAL: return Op::MOD;
+        default: throw std::runtime_error("unknown compound index assign op");
+    }
+}
+
 // ── pre-scan locals in a block (for register pre-allocation) ─────────────────
 // collect_funcs=true inside function bodies (nested FuncDecls need a local register)
 // collect_funcs=false at top level (top-level funcs are accessed via func_table)
 static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
-                          std::vector<std::string>& out, bool collect_funcs = true) {
+                          std::vector<std::string>& out,
+                          std::unordered_set<std::string>& seen,
+                          bool collect_funcs) {
+    auto add = [&](const std::string& n) {
+        if (seen.insert(n).second) out.push_back(n);
+    };
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
-            for (auto& n : v->names)
-                if (std::find(out.begin(), out.end(), n) == out.end())
-                    out.push_back(n);
-        if (collect_funcs) {
+            for (auto& n : v->names) add(n);
+        if (collect_funcs)
             if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
-                if (std::find(out.begin(), out.end(), f->name) == out.end())
-                    out.push_back(f->name);
-        }
+                add(f->name);
         if (auto* f = dynamic_cast<const ForStmt*>(s.get())) {
-            if (std::find(out.begin(), out.end(), f->var) == out.end())
-                out.push_back(f->var);
-            collectLocals(f->body, out, collect_funcs);
+            add(f->var);
+            collectLocals(f->body, out, seen, collect_funcs);
         }
         if (auto* fm = dynamic_cast<const ForMapStmt*>(s.get())) {
-            if (std::find(out.begin(), out.end(), fm->key_var) == out.end())
-                out.push_back(fm->key_var);
-            if (std::find(out.begin(), out.end(), fm->val_var) == out.end())
-                out.push_back(fm->val_var);
-            collectLocals(fm->body, out, collect_funcs);
+            add(fm->key_var);
+            add(fm->val_var);
+            collectLocals(fm->body, out, seen, collect_funcs);
         }
         if (auto* fi = dynamic_cast<const ForInStmt*>(s.get())) {
-            if (std::find(out.begin(), out.end(), fi->val_var) == out.end())
-                out.push_back(fi->val_var);
-            collectLocals(fi->body, out, collect_funcs);
+            add(fi->val_var);
+            collectLocals(fi->body, out, seen, collect_funcs);
         }
         if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
-            collectLocals(w->body, out, collect_funcs);
+            collectLocals(w->body, out, seen, collect_funcs);
         if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
-            collectLocals(i->then_body, out, collect_funcs);
-            for (auto& ei : i->else_ifs) collectLocals(ei.body, out, collect_funcs);
-            collectLocals(i->else_body, out, collect_funcs);
+            collectLocals(i->then_body, out, seen, collect_funcs);
+            for (auto& ei : i->else_ifs) collectLocals(ei.body, out, seen, collect_funcs);
+            collectLocals(i->else_body, out, seen, collect_funcs);
         }
         if (auto* t = dynamic_cast<const TryCatchStmt*>(s.get())) {
-            collectLocals(t->try_body, out, collect_funcs);
-            if (!t->catch_var.empty() &&
-                std::find(out.begin(), out.end(), t->catch_var) == out.end())
-                out.push_back(t->catch_var);
-            collectLocals(t->catch_body, out, collect_funcs);
-            collectLocals(t->else_body, out, collect_funcs);
+            collectLocals(t->try_body, out, seen, collect_funcs);
+            if (!t->catch_var.empty()) add(t->catch_var);
+            collectLocals(t->catch_body, out, seen, collect_funcs);
+            collectLocals(t->else_body, out, seen, collect_funcs);
         }
         if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
-            collectLocals(b->stmts, out, collect_funcs);
+            collectLocals(b->stmts, out, seen, collect_funcs);
     }
+}
+
+static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
+                          std::vector<std::string>& out, bool collect_funcs = true) {
+    std::unordered_set<std::string> seen(out.begin(), out.end());
+    collectLocals(stmts, out, seen, collect_funcs);
 }
 
 // ── compile expression into a specific destination register ──────────────────
@@ -295,14 +319,7 @@ void Compiler::visit(const AssignStmt& s) {
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 // Emit op directly into dest — safe: rhs is already in a register
-                switch (s.op) {
-                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
-                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs)); break;
-                    default:  throw std::runtime_error(std::string("unknown assign op: ") + s.op);
-                }
+                chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs));
                 reg_top_ = saved;
             }
             return;
@@ -323,14 +340,7 @@ void Compiler::visit(const AssignStmt& s) {
                 int rhs = last_reg_;
                 int res = allocReg();
                 if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-                switch (s.op) {
-                    case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-                    case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-                    case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-                    case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-                    case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-                    default:  throw std::runtime_error(std::string("unknown assign op: ") + s.op);
-                }
+                chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
                 chunk.emit(makeABC((uint8_t)Op::SET_UPVAL, (uint8_t)res, (uint8_t)uv, 0));
             }
             reg_top_ = saved;
@@ -352,14 +362,7 @@ void Compiler::visit(const AssignStmt& s) {
         int rhs = last_reg_;
         int res = allocReg();
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        switch (s.op) {
-            case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-            case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-            case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-            case '/': chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-            case '%': chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)res, (uint8_t)cur, (uint8_t)rhs)); break;
-            default:  throw std::runtime_error(std::string("unknown assign op: ") + s.op);
-        }
+        chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
         chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res, gidx));
     }
     reg_top_ = saved;
@@ -900,42 +903,38 @@ void Compiler::visit(const ArrayExpr& e) {
     last_reg_ = dest;
 }
 
-void Compiler::visit(const ForMapStmt& s) {
-    // 4 temps consécutifs (3 persistants + 1 pour la source) :
-    //   [block+0]=iterator, [block+1]=key_out, [block+2]=val_out, [block+3]=map_src (temp)
+void Compiler::compileIteratorLoop(const Expr& src,
+                                   const std::string& key_var,
+                                   const std::string& val_var,
+                                   const std::vector<std::unique_ptr<Stmt>>& body) {
+    auto bind = [&](const std::string& name, int src_reg) {
+        auto it = local_regs_.find(name);
+        if (it != local_regs_.end()) {
+            if (it->second != src_reg)
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)src_reg, 0));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
+                               (uint8_t)src_reg, chunk.addIdentifier(name)));
+        }
+    };
+
     int block = reg_top_;
     reg_top_ += 4;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
-    compileInto(*s.map_expr, block + 3);
-    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)(block + 0), (uint8_t)(block + 3), 0));
-    reg_top_ = block + 3; // libère block+3
+    compileInto(src, block + 3);
+    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)(block), (uint8_t)(block + 3), 0));
+    reg_top_ = block + 3;
 
     auto loop_start = (uint16_t)chunk.currentPos();
     size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
 
-    {
-        auto k_it = local_regs_.find(s.key_var);
-        if (k_it != local_regs_.end()) {
-            if (k_it->second != block + 1)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)k_it->second, (uint8_t)(block + 1), 0));
-        } else {
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
-                               (uint8_t)(block + 1), chunk.addIdentifier(s.key_var)));
-        }
-        auto v_it = local_regs_.find(s.val_var);
-        if (v_it != local_regs_.end()) {
-            if (v_it->second != block + 2)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_it->second, (uint8_t)(block + 2), 0));
-        } else {
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
-                               (uint8_t)(block + 2), chunk.addIdentifier(s.val_var)));
-        }
-    }
+    if (!key_var.empty()) bind(key_var, block + 1);
+    bind(val_var, block + 2);
 
     break_patches.push_back({});
     continue_patches.push_back({});
-    for (auto& stmt : s.body) {
+    for (auto& stmt : body) {
         int saved = reg_top_;
         stmt->accept(*this);
         reg_top_ = saved;
@@ -952,48 +951,12 @@ void Compiler::visit(const ForMapStmt& s) {
     reg_top_ = block;
 }
 
+void Compiler::visit(const ForMapStmt& s) {
+    compileIteratorLoop(*s.map_expr, s.key_var, s.val_var, s.body);
+}
+
 void Compiler::visit(const ForInStmt& s) {
-    // 4 temps (3 persistants + 1 source) :
-    //   [block+0]=iterator, [block+1]=key_tmp (ignoré), [block+2]=val_out, [block+3]=src (temp)
-    int block = reg_top_;
-    reg_top_ += 4;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-
-    compileInto(*s.iter_expr, block + 3);
-    chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)(block + 0), (uint8_t)(block + 3), 0));
-    reg_top_ = block + 3; // libère block+3
-
-    auto loop_start = (uint16_t)chunk.currentPos();
-    size_t exit_patch = chunk.emitJump(Op::FOR_ITER_NEXT, (uint8_t)block);
-
-    {
-        auto v_it = local_regs_.find(s.val_var);
-        if (v_it != local_regs_.end()) {
-            if (v_it->second != block + 2)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)v_it->second, (uint8_t)(block + 2), 0));
-        } else {
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
-                               (uint8_t)(block + 2), chunk.addIdentifier(s.val_var)));
-        }
-    }
-
-    break_patches.push_back({});
-    continue_patches.push_back({});
-    for (auto& stmt : s.body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
-    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
-    continue_patches.pop_back();
-    chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
-
-    uint16_t exit = (uint16_t)chunk.currentPos();
-    chunk.patchJump(exit_patch, exit);
-    for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
-    break_patches.pop_back();
-
-    reg_top_ = block;
+    compileIteratorLoop(*s.iter_expr, "", s.val_var, s.body);
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
@@ -1029,25 +992,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         compileInto(*s.value, rhs_r);
         int result_r = allocReg();
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        switch (s.op) {
-            case TokenType::PLUS_EQUAL:
-                chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
-                break;
-            case TokenType::MINUS_EQUAL:
-                chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
-                break;
-            case TokenType::STAR_EQUAL:
-                chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
-                break;
-            case TokenType::SLASH_EQUAL:
-                chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
-                break;
-            case TokenType::PERCENT_EQUAL:
-                chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
-                break;
-            default:
-                throw std::runtime_error("unknown compound index assign op");
-        }
+        chunk.emit(makeABC((uint8_t)tokenToOp(s.op), (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
     }
     reg_top_ = saved;
