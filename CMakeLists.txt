@@ -17,13 +17,14 @@ set(OLLIN_SOURCES
 if(EMSCRIPTEN)
     add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES})
     target_include_directories(ollin_wasm PRIVATE src)
-    target_compile_options(ollin_wasm PRIVATE -Wall -Wextra)
+    target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fwasm-exceptions)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
     target_link_options(ollin_wasm PRIVATE
         -sMODULARIZE=1
         -sEXPORT_NAME=OllinModule
         -sALLOW_MEMORY_GROWTH=1
         -sNO_EXIT_RUNTIME=1
+        -fwasm-exceptions
         --bind
     )
 else()
