@@ -20,4 +20,4 @@ for i = 1, N do
 end
 
 local t1 = os.clock()
-print(string.format("lua    N=%d : %.6f s", N, t1 - t0))
+print(string.format("lua    objects N=%d  time: %.4fs", N, t1 - t0))

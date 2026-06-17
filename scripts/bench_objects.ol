@@ -14,4 +14,4 @@ while i < N
 end
 
 var t1 = time()
-printf("ollin  N={} : {} s", N, t1 - t0)
+printf("ollin  objects N={}  time: {}s", N, t1 - t0)
