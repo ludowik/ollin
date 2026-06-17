@@ -516,7 +516,8 @@ pre:hover .try-btn { opacity: 1; }
 <span class="kw">var</span> p, q, r = <span class="num">10</span>, <span class="num">20</span>   <span class="cmt">## r → nil (pas assez de valeurs)</span></code></pre>
 
 <h3>Affectation</h3>
-<pre><code>a = <span class="num">42</span>           <span class="cmt">## simple</span>
+<pre><code><span class="kw">var</span> a = <span class="num">10</span>
+a = <span class="num">42</span>           <span class="cmt">## simple</span>
 a += <span class="num">1</span>           <span class="cmt">## compound : += -= *= /= %=</span>
 a *= <span class="num">2</span>
 <span class="bi">assert</span>(a == <span class="num">86</span>)</code></pre>
@@ -632,7 +633,7 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 <h2>Expressions multi-lignes</h2>
 <p>À l'intérieur de parenthèses, les newlines sont ignorés. Cela permet de découper les longues expressions et conditions.</p>
 
-<pre><code><span class="kw">var</span> total = (
+<pre data-no-run><code><span class="kw">var</span> total = (
     prix_ht
     * ((<span class="num">1</span> + tva) / <span class="num">100</span>)
     + frais_port
@@ -650,7 +651,7 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 <!-- ── If ────────────────────────────────────────────────────────────────── -->
 <section id="if">
 <h2>If / Else</h2>
-<pre><code><span class="kw">if</span> condition <span class="kw">then</span>
+<pre data-no-run><code><span class="kw">if</span> condition <span class="kw">then</span>
     <span class="cmt">## bloc then</span>
 <span class="kw">else if</span> autre_condition <span class="kw">then</span>
     <span class="cmt">## else if (autant que nécessaire)</span>
@@ -864,15 +865,19 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <span class="bi">assert</span>(process(<span class="num">3</span>) == <span class="num">14</span>)   <span class="cmt">## 3*2 + 4*2</span></code></pre>
 
 <h3>Upvalue partagé entre fonctions</h3>
-<pre><code><span class="kw">var</span> count = <span class="num">0</span>
+<pre><code><span class="kw">func</span> make_shared()
+    <span class="kw">var</span> count = <span class="num">0</span>
+    <span class="kw">func</span> inc()  count += <span class="num">1</span>  <span class="kw">end</span>
+    <span class="kw">func</span> get()  <span class="kw">return</span> count  <span class="kw">end</span>
+    <span class="kw">return</span> inc, get
+<span class="kw">end</span>
 
-<span class="kw">func</span> inc()  count += <span class="num">1</span>  <span class="kw">end</span>
-<span class="kw">func</span> get()  <span class="kw">return</span> count  <span class="kw">end</span>
-
+<span class="kw">var</span> inc, get = make_shared()
 inc()
 inc()
 inc()
-<span class="bi">assert</span>(get() == <span class="num">3</span>)</code></pre>
+<span class="bi">assert</span>(get() == <span class="num">3</span>)
+<span class="bi">print</span>(get())   <span class="cmt">## 3</span></code></pre>
 </section>
 
 <!-- ── Maps ──────────────────────────────────────────────────────────────── -->
@@ -903,7 +908,8 @@ point.z     <span class="cmt">## nil</span></code></pre></div>
 </div>
 
 <h3>Écriture</h3>
-<pre><code>point[<span class="str">"z"</span>] = <span class="num">0</span>    <span class="cmt">## nouvelle clé</span>
+<pre><code><span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
+point[<span class="str">"z"</span>] = <span class="num">0</span>    <span class="cmt">## nouvelle clé</span>
 point.z = <span class="num">5</span>      <span class="cmt">## équivalent</span>
 
 point[<span class="str">"x"</span>] += <span class="num">1</span>  <span class="cmt">## compound via crochet</span>
@@ -955,7 +961,8 @@ b.x = <span class="num">99</span>
 ## Carol → 78</span></code></pre>
 
 <h3>Somme des valeurs</h3>
-<pre><code><span class="kw">var</span> total = <span class="num">0</span>
+<pre><code><span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
+<span class="kw">var</span> total = <span class="num">0</span>
 <span class="kw">for</span> k, v <span class="kw">in</span> scores
     total += v
 <span class="kw">end</span>
@@ -970,6 +977,7 @@ b.x = <span class="num">99</span>
     <span class="kw">return</span> s
 <span class="kw">end</span>
 
+<span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
 <span class="bi">assert</span>(sum_values(scores) == <span class="num">255</span>)</code></pre>
 </section>
 
@@ -1060,13 +1068,14 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>      <span class="c
 
 <h3>printf</h3>
 <p>Formatage avec <code>{}</code> pour substitution positionnelle ou <code>{n}</code> pour indexation explicite.</p>
-<pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)   <span class="cmt">## 1 + 2 = 3</span>
-<span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>)       <span class="cmt">## oui et oui</span>
-<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, x, y) <span class="cmt">## index explicite</span></code></pre>
+<pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)         <span class="cmt">## 1 + 2 = 3</span>
+<span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>)             <span class="cmt">## oui et oui</span>
+<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, <span class="num">10</span>, <span class="num">20</span>)   <span class="cmt">## index explicite</span></code></pre>
 
 <h3>assert</h3>
 <p>Lève une exception si la condition est falsy. Message optionnel.</p>
-<pre><code><span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
+<pre><code><span class="kw">var</span> x = <span class="num">42</span>
+<span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
 <span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x doit être positif"</span>)</code></pre>
 
 <h3>time</h3>
@@ -1110,7 +1119,7 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)          <span
 
 <h3>Import plat</h3>
 <p>Toutes les définitions du fichier importé deviennent disponibles directement dans le scope courant.</p>
-<pre><code><span class="cmt">## utils.ol</span>
+<pre data-no-run><code><span class="cmt">## utils.ol</span>
 <span class="kw">func</span> add(a, b)
     <span class="kw">return</span> a + b
 <span class="kw">end</span>
@@ -1123,7 +1132,7 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)          <span
 
 <h3>Import modulaire</h3>
 <p>Avec <code>as name</code>, toutes les définitions sont regroupées dans une map nommée.</p>
-<pre><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> math
+<pre data-no-run><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> math
 <span class="bi">print</span>(math.add(<span class="num">10</span>, <span class="num">20</span>))   <span class="cmt">## 30</span>
 <span class="bi">print</span>(math.PI)             <span class="cmt">## 3.14159</span></code></pre>
 
@@ -1158,12 +1167,30 @@ end</code></pre>
 </ul>
 
 <h3>Instanciation</h3>
-<pre><code>var a = Animal("Dog", "woof")
+<pre><code>class Animal
+    func init(name, sound)
+        self.name = name
+        self.sound = sound
+    end
+    func speak()
+        return self.name + " says " + self.sound
+    end
+end
+var a = Animal("Dog", "woof")
 print(a.speak())   ## Dog says woof
 print(a.name)      ## Dog</code></pre>
 
 <h3>Héritage</h3>
-<pre><code>class Dog extends Animal
+<pre><code>class Animal
+    func init(name, sound)
+        self.name = name
+        self.sound = sound
+    end
+    func speak()
+        return self.name + " says " + self.sound
+    end
+end
+class Dog extends Animal
     func init(name)
         super.init(name, "woof")   ## appel du constructeur parent
     end
@@ -1315,6 +1342,7 @@ pgEditor.addEventListener('keydown', e => {
 
 // "▶ Exécuter" buttons — inline output below each code block
 document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
+  if (pre.hasAttribute('data-no-run') || pre.closest('.two-col')) return;
   const code = pre.querySelector('code');
   if (!code) return;
   const text = code.textContent.trim();
