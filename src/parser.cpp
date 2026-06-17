@@ -81,6 +81,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::FUNC))    return funcDeclStmt();
     if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))     return varDecl();
+    if (check(TokenType::GLOBAL))  return globalDecl();
     if (check(TokenType::IDENTIFIER)) {
         TokenType nx = peekNextType();
         if (nx == TokenType::EQUALS      || nx == TokenType::PLUS_EQUAL  ||
@@ -146,6 +147,25 @@ std::unique_ptr<Stmt> Parser::varDecl() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<VarDeclStmt>();
+    s->line = line;
+    s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
+    while (match(TokenType::COMMA))
+        s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
+    if (match(TokenType::EQUALS)) {
+        s->values.push_back(expr());
+        while (match(TokenType::COMMA))
+            s->values.push_back(expr());
+    }
+    // sans '=' → valeurs absentes → nil dans le compilateur
+    consumeLineEnd();
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::globalDecl() {
+    int line = peek().line;
+    advance(); // consume 'global'
+    auto s = std::make_unique<VarDeclStmt>();
+    s->is_global = true;
     s->line = line;
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))

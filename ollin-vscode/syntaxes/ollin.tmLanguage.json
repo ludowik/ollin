@@ -28,7 +28,7 @@
         },
         "keyword": {
             "name": "keyword.control.ollin",
-            "match": "\\b(var|while|for|in|if|then|end|break|true|false|nil|try|catch|throw|else|func|return|import|as|or|and|not|class|extends|super|self)\\b"
+            "match": "\\b(var|global|while|for|in|if|then|end|break|true|false|nil|try|catch|throw|else|func|return|import|as|or|and|not|class|extends|super|self)\\b"
         },
         "builtin": {
             "name": "support.function.builtin.ollin",

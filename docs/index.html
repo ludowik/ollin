@@ -503,7 +503,7 @@ pre:hover .try-btn { opacity: 1; }
 <!-- ── Variables ──────────────────────────────────────────────────────────── -->
 <section id="variables">
 <h2>Variables</h2>
-<p>Toute variable <strong>doit</strong> être déclarée avec <code><span class="kw">var</span></code> avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation. Les variables sont locales à leur portée (registres de la VM).</p>
+<p>Toute variable <strong>doit</strong> être déclarée avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation. <code><span class="kw">var</span></code> crée une variable <strong>locale</strong> (registre de la VM) ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible dans tout le programme.</p>
 
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
 <span class="kw">var</span> b = <span class="num">2.5</span>
@@ -523,6 +523,21 @@ a *= <span class="num">2</span>
 <span class="bi">assert</span>(a == <span class="num">86</span>)</code></pre>
 
 <div class="callout tip">Les underscores dans les littéraux numériques sont ignorés : <code>1_000_000</code> == <code>1000000</code>.</div>
+
+<h3>Variables globales — <code><span class="kw">global</span></code></h3>
+<p>Le mot-clé <code><span class="kw">global</span></code> déclare une variable <strong>globale</strong>, visible dans tout le programme. Elle peut être déclarée n'importe où et lue ou modifiée depuis n'importe quelle fonction. Une variable locale (<code><span class="kw">var</span></code>) de même nom masque le global dans sa portée.</p>
+<pre><code><span class="kw">global</span> compteur = <span class="num">0</span>
+
+<span class="kw">func</span> incr()
+    compteur += <span class="num">1</span>      <span class="cmt">## modifie le global depuis une fonction</span>
+<span class="kw">end</span>
+
+incr()
+incr()
+<span class="bi">assert</span>(compteur == <span class="num">2</span>)
+<span class="bi">print</span>(compteur)        <span class="cmt">## 2</span></code></pre>
+
+<div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> (table partagée de la VM). Affecter un nom non déclaré reste une erreur de compilation.</div>
 </section>
 
 <!-- ── Commentaires ───────────────────────────────────────────────────────── -->

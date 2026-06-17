@@ -447,6 +447,34 @@ func km_fn() end
 km[km_fn] = "func"
 assert(km[km_fn] == "func", "clé function")
 
+## ── global : déclaration et accès depuis fonctions ──────────────────────────
+global g_counter = 0
+func g_inc() g_counter += 1 end
+g_inc()
+g_inc()
+g_inc()
+assert(g_counter == 3, "global modifié depuis fonction")
+
+global g_uninit
+assert(g_uninit == nil, "global sans init → nil")
+g_uninit = 42
+assert(g_uninit == 42, "global assigné")
+
+global g_a, g_b = 1, 2
+assert(g_a == 1 and g_b == 2, "global multi-déclaration")
+
+func g_read() return g_fwd end       ## référence en avant
+global g_fwd = 99
+assert(g_read() == 99, "global forward reference")
+
+global g_shadow = 100
+func g_local()
+    var g_shadow = 7                 ## locale masque le global
+    return g_shadow
+end
+assert(g_local() == 7, "local shadow global")
+assert(g_shadow == 100, "global intact après shadow")
+
 ## ── benchmark : boucle incrémentale 1 000 000 itérations ────────────────────
 var t0 = time()
 var count = 0

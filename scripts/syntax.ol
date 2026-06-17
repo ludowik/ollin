@@ -56,6 +56,21 @@ c = 10
 c %= 3
 assert(c == 1)
 
+## variables globales : `global` déclare une variable visible dans tout le programme,
+## déclarable n'importe où, lisible et modifiable depuis n'importe quelle fonction.
+global gcount = 0
+func bump()
+    gcount += 1        ## écrit le global depuis une fonction
+end
+bump()
+bump()
+assert(gcount == 2)
+
+global gmsg            ## sans init → nil
+assert(gmsg == nil)
+gmsg = "ready"
+assert(gmsg == "ready")
+
 ## ── 4. Arithmétique ──────────────────────────────────────────────────────────
 
 assert(2 + 3   == 5)

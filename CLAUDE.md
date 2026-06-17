@@ -165,11 +165,14 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Déclaration de variables (implémentation de l'enforcement)
 
-> Règle de langage (obligation de `var`, locales uniquement) : voir `grammar.ebnf` (`varDecl`, `assignStmt`).
+> Règle de langage (`var` = locale, `global` = globale, obligation de déclaration) : voir `grammar.ebnf` (`varDecl`, `globalDecl`, `assignStmt`).
 
-- Message d'erreur émis : `undeclared variable '<nom>' (use 'var')`.
-- Seuls les noms de fonctions (`func_table`) et de classes (`declared_globals_`) sont résolus en portée globale ; tout autre nom global déclenche l'erreur.
-- Garde-fous dans le compilateur : `visit(AssignStmt)`, `visit(VarExpr)` et `visit(IndexAssignStmt)` (fallthrough global).
+- Message d'erreur émis : `undeclared variable '<nom>' (use 'var' or 'global')`.
+- `declared_globals_` (set) contient : noms de classes, et tous les noms déclarés par `global`.
+- **Pré-scan** : `collectGlobals()` parcourt tout le programme (y compris l'intérieur des fonctions, classes, blocs) et remplit `declared_globals_` **avant** la compilation → les références en avant à un global fonctionnent.
+- `VarDeclStmt.is_global` : `collectLocals()` ignore ces déclarations (pas de registre) ; `visit(VarDeclStmt)` émet `STORE_GLOBAL` pour l'init.
+- Résolution d'un nom : local (`local_regs_`) → fonction (`func_table`) → upvalue (`resolveUpvalue`) → global (`declared_globals_` → `LOAD_GLOBAL`/`STORE_GLOBAL`) → sinon erreur. Une locale masque donc un global de même nom.
+- Garde-fous + branche global dans le compilateur : `visit(AssignStmt)`, `visit(VarExpr)`, `visit(IndexAssignStmt)`.
 
 ## Allocateur de registres (Compiler)
 

@@ -101,7 +101,8 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
     };
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
-            for (auto& n : v->names) add(n);
+            if (!v->is_global)   // 'global' → table des globaux, pas de registre
+                for (auto& n : v->names) add(n);
         if (collect_funcs)
             if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
                 add(f->name);
@@ -134,6 +135,38 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
     collectLocals(stmts, out, seen, collect_funcs);
 }
 
+// ── pre-scan global declarations (program-wide, incl. nested in functions) ────
+// Les globaux déclarés avec 'global' sont visibles partout, quel que soit
+// l'endroit de leur déclaration → on les collecte tous avant la compilation.
+static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
+                           std::unordered_set<std::string>& out) {
+    for (auto& s : stmts) {
+        if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get())) {
+            if (v->is_global) for (auto& n : v->names) out.insert(n);
+        }
+        if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
+            collectGlobals(f->body, out);
+        if (auto* fi = dynamic_cast<const ForIterStmt*>(s.get()))
+            collectGlobals(fi->body, out);
+        if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
+            collectGlobals(w->body, out);
+        if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
+            collectGlobals(i->then_body, out);
+            for (auto& ei : i->else_ifs) collectGlobals(ei.body, out);
+            collectGlobals(i->else_body, out);
+        }
+        if (auto* t = dynamic_cast<const TryCatchStmt*>(s.get())) {
+            collectGlobals(t->try_body, out);
+            collectGlobals(t->catch_body, out);
+            collectGlobals(t->else_body, out);
+        }
+        if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
+            collectGlobals(b->stmts, out);
+        if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get()))
+            for (auto& m : c->methods) collectGlobals(m->body, out);
+    }
+}
+
 // ── compile expression into a specific destination register ──────────────────
 void Compiler::compileInto(const Expr& e, int dest) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
@@ -160,6 +193,8 @@ void Compiler::compileInto(const Expr& e, int dest) {
 Chunk Compiler::compile(const Program& prog) {
     reg_top_ = 0;
     reg_count_ = 8;
+    // Pre-scan all 'global' declarations (program-wide) so references resolve everywhere
+    collectGlobals(prog.stmts, declared_globals_);
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
@@ -180,6 +215,52 @@ Chunk Compiler::compile(const Program& prog) {
 
 void Compiler::visit(const VarDeclStmt& s) {
     if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+
+    // 'global' declaration → store into the VM-wide globals table
+    if (s.is_global) {
+        // Multi-return from a user function call: global a, b = f(...)
+        if (s.names.size() > 1 && s.values.size() == 1) {
+            if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
+                if (func_table.count(call->callee)) {
+                    int call_base = reg_top_;
+                    int argc = (int)call->args.size();
+                    for (int i = 0; i < argc; ++i) {
+                        int target = call_base + i;
+                        reg_top_ = target;
+                        call->args[i]->accept(*this);
+                        if (last_reg_ != target)
+                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
+                                               (uint8_t)last_reg_, 0));
+                        reg_top_ = target + 1;
+                        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                    }
+                    const FuncInfo& fi = func_table.at(call->callee);
+                    chunk.emit(makeABC((uint8_t)Op::CALL_FUNC,
+                                       (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
+                    for (int i = 0; i < (int)s.names.size(); ++i)
+                        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(call_base + i),
+                                           chunk.addIdentifier(s.names[i])));
+                    reg_top_ = call_base;
+                    return;
+                }
+            }
+        }
+        // Normal: parallel assignment (or nil when no value)
+        for (int i = 0; i < (int)s.names.size(); ++i) {
+            int saved = reg_top_;
+            int src = allocReg();
+            if (i < (int)s.values.size()) {
+                compileInto(*s.values[i], src);
+            } else {
+                chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)src, 0, 0));
+            }
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)src,
+                               chunk.addIdentifier(s.names[i])));
+            reg_top_ = saved;
+        }
+        return;
+    }
+
     // Multi-return from user function call
     if (s.names.size() > 1 && s.values.size() == 1) {
         if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
@@ -343,9 +424,31 @@ void Compiler::visit(const AssignStmt& s) {
             return;
         }
     }
-    // Global scope — assignment without var is not allowed
+    // Global variable (declared with 'global') → store into the globals table
+    if (declared_globals_.count(s.name)) {
+        int saved = reg_top_;
+        if (s.op == '\0') {
+            s.value->accept(*this);
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)last_reg_,
+                               chunk.addIdentifier(s.name)));
+        } else {
+            int cur = allocReg();
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)cur,
+                               chunk.addIdentifier(s.name)));
+            s.value->accept(*this);
+            int rhs = last_reg_;
+            int res = allocReg();
+            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res,
+                               chunk.addIdentifier(s.name)));
+        }
+        reg_top_ = saved;
+        return;
+    }
+    // Global scope — assignment without var/global is not allowed
     throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                             + ": undeclared variable '" + s.name + "' (use 'var')");
+                             + ": undeclared variable '" + s.name + "' (use 'var' or 'global')");
 }
 
 void Compiler::visit(const ExprStmt& s) {

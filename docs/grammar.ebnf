@@ -9,6 +9,7 @@
 program        = { stmt } EOF ;
 
 stmt           = varDecl
+               | globalDecl
                | whileStmt
                | forStmt
                | ifStmt
@@ -34,6 +35,10 @@ superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
                  (* `var` est OBLIGATOIRE pour créer une variable, et ne crée que des locales *)
                  (* sans "=" → nil ; moins de valeurs que de noms → les noms en trop valent nil *)
+globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
+                 (* `global` déclare des variables globales, visibles dans tout le programme *)
+                 (* déclarable n'importe où (top-level ou dans une fonction) ; lue/écrite partout *)
+                 (* une locale `var` de même nom masque le global dans sa portée *)
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
                | "for" IDENT [ "," IDENT ] "in" expr NEWLINE { stmt } "end" NEWLINE ;
@@ -54,8 +59,8 @@ returnStmt     = "return" [ retvals ] NEWLINE ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
-                 (* règle sémantique : IDENT doit avoir été déclaré par "var" — sinon erreur de compilation *)
-                 (* "var" ne crée que des variables locales ; pas de globales utilisateur *)
+                 (* règle sémantique : IDENT doit avoir été déclaré par "var" ou "global" — sinon erreur *)
+                 (* "var" → locale ; "global" → globale (table VM partagée) *)
 indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE
                | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
 exprStmt       = expr NEWLINE ;

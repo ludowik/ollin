@@ -117,6 +117,7 @@ struct CommentStmt : Stmt {
 struct VarDeclStmt : Stmt {
     std::vector<std::string> names;
     std::vector<std::unique_ptr<Expr>> values;
+    bool is_global = false;   // true = déclaré avec 'global' → variables globales
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 
