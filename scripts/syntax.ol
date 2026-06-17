@@ -192,13 +192,30 @@ for i in 1..100
 end
 assert(s5 == 15)
 
-## continue dans for
+## continue dans for range
 var s6 = 0
 for i in 1..10
     if i % 2 == 0 then continue end
     s6 += i
 end
 assert(s6 == 25)
+
+## continue dans for k,v in map
+var cm = {a: 1, b: 2, c: 3, d: 4}
+var cs1 = 0
+for k, v in cm
+    if v % 2 == 0 then continue end
+    cs1 += v
+end
+assert(cs1 == 4)   ## 1+3
+
+## continue dans for v in array
+var cs2 = 0
+for v in [1, 2, 3, 4, 5]
+    if v % 2 == 0 then continue end
+    cs2 += v
+end
+assert(cs2 == 9)   ## 1+3+5
 
 ## ── 11. Fonctions ────────────────────────────────────────────────────────────
 
