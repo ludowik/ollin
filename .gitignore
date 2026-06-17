@@ -3,5 +3,6 @@ build_rel/
 build_native/
 build_native2/
 build_reg/
+build_wasm/
 .claude/
 build_debug/
