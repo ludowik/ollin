@@ -3,6 +3,7 @@
 #include "chunk.h"
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class Compiler : public StmtVisitor, public ExprVisitor {
@@ -31,6 +32,7 @@ private:
         bool    is_closure = false;  // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
     };
     std::unordered_map<std::string, FuncInfo> func_table;
+    std::unordered_set<std::string> declared_globals_;  // class names declared at top level
     std::string current_func_name;  // "" = global scope
     int         current_func_idx_ = -1;  // index in chunk.funcs (-1 = main chunk)
 

@@ -343,25 +343,9 @@ void Compiler::visit(const AssignStmt& s) {
             return;
         }
     }
-    // Global scope
-    uint16_t gidx = chunk.addIdentifier(s.name);
-    int saved = reg_top_;
-    if (s.op == '\0') {
-        s.value->accept(*this);
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)last_reg_, gidx));
-    } else {
-        // Load current global value
-        int cur = allocReg();
-        chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)cur, gidx));
-        // Compile rhs
-        s.value->accept(*this);
-        int rhs = last_reg_;
-        int res = allocReg();
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res, gidx));
-    }
-    reg_top_ = saved;
+    // Global scope — assignment without var is not allowed
+    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
+                             + ": undeclared variable '" + s.name + "' (use 'var')");
 }
 
 void Compiler::visit(const ExprStmt& s) {
@@ -632,7 +616,10 @@ void Compiler::visit(const VarExpr& e) {
             return;
         }
     }
-    // Global
+    // Global — only class names declared with 'class' keyword are allowed here
+    if (!declared_globals_.count(e.name))
+        throw std::runtime_error("line " + std::to_string(current_line_)
+                                 + ": undeclared variable '" + e.name + "'");
     last_reg_ = allocReg();
     chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_,
                        chunk.addIdentifier(e.name)));
@@ -954,9 +941,17 @@ void Compiler::visit(const IndexAssignStmt& s) {
         if (it != local_regs_.end()) {
             obj_r = it->second;
         } else {
+            int uv = resolveUpvalue(s.obj);
             obj_r = allocReg();
-            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
-                               chunk.addIdentifier(s.obj)));
+            if (uv >= 0) {
+                chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
+            } else {
+                if (!declared_globals_.count(s.obj))
+                    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
+                                             + ": undeclared variable '" + s.obj + "'");
+                chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
+                                   chunk.addIdentifier(s.obj)));
+            }
         }
     }
 
@@ -1110,6 +1105,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
     }
 
     // Stocker la classe comme global
+    declared_globals_.insert(s.name);
     chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest,
                        chunk.addIdentifier(s.name)));
 
