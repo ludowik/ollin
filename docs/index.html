@@ -468,7 +468,7 @@ pre:hover .try-btn { opacity: 1; }
 <!-- ── Variables ──────────────────────────────────────────────────────────── -->
 <section id="variables">
 <h2>Variables</h2>
-<p>Toute variable est déclarée avec <code><span class="kw">var</span></code>. Hors d'une fonction, les variables sont globales. À l'intérieur d'une fonction, elles sont locales (registres).</p>
+<p>Toute variable <strong>doit</strong> être déclarée avec <code><span class="kw">var</span></code> avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation. Les variables sont locales à leur portée (registres de la VM).</p>
 
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
 <span class="kw">var</span> b = <span class="num">2.5</span>
