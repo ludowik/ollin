@@ -156,9 +156,9 @@ assert(sum == 25)   ## 1+3+5+7+9
 
 ## ── 10. For ──────────────────────────────────────────────────────────────────
 
-## range inclusif
+## range inclusif [1;5] → 1,2,3,4,5
 var s1 = 0
-for i in 1..5
+for i in [1;5]
     s1 += i
 end
 assert(s1 == 15)
@@ -184,9 +184,9 @@ for i = 5, 1, -1
 end
 assert(s4 == 15)
 
-## break dans for
+## break dans for range
 var s5 = 0
-for i in 1..100
+for i in [1;100]
     if i > 5 then break end
     s5 += i
 end
@@ -194,11 +194,33 @@ assert(s5 == 15)
 
 ## continue dans for range
 var s6 = 0
-for i in 1..10
+for i in [1;10]
     if i % 2 == 0 then continue end
     s6 += i
 end
 assert(s6 == 25)
+
+## range exclusif droit [1;5[ → 1,2,3,4
+var s8 = 0
+for i in [1;5[
+    s8 += i
+end
+assert(s8 == 10)
+
+## range avec step [1;10;2] → 1,3,5,7,9
+var s9 = 0
+for i in [1;10;2]
+    s9 += i
+end
+assert(s9 == 25)
+
+## range first-class : stocker dans une variable
+var r = [1;5]
+var s10 = 0
+for i in r
+    s10 += i
+end
+assert(s10 == 15)
 
 ## continue dans for k,v in map
 var cm = {a: 1, b: 2, c: 3, d: 4}

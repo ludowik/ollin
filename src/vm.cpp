@@ -182,6 +182,7 @@ static std::string valueToString(const Value& v) {
     }
     if (v.isArray())    return "{array}";
     if (v.isIterator()) return "{iterator}";
+    if (v.isRange())    return "{range}";
     if (v.isFuncVal() || v.isClosure() || v.isBuiltin()) return "{function}";
     if (v.isInteger())  return std::to_string(v.asInt());
     std::ostringstream os;
@@ -398,6 +399,7 @@ void VM::execute(const Chunk& chunk) {
         &&op_LOAD_FUNC, &&op_CALL_DYN,
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
+        &&op_MAKE_RANGE,
         &&op_HALT,
     };
 
@@ -964,6 +966,25 @@ op_CALL_METHOD: {
     NEXT();
 }
 
+op_MAKE_RANGE: {
+    {
+        bool has_step  = (C >> 1) & 1;
+        bool incl_right = C & 1;
+        auto toI64 = [](const Value& v) -> int64_t {
+            if (v.isInteger()) return v.asInt();
+            if (v.isFloat())   return (int64_t)v.asFloat();
+            throw std::runtime_error("runtime: range bound must be a number");
+        };
+        int64_t start = toI64(regs[base + B]);
+        int64_t end   = toI64(regs[base + B + 1]);
+        int64_t step  = has_step ? toI64(regs[base + B + 2]) : 1;
+        if (step == 0) throw std::runtime_error("runtime: range step cannot be zero");
+        Range* r = new Range{1, start, end, step, incl_right};
+        regs[base + A] = Value::makeRange(r);
+    }
+    NEXT();
+}
+
 op_HALT:
     return;
 
@@ -1456,6 +1477,22 @@ op_HALT:
             if (regs.size() < full_needed) regs.resize(full_needed);
             call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
             ip = fp.addr;
+            break;
+        }
+        case Op::MAKE_RANGE: {
+            bool has_step   = (C >> 1) & 1;
+            bool incl_right2 = C & 1;
+            auto toI64s = [](const Value& v) -> int64_t {
+                if (v.isInteger()) return v.asInt();
+                if (v.isFloat())   return (int64_t)v.asFloat();
+                throw std::runtime_error("runtime: range bound must be a number");
+            };
+            int64_t start2 = toI64s(regs[base + B]);
+            int64_t end2   = toI64s(regs[base + B + 1]);
+            int64_t step2  = has_step ? toI64s(regs[base + B + 2]) : 1;
+            if (step2 == 0) throw std::runtime_error("runtime: range step cannot be zero");
+            Range* r2 = new Range{1, start2, end2, step2, incl_right2};
+            regs[base + A] = Value::makeRange(r2);
             break;
         }
         case Op::HALT:

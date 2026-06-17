@@ -367,24 +367,8 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     // for i in ...
     expect(TokenType::IN);
     auto iter_expr = expr();
-    if (check(TokenType::DOT_DOT)) {
-        // for i in start..end  (range)
-        advance(); // consume ..
-        auto s = std::make_unique<ForStmt>();
-        s->var   = first_var;
-        s->start = std::move(iter_expr);
-        s->end   = expr();
-        consumeLineEnd();
-        while (true) {
-            skipNewlines();
-            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
-            s->body.push_back(parseOneStmt());
-        }
-        expect(TokenType::END);
-        consumeLineEnd();
-        return s;
-    } else {
-        // for v in iterable_expr  (array or map values)
+    // for v in iterable_expr  (array, map, or range)
+    {
         auto s = std::make_unique<ForInStmt>();
         s->val_var   = first_var;
         s->iter_expr = std::move(iter_expr);
@@ -581,6 +565,83 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
     return base;
 }
 
+// ── Range helpers ─────────────────────────────────────────────────────────────
+
+// Scan forward from current position looking for SEMICOLON at depth 0 before
+// COMMA or RBRACKET at depth 0. Returns true if this looks like a range.
+bool Parser::looksLikeRange() const {
+    int depth = 0;
+    for (int i = pos; i < (int)tokens.size(); ++i) {
+        TokenType t = tokens[i].type;
+        if (t == TokenType::LBRACKET || t == TokenType::LPAREN || t == TokenType::LBRACE) {
+            depth++;
+        } else if (t == TokenType::RBRACKET || t == TokenType::RPAREN || t == TokenType::RBRACE) {
+            if (depth == 0) return false;  // closing bracket at depth 0 = end of array
+            depth--;
+        } else if (depth == 0) {
+            if (t == TokenType::SEMICOLON) return true;
+            if (t == TokenType::COMMA) return false;
+            if (t == TokenType::NEWLINE || t == TokenType::EOF_T) return false;
+        }
+    }
+    return false;
+}
+
+// Parse range after the opening bracket character has been consumed.
+// incl_left=true  means we saw '[' (inclusive left)
+// incl_left=false means we saw ']' (exclusive left = open left)
+std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
+    auto node = std::make_unique<RangeExpr>();
+    node->incl_left = incl_left;
+
+    // Parse start expression
+    node->start = expr();
+
+    // Expect SEMICOLON separator
+    expect(TokenType::SEMICOLON);
+
+    // Parse end expression
+    node->end = expr();
+
+    // Optional step: if next is SEMICOLON
+    if (match(TokenType::SEMICOLON)) {
+        node->step = expr();
+    }
+
+    // Closing bracket: ] = incl_right, [ = excl_right
+    if (check(TokenType::RBRACKET)) {
+        advance();
+        node->incl_right = true;
+    } else if (check(TokenType::LBRACKET)) {
+        advance();
+        node->incl_right = false;
+    } else {
+        throw std::runtime_error("line " + std::to_string(peek().line) +
+                                 ": expected ']' or '[' to close range");
+    }
+
+    // If open-left, adjust start: start += step (or 1 if no step)
+    // We do this at the AST level by wrapping: start = start + step_expr
+    if (!incl_left) {
+        std::unique_ptr<Expr> step_expr;
+        if (node->step) {
+            // clone step - we just copy the node since it'll be owned by BinaryExpr
+            // We can't clone easily so instead store in a temp and recreate
+            // Actually: we need start = start + step. Let's build a BinaryExpr
+            // But step is unique_ptr already stored... we need a second reference.
+            // Simplest: compute at runtime. We'll use a special flag or just adjust here.
+            // Since we can't clone unique_ptr, let's just use a NumberExpr(1) as approximation
+            // for the open-left adjustment and apply the real step in the VM.
+            // Actually: the cleanest approach is to do the adjustment in the compiler.
+            // The compiler will handle incl_left=false by adding step.
+            // So we don't need to adjust here - let the compiler handle it.
+        }
+        (void)step_expr;
+    }
+
+    return node;
+}
+
 std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::NUMBER))
         return std::make_unique<NumberExpr>(std::stod(advance().lexeme));
@@ -647,6 +708,10 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::LBRACKET)) {
         advance(); // consume [
+        // Check if this is a range [a;b] or array [a,b,c]
+        if (looksLikeRange()) {
+            return rangeExpr(true);  // incl_left=true
+        }
         skipNewlines();
         auto arr = std::make_unique<ArrayExpr>();
         while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
@@ -656,6 +721,11 @@ std::unique_ptr<Expr> Parser::primary() {
         }
         expect(TokenType::RBRACKET);
         return parsePostfix(std::move(arr));
+    }
+    if (check(TokenType::RBRACKET)) {
+        // Open-left range: ]a;b]  or  ]a;b[
+        advance(); // consume ]
+        return rangeExpr(false);  // incl_left=false
     }
     if (match(TokenType::LPAREN)) {
         paren_depth_++;

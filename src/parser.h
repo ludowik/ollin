@@ -60,4 +60,8 @@ private:
     std::unique_ptr<Expr> multiplicative();
     std::unique_ptr<Expr> unary();
     std::unique_ptr<Expr> primary();
+
+    // Range parsing helpers
+    bool looksLikeRange() const;   // scan from current pos for SEMICOLON before COMMA/RBRACKET
+    std::unique_ptr<Expr> rangeExpr(bool incl_left);  // parse rest after [ or ]
 };

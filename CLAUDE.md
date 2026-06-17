@@ -174,10 +174,10 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 Cinq syntaxes :
 
 ```
-for i in start..end         ## range, step = 1 implicite (bornes inclusives)
+for i in [start;end]        ## range intervalle (voir §Range)
 for i=start,end             ## numérique, step = 1 implicite
 for i=start,end,step        ## step positif ou négatif
-for v in arr_expr           ## itération valeurs d'un array
+for v in arr_expr           ## itération valeurs d'un array ou range
 for k,v in map_or_arr       ## itération clé/index + valeur (map ou array)
 ```
 
@@ -187,7 +187,24 @@ Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires a
 En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
 `break` fonctionne dans toutes les formes.
 
-`for k,v in m` et `for v in arr` : utilisent le protocole `Iterator` — `MAKE_ITER` crée l'itérateur (MapIterator snapshot ou ArrayIterator ref), stocké dans `[block+0]`. `FOR_ITER_NEXT` appelle `next(key,val)` → `[block+1]`=key, `[block+2]`=val. 3 registres persistants + 1 temp source (libéré après MAKE_ITER).
+`for k,v in m` et `for v in arr/range` : utilisent le protocole `Iterator` — `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`. `FOR_ITER_NEXT` appelle `next(key,val)` → `[block+1]`=key, `[block+2]`=val. 3 registres persistants + 1 temp source (libéré après MAKE_ITER).
+
+## Type range
+
+Notation d'intervalles mathématiques (entiers uniquement, ref-counted `Range*`) :
+
+```
+[1;10]      ## inclusif des deux côtés → 1,2,...,10
+[1;10[      ## fermé gauche, ouvert droit → 1,2,...,9
+]0;10]      ## ouvert gauche, fermé droit → 1,2,...,10
+]0;10[      ## ouvert des deux côtés → 1,2,...,9
+[1;10;2]    ## avec step → 1,3,5,7,9
+var r = [1;5]   ## first-class : stockable dans une variable
+for i in r  ## itérable via RangeIterator
+```
+
+`MAKE_RANGE` (opcode ABC) : A=dest, B=base (start=R[B], end=R[B+1], step=R[B+2] si has_step), C=flags (bit0=incl_right, bit1=has_step). L'ajustement open-left est émis par le compilateur via ADD avant MAKE_RANGE.  
+`T_RANGE = 11` — Range* ref-counted avec `{start, end, step, incl_right}`.
 
 ## Type map
 
@@ -239,6 +256,7 @@ Struct taguée (16 octets) — remplace le NaN-boxing :
 | T_FUNCTION | 7               | ival (int64_t, = func_idx) | index dans chunk.funcs |
 | T_CLOSURE  | 8               | cptr (Closure*) | ref-counted, holds func_idx + upvals |
 | T_CLASS    | 10              | mptr (Map*) | classe : même layout que T_MAP, mais distincte pour CALL_DYN |
+| T_RANGE    | 11              | rptr (Range*) | intervalle entier ref-counted        |
 
 ## Closures / Upvalues
 

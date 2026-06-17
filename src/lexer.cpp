@@ -53,8 +53,6 @@ Token Lexer::number(bool leading_dot) {
             advance();
             if (c != '_') digits += c;
         } else if (c == '.' && !dot_seen) {
-            // Don't consume if it's a range operator (..)
-            if (pos + 1 < (int)src.size() && src[pos + 1] == '.') break;
             advance();
             dot_seen = true;
             digits += '.';
@@ -124,13 +122,14 @@ std::vector<Token> Lexer::tokenize() {
                 if (!atEnd() && peek() == '.') {
                     advance();
                     if (!atEnd() && peek() == '.') { advance(); tokens.push_back({TokenType::DOT_DOT_DOT, "...", line}); }
-                    else tokens.push_back({TokenType::DOT_DOT, "..", line});
+                    else throw std::runtime_error("line " + std::to_string(line) + ": '..' is not valid syntax (use [a;b] for ranges)");
                 } else if (!atEnd() && std::isdigit(peek())) {
                     tokens.push_back(number(true)); // .5 → nombre à virgule
                 } else {
                     tokens.push_back({TokenType::DOT, ".", line});
                 }
                 break;
+            case ';':  tokens.push_back({TokenType::SEMICOLON, ";", line});         break;
             case '-':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::MINUS_EQUAL, "-=", line}); }
                 else tokens.push_back({TokenType::MINUS, "-", line});

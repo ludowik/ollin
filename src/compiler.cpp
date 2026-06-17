@@ -903,6 +903,60 @@ void Compiler::visit(const ArrayExpr& e) {
     last_reg_ = dest;
 }
 
+void Compiler::visit(const RangeExpr& e) {
+    // Allocate dest first, then use temps above it
+    int dest = allocReg();   // dest = reg_top_-1
+
+    // Temps: base = dest+1 for start, base+1 for end, base+2 for step
+    int base = reg_top_;     // = dest+1
+
+    // Compile start
+    int start_r = base;
+    reg_top_ = base + 1;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    compileInto(*e.start, start_r);
+
+    // Compile end
+    int end_r = base + 1;
+    reg_top_ = base + 2;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    compileInto(*e.end, end_r);
+
+    // Compile step if present
+    bool has_step = (e.step != nullptr);
+    if (has_step) {
+        int step_r = base + 2;
+        reg_top_ = base + 3;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        compileInto(*e.step, step_r);
+    }
+
+    // If open-left: adjust start = start + step_or_1
+    if (!e.incl_left) {
+        if (has_step) {
+            chunk.emit(makeABC((uint8_t)Op::ADD,
+                               (uint8_t)start_r, (uint8_t)start_r, (uint8_t)(base + 2)));
+        } else {
+            int one_r = base + 2;
+            reg_top_ = base + 3;
+            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
+                               chunk.addConstant(Value((int64_t)1))));
+            chunk.emit(makeABC((uint8_t)Op::ADD,
+                               (uint8_t)start_r, (uint8_t)start_r, (uint8_t)one_r));
+        }
+    }
+
+    // Build flags: bit0 = incl_right, bit1 = has_step
+    uint8_t flags = (uint8_t)((has_step ? 2 : 0) | (e.incl_right ? 1 : 0));
+
+    chunk.emit(makeABC((uint8_t)Op::MAKE_RANGE, (uint8_t)dest, (uint8_t)base, flags));
+
+    // Restore reg_top_ to dest+1 (temps freed, dest still "live")
+    reg_top_ = dest + 1;
+    last_reg_ = dest;
+}
+
 void Compiler::compileIteratorLoop(const Expr& src,
                                    const std::string& key_var,
                                    const std::string& val_var,

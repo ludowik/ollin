@@ -94,6 +94,7 @@ private:
     void visit(const ArrayExpr&)   override;
     void visit(const ExprCallExpr&) override;
     void visit(const MethodCallExpr&) override;
+    void visit(const RangeExpr&)     override;
 
     // StmtVisitor (map)
     void visit(const IndexAssignStmt&) override;

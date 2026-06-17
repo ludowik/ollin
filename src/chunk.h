@@ -17,11 +17,13 @@
 //   Array   : tag == T_ARRAY    → Array*   (heap, ref-counted, 1-based)
 //   Iterator: tag == T_ITERATOR → Iterator* (heap, ref-counted)
 //   Function: tag == T_FUNCTION → func_idx (int64_t ival, index dans chunk.funcs)
+//   Range   : tag == T_RANGE    → Range*   (heap, ref-counted)
 
 struct Map;
 struct Array;
 struct Iterator;
 struct Closure;
+struct Range;
 
 struct Value {
     uint8_t tag;
@@ -33,6 +35,7 @@ struct Value {
         Array*             aptr;
         Iterator*          iptr;
         Closure*           cptr;
+        Range*             rptr;
     };
 
     static constexpr uint8_t T_NIL      = 0;
@@ -46,12 +49,14 @@ struct Value {
     static constexpr uint8_t T_CLOSURE  = 8;
     static constexpr uint8_t T_BUILTIN  = 9;
     static constexpr uint8_t T_CLASS    = 10;  // prototype de classe (Map* réutilisé)
+    static constexpr uint8_t T_RANGE    = 11;  // range [a;b] (Range*, ref-counted)
 
 private:
     explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
     explicit Value(Array*    p) : tag(T_ARRAY),    aptr(p) {}
     explicit Value(Iterator* p) : tag(T_ITERATOR), iptr(p) {}
     explicit Value(Closure*  p) : tag(T_CLOSURE),  cptr(p) {}
+    explicit Value(Range*    p) : tag(T_RANGE),    rptr(p) {}
 
 public:
     Value()              : tag(T_NIL), ival(0) {}
@@ -77,6 +82,7 @@ public:
     bool isClosure()  const { return tag == T_CLOSURE; }
     bool isBuiltin()  const { return tag == T_BUILTIN; }
     bool isClass()    const { return tag == T_CLASS; }
+    bool isRange()    const { return tag == T_RANGE; }
     bool isCallable() const { return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS; }
 
     Closure* asClosure() const { return cptr; }
@@ -89,6 +95,7 @@ public:
     static Value makeClosure(Closure* p) { return Value(p); }
     static Value makeBuiltin(BuiltinFn fn) { Value v; v.tag = T_BUILTIN; v.ival = (int64_t)(intptr_t)fn; return v; }
     static Value makeClass();
+    static Value makeRange(Range* r) { return Value(r); }
 
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
@@ -117,6 +124,9 @@ public:
 // ── Iterator (protocole d'itération — Map, Array) ────────────────────────────
 #include "iterator.h"
 
+// ── Range ([a;b] littéral, itérable) ─────────────────────────────────────────
+#include "range.h"
+
 // ── Closure / Upvalue ─────────────────────────────────────────────────────────
 #include "closure.h"
 
@@ -137,6 +147,7 @@ inline int   Value::arraySize()                            const { return (int)a
 inline Value Value::makeIterFrom(const Value& src) {
     if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
     if (src.isArray()) return Value(new ArrayIterator(src.aptr));
+    if (src.isRange()) return Value(new RangeIterator(src.rptr));
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
 
@@ -153,6 +164,7 @@ inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
         case T_FUNCTION: ival = o.ival; break;
         case T_CLOSURE:  cptr = o.cptr; cptr->refcount++; break;
         case T_BUILTIN:  ival = o.ival; break;
+        case T_RANGE:    rptr = o.rptr; rptr->refcount++; break;
     }
 }
 inline Value& Value::operator=(const Value& o) {
@@ -165,6 +177,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_ARRAY:    o.aptr->refcount++;             break;
         case T_ITERATOR: o.iptr->refcount++;             break;
         case T_CLOSURE:  o.cptr->refcount++;             break;
+        case T_RANGE:    o.rptr->refcount++;             break;
         default: break;
     }
     // Release de l'ancienne valeur
@@ -175,6 +188,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
+        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
     }
     tag = o.tag; ival = 0;
@@ -190,6 +204,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_FUNCTION: ival = o.ival; break;
         case T_CLOSURE:  cptr = o.cptr; break;
         case T_BUILTIN:  ival = o.ival; break;
+        case T_RANGE:    rptr = o.rptr; break;
     }
     return *this;
 }
@@ -203,6 +218,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
+        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
     }
     tag = o.tag; ival = o.ival; o.tag = T_NIL;
@@ -216,6 +232,7 @@ inline Value::~Value() {
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
+        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
     }
 }
@@ -291,6 +308,7 @@ enum class Op : uint8_t {
     SET_UPVAL,      // AB:  A=src,  B=upval_idx → upval[B] = R[A]
     NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
+    MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags (bit0=incl_right,bit1=has_step)
     HALT,
 };
 
