@@ -16,6 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Emscripten
+        uses: emscripten-core/setup-emsdk@v14
+        with:
+          emsdk-version: latest
+
+      - name: Build WASM
+        run: |
+          mkdir -p build-wasm
+          emcmake cmake -B build-wasm -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-wasm
+          mkdir -p docs/wasm
+          cp build-wasm/ollin.js build-wasm/ollin.wasm docs/wasm/
+
       - name: Push docs to ollin-docs
         env:
           DOCS_TOKEN: ${{ secrets.DOCS_DEPLOY_TOKEN }}

@@ -312,6 +312,24 @@ pre:hover .try-btn { opacity: 1; }
 .pg-output.has-output { color: var(--green); font-style: normal; }
 .pg-output.has-error  { color: var(--red);   font-style: normal; }
 
+/* ── inline output ───────────────────────────────────────────────────────── */
+.inline-output {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: 10px 22px;
+  border-left: 3px solid var(--accent);
+  background: #0a0d14;
+  margin: -8px 0 14px 0;
+  border-radius: 0 0 6px 6px;
+}
+.inline-output.ok    { color: var(--green);    border-left-color: var(--green); }
+.inline-output.err   { color: var(--red);      border-left-color: var(--red); }
+.inline-output.empty { color: var(--text-dim); font-style: italic; }
+.inline-output.wait  { color: var(--yellow);   border-left-color: var(--yellow); }
+
 /* ── responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   body { display: block; }
@@ -1295,18 +1313,40 @@ pgEditor.addEventListener('keydown', e => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runCode();
 });
 
-// "▶ Essayer" buttons on existing code blocks
+// "▶ Exécuter" buttons — inline output below each code block
 document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
   const code = pre.querySelector('code');
   if (!code) return;
   const text = code.textContent.trim();
   if (text.length < 15 || text.includes('→') || text.includes('source .ol')) return;
+
+  const outDiv = document.createElement('div');
+  outDiv.className = 'inline-output';
+  outDiv.style.display = 'none';
+  pre.after(outDiv);
+
   const btn = document.createElement('button');
   btn.className = 'try-btn';
-  btn.textContent = '▶ Essayer';
+  btn.textContent = '▶ Exécuter';
   btn.addEventListener('click', () => {
-    pgEditor.value = text;
-    document.getElementById('playground').scrollIntoView({ behavior: 'smooth' });
+    if (!ollin) {
+      outDiv.textContent = 'Runtime en cours de chargement…';
+      outDiv.className = 'inline-output wait';
+      outDiv.style.display = 'block';
+      return;
+    }
+    const out = ollin.run(text);
+    outDiv.style.display = 'block';
+    if (!out || out === '') {
+      outDiv.textContent = '(aucune sortie)';
+      outDiv.className = 'inline-output empty';
+    } else if (out.startsWith('error:')) {
+      outDiv.textContent = out;
+      outDiv.className = 'inline-output err';
+    } else {
+      outDiv.textContent = out;
+      outDiv.className = 'inline-output ok';
+    }
   });
   pre.appendChild(btn);
 });
