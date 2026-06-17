@@ -59,24 +59,24 @@ ollin/
 
 ## Commande `perf`
 
-Quand l'utilisateur dit **"perf"**, lancer les 5 benchmarks suivants et afficher les résultats dans un tableau **langages en colonnes, benchmarks en lignes** (Ollin | Lua | Python) :
+Quand l'utilisateur dit **"perf"**, lancer : `bash bench/bench_all.sh`
 
-| # | Benchmark | Script Ollin | Équivalent Lua | Équivalent Python |
-|---|-----------|-------------|----------------|-------------------|
-| 1 | fib(35) récursif | `scripts/bench_fib.ol` | inline | inline |
-| 2 | Boucle numérique 10M | `scripts/bench_loop.ol` | inline | inline |
-| 3 | Création/accès map 100K | `scripts/bench_objects.ol` | inline | inline |
-| 4 | Accès array 1M | `scripts/bench_array.ol` | inline | inline |
-| 5 | Appels de fonctions 1M | `scripts/bench_calls.ol` | inline | inline |
+Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le tableau comparatif Ollin | Lua | Python est généré automatiquement.
 
-Procédure :
-1. Créer les scripts manquants (bench_loop, bench_array, bench_calls) pour Ollin + équivalents Lua/Python en `/tmp/`
-2. Mesurer chaque benchmark (`time` ou timer interne)
-3. Présenter le tableau final avec les temps en secondes
+| # | Benchmark | Script |
+|---|-----------|--------|
+| 1 | fib(35) récursif | `bench/bench_fib.*` |
+| 2 | Boucle numérique 10M | `bench/bench_loop.*` |
+| 3 | Création/accès map 100K | `bench/bench_objects.*` |
+| 4 | Accès array 1M | `bench/bench_array.*` |
+| 5 | Appels de fonctions 1M | `bench/bench_calls.*` |
+
+**Environnement de référence (Windows) :**
+- Lua : `C:\Tools\lua\lua55.exe` (Lua 5.5) — pas de Lua 5.4 disponible, pacman/MSYS2 inutilisable (timeouts réseau)
+- Python : `python` ou `python3` dans le PATH
+- Build : `cmake --build build` via **PowerShell** (g++ MinGW écrit ses erreurs via Windows Console API, invisible dans Git Bash)
 
 **Règles strictes pour les comparaisons :**
-- Comparer uniquement avec **Lua 5.4** (interpréteur standard, `lua -v` → 5.4.x). **Jamais LuaJIT** — projet figé sur Lua 5.1, hors sujet.
-- Lua 5.4 utilise `TValue` (struct taguée), **pas du NaN-boxing**. Même architecture de valeur qu'Ollin.
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
 
 ## Maintenance de CLAUDE.md
