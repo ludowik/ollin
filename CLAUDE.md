@@ -40,15 +40,18 @@ ollin/
 
 ## Syntaxe
 
+> **La syntaxe et la sémantique du langage sont décrites dans [`docs/grammar.ebnf`](docs/grammar.ebnf).**
+> CLAUDE.md ne documente **pas** la syntaxe — il décrit l'architecture et l'implémentation (opcodes, registres, structures internes). Pour toute question sur la forme du langage, lire la grammaire.
+
 | Fichier | Propriétaire | Rôle |
 |---|---|---|
-| `syntax.ol` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
-| `grammar.ebnf` | Claude | grammaire formelle dérivée de `syntax.ol` — à maintenir à chaque évolution |
-| `test.ol` | Claude | fichier de tests complets — à maintenir à chaque évolution |
-| `docs/index.html` | Claude | tutoriel HTML — à maintenir à chaque évolution du langage |
-| `ollin-vscode/` | Claude | extension VS Code (colorisation) — à maintenir à chaque évolution du langage |
+| `scripts/syntax.ol` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
+| `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
+| `scripts/test.ol` | Claude | fichier de tests complets |
+| `docs/index.html` | Claude | tutoriel HTML |
+| `ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf`, `test.ol`, `docs/index.html`, `ollin-vscode/` et `CLAUDE.md`.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `test.ol`, `docs/index.html` et `ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 ## Versionning
 
@@ -160,11 +163,11 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
 | HALT          | —      |                            | arrêt                                            |
 
-## Déclaration de variables (règle sémantique)
+## Déclaration de variables (implémentation de l'enforcement)
 
-- Toute variable **doit** être déclarée avec `var` avant usage.
-- Lire ou affecter un identifiant non déclaré → **erreur de compilation** (`undeclared variable '<nom>' (use 'var')`).
-- `var` ne crée que des variables **locales** (registres) — il n'existe pas de variable globale créée par l'utilisateur.
+> Règle de langage (obligation de `var`, locales uniquement) : voir `grammar.ebnf` (`varDecl`, `assignStmt`).
+
+- Message d'erreur émis : `undeclared variable '<nom>' (use 'var')`.
 - Seuls les noms de fonctions (`func_table`) et de classes (`declared_globals_`) sont résolus en portée globale ; tout autre nom global déclenche l'erreur.
 - Garde-fous dans le compilateur : `visit(AssignStmt)`, `visit(VarExpr)` et `visit(IndexAssignStmt)` (fallthrough global).
 
@@ -177,77 +180,44 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 - `reg_count_` = max registres utilisés → stocké dans `FuncProto.reg_count`
 - À l'appel de fonction, la VM resize regs[] pour loger le nouveau frame
 
-## Boucle `for`
+## Boucle `for` (implémentation)
 
-Trois syntaxes :
+> Syntaxe et sémantique (formes numérique/itérateur, valeur primaire, step) : voir `grammar.ebnf` (`forStmt`).
 
-```
-for i=start,end[,step]      ## numérique (step optionnel, défaut = 1)
-for v in expr               ## 1 var : valeur primaire de l'itérable
-for k,v in expr             ## 2 vars : clé/index + valeur
-```
-
-**Valeur primaire (1 var)** : définie par l'itérateur — `ArrayIterator` et `RangeIterator` → val (l'élément) ; `MapIterator` → key (la clé).  
-Step absent → step = 1 (condition `i <= end`).  
-Step présent → condition runtime `(end - i) * step >= 0` (valide dans les deux sens).  
+**Numérique** : step absent → step = 1 (condition `i <= end`) ; step présent → condition runtime `(end - i) * step >= 0` (valide dans les deux sens).  
 Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires au-dessus de `locals_top_`.  
-En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.  
-`break` fonctionne dans toutes les formes.
+En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.
 
-`for [k,] v in expr` : `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`.  
+**Itérateur** (`for [k,] v in expr`) : `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`.  
 - 2 vars : `FOR_ITER_NEXT` → `[block+1]`=key, `[block+2]`=val. 3 registres + 1 temp source.  
 - 1 var  : `FOR_ITER_NEXT1` → `[block+1]`=primary (val si `primary_is_val()`, sinon key). 2 registres + 1 temp source.  
 `Iterator::primary_is_val()` : `ArrayIterator`=true, `RangeIterator`=true, `MapIterator`=false.
 
-## Type range
+## Type range (implémentation)
 
-Notation d'intervalles mathématiques (entiers uniquement, ref-counted `Range*`) :
-
-```
-[1;10]      ## inclusif des deux côtés → 1,2,...,10
-[1;10[      ## fermé gauche, ouvert droit → 1,2,...,9
-]0;10]      ## ouvert gauche, fermé droit → 1,2,...,10
-]0;10[      ## ouvert des deux côtés → 1,2,...,9
-[1;10;2]    ## avec step → 1,3,5,7,9
-var r = [1;5]   ## first-class : stockable dans une variable
-for i in r  ## itérable via RangeIterator
-```
+> Notation d'intervalles `[a;b]` / `]a;b[` / step / first-class : voir `grammar.ebnf` (`rangeLit`).
 
 `MAKE_RANGE` (opcode ABC) : A=dest, B=base (start=R[B], end=R[B+1], step=R[B+2] si has_step), C=flags (bit0=incl_right, bit1=has_step). L'ajustement open-left est émis par le compilateur via ADD avant MAKE_RANGE.  
-`T_RANGE = 11` — Range* ref-counted avec `{start, end, step, incl_right}`.
+`T_RANGE = 11` — Range* ref-counted avec `{start, end, step, incl_right}` (entiers uniquement).
 
-## Type map
+## Type map (implémentation)
 
-Syntaxe JSON-like ; littéral : clés string ou identifiant. À l'exécution, toute Value peut être clé :
-
-```
-var t = {}                      ## map vide
-var m = {                       ## literal multi-lignes
-    "a": 1,
-    b: 2,                       ## clé identifiant (sans guillemets)
-}
-print(m["a"])                   ## GET_INDEX via crochet
-print(m.a)                      ## GET_INDEX via point (syntaxe équivalente)
-m["c"] = 3                      ## SET_INDEX via crochet
-m.c = 3                         ## SET_INDEX via point
-m["a"] += 10                    ## compound : GET_INDEX + op + SET_INDEX
-m.a += 10                       ## idem via point
-```
+> Syntaxe littérale JSON-like, accès `m["k"]` / `m.k`, sémantique : voir `grammar.ebnf` (`mapLit`, `indexAssign`).
 
 Implémentation : `Map { unordered_map<Value,Value,ValueHash,ValueEqual> data; int refcount; }` — pure hashmap, ref-counted.  
 Clés de tout type Value (ValueHash/ValueEqual : INTEGER(1)==FLOAT(1.0), strings par pointeur).  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
 `isFalsy(map)` → toujours `false`.  
-Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.
+Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.  
+Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 
-## Type entier natif
+## Type entier natif (implémentation)
+
+> Règles de promotion (INT/FLOAT) et littéraux : voir `grammar.ebnf` (`additive`, `NUMBER`).
 
 Les littéraux entiers (`42`, `1_000`) sont stockés comme `int64_t` (struct taguée, T_INTEGER).  
-Les opérations arithmétiques et comparaisons dispatchent sur le type :  
-- INT op INT → INT (ADD, SUB, MUL, MOD, comparaisons)  
-- INT op FLOAT ou FLOAT op INT → FLOAT (promotion automatique)  
-- DIV → toujours FLOAT  
-- Overflow int64 → wrapping silencieux (comportement x86-64)  
+Les opcodes arithmétiques/comparaison dispatchent sur le tag (INT op INT → INT ; promotion FLOAT sinon ; DIV → FLOAT).  
+Overflow int64 → wrapping silencieux (comportement x86-64).  
 `Value` = 16 octets (uint8_t tag + union int64_t/double/ptr).
 
 ## Représentation de Value
@@ -319,9 +289,9 @@ std::vector<Upvalue*> open_upvals;  // upvals ouvertes créées par ce frame
 - `visit(FuncDeclStmt)` : si `is_nested` (outer_name non vide) → émet `MAKE_CLOSURE` ou `LOAD_FUNC` dans ce registre local, pas de `STORE_GLOBAL`.
 - Appels récursifs à une fonction interne : `resolveUpvalue(callee)` remonte la chaîne de scopes → `GET_UPVAL + CALL_DYN`.
 
-## Système de classes
+## Système de classes (implémentation)
 
-Syntaxe : `class Name [extends Parent] ... end`
+> Syntaxe (`class`, `extends`, `super`, méthodes, méta-méthodes) : voir `grammar.ebnf` (`classDecl`, `method`, `superCall`).
 
 ### Représentation
 

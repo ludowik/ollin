@@ -1,6 +1,10 @@
 (* Ollin — grammaire formelle
    Source de vérité : syntax.ol
-   Maintenu par : Claude — mettre à jour après chaque évolution de syntax.ol *)
+   Maintenu par : Claude — mettre à jour après chaque évolution de syntax.ol
+
+   Ce fichier est LA référence de la syntaxe et de la sémantique du langage.
+   Les commentaires (* ... *) précisent les règles sémantiques attachées à
+   chaque production. CLAUDE.md ne documente que l'implémentation interne. *)
 
 program        = { stmt } EOF ;
 
@@ -28,9 +32,15 @@ methodCall     = expr "." IDENT "(" [ expr { "," expr } ] ")" ;
 superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
+                 (* `var` est OBLIGATOIRE pour créer une variable, et ne crée que des locales *)
+                 (* sans "=" → nil ; moins de valeurs que de noms → les noms en trop valent nil *)
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
 forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
                | "for" IDENT [ "," IDENT ] "in" expr NEWLINE { stmt } "end" NEWLINE ;
+                 (* numérique : "for i=start,end[,step]" ; step optionnel, défaut 1 ; step<0 décompte *)
+                 (* itérateur : "for v in it" → valeur primaire (élément pour array/range, clé pour map) *)
+                 (*             "for k,v in it" → clé/index + valeur *)
+                 (* itérables : array, map (snapshot), range ; "break" valide partout *)
 ifStmt         = "if" expr "then" NEWLINE { stmt }
                  { "else" "if" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]
@@ -60,6 +70,8 @@ comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
 shift          = additive { ( "<<" | ">>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
              (* "+" : addition numérique ou concaténation de strings *)
+             (* promotion : INT op INT → INT ; INT op FLOAT → FLOAT ; "/" → toujours FLOAT *)
+             (* overflow int64 → wrapping silencieux *)
 multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
 unary          = ( "-" | "not" | "~" ) unary | primary ;
 primary        = NUMBER
@@ -80,6 +92,9 @@ mapLit         = "{" [ NEWLINE ]
                    [ mapEntry { "," [ NEWLINE ] mapEntry } [ NEWLINE ] ]
                  "}" ;
 mapEntry       = ( STRING | IDENT ) ":" expr ;
+                 (* littéral : clés string ou identifiant ; à l'exécution toute Value peut être clé *)
+                 (* accès : m["k"] et m.k sont équivalents (lecture, écriture, compound) *)
+                 (* sémantique de copie : référence comptée (pas de clone) ; map toujours truthy *)
 arrayLit       = "[" [ expr { "," expr } ] "]" ;
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
              (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)
