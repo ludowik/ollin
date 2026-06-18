@@ -1382,7 +1382,10 @@ wasmScript.onload = () => {
     pgRunBtn.disabled = false;
     pgStatus.textContent = 'Runtime prêt';
     setTimeout(() => { pgStatus.textContent = ''; }, 2000);
-  }).catch(() => { pgStatus.textContent = 'Erreur initialisation WASM'; });
+  }).catch(err => {
+    pgStatus.textContent = 'Erreur initialisation WASM';
+    console.error('WASM init error:', err);
+  });
 };
 wasmScript.onerror = () => { pgStatus.textContent = 'WASM non disponible'; };
 document.head.appendChild(wasmScript);
