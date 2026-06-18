@@ -1,7 +1,7 @@
 ## animation : 40 lignes colorées qui bougent et rebondissent
 const W = 800
 const H = 600
-const N = 40
+const N = 200
 const SPEED = 3
 
 func rand_color()
