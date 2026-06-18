@@ -27,8 +27,20 @@ static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
     int h = argc > 1 ? toInt(args[1]) : 600;
     const char* title = (argc > 2 && args[2].isString()) ? args[2].sptr->c_str() : "Ollin";
+#ifdef __EMSCRIPTEN__
+    emscripten_cancel_main_loop();
+    if (IsWindowReady()) CloseWindow();
+#endif
     InitWindow(w, h, title);
     SetTargetFPS(60);
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        var c = document.getElementById('canvas');
+        if (c) { c.width = $0; c.height = $1; c.style.display = 'block'; }
+        var o = document.getElementById('pg-output');
+        if (o) o.style.display = 'none';
+    }, w, h);
+#endif
     return Value{};
 }
 
@@ -86,6 +98,12 @@ static void emscripten_frame() {
     if (WindowShouldClose()) {
         emscripten_cancel_main_loop();
         CloseWindow();
+        EM_ASM({
+            var c = document.getElementById('canvas');
+            if (c) c.style.display = 'none';
+            var o = document.getElementById('pg-output');
+            if (o) { o.style.display = 'block'; o.textContent = '(fenêtre fermée)'; o.className = 'pg-output'; }
+        });
         return;
     }
     VM::current()->callValue(s_run_callback);
@@ -97,7 +115,7 @@ static Value gfx_run(Value* args, int argc) {
     Value fn = args[0];
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
-    emscripten_set_main_loop(emscripten_frame, 0, 1);
+    emscripten_set_main_loop(emscripten_frame, 0, 0);
 #else
     while (!WindowShouldClose()) {
         VM::current()->callValue(fn);

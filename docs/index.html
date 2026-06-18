@@ -1415,6 +1415,7 @@ const pgExamples = [
   { name: 'Closure',      code: 'func counter()\n  var n = 0\n  return func()\n    n = n + 1\n    return n\n  end\nend\nvar c = counter()\nprint(c(), c(), c())' },
   { name: 'Map',          code: 'var m = {name: "ollin", version: 1}\nfor k, v in m\n  print(k, "=", v)\nend' },
   { name: 'Classe',       code: 'class Vec2\n  func init(x, y)\n    self.x = x\n    self.y = y\n  end\n  func __add(other)\n    return Vec2(self.x + other.x, self.y + other.y)\n  end\n  func __str()\n    return "Vec2(" + self.x + "," + self.y + ")"\n  end\nend\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
+  { name: 'Graphics',     code: 'graphics.canvas(800, 400, "Playground")\nvar t = 0\nfunc frame()\n  graphics.begin_draw()\n  graphics.clear(graphics.BLACK)\n  var x = 400 + math.cos(t) * 150\n  var y = 200 + math.sin(t) * 100\n  graphics.line(400, 200, x, y, graphics.WHITE)\n  graphics.draw_text("FPS: " + graphics.fps(), 10, 10, 20, graphics.GREEN)\n  graphics.end_draw()\n  t = t + 0.03\nend\ngraphics.run(frame)' },
 ];
 
 const pgEditor     = document.getElementById('pg-editor');
@@ -1473,10 +1474,14 @@ document.head.appendChild(wasmScript);
 
 function runCode() {
   if (!ollin) return;
+  const canvas = document.getElementById('canvas');
+  canvas.style.display = 'none';
+  pgOutput.style.display = 'block';
+  pgOutput.className = 'pg-output';
   const out = ollin.execute(pgEditor.value);
+  if (canvas.style.display === 'block') return; // graphics mode
   if (!out) {
     pgOutput.textContent = '(aucune sortie)';
-    pgOutput.className = 'pg-output';
   } else if (out.startsWith('error:')) {
     pgOutput.textContent = out;
     pgOutput.className = 'pg-output has-error';
