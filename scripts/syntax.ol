@@ -309,7 +309,7 @@ end
 assert(fact(0) == 1)    ## cas limite : n=0 déclenche la branche n < 2
 assert(fact(5) == 120)
 
-## paramètres par défaut (constantes littérales uniquement)
+## paramètres par défaut (constes littérales uniquement)
 func greet(name, greeting = "Bonjour")
     return greeting
 end
@@ -657,32 +657,32 @@ print("class tests ok")
 
 ## ── 19. Constantes ───────────────────────────────────────────────────────────
 
-## 'constant' : locale immuable, initialisation obligatoire
-constant PI = 3.14159
-constant MAX = 100
+## 'const' : locale immuable, initialisation obligatoire
+const PI = 3.14159
+const MAX = 100
 assert(PI  == 3.14159)
 assert(MAX == 100)
 
-## constante dans une fonction
+## conste dans une fonction
 func circle_area(r)
-    constant TWO_PI = 2 * PI
+    const TWO_PI = 2 * PI
     return TWO_PI * r * r
 end
 assert(circle_area(1) == 2 * PI)
 
-## constante capturée en lecture seule par une closure
-constant BASE = 10
+## conste capturée en lecture seule par une closure
+const BASE = 10
 func with_base(x)  return BASE + x  end
 assert(with_base(5) == 15)
 
 ## les erreurs ci-dessous sont des erreurs de COMPILATION :
 ##
-##   constant x          ## ERROR: must be initialized
-##   constant x = 1
-##   x = 2               ## ERROR: cannot assign to constant 'x'
-##   x += 1              ## ERROR: cannot assign to constant 'x'
-##   constant k = 1
-##   func f()  k = 0  end  ## ERROR: cannot assign to constant 'k'
+##   const x          ## ERROR: must be initialized
+##   const x = 1
+##   x = 2               ## ERROR: cannot assign to const 'x'
+##   x += 1              ## ERROR: cannot assign to const 'x'
+##   const k = 1
+##   func f()  k = 0  end  ## ERROR: cannot assign to const 'k'
 
 ## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##

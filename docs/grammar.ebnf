@@ -40,8 +40,8 @@ globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE 
                  (* `global` déclare des variables globales, visibles dans tout le programme *)
                  (* déclarable n'importe où (top-level ou dans une fonction) ; lue/écrite partout *)
                  (* une locale `var` de même nom masque le global dans sa portée *)
-constDecl      = "constant" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
-                 (* `constant` déclare une locale immuable ; initialisation obligatoire *)
+constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
+                 (* `const` déclare une locale immuable ; initialisation obligatoire *)
                  (* toute tentative d'assignation ultérieure est une erreur de compilation *)
                  (* une constante peut être capturée en lecture seule par une closure *)
 whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;

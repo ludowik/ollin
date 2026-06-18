@@ -182,7 +182,7 @@ std::unique_ptr<Stmt> Parser::globalDecl() {
 
 std::unique_ptr<Stmt> Parser::constantDecl() {
     int line = peek().line;
-    advance(); // consume 'constant'
+    advance(); // consume 'const'
     auto s = std::make_unique<VarDeclStmt>();
     s->is_constant = true;
     s->line = line;
@@ -191,7 +191,7 @@ std::unique_ptr<Stmt> Parser::constantDecl() {
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     if (!check(TokenType::EQUALS))
         throw std::runtime_error("line " + std::to_string(line)
-                                 + ": constant '" + s->names[0] + "' must be initialized");
+                                 + ": const '" + s->names[0] + "' must be initialized");
     advance(); // consume '='
     s->values.push_back(expr());
     while (match(TokenType::COMMA))

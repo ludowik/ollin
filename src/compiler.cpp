@@ -397,12 +397,12 @@ void Compiler::visit(const AssignStmt& s) {
     if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     if (const_names_.count(s.name))
         throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                                 + ": cannot assign to constant '" + s.name + "'");
+                                 + ": cannot assign to const '" + s.name + "'");
     // Also block assignment when name is a constant captured from an outer scope
     for (auto& scope : outer_scopes_)
         if (scope.consts.count(s.name))
             throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                                     + ": cannot assign to constant '" + s.name + "'");
+                                     + ": cannot assign to const '" + s.name + "'");
     {
         auto it = local_regs_.find(s.name);
         if (it != local_regs_.end()) {

@@ -51,26 +51,26 @@ func f()
 end' \
     "global variable 'h' already declared"
 
-check_error "constant sans init" \
-    'constant x' \
+check_error "const sans init" \
+    'const x' \
     "must be initialized"
 
-check_error "constant reassignment direct" \
-    'constant x = 1
+check_error "const reassignment direct" \
+    'const x = 1
 x = 2' \
-    "cannot assign to constant 'x'"
+    "cannot assign to const 'x'"
 
-check_error "constant compound assignment" \
-    'constant x = 10
+check_error "const compound assignment" \
+    'const x = 10
 x += 1' \
-    "cannot assign to constant 'x'"
+    "cannot assign to const 'x'"
 
-check_error "constant reassignment inside function" \
-    'constant k = 42
+check_error "const reassignment inside function" \
+    'const k = 42
 func f()
     k = 0
 end' \
-    "cannot assign to constant 'k'"
+    "cannot assign to const 'k'"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
