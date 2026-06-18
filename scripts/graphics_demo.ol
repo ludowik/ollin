@@ -19,7 +19,7 @@ while graphics.is_open()
     graphics.line(400, 0,   400, 600, graphics.WHITE)
     graphics.line(0,   300, 800, 300, graphics.GREEN)
 
-    graphics.draw_fps(720, 580)
+    graphics.draw_text("FPS: " + graphics.fps(), 720, 580, 16, graphics.WHITE)
     graphics.end_draw()
 end
 

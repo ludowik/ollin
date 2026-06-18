@@ -104,6 +104,11 @@ assert(2 + 3 * 4 == 14)     ## priorité : * avant +
 assert(1 + 2     == 3)
 assert(1 + 2.0   == 3.0)
 
+## concaténation : string + any → string
+assert("x" + 1     == "x1")
+assert("v=" + 3.14 == "v=3.14")
+assert(42 + " !"   == "42 !")
+
 ## ── 5. Comparaisons ──────────────────────────────────────────────────────────
 
 assert(1 == 1)
@@ -739,7 +744,8 @@ assert(rnd >= 0 and rnd < 1)
 ##
 ## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY
 ## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
-## FPS : graphics.fps() → entier, graphics.draw_fps(x, y) → affiche en bas à droite
+## FPS : graphics.fps() → entier
+## Texte : graphics.draw_text(text, x, y, size [, color])
 
 ## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##

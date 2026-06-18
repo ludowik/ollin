@@ -442,8 +442,8 @@ op_STORE_GLOBAL:
     NEXT();
 
 op_ADD: {
-    if (regs[base+B].isString() && regs[base+C].isString()) {
-        regs[base+A] = Value(regs[base+B].asString() + regs[base+C].asString());
+    if (regs[base+B].isString() || regs[base+C].isString()) {
+        regs[base+A] = Value(valueToString(regs[base+B]) + valueToString(regs[base+C]));
         NEXT();
     }
     if (isInstance(regs[base+B])) {
@@ -1053,8 +1053,8 @@ op_HALT:
             break;
 
         case Op::ADD: {
-            if (regs[base+B].isString() && regs[base+C].isString()) {
-                regs[base+A] = Value(regs[base+B].asString() + regs[base+C].asString());
+            if (regs[base+B].isString() || regs[base+C].isString()) {
+                regs[base+A] = Value(valueToString(regs[base+B]) + valueToString(regs[base+C]));
                 break;
             }
             if (isInstance(regs[base+B])) {

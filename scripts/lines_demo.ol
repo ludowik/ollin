@@ -55,7 +55,7 @@ while graphics.is_open()
         graphics.line(x1[i], y1[i], x2[i], y2[i], cols[i])
     end
 
-    graphics.draw_fps(W - 80, H - 20)
+    graphics.draw_text("FPS: " + graphics.fps(), W - 80, H - 20, 16, graphics.WHITE)
     graphics.end_draw()
 end
 

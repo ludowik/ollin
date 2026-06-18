@@ -62,10 +62,11 @@ static Value gfx_fps(Value* args, int argc) {
     return Value((int64_t)GetFPS());
 }
 
-static Value gfx_draw_fps(Value* args, int argc) {
-    int x = argc > 0 ? toInt(args[0]) : 0;
-    int y = argc > 1 ? toInt(args[1]) : 0;
-    DrawFPS(x, y);
+static Value gfx_draw_text(Value* args, int argc) {
+    if (argc < 4) throw std::runtime_error("graphics.draw_text: expected text, x, y, size [, color]");
+    const char* text = (args[0].isString()) ? args[0].sptr->c_str() : "";
+    DrawText(text, toInt(args[1]), toInt(args[2]), toInt(args[3]),
+             argc > 4 ? toColor(args[4]) : WHITE);
     return Value{};
 }
 
@@ -83,8 +84,8 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(gfx_end_draw));
     m.mapSet(Value(std::string("clear")),   Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("line")),     Value::makeBuiltin(gfx_line));
-    m.mapSet(Value(std::string("fps")),      Value::makeBuiltin(gfx_fps));
-    m.mapSet(Value(std::string("draw_fps")), Value::makeBuiltin(gfx_draw_fps));
+    m.mapSet(Value(std::string("fps")),       Value::makeBuiltin(gfx_fps));
+    m.mapSet(Value(std::string("draw_text")), Value::makeBuiltin(gfx_draw_text));
     m.mapSet(Value(std::string("close")),    Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("BLACK")),   Value(rgb(0,   0,   0)));
     m.mapSet(Value(std::string("WHITE")),   Value(rgb(255, 255, 255)));
