@@ -1,8 +1,13 @@
+#define _USE_MATH_DEFINES
 #include "chunk.h"
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <stdexcept>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 static inline double numArg(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc) throw std::runtime_error(std::string(fn) + ": missing argument");
