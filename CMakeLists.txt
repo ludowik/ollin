@@ -45,8 +45,7 @@ if(EMSCRIPTEN)
         --bind
     )
     add_custom_command(TARGET ollin_wasm POST_BUILD
-        COMMAND python3 -c
-            "import re,datetime; p='${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html'; s=open(p).read(); s=re.sub(r'id=\"build-date\">[^<]+<',f'id=\"build-date\">{datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M\")}<',s); open(p,'w').write(s)"
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/update_build_date.py
         COMMENT "Updating build date in docs/index.html"
     )
 else()
