@@ -412,6 +412,7 @@ pre:hover .try-btn { opacity: 1; }
   <a href="#try">Try / Catch</a>
   <div class="section-label">Builtins</div>
   <a href="#builtins">Fonctions intégrées</a>
+  <a href="#stdlib">Modules built-in</a>
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
   <div class="section-label">Interactif</div>
@@ -1146,6 +1147,35 @@ f(<span class="str">"hello"</span>)               <span class="cmt">## hello</sp
     fn(x)
 <span class="kw">end</span>
 apply(<span class="bi">print</span>, <span class="num">42</span>)          <span class="cmt">## 42</span></code></pre>
+</section>
+
+<!-- ── Modules built-in ──────────────────────────────────────────────────── -->
+<section id="stdlib">
+<h2>Modules built-in</h2>
+<p>Les modules built-in sont disponibles sans <code>import</code> — ils sont automatiquement injectés au démarrage de la VM sous forme de maps.</p>
+
+<h3 id="module-math">math</h3>
+<p>Fonctions et constantes mathématiques.</p>
+
+<table>
+  <thead><tr><th>Nom</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>math.PI</code></td><td>float</td><td>π ≈ 3.14159265358979</td></tr>
+    <tr><td><code>math.TAU</code></td><td>float</td><td>τ = 2π ≈ 6.28318530717959</td></tr>
+    <tr><td><code>math.abs(x)</code></td><td>fonction</td><td>Valeur absolue — conserve le type (int→int, float→float)</td></tr>
+    <tr><td><code>math.sign(x)</code></td><td>fonction</td><td>Signe : -1, 0 ou 1 (retourne un entier)</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="bi">print</span>(math.PI)             <span class="cmt">## 3.141592653589793</span>
+<span class="bi">print</span>(math.TAU)            <span class="cmt">## 6.283185307179586</span>
+
+<span class="bi">print</span>(math.abs(-5))        <span class="cmt">## 5</span>
+<span class="bi">print</span>(math.abs(-3.14))     <span class="cmt">## 3.14</span>
+
+<span class="bi">print</span>(math.sign(10))       <span class="cmt">## 1</span>
+<span class="bi">print</span>(math.sign(-7))       <span class="cmt">## -1</span>
+<span class="bi">print</span>(math.sign(0))        <span class="cmt">## 0</span></code></pre>
 </section>
 
 <!-- ── Import ─────────────────────────────────────────────────────────── -->
