@@ -33,6 +33,7 @@ private:
     };
     std::unordered_map<std::string, FuncInfo> func_table;
     std::unordered_set<std::string> declared_globals_;  // class names declared at top level
+    std::unordered_set<std::string> const_names_;       // locals declared with 'constant'
     std::string current_func_name;  // "" = global scope
     int         current_func_idx_ = -1;  // index in chunk.funcs (-1 = main chunk)
 
@@ -42,6 +43,7 @@ private:
     struct OuterScope {
         std::unordered_map<std::string, int> regs;
         std::unordered_map<std::string, int> upval_idx;  // name → upvalue index in this scope's proto
+        std::unordered_set<std::string>      consts;     // constants declared in this scope
         int func_proto_idx;  // -1 = main chunk
     };
     std::vector<OuterScope>              outer_scopes_;

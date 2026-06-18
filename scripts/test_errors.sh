@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vérifie que le compilateur rejette les redéclarations
+# Vérifie que le compilateur rejette les redéclarations et assignations illégales
 OLLIN=./build/ollin
 PASS=0
 FAIL=0
@@ -50,6 +50,27 @@ func f()
     global h = 2
 end' \
     "global variable 'h' already declared"
+
+check_error "constant sans init" \
+    'constant x' \
+    "must be initialized"
+
+check_error "constant reassignment direct" \
+    'constant x = 1
+x = 2' \
+    "cannot assign to constant 'x'"
+
+check_error "constant compound assignment" \
+    'constant x = 10
+x += 1' \
+    "cannot assign to constant 'x'"
+
+check_error "constant reassignment inside function" \
+    'constant k = 42
+func f()
+    k = 0
+end' \
+    "cannot assign to constant 'k'"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

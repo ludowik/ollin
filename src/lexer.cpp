@@ -3,8 +3,9 @@
 #include <unordered_map>
 
 static const std::unordered_map<std::string, TokenType> s_keywords = {
-    {"var",   TokenType::VAR},
-    {"global", TokenType::GLOBAL},
+    {"var",      TokenType::VAR},
+    {"global",   TokenType::GLOBAL},
+    {"constant", TokenType::CONSTANT},
     {"while", TokenType::WHILE},
     {"if",    TokenType::IF},
     {"then",  TokenType::THEN},

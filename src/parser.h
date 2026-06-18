@@ -33,6 +33,7 @@ private:
     std::unique_ptr<Stmt> parseOneStmt();
     std::unique_ptr<Stmt> varDecl();
     std::unique_ptr<Stmt> globalDecl();
+    std::unique_ptr<Stmt> constantDecl();
     std::unique_ptr<Stmt> whileStmt();
     std::unique_ptr<Stmt> ifStmt();
     std::unique_ptr<Stmt> breakStmt();

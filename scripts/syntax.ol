@@ -655,8 +655,36 @@ assert(v3.y == 6)
 
 print("class tests ok")
 
-## ── 19. Erreurs de redéclaration (erreurs de compilation) ───────────────────
-## Les exemples ci-dessous provoqueraient une erreur à la compilation :
+## ── 19. Constantes ───────────────────────────────────────────────────────────
+
+## 'constant' : locale immuable, initialisation obligatoire
+constant PI = 3.14159
+constant MAX = 100
+assert(PI  == 3.14159)
+assert(MAX == 100)
+
+## constante dans une fonction
+func circle_area(r)
+    constant TWO_PI = 2 * PI
+    return TWO_PI * r * r
+end
+assert(circle_area(1) == 2 * PI)
+
+## constante capturée en lecture seule par une closure
+constant BASE = 10
+func with_base(x)  return BASE + x  end
+assert(with_base(5) == 15)
+
+## les erreurs ci-dessous sont des erreurs de COMPILATION :
+##
+##   constant x          ## ERROR: must be initialized
+##   constant x = 1
+##   x = 2               ## ERROR: cannot assign to constant 'x'
+##   x += 1              ## ERROR: cannot assign to constant 'x'
+##   constant k = 1
+##   func f()  k = 0  end  ## ERROR: cannot assign to constant 'k'
+
+## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##
 ##   var x = 1
 ##   var x = 2          ## ERROR: local variable 'x' already declared in this scope

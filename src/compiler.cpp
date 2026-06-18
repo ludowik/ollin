@@ -102,6 +102,7 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
             if (!v->is_global)   // 'global' → table des globaux, pas de registre
+                                 // 'constant' → locale normale (même registre, immuable à la compilation)
                 for (auto& n : v->names) {
                     if (!seen.insert(n).second)
                         throw std::runtime_error("local variable '" + n + "' already declared in this scope");
@@ -307,6 +308,9 @@ void Compiler::visit(const VarDeclStmt& s) {
             chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
         }
     }
+    // Register constants so any later assignment is caught at compile time
+    if (s.is_constant)
+        for (auto& n : s.names) const_names_.insert(n);
 }
 
 void Compiler::visit(const WhileStmt& s) {
@@ -391,6 +395,14 @@ void Compiler::visit(const ContinueStmt& s) {
 
 void Compiler::visit(const AssignStmt& s) {
     if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (const_names_.count(s.name))
+        throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
+                                 + ": cannot assign to constant '" + s.name + "'");
+    // Also block assignment when name is a constant captured from an outer scope
+    for (auto& scope : outer_scopes_)
+        if (scope.consts.count(s.name))
+            throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
+                                     + ": cannot assign to constant '" + s.name + "'");
     {
         auto it = local_regs_.find(s.name);
         if (it != local_regs_.end()) {
@@ -524,8 +536,11 @@ void Compiler::visit(const FuncDeclStmt& s) {
     int  outer_fidx    = current_func_idx_;
     bool is_nested     = !outer_name.empty();  // déclarée dans une autre fonction
 
+    auto outer_consts = const_names_;   // copy (not move) — stays in OuterScope too
+    const_names_.clear();
+
     // Push outer scope for upvalue resolution
-    outer_scopes_.push_back({outer_regs, outer_upvals, outer_fidx});
+    outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
 
     current_func_name = s.name;
     cur_upval_idx_.clear();
@@ -593,6 +608,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     outer_scopes_.pop_back();
     local_regs_        = std::move(outer_regs);
     cur_upval_idx_     = std::move(outer_upvals);
+    const_names_       = std::move(outer_consts);
     reg_top_           = outer_top;
     reg_count_         = outer_count;
     locals_top_        = outer_locals;
@@ -1097,13 +1113,15 @@ void Compiler::visit(const BlockStmt& s) {
 uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     auto outer_regs   = std::move(local_regs_);
     auto outer_upvals = std::move(cur_upval_idx_);
+    auto outer_consts = const_names_;   // copy — stays in OuterScope too
     int  outer_top    = reg_top_;
     int  outer_count  = reg_count_;
     int  outer_locals = locals_top_;
     auto outer_name   = current_func_name;
     int  outer_fidx   = current_func_idx_;
+    const_names_.clear();
 
-    outer_scopes_.push_back({outer_regs, outer_upvals, outer_fidx});
+    outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
 
     current_func_name = s.name;
     cur_upval_idx_.clear();
@@ -1156,6 +1174,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     outer_scopes_.pop_back();
     local_regs_       = std::move(outer_regs);
     cur_upval_idx_    = std::move(outer_upvals);
+    const_names_      = std::move(outer_consts);
     reg_top_          = outer_top;
     reg_count_        = outer_count;
     locals_top_       = outer_locals;
