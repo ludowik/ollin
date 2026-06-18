@@ -2,15 +2,11 @@
 #include <stdexcept>
 
 Value makeMathModule();
-#ifndef OLLIN_WASM
 Value makeGraphicsModule();
-#endif
 
 static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "math",     makeMathModule     },
-#ifndef OLLIN_WASM
     { "graphics", makeGraphicsModule },
-#endif
 };
 
 const std::vector<std::string>& builtinModuleNames() {
