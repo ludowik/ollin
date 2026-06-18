@@ -739,6 +739,7 @@ assert(rnd >= 0 and rnd < 1)
 ##
 ## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY
 ## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
+## FPS : graphics.fps() → entier, graphics.draw_fps(x, y) → affiche en bas à droite
 
 ## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##

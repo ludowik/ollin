@@ -57,6 +57,18 @@ static Value gfx_line(Value* args, int argc) {
     return Value{};
 }
 
+static Value gfx_fps(Value* args, int argc) {
+    (void)args; (void)argc;
+    return Value((int64_t)GetFPS());
+}
+
+static Value gfx_draw_fps(Value* args, int argc) {
+    int x = argc > 0 ? toInt(args[0]) : 0;
+    int y = argc > 1 ? toInt(args[1]) : 0;
+    DrawFPS(x, y);
+    return Value{};
+}
+
 static Value gfx_close(Value* args, int argc) {
     (void)args; (void)argc;
     CloseWindow();
@@ -70,8 +82,10 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(gfx_begin_draw));
     m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(gfx_end_draw));
     m.mapSet(Value(std::string("clear")),   Value::makeBuiltin(gfx_clear));
-    m.mapSet(Value(std::string("line")),    Value::makeBuiltin(gfx_line));
-    m.mapSet(Value(std::string("close")),   Value::makeBuiltin(gfx_close));
+    m.mapSet(Value(std::string("line")),     Value::makeBuiltin(gfx_line));
+    m.mapSet(Value(std::string("fps")),      Value::makeBuiltin(gfx_fps));
+    m.mapSet(Value(std::string("draw_fps")), Value::makeBuiltin(gfx_draw_fps));
+    m.mapSet(Value(std::string("close")),    Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("BLACK")),   Value(rgb(0,   0,   0)));
     m.mapSet(Value(std::string("WHITE")),   Value(rgb(255, 255, 255)));
     m.mapSet(Value(std::string("RED")),     Value(rgb(230, 41,  55)));
