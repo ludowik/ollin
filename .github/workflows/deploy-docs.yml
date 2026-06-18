@@ -19,7 +19,7 @@ jobs:
       - name: Setup Emscripten
         uses: emscripten-core/setup-emsdk@v14
         with:
-          emsdk-version: latest
+          version: latest
 
       - name: Build WASM
         run: |
