@@ -133,10 +133,6 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | RETURN        | AB     | A=first_reg, B=count       | copie R[A..A+B-1]→R[0..B-1], pop frame          |
 | RETURN_V      | AB     | A=first_reg, B=n_explicit  | retourne n explicites + varargs, pop frame       |
 | LOAD_VARARGS  | AB     | A=dest, B=count (0=all)    | R[A..] = varargs du frame courant               |
-| CALL_PRINT    | AB     | A=first_arg, B=argc        | print(R[A..A+B-1])                               |
-| CALL_PRINTF   | AB     | A=first_arg, B=argc        | printf(R[A]=fmt, R[A+1..])                       |
-| CALL_ASSERT   | AB     | A=first_arg, B=argc        | assert(R[A], R[A+1]=msg optionnel)               |
-| CALL_TIME     | A      | A=dest                     | R[A] = time()                                    |
 | TRY           | ABx    | A=catch_reg, Bx=catch_addr | empile handler{catch_addr, catch_reg}            |
 | POP_TRY       | —      |                            | dépile le handler (try body ok)                  |
 | THROW         | A      | A=value_reg                | lance R[A] → restaure frame → jump handler      |

@@ -1479,7 +1479,7 @@ function runCode() {
   if (!out) {
     pgOutput.textContent = '(aucune sortie)';
     pgOutput.className = 'pg-output';
-  } elseif (out.startsWith('error:')) {
+  } else if (out.startsWith('error:')) {
     pgOutput.textContent = out;
     pgOutput.className = 'pg-output has-error';
   } else {
@@ -1521,7 +1521,7 @@ document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
     if (!out || out === '') {
       outDiv.textContent = '(aucune sortie)';
       outDiv.className = 'inline-output empty';
-    } elseif (out.startsWith('error:')) {
+    } else if (out.startsWith('error:')) {
       outDiv.textContent = out;
       outDiv.className = 'inline-output err';
     } else {
