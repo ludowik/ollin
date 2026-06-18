@@ -67,86 +67,13 @@ std::string VM::invokeStr(const Value& obj) {
     }
     const FuncProto& fp = ch->funcs[fi];
     int call_base = (int)regs.size();
-    size_t needed = call_base + (size_t)fp.reg_count;
-    regs.resize(needed > (size_t)(call_base + 1) ? needed : (size_t)(call_base + 1));
+    size_t needed = (size_t)(call_base + std::max((int)fp.reg_count, 1));
+    regs.resize(needed);
     regs[call_base] = obj;
     uint32_t saved_ip = ip;
-    size_t stop_depth = call_stack.size();
     call_stack.push_back({0, call_base, {}, std::move(frame_upvals), {}, {}});
     ip = fp.addr;
-    while (call_stack.size() > stop_depth) {
-        Instr instr = ch->code[ip++];
-        uint8_t op = iOP(instr), A = iA(instr), B = iB(instr), C = iC(instr);
-        uint16_t Bx = iBx(instr);
-        int base = call_stack.back().reg_base;
-        switch (static_cast<Op>(op)) {
-        case Op::LOAD_K:       regs[base+A] = ch->constants[Bx]; break;
-        case Op::LOAD_NIL:     regs[base+A] = Value{}; break;
-        case Op::MOVE:         regs[base+A] = regs[base+B]; break;
-        case Op::LOAD_GLOBAL:  regs[base+A] = globals[Bx]; break;
-        case Op::STORE_GLOBAL: globals[Bx] = regs[base+A]; globals_init[Bx] = true; break;
-        case Op::ADD: {
-            auto& bv = regs[base+B]; auto& cv = regs[base+C];
-            if (bv.isString() && cv.isString())
-                regs[base+A] = Value(bv.asString() + cv.asString());
-            else
-                regs[base+A] = (bv.isInteger() && cv.isInteger())
-                    ? Value(bv.asInt() + cv.asInt())
-                    : Value(asDouble(bv) + asDouble(cv));
-            break;
-        }
-        case Op::SUB: {
-            auto& bv = regs[base+B]; auto& cv = regs[base+C];
-            regs[base+A] = (bv.isInteger() && cv.isInteger())
-                ? Value(bv.asInt() - cv.asInt())
-                : Value(asDouble(bv) - asDouble(cv));
-            break;
-        }
-        case Op::MUL: {
-            auto& bv = regs[base+B]; auto& cv = regs[base+C];
-            regs[base+A] = (bv.isInteger() && cv.isInteger())
-                ? Value(bv.asInt() * cv.asInt())
-                : Value(asDouble(bv) * asDouble(cv));
-            break;
-        }
-        case Op::GET_INDEX: {
-            regs[base+A] = protoChainGet(regs[base+B], regs[base+C]);
-            break;
-        }
-        case Op::SET_INDEX: {
-            Value& obj2 = regs[base+A];
-            if (obj2.isMap() || obj2.isClass())
-                obj2.mapSet(regs[base+B], regs[base+C]);
-            break;
-        }
-        case Op::RETURN: {
-            for (auto* uv : call_stack.back().open_upvals) {
-                if (!uv->closed) {
-                    uv->val = regs[uv->frame_base + uv->reg_idx];
-                    uv->closed = true;
-                }
-                if (--uv->refcount == 0) delete uv;
-            }
-            Value ctor = std::move(call_stack.back().ctor_result);
-            int ret_dest = call_stack.back().return_dest;
-            int n = B;
-            if (n > 0 && A != 0)
-                for (int i = 0; i < n; ++i)
-                    regs[base + i] = std::move(regs[base + A + i]);
-            uint32_t rip = call_stack.back().return_ip;
-            call_stack.pop_back();
-            if (!ctor.isNil())   regs[base + 0] = std::move(ctor);
-            if (ret_dest >= 0)   regs[ret_dest] = regs[base + 0];
-            if (call_stack.size() <= stop_depth) goto mini_done;
-            ip = rip;
-            break;
-        }
-        case Op::JUMP:          ip = Bx; break;
-        case Op::JUMP_IF_FALSE: if (isFalsy(regs[base+A])) ip = Bx; break;
-        default: goto mini_done;
-        }
-    }
-    mini_done:
+    runSwitch(call_stack.size() - 1);
     std::string result;
     if ((int)regs.size() > call_base) {
         const Value& rv = regs[call_base];
@@ -352,6 +279,569 @@ static bool valuesEqual(const Value& av, const Value& bv) {
     if (av.isNumber()  && bv.isString())       return av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
     return (av.isMap()   && bv.isMap()   && av.mptr == bv.mptr) ||
            (av.isClass() && bv.isClass() && av.mptr == bv.mptr);
+}
+
+// ── VM::errLine / VM::current / VM::callValue / VM::runSwitch ────────────────
+
+int VM::errLine() const {
+    uint32_t idx = ip > 0 ? ip - 1 : 0;
+    return (idx < (uint32_t)ch->lines.size()) ? ch->lines[idx] : 0;
+}
+
+VM* VM::current() { return s_current_vm; }
+
+Value VM::callValue(const Value& fn) {
+    if (fn.isBuiltin())
+        return fn.asBuiltin()(nullptr, 0);
+    uint8_t fi;
+    std::vector<Upvalue*> frame_upvals;
+    if (fn.isFuncVal()) {
+        fi = (uint8_t)fn.asInt();
+    } else if (fn.isClosure()) {
+        fi = fn.asClosure()->func_idx;
+        frame_upvals = fn.asClosure()->upvals;
+    } else {
+        throw std::runtime_error("callValue: not callable");
+    }
+    const FuncProto& fp = ch->funcs[fi];
+    int call_base = (int)regs.size();
+    regs.resize(call_base + std::max((int)fp.reg_count, 1));
+    uint32_t saved_ip = ip;
+    call_stack.push_back({saved_ip, call_base, {}, std::move(frame_upvals), {}, {}});
+    ip = fp.addr;
+    runSwitch(call_stack.size() - 1);
+    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
+    regs.resize(call_base);
+    ip = saved_ip;
+    return result;
+}
+
+void VM::runSwitch(size_t stop_depth) {
+    while (call_stack.size() > stop_depth) {
+        Instr    instr = ch->code[ip++];
+        uint8_t  A     = iA(instr),  B = iB(instr), C = iC(instr);
+        uint16_t Bx    = iBx(instr);
+        int      base  = call_stack.back().reg_base;
+
+        switch (static_cast<Op>(iOP(instr))) {
+
+        case Op::LOAD_K:
+            regs[base+A] = ch->constants[Bx];
+            break;
+        case Op::LOAD_NIL:
+            regs[base+A] = Value{};
+            break;
+        case Op::MOVE:
+            regs[base+A] = regs[base+B];
+            break;
+        case Op::LOAD_GLOBAL:
+            if (!globals_init[Bx])
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": undefined: " + ch->identifiers[Bx]);
+            regs[base+A] = globals[Bx];
+            break;
+        case Op::STORE_GLOBAL:
+            globals[Bx] = regs[base+A];
+            globals_init[Bx] = true;
+            break;
+
+        case Op::ADD: {
+            if (regs[base+B].isString() || regs[base+C].isString()) {
+                regs[base+A] = Value(valueToString(regs[base+B]) + valueToString(regs[base+C]));
+                break;
+            }
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().add_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() + cv.asInt())
+                : Value(asDouble(bv) + asDouble(cv));
+            break;
+        }
+        case Op::SUB: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().sub_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() - cv.asInt())
+                : Value(asDouble(bv) - asDouble(cv));
+            break;
+        }
+        case Op::MUL: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().mul_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = (bv.isInteger() && cv.isInteger())
+                ? Value(bv.asInt() * cv.asInt())
+                : Value(asDouble(bv) * asDouble(cv));
+            break;
+        }
+        case Op::DIV: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().div_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            double dv = asDouble(regs[base+C]);
+            if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+            regs[base+A] = Value(asDouble(regs[base+B]) / dv);
+            break;
+        }
+        case Op::MOD: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().mod_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger()) {
+                if (cv.asInt() == 0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
+                regs[base+A] = Value(bv.asInt() % cv.asInt());
+            } else {
+                double dv = asDouble(cv);
+                if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
+                regs[base+A] = Value(std::fmod(asDouble(bv), dv));
+            }
+            break;
+        }
+        case Op::NEGATE: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaUnary(MK().neg_, base+A, regs[base+B]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B];
+            regs[base+A] = bv.isInteger() ? Value(-bv.asInt()) : Value(-asDouble(bv));
+            break;
+        }
+        case Op::NOT:
+            regs[base+A] = Value((int64_t)(isFalsy(regs[base+B]) ? 1 : 0));
+            break;
+        case Op::AND:
+            regs[base+A] = Value((int64_t)(!isFalsy(regs[base+B]) && !isFalsy(regs[base+C]) ? 1 : 0));
+            break;
+        case Op::OR:
+            regs[base+A] = Value((int64_t)(!isFalsy(regs[base+B]) || !isFalsy(regs[base+C]) ? 1 : 0));
+            break;
+
+        case Op::EQ: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().eq_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            regs[base+A] = Value((int64_t)(valuesEqual(regs[base+B], regs[base+C]) ? 1 : 0));
+            break;
+        }
+        case Op::NEQ:
+            regs[base+A] = Value((int64_t)(valuesEqual(regs[base+B], regs[base+C]) ? 0 : 1));
+            break;
+        case Op::GT: {
+            if (isInstance(regs[base+C])) {
+                if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, regs[base+C], regs[base+B]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt()  > cv.asInt()
+                : asDouble(bv) > asDouble(cv)));
+            break;
+        }
+        case Op::LT: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt()  < cv.asInt()
+                : asDouble(bv) < asDouble(cv)));
+            break;
+        }
+        case Op::GE: {
+            if (isInstance(regs[base+C])) {
+                if (uint32_t addr = tryMetaBinary(MK().le_, base+A, regs[base+C], regs[base+B]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt()  >= cv.asInt()
+                : asDouble(bv) >= asDouble(cv)));
+            break;
+        }
+        case Op::LE: {
+            if (isInstance(regs[base+B])) {
+                if (uint32_t addr = tryMetaBinary(MK().le_, base+A, regs[base+B], regs[base+C]))
+                    { ip = addr; break; }
+            }
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
+                ? bv.asInt()  <= cv.asInt()
+                : asDouble(bv) <= asDouble(cv)));
+            break;
+        }
+
+        case Op::JUMP:
+            ip = Bx;
+            break;
+        case Op::JUMP_IF_FALSE:
+            if (isFalsy(regs[base+A])) ip = Bx;
+            break;
+
+        case Op::CALL_FUNC: {
+            const FuncProto& fp = ch->funcs[B];
+            int new_base = base + A;
+            int argc = C;
+            size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
+            if (regs.size() < needed) regs.resize(needed);
+            if (argc < fp.n_fixed) {
+                auto& defs = ch->func_defaults[fp.defaults_idx];
+                for (int i = argc; i < fp.n_fixed; ++i)
+                    regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+            }
+            std::unique_ptr<std::vector<Value>> varargs;
+            if (fp.variadic && argc > fp.n_fixed) {
+                varargs = std::make_unique<std::vector<Value>>();
+                for (int i = fp.n_fixed; i < argc; ++i)
+                    varargs->push_back(std::move(regs[new_base + i]));
+            }
+            size_t full_needed = (size_t)(new_base + fp.reg_count);
+            if (regs.size() < full_needed) regs.resize(full_needed);
+            call_stack.push_back({ip, new_base, std::move(varargs), {}, {}});
+            ip = fp.addr;
+            break;
+        }
+        case Op::RETURN: {
+            closeUpvals();
+            Value ctor   = std::move(call_stack.back().ctor_result);
+            int ret_dest = call_stack.back().return_dest;
+            int n = B;
+            if (n > 0 && A != 0)
+                for (int i = 0; i < n; ++i)
+                    regs[base + i] = std::move(regs[base + A + i]);
+            uint32_t rip = call_stack.back().return_ip;
+            call_stack.pop_back();
+            if (!ctor.isNil())  regs[base + 0] = std::move(ctor);
+            if (ret_dest >= 0)  regs[ret_dest] = regs[base + 0];
+            ip = rip;
+            break;
+        }
+        case Op::LOAD_VARARGS: {
+            auto& va = call_stack.back().varargs;
+            if (va) {
+                int count = B;
+                int n = (count == 0) ? (int)va->size() : std::min(count, (int)va->size());
+                size_t needed = (size_t)(base + A + n);
+                if (regs.size() < needed) regs.resize(needed);
+                for (int i = 0; i < n; ++i) regs[base + A + i] = (*va)[i];
+            }
+            break;
+        }
+        case Op::RETURN_V: {
+            closeUpvals();
+            auto& va   = call_stack.back().varargs;
+            int n_va   = va ? (int)va->size() : 0;
+            int n_expl = B;
+            int total  = n_expl + n_va;
+            std::vector<Value> rvs(total);
+            for (int i = 0; i < n_expl; ++i) rvs[i] = std::move(regs[base + A + i]);
+            if (va) for (int i = 0; i < n_va; ++i) rvs[n_expl + i] = std::move((*va)[i]);
+            uint32_t rip = call_stack.back().return_ip;
+            int rbase    = call_stack.back().reg_base;
+            call_stack.pop_back();
+            if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
+            for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
+            ip = rip;
+            break;
+        }
+        case Op::TRY:
+            handler_stack.push_back({Bx, A, base, regs.size(), call_stack.size()});
+            break;
+        case Op::POP_TRY:
+            handler_stack.pop_back();
+            break;
+        case Op::THROW: {
+            Value thrown = regs[base + A];
+            if (handler_stack.empty())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": unhandled exception: " + valueToString(thrown));
+            Handler h = handler_stack.back();
+            handler_stack.pop_back();
+            while (call_stack.size() > h.call_depth) {
+                closeUpvals();
+                call_stack.pop_back();
+            }
+            if (regs.size() > h.regs_size) regs.resize(h.regs_size);
+            regs[h.reg_base + h.catch_reg] = std::move(thrown);
+            ip = h.catch_addr;
+            break;
+        }
+
+        case Op::NEW_MAP:
+            regs[base+A] = Value::makeMap();
+            break;
+        case Op::GET_INDEX: {
+            const Value& obj = regs[base+B]; const Value& key = regs[base+C];
+            if (obj.isMap() || obj.isClass()) {
+                regs[base+A] = protoChainGet(obj, key);
+            } else if (obj.isArray()) {
+                if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
+                regs[base+A] = obj.arrayGet(key.asInt());
+            } else {
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: [] on non-indexable");
+            }
+            break;
+        }
+        case Op::SET_INDEX: {
+            Value& obj = regs[base+A]; const Value& key = regs[base+B];
+            if (obj.isMap() || obj.isClass()) {
+                obj.mapSet(key, regs[base+C]);
+            } else if (obj.isArray()) {
+                if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
+                obj.arraySet(key.asInt(), regs[base+C]);
+            } else {
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: []= on non-indexable");
+            }
+            break;
+        }
+        case Op::MAKE_ITER:
+            regs[base+A] = Value::makeIterFrom(regs[base+B]);
+            break;
+
+        case Op::BAND: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (!bv.isInteger() || !cv.isInteger())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: & requires integer operands");
+            regs[base+A] = Value(bv.asInt() & cv.asInt());
+            break;
+        }
+        case Op::BOR: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (!bv.isInteger() || !cv.isInteger())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: | requires integer operands");
+            regs[base+A] = Value(bv.asInt() | cv.asInt());
+            break;
+        }
+        case Op::BXOR: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (!bv.isInteger() || !cv.isInteger())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ^ requires integer operands");
+            regs[base+A] = Value(bv.asInt() ^ cv.asInt());
+            break;
+        }
+        case Op::BNOT: {
+            const Value& bv = regs[base+B];
+            if (!bv.isInteger())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ~ requires integer operand");
+            regs[base+A] = Value(~bv.asInt());
+            break;
+        }
+        case Op::BLSHIFT: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (!bv.isInteger() || !cv.isInteger())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: << requires integer operands");
+            regs[base+A] = Value((int64_t)((uint64_t)bv.asInt() << (cv.asInt() & 63)));
+            break;
+        }
+        case Op::BRSHIFT: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (!bv.isInteger() || !cv.isInteger())
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: >> requires integer operands");
+            regs[base+A] = Value(bv.asInt() >> (cv.asInt() & 63));
+            break;
+        }
+
+        case Op::NEW_ARRAY:
+            regs[base+A] = Value::makeArray();
+            break;
+        case Op::ARRAY_PUSH:
+            regs[base+A].arrayPush(regs[base+B]);
+            break;
+        case Op::FOR_ITER_NEXT: {
+            Value key, val;
+            if (!regs[base+A].iptr->next(key, val)) {
+                ip = Bx;
+            } else {
+                regs[base+A+1] = std::move(key);
+                regs[base+A+2] = std::move(val);
+            }
+            break;
+        }
+        case Op::FOR_ITER_NEXT1: {
+            Value key, val;
+            if (!regs[base+A].iptr->next(key, val)) {
+                ip = Bx;
+            } else {
+                regs[base+A+1] = regs[base+A].iptr->primary_is_val()
+                                  ? std::move(val) : std::move(key);
+            }
+            break;
+        }
+        case Op::LOAD_FUNC:
+            regs[base+A] = Value::makeFunc((uint8_t)Bx);
+            break;
+
+        case Op::CALL_DYN: {
+            if (regs[base+B].isBuiltin()) {
+                regs[base+A] = regs[base+B].asBuiltin()(&regs[base+A], C);
+                break;
+            }
+            if (regs[base+B].isClass()) {
+                Value cls  = regs[base+B];
+                Value inst = Value::makeMap();
+                inst.mapSet(MK().class_, cls);
+                int new_base = base + A;
+                int argc = C;
+                Value init_fn = protoChainGet(cls, MK().init_);
+                if (!init_fn.isCallable()) { regs[new_base] = std::move(inst); break; }
+                std::vector<Upvalue*> fuv;
+                uint8_t fi = resolveFuncVal(init_fn, fuv);
+                const FuncProto& fp = ch->funcs[fi];
+                int total = argc + 1;
+                size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, total));
+                if (regs.size() < needed) regs.resize(needed);
+                for (int i = argc - 1; i >= 0; --i)
+                    regs[new_base + 1 + i] = std::move(regs[new_base + i]);
+                regs[new_base + 0] = inst;
+                if (total < fp.n_fixed) {
+                    auto& defs = ch->func_defaults[fp.defaults_idx];
+                    for (int i = total; i < fp.n_fixed; ++i)
+                        regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+                }
+                size_t full_needed = (size_t)(new_base + fp.reg_count);
+                if (regs.size() < full_needed) regs.resize(full_needed);
+                call_stack.push_back({ip, new_base, {}, std::move(fuv), {}, inst});
+                ip = fp.addr;
+                break;
+            }
+            {
+                int new_base = base + A;
+                int argc = C;
+                std::vector<Upvalue*> fuv;
+                uint8_t fi = resolveFuncVal(regs[base + B], fuv);
+                const FuncProto& fp = ch->funcs[fi];
+                size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
+                if (regs.size() < needed) regs.resize(needed);
+                if (argc < fp.n_fixed) {
+                    auto& defs = ch->func_defaults[fp.defaults_idx];
+                    for (int i = argc; i < fp.n_fixed; ++i)
+                        regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+                }
+                std::unique_ptr<std::vector<Value>> varargs;
+                if (fp.variadic && argc > fp.n_fixed) {
+                    varargs = std::make_unique<std::vector<Value>>();
+                    for (int i = fp.n_fixed; i < argc; ++i)
+                        varargs->push_back(std::move(regs[new_base + i]));
+                }
+                size_t full_needed = (size_t)(new_base + fp.reg_count);
+                if (regs.size() < full_needed) regs.resize(full_needed);
+                call_stack.push_back({ip, new_base, std::move(varargs), std::move(fuv), {}, {}});
+                ip = fp.addr;
+            }
+            break;
+        }
+
+        case Op::MAKE_CLOSURE: {
+            uint8_t fi = (uint8_t)Bx;
+            auto* cl = new Closure(fi);
+            for (auto& desc : ch->funcs[fi].upvals) {
+                Upvalue* uv = nullptr;
+                if (desc.is_local) {
+                    for (auto* ou : call_stack.back().open_upvals)
+                        if (!ou->closed && ou->frame_base == base && ou->reg_idx == desc.idx)
+                            { uv = ou; break; }
+                    if (!uv) {
+                        uv = new Upvalue;
+                        uv->frame_base = base;
+                        uv->reg_idx    = desc.idx;
+                        call_stack.back().open_upvals.push_back(uv);
+                    }
+                    uv->refcount++;
+                } else {
+                    uv = call_stack.back().upvals[desc.idx];
+                    uv->refcount++;
+                }
+                cl->upvals.push_back(uv);
+            }
+            regs[base+A] = Value::makeClosure(cl);
+            break;
+        }
+        case Op::GET_UPVAL: {
+            Upvalue* uv = call_stack.back().upvals[B];
+            regs[base+A] = uv->closed ? uv->val : regs[uv->frame_base + uv->reg_idx];
+            break;
+        }
+        case Op::SET_UPVAL: {
+            Upvalue* uv = call_stack.back().upvals[B];
+            if (uv->closed) uv->val = regs[base+A];
+            else            regs[uv->frame_base + uv->reg_idx] = regs[base+A];
+            break;
+        }
+        case Op::NEW_CLASS:
+            regs[base+A] = Value::makeClass();
+            break;
+        case Op::CALL_METHOD: {
+            int cb   = base + A;
+            int argc = C;
+            bool is_instance = isInstance(regs[cb]);
+            Value fn = regs[cb + 1];
+            int total;
+            if (is_instance) {
+                for (int i = 0; i < argc; ++i)
+                    regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);
+                total = argc + 1;
+            } else {
+                for (int i = 0; i < argc; ++i)
+                    regs[cb + i] = std::move(regs[cb + 2 + i]);
+                total = argc;
+            }
+            if (fn.isBuiltin()) {
+                regs[cb] = fn.asBuiltin()(&regs[cb], total);
+                break;
+            }
+            std::vector<Upvalue*> fuv;
+            uint8_t fi;
+            if (fn.isFuncVal())       fi = (uint8_t)fn.asInt();
+            else if (fn.isClosure())  { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
+            else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
+            const FuncProto& fp = ch->funcs[fi];
+            size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
+            if (regs.size() < needed) regs.resize(needed);
+            if (total < fp.n_fixed) {
+                auto& defs = ch->func_defaults[fp.defaults_idx];
+                for (int i = total; i < fp.n_fixed; ++i)
+                    regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+            }
+            size_t full_needed = (size_t)(cb + fp.reg_count);
+            if (regs.size() < full_needed) regs.resize(full_needed);
+            call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
+            ip = fp.addr;
+            break;
+        }
+        case Op::MAKE_RANGE: {
+            bool has_step    = (C >> 1) & 1;
+            bool incl_right2 = C & 1;
+            int line_s = errLine();
+            auto toDouble_s = [&](const Value& v) -> double {
+                if (v.isInteger()) return (double)v.asInt();
+                if (v.isFloat())   return v.asFloat();
+                throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range bound must be a number");
+            };
+            double start2 = toDouble_s(regs[base + B]);
+            double end2   = toDouble_s(regs[base + B + 1]);
+            double step2  = has_step ? toDouble_s(regs[base + B + 2]) : 1.0;
+            if (step2 == 0.0) throw std::runtime_error("line " + std::to_string(line_s) + ": runtime: range step cannot be zero");
+            Range* r2 = new Range{1, start2, end2, step2, incl_right2};
+            regs[base + A] = Value::makeRange(r2);
+            break;
+        }
+        case Op::HALT:
+            return;
+        default:
+            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: unknown opcode (" +
+                std::to_string((int)iOP(ch->code[ip-1])) + ")");
+        }
+    }
 }
 
 // ── execute ───────────────────────────────────────────────────────────────────
@@ -1024,6 +1514,8 @@ op_HALT:
 #undef NEXT
 
 #else
+    runSwitch(0);
+/*
 // ── Fallback switch (compilers without GNU extensions) ────────────────────────
     while (true) {
         Instr    instr = ch->code[ip++];
@@ -1550,5 +2042,6 @@ op_HALT:
                 std::to_string((int)iOP(ch->code[ip-1])) + ")");
         }
     }
+*/
 #endif
 }

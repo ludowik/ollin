@@ -1318,13 +1318,13 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->
 <section id="graphics">
-<h2>Graphics <span style="font-size:0.6em;color:var(--muted)">(natif, non disponible en WASM)</span></h2>
-<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code> sur les plateformes natives (desktop).</p>
+<h2>Graphics</h2>
+<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. <code>graphics.run(callback)</code> fonctionne sur desktop et WASM.</p>
 
 <h3>Cycle de vie</h3>
 <pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>)   <span class="cmt">## ouvre la fenêtre</span>
 
-<span class="kw">while</span> <span class="bi">graphics</span>.is_open()
+<span class="kw">func</span> frame()
     <span class="bi">graphics</span>.begin_draw()
     <span class="bi">graphics</span>.clear(<span class="bi">graphics</span>.BLACK)
 
@@ -1333,13 +1333,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.end_draw()
 <span class="kw">end</span>
 
-<span class="bi">graphics</span>.close()</code></pre>
+<span class="bi">graphics</span>.run(frame)   <span class="cmt">## boucle principale (compatible WASM)</span></code></pre>
 
 <h3>API</h3>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné, 60 fps</td></tr>
+    <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale ; appelle <code>callback()</code> chaque frame jusqu'à fermeture</td></tr>
     <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
     <tr><td><code>graphics.begin_draw()</code></td><td>Commence un frame (appel obligatoire avant tout dessin)</td></tr>
     <tr><td><code>graphics.end_draw()</code></td><td>Présente le frame à l'écran</td></tr>

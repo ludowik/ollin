@@ -1,6 +1,10 @@
 #include "chunk.h"
+#include "vm.h"
 #include <raylib.h>
 #include <stdexcept>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 static int toInt(const Value& v) {
     if (v.isInteger()) return (int)v.asInt();
@@ -76,6 +80,33 @@ static Value gfx_close(Value* args, int argc) {
     return Value{};
 }
 
+#ifdef __EMSCRIPTEN__
+static Value  s_run_callback;
+static void emscripten_frame() {
+    if (WindowShouldClose()) {
+        emscripten_cancel_main_loop();
+        CloseWindow();
+        return;
+    }
+    VM::current()->callValue(s_run_callback);
+}
+#endif
+
+static Value gfx_run(Value* args, int argc) {
+    if (argc < 1) throw std::runtime_error("graphics.run: expected callback function");
+    Value fn = args[0];
+#ifdef __EMSCRIPTEN__
+    s_run_callback = fn;
+    emscripten_set_main_loop(emscripten_frame, 0, 1);
+#else
+    while (!WindowShouldClose()) {
+        VM::current()->callValue(fn);
+    }
+    CloseWindow();
+#endif
+    return Value{};
+}
+
 Value makeGraphicsModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("canvas")),  Value::makeBuiltin(gfx_canvas));
@@ -87,6 +118,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("fps")),       Value::makeBuiltin(gfx_fps));
     m.mapSet(Value(std::string("draw_text")), Value::makeBuiltin(gfx_draw_text));
     m.mapSet(Value(std::string("close")),    Value::makeBuiltin(gfx_close));
+    m.mapSet(Value(std::string("run")),      Value::makeBuiltin(gfx_run));
     m.mapSet(Value(std::string("BLACK")),   Value(rgb(0,   0,   0)));
     m.mapSet(Value(std::string("WHITE")),   Value(rgb(255, 255, 255)));
     m.mapSet(Value(std::string("RED")),     Value(rgb(230, 41,  55)));

@@ -1,7 +1,7 @@
 ## demo graphique : fenêtre, grille et diagonales
 graphics.canvas(800, 600, "Ollin Demo")
 
-while graphics.is_open()
+func frame()
     graphics.begin_draw()
     graphics.clear(graphics.BLACK)
 
@@ -23,4 +23,4 @@ while graphics.is_open()
     graphics.end_draw()
 end
 
-graphics.close()
+graphics.run(frame)

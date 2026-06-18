@@ -10,8 +10,12 @@ class VM {
 public:
     void execute(const Chunk& chunk);
     std::string invokeStr(const Value& v);
+    static VM* current();                   // returns s_current_vm
+    Value callValue(const Value& fn);       // calls an Ollin function from C++
 
 private:
+    int  errLine() const;                   // extracted from the lambda in execute()
+    void runSwitch(size_t stop_depth);      // complete reusable switch dispatch
     struct Handler {
         uint32_t catch_addr;
         uint8_t  catch_reg;
