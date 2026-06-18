@@ -684,6 +684,26 @@ assert(with_base(5) == 15)
 ##   const k = 1
 ##   func f()  k = 0  end  ## ERROR: cannot assign to const 'k'
 
+## ── 21. Module math ──────────────────────────────────────────────────────────
+
+## constantes
+assert(math.PI  == 3.141592653589793)
+assert(math.TAU == 6.283185307179586)
+assert(math.TAU == 2 * math.PI)
+
+## abs
+assert(math.abs(5)    == 5)
+assert(math.abs(-5)   == 5)
+assert(math.abs(0)    == 0)
+assert(math.abs(-3.5) == 3.5)
+
+## sign
+assert(math.sign(10)   == 1)
+assert(math.sign(-10)  == -1)
+assert(math.sign(0)    == 0)
+assert(math.sign(2.5)  == 1)
+assert(math.sign(-2.5) == -1)
+
 ## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##
 ##   var x = 1

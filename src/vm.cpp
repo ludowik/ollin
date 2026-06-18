@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "stdlib.h"
 #include <chrono>
 #include <cmath>
 #include <sstream>
@@ -364,6 +365,12 @@ void VM::execute(const Chunk& chunk) {
         for (auto& b : k_builtins)
             if (chunk.identifiers[gi] == b.name) {
                 globals[gi]      = Value::makeBuiltin(b.fn);
+                globals_init[gi] = true;
+            }
+    for (int gi = 0; gi < (int)chunk.identifiers.size(); ++gi)
+        for (auto& name : builtinModuleNames())
+            if (chunk.identifiers[gi] == name) {
+                globals[gi]      = makeBuiltinModule(name);
                 globals_init[gi] = true;
             }
     regs.resize(chunk.top_reg_count);
@@ -946,7 +953,7 @@ op_NEW_CLASS:
     NEXT();
 
 op_CALL_METHOD: {
-    uint32_t fp_addr;
+    uint32_t fp_addr = 0;
     {
         int cb   = base + A;
         int argc = C;
@@ -962,25 +969,32 @@ op_CALL_METHOD: {
                 regs[cb + i] = std::move(regs[cb + 2 + i]);
             total = argc;
         }
-        std::vector<Upvalue*> fuv;
-        uint8_t fi;
-        if (fn.isFuncVal())      fi = (uint8_t)fn.asInt();
-        else if (fn.isClosure()) { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
-        else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
-        const FuncProto& fp = ch->funcs[fi];
-        size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
-        if (regs.size() < needed) regs.resize(needed);
-        if (total < fp.n_fixed) {
-            auto& defs = ch->func_defaults[fp.defaults_idx];
-            for (int i = total; i < fp.n_fixed; ++i)
-                regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+        if (fn.isBuiltin()) {
+            regs[cb] = fn.asBuiltin()(&regs[cb], total);
+            goto call_method_done;
         }
-        size_t full_needed = (size_t)(cb + fp.reg_count);
-        if (regs.size() < full_needed) regs.resize(full_needed);
-        call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
-        fp_addr = fp.addr;
+        {
+            std::vector<Upvalue*> fuv;
+            uint8_t fi;
+            if (fn.isFuncVal())      fi = (uint8_t)fn.asInt();
+            else if (fn.isClosure()) { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
+            else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
+            const FuncProto& fp = ch->funcs[fi];
+            size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
+            if (regs.size() < needed) regs.resize(needed);
+            if (total < fp.n_fixed) {
+                auto& defs = ch->func_defaults[fp.defaults_idx];
+                for (int i = total; i < fp.n_fixed; ++i)
+                    regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+            }
+            size_t full_needed = (size_t)(cb + fp.reg_count);
+            if (regs.size() < full_needed) regs.resize(full_needed);
+            call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
+            fp_addr = fp.addr;
+        }
     }
     ip = fp_addr;
+    call_method_done:
     NEXT();
 }
 
@@ -1488,6 +1502,10 @@ op_HALT:
                 for (int i = 0; i < argc; ++i)
                     regs[cb + i] = std::move(regs[cb + 2 + i]);
                 total = argc;
+            }
+            if (fn.isBuiltin()) {
+                regs[cb] = fn.asBuiltin()(&regs[cb], total);
+                break;
             }
             std::vector<Upvalue*> fuv;
             uint8_t fi;
