@@ -21,8 +21,8 @@ var n_fsep  = 1_000.12
 assert(n_fsep == 1000.12)   ## underscore ignoré dans float
 
 var s = "hello"             ## chaîne (immuable)
-var s2 = "hello" + ", " + "world"  ## concaténation avec +
-assert(s2 == "hello, world")
+var s_concat = "hello" + ", " + "world"  ## concaténation avec +
+assert(s_concat == "hello, world")
 var vrai  = true            ## booléen (stocké comme entier 1)
 var faux  = false           ## booléen (stocké comme entier 0)
 var rien  = nil             ## valeur absente
@@ -261,9 +261,9 @@ end
 assert(s9 == 25)
 
 ## range first-class : stocker dans une variable
-var r = [1;5]
+var rng = [1;5]
 var s10 = 0
-for i in r
+for i in rng
     s10 += i
 end
 assert(s10 == 15)
@@ -583,10 +583,10 @@ class Animal
     end
 end
 
-var a = Animal("Dog", "woof")
-assert(a.speak() == "Dog says woof")
-assert(a.name == "Dog")
-assert(a.sound == "woof")
+var anm = Animal("Dog", "woof")
+assert(anm.speak() == "Dog says woof")
+assert(anm.name == "Dog")
+assert(anm.sound == "woof")
 
 ## héritage simple
 class Dog extends Animal
@@ -610,9 +610,9 @@ class Cat extends Animal
     end
 end
 
-var c = Cat("Whiskers", "meow")
-assert(c.speak() == "Whiskers says meow")
-assert(c.purr() == "Whiskers purrs")
+var catw = Cat("Whiskers", "meow")
+assert(catw.speak() == "Whiskers says meow")
+assert(catw.purr() == "Whiskers purrs")
 
 ## méthode qui modifie self
 class Counter
@@ -654,4 +654,23 @@ assert(v3.x == 4)
 assert(v3.y == 6)
 
 print("class tests ok")
+
+## ── 19. Erreurs de redéclaration (erreurs de compilation) ───────────────────
+## Les exemples ci-dessous provoqueraient une erreur à la compilation :
+##
+##   var x = 1
+##   var x = 2          ## ERROR: local variable 'x' already declared in this scope
+##
+##   global g = 1
+##   global g = 2       ## ERROR: global variable 'g' already declared
+##
+##   func f(a)
+##       var a = 1      ## ERROR: local variable 'a' already declared in this scope
+##   end
+##
+## Une locale dans une AUTRE fonction ne provoque pas d'erreur :
+##   var x = 1          ## OK : portée top-level
+##   func f()
+##       var x = 2      ## OK : portée distincte (registres de f)
+##   end
 

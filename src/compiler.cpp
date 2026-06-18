@@ -102,7 +102,11 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
             if (!v->is_global)   // 'global' → table des globaux, pas de registre
-                for (auto& n : v->names) add(n);
+                for (auto& n : v->names) {
+                    if (!seen.insert(n).second)
+                        throw std::runtime_error("local variable '" + n + "' already declared in this scope");
+                    out.push_back(n);
+                }
         if (collect_funcs)
             if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
                 add(f->name);
@@ -142,7 +146,10 @@ static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
                            std::unordered_set<std::string>& out) {
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get())) {
-            if (v->is_global) for (auto& n : v->names) out.insert(n);
+            if (v->is_global)
+                for (auto& n : v->names)
+                    if (!out.insert(n).second)
+                        throw std::runtime_error("global variable '" + n + "' already declared");
         }
         if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
             collectGlobals(f->body, out);
@@ -534,7 +541,8 @@ void Compiler::visit(const FuncDeclStmt& s) {
     reg_top_ = n_fixed;
 
     // Pre-scan body for all var declarations and for-loop variables
-    std::vector<std::string> body_locals;
+    // Seed with param names so redeclaring a param with 'var' is caught
+    std::vector<std::string> body_locals(s.params.begin(), s.params.end());
     collectLocals(s.body, body_locals);
     for (auto& name : body_locals) {
         if (!local_regs_.count(name))
@@ -1112,7 +1120,8 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     int n_fixed = 1 + n_params;
     reg_top_ = n_fixed;
 
-    std::vector<std::string> body_locals;
+    std::vector<std::string> body_locals = {"self"};
+    body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
     collectLocals(s.body, body_locals);
     for (auto& name : body_locals)
         if (!local_regs_.count(name))
