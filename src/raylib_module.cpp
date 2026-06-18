@@ -32,7 +32,9 @@ static Value gfx_canvas(Value* args, int argc) {
     if (IsWindowReady()) CloseWindow();
 #endif
     InitWindow(w, h, title);
+#ifndef __EMSCRIPTEN__
     SetTargetFPS(60);
+#endif
 #ifdef __EMSCRIPTEN__
     EM_ASM({
         var c = document.getElementById('canvas');
