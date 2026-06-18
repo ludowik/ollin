@@ -1452,11 +1452,12 @@ function hardReload() {
 
 let ollin = null;
 const wasmScript = document.createElement('script');
-wasmScript.src = 'wasm/ollin.js?' + Date.now();
+const cacheBust = Date.now();
+wasmScript.src = 'wasm/ollin.js?' + cacheBust;
 wasmScript.onload = () => {
   const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '');
   OllinModule({
-    locateFile: f => wasmDir + f,
+    locateFile: f => wasmDir + f + '?' + cacheBust,
     canvas: document.getElementById('canvas'),
     print:    () => {},
     printErr: () => {},
