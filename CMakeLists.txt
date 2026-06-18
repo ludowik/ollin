@@ -40,8 +40,7 @@ if(EMSCRIPTEN)
         -sNO_EXIT_RUNTIME=1
         -sDISABLE_EXCEPTION_CATCHING=0
         -sUSE_GLFW=3
-        -sUSE_WEBGL2=1
-        -sFULL_ES3=1
+        -sASSERTIONS=1
         --bind
     )
     add_custom_command(TARGET ollin_wasm POST_BUILD
