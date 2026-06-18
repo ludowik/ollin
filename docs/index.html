@@ -696,8 +696,8 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 <h2>If / Else</h2>
 <pre data-no-run><code><span class="kw">if</span> condition <span class="kw">then</span>
     <span class="cmt">## bloc then</span>
-<span class="kw">else if</span> autre_condition <span class="kw">then</span>
-    <span class="cmt">## else if (autant que nécessaire)</span>
+<span class="kw">elseif</span> autre_condition <span class="kw">then</span>
+    <span class="cmt">## elseif (autant que nécessaire)</span>
 <span class="kw">else</span>
     <span class="cmt">## else optionnel</span>
 <span class="kw">end</span></code></pre>
@@ -707,9 +707,9 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 
 <span class="kw">if</span> score >= <span class="num">90</span> <span class="kw">then</span>
     grade = <span class="str">"A"</span>
-<span class="kw">else if</span> score >= <span class="num">80</span> <span class="kw">then</span>
+<span class="kw">elseif</span> score >= <span class="num">80</span> <span class="kw">then</span>
     grade = <span class="str">"B"</span>
-<span class="kw">else if</span> score >= <span class="num">70</span> <span class="kw">then</span>
+<span class="kw">elseif</span> score >= <span class="num">70</span> <span class="kw">then</span>
     grade = <span class="str">"C"</span>
 <span class="kw">else</span>
     grade = <span class="str">"F"</span>
@@ -1413,7 +1413,7 @@ sections.forEach(s => observer.observe(s));
 const pgExamples = [
   { name: 'Hello world',  code: 'print("hello world!")' },
   { name: 'Fibonacci',    code: 'func fib(n)\n  if n <= 1 then return n end\n  return fib(n-1) + fib(n-2)\nend\nprint(fib(10))' },
-  { name: 'FizzBuzz',     code: 'for i in [1;15]\n  if i % 15 == 0 then print("FizzBuzz")\n  elif i % 3 == 0 then print("Fizz")\n  elif i % 5 == 0 then print("Buzz")\n  else print(i)\n  end\nend' },
+  { name: 'FizzBuzz',     code: 'for i in [1;15]\n  if i % 15 == 0 then print("FizzBuzz")\n  elseif i % 3 == 0 then print("Fizz")\n  elseif i % 5 == 0 then print("Buzz")\n  else print(i)\n  end\nend' },
   { name: 'Closure',      code: 'func counter()\n  var n = 0\n  return func()\n    n = n + 1\n    return n\n  end\nend\nvar c = counter()\nprint(c(), c(), c())' },
   { name: 'Map',          code: 'var m = {name: "ollin", version: 1}\nfor k, v in m\n  print(k, "=", v)\nend' },
   { name: 'Classe',       code: 'class Vec2\n  func init(x, y)\n    self.x = x\n    self.y = y\n  end\n  func __add(other)\n    return Vec2(self.x + other.x, self.y + other.y)\n  end\n  func __str()\n    return "Vec2(" + self.x + "," + self.y + ")"\n  end\nend\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
@@ -1475,11 +1475,11 @@ document.head.appendChild(wasmScript);
 
 function runCode() {
   if (!ollin) return;
-  const out = ollin.run(pgEditor.value);
+  const out = ollin.execute(pgEditor.value);
   if (!out) {
     pgOutput.textContent = '(aucune sortie)';
     pgOutput.className = 'pg-output';
-  } else if (out.startsWith('error:')) {
+  } elseif (out.startsWith('error:')) {
     pgOutput.textContent = out;
     pgOutput.className = 'pg-output has-error';
   } else {
@@ -1521,7 +1521,7 @@ document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
     if (!out || out === '') {
       outDiv.textContent = '(aucune sortie)';
       outDiv.className = 'inline-output empty';
-    } else if (out.startsWith('error:')) {
+    } elseif (out.startsWith('error:')) {
       outDiv.textContent = out;
       outDiv.className = 'inline-output err';
     } else {

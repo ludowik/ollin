@@ -18,6 +18,7 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"catch", TokenType::CATCH},
     {"throw",  TokenType::THROW},
     {"else",   TokenType::ELSE},
+    {"elseif", TokenType::ELIF},
     {"func",   TokenType::FUNC},
     {"return", TokenType::RETURN},
     {"nil",    TokenType::NIL},

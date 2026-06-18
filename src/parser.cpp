@@ -227,20 +227,21 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
     consumeLineEnd();
     while (true) {
         skipNewlines();
-        if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
+        if (check(TokenType::ELSE) || check(TokenType::ELIF) || check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->then_body.push_back(parseOneStmt());
     }
-    while (check(TokenType::ELSE)) {
-        advance(); // ELSE
-        if (check(TokenType::IF)) {
-            advance(); // IF
+    while (check(TokenType::ELSE) || check(TokenType::ELIF)) {
+        bool is_elif = check(TokenType::ELIF);
+        advance(); // ELSE or ELIF
+        if (is_elif || check(TokenType::IF)) {
+            if (!is_elif) advance(); // IF
             ElseIfClause ei;
             ei.cond = expr();
             expect(TokenType::THEN);
             consumeLineEnd();
             while (true) {
                 skipNewlines();
-                if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
+                if (check(TokenType::ELSE) || check(TokenType::ELIF) || check(TokenType::END) || check(TokenType::EOF_T)) break;
                 ei.body.push_back(parseOneStmt());
             }
             s->else_ifs.push_back(std::move(ei));

@@ -25,5 +25,5 @@ static std::string ollin_run(const std::string& source) {
 }
 
 EMSCRIPTEN_BINDINGS(ollin) {
-    emscripten::function("run", &ollin_run);
+    emscripten::function("execute", &ollin_run);
 }

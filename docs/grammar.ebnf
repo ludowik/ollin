@@ -52,7 +52,7 @@ forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "en
                  (*             "for k,v in it" → clé/index + valeur *)
                  (* itérables : array, map (snapshot), range ; "break" valide partout *)
 ifStmt         = "if" expr "then" NEWLINE { stmt }
-                 { "else" "if" expr "then" NEWLINE { stmt } }
+                 { "elseif" expr "then" NEWLINE { stmt } }
                  [ "else" NEWLINE { stmt } ]
                  "end" NEWLINE ;
 tryStmt        = "try" NEWLINE { stmt } "catch" IDENT NEWLINE { stmt } [ "else" NEWLINE { stmt } ] "end" NEWLINE ;

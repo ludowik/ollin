@@ -167,7 +167,7 @@ var grade = "F"
 
 if score >= 90 then
     grade = "A"
-else if score >= 70 then
+elseif score >= 70 then
     grade = "C"
 else
     grade = "F"
