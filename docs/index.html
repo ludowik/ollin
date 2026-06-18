@@ -382,6 +382,7 @@ pre:hover .try-btn { opacity: 1; }
     <h1>Ollin</h1>
     <p>Documentation</p>
   </div>
+  <a href="#playground" style="font-weight:600;color:var(--accent)">▶ Playground</a>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
   <a href="#types">Types</a>
@@ -418,6 +419,7 @@ pre:hover .try-btn { opacity: 1; }
   <a href="#graphics">Graphics</a>
   <div class="section-label">Interactif</div>
   <a href="#playground">Playground</a>
+  <button onclick="hardReload()" style="margin:12px 16px 0;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
 </nav>
 
 <main>
@@ -448,6 +450,7 @@ pre:hover .try-btn { opacity: 1; }
 </div>
 
 <div class="pg-output" id="pg-output">La sortie apparaîtra ici.</div>
+<canvas id="canvas" style="display:none;width:100%;max-width:800px;height:600px;margin-top:12px;border-radius:4px;border:1px solid var(--border)"></canvas>
 </section>
 
 <!-- ── Introduction ──────────────────────────────────────────────────────── -->
@@ -1439,22 +1442,35 @@ pgEditor.addEventListener('keydown', e => {
   }
 });
 
+function hardReload() {
+  if ('caches' in window) {
+    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => location.reload(true));
+  } else {
+    location.reload(true);
+  }
+}
+
 let ollin = null;
 const wasmScript = document.createElement('script');
-wasmScript.src = 'wasm/ollin.js';
+wasmScript.src = 'wasm/ollin.js?' + Date.now();
 wasmScript.onload = () => {
-  const wasmDir = wasmScript.src.replace(/[^/]*$/, '');
-  OllinModule({ locateFile: f => wasmDir + f }).then(m => {
+  const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '');
+  OllinModule({
+    locateFile: f => wasmDir + f,
+    canvas: document.getElementById('canvas'),
+    print:    () => {},
+    printErr: () => {},
+  }).then(m => {
     ollin = m;
     pgRunBtn.disabled = false;
-    pgStatus.textContent = 'Runtime prêt';
+    pgStatus.textContent = 'Runtime prêt ✓';
     setTimeout(() => { pgStatus.textContent = ''; }, 2000);
   }).catch(err => {
-    pgStatus.textContent = 'Erreur initialisation WASM';
+    pgStatus.textContent = 'Erreur WASM : ' + (err && err.message ? err.message : err);
     console.error('WASM init error:', err);
   });
 };
-wasmScript.onerror = () => { pgStatus.textContent = 'WASM non disponible'; };
+wasmScript.onerror = () => { pgStatus.textContent = 'WASM non disponible (fichier introuvable)'; };
 document.head.appendChild(wasmScript);
 
 function runCode() {
