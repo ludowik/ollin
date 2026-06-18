@@ -1377,7 +1377,8 @@ let ollin = null;
 const wasmScript = document.createElement('script');
 wasmScript.src = 'wasm/ollin.js';
 wasmScript.onload = () => {
-  OllinModule().then(m => {
+  const wasmDir = wasmScript.src.replace(/[^/]*$/, '');
+  OllinModule({ locateFile: f => wasmDir + f }).then(m => {
     ollin = m;
     pgRunBtn.disabled = false;
     pgStatus.textContent = 'Runtime prêt';
