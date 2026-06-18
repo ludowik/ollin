@@ -18,6 +18,7 @@ var n_float = 3.14          ## flottant (double)
 var n_lead  = .5            ## décimal sans zéro initial
 var n_sep   = 1_000_000     ## underscores ignorés
 var n_fsep  = 1_000.12
+assert(n_fsep == 1000.12)   ## underscore ignoré dans float
 
 var s = "hello"             ## chaîne (immuable)
 var s2 = "hello" + ", " + "world"  ## concaténation avec +
@@ -107,10 +108,13 @@ assert(1 + 2.0   == 3.0)
 
 assert(1 == 1)
 assert(1 <> 2)
+assert(not (5 <> 5))    ## cas faux : opérandes égaux
 assert(3 > 2)
 assert(2 < 3)
 assert(3 >= 3)
+assert(not (2 >= 3))    ## cas faux : left < right
 assert(2 <= 3)
+assert(not (3 <= 2))    ## cas faux : left > right
 
 ## cross-type numérique
 assert(1 == 1.0)
@@ -128,6 +132,12 @@ assert(not ""    == 1)
 
 ## précédence : not > and > or
 assert(true or false and false)     ## true or (false and false)
+
+## résultat faux → valeur numérique 0
+var fa = false and true
+assert(fa == 0)
+var fo = false or false
+assert(fo == 0)
 
 ## vérité des types
 assert(1    == true)
@@ -296,6 +306,7 @@ func fact(n)
     if n < 2 then return 1 end
     return n * fact(n - 1)
 end
+assert(fact(0) == 1)    ## cas limite : n=0 déclenche la branche n < 2
 assert(fact(5) == 120)
 
 ## paramètres par défaut (constantes littérales uniquement)
@@ -304,6 +315,12 @@ func greet(name, greeting = "Bonjour")
 end
 assert(greet("Alice")          == "Bonjour")
 assert(greet("Bob", "Salut")   == "Salut")
+
+## appel zéro args : param sans défaut → nil par manque d'arguments
+func f_nodefault(a, b)
+    return a
+end
+assert(f_nodefault() == nil)
 
 ## varargs
 func sum_all(...)
@@ -524,6 +541,7 @@ print("hello", 42, true)    ## hello 42 1
 ## printf — substitution positionnelle ou indexée
 printf("{} + {} = {}", 1, 2, 3)         ## 1 + 2 = 3
 printf("{0} et {0}", "oui")             ## oui et oui
+printf("a={0} b={1} a={0}", 10, 20)    ## a=10 b=20 a=10
 
 ## assert — lève une exception si falsy
 assert(1 + 1 == 2)
@@ -637,12 +655,3 @@ assert(v3.y == 6)
 
 print("class tests ok")
 
-## ── 19. Benchmark ────────────────────────────────────────────────────────────
-
-var _t0 = time()
-var _count = 0
-while _count < 1_000_000
-    _count += 1
-end
-var _t1 = time()
-printf("benchmark: {} s", _t1 - _t0)
