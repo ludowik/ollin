@@ -386,6 +386,7 @@ pre:hover .try-btn { opacity: 1; }
   <a href="#intro">Introduction</a>
   <a href="#types">Types</a>
   <a href="#variables">Variables</a>
+  <a href="#constants">Constantes</a>
   <a href="#comments">Commentaires</a>
   <div class="section-label">Expressions</div>
   <a href="#operators">Opérateurs</a>
@@ -538,6 +539,27 @@ incr()
 <span class="bi">print</span>(compteur)        <span class="cmt">## 2</span></code></pre>
 
 <div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> (table partagée de la VM). Affecter un nom non déclaré reste une erreur de compilation.</div>
+
+<h3 id="constants">Constantes — <code><span class="kw">constant</span></code></h3>
+<p>Le mot-clé <code><span class="kw">constant</span></code> déclare une <strong>locale immuable</strong>. L'initialisation est <strong>obligatoire</strong>. Toute tentative d'assignation ultérieure est une <strong>erreur de compilation</strong>.</p>
+<pre><code><span class="kw">constant</span> PI = <span class="num">3.14159</span>
+<span class="kw">constant</span> MAX = <span class="num">100</span>
+
+<span class="bi">assert</span>(PI == <span class="num">3.14159</span>)
+<span class="bi">assert</span>(MAX == <span class="num">100</span>)
+
+<span class="kw">func</span> aire(r)
+    <span class="kw">constant</span> DEUX_PI = <span class="num">2</span> * PI
+    <span class="kw">return</span> DEUX_PI * r * r
+<span class="kw">end</span>
+
+<span class="bi">print</span>(aire(<span class="num">1</span>))     <span class="cmt">## 6.28318…</span></code></pre>
+
+<div class="callout warn">Les erreurs suivantes sont détectées à la <strong>compilation</strong> :
+<pre style="margin-top:8px"><code><span class="kw">constant</span> x      <span class="cmt">## ERROR: must be initialized</span>
+<span class="kw">constant</span> x = <span class="num">1</span>
+x = <span class="num">2</span>            <span class="cmt">## ERROR: cannot assign to constant 'x'</span></code></pre>
+</div>
 </section>
 
 <!-- ── Commentaires ───────────────────────────────────────────────────────── -->
