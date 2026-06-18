@@ -20,7 +20,8 @@ if(EMSCRIPTEN)
     include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
-    set(PLATFORM "Web"  CACHE STRING "" FORCE)
+    set(PLATFORM "Web"                    CACHE STRING "" FORCE)
+    set(GRAPHICS "GRAPHICS_API_OPENGL_ES3" CACHE STRING "" FORCE)
     FetchContent_Declare(raylib
         GIT_REPOSITORY https://github.com/raysan5/raylib.git
         GIT_TAG        5.5
@@ -40,6 +41,8 @@ if(EMSCRIPTEN)
         -sNO_EXIT_RUNTIME=1
         -sDISABLE_EXCEPTION_CATCHING=0
         -sUSE_GLFW=3
+        -sMAX_WEBGL_VERSION=2
+        -sMIN_WEBGL_VERSION=2
         -sASSERTIONS=1
         --bind
     )
