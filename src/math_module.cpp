@@ -2,28 +2,22 @@
 #include <cmath>
 #include <stdexcept>
 
-static Value math_abs(Value* args, int argc) {
-    if (argc < 1) throw std::runtime_error("math.abs: missing argument");
-    if (args[0].isInteger()) {
-        int64_t n = args[0].asInt();
-        return Value(n < 0 ? -n : n);
-    }
-    if (args[0].isFloat()) return Value(std::fabs(args[0].asFloat()));
-    throw std::runtime_error("math.abs: expected number");
+static inline double numArg(const Value* args, int argc, int i, const char* fn) {
+    if (i >= argc) throw std::runtime_error(std::string(fn) + ": missing argument");
+    const Value& v = args[i];
+    if (v.isInteger()) return (double)v.asInt();
+    if (v.isFloat())   return v.asFloat();
+    throw std::runtime_error(std::string(fn) + ": expected number");
 }
 
-static Value math_sign(Value* args, int argc) {
-    if (argc < 1) throw std::runtime_error("math.sign: missing argument");
-    if (args[0].isInteger()) {
-        int64_t n = args[0].asInt();
-        return Value(n > 0 ? int64_t(1) : n < 0 ? int64_t(-1) : int64_t(0));
+#define MATH1(name, expr) \
+    static Value math_##name(Value* args, int argc) { \
+        double x = numArg(args, argc, 0, "math." #name); \
+        return numValue(expr); \
     }
-    if (args[0].isFloat()) {
-        double d = args[0].asFloat();
-        return Value(d > 0.0 ? int64_t(1) : d < 0.0 ? int64_t(-1) : int64_t(0));
-    }
-    throw std::runtime_error("math.sign: expected number");
-}
+
+MATH1(abs,  std::fabs(x))
+MATH1(sign, x > 0.0 ? 1.0 : x < 0.0 ? -1.0 : 0.0)
 
 Value makeMathModule() {
     Value m = Value::makeMap();
