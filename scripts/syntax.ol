@@ -380,6 +380,22 @@ end
 var add5 = make_adder(5)
 assert(add5(3) == 8)
 
+## fonctions anonymes (lambdas)
+func make_counter2()
+    var n = 0
+    return func()
+        n = n + 1
+        return n
+    end
+end
+var cx = make_counter2()
+assert(cx() == 1)
+assert(cx() == 2)
+assert(cx() == 3)
+
+var double = func(x)  return x * 2  end
+assert(double(7) == 14)
+
 ## ── 13. Gestion d'erreurs ────────────────────────────────────────────────────
 
 ## throw + catch

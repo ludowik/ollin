@@ -649,6 +649,76 @@ void Compiler::visit(const FuncDeclStmt& s) {
     }
 }
 
+void Compiler::visit(const FuncExpr& s) {
+    auto outer_regs   = std::move(local_regs_);
+    auto outer_upvals = std::move(cur_upval_idx_);
+    int  outer_top    = reg_top_;
+    int  outer_count  = reg_count_;
+    int  outer_locals = locals_top_;
+    auto outer_name   = current_func_name;
+    int  outer_fidx   = current_func_idx_;
+    auto outer_consts = const_names_;
+    const_names_.clear();
+
+    outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
+
+    current_func_name = "<lambda>";
+    cur_upval_idx_.clear();
+    local_regs_.clear();
+    reg_top_ = 0; reg_count_ = 0; locals_top_ = 0;
+
+    int n_fixed = (int)s.params.size();
+    for (int i = 0; i < n_fixed; ++i)
+        local_regs_[s.params[i]] = i;
+    reg_top_ = n_fixed;
+
+    std::vector<std::string> body_locals(s.params.begin(), s.params.end());
+    collectLocals(s.body, body_locals);
+    for (auto& nm : body_locals)
+        if (!local_regs_.count(nm)) local_regs_[nm] = reg_top_++;
+    locals_top_ = reg_top_;
+    reg_count_  = reg_top_;
+
+    size_t jump_patch = chunk.emitJump(Op::JUMP);
+    uint32_t func_addr = (uint32_t)chunk.currentPos();
+
+    std::vector<Value> defs(n_fixed);
+    for (int i = 0; i < n_fixed; ++i)
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i])
+                  ? evalConstant(*s.defaults[i]) : Value{};
+    uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
+
+    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0, {}};
+    uint8_t func_idx = chunk.addFunc(fp);
+    current_func_idx_ = func_idx;
+
+    for (auto& stmt : s.body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
+    chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
+    chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
+
+    outer_scopes_.pop_back();
+    local_regs_       = std::move(outer_regs);
+    cur_upval_idx_    = std::move(outer_upvals);
+    const_names_      = std::move(outer_consts);
+    reg_top_          = outer_top;
+    reg_count_        = outer_count;
+    locals_top_       = outer_locals;
+    current_func_name = outer_name;
+    current_func_idx_ = outer_fidx;
+
+    bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
+    int dest = reg_top_++;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    chunk.emit(makeABx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC,
+                       (uint8_t)dest, func_idx));
+    last_reg_ = dest;
+}
+
 void Compiler::visit(const ReturnStmt& s) {
     if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
     if (!inFunction())

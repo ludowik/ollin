@@ -94,8 +94,12 @@ primary        = NUMBER
                | mapLit { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
                | arrayLit { ( "[" expr "]" ) }
                | rangeLit
+               | lambdaExpr
                | "..."
                | "(" expr ")" ;
+
+lambdaExpr     = "func" "(" [ params ] ")" NEWLINE { stmt } "end" ;
+               (* fonction anonyme utilisable comme expression ; capture des upvalues comme toute closure *)
                (* "expr.method(args)" = appel de méthode avec self implicite *)
 
 mapLit         = "{" [ NEWLINE ]

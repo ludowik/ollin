@@ -14,7 +14,7 @@ struct BlockStmt; struct ClassDeclStmt;
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
 struct MapExpr; struct IndexExpr; struct ArrayExpr; struct ExprCallExpr; struct MethodCallExpr;
-struct RangeExpr;
+struct RangeExpr; struct FuncExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -54,6 +54,7 @@ struct ExprVisitor {
     virtual void visit(const ExprCallExpr&) = 0;
     virtual void visit(const MethodCallExpr&) = 0;
     virtual void visit(const RangeExpr&)      = 0;
+    virtual void visit(const FuncExpr&)       = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -250,6 +251,14 @@ struct RangeExpr : Expr {
     std::unique_ptr<Expr> start;
     std::unique_ptr<Expr> end;
     std::unique_ptr<Expr> step;  // nullptr if absent
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+struct FuncExpr : Expr {
+    std::vector<std::string> params;
+    std::vector<std::unique_ptr<Expr>> defaults;
+    bool variadic = false;
+    std::vector<std::unique_ptr<Stmt>> body;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

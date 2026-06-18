@@ -743,6 +743,29 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::NIL))       { advance(); return std::make_unique<NilExpr>(); }
     if (check(TokenType::DOT_DOT_DOT)) { advance(); return std::make_unique<VarArgExpr>(); }
+    if (check(TokenType::FUNC)) {
+        advance(); // FUNC
+        auto fe = std::make_unique<FuncExpr>();
+        expect(TokenType::LPAREN);
+        while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
+            if (check(TokenType::DOT_DOT_DOT)) { advance(); fe->variadic = true; break; }
+            fe->params.push_back(expect(TokenType::IDENTIFIER).lexeme);
+            if (match(TokenType::EQUALS))
+                fe->defaults.push_back(expr());
+            else
+                fe->defaults.push_back(nullptr);
+            if (!check(TokenType::RPAREN)) expect(TokenType::COMMA);
+        }
+        expect(TokenType::RPAREN);
+        consumeLineEnd();
+        while (true) {
+            skipNewlines();
+            if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+            fe->body.push_back(parseOneStmt());
+        }
+        expect(TokenType::END);
+        return parsePostfix(std::move(fe));
+    }
     if (check(TokenType::LBRACE)) {
         advance(); // consume {
         skipNewlines();

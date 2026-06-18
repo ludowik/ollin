@@ -100,6 +100,7 @@ private:
     void visit(const ExprCallExpr&) override;
     void visit(const MethodCallExpr&) override;
     void visit(const RangeExpr&)     override;
+    void visit(const FuncExpr&)      override;
 
     // StmtVisitor (map)
     void visit(const IndexAssignStmt&) override;
