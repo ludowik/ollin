@@ -19,7 +19,8 @@ jobs:
       - name: Setup Emscripten
         uses: emscripten-core/setup-emsdk@v14
         with:
-          version: latest
+          version: 3.1.74
+          cache: true
 
       - name: Cache Raylib WASM build
         uses: actions/cache@v4
