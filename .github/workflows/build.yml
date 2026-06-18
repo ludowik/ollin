@@ -32,5 +32,10 @@ jobs:
         run: cmake --build build --config Release -j
 
       - name: Test
-        run: ./build/ollin scripts/syntax.ol
         shell: bash
+        run: |
+          if [ -f "build/Release/ollin.exe" ]; then
+            "build/Release/ollin.exe" scripts/syntax.ol
+          else
+            ./build/ollin scripts/syntax.ol
+          fi
