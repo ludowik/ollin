@@ -14,16 +14,16 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7
 
       - name: Setup Emscripten
-        uses: emscripten-core/setup-emsdk@v14
+        uses: emscripten-core/setup-emsdk@v16
         with:
           version: 3.1.74
           cache: true
 
       - name: Cache Raylib WASM build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: build-wasm/_deps
           key: raylib-wasm-${{ hashFiles('CMakeLists.txt') }}
