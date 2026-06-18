@@ -21,6 +21,12 @@ jobs:
         with:
           version: latest
 
+      - name: Cache Raylib WASM build
+        uses: actions/cache@v4
+        with:
+          path: build-wasm/_deps
+          key: raylib-wasm-${{ hashFiles('CMakeLists.txt') }}
+
       - name: Build WASM
         run: |
           mkdir -p build-wasm
