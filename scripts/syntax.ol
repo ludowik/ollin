@@ -71,6 +71,24 @@ assert(gmsg == nil)
 gmsg = "ready"
 assert(gmsg == "ready")
 
+## multi-déclaration
+global ga, gb = 1, 2
+assert(ga == 1 and gb == 2)
+
+## référence en avant : fonction déclarée avant le global
+func read_fwd()  return gfwd  end
+global gfwd = 99
+assert(read_fwd() == 99)
+
+## locale masque le global dans sa portée
+global gshadow = 100
+func shadow_test()
+    var gshadow = 7
+    return gshadow
+end
+assert(shadow_test() == 7)
+assert(gshadow == 100)
+
 ## ── 4. Arithmétique ──────────────────────────────────────────────────────────
 
 assert(2 + 3   == 5)
@@ -424,6 +442,19 @@ assert(km[nil]   == "nil")
 assert(km[42]    == "int")
 assert(km[1.0]   == km[1])     ## int == float comme clé (si même valeur numérique)
 
+## clés : array, map, fonction
+var km_arr = [1, 2]
+km[km_arr] = "array"
+assert(km[km_arr] == "array")
+
+var km_map = {"a": 1}
+km[km_map] = "map"
+assert(km[km_map] == "map")
+
+func km_fn()  end
+km[km_fn] = "func"
+assert(km[km_fn] == "func")
+
 ## itération clé+valeur
 var total = 0
 for k, v in {x: 1, y: 2, z: 3}
@@ -437,6 +468,16 @@ for k in {a: 1, b: 2, c: 3}
     key_sum += 1   ## on compte juste les itérations
 end
 assert(key_sum == 3)
+
+## for k,v dans une fonction
+func sum_map_vals(m)
+    var s = 0
+    for k, v in m
+        s += v
+    end
+    return s
+end
+assert(sum_map_vals({x: 1, y: 2, z: 3}) == 6)
 
 ## ── 15. Arrays ───────────────────────────────────────────────────────────────
 
@@ -595,3 +636,13 @@ assert(v3.x == 4)
 assert(v3.y == 6)
 
 print("class tests ok")
+
+## ── 19. Benchmark ────────────────────────────────────────────────────────────
+
+var _t0 = time()
+var _count = 0
+while _count < 1_000_000
+    _count += 1
+end
+var _t1 = time()
+printf("benchmark: {} s", _t1 - _t0)

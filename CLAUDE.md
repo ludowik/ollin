@@ -45,13 +45,12 @@ ollin/
 
 | Fichier | Propriétaire | Rôle |
 |---|---|---|
-| `scripts/syntax.ol` | utilisateur | source de vérité — déclare la syntaxe par l'exemple |
+| `scripts/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
-| `scripts/test.ol` | Claude | fichier de tests complets |
 | `docs/index.html` | Claude | tutoriel HTML |
 | `ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `test.ol`, `docs/index.html` et `ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/index.html` et `ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 ## Versionning
 
