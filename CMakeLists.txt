@@ -30,6 +30,11 @@ if(EMSCRIPTEN)
         -sDISABLE_EXCEPTION_CATCHING=0
         --bind
     )
+    add_custom_command(TARGET ollin_wasm POST_BUILD
+        COMMAND python3 -c
+            "import re,datetime; p='${CMAKE_CURRENT_SOURCE_DIR}/docs/index.html'; s=open(p).read(); s=re.sub(r'id=\"build-date\">[^<]+<',f'id=\"build-date\">{datetime.datetime.now().strftime(\"%Y-%m-%d %H:%M\")}<',s); open(p,'w').write(s)"
+        COMMENT "Updating build date in docs/index.html"
+    )
 else()
     include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
