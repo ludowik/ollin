@@ -33,13 +33,13 @@ static Value gfx_is_open(Value* args, int argc) {
     return Value(WindowShouldClose() ? int64_t(0) : int64_t(1));
 }
 
-static Value gfx_begin(Value* args, int argc) {
+static Value gfx_begin_draw(Value* args, int argc) {
     (void)args; (void)argc;
     BeginDrawing();
     return Value{};
 }
 
-static Value gfx_end(Value* args, int argc) {
+static Value gfx_end_draw(Value* args, int argc) {
     (void)args; (void)argc;
     EndDrawing();
     return Value{};
@@ -67,8 +67,8 @@ Value makeGraphicsModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("canvas")),  Value::makeBuiltin(gfx_canvas));
     m.mapSet(Value(std::string("is_open")), Value::makeBuiltin(gfx_is_open));
-    m.mapSet(Value(std::string("begin")),   Value::makeBuiltin(gfx_begin));
-    m.mapSet(Value(std::string("end")),     Value::makeBuiltin(gfx_end));
+    m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(gfx_begin_draw));
+    m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(gfx_end_draw));
     m.mapSet(Value(std::string("clear")),   Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("line")),    Value::makeBuiltin(gfx_line));
     m.mapSet(Value(std::string("close")),   Value::makeBuiltin(gfx_close));

@@ -704,6 +704,42 @@ assert(math.sign(0)    == 0)
 assert(math.sign(2.5)  == 1)
 assert(math.sign(-2.5) == -1)
 
+## floor / ceil
+assert(math.floor(2.9)  == 2)
+assert(math.floor(-2.1) == -3)
+assert(math.ceil(2.1)   == 3)
+assert(math.ceil(-2.9)  == -2)
+
+## sqrt
+assert(math.sqrt(4)   == 2)
+assert(math.sqrt(9)   == 3)
+assert(math.sqrt(2.0) > 1.41 and math.sqrt(2.0) < 1.42)
+
+## sin / cos
+assert(math.sin(0) == 0)
+assert(math.cos(0) == 1)
+assert(math.sin(math.PI) > -0.001 and math.sin(math.PI) < 0.001)
+
+## rand — valeur dans [0, 1)
+var rnd = math.rand()
+assert(rnd >= 0 and rnd < 1)
+
+## ── 22. Module graphics (Raylib) ─────────────────────────────────────────────
+##
+## Module natif (non disponible en WASM). Usage :
+##
+##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
+##   while graphics.is_open()
+##       graphics.begin_draw()
+##       graphics.clear(graphics.BLACK)
+##       graphics.line(x1, y1, x2, y2, color)
+##       graphics.end_draw()
+##   end
+##   graphics.close()
+##
+## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY
+## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
+
 ## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##
 ##   var x = 1

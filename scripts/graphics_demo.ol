@@ -2,7 +2,7 @@
 graphics.canvas(800, 600, "Ollin Demo")
 
 while graphics.is_open()
-    graphics.begin()
+    graphics.begin_draw()
     graphics.clear(graphics.BLACK)
 
     ## grille
@@ -19,7 +19,7 @@ while graphics.is_open()
     graphics.line(400, 0,   400, 600, graphics.WHITE)
     graphics.line(0,   300, 800, 300, graphics.GREEN)
 
-    graphics.end()
+    graphics.end_draw()
 end
 
 graphics.close()

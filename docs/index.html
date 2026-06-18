@@ -415,6 +415,7 @@ pre:hover .try-btn { opacity: 1; }
   <a href="#stdlib">Modules built-in</a>
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
+  <a href="#graphics">Graphics</a>
   <div class="section-label">Interactif</div>
   <a href="#playground">Playground</a>
 </nav>
@@ -1164,6 +1165,12 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)          <span
     <tr><td><code>math.TAU</code></td><td>float</td><td>τ = 2π ≈ 6.28318530717959</td></tr>
     <tr><td><code>math.abs(x)</code></td><td>fonction</td><td>Valeur absolue — conserve le type (int→int, float→float)</td></tr>
     <tr><td><code>math.sign(x)</code></td><td>fonction</td><td>Signe : -1, 0 ou 1 (retourne un entier)</td></tr>
+    <tr><td><code>math.floor(x)</code></td><td>fonction</td><td>Arrondi vers le bas → entier</td></tr>
+    <tr><td><code>math.ceil(x)</code></td><td>fonction</td><td>Arrondi vers le haut → entier</td></tr>
+    <tr><td><code>math.sqrt(x)</code></td><td>fonction</td><td>Racine carrée → float</td></tr>
+    <tr><td><code>math.sin(x)</code></td><td>fonction</td><td>Sinus (radians) → float</td></tr>
+    <tr><td><code>math.cos(x)</code></td><td>fonction</td><td>Cosinus (radians) → float</td></tr>
+    <tr><td><code>math.rand()</code></td><td>fonction</td><td>Nombre aléatoire dans [0, 1) — graine initialisée au démarrage</td></tr>
   </tbody>
 </table>
 
@@ -1307,6 +1314,61 @@ var v1 = Vec2(1, 2)
 var v2 = Vec2(3, 4)
 var v3 = v1 + v2   ## appelle v1.__add(v2)
 print(v3)          ## Vec2(4,6)</code></pre>
+</section>
+
+<!-- ── Graphics ──────────────────────────────────────────────────────────── -->
+<section id="graphics">
+<h2>Graphics <span style="font-size:0.6em;color:var(--muted)">(natif, non disponible en WASM)</span></h2>
+<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code> sur les plateformes natives (desktop).</p>
+
+<h3>Cycle de vie</h3>
+<pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>)   <span class="cmt">## ouvre la fenêtre</span>
+
+<span class="kw">while</span> <span class="bi">graphics</span>.is_open()
+    <span class="bi">graphics</span>.begin_draw()
+    <span class="bi">graphics</span>.clear(<span class="bi">graphics</span>.BLACK)
+
+    <span class="cmt">## dessin ici</span>
+
+    <span class="bi">graphics</span>.end_draw()
+<span class="kw">end</span>
+
+<span class="bi">graphics</span>.close()</code></pre>
+
+<h3>API</h3>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné, 60 fps</td></tr>
+    <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
+    <tr><td><code>graphics.begin_draw()</code></td><td>Commence un frame (appel obligatoire avant tout dessin)</td></tr>
+    <tr><td><code>graphics.end_draw()</code></td><td>Présente le frame à l'écran</td></tr>
+    <tr><td><code>graphics.clear(color)</code></td><td>Efface l'écran avec la couleur donnée</td></tr>
+    <tr><td><code>graphics.line(x1,y1,x2,y2 [,color])</code></td><td>Trace un segment de (x1,y1) à (x2,y2)</td></tr>
+    <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
+  </tbody>
+</table>
+
+<h3>Couleurs</h3>
+<p>Les couleurs sont des entiers 32 bits au format <code>RRGGBBAA</code> :</p>
+<table>
+  <thead><tr><th>Constante</th><th>Valeur</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.BLACK</code></td><td>0x000000FF</td></tr>
+    <tr><td><code>graphics.WHITE</code></td><td>0xFFFFFFFF</td></tr>
+    <tr><td><code>graphics.RED</code></td><td>0xE6293AFF</td></tr>
+    <tr><td><code>graphics.GREEN</code></td><td>0x00E430FF</td></tr>
+    <tr><td><code>graphics.BLUE</code></td><td>0x0079F1FF</td></tr>
+    <tr><td><code>graphics.YELLOW</code></td><td>0xFDF900FF</td></tr>
+    <tr><td><code>graphics.GRAY</code></td><td>0x828282FF</td></tr>
+  </tbody>
+</table>
+<p>Couleur personnalisée via les opérateurs bits :</p>
+<pre data-no-run><code><span class="cmt">## couleur aléatoire claire</span>
+<span class="kw">var</span> r = math.floor(math.rand() * <span class="num">200</span>) + <span class="num">55</span>
+<span class="kw">var</span> g = math.floor(math.rand() * <span class="num">200</span>) + <span class="num">55</span>
+<span class="kw">var</span> b = math.floor(math.rand() * <span class="num">200</span>) + <span class="num">55</span>
+<span class="kw">var</span> color = (r &lt;&lt; <span class="num">24</span>) | (g &lt;&lt; <span class="num">16</span>) | (b &lt;&lt; <span class="num">8</span>) | <span class="num">255</span></code></pre>
 </section>
 
 
