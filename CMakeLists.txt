@@ -19,6 +19,7 @@ set(OLLIN_SOURCES
 if(EMSCRIPTEN)
     add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES})
     target_include_directories(ollin_wasm PRIVATE src)
+    target_compile_definitions(ollin_wasm PRIVATE OLLIN_WASM)
     target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
     target_link_options(ollin_wasm PRIVATE
@@ -30,8 +31,19 @@ if(EMSCRIPTEN)
         --bind
     )
 else()
-    add_executable(ollin src/main.cpp ${OLLIN_SOURCES})
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(raylib
+        GIT_REPOSITORY https://github.com/raysan5/raylib.git
+        GIT_TAG        5.5
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(raylib)
+
+    add_executable(ollin src/main.cpp ${OLLIN_SOURCES} src/raylib_module.cpp)
     target_include_directories(ollin PRIVATE src)
+    target_link_libraries(ollin PRIVATE raylib)
     if(MSVC)
         target_compile_options(ollin PRIVATE /W4)
     else()
