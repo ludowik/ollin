@@ -12,7 +12,7 @@ set(OLLIN_SOURCES
     src/parser.cpp
     src/compiler.cpp
     src/vm.cpp
-    src/stdlib.cpp
+    src/modules.cpp
     src/math_module.cpp
 )
 
