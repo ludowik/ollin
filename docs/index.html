@@ -1652,7 +1652,7 @@ pgRunBtn.innerHTML = ICON_RUN
 pgActions.appendChild(pgRunBtn)
 pgRunBtn.addEventListener('click', runCode)
 pgView.dom.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runCode()
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runCode() }
 })
 
 // ── Remplace les blocs <pre><code> par des éditeurs CM6 read-only ─────────
