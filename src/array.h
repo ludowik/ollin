@@ -1,6 +1,8 @@
 #pragma once
 // Inclus par chunk.h après la définition de Value — ne pas inclure directement.
 #include <vector>
+#include <stdexcept>
+#include <string>
 
 struct Array {
     std::vector<Value> items;
@@ -8,12 +10,14 @@ struct Array {
 
     Value get(int64_t idx) const {
         int64_t i = idx - 1;
-        if (i < 0 || i >= (int64_t)items.size()) return Value{};
+        if (i < 0) throw std::runtime_error("runtime: array index must be >= 1 (got " + std::to_string(idx) + ")");
+        if (i >= (int64_t)items.size()) return Value{};
         return items[(size_t)i];
     }
     void set(int64_t idx, const Value& v) {
         int64_t i = idx - 1;
-        if (i < 0) return;
+        if (i < 0) throw std::runtime_error("runtime: array index must be >= 1 (got " + std::to_string(idx) + ")");
+        if (i > 16'777'216) throw std::runtime_error("runtime: array index too large (" + std::to_string(idx) + ")");
         if (i >= (int64_t)items.size()) items.resize((size_t)(i + 1));
         items[(size_t)i] = v;
     }
