@@ -113,6 +113,24 @@ public:
     int    arraySize()                              const;
 
     static Value makeIterFrom(const Value& src);
+
+    const char* typeName() const {
+        switch (tag) {
+            case T_NIL:      return "nil";
+            case T_INTEGER:  return "int";
+            case T_FLOAT:    return "float";
+            case T_STRING:   return "string";
+            case T_MAP:      return "map";
+            case T_ARRAY:    return "array";
+            case T_ITERATOR: return "iterator";
+            case T_FUNCTION: return "function";
+            case T_CLOSURE:  return "function";
+            case T_BUILTIN:  return "function";
+            case T_CLASS:    return "class";
+            case T_RANGE:    return "range";
+            default:         return "unknown";
+        }
+    }
 };
 
 // ── Array (1-based, ref-counted) — définition complète ───────────────────────

@@ -578,7 +578,7 @@ void VM::runSwitch(size_t stop_depth) {
                 if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 obj.arraySet(key.asInt(), regs[base+C]);
             } else {
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: []= on non-indexable");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot assign index on " + std::string(obj.typeName()) + (key.isString() ? " with field '" + key.asString() + "'" : ""));
             }
             break;
         }
@@ -1242,7 +1242,7 @@ op_GET_INDEX: {
         if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
         regs[base + A] = obj.arrayGet(key.asInt());
     } else {
-        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: [] on non-indexable");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot index " + std::string(obj.typeName()) + (key.isString() ? " with field '" + key.asString() + "'" : ""));
     }
     NEXT();
 }
@@ -1256,7 +1256,7 @@ op_SET_INDEX: {
         if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
         obj.arraySet(key.asInt(), regs[base + C]);
     } else {
-        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: []= on non-indexable");
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot assign index on " + std::string(obj.typeName()) + (key.isString() ? " with field '" + key.asString() + "'" : ""));
     }
     NEXT();
 }
@@ -1864,7 +1864,7 @@ op_HALT:
                 if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 obj.arraySet(key.asInt(), regs[base+C]);
             } else {
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: []= on non-indexable");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot assign index on " + std::string(obj.typeName()) + (key.isString() ? " with field '" + key.asString() + "'" : ""));
             }
             break;
         }
