@@ -36,8 +36,6 @@ static Value gfx_canvas(Value* args, int argc) {
         if (c) { c.width = $0; c.height = $1; c.style.display = 'block'; }
         var o = document.getElementById('pg-output');
         if (o) o.style.display = 'none';
-        // GLFW uses Module.canvas as the WebGL target — point it to the visible canvas
-        Module.canvas = c;
     }, w, h);
 #endif
     InitWindow(w, h, title);
