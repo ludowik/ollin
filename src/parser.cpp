@@ -40,13 +40,12 @@ TokenType Parser::peekAt(int offset) const {
 }
 
 void Parser::skipSemis() {
-    while (check(TokenType::SEMICOLON) || check(TokenType::COMMENT)) advance();
+    while (check(TokenType::COMMENT)) advance();
 }
 
 // absorbe un commentaire optionnel puis un SEMICOLON (inséré par ASI ou explicite)
 void Parser::consumeSemi() {
     match(TokenType::COMMENT);
-    match(TokenType::SEMICOLON);
 }
 
 // ── entrée principale ────────────────────────────────────────────────────────
@@ -451,10 +450,10 @@ std::unique_ptr<Expr> Parser::expr() { return logical(); }
 std::unique_ptr<Expr> Parser::logical() {
     auto left = logicalAnd();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::OR)) break;
         advance();
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>('|', std::move(left), logicalAnd());
     }
     return left;
@@ -463,10 +462,10 @@ std::unique_ptr<Expr> Parser::logical() {
 std::unique_ptr<Expr> Parser::logicalAnd() {
     auto left = bitwiseOr();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::AND)) break;
         advance();
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>('&', std::move(left), bitwiseOr());
     }
     return left;
@@ -475,10 +474,10 @@ std::unique_ptr<Expr> Parser::logicalAnd() {
 std::unique_ptr<Expr> Parser::bitwiseOr() {
     auto left = bitwiseXor();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::PIPE)) break;
         advance();
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>('o', std::move(left), bitwiseXor());
     }
     return left;
@@ -487,10 +486,10 @@ std::unique_ptr<Expr> Parser::bitwiseOr() {
 std::unique_ptr<Expr> Parser::bitwiseXor() {
     auto left = bitwiseAnd();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::CARET)) break;
         advance();
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>('x', std::move(left), bitwiseAnd());
     }
     return left;
@@ -499,10 +498,10 @@ std::unique_ptr<Expr> Parser::bitwiseXor() {
 std::unique_ptr<Expr> Parser::bitwiseAnd() {
     auto left = comparison();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::AMP)) break;
         advance();
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>('b', std::move(left), comparison());
     }
     return left;
@@ -524,7 +523,7 @@ static char cmpChar(TokenType t) {
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto first = shift();
-    if (paren_depth_ > 0) skipSemis();
+    skipSemis();
     if (!isCmpToken(peek().type)) return first;
 
     // collect all operands and operators
@@ -532,9 +531,9 @@ std::unique_ptr<Expr> Parser::comparison() {
     chain->operands.push_back(std::move(first));
     while (isCmpToken(peek().type)) {
         chain->ops.push_back(cmpChar(advance().type));
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         chain->operands.push_back(shift());
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
     }
     // single comparison: return a plain BinaryExpr for simplicity
     if (chain->ops.size() == 1)
@@ -547,11 +546,11 @@ std::unique_ptr<Expr> Parser::comparison() {
 std::unique_ptr<Expr> Parser::shift() {
     auto left = additive();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::LSHIFT) && !check(TokenType::RSHIFT)) break;
         char op = check(TokenType::LSHIFT) ? 'l' : 'r';
         advance();
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }
     return left;
@@ -560,10 +559,10 @@ std::unique_ptr<Expr> Parser::shift() {
 std::unique_ptr<Expr> Parser::additive() {
     auto left = multiplicative();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::PLUS) && !check(TokenType::MINUS)) break;
         char op = advance().lexeme[0];
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
     }
     return left;
@@ -572,10 +571,10 @@ std::unique_ptr<Expr> Parser::additive() {
 std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = power();
     while (true) {
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) && !check(TokenType::PERCENT)) break;
         char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
-        if (paren_depth_ > 0) skipSemis();
+        skipSemis();
         left = std::make_unique<BinaryExpr>(op, std::move(left), power());
     }
     return left;
@@ -583,10 +582,10 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 
 std::unique_ptr<Expr> Parser::power() {
     auto left = unary();
-    if (paren_depth_ > 0) skipSemis();
+    skipSemis();
     if (!check(TokenType::STAR_STAR)) return left;
     advance();
-    if (paren_depth_ > 0) skipSemis();
+    skipSemis();
     return std::make_unique<BinaryExpr>('p', std::move(left), power()); // right-associative
 }
 
@@ -831,12 +830,10 @@ std::unique_ptr<Expr> Parser::primary() {
         return rangeExpr(false);  // incl_left=false
     }
     if (match(TokenType::LPAREN)) {
-        paren_depth_++;
         skipSemis();
         auto e = expr();
         skipSemis();
         expect(TokenType::RPAREN);
-        paren_depth_--;
         return e;
     }
     throw std::runtime_error("line " + std::to_string(peek().line) +

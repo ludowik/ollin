@@ -109,25 +109,8 @@ Token Lexer::blockComment() {
 std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
     int  paren_depth = 0;
-    TokenType last_type = TokenType::EOF_T; // rien émis encore
 
-    // Retourne true si ce token peut terminer une instruction → ASI
-    auto asiTrigger = [](TokenType t) -> bool {
-        switch (t) {
-            case TokenType::NUMBER:    case TokenType::STRING:
-            case TokenType::IDENTIFIER:
-            case TokenType::TRUE:      case TokenType::FALSE:  case TokenType::NIL:
-            case TokenType::RPAREN:    case TokenType::RBRACKET: case TokenType::RBRACE:
-            case TokenType::END:       case TokenType::BREAK:  case TokenType::CONTINUE:
-            case TokenType::RETURN:    case TokenType::DOT_DOT_DOT:
-                return true;
-            default: return false;
-        }
-    };
-
-    // Émet un token et met à jour last_type (COMMENT ne le modifie pas)
     auto emit = [&](Token t) {
-        if (t.type != TokenType::COMMENT) last_type = t.type;
         tokens.push_back(std::move(t));
     };
 
@@ -138,8 +121,6 @@ std::vector<Token> Lexer::tokenize() {
         char c = advance();
         switch (c) {
             case '\n':
-                if (paren_depth == 0 && asiTrigger(last_type))
-                    emit({TokenType::SEMICOLON, ";", line});
                 line++;
                 break;
             case '=':
@@ -222,9 +203,6 @@ std::vector<Token> Lexer::tokenize() {
                 throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
         }
     }
-    // ASI en fin de fichier si nécessaire
-    if (asiTrigger(last_type))
-        tokens.push_back({TokenType::SEMICOLON, ";", line});
     tokens.push_back({TokenType::EOF_T, "", line});
     return tokens;
 }

@@ -15,7 +15,6 @@ public:
 private:
     std::vector<Token> tokens;
     int pos = 0;
-    int paren_depth_ = 0;
     std::string base_dir_;
     std::shared_ptr<std::unordered_set<std::string>> imported_paths_;
 
@@ -28,7 +27,7 @@ private:
 
     TokenType peekNextType() const;
     TokenType peekAt(int offset) const;
-    void consumeSemi();   // absorbe un COMMENT optionnel + SEMICOLON (ASI)
+    void consumeSemi();   // absorbe un COMMENT optionnel
 
     std::unique_ptr<Stmt> parseOneStmt();
     std::unique_ptr<Stmt> varDecl();
