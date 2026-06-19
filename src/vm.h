@@ -6,6 +6,8 @@
 #include <unordered_map>
 #include <vector>
 
+std::string valueToString(const Value& v);
+
 class VM {
 public:
     void execute(Chunk chunk);

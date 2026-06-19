@@ -107,14 +107,15 @@ std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide 
 }
 
 // ── valueToString ─────────────────────────────────────────────────────────────
-static std::string valueToString(const Value& v) {
+std::string valueToString(const Value& v) {
     if (v.isNil())      return "nil";
     if (v.isString())   return v.asString();
     if (v.isClass())    return "{class}";
     if (v.isMap()) {
-        if (s_current_vm) {
+        VM* vm = VM::current();
+        if (vm) {
             Value cls = v.mapGet(MK().class_);
-            if (!cls.isNil()) return s_current_vm->invokeStr(v);
+            if (!cls.isNil()) return vm->invokeStr(v);
         }
         return "{map}";
     }
@@ -130,54 +131,7 @@ static std::string valueToString(const Value& v) {
     return os.str();
 }
 
-// ── applyFormat ───────────────────────────────────────────────────────────────
-static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
-    std::string out;
-    int auto_idx = 0;
-    for (size_t i = 0; i < fmt.size(); ++i) {
-        if (fmt[i] == '{') {
-            size_t j = fmt.find('}', i + 1);
-            if (j != std::string::npos) {
-                std::string spec = fmt.substr(i + 1, j - i - 1);
-                int idx;
-                if (spec.empty()) {
-                    idx = auto_idx++;
-                } else {
-                    try { idx = std::stoi(spec); }
-                    catch (...) {
-                        throw std::runtime_error("printf: invalid index '{" + spec + "}'");
-                    }
-                }
-                long long ai = (long long)idx + offset;
-                if (ai >= 0 && ai < (long long)args.size())
-                    out += valueToString(args[(int)ai]);
-                i = j;
-                continue;
-            }
-        }
-        out += fmt[i];
-    }
-    return out;
-}
-
 // ── Builtins ──────────────────────────────────────────────────────────────────
-
-static Value builtin_print(Value* args, int argc) {
-    for (int i = 0; i < argc; ++i) {
-        if (i) std::cout << ' ';
-        std::cout << valueToString(args[i]);
-    }
-    std::cout << '\n';
-    return Value{};
-}
-
-static Value builtin_printf(Value* args, int argc) {
-    if (argc < 1 || !args[0].isString())
-        throw std::runtime_error("printf: first arg must be string");
-    std::vector<Value> vargs(args, args + argc);
-    std::cout << applyFormat(args[0].asString(), vargs, 1) << '\n';
-    return Value{};
-}
 
 static Value builtin_assert(Value* args, int argc) {
     if (argc == 0 || isFalsy(args[0])) {
@@ -195,8 +149,6 @@ static Value builtin_time(Value* args, int argc) {
 }
 
 static const struct { const char* name; Value::BuiltinFn fn; } k_builtins[] = {
-    { "print",  builtin_print  },
-    { "printf", builtin_printf },
     { "assert", builtin_assert },
     { "time",   builtin_time   },
 };
@@ -238,7 +190,9 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
 
 // ── closeUpvals : close and free all open upvalues of the top frame ──────────
 void VM::closeUpvals() {
-    for (auto* uv : call_stack.back().open_upvals) {
+    auto& ouv = call_stack.back().open_upvals;
+    if (ouv.empty()) return;
+    for (auto* uv : ouv) {
         if (!uv->closed) {
             uv->val    = regs[uv->frame_base + uv->reg_idx];
             uv->closed = true;
@@ -887,6 +841,18 @@ void VM::execute(Chunk chunk) {
                 globals[gi]      = makeBuiltinModule(name);
                 globals_init[gi] = true;
             }
+    {
+        Value core = makeBuiltinModule("core");
+        for (auto& [k, v] : core.asMap()->data) {
+            if (!k.isString()) continue;
+            const std::string& fname = k.asString();
+            for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
+                if (owned_chunk.identifiers[gi] == fname) {
+                    globals[gi]      = v;
+                    globals_init[gi] = true;
+                }
+        }
+    }
     growRegs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     call_stack.push_back({0, 0, {}, {}, {}});
