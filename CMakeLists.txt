@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(ollin VERSION 0.1 LANGUAGES CXX)
 
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "")
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -13,7 +15,9 @@ set(OLLIN_SOURCES
     src/compiler.cpp
     src/vm.cpp
     src/modules.cpp
+    src/core_module.cpp
     src/math_module.cpp
+    src/string_module.cpp
 )
 
 if(EMSCRIPTEN)
@@ -24,7 +28,7 @@ if(EMSCRIPTEN)
     set(GRAPHICS "GRAPHICS_API_OPENGL_ES3" CACHE STRING "" FORCE)
     FetchContent_Declare(raylib
         GIT_REPOSITORY https://github.com/raysan5/raylib.git
-        GIT_TAG        5.5
+        GIT_TAG        6.0
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(raylib)
@@ -56,7 +60,7 @@ else()
     set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(raylib
         GIT_REPOSITORY https://github.com/raysan5/raylib.git
-        GIT_TAG        5.5
+        GIT_TAG        6.0
         GIT_SHALLOW    TRUE
     )
     FetchContent_MakeAvailable(raylib)
