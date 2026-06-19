@@ -46,7 +46,7 @@ Value VM::protoChainGet(const Value& obj, const Value& key) {
 }
 
 // ── invokeStr : mini-loop to call __str without recursion ─────────────────────
-std::string VM::invokeStr(const Value& obj) {
+std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide pas obj
     Value cls = obj.mapGet(MK().class_);
     if (cls.isNil()) return "{map}";
     Value str_fn = protoChainGet(cls, MK().str_);

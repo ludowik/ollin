@@ -9,7 +9,7 @@
 class VM {
 public:
     void execute(Chunk chunk);
-    std::string invokeStr(const Value& v);
+    std::string invokeStr(Value v);
     static VM* current();                   // returns s_current_vm
     Value callValue(const Value& fn);       // calls an Ollin function from C++
 
