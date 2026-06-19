@@ -32,7 +32,7 @@
         },
         "builtin": {
             "name": "support.function.builtin.ollin",
-            "match": "\\b(print|printf|time|assert)\\b"
+            "match": "\\b(print|printf|time|assert|math|graphics|string)\\b"
         },
         "number": {
             "name": "constant.numeric.ollin",
@@ -40,7 +40,7 @@
         },
         "operator": {
             "name": "keyword.operator.ollin",
-            "match": "\\+=|-=|\\*=|/=|%=|==|>=|<=|<>|<<|>>|\\.\\.\\.|\\.\\.|[+\\-*/%><&|^~]|[\\[\\]{}:.]"
+            "match": "\\*\\*|//|\\+=|-=|\\*=|/=|%=|==|>=|<=|<>|<<|>>|\\.\\.\\.|\\.\\.|[+\\-*/%><&|^~]|[\\[\\]{}:.]"
         }
     }
 }
