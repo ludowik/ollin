@@ -153,24 +153,7 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
 // ── Builtins ──────────────────────────────────────────────────────────────────
 
 void printOneValue(const Value& v) {
-    if (v.isNil())       std::cout << "nil";
-    else if (v.isString()) std::cout << v.asString();
-    else if (v.isClass()) std::cout << "{class}";
-    else if (v.isMap()) {
-        if (s_current_vm) {
-            Value cls = v.mapGet(MK().class_);
-            if (!cls.isNil()) { std::cout << s_current_vm->invokeStr(v); return; }
-        }
-        std::cout << "{map}";
-    } else if (v.isArray())  std::cout << "{array}";
-    else if (v.isFuncVal() || v.isClosure() || v.isBuiltin())
-        std::cout << "{function}";
-    else if (v.isInteger())  std::cout << v.asInt();
-    else {
-        double d = v.asFloat();
-        if (d == (long long)d && d >= -1e15 && d <= 1e15) std::cout << (long long)d;
-        else                                               std::cout << d;
-    }
+    std::cout << valueToString(v);
 }
 
 static Value builtin_print(Value* args, int argc) {
