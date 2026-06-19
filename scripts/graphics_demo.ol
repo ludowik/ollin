@@ -2,7 +2,6 @@
 graphics.canvas(800, 600, "Ollin Demo")
 
 func frame()
-    graphics.begin_draw()
     graphics.clear(graphics.BLACK)
 
     ## grille
@@ -20,7 +19,6 @@ func frame()
     graphics.line(0,   300, 800, 300, graphics.GREEN)
 
     graphics.draw_text("FPS: " + graphics.fps(), 720, 580, 16, graphics.WHITE)
-    graphics.end_draw()
 end
 
 graphics.run(frame)

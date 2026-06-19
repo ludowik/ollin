@@ -750,13 +750,10 @@ assert(rnd >= 0 and rnd < 1)
 ## Module natif (non disponible en WASM). Usage :
 ##
 ##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
-##   while graphics.is_open() do
-##       graphics.begin_draw()
+##   graphics.run(func()
 ##       graphics.clear(graphics.BLACK)
 ##       graphics.line(x1, y1, x2, y2, color)
-##       graphics.end_draw()
-##   end
-##   graphics.close()
+##   end)
 ##
 ## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY
 ## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255

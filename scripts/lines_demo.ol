@@ -38,7 +38,6 @@ end
 graphics.canvas(W, H, "Ollin — Lignes animées")
 
 func frame()
-    graphics.begin_draw()
     graphics.clear(graphics.BLACK)
 
     for i = 1, N do
@@ -56,7 +55,6 @@ func frame()
     end
 
     graphics.draw_text("FPS: " + graphics.fps(), W - 80, H - 20, 16, graphics.WHITE)
-    graphics.end_draw()
 end
 
 graphics.run(frame)
