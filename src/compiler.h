@@ -14,7 +14,6 @@ private:
     Chunk chunk;
     std::vector<std::vector<size_t>> break_patches;
     std::vector<std::vector<size_t>> continue_patches;
-    int for_counter_  = 0;
     int current_line_ = 0;
 
     // ── register allocator ────────────────────────────────────────────────────
@@ -34,6 +33,7 @@ private:
     std::unordered_map<std::string, FuncInfo> func_table;
     std::unordered_set<std::string> declared_globals_;  // globals declared in source (global / class)
     std::unordered_set<std::string> builtin_modules_;   // built-in module names (math, …)
+    std::unordered_set<std::string> builtin_names_;     // built-in function names (print, typeof, …)
     std::unordered_set<std::string> const_names_;       // locals declared with 'const'
     std::string current_func_name;  // "" = global scope
     int         current_func_idx_ = -1;  // index in chunk.funcs (-1 = main chunk)
