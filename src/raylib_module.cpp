@@ -32,7 +32,9 @@ static Value gfx_canvas(Value* args, int argc) {
     if (IsWindowReady()) CloseWindow();
 #endif
     InitWindow(w, h, title);
-#ifndef __EMSCRIPTEN__
+#ifdef __EMSCRIPTEN__
+    SetTargetFPS(0);   // InitWindow pose 60 en interne ; 0 = requestAnimationFrame gère le timing
+#else
     SetTargetFPS(60);
 #endif
 #ifdef __EMSCRIPTEN__
