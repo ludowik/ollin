@@ -28,9 +28,7 @@ static Value gfx_canvas(Value* args, int argc) {
     int h = argc > 1 ? toInt(args[1]) : 600;
     const char* title = (argc > 2 && args[2].isString()) ? args[2].sptr->c_str() : "Ollin";
 #ifdef __EMSCRIPTEN__
-    emscripten_cancel_main_loop();
     if (IsWindowReady()) CloseWindow();
-    // Dimensionner le canvas AVANT InitWindow (Raylib lit la taille au moment de l'init WebGL)
     EM_ASM({
         var c = document.getElementById('canvas');
         if (c) { c.width = $0; c.height = $1; c.style.display = 'block'; }

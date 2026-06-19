@@ -38,7 +38,6 @@ if(EMSCRIPTEN)
         -sMODULARIZE=1
         -sEXPORT_NAME=OllinModule
         -sALLOW_MEMORY_GROWTH=1
-        -sSTACK_SIZE=1048576
         -sNO_EXIT_RUNTIME=1
         -sDISABLE_EXCEPTION_CATCHING=0
         -sUSE_GLFW=3
