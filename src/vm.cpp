@@ -323,6 +323,7 @@ void VM::runSwitch(size_t stop_depth) {
         uint16_t Bx    = iBx(instr);
         int      base  = call_stack.back().reg_base;
 
+        try {
         switch (static_cast<Op>(iOP(instr))) {
 
         case Op::LOAD_K:
@@ -346,7 +347,8 @@ void VM::runSwitch(size_t stop_depth) {
 
         case Op::ADD: {
             if (regs[base+B].isString() || regs[base+C].isString()) {
-                regs[base+A] = Value(valueToString(regs[base+B]) + valueToString(regs[base+C]));
+                Value bv_ = regs[base+B], cv_ = regs[base+C];
+                regs[base+A] = Value(valueToString(bv_) + valueToString(cv_));
                 break;
             }
             if (isInstance(regs[base+B])) {
@@ -866,6 +868,14 @@ void VM::runSwitch(size_t stop_depth) {
             throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: unknown opcode (" +
                 std::to_string((int)iOP(ch->code[ip-1])) + ")");
         }
+        } catch (const std::runtime_error& e) {
+            if (handler_stack.empty()) throw;
+            Handler h = handler_stack.back(); handler_stack.pop_back();
+            while (call_stack.size() > h.call_depth) { closeUpvals(); call_stack.pop_back(); }
+            if (regs.size() > h.regs_size) regs.resize(h.regs_size);
+            regs[h.reg_base + h.catch_reg] = Value(std::string(e.what()));
+            ip = h.catch_addr;
+        }
     }
 }
 
@@ -932,6 +942,8 @@ void VM::execute(Chunk chunk) {
     };
 
     uint8_t A, B, C; uint16_t Bx; int base;
+dispatch_loop:
+    try {
     NEXT();
 
 op_LOAD_K:
@@ -959,7 +971,8 @@ op_STORE_GLOBAL:
 
 op_ADD: {
     if (regs[base+B].isString() || regs[base+C].isString()) {
-        regs[base+A] = Value(valueToString(regs[base+B]) + valueToString(regs[base+C]));
+        { Value bv_ = regs[base+B], cv_ = regs[base+C];
+          regs[base+A] = Value(valueToString(bv_) + valueToString(cv_)); }
         NEXT();
     }
     if (isInstance(regs[base+B])) {
@@ -1567,6 +1580,16 @@ op_MAKE_RANGE: {
 op_HALT:
     return;
 
+    } catch (const std::runtime_error& e) {
+        if (handler_stack.empty()) throw;
+        Handler h = handler_stack.back(); handler_stack.pop_back();
+        while (call_stack.size() > h.call_depth) { closeUpvals(); call_stack.pop_back(); }
+        if (regs.size() > h.regs_size) regs.resize(h.regs_size);
+        regs[h.reg_base + h.catch_reg] = Value(std::string(e.what()));
+        ip = h.catch_addr;
+        goto dispatch_loop;
+    }
+
 #undef NEXT
 
 #else
@@ -1602,7 +1625,8 @@ op_HALT:
 
         case Op::ADD: {
             if (regs[base+B].isString() || regs[base+C].isString()) {
-                regs[base+A] = Value(valueToString(regs[base+B]) + valueToString(regs[base+C]));
+                Value bv_ = regs[base+B], cv_ = regs[base+C];
+                regs[base+A] = Value(valueToString(bv_) + valueToString(cv_));
                 break;
             }
             if (isInstance(regs[base+B])) {
