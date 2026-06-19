@@ -6,6 +6,7 @@
 #include <unordered_set>
 #include "compiler.h"
 #include "lexer.h"
+#include "modules.h"
 #include "parser.h"
 #include "vm.h"
 
@@ -26,14 +27,8 @@ static std::string ollin_run(const std::string& source) {
         ));
         Value draw = s_vm->getGlobal("draw");
         if (draw.isCallable()) {
-            Value gfx = s_vm->getGlobal("graphics");
-            if (gfx.isMap()) {
-                Value run_fn = gfx.mapGet(Value(std::string("run")));
-                if (run_fn.isCallable()) {
-                    Value args[1] = { draw };
-                    run_fn.asBuiltin()(args, 1);
-                }
-            }
+            Value run_fn = makeBuiltinModule("graphics").mapGet(Value(std::string("run")));
+            run_fn.asBuiltin()(&draw, 1);
         }
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);

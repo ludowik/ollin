@@ -637,9 +637,10 @@ void Compiler::visit(const FuncDeclStmt& s) {
         chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp,
                            chunk.addIdentifier(s.name)));
         reg_top_--;
-    } else if (outer_has_vars) {
-        // Fonction top-level non-closure dans un scope avec vars : LOAD_FUNC + STORE_GLOBAL
-        // pour que les appels récursifs via LOAD_GLOBAL (pré-marquage) trouvent la valeur.
+    } else {
+        // Fonction top-level non-closure : LOAD_FUNC + STORE_GLOBAL.
+        // Nécessaire même sans outer vars pour que getGlobal("draw") fonctionne
+        // (auto-détection WASM) et pour que la fonction soit accessible comme valeur.
         func_table[s.name].is_closure = false;
         int tmp = reg_top_++;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
