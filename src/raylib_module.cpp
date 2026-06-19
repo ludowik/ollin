@@ -30,20 +30,19 @@ static Value gfx_canvas(Value* args, int argc) {
 #ifdef __EMSCRIPTEN__
     emscripten_cancel_main_loop();
     if (IsWindowReady()) CloseWindow();
-#endif
-    InitWindow(w, h, title);
-#ifdef __EMSCRIPTEN__
-    SetTargetFPS(0);   // InitWindow pose 60 en interne ; 0 = requestAnimationFrame gère le timing
-#else
-    SetTargetFPS(60);
-#endif
-#ifdef __EMSCRIPTEN__
+    // Dimensionner le canvas AVANT InitWindow (Raylib lit la taille au moment de l'init WebGL)
     EM_ASM({
         var c = document.getElementById('canvas');
         if (c) { c.width = $0; c.height = $1; c.style.display = 'block'; }
         var o = document.getElementById('pg-output');
         if (o) o.style.display = 'none';
     }, w, h);
+#endif
+    InitWindow(w, h, title);
+#ifdef __EMSCRIPTEN__
+    SetTargetFPS(0);
+#else
+    SetTargetFPS(60);
 #endif
     return Value{};
 }
@@ -99,17 +98,6 @@ static Value gfx_close(Value* args, int argc) {
 #ifdef __EMSCRIPTEN__
 static Value  s_run_callback;
 static void emscripten_frame() {
-    if (WindowShouldClose()) {
-        emscripten_cancel_main_loop();
-        CloseWindow();
-        EM_ASM({
-            var c = document.getElementById('canvas');
-            if (c) c.style.display = 'none';
-            var o = document.getElementById('pg-output');
-            if (o) { o.style.display = 'block'; o.textContent = '(fenêtre fermée)'; o.className = 'pg-output'; }
-        });
-        return;
-    }
     VM::current()->callValue(s_run_callback);
 }
 #endif

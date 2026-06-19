@@ -381,7 +381,7 @@ pre:hover .try-btn { opacity: 1; }
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">–</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-19 10:04</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="#playground" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -449,6 +449,7 @@ pre:hover .try-btn { opacity: 1; }
 </div>
 
 <div class="pg-output" id="pg-output">La sortie apparaîtra ici.</div>
+<canvas id="canvas-emscripten" style="display:none;width:1px;height:1px;"></canvas>
 <canvas id="canvas" style="display:none;width:100%;max-width:800px;height:600px;margin-top:12px;border-radius:4px;border:1px solid var(--border)"></canvas>
 </section>
 
@@ -1458,7 +1459,7 @@ wasmScript.onload = () => {
   const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '');
   OllinModule({
     locateFile: f => wasmDir + f + '?' + cacheBust,
-    canvas: document.getElementById('canvas'),
+    canvas: document.getElementById('canvas-emscripten'),
     print:    () => {},
     printErr: () => {},
   }).then(m => {

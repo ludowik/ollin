@@ -845,8 +845,9 @@ void VM::runSwitch(size_t stop_depth) {
 }
 
 // ── execute ───────────────────────────────────────────────────────────────────
-void VM::execute(const Chunk& chunk) {
-    ch = &chunk;
+void VM::execute(Chunk chunk) {
+    owned_chunk = std::move(chunk);
+    ch = &owned_chunk;
     ip = 0;
     s_current_vm = this;
     globals.assign(chunk.identifiers.size(), Value{});

@@ -8,7 +8,7 @@
 
 class VM {
 public:
-    void execute(const Chunk& chunk);
+    void execute(Chunk chunk);
     std::string invokeStr(const Value& v);
     static VM* current();                   // returns s_current_vm
     Value callValue(const Value& fn);       // calls an Ollin function from C++
@@ -34,6 +34,7 @@ private:
         int         return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
     };
 
+    Chunk                owned_chunk;
     const Chunk*         ch = nullptr;
     uint32_t             ip = 0;
     std::vector<Value>   globals;
