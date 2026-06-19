@@ -1397,7 +1397,7 @@ import { EditorState }                                                    from '
 import { EditorView, lineNumbers, keymap, drawSelection,
          highlightActiveLine, highlightActiveLineGutter }                 from '@codemirror/view'
 import { defaultKeymap, historyKeymap, history, indentWithTab }           from '@codemirror/commands'
-import { StreamLanguage, syntaxHighlighting, HighlightStyle }             from '@codemirror/language'
+import { StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit } from '@codemirror/language'
 import { tags }                                                           from '@lezer/highlight'
 
 // ── Ollin language — aligne sur ollin.tmLanguage.json (composant VSC) ────
@@ -1505,6 +1505,7 @@ function makePlaygroundEditor(parent, code, onRun) {
       extensions: [
         ...BASE_EXT,
         history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
+        indentUnit.of('    '),
         keymap.of([{ key: 'Mod-Enter', run: () => { onRun(); return true; } }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
         EditorView.theme({ '&': { minHeight: '200px' } }),
       ]
