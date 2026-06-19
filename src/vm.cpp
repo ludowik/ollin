@@ -72,6 +72,10 @@ std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide 
     } else if (str_fn.isClosure()) {
         fi = str_fn.asClosure()->func_idx;
         frame_upvals = str_fn.asClosure()->upvals;
+    } else if (str_fn.isBuiltin()) {
+        Value self = obj;
+        Value result = str_fn.asBuiltin()(&self, 1);
+        return result.isString() ? result.asString() : "{object}";
     } else {
         Value nm = cls.mapGet(MK().name_);
         return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
@@ -665,6 +669,14 @@ void VM::runSwitch(size_t stop_depth) {
                 int argc = C;
                 Value init_fn = protoChainGet(cls, MK().init_);
                 if (!init_fn.isCallable()) { regs[new_base] = std::move(inst); break; }
+                if (init_fn.isBuiltin()) {
+                    std::vector<Value> bargs(argc + 1);
+                    bargs[0] = inst;
+                    for (int i = 0; i < argc; ++i) bargs[1+i] = regs[new_base+i];
+                    init_fn.asBuiltin()(bargs.data(), argc + 1);
+                    regs[new_base] = std::move(inst);
+                    break;
+                }
                 std::vector<Upvalue*> fuv;
                 uint8_t fi = resolveFuncVal(init_fn, fuv);
                 const FuncProto& fp = ch->funcs[fi];
@@ -1364,6 +1376,14 @@ op_CALL_DYN: {
                 regs[ctor_base] = std::move(inst);
                 goto call_dyn_done;
             }
+            if (init_fn.isBuiltin()) {
+                std::vector<Value> bargs(argc + 1);
+                bargs[0] = inst;
+                for (int i = 0; i < argc; ++i) bargs[1+i] = regs[ctor_base+i];
+                init_fn.asBuiltin()(bargs.data(), argc + 1);
+                regs[ctor_base] = std::move(inst);
+                goto call_dyn_done;
+            }
             std::vector<Upvalue*> fuv;
             uint8_t fi = resolveFuncVal(init_fn, fuv);
             const FuncProto& fp = ch->funcs[fi];
@@ -1951,6 +1971,14 @@ op_HALT:
                 int argc = C;
                 Value init_fn = protoChainGet(cls, MK().init_);
                 if (!init_fn.isCallable()) { regs[new_base] = std::move(inst); break; }
+                if (init_fn.isBuiltin()) {
+                    std::vector<Value> bargs(argc + 1);
+                    bargs[0] = inst;
+                    for (int i = 0; i < argc; ++i) bargs[1+i] = regs[new_base+i];
+                    init_fn.asBuiltin()(bargs.data(), argc + 1);
+                    regs[new_base] = std::move(inst);
+                    break;
+                }
                 std::vector<Upvalue*> fuv;
                 uint8_t fi = resolveFuncVal(init_fn, fuv);
                 const FuncProto& fp = ch->funcs[fi];

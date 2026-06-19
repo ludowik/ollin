@@ -16,6 +16,7 @@ set(OLLIN_SOURCES
     src/vm.cpp
     src/modules.cpp
     src/core_module.cpp
+    src/color_module.cpp
     src/math_module.cpp
     src/string_module.cpp
 )

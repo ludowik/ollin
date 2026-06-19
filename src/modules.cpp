@@ -24,7 +24,7 @@ const std::vector<std::string>& builtinModuleNames() {
 
 const std::vector<std::string>& builtinFuncNames() {
     static const std::vector<std::string> names = {
-        "print", "printf", "typeof", "assert", "time"
+        "print", "printf", "typeof", "assert", "time", "Color"
     };
     return names;
 }

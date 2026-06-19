@@ -13,6 +13,13 @@ static int toInt(const Value& v) {
 }
 
 static Color toColor(const Value& v) {
+    if (v.isMap() || v.isClass()) {
+        auto getComp = [&](const char* k) -> uint8_t {
+            Value f = v.mapGet(Value(std::string(k)));
+            return f.isNumber() ? (uint8_t)f.asNum() : 255;
+        };
+        return { getComp("r"), getComp("g"), getComp("b"), getComp("a") };
+    }
     if (!v.isInteger()) return WHITE;
     int64_t c = v.asInt();
     return { (uint8_t)(c >> 24 & 0xFF), (uint8_t)(c >> 16 & 0xFF),
