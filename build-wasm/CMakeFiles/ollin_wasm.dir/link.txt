@@ -1,0 +1,1 @@
+/Users/lca/emsdk/upstream/emscripten/em++ -O3 -DNDEBUG -sMODULARIZE=1 -sEXPORT_NAME=OllinModule -sALLOW_MEMORY_GROWTH=1 -sNO_EXIT_RUNTIME=1 -sDISABLE_EXCEPTION_CATCHING=0 -sUSE_GLFW=3 -sMAX_WEBGL_VERSION=2 -sMIN_WEBGL_VERSION=2 -sASSERTIONS=1 --bind @CMakeFiles/ollin_wasm.dir/objects1.rsp -o ollin.js @CMakeFiles/ollin_wasm.dir/linkLibs.rsp

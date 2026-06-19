@@ -39,14 +39,14 @@ TokenType Parser::peekAt(int offset) const {
     return TokenType::EOF_T;
 }
 
-void Parser::skipNewlines() {
-    while (check(TokenType::NEWLINE) || check(TokenType::COMMENT)) advance();
+void Parser::skipSemis() {
+    while (check(TokenType::SEMICOLON) || check(TokenType::COMMENT)) advance();
 }
 
-// absorbe un commentaire de fin de ligne optionnel puis le NEWLINE
-void Parser::consumeLineEnd() {
+// absorbe un commentaire optionnel puis un SEMICOLON (inséré par ASI ou explicite)
+void Parser::consumeSemi() {
     match(TokenType::COMMENT);
-    match(TokenType::NEWLINE);
+    match(TokenType::SEMICOLON);
 }
 
 // ── entrée principale ────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ void Parser::consumeLineEnd() {
 Program Parser::parse() {
     Program prog;
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::EOF_T)) break;
         prog.stmts.push_back(parseOneStmt());
     }
@@ -66,7 +66,7 @@ Program Parser::parse() {
 std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::COMMENT)) {
         std::string text = advance().lexeme;
-        consumeLineEnd();
+        consumeSemi();
         return std::make_unique<CommentStmt>(std::move(text));
     }
     if (check(TokenType::WHILE))   return whileStmt();
@@ -105,7 +105,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
                 std::string field = advance().lexeme; // consume field IDENTIFIER
                 TokenType op = advance().type; // consume operator
                 auto val = expr();
-                consumeLineEnd();
+                consumeSemi();
                 auto s = std::make_unique<IndexAssignStmt>();
                 s->obj = obj_name;
                 s->key = std::make_unique<StringExpr>(field);
@@ -130,7 +130,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
             else throw std::runtime_error("line " + std::to_string(peek().line) +
                                           ": expected assignment operator after index");
             auto val = expr();
-            consumeLineEnd();
+            consumeSemi();
             auto s = std::make_unique<IndexAssignStmt>();
             s->obj = obj_name;
             s->key = std::move(key);
@@ -158,7 +158,7 @@ std::unique_ptr<Stmt> Parser::varDecl() {
             s->values.push_back(expr());
     }
     // sans '=' → valeurs absentes → nil dans le compilateur
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -176,7 +176,7 @@ std::unique_ptr<Stmt> Parser::globalDecl() {
         while (match(TokenType::COMMA))
             s->values.push_back(expr());
     }
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -196,7 +196,7 @@ std::unique_ptr<Stmt> Parser::constantDecl() {
     s->values.push_back(expr());
     while (match(TokenType::COMMA))
         s->values.push_back(expr());
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -206,14 +206,14 @@ std::unique_ptr<Stmt> Parser::whileStmt() {
     auto s = std::make_unique<WhileStmt>();
     s->line = line;
     s->cond = expr();
-    consumeLineEnd();
+    skipSemis(); expect(TokenType::DO);
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->body.push_back(parseOneStmt());
     }
     expect(TokenType::END);
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -223,32 +223,30 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
     auto s = std::make_unique<IfStmt>();
     s->line = line;
     s->cond = expr();
-    expect(TokenType::THEN);
-    consumeLineEnd();
+    skipSemis(); expect(TokenType::THEN);
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->then_body.push_back(parseOneStmt());
     }
     while (check(TokenType::ELSE) || check(TokenType::ELSEIF)) {
         bool is_elif = check(TokenType::ELSEIF);
-        advance(); // ELSE or ELIF
+        advance(); // ELSE or ELSEIF
         if (is_elif || check(TokenType::IF)) {
             if (!is_elif) advance(); // IF
             ElseIfClause ei;
             ei.cond = expr();
-            expect(TokenType::THEN);
-            consumeLineEnd();
+            skipSemis(); expect(TokenType::THEN);
             while (true) {
-                skipNewlines();
+                skipSemis();
                 if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) || check(TokenType::EOF_T)) break;
                 ei.body.push_back(parseOneStmt());
             }
             s->else_ifs.push_back(std::move(ei));
         } else {
-            consumeLineEnd();
+            skipSemis(); expect(TokenType::DO);
             while (true) {
-                skipNewlines();
+                skipSemis();
                 if (check(TokenType::END) || check(TokenType::EOF_T)) break;
                 s->else_body.push_back(parseOneStmt());
             }
@@ -256,14 +254,14 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
         }
     }
     expect(TokenType::END);
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::breakStmt() {
     int line = peek().line;
     advance();
-    consumeLineEnd();
+    consumeSemi();
     auto s = std::make_unique<BreakStmt>();
     s->line = line;
     return s;
@@ -272,7 +270,7 @@ std::unique_ptr<Stmt> Parser::breakStmt() {
 std::unique_ptr<Stmt> Parser::continueStmt() {
     int line = peek().line;
     advance();
-    consumeLineEnd();
+    consumeSemi();
     auto s = std::make_unique<ContinueStmt>();
     s->line = line;
     return s;
@@ -283,7 +281,7 @@ std::unique_ptr<Stmt> Parser::throwStmt() {
     advance(); // throw
     auto s = std::make_unique<ThrowStmt>(expr());
     s->line = line;
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -292,30 +290,30 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
     s->line = line;
-    consumeLineEnd();
+    skipSemis(); expect(TokenType::DO);
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::CATCH) || check(TokenType::EOF_T)) break;
         s->try_body.push_back(parseOneStmt());
     }
     expect(TokenType::CATCH);
     s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
-    consumeLineEnd();
+    skipSemis(); expect(TokenType::DO);
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->catch_body.push_back(parseOneStmt());
     }
     if (match(TokenType::ELSE)) {
-        consumeLineEnd();
+        skipSemis(); expect(TokenType::DO);
         while (true) {
-            skipNewlines();
+            skipSemis();
             if (check(TokenType::END) || check(TokenType::EOF_T)) break;
             s->else_body.push_back(parseOneStmt());
         }
     }
     expect(TokenType::END);
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -336,14 +334,14 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
         if (!check(TokenType::RPAREN)) expect(TokenType::COMMA);
     }
     expect(TokenType::RPAREN);
-    consumeLineEnd();
+    skipSemis(); expect(TokenType::DO);
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->body.push_back(parseOneStmt());
     }
     expect(TokenType::END);
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -352,7 +350,7 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
     s->line = line;
-    if (!check(TokenType::NEWLINE) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)) {
+    if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)) {
         if (check(TokenType::DOT_DOT_DOT)) {
             advance(); s->spread_varargs = true;
         } else {
@@ -363,7 +361,7 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
             }
         }
     }
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -379,7 +377,7 @@ std::unique_ptr<Stmt> Parser::assignStmt() {
     else if (match(TokenType::PERCENT_EQUAL)) s->op = '%';
     else                                    { advance(); s->op = '\0'; }
     s->value = expr();
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -398,18 +396,18 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         expect(TokenType::COMMA);
         range->end = expr();
         if (match(TokenType::COMMA)) range->step = expr();
-        consumeLineEnd();
+        consumeSemi();
         auto s = std::make_unique<ForIterStmt>();
         s->line      = line;
         s->var1      = first_var;
         s->iter_expr = std::move(range);
         while (true) {
-            skipNewlines();
+            skipSemis();
             if (check(TokenType::END) || check(TokenType::EOF_T)) break;
             s->body.push_back(parseOneStmt());
         }
         expect(TokenType::END);
-        consumeLineEnd();
+        consumeSemi();
         return s;
     }
 
@@ -421,26 +419,26 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     }
     expect(TokenType::IN);
     auto iter_e = expr();
-    consumeLineEnd();
+    consumeSemi();
     auto s = std::make_unique<ForIterStmt>();
     s->line      = line;
     s->var1      = first_var;
     s->var2      = var2;
     s->iter_expr = std::move(iter_e);
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->body.push_back(parseOneStmt());
     }
     expect(TokenType::END);
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::exprStmt() {
     int line = peek().line;
     auto e = expr();
-    consumeLineEnd();
+    consumeSemi();
     auto s = std::make_unique<ExprStmt>(std::move(e));
     s->line = line;
     return s;
@@ -453,10 +451,10 @@ std::unique_ptr<Expr> Parser::expr() { return logical(); }
 std::unique_ptr<Expr> Parser::logical() {
     auto left = logicalAnd();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::OR)) break;
         advance();
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>('|', std::move(left), logicalAnd());
     }
     return left;
@@ -465,10 +463,10 @@ std::unique_ptr<Expr> Parser::logical() {
 std::unique_ptr<Expr> Parser::logicalAnd() {
     auto left = bitwiseOr();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::AND)) break;
         advance();
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>('&', std::move(left), bitwiseOr());
     }
     return left;
@@ -477,10 +475,10 @@ std::unique_ptr<Expr> Parser::logicalAnd() {
 std::unique_ptr<Expr> Parser::bitwiseOr() {
     auto left = bitwiseXor();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::PIPE)) break;
         advance();
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>('o', std::move(left), bitwiseXor());
     }
     return left;
@@ -489,10 +487,10 @@ std::unique_ptr<Expr> Parser::bitwiseOr() {
 std::unique_ptr<Expr> Parser::bitwiseXor() {
     auto left = bitwiseAnd();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::CARET)) break;
         advance();
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>('x', std::move(left), bitwiseAnd());
     }
     return left;
@@ -501,42 +499,59 @@ std::unique_ptr<Expr> Parser::bitwiseXor() {
 std::unique_ptr<Expr> Parser::bitwiseAnd() {
     auto left = comparison();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::AMP)) break;
         advance();
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>('b', std::move(left), comparison());
     }
     return left;
 }
 
+static bool isCmpToken(TokenType t) {
+    return t == TokenType::GREATER || t == TokenType::LESS ||
+           t == TokenType::GREATER_EQUAL || t == TokenType::LESS_EQUAL ||
+           t == TokenType::EQUAL_EQUAL || t == TokenType::NOT_EQUAL;
+}
+static char cmpChar(TokenType t) {
+    if (t == TokenType::EQUAL_EQUAL)  return '=';
+    if (t == TokenType::GREATER_EQUAL) return 'G';
+    if (t == TokenType::LESS_EQUAL)   return 'L';
+    if (t == TokenType::NOT_EQUAL)    return 'N';
+    if (t == TokenType::GREATER)      return '>';
+    return '<';
+}
+
 std::unique_ptr<Expr> Parser::comparison() {
-    auto left = shift();
-    while (true) {
-        if (paren_depth_ > 0) skipNewlines();
-        if (!check(TokenType::GREATER) && !check(TokenType::LESS) &&
-            !check(TokenType::GREATER_EQUAL) && !check(TokenType::LESS_EQUAL) &&
-            !check(TokenType::EQUAL_EQUAL) && !check(TokenType::NOT_EQUAL)) break;
-        char op;
-        if      (check(TokenType::EQUAL_EQUAL))   { advance(); op = '='; }
-        else if (check(TokenType::GREATER_EQUAL))  { advance(); op = 'G'; }
-        else if (check(TokenType::LESS_EQUAL))     { advance(); op = 'L'; }
-        else if (check(TokenType::NOT_EQUAL))      { advance(); op = 'N'; }
-        else op = advance().lexeme[0];
-        if (paren_depth_ > 0) skipNewlines();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
+    auto first = shift();
+    if (paren_depth_ > 0) skipSemis();
+    if (!isCmpToken(peek().type)) return first;
+
+    // collect all operands and operators
+    auto chain = std::make_unique<ChainedCompareExpr>();
+    chain->operands.push_back(std::move(first));
+    while (isCmpToken(peek().type)) {
+        chain->ops.push_back(cmpChar(advance().type));
+        if (paren_depth_ > 0) skipSemis();
+        chain->operands.push_back(shift());
+        if (paren_depth_ > 0) skipSemis();
     }
-    return left;
+    // single comparison: return a plain BinaryExpr for simplicity
+    if (chain->ops.size() == 1)
+        return std::make_unique<BinaryExpr>(chain->ops[0],
+                                            std::move(chain->operands[0]),
+                                            std::move(chain->operands[1]));
+    return chain;
 }
 
 std::unique_ptr<Expr> Parser::shift() {
     auto left = additive();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::LSHIFT) && !check(TokenType::RSHIFT)) break;
         char op = check(TokenType::LSHIFT) ? 'l' : 'r';
         advance();
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }
     return left;
@@ -545,10 +560,10 @@ std::unique_ptr<Expr> Parser::shift() {
 std::unique_ptr<Expr> Parser::additive() {
     auto left = multiplicative();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::PLUS) && !check(TokenType::MINUS)) break;
         char op = advance().lexeme[0];
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
     }
     return left;
@@ -557,10 +572,10 @@ std::unique_ptr<Expr> Parser::additive() {
 std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = power();
     while (true) {
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) && !check(TokenType::PERCENT)) break;
         char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
-        if (paren_depth_ > 0) skipNewlines();
+        if (paren_depth_ > 0) skipSemis();
         left = std::make_unique<BinaryExpr>(op, std::move(left), power());
     }
     return left;
@@ -568,10 +583,10 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 
 std::unique_ptr<Expr> Parser::power() {
     auto left = unary();
-    if (paren_depth_ > 0) skipNewlines();
+    if (paren_depth_ > 0) skipSemis();
     if (!check(TokenType::STAR_STAR)) return left;
     advance();
-    if (paren_depth_ > 0) skipNewlines();
+    if (paren_depth_ > 0) skipSemis();
     return std::make_unique<BinaryExpr>('p', std::move(left), power()); // right-associative
 }
 
@@ -646,7 +661,7 @@ bool Parser::looksLikeRange() const {
         } else if (depth == 0) {
             if (t == TokenType::SEMICOLON) return true;
             if (t == TokenType::COMMA) return false;
-            if (t == TokenType::NEWLINE || t == TokenType::EOF_T) return false;
+            if (t == TokenType::EOF_T) return false;
         }
     }
     return false;
@@ -766,9 +781,9 @@ std::unique_ptr<Expr> Parser::primary() {
             if (!check(TokenType::RPAREN)) expect(TokenType::COMMA);
         }
         expect(TokenType::RPAREN);
-        consumeLineEnd();
+        consumeSemi();
         while (true) {
-            skipNewlines();
+            skipSemis();
             if (check(TokenType::END) || check(TokenType::EOF_T)) break;
             fe->body.push_back(parseOneStmt());
         }
@@ -777,7 +792,7 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::LBRACE)) {
         advance(); // consume {
-        skipNewlines();
+        skipSemis();
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
             std::string key;
@@ -789,7 +804,7 @@ std::unique_ptr<Expr> Parser::primary() {
             auto val = expr();
             map->entries.push_back({key, std::move(val)});
             if (check(TokenType::COMMA)) advance();
-            skipNewlines();
+            skipSemis();
         }
         expect(TokenType::RBRACE);
         return parsePostfix(std::move(map));
@@ -800,12 +815,12 @@ std::unique_ptr<Expr> Parser::primary() {
         if (looksLikeRange()) {
             return rangeExpr(true);  // incl_left=true
         }
-        skipNewlines();
+        skipSemis();
         auto arr = std::make_unique<ArrayExpr>();
         while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
             arr->elements.push_back(expr());
             if (check(TokenType::COMMA)) advance();
-            skipNewlines();
+            skipSemis();
         }
         expect(TokenType::RBRACKET);
         return parsePostfix(std::move(arr));
@@ -817,9 +832,9 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (match(TokenType::LPAREN)) {
         paren_depth_++;
-        skipNewlines();
+        skipSemis();
         auto e = expr();
-        skipNewlines();
+        skipSemis();
         expect(TokenType::RPAREN);
         paren_depth_--;
         return e;
@@ -838,9 +853,9 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         advance();
         s->parent = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consumeLineEnd();
+    consumeSemi();
     while (true) {
-        skipNewlines();
+        skipSemis();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
         if (!check(TokenType::FUNC))
             throw std::runtime_error("line " + std::to_string(peek().line) +
@@ -849,7 +864,7 @@ std::unique_ptr<Stmt> Parser::classDecl() {
             static_cast<FuncDeclStmt*>(funcDeclStmt().release())));
     }
     expect(TokenType::END);
-    consumeLineEnd();
+    consumeSemi();
     return s;
 }
 
@@ -878,7 +893,7 @@ std::unique_ptr<Stmt> Parser::importStmt() {
         advance();
         alias = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consumeLineEnd();
+    consumeSemi();
 
     // Résoudre le chemin par rapport au répertoire du script courant
     std::string resolved = (!path.empty() && (path[0] == '/' ||

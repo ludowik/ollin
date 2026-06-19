@@ -855,6 +855,47 @@ void Compiler::visit(const BinaryExpr& e) {
     (void)saved_after_left;
 }
 
+// a < b < c  →  chaque opérande dans un registre dédié, comparaisons pairées, AND final
+void Compiler::visit(const ChainedCompareExpr& e) {
+    int n = (int)e.operands.size(); // n opérandes, n-1 opérateurs
+
+    // évaluer tous les opérandes dans des registres temporaires contigus
+    int base_tmp = reg_top_;
+    std::vector<int> regs;
+    for (int i = 0; i < n; i++) {
+        e.operands[i]->accept(*this);
+        regs.push_back(last_reg_);
+        if (last_reg_ >= reg_top_) { reg_top_ = last_reg_ + 1; if (reg_top_ > reg_count_) reg_count_ = reg_top_; }
+    }
+
+    // allouer n-1 registres de résultat de comparaison
+    int cmp_base = reg_top_;
+    reg_top_ += n - 1;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+    static auto cmpOp = [](char op) -> uint8_t {
+        switch (op) {
+            case '=': return (uint8_t)Op::EQ;
+            case 'N': return (uint8_t)Op::NEQ;
+            case '>': return (uint8_t)Op::GT;
+            case '<': return (uint8_t)Op::LT;
+            case 'G': return (uint8_t)Op::GE;
+            case 'L': return (uint8_t)Op::LE;
+            default:  throw std::runtime_error("unknown cmp op in chain");
+        }
+    };
+
+    for (int i = 0; i < n - 1; i++)
+        chunk.emit(makeABC(cmpOp(e.ops[i]), (uint8_t)(cmp_base+i), (uint8_t)regs[i], (uint8_t)regs[i+1]));
+
+    // AND itératif des résultats partiels dans cmp_base
+    for (int i = 1; i < n - 1; i++)
+        chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)cmp_base, (uint8_t)cmp_base, (uint8_t)(cmp_base+i)));
+
+    last_reg_ = cmp_base;
+    reg_top_  = base_tmp; // libère tous les temporaires après l'expression
+}
+
 void Compiler::visit(const UnaryExpr& e) {
     e.operand->accept(*this);
     int rIn = last_reg_;

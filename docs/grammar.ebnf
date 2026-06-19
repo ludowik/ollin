@@ -77,6 +77,7 @@ bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
 bitwiseXor     = bitwiseAnd { "^" bitwiseAnd } ;
 bitwiseAnd     = comparison { "&" comparison } ;
 comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
+             (* comparaisons chaînées : 1 < x < 10  ≡  (1 < x) and (x < 10), x évalué une fois *)
 shift          = additive { ( "<<" | ">>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
              (* "+" : addition numérique ou concaténation de strings *)

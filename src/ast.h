@@ -14,7 +14,7 @@ struct BlockStmt; struct ClassDeclStmt;
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
 struct MapExpr; struct IndexExpr; struct ArrayExpr; struct ExprCallExpr; struct MethodCallExpr;
-struct RangeExpr; struct FuncExpr;
+struct RangeExpr; struct FuncExpr; struct ChainedCompareExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -53,8 +53,9 @@ struct ExprVisitor {
     virtual void visit(const ArrayExpr&)   = 0;
     virtual void visit(const ExprCallExpr&) = 0;
     virtual void visit(const MethodCallExpr&) = 0;
-    virtual void visit(const RangeExpr&)      = 0;
-    virtual void visit(const FuncExpr&)       = 0;
+    virtual void visit(const RangeExpr&)         = 0;
+    virtual void visit(const FuncExpr&)          = 0;
+    virtual void visit(const ChainedCompareExpr&) = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -99,6 +100,14 @@ struct UnaryExpr : Expr {
     char op;
     std::unique_ptr<Expr> operand;
     UnaryExpr(char o, std::unique_ptr<Expr> e) : op(o), operand(std::move(e)) {}
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
+};
+
+// 1 < x < 10  →  (1 < x) and (x < 10), x évalué une seule fois
+// ops[i] est le char-opérateur entre operands[i] et operands[i+1]
+struct ChainedCompareExpr : Expr {
+    std::vector<std::unique_ptr<Expr>> operands;
+    std::vector<char> ops;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

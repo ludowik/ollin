@@ -24,11 +24,11 @@ private:
     bool check(TokenType t) const;
     bool match(TokenType t);
     Token expect(TokenType t);
-    void skipNewlines();
+    void skipSemis();
 
     TokenType peekNextType() const;
     TokenType peekAt(int offset) const;
-    void consumeLineEnd();   // absorbe un COMMENT de fin de ligne optionnel + NEWLINE
+    void consumeSemi();   // absorbe un COMMENT optionnel + SEMICOLON (ASI)
 
     std::unique_ptr<Stmt> parseOneStmt();
     std::unique_ptr<Stmt> varDecl();

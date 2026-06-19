@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/lca/Dev/ollin/build-wasm/_deps/raylib-subbuild/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

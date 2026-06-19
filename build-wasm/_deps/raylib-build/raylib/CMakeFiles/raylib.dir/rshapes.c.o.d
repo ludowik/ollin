@@ -1,0 +1,25 @@
+_deps/raylib-build/raylib/CMakeFiles/raylib.dir/rshapes.c.o: \
+  /Users/lca/Dev/ollin/build-wasm/_deps/raylib-src/src/rshapes.c \
+  /Users/lca/Dev/ollin/build-wasm/_deps/raylib-src/src/raylib.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/compat/stdarg.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/stdarg.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/stdarg.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/__stdarg_header_macro.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/__stdarg___gnuc_va_list.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/__stdarg_va_list.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/__stdarg_va_arg.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/__stdarg___va_copy.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/__stdarg_va_copy.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/stdbool.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/stdbool.h \
+  /Users/lca/Dev/ollin/build-wasm/_deps/raylib-src/src/config.h \
+  /Users/lca/Dev/ollin/build-wasm/_deps/raylib-src/src/rlgl.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/compat/math.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/math.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/features.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/bits/alltypes.h \
+  /Users/lca/emsdk/upstream/lib/clang/20/include/float.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/float.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/compat/stdlib.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/stdlib.h \
+  /Users/lca/emsdk/upstream/emscripten/cache/sysroot/include/alloca.h

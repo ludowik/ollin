@@ -7,6 +7,7 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"global",   TokenType::GLOBAL},
     {"const",    TokenType::CONSTANT},
     {"while", TokenType::WHILE},
+    {"do",    TokenType::DO},
     {"if",    TokenType::IF},
     {"then",  TokenType::THEN},
     {"end",   TokenType::END},
@@ -107,90 +108,120 @@ Token Lexer::blockComment() {
 
 std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
+    int  paren_depth = 0;
+    TokenType last_type = TokenType::EOF_T; // rien émis encore
+
+    // Retourne true si ce token peut terminer une instruction → ASI
+    auto asiTrigger = [](TokenType t) -> bool {
+        switch (t) {
+            case TokenType::NUMBER:    case TokenType::STRING:
+            case TokenType::IDENTIFIER:
+            case TokenType::TRUE:      case TokenType::FALSE:  case TokenType::NIL:
+            case TokenType::RPAREN:    case TokenType::RBRACKET: case TokenType::RBRACE:
+            case TokenType::END:       case TokenType::BREAK:  case TokenType::CONTINUE:
+            case TokenType::RETURN:    case TokenType::DOT_DOT_DOT:
+                return true;
+            default: return false;
+        }
+    };
+
+    // Émet un token et met à jour last_type (COMMENT ne le modifie pas)
+    auto emit = [&](Token t) {
+        if (t.type != TokenType::COMMENT) last_type = t.type;
+        tokens.push_back(std::move(t));
+    };
+
     while (!atEnd()) {
         skipWhitespace();
         if (atEnd()) break;
 
         char c = advance();
         switch (c) {
-            case '\n': tokens.push_back({TokenType::NEWLINE,     "\\n", line++}); break;
-            case '=':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::EQUAL_EQUAL, "==", line}); }
-                else tokens.push_back({TokenType::EQUALS, "=", line});
+            case '\n':
+                if (paren_depth == 0 && asiTrigger(last_type))
+                    emit({TokenType::SEMICOLON, ";", line});
+                line++;
                 break;
-            case ',':  tokens.push_back({TokenType::COMMA,       ",",   line});   break;
-            case '(':  tokens.push_back({TokenType::LPAREN,      "(",   line});   break;
-            case ')':  tokens.push_back({TokenType::RPAREN,      ")",   line});   break;
+            case '=':
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::EQUAL_EQUAL, "==", line}); }
+                else emit({TokenType::EQUALS, "=", line});
+                break;
+            case ',':  emit({TokenType::COMMA,  ",", line}); break;
+            case '(':  ++paren_depth; emit({TokenType::LPAREN,  "(", line}); break;
+            case ')':  --paren_depth; emit({TokenType::RPAREN,  ")", line}); break;
             case '.':
                 if (!atEnd() && peek() == '.') {
                     advance();
-                    if (!atEnd() && peek() == '.') { advance(); tokens.push_back({TokenType::DOT_DOT_DOT, "...", line}); }
+                    if (!atEnd() && peek() == '.') { advance(); emit({TokenType::DOT_DOT_DOT, "...", line}); }
                     else throw std::runtime_error("line " + std::to_string(line) + ": '..' is not valid syntax (use [a;b] for ranges)");
                 } else if (!atEnd() && std::isdigit(peek())) {
-                    tokens.push_back(number(true)); // .5 → nombre à virgule
+                    emit(number(true)); // .5 → nombre à virgule
                 } else {
-                    tokens.push_back({TokenType::DOT, ".", line});
+                    emit({TokenType::DOT, ".", line});
                 }
                 break;
-            case ';':  tokens.push_back({TokenType::SEMICOLON, ";", line});         break;
+            case ';':  emit({TokenType::SEMICOLON, ";", line}); break;
             case '-':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::MINUS_EQUAL, "-=", line}); }
-                else tokens.push_back({TokenType::MINUS, "-", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::MINUS_EQUAL, "-=", line}); }
+                else emit({TokenType::MINUS, "-", line});
                 break;
             case '*':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::STAR_EQUAL, "*=", line}); }
-                else if (!atEnd() && peek() == '*') { advance(); tokens.push_back({TokenType::STAR_STAR, "**", line}); }
-                else tokens.push_back({TokenType::STAR, "*", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::STAR_EQUAL, "*=", line}); }
+                else if (!atEnd() && peek() == '*') { advance(); emit({TokenType::STAR_STAR, "**", line}); }
+                else emit({TokenType::STAR, "*", line});
                 break;
             case '/':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::SLASH_EQUAL, "/=", line}); }
-                else if (!atEnd() && peek() == '/') { advance(); tokens.push_back({TokenType::SLASH_SLASH, "//", line}); }
-                else tokens.push_back({TokenType::SLASH, "/", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::SLASH_EQUAL, "/=", line}); }
+                else if (!atEnd() && peek() == '/') { advance(); emit({TokenType::SLASH_SLASH, "//", line}); }
+                else emit({TokenType::SLASH, "/", line});
                 break;
             case '%':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::PERCENT_EQUAL, "%=", line}); }
-                else tokens.push_back({TokenType::PERCENT, "%", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::PERCENT_EQUAL, "%=", line}); }
+                else emit({TokenType::PERCENT, "%", line});
                 break;
             case '>':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::GREATER_EQUAL, ">=", line}); }
-                else if (!atEnd() && peek() == '>') { advance(); tokens.push_back({TokenType::RSHIFT, ">>", line}); }
-                else tokens.push_back({TokenType::GREATER, ">", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::GREATER_EQUAL, ">=", line}); }
+                else if (!atEnd() && peek() == '>') { advance(); emit({TokenType::RSHIFT, ">>", line}); }
+                else emit({TokenType::GREATER, ">", line});
                 break;
             case '<':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::LESS_EQUAL, "<=", line}); }
-                else if (!atEnd() && peek() == '>') { advance(); tokens.push_back({TokenType::NOT_EQUAL, "<>", line}); }
-                else if (!atEnd() && peek() == '<') { advance(); tokens.push_back({TokenType::LSHIFT, "<<", line}); }
-                else tokens.push_back({TokenType::LESS, "<", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::LESS_EQUAL, "<=", line}); }
+                else if (!atEnd() && peek() == '>') { advance(); emit({TokenType::NOT_EQUAL, "<>", line}); }
+                else if (!atEnd() && peek() == '<') { advance(); emit({TokenType::LSHIFT, "<<", line}); }
+                else emit({TokenType::LESS, "<", line});
                 break;
-            case '&':  tokens.push_back({TokenType::AMP,   "&", line});   break;
-            case '|':  tokens.push_back({TokenType::PIPE,  "|", line});   break;
-            case '^':  tokens.push_back({TokenType::CARET, "^", line});   break;
-            case '~':  tokens.push_back({TokenType::TILDE, "~", line});   break;
-            case '{':  tokens.push_back({TokenType::LBRACE,   "{", line});        break;
-            case '}':  tokens.push_back({TokenType::RBRACE,   "}", line});        break;
-            case '[':  tokens.push_back({TokenType::LBRACKET, "[", line});        break;
-            case ']':  tokens.push_back({TokenType::RBRACKET, "]", line});        break;
-            case ':':  tokens.push_back({TokenType::COLON,    ":", line});        break;
-            case '"':  tokens.push_back(string());                                break;
+            case '&':  emit({TokenType::AMP,   "&", line}); break;
+            case '|':  emit({TokenType::PIPE,  "|", line}); break;
+            case '^':  emit({TokenType::CARET, "^", line}); break;
+            case '~':  emit({TokenType::TILDE, "~", line}); break;
+            case '{':  ++paren_depth; emit({TokenType::LBRACE,   "{", line}); break;
+            case '}':  --paren_depth; emit({TokenType::RBRACE,   "}", line}); break;
+            case '[':  ++paren_depth; emit({TokenType::LBRACKET, "[", line}); break;
+            case ']':  --paren_depth; emit({TokenType::RBRACKET, "]", line}); break;
+            case ':':  emit({TokenType::COLON, ":", line}); break;
+            case '"':  emit(string()); break;
             case '+':
-                if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::PLUS_EQUAL, "+=", line}); }
-                else tokens.push_back({TokenType::PLUS, "+", line});
+                if (!atEnd() && peek() == '=') { advance(); emit({TokenType::PLUS_EQUAL, "+=", line}); }
+                else emit({TokenType::PLUS, "+", line});
                 break;
             case '#':
                 if (!atEnd() && peek() == '#') {
-                    advance(); // 2e #
-                    if (!atEnd() && peek() == '#') { advance(); tokens.push_back(blockComment()); }
-                    else tokens.push_back(comment());
+                    advance();
+                    if (!atEnd() && peek() == '#') { advance(); emit(blockComment()); }
+                    else emit(comment());
                 } else {
                     throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
                 }
                 break;
             default:
-                if (std::isdigit(c)) { tokens.push_back(number(false)); break; }
-                if (std::isalpha(c) || c == '_') { tokens.push_back(identifier()); break; }
+                if (std::isdigit(c)) { emit(number(false)); break; }
+                if (std::isalpha(c) || c == '_') { emit(identifier()); break; }
                 throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
         }
     }
+    // ASI en fin de fichier si nécessaire
+    if (asiTrigger(last_type))
+        tokens.push_back({TokenType::SEMICOLON, ";", line});
     tokens.push_back({TokenType::EOF_T, "", line});
     return tokens;
 }

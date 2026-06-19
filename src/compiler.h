@@ -99,8 +99,9 @@ private:
     void visit(const ArrayExpr&)   override;
     void visit(const ExprCallExpr&) override;
     void visit(const MethodCallExpr&) override;
-    void visit(const RangeExpr&)     override;
-    void visit(const FuncExpr&)      override;
+    void visit(const RangeExpr&)          override;
+    void visit(const FuncExpr&)           override;
+    void visit(const ChainedCompareExpr&) override;
 
     // StmtVisitor (map)
     void visit(const IndexAssignStmt&) override;
