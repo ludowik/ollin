@@ -96,7 +96,9 @@ static Value gfx_close(Value* args, int argc) {
 #ifdef __EMSCRIPTEN__
 static Value  s_run_callback;
 static void emscripten_frame() {
+    BeginDrawing();
     VM::current()->callValue(s_run_callback);
+    EndDrawing();
 }
 #endif
 
@@ -108,7 +110,9 @@ static Value gfx_run(Value* args, int argc) {
     emscripten_set_main_loop(emscripten_frame, 0, 0);
 #else
     while (!WindowShouldClose()) {
+        BeginDrawing();
         VM::current()->callValue(fn);
+        EndDrawing();
     }
     CloseWindow();
 #endif
