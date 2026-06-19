@@ -5,5 +5,5 @@ build_native2/
 build_reg/
 build_wasm/
 build-wasm/
-.claude/
+.claude/worktrees/
 build_debug/
