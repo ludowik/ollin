@@ -4,7 +4,11 @@
 
    Ce fichier est LA référence de la syntaxe et de la sémantique du langage.
    Les commentaires (* ... *) précisent les règles sémantiques attachées à
-   chaque production. CLAUDE.md ne documente que l'implémentation interne. *)
+   chaque production. CLAUDE.md ne documente que l'implémentation interne.
+
+   Terminateurs de statements : chaque statement se termine par un saut de ligne.
+   Le caractère ';' est interdit. À l'intérieur des parenthèses, crochets et
+   accolades, les sauts de ligne sont ignorés (continuation implicite). *)
 
 program        = { stmt } EOF ;
 
@@ -23,30 +27,30 @@ stmt           = varDecl
                | assignStmt
                | exprStmt ;
 
-importStmt     = "import" STRING [ "as" IDENT ] SEMI ;
+importStmt     = "import" STRING [ "as" IDENT ] NL ;
 
-classDecl      = "class" IDENT [ "extends" IDENT ] SEMI { method } "end" SEMI ;
-method         = "func" IDENT "(" [ params ] ")" SEMI { stmt } "end" SEMI ;
+classDecl      = "class" IDENT [ "extends" IDENT ] NL { method } "end" NL ;
+method         = "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
                  (* le premier paramètre implicite est "self" ; "func init(...)" = constructeur *)
                  (* méthodes spéciales : init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
 
 methodCall     = expr "." IDENT "(" [ expr { "," expr } ] ")" ;
 superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 
-varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] SEMI ;
+varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NL ;
                  (* `var` est OBLIGATOIRE pour créer une variable, et ne crée que des locales *)
                  (* sans "=" → nil ; moins de valeurs que de noms → les noms en trop valent nil *)
-globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] SEMI ;
+globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] NL ;
                  (* `global` déclare des variables globales, visibles dans tout le programme *)
                  (* déclarable n'importe où (top-level ou dans une fonction) ; lue/écrite partout *)
                  (* une locale `var` de même nom masque le global dans sa portée *)
-constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } SEMI ;
+constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } NL ;
                  (* `const` déclare une locale immuable ; initialisation obligatoire *)
                  (* toute tentative d'assignation ultérieure est une erreur de compilation *)
                  (* une constante peut être capturée en lecture seule par une closure *)
-whileStmt      = "while" expr "do" { stmt } "end" SEMI ;
-forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" SEMI
-               | "for" IDENT [ "," IDENT ] "in" expr "do" { stmt } "end" SEMI ;
+whileStmt      = "while" expr "do" { stmt } "end" NL ;
+forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" NL
+               | "for" IDENT [ "," IDENT ] "in" expr "do" { stmt } "end" NL ;
                  (* numérique : "for i=start,end[,step]" ; step optionnel, défaut 1 ; step<0 décompte *)
                  (* itérateur : "for v in it" → valeur primaire (élément pour array/range, clé pour map) *)
                  (*             "for k,v in it" → clé/index + valeur *)
@@ -54,21 +58,21 @@ forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" 
 ifStmt         = "if" expr "then" { stmt }
                  { "elseif" expr "then" { stmt } }
                  [ "else" { stmt } ]
-                 "end" SEMI ;
-tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" SEMI ;
-throwStmt      = "throw" expr SEMI ;
-funcDecl       = "func" IDENT "(" [ params ] ")" { stmt } "end" SEMI ;
+                 "end" NL ;
+tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" NL ;
+throwStmt      = "throw" expr NL ;
+funcDecl       = "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
 params         = param { "," param } [ "," "..." ] | "..." ;
 param          = IDENT [ "=" literal ] ;
-returnStmt     = "return" [ retvals ] SEMI ;
+returnStmt     = "return" [ retvals ] NL ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
-assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr SEMI ;
+assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
                  (* règle sémantique : IDENT doit avoir été déclaré par "var" ou "global" — sinon erreur *)
                  (* "var" → locale ; "global" → globale (table VM partagée) *)
-indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr SEMI
-               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr SEMI ;
-exprStmt       = expr SEMI ;
+indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL
+               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
+exprStmt       = expr NL ;
 
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
@@ -103,13 +107,12 @@ primary        = NUMBER
                | "..."
                | "(" expr ")" ;
 
-lambdaExpr     = "func" "(" [ params ] ")" { stmt } "end" ;
+lambdaExpr     = "func" "(" [ params ] ")" NL { stmt } "end" ;
                (* fonction anonyme utilisable comme expression ; capture des upvalues comme toute closure *)
                (* "expr.method(args)" = appel de méthode avec self implicite *)
 
-mapLit         = "{" [ NEWLINE ]
-                   [ mapEntry { "," [ NEWLINE ] mapEntry } [ NEWLINE ] ]
-                 "}" ;
+mapLit         = "{" [ mapEntry { "," mapEntry } ] "}" ;
+               (* sauts de ligne autorisés entre les entrées — la continuation implicite s'applique à l'intérieur de {} *)
 mapEntry       = ( STRING | IDENT ) ":" expr ;
                  (* littéral : clés string ou identifiant ; à l'exécution toute Value peut être clé *)
                  (* accès : m["k"] et m.k sont équivalents (lecture, écriture, compound) *)
@@ -123,10 +126,9 @@ call           = IDENT "(" [ expr { "," expr } ] ")" ;
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
 
-(* SEMI : point-virgule explicite ";" ou inséré automatiquement (ASI) après un saut de ligne
-   quand le dernier token est un terminateur de valeur (NUMBER, STRING, IDENT, TRUE, FALSE, NIL,
-   RPAREN, RBRACKET, RBRACE, END, BREAK, CONTINUE, RETURN, DOT_DOT_DOT).
-   L'ASI ne se déclenche pas à l'intérieur des parenthèses/crochets/accolades. *)
+(* NL : saut de ligne — termine tout statement. Le caractère ';' est interdit.
+   La continuation implicite s'applique à l'intérieur des parenthèses, crochets
+   et accolades : un saut de ligne n'y termine pas le statement. *)
 
 NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
                | ( "." digit { [ "_" ] digit } ) ;

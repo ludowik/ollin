@@ -160,7 +160,10 @@ std::vector<Token> Lexer::tokenize() {
                     emit({TokenType::DOT, ".", line});
                 }
                 break;
-            case ';':  emit({TokenType::SEMICOLON, ";", line}); break;
+            case ';':
+                if (paren_depth > 0) emit({TokenType::SEMICOLON, ";", line});
+                else throw std::runtime_error("line " + std::to_string(line) + ": ';' is not valid syntax — statements are terminated by newlines");
+                break;
             case '-':
                 if (!atEnd() && peek() == '=') { advance(); emit({TokenType::MINUS_EQUAL, "-=", line}); }
                 else emit({TokenType::MINUS, "-", line});
