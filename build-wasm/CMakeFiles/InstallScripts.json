@@ -1,9 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/lca/Dev/ollin/build-wasm/cmake_install.cmake",
-		"/Users/lca/Dev/ollin/build-wasm/_deps/raylib-build/cmake_install.cmake",
-		"/Users/lca/Dev/ollin/build-wasm/_deps/raylib-build/raylib/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
