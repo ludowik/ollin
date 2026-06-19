@@ -182,14 +182,14 @@ assert(ok)
 ## ── 9. While ─────────────────────────────────────────────────────────────────
 
 var i = 0
-while i < 5
+while i < 5 do
     i += 1
 end
 assert(i == 5)
 
 ## break
 var j = 0
-while true
+while true do
     j += 1
     if j >= 3 then break end
 end
@@ -198,7 +198,7 @@ assert(j == 3)
 ## continue
 var sum = 0
 var k = 0
-while k < 10
+while k < 10 do
     k += 1
     if k % 2 == 0 then continue end    ## saute les pairs
     sum += k
@@ -209,35 +209,35 @@ assert(sum == 25)   ## 1+3+5+7+9
 
 ## range inclusif [1;5] → 1,2,3,4,5
 var s1 = 0
-for i in [1;5]
+for i in [1;5] do
     s1 += i
 end
 assert(s1 == 15)
 
 ## numérique sans step
 var s2 = 0
-for i = 1, 5
+for i = 1, 5 do
     s2 += i
 end
 assert(s2 == 15)
 
 ## step positif
 var s3 = 0
-for i = 1, 9, 2
+for i = 1, 9, 2 do
     s3 += i
 end
 assert(s3 == 25)    ## 1+3+5+7+9
 
 ## step négatif
 var s4 = 0
-for i = 5, 1, -1
+for i = 5, 1, -1 do
     s4 += i
 end
 assert(s4 == 15)
 
 ## break dans for range
 var s5 = 0
-for i in [1;100]
+for i in [1;100] do
     if i > 5 then break end
     s5 += i
 end
@@ -245,7 +245,7 @@ assert(s5 == 15)
 
 ## continue dans for range
 var s6 = 0
-for i in [1;10]
+for i in [1;10] do
     if i % 2 == 0 then continue end
     s6 += i
 end
@@ -253,14 +253,14 @@ assert(s6 == 25)
 
 ## range exclusif droit [1;5[ → 1,2,3,4
 var s8 = 0
-for i in [1;5[
+for i in [1;5[ do
     s8 += i
 end
 assert(s8 == 10)
 
 ## range avec step [1;10;2] → 1,3,5,7,9
 var s9 = 0
-for i in [1;10;2]
+for i in [1;10;2] do
     s9 += i
 end
 assert(s9 == 25)
@@ -268,7 +268,7 @@ assert(s9 == 25)
 ## range first-class : stocker dans une variable
 var rng = [1;5]
 var s10 = 0
-for i in rng
+for i in rng do
     s10 += i
 end
 assert(s10 == 15)
@@ -276,7 +276,7 @@ assert(s10 == 15)
 ## continue dans for k,v in map
 var cm = {a: 1, b: 2, c: 3, d: 4}
 var cs1 = 0
-for k, v in cm
+for k, v in cm do
     if v % 2 == 0 then continue end
     cs1 += v
 end
@@ -284,7 +284,7 @@ assert(cs1 == 4)   ## 1+3
 
 ## continue dans for v in array
 var cs2 = 0
-for v in [1, 2, 3, 4, 5]
+for v in [1, 2, 3, 4, 5] do
     if v % 2 == 0 then continue end
     cs2 += v
 end
@@ -331,7 +331,7 @@ assert(f_nodefault() == nil)
 func sum_all(...)
     var s = 0
     var i = 1
-    while i <= 3
+    while i <= 3 do
         s += 1
         i += 1
     end
@@ -495,14 +495,14 @@ assert(km[km_fn] == "func")
 
 ## itération clé+valeur
 var total = 0
-for k, v in {x: 1, y: 2, z: 3}
+for k, v in {x: 1, y: 2, z: 3} do
     total += v
 end
 assert(total == 6)
 
 ## itération clé seule (1 variable sur map → clé)
 var key_sum = 0
-for k in {a: 1, b: 2, c: 3}
+for k in {a: 1, b: 2, c: 3} do
     key_sum += 1   ## on compte juste les itérations
 end
 assert(key_sum == 3)
@@ -510,7 +510,7 @@ assert(key_sum == 3)
 ## for k,v dans une fonction
 func sum_map_vals(m)
     var s = 0
-    for k, v in m
+    for k, v in m do
         s += v
     end
     return s
@@ -539,13 +539,13 @@ assert(a2[3] == "x")
 
 ## itération valeurs seules
 var s7 = 0
-for v in [1, 2, 3, 4, 5]
+for v in [1, 2, 3, 4, 5] do
     s7 += v
 end
 assert(s7 == 15)
 
 ## itération index + valeur
-for i, v in arr
+for i, v in arr do
     printf("{}: {}", i, v)
 end
 
@@ -750,7 +750,7 @@ assert(rnd >= 0 and rnd < 1)
 ## Module natif (non disponible en WASM). Usage :
 ##
 ##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
-##   while graphics.is_open()
+##   while graphics.is_open() do
 ##       graphics.begin_draw()
 ##       graphics.clear(graphics.BLACK)
 ##       graphics.line(x1, y1, x2, y2, color)
@@ -780,4 +780,3 @@ assert(rnd >= 0 and rnd < 1)
 ##   func f()
 ##       var x = 2      ## OK : portée distincte (registres de f)
 ##   end
-

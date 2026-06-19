@@ -244,7 +244,7 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
             }
             s->else_ifs.push_back(std::move(ei));
         } else {
-            skipSemis(); expect(TokenType::DO);
+            consumeSemi();
             while (true) {
                 skipSemis();
                 if (check(TokenType::END) || check(TokenType::EOF_T)) break;
@@ -290,7 +290,7 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
     s->line = line;
-    skipSemis(); expect(TokenType::DO);
+    consumeSemi();
     while (true) {
         skipSemis();
         if (check(TokenType::CATCH) || check(TokenType::EOF_T)) break;
@@ -298,14 +298,14 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
     }
     expect(TokenType::CATCH);
     s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
-    skipSemis(); expect(TokenType::DO);
+    consumeSemi();
     while (true) {
         skipSemis();
         if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T)) break;
         s->catch_body.push_back(parseOneStmt());
     }
     if (match(TokenType::ELSE)) {
-        skipSemis(); expect(TokenType::DO);
+        consumeSemi();
         while (true) {
             skipSemis();
             if (check(TokenType::END) || check(TokenType::EOF_T)) break;
@@ -334,7 +334,7 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
         if (!check(TokenType::RPAREN)) expect(TokenType::COMMA);
     }
     expect(TokenType::RPAREN);
-    skipSemis(); expect(TokenType::DO);
+    consumeSemi();
     while (true) {
         skipSemis();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
@@ -396,7 +396,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         expect(TokenType::COMMA);
         range->end = expr();
         if (match(TokenType::COMMA)) range->step = expr();
-        consumeSemi();
+        skipSemis(); expect(TokenType::DO);
         auto s = std::make_unique<ForIterStmt>();
         s->line      = line;
         s->var1      = first_var;
@@ -419,7 +419,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     }
     expect(TokenType::IN);
     auto iter_e = expr();
-    consumeSemi();
+    skipSemis(); expect(TokenType::DO);
     auto s = std::make_unique<ForIterStmt>();
     s->line      = line;
     s->var1      = first_var;

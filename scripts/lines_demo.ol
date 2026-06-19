@@ -23,7 +23,7 @@ var x1 = []  var y1 = []  var x2 = []  var y2 = []
 var vx1 = [] var vy1 = [] var vx2 = [] var vy2 = []
 var cols = []
 
-for i = 1, N
+for i = 1, N do
     x1[i]  = rpos(W)
     y1[i]  = rpos(H)
     x2[i]  = rpos(W)
@@ -41,7 +41,7 @@ func frame()
     graphics.begin_draw()
     graphics.clear(graphics.BLACK)
 
-    for i = 1, N
+    for i = 1, N do
         x1[i]  = x1[i]  + vx1[i]
         y1[i]  = y1[i]  + vy1[i]
         x2[i]  = x2[i]  + vx2[i]

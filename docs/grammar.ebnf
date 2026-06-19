@@ -23,52 +23,52 @@ stmt           = varDecl
                | assignStmt
                | exprStmt ;
 
-importStmt     = "import" STRING [ "as" IDENT ] NEWLINE ;
+importStmt     = "import" STRING [ "as" IDENT ] SEMI ;
 
-classDecl      = "class" IDENT [ "extends" IDENT ] NEWLINE { method } "end" NEWLINE ;
-method         = "func" IDENT "(" [ params ] ")" NEWLINE { stmt } "end" NEWLINE ;
+classDecl      = "class" IDENT [ "extends" IDENT ] SEMI { method } "end" SEMI ;
+method         = "func" IDENT "(" [ params ] ")" SEMI { stmt } "end" SEMI ;
                  (* le premier paramètre implicite est "self" ; "func init(...)" = constructeur *)
                  (* méthodes spéciales : init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
 
 methodCall     = expr "." IDENT "(" [ expr { "," expr } ] ")" ;
 superCall      = "super" "." IDENT "(" [ expr { "," expr } ] ")" ;
 
-varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
+varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] SEMI ;
                  (* `var` est OBLIGATOIRE pour créer une variable, et ne crée que des locales *)
                  (* sans "=" → nil ; moins de valeurs que de noms → les noms en trop valent nil *)
-globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] NEWLINE ;
+globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] SEMI ;
                  (* `global` déclare des variables globales, visibles dans tout le programme *)
                  (* déclarable n'importe où (top-level ou dans une fonction) ; lue/écrite partout *)
                  (* une locale `var` de même nom masque le global dans sa portée *)
-constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } NEWLINE ;
+constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } SEMI ;
                  (* `const` déclare une locale immuable ; initialisation obligatoire *)
                  (* toute tentative d'assignation ultérieure est une erreur de compilation *)
                  (* une constante peut être capturée en lecture seule par une closure *)
-whileStmt      = "while" expr NEWLINE { stmt } "end" NEWLINE ;
-forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] NEWLINE { stmt } "end" NEWLINE
-               | "for" IDENT [ "," IDENT ] "in" expr NEWLINE { stmt } "end" NEWLINE ;
+whileStmt      = "while" expr "do" { stmt } "end" SEMI ;
+forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" SEMI
+               | "for" IDENT [ "," IDENT ] "in" expr "do" { stmt } "end" SEMI ;
                  (* numérique : "for i=start,end[,step]" ; step optionnel, défaut 1 ; step<0 décompte *)
                  (* itérateur : "for v in it" → valeur primaire (élément pour array/range, clé pour map) *)
                  (*             "for k,v in it" → clé/index + valeur *)
                  (* itérables : array, map (snapshot), range ; "break" valide partout *)
-ifStmt         = "if" expr "then" NEWLINE { stmt }
-                 { "elseif" expr "then" NEWLINE { stmt } }
-                 [ "else" NEWLINE { stmt } ]
-                 "end" NEWLINE ;
-tryStmt        = "try" NEWLINE { stmt } "catch" IDENT NEWLINE { stmt } [ "else" NEWLINE { stmt } ] "end" NEWLINE ;
-throwStmt      = "throw" expr NEWLINE ;
-funcDecl       = "func" IDENT "(" [ params ] ")" NEWLINE { stmt } "end" NEWLINE ;
+ifStmt         = "if" expr "then" { stmt }
+                 { "elseif" expr "then" { stmt } }
+                 [ "else" { stmt } ]
+                 "end" SEMI ;
+tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" SEMI ;
+throwStmt      = "throw" expr SEMI ;
+funcDecl       = "func" IDENT "(" [ params ] ")" { stmt } "end" SEMI ;
 params         = param { "," param } [ "," "..." ] | "..." ;
 param          = IDENT [ "=" literal ] ;
-returnStmt     = "return" [ retvals ] NEWLINE ;
+returnStmt     = "return" [ retvals ] SEMI ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
-assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
+assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr SEMI ;
                  (* règle sémantique : IDENT doit avoir été déclaré par "var" ou "global" — sinon erreur *)
                  (* "var" → locale ; "global" → globale (table VM partagée) *)
-indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE
-               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NEWLINE ;
-exprStmt       = expr NEWLINE ;
+indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr SEMI
+               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr SEMI ;
+exprStmt       = expr SEMI ;
 
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
@@ -103,7 +103,7 @@ primary        = NUMBER
                | "..."
                | "(" expr ")" ;
 
-lambdaExpr     = "func" "(" [ params ] ")" NEWLINE { stmt } "end" ;
+lambdaExpr     = "func" "(" [ params ] ")" { stmt } "end" ;
                (* fonction anonyme utilisable comme expression ; capture des upvalues comme toute closure *)
                (* "expr.method(args)" = appel de méthode avec self implicite *)
 
@@ -122,6 +122,11 @@ call           = IDENT "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
+
+(* SEMI : point-virgule explicite ";" ou inséré automatiquement (ASI) après un saut de ligne
+   quand le dernier token est un terminateur de valeur (NUMBER, STRING, IDENT, TRUE, FALSE, NIL,
+   RPAREN, RBRACKET, RBRACE, END, BREAK, CONTINUE, RETURN, DOT_DOT_DOT).
+   L'ASI ne se déclenche pas à l'intérieur des parenthèses/crochets/accolades. *)
 
 NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
                | ( "." digit { [ "_" ] digit } ) ;
