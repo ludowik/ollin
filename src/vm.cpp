@@ -824,7 +824,13 @@ void VM::runSwitch(size_t stop_depth) {
             }
             size_t full_needed = (size_t)(cb + fp.reg_count);
             if (regs.size() < full_needed) regs.resize(full_needed);
-            call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
+            std::unique_ptr<std::vector<Value>> varargs;
+            if (fp.variadic && total > fp.n_fixed) {
+                varargs = std::make_unique<std::vector<Value>>();
+                for (int i = fp.n_fixed; i < total; ++i)
+                    varargs->push_back(std::move(regs[cb + i]));
+            }
+            call_stack.push_back({ip, cb, std::move(varargs), std::move(fuv), {}, {}});
             ip = fp.addr;
             break;
         }
@@ -1531,7 +1537,13 @@ op_CALL_METHOD: {
             }
             size_t full_needed = (size_t)(cb + fp.reg_count);
             if (regs.size() < full_needed) regs.resize(full_needed);
-            call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
+            std::unique_ptr<std::vector<Value>> varargs;
+            if (fp.variadic && total > fp.n_fixed) {
+                varargs = std::make_unique<std::vector<Value>>();
+                for (int i = fp.n_fixed; i < total; ++i)
+                    varargs->push_back(std::move(regs[cb + i]));
+            }
+            call_stack.push_back({ip, cb, std::move(varargs), std::move(fuv), {}, {}});
             fp_addr = fp.addr;
         }
     }
@@ -2102,7 +2114,13 @@ op_HALT:
             }
             size_t full_needed = (size_t)(cb + fp.reg_count);
             if (regs.size() < full_needed) regs.resize(full_needed);
-            call_stack.push_back({ip, cb, {}, std::move(fuv), {}, {}});
+            std::unique_ptr<std::vector<Value>> varargs;
+            if (fp.variadic && total > fp.n_fixed) {
+                varargs = std::make_unique<std::vector<Value>>();
+                for (int i = fp.n_fixed; i < total; ++i)
+                    varargs->push_back(std::move(regs[cb + i]));
+            }
+            call_stack.push_back({ip, cb, std::move(varargs), std::move(fuv), {}, {}});
             ip = fp.addr;
             break;
         }
