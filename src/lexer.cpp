@@ -139,6 +139,7 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case '*':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::STAR_EQUAL, "*=", line}); }
+                else if (!atEnd() && peek() == '*') { advance(); tokens.push_back({TokenType::STAR_STAR, "**", line}); }
                 else tokens.push_back({TokenType::STAR, "*", line});
                 break;
             case '/':

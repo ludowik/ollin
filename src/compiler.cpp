@@ -835,6 +835,7 @@ void Compiler::visit(const BinaryExpr& e) {
         case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case '/': chunk.emit(makeABC((uint8_t)Op::DIV,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case 'q': chunk.emit(makeABC((uint8_t)Op::IDIV, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
+        case 'p': chunk.emit(makeABC((uint8_t)Op::POW,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case '%': chunk.emit(makeABC((uint8_t)Op::MOD,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case '>': chunk.emit(makeABC((uint8_t)Op::GT,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         case '<': chunk.emit(makeABC((uint8_t)Op::LT,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;

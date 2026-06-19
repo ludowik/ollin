@@ -555,15 +555,24 @@ std::unique_ptr<Expr> Parser::additive() {
 }
 
 std::unique_ptr<Expr> Parser::multiplicative() {
-    auto left = unary();
+    auto left = power();
     while (true) {
         if (paren_depth_ > 0) skipNewlines();
         if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) && !check(TokenType::PERCENT)) break;
         char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
         if (paren_depth_ > 0) skipNewlines();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
+        left = std::make_unique<BinaryExpr>(op, std::move(left), power());
     }
     return left;
+}
+
+std::unique_ptr<Expr> Parser::power() {
+    auto left = unary();
+    if (paren_depth_ > 0) skipNewlines();
+    if (!check(TokenType::STAR_STAR)) return left;
+    advance();
+    if (paren_depth_ > 0) skipNewlines();
+    return std::make_unique<BinaryExpr>('p', std::move(left), power()); // right-associative
 }
 
 std::unique_ptr<Expr> Parser::unary() {

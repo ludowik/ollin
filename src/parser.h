@@ -60,6 +60,7 @@ private:
     std::unique_ptr<Expr> shift();
     std::unique_ptr<Expr> additive();
     std::unique_ptr<Expr> multiplicative();
+    std::unique_ptr<Expr> power();
     std::unique_ptr<Expr> unary();
     std::unique_ptr<Expr> primary();
 

@@ -125,6 +125,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | STORE_GLOBAL  | ABx    | A=src, Bx=ident_idx        | globals[Bx] = R[A]                               |
 | ADD/SUB/MUL/DIV/MOD | ABC | A=dst, B=lhs, C=rhs   | R[A] = R[B] op R[C]                              |
 | IDIV          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = floor(R[B] / R[C])  (INT//INT → INT)      |
+| POW           | ABC    | A=dst, B=base, C=exp       | R[A] = R[B] ** R[C]  (INT**INT(≥0) → INT ; sinon FLOAT) |
 | NEGATE / NOT  | AB     | A=dst, B=src               | R[A] = -R[B] / !R[B]                            |
 | AND / OR      | ABC    | A=dst, B=lhs, C=rhs        | R[A] = 1.0 si condition vraie sinon 0.0          |
 | EQ/NEQ/GT/LT/GE/LE | ABC | A=dst, B=lhs, C=rhs  | R[A] = 1.0 si vrai sinon 0.0                     |

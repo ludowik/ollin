@@ -421,6 +421,17 @@ void VM::runSwitch(size_t stop_depth) {
             }
             break;
         }
+        case Op::POW: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger() && cv.asInt() >= 0) {
+                int64_t b = bv.asInt(), e = cv.asInt(), r = 1;
+                while (e > 0) { if (e & 1) r *= b; b *= b; e >>= 1; }
+                regs[base+A] = Value(r);
+            } else {
+                regs[base+A] = Value(std::pow(asDouble(bv), asDouble(cv)));
+            }
+            break;
+        }
         case Op::NEGATE: {
             if (isInstance(regs[base+B])) {
                 if (uint32_t addr = tryMetaUnary(MK().neg_, base+A, regs[base+B]))
@@ -901,7 +912,7 @@ void VM::execute(Chunk chunk) {
     static const void* const dt[] = {
         &&op_LOAD_K, &&op_LOAD_NIL, &&op_MOVE,
         &&op_LOAD_GLOBAL, &&op_STORE_GLOBAL,
-        &&op_ADD, &&op_SUB, &&op_MUL, &&op_DIV, &&op_MOD, &&op_IDIV,
+        &&op_ADD, &&op_SUB, &&op_MUL, &&op_DIV, &&op_MOD, &&op_IDIV, &&op_POW,
         &&op_NEGATE, &&op_NOT, &&op_AND, &&op_OR,
         &&op_EQ, &&op_NEQ, &&op_GT, &&op_LT, &&op_GE, &&op_LE,
         &&op_JUMP, &&op_JUMP_IF_FALSE,
@@ -1030,6 +1041,20 @@ op_IDIV: {
     NEXT();
 }
 
+
+op_POW: {
+    {
+        Value bv = regs[base+B]; Value cv = regs[base+C];
+        if (bv.isInteger() && cv.isInteger() && cv.asInt() >= 0) {
+            int64_t b = bv.asInt(), e = cv.asInt(), r = 1;
+            while (e > 0) { if (e & 1) r *= b; b *= b; e >>= 1; }
+            regs[base+A] = Value(r);
+        } else {
+            regs[base+A] = Value(std::pow(asDouble(bv), asDouble(cv)));
+        }
+    }
+    NEXT();
+}
 op_NEGATE: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaUnary(MK().neg_, base+A, regs[base+B]))
@@ -1649,6 +1674,17 @@ op_HALT:
                 double dv = asDouble(cv);
                 if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
                 regs[base+A] = Value(std::floor(asDouble(bv) / dv));
+            }
+            break;
+        }
+        case Op::POW: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger() && cv.asInt() >= 0) {
+                int64_t b = bv.asInt(), e = cv.asInt(), r = 1;
+                while (e > 0) { if (e & 1) r *= b; b *= b; e >>= 1; }
+                regs[base+A] = Value(r);
+            } else {
+                regs[base+A] = Value(std::pow(asDouble(bv), asDouble(cv)));
             }
             break;
         }
