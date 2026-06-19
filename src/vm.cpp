@@ -152,14 +152,10 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
 
 // ── Builtins ──────────────────────────────────────────────────────────────────
 
-void printOneValue(const Value& v) {
-    std::cout << valueToString(v);
-}
-
 static Value builtin_print(Value* args, int argc) {
     for (int i = 0; i < argc; ++i) {
         if (i) std::cout << ' ';
-        printOneValue(args[i]);
+        std::cout << valueToString(args[i]);
     }
     std::cout << '\n';
     return Value{};
@@ -667,16 +663,10 @@ void VM::runSwitch(size_t stop_depth) {
         case Op::ARRAY_PUSH:
             regs[base+A].arrayPush(regs[base+B]);
             break;
-        case Op::FOR_ITER_NEXT: {
-            Value key, val;
-            if (!regs[base+A].iptr->next(key, val)) {
+        case Op::FOR_ITER_NEXT:
+            if (!regs[base+A].iptr->next(regs[base+A+1], regs[base+A+2]))
                 ip = Bx;
-            } else {
-                regs[base+A+1] = std::move(key);
-                regs[base+A+2] = std::move(val);
-            }
             break;
-        }
         case Op::FOR_ITER_NEXT1: {
             Value primary;
             if (!regs[base+A].iptr->next_primary(primary)) {
@@ -1347,18 +1337,10 @@ op_ARRAY_PUSH:
     regs[base + A].arrayPush(regs[base + B]);
     NEXT();
 
-op_FOR_ITER_NEXT: {
-    {
-        Value key, val;
-        if (!regs[base + A].iptr->next(key, val)) {
-            ip = Bx;
-        } else {
-            regs[base + A + 1] = std::move(key);
-            regs[base + A + 2] = std::move(val);
-        }
-    }
+op_FOR_ITER_NEXT:
+    if (!regs[base + A].iptr->next(regs[base + A + 1], regs[base + A + 2]))
+        ip = Bx;
     NEXT();
-}
 
 op_FOR_ITER_NEXT1: {
     {
@@ -1955,16 +1937,10 @@ op_HALT:
         case Op::ARRAY_PUSH:
             regs[base+A].arrayPush(regs[base+B]);
             break;
-        case Op::FOR_ITER_NEXT: {
-            Value key, val;
-            if (!regs[base+A].iptr->next(key, val)) {
+        case Op::FOR_ITER_NEXT:
+            if (!regs[base+A].iptr->next(regs[base+A+1], regs[base+A+2]))
                 ip = Bx;
-            } else {
-                regs[base+A+1] = std::move(key);
-                regs[base+A+2] = std::move(val);
-            }
             break;
-        }
         case Op::FOR_ITER_NEXT1: {
             Value primary;
             if (!regs[base+A].iptr->next_primary(primary)) {

@@ -146,7 +146,7 @@ inline int   Value::arraySize()                            const { return (int)a
 
 inline Value Value::makeIterFrom(const Value& src) {
     if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
-    if (src.isArray()) return Value(new ArrayIterator(src.aptr));
+    if (src.isArray()) return Value(array_iter_pool().acquire(src.aptr));
     if (src.isRange()) return Value(new RangeIterator(src.rptr));
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
@@ -186,7 +186,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
@@ -216,7 +216,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
@@ -230,7 +230,7 @@ inline Value::~Value() {
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) delete ip;               break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
