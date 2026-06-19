@@ -6,7 +6,8 @@
 struct Iterator {
     int refcount = 1;
     virtual bool next(Value& key, Value& val) = 0;
-    virtual bool primary_is_val() const = 0;  // true=val (array/range), false=key (map)
+    virtual bool next_primary(Value& out) = 0;   // FOR_ITER_NEXT1: retourne seulement la valeur primaire
+    virtual bool primary_is_val() const = 0;     // true=val (array/range), false=key (map)
     virtual ~Iterator() = default;
 };
 
@@ -24,22 +25,31 @@ struct MapIterator : Iterator {
         ++pos;
         return true;
     }
+    bool next_primary(Value& out) override {
+        if (pos >= snapshot.size()) return false;
+        out = snapshot[pos].first;
+        ++pos;
+        return true;
+    }
     bool primary_is_val() const override { return false; }  // 1 var → key
 };
 
 struct ArrayIterator : Iterator {
-    Array* arr;
+    std::vector<Value> items;  // snapshot au moment du for-in (cohérent avec MapIterator)
     int pos = 0;
-    explicit ArrayIterator(Array* a) : arr(a) { arr->refcount++; }
-    ~ArrayIterator() override {
-        if (--arr->refcount == 0) array_pool().release(arr);
-    }
+    explicit ArrayIterator(Array* a) : items(a->items) {}
     bool next(Value& key, Value& val) override {
-        if (pos >= (int)arr->items.size()) return false;
+        if (pos >= (int)items.size()) return false;
         key = Value((int64_t)(pos + 1));
-        val = arr->items[pos];
+        val = items[pos];
         ++pos;
         return true;
     }
-    bool primary_is_val() const override { return true; }  // 1 var → element
+    bool next_primary(Value& out) override {
+        if (pos >= (int)items.size()) return false;
+        out = items[pos];
+        ++pos;
+        return true;
+    }
+    bool primary_is_val() const override { return true; }
 };

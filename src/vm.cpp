@@ -678,12 +678,11 @@ void VM::runSwitch(size_t stop_depth) {
             break;
         }
         case Op::FOR_ITER_NEXT1: {
-            Value key, val;
-            if (!regs[base+A].iptr->next(key, val)) {
+            Value primary;
+            if (!regs[base+A].iptr->next_primary(primary)) {
                 ip = Bx;
             } else {
-                regs[base+A+1] = regs[base+A].iptr->primary_is_val()
-                                  ? std::move(val) : std::move(key);
+                regs[base+A+1] = std::move(primary);
             }
             break;
         }
@@ -1363,12 +1362,11 @@ op_FOR_ITER_NEXT: {
 
 op_FOR_ITER_NEXT1: {
     {
-        Value key, val;
-        if (!regs[base + A].iptr->next(key, val)) {
+        Value primary;
+        if (!regs[base + A].iptr->next_primary(primary)) {
             ip = Bx;
         } else {
-            regs[base + A + 1] = regs[base + A].iptr->primary_is_val()
-                                  ? std::move(val) : std::move(key);
+            regs[base + A + 1] = std::move(primary);
         }
     }
     NEXT();
@@ -1968,12 +1966,11 @@ op_HALT:
             break;
         }
         case Op::FOR_ITER_NEXT1: {
-            Value key, val;
-            if (!regs[base+A].iptr->next(key, val)) {
+            Value primary;
+            if (!regs[base+A].iptr->next_primary(primary)) {
                 ip = Bx;
             } else {
-                regs[base+A+1] = regs[base+A].iptr->primary_is_val()
-                                  ? std::move(val) : std::move(key);
+                regs[base+A+1] = std::move(primary);
             }
             break;
         }

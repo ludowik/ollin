@@ -30,5 +30,15 @@ struct RangeIterator : Iterator {
         current += step;
         return true;
     }
+    bool next_primary(Value& out) override {
+        bool done;
+        if (step > 0) done = incl_right ? (current > end) : (current >= end);
+        else          done = incl_right ? (current < end) : (current <= end);
+        if (done) return false;
+        out = (current == std::floor(current) && current >= (double)INT64_MIN && current <= (double)INT64_MAX)
+              ? Value((int64_t)current) : Value(current);
+        current += step;
+        return true;
+    }
     bool primary_is_val() const override { return true; }
 };
