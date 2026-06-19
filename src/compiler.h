@@ -31,9 +31,7 @@ private:
         bool    is_closure = false;  // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
     };
     std::unordered_map<std::string, FuncInfo> func_table;
-    std::unordered_set<std::string> declared_globals_;  // globals declared in source (global / class)
-    std::unordered_set<std::string> builtin_modules_;   // built-in module names (math, …)
-    std::unordered_set<std::string> builtin_names_;     // built-in function names (print, typeof, …)
+    std::unordered_set<std::string> declared_globals_;  // globals déclarés (source + builtins + modules)
     std::unordered_set<std::string> const_names_;       // locals declared with 'const'
     std::string current_func_name;  // "" = global scope
     int         current_func_idx_ = -1;  // index in chunk.funcs (-1 = main chunk)

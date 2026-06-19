@@ -202,9 +202,9 @@ void Compiler::compileInto(const Expr& e, int dest) {
 Chunk Compiler::compile(const Program& prog) {
     reg_top_ = 0;
     reg_count_ = 8;
-    for (auto& n : builtinModuleNames()) builtin_modules_.insert(n);
-    for (auto& n : builtinFuncNames())   builtin_names_.insert(n);
     collectGlobals(prog.stmts, declared_globals_);
+    for (auto& n : builtinModuleNames()) declared_globals_.insert(n);
+    for (auto& n : builtinFuncNames())   declared_globals_.insert(n);
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
@@ -815,7 +815,7 @@ void Compiler::visit(const VarExpr& e) {
             return;
         }
     }
-    if (!declared_globals_.count(e.name) && !builtin_modules_.count(e.name) && !builtin_names_.count(e.name))
+    if (!declared_globals_.count(e.name))
         throw std::runtime_error("line " + std::to_string(current_line_)
                                  + ": undeclared variable '" + e.name + "'");
     last_reg_ = allocReg();
