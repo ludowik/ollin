@@ -1219,6 +1219,64 @@ void Compiler::visit(const IndexAssignStmt& s) {
     reg_top_ = saved;
 }
 
+void Compiler::visit(const MultiAssignStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    int saved = reg_top_;
+
+    // Évalue tous les RHS dans des registres temporaires consécutifs
+    int base = reg_top_;
+    int n = (int)s.values.size();
+    for (int i = 0; i < n; ++i) {
+        int r = allocReg();
+        compileInto(*s.values[i], r);
+    }
+
+    // Assigne chaque cible depuis son temporaire (ou nil si plus de valeurs que de cibles)
+    for (int i = 0; i < (int)s.targets.size(); ++i) {
+        int val_r = (i < n) ? base + i : allocReg(); // nil si pas de valeur
+        const LValue& lv = s.targets[i];
+
+        if (lv.kind == LValue::VAR) {
+            auto it = local_regs_.find(lv.name);
+            if (it != local_regs_.end()) {
+                if (val_r != it->second)
+                    chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)val_r, 0));
+            } else {
+                int uv = resolveUpvalue(lv.name);
+                if (uv >= 0) {
+                    chunk.emit(makeABC((uint8_t)Op::SET_UPVAL, (uint8_t)val_r, (uint8_t)uv, 0));
+                } else {
+                    chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)val_r,
+                                       chunk.addIdentifier(lv.name)));
+                }
+            }
+        } else {
+            // FIELD ou INDEX : charger l'objet
+            int obj_r = allocReg();
+            auto it = local_regs_.find(lv.name);
+            if (it != local_regs_.end()) {
+                obj_r = it->second;
+                reg_top_--;
+            } else {
+                int uv = resolveUpvalue(lv.name);
+                if (uv >= 0)
+                    chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
+                else
+                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
+                                       chunk.addIdentifier(lv.name)));
+            }
+            int key_r = allocReg();
+            if (lv.kind == LValue::FIELD)
+                compileInto(StringExpr(lv.field), key_r);
+            else
+                compileInto(*lv.key, key_r);
+            chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
+        }
+    }
+
+    reg_top_ = saved;
+}
+
 void Compiler::visit(const BlockStmt& s) {
     for (auto& stmt : s.stmts) stmt->accept(*this);
 }

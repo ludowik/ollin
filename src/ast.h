@@ -8,7 +8,7 @@
 struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
-struct ForIterStmt; struct IndexAssignStmt;
+struct ForIterStmt; struct IndexAssignStmt; struct MultiAssignStmt;
 struct BlockStmt; struct ClassDeclStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
@@ -31,8 +31,9 @@ struct StmtVisitor {
     virtual void visit(const FuncDeclStmt&)  = 0;
     virtual void visit(const ReturnStmt&)    = 0;
 
-    virtual void visit(const IndexAssignStmt&) = 0;
-    virtual void visit(const ForIterStmt&)   = 0;
+    virtual void visit(const IndexAssignStmt&)  = 0;
+    virtual void visit(const MultiAssignStmt&)  = 0;
+    virtual void visit(const ForIterStmt&)      = 0;
     virtual void visit(const BlockStmt&)     = 0;
     virtual void visit(const ClassDeclStmt&) = 0;
     virtual ~StmtVisitor() = default;
@@ -229,6 +230,21 @@ struct IndexAssignStmt : Stmt {
     std::unique_ptr<Expr> key;
     TokenType op;          // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
     std::unique_ptr<Expr> value;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct LValue {
+    enum Kind { VAR, FIELD, INDEX };
+    Kind kind = VAR;
+    std::string name;               // VAR: variable; FIELD/INDEX: object name
+    std::string field;              // FIELD only
+    std::unique_ptr<Expr> key;      // INDEX only
+};
+
+struct MultiAssignStmt : Stmt {
+    int line = 0;
+    std::vector<LValue> targets;
+    std::vector<std::unique_ptr<Expr>> values;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

@@ -84,6 +84,12 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::CONSTANT)) return constantDecl();
     if (check(TokenType::IDENTIFIER)) {
         TokenType nx = peekNextType();
+        // Multi-assign: a, b = x, y
+        if (nx == TokenType::COMMA)
+            return multiAssignStmt();
+        // Multi-assign starting with field: self.x, self.y = x, y
+        if (nx == TokenType::DOT && peekAt(2) == TokenType::IDENTIFIER && peekAt(3) == TokenType::COMMA)
+            return multiAssignStmt();
         if (nx == TokenType::EQUALS      || nx == TokenType::PLUS_EQUAL  ||
             nx == TokenType::MINUS_EQUAL || nx == TokenType::STAR_EQUAL  ||
             nx == TokenType::SLASH_EQUAL || nx == TokenType::PERCENT_EQUAL)
@@ -376,6 +382,43 @@ std::unique_ptr<Stmt> Parser::assignStmt() {
     else if (match(TokenType::PERCENT_EQUAL)) s->op = '%';
     else                                    { advance(); s->op = '\0'; }
     s->value = expr();
+    consumeSemi();
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::multiAssignStmt() {
+    int line = peek().line;
+    auto s = std::make_unique<MultiAssignStmt>();
+    s->line = line;
+
+    // Parse LValue list
+    auto parseLValue = [&]() {
+        LValue lv;
+        lv.name = expect(TokenType::IDENTIFIER).lexeme;
+        if (match(TokenType::DOT)) {
+            lv.kind  = LValue::FIELD;
+            lv.field = expect(TokenType::IDENTIFIER).lexeme;
+        } else if (check(TokenType::LBRACKET)) {
+            advance();
+            lv.kind = LValue::INDEX;
+            lv.key  = expr();
+            expect(TokenType::RBRACKET);
+        } else {
+            lv.kind = LValue::VAR;
+        }
+        return lv;
+    };
+
+    s->targets.push_back(parseLValue());
+    while (match(TokenType::COMMA))
+        s->targets.push_back(parseLValue());
+
+    expect(TokenType::EQUALS);
+
+    s->values.push_back(expr());
+    while (match(TokenType::COMMA))
+        s->values.push_back(expr());
+
     consumeSemi();
     return s;
 }

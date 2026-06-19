@@ -102,5 +102,6 @@ private:
     void visit(const ChainedCompareExpr&) override;
 
     // StmtVisitor (map)
-    void visit(const IndexAssignStmt&) override;
+    void visit(const IndexAssignStmt&)  override;
+    void visit(const MultiAssignStmt&)  override;
 };

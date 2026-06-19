@@ -42,6 +42,7 @@ private:
     std::unique_ptr<Stmt> funcDeclStmt();
     std::unique_ptr<Stmt> returnStmt();
     std::unique_ptr<Stmt> assignStmt();
+    std::unique_ptr<Stmt> multiAssignStmt();
     std::unique_ptr<Stmt> exprStmt();
     std::unique_ptr<Stmt> forStmt();
     std::unique_ptr<Stmt> importStmt();
