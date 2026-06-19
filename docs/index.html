@@ -1498,14 +1498,14 @@ function makeStaticEditor(parent, code) {
   })
 }
 
-function makePlaygroundEditor(parent, code) {
+function makePlaygroundEditor(parent, code, onRun) {
   return new EditorView({
     state: EditorState.create({
       doc: code,
       extensions: [
         ...BASE_EXT,
         history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        keymap.of([{ key: 'Mod-Enter', run: () => { onRun(); return true; } }, ...defaultKeymap, ...historyKeymap, indentWithTab]),
         EditorView.theme({ '&': { minHeight: '200px' } }),
       ]
     }),
@@ -1560,7 +1560,7 @@ const pgStatus     = document.getElementById('pg-status')
 const pgOutput     = document.getElementById('pg-output')
 const pgExamplesEl = document.getElementById('pg-examples')
 
-const pgView = makePlaygroundEditor(pgEditorCm, 'print("hello world!")')
+const pgView = makePlaygroundEditor(pgEditorCm, 'print("hello world!")', () => runCode())
 
 pgExamples.forEach(ex => {
   const btn = document.createElement('button')
@@ -1651,9 +1651,6 @@ pgRunBtn.title     = 'Exécuter (Ctrl+Entrée)'
 pgRunBtn.innerHTML = ICON_RUN
 pgActions.appendChild(pgRunBtn)
 pgRunBtn.addEventListener('click', runCode)
-pgView.dom.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); runCode() }
-})
 
 // ── Remplace les blocs <pre><code> par des éditeurs CM6 read-only ─────────
 document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
