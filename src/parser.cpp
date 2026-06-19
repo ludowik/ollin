@@ -558,8 +558,8 @@ std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = unary();
     while (true) {
         if (paren_depth_ > 0) skipNewlines();
-        if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::PERCENT)) break;
-        char op = advance().lexeme[0];
+        if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) && !check(TokenType::PERCENT)) break;
+        char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
         if (paren_depth_ > 0) skipNewlines();
         left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
     }

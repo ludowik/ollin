@@ -143,6 +143,7 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case '/':
                 if (!atEnd() && peek() == '=') { advance(); tokens.push_back({TokenType::SLASH_EQUAL, "/=", line}); }
+                else if (!atEnd() && peek() == '/') { advance(); tokens.push_back({TokenType::SLASH_SLASH, "//", line}); }
                 else tokens.push_back({TokenType::SLASH, "/", line});
                 break;
             case '%':

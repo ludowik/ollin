@@ -407,6 +407,20 @@ void VM::runSwitch(size_t stop_depth) {
             }
             break;
         }
+        case Op::IDIV: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger()) {
+                if (cv.asInt() == 0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+                int64_t q = bv.asInt() / cv.asInt();
+                if ((bv.asInt() ^ cv.asInt()) < 0 && q * cv.asInt() != bv.asInt()) q--;
+                regs[base+A] = Value(q);
+            } else {
+                double dv = asDouble(cv);
+                if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+                regs[base+A] = Value(std::floor(asDouble(bv) / dv));
+            }
+            break;
+        }
         case Op::NEGATE: {
             if (isInstance(regs[base+B])) {
                 if (uint32_t addr = tryMetaUnary(MK().neg_, base+A, regs[base+B]))
@@ -887,7 +901,7 @@ void VM::execute(Chunk chunk) {
     static const void* const dt[] = {
         &&op_LOAD_K, &&op_LOAD_NIL, &&op_MOVE,
         &&op_LOAD_GLOBAL, &&op_STORE_GLOBAL,
-        &&op_ADD, &&op_SUB, &&op_MUL, &&op_DIV, &&op_MOD,
+        &&op_ADD, &&op_SUB, &&op_MUL, &&op_DIV, &&op_MOD, &&op_IDIV,
         &&op_NEGATE, &&op_NOT, &&op_AND, &&op_OR,
         &&op_EQ, &&op_NEQ, &&op_GT, &&op_LT, &&op_GE, &&op_LE,
         &&op_JUMP, &&op_JUMP_IF_FALSE,
@@ -996,6 +1010,22 @@ op_MOD: {
         double dv = asDouble(cv);
         if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
         regs[base+A] = Value(std::fmod(asDouble(bv), dv));
+    }
+    NEXT();
+}
+
+op_IDIV: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (bv.isInteger() && cv.isInteger()) {
+        if (cv.asInt() == 0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+        int64_t q = bv.asInt() / cv.asInt();
+        // floor division: adjust if signs differ and there is a remainder
+        if ((bv.asInt() ^ cv.asInt()) < 0 && q * cv.asInt() != bv.asInt()) q--;
+        regs[base+A] = Value(q);
+    } else {
+        double dv = asDouble(cv);
+        if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+        regs[base+A] = Value(std::floor(asDouble(bv) / dv));
     }
     NEXT();
 }
@@ -1605,6 +1635,20 @@ op_HALT:
                 double dv = asDouble(cv);
                 if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
                 regs[base+A] = Value(std::fmod(asDouble(bv), dv));
+            }
+            break;
+        }
+        case Op::IDIV: {
+            const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+            if (bv.isInteger() && cv.isInteger()) {
+                if (cv.asInt() == 0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+                int64_t q = bv.asInt() / cv.asInt();
+                if ((bv.asInt() ^ cv.asInt()) < 0 && q * cv.asInt() != bv.asInt()) q--;
+                regs[base+A] = Value(q);
+            } else {
+                double dv = asDouble(cv);
+                if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+                regs[base+A] = Value(std::floor(asDouble(bv) / dv));
             }
             break;
         }

@@ -280,7 +280,7 @@ enum class Op : uint8_t {
     MOVE,         // AB:  R[A] = R[B]
     LOAD_GLOBAL,  // ABx: R[A] = G[Bx]
     STORE_GLOBAL, // ABx: G[Bx] = R[A]
-    ADD, SUB, MUL, DIV, MOD,   // ABC: R[A] = R[B] op R[C]
+    ADD, SUB, MUL, DIV, MOD, IDIV,   // ABC: R[A] = R[B] op R[C]
     NEGATE, NOT,                // AB:  R[A] = op R[B]
     AND, OR,                    // ABC: logical and/or → 0 or 1
     EQ, NEQ, GT, LT, GE, LE,   // ABC: R[A] = R[B] cmp R[C] → 0 or 1

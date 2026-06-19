@@ -82,7 +82,8 @@ additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
              (* "+" : addition numérique ou concaténation de strings *)
              (* promotion : INT op INT → INT ; INT op FLOAT → FLOAT ; "/" → toujours FLOAT *)
              (* overflow int64 → wrapping silencieux *)
-multiplicative = unary { ( "*" | "/" | "%" ) unary } ;
+multiplicative = unary { ( "*" | "/" | "//" | "%" ) unary } ;
+             (* "//" : division entière plancher (floor) — INT//INT → INT, FLOAT//FLOAT → FLOAT *)
 unary          = ( "-" | "not" | "~" ) unary | primary ;
 primary        = NUMBER
                | STRING
