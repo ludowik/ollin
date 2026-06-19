@@ -9,9 +9,8 @@
    Terminateurs de statements : chaque statement se termine par un saut de ligne.
    À l'intérieur des parenthèses, crochets et accolades, les sauts de ligne
    sont ignorés (continuation implicite).
-   Le caractère ';' a deux usages distincts :
-     — séparateur d'intervalle dans rangeLit : [a;b], [a;b;step]
-     — terminateur de statement explicite (équivalent au saut de ligne) *)
+   Le caractère ';' est UNIQUEMENT le séparateur d'intervalle dans rangeLit.
+   Un ';' hors d'un contexte entre crochets/parenthèses est une erreur. *)
 
 program        = { stmt } EOF ;
 
@@ -129,10 +128,10 @@ call           = IDENT "(" [ expr { "," expr } ] ")" ;
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
 
-(* NL : saut de ligne (ou ';' explicite) — termine tout statement.
+(* NL : saut de ligne — termine tout statement.
    La continuation implicite s'applique à l'intérieur des parenthèses, crochets
    et accolades : un saut de ligne n'y termine pas le statement.
-   Note : ';' sert aussi de séparateur dans rangeLit — le contexte lève l'ambiguïté. *)
+   ';' est le séparateur d'intervalle dans rangeLit ; interdit partout ailleurs. *)
 
 NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
                | ( "." digit { [ "_" ] digit } ) ;
