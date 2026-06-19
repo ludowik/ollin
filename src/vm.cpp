@@ -45,6 +45,17 @@ Value VM::protoChainGet(const Value& obj, const Value& key) {
     return Value{};
 }
 
+// ── growRegs : croît par doublement, max 4096, size reste exacte ─────────────
+void VM::growRegs(size_t needed) {
+    if (regs.size() >= needed) return;
+    if (needed > 4096)
+        throw std::runtime_error("runtime: stack overflow (max 4096 registers)");
+    size_t cap = regs.capacity() < 32 ? 32 : regs.capacity();
+    while (cap < needed) cap *= 2;
+    regs.reserve(cap < 4096 ? cap : 4096);
+    regs.resize(needed);
+}
+
 // ── invokeStr : mini-loop to call __str without recursion ─────────────────────
 std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide pas obj
     Value cls = obj.mapGet(MK().class_);
@@ -67,8 +78,7 @@ std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide 
     }
     const FuncProto& fp = ch->funcs[fi];
     int call_base = (int)regs.size();
-    size_t needed = (size_t)(call_base + std::max((int)fp.reg_count, 1));
-    regs.resize(needed);
+    growRegs((size_t)(call_base + std::max((int)fp.reg_count, 1)));
     regs[call_base] = obj;
     uint32_t saved_ip = ip;
     call_stack.push_back({0, call_base, {}, std::move(frame_upvals), {}, {}});
@@ -204,7 +214,7 @@ uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs) {
     else { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
     const FuncProto& fp = ch->funcs[fi];
     int nb = (int)regs.size();
-    regs.resize(nb + std::max((int)fp.reg_count, 2));
+    growRegs((size_t)(nb + std::max((int)fp.reg_count, 2)));
     regs[nb]     = std::move(lhs);
     regs[nb + 1] = std::move(rhs);
     call_stack.push_back({ip, nb, {}, std::move(fuv), {}, {}, dest});
@@ -220,7 +230,7 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
     else { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
     const FuncProto& fp = ch->funcs[fi];
     int nb = (int)regs.size();
-    regs.resize(nb + std::max((int)fp.reg_count, 1));
+    growRegs((size_t)(nb + std::max((int)fp.reg_count, 1)));
     regs[nb] = std::move(lhs);
     call_stack.push_back({ip, nb, {}, std::move(fuv), {}, {}, dest});
     return fp.addr;
@@ -284,7 +294,7 @@ Value VM::callValue(const Value& fn) {
     }
     const FuncProto& fp = ch->funcs[fi];
     int call_base = (int)regs.size();
-    regs.resize(call_base + std::max((int)fp.reg_count, 1));
+    growRegs((size_t)(call_base + std::max((int)fp.reg_count, 1)));
     uint32_t saved_ip = ip;
     call_stack.push_back({saved_ip, call_base, {}, std::move(frame_upvals), {}, {}});
     ip = fp.addr;
@@ -500,7 +510,7 @@ void VM::runSwitch(size_t stop_depth) {
             int new_base = base + A;
             int argc = C;
             size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             if (argc < fp.n_fixed) {
                 auto& defs = ch->func_defaults[fp.defaults_idx];
                 for (int i = argc; i < fp.n_fixed; ++i)
@@ -513,7 +523,7 @@ void VM::runSwitch(size_t stop_depth) {
                     varargs->push_back(std::move(regs[new_base + i]));
             }
             size_t full_needed = (size_t)(new_base + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             call_stack.push_back({ip, new_base, std::move(varargs), {}, {}});
             ip = fp.addr;
             break;
@@ -539,7 +549,7 @@ void VM::runSwitch(size_t stop_depth) {
                 int count = B;
                 int n = (count == 0) ? (int)va->size() : std::min(count, (int)va->size());
                 size_t needed = (size_t)(base + A + n);
-                if (regs.size() < needed) regs.resize(needed);
+                growRegs(needed);
                 for (int i = 0; i < n; ++i) regs[base + A + i] = (*va)[i];
             }
             break;
@@ -556,7 +566,7 @@ void VM::runSwitch(size_t stop_depth) {
             uint32_t rip = call_stack.back().return_ip;
             int rbase    = call_stack.back().reg_base;
             call_stack.pop_back();
-            if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
+            growRegs(rbase + total);
             for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
             ip = rip;
             break;
@@ -698,7 +708,7 @@ void VM::runSwitch(size_t stop_depth) {
                 const FuncProto& fp = ch->funcs[fi];
                 int total = argc + 1;
                 size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, total));
-                if (regs.size() < needed) regs.resize(needed);
+                growRegs(needed);
                 for (int i = argc - 1; i >= 0; --i)
                     regs[new_base + 1 + i] = std::move(regs[new_base + i]);
                 regs[new_base + 0] = inst;
@@ -708,7 +718,7 @@ void VM::runSwitch(size_t stop_depth) {
                         regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
                 }
                 size_t full_needed = (size_t)(new_base + fp.reg_count);
-                if (regs.size() < full_needed) regs.resize(full_needed);
+                growRegs(full_needed);
                 call_stack.push_back({ip, new_base, {}, std::move(fuv), {}, inst});
                 ip = fp.addr;
                 break;
@@ -720,7 +730,7 @@ void VM::runSwitch(size_t stop_depth) {
                 uint8_t fi = resolveFuncVal(regs[base + B], fuv);
                 const FuncProto& fp = ch->funcs[fi];
                 size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-                if (regs.size() < needed) regs.resize(needed);
+                growRegs(needed);
                 if (argc < fp.n_fixed) {
                     auto& defs = ch->func_defaults[fp.defaults_idx];
                     for (int i = argc; i < fp.n_fixed; ++i)
@@ -733,7 +743,7 @@ void VM::runSwitch(size_t stop_depth) {
                         varargs->push_back(std::move(regs[new_base + i]));
                 }
                 size_t full_needed = (size_t)(new_base + fp.reg_count);
-                if (regs.size() < full_needed) regs.resize(full_needed);
+                growRegs(full_needed);
                 call_stack.push_back({ip, new_base, std::move(varargs), std::move(fuv), {}, {}});
                 ip = fp.addr;
             }
@@ -805,14 +815,14 @@ void VM::runSwitch(size_t stop_depth) {
             else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             if (total < fp.n_fixed) {
                 auto& defs = ch->func_defaults[fp.defaults_idx];
                 for (int i = total; i < fp.n_fixed; ++i)
                     regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
             size_t full_needed = (size_t)(cb + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             std::unique_ptr<std::vector<Value>> varargs;
             if (fp.variadic && total > fp.n_fixed) {
                 varargs = std::make_unique<std::vector<Value>>();
@@ -877,7 +887,7 @@ void VM::execute(Chunk chunk) {
                 globals[gi]      = makeBuiltinModule(name);
                 globals_init[gi] = true;
             }
-    regs.resize(owned_chunk.top_reg_count);
+    growRegs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     call_stack.push_back({0, 0, {}, {}, {}});
 
@@ -1385,7 +1395,7 @@ op_CALL_DYN: {
             const FuncProto& fp = ch->funcs[fi];
             int total = argc + 1;
             size_t needed = (size_t)(ctor_base + std::max((int)fp.reg_count, total));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             for (int i = argc - 1; i >= 0; --i)
                 regs[ctor_base + 1 + i] = std::move(regs[ctor_base + i]);
             regs[ctor_base + 0] = inst;
@@ -1395,7 +1405,7 @@ op_CALL_DYN: {
                     regs[ctor_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
             size_t full_needed = (size_t)(ctor_base + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             ctor_addr = fp.addr;
             call_stack.push_back({ip, ctor_base, {}, std::move(fuv), {}, inst});
             do_call = true;
@@ -1412,7 +1422,7 @@ op_CALL_DYN: {
             uint8_t fi = resolveFuncVal(regs[base + B], fuv);
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             if (argc < fp.n_fixed) {
                 auto& defs = ch->func_defaults[fp.defaults_idx];
                 for (int i = argc; i < fp.n_fixed; ++i)
@@ -1425,7 +1435,7 @@ op_CALL_DYN: {
                     varargs->push_back(std::move(regs[new_base + i]));
             }
             size_t full_needed = (size_t)(new_base + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             call_stack.push_back({ip, new_base, std::move(varargs), std::move(fuv), {}, {}});
             fp_addr = fp.addr;
         }
@@ -1509,14 +1519,14 @@ op_CALL_METHOD: {
             else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             if (total < fp.n_fixed) {
                 auto& defs = ch->func_defaults[fp.defaults_idx];
                 for (int i = total; i < fp.n_fixed; ++i)
                     regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
             size_t full_needed = (size_t)(cb + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             std::unique_ptr<std::vector<Value>> varargs;
             if (fp.variadic && total > fp.n_fixed) {
                 varargs = std::make_unique<std::vector<Value>>();
@@ -1774,7 +1784,7 @@ op_HALT:
             int new_base = base + A;
             int argc = C;
             size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             if (argc < fp.n_fixed) {
                 auto& defs = ch->func_defaults[fp.defaults_idx];
                 for (int i = argc; i < fp.n_fixed; ++i)
@@ -1787,7 +1797,7 @@ op_HALT:
                     varargs->push_back(std::move(regs[new_base + i]));
             }
             size_t full_needed = (size_t)(new_base + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             call_stack.push_back({ip, new_base, std::move(varargs), {}, {}});
             ip = fp.addr;
             break;
@@ -1813,7 +1823,7 @@ op_HALT:
                 int count = B;
                 int n = (count == 0) ? (int)va->size() : std::min(count, (int)va->size());
                 size_t needed = (size_t)(base + A + n);
-                if (regs.size() < needed) regs.resize(needed);
+                growRegs(needed);
                 for (int i = 0; i < n; ++i) regs[base + A + i] = (*va)[i];
             }
             break;
@@ -1830,7 +1840,7 @@ op_HALT:
             uint32_t rip = call_stack.back().return_ip;
             int rbase    = call_stack.back().reg_base;
             call_stack.pop_back();
-            if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
+            growRegs(rbase + total);
             for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
             ip = rip;
             break;
@@ -1972,7 +1982,7 @@ op_HALT:
                 const FuncProto& fp = ch->funcs[fi];
                 int total = argc + 1;
                 size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, total));
-                if (regs.size() < needed) regs.resize(needed);
+                growRegs(needed);
                 for (int i = argc - 1; i >= 0; --i)
                     regs[new_base + 1 + i] = std::move(regs[new_base + i]);
                 regs[new_base + 0] = inst;
@@ -1982,7 +1992,7 @@ op_HALT:
                         regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
                 }
                 size_t full_needed = (size_t)(new_base + fp.reg_count);
-                if (regs.size() < full_needed) regs.resize(full_needed);
+                growRegs(full_needed);
                 call_stack.push_back({ip, new_base, {}, std::move(fuv), {}, inst});
                 ip = fp.addr;
                 break;
@@ -1994,7 +2004,7 @@ op_HALT:
                 uint8_t fi = resolveFuncVal(regs[base + B], fuv);
                 const FuncProto& fp = ch->funcs[fi];
                 size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-                if (regs.size() < needed) regs.resize(needed);
+                growRegs(needed);
                 if (argc < fp.n_fixed) {
                     auto& defs = ch->func_defaults[fp.defaults_idx];
                     for (int i = argc; i < fp.n_fixed; ++i)
@@ -2007,7 +2017,7 @@ op_HALT:
                         varargs->push_back(std::move(regs[new_base + i]));
                 }
                 size_t full_needed = (size_t)(new_base + fp.reg_count);
-                if (regs.size() < full_needed) regs.resize(full_needed);
+                growRegs(full_needed);
                 call_stack.push_back({ip, new_base, std::move(varargs), std::move(fuv), {}, {}});
                 ip = fp.addr;
             }
@@ -2079,14 +2089,14 @@ op_HALT:
             else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
-            if (regs.size() < needed) regs.resize(needed);
+            growRegs(needed);
             if (total < fp.n_fixed) {
                 auto& defs = ch->func_defaults[fp.defaults_idx];
                 for (int i = total; i < fp.n_fixed; ++i)
                     regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
             size_t full_needed = (size_t)(cb + fp.reg_count);
-            if (regs.size() < full_needed) regs.resize(full_needed);
+            growRegs(full_needed);
             std::unique_ptr<std::vector<Value>> varargs;
             if (fp.variadic && total > fp.n_fixed) {
                 varargs = std::make_unique<std::vector<Value>>();

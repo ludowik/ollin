@@ -30,7 +30,7 @@ private:
         std::unique_ptr<std::vector<Value>> varargs;
         std::vector<Upvalue*> upvals;
         std::vector<Upvalue*> open_upvals;
-        Value       ctor_result;   // non-nil = frame is a constructor; RETURN overrides R[0] with instance
+        Value       ctor_result{};  // non-nil = frame is a constructor; RETURN overrides R[0] with instance
         int         return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
     };
 
@@ -50,6 +50,7 @@ private:
     uint32_t tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs);
     uint32_t tryMetaUnary (const Value& name, int dest, Value lhs);
     void     closeUpvals  ();   // closes & frees all open upvalues of the top frame
+    void     growRegs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
 
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
         if (v.isInteger()) return (double)v.asInt();
