@@ -1,6 +1,6 @@
 #pragma once
 // Inclus par chunk.h après la définition de Value — ne pas inclure directement.
-#include <unordered_map>
+#include "robin_hood.h"
 
 struct ValueHash {
     std::size_t operator()(const Value& v) const noexcept;
@@ -11,7 +11,7 @@ struct ValueEqual {
 };
 
 struct Map {
-    std::unordered_map<Value, Value, ValueHash, ValueEqual> data;
+    robin_hood::unordered_map<Value, Value, ValueHash, ValueEqual> data;
     int refcount = 1;
 
     Value get(const Value& k) const;
