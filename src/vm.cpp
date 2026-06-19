@@ -233,6 +233,14 @@ int VM::errLine() const {
 
 VM* VM::current() { return s_current_vm; }
 
+Value VM::getGlobal(const std::string& name) const {
+    if (!ch) return Value{};
+    for (int i = 0; i < (int)ch->identifiers.size(); ++i)
+        if (ch->identifiers[i] == name && globals_init[i])
+            return globals[i];
+    return Value{};
+}
+
 Value VM::callValue(const Value& fn) {
     if (fn.isBuiltin())
         return fn.asBuiltin()(nullptr, 0);
@@ -558,7 +566,7 @@ void VM::runSwitch(size_t stop_depth) {
                 if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 regs[base+A] = obj.arrayGet(key.asInt());
             } else {
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: [] on non-indexable");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot index " + std::string(obj.typeName()) + (key.isString() ? " with field '" + key.asString() + "'" : ""));
             }
             break;
         }
@@ -1844,7 +1852,7 @@ op_HALT:
                 if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 regs[base+A] = obj.arrayGet(key.asInt());
             } else {
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: [] on non-indexable");
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot index " + std::string(obj.typeName()) + (key.isString() ? " with field '" + key.asString() + "'" : ""));
             }
             break;
         }

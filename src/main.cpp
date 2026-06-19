@@ -46,7 +46,17 @@ int main(int argc, char* argv[]) {
         ss << main_file.rdbuf();
         appendProgram(program, Parser(Lexer(ss.str()).tokenize(), dir, imported).parse());
 
-        VM().execute(Compiler().compile(program));
+        VM vm;
+        vm.execute(Compiler().compile(program));
+        Value draw = vm.getGlobal("draw");
+        if (draw.isCallable()) {
+            Value gfx = vm.getGlobal("graphics");
+            if (gfx.isMap()) {
+                Value run_fn = gfx.mapGet(Value(std::string("run")));
+                if (run_fn.isCallable())
+                    run_fn.asBuiltin()(&draw, 1);
+            }
+        }
     } catch (const std::exception& e) {
         std::cerr << scriptPath << ": " << e.what() << '\n';
         return 1;

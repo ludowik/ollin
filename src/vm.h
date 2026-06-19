@@ -14,6 +14,7 @@ public:
     std::string invokeStr(Value v);
     static VM* current();                   // returns s_current_vm
     Value callValue(const Value& fn);       // calls an Ollin function from C++
+    Value getGlobal(const std::string& name) const; // returns nil if not found
 
 private:
     int  errLine() const;                   // extracted from the lambda in execute()

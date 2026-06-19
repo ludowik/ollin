@@ -24,6 +24,17 @@ static std::string ollin_run(const std::string& source) {
         s_vm->execute(Compiler().compile(
             Parser(Lexer(source).tokenize(), "", imported).parse()
         ));
+        Value draw = s_vm->getGlobal("draw");
+        if (draw.isCallable()) {
+            Value gfx = s_vm->getGlobal("graphics");
+            if (gfx.isMap()) {
+                Value run_fn = gfx.mapGet(Value(std::string("run")));
+                if (run_fn.isCallable()) {
+                    Value args[1] = { draw };
+                    run_fn.asBuiltin()(args, 1);
+                }
+            }
+        }
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
         return std::string("error: ") + e.what();
