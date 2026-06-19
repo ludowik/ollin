@@ -850,21 +850,21 @@ void VM::execute(Chunk chunk) {
     ch = &owned_chunk;
     ip = 0;
     s_current_vm = this;
-    globals.assign(chunk.identifiers.size(), Value{});
-    globals_init.assign(chunk.identifiers.size(), false);
-    for (int gi = 0; gi < (int)chunk.identifiers.size(); ++gi)
+    globals.assign(owned_chunk.identifiers.size(), Value{});
+    globals_init.assign(owned_chunk.identifiers.size(), false);
+    for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
         for (auto& b : k_builtins)
-            if (chunk.identifiers[gi] == b.name) {
+            if (owned_chunk.identifiers[gi] == b.name) {
                 globals[gi]      = Value::makeBuiltin(b.fn);
                 globals_init[gi] = true;
             }
-    for (int gi = 0; gi < (int)chunk.identifiers.size(); ++gi)
+    for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
         for (auto& name : builtinModuleNames())
-            if (chunk.identifiers[gi] == name) {
+            if (owned_chunk.identifiers[gi] == name) {
                 globals[gi]      = makeBuiltinModule(name);
                 globals_init[gi] = true;
             }
-    regs.resize(chunk.top_reg_count);
+    regs.resize(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     call_stack.push_back({0, 0, {}, {}, {}});
 
