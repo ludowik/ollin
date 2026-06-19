@@ -1,22 +1,13 @@
 #define _USE_MATH_DEFINES
-#include "chunk.h"
+#include "module_utils.h"
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
 #include <limits>
-#include <stdexcept>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
-
-static inline double numArg(const Value* args, int argc, int i, const char* fn) {
-    if (i >= argc) throw std::runtime_error(std::string(fn) + ": missing argument");
-    const Value& v = args[i];
-    if (v.isInteger()) return (double)v.asInt();
-    if (v.isFloat())   return v.asFloat();
-    throw std::runtime_error(std::string(fn) + ": expected number");
-}
 
 #define MATH1(name, expr) \
     static Value math_##name(Value* args, int argc) { \
@@ -41,6 +32,20 @@ MATH1(tan,   std::tan(x))
 MATH1(asin,  std::asin(x))
 MATH1(acos,  std::acos(x))
 MATH1(atan,  std::atan(x))
+MATH1(deg,   x * (180.0 / M_PI))
+MATH1(rad,   x * (M_PI / 180.0))
+MATH1(frac,  x - std::floor(x))
+MATH1(is_nan, std::isnan(x) ? 1.0 : 0.0)
+MATH1(is_inf, std::isinf(x) ? 1.0 : 0.0)
+
+static Value math_map(Value* args, int argc) {
+    double x      = numArg(args, argc, 0, "math.map");
+    double in_lo  = numArg(args, argc, 1, "math.map");
+    double in_hi  = numArg(args, argc, 2, "math.map");
+    double out_lo = numArg(args, argc, 3, "math.map");
+    double out_hi = numArg(args, argc, 4, "math.map");
+    return Value(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo));
+}
 
 static Value math_atan2(Value* args, int argc) {
     double y = numArg(args, argc, 0, "math.atan2");
@@ -154,7 +159,13 @@ Value makeMathModule() {
     m.mapSet(Value(std::string("asin")),  Value::makeBuiltin(math_asin));
     m.mapSet(Value(std::string("acos")),  Value::makeBuiltin(math_acos));
     m.mapSet(Value(std::string("atan")),  Value::makeBuiltin(math_atan));
-    m.mapSet(Value(std::string("atan2")), Value::makeBuiltin(math_atan2));
+    m.mapSet(Value(std::string("atan2")),  Value::makeBuiltin(math_atan2));
+    m.mapSet(Value(std::string("deg")),    Value::makeBuiltin(math_deg));
+    m.mapSet(Value(std::string("rad")),    Value::makeBuiltin(math_rad));
+    m.mapSet(Value(std::string("frac")),   Value::makeBuiltin(math_frac));
+    m.mapSet(Value(std::string("is_nan")), Value::makeBuiltin(math_is_nan));
+    m.mapSet(Value(std::string("is_inf")), Value::makeBuiltin(math_is_inf));
+    m.mapSet(Value(std::string("map")),    Value::makeBuiltin(math_map));
     // aléatoire
     m.mapSet(Value(std::string("rand")),     Value::makeBuiltin(math_rand));
     m.mapSet(Value(std::string("rand_int")), Value::makeBuiltin(math_rand_int));
