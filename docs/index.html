@@ -1506,8 +1506,7 @@ function makePlaygroundEditor(parent, code, onRun) {
         ...BASE_EXT,
         history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
         indentUnit.of('    '),
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab,
-          { key: 'Mod-Enter', run: () => { onRun(); return true; } }]),
+        keymap.of([{ key: 'Mod-Enter', run: () => { onRun(); return true; } }]),
         EditorView.theme({ '&': { minHeight: '200px' } }),
       ]
     }),
