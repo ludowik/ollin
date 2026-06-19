@@ -190,15 +190,15 @@ code {
 
 pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
 
-/* syntax tokens */
-.kw   { color: var(--accent); font-weight: 600; }
-.bi   { color: var(--cyan); }
-.str  { color: var(--green); }
-.num  { color: var(--orange); }
-.cmt  { color: #4a5568; font-style: italic; }
-.op   { color: var(--text-dim); }
-.nil  { color: var(--red); }
-.bool { color: var(--yellow); }
+/* syntax tokens — couleurs VS Code Dark+ */
+.kw   { color: #569CD6; }
+.bi   { color: #DCDCAA; }
+.str  { color: #CE9178; }
+.num  { color: #B5CEA8; }
+.cmt  { color: #6A9955; font-style: italic; }
+.op   { color: #c9d1e0; }
+.nil  { color: #569CD6; }
+.bool { color: #569CD6; }
 .var  { color: var(--text); }
 
 /* ── table ────────────────────────────────────────────────────────────────── */
@@ -261,15 +261,35 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 
 /* ── playground ─────────────────────────────────────────────────────────── */
 pre { position: relative; }
-.try-btn {
-  position: absolute; top: 8px; right: 8px;
-  background: var(--surface2); border: 1px solid var(--border);
-  color: var(--accent); font-family: var(--font);
-  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
-  padding: 3px 9px; border-radius: 4px; cursor: pointer;
+
+/* static CM block wrapper */
+.cm-static-wrap { position: relative; margin: 14px 0; }
+.two-col .cm-static-wrap { margin: 0; }
+
+/* playground CM container */
+#pg-editor-cm { position: relative; margin: 14px 0; }
+
+/* code action buttons (copy + run) */
+.code-actions {
+  position: absolute; top: 8px; right: 8px; z-index: 10;
+  display: flex; gap: 4px;
   opacity: 0; transition: opacity 0.15s;
 }
-pre:hover .try-btn { opacity: 1; }
+pre:hover .code-actions,
+.cm-static-wrap:hover .code-actions { opacity: 1; }
+.code-actions.always-visible { opacity: 1; }
+
+.code-btn {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 5px; cursor: pointer;
+  color: var(--text-dim); transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.code-btn:hover { color: var(--accent); border-color: var(--accent); }
+.code-btn.run { background: var(--accent); color: #fff; border-color: transparent; }
+.code-btn.run:hover { opacity: 0.85; }
+.code-btn.run:disabled { opacity: 0.4; cursor: default; }
 
 .pg-examples { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .pg-ex-btn {
@@ -280,25 +300,7 @@ pre:hover .try-btn { opacity: 1; }
 }
 .pg-ex-btn:hover { color: var(--accent); border-color: var(--accent); }
 
-.pg-editor {
-  display: block; width: 100%; min-height: 180px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 8px; padding: 16px 18px;
-  color: var(--text); font-family: var(--font-mono);
-  font-size: 13.5px; line-height: 1.65;
-  resize: vertical; outline: none; tab-size: 4;
-}
-.pg-editor:focus { border-color: var(--accent); }
-
-.pg-toolbar { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
-.pg-run {
-  background: var(--accent); color: #fff; border: none;
-  border-radius: 6px; padding: 8px 20px;
-  font-size: 14px; font-weight: 600; font-family: var(--font);
-  cursor: pointer; transition: opacity 0.15s;
-}
-.pg-run:hover { opacity: 0.85; }
-.pg-run:disabled { opacity: 0.4; cursor: default; }
+.pg-toolbar { display: flex; align-items: center; gap: 12px; margin: 6px 0 10px; }
 .pg-status { font-size: 12px; color: var(--text-dim); }
 
 .pg-output {
@@ -369,6 +371,17 @@ pre:hover .try-btn { opacity: 1; }
   td:first-child { white-space: normal; }
 }
 </style>
+<script type="importmap">
+{
+  "imports": {
+    "@codemirror/state":    "https://esm.sh/@codemirror/state@6",
+    "@codemirror/view":     "https://esm.sh/@codemirror/view@6",
+    "@codemirror/language": "https://esm.sh/@codemirror/language@6",
+    "@codemirror/commands": "https://esm.sh/@codemirror/commands@6",
+    "@lezer/highlight":     "https://esm.sh/@lezer/highlight@1"
+  }
+}
+</script>
 </head>
 <body>
 
@@ -381,7 +394,7 @@ pre:hover .try-btn { opacity: 1; }
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-19 18:06</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-19 19:25</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="#playground" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -441,10 +454,9 @@ pre:hover .try-btn { opacity: 1; }
 
 <div class="pg-examples" id="pg-examples"></div>
 
-<textarea class="pg-editor" id="pg-editor" spellcheck="false" autocorrect="off" autocapitalize="off" placeholder="Entrez votre code Ollin ici…">print("hello world!")</textarea>
+<div id="pg-editor-cm"></div>
 
 <div class="pg-toolbar">
-  <button class="pg-run" id="pg-run" disabled>▶ Exécuter</button>
   <span class="pg-status" id="pg-status">Chargement du runtime…</span>
 </div>
 
@@ -1380,35 +1392,159 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 </main>
 
-<script>
-// ── hamburger ────────────────────────────────────────────────────────────
-const ham = document.getElementById('ham');
-const nav = document.getElementById('nav');
-const backdrop = document.getElementById('backdrop');
+<script type="module">
+import { EditorState }                                                    from '@codemirror/state'
+import { EditorView, lineNumbers, keymap, drawSelection,
+         highlightActiveLine, highlightActiveLineGutter }                 from '@codemirror/view'
+import { defaultKeymap, historyKeymap, history, indentWithTab }           from '@codemirror/commands'
+import { StreamLanguage, syntaxHighlighting, HighlightStyle }             from '@codemirror/language'
+import { tags }                                                           from '@lezer/highlight'
 
-function openNav()  { nav.classList.add('open'); backdrop.classList.add('visible'); ham.classList.add('open'); }
-function closeNav() { nav.classList.remove('open'); backdrop.classList.remove('visible'); ham.classList.remove('open'); }
-function toggleNav() { nav.classList.contains('open') ? closeNav() : openNav(); }
+// ── Ollin language — aligne sur ollin.tmLanguage.json (composant VSC) ────
+// keyword.control : var|global|const|while|do|for|in|if|then|elseif|end|
+//                   break|true|false|nil|try|catch|throw|else|func|return|
+//                   import|as|or|and|not|class|extends|super|self
+// support.function.builtin : print|printf|time|assert
+// constant.numeric  : \.digit+ ou digit+(\.digit+)?
+// keyword.operator  : +=|-=|*=|/=|%=|==|>=|<=|<>|<<|>>|...|..|+-*/%><&|^~[]{}:.
+// comment.block     : ### ... ###
+// comment.line      : ## (pas ###)
+// string            : "..."
 
-ham.addEventListener('click', toggleNav);
-backdrop.addEventListener('click', closeNav);
-nav.querySelectorAll('a').forEach(a => a.addEventListener('click', closeNav));
+const KEYWORDS = new Set([
+  'var','global','const','while','do','for','in','if','then','elseif','end',
+  'break','true','false','nil','try','catch','throw','else','func','return',
+  'import','as','or','and','not','class','extends','super','self'
+])
+const BUILTINS = new Set(['print','printf','time','assert','math','graphics','string'])
 
-// ── active nav link on scroll ────────────────────────────────────────────
-const sections = document.querySelectorAll('section[id]');
-const links = document.querySelectorAll('nav a[href^="#"]');
-const observer = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-        if (e.isIntersecting) {
-            links.forEach(l => l.classList.remove('active'));
-            const l = document.querySelector(`nav a[href="#${e.target.id}"]`);
-            if (l) l.classList.add('active');
-        }
-    });
-}, { rootMargin: '-20% 0px -70% 0px' });
-sections.forEach(s => observer.observe(s));
+const ollinLang = StreamLanguage.define({
+  name: 'ollin',
+  startState: () => ({ block: false }),
+  token(stream, state) {
+    // Block comment ### ... ###
+    if (state.block) {
+      if (stream.match('###')) { state.block = false; return 'comment' }
+      stream.next(); return 'comment'
+    }
+    if (stream.match('###')) { state.block = true; return 'comment' }
 
-// ── playground ────────────────────────────────────────────────────────────
+    if (stream.eatSpace()) return null
+
+    // Line comment ##
+    if (stream.match('##')) { stream.skipToEnd(); return 'comment' }
+
+    // String
+    if (stream.peek() === '"') {
+      stream.next()
+      while (!stream.eol()) { const ch = stream.next(); if (ch === '"') break; if (ch === '\\') stream.next() }
+      return 'string'
+    }
+
+    // Number : leading-dot form  .5  or  42  42.0
+    if (stream.match(/^\.\d[\d_]*/)) return 'number'
+    if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
+
+    // Identifier → keyword / builtin
+    if (stream.match(/^[a-zA-Z_]\w*/)) {
+      const w = stream.current()
+      if (KEYWORDS.has(w)) return 'keyword'
+      if (BUILTINS.has(w)) return 'atom'
+      return null
+    }
+
+    // Operators (multi-char first)
+    if (stream.match(/^(\*\*|\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
+        stream.match(/^[+\-*/%><&|^~\[\]{}:.]/)) return 'operator'
+
+    stream.next()
+    return null
+  }
+})
+
+// ── Highlight style — couleurs VS Code Dark+ ──────────────────────────────
+const ollinHighlight = HighlightStyle.define([
+  { tag: tags.keyword,  color: '#569CD6' },           // keyword.control
+  { tag: tags.atom,     color: '#DCDCAA' },           // support.function.builtin
+  { tag: tags.number,   color: '#B5CEA8' },           // constant.numeric
+  { tag: tags.string,   color: '#CE9178' },           // string.quoted.double
+  { tag: tags.comment,  color: '#6A9955', fontStyle: 'italic' }, // comment
+  { tag: tags.operator, color: '#c9d1e0' },           // keyword.operator (texte par défaut)
+])
+
+// ── Editor theme ──────────────────────────────────────────────────────────
+const ollinTheme = EditorView.theme({
+  '&': { background: '#1a1d2e', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '8px', fontSize: '13.5px' },
+  '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto' },
+  '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
+  '.cm-line': { padding: '0 18px' },
+  '.cm-gutters': { background: '#1a1d2e', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150', borderRadius: '8px 0 0 8px' },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px', minWidth: '2.8em', fontSize: '11.5px', userSelect: 'none' },
+  '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
+  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
+  '&.cm-focused': { outline: 'none', borderColor: '#7c83ff' },
+  '&.cm-focused .cm-cursor': { borderLeftColor: '#7c83ff', borderLeftWidth: '2px' },
+  '.cm-selectionBackground': { background: 'rgba(124,131,255,0.2)' },
+  '&.cm-focused .cm-selectionBackground': { background: 'rgba(124,131,255,0.3)' },
+  '.cm-content[contenteditable="false"]': { cursor: 'default' },
+})
+
+const BASE_EXT = [ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme]
+
+function makeStaticEditor(parent, code) {
+  return new EditorView({
+    state: EditorState.create({ doc: code, extensions: [...BASE_EXT, EditorView.editable.of(false), EditorState.readOnly.of(true)] }),
+    parent,
+  })
+}
+
+function makePlaygroundEditor(parent, code) {
+  return new EditorView({
+    state: EditorState.create({
+      doc: code,
+      extensions: [
+        ...BASE_EXT,
+        history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
+        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        EditorView.theme({ '&': { minHeight: '200px' } }),
+      ]
+    }),
+    parent,
+  })
+}
+
+// ── Hamburger ─────────────────────────────────────────────────────────────
+const ham      = document.getElementById('ham')
+const navEl    = document.getElementById('nav')
+const backdrop = document.getElementById('backdrop')
+
+function openNav()  { navEl.classList.add('open');    backdrop.classList.add('visible');    ham.classList.add('open') }
+function closeNav() { navEl.classList.remove('open'); backdrop.classList.remove('visible'); ham.classList.remove('open') }
+ham.addEventListener('click', () => navEl.classList.contains('open') ? closeNav() : openNav())
+backdrop.addEventListener('click', closeNav)
+navEl.querySelectorAll('a').forEach(a => a.addEventListener('click', closeNav))
+
+// ── Active nav on scroll ──────────────────────────────────────────────────
+const navLinks     = document.querySelectorAll('nav a[href^="#"]')
+const scrollObs    = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(l => l.classList.remove('active'))
+      const l = document.querySelector(`nav a[href="#${e.target.id}"]`)
+      if (l) l.classList.add('active')
+    }
+  })
+}, { rootMargin: '-20% 0px -70% 0px' })
+document.querySelectorAll('section[id]').forEach(s => scrollObs.observe(s))
+
+// ── Hard reload ───────────────────────────────────────────────────────────
+window.hardReload = () => {
+  if ('caches' in window) {
+    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => location.reload(true))
+  } else { location.reload(true) }
+}
+
+// ── Playground ────────────────────────────────────────────────────────────
 const pgExamples = [
   { name: 'Hello world',  code: 'print("hello world!")' },
   { name: 'Fibonacci',    code: 'func fib(n)\n  if n <= 1 then return n end\n  return fib(n-1) + fib(n-2)\nend\nprint(fib(10))' },
@@ -1417,125 +1553,168 @@ const pgExamples = [
   { name: 'Map',          code: 'var m = {name: "ollin", version: 1}\nfor k, v in m do\n  print(k, "=", v)\nend' },
   { name: 'Classe',       code: 'class Vec2\n  func init(x, y)\n    self.x = x\n    self.y = y\n  end\n  func __add(other)\n    return Vec2(self.x + other.x, self.y + other.y)\n  end\n  func __str()\n    return "Vec2(" + self.x + "," + self.y + ")"\n  end\nend\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
   { name: 'Graphics',     code: 'const W = 800\nconst H = 500\nconst N = 200\nconst SPEED = 3\n\nfunc rand_color()\n  var r = math.floor(math.rand() * 200) + 55\n  var g = math.floor(math.rand() * 200) + 55\n  var b = math.floor(math.rand() * 200) + 55\n  return (r << 24) | (g << 16) | (b << 8) | 255\nend\n\nfunc rpos(max)  return math.floor(math.rand() * max)  end\nfunc rvel()     return math.rand() * SPEED * 2 - SPEED end\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n  x1[i]=rpos(W)  y1[i]=rpos(H)  x2[i]=rpos(W)  y2[i]=rpos(H)\n  vx1[i]=rvel()  vy1[i]=rvel()  vx2[i]=rvel()  vy2[i]=rvel()\n  cols[i]=rand_color()\nend\n\ngraphics.canvas(W, H, "Lignes animées")\n\nfunc frame()\n  graphics.begin_draw()\n  graphics.clear(graphics.BLACK)\n  for i = 1, N do\n    x1[i]=x1[i]+vx1[i]  y1[i]=y1[i]+vy1[i]\n    x2[i]=x2[i]+vx2[i]  y2[i]=y2[i]+vy2[i]\n    if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n    if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n    if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n    if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n    graphics.line(x1[i],y1[i],x2[i],y2[i],cols[i])\n  end\n  graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16, graphics.WHITE)\n  graphics.end_draw()\nend\n\ngraphics.run(frame)' },
-];
+]
 
-const pgEditor     = document.getElementById('pg-editor');
-const pgRunBtn     = document.getElementById('pg-run');
-const pgStatus     = document.getElementById('pg-status');
-const pgOutput     = document.getElementById('pg-output');
-const pgExamplesEl = document.getElementById('pg-examples');
+const pgEditorCm   = document.getElementById('pg-editor-cm')
+const pgStatus     = document.getElementById('pg-status')
+const pgOutput     = document.getElementById('pg-output')
+const pgExamplesEl = document.getElementById('pg-examples')
+
+const pgView = makePlaygroundEditor(pgEditorCm, 'print("hello world!")')
 
 pgExamples.forEach(ex => {
-  const btn = document.createElement('button');
-  btn.className = 'pg-ex-btn';
-  btn.textContent = ex.name;
-  btn.addEventListener('click', () => { pgEditor.value = ex.code; pgEditor.focus(); });
-  pgExamplesEl.appendChild(btn);
-});
+  const btn = document.createElement('button')
+  btn.className   = 'pg-ex-btn'
+  btn.textContent = ex.name
+  btn.addEventListener('click', () => {
+    pgView.dispatch({ changes: { from: 0, to: pgView.state.doc.length, insert: ex.code } })
+    pgView.focus()
+  })
+  pgExamplesEl.appendChild(btn)
+})
 
-pgEditor.addEventListener('keydown', e => {
-  if (e.key === 'Tab') {
-    e.preventDefault();
-    const s = pgEditor.selectionStart;
-    pgEditor.value = pgEditor.value.substring(0, s) + '  ' + pgEditor.value.substring(pgEditor.selectionEnd);
-    pgEditor.selectionStart = pgEditor.selectionEnd = s + 2;
-  }
-});
-
-function hardReload() {
-  if ('caches' in window) {
-    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => location.reload(true));
+function runCode() {
+  if (!ollin) return
+  const canvas = document.getElementById('canvas')
+  canvas.style.display = 'none'
+  pgOutput.style.display = 'block'
+  pgOutput.className = 'pg-output'
+  const out = ollin.execute(pgView.state.doc.toString())
+  if (canvas.style.display === 'block') return  // graphics mode
+  if (!out) {
+    pgOutput.textContent = '(aucune sortie)'
+  } else if (out.startsWith('error:')) {
+    pgOutput.textContent = out
+    pgOutput.className   = 'pg-output has-error'
   } else {
-    location.reload(true);
+    pgOutput.textContent = out
+    pgOutput.className   = 'pg-output has-output'
   }
 }
 
-let ollin = null;
-const wasmScript = document.createElement('script');
-const cacheBust = Date.now();
-wasmScript.src = 'wasm/ollin.js?' + cacheBust;
+// ── WASM loading ──────────────────────────────────────────────────────────
+let ollin = null
+const wasmScript = document.createElement('script')
+const cacheBust  = Date.now()
+wasmScript.src   = 'wasm/ollin.js?' + cacheBust
 wasmScript.onload = () => {
-  const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '');
+  const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '')
   OllinModule({
     locateFile: f => wasmDir + f + '?' + cacheBust,
-    canvas: document.getElementById('canvas'),
+    canvas:   document.getElementById('canvas'),
     print:    () => {},
     printErr: () => {},
   }).then(m => {
-    ollin = m;
-    pgRunBtn.disabled = false;
-    pgStatus.textContent = 'Runtime prêt ✓';
-    setTimeout(() => { pgStatus.textContent = ''; }, 2000);
+    ollin = m
+    pgRunBtn.disabled       = false
+    pgStatus.textContent    = 'Runtime prêt ✓'
+    setTimeout(() => { pgStatus.textContent = '' }, 2000)
   }).catch(err => {
-    pgStatus.textContent = 'Erreur WASM : ' + (err && err.message ? err.message : err);
-    console.error('WASM init error:', err);
-  });
-};
-wasmScript.onerror = () => { pgStatus.textContent = 'WASM non disponible (fichier introuvable)'; };
-document.head.appendChild(wasmScript);
+    pgStatus.textContent = 'Erreur WASM : ' + (err && err.message ? err.message : err)
+    console.error('WASM init error:', err)
+  })
+}
+wasmScript.onerror = () => { pgStatus.textContent = 'WASM non disponible (fichier introuvable)' }
+document.head.appendChild(wasmScript)
 
-function runCode() {
-  if (!ollin) return;
-  const canvas = document.getElementById('canvas');
-  canvas.style.display = 'none';
-  pgOutput.style.display = 'block';
-  pgOutput.className = 'pg-output';
-  const out = ollin.execute(pgEditor.value);
-  if (canvas.style.display === 'block') return; // graphics mode
-  if (!out) {
-    pgOutput.textContent = '(aucune sortie)';
-  } else if (out.startsWith('error:')) {
-    pgOutput.textContent = out;
-    pgOutput.className = 'pg-output has-error';
-  } else {
-    pgOutput.textContent = out;
-    pgOutput.className = 'pg-output has-output';
-  }
+// ── Icônes SVG ────────────────────────────────────────────────────────────
+const ICON_RUN  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M3 2l11 6-11 6V2z"/></svg>'
+const ICON_COPY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>'
+const ICON_OK   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8l4 4 6-6"/></svg>'
+
+function makeCopyBtn(getText) {
+  const btn = document.createElement('button')
+  btn.className = 'code-btn copy'
+  btn.title     = 'Copier'
+  btn.innerHTML = ICON_COPY
+  btn.addEventListener('click', () => {
+    navigator.clipboard.writeText(getText()).then(() => {
+      btn.innerHTML           = ICON_OK
+      btn.style.color         = '#4ade80'
+      btn.style.borderColor   = '#4ade80'
+      setTimeout(() => { btn.innerHTML = ICON_COPY; btn.style.color = ''; btn.style.borderColor = '' }, 1500)
+    })
+  })
+  return btn
 }
 
-pgRunBtn.addEventListener('click', runCode);
-pgEditor.addEventListener('keydown', e => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runCode();
-});
+// ── Playground — boutons run + copy ──────────────────────────────────────
+const pgActions = document.createElement('div')
+pgActions.className = 'code-actions always-visible'
+pgEditorCm.appendChild(pgActions)
+pgActions.appendChild(makeCopyBtn(() => pgView.state.doc.toString()))
 
-// "▶ Exécuter" buttons — inline output below each code block
+const pgRunBtn = document.createElement('button')
+pgRunBtn.className = 'code-btn run'
+pgRunBtn.disabled  = true
+pgRunBtn.title     = 'Exécuter (Ctrl+Entrée)'
+pgRunBtn.innerHTML = ICON_RUN
+pgActions.appendChild(pgRunBtn)
+pgRunBtn.addEventListener('click', runCode)
+pgView.dom.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runCode()
+})
+
+// ── Remplace les blocs <pre><code> par des éditeurs CM6 read-only ─────────
 document.querySelectorAll('section:not(#playground) pre').forEach(pre => {
-  if (pre.hasAttribute('data-no-run') || pre.closest('.two-col')) return;
-  const code = pre.querySelector('code');
-  if (!code) return;
-  const text = code.textContent.trim();
-  if (text.length < 15 || text.includes('→') || text.includes('source .ol')) return;
+  const code = pre.querySelector('code')
+  if (!code) return
+  const text = code.textContent.trim()
+  if (!text || text.includes('→')) return  // skip pipeline / diagram blocks
 
-  const outDiv = document.createElement('div');
-  outDiv.className = 'inline-output';
-  outDiv.style.display = 'none';
-  pre.after(outDiv);
+  const isRunnable = !pre.hasAttribute('data-no-run') &&
+                     !pre.closest('.two-col') &&
+                     text.length >= 15 &&
+                     !text.includes('source .ol')
 
-  const btn = document.createElement('button');
-  btn.className = 'try-btn';
-  btn.textContent = '▶ Exécuter';
-  btn.addEventListener('click', () => {
-    if (!ollin) {
-      outDiv.textContent = 'Runtime en cours de chargement…';
-      outDiv.className = 'inline-output wait';
-      outDiv.style.display = 'block';
-      return;
-    }
-    const out = ollin.run(text);
-    outDiv.style.display = 'block';
-    if (!out || out === '') {
-      outDiv.textContent = '(aucune sortie)';
-      outDiv.className = 'inline-output empty';
-    } else if (out.startsWith('error:')) {
-      outDiv.textContent = out;
-      outDiv.className = 'inline-output err';
-    } else {
-      outDiv.textContent = out;
-      outDiv.className = 'inline-output ok';
-    }
-  });
-  pre.appendChild(btn);
-});
+  const wrap = document.createElement('div')
+  wrap.className = 'cm-static-wrap'
+  if (pre.closest('.two-col')) wrap.style.margin = '0'
+
+  makeStaticEditor(wrap, text)
+
+  // actions group (copy + optional run)
+  const actions = document.createElement('div')
+  actions.className = 'code-actions'
+  wrap.appendChild(actions)
+  actions.appendChild(makeCopyBtn(() => text))
+
+  let outDiv = null
+  if (isRunnable) {
+    outDiv = document.createElement('div')
+    outDiv.className     = 'inline-output'
+    outDiv.style.display = 'none'
+
+    const runBtn = document.createElement('button')
+    runBtn.className = 'code-btn run'
+    runBtn.title     = 'Exécuter'
+    runBtn.innerHTML = ICON_RUN
+    runBtn.addEventListener('click', () => {
+      if (!ollin) {
+        outDiv.textContent   = 'Runtime en cours de chargement…'
+        outDiv.className     = 'inline-output wait'
+        outDiv.style.display = 'block'
+        return
+      }
+      const out = ollin.run(text)
+      outDiv.style.display = 'block'
+      if (!out || out === '') {
+        outDiv.textContent = '(aucune sortie)'
+        outDiv.className   = 'inline-output empty'
+      } else if (out.startsWith('error:')) {
+        outDiv.textContent = out
+        outDiv.className   = 'inline-output err'
+      } else {
+        outDiv.textContent = out
+        outDiv.className   = 'inline-output ok'
+      }
+    })
+    actions.appendChild(runBtn)
+  }
+
+  pre.replaceWith(wrap)
+  if (outDiv) wrap.after(outDiv)
+})
 </script>
 </body>
 </html>
