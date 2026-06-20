@@ -30,9 +30,9 @@ private:
     struct Frame {
         uint32_t    return_ip;
         int         reg_base;
-        std::unique_ptr<std::vector<Value>> varargs;
-        std::vector<Upvalue*> upvals;
-        std::vector<Upvalue*> open_upvals;
+        std::unique_ptr<std::vector<Value>>    varargs;
+        std::unique_ptr<std::vector<Upvalue*>> upvals;
+        std::unique_ptr<std::vector<Upvalue*>> open_upvals;
         Value       ctor_result{};  // non-nil = frame is a constructor; RETURN overrides R[0] with instance
         int         return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
     };

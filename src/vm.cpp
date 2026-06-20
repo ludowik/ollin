@@ -66,12 +66,13 @@ std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide 
         return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
     }
     uint8_t fi;
-    std::vector<Upvalue*> frame_upvals;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     if (str_fn.isFuncVal()) {
         fi = (uint8_t)str_fn.asInt();
     } else if (str_fn.isClosure()) {
         fi = str_fn.asClosure()->func_idx;
-        frame_upvals = str_fn.asClosure()->upvals;
+        const auto& uvs = str_fn.asClosure()->upvals;
+        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
     } else if (str_fn.isBuiltin()) {
         Value self = obj;
         Value result = str_fn.asBuiltin()(&self, 1);
@@ -165,9 +166,9 @@ uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs) {
     Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
     if (!fn.isCallable()) return 0;
     uint8_t fi;
-    std::vector<Upvalue*> fuv;
-    if (fn.isFuncVal())      fi = (uint8_t)fn.asInt();
-    else { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
+    std::unique_ptr<std::vector<Upvalue*>> fuv;
+    if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
+    else { fi = fn.asClosure()->func_idx; const auto& u = fn.asClosure()->upvals; if (!u.empty()) fuv = std::make_unique<std::vector<Upvalue*>>(u); }
     const FuncProto& fp = ch->funcs[fi];
     int nb = (int)regs.size();
     growRegs((size_t)(nb + std::max((int)fp.reg_count, 2)));
@@ -181,9 +182,9 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
     Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
     if (!fn.isCallable()) return 0;
     uint8_t fi;
-    std::vector<Upvalue*> fuv;
-    if (fn.isFuncVal())      fi = (uint8_t)fn.asInt();
-    else { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
+    std::unique_ptr<std::vector<Upvalue*>> fuv;
+    if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
+    else { fi = fn.asClosure()->func_idx; const auto& u = fn.asClosure()->upvals; if (!u.empty()) fuv = std::make_unique<std::vector<Upvalue*>>(u); }
     const FuncProto& fp = ch->funcs[fi];
     int nb = (int)regs.size();
     growRegs((size_t)(nb + std::max((int)fp.reg_count, 1)));
@@ -195,8 +196,8 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
 // ── closeUpvals : close and free all open upvalues of the top frame ──────────
 void VM::closeUpvals() {
     auto& ouv = call_stack.back().open_upvals;
-    if (ouv.empty()) return;
-    for (auto* uv : ouv) {
+    if (!ouv) return;
+    for (auto* uv : *ouv) {
         if (!uv->closed) {
             uv->val    = regs[uv->frame_base + uv->reg_idx];
             uv->closed = true;
@@ -206,10 +207,12 @@ void VM::closeUpvals() {
 }
 
 // ── Helper: resolve function value → func_idx + upvals ───────────────────────
-static uint8_t resolveFuncVal(const Value& fv, std::vector<Upvalue*>& out_upvals) {
-    if (fv.isFuncVal())  return (uint8_t)fv.asInt();
+static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals) {
+    if (fv.isFuncVal()) return (uint8_t)fv.asInt();
     if (fv.isClosure()) {
-        out_upvals = fv.asClosure()->upvals;
+        const auto& uvs = fv.asClosure()->upvals;
+        if (!uvs.empty())
+            out_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
         return fv.asClosure()->func_idx;
     }
     throw std::runtime_error("runtime: call on non-function value");
@@ -249,12 +252,13 @@ Value VM::callValue(const Value& fn) {
     if (fn.isBuiltin())
         return fn.asBuiltin()(nullptr, 0);
     uint8_t fi;
-    std::vector<Upvalue*> frame_upvals;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     if (fn.isFuncVal()) {
         fi = (uint8_t)fn.asInt();
     } else if (fn.isClosure()) {
         fi = fn.asClosure()->func_idx;
-        frame_upvals = fn.asClosure()->upvals;
+        const auto& uvs = fn.asClosure()->upvals;
+        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
     } else {
         throw std::runtime_error("callValue: not callable");
     }
@@ -779,7 +783,7 @@ op_CALL_DYN: {
                 regs[ctor_base] = std::move(inst);
                 goto call_dyn_done;
             }
-            std::vector<Upvalue*> fuv;
+            std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolveFuncVal(init_fn, fuv);
             const FuncProto& fp = ch->funcs[fi];
             int total = argc + 1;
@@ -807,7 +811,7 @@ op_CALL_DYN: {
         {
             int new_base = base + A;
             int argc = C;
-            std::vector<Upvalue*> fuv;
+            std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolveFuncVal(regs[base + B], fuv);
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
@@ -841,19 +845,23 @@ op_MAKE_CLOSURE: {
         Upvalue* uv;
         if (desc.is_local) {
             uv = nullptr;
-            for (auto* ou : call_stack.back().open_upvals) {
-                if (!ou->closed && ou->frame_base == base && ou->reg_idx == desc.idx)
-                    { uv = ou; break; }
+            auto& frame_ouv = call_stack.back().open_upvals;
+            if (frame_ouv) {
+                for (auto* ou : *frame_ouv) {
+                    if (!ou->closed && ou->frame_base == base && ou->reg_idx == desc.idx)
+                        { uv = ou; break; }
+                }
             }
             if (!uv) {
                 uv = new Upvalue;
                 uv->frame_base = base;
                 uv->reg_idx    = desc.idx;
-                call_stack.back().open_upvals.push_back(uv);
+                if (!frame_ouv) frame_ouv = std::make_unique<std::vector<Upvalue*>>();
+                frame_ouv->push_back(uv);
             }
             uv->refcount++;
         } else {
-            uv = call_stack.back().upvals[desc.idx];
+            uv = (*call_stack.back().upvals)[desc.idx];
             uv->refcount++;
         }
         cl->upvals.push_back(uv);
@@ -863,13 +871,13 @@ op_MAKE_CLOSURE: {
 }
 
 op_GET_UPVAL: {
-    Upvalue* uv = call_stack.back().upvals[B];
+    Upvalue* uv = (*call_stack.back().upvals)[B];
     regs[base + A] = uv->closed ? uv->val : regs[uv->frame_base + uv->reg_idx];
     NEXT();
 }
 
 op_SET_UPVAL: {
-    Upvalue* uv = call_stack.back().upvals[B];
+    Upvalue* uv = (*call_stack.back().upvals)[B];
     if (uv->closed) uv->val = regs[base + A];
     else            regs[uv->frame_base + uv->reg_idx] = regs[base + A];
     NEXT();
@@ -901,10 +909,10 @@ op_CALL_METHOD: {
             goto call_method_done;
         }
         {
-            std::vector<Upvalue*> fuv;
+            std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi;
-            if (fn.isFuncVal())      fi = (uint8_t)fn.asInt();
-            else if (fn.isClosure()) { fi = fn.asClosure()->func_idx; fuv = fn.asClosure()->upvals; }
+            if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
+            else if (fn.isClosure()) { fi = fn.asClosure()->func_idx; const auto& u = fn.asClosure()->upvals; if (!u.empty()) fuv = std::make_unique<std::vector<Upvalue*>>(u); }
             else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
             const FuncProto& fp = ch->funcs[fi];
             size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
