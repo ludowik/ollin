@@ -39,6 +39,7 @@ private:
 
     Chunk                owned_chunk;
     const Chunk*         ch = nullptr;
+    Value                string_module_;
     uint32_t             ip = 0;
     std::vector<Value>   globals;
     std::vector<bool>    globals_init;

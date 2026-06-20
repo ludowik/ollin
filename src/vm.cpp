@@ -566,6 +566,8 @@ void VM::runSwitch(size_t stop_depth) {
             const Value& obj = regs[base+B]; const Value& key = regs[base+C];
             if (obj.isMap() || obj.isClass()) {
                 regs[base+A] = protoChainGet(obj, key);
+            } else if (obj.isString()) {
+                regs[base+A] = string_module_.mapGet(key);
             } else if (obj.isArray()) {
                 if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 regs[base+A] = obj.arrayGet(key.asInt());
@@ -766,7 +768,7 @@ void VM::runSwitch(size_t stop_depth) {
         case Op::CALL_METHOD: {
             int cb   = base + A;
             int argc = C;
-            bool is_instance = isInstance(regs[cb]);
+            bool is_instance = isInstance(regs[cb]) || regs[cb].isString();
             Value fn = regs[cb + 1];
             int total;
             if (is_instance) {
@@ -861,6 +863,7 @@ void VM::execute(Chunk chunk) {
                 globals[gi]      = makeBuiltinModule(name);
                 globals_init[gi] = true;
             }
+    string_module_ = makeBuiltinModule("string");
     {
         Value core = makeBuiltinModule("core");
         for (auto& [k, v] : core.asMap()->data) {
@@ -1250,6 +1253,8 @@ op_GET_INDEX: {
     const Value& key = regs[base + C];
     if (obj.isMap() || obj.isClass()) {
         regs[base + A] = protoChainGet(obj, key);
+    } else if (obj.isString()) {
+        regs[base + A] = string_module_.mapGet(key);
     } else if (obj.isArray()) {
         if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
         regs[base + A] = obj.arrayGet(key.asInt());
@@ -1489,7 +1494,7 @@ op_CALL_METHOD: {
     {
         int cb   = base + A;
         int argc = C;
-        bool is_instance = isInstance(regs[cb]);
+        bool is_instance = isInstance(regs[cb]) || regs[cb].isString();
         Value fn = regs[cb + 1];
         int total;
         if (is_instance) {
@@ -1868,6 +1873,8 @@ op_HALT:
             const Value& obj = regs[base+B]; const Value& key = regs[base+C];
             if (obj.isMap() || obj.isClass()) {
                 regs[base+A] = protoChainGet(obj, key);
+            } else if (obj.isString()) {
+                regs[base+A] = string_module_.mapGet(key);
             } else if (obj.isArray()) {
                 if (!key.isInteger()) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: array index must be integer");
                 regs[base+A] = obj.arrayGet(key.asInt());
@@ -2068,7 +2075,7 @@ op_HALT:
         case Op::CALL_METHOD: {
             int cb   = base + A;
             int argc = C;
-            bool is_instance = isInstance(regs[cb]);
+            bool is_instance = isInstance(regs[cb]) || regs[cb].isString();
             Value fn = regs[cb + 1];
             int total;
             if (is_instance) {

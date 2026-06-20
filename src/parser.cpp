@@ -768,7 +768,7 @@ std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::NUMBER))
         return std::make_unique<NumberExpr>(std::stod(advance().lexeme));
     if (check(TokenType::STRING))
-        return std::make_unique<StringExpr>(advance().lexeme);
+        return parsePostfix(std::make_unique<StringExpr>(advance().lexeme));
     if (check(TokenType::TRUE))  { advance(); return std::make_unique<BoolExpr>(true);  }
     if (check(TokenType::FALSE)) { advance(); return std::make_unique<BoolExpr>(false); }
     if (check(TokenType::IDENTIFIER)) {
