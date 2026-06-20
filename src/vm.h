@@ -18,7 +18,7 @@ public:
 
 private:
     int  errLine() const;                   // extracted from the lambda in execute()
-    void runSwitch(size_t stop_depth);      // complete reusable switch dispatch
+    void runGoto(size_t stop_depth);        // unified computed-goto dispatch loop
     struct Handler {
         uint32_t catch_addr;
         uint8_t  catch_reg;
