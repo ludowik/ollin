@@ -28,13 +28,14 @@ private:
     };
 
     struct Frame {
-        uint32_t    return_ip;
-        int         reg_base;
-        std::unique_ptr<std::vector<Value>>    varargs;
+        uint32_t    return_ip     = 0;
+        int         reg_base      = 0;
+        int         varargs_base  = 0;  // = reg_base + fp.reg_count (where varargs live in regs)
+        int         n_varargs     = 0;  // count of extra variadic args (0 if none)
+        bool        is_ctor       = false; // true = frame is a constructor; RETURN overrides R[0] with instance
+        int         return_dest   = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
         std::unique_ptr<std::vector<Upvalue*>> upvals;
         std::unique_ptr<std::vector<Upvalue*>> open_upvals;
-        Value       ctor_result{};  // non-nil = frame is a constructor; RETURN overrides R[0] with instance
-        int         return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
     };
 
     Chunk                owned_chunk;

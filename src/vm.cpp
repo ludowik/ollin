@@ -86,7 +86,13 @@ std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide 
     growRegs((size_t)(call_base + std::max((int)fp.reg_count, 1)));
     regs[call_base] = obj;
     uint32_t saved_ip = ip;
-    call_stack.push_back({0, call_base, {}, std::move(frame_upvals), {}, {}});
+    {
+        Frame fr;
+        fr.return_ip = 0;
+        fr.reg_base  = call_base;
+        fr.upvals    = std::move(frame_upvals);
+        call_stack.push_back(std::move(fr));
+    }
     ip = fp.addr;
     runGoto(call_stack.size() - 1);
     std::string result;
@@ -174,7 +180,14 @@ uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs) {
     growRegs((size_t)(nb + std::max((int)fp.reg_count, 2)));
     regs[nb]     = std::move(lhs);
     regs[nb + 1] = std::move(rhs);
-    call_stack.push_back({ip, nb, {}, std::move(fuv), {}, {}, dest});
+    {
+        Frame fr;
+        fr.return_ip  = ip;
+        fr.reg_base   = nb;
+        fr.return_dest = dest;
+        fr.upvals     = std::move(fuv);
+        call_stack.push_back(std::move(fr));
+    }
     return fp.addr;
 }
 
@@ -189,7 +202,14 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
     int nb = (int)regs.size();
     growRegs((size_t)(nb + std::max((int)fp.reg_count, 1)));
     regs[nb] = std::move(lhs);
-    call_stack.push_back({ip, nb, {}, std::move(fuv), {}, {}, dest});
+    {
+        Frame fr;
+        fr.return_ip   = ip;
+        fr.reg_base    = nb;
+        fr.return_dest = dest;
+        fr.upvals      = std::move(fuv);
+        call_stack.push_back(std::move(fr));
+    }
     return fp.addr;
 }
 
@@ -266,7 +286,13 @@ Value VM::callValue(const Value& fn) {
     int call_base = (int)regs.size();
     growRegs((size_t)(call_base + std::max((int)fp.reg_count, 1)));
     uint32_t saved_ip = ip;
-    call_stack.push_back({saved_ip, call_base, {}, std::move(frame_upvals), {}, {}});
+    {
+        Frame fr;
+        fr.return_ip = saved_ip;
+        fr.reg_base  = call_base;
+        fr.upvals    = std::move(frame_upvals);
+        call_stack.push_back(std::move(fr));
+    }
     ip = fp.addr;
     runGoto(call_stack.size() - 1);
     Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
@@ -545,15 +571,23 @@ op_CALL_FUNC: {
             for (int i = argc; i < fp.n_fixed; ++i)
                 regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
         }
-        std::unique_ptr<std::vector<Value>> varargs;
+        int n_extra = 0;
+        int va_base = new_base + fp.reg_count;
         if (fp.variadic && argc > fp.n_fixed) {
-            varargs = std::make_unique<std::vector<Value>>();
-            for (int i = fp.n_fixed; i < argc; ++i)
-                varargs->push_back(std::move(regs[new_base + i]));
+            n_extra = argc - fp.n_fixed;
+            growRegs((size_t)(va_base + n_extra));
+            // Backward copy: va_base may overlap source range when reg_count > n_fixed
+            for (int i = n_extra - 1; i >= 0; --i)
+                regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
         }
         size_t full_needed = (size_t)(new_base + fp.reg_count);
         if (regs.size() < full_needed) regs.resize(full_needed);
-        call_stack.push_back({ip, new_base, std::move(varargs), {}, {}});
+        Frame fr;
+        fr.return_ip   = ip;
+        fr.reg_base    = new_base;
+        fr.varargs_base = va_base;
+        fr.n_varargs   = n_extra;
+        call_stack.push_back(std::move(fr));
         fp_addr = fp.addr;
     }
     ip = fp_addr;
@@ -563,7 +597,9 @@ op_CALL_FUNC: {
 op_RETURN: {
     {
         closeUpvals();
-        Value ctor   = std::move(call_stack.back().ctor_result);
+        bool is_ctor_ = call_stack.back().is_ctor;
+        Value ctor_val;
+        if (is_ctor_) ctor_val = regs[base + 0];  // save self before potential overwrite
         int ret_dest = call_stack.back().return_dest;
         int n = B;
         if (n > 0 && A != 0)
@@ -571,8 +607,8 @@ op_RETURN: {
                 regs[base + i] = std::move(regs[base + A + i]);
         uint32_t rip = call_stack.back().return_ip;
         call_stack.pop_back();
-        if (!ctor.isNil())  regs[base + 0] = std::move(ctor);
-        if (ret_dest >= 0)  regs[ret_dest] = regs[base + 0];
+        if (is_ctor_)      regs[base + 0] = std::move(ctor_val);
+        if (ret_dest >= 0) regs[ret_dest] = regs[base + 0];
         ip = rip;
     }
     if (call_stack.size() <= stop_depth) return;
@@ -580,13 +616,16 @@ op_RETURN: {
 }
 
 op_LOAD_VARARGS: {
-    auto& va = call_stack.back().varargs;
-    if (va) {
-        int count = B;
-        int n = (count == 0) ? (int)va->size() : std::min(count, (int)va->size());
-        size_t needed = (size_t)(base + A + n);
-        if (regs.size() < needed) regs.resize(needed);
-        for (int i = 0; i < n; ++i) regs[base + A + i] = (*va)[i];
+    {
+        const Frame& fr = call_stack.back();
+        int n_va = fr.n_varargs;
+        if (n_va > 0) {
+            int count = B;
+            int n = (count == 0) ? n_va : std::min(count, n_va);
+            size_t needed = (size_t)(base + A + n);
+            if (regs.size() < needed) regs.resize(needed);
+            for (int i = 0; i < n; ++i) regs[base + A + i] = regs[fr.varargs_base + i];
+        }
     }
     NEXT();
 }
@@ -594,13 +633,13 @@ op_LOAD_VARARGS: {
 op_RETURN_V: {
     {
         closeUpvals();
-        auto& va   = call_stack.back().varargs;
-        int n_va   = va ? (int)va->size() : 0;
+        int n_va   = call_stack.back().n_varargs;
+        int va_src = call_stack.back().varargs_base;
         int n_expl = B;
         int total  = n_expl + n_va;
         std::vector<Value> rvs(total);
         for (int i = 0; i < n_expl; ++i) rvs[i] = std::move(regs[base + A + i]);
-        if (va) for (int i = 0; i < n_va; ++i) rvs[n_expl + i] = std::move((*va)[i]);
+        for (int i = 0; i < n_va;   ++i) rvs[n_expl + i] = std::move(regs[va_src + i]);
         uint32_t rip   = call_stack.back().return_ip;
         int      rbase = call_stack.back().reg_base;
         call_stack.pop_back();
@@ -800,7 +839,14 @@ op_CALL_DYN: {
             size_t full_needed = (size_t)(ctor_base + fp.reg_count);
             growRegs(full_needed);
             ctor_addr = fp.addr;
-            call_stack.push_back({ip, ctor_base, {}, std::move(fuv), {}, inst});
+            {
+                Frame fr;
+                fr.return_ip = ip;
+                fr.reg_base  = ctor_base;
+                fr.is_ctor   = true;
+                fr.upvals    = std::move(fuv);
+                call_stack.push_back(std::move(fr));
+            }
             do_call = true;
         }
         if (do_call) { ip = ctor_addr; NEXT(); }
@@ -821,15 +867,25 @@ op_CALL_DYN: {
                 for (int i = argc; i < fp.n_fixed; ++i)
                     regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
-            std::unique_ptr<std::vector<Value>> varargs;
+            int n_extra2 = 0;
+            int va_base2 = new_base + fp.reg_count;
             if (fp.variadic && argc > fp.n_fixed) {
-                varargs = std::make_unique<std::vector<Value>>();
-                for (int i = fp.n_fixed; i < argc; ++i)
-                    varargs->push_back(std::move(regs[new_base + i]));
+                n_extra2 = argc - fp.n_fixed;
+                growRegs((size_t)(va_base2 + n_extra2));
+                for (int i = n_extra2 - 1; i >= 0; --i)
+                    regs[va_base2 + i] = std::move(regs[new_base + fp.n_fixed + i]);
             }
             size_t full_needed = (size_t)(new_base + fp.reg_count);
             growRegs(full_needed);
-            call_stack.push_back({ip, new_base, std::move(varargs), std::move(fuv), {}, {}});
+            {
+                Frame fr;
+                fr.return_ip    = ip;
+                fr.reg_base     = new_base;
+                fr.varargs_base = va_base2;
+                fr.n_varargs    = n_extra2;
+                fr.upvals       = std::move(fuv);
+                call_stack.push_back(std::move(fr));
+            }
             fp_addr = fp.addr;
         }
         ip = fp_addr;
@@ -922,15 +978,25 @@ op_CALL_METHOD: {
                 for (int i = total; i < fp.n_fixed; ++i)
                     regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
             }
+            int n_extra3 = 0;
+            int va_base3 = cb + fp.reg_count;
+            if (fp.variadic && total > fp.n_fixed) {
+                n_extra3 = total - fp.n_fixed;
+                growRegs((size_t)(va_base3 + n_extra3));
+                for (int i = n_extra3 - 1; i >= 0; --i)
+                    regs[va_base3 + i] = std::move(regs[cb + fp.n_fixed + i]);
+            }
             size_t full_needed = (size_t)(cb + fp.reg_count);
             growRegs(full_needed);
-            std::unique_ptr<std::vector<Value>> varargs;
-            if (fp.variadic && total > fp.n_fixed) {
-                varargs = std::make_unique<std::vector<Value>>();
-                for (int i = fp.n_fixed; i < total; ++i)
-                    varargs->push_back(std::move(regs[cb + i]));
+            {
+                Frame fr;
+                fr.return_ip    = ip;
+                fr.reg_base     = cb;
+                fr.varargs_base = va_base3;
+                fr.n_varargs    = n_extra3;
+                fr.upvals       = std::move(fuv);
+                call_stack.push_back(std::move(fr));
             }
-            call_stack.push_back({ip, cb, std::move(varargs), std::move(fuv), {}, {}});
             fp_addr = fp.addr;
         }
     }
@@ -1011,7 +1077,7 @@ void VM::execute(Chunk chunk) {
     }
     growRegs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
-    call_stack.push_back({0, 0, {}, {}, {}});
+    call_stack.push_back(Frame{});
 
 
     runGoto(0);
