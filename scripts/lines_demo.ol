@@ -51,7 +51,7 @@ func frame()
         if x2[i] < 0 or x2[i] > W then vx2[i] = -vx2[i] end
         if y2[i] < 0 or y2[i] > H then vy2[i] = -vy2[i] end
 
-        graphics.line(x1[i], y1[i], x2[i], y2[i], cols[i])
+        graphics.line(x1[i], y1[i], x2[i], y2[i], 1, cols[i])
     end
 
     graphics.draw_text("FPS: " + graphics.fps(), W - 80, H - 20, 16, graphics.WHITE)

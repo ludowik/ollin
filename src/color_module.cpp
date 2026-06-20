@@ -12,8 +12,10 @@ static uint8_t colorComponent(const Value& v, const char* name) {
     return (uint8_t)d;
 }
 
-static const Value& colorField(const Value& self, const char* name) {
-    return self.asMap()->data.at(Value(std::string(name)));
+static Value colorField(const Value& self, const char* name) {
+    Value v = self.mapGet(Value(std::string(name)));
+    if (v.isNil()) throw std::runtime_error(std::string("Color: missing field '") + name + "'");
+    return v;
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────

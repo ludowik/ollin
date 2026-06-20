@@ -20,6 +20,7 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
                     catch (...) {
                         throw std::runtime_error("printf: invalid index '{" + spec + "}'");
                     }
+                    if (idx < 0) throw std::runtime_error("printf: index must be >= 0 (got " + spec + ")");
                 }
                 long long ai = (long long)idx + offset;
                 if (ai >= 0 && ai < (long long)args.size())
@@ -52,19 +53,7 @@ static Value core_printf(Value* args, int argc) {
 
 static Value core_typeof(Value* args, int argc) {
     if (argc < 1) return Value(std::string("nil"));
-    const Value& v = args[0];
-    const char* t;
-    if      (v.isNil())                         t = "nil";
-    else if (v.isInteger())                     t = "int";
-    else if (v.isFloat())                       t = "float";
-    else if (v.isString())                      t = "string";
-    else if (v.isArray())                       t = "array";
-    else if (v.isRange())                       t = "range";
-    else if (v.isClass())                       t = "class";
-    else if (v.isMap())                         t = "map";
-    else if (v.isFuncVal() || v.isClosure() || v.isBuiltin()) t = "function";
-    else                                        t = "unknown";
-    return Value(std::string(t));
+    return Value(std::string(args[0].typeName()));
 }
 
 Value makeCoreModule() {

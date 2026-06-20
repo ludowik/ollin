@@ -76,7 +76,7 @@ static Value gfx_clear(Value* args, int argc) {
 
 static Value gfx_line(Value* args, int argc) {
     if (argc < 4) throw std::runtime_error("graphics.line: expected x1, y1, x2, y2 [, thickness [, color]]");
-    float thick = argc > 4 ? (float)args[4].asNum() : 1.0f;
+    float thick = argc > 4 ? (args[4].isNumber() ? (float)args[4].asNum() : 1.0f) : 1.0f;
     Color color = argc > 5 ? toColor(args[5]) : WHITE;
     if (thick <= 1.0f) {
         DrawLine(toInt(args[0]), toInt(args[1]), toInt(args[2]), toInt(args[3]), color);

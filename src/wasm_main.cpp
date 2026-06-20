@@ -27,8 +27,9 @@ static std::string ollin_run(const std::string& source) {
         ));
         Value draw = s_vm->getGlobal("draw");
         if (draw.isCallable()) {
-            Value run_fn = makeBuiltinModule("graphics").mapGet(Value(std::string("run")));
-            run_fn.asBuiltin()(&draw, 1);
+            Value run_fn = s_vm->getGlobal("graphics").mapGet(Value(std::string("run")));
+            if (run_fn.isBuiltin())
+                run_fn.asBuiltin()(&draw, 1);
         }
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);

@@ -752,7 +752,7 @@ assert(rnd >= 0 and rnd < 1)
 ##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
 ##   graphics.run(func()
 ##       graphics.clear(graphics.BLACK)
-##       graphics.line(x1, y1, x2, y2, color)
+##       graphics.line(x1, y1, x2, y2, 1, color)
 ##   end)
 ##
 ## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY

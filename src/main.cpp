@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
             Value gfx = vm.getGlobal("graphics");
             if (gfx.isMap()) {
                 Value run_fn = gfx.mapGet(Value(std::string("run")));
-                if (run_fn.isCallable())
+                if (run_fn.isBuiltin())
                     run_fn.asBuiltin()(&draw, 1);
             }
         }
