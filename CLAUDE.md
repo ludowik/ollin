@@ -3,7 +3,8 @@
 ## Stack
 - Implémentation : **C++17**
 - Build : **CMake** (cross-platform)
-- Cibles : Windows, Linux, macOS, iOS, Android, wasm
+- Compilateurs supportés : **GCC et Clang** (computed-goto requis — MSVC non supporté)
+- Cibles : Windows (Clang natif), Linux, macOS, iOS, Android, wasm
 - Runtime : **bytecode custom + VM register-based** (instructions 32-bit format ABC/ABx/Bx)
 
 ## Architecture (pipeline strict, modules indépendants)
@@ -63,7 +64,7 @@ ollin/
 
 La VM utilise le **computed-goto dispatch** (`goto *dt[op]`) pour la performance (+15-25% vs switch).  
 gcc/clang sont **stricts** : toute variable avec destructeur non-trivial (`Value`, `std::vector`, `std::unique_ptr`…) doit être dans un bloc `{}` qui se ferme **avant** `NEXT()`.  
-MinGW/Windows accepte silencieusement ce code invalide — le CI Linux détecte l'erreur.
+Le fallback switch MSVC a été supprimé — seuls GCC et Clang sont supportés.
 
 **Règle** : dans chaque handler computed-goto, si des variables non-triviales sont nécessaires, les encapsuler :
 ```cpp
@@ -95,7 +96,7 @@ Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le 
 **Environnement de référence (Windows) :**
 - Lua : `C:\Tools\lua\lua55.exe` (Lua 5.5) — pas de Lua 5.4 disponible, pacman/MSYS2 inutilisable (timeouts réseau)
 - Python : `python` ou `python3` dans le PATH
-- Build : `cmake --build build` via **PowerShell** (g++ MinGW écrit ses erreurs via Windows Console API, invisible dans Git Bash)
+- Build : `cmake --build build` via **PowerShell** avec **Clang natif (LLVM)** — Clang définit `__GNUC__`, le computed-goto est actif
 
 **Règles strictes pour les comparaisons :**
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.

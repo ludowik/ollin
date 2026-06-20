@@ -885,8 +885,7 @@ void VM::execute(Chunk chunk) {
         return (idx < (uint32_t)ch->lines.size()) ? ch->lines[idx] : 0;
     };
 
-#ifdef __GNUC__
-// ── Computed-goto dispatch ────────────────────────────────────────────────────
+// ── Computed-goto dispatch (GCC / Clang) ─────────────────────────────────────
 // Table in the exact order of enum Op (chunk.h).
 // Each handler ends with NEXT() → direct jump to the next handler.
 #define NEXT() do {                                          \
@@ -1575,9 +1574,6 @@ op_HALT:
     }
 
 #undef NEXT
-
-#else
-    runSwitch(0);
 /*
 // ── Fallback switch (compilers without GNU extensions) ────────────────────────
     while (true) {
@@ -2141,5 +2137,4 @@ op_HALT:
         }
     }
 */
-#endif
 }
