@@ -310,7 +310,6 @@ void VM::runGoto(size_t stop_depth) {
 #define NEXT() do {                                          \
     Instr _ni = ch->code[ip++];                             \
     A  = iA(_ni); B = iB(_ni); C = iC(_ni); Bx = iBx(_ni); \
-    base = call_stack.back().reg_base;                      \
     goto *dt[iOP(_ni)];                                     \
 } while(0)
 
@@ -336,7 +335,7 @@ void VM::runGoto(size_t stop_depth) {
         &&op_HALT,
     };
 
-    uint8_t A, B, C; uint16_t Bx; int base;
+    uint8_t A, B, C; uint16_t Bx; int base = call_stack.back().reg_base;
 dispatch_loop:
     try {
     NEXT();
@@ -372,7 +371,7 @@ op_ADD: {
     }
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().add_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = (bv.isInteger() && cv.isInteger())
@@ -384,7 +383,7 @@ op_ADD: {
 op_SUB: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().sub_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = (bv.isInteger() && cv.isInteger())
@@ -396,7 +395,7 @@ op_SUB: {
 op_MUL: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().mul_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = (bv.isInteger() && cv.isInteger())
@@ -408,7 +407,7 @@ op_MUL: {
 op_DIV: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().div_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     double dv = asDouble(regs[base+C]);
     if (dv == 0.0) throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
@@ -419,7 +418,7 @@ op_DIV: {
 op_MOD: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().mod_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     if (bv.isInteger() && cv.isInteger()) {
@@ -466,7 +465,7 @@ op_POW: {
 op_NEGATE: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaUnary(MK().neg_, base+A, regs[base+B]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B];
     regs[base+A] = bv.isInteger() ? Value(-bv.asInt()) : Value(-asDouble(bv));
@@ -488,7 +487,7 @@ op_OR:
 op_EQ: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().eq_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     regs[base+A] = Value((int64_t)(valuesEqual(regs[base+B], regs[base+C]) ? 1 : 0));
     NEXT();
@@ -504,7 +503,7 @@ op_GT: {
     // GT(a,b) == LT(b,a): check __lt on rhs
     if (isInstance(regs[base+C])) {
         if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, regs[base+C], regs[base+B]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
@@ -516,7 +515,7 @@ op_GT: {
 op_LT: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
@@ -529,7 +528,7 @@ op_GE: {
     // GE(a,b) == LE(b,a): check __le on rhs
     if (isInstance(regs[base+C])) {
         if (uint32_t addr = tryMetaBinary(MK().le_, base+A, regs[base+C], regs[base+B]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
@@ -541,7 +540,7 @@ op_GE: {
 op_LE: {
     if (isInstance(regs[base+B])) {
         if (uint32_t addr = tryMetaBinary(MK().le_, base+A, regs[base+B], regs[base+C]))
-            { ip = addr; NEXT(); }
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
     const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
     regs[base+A] = Value((int64_t)((bv.isInteger() && cv.isInteger())
@@ -591,6 +590,7 @@ op_CALL_FUNC: {
         fp_addr = fp.addr;
     }
     ip = fp_addr;
+    base = call_stack.back().reg_base;
     NEXT();
 }
 
@@ -612,6 +612,7 @@ op_RETURN: {
         ip = rip;
     }
     if (call_stack.size() <= stop_depth) return;
+    base = call_stack.back().reg_base;
     NEXT();
 }
 
@@ -648,6 +649,7 @@ op_RETURN_V: {
         ip = rip;
     }
     if (call_stack.size() <= stop_depth) return;
+    base = call_stack.back().reg_base;
     NEXT();
 }
 
@@ -673,6 +675,7 @@ op_THROW: {
         if (regs.size() > h.regs_size) regs.resize(h.regs_size);
         regs[h.reg_base + h.catch_reg] = std::move(thrown);
         ip = h.catch_addr;
+        base = call_stack.back().reg_base;
     }
     NEXT();
 }
@@ -849,7 +852,7 @@ op_CALL_DYN: {
             }
             do_call = true;
         }
-        if (do_call) { ip = ctor_addr; NEXT(); }
+        if (do_call) { ip = ctor_addr; base = call_stack.back().reg_base; NEXT(); }
     }
     {
         // Regular function/closure call
@@ -891,6 +894,7 @@ op_CALL_DYN: {
         ip = fp_addr;
     }
     call_dyn_done:
+    base = call_stack.back().reg_base;
     NEXT();
 }
 
@@ -1002,6 +1006,7 @@ op_CALL_METHOD: {
     }
     ip = fp_addr;
     call_method_done:
+    base = call_stack.back().reg_base;
     NEXT();
 }
 
