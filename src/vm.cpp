@@ -1031,6 +1031,8 @@ op_MAKE_RANGE: {
 }
 
 op_HALT:
+    closeUpvals();
+    call_stack.pop_back();
     return;
 
     } catch (const std::runtime_error& e) {
