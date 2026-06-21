@@ -7,3 +7,4 @@ build_wasm/
 build-wasm/
 .claude/worktrees/
 build_debug/
+build-dbg/
