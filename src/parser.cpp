@@ -897,11 +897,18 @@ std::unique_ptr<Stmt> Parser::classDecl() {
     while (true) {
         skipSemis();
         if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+        bool is_static = false;
+        if (check(TokenType::STATIC)) {
+            advance();   // consomme 'static'
+            is_static = true;
+        }
         if (!check(TokenType::FUNC))
             throw std::runtime_error("line " + std::to_string(peek().line) +
                                      ": expected 'func' inside class body");
-        s->methods.push_back(std::unique_ptr<FuncDeclStmt>(
-            static_cast<FuncDeclStmt*>(funcDeclStmt().release())));
+        auto method = std::unique_ptr<FuncDeclStmt>(
+            static_cast<FuncDeclStmt*>(funcDeclStmt().release()));
+        method->is_static = is_static;
+        s->methods.push_back(std::move(method));
     }
     expect(TokenType::END);
     consumeSemi();
