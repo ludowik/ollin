@@ -12,19 +12,14 @@ static int toInt(const Value& v) {
     return 0;
 }
 
-// Color: map/instance avec r,g,b,a en [0,1], ou entier packté (r<<24|g<<16|b<<8|a)
 static Color toColor(const Value& v) {
-    if (v.isMap() || v.isClass()) {
-        auto getComp = [&](const char* k, double def) -> uint8_t {
-            Value f = v.mapGet(Value(std::string(k)));
-            return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
-        };
-        return { getComp("r", 0), getComp("g", 0), getComp("b", 0), getComp("a", 1) };
-    }
-    if (!v.isInteger()) return WHITE;
-    int64_t c = v.asInt();
-    return { (uint8_t)(c >> 24 & 0xFF), (uint8_t)(c >> 16 & 0xFF),
-             (uint8_t)(c >>  8 & 0xFF), (uint8_t)(c        & 0xFF) };
+    if (!v.isMap() && !v.isClass())
+        throw std::runtime_error("expected a Color object");
+    auto getComp = [&](const char* k, double def) -> uint8_t {
+        Value f = v.mapGet(Value(std::string(k)));
+        return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
+    };
+    return { getComp("r", 0), getComp("g", 0), getComp("b", 0), getComp("a", 1) };
 }
 
 static Value colorInst(double r, double g, double b) {

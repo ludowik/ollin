@@ -398,7 +398,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-22 17:41</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-22 17:48</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="#playground" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -435,7 +435,7 @@ pre:hover .code-actions,
   <a href="#stdlib">Modules built-in</a>
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
-  <a href="#graphics">Graphics</a>
+  <a href="#graphics">Graphics + Colors</a>
 </nav>
 
 <main>
@@ -1367,26 +1367,42 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 
-<h3>Couleurs</h3>
-<p>Les couleurs sont des entiers 32 bits au format <code>RRGGBBAA</code> :</p>
+<h3>Couleurs — classe <code>Color</code></h3>
+<p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code>. L'alpha est optionnel (défaut : <code>1.0</code>). Les composantes sont clampées silencieusement.</p>
+<pre><code><span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)          <span class="cmt">## rouge opaque</span>
+<span class="kw">var</span> bleu  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)    <span class="cmt">## bleu semi-transparent</span>
+<span class="bi">print</span>(rouge)   <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
+
+<span class="cmt">## accès direct aux composantes</span>
+<span class="bi">print</span>(rouge.r, rouge.g, rouge.b, rouge.a)</code></pre>
+
+<h3>Module <code>colors</code></h3>
+<p>Palette de constantes prédéfinies, disponible sans <code>import</code>. Chaque constante est un objet <code>Color</code>.</p>
 <table>
-  <thead><tr><th>Constante</th><th>Valeur</th></tr></thead>
+  <thead><tr><th>Constante</th><th>r</th><th>g</th><th>b</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.BLACK</code></td><td>0x000000FF</td></tr>
-    <tr><td><code>graphics.WHITE</code></td><td>0xFFFFFFFF</td></tr>
-    <tr><td><code>graphics.RED</code></td><td>0xE6293AFF</td></tr>
-    <tr><td><code>graphics.GREEN</code></td><td>0x00E430FF</td></tr>
-    <tr><td><code>graphics.BLUE</code></td><td>0x0079F1FF</td></tr>
-    <tr><td><code>graphics.YELLOW</code></td><td>0xFDF900FF</td></tr>
-    <tr><td><code>graphics.GRAY</code></td><td>0x828282FF</td></tr>
+    <tr><td><code>colors.BLACK</code></td><td>0.0</td><td>0.0</td><td>0.0</td></tr>
+    <tr><td><code>colors.WHITE</code></td><td>1.0</td><td>1.0</td><td>1.0</td></tr>
+    <tr><td><code>colors.RED</code></td><td>0.902</td><td>0.161</td><td>0.216</td></tr>
+    <tr><td><code>colors.GREEN</code></td><td>0.0</td><td>0.894</td><td>0.188</td></tr>
+    <tr><td><code>colors.BLUE</code></td><td>0.0</td><td>0.475</td><td>0.945</td></tr>
+    <tr><td><code>colors.YELLOW</code></td><td>0.992</td><td>0.976</td><td>0.0</td></tr>
+    <tr><td><code>colors.GRAY</code></td><td>0.510</td><td>0.510</td><td>0.510</td></tr>
+    <tr><td><code>colors.ORANGE</code></td><td>1.0</td><td>0.631</td><td>0.0</td></tr>
+    <tr><td><code>colors.PINK</code></td><td>1.0</td><td>0.427</td><td>0.761</td></tr>
+    <tr><td><code>colors.PURPLE</code></td><td>0.784</td><td>0.478</td><td>1.0</td></tr>
+    <tr><td><code>colors.SKYBLUE</code></td><td>0.400</td><td>0.749</td><td>1.0</td></tr>
+    <tr><td><code>colors.LIME</code></td><td>0.0</td><td>0.620</td><td>0.184</td></tr>
+    <tr><td><code>colors.MAGENTA</code></td><td>1.0</td><td>0.0</td><td>1.0</td></tr>
   </tbody>
 </table>
-<p>Couleur personnalisée via les opérateurs bits :</p>
+<div class="callout tip">Les mêmes constantes sont aussi accessibles via <code>graphics</code> : <code>graphics.BLACK</code>, <code>graphics.WHITE</code>, etc.</div>
+
+<h3>Couleur personnalisée</h3>
 <pre data-no-run><code><span class="cmt">## couleur aléatoire claire</span>
-<span class="kw">var</span> r = math.floor(math.rand() * <span class="num">200</span>) + <span class="num">55</span>
-<span class="kw">var</span> g = math.floor(math.rand() * <span class="num">200</span>) + <span class="num">55</span>
-<span class="kw">var</span> b = math.floor(math.rand() * <span class="num">200</span>) + <span class="num">55</span>
-<span class="kw">var</span> color = (r &lt;&lt; <span class="num">24</span>) | (g &lt;&lt; <span class="num">16</span>) | (b &lt;&lt; <span class="num">8</span>) | <span class="num">255</span></code></pre>
+<span class="kw">func</span> rand_color()
+    <span class="kw">return</span> <span class="bi">Color</span>(math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>)
+<span class="kw">end</span></code></pre>
 </section>
 
 
@@ -1416,7 +1432,7 @@ const KEYWORDS = new Set([
   'break','true','false','nil','try','catch','throw','else','func','return',
   'import','as','or','and','not','class','extends','super','self'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','math','graphics','string'])
+const BUILTINS = new Set(['print','printf','time','assert','Color','math','graphics','string','colors'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',
@@ -1552,7 +1568,7 @@ const pgExamples = [
   { name: 'Closure',      code: 'func counter()\n  var n = 0\n  return func()\n    n = n + 1\n    return n\n  end\nend\nvar c = counter()\nprint(c(), c(), c())' },
   { name: 'Map',          code: 'var m = {name: "ollin", version: 1}\nfor k, v in m do\n  print(k, "=", v)\nend' },
   { name: 'Classe',       code: 'class Vec2\n  func init(x, y)\n    self.x = x\n    self.y = y\n  end\n  func __add(other)\n    return Vec2(self.x + other.x, self.y + other.y)\n  end\n  func __str()\n    return "Vec2(" + self.x + "," + self.y + ")"\n  end\nend\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
-  { name: 'Graphics',     code: 'const W = 800\nconst H = 500\nconst N = 200\nconst SPEED = 3\n\nfunc rand_color()\n  var r = math.floor(math.rand() * 200) + 55\n  var g = math.floor(math.rand() * 200) + 55\n  var b = math.floor(math.rand() * 200) + 55\n  return (r << 24) | (g << 16) | (b << 8) | 255\nend\n\nfunc rpos(max)  return math.floor(math.rand() * max)  end\nfunc rvel()     return math.rand() * SPEED * 2 - SPEED end\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n  x1[i]=rpos(W)  y1[i]=rpos(H)  x2[i]=rpos(W)  y2[i]=rpos(H)\n  vx1[i]=rvel()  vy1[i]=rvel()  vx2[i]=rvel()  vy2[i]=rvel()\n  cols[i]=rand_color()\nend\n\ngraphics.canvas(W, H, "Lignes animées")\n\nfunc frame()\n  graphics.clear(graphics.BLACK)\n  for i = 1, N do\n    x1[i]=x1[i]+vx1[i]  y1[i]=y1[i]+vy1[i]\n    x2[i]=x2[i]+vx2[i]  y2[i]=y2[i]+vy2[i]\n    if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n    if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n    if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n    if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n    graphics.line(x1[i],y1[i],x2[i],y2[i],1,cols[i])\n  end\n  graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16, graphics.WHITE)\nend\n\ngraphics.run(frame)' },
+  { name: 'Graphics',     code: 'const W = 800\nconst H = 500\nconst N = 200\nconst SPEED = 3\n\nfunc rand_color()\n  return Color(math.rand() * 0.8 + 0.2, math.rand() * 0.8 + 0.2, math.rand() * 0.8 + 0.2)\nend\n\nfunc rpos(max)  return math.floor(math.rand() * max)  end\nfunc rvel()     return math.rand() * SPEED * 2 - SPEED end\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n  x1[i]=rpos(W)  y1[i]=rpos(H)  x2[i]=rpos(W)  y2[i]=rpos(H)\n  vx1[i]=rvel()  vy1[i]=rvel()  vx2[i]=rvel()  vy2[i]=rvel()\n  cols[i]=rand_color()\nend\n\ngraphics.canvas(W, H, "Lignes animées")\n\nfunc frame()\n  graphics.clear(graphics.BLACK)\n  for i = 1, N do\n    x1[i]=x1[i]+vx1[i]  y1[i]=y1[i]+vy1[i]\n    x2[i]=x2[i]+vx2[i]  y2[i]=y2[i]+vy2[i]\n    if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n    if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n    if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n    if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n    graphics.line(x1[i],y1[i],x2[i],y2[i],1,cols[i])\n  end\n  graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16, graphics.WHITE)\nend\n\ngraphics.run(frame)' },
 ]
 
 const pgEditorCm   = document.getElementById('pg-editor-cm')

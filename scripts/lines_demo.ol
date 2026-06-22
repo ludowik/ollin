@@ -5,10 +5,7 @@ const N = 200
 const SPEED = 3
 
 func rand_color()
-    var r = math.floor(math.rand() * 200) + 55
-    var g = math.floor(math.rand() * 200) + 55
-    var b = math.floor(math.rand() * 200) + 55
-    return (r << 24) | (g << 16) | (b << 8) | 255
+    return Color(math.rand() * 0.8 + 0.2, math.rand() * 0.8 + 0.2, math.rand() * 0.8 + 0.2)
 end
 
 func rpos(max)
