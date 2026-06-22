@@ -1,11 +1,3 @@
-build/
-build_rel/
-build_native/
-build_native2/
-build_reg/
-build_wasm/
-build-wasm/
-.claude/worktrees/
-build_debug/
-build-dbg/
+build*/
 third_party/
+.claude/worktrees/
