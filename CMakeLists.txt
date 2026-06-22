@@ -56,19 +56,21 @@ if(EMSCRIPTEN)
         COMMENT "Updating build date in docs/index.html"
     )
 else()
-    include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(raylib
-        GIT_REPOSITORY https://github.com/raysan5/raylib.git
-        GIT_TAG        6.0
-        GIT_SHALLOW    TRUE
-    )
-    FetchContent_MakeAvailable(raylib)
 
-    add_executable(ollin src/main.cpp ${OLLIN_SOURCES} src/raylib_module.cpp)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/raylib/CMakeLists.txt")
+        add_subdirectory(third_party/raylib)
+        set(OLLIN_GRAPHICS_SOURCE src/raylib_module.cpp)
+        set(OLLIN_GRAPHICS_LIB raylib)
+    else()
+        set(OLLIN_GRAPHICS_SOURCE src/graphics_stub.cpp)
+        set(OLLIN_GRAPHICS_LIB "")
+    endif()
+
+    add_executable(ollin src/main.cpp ${OLLIN_SOURCES} ${OLLIN_GRAPHICS_SOURCE})
     target_include_directories(ollin PRIVATE src)
-    target_link_libraries(ollin PRIVATE raylib)
+    target_link_libraries(ollin PRIVATE ${OLLIN_GRAPHICS_LIB})
     if(MSVC)
         target_compile_options(ollin PRIVATE /W4)
     else()

@@ -8,3 +8,4 @@ build-wasm/
 .claude/worktrees/
 build_debug/
 build-dbg/
+third_party/
