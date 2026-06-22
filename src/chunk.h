@@ -32,7 +32,7 @@ struct Value {
     union {
         int64_t            ival;
         double             dval;
-        const std::string* sptr;  // pointe vers la string_table (non-owning)
+        InternedStr*       sptr;  // pointe vers l'objet interné (refcount géré inline)
         Map*               mptr;
         Array*             aptr;
         Iterator*          iptr;
@@ -66,7 +66,7 @@ public:
     Value(int64_t v)     : tag(T_INTEGER), str_hash(0), ival(v) {}
     Value(std::string v) : tag(T_STRING),  str_hash(0) {
         sptr = intern(std::move(v));
-        str_hash = (uint32_t)string_table().hashOf(sptr);
+        str_hash = sptr->hash;
     }
 
     Value(const Value& o);
@@ -105,7 +105,7 @@ public:
     int64_t asInt()               const { return ival; }
     double  asFloat()             const { return dval; }
     double  asNum()               const { return isInteger() ? (double)ival : dval; }
-    const std::string& asString() const { return *sptr; }
+    const std::string& asString() const { return sptr->str; }
 
     static Value makeMap();
     Value        mapGet(const Value& key)              const;
@@ -179,7 +179,7 @@ inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(0) 
         case T_NIL:      break;
         case T_INTEGER:  ival = o.ival; break;
         case T_FLOAT:    dval = o.dval; break;
-        case T_STRING:   sptr = o.sptr; string_table().retain(sptr); break;
+        case T_STRING:   sptr = o.sptr; ++sptr->refcount; break;
         case T_MAP:      mptr = o.mptr; mptr->refcount++; break;
         case T_CLASS:    mptr = o.mptr; mptr->refcount++; break;
         case T_ARRAY:    aptr = o.aptr; aptr->refcount++; break;
@@ -194,7 +194,7 @@ inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
     // Retain d'abord (protège si this et o partagent la même ressource)
     switch (o.tag) {
-        case T_STRING:   string_table().retain(o.sptr); break;
+        case T_STRING:   ++o.sptr->refcount; break;
         case T_MAP:      o.mptr->refcount++;             break;
         case T_CLASS:    o.mptr->refcount++;             break;
         case T_ARRAY:    o.aptr->refcount++;             break;
@@ -205,7 +205,7 @@ inline Value& Value::operator=(const Value& o) {
     }
     // Release de l'ancienne valeur
     switch (tag) {
-        case T_STRING:   string_table().release(sptr); break;
+        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
@@ -235,7 +235,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
     // Release de l'ancienne valeur (on prend possession de la référence de o)
     switch (tag) {
-        case T_STRING:   string_table().release(sptr); break;
+        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
@@ -249,7 +249,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
 }
 inline Value::~Value() {
     switch (tag) {
-        case T_STRING:   string_table().release(sptr); break;
+        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
         case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
         case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
