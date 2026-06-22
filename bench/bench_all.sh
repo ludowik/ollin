@@ -17,7 +17,7 @@ labels=("fib(35) récursif" "boucle 10M" "map 100K" "array 1M" "appels 1M")
 
 echo ""
 echo "┌──────────────────────┬──────────────┬──────────────┬──────────────┐"
-echo "│ Benchmark            │    Ollin     │    Lua 5.5   │   Python 3   │"
+echo "│ Benchmark            │   Lua 5.5    │    Ollin     │   Python 3   │"
 echo "├──────────────────────┼──────────────┼──────────────┼──────────────┤"
 
 ollin_times=()
@@ -45,16 +45,27 @@ for b in "${benchmarks[@]}"; do
     fi
 done
 
+ratio() {
+    local val="$1" ref="$2"
+    if [[ "$val" == "N/A" || "$ref" == "N/A" || "$ref" == "0" ]]; then
+        echo "N/A"
+    else
+        awk "BEGIN { printf \"x%.2f\", $val / $ref }"
+    fi
+}
+
 for i in 0 1 2 3 4; do
     label="${labels[$i]}"
     ot="${ollin_times[$i]}"
     lt="${lua_times[$i]}"
     pt="${py_times[$i]}"
+    or=$(ratio "$ot" "$lt")
+    pr=$(ratio "$pt" "$lt")
     printf "│ %-20s │ %12s │ %12s │ %12s │\n" \
         "$label" \
-        "${ot:+${ot}s}" \
         "${lt:+${lt}s}" \
-        "${pt:+${pt}s}"
+        "$or" \
+        "$pr"
 done
 
 echo "└──────────────────────┴──────────────┴──────────────┴──────────────┘"
