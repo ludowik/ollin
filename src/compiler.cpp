@@ -171,8 +171,10 @@ static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
         }
         if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
             collectGlobals(b->stmts, out);
-        if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get()))
+        if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get())) {
+            out.insert(c->name);  // classe visible par ses propres méthodes
             for (auto& m : c->methods) collectGlobals(m->body, out);
+        }
     }
 }
 
@@ -579,7 +581,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
                   ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0, {}};
+    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
     uint8_t func_idx = chunk.addFunc(fp);
     current_func_idx_ = func_idx;
 
@@ -690,7 +692,7 @@ void Compiler::visit(const FuncExpr& s) {
                   ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0, {}};
+    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
     uint8_t func_idx = chunk.addFunc(fp);
     current_func_idx_ = func_idx;
 
@@ -1303,15 +1305,25 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     reg_count_ = 0;
     locals_top_ = 0;
 
-    // 'self' en R[0], puis les paramètres déclarés en R[1..n]
-    local_regs_["self"] = 0;
     int n_params = (int)s.params.size();
-    for (int i = 0; i < n_params; ++i)
-        local_regs_[s.params[i]] = i + 1;
-    int n_fixed = 1 + n_params;
+    int n_fixed;
+
+    if (s.is_static) {
+        // méthode statique : pas de self, params en R[0..n-1]
+        for (int i = 0; i < n_params; ++i)
+            local_regs_[s.params[i]] = i;
+        n_fixed = n_params;
+    } else {
+        // méthode d'instance : self en R[0], params en R[1..n]
+        local_regs_["self"] = 0;
+        for (int i = 0; i < n_params; ++i)
+            local_regs_[s.params[i]] = i + 1;
+        n_fixed = 1 + n_params;
+    }
     reg_top_ = n_fixed;
 
-    std::vector<std::string> body_locals = {"self"};
+    std::vector<std::string> body_locals;
+    if (!s.is_static) body_locals.push_back("self");
     body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
     collectLocals(s.body, body_locals);
     for (auto& name : body_locals)
@@ -1323,14 +1335,15 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     size_t jump_patch = chunk.emitJump(Op::JUMP);
     uint32_t func_addr = (uint32_t)chunk.currentPos();
 
-    // defaults : index 0 = self (pas de défaut), puis les params
+    // defaults : pour méthode instance, index 0 = self (pas de défaut)
     std::vector<Value> defs(n_fixed);
+    int defs_offset = s.is_static ? 0 : 1;
     for (int i = 0; i < n_params; ++i)
-        defs[i+1] = (i < (int)s.defaults.size() && s.defaults[i])
-                    ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i])
+                                 ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, defaults_idx, 0, {}};
+    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, s.is_static, defaults_idx, 0, {}};
     uint8_t func_idx = chunk.addFunc(fp);
     current_func_idx_ = func_idx;
 

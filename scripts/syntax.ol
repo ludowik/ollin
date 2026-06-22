@@ -691,6 +691,35 @@ var v3 = v1 + v2
 assert(v3.x == 4)
 assert(v3.y == 6)
 
+## méthodes statiques (appelables sur la classe, pas de self)
+class Factory
+    static func zero()
+        return Factory.make(0)
+    end
+    static func make(val)
+        var obj = Factory()
+        obj.val = val
+        return obj
+    end
+    func init()
+        self.val = -1
+    end
+    func get()
+        return self.val
+    end
+end
+
+var f0 = Factory.zero()
+assert(f0.get() == 0)
+
+var f5 = Factory.make(5)
+assert(f5.get() == 5)
+
+## appel via une instance : pas de self injecté
+var fi = Factory()
+var f7 = fi.make(7)
+assert(f7.get() == 7)
+
 print("class tests ok")
 
 ## ── 19. Constantes ───────────────────────────────────────────────────────────

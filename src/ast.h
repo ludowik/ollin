@@ -194,7 +194,8 @@ struct FuncDeclStmt : Stmt {
     std::string name;
     std::vector<std::string> params;
     std::vector<std::unique_ptr<Expr>> defaults; // nullptr = pas de défaut
-    bool variadic = false;
+    bool variadic   = false;
+    bool is_static  = false;   // méthode de classe (pas de self implicite)
     std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };

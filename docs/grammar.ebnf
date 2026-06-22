@@ -32,8 +32,10 @@ stmt           = varDecl
 importStmt     = "import" STRING [ "as" IDENT ] NL ;
 
 classDecl      = "class" IDENT [ "extends" IDENT ] NL { method } "end" NL ;
-method         = "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
-                 (* le premier paramètre implicite est "self" ; "func init(...)" = constructeur *)
+method         = [ "static" ] "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
+                 (* sans "static" : méthode d'instance — premier param implicite "self" en R[0] *)
+                 (* avec "static" : méthode de classe — pas de self, appelable via Classe.m() ou instance.m() *)
+                 (* "func init(...)" = constructeur (toujours instance) *)
                  (* méthodes spéciales : init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
 
 methodCall     = expr "." IDENT "(" [ expr { "," expr } ] ")" ;

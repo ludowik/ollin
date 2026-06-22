@@ -340,6 +340,7 @@ struct FuncProto {
     uint32_t addr;
     uint8_t  n_fixed;
     bool     variadic;
+    bool     is_static = false;
     uint16_t defaults_idx;
     uint8_t  reg_count;
     std::vector<UpvalDesc> upvals;

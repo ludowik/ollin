@@ -954,8 +954,13 @@ op_CALL_METHOD: {
         int argc = C;
         bool is_instance = isInstance(regs[cb]) || regs[cb].isString();
         Value fn = regs[cb + 1];
+        // méthode statique : pas d'injection de self, même si appelée sur une instance
+        bool fn_is_static = false;
+        if (fn.isFuncVal())  fn_is_static = ch->funcs[(uint8_t)fn.asInt()].is_static;
+        else if (fn.isClosure()) fn_is_static = ch->funcs[fn.asClosure()->func_idx].is_static;
+        bool inject_self = is_instance && !fn_is_static;
         int total;
-        if (is_instance) {
+        if (inject_self) {
             for (int i = 0; i < argc; ++i)
                 regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);
             total = argc + 1;
