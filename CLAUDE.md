@@ -83,7 +83,7 @@ op_EXEMPLE: {
 
 Quand l'utilisateur dit **"perf"**, lancer : `bash bench/bench_all.sh`
 
-Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le tableau comparatif Ollin | Lua | Python est généré automatiquement.
+Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le tableau affiche : **temps absolu Lua** comme référence, **coefficient multiplicateur** (xN.NN) pour Ollin et Python.
 
 | # | Benchmark | Script |
 |---|-----------|--------|
