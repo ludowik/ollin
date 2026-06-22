@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 // Objet d'internement : refcount + hash + contenu au même endroit.
@@ -12,19 +13,21 @@ struct InternedStr {
 };
 
 struct StringTable {
-    std::unordered_map<std::string, InternedStr*> table_;
+    // Clé = string_view pointant dans InternedStr::str (stable, heap-alloué).
+    // Zéro copie du contenu : la string n'existe qu'une seule fois dans InternedStr.
+    std::unordered_map<std::string_view, InternedStr*> table_;
 
     InternedStr* intern(std::string s) {
-        auto it = table_.find(s);
+        auto it = table_.find(std::string_view(s));
         if (it != table_.end()) { ++it->second->refcount; return it->second; }
         auto h = (uint32_t)std::hash<std::string>{}(s);
         auto* p = new InternedStr{1, h, std::move(s)};
-        table_[p->str] = p;
+        table_.emplace(std::string_view(p->str), p);  // view dans p->str, pas de copie
         return p;
     }
 
     void erase(InternedStr* p) {
-        table_.erase(p->str);
+        table_.erase(std::string_view(p->str));  // avant delete — view doit rester valide
         delete p;
     }
 };
