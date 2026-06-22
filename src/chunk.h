@@ -26,7 +26,9 @@ struct Closure;
 struct Range;
 
 struct Value {
-    uint8_t tag;
+    uint8_t  tag;
+    uint8_t  _pad[3];    // padding explicite (anciennement implicite)
+    uint32_t str_hash;   // hash contenu mis en cache, valide uniquement pour T_STRING
     union {
         int64_t            ival;
         double             dval;
@@ -52,20 +54,23 @@ struct Value {
     static constexpr uint8_t T_RANGE    = 11;  // range [a;b] (Range*, ref-counted)
 
 private:
-    explicit Value(Map*      p) : tag(T_MAP),      mptr(p) {}
-    explicit Value(Array*    p) : tag(T_ARRAY),    aptr(p) {}
-    explicit Value(Iterator* p) : tag(T_ITERATOR), iptr(p) {}
-    explicit Value(Closure*  p) : tag(T_CLOSURE),  cptr(p) {}
-    explicit Value(Range*    p) : tag(T_RANGE),    rptr(p) {}
+    explicit Value(Map*      p) : tag(T_MAP),      str_hash(0), mptr(p) {}
+    explicit Value(Array*    p) : tag(T_ARRAY),    str_hash(0), aptr(p) {}
+    explicit Value(Iterator* p) : tag(T_ITERATOR), str_hash(0), iptr(p) {}
+    explicit Value(Closure*  p) : tag(T_CLOSURE),  str_hash(0), cptr(p) {}
+    explicit Value(Range*    p) : tag(T_RANGE),    str_hash(0), rptr(p) {}
 
 public:
-    Value()              : tag(T_NIL), ival(0) {}
-    Value(double d)      : tag(T_FLOAT), dval(d) {}
-    Value(int64_t v)     : tag(T_INTEGER), ival(v) {}
-    Value(std::string v) : tag(T_STRING), sptr(intern(std::move(v))) {}
+    Value()              : tag(T_NIL),     str_hash(0), ival(0) {}
+    Value(double d)      : tag(T_FLOAT),   str_hash(0), dval(d) {}
+    Value(int64_t v)     : tag(T_INTEGER), str_hash(0), ival(v) {}
+    Value(std::string v) : tag(T_STRING),  str_hash(0) {
+        sptr = intern(std::move(v));
+        str_hash = (uint32_t)string_table().hashOf(sptr);
+    }
 
     Value(const Value& o);
-    Value(Value&& o) noexcept : tag(o.tag), ival(o.ival) { o.tag = T_NIL; }
+    Value(Value&& o) noexcept : tag(o.tag), str_hash(o.str_hash), ival(o.ival) { o.tag = T_NIL; }
     Value& operator=(const Value& o);
     Value& operator=(Value&& o) noexcept;
     ~Value();
@@ -169,7 +174,7 @@ inline Value Value::makeIterFrom(const Value& src) {
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
 
-inline Value::Value(const Value& o) : tag(o.tag), ival(0) {
+inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(0) {
     switch (tag) {
         case T_NIL:      break;
         case T_INTEGER:  ival = o.ival; break;
@@ -209,7 +214,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
     }
-    tag = o.tag; ival = 0;
+    tag = o.tag; str_hash = o.str_hash; ival = 0;
     switch (tag) {
         case T_NIL:      break;
         case T_INTEGER:  ival = o.ival; break;
@@ -239,7 +244,7 @@ inline Value& Value::operator=(Value&& o) noexcept {
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
         default: break;
     }
-    tag = o.tag; ival = o.ival; o.tag = T_NIL;
+    tag = o.tag; str_hash = o.str_hash; ival = o.ival; o.tag = T_NIL;
     return *this;
 }
 inline Value::~Value() {
