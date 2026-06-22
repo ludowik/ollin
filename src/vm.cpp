@@ -81,19 +81,11 @@ std::string VM::invokeStr(Value obj) {   // by value: regs.resize() ne invalide 
         Value nm = cls.mapGet(MK().name_);
         return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
     }
-    const FuncProto& fp = ch->funcs[fi];
     int call_base = (int)regs.size();
-    growRegs((size_t)(call_base + std::max((int)fp.reg_count, 1)));
-    regs[call_base] = obj;
+    growRegs((size_t)(call_base + std::max((int)ch->funcs[fi].reg_count, 1)));
+    regs[call_base] = obj;  // self en R[0] avant pushCallFrame
     uint32_t saved_ip = ip;
-    {
-        Frame fr;
-        fr.return_ip = 0;
-        fr.reg_base  = call_base;
-        fr.upvals    = std::move(frame_upvals);
-        call_stack.push_back(std::move(fr));
-    }
-    ip = fp.addr;
+    ip = pushCallFrame(call_base, fi, 1, std::move(frame_upvals), 0);
     runGoto(call_stack.size() - 1);
     std::string result;
     if ((int)regs.size() > call_base) {
@@ -175,20 +167,11 @@ uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs) {
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
     else { fi = fn.asClosure()->func_idx; const auto& u = fn.asClosure()->upvals; if (!u.empty()) fuv = std::make_unique<std::vector<Upvalue*>>(u); }
-    const FuncProto& fp = ch->funcs[fi];
     int nb = (int)regs.size();
-    growRegs((size_t)(nb + std::max((int)fp.reg_count, 2)));
+    growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb]     = std::move(lhs);
     regs[nb + 1] = std::move(rhs);
-    {
-        Frame fr;
-        fr.return_ip  = ip;
-        fr.reg_base   = nb;
-        fr.return_dest = dest;
-        fr.upvals     = std::move(fuv);
-        call_stack.push_back(std::move(fr));
-    }
-    return fp.addr;
+    return pushCallFrame(nb, fi, 2, std::move(fuv), ip, false, dest);
 }
 
 uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
@@ -198,19 +181,10 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
     else { fi = fn.asClosure()->func_idx; const auto& u = fn.asClosure()->upvals; if (!u.empty()) fuv = std::make_unique<std::vector<Upvalue*>>(u); }
-    const FuncProto& fp = ch->funcs[fi];
     int nb = (int)regs.size();
-    growRegs((size_t)(nb + std::max((int)fp.reg_count, 1)));
+    growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[nb] = std::move(lhs);
-    {
-        Frame fr;
-        fr.return_ip   = ip;
-        fr.reg_base    = nb;
-        fr.return_dest = dest;
-        fr.upvals      = std::move(fuv);
-        call_stack.push_back(std::move(fr));
-    }
-    return fp.addr;
+    return pushCallFrame(nb, fi, 1, std::move(fuv), ip, false, dest);
 }
 
 // ── closeUpvals : close and free all open upvalues of the top frame ──────────
@@ -282,18 +256,9 @@ Value VM::callValue(const Value& fn) {
     } else {
         throw std::runtime_error("callValue: not callable");
     }
-    const FuncProto& fp = ch->funcs[fi];
     int call_base = (int)regs.size();
-    growRegs((size_t)(call_base + std::max((int)fp.reg_count, 1)));
     uint32_t saved_ip = ip;
-    {
-        Frame fr;
-        fr.return_ip = saved_ip;
-        fr.reg_base  = call_base;
-        fr.upvals    = std::move(frame_upvals);
-        call_stack.push_back(std::move(fr));
-    }
-    ip = fp.addr;
+    ip = pushCallFrame(call_base, fi, 0, std::move(frame_upvals), saved_ip);
     runGoto(call_stack.size() - 1);
     Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
     regs.resize(call_base);
@@ -301,6 +266,44 @@ Value VM::callValue(const Value& fn) {
     return result;
 }
 
+
+// ── pushCallFrame ─────────────────────────────────────────────────────────────
+// Point d'entrée unique pour toute construction de frame d'appel :
+//   1. growRegs au minimum nécessaire
+//   2. rempli les défauts pour les args manquants (argc < n_fixed)
+//   3. déplace les varargs au-delà de reg_count
+//   4. construit et empile le Frame
+//   5. retourne fp.addr (le caller fait ip = pushCallFrame(...))
+uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc,
+                            std::unique_ptr<std::vector<Upvalue*>> fuv,
+                            uint32_t return_ip, bool is_ctor, int return_dest) {
+    const FuncProto& fp = ch->funcs[fi];
+    growRegs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
+    if (argc < fp.n_fixed) {
+        auto& defs = ch->func_defaults[fp.defaults_idx];
+        for (int i = argc; i < fp.n_fixed; ++i)
+            regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
+    }
+    int n_varargs = 0;
+    int va_base   = new_base + fp.reg_count;
+    if (fp.variadic && argc > fp.n_fixed) {
+        n_varargs = argc - fp.n_fixed;
+        growRegs((size_t)(va_base + n_varargs));
+        for (int i = n_varargs - 1; i >= 0; --i)
+            regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
+    }
+    growRegs((size_t)(new_base + fp.reg_count));
+    Frame fr;
+    fr.return_ip    = return_ip;
+    fr.reg_base     = new_base;
+    fr.varargs_base = va_base;
+    fr.n_varargs    = n_varargs;
+    fr.is_ctor      = is_ctor;
+    fr.return_dest  = return_dest;
+    fr.upvals       = std::move(fuv);
+    call_stack.push_back(std::move(fr));
+    return fp.addr;
+}
 
 // ── runGoto: dispatch loop, stops when call_stack.size() <= stop_depth ────────
 void VM::runGoto(size_t stop_depth) {
@@ -558,38 +561,7 @@ op_JUMP_IF_FALSE:
     NEXT();
 
 op_CALL_FUNC: {
-    uint32_t fp_addr;
-    {
-        const FuncProto& fp = ch->funcs[B];
-        int new_base = base + A;
-        int argc = C;
-        size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-        if (regs.size() < needed) regs.resize(needed);
-        if (argc < fp.n_fixed) {
-            auto& defs = ch->func_defaults[fp.defaults_idx];
-            for (int i = argc; i < fp.n_fixed; ++i)
-                regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
-        }
-        int n_extra = 0;
-        int va_base = new_base + fp.reg_count;
-        if (fp.variadic && argc > fp.n_fixed) {
-            n_extra = argc - fp.n_fixed;
-            growRegs((size_t)(va_base + n_extra));
-            // Backward copy: va_base may overlap source range when reg_count > n_fixed
-            for (int i = n_extra - 1; i >= 0; --i)
-                regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
-        }
-        size_t full_needed = (size_t)(new_base + fp.reg_count);
-        if (regs.size() < full_needed) regs.resize(full_needed);
-        Frame fr;
-        fr.return_ip   = ip;
-        fr.reg_base    = new_base;
-        fr.varargs_base = va_base;
-        fr.n_varargs   = n_extra;
-        call_stack.push_back(std::move(fr));
-        fp_addr = fp.addr;
-    }
-    ip = fp_addr;
+    ip = pushCallFrame(base + A, (uint8_t)B, C, nullptr, ip);
     base = call_stack.back().reg_base;
     NEXT();
 }
@@ -827,71 +799,21 @@ op_CALL_DYN: {
             }
             std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolveFuncVal(init_fn, fuv);
-            const FuncProto& fp = ch->funcs[fi];
             int total = argc + 1;
-            size_t needed = (size_t)(ctor_base + std::max((int)fp.reg_count, total));
-            growRegs(needed);
+            growRegs((size_t)(ctor_base + std::max((int)ch->funcs[fi].reg_count, total)));
             for (int i = argc - 1; i >= 0; --i)
                 regs[ctor_base + 1 + i] = std::move(regs[ctor_base + i]);
             regs[ctor_base + 0] = inst;
-            if (total < fp.n_fixed) {
-                auto& defs = ch->func_defaults[fp.defaults_idx];
-                for (int i = total; i < fp.n_fixed; ++i)
-                    regs[ctor_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
-            }
-            size_t full_needed = (size_t)(ctor_base + fp.reg_count);
-            growRegs(full_needed);
-            ctor_addr = fp.addr;
-            {
-                Frame fr;
-                fr.return_ip = ip;
-                fr.reg_base  = ctor_base;
-                fr.is_ctor   = true;
-                fr.upvals    = std::move(fuv);
-                call_stack.push_back(std::move(fr));
-            }
+            ctor_addr = pushCallFrame(ctor_base, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
             do_call = true;
         }
         if (do_call) { ip = ctor_addr; base = call_stack.back().reg_base; NEXT(); }
     }
     {
         // Regular function/closure call
-        uint32_t fp_addr;
-        {
-            int new_base = base + A;
-            int argc = C;
-            std::unique_ptr<std::vector<Upvalue*>> fuv;
-            uint8_t fi = resolveFuncVal(regs[base + B], fuv);
-            const FuncProto& fp = ch->funcs[fi];
-            size_t needed = (size_t)(new_base + std::max((int)fp.reg_count, argc));
-            growRegs(needed);
-            if (argc < fp.n_fixed) {
-                auto& defs = ch->func_defaults[fp.defaults_idx];
-                for (int i = argc; i < fp.n_fixed; ++i)
-                    regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
-            }
-            int n_extra2 = 0;
-            int va_base2 = new_base + fp.reg_count;
-            if (fp.variadic && argc > fp.n_fixed) {
-                n_extra2 = argc - fp.n_fixed;
-                growRegs((size_t)(va_base2 + n_extra2));
-                for (int i = n_extra2 - 1; i >= 0; --i)
-                    regs[va_base2 + i] = std::move(regs[new_base + fp.n_fixed + i]);
-            }
-            size_t full_needed = (size_t)(new_base + fp.reg_count);
-            growRegs(full_needed);
-            {
-                Frame fr;
-                fr.return_ip    = ip;
-                fr.reg_base     = new_base;
-                fr.varargs_base = va_base2;
-                fr.n_varargs    = n_extra2;
-                fr.upvals       = std::move(fuv);
-                call_stack.push_back(std::move(fr));
-            }
-            fp_addr = fp.addr;
-        }
-        ip = fp_addr;
+        std::unique_ptr<std::vector<Upvalue*>> fuv;
+        uint8_t fi = resolveFuncVal(regs[base + B], fuv);
+        ip = pushCallFrame(base + A, fi, C, std::move(fuv), ip);
     }
     call_dyn_done:
     base = call_stack.back().reg_base;
@@ -979,34 +901,7 @@ op_CALL_METHOD: {
             if (fn.isFuncVal()) fi = (uint8_t)fn.asInt();
             else if (fn.isClosure()) { fi = fn.asClosure()->func_idx; const auto& u = fn.asClosure()->upvals; if (!u.empty()) fuv = std::make_unique<std::vector<Upvalue*>>(u); }
             else throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
-            const FuncProto& fp = ch->funcs[fi];
-            size_t needed = (size_t)(cb + std::max((int)fp.reg_count, total));
-            growRegs(needed);
-            if (total < fp.n_fixed) {
-                auto& defs = ch->func_defaults[fp.defaults_idx];
-                for (int i = total; i < fp.n_fixed; ++i)
-                    regs[cb + i] = (i < (int)defs.size()) ? defs[i] : Value{};
-            }
-            int n_extra3 = 0;
-            int va_base3 = cb + fp.reg_count;
-            if (fp.variadic && total > fp.n_fixed) {
-                n_extra3 = total - fp.n_fixed;
-                growRegs((size_t)(va_base3 + n_extra3));
-                for (int i = n_extra3 - 1; i >= 0; --i)
-                    regs[va_base3 + i] = std::move(regs[cb + fp.n_fixed + i]);
-            }
-            size_t full_needed = (size_t)(cb + fp.reg_count);
-            growRegs(full_needed);
-            {
-                Frame fr;
-                fr.return_ip    = ip;
-                fr.reg_base     = cb;
-                fr.varargs_base = va_base3;
-                fr.n_varargs    = n_extra3;
-                fr.upvals       = std::move(fuv);
-                call_stack.push_back(std::move(fr));
-            }
-            fp_addr = fp.addr;
+            fp_addr = pushCallFrame(cb, fi, total, std::move(fuv), ip);
         }
     }
     ip = fp_addr;

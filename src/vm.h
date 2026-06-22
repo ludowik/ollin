@@ -57,6 +57,13 @@ private:
     void     closeUpvals  ();   // closes & frees all open upvalues of the top frame
     void     growRegs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
 
+    // Pousse un frame d'appel, remplit les défauts et varargs, retourne fp.addr.
+    uint32_t pushCallFrame(int new_base, uint8_t fi, int argc,
+                           std::unique_ptr<std::vector<Upvalue*>> fuv,
+                           uint32_t return_ip,
+                           bool is_ctor    = false,
+                           int  return_dest = -1);
+
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
         if (v.isInteger()) return (double)v.asInt();
         if (v.isFloat())   return v.asFloat();
