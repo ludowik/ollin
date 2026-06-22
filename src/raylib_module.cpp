@@ -12,9 +12,9 @@ static int toInt(const Value& v) {
     return 0;
 }
 
+// Color: map/instance avec r,g,b,a en [0,1], ou entier packté (r<<24|g<<16|b<<8|a)
 static Color toColor(const Value& v) {
     if (v.isMap() || v.isClass()) {
-        // Color components are stored as [0.0, 1.0] — convert to [0, 255] for Raylib
         auto getComp = [&](const char* k, double def) -> uint8_t {
             Value f = v.mapGet(Value(std::string(k)));
             return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
@@ -24,11 +24,16 @@ static Color toColor(const Value& v) {
     if (!v.isInteger()) return WHITE;
     int64_t c = v.asInt();
     return { (uint8_t)(c >> 24 & 0xFF), (uint8_t)(c >> 16 & 0xFF),
-             (uint8_t)(c >>  8 & 0xFF), (uint8_t)(c & 0xFF) };
+             (uint8_t)(c >>  8 & 0xFF), (uint8_t)(c        & 0xFF) };
 }
 
-static int64_t rgb(uint8_t r, uint8_t g, uint8_t b) {
-    return ((int64_t)r << 24) | ((int64_t)g << 16) | ((int64_t)b << 8) | 255;
+static Value colorInst(double r, double g, double b) {
+    Value m = Value::makeMap();
+    m.mapSet(Value(std::string("r")), Value(r));
+    m.mapSet(Value(std::string("g")), Value(g));
+    m.mapSet(Value(std::string("b")), Value(b));
+    m.mapSet(Value(std::string("a")), Value(1.0));
+    return m;
 }
 
 static Value gfx_canvas(Value* args, int argc) {
@@ -149,23 +154,23 @@ static Value gfx_run(Value* args, int argc) {
 
 Value makeGraphicsModule() {
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("canvas")),  Value::makeBuiltin(gfx_canvas));
-    m.mapSet(Value(std::string("is_open")), Value::makeBuiltin(gfx_is_open));
+    m.mapSet(Value(std::string("canvas")),     Value::makeBuiltin(gfx_canvas));
+    m.mapSet(Value(std::string("is_open")),    Value::makeBuiltin(gfx_is_open));
     m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(gfx_begin_draw));
     m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(gfx_end_draw));
-    m.mapSet(Value(std::string("clear")),   Value::makeBuiltin(gfx_clear));
-    m.mapSet(Value(std::string("line")),     Value::makeBuiltin(gfx_line));
-    m.mapSet(Value(std::string("fps")),       Value::makeBuiltin(gfx_fps));
-    m.mapSet(Value(std::string("draw_text")), Value::makeBuiltin(gfx_draw_text));
-    m.mapSet(Value(std::string("close")),    Value::makeBuiltin(gfx_close));
-    m.mapSet(Value(std::string("quit")),     Value::makeBuiltin(gfx_quit));
-    m.mapSet(Value(std::string("run")),      Value::makeBuiltin(gfx_run));
-    m.mapSet(Value(std::string("BLACK")),   Value(rgb(0,   0,   0)));
-    m.mapSet(Value(std::string("WHITE")),   Value(rgb(255, 255, 255)));
-    m.mapSet(Value(std::string("RED")),     Value(rgb(230, 41,  55)));
-    m.mapSet(Value(std::string("GREEN")),   Value(rgb(0,   228, 48)));
-    m.mapSet(Value(std::string("BLUE")),    Value(rgb(0,   121, 241)));
-    m.mapSet(Value(std::string("YELLOW")),  Value(rgb(253, 249, 0)));
-    m.mapSet(Value(std::string("GRAY")),    Value(rgb(130, 130, 130)));
+    m.mapSet(Value(std::string("clear")),      Value::makeBuiltin(gfx_clear));
+    m.mapSet(Value(std::string("line")),       Value::makeBuiltin(gfx_line));
+    m.mapSet(Value(std::string("fps")),        Value::makeBuiltin(gfx_fps));
+    m.mapSet(Value(std::string("draw_text")),  Value::makeBuiltin(gfx_draw_text));
+    m.mapSet(Value(std::string("close")),      Value::makeBuiltin(gfx_close));
+    m.mapSet(Value(std::string("quit")),       Value::makeBuiltin(gfx_quit));
+    m.mapSet(Value(std::string("run")),        Value::makeBuiltin(gfx_run));
+    m.mapSet(Value(std::string("BLACK")),   colorInst(0.0,        0.0,        0.0));
+    m.mapSet(Value(std::string("WHITE")),   colorInst(1.0,        1.0,        1.0));
+    m.mapSet(Value(std::string("RED")),     colorInst(230/255.0,  41/255.0,   55/255.0));
+    m.mapSet(Value(std::string("GREEN")),   colorInst(  0/255.0, 228/255.0,   48/255.0));
+    m.mapSet(Value(std::string("BLUE")),    colorInst(  0/255.0, 121/255.0,  241/255.0));
+    m.mapSet(Value(std::string("YELLOW")),  colorInst(253/255.0, 249/255.0,    0/255.0));
+    m.mapSet(Value(std::string("GRAY")),    colorInst(130/255.0, 130/255.0,  130/255.0));
     return m;
 }
