@@ -1,5 +1,6 @@
 #include "chunk.h"
 #include "module_utils.h"
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 
@@ -46,6 +47,23 @@ static Value color_str(Value* args, int argc) {
                  std::to_string(a) + ")");
 }
 
+// ── random ────────────────────────────────────────────────────────────────────
+// Appel : Color.random() — args[0] = la classe Color (receiver), argc = 0.
+// Retourne une instance Color avec r, g, b aléatoires dans [0, 1] et a = 1.
+
+static Value color_random(Value* args, int argc) {
+    (void)argc;
+    Value cls = args[0];  // Color class — toujours valide comme receiver de méthode
+    auto rnd = []() { return (double)rand() / ((double)RAND_MAX + 1.0); };
+    Value inst = Value::makeMap();
+    inst.mapSet(Value(std::string("__class__")), cls);
+    inst.mapSet(Value(std::string("r")), Value(rnd()));
+    inst.mapSet(Value(std::string("g")), Value(rnd()));
+    inst.mapSet(Value(std::string("b")), Value(rnd()));
+    inst.mapSet(Value(std::string("a")), Value(1.0));
+    return inst;
+}
+
 // ── makeColorClass ────────────────────────────────────────────────────────────
 
 Value makeColorClass() {
@@ -53,6 +71,7 @@ Value makeColorClass() {
     cls.mapSet(Value(std::string("__name__")), Value(std::string("Color")));
     cls.mapSet(Value(std::string("init")),    Value::makeBuiltin(color_init));
     cls.mapSet(Value(std::string("__str")),   Value::makeBuiltin(color_str));
+    cls.mapSet(Value(std::string("random")),  Value::makeBuiltin(color_random));
     return cls;
 }
 

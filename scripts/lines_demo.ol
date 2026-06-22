@@ -4,10 +4,6 @@ const H = 600
 const N = 200
 const SPEED = 3
 
-func rand_color()
-    return Color(math.rand() * 0.8 + 0.2, math.rand() * 0.8 + 0.2, math.rand() * 0.8 + 0.2)
-end
-
 func rpos(max)
     return math.floor(math.rand() * max)
 end
@@ -29,7 +25,7 @@ for i = 1, N do
     vy1[i] = rvel()
     vx2[i] = rvel()
     vy2[i] = rvel()
-    cols[i] = rand_color()
+    cols[i] = Color.random()
 end
 
 graphics.canvas(W, H, "Ollin — Lignes animées")
