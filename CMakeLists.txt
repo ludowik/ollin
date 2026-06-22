@@ -6,6 +6,13 @@ set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MSVC)
+    message(FATAL_ERROR "MSVC is not supported: the VM uses computed-goto (GNU extension), which requires GCC or Clang.")
+endif()
+
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
+
 set(OLLIN_SOURCES
     src/chunk.cpp
     src/array.cpp
@@ -22,8 +29,6 @@ set(OLLIN_SOURCES
 )
 
 if(EMSCRIPTEN)
-    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
     set(PLATFORM "Web"                     CACHE STRING "" FORCE)
     set(GRAPHICS "GRAPHICS_API_OPENGL_ES3" CACHE STRING "" FORCE)
 
@@ -53,22 +58,22 @@ if(EMSCRIPTEN)
         -sUSE_GLFW=3
         -sMAX_WEBGL_VERSION=2
         -sMIN_WEBGL_VERSION=2
-        -sASSERTIONS=1
         --bind
     )
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_link_options(ollin_wasm PRIVATE -sASSERTIONS=1)
+    endif()
     add_custom_command(TARGET ollin_wasm POST_BUILD
         COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/update_build_date.py
         COMMENT "Updating build date in docs/index.html"
     )
 else()
-    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
-
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/raylib/CMakeLists.txt")
         add_subdirectory(third_party/raylib)
         set(OLLIN_GRAPHICS_SOURCE src/raylib_module.cpp)
         set(OLLIN_GRAPHICS_LIB raylib)
     else()
+        message(STATUS "raylib not found — building with graphics stub (no window)")
         set(OLLIN_GRAPHICS_SOURCE src/graphics_stub.cpp)
         set(OLLIN_GRAPHICS_LIB "")
     endif()
@@ -76,12 +81,8 @@ else()
     add_executable(ollin src/main.cpp ${OLLIN_SOURCES} ${OLLIN_GRAPHICS_SOURCE})
     target_include_directories(ollin PRIVATE src)
     target_link_libraries(ollin PRIVATE ${OLLIN_GRAPHICS_LIB})
-    if(MSVC)
-        target_compile_options(ollin PRIVATE /W4)
-    else()
-        target_compile_options(ollin PRIVATE -Wall -Wextra)
-        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-            set_source_files_properties(src/vm.cpp PROPERTIES COMPILE_OPTIONS "-Og")
-        endif()
+    target_compile_options(ollin PRIVATE -Wall -Wextra)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set_source_files_properties(src/vm.cpp PROPERTIES COMPILE_OPTIONS "-Og")
     endif()
 endif()
