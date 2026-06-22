@@ -10,7 +10,7 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
             if (static_cast<double>(i) == d) return std::hash<int64_t>{}(i);
             return std::hash<double>{}(d);
         }
-        case Value::T_STRING:   return std::hash<const std::string*>{}(v.sptr);
+        case Value::T_STRING:   return string_table().hashOf(v.sptr);
         case Value::T_MAP:      return std::hash<void*>{}((void*)v.mptr);
         case Value::T_ARRAY:    return std::hash<void*>{}((void*)v.aptr);
         case Value::T_ITERATOR: return std::hash<void*>{}((void*)v.iptr);
