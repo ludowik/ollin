@@ -47,6 +47,7 @@ private:
     std::unique_ptr<Stmt> forStmt();
     std::unique_ptr<Stmt> importStmt();
     std::unique_ptr<Stmt> classDecl();
+    std::unique_ptr<Stmt> switchStmt();
 
     std::unique_ptr<Expr> parsePostfix(std::unique_ptr<Expr> base);
 

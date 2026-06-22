@@ -132,6 +132,10 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
         }
         if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
             collectLocals(b->stmts, out, seen, collect_funcs);
+        if (auto* sw = dynamic_cast<const SwitchStmt*>(s.get())) {
+            for (auto& arm : sw->cases) collectLocals(arm.body, out, seen, collect_funcs);
+            collectLocals(sw->else_body, out, seen, collect_funcs);
+        }
     }
 }
 
@@ -174,6 +178,10 @@ static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
         if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get())) {
             out.insert(c->name);  // classe visible par ses propres méthodes
             for (auto& m : c->methods) collectGlobals(m->body, out);
+        }
+        if (auto* sw = dynamic_cast<const SwitchStmt*>(s.get())) {
+            for (auto& arm : sw->cases) collectGlobals(arm.body, out);
+            collectGlobals(sw->else_body, out);
         }
     }
 }
@@ -383,6 +391,61 @@ void Compiler::visit(const IfStmt& s) {
 
     uint16_t end_addr = (uint16_t)chunk.currentPos();
     for (size_t p : end_patches) chunk.patchJump(p, end_addr);
+}
+
+void Compiler::visit(const SwitchStmt& s) {
+    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+
+    int saved = reg_top_;
+    s.subject->accept(*this);
+    int subj_r = last_reg_;
+    int above_subj = reg_top_;  // subj_r reste vivant pendant tous les bras
+
+    std::vector<size_t> end_patches;
+
+    for (auto& arm : s.cases) {
+        std::vector<size_t> body_patches;
+        size_t next_arm_patch = 0;
+
+        for (size_t vi = 0; vi < arm.values.size(); ++vi) {
+            bool is_last = (vi == arm.values.size() - 1);
+            reg_top_ = above_subj;
+            arm.values[vi]->accept(*this);
+            int val_r = last_reg_;
+            int cond_r = reg_top_++;
+            chunk.emit(makeABC((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
+            if (!is_last) {
+                size_t skip = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+                body_patches.push_back(chunk.emitJump(Op::JUMP));
+                chunk.patchJump(skip, (uint16_t)chunk.currentPos());
+            } else {
+                next_arm_patch = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+            }
+        }
+
+        uint16_t body_addr = (uint16_t)chunk.currentPos();
+        for (size_t p : body_patches) chunk.patchJump(p, body_addr);
+
+        reg_top_ = above_subj;
+        for (auto& stmt : arm.body) {
+            int st = reg_top_;
+            stmt->accept(*this);
+            reg_top_ = st;
+        }
+        end_patches.push_back(chunk.emitJump(Op::JUMP));
+        chunk.patchJump(next_arm_patch, (uint16_t)chunk.currentPos());
+    }
+
+    reg_top_ = above_subj;
+    for (auto& stmt : s.else_body) {
+        int st = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = st;
+    }
+
+    uint16_t end_addr = (uint16_t)chunk.currentPos();
+    for (size_t p : end_patches) chunk.patchJump(p, end_addr);
+    reg_top_ = saved;
 }
 
 void Compiler::visit(const BreakStmt& s) {

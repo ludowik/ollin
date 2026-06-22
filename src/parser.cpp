@@ -77,6 +77,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     if (check(TokenType::FOR))     return forStmt();
     if (check(TokenType::IMPORT))  return importStmt();
     if (check(TokenType::CLASS))   return classDecl();
+    if (check(TokenType::SWITCH))  return switchStmt();
     if (check(TokenType::FUNC))    return funcDeclStmt();
     if (check(TokenType::RETURN))  return returnStmt();
     if (check(TokenType::VAR))      return varDecl();
@@ -1001,4 +1002,53 @@ std::unique_ptr<Stmt> Parser::importStmt() {
         }
     }
     return block;
+}
+
+std::unique_ptr<Stmt> Parser::switchStmt() {
+    int line = peek().line;
+    advance(); // SWITCH
+    auto s = std::make_unique<SwitchStmt>();
+    s->line = line;
+    s->subject = expr();
+    consumeSemi();
+
+    auto isArmStart = [&]() {
+        return check(TokenType::CASE) || check(TokenType::ELSE) ||
+               check(TokenType::END)  || check(TokenType::EOF_T);
+    };
+
+    while (true) {
+        skipSemis();
+        if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+
+        if (check(TokenType::ELSE)) {
+            advance(); // ELSE
+            consumeSemi();
+            while (!check(TokenType::END) && !check(TokenType::EOF_T)) {
+                skipSemis();
+                if (check(TokenType::END) || check(TokenType::EOF_T)) break;
+                s->else_body.push_back(parseOneStmt());
+            }
+            break;
+        }
+
+        expect(TokenType::CASE);
+        CaseClause arm;
+        arm.values.push_back(expr());
+        while (check(TokenType::COMMA)) {
+            advance(); // COMMA
+            arm.values.push_back(expr());
+        }
+        consumeSemi();
+        while (!isArmStart()) {
+            skipSemis();
+            if (isArmStart()) break;
+            arm.body.push_back(parseOneStmt());
+        }
+        s->cases.push_back(std::move(arm));
+    }
+
+    expect(TokenType::END);
+    consumeSemi();
+    return s;
 }

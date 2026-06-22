@@ -33,6 +33,8 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"class",   TokenType::CLASS},
     {"extends", TokenType::EXTENDS},
     {"static",  TokenType::STATIC},
+    {"switch",  TokenType::SWITCH},
+    {"case",    TokenType::CASE},
 };
 
 Lexer::Lexer(std::string source) : src(std::move(source)) {}

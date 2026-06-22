@@ -21,6 +21,7 @@ stmt           = varDecl
                | forStmt
                | ifStmt
                | tryStmt
+               | switchStmt
                | throwStmt
                | funcDecl
                | classDecl
@@ -64,6 +65,7 @@ ifStmt         = "if" expr "then" { stmt }
                  [ "else" { stmt } ]
                  "end" NL ;
 tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" NL ;
+switchStmt     = "switch" expr NL { "case" expr { "," expr } NL { stmt } } [ "else" NL { stmt } ] "end" NL ;
 throwStmt      = "throw" expr NL ;
 funcDecl       = "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
 params         = param { "," param } [ "," "..." ] | "..." ;

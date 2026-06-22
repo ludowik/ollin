@@ -9,7 +9,7 @@ struct CommentStmt; struct VarDeclStmt; struct WhileStmt;
 struct IfStmt; struct BreakStmt; struct ContinueStmt; struct AssignStmt; struct ExprStmt;
 struct ThrowStmt; struct TryCatchStmt; struct FuncDeclStmt; struct ReturnStmt;
 struct ForIterStmt; struct IndexAssignStmt; struct MultiAssignStmt;
-struct BlockStmt; struct ClassDeclStmt;
+struct BlockStmt; struct ClassDeclStmt; struct SwitchStmt;
 
 struct BoolExpr; struct NumberExpr; struct StringExpr; struct NilExpr;
 struct VarExpr; struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct VarArgExpr;
@@ -36,6 +36,7 @@ struct StmtVisitor {
     virtual void visit(const ForIterStmt&)      = 0;
     virtual void visit(const BlockStmt&)     = 0;
     virtual void visit(const ClassDeclStmt&) = 0;
+    virtual void visit(const SwitchStmt&)   = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -309,6 +310,21 @@ struct ClassDeclStmt : Stmt {
     std::string name;
     std::string parent;  // vide si pas d'extends
     std::vector<std::unique_ptr<FuncDeclStmt>> methods;
+    void accept(StmtVisitor& v) const override { v.visit(*this); }
+};
+
+struct CaseClause {
+    std::vector<std::unique_ptr<Expr>> values;
+    std::vector<std::unique_ptr<Stmt>> body;
+    CaseClause() = default;
+    CaseClause(CaseClause&&) = default;
+    CaseClause& operator=(CaseClause&&) = default;
+};
+
+struct SwitchStmt : Stmt {
+    std::unique_ptr<Expr>              subject;
+    std::vector<CaseClause>            cases;
+    std::vector<std::unique_ptr<Stmt>> else_body;
     void accept(StmtVisitor& v) const override { v.visit(*this); }
 };
 

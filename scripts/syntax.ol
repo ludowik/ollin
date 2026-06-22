@@ -809,7 +809,76 @@ assert(math.sin(math.PI) > -0.001 and math.sin(math.PI) < 0.001)
 var rnd = math.rand()
 assert(rnd >= 0 and rnd < 1)
 
-## ── 22. Module graphics (Raylib) ─────────────────────────────────────────────
+## ── 22. Switch ───────────────────────────────────────────────────────────────
+
+## cas de base — valeur entière
+var sw_r = 0
+switch 2
+    case 1
+        sw_r = 1
+    case 2
+        sw_r = 2
+    case 3
+        sw_r = 3
+    else
+        sw_r = 99
+end
+assert(sw_r == 2)
+
+## else déclenché
+switch 42
+    case 1
+        sw_r = 1
+    else
+        sw_r = 99
+end
+assert(sw_r == 99)
+
+## sans else — aucun case ne matche, rien ne s'exécute
+sw_r = 0
+switch 7
+    case 1
+        sw_r = 1
+    case 2
+        sw_r = 2
+end
+assert(sw_r == 0)
+
+## valeurs multiples par case
+switch "b"
+    case "a", "b"
+        sw_r = 1
+    case "c"
+        sw_r = 2
+end
+assert(sw_r == 1)
+
+## switch sur string — premier case
+switch "hello"
+    case "hello"
+        sw_r = 10
+    case "world"
+        sw_r = 20
+end
+assert(sw_r == 10)
+
+## switch dans une fonction
+func sw_func(n)
+    switch n
+        case 0
+            return "zero"
+        case 1, 2
+            return "un ou deux"
+        else
+            return "autre"
+    end
+end
+assert(sw_func(0) == "zero")
+assert(sw_func(1) == "un ou deux")
+assert(sw_func(2) == "un ou deux")
+assert(sw_func(5) == "autre")
+
+## ── 23. Module graphics (Raylib) ─────────────────────────────────────────────
 ##
 ## Module natif (non disponible en WASM/headless). Voir scripts/graphics_demo.ol.
 ##

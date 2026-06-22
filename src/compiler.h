@@ -81,6 +81,7 @@ private:
     void visit(const ForIterStmt&)   override;
     void visit(const BlockStmt&)     override;
     void visit(const ClassDeclStmt&) override;
+    void visit(const SwitchStmt&)   override;
 
     // ExprVisitor
     void visit(const BoolExpr&)    override;
