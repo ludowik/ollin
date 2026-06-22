@@ -10,6 +10,8 @@ struct InternedStr {
     int         refcount = 1;
     uint32_t    hash;
     std::string str;
+    InternedStr(InternedStr&&) = delete;
+    InternedStr& operator=(InternedStr&&) = delete;
 };
 
 struct StringTable {
