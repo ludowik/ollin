@@ -398,7 +398,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-22 20:09</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-22 20:52</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="#playground" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -429,6 +429,7 @@ pre:hover .code-actions,
   <div class="section-label">Arrays</div>
   <a href="#arrays">Arrays</a>
   <div class="section-label">Gestion d'erreurs</div>
+  <a href="#switch">Switch</a>
   <a href="#try">Try / Catch</a>
   <div class="section-label">Builtins</div>
   <a href="#builtins">Fonctions intégrées</a>
@@ -1081,6 +1082,33 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>      <span class="c
 <div class="callout warn">Les arrays sont <strong>partagés par référence</strong> (comptage de référence), comme les maps.</div>
 </section>
 
+<!-- ── Switch ──────────────────────────────────────────────────────────────── -->
+<section id="switch">
+<h2>Switch</h2>
+<p><code>switch</code> compare une expression à plusieurs valeurs. Chaque branche commence par <code>case</code> suivi d'une ou plusieurs valeurs séparées par des virgules. Le bloc <code>else</code> s'exécute si aucun <code>case</code> ne correspond. <code>break</code> est valide à l'intérieur.</p>
+
+<pre><code><span class="kw">var</span> x = <span class="num">2</span>
+<span class="kw">switch</span> x
+<span class="kw">case</span> <span class="num">1</span>
+    <span class="bi">print</span>(<span class="str">"un"</span>)
+<span class="kw">case</span> <span class="num">2</span>, <span class="num">3</span>
+    <span class="bi">print</span>(<span class="str">"deux ou trois"</span>)
+<span class="kw">else</span>
+    <span class="bi">print</span>(<span class="str">"autre"</span>)
+<span class="kw">end</span></code></pre>
+
+<h3>Switch sur des chaînes</h3>
+<pre><code><span class="kw">var</span> cmd = <span class="str">"start"</span>
+<span class="kw">switch</span> cmd
+<span class="kw">case</span> <span class="str">"start"</span>, <span class="str">"go"</span>
+    <span class="bi">print</span>(<span class="str">"démarrage"</span>)
+<span class="kw">case</span> <span class="str">"stop"</span>
+    <span class="bi">print</span>(<span class="str">"arrêt"</span>)
+<span class="kw">else</span>
+    <span class="bi">print</span>(<span class="str">"commande inconnue"</span>)
+<span class="kw">end</span></code></pre>
+</section>
+
 <!-- ── Try / Catch ───────────────────────────────────────────────────────── -->
 <section id="try">
 <h2>Gestion d'erreurs</h2>
@@ -1419,7 +1447,8 @@ import { tags }                                                           from '
 // ── Ollin language — aligne sur ollin.tmLanguage.json (composant VSC) ────
 // keyword.control : var|global|const|while|do|for|in|if|then|elseif|end|
 //                   break|true|false|nil|try|catch|throw|else|func|return|
-//                   import|as|or|and|not|class|extends|static|super|self
+//                   import|as|or|and|not|class|extends|static|super|self|
+//                   switch|case
 // support.function.builtin : print|printf|time|assert
 // constant.numeric  : \.digit+ ou digit+(\.digit+)?
 // keyword.operator  : +=|-=|*=|/=|%=|==|>=|<=|<>|<<|>>|...|..|+-*/%><&|^~[]{}:.
@@ -1430,7 +1459,8 @@ import { tags }                                                           from '
 const KEYWORDS = new Set([
   'var','global','const','while','do','for','in','if','then','elseif','end',
   'break','true','false','nil','try','catch','throw','else','func','return',
-  'import','as','or','and','not','class','extends','static','super','self'
+  'import','as','or','and','not','class','extends','static','super','self',
+  'switch','case'
 ])
 const BUILTINS = new Set(['print','printf','time','assert','Color','math','graphics','string','colors'])
 

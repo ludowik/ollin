@@ -402,6 +402,7 @@ void Compiler::visit(const SwitchStmt& s) {
     int above_subj = reg_top_;  // subj_r reste vivant pendant tous les bras
 
     std::vector<size_t> end_patches;
+    break_patches.push_back({});  // break à l'intérieur du switch cible end_addr
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;
@@ -412,7 +413,8 @@ void Compiler::visit(const SwitchStmt& s) {
             reg_top_ = above_subj;
             arm.values[vi]->accept(*this);
             int val_r = last_reg_;
-            int cond_r = reg_top_++;
+            int cond_r = allocReg();  // allocReg() met à jour reg_count_
+            reg_top_ = above_subj;   // libère le temporaire après EQ
             chunk.emit(makeABC((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
             if (!is_last) {
                 size_t skip = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
@@ -445,6 +447,8 @@ void Compiler::visit(const SwitchStmt& s) {
 
     uint16_t end_addr = (uint16_t)chunk.currentPos();
     for (size_t p : end_patches) chunk.patchJump(p, end_addr);
+    for (size_t p : break_patches.back()) chunk.patchJump(p, end_addr);
+    break_patches.pop_back();
     reg_top_ = saved;
 }
 
