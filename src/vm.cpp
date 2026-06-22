@@ -292,7 +292,6 @@ uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc,
         for (int i = n_varargs - 1; i >= 0; --i)
             regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
     }
-    growRegs((size_t)(new_base + fp.reg_count));
     Frame fr;
     fr.return_ip    = return_ip;
     fr.reg_base     = new_base;
@@ -800,6 +799,8 @@ op_CALL_DYN: {
             std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolveFuncVal(init_fn, fuv);
             int total = argc + 1;
+            // grow AVANT le décalage d'args — pushCallFrame fera le même calcul (no-op),
+            // mais le décalage doit avoir lieu avant pushCallFrame, d'où ce grow explicite.
             growRegs((size_t)(ctor_base + std::max((int)ch->funcs[fi].reg_count, total)));
             for (int i = argc - 1; i >= 0; --i)
                 regs[ctor_base + 1 + i] = std::move(regs[ctor_base + i]);
