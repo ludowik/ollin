@@ -85,4 +85,19 @@ else()
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set_source_files_properties(src/vm.cpp PROPERTIES COMPILE_OPTIONS "-Og")
     endif()
+
+    find_program(EMCC emcc)
+    if(EMCC)
+        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/raylib_module.cpp)
+        add_custom_command(
+            OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm
+            DEPENDS ${WASM_SOURCES}
+            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/wasm/build.sh
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Building WASM"
+        )
+        add_custom_target(wasm ALL
+            DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm ollin
+        )
+    endif()
 endif()
