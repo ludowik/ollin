@@ -218,7 +218,7 @@ static bool valuesEqual(const Value& av, const Value& bv) {
     if (av.isNil() || bv.isNil())              return false;
     if (av.isInteger() && bv.isInteger())      return av.asInt()  == bv.asInt();
     if (av.isNumber()  && bv.isNumber())       return av.asNum()  == bv.asNum();
-    if (av.isString()  && bv.isString())       return av.asString() == bv.asString();
+    if (av.isString()  && bv.isString())       return av.sptr == bv.sptr;
     if (av.isString()  && bv.isNumber())       return (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
     if (av.isNumber()  && bv.isString())       return av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
     return (av.isMap()   && bv.isMap()   && av.mptr == bv.mptr) ||

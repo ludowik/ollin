@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <string_view>
-#include <unordered_map>
+#include "robin_hood.h"
 
 // Objet d'internement : refcount + hash + contenu au même endroit.
 // retain = ++p->refcount (zéro lookup)
@@ -15,7 +15,7 @@ struct InternedStr {
 struct StringTable {
     // Clé = string_view pointant dans InternedStr::str (stable, heap-alloué).
     // Zéro copie du contenu : la string n'existe qu'une seule fois dans InternedStr.
-    std::unordered_map<std::string_view, InternedStr*> table_;
+    robin_hood::unordered_map<std::string_view, InternedStr*> table_;
 
     InternedStr* intern(std::string s) {
         auto it = table_.find(std::string_view(s));
