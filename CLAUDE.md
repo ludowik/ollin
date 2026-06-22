@@ -219,18 +219,25 @@ Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 Les littéraux entiers (`42`, `1_000`) sont stockés comme `int64_t` (struct taguée, T_INTEGER).  
 Les opcodes arithmétiques/comparaison dispatchent sur le tag (INT op INT → INT ; promotion FLOAT sinon ; DIV → FLOAT).  
 Overflow int64 → wrapping silencieux (comportement x86-64).  
-`Value` = 16 octets (uint8_t tag + union int64_t/double/ptr).
+`Value` = 16 octets (tag 1 o + pad 3 o + str_hash 4 o + union 8 o).
 
 ## Représentation de Value
 
-Struct taguée (16 octets) — remplace le NaN-boxing :
+Struct taguée (16 octets) — layout :
+
+```
+offset 0   : uint8_t  tag
+offset 1-3 : uint8_t  _pad[3]
+offset 4-7 : uint32_t str_hash  (hash contenu, valide uniquement T_STRING)
+offset 8-15: union { int64_t ival; double dval; InternedStr* sptr; Map* mptr; Array* aptr; Iterator* iptr; Closure* cptr; Range* rptr; }
+```
 
 | tag        | valeur (uint8_t) | union actif | plage              |
 |------------|-----------------|-------------|---------------------|
 | T_NIL      | 0               | —           | —                   |
 | T_INTEGER  | 1               | ival (int64_t) | ±2^63            |
 | T_FLOAT    | 2               | dval (double) | IEEE 754 double   |
-| T_STRING   | 3               | sptr (std::string*) | —          |
+| T_STRING   | 3               | sptr (InternedStr*) | ref-counted, str_hash = sptr->hash |
 | T_MAP      | 4               | mptr (Map*) | —               |
 | T_ARRAY    | 5               | aptr (Array*) | —             |
 | T_ITERATOR | 6               | iptr (Iterator*) | —          |

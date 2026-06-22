@@ -7,12 +7,12 @@
 #include <vector>
 #include "string_table.h"
 
-// Tagged union Value — 16 octets (tag + union 8 octets).
+// Tagged union Value — 16 octets : tag(1) + _pad(3) + str_hash(4) + union(8).
 //
 //   NIL     : tag == T_NIL
 //   Integer : tag == T_INTEGER  → int64_t  (range ±2^63)
 //   Float   : tag == T_FLOAT    → double IEEE 754
-//   String  : tag == T_STRING   → const std::string*  (internée, non-owning)
+//   String  : tag == T_STRING   → InternedStr*  (ref-counted, str_hash = sptr->hash)
 //   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
 //   Array   : tag == T_ARRAY    → Array*   (heap, ref-counted, 1-based)
 //   Iterator: tag == T_ITERATOR → Iterator* (heap, ref-counted)
