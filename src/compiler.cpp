@@ -1406,6 +1406,17 @@ void Compiler::visit(const ClassDeclStmt& s) {
 
     // Compiler chaque méthode et la stocker dans la map classe
     for (auto& method : s.methods) {
+        // 'static' interdit sur init et sur les méta-méthodes : ces appels
+        // (constructeur, opérateurs) injectent self par construction — un
+        // membre statique y produirait un décalage d'arguments silencieux.
+        if (method->is_static) {
+            if (method->name == "init")
+                throw std::runtime_error("line " + std::to_string(method->line) +
+                    ": 'init' cannot be static (a constructor always has 'self')");
+            if (method->name.size() >= 2 && method->name[0] == '_' && method->name[1] == '_')
+                throw std::runtime_error("line " + std::to_string(method->line) +
+                    ": metamethod '" + method->name + "' cannot be static (operators always have 'self')");
+        }
         uint8_t func_idx = compileMethodFunc(*method);
         bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
@@ -1421,8 +1432,8 @@ void Compiler::visit(const ClassDeclStmt& s) {
         reg_top_ = dest + 1;
     }
 
-    // Stocker la classe comme global
-    declared_globals_.insert(s.name);
+    // Stocker la classe comme global (le nom est déjà dans declared_globals_
+    // via le pré-scan collectGlobals — source unique de vérité)
     chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest,
                        chunk.addIdentifier(s.name)));
 
