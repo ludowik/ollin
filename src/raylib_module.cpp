@@ -34,7 +34,7 @@ static Value colorInst(double r, double g, double b) {
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
     int h = argc > 1 ? toInt(args[1]) : 600;
-    const char* title = (argc > 2 && args[2].isString()) ? args[2].sptr->c_str() : "Ollin";
+    const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
 #ifdef __EMSCRIPTEN__
     if (IsWindowReady()) CloseWindow();
     EM_ASM({
@@ -96,7 +96,7 @@ static Value gfx_fps(Value* args, int argc) {
 
 static Value gfx_draw_text(Value* args, int argc) {
     if (argc < 4) throw std::runtime_error("graphics.draw_text: expected text, x, y, size [, color]");
-    const char* text = (args[0].isString()) ? args[0].sptr->c_str() : "";
+    const char* text = (args[0].isString()) ? args[0].asString().c_str() : "";
     DrawText(text, toInt(args[1]), toInt(args[2]), toInt(args[3]),
              argc > 4 ? toColor(args[4]) : WHITE);
     return Value{};
