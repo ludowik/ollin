@@ -22,17 +22,22 @@ set(OLLIN_SOURCES
 )
 
 if(EMSCRIPTEN)
-    include(FetchContent)
     set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
     set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
-    set(PLATFORM "Web"                    CACHE STRING "" FORCE)
+    set(PLATFORM "Web"                     CACHE STRING "" FORCE)
     set(GRAPHICS "GRAPHICS_API_OPENGL_ES3" CACHE STRING "" FORCE)
-    FetchContent_Declare(raylib
-        GIT_REPOSITORY https://github.com/raysan5/raylib.git
-        GIT_TAG        6.0
-        GIT_SHALLOW    TRUE
-    )
-    FetchContent_MakeAvailable(raylib)
+
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/raylib/CMakeLists.txt")
+        add_subdirectory(third_party/raylib)
+    else()
+        include(FetchContent)
+        FetchContent_Declare(raylib
+            GIT_REPOSITORY https://github.com/raysan5/raylib.git
+            GIT_TAG        6.0
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(raylib)
+    endif()
 
     add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/raylib_module.cpp)
     target_include_directories(ollin_wasm PRIVATE src)

@@ -746,19 +746,40 @@ var rnd = math.rand()
 assert(rnd >= 0 and rnd < 1)
 
 ## ── 22. Module graphics (Raylib) ─────────────────────────────────────────────
-##
-## Module natif (non disponible en WASM). Usage :
-##
-##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
-##   graphics.run(func()
-##       graphics.clear(graphics.BLACK)
-##       graphics.line(x1, y1, x2, y2, 1, color)
-##   end)
-##
-## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY
-## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
-## FPS : graphics.fps() → entier
-## Texte : graphics.draw_text(text, x, y, size [, color])
+
+graphics.canvas(600, 400, "Ollin – test graphique")
+
+global frame = 0
+
+func draw()
+    frame += 1
+    var t = frame / 60.0
+
+    graphics.clear(graphics.BLACK)
+
+    ## Lignes tournantes depuis le centre
+    var cx = 300
+    var cy = 200
+    for i in [0;7] do
+        var angle = t + i * math.PI / 4
+        var x2 = cx + 150 * math.cos(angle)
+        var y2 = cy + 150 * math.sin(angle)
+        graphics.line(cx, cy, x2, y2, 2, graphics.BLUE)
+    end
+
+    ## Croix animée
+    var bx = 300 + 200 * math.sin(t * 1.3)
+    var by = 200 + 100 * math.cos(t * 0.9)
+    graphics.line(bx - 8, by,     bx + 8, by,     3, graphics.RED)
+    graphics.line(bx,     by - 8, bx,     by + 8, 3, graphics.RED)
+
+    graphics.draw_text("Ollin graphics OK", 10, 10, 20, graphics.WHITE)
+    graphics.draw_text("FPS: " + graphics.fps(), 10, 36, 16, graphics.GRAY)
+
+    if frame >= 60 then
+        graphics.quit()
+    end
+end
 
 ## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##

@@ -14,11 +14,12 @@ static int toInt(const Value& v) {
 
 static Color toColor(const Value& v) {
     if (v.isMap() || v.isClass()) {
-        auto getComp = [&](const char* k) -> uint8_t {
+        // Color components are stored as [0.0, 1.0] — convert to [0, 255] for Raylib
+        auto getComp = [&](const char* k, double def) -> uint8_t {
             Value f = v.mapGet(Value(std::string(k)));
-            return f.isNumber() ? (uint8_t)f.asNum() : 255;
+            return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
         };
-        return { getComp("r"), getComp("g"), getComp("b"), getComp("a") };
+        return { getComp("r", 0), getComp("g", 0), getComp("b", 0), getComp("a", 1) };
     }
     if (!v.isInteger()) return WHITE;
     int64_t c = v.asInt();
@@ -107,6 +108,18 @@ static Value gfx_close(Value* args, int argc) {
     return Value{};
 }
 
+static bool s_quit = false;
+
+static Value gfx_quit(Value* args, int argc) {
+    (void)args; (void)argc;
+#ifdef __EMSCRIPTEN__
+    emscripten_cancel_main_loop();
+#else
+    s_quit = true;
+#endif
+    return Value{};
+}
+
 #ifdef __EMSCRIPTEN__
 static Value  s_run_callback;
 static void emscripten_frame() {
@@ -123,7 +136,8 @@ static Value gfx_run(Value* args, int argc) {
     s_run_callback = fn;
     emscripten_set_main_loop(emscripten_frame, 0, 0);
 #else
-    while (!WindowShouldClose()) {
+    s_quit = false;
+    while (!WindowShouldClose() && !s_quit) {
         BeginDrawing();
         VM::current()->callValue(fn);
         EndDrawing();
@@ -144,6 +158,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("fps")),       Value::makeBuiltin(gfx_fps));
     m.mapSet(Value(std::string("draw_text")), Value::makeBuiltin(gfx_draw_text));
     m.mapSet(Value(std::string("close")),    Value::makeBuiltin(gfx_close));
+    m.mapSet(Value(std::string("quit")),     Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")),      Value::makeBuiltin(gfx_run));
     m.mapSet(Value(std::string("BLACK")),   Value(rgb(0,   0,   0)));
     m.mapSet(Value(std::string("WHITE")),   Value(rgb(255, 255, 255)));
