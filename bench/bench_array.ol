@@ -1,6 +1,6 @@
 var N = 1_000_000
-var arr = []
 var t0 = time()
+var arr = []
 for i = 1, N do
     arr[i] = i
 end

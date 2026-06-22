@@ -5,10 +5,10 @@ func frame()
     graphics.clear(graphics.BLACK)
 
     ## grille
-    for i = 0, 800, 50 do
+    for i = 0, 750, 50 do
         graphics.line(i, 0, i, 600, 1, graphics.GRAY)
     end
-    for j = 0, 600, 50 do
+    for j = 0, 550, 50 do
         graphics.line(0, j, 800, j, 1, graphics.GRAY)
     end
 

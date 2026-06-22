@@ -1,4 +1,4 @@
-## animation : 40 lignes colorées qui bougent et rebondissent
+## animation : 200 lignes colorées qui bougent et rebondissent
 const W = 800
 const H = 600
 const N = 200
@@ -44,9 +44,13 @@ func frame()
         y2[i]  = y2[i]  + vy2[i]
 
         if x1[i] < 0 or x1[i] > W then vx1[i] = -vx1[i] end
+        x1[i] = math.clamp(x1[i], 0, W)
         if y1[i] < 0 or y1[i] > H then vy1[i] = -vy1[i] end
+        y1[i] = math.clamp(y1[i], 0, H)
         if x2[i] < 0 or x2[i] > W then vx2[i] = -vx2[i] end
+        x2[i] = math.clamp(x2[i], 0, W)
         if y2[i] < 0 or y2[i] > H then vy2[i] = -vy2[i] end
+        y2[i] = math.clamp(y2[i], 0, H)
 
         graphics.line(x1[i], y1[i], x2[i], y2[i], 1, cols[i])
     end

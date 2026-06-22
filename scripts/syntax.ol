@@ -109,6 +109,12 @@ assert("x" + 1     == "x1")
 assert("v=" + 3.14 == "v=3.14")
 assert(42 + " !"   == "42 !")
 
+## division entière plancher (//) et exponentiation (**)
+assert(7 // 2    == 3)         ## IDIV → plancher vers -∞
+assert(-7 // 2   == -4)
+assert(2 ** 8    == 256)       ## POW : INT**INT≥0 → INT
+assert(2.0 ** -1 == 0.5)       ## exposant négatif → float
+
 ## ── 5. Comparaisons ──────────────────────────────────────────────────────────
 
 assert(1 == 1)
@@ -150,6 +156,7 @@ assert(0    == false)
 assert("x" == true)    ## string non vide : truthy == 1
 assert(""  == false)   ## string vide : falsy == 0
 assert(not nil)        ## nil est falsy, mais nil <> false (types distincts)
+assert(nil <> false)   ## nil et false sont des types distincts
 
 ## ── 7. Opérateurs bits ───────────────────────────────────────────────────────
 
@@ -273,6 +280,20 @@ for i in rng do
 end
 assert(s10 == 15)
 
+## range exclusif gauche ]1;5[ → 2,3,4
+var s11 = 0
+for i in ]1;5[ do
+    s11 += i
+end
+assert(s11 == 9)
+
+## range semi-ouvert ]1;5] → 2,3,4,5
+var s12 = 0
+for i in ]1;5] do
+    s12 += i
+end
+assert(s12 == 14)
+
 ## continue dans for k,v in map
 var cm = {a: 1, b: 2, c: 3, d: 4}
 var cs1 = 0
@@ -327,16 +348,12 @@ func f_nodefault(a, b)
 end
 assert(f_nodefault() == nil)
 
-## varargs
-func sum_all(...)
-    var s = 0
-    var i = 1
-    while i <= 3 do
-        s += 1
-        i += 1
-    end
+## varargs purs : la fonction accepte n'importe quel nombre d'arguments
+func wrap(...)
     return ...
 end
+var w1, w2, w3 = wrap(10, 20, 30)
+assert(w1 == 10 and w2 == 20 and w3 == 30)
 
 func passthrough(a, ...)
     return a, ...
@@ -705,6 +722,24 @@ assert(with_base(5) == 15)
 ##   const k = 1
 ##   func f()  k = 0  end  ## ERROR: cannot assign to const 'k'
 
+## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
+##
+##   var x = 1
+##   var x = 2          ## ERROR: local variable 'x' already declared in this scope
+##
+##   global g = 1
+##   global g = 2       ## ERROR: global variable 'g' already declared
+##
+##   func f(a)
+##       var a = 1      ## ERROR: local variable 'a' already declared in this scope
+##   end
+##
+## Une locale dans une AUTRE fonction ne provoque pas d'erreur :
+##   var x = 1          ## OK : portée top-level
+##   func f()
+##       var x = 2      ## OK : portée distincte (registres de f)
+##   end
+
 ## ── 21. Module math ──────────────────────────────────────────────────────────
 
 ## constantes
@@ -746,55 +781,16 @@ var rnd = math.rand()
 assert(rnd >= 0 and rnd < 1)
 
 ## ── 22. Module graphics (Raylib) ─────────────────────────────────────────────
-
-graphics.canvas(600, 400, "Ollin – test graphique")
-
-global frame = 0
-
-func draw()
-    frame += 1
-    var t = frame / 60.0
-
-    graphics.clear(graphics.BLACK)
-
-    ## Lignes tournantes depuis le centre
-    var cx = 300
-    var cy = 200
-    for i in [0;7] do
-        var angle = t + i * math.PI / 4
-        var x2 = cx + 150 * math.cos(angle)
-        var y2 = cy + 150 * math.sin(angle)
-        graphics.line(cx, cy, x2, y2, 2, graphics.BLUE)
-    end
-
-    ## Croix animée
-    var bx = 300 + 200 * math.sin(t * 1.3)
-    var by = 200 + 100 * math.cos(t * 0.9)
-    graphics.line(bx - 8, by,     bx + 8, by,     3, graphics.RED)
-    graphics.line(bx,     by - 8, bx,     by + 8, 3, graphics.RED)
-
-    graphics.draw_text("Ollin graphics OK", 10, 10, 20, graphics.WHITE)
-    graphics.draw_text("FPS: " + graphics.fps(), 10, 36, 16, graphics.GRAY)
-
-    if frame >= 60 then
-        graphics.quit()
-    end
-end
-
-## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
 ##
-##   var x = 1
-##   var x = 2          ## ERROR: local variable 'x' already declared in this scope
+## Module natif (non disponible en WASM/headless). Voir scripts/graphics_demo.ol.
 ##
-##   global g = 1
-##   global g = 2       ## ERROR: global variable 'g' already declared
+##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
+##   graphics.run(func()
+##       graphics.clear(graphics.BLACK)
+##       graphics.line(x1, y1, x2, y2, 1, color)
+##   end)
 ##
-##   func f(a)
-##       var a = 1      ## ERROR: local variable 'a' already declared in this scope
-##   end
-##
-## Une locale dans une AUTRE fonction ne provoque pas d'erreur :
-##   var x = 1          ## OK : portée top-level
-##   func f()
-##       var x = 2      ## OK : portée distincte (registres de f)
-##   end
+## Couleurs prédéfinies : BLACK, WHITE, RED, GREEN, BLUE, YELLOW, GRAY
+## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
+## FPS : graphics.fps() → entier
+## Texte : graphics.draw_text(text, x, y, size [, color])
