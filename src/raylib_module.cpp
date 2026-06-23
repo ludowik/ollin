@@ -81,7 +81,6 @@ static bool  s_has_stroke   = true;
 static Color s_stroke_color = WHITE;
 static bool  s_has_fill     = false;
 static Color s_fill_color   = WHITE;
-static int   s_segments     = 32;
 
 static void applyStrokeSize(float sz)            { s_stroke_size = sz; }
 static void applyStroke(bool en, Color c = WHITE) { s_has_stroke = en; s_stroke_color = c; }
@@ -91,7 +90,6 @@ static void resetStyles() {
     applyStrokeSize(2.0f);
     applyStroke(true, WHITE);
     applyFill(false);
-    s_segments = 32;
 }
 
 static Value gfx_stroke_size(Value* args, int argc) {
@@ -100,11 +98,6 @@ static Value gfx_stroke_size(Value* args, int argc) {
     return Value{};
 }
 
-static Value gfx_segments(Value* args, int argc) {
-    if (argc > 0 && args[0].isNumber())
-        s_segments = std::max(3, (int)args[0].asNum());
-    return Value{};
-}
 
 static Value gfx_stroke(Value* args, int argc) {
     if (argc > 0 && (args[0].isMap() || args[0].isClass()))
@@ -198,7 +191,7 @@ static Value gfx_ellipse(Value* args, int argc) {
     float cy   = (float)args[1].asNum();
     float rx   = (float)args[2].asNum() * 0.5f;
     float ry   = (float)args[3].asNum() * 0.5f;
-    int   segs = (argc > 4 && args[4].isNumber()) ? std::max(3,(int)args[4].asNum()) : s_segments;
+    int   segs = (argc > 4 && args[4].isNumber()) ? std::max(3,(int)args[4].asNum()) : 32;
     if (s_has_fill)
         drawEllipseFill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke)
@@ -211,7 +204,7 @@ static Value gfx_circle(Value* args, int argc) {
     float cx   = (float)args[0].asNum();
     float cy   = (float)args[1].asNum();
     float r    = (float)args[2].asNum();
-    int   segs = (argc > 3 && args[3].isNumber()) ? std::max(3,(int)args[3].asNum()) : s_segments;
+    int   segs = (argc > 3 && args[3].isNumber()) ? std::max(3,(int)args[3].asNum()) : 32;
     if (s_has_fill)
         drawEllipseFill(cx, cy, r, r, s_fill_color, segs);
     if (s_has_stroke) {
@@ -279,7 +272,6 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(gfx_end_draw));
     m.mapSet(Value(std::string("clear")),       Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
-    m.mapSet(Value(std::string("segments")),   Value::makeBuiltin(gfx_segments));
     m.mapSet(Value(std::string("stroke")),     Value::makeBuiltin(gfx_stroke));
     m.mapSet(Value(std::string("fill")),       Value::makeBuiltin(gfx_fill));
     m.mapSet(Value(std::string("line")),       Value::makeBuiltin(gfx_line));
