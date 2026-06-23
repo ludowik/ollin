@@ -103,8 +103,6 @@ static Value gfx_stroke(Value* args, int argc) {
         applyStroke(true, toColor(args[0]));
     else
         applyStroke(false);
-    if (argc > 1 && args[1].isNumber())
-        applyStrokeSize((float)args[1].asNum());
     return Value{};
 }
 
