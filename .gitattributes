@@ -1,0 +1,21 @@
+# Normalise les fins de ligne : LF dans le dépôt, conversion auto sur checkout
+* text=auto
+
+# Sources et scripts : LF strict
+*.cpp   text eol=lf
+*.h     text eol=lf
+*.ol    text eol=lf
+*.html  text eol=lf
+*.js    text eol=lf
+*.ts    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.sh    text eol=lf
+*.cmake text eol=lf
+CMakeLists.txt text eol=lf
+
+# Binaires : pas de conversion
+*.wasm  binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
