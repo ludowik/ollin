@@ -118,6 +118,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  overflow: auto;
 }
 
 #output-header {
@@ -161,10 +162,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 canvas#canvas {
   display: none;
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
+  margin: auto;
 }
 
 /* ── divider (drag to resize) ─────────────────────────────────────────────── */
@@ -302,6 +300,21 @@ const ollinTheme = EditorView.theme({
   '&.cm-focused .cm-cursor': { borderLeftColor: '#7c83ff', borderLeftWidth: '2px' },
   '.cm-selectionBackground': { background: 'rgba(255,255,255,0.18) !important' },
   '&.cm-focused .cm-selectionBackground': { background: 'rgba(255,255,255,0.25) !important' },
+
+  /* autocomplete dropdown */
+  '.cm-tooltip.cm-tooltip-autocomplete': { background: '#1e2133', border: '1px solid #3a3f5c', borderRadius: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', padding: '2px 0' },
+  '.cm-tooltip-autocomplete > ul': { fontFamily: "'JetBrains Mono','Fira Code',Consolas,monospace", fontSize: '12.5px', maxHeight: '280px' },
+  '.cm-tooltip-autocomplete > ul > li': { padding: '3px 10px 3px 6px', color: '#c9d1e0', lineHeight: '1.5' },
+  '.cm-tooltip-autocomplete > ul > li[aria-selected]': { background: '#2d3259', color: '#ffffff' },
+  '.cm-completionLabel': { color: '#c9d1e0' },
+  '.cm-completionDetail': { color: '#7c85a2', fontStyle: 'italic', marginLeft: '6px' },
+  '.cm-completionIcon': { opacity: 0.7, width: '16px', marginRight: '4px' },
+  '.cm-completionIcon-keyword': { color: '#569CD6' },
+  '.cm-completionIcon-function': { color: '#DCDCAA' },
+  '.cm-completionIcon-constant': { color: '#4FC1FF' },
+  '.cm-completionIcon-namespace': { color: '#C586C0' },
+  '[aria-selected] .cm-completionLabel': { color: '#ffffff' },
+  '[aria-selected] .cm-completionDetail': { color: '#a0aabf' },
 })
 
 // ── Autocompletion ────────────────────────────────────────────────────────
@@ -347,8 +360,6 @@ const MODULE_MEMBERS = {
     fn('graphics.fps','fps()→int'),                fn('graphics.is_open','is_open()→bool'),
     fn('graphics.begin_draw','begin_draw()'),      fn('graphics.end_draw','end_draw()'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
-    cst('graphics.BLACK',''), cst('graphics.WHITE',''), cst('graphics.RED',''),
-    cst('graphics.GREEN',''), cst('graphics.BLUE',''),  cst('graphics.YELLOW',''), cst('graphics.GRAY',''),
   ],
   colors: [
     cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),
@@ -389,7 +400,10 @@ function ollinComplete(context) {
 }
 
 // ── Editor ────────────────────────────────────────────────────────────────
-const INIT_CODE = 'print("hello world!")\n'
+const CODE_KEY  = 'ollin-pg-code'
+const INIT_CODE = localStorage.getItem(CODE_KEY) ?? 'print("hello world!")\n'
+
+let saveTimer = null
 
 const view = new EditorView({
   state: EditorState.create({
@@ -401,6 +415,11 @@ const view = new EditorView({
       keymap.of([{ key: 'Alt-Enter', run: () => { run(); return true } }]),
       indentUnit.of('    '),
       autocompletion({ override: [ollinComplete], activateOnTyping: true }),
+      EditorView.updateListener.of(update => {
+        if (!update.docChanged) return
+        clearTimeout(saveTimer)
+        saveTimer = setTimeout(() => localStorage.setItem(CODE_KEY, view.state.doc.toString()), 500)
+      }),
     ]
   }),
   parent: document.getElementById('editor-wrap'),
@@ -418,8 +437,8 @@ const EXAMPLES = [
   { name: 'Closure',      code: 'func make_counter()\n    var n = 0\n    func inc()\n        n += 1\n        return n\n    end\n    return inc\nend\n\nvar c = make_counter()\nprint(c(), c(), c())' },
   { name: 'Classe Vec2',  code: 'class Vec2\n    func init(x, y)\n        self.x = x\n        self.y = y\n    end\n    func __add(other)\n        return Vec2(self.x + other.x, self.y + other.y)\n    end\n    func __str()\n        return "Vec2(" + self.x + "," + self.y + ")"\n    end\nend\n\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
   { name: 'Colors',       code: 'var c = Color(1.0, 0.5, 0.2)\nprint(c)\nprint(c.r, c.g, c.b, c.a)\n\nvar red = colors.RED\nprint(red.r, red.g, red.b)' },
-  { name: 'Lignes animées', code: 'const W = 800\nconst H = 500\nconst N = 150\nconst SPEED = 3\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n    x1[i]=math.rand_int(0,W)  y1[i]=math.rand_int(0,H)\n    x2[i]=math.rand_int(0,W)  y2[i]=math.rand_int(0,H)\n    vx1[i]=math.rand(-SPEED,SPEED)  vy1[i]=math.rand(-SPEED,SPEED)\n    vx2[i]=math.rand(-SPEED,SPEED)  vy2[i]=math.rand(-SPEED,SPEED)\n    cols[i]=Color.random()\nend\n\ngraphics.canvas(W, H, "Lignes")\n\nfunc frame()\n    graphics.clear(graphics.BLACK)\n    graphics.strokeSize(1)\n    for i = 1, N do\n        x1[i]+=vx1[i]  y1[i]+=vy1[i]  x2[i]+=vx2[i]  y2[i]+=vy2[i]\n        if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n        if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n        if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n        if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n        graphics.stroke(cols[i])\n        graphics.line(x1[i],y1[i],x2[i],y2[i])\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
-  { name: 'Rectangles',    code: 'const W = 800\nconst H = 500\nconst N = 20\n\nvar rects = []\nfor i = 1, N do\n    var w = math.rand_int(30, 110)\n    var h = math.rand_int(20, 80)\n    rects[i] = {\n        x: math.rand_int(0, W - w), y: math.rand_int(0, H - h),\n        w: w, h: h,\n        vx: math.rand(-2, 2), vy: math.rand(-2, 2),\n        fc: Color.random(), sc: Color.random()\n    }\nend\n\ngraphics.canvas(W, H, "Rectangles")\n\nfunc frame()\n    graphics.clear(graphics.BLACK)\n    for r in rects do\n        r.x += r.vx  r.y += r.vy\n        if r.x < 0 or r.x + r.w > W then r.vx = -r.vx end\n        if r.y < 0 or r.y + r.h > H then r.vy = -r.vy end\n        r.x = math.clamp(r.x, 0, W - r.w)\n        r.y = math.clamp(r.y, 0, H - r.h)\n        graphics.fill(r.fc)\n        graphics.stroke(r.sc)\n        graphics.rect(r.x, r.y, r.w, r.h)\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
+  { name: 'Lignes animées', code: 'const W = 800\nconst H = 500\nconst N = 150\nconst SPEED = 3\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n    x1[i]=math.rand_int(0,W)  y1[i]=math.rand_int(0,H)\n    x2[i]=math.rand_int(0,W)  y2[i]=math.rand_int(0,H)\n    vx1[i]=math.rand(-SPEED,SPEED)  vy1[i]=math.rand(-SPEED,SPEED)\n    vx2[i]=math.rand(-SPEED,SPEED)  vy2[i]=math.rand(-SPEED,SPEED)\n    cols[i]=Color.random()\nend\n\ngraphics.canvas(W, H, "Lignes")\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    graphics.strokeSize(1)\n    for i = 1, N do\n        x1[i]+=vx1[i]  y1[i]+=vy1[i]  x2[i]+=vx2[i]  y2[i]+=vy2[i]\n        if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n        if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n        if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n        if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n        graphics.stroke(cols[i])\n        graphics.line(x1[i],y1[i],x2[i],y2[i])\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
+  { name: 'Rectangles',    code: 'const W = 800\nconst H = 500\nconst N = 20\n\nvar rects = []\nfor i = 1, N do\n    var w = math.rand_int(30, 110)\n    var h = math.rand_int(20, 80)\n    rects[i] = {\n        x: math.rand_int(0, W - w), y: math.rand_int(0, H - h),\n        w: w, h: h,\n        vx: math.rand(-2, 2), vy: math.rand(-2, 2),\n        fc: Color.random(), sc: Color.random()\n    }\nend\n\ngraphics.canvas(W, H, "Rectangles")\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    for r in rects do\n        r.x += r.vx  r.y += r.vy\n        if r.x < 0 or r.x + r.w > W then r.vx = -r.vx end\n        if r.y < 0 or r.y + r.h > H then r.vy = -r.vy end\n        r.x = math.clamp(r.x, 0, W - r.w)\n        r.y = math.clamp(r.y, 0, H - r.h)\n        graphics.fill(r.fc)\n        graphics.stroke(r.sc)\n        graphics.rect(r.x, r.y, r.w, r.h)\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
 ]
 
 const sel = document.getElementById('examples')
