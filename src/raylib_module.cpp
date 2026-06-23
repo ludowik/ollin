@@ -162,21 +162,29 @@ static Value gfx_close(Value* args, int argc) {
     return Value{};
 }
 
+static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thick, Color color) {
+    const int segments = 64;
+    float prev_x = cx + rx;
+    float prev_y = cy;
+    for (int i = 1; i <= segments; i++) {
+        float a = (float)i / segments * 2.0f * PI;
+        float nx = cx + rx * cosf(a);
+        float ny = cy + ry * sinf(a);
+        DrawLineEx({prev_x, prev_y}, {nx, ny}, thick, color);
+        prev_x = nx; prev_y = ny;
+    }
+}
+
 static Value gfx_ellipse(Value* args, int argc) {
     if (argc < 4) throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
-    int   cx = (int)args[0].asNum();
-    int   cy = (int)args[1].asNum();
+    float cx = (float)args[0].asNum();
+    float cy = (float)args[1].asNum();
     float rx = (float)args[2].asNum() * 0.5f;
     float ry = (float)args[3].asNum() * 0.5f;
-    float half = s_stroke_size * 0.5f;
-    if (s_has_fill && s_has_stroke) {
-        DrawEllipse(cx, cy, rx + half, ry + half, s_stroke_color);
-        DrawEllipse(cx, cy, std::max(0.0f, rx - half), std::max(0.0f, ry - half), s_fill_color);
-    } else if (s_has_fill) {
-        DrawEllipse(cx, cy, rx, ry, s_fill_color);
-    } else if (s_has_stroke) {
-        DrawEllipseLines(cx, cy, rx, ry, s_stroke_color);
-    }
+    if (s_has_fill)
+        DrawEllipse((int)cx, (int)cy, rx, ry, s_fill_color);
+    if (s_has_stroke)
+        drawEllipseStroke(cx, cy, rx, ry, s_stroke_size, s_stroke_color);
     return Value{};
 }
 
