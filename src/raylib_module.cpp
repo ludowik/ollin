@@ -163,6 +163,58 @@ static Value gfx_close(Value* args, int argc) {
     return Value{};
 }
 
+// ── Polygon ───────────────────────────────────────────────────────────────────
+static void polyFill(std::vector<Vector2> pts, Color color) {
+    int n = (int)pts.size();
+    if (n < 3) return;
+    // Normalise vers CCW (coordonnées écran Y↓ : shoelace > 0 = CW → inverser)
+    float area = 0;
+    for (int i = 0; i < n; i++) {
+        const auto& a = pts[i]; const auto& b = pts[(i+1)%n];
+        area += (b.x - a.x) * (b.y + a.y);
+    }
+    if (area > 0) std::reverse(pts.begin(), pts.end());
+    // Fan depuis le centroïde
+    float cx = 0, cy = 0;
+    for (const auto& p : pts) { cx += p.x; cy += p.y; }
+    cx /= n; cy /= n;
+    Vector2 hub = {cx, cy};
+    for (int i = 0; i < n; i++)
+        DrawTriangle(hub, pts[(i+1)%n], pts[i], color);
+}
+
+static std::vector<Vector2> parsePoints(const Value& v) {
+    std::vector<Vector2> pts;
+    if (!v.isArray()) return pts;
+    const auto& items = v.aptr->items;
+    if (items.empty()) return pts;
+    if (items[0].isArray()) {
+        for (const auto& p : items) {
+            if (!p.isArray() || p.aptr->items.size() < 2) continue;
+            pts.push_back({(float)p.aptr->items[0].asNum(), (float)p.aptr->items[1].asNum()});
+        }
+    } else {
+        for (size_t i = 0; i + 1 < items.size(); i += 2)
+            pts.push_back({(float)items[i].asNum(), (float)items[i+1].asNum()});
+    }
+    return pts;
+}
+
+static Value gfx_polygon(Value* args, int argc) {
+    if (argc < 1 || !args[0].isArray())
+        throw std::runtime_error("graphics.polygon: expected array of points");
+    auto pts = parsePoints(args[0]);
+    if ((int)pts.size() < 3) return Value{};
+    if (s_has_fill)
+        polyFill(pts, s_fill_color);
+    if (s_has_stroke) {
+        int n = (int)pts.size();
+        for (int i = 0; i < n; i++)
+            DrawLineEx(pts[i], pts[(i+1)%n], s_stroke_size, s_stroke_color);
+    }
+    return Value{};
+}
+
 static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
     float prev_x = cx + rx, prev_y = cy;
     for (int i = 1; i <= segs; i++) {
@@ -275,6 +327,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("close")),      Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")),       Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")),        Value::makeBuiltin(gfx_run));
+    m.mapSet(Value(std::string("polygon")),    Value::makeBuiltin(gfx_polygon));
     m.mapSet(Value(std::string("ellipse")),    Value::makeBuiltin(gfx_ellipse));
     m.mapSet(Value(std::string("circle")),     Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")),      Value::makeBuiltin(gfx_point));
