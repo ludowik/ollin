@@ -412,7 +412,7 @@ pre:hover .code-actions,
 
 <div class="hero">
   <h1>Ollin</h1>
-  <p class="subtitle">Langage de script minimaliste — VM register-based, struct taguée, bytecode 32-bit</p>
+  <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
     <span class="badge badge-blue">C++17</span>
@@ -432,7 +432,7 @@ pre:hover .code-actions,
 <!-- ── Introduction ──────────────────────────────────────────────────────── -->
 <section id="intro">
 <h2>Introduction</h2>
-<p>Ollin est un langage de script dynamiquement typé compilé vers un bytecode 32-bit et exécuté par une VM register-based. La syntaxe est inspirée de Lua et Python : blocs délimités par <code>end</code>, newline comme terminateur d'instruction, typage implicite.</p>
+<p>Ollin est un langage de script <strong>minimaliste</strong> et <strong>expressif</strong> : dynamiquement typé, compilé vers un bytecode 32-bit, exécuté par une VM register-based, et conçu pour être embarqué. Blocs délimités par <code>end</code>, newline comme terminateur d'instruction.</p>
 
 <h3>Pipeline d'exécution</h3>
 <pre><code>source .ol  →  Lexer  →  Parser  →  Compiler  →  VM</code></pre>
@@ -1348,9 +1348,13 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale ; appelle <code>callback()</code> chaque frame jusqu'à fermeture</td></tr>
     <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
     <tr><td><code>graphics.clear(color)</code></td><td>Efface l'écran avec la couleur donnée</td></tr>
-    <tr><td><code>graphics.line(x1,y1,x2,y2 [,thickness [,color]])</code></td><td>Trace un segment de (x1,y1) à (x2,y2)</td></tr>
+    <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés (défaut : 2). Remis à 2 à chaque frame.</td></tr>
+    <tr><td><code>graphics.stroke([color])</code></td><td>Couleur des tracés (défaut : blanc). Sans argument : désactive le tracé.</td></tr>
+    <tr><td><code>graphics.fill([color])</code></td><td>Couleur de remplissage (défaut : aucun). Sans argument : désactive le remplissage.</td></tr>
+    <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
+    <tr><td><code>graphics.rect(x, y, w, h)</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif</td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
-    <tr><td><code>graphics.draw_text(text, x, y, size [,color])</code></td><td>Affiche une chaîne à (x,y) avec la taille et la couleur données</td></tr>
+    <tr><td><code>graphics.draw_text(text, x, y, size [,color])</code></td><td>Affiche une chaîne — couleur stroke par défaut</td></tr>
     <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
   </tbody>
 </table>

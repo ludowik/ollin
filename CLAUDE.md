@@ -1,4 +1,5 @@
 # Ollin — Scripting Language
+> Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable
 
 ## Stack
 - Implémentation : **C++17**
