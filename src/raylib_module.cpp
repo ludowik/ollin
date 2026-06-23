@@ -103,6 +103,8 @@ static Value gfx_stroke(Value* args, int argc) {
         applyStroke(true, toColor(args[0]));
     else
         applyStroke(false);
+    if (argc > 1 && args[1].isNumber())
+        applyStrokeSize((float)args[1].asNum());
     return Value{};
 }
 
@@ -160,19 +162,11 @@ static Value gfx_close(Value* args, int argc) {
     return Value{};
 }
 
-static Color s_stroke_color = WHITE;
-static float s_stroke_size  = 1.0f;
-
-static Value gfx_stroke(Value* args, int argc) {
-    if (argc > 0) s_stroke_color = toColor(args[0]);
-    if (argc > 1 && args[1].isNumber()) s_stroke_size = (float)args[1].asNum();
-    return Value{};
-}
-
 static Value gfx_point(Value* args, int argc) {
     if (argc < 2) throw std::runtime_error("graphics.point: expected x, y");
-    float x = (float)(args[0].isNumber() ? args[0].asNum() : 0.0);
-    float y = (float)(args[1].isNumber() ? args[1].asNum() : 0.0);
+    if (!s_has_stroke) return Value{};
+    float x = (float)args[0].asNum();
+    float y = (float)args[1].asNum();
     DrawCircleV({x, y}, s_stroke_size, s_stroke_color);
     return Value{};
 }
@@ -235,7 +229,6 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("close")),      Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")),       Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")),        Value::makeBuiltin(gfx_run));
-    m.mapSet(Value(std::string("stroke")),     Value::makeBuiltin(gfx_stroke));
     m.mapSet(Value(std::string("point")),      Value::makeBuiltin(gfx_point));
     m.mapSet(Value(std::string("BLACK")),   colorInst(0.0,        0.0,        0.0));
     m.mapSet(Value(std::string("WHITE")),   colorInst(1.0,        1.0,        1.0));
