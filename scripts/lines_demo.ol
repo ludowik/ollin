@@ -4,10 +4,6 @@ const H = 600
 const N = 200
 const SPEED = 3
 
-func rpos(max)
-    return math.floor(math.rand() * max)
-end
-
 func rvel()
     return math.rand() * SPEED * 2 - SPEED
 end
@@ -17,10 +13,10 @@ var vx1 = [] var vy1 = [] var vx2 = [] var vy2 = []
 var cols = []
 
 for i = 1, N do
-    x1[i]  = rpos(W)
-    y1[i]  = rpos(H)
-    x2[i]  = rpos(W)
-    y2[i]  = rpos(H)
+    x1[i]  = math.rand_int(0, W)
+    y1[i]  = math.rand_int(0, H)
+    x2[i]  = math.rand_int(0, W)
+    y2[i]  = math.rand_int(0, H)
     vx1[i] = rvel()
     vy1[i] = rvel()
     vx2[i] = rvel()
@@ -32,6 +28,7 @@ graphics.canvas(W, H, "Ollin — Lignes animées")
 
 func frame()
     graphics.clear(graphics.BLACK)
+    graphics.strokeSize(1)
 
     for i = 1, N do
         x1[i]  = x1[i]  + vx1[i]
@@ -48,10 +45,11 @@ func frame()
         if y2[i] < 0 or y2[i] > H then vy2[i] = -vy2[i] end
         y2[i] = math.clamp(y2[i], 0, H)
 
-        graphics.line(x1[i], y1[i], x2[i], y2[i], 1, cols[i])
+        graphics.stroke(cols[i])
+        graphics.line(x1[i], y1[i], x2[i], y2[i])
     end
 
-    graphics.draw_text("FPS: " + graphics.fps(), W - 80, H - 20, 16, graphics.WHITE)
+    graphics.draw_text("FPS: " + graphics.fps(), W - 80, H - 20, 16)
 end
 
 graphics.run(frame)
