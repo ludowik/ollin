@@ -527,6 +527,16 @@ const editorPane = document.getElementById('editor-pane')
 const outputPane = document.getElementById('output-pane')
 let   dragging   = false
 
+const SPLIT_KEY = 'ollin-pg-split'
+
+function applySplit(pct) {
+  editorPane.style.flex = `0 0 ${pct}%`
+  outputPane.style.flex = `0 0 ${100 - pct}%`
+}
+
+const savedSplit = parseFloat(localStorage.getItem(SPLIT_KEY))
+if (savedSplit >= 15 && savedSplit <= 85) applySplit(savedSplit)
+
 divider.addEventListener('mousedown', e => {
   dragging = true
   divider.classList.add('dragging')
@@ -537,19 +547,17 @@ document.addEventListener('mousemove', e => {
   const layout = document.getElementById('layout')
   const rect   = layout.getBoundingClientRect()
   const mobile = window.innerWidth <= 640
-  if (mobile) {
-    const pct = Math.min(85, Math.max(15, (e.clientY - rect.top) / rect.height * 100))
-    editorPane.style.flex = `0 0 ${pct}%`
-    outputPane.style.flex = `0 0 ${100 - pct}%`
-  } else {
-    const pct = Math.min(85, Math.max(15, (e.clientX - rect.left) / rect.width * 100))
-    editorPane.style.flex = `0 0 ${pct}%`
-    outputPane.style.flex = `0 0 ${100 - pct}%`
-  }
+  const pct = mobile
+    ? Math.min(85, Math.max(15, (e.clientY - rect.top)  / rect.height * 100))
+    : Math.min(85, Math.max(15, (e.clientX - rect.left) / rect.width  * 100))
+  applySplit(pct)
 })
 document.addEventListener('mouseup', () => {
+  if (!dragging) return
   dragging = false
   divider.classList.remove('dragging')
+  const pct = parseFloat(editorPane.style.flex.split(' ')[2])
+  if (!isNaN(pct)) localStorage.setItem(SPLIT_KEY, pct)
 })
 </script>
 </body>
