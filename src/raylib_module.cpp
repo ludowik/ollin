@@ -162,6 +162,20 @@ static Value gfx_close(Value* args, int argc) {
     return Value{};
 }
 
+static Value gfx_circle(Value* args, int argc) {
+    if (argc < 3) throw std::runtime_error("graphics.circle: expected x, y, radius");
+    float x = (float)args[0].asNum();
+    float y = (float)args[1].asNum();
+    float r = (float)args[2].asNum();
+    if (s_has_fill)
+        DrawCircleV({x, y}, r, s_fill_color);
+    if (s_has_stroke) {
+        float half = s_stroke_size * 0.5f;
+        DrawRing({x, y}, r - half, r + half, 0.0f, 360.0f, 36, s_stroke_color);
+    }
+    return Value{};
+}
+
 static Value gfx_point(Value* args, int argc) {
     if (argc < 2) throw std::runtime_error("graphics.point: expected x, y");
     if (!s_has_stroke) return Value{};
@@ -229,6 +243,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("close")),      Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")),       Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")),        Value::makeBuiltin(gfx_run));
+    m.mapSet(Value(std::string("circle")),     Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")),      Value::makeBuiltin(gfx_point));
     m.mapSet(Value(std::string("BLACK")),   colorInst(0.0,        0.0,        0.0));
     m.mapSet(Value(std::string("WHITE")),   colorInst(1.0,        1.0,        1.0));
