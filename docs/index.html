@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ollin — Tutoriel</title>
+<script>
+;(function(){
+  var last = localStorage.getItem('ollin-last-page')
+  if (last === 'playground.html' && !document.referrer.includes('playground.html'))
+    location.replace('playground.html')
+})()
+</script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1505,6 +1512,8 @@ function makeStaticEditor(parent, code) {
     parent,
   })
 }
+
+localStorage.setItem('ollin-last-page', 'index.html')
 
 // ── Hamburger ─────────────────────────────────────────────────────────────
 const ham      = document.getElementById('ham')
