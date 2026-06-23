@@ -201,17 +201,11 @@ static Value gfx_ellipse(Value* args, int argc) {
 
 static Value gfx_circle(Value* args, int argc) {
     if (argc < 3) throw std::runtime_error("graphics.circle: expected x, y, radius");
-    float cx   = (float)args[0].asNum();
-    float cy   = (float)args[1].asNum();
-    float r    = (float)args[2].asNum();
-    int   segs = (argc > 3 && args[3].isNumber()) ? std::max(3,(int)args[3].asNum()) : 32;
-    if (s_has_fill)
-        drawEllipseFill(cx, cy, r, r, s_fill_color, segs);
-    if (s_has_stroke) {
-        float half = s_stroke_size * 0.5f;
-        DrawRing({cx, cy}, r - half, r + half, 0.0f, 360.0f, segs, s_stroke_color);
-    }
-    return Value{};
+    double d = args[2].asNum() * 2.0;
+    Value dv(d);
+    Value ellipse_args[] = { args[0], args[1], dv, dv,
+                             argc > 3 ? args[3] : Value{} };
+    return gfx_ellipse(ellipse_args, argc > 3 ? 5 : 4);
 }
 
 static Value gfx_point(Value* args, int argc) {
