@@ -1,3 +1,6 @@
 build*/
 third_party/
 .claude/worktrees/
+node_modules/
+package.json
+package-lock.json
