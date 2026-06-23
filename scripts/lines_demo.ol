@@ -4,10 +4,6 @@ const H = 600
 const N = 200
 const SPEED = 3
 
-func rvel()
-    return math.rand() * SPEED * 2 - SPEED
-end
-
 var x1 = []  var y1 = []  var x2 = []  var y2 = []
 var vx1 = [] var vy1 = [] var vx2 = [] var vy2 = []
 var cols = []
@@ -17,10 +13,10 @@ for i = 1, N do
     y1[i]  = math.rand_int(0, H)
     x2[i]  = math.rand_int(0, W)
     y2[i]  = math.rand_int(0, H)
-    vx1[i] = rvel()
-    vy1[i] = rvel()
-    vx2[i] = rvel()
-    vy2[i] = rvel()
+    vx1[i] = math.rand(-SPEED, SPEED)
+    vy1[i] = math.rand(-SPEED, SPEED)
+    vx2[i] = math.rand(-SPEED, SPEED)
+    vy2[i] = math.rand(-SPEED, SPEED)
     cols[i] = Color.random()
 end
 
