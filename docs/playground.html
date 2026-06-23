@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ollin — Playground</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0f1117;
+  --surface: #1a1d2e;
+  --surface2:#242742;
+  --border:  #2e3150;
+  --text:    #c9d1e0;
+  --dim:     #7c85a2;
+  --accent:  #7c83ff;
+  --green:   #4ade80;
+  --red:     #f87171;
+  --yellow:  #fbbf24;
+  --mono:    'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; }
+
+/* ── toolbar ─────────────────────────────────────────────────────────────── */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent);
+  letter-spacing: -0.3px;
+  margin-right: 4px;
+}
+
+.sep { width: 1px; height: 20px; background: var(--border); }
+
+#examples {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  outline: none;
+  max-width: 180px;
+}
+#examples:focus { border-color: var(--accent); }
+
+.spacer { flex: 1; }
+
+#status { font-size: 12px; color: var(--dim); }
+
+#run-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+#run-btn:hover   { opacity: 0.85; }
+#run-btn:disabled{ opacity: 0.4; cursor: default; }
+
+#run-btn kbd {
+  font-size: 10px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+/* ── layout ──────────────────────────────────────────────────────────────── */
+#layout {
+  display: flex;
+  height: calc(100vh - 44px);
+}
+
+#editor-pane {
+  flex: 1 1 60%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+#editor-wrap {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Make CM fill the pane */
+#editor-wrap .cm-editor { height: 100%; border-radius: 0; border: none; }
+#editor-wrap .cm-scroller { height: 100%; overflow: auto; }
+
+#output-pane {
+  flex: 1 1 40%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+#output-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 34px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#output-header span { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+
+#clear-btn {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--dim);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+#clear-btn:hover { color: var(--text); background: var(--surface2); }
+
+#output {
+  flex: 1;
+  padding: 16px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-y: auto;
+  color: var(--dim);
+  font-style: italic;
+}
+#output.ok  { color: var(--green); font-style: normal; }
+#output.err { color: var(--red);   font-style: normal; }
+
+canvas#canvas {
+  display: none;
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* ── divider (drag to resize) ─────────────────────────────────────────────── */
+#divider {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+#divider:hover, #divider.dragging { background: var(--accent); }
+
+/* ── mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  #layout { flex-direction: column; }
+  #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
+  #output-pane { flex: 1 1 45%; }
+  #divider { width: 100%; height: 5px; cursor: row-resize; }
+}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "@codemirror/state":         "https://esm.sh/@codemirror/state@6",
+    "@codemirror/view":          "https://esm.sh/@codemirror/view@6",
+    "@codemirror/language":      "https://esm.sh/@codemirror/language@6",
+    "@codemirror/commands":      "https://esm.sh/@codemirror/commands@6",
+    "@codemirror/autocomplete":  "https://esm.sh/@codemirror/autocomplete@6",
+    "@lezer/highlight":          "https://esm.sh/@lezer/highlight@1"
+  }
+}
+</script>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="logo">Ollin</span>
+  <a href="index.html" style="font-size:12px;color:var(--dim);text-decoration:none">Docs</a>
+  <div class="sep"></div>
+  <select id="examples" title="Charger un exemple"></select>
+  <div class="spacer"></div>
+  <span id="status">Chargement…</span>
+  <button id="copy-btn" title="Copier le code" style="display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;transition:color 0.15s,border-color 0.15s">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>
+    Copier
+  </button>
+  <button id="run-btn" disabled>
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
+    Exécuter <kbd>Ctrl+↵</kbd>
+  </button>
+</div>
+
+<div id="layout">
+  <div id="editor-pane">
+    <div id="editor-wrap"></div>
+  </div>
+  <div id="divider"></div>
+  <div id="output-pane">
+    <div id="output-header">
+      <span>Sortie</span>
+      <button id="clear-btn" title="Effacer">✕ Effacer</button>
+    </div>
+    <div id="output">Prêt.</div>
+    <canvas id="canvas"></canvas>
+  </div>
+</div>
+
+<script type="module">
+import { EditorState }                                                    from '@codemirror/state'
+import { EditorView, lineNumbers, keymap, drawSelection,
+         highlightActiveLine, highlightActiveLineGutter }                 from '@codemirror/view'
+import { defaultKeymap, historyKeymap, history, indentWithTab }           from '@codemirror/commands'
+import { StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit } from '@codemirror/language'
+import { tags }                                                           from '@lezer/highlight'
+import { autocompletion, completionKeymap, acceptCompletion }             from '@codemirror/autocomplete'
+
+// ── Ollin syntax ──────────────────────────────────────────────────────────
+const KEYWORDS = new Set([
+  'var','global','const','while','do','for','in','if','then','elseif','end',
+  'break','true','false','nil','try','catch','throw','else','func','return',
+  'import','as','or','and','not','class','extends','super','self',
+  'switch','case','default'
+])
+const BUILTINS = new Set(['print','printf','time','assert','typeof','Color','math','graphics','string','colors'])
+
+const ollinLang = StreamLanguage.define({
+  name: 'ollin',
+  startState: () => ({ block: false }),
+  token(stream, state) {
+    if (state.block) {
+      if (stream.match('###')) { state.block = false; return 'comment' }
+      stream.next(); return 'comment'
+    }
+    if (stream.match('###')) { state.block = true; return 'comment' }
+    if (stream.eatSpace()) return null
+    if (stream.match('##')) { stream.skipToEnd(); return 'comment' }
+    if (stream.peek() === '"') {
+      stream.next()
+      while (!stream.eol()) { const ch = stream.next(); if (ch === '"') break; if (ch === '\\') stream.next() }
+      return 'string'
+    }
+    if (stream.match(/^\.\d[\d_]*/)) return 'number'
+    if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
+    if (stream.match(/^[a-zA-Z_]\w*/)) {
+      const w = stream.current()
+      if (KEYWORDS.has(w)) return 'keyword'
+      if (BUILTINS.has(w)) return 'atom'
+      return null
+    }
+    if (stream.match(/^(\*\*|\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
+        stream.match(/^[+\-*/%><&|^~\[\]{}:.]/)) return 'operator'
+    stream.next(); return null
+  }
+})
+
+const ollinHighlight = HighlightStyle.define([
+  { tag: tags.keyword,  color: '#569CD6' },
+  { tag: tags.atom,     color: '#DCDCAA' },
+  { tag: tags.number,   color: '#B5CEA8' },
+  { tag: tags.string,   color: '#CE9178' },
+  { tag: tags.comment,  color: '#6A9955', fontStyle: 'italic' },
+  { tag: tags.operator, color: '#c9d1e0' },
+])
+
+const ollinTheme = EditorView.theme({
+  '&': { background: '#1a1d2e', color: '#c9d1e0', fontSize: '13.5px', height: '100%' },
+  '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65' },
+  '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
+  '.cm-line': { padding: '0 18px' },
+  '.cm-gutters': { background: '#1a1d2e', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150' },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px', minWidth: '2.8em', fontSize: '11.5px' },
+  '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
+  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
+  '&.cm-focused': { outline: 'none' },
+  '&.cm-focused .cm-cursor': { borderLeftColor: '#7c83ff', borderLeftWidth: '2px' },
+  '.cm-selectionBackground': { background: 'rgba(255,255,255,0.18) !important' },
+  '&.cm-focused .cm-selectionBackground': { background: 'rgba(255,255,255,0.25) !important' },
+})
+
+// ── Autocompletion ────────────────────────────────────────────────────────
+const kw  = label => ({ label, type: 'keyword' })
+const fn  = (label, detail) => ({ label, type: 'function', detail })
+const cst = (label, detail) => ({ label, type: 'constant', detail })
+
+const AC_KEYWORDS = [
+  'var','global','const','func','if','then','else','elseif','end',
+  'while','do','for','in','return','break','true','false','nil',
+  'try','catch','throw','class','extends','super','self','import','as',
+  'or','and','not','switch','case','default',
+].map(kw)
+
+const AC_BUILTINS = [
+  fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
+  fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
+  fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(r, g, b [, a])'),
+]
+
+const MODULE_MEMBERS = {
+  math: [
+    cst('math.PI','3.14159…'), cst('math.TAU','6.28318…'), cst('math.E','2.71828…'), cst('math.INF','Infinity'),
+    fn('math.abs','abs(x)'),       fn('math.sign','sign(x)'),      fn('math.floor','floor(x)'),
+    fn('math.ceil','ceil(x)'),     fn('math.round','round(x)'),    fn('math.trunc','trunc(x)'),
+    fn('math.sqrt','sqrt(x)'),     fn('math.pow','pow(x,n)'),      fn('math.clamp','clamp(x,lo,hi)'),
+    fn('math.min','min(...)'),     fn('math.max','max(...)'),       fn('math.map','map(x,ilo,ihi,olo,ohi)'),
+    fn('math.exp','exp(x)'),       fn('math.log','log(x)'),        fn('math.log2','log2(x)'),
+    fn('math.log10','log10(x)'),   fn('math.logn','logn(x,n)'),   fn('math.frac','frac(x)'),
+    fn('math.sin','sin(x)'),       fn('math.cos','cos(x)'),        fn('math.tan','tan(x)'),
+    fn('math.asin','asin(x)'),     fn('math.acos','acos(x)'),      fn('math.atan','atan(x)'),
+    fn('math.atan2','atan2(y,x)'), fn('math.deg','deg(rad)'),      fn('math.rad','rad(deg)'),
+    fn('math.is_nan','is_nan(x)'), fn('math.is_inf','is_inf(x)'),
+    fn('math.rand','rand([lo,hi])'), fn('math.rand_int','rand_int([lo,]hi)'), fn('math.seed','seed(n)'),
+  ],
+  graphics: [
+    fn('graphics.canvas','canvas(w,h,title)'),     fn('graphics.run','run(callback)'),
+    fn('graphics.clear','clear(color)'),
+    fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color])'),
+    fn('graphics.fill','fill([color])'),
+    fn('graphics.line','line(x1,y1,x2,y2)'),       fn('graphics.rect','rect(x,y,w,h)'),
+    fn('graphics.draw_text','draw_text(text,x,y,size[,color])'),
+    fn('graphics.fps','fps()→int'),                fn('graphics.is_open','is_open()→bool'),
+    fn('graphics.begin_draw','begin_draw()'),      fn('graphics.end_draw','end_draw()'),
+    fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
+    cst('graphics.BLACK',''), cst('graphics.WHITE',''), cst('graphics.RED',''),
+    cst('graphics.GREEN',''), cst('graphics.BLUE',''),  cst('graphics.YELLOW',''), cst('graphics.GRAY',''),
+  ],
+  colors: [
+    cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),
+    cst('colors.GREEN',''),   cst('colors.BLUE',''),   cst('colors.YELLOW',''),
+    cst('colors.GRAY',''),    cst('colors.ORANGE',''), cst('colors.PINK',''),
+    cst('colors.PURPLE',''),  cst('colors.BROWN',''),  cst('colors.DARKGRAY',''),
+    cst('colors.SKYBLUE',''), cst('colors.LIME',''),   cst('colors.MAGENTA',''),
+  ],
+  string: [
+    fn('string.upper','upper(s)'), fn('string.lower','lower(s)'), fn('string.trim','trim(s)'),
+    fn('string.ltrim','ltrim(s)'), fn('string.rtrim','rtrim(s)'),
+  ],
+}
+
+function ollinComplete(context) {
+  const dotWord = context.matchBefore(/[a-zA-Z_]\w*\.\w*/)
+  if (dotWord) {
+    const dot    = dotWord.text.indexOf('.')
+    const prefix = dotWord.text.slice(0, dot)
+    const members = MODULE_MEMBERS[prefix]
+    if (members) {
+      return {
+        from: dotWord.from + dot + 1,
+        options: members.map(m => ({ ...m, label: m.label.slice(prefix.length + 1) })),
+        validFor: /^\w*$/,
+      }
+    }
+    return null
+  }
+  const word = context.matchBefore(/\w+/)
+  if (!word || (word.from === word.to && !context.explicit)) return null
+  const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({ label: m, type: 'namespace' }))
+  return {
+    from: word.from,
+    options: [...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
+    validFor: /^\w*$/,
+  }
+}
+
+// ── Editor ────────────────────────────────────────────────────────────────
+const INIT_CODE = 'print("hello world!")\n'
+
+const view = new EditorView({
+  state: EditorState.create({
+    doc: INIT_CODE,
+    extensions: [
+      ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme,
+      history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
+      keymap.of([{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
+      keymap.of([{ key: 'Alt-Enter', run: () => { run(); return true } }]),
+      indentUnit.of('    '),
+      autocompletion({ override: [ollinComplete], activateOnTyping: true }),
+    ]
+  }),
+  parent: document.getElementById('editor-wrap'),
+})
+
+view.focus()
+
+// ── Examples ──────────────────────────────────────────────────────────────
+const EXAMPLES = [
+  { name: '— Exemples —', code: null },
+  { name: 'Hello world',  code: 'print("hello world!")' },
+  { name: 'Fibonacci',    code: 'func fib(n)\n    if n <= 1 then return n end\n    return fib(n-1) + fib(n-2)\nend\nprint(fib(10))' },
+  { name: 'FizzBuzz',     code: 'for i in [1;20] do\n    if i % 15 == 0 then print("FizzBuzz")\n    elseif i % 3 == 0 then print("Fizz")\n    elseif i % 5 == 0 then print("Buzz")\n    else print(i)\n    end\nend' },
+  { name: 'Closure',      code: 'func make_counter()\n    var n = 0\n    func inc()\n        n += 1\n        return n\n    end\n    return inc\nend\n\nvar c = make_counter()\nprint(c(), c(), c())' },
+  { name: 'Classe Vec2',  code: 'class Vec2\n    func init(x, y)\n        self.x = x\n        self.y = y\n    end\n    func __add(other)\n        return Vec2(self.x + other.x, self.y + other.y)\n    end\n    func __str()\n        return "Vec2(" + self.x + "," + self.y + ")"\n    end\nend\n\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
+  { name: 'Colors',       code: 'var c = Color(1.0, 0.5, 0.2)\nprint(c)\nprint(c.r, c.g, c.b, c.a)\n\nvar red = colors.RED\nprint(red.r, red.g, red.b)' },
+  { name: 'Lignes animées', code: 'const W = 800\nconst H = 500\nconst N = 150\nconst SPEED = 3\n\nfunc rpos(max)  return math.floor(math.rand() * max)  end\nfunc rvel()     return math.rand() * SPEED * 2 - SPEED end\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n    x1[i]=rpos(W)  y1[i]=rpos(H)  x2[i]=rpos(W)  y2[i]=rpos(H)\n    vx1[i]=rvel()  vy1[i]=rvel()  vx2[i]=rvel()  vy2[i]=rvel()\n    cols[i]=Color(math.rand()*0.8+0.2, math.rand()*0.8+0.2, math.rand()*0.8+0.2)\nend\n\ngraphics.canvas(W, H, "Lignes")\n\nfunc frame()\n    graphics.clear(graphics.BLACK)\n    graphics.strokeSize(1)\n    for i = 1, N do\n        x1[i]+=vx1[i]  y1[i]+=vy1[i]  x2[i]+=vx2[i]  y2[i]+=vy2[i]\n        if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n        if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n        if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n        if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n        graphics.stroke(cols[i])\n        graphics.line(x1[i],y1[i],x2[i],y2[i])\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
+  { name: 'Rectangles',    code: 'const W = 800\nconst H = 500\nconst N = 20\n\nfunc rnd(n)  return math.floor(math.rand() * n)  end\nfunc rndCol() return Color(math.rand()*0.7+0.3, math.rand()*0.7+0.3, math.rand()*0.7+0.3) end\n\nvar rx=[] var ry=[] var rw=[] var rh=[]\nvar vx=[] var vy=[] var fc=[] var sc=[]\n\nfor i = 1, N do\n    rw[i] = rnd(80) + 30\n    rh[i] = rnd(60) + 20\n    rx[i] = rnd(W - rw[i])\n    ry[i] = rnd(H - rh[i])\n    vx[i] = math.rand() * 4 - 2\n    vy[i] = math.rand() * 4 - 2\n    fc[i] = rndCol()\n    sc[i] = rndCol()\nend\n\ngraphics.canvas(W, H, "Rectangles")\n\nfunc frame()\n    graphics.clear(graphics.BLACK)\n    for i = 1, N do\n        rx[i] += vx[i]  ry[i] += vy[i]\n        if rx[i] < 0 or rx[i] + rw[i] > W then vx[i] = -vx[i] end\n        if ry[i] < 0 or ry[i] + rh[i] > H then vy[i] = -vy[i] end\n        rx[i] = math.clamp(rx[i], 0, W - rw[i])\n        ry[i] = math.clamp(ry[i], 0, H - rh[i])\n        graphics.fill(fc[i])\n        graphics.stroke(sc[i])\n        graphics.rect(rx[i], ry[i], rw[i], rh[i])\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
+]
+
+const sel = document.getElementById('examples')
+EXAMPLES.forEach((ex, i) => {
+  const opt = document.createElement('option')
+  opt.value = i
+  opt.textContent = ex.name
+  sel.appendChild(opt)
+})
+sel.addEventListener('change', () => {
+  const ex = EXAMPLES[+sel.value]
+  if (!ex || !ex.code) return
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: ex.code } })
+  sel.value = 0
+  view.focus()
+})
+
+// ── Output ────────────────────────────────────────────────────────────────
+const outputEl = document.getElementById('output')
+const canvasEl = document.getElementById('canvas')
+
+document.getElementById('clear-btn').addEventListener('click', () => {
+  canvasEl.style.display = 'none'
+  outputEl.style.display = 'block'
+  outputEl.textContent   = ''
+  outputEl.className     = ''
+})
+
+function showOutput(text) {
+  canvasEl.style.display = 'none'
+  outputEl.style.display = 'block'
+  if (!text) {
+    outputEl.textContent = '(aucune sortie)'
+    outputEl.className   = ''
+  } else if (text.startsWith('error:')) {
+    outputEl.textContent = text
+    outputEl.className   = 'err'
+  } else {
+    outputEl.textContent = text
+    outputEl.className   = 'ok'
+  }
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────
+let ollin = null
+
+function run() {
+  if (!ollin) return
+  canvasEl.style.display = 'none'
+  outputEl.style.display = 'block'
+  outputEl.className     = ''
+  const code = view.state.doc.toString()
+  const out  = ollin.execute(code)
+  if (canvasEl.style.display === 'block') return   // graphics mode
+  showOutput(out)
+}
+
+document.getElementById('run-btn').addEventListener('click', run)
+
+// ── Copy ──────────────────────────────────────────────────────────────────
+const copyBtn = document.getElementById('copy-btn')
+const ICON_COPY = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>'
+const ICON_OK   = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4 4 6-6"/></svg>'
+copyBtn.addEventListener('click', () => {
+  navigator.clipboard.writeText(view.state.doc.toString()).then(() => {
+    copyBtn.innerHTML = ICON_OK + ' Copié !'
+    copyBtn.style.color        = 'var(--green)'
+    copyBtn.style.borderColor  = 'var(--green)'
+    setTimeout(() => {
+      copyBtn.innerHTML = ICON_COPY + ' Copier'
+      copyBtn.style.color = ''
+      copyBtn.style.borderColor = ''
+    }, 1500)
+  })
+})
+
+// ── WASM ──────────────────────────────────────────────────────────────────
+const statusEl = document.getElementById('status')
+const runBtn   = document.getElementById('run-btn')
+
+const wasmScript    = document.createElement('script')
+const cacheBust     = Date.now()
+wasmScript.src      = 'wasm/ollin.js?' + cacheBust
+wasmScript.onload   = () => {
+  const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '')
+  OllinModule({
+    locateFile: f => wasmDir + f + '?' + cacheBust,
+    canvas:   canvasEl,
+    print:    () => {},
+    printErr: () => {},
+  }).then(m => {
+    ollin              = m
+    runBtn.disabled    = false
+    statusEl.textContent = 'Prêt ✓'
+    setTimeout(() => { statusEl.textContent = '' }, 2000)
+  }).catch(err => {
+    statusEl.textContent = 'Erreur WASM : ' + (err?.message ?? err)
+  })
+}
+wasmScript.onerror = () => { statusEl.textContent = 'WASM introuvable' }
+document.head.appendChild(wasmScript)
+
+// ── Divider resize ────────────────────────────────────────────────────────
+const divider    = document.getElementById('divider')
+const editorPane = document.getElementById('editor-pane')
+const outputPane = document.getElementById('output-pane')
+let   dragging   = false
+
+divider.addEventListener('mousedown', e => {
+  dragging = true
+  divider.classList.add('dragging')
+  e.preventDefault()
+})
+document.addEventListener('mousemove', e => {
+  if (!dragging) return
+  const layout = document.getElementById('layout')
+  const rect   = layout.getBoundingClientRect()
+  const mobile = window.innerWidth <= 640
+  if (mobile) {
+    const pct = Math.min(85, Math.max(15, (e.clientY - rect.top) / rect.height * 100))
+    editorPane.style.flex = `0 0 ${pct}%`
+    outputPane.style.flex = `0 0 ${100 - pct}%`
+  } else {
+    const pct = Math.min(85, Math.max(15, (e.clientX - rect.left) / rect.width * 100))
+    editorPane.style.flex = `0 0 ${pct}%`
+    outputPane.style.flex = `0 0 ${100 - pct}%`
+  }
+})
+document.addEventListener('mouseup', () => {
+  dragging = false
+  divider.classList.remove('dragging')
+})
+</script>
+</body>
+</html>

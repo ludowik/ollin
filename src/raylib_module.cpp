@@ -40,7 +40,7 @@ static Value gfx_canvas(Value* args, int argc) {
     EM_ASM({
         var c = document.getElementById('canvas');
         if (c) { c.width = $0; c.height = $1; c.style.display = 'block'; }
-        var o = document.getElementById('pg-output');
+        var o = document.getElementById('output');
         if (o) o.style.display = 'none';
     }, w, h);
 #endif
@@ -75,17 +75,69 @@ static Value gfx_clear(Value* args, int argc) {
     return Value{};
 }
 
+// ── Style state ───────────────────────────────────────────────────────────────
+static float s_stroke_size  = 2.0f;
+static bool  s_has_stroke   = true;
+static Color s_stroke_color = WHITE;
+static bool  s_has_fill     = false;
+static Color s_fill_color   = WHITE;
+
+static void applyStrokeSize(float sz)            { s_stroke_size = sz; }
+static void applyStroke(bool en, Color c = WHITE) { s_has_stroke = en; s_stroke_color = c; }
+static void applyFill(bool en, Color c = WHITE)   { s_has_fill = en; s_fill_color = c; }
+
+static void resetStyles() {
+    applyStrokeSize(2.0f);
+    applyStroke(true, WHITE);
+    applyFill(false);
+}
+
+static Value gfx_stroke_size(Value* args, int argc) {
+    if (argc > 0 && args[0].isNumber())
+        applyStrokeSize((float)args[0].asNum());
+    return Value{};
+}
+
+static Value gfx_stroke(Value* args, int argc) {
+    if (argc > 0 && (args[0].isMap() || args[0].isClass()))
+        applyStroke(true, toColor(args[0]));
+    else
+        applyStroke(false);
+    return Value{};
+}
+
+static Value gfx_fill(Value* args, int argc) {
+    if (argc > 0 && (args[0].isMap() || args[0].isClass()))
+        applyFill(true, toColor(args[0]));
+    else
+        applyFill(false);
+    return Value{};
+}
+
 static Value gfx_line(Value* args, int argc) {
-    if (argc < 4) throw std::runtime_error("graphics.line: expected x1, y1, x2, y2 [, thickness [, color]]");
-    float thick = argc > 4 ? (args[4].isNumber() ? (float)args[4].asNum() : 1.0f) : 1.0f;
-    Color color = argc > 5 ? toColor(args[5]) : WHITE;
-    if (thick <= 1.0f) {
-        DrawLine(toInt(args[0]), toInt(args[1]), toInt(args[2]), toInt(args[3]), color);
-    } else {
-        DrawLineEx({(float)args[0].asNum(), (float)args[1].asNum()},
-                   {(float)args[2].asNum(), (float)args[3].asNum()},
-                   thick, color);
-    }
+    if (argc < 4) throw std::runtime_error("graphics.line: expected x1, y1, x2, y2");
+    if (!s_has_stroke) return Value{};
+    float x1 = (float)args[0].asNum();
+    float y1 = (float)args[1].asNum();
+    float x2 = (float)args[2].asNum();
+    float y2 = (float)args[3].asNum();
+    if (s_stroke_size <= 1.0f)
+        DrawLine((int)x1, (int)y1, (int)x2, (int)y2, s_stroke_color);
+    else
+        DrawLineEx({x1, y1}, {x2, y2}, s_stroke_size, s_stroke_color);
+    return Value{};
+}
+
+static Value gfx_rect(Value* args, int argc) {
+    if (argc < 4) throw std::runtime_error("graphics.rect: expected x, y, w, h");
+    int x = toInt(args[0]);
+    int y = toInt(args[1]);
+    int w = toInt(args[2]);
+    int h = toInt(args[3]);
+    if (s_has_fill)
+        DrawRectangle(x, y, w, h, s_fill_color);
+    if (s_has_stroke)
+        DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, s_stroke_size, s_stroke_color);
     return Value{};
 }
 
@@ -96,9 +148,9 @@ static Value gfx_fps(Value* args, int argc) {
 
 static Value gfx_draw_text(Value* args, int argc) {
     if (argc < 4) throw std::runtime_error("graphics.draw_text: expected text, x, y, size [, color]");
-    const char* text = (args[0].isString()) ? args[0].asString().c_str() : "";
+    const char* text = args[0].isString() ? args[0].asString().c_str() : "";
     DrawText(text, toInt(args[1]), toInt(args[2]), toInt(args[3]),
-             argc > 4 ? toColor(args[4]) : WHITE);
+             argc > 4 ? toColor(args[4]) : s_stroke_color);
     return Value{};
 }
 
@@ -124,6 +176,7 @@ static Value gfx_quit(Value* args, int argc) {
 static Value  s_run_callback;
 static void emscripten_frame() {
     BeginDrawing();
+    resetStyles();
     VM::current()->callValue(s_run_callback);
     EndDrawing();
 }
@@ -139,6 +192,7 @@ static Value gfx_run(Value* args, int argc) {
     s_quit = false;
     while (!WindowShouldClose() && !s_quit) {
         BeginDrawing();
+        resetStyles();
         VM::current()->callValue(fn);
         EndDrawing();
     }
@@ -153,8 +207,12 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("is_open")),    Value::makeBuiltin(gfx_is_open));
     m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(gfx_begin_draw));
     m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(gfx_end_draw));
-    m.mapSet(Value(std::string("clear")),      Value::makeBuiltin(gfx_clear));
+    m.mapSet(Value(std::string("clear")),       Value::makeBuiltin(gfx_clear));
+    m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
+    m.mapSet(Value(std::string("stroke")),     Value::makeBuiltin(gfx_stroke));
+    m.mapSet(Value(std::string("fill")),       Value::makeBuiltin(gfx_fill));
     m.mapSet(Value(std::string("line")),       Value::makeBuiltin(gfx_line));
+    m.mapSet(Value(std::string("rect")),       Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")),        Value::makeBuiltin(gfx_fps));
     m.mapSet(Value(std::string("draw_text")),  Value::makeBuiltin(gfx_draw_text));
     m.mapSet(Value(std::string("close")),      Value::makeBuiltin(gfx_close));
