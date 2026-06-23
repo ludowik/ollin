@@ -185,27 +185,27 @@ static void drawEllipseFill(float cx, float cy, float rx, float ry, Color color,
     }
 }
 
-static Value gfx_ellipse(Value* args, int argc) {
-    if (argc < 4) throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
-    float cx   = (float)args[0].asNum();
-    float cy   = (float)args[1].asNum();
-    float rx   = (float)args[2].asNum() * 0.5f;
-    float ry   = (float)args[3].asNum() * 0.5f;
-    int   segs = (argc > 4 && args[4].isNumber()) ? std::max(3,(int)args[4].asNum()) : 32;
+static void drawOval(float cx, float cy, float rx, float ry, int segs) {
     if (s_has_fill)
         drawEllipseFill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke)
         drawEllipseStroke(cx, cy, rx, ry, s_stroke_size, s_stroke_color, segs);
+}
+
+static Value gfx_ellipse(Value* args, int argc) {
+    if (argc < 4) throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
+    int segs = (argc > 4 && args[4].isNumber()) ? std::max(3,(int)args[4].asNum()) : 32;
+    drawOval((float)args[0].asNum(), (float)args[1].asNum(),
+             (float)args[2].asNum() * 0.5f, (float)args[3].asNum() * 0.5f, segs);
     return Value{};
 }
 
 static Value gfx_circle(Value* args, int argc) {
     if (argc < 3) throw std::runtime_error("graphics.circle: expected x, y, radius");
-    double d = args[2].asNum() * 2.0;
-    Value dv(d);
-    Value ellipse_args[] = { args[0], args[1], dv, dv,
-                             argc > 3 ? args[3] : Value{} };
-    return gfx_ellipse(ellipse_args, argc > 3 ? 5 : 4);
+    int   segs = (argc > 3 && args[3].isNumber()) ? std::max(3,(int)args[3].asNum()) : 32;
+    float r    = (float)args[2].asNum();
+    drawOval((float)args[0].asNum(), (float)args[1].asNum(), r, r, segs);
+    return Value{};
 }
 
 static Value gfx_point(Value* args, int argc) {
