@@ -235,6 +235,11 @@ canvas#canvas {
   <select id="examples" title="Charger un exemple"></select>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
+  <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
+  <label for="img-file-input" id="img-btn" title="Charger des images (PNG, JPG…) pour image.load()" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;user-select:none">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 10l4-3 3 2.5 3-3.5 4 4"/><circle cx="11.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <span class="btn-label" id="img-btn-label">Images</span>
+  </label>
   <button id="copy-btn" title="Copier le code" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,opacity 0.15s" onmouseover="this.style.background='rgba(124,131,255,0.12)'" onmouseout="this.style.background='transparent'">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1h2.5"/></svg>
     <span class="btn-label">Copier</span>
@@ -280,7 +285,7 @@ const KEYWORDS = new Set([
   'import','as','or','and','not','class','extends','super','self',
   'switch','case','default'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','typeof','Color','math','graphics','string','colors','window'])
+const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',
@@ -367,6 +372,7 @@ const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
   fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(r, g, b [, a])'),
+  fn('len',    'len(v) → int'),
 ]
 
 const MODULE_MEMBERS = {
@@ -390,10 +396,24 @@ const MODULE_MEMBERS = {
     fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color])'),
     fn('graphics.fill','fill([color])'),
     fn('graphics.line','line(x1,y1,x2,y2)'),       fn('graphics.rect','rect(x,y,w,h)'),
+    fn('graphics.circle','circle(x,y,r)'),          fn('graphics.ellipse','ellipse(x,y,rx,ry)'),
+    fn('graphics.point','point(x,y)'),
+    fn('graphics.polygon','polygon(pts)'),          fn('graphics.polyline','polyline(pts)'),
+    fn('graphics.push','push()'),                   fn('graphics.pop','pop()'),
+    fn('graphics.translate','translate(x,y)'),      fn('graphics.rotate','rotate(deg)'),
+    fn('graphics.scale','scale(sx[,sy])'),          fn('graphics.resetTransform','resetTransform()'),
     fn('graphics.draw_text','draw_text(text,x,y,size[,color])'),
     fn('graphics.fps','fps()→int'),                fn('graphics.is_open','is_open()→bool'),
-    fn('graphics.begin_draw','begin_draw()'),      fn('graphics.end_draw','end_draw()'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
+  ],
+  image: [
+    fn('image.load','load(path) → img'),
+    fn('image.load_data','load_data(format, base64) → img'),
+    fn('image.create','create(w, h) → img'),
+    fn('image.begin','begin(img)'),
+    fn('image.end','end()'),
+    fn('image.draw','draw(img, x, y [, w, h [, tint]])'),
+    fn('image.unload','unload(img)'),
   ],
   colors: [
     cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),
@@ -579,6 +599,36 @@ copyBtn.addEventListener('click', () => {
       copyBtn.style.borderColor = ''
     }, 1500)
   })
+})
+
+// ── Image upload ──────────────────────────────────────────────────────────
+const imgFileInput = document.getElementById('img-file-input')
+const imgBtnLabel  = document.getElementById('img-btn-label')
+const imgBtn       = document.getElementById('img-btn')
+const loadedImages = new Map()  // name → {b64, ext}
+
+imgFileInput.addEventListener('change', () => {
+  const files = Array.from(imgFileInput.files)
+  if (!files.length) return
+  let done = 0
+  files.forEach(file => {
+    const ext  = file.name.split('.').pop().toLowerCase()
+    const name = file.name
+    const reader = new FileReader()
+    reader.onload = e => {
+      const dataUrl = e.target.result               // "data:image/png;base64,xxxx"
+      const b64     = dataUrl.split(',')[1] ?? ''
+      loadedImages.set(name, { b64, ext })
+      if (ollin) ollin.preloadImage(name, b64, ext)
+      done++
+      const n = loadedImages.size
+      imgBtnLabel.textContent = n + ' image' + (n > 1 ? 's' : '')
+      imgBtn.style.borderColor = 'var(--green)'
+      imgBtn.style.color       = 'var(--green)'
+    }
+    reader.readAsDataURL(file)
+  })
+  imgFileInput.value = ''
 })
 
 // ── WASM ──────────────────────────────────────────────────────────────────
