@@ -272,7 +272,7 @@ Value makeImageModule() {
     m.mapSet(Value(std::string("load_data")), Value::makeBuiltin(img_load_data));
     m.mapSet(Value(std::string("create")),    Value::makeBuiltin(img_create));
     m.mapSet(Value(std::string("begin")),     Value::makeBuiltin(img_begin));
-    m.mapSet(Value(std::string("end")),       Value::makeBuiltin(img_end));
+    m.mapSet(Value(std::string("finish")),    Value::makeBuiltin(img_end));
     m.mapSet(Value(std::string("draw")),      Value::makeBuiltin(img_draw));
     m.mapSet(Value(std::string("unload")),    Value::makeBuiltin(img_unload));
     return m;
