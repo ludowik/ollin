@@ -244,6 +244,26 @@ static Value img_unload(Value* args, int argc) {
     return Value{};
 }
 
+// ── image_draw_sprite ─────────────────────────────────────────────────────────
+
+void image_draw_sprite(int id, float x, float y, float dw, float dh,
+                       unsigned char cr, unsigned char cg, unsigned char cb, unsigned char ca) {
+    auto it = s_images.find(id);
+    if (it == s_images.end()) return;
+    const TexHandle& h = it->second;
+
+    Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
+    if (dw == 0.0f) dw = (float)tex.width;
+    if (dh == 0.0f) dh = (float)tex.height;
+
+    // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
+    float sh = h.is_render ? -(float)tex.height : (float)tex.height;
+    Rectangle src = { 0, 0, (float)tex.width, sh };
+    Rectangle dst = { x, y, dw, dh };
+    Color tint = { cr, cg, cb, ca };
+    DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
+}
+
 // ── makeImageModule ───────────────────────────────────────────────────────────
 
 Value makeImageModule() {

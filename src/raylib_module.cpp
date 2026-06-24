@@ -1,5 +1,6 @@
 #include "chunk.h"
 #include "vm.h"
+#include "image_module.h"
 #include <raylib.h>
 #include <rlgl.h>
 #include <stdexcept>
@@ -367,6 +368,27 @@ static Value gfx_reset_transform(Value* args, int argc) {
     return Value{};
 }
 
+// ── graphics.sprite(img, x, y [, w, h]) ──────────────────────────────────────
+
+static Value gfx_sprite(Value* args, int argc) {
+    if (argc < 3) throw std::runtime_error("graphics.sprite: expected img, x, y");
+    if (!args[0].isMap())
+        throw std::runtime_error("graphics.sprite: expected image handle");
+    Value idv = args[0].mapGet(Value(std::string("id")));
+    if (!idv.isInteger())
+        throw std::runtime_error("graphics.sprite: invalid image handle");
+    int id = (int)idv.asInt();
+
+    float x  = (float)args[1].asNum();
+    float y  = (float)args[2].asNum();
+    float dw = argc > 3 ? (float)args[3].asNum() : 0.0f;
+    float dh = argc > 4 ? (float)args[4].asNum() : 0.0f;
+
+    Color tint = s_has_fill ? s_fill_color : WHITE;
+    image_draw_sprite(id, x, y, dw, dh, tint.r, tint.g, tint.b, tint.a);
+    return Value{};
+}
+
 Value makeGraphicsModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("canvas")),     Value::makeBuiltin(gfx_canvas));
@@ -395,6 +417,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("ellipse")),    Value::makeBuiltin(gfx_ellipse));
     m.mapSet(Value(std::string("circle")),     Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")),      Value::makeBuiltin(gfx_point));
+    m.mapSet(Value(std::string("sprite")),     Value::makeBuiltin(gfx_sprite));
     m.mapSet(Value(std::string("BLACK")),   colorInst(0.0,        0.0,        0.0));
     m.mapSet(Value(std::string("WHITE")),   colorInst(1.0,        1.0,        1.0));
     m.mapSet(Value(std::string("RED")),     colorInst(230/255.0,  41/255.0,   55/255.0));
