@@ -201,14 +201,21 @@ canvas#canvas {
   #layout { flex-direction: column; }
   #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
   #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
-  #divider { width: 100%; height: 5px; cursor: row-resize; }
-  /* iOS auto-zoom se déclenche si font-size < 16px sur un élément éditable */
-  #editor-wrap .cm-content { font-size: 16px; }
-  /* toolbar compact : masquer textes et éléments non essentiels */
+  #divider { width: 100%; height: 6px; cursor: row-resize; }
+
+  /* Police réduite — maximum-scale=1.0 dans le viewport empêche le zoom iOS */
+  #editor-wrap .cm-editor  { font-size: 12px; }
+  #editor-wrap .cm-content { font-size: 12px; }
+  /* Scroll horizontal fluide sur iOS */
+  #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* toolbar compact */
+  #toolbar { gap: 5px; padding: 0 8px; }
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #examples { max-width: 110px; }
+  #examples { max-width: 90px; font-size: 11px; }
+  #img-btn  { padding: 6px 8px; }
   #run-btn  { padding: 6px 10px; }
   #stop-btn { padding: 6px 10px; }
   #copy-btn { padding: 6px 10px !important; }
@@ -675,28 +682,36 @@ function applySplit(pct) {
 const savedSplit = parseFloat(localStorage.getItem(SPLIT_KEY))
 if (savedSplit >= 15 && savedSplit <= 85) applySplit(savedSplit)
 
-divider.addEventListener('mousedown', e => {
+function startDrag(e) {
   dragging = true
   divider.classList.add('dragging')
   e.preventDefault()
-})
-document.addEventListener('mousemove', e => {
+}
+function moveDrag(clientX, clientY) {
   if (!dragging) return
   const layout = document.getElementById('layout')
   const rect   = layout.getBoundingClientRect()
   const mobile = window.innerWidth <= 640
   const pct = mobile
-    ? Math.min(85, Math.max(15, (e.clientY - rect.top)  / rect.height * 100))
-    : Math.min(85, Math.max(15, (e.clientX - rect.left) / rect.width  * 100))
+    ? Math.min(85, Math.max(15, (clientY - rect.top)  / rect.height * 100))
+    : Math.min(85, Math.max(15, (clientX - rect.left) / rect.width  * 100))
   applySplit(pct)
-})
-document.addEventListener('mouseup', () => {
+}
+function endDrag() {
   if (!dragging) return
   dragging = false
   divider.classList.remove('dragging')
   const pct = parseFloat(editorPane.style.flex.split(' ')[2])
   if (!isNaN(pct)) localStorage.setItem(SPLIT_KEY, pct)
-})
+}
+
+divider.addEventListener('mousedown',  e => startDrag(e))
+document.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY))
+document.addEventListener('mouseup',   () => endDrag())
+
+divider.addEventListener('touchstart', e => startDrag(e), { passive: false })
+document.addEventListener('touchmove',  e => { if (dragging) { moveDrag(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault() } }, { passive: false })
+document.addEventListener('touchend',  () => endDrag())
 </script>
 </body>
 </html>
