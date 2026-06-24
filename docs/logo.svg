@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <radialGradient id="g" gradientUnits="userSpaceOnUse" cx="82" cy="70" r="112">
+      <stop offset="0%"   stop-color="#FFE060"/>
+      <stop offset="38%"  stop-color="#D4881A"/>
+      <stop offset="100%" stop-color="#6A3006"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background (app icon) -->
+  <rect width="200" height="200" rx="38" fill="#110C00"/>
+
+  <!-- Ring : outer r=74, inner r=52  (evenodd = anneau) -->
+  <!-- Chaque demi-cercle tracé clockwise ; avec evenodd l'intérieur du second cercle est exclu -->
+  <path fill-rule="evenodd" fill="url(#g)" d="
+    M 174,100 A 74,74 0 1 1 26,100 A 74,74 0 1 1 174,100 Z
+    M 152,100 A 52,52 0 1 1 48,100 A 52,52 0 1 1 152,100 Z
+  "/>
+
+  <!-- 8 pyramides aztèques en escalier pointant vers l'extérieur -->
+  <!-- Base à y=27 (légèrement dans le ring pour supprimer le gap), sommet à y=5 -->
+  <!-- Largeurs par palier : 18 (y=21→27)  14 (y=15→21)  10 (y=9→15)  6 (y=5→9) -->
+  <g fill="url(#g)">
+    <polygon transform="rotate(  0,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate( 45,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate( 90,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate(135,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate(180,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate(225,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate(270,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+    <polygon transform="rotate(315,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
+  </g>
+
+  <!-- Cercle intérieur : fin filet lumineux sur le bord de l'anneau -->
+  <circle cx="100" cy="100" r="52" fill="none" stroke="#FFE060" stroke-width="1.5" stroke-opacity="0.35"/>
+</svg>
