@@ -188,19 +188,19 @@ static Value img_create(Value* args, int argc) {
     return makeHandle(id, w, h);
 }
 
-// ── image.begin(img) ─────────────────────────────────────────────────────────
+// ── image.begin_draw(img) ────────────────────────────────────────────────────
 
 static Value img_begin(Value* args, int argc) {
-    if (argc < 1) throw std::runtime_error("image.begin: expected image handle");
-    int id = handleId(args[0], "image.begin");
-    TexHandle& h = findHandle(id, "image.begin");
+    if (argc < 1) throw std::runtime_error("image.begin_draw: expected image handle");
+    int id = handleId(args[0], "image.begin_draw");
+    TexHandle& h = findHandle(id, "image.begin_draw");
     if (!h.is_render)
-        throw std::runtime_error("image.begin: not a render texture — use image.create()");
+        throw std::runtime_error("image.begin_draw: not a render texture — use image.create()");
     BeginTextureMode(h.rtt);
     return Value{};
 }
 
-// ── image.end() ──────────────────────────────────────────────────────────────
+// ── image.end_draw() ─────────────────────────────────────────────────────────
 
 static Value img_end(Value* args, int argc) {
     (void)args; (void)argc;
@@ -271,8 +271,8 @@ Value makeImageModule() {
     m.mapSet(Value(std::string("load")),      Value::makeBuiltin(img_load));
     m.mapSet(Value(std::string("load_data")), Value::makeBuiltin(img_load_data));
     m.mapSet(Value(std::string("create")),    Value::makeBuiltin(img_create));
-    m.mapSet(Value(std::string("begin")),     Value::makeBuiltin(img_begin));
-    m.mapSet(Value(std::string("finish")),    Value::makeBuiltin(img_end));
+    m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(img_begin));
+    m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(img_end));
     m.mapSet(Value(std::string("draw")),      Value::makeBuiltin(img_draw));
     m.mapSet(Value(std::string("unload")),    Value::makeBuiltin(img_unload));
     return m;

@@ -13,7 +13,7 @@ var bg   = {r:0.067, g:0.047, b:0, a:1}
 
 var logo = img.create(200, 200)
 
-img.begin(logo)
+img.begin_draw(logo)
     g.clear(bg)
 
     ## outer ring r=74 filled with gold
@@ -49,7 +49,7 @@ img.begin(logo)
         g.pop()
         step = step + 1
     end
-img.finish()
+img.end_draw()
 
 ## animation loop
 var angle = 0.0
