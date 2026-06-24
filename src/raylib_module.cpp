@@ -220,6 +220,17 @@ static Value gfx_polygon(Value* args, int argc) {
     return Value{};
 }
 
+static Value gfx_polyline(Value* args, int argc) {
+    if (argc < 1 || !args[0].isArray())
+        throw std::runtime_error("graphics.polyline: expected array of points");
+    if (!s_has_stroke) return Value{};
+    auto pts = parsePoints(args[0]);
+    int n = (int)pts.size();
+    for (int i = 0; i < n - 1; i++)
+        DrawLineEx(pts[i], pts[i+1], s_stroke_size, s_stroke_color);
+    return Value{};
+}
+
 static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
     float prev_x = cx + rx, prev_y = cy;
     for (int i = 1; i <= segs; i++) {
@@ -333,6 +344,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("quit")),       Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")),        Value::makeBuiltin(gfx_run));
     m.mapSet(Value(std::string("polygon")),    Value::makeBuiltin(gfx_polygon));
+    m.mapSet(Value(std::string("polyline")),   Value::makeBuiltin(gfx_polyline));
     m.mapSet(Value(std::string("ellipse")),    Value::makeBuiltin(gfx_ellipse));
     m.mapSet(Value(std::string("circle")),     Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")),      Value::makeBuiltin(gfx_point));
