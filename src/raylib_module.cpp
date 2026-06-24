@@ -50,6 +50,11 @@ static Value gfx_canvas(Value* args, int argc) {
 #else
     SetTargetFPS(60);
 #endif
+    Value win = VM::current()->getGlobal("window");
+    if (win.isMap()) {
+        win.mapSet(Value(std::string("width")),  Value((int64_t)w));
+        win.mapSet(Value(std::string("height")), Value((int64_t)h));
+    }
     return Value{};
 }
 

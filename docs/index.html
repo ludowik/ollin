@@ -374,7 +374,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-23 21:55</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-24 18:56</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -413,6 +413,7 @@ pre:hover .code-actions,
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
   <a href="#graphics">Graphics + Colors</a>
+  <a href="#window">Module window</a>
 </nav>
 
 <main>
@@ -423,8 +424,8 @@ pre:hover .code-actions,
 
   <div class="badges">
     <span class="badge badge-blue">C++17</span>
-    <span class="badge badge-green">Register VM</span>
-    <span class="badge badge-purple">Tagged struct</span>
+    <span class="badge badge-green">Dynamiquement typé</span>
+    <span class="badge badge-purple">Embarquable</span>
   </div>
   <div style="margin-top:20px">
     <a href="playground.html" style="display:inline-flex;align-items:center;gap:8px;background:var(--accent);color:#fff;text-decoration:none;padding:8px 18px;border-radius:7px;font-size:14px;font-weight:600">
@@ -439,10 +440,7 @@ pre:hover .code-actions,
 <!-- ── Introduction ──────────────────────────────────────────────────────── -->
 <section id="intro">
 <h2>Introduction</h2>
-<p>Ollin est un langage de script <strong>minimaliste</strong> et <strong>expressif</strong> : dynamiquement typé, compilé vers un bytecode 32-bit, exécuté par une VM register-based, et conçu pour être embarqué.</p>
-
-<h3>Pipeline d'exécution</h3>
-<pre><code>source .ol  →  Lexer  →  Parser  →  Compiler  →  VM</code></pre>
+<p>Ollin est un langage de script <strong>minimaliste</strong> et <strong>expressif</strong> : dynamiquement typé, compilé, et conçu pour être embarqué.</p>
 
 <h3>Premier programme</h3>
 <pre><code><span class="bi">print</span>(<span class="str">"hello world!"</span>)
@@ -454,17 +452,15 @@ pre:hover .code-actions,
 <!-- ── Types ─────────────────────────────────────────────────────────────── -->
 <section id="types">
 <h2>Types</h2>
-<p>Ollin utilise une <strong>struct taguée</strong> : 1 octet de tag + union 8 octets = 16 octets par valeur. Ceci permet des entiers 64-bit complets.</p>
-
 <table>
 <tr><th>Type</th><th>Littéral</th><th>Description</th></tr>
 <tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
-<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Stockés comme entiers 1 et 0.</td></tr>
+<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Booléens. <code>true</code> vaut 1, <code>false</code> vaut 0.</td></tr>
 <tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>).</td></tr>
-<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Double IEEE 754.</td></tr>
-<tr><td>string</td><td><code class="str">"texte"</code></td><td>UTF-8, immuable, alloué sur le tas.</td></tr>
+<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Nombre à virgule flottante (double précision).</td></tr>
+<tr><td>string</td><td><code class="str">"texte"</code></td><td>Chaîne UTF-8 immuable.</td></tr>
 <tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident).</td></tr>
-<tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1, poolé.</td></tr>
+<tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1.</td></tr>
 </table>
 
 <h3>Règles de vérité (truthy/falsy)</h3>
@@ -493,7 +489,7 @@ pre:hover .code-actions,
 <!-- ── Variables ──────────────────────────────────────────────────────────── -->
 <section id="variables">
 <h2>Variables</h2>
-<p>Toute variable <strong>doit</strong> être déclarée avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation. <code><span class="kw">var</span></code> crée une variable <strong>locale</strong> (registre de la VM) ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible dans tout le programme.</p>
+<p>Toute variable <strong>doit</strong> être déclarée avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation. <code><span class="kw">var</span></code> crée une variable <strong>locale</strong> à la fonction courante ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible dans tout le programme.</p>
 
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
 <span class="kw">var</span> b = <span class="num">2.5</span>
@@ -527,7 +523,7 @@ incr()
 <span class="bi">assert</span>(compteur == <span class="num">2</span>)
 <span class="bi">print</span>(compteur)        <span class="cmt">## 2</span></code></pre>
 
-<div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> (table partagée de la VM). Affecter un nom non déclaré reste une erreur de compilation.</div>
+<div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible partout. Affecter un nom non déclaré reste une erreur de compilation.</div>
 
 <h3 id="constants">Constantes — <code><span class="kw">const</span></code></h3>
 <p>Le mot-clé <code><span class="kw">const</span></code> déclare une <strong>locale immuable</strong>. L'initialisation est <strong>obligatoire</strong>. Toute tentative d'assignation ultérieure est une <strong>erreur de compilation</strong>.</p>
@@ -598,7 +594,7 @@ multi-lignes
 <!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
 <section id="bitwise">
 <h2>Opérateurs bits</h2>
-<p>Ollin supporte les opérateurs bit-à-bit style C. Ils opèrent uniquement sur des <strong>entiers</strong> (<code>int48</code>).</p>
+<p>Ollin supporte les opérateurs bit-à-bit style C. Ils opèrent uniquement sur des <strong>entiers</strong>.</p>
 
 <h3>Binaires</h3>
 <table>
@@ -846,7 +842,7 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <!-- ── Closures ───────────────────────────────────────────────────────────── -->
 <section id="closures">
 <h2>Closures</h2>
-<p>Une fonction peut capturer les variables de la portée qui l'entoure (<strong>upvalues</strong>). La valeur capturée reste vivante même après le retour de la fonction externe.</p>
+<p>Une fonction peut capturer les variables de la portée qui l'entoure. La valeur capturée reste vivante même après le retour de la fonction externe.</p>
 
 <h3>Compteur encapsulé</h3>
 <pre><code><span class="kw">func</span> make_counter()
@@ -890,7 +886,7 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 
 <span class="bi">assert</span>(process(<span class="num">3</span>) == <span class="num">14</span>)   <span class="cmt">## 3*2 + 4*2</span></code></pre>
 
-<h3>Upvalue partagé entre fonctions</h3>
+<h3>État partagé entre fonctions</h3>
 <pre><code><span class="kw">func</span> make_shared()
     <span class="kw">var</span> count = <span class="num">0</span>
     <span class="kw">func</span> inc()  count += <span class="num">1</span>  <span class="kw">end</span>
@@ -960,7 +956,7 @@ m[<span class="num">42</span>]    = <span class="str">"int key"</span>
 m[<span class="num">3.14</span>]  = <span class="str">"float key"</span>
 m[<span class="bool">true</span>]  = <span class="str">"bool key"</span>
 
-<span class="cmt">## INTEGER(1) et FLOAT(1.0) sont la même clé</span>
+<span class="cmt">## 1 et 1.0 sont la même clé</span>
 m[<span class="num">1</span>] = <span class="str">"one"</span>
 <span class="bi">assert</span>(m[<span class="num">1.0</span>] == <span class="str">"one"</span>)</code></pre>
 
@@ -975,7 +971,7 @@ b.x = <span class="num">99</span>
 <!-- ── Itération ──────────────────────────────────────────────────────────── -->
 <section id="map-iter">
 <h2>Itération sur une map</h2>
-<p>La syntaxe <code>for k, v in m</code> parcourt toutes les entrées dans l'ordre d'insertion.</p>
+<p>La syntaxe <code>for k, v in m</code> parcourt toutes les entrées de la map. L'ordre n'est pas garanti.</p>
 
 <pre><code><span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
 
@@ -1010,7 +1006,7 @@ b.x = <span class="num">99</span>
 <!-- ── Arrays ─────────────────────────────────────────────────────────────── -->
 <section id="arrays">
 <h2>Arrays</h2>
-<p>Tableau dynamique distinct des maps. Les indices commencent à <strong>1</strong>. Les arrays sont poolés et ref-comptés comme les maps.</p>
+<p>Tableau dynamique distinct des maps. Les indices commencent à <strong>1</strong>. Comme les maps, les arrays sont partagés par référence.</p>
 
 <h3>Création</h3>
 <pre><code><span class="kw">var</span> vide = []
@@ -1202,7 +1198,7 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)          <span
 <!-- ── Import ─────────────────────────────────────────────────────────── -->
 <section id="import">
 <h2>Import</h2>
-<p>L'instruction <code>import</code> charge un fichier Ollin et injecte son contenu dans le programme courant au moment de la compilation (résolution statique, pas de sous-VM).</p>
+<p>L'instruction <code>import</code> charge un fichier Ollin et rend son contenu disponible dans le programme courant.</p>
 <p>Les chemins sont relatifs au répertoire du script courant. L'extension <code>.ol</code> est ajoutée automatiquement si absente.</p>
 
 <h3>Import plat</h3>
@@ -1398,10 +1394,25 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <div class="callout tip">Les mêmes constantes sont aussi accessibles via <code>graphics</code> : <code>graphics.BLACK</code>, <code>graphics.WHITE</code>, etc.</div>
 
 <h3>Couleur personnalisée</h3>
+
 <pre data-no-run><code><span class="cmt">## couleur aléatoire claire</span>
 <span class="kw">func</span> rand_color()
     <span class="kw">return</span> <span class="bi">Color</span>(math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>)
 <span class="kw">end</span></code></pre>
+</section>
+
+<section id="window">
+<h2>Module <code>window</code></h2>
+<p>Le module <code>window</code> expose les dimensions de la zone de rendu courante. Disponible sans <code>import</code>.</p>
+<table>
+  <thead><tr><th>Propriété</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>window.width</code></td><td>int</td><td>Largeur de la zone de rendu en pixels</td></tr>
+    <tr><td><code>window.height</code></td><td>int</td><td>Hauteur de la zone de rendu en pixels</td></tr>
+  </tbody>
+</table>
+<div class="callout tip">Sur WASM (playground), <code>window.width/height</code> reflètent la taille du panneau de rendu avant création du canvas, puis se mettent à jour après <code>graphics.canvas()</code>. Sur desktop, ils valent 0 avant <code>graphics.canvas()</code> puis les dimensions de la fenêtre.</div>
+<pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="bi">window</span>.width, <span class="bi">window</span>.height, <span class="str">"Titre"</span>)   <span class="cmt">## fenêtre pleine zone</span></code></pre>
 </section>
 
 

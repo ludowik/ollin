@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Ollin — Playground</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -79,6 +79,23 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 #run-btn:hover   { opacity: 0.85; }
 #run-btn:disabled{ opacity: 0.4; cursor: default; }
 
+#stop-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+}
+#stop-btn:disabled { opacity: 0.3; cursor: default; }
+#stop-btn:not(:disabled):hover { background: rgba(248,113,113,0.12); }
+
 #run-btn kbd {
   font-size: 10px;
   background: rgba(255,255,255,0.15);
@@ -97,6 +114,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 #editor-pane {
   flex: 1 1 50%;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -104,6 +123,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 
 #editor-wrap {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   position: relative;
 }
@@ -179,8 +199,18 @@ canvas#canvas {
 @media (max-width: 640px) {
   #layout { flex-direction: column; }
   #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
-  #output-pane { flex: 1 1 45%; }
+  #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
   #divider { width: 100%; height: 5px; cursor: row-resize; }
+  /* iOS auto-zoom se déclenche si font-size < 16px sur un élément éditable */
+  #editor-wrap .cm-content { font-size: 16px; }
+  /* toolbar compact : masquer textes et éléments non essentiels */
+  .btn-label { display: none; }
+  #run-btn kbd { display: none; }
+  #status { display: none; }
+  #examples { max-width: 110px; }
+  #run-btn  { padding: 6px 10px; }
+  #stop-btn { padding: 6px 10px; }
+  #copy-btn { padding: 6px 10px !important; }
 }
 </style>
 <script type="importmap">
@@ -206,12 +236,16 @@ canvas#canvas {
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
   <button id="copy-btn" title="Copier le code" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,opacity 0.15s" onmouseover="this.style.background='rgba(124,131,255,0.12)'" onmouseout="this.style.background='transparent'">
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>
-    Copier
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1h2.5"/></svg>
+    <span class="btn-label">Copier</span>
   </button>
   <button id="run-btn" disabled>
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
-    Exécuter <kbd>Ctrl+↵</kbd>
+    <span class="btn-label">Exécuter</span><kbd>Ctrl+↵</kbd>
+  </button>
+  <button id="stop-btn" disabled title="Pause / Reprendre">
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
+    <span class="btn-label">Pause</span>
   </button>
 </div>
 
@@ -246,7 +280,7 @@ const KEYWORDS = new Set([
   'import','as','or','and','not','class','extends','super','self',
   'switch','case','default'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','typeof','Color','math','graphics','string','colors'])
+const BUILTINS = new Set(['print','printf','time','assert','typeof','Color','math','graphics','string','colors','window'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',
@@ -372,6 +406,10 @@ const MODULE_MEMBERS = {
     fn('string.upper','upper(s)'), fn('string.lower','lower(s)'), fn('string.trim','trim(s)'),
     fn('string.ltrim','ltrim(s)'), fn('string.rtrim','rtrim(s)'),
   ],
+  window: [
+    cst('window.width','largeur de la zone de rendu (px)'),
+    cst('window.height','hauteur de la zone de rendu (px)'),
+  ],
 }
 
 function ollinComplete(context) {
@@ -460,11 +498,26 @@ sel.addEventListener('change', () => {
 const outputEl = document.getElementById('output')
 const canvasEl = document.getElementById('canvas')
 
+const stopBtn  = document.getElementById('stop-btn')
+const ICON_PAUSE   = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>'
+const ICON_RESUME  = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
+let   isPaused = false
+
+function setPauseBtn(paused) {
+  isPaused = paused
+  stopBtn.innerHTML = paused
+    ? ICON_RESUME + '<span class="btn-label"> Reprendre</span>'
+    : ICON_PAUSE  + '<span class="btn-label"> Pause</span>'
+}
+
 document.getElementById('clear-btn').addEventListener('click', () => {
+  try { ollin && ollin.pauseMainLoop() } catch(_) {}
   canvasEl.style.display = 'none'
   outputEl.style.display = 'block'
   outputEl.textContent   = ''
   outputEl.className     = ''
+  stopBtn.disabled = true
+  setPauseBtn(false)
 })
 
 function showOutput(text) {
@@ -487,16 +540,29 @@ let ollin = null
 
 function run() {
   if (!ollin) return
-  canvasEl.style.display = 'none'
-  outputEl.style.display = 'block'
-  outputEl.className     = ''
+  try { ollin.pauseMainLoop() } catch(_) {}
+  setPauseBtn(false)
+  stopBtn.disabled = true
+  outputEl.className = ''
   const code = view.state.doc.toString()
   const out  = ollin.execute(code)
-  if (canvasEl.style.display === 'block') return   // graphics mode
+  if (canvasEl.style.display === 'block') {
+    stopBtn.disabled = false
+    return
+  }
   showOutput(out)
 }
 
 document.getElementById('run-btn').addEventListener('click', run)
+stopBtn.addEventListener('click', () => {
+  if (isPaused) {
+    try { ollin.resumeMainLoop() } catch(_) {}
+    setPauseBtn(false)
+  } else {
+    try { ollin.pauseMainLoop() } catch(_) {}
+    setPauseBtn(true)
+  }
+})
 
 // ── Copy ──────────────────────────────────────────────────────────────────
 const copyBtn = document.getElementById('copy-btn')
@@ -504,11 +570,11 @@ const ICON_COPY = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" s
 const ICON_OK   = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4 4 6-6"/></svg>'
 copyBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(view.state.doc.toString()).then(() => {
-    copyBtn.innerHTML = ICON_OK + ' Copié !'
+    copyBtn.innerHTML = ICON_OK + '<span class="btn-label"> Copié !</span>'
     copyBtn.style.color        = 'var(--green)'
     copyBtn.style.borderColor  = 'var(--green)'
     setTimeout(() => {
-      copyBtn.innerHTML = ICON_COPY + ' Copier'
+      copyBtn.innerHTML = ICON_COPY + '<span class="btn-label"> Copier</span>'
       copyBtn.style.color = ''
       copyBtn.style.borderColor = ''
     }, 1500)
