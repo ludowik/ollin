@@ -42,6 +42,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   color: var(--accent);
   letter-spacing: -0.3px;
   margin-right: 4px;
+  text-decoration: none;
+  flex-shrink: 0;
 }
 
 .sep { width: 1px; height: 20px; background: var(--border); }
@@ -76,6 +78,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 #run-btn:hover   { opacity: 0.85; }
 #run-btn:disabled{ opacity: 0.4; cursor: default; }
@@ -93,6 +96,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
 }
 #stop-btn:disabled { opacity: 0.3; cursor: default; }
 #stop-btn:not(:disabled):hover { background: rgba(248,113,113,0.12); }
@@ -237,9 +241,7 @@ canvas#canvas {
 <body>
 
 <div id="toolbar">
-  <span class="logo">Ollin</span>
-  <a href="index.html" style="font-size:12px;color:var(--dim);text-decoration:none">Docs</a>
-  <div class="sep"></div>
+  <a href="index.html" class="logo">Ollin</a>
   <select id="examples" title="Charger un exemple"></select>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
