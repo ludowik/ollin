@@ -115,7 +115,7 @@ public:
     Value  arrayGet(int64_t idx)                    const; // 1-based
     void   arraySet(int64_t idx, const Value& val);        // 1-based, grows if needed
     void   arrayPush(const Value& val);
-    int    arraySize()                              const;
+    int64_t arraySize()                             const;
 
     static Value makeIterFrom(const Value& src);
 
@@ -165,7 +165,7 @@ inline void  Value::mapSet(const Value& k, const Value& v)        { mptr->set(k,
 inline Value Value::arrayGet(int64_t idx)                  const { return aptr->get(idx); }
 inline void  Value::arraySet(int64_t idx, const Value& v)        { aptr->set(idx, v); }
 inline void  Value::arrayPush(const Value& v)                    { aptr->push(v); }
-inline int   Value::arraySize()                            const { return (int)aptr->items.size(); }
+inline int64_t Value::arraySize()                          const { return (int64_t)aptr->items.size(); }
 
 inline Value Value::makeIterFrom(const Value& src) {
     if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));

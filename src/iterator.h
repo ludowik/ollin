@@ -37,18 +37,18 @@ struct MapIterator : Iterator {
 
 struct ArrayIterator : Iterator {
     std::vector<Value> items;  // snapshot au moment du for-in (cohérent avec MapIterator)
-    int pos = 0;
+    int64_t pos = 0;
     explicit ArrayIterator(Array* a) : items(a->items) {}
     bool next(Value& key, Value& val) override {
-        if (pos >= (int)items.size()) return false;
-        key = Value((int64_t)(pos + 1));
-        val = items[pos];
+        if (pos >= (int64_t)items.size()) return false;
+        key = Value(pos + 1);
+        val = items[(size_t)pos];
         ++pos;
         return true;
     }
     bool next_primary(Value& out) override {
-        if (pos >= (int)items.size()) return false;
-        out = items[pos];
+        if (pos >= (int64_t)items.size()) return false;
+        out = items[(size_t)pos];
         ++pos;
         return true;
     }

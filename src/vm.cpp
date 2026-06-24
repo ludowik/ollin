@@ -151,9 +151,32 @@ static Value builtin_time(Value* args, int argc) {
     return Value(std::chrono::duration<double>(now.time_since_epoch()).count());
 }
 
+static int64_t range_len(const Range* r) {
+    if (r->step == 0.0) return 0;
+    double diff    = (r->step > 0) ? (r->end - r->start) : (r->start - r->end);
+    double absstep = (r->step > 0) ? r->step : -r->step;
+    if (diff < 0) return 0;
+    double n = r->incl_right ? std::floor(diff / absstep) + 1.0
+                             : std::ceil(diff / absstep);
+    return n <= 0.0 ? 0 : (int64_t)n;
+}
+
+static Value builtin_len(Value* args, int argc) {
+    if (argc == 0) throw std::runtime_error("len() requires 1 argument");
+    const Value& v = args[0];
+    if (v.isNil())    return Value((int64_t)0);
+    if (v.isArray())  return Value((int64_t)v.arraySize());
+    if (v.isMap() || v.isClass())
+                      return Value((int64_t)v.mptr->data.size());
+    if (v.isString()) return Value((int64_t)v.asString().size());
+    if (v.isRange())  return Value(range_len(v.rptr));
+    return Value((int64_t)1);
+}
+
 static const struct { const char* name; Value::BuiltinFn fn; } k_builtins[] = {
     { "assert", builtin_assert },
     { "time",   builtin_time   },
+    { "len",    builtin_len    },
 };
 
 // ── Meta-method dispatch helpers ──────────────────────────────────────────────
