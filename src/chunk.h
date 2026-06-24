@@ -15,15 +15,15 @@
 //   String  : tag == T_STRING   → InternedStr*  (ref-counted, str_hash = sptr->hash)
 //   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
 //   Array   : tag == T_ARRAY    → Array*   (heap, ref-counted, 1-based)
+//   Range   : tag == T_RANGE    → Range*   (heap, ref-counted)
 //   Iterator: tag == T_ITERATOR → Iterator* (heap, ref-counted)
 //   Function: tag == T_FUNCTION → func_idx (int64_t ival, index dans chunk.funcs)
-//   Range   : tag == T_RANGE    → Range*   (heap, ref-counted)
 
 struct Map;
 struct Array;
+struct Range;
 struct Iterator;
 struct Closure;
-struct Range;
 
 struct Value {
     uint8_t  tag;
