@@ -1,5 +1,5 @@
 #include "image_module.h"
-#include "module_utils.h"
+#include "modules/module_utils.h"
 #include <raylib.h>
 #include <stdexcept>
 #include <unordered_map>
@@ -10,9 +10,11 @@
 // ── storage ───────────────────────────────────────────────────────────────────
 
 struct TexHandle {
-    bool is_render = false;
-    Texture2D      tex = {};
+    bool  is_render   = false;
+    bool  pixels_open = false;
+    Texture2D       tex = {};
     RenderTexture2D rtt = {};
+    Image           cpu = {};
 };
 
 static std::unordered_map<int, TexHandle> s_images;
@@ -80,6 +82,7 @@ void image_preload_b64(const std::string& name,
 void image_reset() {
     for (auto& [id, h] : s_images) {
         if (!IsWindowReady()) break;
+        if (h.pixels_open) { UnloadImage(h.cpu); }
         if (h.is_render) UnloadRenderTexture(h.rtt);
         else             UnloadTexture(h.tex);
     }
@@ -121,6 +124,22 @@ static Color toColor(const Value& v) {
         return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0);
     };
     return { gc("r",1), gc("g",1), gc("b",1), gc("a",1) };
+}
+
+static void pixelsOpen(TexHandle& h) {
+    if (h.pixels_open) return;
+    if (!h.is_render)
+        throw std::runtime_error("image: pixel access requires a render texture (use image.create())");
+    h.cpu = LoadImageFromTexture(h.rtt.texture);
+    h.pixels_open = true;
+}
+
+static void pixelsClose(TexHandle& h) {
+    if (!h.pixels_open) return;
+    UpdateTexture(h.rtt.texture, h.cpu.data);
+    UnloadImage(h.cpu);
+    h.cpu = {};
+    h.pixels_open = false;
 }
 
 static Texture2D loadFromMemory(const std::vector<uint8_t>& bytes, const std::string& ext) {
@@ -196,6 +215,7 @@ static Value img_begin(Value* args, int argc) {
     TexHandle& h = findHandle(id, "image.begin_draw");
     if (!h.is_render)
         throw std::runtime_error("image.begin_draw: not a render texture — use image.create()");
+    pixelsClose(h);
     BeginTextureMode(h.rtt);
     return Value{};
 }
@@ -214,6 +234,7 @@ static Value img_draw(Value* args, int argc) {
     if (argc < 3) throw std::runtime_error("image.draw: expected img, x, y");
     int id = handleId(args[0], "image.draw");
     TexHandle& h = findHandle(id, "image.draw");
+    pixelsClose(h);
 
     Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
     float x  = (float)numArg(args, argc, 1, "image.draw");
@@ -238,9 +259,59 @@ static Value img_unload(Value* args, int argc) {
     auto it = s_images.find(id);
     if (it == s_images.end()) return Value{};
     TexHandle& h = it->second;
+    if (h.pixels_open) { UnloadImage(h.cpu); h.pixels_open = false; }
     if (h.is_render) UnloadRenderTexture(h.rtt);
     else             UnloadTexture(h.tex);
     s_images.erase(it);
+    return Value{};
+}
+
+// ── image.begin_pixels(img) ──────────────────────────────────────────────────
+
+static Value img_begin_pixels(Value* args, int argc) {
+    if (argc < 1) throw std::runtime_error("image.begin_pixels: expected image handle");
+    int id = handleId(args[0], "image.begin_pixels");
+    pixelsOpen(findHandle(id, "image.begin_pixels"));
+    return Value{};
+}
+
+// ── image.end_pixels(img) ────────────────────────────────────────────────────
+
+static Value img_end_pixels(Value* args, int argc) {
+    if (argc < 1) throw std::runtime_error("image.end_pixels: expected image handle");
+    int id = handleId(args[0], "image.end_pixels");
+    pixelsClose(findHandle(id, "image.end_pixels"));
+    return Value{};
+}
+
+// ── image.get_pixel(img, x, y) ───────────────────────────────────────────────
+
+static Value img_get_pixel(Value* args, int argc) {
+    if (argc < 3) throw std::runtime_error("image.get_pixel: expected img, x, y");
+    int id = handleId(args[0], "image.get_pixel");
+    TexHandle& h = findHandle(id, "image.get_pixel");
+    int x = (int)numArg(args, argc, 1, "image.get_pixel");
+    int y = (int)numArg(args, argc, 2, "image.get_pixel");
+    pixelsOpen(h);
+    Color c = GetImageColor(h.cpu, x, y);
+    Value m = Value::makeMap();
+    m.mapSet(Value(std::string("r")), Value(c.r / 255.0));
+    m.mapSet(Value(std::string("g")), Value(c.g / 255.0));
+    m.mapSet(Value(std::string("b")), Value(c.b / 255.0));
+    m.mapSet(Value(std::string("a")), Value(c.a / 255.0));
+    return m;
+}
+
+// ── image.set_pixel(img, x, y, color) ────────────────────────────────────────
+
+static Value img_set_pixel(Value* args, int argc) {
+    if (argc < 4) throw std::runtime_error("image.set_pixel: expected img, x, y, color");
+    int id = handleId(args[0], "image.set_pixel");
+    TexHandle& h = findHandle(id, "image.set_pixel");
+    int x = (int)numArg(args, argc, 1, "image.set_pixel");
+    int y = (int)numArg(args, argc, 2, "image.set_pixel");
+    pixelsOpen(h);
+    ImageDrawPixel(&h.cpu, x, y, toColor(args[3]));
     return Value{};
 }
 
@@ -273,7 +344,11 @@ Value makeImageModule() {
     m.mapSet(Value(std::string("create")),    Value::makeBuiltin(img_create));
     m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(img_begin));
     m.mapSet(Value(std::string("end_draw")),   Value::makeBuiltin(img_end));
-    m.mapSet(Value(std::string("draw")),      Value::makeBuiltin(img_draw));
-    m.mapSet(Value(std::string("unload")),    Value::makeBuiltin(img_unload));
+    m.mapSet(Value(std::string("draw")),         Value::makeBuiltin(img_draw));
+    m.mapSet(Value(std::string("unload")),       Value::makeBuiltin(img_unload));
+    m.mapSet(Value(std::string("begin_pixels")), Value::makeBuiltin(img_begin_pixels));
+    m.mapSet(Value(std::string("end_pixels")),   Value::makeBuiltin(img_end_pixels));
+    m.mapSet(Value(std::string("get_pixel")),    Value::makeBuiltin(img_get_pixel));
+    m.mapSet(Value(std::string("set_pixel")),    Value::makeBuiltin(img_set_pixel));
     return m;
 }
