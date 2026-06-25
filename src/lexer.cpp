@@ -197,7 +197,7 @@ std::vector<Token> Lexer::tokenize() {
                     if (!atEnd() && peek() == '#') { advance(); emit(blockComment()); }
                     else emit(comment());
                 } else {
-                    throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
+                    emit({TokenType::HASH, "#", line});
                 }
                 break;
             default:

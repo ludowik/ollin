@@ -590,6 +590,20 @@ var t0 = time()
 var t1 = time()
 assert(t1 >= t0)
 
+## len — taille d'une collection ou string
+var la = [1, 2, 3]
+assert(len(la) == 3)
+assert(len("hello") == 5)
+assert(len({a: 1, b: 2}) == 2)
+assert(len([1;5]) == 5)
+
+## # — sucre syntaxique pour len()
+assert(#la == 3)
+assert(#"hello" == 5)
+assert(#{a: 1, b: 2} == 2)
+assert(#[1;5] == 5)
+assert(#la == len(la))
+
 ## ── 17. Import ───────────────────────────────────────────────────────────────
 
 ## import plat : les symboles du fichier sont injectés dans le scope courant

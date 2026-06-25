@@ -637,6 +637,13 @@ std::unique_ptr<Expr> Parser::unary() {
     if (check(TokenType::MINUS)) { advance(); return std::make_unique<UnaryExpr>('-', unary()); }
     if (check(TokenType::NOT))   { advance(); return std::make_unique<UnaryExpr>('!', unary()); }
     if (check(TokenType::TILDE)) { advance(); return std::make_unique<UnaryExpr>('~', unary()); }
+    if (check(TokenType::HASH)) {
+        advance();
+        auto e = std::make_unique<CallExpr>();
+        e->callee = "len";
+        e->args.push_back(unary());
+        return e;
+    }
     return primary();
 }
 
