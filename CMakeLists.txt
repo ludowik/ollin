@@ -21,11 +21,11 @@ set(OLLIN_SOURCES
     src/parser.cpp
     src/compiler.cpp
     src/vm.cpp
-    src/modules.cpp
-    src/core_module.cpp
-    src/color_module.cpp
-    src/math_module.cpp
-    src/string_module.cpp
+    src/modules/modules.cpp
+    src/modules/core_module.cpp
+    src/modules/color_module.cpp
+    src/modules/math_module.cpp
+    src/modules/string_module.cpp
 )
 
 if(EMSCRIPTEN)
@@ -44,7 +44,7 @@ if(EMSCRIPTEN)
         FetchContent_MakeAvailable(raylib)
     endif()
 
-    add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/raylib_module.cpp src/window_module.cpp)
+    add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/raylib_module.cpp src/modules/window_module.cpp)
     target_include_directories(ollin_wasm PRIVATE src)
     target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
@@ -70,17 +70,17 @@ if(EMSCRIPTEN)
 else()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/raylib/CMakeLists.txt")
         add_subdirectory(third_party/raylib)
-        set(OLLIN_GRAPHICS_SOURCE src/raylib_module.cpp)
+        set(OLLIN_GRAPHICS_SOURCE src/modules/raylib_module.cpp)
         set(OLLIN_GRAPHICS_LIB raylib)
         set(OLLIN_GRAPHICS_DEFINES OLLIN_HAS_RAYLIB)
     else()
         message(STATUS "raylib not found — building with graphics stub (no window)")
-        set(OLLIN_GRAPHICS_SOURCE src/graphics_stub.cpp)
+        set(OLLIN_GRAPHICS_SOURCE src/modules/graphics_stub.cpp)
         set(OLLIN_GRAPHICS_LIB "")
         set(OLLIN_GRAPHICS_DEFINES "")
     endif()
 
-    add_executable(ollin src/main.cpp ${OLLIN_SOURCES} ${OLLIN_GRAPHICS_SOURCE} src/window_module.cpp)
+    add_executable(ollin src/main.cpp ${OLLIN_SOURCES} ${OLLIN_GRAPHICS_SOURCE} src/modules/window_module.cpp)
     target_compile_definitions(ollin PRIVATE ${OLLIN_GRAPHICS_DEFINES})
     target_include_directories(ollin PRIVATE src)
     target_link_libraries(ollin PRIVATE ${OLLIN_GRAPHICS_LIB})
@@ -91,7 +91,7 @@ else()
 
     find_program(EMCC emcc)
     if(EMCC)
-        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/raylib_module.cpp src/window_module.cpp)
+        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/modules/raylib_module.cpp src/modules/window_module.cpp)
         add_custom_command(
             OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm
             DEPENDS ${WASM_SOURCES}

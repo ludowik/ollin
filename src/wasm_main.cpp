@@ -6,7 +6,7 @@
 #include <unordered_set>
 #include "compiler.h"
 #include "lexer.h"
-#include "modules.h"
+#include "modules/modules.h"
 #include "parser.h"
 #include "vm.h"
 

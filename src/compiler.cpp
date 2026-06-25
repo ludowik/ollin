@@ -1,5 +1,5 @@
 #include "compiler.h"
-#include "modules.h"
+#include "modules/modules.h"
 #include <algorithm>
 #include <stdexcept>
 #include <unordered_set>
