@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_set>
 #include "compiler.h"
+#include "image_module.h"
 #include "lexer.h"
 #include "modules/modules.h"
 #include "parser.h"
@@ -14,6 +15,8 @@
 static std::unique_ptr<VM> s_vm;
 
 static std::string ollin_run(const std::string& source) {
+    // Release stale GL texture handles before GL context may be reset.
+    image_reset();
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
     s_vm = std::make_unique<VM>();
@@ -39,6 +42,15 @@ static std::string ollin_run(const std::string& source) {
     return out.str();
 }
 
+// Preload an image from JS so image.load(name) works on WASM.
+// ext: extension without dot, e.g. "png", "jpg"
+static void preload_image_js(const std::string& name,
+                              const std::string& b64,
+                              const std::string& ext) {
+    image_preload_b64(name, b64, ext);
+}
+
 EMSCRIPTEN_BINDINGS(ollin) {
-    emscripten::function("execute", &ollin_run);
+    emscripten::function("execute",      &ollin_run);
+    emscripten::function("preloadImage", &preload_image_js);
 }

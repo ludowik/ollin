@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ollin — Tutoriel</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
 <script>
 ;(function(){
   var last = localStorage.getItem('ollin-last-page')
@@ -374,7 +375,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-24 18:56</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-24 21:14</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -1149,8 +1150,24 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>      <span class="c
 <span class="kw">var</span> t1 = <span class="bi">time</span>()
 <span class="bi">printf</span>(<span class="str">"somme = {}  temps = {} s"</span>, s, t1 - t0)</code></pre>
 
+<h3>len</h3>
+<p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments).</p>
+<pre><code><span class="bi">len</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])          <span class="cmt">## 3</span>
+<span class="bi">len</span>(<span class="str">"bonjour"</span>)          <span class="cmt">## 7</span>
+<span class="kw">var</span> m = {<span class="str">"a"</span>: <span class="num">1</span>, <span class="str">"b"</span>: <span class="num">2</span>}
+<span class="bi">len</span>(m)                  <span class="cmt">## 2</span>
+<span class="bi">len</span>([<span class="num">1</span>;<span class="num">10</span>])             <span class="cmt">## 10 (range inclusif)</span></code></pre>
+
+<h3>typeof</h3>
+<p>Retourne le type d'une valeur sous forme de string : <code>"nil"</code>, <code>"int"</code>, <code>"float"</code>, <code>"string"</code>, <code>"array"</code>, <code>"map"</code>, <code>"function"</code>, <code>"class"</code>, <code>"range"</code>.</p>
+<pre><code><span class="bi">typeof</span>(<span class="num">42</span>)             <span class="cmt">## "int"</span>
+<span class="bi">typeof</span>(<span class="num">3.14</span>)           <span class="cmt">## "float"</span>
+<span class="bi">typeof</span>(<span class="str">"hello"</span>)        <span class="cmt">## "string"</span>
+<span class="bi">typeof</span>([<span class="num">1</span>, <span class="num">2</span>])         <span class="cmt">## "array"</span>
+<span class="bi">typeof</span>(<span class="bool">nil</span>)            <span class="cmt">## "nil"</span></code></pre>
+
 <h3>Fonctions intégrées comme valeurs</h3>
-<p><code>print</code>, <code>printf</code>, <code>assert</code> et <code>time</code> sont des valeurs de première classe — assignables, passables en argument :</p>
+<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>len</code> et <code>typeof</code> sont des valeurs de première classe — assignables, passables en argument :</p>
 <pre><code><span class="kw">var</span> f = <span class="bi">print</span>
 f(<span class="str">"hello"</span>)               <span class="cmt">## hello</span>
 
@@ -1359,8 +1376,33 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
     <tr><td><code>graphics.draw_text(text, x, y, size [,color])</code></td><td>Affiche une chaîne — couleur stroke par défaut</td></tr>
     <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
+    <tr><td><code>graphics.point(x, y)</code></td><td>Trace un point aux coordonnées données</td></tr>
+    <tr><td><code>graphics.circle(x, y, r)</code></td><td>Cercle de centre (x,y) et rayon r — fill/stroke selon styles</td></tr>
+    <tr><td><code>graphics.ellipse(x, y, rx, ry)</code></td><td>Ellipse de centre (x,y) et demi-axes rx, ry — fill/stroke selon styles</td></tr>
+    <tr><td><code>graphics.polygon(pts)</code></td><td>Polygone fermé — <code>pts</code> : tableau plat <code>[x1,y1,x2,y2,…]</code> ou tableau de paires <code>[[x1,y1],…]</code></td></tr>
+    <tr><td><code>graphics.polyline(pts)</code></td><td>Polyligne ouverte (stroke uniquement) — mêmes formats que <code>polygon</code></td></tr>
   </tbody>
 </table>
+
+<h3>Transformations matricielles</h3>
+<p>Les transformations s'appliquent à toutes les primitives suivantes jusqu'à <code>resetTransform()</code> ou <code>pop()</code>. La matrice est remise à l'identité automatiquement à chaque frame.</p>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.push()</code></td><td>Empile la matrice courante (sauvegarde l'état)</td></tr>
+    <tr><td><code>graphics.pop()</code></td><td>Restaure la matrice précédente</td></tr>
+    <tr><td><code>graphics.translate(x, y)</code></td><td>Déplace l'origine de (x, y) pixels</td></tr>
+    <tr><td><code>graphics.rotate(angle)</code></td><td>Rotation en degrés (sens horaire en coords écran)</td></tr>
+    <tr><td><code>graphics.scale(sx [, sy])</code></td><td>Mise à l'échelle ; si <code>sy</code> absent, uniforme</td></tr>
+    <tr><td><code>graphics.resetTransform()</code></td><td>Réinitialise la matrice à l'identité</td></tr>
+  </tbody>
+</table>
+<pre data-no-run><code><span class="bi">graphics</span>.push()
+<span class="bi">graphics</span>.translate(<span class="num">200</span>, <span class="num">200</span>)
+<span class="bi">graphics</span>.rotate(<span class="num">45</span>)
+<span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
+<span class="bi">graphics</span>.rect(<span class="num">-50</span>, <span class="num">-50</span>, <span class="num">100</span>, <span class="num">100</span>)   <span class="cmt">## carré pivoté centré en (200,200)</span>
+<span class="bi">graphics</span>.pop()</code></pre>
 
 <h3>Couleurs — classe <code>Color</code></h3>
 <p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code>. L'alpha est optionnel (défaut : <code>1.0</code>). Les composantes sont clampées silencieusement.</p>
@@ -1442,7 +1484,7 @@ const KEYWORDS = new Set([
   'import','as','or','and','not','class','extends','static','super','self',
   'switch','case'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','Color','math','graphics','string','colors'])
+const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',

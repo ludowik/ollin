@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Ollin — Playground</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -41,6 +42,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   color: var(--accent);
   letter-spacing: -0.3px;
   margin-right: 4px;
+  text-decoration: none;
+  flex-shrink: 0;
 }
 
 .sep { width: 1px; height: 20px; background: var(--border); }
@@ -75,6 +78,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
+  flex-shrink: 0;
 }
 #run-btn:hover   { opacity: 0.85; }
 #run-btn:disabled{ opacity: 0.4; cursor: default; }
@@ -92,6 +96,7 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
 }
 #stop-btn:disabled { opacity: 0.3; cursor: default; }
 #stop-btn:not(:disabled):hover { background: rgba(248,113,113,0.12); }
@@ -200,14 +205,21 @@ canvas#canvas {
   #layout { flex-direction: column; }
   #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
   #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
-  #divider { width: 100%; height: 5px; cursor: row-resize; }
-  /* iOS auto-zoom se déclenche si font-size < 16px sur un élément éditable */
-  #editor-wrap .cm-content { font-size: 16px; }
-  /* toolbar compact : masquer textes et éléments non essentiels */
+  #divider { width: 100%; height: 6px; cursor: row-resize; }
+
+  /* Police réduite — maximum-scale=1.0 dans le viewport empêche le zoom iOS */
+  #editor-wrap .cm-editor  { font-size: 12px; }
+  #editor-wrap .cm-content { font-size: 12px; }
+  /* Scroll horizontal fluide sur iOS */
+  #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* toolbar compact */
+  #toolbar { gap: 5px; padding: 0 8px; }
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #examples { max-width: 110px; }
+  #examples { max-width: 90px; font-size: 11px; }
+  #img-btn  { padding: 6px 8px; }
   #run-btn  { padding: 6px 10px; }
   #stop-btn { padding: 6px 10px; }
   #copy-btn { padding: 6px 10px !important; }
@@ -229,12 +241,15 @@ canvas#canvas {
 <body>
 
 <div id="toolbar">
-  <span class="logo">Ollin</span>
-  <a href="index.html" style="font-size:12px;color:var(--dim);text-decoration:none">Docs</a>
-  <div class="sep"></div>
+  <a href="index.html" class="logo">Ollin</a>
   <select id="examples" title="Charger un exemple"></select>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
+  <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
+  <label for="img-file-input" id="img-btn" title="Charger des images (PNG, JPG…) pour image.load()" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;user-select:none">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 10l4-3 3 2.5 3-3.5 4 4"/><circle cx="11.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <span class="btn-label" id="img-btn-label">Images</span>
+  </label>
   <button id="copy-btn" title="Copier le code" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,opacity 0.15s" onmouseover="this.style.background='rgba(124,131,255,0.12)'" onmouseout="this.style.background='transparent'">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1h2.5"/></svg>
     <span class="btn-label">Copier</span>
@@ -280,7 +295,7 @@ const KEYWORDS = new Set([
   'import','as','or','and','not','class','extends','super','self',
   'switch','case','default'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','typeof','Color','math','graphics','string','colors','window'])
+const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',
@@ -367,6 +382,7 @@ const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
   fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(r, g, b [, a])'),
+  fn('len',    'len(v) → int'),
 ]
 
 const MODULE_MEMBERS = {
@@ -390,10 +406,25 @@ const MODULE_MEMBERS = {
     fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color])'),
     fn('graphics.fill','fill([color])'),
     fn('graphics.line','line(x1,y1,x2,y2)'),       fn('graphics.rect','rect(x,y,w,h)'),
+    fn('graphics.circle','circle(x,y,r)'),          fn('graphics.ellipse','ellipse(x,y,rx,ry)'),
+    fn('graphics.point','point(x,y)'),
+    fn('graphics.polygon','polygon(pts)'),          fn('graphics.polyline','polyline(pts)'),
+    fn('graphics.push','push()'),                   fn('graphics.pop','pop()'),
+    fn('graphics.translate','translate(x,y)'),      fn('graphics.rotate','rotate(deg)'),
+    fn('graphics.scale','scale(sx[,sy])'),          fn('graphics.resetTransform','resetTransform()'),
+    fn('graphics.sprite','sprite(img,x,y[,w,h])'),
     fn('graphics.draw_text','draw_text(text,x,y,size[,color])'),
     fn('graphics.fps','fps()→int'),                fn('graphics.is_open','is_open()→bool'),
-    fn('graphics.begin_draw','begin_draw()'),      fn('graphics.end_draw','end_draw()'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
+  ],
+  image: [
+    fn('image.load','load(path) → img'),
+    fn('image.load_data','load_data(format, base64) → img'),
+    fn('image.create','create(w, h) → img'),
+    fn('image.begin_draw','begin_draw(img)'),
+    fn('image.end_draw','end_draw()'),
+    fn('image.draw','draw(img, x, y [, w, h [, tint]])'),
+    fn('image.unload','unload(img)'),
   ],
   colors: [
     cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),
@@ -581,6 +612,36 @@ copyBtn.addEventListener('click', () => {
   })
 })
 
+// ── Image upload ──────────────────────────────────────────────────────────
+const imgFileInput = document.getElementById('img-file-input')
+const imgBtnLabel  = document.getElementById('img-btn-label')
+const imgBtn       = document.getElementById('img-btn')
+const loadedImages = new Map()  // name → {b64, ext}
+
+imgFileInput.addEventListener('change', () => {
+  const files = Array.from(imgFileInput.files)
+  if (!files.length) return
+  let done = 0
+  files.forEach(file => {
+    const ext  = file.name.split('.').pop().toLowerCase()
+    const name = file.name
+    const reader = new FileReader()
+    reader.onload = e => {
+      const dataUrl = e.target.result               // "data:image/png;base64,xxxx"
+      const b64     = dataUrl.split(',')[1] ?? ''
+      loadedImages.set(name, { b64, ext })
+      if (ollin) ollin.preloadImage(name, b64, ext)
+      done++
+      const n = loadedImages.size
+      imgBtnLabel.textContent = n + ' image' + (n > 1 ? 's' : '')
+      imgBtn.style.borderColor = 'var(--green)'
+      imgBtn.style.color       = 'var(--green)'
+    }
+    reader.readAsDataURL(file)
+  })
+  imgFileInput.value = ''
+})
+
 // ── WASM ──────────────────────────────────────────────────────────────────
 const statusEl = document.getElementById('status')
 const runBtn   = document.getElementById('run-btn')
@@ -623,28 +684,36 @@ function applySplit(pct) {
 const savedSplit = parseFloat(localStorage.getItem(SPLIT_KEY))
 if (savedSplit >= 15 && savedSplit <= 85) applySplit(savedSplit)
 
-divider.addEventListener('mousedown', e => {
+function startDrag(e) {
   dragging = true
   divider.classList.add('dragging')
   e.preventDefault()
-})
-document.addEventListener('mousemove', e => {
+}
+function moveDrag(clientX, clientY) {
   if (!dragging) return
   const layout = document.getElementById('layout')
   const rect   = layout.getBoundingClientRect()
   const mobile = window.innerWidth <= 640
   const pct = mobile
-    ? Math.min(85, Math.max(15, (e.clientY - rect.top)  / rect.height * 100))
-    : Math.min(85, Math.max(15, (e.clientX - rect.left) / rect.width  * 100))
+    ? Math.min(85, Math.max(15, (clientY - rect.top)  / rect.height * 100))
+    : Math.min(85, Math.max(15, (clientX - rect.left) / rect.width  * 100))
   applySplit(pct)
-})
-document.addEventListener('mouseup', () => {
+}
+function endDrag() {
   if (!dragging) return
   dragging = false
   divider.classList.remove('dragging')
   const pct = parseFloat(editorPane.style.flex.split(' ')[2])
   if (!isNaN(pct)) localStorage.setItem(SPLIT_KEY, pct)
-})
+}
+
+divider.addEventListener('mousedown',  e => startDrag(e))
+document.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY))
+document.addEventListener('mouseup',   () => endDrag())
+
+divider.addEventListener('touchstart', e => startDrag(e), { passive: false })
+document.addEventListener('touchmove',  e => { if (dragging) { moveDrag(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault() } }, { passive: false })
+document.addEventListener('touchend',  () => endDrag())
 </script>
 </body>
 </html>

@@ -1,6 +1,15 @@
 # Ollin — Scripting Language
 > Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable
 
+## Règle obligatoire : écrire du code Ollin
+
+Avant d'écrire **tout** fichier `.ol`, lire dans cet ordre :
+1. `docs/grammar.ebnf` — syntaxe formelle du langage
+2. `scripts/syntax.ol` — exemples de référence
+
+Tester ensuite avec `./build/ollin <script>` avant tout build WASM.  
+Ces deux étapes sont **non négociables**, quelle que soit la taille du script.
+
 ## Stack
 - Implémentation : **C++17**
 - Build : **CMake** (cross-platform)

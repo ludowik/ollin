@@ -1,6 +1,8 @@
 #include "value.h"
 #include "vm.h"
+#include "image_module.h"
 #include <raylib.h>
+#include <rlgl.h>
 #include <stdexcept>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -95,6 +97,7 @@ static void resetStyles() {
     applyStrokeSize(2.0f);
     applyStroke(true, WHITE);
     applyFill(false);
+    rlLoadIdentity();
 }
 
 static Value gfx_stroke_size(Value* args, int argc) {
@@ -220,6 +223,17 @@ static Value gfx_polygon(Value* args, int argc) {
     return Value{};
 }
 
+static Value gfx_polyline(Value* args, int argc) {
+    if (argc < 1 || !args[0].isArray())
+        throw std::runtime_error("graphics.polyline: expected array of points");
+    if (!s_has_stroke) return Value{};
+    auto pts = parsePoints(args[0]);
+    int n = (int)pts.size();
+    for (int i = 0; i < n - 1; i++)
+        DrawLineEx(pts[i], pts[i+1], s_stroke_size, s_stroke_color);
+    return Value{};
+}
+
 static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
     float prev_x = cx + rx, prev_y = cy;
     for (int i = 1; i <= segs; i++) {
@@ -315,6 +329,66 @@ static Value gfx_run(Value* args, int argc) {
     return Value{};
 }
 
+// ── Transformations matricielles ──────────────────────────────────────────────
+static Value gfx_push(Value* args, int argc) {
+    (void)args; (void)argc;
+    rlPushMatrix();
+    return Value{};
+}
+
+static Value gfx_pop(Value* args, int argc) {
+    (void)args; (void)argc;
+    rlPopMatrix();
+    return Value{};
+}
+
+static Value gfx_translate(Value* args, int argc) {
+    if (argc < 2) throw std::runtime_error("graphics.translate: expected x, y");
+    rlTranslatef((float)args[0].asNum(), (float)args[1].asNum(), 0.0f);
+    return Value{};
+}
+
+static Value gfx_rotate(Value* args, int argc) {
+    if (argc < 1) throw std::runtime_error("graphics.rotate: expected angle (degrees)");
+    rlRotatef((float)args[0].asNum(), 0.0f, 0.0f, 1.0f);
+    return Value{};
+}
+
+static Value gfx_scale(Value* args, int argc) {
+    if (argc < 1) throw std::runtime_error("graphics.scale: expected sx [, sy]");
+    float sx = (float)args[0].asNum();
+    float sy = argc > 1 ? (float)args[1].asNum() : sx;
+    rlScalef(sx, sy, 1.0f);
+    return Value{};
+}
+
+static Value gfx_reset_transform(Value* args, int argc) {
+    (void)args; (void)argc;
+    rlLoadIdentity();
+    return Value{};
+}
+
+// ── graphics.sprite(img, x, y [, w, h]) ──────────────────────────────────────
+
+static Value gfx_sprite(Value* args, int argc) {
+    if (argc < 3) throw std::runtime_error("graphics.sprite: expected img, x, y");
+    if (!args[0].isMap())
+        throw std::runtime_error("graphics.sprite: expected image handle");
+    Value idv = args[0].mapGet(Value(std::string("id")));
+    if (!idv.isInteger())
+        throw std::runtime_error("graphics.sprite: invalid image handle");
+    int id = (int)idv.asInt();
+
+    float x  = (float)args[1].asNum();
+    float y  = (float)args[2].asNum();
+    float dw = argc > 3 ? (float)args[3].asNum() : 0.0f;
+    float dh = argc > 4 ? (float)args[4].asNum() : 0.0f;
+
+    Color tint = s_has_fill ? s_fill_color : WHITE;
+    image_draw_sprite(id, x, y, dw, dh, tint.r, tint.g, tint.b, tint.a);
+    return Value{};
+}
+
 Value makeGraphicsModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("canvas")),     Value::makeBuiltin(gfx_canvas));
@@ -332,10 +406,18 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("close")),      Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")),       Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")),        Value::makeBuiltin(gfx_run));
+    m.mapSet(Value(std::string("push")),            Value::makeBuiltin(gfx_push));
+    m.mapSet(Value(std::string("pop")),             Value::makeBuiltin(gfx_pop));
+    m.mapSet(Value(std::string("translate")),       Value::makeBuiltin(gfx_translate));
+    m.mapSet(Value(std::string("rotate")),          Value::makeBuiltin(gfx_rotate));
+    m.mapSet(Value(std::string("scale")),           Value::makeBuiltin(gfx_scale));
+    m.mapSet(Value(std::string("resetTransform")),  Value::makeBuiltin(gfx_reset_transform));
     m.mapSet(Value(std::string("polygon")),    Value::makeBuiltin(gfx_polygon));
+    m.mapSet(Value(std::string("polyline")),   Value::makeBuiltin(gfx_polyline));
     m.mapSet(Value(std::string("ellipse")),    Value::makeBuiltin(gfx_ellipse));
     m.mapSet(Value(std::string("circle")),     Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")),      Value::makeBuiltin(gfx_point));
+    m.mapSet(Value(std::string("sprite")),     Value::makeBuiltin(gfx_sprite));
     m.mapSet(Value(std::string("BLACK")),   colorInst(0.0,        0.0,        0.0));
     m.mapSet(Value(std::string("WHITE")),   colorInst(1.0,        1.0,        1.0));
     m.mapSet(Value(std::string("RED")),     colorInst(230/255.0,  41/255.0,   55/255.0));
