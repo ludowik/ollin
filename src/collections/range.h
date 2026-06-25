@@ -19,26 +19,21 @@ struct RangeIterator : Iterator {
     explicit RangeIterator(Range* r)
         : current(r->start), end(r->end), step(r->step), incl_right(r->incl_right) {}
 
-    bool next(Value& key, Value& val) override {
-        bool done;
-        if (step > 0) done = incl_right ? (current > end) : (current >= end);
-        else          done = incl_right ? (current < end) : (current <= end);
-        if (done) return false;
-        Value v = (current == std::floor(current) && current >= (double)INT64_MIN && current <= (double)INT64_MAX)
-                  ? Value((int64_t)current) : Value(current);
-        key = v; val = v;
-        current += step;
-        return true;
-    }
-    bool next_primary(Value& out) override {
-        bool done;
-        if (step > 0) done = incl_right ? (current > end) : (current >= end);
-        else          done = incl_right ? (current < end) : (current <= end);
+private:
+    bool advance(Value& out) {
+        bool done = (step > 0) ? (incl_right ? current > end : current >= end)
+                               : (incl_right ? current < end : current <= end);
         if (done) return false;
         out = (current == std::floor(current) && current >= (double)INT64_MIN && current <= (double)INT64_MAX)
               ? Value((int64_t)current) : Value(current);
         current += step;
         return true;
     }
+public:
+
+    bool next(Value& key, Value& val) override {
+        Value v; if (!advance(v)) return false; key = val = v; return true;
+    }
+    bool next_primary(Value& out) override { return advance(out); }
     bool primary_is_val() const override { return true; }
 };

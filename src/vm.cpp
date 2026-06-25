@@ -167,7 +167,7 @@ static Value builtin_len(Value* args, int argc) {
     if (v.isNil())    return Value((int64_t)0);
     if (v.isArray())  return Value((int64_t)v.arraySize());
     if (v.isMap() || v.isClass())
-                      return Value((int64_t)v.mptr->data.size());
+                      return Value(v.mapSize());
     if (v.isString()) return Value((int64_t)v.asString().size());
     if (v.isRange())  return Value(range_len(v.rptr));
     return Value((int64_t)1);

@@ -58,6 +58,7 @@ private:
     explicit Value(Iterator* p) : tag(T_ITERATOR), str_hash(0), iptr(p) {}
     explicit Value(Closure*  p) : tag(T_CLOSURE),  str_hash(0), cptr(p) {}
     explicit Value(Range*    p) : tag(T_RANGE),    str_hash(0), rptr(p) {}
+    void release() noexcept;
 
 public:
     Value()              : tag(T_NIL),     str_hash(0), ival(0) {}
@@ -115,6 +116,7 @@ public:
     void   arraySet(int64_t idx, const Value& val);        // 1-based, grows if needed
     void   arrayPush(const Value& val);
     int64_t arraySize()                             const;
+    int64_t mapSize()                               const;
 
     static Value makeIterFrom(const Value& src);
 
@@ -165,6 +167,20 @@ inline Value Value::arrayGet(int64_t idx)                  const { return aptr->
 inline void  Value::arraySet(int64_t idx, const Value& v)        { aptr->set(idx, v); }
 inline void  Value::arrayPush(const Value& v)                    { aptr->push(v); }
 inline int64_t Value::arraySize()                          const { return (int64_t)aptr->items.size(); }
+inline int64_t Value::mapSize()                            const { return (int64_t)mptr->data.size(); }
+
+inline void Value::release() noexcept {
+    switch (tag) {
+        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
+        case T_MAP:
+        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
+        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
+        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
+        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
+        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
+        default: break;
+    }
+}
 
 inline Value Value::makeIterFrom(const Value& src) {
     if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
@@ -202,17 +218,7 @@ inline Value& Value::operator=(const Value& o) {
         case T_RANGE:    o.rptr->refcount++;             break;
         default: break;
     }
-    // Release de l'ancienne valeur
-    switch (tag) {
-        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
-        case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
-        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
-        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
-        default: break;
-    }
+    release();
     tag = o.tag; str_hash = o.str_hash; ival = 0;
     switch (tag) {
         case T_NIL:      break;
@@ -232,32 +238,11 @@ inline Value& Value::operator=(const Value& o) {
 }
 inline Value& Value::operator=(Value&& o) noexcept {
     if (this == &o) return *this;
-    // Release de l'ancienne valeur (on prend possession de la référence de o)
-    switch (tag) {
-        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
-        case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
-        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
-        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
-        default: break;
-    }
+    release();
     tag = o.tag; str_hash = o.str_hash; ival = o.ival; o.tag = T_NIL;
     return *this;
 }
-inline Value::~Value() {
-    switch (tag) {
-        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
-        case T_MAP:      { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
-        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
-        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
-        default: break;
-    }
-}
+inline Value::~Value() { release(); }
 
 inline bool isFalsy(const Value& v) {
     if (v.isNil())     return true;
