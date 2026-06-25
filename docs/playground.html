@@ -425,6 +425,10 @@ const MODULE_MEMBERS = {
     fn('image.end_draw','end_draw()'),
     fn('image.draw','draw(img, x, y [, w, h [, tint]])'),
     fn('image.unload','unload(img)'),
+    fn('image.set_pixel','set_pixel(img, x, y, color)'),
+    fn('image.get_pixel','get_pixel(img, x, y) → color'),
+    fn('image.begin_pixels','begin_pixels(img)'),
+    fn('image.end_pixels','end_pixels(img)'),
   ],
   colors: [
     cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),
@@ -507,6 +511,7 @@ const EXAMPLES = [
   { name: 'Classe Vec2',  code: 'class Vec2\n    func init(x, y)\n        self.x = x\n        self.y = y\n    end\n    func __add(other)\n        return Vec2(self.x + other.x, self.y + other.y)\n    end\n    func __str()\n        return "Vec2(" + self.x + "," + self.y + ")"\n    end\nend\n\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
   { name: 'Colors',       code: 'var c = Color(1.0, 0.5, 0.2)\nprint(c)\nprint(c.r, c.g, c.b, c.a)\n\nvar red = colors.RED\nprint(red.r, red.g, red.b)' },
   { name: 'Lignes animées', code: 'const W = 800\nconst H = 500\nconst N = 150\nconst SPEED = 3\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n    x1[i]=math.rand_int(0,W)  y1[i]=math.rand_int(0,H)\n    x2[i]=math.rand_int(0,W)  y2[i]=math.rand_int(0,H)\n    vx1[i]=math.rand(-SPEED,SPEED)  vy1[i]=math.rand(-SPEED,SPEED)\n    vx2[i]=math.rand(-SPEED,SPEED)  vy2[i]=math.rand(-SPEED,SPEED)\n    cols[i]=Color.random()\nend\n\ngraphics.canvas(W, H, "Lignes")\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    graphics.strokeSize(1)\n    for i = 1, N do\n        x1[i]+=vx1[i]  y1[i]+=vy1[i]  x2[i]+=vx2[i]  y2[i]+=vy2[i]\n        if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n        if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n        if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n        if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n        graphics.stroke(cols[i])\n        graphics.line(x1[i],y1[i],x2[i],y2[i])\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
+  { name: 'Pixels',        code: 'const W = 400\nconst H = 300\n\ngraphics.canvas(W, H, "Pixels")\nvar canvas = image.create(W, H)\n\nfor y = 0, H-1 do\n    for x = 0, W-1 do\n        image.set_pixel(canvas, x, y, {r: x/W, g: y/H, b: 1-x/W, a: 1})\n    end\nend\n\nvar c = image.get_pixel(canvas, 0, 0)\nprint("(0,0) r=" + math.round(c.r * 100) / 100)\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    image.draw(canvas, 0, 0)\n    graphics.draw_text("FPS: " + graphics.fps(), 4, H-18, 13)\nend\n\ngraphics.run(frame)' },
   { name: 'Rectangles',    code: 'const W = 800\nconst H = 500\nconst N = 20\n\nvar rects = []\nfor i = 1, N do\n    var w = math.rand_int(30, 110)\n    var h = math.rand_int(20, 80)\n    rects[i] = {\n        x: math.rand_int(0, W - w), y: math.rand_int(0, H - h),\n        w: w, h: h,\n        vx: math.rand(-2, 2), vy: math.rand(-2, 2),\n        fc: Color.random(), sc: Color.random()\n    }\nend\n\ngraphics.canvas(W, H, "Rectangles")\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    for r in rects do\n        r.x += r.vx  r.y += r.vy\n        if r.x < 0 or r.x + r.w > W then r.vx = -r.vx end\n        if r.y < 0 or r.y + r.h > H then r.vy = -r.vy end\n        r.x = math.clamp(r.x, 0, W - r.w)\n        r.y = math.clamp(r.y, 0, H - r.h)\n        graphics.fill(r.fc)\n        graphics.stroke(r.sc)\n        graphics.rect(r.x, r.y, r.w, r.h)\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
 ]
 
