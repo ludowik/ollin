@@ -242,8 +242,6 @@ static bool valuesEqual(const Value& av, const Value& bv) {
     if (av.isInteger() && bv.isInteger())      return av.asInt()  == bv.asInt();
     if (av.isNumber()  && bv.isNumber())       return av.asNum()  == bv.asNum();
     if (av.isString()  && bv.isString())       return av.sptr == bv.sptr;
-    if (av.isString()  && bv.isNumber())       return (isFalsy(av) ? 0.0 : 1.0) == bv.asNum();
-    if (av.isNumber()  && bv.isString())       return av.asNum() == (isFalsy(bv) ? 0.0 : 1.0);
     return (av.isMap()   && bv.isMap()   && av.mptr == bv.mptr) ||
            (av.isClass() && bv.isClass() && av.mptr == bv.mptr);
 }
@@ -628,6 +626,10 @@ op_LOAD_VARARGS: {
 op_RETURN_V: {
     {
         closeUpvals();
+        bool  is_ctor_ = call_stack.back().is_ctor;
+        Value ctor_val;
+        if (is_ctor_) ctor_val = regs[base + 0];
+        int ret_dest = call_stack.back().return_dest;
         int n_va   = call_stack.back().n_varargs;
         int va_src = call_stack.back().varargs_base;
         int n_expl = B;
@@ -640,6 +642,8 @@ op_RETURN_V: {
         call_stack.pop_back();
         if ((int)regs.size() < rbase + total) regs.resize(rbase + total);
         for (int i = 0; i < total; ++i) regs[rbase + i] = std::move(rvs[i]);
+        if (is_ctor_)      regs[rbase + 0] = std::move(ctor_val);
+        if (ret_dest >= 0) regs[ret_dest]  = regs[rbase + 0];
         ip = rip;
     }
     if (call_stack.size() <= stop_depth) return;
@@ -867,6 +871,8 @@ op_MAKE_CLOSURE: {
             }
             uv->refcount++;
         } else {
+            if (!call_stack.back().upvals)
+                throw std::runtime_error("runtime: closure captures upvalue from non-closure frame");
             uv = (*call_stack.back().upvals)[desc.idx];
             uv->refcount++;
         }

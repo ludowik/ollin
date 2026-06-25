@@ -773,8 +773,12 @@ std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
 }
 
 std::unique_ptr<Expr> Parser::primary() {
-    if (check(TokenType::NUMBER))
-        return std::make_unique<NumberExpr>(std::stod(advance().lexeme));
+    if (check(TokenType::NUMBER)) {
+        const std::string& lex = advance().lexeme;
+        if (lex.find('.') == std::string::npos)
+            return std::make_unique<NumberExpr>(std::stoll(lex));
+        return std::make_unique<NumberExpr>(std::stod(lex));
+    }
     if (check(TokenType::STRING))
         return parsePostfix(std::make_unique<StringExpr>(advance().lexeme));
     if (check(TokenType::TRUE))  { advance(); return std::make_unique<BoolExpr>(true);  }

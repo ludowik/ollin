@@ -1,5 +1,6 @@
 #pragma once
 #include "token.h"
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -73,8 +74,11 @@ struct BoolExpr : Expr {
 };
 
 struct NumberExpr : Expr {
-    double value;
-    explicit NumberExpr(double v) : value(v) {}
+    double  value;
+    int64_t ival;
+    bool    is_integer;
+    explicit NumberExpr(double v)  : value(v), ival(0), is_integer(false) {}
+    explicit NumberExpr(int64_t v) : value(0.0), ival(v), is_integer(true) {}
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

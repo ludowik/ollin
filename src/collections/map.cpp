@@ -16,6 +16,7 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
         case Value::T_ITERATOR: return std::hash<void*>{}((void*)v.iptr);
         case Value::T_FUNCTION: return std::hash<int64_t>{}(v.ival);
         case Value::T_CLOSURE:  return std::hash<void*>{}((void*)v.cptr);
+        case Value::T_CLASS:    return std::hash<void*>{}((void*)v.mptr);
         default:                return 0;
     }
 }

@@ -119,10 +119,12 @@ static Value math_rand_int(Value* args, int argc) {
     if (argc == 0) throw std::runtime_error("math.rand_int: at least one argument required");
     if (argc == 1) {
         int64_t hi = (int64_t)numArg(args, argc, 0, "math.rand_int");
-        return Value((int64_t)(1 + rand() % hi));
+        if (hi <= 0) throw std::runtime_error("math.rand_int: argument must be > 0");
+        return Value((int64_t)(rand() % hi + 1));
     }
     int64_t lo = (int64_t)numArg(args, argc, 0, "math.rand_int");
     int64_t hi = (int64_t)numArg(args, argc, 1, "math.rand_int");
+    if (lo > hi) throw std::runtime_error("math.rand_int: lo must be <= hi");
     return Value(lo + (int64_t)(rand() % (hi - lo + 1)));
 }
 

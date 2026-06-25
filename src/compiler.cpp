@@ -61,7 +61,7 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
 static Value evalConstant(const Expr& e) {
-    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return numValue(n->value);
+    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return n->is_integer ? Value(n->ival) : numValue(n->value);
     if (auto* s = dynamic_cast<const StringExpr*>(&e)) return Value(s->value);
     if (auto* b = dynamic_cast<const BoolExpr*>(&e))   return Value((int64_t)(b->value ? 1 : 0));
     if (dynamic_cast<const NilExpr*>(&e))               return Value{};
@@ -190,7 +190,7 @@ static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
 void Compiler::compileInto(const Expr& e, int dest) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                           chunk.addConstant(numValue(n->value))));
+                           chunk.addConstant(n->is_integer ? Value(n->ival) : numValue(n->value))));
     } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
                            chunk.addConstant(Value(s->value))));
@@ -670,6 +670,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));  // implicit void return
 
     // Update reg_count in FuncProto
+    if (reg_count_ > 255) throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
 
     // Patch jump over body
@@ -769,6 +770,7 @@ void Compiler::visit(const FuncExpr& s) {
         reg_top_ = saved;
     }
     chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
+    if (reg_count_ > 255) throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
@@ -834,7 +836,7 @@ void Compiler::visit(const ReturnStmt& s) {
 void Compiler::visit(const NumberExpr& e) {
     last_reg_ = allocReg();
     chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                       chunk.addConstant(numValue(e.value))));
+                       chunk.addConstant(e.is_integer ? Value(e.ival) : numValue(e.value))));
 }
 
 void Compiler::visit(const StringExpr& e) {
@@ -1421,6 +1423,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     }
     chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
 
+    if (reg_count_ > 255) throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
