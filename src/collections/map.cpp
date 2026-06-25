@@ -1,4 +1,4 @@
-#include "chunk.h"
+#include "value.h"
 
 std::size_t ValueHash::operator()(const Value& v) const noexcept {
     switch (v.tag) {

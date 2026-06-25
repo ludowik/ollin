@@ -1,5 +1,5 @@
 #pragma once
-#include "chunk.h"
+#include "value.h"
 #include <stdexcept>
 
 static inline double numArg(const Value* args, int argc, int i, const char* fn) {

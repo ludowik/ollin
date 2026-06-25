@@ -1,4 +1,4 @@
-#include "chunk.h"
+#include "value.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten/val.h>
