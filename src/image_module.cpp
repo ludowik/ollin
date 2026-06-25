@@ -131,6 +131,10 @@ static void pixelsOpen(TexHandle& h) {
     if (!h.is_render)
         throw std::runtime_error("image: pixel access requires a render texture (use image.create())");
     h.cpu = LoadImageFromTexture(h.rtt.texture);
+    // WebGL/WASM: glReadPixels via temp FBO may fail on a fresh render texture
+    // that has never been drawn to — fall back to a zeroed CPU image.
+    if (!h.cpu.data)
+        h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
     h.pixels_open = true;
 }
 

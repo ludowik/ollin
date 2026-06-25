@@ -776,7 +776,7 @@ std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::NUMBER)) {
         const std::string& lex = advance().lexeme;
         if (lex.find('.') == std::string::npos)
-            return std::make_unique<NumberExpr>(std::stoll(lex));
+            return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
         return std::make_unique<NumberExpr>(std::stod(lex));
     }
     if (check(TokenType::STRING))
