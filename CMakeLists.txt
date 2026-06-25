@@ -15,8 +15,8 @@ set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
 
 set(OLLIN_SOURCES
     src/chunk.cpp
-    src/array.cpp
-    src/map.cpp
+    src/collections/array.cpp
+    src/collections/map.cpp
     src/lexer.cpp
     src/parser.cpp
     src/compiler.cpp

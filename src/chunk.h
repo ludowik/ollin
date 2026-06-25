@@ -139,16 +139,16 @@ public:
 };
 
 // ── Array (1-based, ref-counted) — définition complète ───────────────────────
-#include "array.h"
+#include "collections/array.h"
 
 // ── Map (pure hashmap, clés Value) — définition complète ─────────────────────
-#include "map.h"
+#include "collections/map.h"
 
 // ── Iterator (protocole d'itération — Map, Array) ────────────────────────────
-#include "iterator.h"
+#include "collections/iterator.h"
 
 // ── Range ([a;b] littéral, itérable) ─────────────────────────────────────────
-#include "range.h"
+#include "collections/range.h"
 
 // ── Closure / Upvalue ─────────────────────────────────────────────────────────
 #include "closure.h"
