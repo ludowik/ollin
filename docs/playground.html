@@ -509,9 +509,10 @@ sel.addEventListener('change', async () => {
 })
 
 // ── Output ────────────────────────────────────────────────────────────────
-const outputEl  = document.getElementById('output')
-const canvasEl  = document.getElementById('canvas')
+const outputEl   = document.getElementById('output')
+const canvasEl   = document.getElementById('canvas')
 const outputPane = document.getElementById('output-pane')
+const outputHdr  = document.getElementById('output-header')
 
 const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
@@ -544,6 +545,7 @@ function clearAndStop() {
   try { ollin && ollin.pauseMainLoop() } catch(_) {}
   canvasEl.style.display = 'none'
   outputEl.style.display = 'block'
+  if (outputHdr) outputHdr.style.display = 'flex'
   outputEl.textContent   = ''
   outputEl.className     = ''
   outputPane.style.overflow = ''
@@ -553,6 +555,7 @@ function clearAndStop() {
 function showOutput(text) {
   canvasEl.style.display = 'none'
   outputEl.style.display = 'block'
+  if (outputHdr) outputHdr.style.display = 'flex'
   outputPane.style.overflow = ''
   if (!text) {
     outputEl.textContent = '(aucune sortie)'
@@ -579,6 +582,7 @@ function run() {
   const out  = ollin.execute(code)
   if (canvasEl.style.display === 'block') {
     outputPane.style.overflow = 'hidden'
+    if (outputHdr) outputHdr.style.display = 'none'
     setRunning(true)
     return
   }
