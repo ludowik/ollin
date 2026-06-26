@@ -33,23 +33,35 @@ static Value colorInst(double r, double g, double b) {
     return m;
 }
 
+static float s_dpr = 1.0f;
+
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
     int h = argc > 1 ? toInt(args[1]) : 600;
     const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
 #ifdef __EMSCRIPTEN__
     if (IsWindowReady()) CloseWindow();
+    s_dpr = (float)EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
+    int physW = (int)(w * s_dpr + 0.5f);
+    int physH = (int)(h * s_dpr + 0.5f);
     EM_ASM({
-        var c = document.getElementById('canvas');
-        if (c) { c.width = $0; c.height = $1; c.style.display = 'block'; }
         var o = document.getElementById('output');
         if (o) o.style.display = 'none';
-    }, w, h);
-#endif
-    InitWindow(w, h, title);
-#ifdef __EMSCRIPTEN__
+    });
+    InitWindow(physW, physH, title);
     SetTargetFPS(0);
+    // Display at CSS pixel size — rendering happens at physical resolution via rlScalef in emscripten_frame
+    EM_ASM({
+        var c = document.getElementById('canvas');
+        if (c) {
+            c.style.width  = $0 + 'px';
+            c.style.height = $1 + 'px';
+            c.style.display = 'block';
+        }
+    }, w, h);
 #else
+    s_dpr = 1.0f;
+    InitWindow(w, h, title);
     SetTargetFPS(60);
 #endif
     Value win = VM::current()->getGlobal("window");
@@ -304,8 +316,13 @@ static Value gfx_quit(Value* args, int argc) {
 static Value  s_run_callback;
 static void emscripten_frame() {
     BeginDrawing();
+    if (s_dpr != 1.0f) {
+        rlPushMatrix();
+        rlScalef(s_dpr, s_dpr, 1.0f);
+    }
     resetStyles();
     VM::current()->callValue(s_run_callback);
+    if (s_dpr != 1.0f) rlPopMatrix();
     EndDrawing();
 }
 #endif

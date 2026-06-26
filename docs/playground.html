@@ -523,8 +523,9 @@ sel.addEventListener('change', async () => {
 })
 
 // ── Output ────────────────────────────────────────────────────────────────
-const outputEl = document.getElementById('output')
-const canvasEl = document.getElementById('canvas')
+const outputEl  = document.getElementById('output')
+const canvasEl  = document.getElementById('canvas')
+const outputPane = document.getElementById('output-pane')
 
 const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
@@ -559,12 +560,14 @@ function clearAndStop() {
   outputEl.style.display = 'block'
   outputEl.textContent   = ''
   outputEl.className     = ''
+  outputPane.style.overflow = ''
   setRunning(false)
 }
 
 function showOutput(text) {
   canvasEl.style.display = 'none'
   outputEl.style.display = 'block'
+  outputPane.style.overflow = ''
   if (!text) {
     outputEl.textContent = '(aucune sortie)'
     outputEl.className   = ''
@@ -589,6 +592,7 @@ function run() {
   const code = view.state.doc.toString()
   const out  = ollin.execute(code)
   if (canvasEl.style.display === 'block') {
+    outputPane.style.overflow = 'hidden'
     setRunning(true)
     return
   }
@@ -683,7 +687,6 @@ document.head.appendChild(wasmScript)
 // ── Divider resize ────────────────────────────────────────────────────────
 const divider    = document.getElementById('divider')
 const editorPane = document.getElementById('editor-pane')
-const outputPane = document.getElementById('output-pane')
 let   dragging   = false
 
 const SPLIT_KEY = 'ollin-pg-split'
