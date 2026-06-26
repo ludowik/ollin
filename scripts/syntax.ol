@@ -20,6 +20,14 @@ var n_sep   = 1_000_000     ## underscores ignorés
 var n_fsep  = 1_000.12
 assert(n_fsep == 1000.12)   ## underscore ignoré dans float
 
+var n_hex   = 0xFF          ## hexadécimal → entier
+var n_oct   = 0o10          ## octal → entier
+assert(n_hex == 255)
+assert(n_oct == 8)
+assert(0xDEAD_BEEF == 3735928559)  ## underscores dans hex
+assert(0o7_7 == 63)                ## underscores dans octal
+assert((0xF0 | 0x0F) == 0xFF)      ## littéraux hex avec opérateurs bits
+
 var s = "hello"             ## chaîne (immuable)
 var s_concat = "hello" + ", " + "world"  ## concaténation avec +
 assert(s_concat == "hello, world")

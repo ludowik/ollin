@@ -142,8 +142,13 @@ block_comment  = "###" { any } "###" ;
    ';' est le séparateur d'intervalle dans rangeLit ; interdit partout ailleurs. *)
 
 NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
-               | ( "." digit { [ "_" ] digit } ) ;
+               | ( "." digit { [ "_" ] digit } )
+               | ( ( "0x" | "0X" ) hexDigit { [ "_" ] hexDigit } )
+               | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } ) ;
              (* underscores ignorés : 1_000 == 1000 ; littéraux entiers → int48, sinon float *)
+             (* 0x.. hexadécimal, 0o.. octal : toujours entiers (ex. 0xFF == 255, 0o10 == 8) *)
+hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
+octDigit       = "0" | ... | "7" ;
 STRING         = '"' { any \ '"' } '"' ;
 BOOL           = "true" | "false" ;
 NIL            = "nil" ;

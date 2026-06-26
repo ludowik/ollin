@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-26 18:24</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-26 18:35</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-26 18:24</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-26 18:35</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -470,7 +470,7 @@ pre:hover .code-actions,
 <tr><th>Type</th><th>Littéral</th><th>Description</th></tr>
 <tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
 <tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Booléens. <code>true</code> vaut 1, <code>false</code> vaut 0.</td></tr>
-<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>).</td></tr>
+<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code>, <code class="num">0xFF</code>, <code class="num">0o17</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>). Bases : décimale, <code>0x</code> hexadécimale, <code>0o</code> octale.</td></tr>
 <tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Nombre à virgule flottante (double précision).</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>Chaîne UTF-8 immuable.</td></tr>
 <tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident).</td></tr>
@@ -488,10 +488,11 @@ pre:hover .code-actions,
 <tr><td>array</td><td>jamais (toujours truthy)</td></tr>
 </table>
 
-<pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)
-<span class="bi">assert</span>(<span class="num">0</span> == <span class="bool">false</span>)
-<span class="bi">assert</span>(<span class="str">"non vide"</span> == <span class="bool">true</span>)
-<span class="bi">assert</span>(<span class="str">""</span> == <span class="bool">false</span>)</code></pre>
+<pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)        <span class="cmt">## true est stocké comme 1</span>
+<span class="bi">assert</span>(<span class="num">0</span> == <span class="bool">false</span>)       <span class="cmt">## false comme 0</span>
+<span class="cmt">## == compare type ET valeur ; pour tester la vérité d'une string, utiliser not</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="kw">not</span> <span class="str">"non vide"</span>)  <span class="cmt">## string non vide → truthy</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)              <span class="cmt">## string vide → falsy</span></code></pre>
 
 <h3>Arithmétique des types numériques</h3>
 <div class="callout">INT op INT → INT · INT / INT → FLOAT · INT op FLOAT → FLOAT</div>
@@ -1591,7 +1592,9 @@ const ollinLang = StreamLanguage.define({
       return 'string'
     }
 
-    // Number : leading-dot form  .5  or  42  42.0
+    // Number : hex 0x.. / octal 0o.. (avant le décimal), puis .5 / 42 / 42.0
+    if (stream.match(/^0[xX][\da-fA-F][\da-fA-F_]*/)) return 'number'
+    if (stream.match(/^0[oO][0-7][0-7_]*/)) return 'number'
     if (stream.match(/^\.\d[\d_]*/)) return 'number'
     if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
 

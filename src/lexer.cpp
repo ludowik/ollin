@@ -54,6 +54,31 @@ Token Lexer::number(bool leading_dot) {
     bool dot_seen = leading_dot;
     if (leading_dot) digits += '.';
     else             digits += src[start];
+
+    // littéraux hexadécimaux (0x..) et octaux (0o..) — entiers, '_' séparateur
+    if (!leading_dot && src[start] == '0' && !atEnd()) {
+        char p = peek();
+        if (p == 'x' || p == 'X' || p == 'o' || p == 'O') {
+            bool hex = (p == 'x' || p == 'X');
+            advance();                          // consomme x/o
+            digits += hex ? 'x' : 'o';
+            bool any = false;
+            while (!atEnd()) {
+                char c = peek();
+                bool ok = (c == '_') ||
+                          (hex ? (bool)std::isxdigit((unsigned char)c)
+                               : (c >= '0' && c <= '7'));
+                if (!ok) break;
+                advance();
+                if (c != '_') { digits += c; any = true; }
+            }
+            if (!any)
+                throw std::runtime_error("line " + std::to_string(line) +
+                    ": invalid " + (hex ? "hexadecimal" : "octal") + " literal");
+            return {TokenType::NUMBER, digits, line};
+        }
+    }
+
     while (!atEnd()) {
         char c = peek();
         if (std::isdigit(c) || c == '_') {
