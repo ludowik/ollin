@@ -15,12 +15,11 @@ Value makeWindowModule() {
 }
 
 #elif defined(OLLIN_HAS_RAYLIB)
-#include <raylib.h>
 
 Value makeWindowModule() {
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("width")),  Value((int64_t)GetScreenWidth()));
-    m.mapSet(Value(std::string("height")), Value((int64_t)GetScreenHeight()));
+    m.mapSet(Value(std::string("width")),  Value((int64_t)800));
+    m.mapSet(Value(std::string("height")), Value((int64_t)600));
     return m;
 }
 

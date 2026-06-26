@@ -12,7 +12,6 @@
             "label": "cmake: build",
             "type": "shell",
             "command": "cmake --build build",
-            "dependsOn": ["cmake: configure"],
             "group": { "kind": "build", "isDefault": true },
             "presentation": { "reveal": "silent", "panel": "shared" },
             "problemMatcher": ["$gcc"]
