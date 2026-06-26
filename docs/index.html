@@ -384,7 +384,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span id="build-date">2026-06-26 18:15</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-26 18:24</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -430,7 +430,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin</h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-26 18:24</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -940,6 +940,15 @@ inc()
 <span class="cmt">## la clé calculée peut être de tout type</span>
 <span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"deux"</span>}
 <span class="bi">assert</span>(n[<span class="num">2</span>] == <span class="str">"deux"</span>)</code></pre>
+<p>La même règle vaut pour <strong>l'accès</strong> : entre crochets, un littéral string désigne la clé telle quelle, une variable désigne sa valeur. Lecture, écriture et affectation composée sont identiques :</p>
+<pre><code><span class="kw">var</span> ref = <span class="str">"couleur"</span>
+<span class="kw">var</span> m = {}
+m[ref]     = <span class="str">"rouge"</span>   <span class="cmt">## écrit le slot "couleur" (valeur de ref)</span>
+m[<span class="str">"taille"</span>] = <span class="num">10</span>        <span class="cmt">## écrit le slot "taille" (littéral)</span>
+<span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>) <span class="cmt">## relu via littéral</span>
+<span class="bi">assert</span>(m.couleur     == <span class="str">"rouge"</span>) <span class="cmt">## ou via point</span>
+m[<span class="str">"taille"</span>] += <span class="num">5</span>
+<span class="bi">assert</span>(m[<span class="str">"taille"</span>] == <span class="num">15</span>)</code></pre>
 
 <h3>Lecture</h3>
 <div class="two-col">
