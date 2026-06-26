@@ -32,6 +32,7 @@
   --sidebar-w: 240px;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
   --font: system-ui, -apple-system, sans-serif;
+  --code-size: 13.5px;   /* taille unique pour TOUS les blocs de code (pre + CodeMirror) */
 }
 
 html { scroll-behavior: smooth; }
@@ -183,8 +184,15 @@ pre {
   overflow-x: auto;
   margin: 14px 0;
   font-family: var(--font-mono);
-  font-size: 13.5px;
+  font-size: var(--code-size);
   line-height: 1.65;
+}
+
+/* CodeMirror statique : même taille que les <pre> bruts (source unique : --code-size) */
+.cm-static-wrap .cm-editor,
+.cm-static-wrap .cm-scroller,
+.cm-static-wrap .cm-content {
+  font-size: var(--code-size) !important;
 }
 
 code {
@@ -344,7 +352,8 @@ pre:hover .code-actions,
 
   section { margin-bottom: 52px; }
 
-  pre { font-size: 12.5px; padding: 16px; }
+  :root { --code-size: 12.5px; }   /* rétrécit pre ET CodeMirror ensemble */
+  pre { padding: 16px; }
 
   .two-col { grid-template-columns: 1fr; }
 
@@ -1585,7 +1594,7 @@ const ollinHighlight = HighlightStyle.define([
 
 // ── Editor theme ──────────────────────────────────────────────────────────
 const ollinTheme = EditorView.theme({
-  '&': { background: '#1a1d2e', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '8px', fontSize: '13.5px' },
+  '&': { background: '#1a1d2e', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '8px' },  /* font-size piloté par CSS (--code-size) */
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto' },
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
   '.cm-line': { padding: '0 18px' },
