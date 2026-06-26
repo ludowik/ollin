@@ -3,32 +3,49 @@ var H = window.height
 const N = 150
 const SPEED = 3
 
-var x1=[] var y1=[] var x2=[] var y2=[]
-var vx1=[] var vy1=[] var vx2=[] var vy2=[]
-var cols=[]
-for i = 1, N do
-    x1[i]=math.rand_int(0,W)  y1[i]=math.rand_int(0,H)
-    x2[i]=math.rand_int(0,W)  y2[i]=math.rand_int(0,H)
-    vx1[i]=math.rand(-SPEED,SPEED)  vy1[i]=math.rand(-SPEED,SPEED)
-    vx2[i]=math.rand(-SPEED,SPEED)  vy2[i]=math.rand(-SPEED,SPEED)
-    cols[i]=Color.random()
+class Line
+    func init()
+        self.x1 = math.rand_int(0, W)
+        self.y1 = math.rand_int(0, H)
+        self.x2 = math.rand_int(0, W)
+        self.y2 = math.rand_int(0, H)
+        self.vx1 = math.rand(-SPEED, SPEED)
+        self.vy1 = math.rand(-SPEED, SPEED)
+        self.vx2 = math.rand(-SPEED, SPEED)
+        self.vy2 = math.rand(-SPEED, SPEED)
+        self.col = Color.random()
+    end
+
+    func update()
+        self.x1 += self.vx1  self.y1 += self.vy1
+        self.x2 += self.vx2  self.y2 += self.vy2
+        if self.x1 < 0 or self.x1 > W then self.vx1 = -self.vx1 end
+        if self.y1 < 0 or self.y1 > H then self.vy1 = -self.vy1 end
+        if self.x2 < 0 or self.x2 > W then self.vx2 = -self.vx2 end
+        if self.y2 < 0 or self.y2 > H then self.vy2 = -self.vy2 end
+    end
+
+    func draw()
+        graphics.stroke(self.col)
+        graphics.line(self.x1, self.y1, self.x2, self.y2)
+    end
 end
 
-graphics.canvas(W, H, "Lignes")
+var lines = []
+for i = 1, N do
+    lines[i] = Line()
+end
+
+graphics.canvas(W, H, "Lignes animées")
 
 func frame()
     graphics.clear(colors.BLACK)
     graphics.strokeSize(1)
-    for i = 1, N do
-        x1[i]+=vx1[i]  y1[i]+=vy1[i]  x2[i]+=vx2[i]  y2[i]+=vy2[i]
-        if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end
-        if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end
-        if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end
-        if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end
-        graphics.stroke(cols[i])
-        graphics.line(x1[i],y1[i],x2[i],y2[i])
+    for l in lines do
+        l.update()
+        l.draw()
     end
-    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)
+    graphics.draw_text("FPS: " + graphics.fps(), W-80, H-20, 16)
 end
 
 graphics.run(frame)
