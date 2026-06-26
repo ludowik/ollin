@@ -486,7 +486,7 @@ const sel = document.getElementById('examples')
 let examples = []
 
 async function loadExamples() {
-  const list = await fetch('samples/index.json').then(r => r.json())
+  const list = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json())
   examples = [{ name: '— Exemples —', file: null }, ...list]
   sel.innerHTML = ''
   examples.forEach((ex, i) => {
@@ -503,7 +503,7 @@ sel.addEventListener('change', async () => {
   const ex = examples[+sel.value]
   if (!ex || !ex.file) return
   sel.value = 0
-  const code = await fetch('samples/' + ex.file).then(r => r.text())
+  const code = await fetch('samples/' + ex.file, { cache: 'no-cache' }).then(r => r.text())
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } })
   view.focus()
 })
