@@ -49,6 +49,7 @@ static Value gfx_canvas(Value* args, int argc) {
         var o = document.getElementById('output');
         if (o) o.style.display = 'none';
     });
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(w, h, title);
     SetTargetFPS(0);
     // Override canvas bitmap to physical resolution, CSS display to logical size
@@ -65,6 +66,7 @@ static Value gfx_canvas(Value* args, int argc) {
     }, s_physW, s_physH, w, h);
 #else
     s_physW = w; s_physH = h;
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(w, h, title);
     SetTargetFPS(60);
 #endif
