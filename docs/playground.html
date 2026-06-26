@@ -293,8 +293,8 @@ const ollinLang = StreamLanguage.define({
       while (!stream.eol()) { const ch = stream.next(); if (ch === '"') break; if (ch === '\\') stream.next() }
       return 'string'
     }
-    if (stream.match(/^0[xX][\da-fA-F][\da-fA-F_]*/)) return 'number'
-    if (stream.match(/^0[oO][0-7][0-7_]*/)) return 'number'
+    if (stream.match(/^0[xX][\da-fA-F](?:_?[\da-fA-F])*/)) return 'number'
+    if (stream.match(/^0[oO][0-7](?:_?[0-7])*/)) return 'number'
     if (stream.match(/^\.\d[\d_]*/)) return 'number'
     if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
     if (stream.match(/^[a-zA-Z_]\w*/)) {

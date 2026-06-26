@@ -145,7 +145,7 @@ NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
                | ( "." digit { [ "_" ] digit } )
                | ( ( "0x" | "0X" ) hexDigit { [ "_" ] hexDigit } )
                | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } ) ;
-             (* underscores ignorés : 1_000 == 1000 ; littéraux entiers → int48, sinon float *)
+             (* underscores ignorés : 1_000 == 1000 ; littéraux entiers → int64, sinon float *)
              (* 0x.. hexadécimal, 0o.. octal : toujours entiers (ex. 0xFF == 255, 0o10 == 8) *)
 hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;

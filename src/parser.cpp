@@ -774,15 +774,21 @@ std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
 
 std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::NUMBER)) {
-        const std::string& lex = advance().lexeme;
-        // 0x.. / 0o.. : entiers en base 16 / 8 (stoull → bit-pattern complet, wrapping int64)
-        if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'x' || lex[1] == 'X'))
-            return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 16)));
-        if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'o' || lex[1] == 'O'))
-            return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
-        if (lex.find('.') == std::string::npos)
-            return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
-        return std::make_unique<NumberExpr>(std::stod(lex));
+        Token tok = advance();
+        const std::string& lex = tok.lexeme;
+        try {
+            // 0x.. / 0o.. : entiers base 16/8 (stoull → bit-pattern complet, wrapping int64)
+            if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'x' || lex[1] == 'X'))
+                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 16)));
+            if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'o' || lex[1] == 'O'))
+                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
+            if (lex.find('.') == std::string::npos)
+                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
+            return std::make_unique<NumberExpr>(std::stod(lex));
+        } catch (const std::out_of_range&) {
+            throw std::runtime_error("line " + std::to_string(tok.line) +
+                                     ": numeric literal out of range: " + lex);
+        }
     }
     if (check(TokenType::STRING))
         return parsePostfix(std::make_unique<StringExpr>(advance().lexeme));

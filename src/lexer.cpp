@@ -55,26 +55,42 @@ Token Lexer::number(bool leading_dot) {
     if (leading_dot) digits += '.';
     else             digits += src[start];
 
-    // littéraux hexadécimaux (0x..) et octaux (0o..) — entiers, '_' séparateur
+    // littéraux hexadécimaux (0x..) et octaux (0o..) — entiers
+    // '_' autorisé uniquement entre deux chiffres (cf. grammar.ebnf)
     if (!leading_dot && src[start] == '0' && !atEnd()) {
         char p = peek();
         if (p == 'x' || p == 'X' || p == 'o' || p == 'O') {
             bool hex = (p == 'x' || p == 'X');
+            const char* kind = hex ? "hexadecimal" : "octal";
+            auto invalid = [&]() {
+                throw std::runtime_error("line " + std::to_string(line) +
+                    ": invalid " + kind + " literal");
+            };
             advance();                          // consomme x/o
             digits += hex ? 'x' : 'o';
-            bool any = false;
+            auto is_base_digit = [&](char c) {
+                return hex ? (bool)std::isxdigit((unsigned char)c)
+                           : (c >= '0' && c <= '7');
+            };
+            bool any = false, last_was_digit = false;
             while (!atEnd()) {
                 char c = peek();
-                bool ok = (c == '_') ||
-                          (hex ? (bool)std::isxdigit((unsigned char)c)
-                               : (c >= '0' && c <= '7'));
-                if (!ok) break;
+                if (c == '_') {
+                    if (!last_was_digit) break;   // '_' en tête ou doublé → invalide
+                    advance();
+                    last_was_digit = false;
+                    continue;
+                }
+                if (!is_base_digit(c)) break;
                 advance();
-                if (c != '_') { digits += c; any = true; }
+                digits += c;
+                any = true;
+                last_was_digit = true;
             }
-            if (!any)
-                throw std::runtime_error("line " + std::to_string(line) +
-                    ": invalid " + (hex ? "hexadecimal" : "octal") + " literal");
+            // pas de chiffre, underscore final, ou caractère alphanumérique/'.' collé
+            if (!any || !last_was_digit) invalid();
+            if (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '.'))
+                invalid();
             return {TokenType::NUMBER, digits, line};
         }
     }

@@ -27,6 +27,7 @@ assert(n_oct == 8)
 assert(0xDEAD_BEEF == 3735928559)  ## underscores dans hex
 assert(0o7_7 == 63)                ## underscores dans octal
 assert((0xF0 | 0x0F) == 0xFF)      ## littéraux hex avec opérateurs bits
+assert(0xFFFFFFFFFFFFFFFF == -1)   ## motif de bits complet → wrapping int64
 
 var s = "hello"             ## chaîne (immuable)
 var s_concat = "hello" + ", " + "world"  ## concaténation avec +
