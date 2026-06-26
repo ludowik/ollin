@@ -35,7 +35,13 @@
   --code-size: 13.5px;   /* taille unique pour TOUS les blocs de code (pre + CodeMirror) */
 }
 
-html { scroll-behavior: smooth; }
+html {
+  scroll-behavior: smooth;
+  /* désactive le font-boosting auto d'iOS Safari (sinon les blocs de code
+     sont gonflés différemment selon leur largeur → tailles incohérentes) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 
 body {
   background: var(--bg);
