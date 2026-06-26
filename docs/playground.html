@@ -71,17 +71,23 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   gap: 6px;
   background: var(--accent);
   color: #fff;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
   flex-shrink: 0;
 }
 #run-btn:hover   { opacity: 0.85; }
 #run-btn:disabled{ opacity: 0.4; cursor: default; }
+#run-btn.running {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+#run-btn.running:hover { opacity: 1; background: rgba(248,113,113,0.12); }
 
 #stop-btn {
   display: flex;
@@ -158,17 +164,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 }
 #output-header span { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
 
-#clear-btn {
-  margin-left: auto;
-  background: none;
-  border: none;
-  color: var(--dim);
-  font-size: 11px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-#clear-btn:hover { color: var(--text); background: var(--surface2); }
 
 #output {
   flex: 1;
@@ -258,7 +253,7 @@ canvas#canvas {
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
     <span class="btn-label">Exécuter</span><kbd>Ctrl+↵</kbd>
   </button>
-  <button id="stop-btn" disabled title="Pause / Reprendre">
+  <button id="stop-btn" disabled title="Pause / Reprendre" style="display:none">
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
     <span class="btn-label">Pause</span>
   </button>
@@ -272,7 +267,6 @@ canvas#canvas {
   <div id="output-pane">
     <div id="output-header">
       <span>Sortie</span>
-      <button id="clear-btn" title="Effacer">✕ Effacer</button>
     </div>
     <div id="output">Prêt.</div>
     <canvas id="canvas"></canvas>
@@ -532,27 +526,41 @@ sel.addEventListener('change', async () => {
 const outputEl = document.getElementById('output')
 const canvasEl = document.getElementById('canvas')
 
+const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
-const ICON_PAUSE   = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>'
-const ICON_RESUME  = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
-let   isPaused = false
+let   isRunning = false
+let   isPaused  = false
 
-function setPauseBtn(paused) {
-  isPaused = paused
-  stopBtn.innerHTML = paused
-    ? ICON_RESUME + '<span class="btn-label"> Reprendre</span>'
-    : ICON_PAUSE  + '<span class="btn-label"> Pause</span>'
+const ICON_RUN   = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
+const ICON_STOP  = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>'
+const ICON_PAUSE = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>'
+const ICON_RESUME= '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
+
+function setRunning(running) {
+  isRunning = running
+  if (running) {
+    runBtn.classList.add('running')
+    runBtn.innerHTML = ICON_STOP + '<span class="btn-label"> Arrêter</span>'
+    stopBtn.style.display = 'flex'
+    stopBtn.disabled = false
+  } else {
+    runBtn.classList.remove('running')
+    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Ctrl+↵</kbd>'
+    stopBtn.style.display = 'none'
+    stopBtn.disabled = true
+    isPaused = false
+    stopBtn.innerHTML = ICON_PAUSE + '<span class="btn-label"> Pause</span>'
+  }
 }
 
-document.getElementById('clear-btn').addEventListener('click', () => {
+function clearAndStop() {
   try { ollin && ollin.pauseMainLoop() } catch(_) {}
   canvasEl.style.display = 'none'
   outputEl.style.display = 'block'
   outputEl.textContent   = ''
   outputEl.className     = ''
-  stopBtn.disabled = true
-  setPauseBtn(false)
-})
+  setRunning(false)
+}
 
 function showOutput(text) {
   canvasEl.style.display = 'none'
@@ -574,27 +582,29 @@ let ollin = null
 
 function run() {
   if (!ollin) return
+  if (isRunning) { clearAndStop(); return }
   try { ollin.pauseMainLoop() } catch(_) {}
-  setPauseBtn(false)
-  stopBtn.disabled = true
+  setRunning(false)
   outputEl.className = ''
   const code = view.state.doc.toString()
   const out  = ollin.execute(code)
   if (canvasEl.style.display === 'block') {
-    stopBtn.disabled = false
+    setRunning(true)
     return
   }
   showOutput(out)
 }
 
-document.getElementById('run-btn').addEventListener('click', run)
+runBtn.addEventListener('click', run)
 stopBtn.addEventListener('click', () => {
   if (isPaused) {
     try { ollin.resumeMainLoop() } catch(_) {}
-    setPauseBtn(false)
+    isPaused = false
+    stopBtn.innerHTML = ICON_PAUSE + '<span class="btn-label"> Pause</span>'
   } else {
     try { ollin.pauseMainLoop() } catch(_) {}
-    setPauseBtn(true)
+    isPaused = true
+    stopBtn.innerHTML = ICON_RESUME + '<span class="btn-label"> Reprendre</span>'
   }
 })
 
