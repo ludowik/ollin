@@ -152,17 +152,6 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   overflow: auto;
 }
 
-#output-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 14px;
-  height: 34px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-}
-#output-header span { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
 
 
 #output {
@@ -265,9 +254,6 @@ canvas#canvas {
   </div>
   <div id="divider"></div>
   <div id="output-pane">
-    <div id="output-header">
-      <span>Sortie</span>
-    </div>
     <div id="output">Prêt.</div>
     <canvas id="canvas"></canvas>
   </div>
