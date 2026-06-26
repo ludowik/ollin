@@ -375,7 +375,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-26 13:51</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-25 17:36</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -414,6 +414,7 @@ pre:hover .code-actions,
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
   <a href="#graphics">Graphics + Colors</a>
+  <a href="#image">Module image</a>
   <a href="#window">Module window</a>
 </nav>
 
@@ -654,21 +655,20 @@ flags = flags <span class="op">^</span> <span class="num">1</span>   <span class
 <!-- ── Multi-lignes ───────────────────────────────────────────────────────── -->
 <section id="multiline">
 <h2>Expressions multi-lignes</h2>
-<p>À l'intérieur de parenthèses, les newlines sont ignorés. Cela permet de découper les longues expressions et conditions.</p>
+<p>Les sauts de ligne sont traités comme de l'espace blanc — une expression peut s'étendre sur autant de lignes que nécessaire, sans syntaxe spéciale.</p>
 
-<pre data-no-run><code><span class="kw">var</span> total = (
+<pre data-no-run><code><span class="kw">var</span> total =
     prix_ht
     * ((<span class="num">1</span> + tva) / <span class="num">100</span>)
     + frais_port
-)
 
-<span class="kw">if</span> (commande_valide
+<span class="kw">if</span> commande_valide
     <span class="kw">and</span> stock_disponible
-    <span class="kw">and</span> paiement_ok) <span class="kw">then</span>
+    <span class="kw">and</span> paiement_ok <span class="kw">then</span>
     expédier()
 <span class="kw">end</span></code></pre>
 
-<div class="callout">Hors parenthèses, le newline termine l'instruction. <code>then</code> sert de délimiteur explicite pour <code>if</code> — les parenthèses ne sont donc pas obligatoires pour les conditions courtes.</div>
+<div class="callout"><code>then</code>, <code>do</code> et <code>end</code> délimitent les blocs — les parenthèses autour des conditions ne sont jamais obligatoires.</div>
 </section>
 
 <!-- ── If ────────────────────────────────────────────────────────────────── -->
@@ -1364,7 +1364,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné, 60 fps</td></tr>
+    <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné (60 fps sur desktop, vsync navigateur sur WASM)</td></tr>
     <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale ; appelle <code>callback()</code> chaque frame jusqu'à fermeture</td></tr>
     <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
     <tr><td><code>graphics.clear(color)</code></td><td>Efface l'écran avec la couleur donnée</td></tr>
@@ -1375,12 +1375,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.rect(x, y, w, h)</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif</td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
     <tr><td><code>graphics.draw_text(text, x, y, size [,color])</code></td><td>Affiche une chaîne — couleur stroke par défaut</td></tr>
-    <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
     <tr><td><code>graphics.point(x, y)</code></td><td>Trace un point aux coordonnées données</td></tr>
     <tr><td><code>graphics.circle(x, y, r)</code></td><td>Cercle de centre (x,y) et rayon r — fill/stroke selon styles</td></tr>
-    <tr><td><code>graphics.ellipse(x, y, rx, ry)</code></td><td>Ellipse de centre (x,y) et demi-axes rx, ry — fill/stroke selon styles</td></tr>
+    <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>Ellipse de centre (x,y), largeur w et hauteur h — fill/stroke selon styles</td></tr>
     <tr><td><code>graphics.polygon(pts)</code></td><td>Polygone fermé — <code>pts</code> : tableau plat <code>[x1,y1,x2,y2,…]</code> ou tableau de paires <code>[[x1,y1],…]</code></td></tr>
     <tr><td><code>graphics.polyline(pts)</code></td><td>Polyligne ouverte (stroke uniquement) — mêmes formats que <code>polygon</code></td></tr>
+    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Affiche une texture (handle <code>image</code>) à (x,y) — tintée par la couleur <code>fill</code> courante ; respecte la matrice de transformation</td></tr>
+    <tr><td><code>graphics.quit()</code></td><td>Arrête la boucle <code>run()</code> sans fermer la fenêtre (safe sur WASM)</td></tr>
+    <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
   </tbody>
 </table>
 
@@ -1431,6 +1433,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>colors.SKYBLUE</code></td><td>0.400</td><td>0.749</td><td>1.0</td></tr>
     <tr><td><code>colors.LIME</code></td><td>0.0</td><td>0.620</td><td>0.184</td></tr>
     <tr><td><code>colors.MAGENTA</code></td><td>1.0</td><td>0.0</td><td>1.0</td></tr>
+    <tr><td><code>colors.BROWN</code></td><td>0.498</td><td>0.416</td><td>0.310</td></tr>
+    <tr><td><code>colors.DARKGRAY</code></td><td>0.314</td><td>0.314</td><td>0.314</td></tr>
   </tbody>
 </table>
 <div class="callout tip">Les mêmes constantes sont aussi accessibles via <code>graphics</code> : <code>graphics.BLACK</code>, <code>graphics.WHITE</code>, etc.</div>
@@ -1441,6 +1445,48 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">func</span> rand_color()
     <span class="kw">return</span> <span class="bi">Color</span>(math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>)
 <span class="kw">end</span></code></pre>
+</section>
+
+<section id="image">
+<h2>Module <code>image</code></h2>
+<p>Le module <code>image</code> permet de charger des textures depuis le disque (ou des données base64) et de créer des <strong>render textures</strong> pour le rendu hors-écran. Disponible sans <code>import</code>.</p>
+<div class="callout"><code>graphics.canvas()</code> doit être appelé <strong>avant</strong> toute opération image — le contexte GL doit exister.</div>
+
+<h3>Charger une image</h3>
+<pre><code><span class="kw">var</span> img = image
+<span class="kw">var</span> tex = img.load(<span class="str">"logo.png"</span>)   <span class="cmt">## handle {id, width, height}</span>
+<span class="bi">graphics</span>.fill(<span class="bi">colors</span>.WHITE)
+<span class="bi">graphics</span>.sprite(tex, <span class="num">100</span>, <span class="num">100</span>)   <span class="cmt">## taille naturelle</span>
+<span class="bi">graphics</span>.sprite(tex, <span class="num">100</span>, <span class="num">100</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## redimensionné</span>
+img.unload(tex)</code></pre>
+
+<h3>Render texture (dessin hors-écran)</h3>
+<pre><code><span class="kw">var</span> rt = image.create(<span class="num">200</span>, <span class="num">200</span>)   <span class="cmt">## render texture 200×200</span>
+
+image.begin_draw(rt)
+    <span class="bi">graphics</span>.clear({<span class="str">r</span>:<span class="num">0</span>, <span class="str">g</span>:<span class="num">0</span>, <span class="str">b</span>:<span class="num">0</span>, <span class="str">a</span>:<span class="num">1</span>})
+    <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
+    <span class="bi">graphics</span>.circle(<span class="num">100</span>, <span class="num">100</span>, <span class="num">80</span>)
+image.end_draw()
+
+<span class="cmt">## utiliser rt comme sprite dans la boucle principale</span>
+<span class="bi">graphics</span>.fill(<span class="bi">colors</span>.WHITE)
+<span class="bi">graphics</span>.sprite(rt, <span class="num">0</span>, <span class="num">0</span>)</code></pre>
+
+<h3>API</h3>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>image.load(path)</code></td><td>Charge une texture depuis un fichier — retourne un handle <code>{id, width, height}</code></td></tr>
+    <tr><td><code>image.load_data(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
+    <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
+    <tr><td><code>image.begin_draw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
+    <tr><td><code>image.end_draw()</code></td><td>Termine le rendu hors-écran et restaure la cible par défaut</td></tr>
+    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture directement, sans passer par la couleur <code>fill</code></td></tr>
+    <tr><td><code>image.unload(handle)</code></td><td>Libère les ressources GPU de la texture</td></tr>
+  </tbody>
+</table>
+<div class="callout tip"><code>graphics.sprite()</code> est l'alternative recommandée à <code>image.draw()</code> : elle respecte la matrice de transformation courante et prend la couleur <code>fill</code> comme teinte.</div>
 </section>
 
 <section id="window">
@@ -1484,7 +1530,7 @@ const KEYWORDS = new Set([
   'import','as','or','and','not','class','extends','static','super','self',
   'switch','case'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window'])
+const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',

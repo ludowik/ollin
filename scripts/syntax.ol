@@ -153,8 +153,8 @@ assert(fo == 0)
 ## vérité des types
 assert(1    == true)
 assert(0    == false)
-assert("x" == true)    ## string non vide : truthy == 1
-assert(""  == false)   ## string vide : falsy == 0
+assert(not not "x")    ## string non vide : truthy (== ne coerce pas les types)
+assert(not "")         ## string vide : falsy
 assert(not nil)        ## nil est falsy, mais nil <> false (types distincts)
 assert(nil <> false)   ## nil et false sont des types distincts
 
