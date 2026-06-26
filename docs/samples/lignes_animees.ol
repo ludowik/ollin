@@ -17,8 +17,8 @@ class Line
     end
 
     func update()
-        self.x1 += self.vx1  self.y1 += self.vy1
-        self.x2 += self.vx2  self.y2 += self.vy2
+        self.x1 += self.vx1 self.y1 += self.vy1
+        self.x2 += self.vx2 self.y2 += self.vy2
         if self.x1 < 0 or self.x1 > W then self.vx1 = -self.vx1 end
         if self.y1 < 0 or self.y1 > H then self.vy1 = -self.vy1 end
         if self.x2 < 0 or self.x2 > W then self.vx2 = -self.vx2 end

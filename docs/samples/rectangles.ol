@@ -4,10 +4,10 @@ const N = 20
 
 class Rect
     func init()
-        self.w  = math.rand_int(30, 110)
-        self.h  = math.rand_int(20, 80)
-        self.x  = math.rand_int(0, W - self.w)
-        self.y  = math.rand_int(0, H - self.h)
+        self.w = math.rand_int(30, 110)
+        self.h = math.rand_int(20, 80)
+        self.x = math.rand_int(0, W - self.w)
+        self.y = math.rand_int(0, H - self.h)
         self.vx = math.rand(-2, 2)
         self.vy = math.rand(-2, 2)
         self.fc = Color.random()
@@ -15,7 +15,7 @@ class Rect
     end
 
     func update()
-        self.x += self.vx  self.y += self.vy
+        self.x += self.vx self.y += self.vy
         if self.x < 0 or self.x + self.w > W then self.vx = -self.vx end
         if self.y < 0 or self.y + self.h > H then self.vy = -self.vy end
         self.x = math.clamp(self.x, 0, W - self.w)
