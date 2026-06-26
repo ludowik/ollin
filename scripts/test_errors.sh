@@ -72,6 +72,22 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# ── littéraux numériques malformés ────────────────────────────────────────────
+check_error "octal digit invalide"      'print(0o18)'   "invalid octal literal"
+check_error "octal 9"                    'print(0o9)'    "invalid octal literal"
+check_error "hex lettre invalide"        'print(0xFFg)'  "invalid hexadecimal literal"
+check_error "hex point colle"            'print(0x1.5)'  "invalid hexadecimal literal"
+check_error "hex underscore en tete"     'print(0x_FF)'  "invalid hexadecimal literal"
+check_error "hex underscore final"       'print(0xFF_)'  "invalid hexadecimal literal"
+check_error "hex underscore double"      'print(0xF__F)' "invalid hexadecimal literal"
+check_error "hex sans chiffre"           'print(0x)'     "invalid hexadecimal literal"
+check_error "decimal alnum colle"        'print(42abc)'  "invalid number literal"
+check_error "decimal underscore final"   'print(1_)'     "invalid number literal"
+check_error "decimal underscore double"  'print(1__0)'   "invalid number literal"
+check_error "decimal double point"       'print(1.2.3)'  "invalid number literal"
+check_error "hex hors limites"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
+check_error "decimal hors limites"       'print(99999999999999999999999)' "out of range"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

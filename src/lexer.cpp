@@ -95,19 +95,33 @@ Token Lexer::number(bool leading_dot) {
         }
     }
 
+    // décimal : '_' uniquement entre deux chiffres, un seul '.', pas d'alnum/'.' collé
+    bool last_was_digit  = !leading_dot;   // src[start] est un chiffre si !leading_dot
+    bool prev_underscore = false;
     while (!atEnd()) {
         char c = peek();
-        if (std::isdigit(c) || c == '_') {
+        if (std::isdigit((unsigned char)c)) {
             advance();
-            if (c != '_') digits += c;
-        } else if (c == '.' && !dot_seen) {
+            digits += c;
+            last_was_digit  = true;
+            prev_underscore = false;
+        } else if (c == '_' && last_was_digit) {
+            advance();
+            last_was_digit  = false;
+            prev_underscore = true;        // doit être suivi d'un chiffre
+        } else if (c == '.' && !dot_seen && !prev_underscore) {
             advance();
             dot_seen = true;
             digits += '.';
+            last_was_digit = false;
         } else {
             break;
         }
     }
+    // '_' final (ou non suivi d'un chiffre), ou caractère alphanumérique / '.' / '_' collé
+    if (prev_underscore ||
+        (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '.' || peek() == '_')))
+        throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
     return {TokenType::NUMBER, digits, line};
 }
 
@@ -124,7 +138,7 @@ Token Lexer::string() {
 
 Token Lexer::identifier() {
     int start = pos - 1;
-    while (!atEnd() && (std::isalnum(peek()) || peek() == '_'))
+    while (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '_'))
         advance();
     std::string lex = src.substr(start, pos - start);
     auto it = s_keywords.find(lex);
@@ -179,7 +193,7 @@ std::vector<Token> Lexer::tokenize() {
                     advance();
                     if (!atEnd() && peek() == '.') { advance(); emit({TokenType::DOT_DOT_DOT, "...", line}); }
                     else throw std::runtime_error("line " + std::to_string(line) + ": '..' is not valid syntax (use [a;b] for ranges)");
-                } else if (!atEnd() && std::isdigit(peek())) {
+                } else if (!atEnd() && std::isdigit((unsigned char)peek())) {
                     emit(number(true)); // .5 → nombre à virgule
                 } else {
                     emit({TokenType::DOT, ".", line});
@@ -242,8 +256,8 @@ std::vector<Token> Lexer::tokenize() {
                 }
                 break;
             default:
-                if (std::isdigit(c)) { emit(number(false)); break; }
-                if (std::isalpha(c) || c == '_') { emit(identifier()); break; }
+                if (std::isdigit((unsigned char)c)) { emit(number(false)); break; }
+                if (std::isalpha((unsigned char)c) || c == '_') { emit(identifier()); break; }
                 throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
         }
     }

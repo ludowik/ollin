@@ -141,12 +141,13 @@ block_comment  = "###" { any } "###" ;
    et accolades : un saut de ligne n'y termine pas le statement.
    ';' est le séparateur d'intervalle dans rangeLit ; interdit partout ailleurs. *)
 
-NUMBER         = ( digit { [ "_" ] digit } [ "." { digit | "_" } ] )
+NUMBER         = ( digit { [ "_" ] digit } [ "." [ digit { [ "_" ] digit } ] ] )
                | ( "." digit { [ "_" ] digit } )
                | ( ( "0x" | "0X" ) hexDigit { [ "_" ] hexDigit } )
                | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } ) ;
-             (* underscores ignorés : 1_000 == 1000 ; littéraux entiers → int64, sinon float *)
+             (* '_' uniquement entre deux chiffres (1_000 == 1000) ; littéraux entiers → int64, sinon float *)
              (* 0x.. hexadécimal, 0o.. octal : toujours entiers (ex. 0xFF == 255, 0o10 == 8) *)
+             (* un littéral suivi immédiatement d'un caractère alphanumérique, '.' ou '_' est une erreur *)
 hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;
 STRING         = '"' { any \ '"' } '"' ;
