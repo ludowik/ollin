@@ -33,7 +33,7 @@ static Value colorInst(double r, double g, double b) {
     return m;
 }
 
-static float s_dpr = 1.0f;
+static int s_physW = 0, s_physH = 0;
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
@@ -41,26 +41,30 @@ static Value gfx_canvas(Value* args, int argc) {
     const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
 #ifdef __EMSCRIPTEN__
     if (IsWindowReady()) CloseWindow();
-    s_dpr = (float)EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
-    int physW = (int)(w * s_dpr + 0.5f);
-    int physH = (int)(h * s_dpr + 0.5f);
+    double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
+    s_physW = (int)(w * dpr + 0.5);
+    s_physH = (int)(h * dpr + 0.5);
+    // InitWindow with logical dimensions — sets projection [0,w]×[0,h]
     EM_ASM({
         var o = document.getElementById('output');
         if (o) o.style.display = 'none';
     });
-    InitWindow(physW, physH, title);
+    InitWindow(w, h, title);
     SetTargetFPS(0);
-    // Display at CSS pixel size — rendering happens at physical resolution via rlScalef in emscripten_frame
+    // Override canvas bitmap to physical resolution, CSS display to logical size
+    // rlViewport in emscripten_frame will render to the full physical bitmap
     EM_ASM({
         var c = document.getElementById('canvas');
         if (c) {
-            c.style.width  = $0 + 'px';
-            c.style.height = $1 + 'px';
+            c.width  = $0;
+            c.height = $1;
+            c.style.width  = $2 + 'px';
+            c.style.height = $3 + 'px';
             c.style.display = 'block';
         }
-    }, w, h);
+    }, s_physW, s_physH, w, h);
 #else
-    s_dpr = 1.0f;
+    s_physW = w; s_physH = h;
     InitWindow(w, h, title);
     SetTargetFPS(60);
 #endif
@@ -316,13 +320,11 @@ static Value gfx_quit(Value* args, int argc) {
 static Value  s_run_callback;
 static void emscripten_frame() {
     BeginDrawing();
-    if (s_dpr != 1.0f) {
-        rlPushMatrix();
-        rlScalef(s_dpr, s_dpr, 1.0f);
-    }
+    // Override viewport to physical canvas resolution so rendering is crisp on HiDPI displays
+    if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
+        rlViewport(0, 0, s_physW, s_physH);
     resetStyles();
     VM::current()->callValue(s_run_callback);
-    if (s_dpr != 1.0f) rlPopMatrix();
     EndDrawing();
 }
 #endif
