@@ -3,7 +3,7 @@
 
 $RAYLIB_VERSION = "6.0"
 $RAYLIB_URL     = "https://github.com/raysan5/raylib/archive/refs/tags/$RAYLIB_VERSION.zip"
-$DEST           = "$PSScriptRoot\..\third_party"
+$DEST           = "$PSScriptRoot\..\libs"
 $RAYLIB_DIR     = "$DEST\raylib"
 
 if (Test-Path "$RAYLIB_DIR\CMakeLists.txt") {
@@ -21,4 +21,4 @@ Expand-Archive -Path $zip -DestinationPath $DEST -Force
 Rename-Item "$DEST\raylib-$RAYLIB_VERSION" "raylib"
 Remove-Item $zip
 
-Write-Host "Done — raylib $RAYLIB_VERSION ready in third_party\raylib\"
+Write-Host "Done — raylib $RAYLIB_VERSION ready in libs\raylib\"
