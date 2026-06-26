@@ -4,7 +4,7 @@
         {
             "label": "cmake: configure",
             "type": "shell",
-            "command": "cmake -B build -DCMAKE_BUILD_TYPE=Debug",
+            "command": "cmake -B build -DCMAKE_BUILD_TYPE=Release",
             "presentation": { "reveal": "silent", "panel": "shared" },
             "problemMatcher": []
         },
@@ -24,6 +24,14 @@
             "dependsOn": ["cmake: build"],
             "group": { "kind": "test", "isDefault": true },
             "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+        },
+        {
+            "label": "wasm: build",
+            "type": "shell",
+            "command": "bash wasm/build.sh",
+            "group": "build",
+            "presentation": { "reveal": "always", "panel": "shared", "clear": true },
+            "problemMatcher": []
         }
     ]
 }

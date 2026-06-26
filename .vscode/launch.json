@@ -2,7 +2,18 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug ollin (syntax.ol)",
+            "name": "Ollin: fichier courant",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/ollin",
+            "args": ["${file}"],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "cmake: build",
+            "terminal": "integrated",
+            "internalConsoleOptions": "neverOpen"
+        },
+        {
+            "name": "Ollin: syntax.ol (tests)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/ollin",
