@@ -503,17 +503,17 @@ localStorage.setItem('ollin-last-page', 'playground.html')
 
 // ── Examples ──────────────────────────────────────────────────────────────
 const EXAMPLES = [
-  { name: '— Exemples —', code: null },
-  { name: 'Hello world',  code: 'print("hello world!")' },
-  { name: 'Fibonacci',    code: 'func fib(n)\n    if n <= 1 then return n end\n    return fib(n-1) + fib(n-2)\nend\nprint(fib(10))' },
-  { name: 'FizzBuzz',     code: 'for i in [1;20] do\n    if i % 15 == 0 then print("FizzBuzz")\n    elseif i % 3 == 0 then print("Fizz")\n    elseif i % 5 == 0 then print("Buzz")\n    else print(i)\n    end\nend' },
-  { name: 'Closure',      code: 'func make_counter()\n    var n = 0\n    func inc()\n        n += 1\n        return n\n    end\n    return inc\nend\n\nvar c = make_counter()\nprint(c(), c(), c())' },
-  { name: 'Classe Vec2',  code: 'class Vec2\n    func init(x, y)\n        self.x = x\n        self.y = y\n    end\n    func __add(other)\n        return Vec2(self.x + other.x, self.y + other.y)\n    end\n    func __str()\n        return "Vec2(" + self.x + "," + self.y + ")"\n    end\nend\n\nvar v = Vec2(1, 2) + Vec2(3, 4)\nprint(v)' },
-  { name: 'Colors',       code: 'var c = Color(1.0, 0.5, 0.2)\nprint(c)\nprint(c.r, c.g, c.b, c.a)\n\nvar red = colors.RED\nprint(red.r, red.g, red.b)' },
-  { name: 'Lignes animées', code: 'const W = 800\nconst H = 500\nconst N = 150\nconst SPEED = 3\n\nvar x1=[] var y1=[] var x2=[] var y2=[]\nvar vx1=[] var vy1=[] var vx2=[] var vy2=[]\nvar cols=[]\nfor i = 1, N do\n    x1[i]=math.rand_int(0,W)  y1[i]=math.rand_int(0,H)\n    x2[i]=math.rand_int(0,W)  y2[i]=math.rand_int(0,H)\n    vx1[i]=math.rand(-SPEED,SPEED)  vy1[i]=math.rand(-SPEED,SPEED)\n    vx2[i]=math.rand(-SPEED,SPEED)  vy2[i]=math.rand(-SPEED,SPEED)\n    cols[i]=Color.random()\nend\n\ngraphics.canvas(W, H, "Lignes")\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    graphics.strokeSize(1)\n    for i = 1, N do\n        x1[i]+=vx1[i]  y1[i]+=vy1[i]  x2[i]+=vx2[i]  y2[i]+=vy2[i]\n        if x1[i]<0 or x1[i]>W then vx1[i]=-vx1[i] end\n        if y1[i]<0 or y1[i]>H then vy1[i]=-vy1[i] end\n        if x2[i]<0 or x2[i]>W then vx2[i]=-vx2[i] end\n        if y2[i]<0 or y2[i]>H then vy2[i]=-vy2[i] end\n        graphics.stroke(cols[i])\n        graphics.line(x1[i],y1[i],x2[i],y2[i])\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
-  { name: 'Pixels',        code: 'const W = 400\nconst H = 300\n\ngraphics.canvas(W, H, "Pixels")\nvar canvas = image.create(W, H)\n\nfor y = 0, H-1 do\n    for x = 0, W-1 do\n        image.set_pixel(canvas, x, y, {r: x/W, g: y/H, b: 1-x/W, a: 1})\n    end\nend\n\nvar c = image.get_pixel(canvas, 0, 0)\nprint("(0,0) r=" + math.round(c.r * 100) / 100)\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    image.draw(canvas, 0, 0)\n    graphics.draw_text("FPS: " + graphics.fps(), 4, H-18, 13)\nend\n\ngraphics.run(frame)' },
-  { name: 'Primitives',     code: 'const W = 700\nconst H = 460\n\ngraphics.canvas(W, H, "Primitives")\nvar g = graphics\nvar t = 0\n\nfunc frame()\n    t += 0.02\n    g.clear({r:0.08, g:0.09, b:0.12, a:1})\n    var dim = {r:0.6, g:0.65, b:0.75, a:1}\n\n    ## point\n    g.stroke({r:1, g:0.85, b:0.2}, 8)\n    g.point(55, 45)\n    g.draw_text("point", 75, 38, 13, dim)\n\n    ## line\n    g.stroke({r:0.4, g:0.8, b:1}, 2)\n    g.line(30, 85, 160, 85)\n    g.draw_text("line", 170, 78, 13, dim)\n\n    ## rect (stroke)\n    g.stroke({r:1, g:0.4, b:0.4}, 2)\n    g.fill()\n    g.rect(30, 110, 80, 45)\n    g.draw_text("rect", 120, 125, 13, dim)\n\n    ## rect (fill)\n    g.stroke()\n    g.fill({r:0.3, g:0.8, b:0.45})\n    g.rect(30, 170, 80, 45)\n    g.draw_text("fill", 120, 185, 13, dim)\n\n    ## rect (stroke+fill)\n    g.stroke({r:1, g:0.6, b:0}, 2)\n    g.fill({r:1, g:0.6, b:0, a:0.25})\n    g.rect(30, 230, 80, 45)\n    g.draw_text("stroke+fill", 120, 245, 13, dim)\n\n    ## polyline (animée)\n    g.stroke({r:0.5, g:0.9, b:1}, 2)\n    var wave = []\n    for i = 0, 9 do\n        wave[#wave+1] = 30 + i * 18\n        wave[#wave+1] = 305 + math.sin(t * 2 + i * 0.9) * 22\n    end\n    g.polyline(wave)\n    g.draw_text("polyline", 30, 340, 13, dim)\n\n    ## circle\n    g.stroke({r:0.7, g:0.5, b:1}, 2)\n    g.fill({r:0.7, g:0.5, b:1, a:0.2})\n    g.circle(310, 55, 38)\n    g.draw_text("circle", 355, 48, 13, dim)\n\n    ## ellipse\n    g.stroke({r:0.3, g:1, b:0.7}, 2)\n    g.fill({r:0.3, g:1, b:0.7, a:0.2})\n    g.ellipse(310, 155, 120, 50)\n    g.draw_text("ellipse", 375, 148, 13, dim)\n\n    ## polygon (rotation animée)\n    g.stroke({r:1, g:0.8, b:0.3}, 2)\n    g.fill({r:1, g:0.8, b:0.3, a:0.2})\n    var pts = []\n    for i = 0, 4 do\n        var a = t + i * math.TAU / 5\n        pts[#pts+1] = 310 + math.cos(a) * 42\n        pts[#pts+1] = 255 + math.sin(a) * 42\n    end\n    g.polygon(pts)\n    g.draw_text("polygon", 358, 250, 13, dim)\n\n    ## strokeSize\n    for i = 1, 4 do\n        g.stroke({r:0.9, g:0.6, b:0.3}, i * 2)\n        g.line(470, 65 + i * 28, 640, 65 + i * 28)\n    end\n    g.draw_text("strokeSize", 470, 48, 13, dim)\n\n    ## push/pop/translate/rotate/scale\n    g.push()\n    g.translate(560, 200)\n    g.rotate(t * 57.3)\n    g.stroke({r:0.8, g:0.9, b:1}, 2)\n    g.fill({r:0.5, g:0.7, b:1, a:0.25})\n    g.rect(-35, -35, 70, 70)\n    g.push()\n    g.scale(0.55)\n    g.rotate(t * 57.3)\n    g.fill({r:1, g:0.5, b:0.5, a:0.5})\n    g.stroke()\n    g.rect(-35, -35, 70, 70)\n    g.pop()\n    g.pop()\n    g.draw_text("push/pop/translate", 476, 246, 13, dim)\n    g.draw_text("rotate/scale", 490, 262, 13, dim)\n\n    ## draw_text\n    g.draw_text("draw_text", 460, 310, 13, dim)\n    g.draw_text("size 16", 460, 328, 16, {r:0.9, g:0.9, b:1})\n    g.draw_text("size 22", 460, 352, 22, {r:0.7, g:0.85, b:1})\n\n    g.draw_text("FPS: " + g.fps(), 4, H-18, 13, {r:0.4, g:0.45, b:0.55})\nend\n\ngraphics.run(frame)' },
-  { name: 'Rectangles',    code: 'const W = 800\nconst H = 500\nconst N = 20\n\nvar rects = []\nfor i = 1, N do\n    var w = math.rand_int(30, 110)\n    var h = math.rand_int(20, 80)\n    rects[i] = {\n        x: math.rand_int(0, W - w), y: math.rand_int(0, H - h),\n        w: w, h: h,\n        vx: math.rand(-2, 2), vy: math.rand(-2, 2),\n        fc: Color.random(), sc: Color.random()\n    }\nend\n\ngraphics.canvas(W, H, "Rectangles")\n\nfunc frame()\n    graphics.clear(colors.BLACK)\n    for r in rects do\n        r.x += r.vx  r.y += r.vy\n        if r.x < 0 or r.x + r.w > W then r.vx = -r.vx end\n        if r.y < 0 or r.y + r.h > H then r.vy = -r.vy end\n        r.x = math.clamp(r.x, 0, W - r.w)\n        r.y = math.clamp(r.y, 0, H - r.h)\n        graphics.fill(r.fc)\n        graphics.stroke(r.sc)\n        graphics.rect(r.x, r.y, r.w, r.h)\n    end\n    graphics.draw_text("FPS: "+graphics.fps(), W-80, H-20, 16)\nend\n\ngraphics.run(frame)' },
+  { name: '— Exemples —',   file: null },
+  { name: 'Hello world',    file: 'samples/hello_world.ol' },
+  { name: 'Fibonacci',      file: 'samples/fibonacci.ol' },
+  { name: 'FizzBuzz',       file: 'samples/fizzbuzz.ol' },
+  { name: 'Closure',        file: 'samples/closure.ol' },
+  { name: 'Classe Vec2',    file: 'samples/vec2.ol' },
+  { name: 'Colors',         file: 'samples/colors.ol' },
+  { name: 'Lignes animées', file: 'samples/lignes_animees.ol' },
+  { name: 'Pixels',         file: 'samples/pixels.ol' },
+  { name: 'Primitives',     file: 'samples/primitives.ol' },
+  { name: 'Rectangles',     file: 'samples/rectangles.ol' },
 ]
 
 const sel = document.getElementById('examples')
@@ -523,11 +523,12 @@ EXAMPLES.forEach((ex, i) => {
   opt.textContent = ex.name
   sel.appendChild(opt)
 })
-sel.addEventListener('change', () => {
+sel.addEventListener('change', async () => {
   const ex = EXAMPLES[+sel.value]
-  if (!ex || !ex.code) return
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: ex.code } })
+  if (!ex || !ex.file) return
   sel.value = 0
+  const code = await fetch(ex.file).then(r => r.text())
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } })
   view.focus()
 })
 
