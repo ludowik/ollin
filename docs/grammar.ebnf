@@ -120,8 +120,11 @@ lambdaExpr     = "func" "(" [ params ] ")" NL { stmt } "end" ;
 
 mapLit         = "{" [ mapEntry { "," mapEntry } ] "}" ;
                (* sauts de ligne autorisés entre les entrées — la continuation implicite s'applique à l'intérieur de {} *)
-mapEntry       = ( STRING | IDENT ) ":" expr ;
-                 (* littéral : clés string ou identifiant ; à l'exécution toute Value peut être clé *)
+mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
+                 (* clé littérale : IDENT, STRING et ["STRING"] sont équivalents → clé = la string *)
+                 (*   { ref: 12 } ≡ { "ref": 12 } ≡ { ["ref"]: 12 }  (clé = "ref") *)
+                 (* clé calculée : [expr] évalue expr à l'exécution et utilise sa valeur comme clé *)
+                 (*   { [ref]: 12 } → clé = valeur de la variable ref (toute Value : string, int, …) *)
                  (* accès : m["k"] et m.k sont équivalents (lecture, écriture, compound) *)
                  (* sémantique de copie : référence comptée (pas de clone) ; map toujours truthy *)
 arrayLit       = "[" [ expr { "," expr } ] "]" ;

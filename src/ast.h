@@ -219,9 +219,15 @@ struct NilExpr : Expr {
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
+struct MapEntry {
+    // key : StringExpr littéral pour `ident:` / `"s":` / `["s"]:` ;
+    //       expression quelconque pour les clés calculées `[expr]:`
+    std::unique_ptr<Expr> key;
+    std::unique_ptr<Expr> value;
+};
+
 struct MapExpr : Expr {
-    // keys are always strings (JSON-like)
-    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> entries;
+    std::vector<MapEntry> entries;
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

@@ -463,6 +463,28 @@ assert(m.b    == 2)
 assert(m["x"] == nil)   ## clé absente → nil
 assert(m.x    == nil)
 
+## clés littérales : ident, "string" et ["string"] sont équivalents (clé = la string)
+var lit = {
+    a: 1,
+    "a2": 2,
+    ["a3"]: 3
+}
+assert(lit["a"]  == 1)
+assert(lit["a2"] == 2)
+assert(lit["a3"] == 3)
+
+## clé calculée : [expr] utilise la VALEUR de l'expression comme clé
+var kname = "calculee"
+var ck = {
+    kname:   1,      ## clé littérale "kname"
+    [kname]: 2,      ## clé "calculee" (valeur de kname)
+    [1 + 1]: "deux"  ## clé entière 2
+}
+assert(ck["kname"]    == 1)
+assert(ck["calculee"] == 2)
+assert(ck[2]          == "deux")
+assert(ck["kname"] <> ck["calculee"])
+
 ## écriture
 m["d"] = 4
 m.e    = 5

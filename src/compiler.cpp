@@ -1092,10 +1092,9 @@ void Compiler::visit(const MapExpr& e) {
     for (auto& entry : e.entries) {
         int saved = reg_top_;
         int key_reg = allocReg();
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_reg,
-                           chunk.addConstant(Value(entry.first))));
+        compileInto(*entry.key, key_reg);        // StringExpr littéral OU clé calculée
         int val_reg = allocReg();
-        compileInto(*entry.second, val_reg);
+        compileInto(*entry.value, val_reg);
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_reg, (uint8_t)val_reg));
         reg_top_ = saved;
     }

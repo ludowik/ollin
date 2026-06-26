@@ -849,14 +849,21 @@ std::unique_ptr<Expr> Parser::primary() {
         skipSemis();
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
-            std::string key;
-            if (check(TokenType::STRING))     key = advance().lexeme;
-            else if (check(TokenType::IDENTIFIER)) key = advance().lexeme;
+            std::unique_ptr<Expr> key;
+            if (check(TokenType::STRING))
+                key = std::make_unique<StringExpr>(advance().lexeme);
+            else if (check(TokenType::IDENTIFIER))
+                key = std::make_unique<StringExpr>(advance().lexeme);  // `ident:` = clé string littérale
+            else if (check(TokenType::LBRACKET)) {
+                advance();                       // consume [
+                key = expr();                    // clé calculée : valeur de l'expression à l'exécution
+                expect(TokenType::RBRACKET);
+            }
             else throw std::runtime_error("line " + std::to_string(peek().line) +
-                     ": expected string or identifier key in map literal");
+                     ": expected string, identifier, or [expr] key in map literal");
             expect(TokenType::COLON);
             auto val = expr();
-            map->entries.push_back({key, std::move(val)});
+            map->entries.push_back({std::move(key), std::move(val)});
             if (check(TokenType::COMMA)) advance();
             skipSemis();
         }

@@ -384,7 +384,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-26 15:26</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-26 18:12</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -912,7 +912,7 @@ inc()
 <!-- ── Maps ──────────────────────────────────────────────────────────────── -->
 <section id="maps">
 <h2>Maps</h2>
-<p>Dictionnaire clé→valeur. La syntaxe de littéral accepte des chaînes ou des identifiants ; à l'exécution, toute valeur peut servir de clé (<code>nil</code>, entier, float, string, bool, array, map, fonction…).</p>
+<p>Dictionnaire clé→valeur. La syntaxe de littéral accepte des chaînes, des identifiants, ou des <strong>clés calculées</strong> <code>[expr]</code> ; à l'exécution, toute valeur peut servir de clé (<code>nil</code>, entier, float, string, bool, array, map, fonction…).</p>
 
 <h3>Création</h3>
 <pre><code><span class="kw">var</span> vide = {}
@@ -925,6 +925,21 @@ inc()
     port:  <span class="num">8080</span>,
     debug: <span class="bool">false</span>,
 }</code></pre>
+
+<h3>Clés littérales et clés calculées</h3>
+<p>Une clé écrite en <strong>identifiant</strong>, en <strong>chaîne</strong>, ou entre crochets autour d'une chaîne est la <em>même clé littérale</em> :</p>
+<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}        <span class="cmt">## clé = la string "ref"</span>
+<span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}      <span class="cmt">## identique</span>
+<span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}    <span class="cmt">## identique</span></code></pre>
+<p>Entre crochets, une <strong>expression</strong> est évaluée à l'exécution et sa valeur devient la clé :</p>
+<pre><code><span class="kw">var</span> ref = <span class="str">"couleur"</span>
+<span class="kw">var</span> m = {[ref]: <span class="str">"rouge"</span>}   <span class="cmt">## clé = valeur de ref → "couleur"</span>
+<span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>)
+<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)   <span class="cmt">## "ref" littéral n'est PAS une clé</span>
+
+<span class="cmt">## la clé calculée peut être de tout type</span>
+<span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"deux"</span>}
+<span class="bi">assert</span>(n[<span class="num">2</span>] == <span class="str">"deux"</span>)</code></pre>
 
 <h3>Lecture</h3>
 <div class="two-col">
