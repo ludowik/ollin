@@ -384,7 +384,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Build : <span id="build-date">2026-06-26 18:12</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span id="build-date">2026-06-26 18:15</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -1667,10 +1667,16 @@ window.hardReload = () => {
 }
 
 // ── Pull-to-refresh (mobile) ────────────────────────────────────────────────
-// Tirer la page vers le bas en étant tout en haut → rechargement forcé.
+// Tirer la page vers le bas en étant tout en haut → la page suit le geste,
+// puis rechargement forcé au-delà du seuil.
 ;(() => {
   const THRESHOLD = 70   // px de tirage pour déclencher
-  const MAX       = 110  // amortissement visuel
+  const MAX       = 140  // amortissement visuel
+  const FOLLOW    = 0.5  // fraction du geste répercutée sur le contenu
+
+  // Le contenu qui « suit » le geste — pas <body> (transformer body casserait
+  // le position:fixed du nav/hamburger/indicateur).
+  const content = document.querySelector('main')
 
   const ind = document.createElement('div')
   ind.id = 'ptr-indicator'
@@ -1690,12 +1696,21 @@ window.hardReload = () => {
 
   const atTop = () => (window.scrollY || document.documentElement.scrollTop || 0) <= 0
 
+  const reset = (animate) => {
+    ind.style.transition = animate ? 'opacity 0.2s, transform 0.25s' : 'none'
+    ind.style.opacity = '0'
+    ind.style.transform = 'translate(-50%, -48px)'
+    if (content) {
+      content.style.transition = animate ? 'transform 0.25s cubic-bezier(0.2,0.8,0.2,1)' : 'none'
+      content.style.transform = ''
+    }
+  }
+
   addEventListener('touchstart', e => {
     if (e.touches.length !== 1 || !atTop()) { pulling = false; return }
     startY = e.touches[0].clientY
     pulling = true
     dist = 0
-    ind.style.transition = 'opacity 0.15s'
   }, { passive: true })
 
   addEventListener('touchmove', e => {
@@ -1703,30 +1718,34 @@ window.hardReload = () => {
     dist = e.touches[0].clientY - startY
     if (dist <= 0 || !atTop()) {            // scroll vers le haut ou plus en haut : annule
       pulling = false
-      ind.style.opacity = '0'
-      ind.style.transform = 'translate(-50%, -48px)'
+      reset(true)
       return
     }
     e.preventDefault()                       // empêche le rebond natif pendant le geste
     const pull = Math.min(dist, MAX)
-    const y = -48 + pull * 0.7
-    const rot = Math.min(pull / THRESHOLD, 1) * 270
+    const ratio = Math.min(pull / THRESHOLD, 1)
+    const rot = ratio * 270
+    // la page accompagne le geste (amorti)
+    if (content) {
+      content.style.transition = 'none'
+      content.style.transform = `translateY(${pull * FOLLOW}px)`
+    }
+    // l'indicateur descend en haut, ancré juste au-dessus du contenu tiré
     ind.style.transition = 'none'
-    ind.style.opacity = String(Math.min(pull / THRESHOLD, 1))
-    ind.style.transform = `translate(-50%, ${y}px) rotate(${rot}deg)`
+    ind.style.opacity = String(ratio)
+    ind.style.transform = `translate(-50%, ${-48 + pull * FOLLOW + 8}px) rotate(${rot}deg)`
   }, { passive: false })
 
   const release = () => {
     if (!pulling) return
     pulling = false
-    ind.style.transition = 'opacity 0.2s, transform 0.2s'
     if (dist >= THRESHOLD) {
+      ind.style.transition = 'opacity 0.2s, transform 0.2s'
       ind.style.opacity = '1'
-      ind.style.transform = 'translate(-50%, 20px) rotate(270deg)'
+      ind.style.transform = 'translate(-50%, 24px) rotate(270deg)'
       window.hardReload()
     } else {
-      ind.style.opacity = '0'
-      ind.style.transform = 'translate(-50%, -48px)'
+      reset(true)                            // revient en place avec un ressort
     }
   }
   addEventListener('touchend', release,    { passive: true })
