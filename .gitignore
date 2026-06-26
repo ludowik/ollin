@@ -1,5 +1,6 @@
 build*/
-libs/
+libs/*
+!libs/robin_hood.h
 .claude/worktrees/
 node_modules/
 package.json
