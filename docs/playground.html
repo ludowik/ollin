@@ -242,7 +242,7 @@ canvas#canvas {
 
 <div id="toolbar">
   <a href="index.html" class="logo">Ollin</a>
-  <select id="examples" title="Charger un exemple"></select>
+  <select id="examples" title="Charger un exemple" disabled><option>Chargement…</option></select>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
   <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
@@ -502,32 +502,28 @@ view.focus()
 localStorage.setItem('ollin-last-page', 'playground.html')
 
 // ── Examples ──────────────────────────────────────────────────────────────
-const EXAMPLES = [
-  { name: '— Exemples —',   file: null },
-  { name: 'Hello world',    file: 'samples/hello_world.ol' },
-  { name: 'Fibonacci',      file: 'samples/fibonacci.ol' },
-  { name: 'FizzBuzz',       file: 'samples/fizzbuzz.ol' },
-  { name: 'Closure',        file: 'samples/closure.ol' },
-  { name: 'Classe Vec2',    file: 'samples/vec2.ol' },
-  { name: 'Colors',         file: 'samples/colors.ol' },
-  { name: 'Lignes animées', file: 'samples/lignes_animees.ol' },
-  { name: 'Pixels',         file: 'samples/pixels.ol' },
-  { name: 'Primitives',     file: 'samples/primitives.ol' },
-  { name: 'Rectangles',     file: 'samples/rectangles.ol' },
-]
-
 const sel = document.getElementById('examples')
-EXAMPLES.forEach((ex, i) => {
-  const opt = document.createElement('option')
-  opt.value = i
-  opt.textContent = ex.name
-  sel.appendChild(opt)
-})
+let examples = []
+
+async function loadExamples() {
+  const list = await fetch('samples/index.json').then(r => r.json())
+  examples = [{ name: '— Exemples —', file: null }, ...list]
+  sel.innerHTML = ''
+  examples.forEach((ex, i) => {
+    const opt = document.createElement('option')
+    opt.value = i
+    opt.textContent = ex.name
+    sel.appendChild(opt)
+  })
+  sel.disabled = false
+}
+loadExamples()
+
 sel.addEventListener('change', async () => {
-  const ex = EXAMPLES[+sel.value]
+  const ex = examples[+sel.value]
   if (!ex || !ex.file) return
   sel.value = 0
-  const code = await fetch(ex.file).then(r => r.text())
+  const code = await fetch('samples/' + ex.file).then(r => r.text())
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } })
   view.focus()
 })
