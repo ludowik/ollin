@@ -155,12 +155,14 @@ block_comment  = "###" { any } "###" ;
 NUMBER         = ( digit { [ "_" ] digit } [ "." [ digit { [ "_" ] digit } ] ] )
                | ( "." digit { [ "_" ] digit } )
                | ( ( "0x" | "0X" ) hexDigit { [ "_" ] hexDigit } )
-               | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } ) ;
+               | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } )
+               | ( ( "0b" | "0B" ) binDigit { [ "_" ] binDigit } ) ;
              (* '_' uniquement entre deux chiffres (1_000 == 1000) ; littéraux entiers → int64, sinon float *)
-             (* 0x.. hexadécimal, 0o.. octal : toujours entiers (ex. 0xFF == 255, 0o10 == 8) *)
+             (* 0x.. hexa, 0o.. octal, 0b.. binaire : toujours entiers (0xFF==255, 0o10==8, 0b1010==10) *)
              (* un littéral suivi immédiatement d'un caractère alphanumérique, '.' ou '_' est une erreur *)
 hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;
+binDigit       = "0" | "1" ;
 STRING         = '"' { any \ '"' } '"' ;
 BOOL           = "true" | "false" ;
 NIL            = "nil" ;

@@ -55,22 +55,23 @@ Token Lexer::number(bool leading_dot) {
     if (leading_dot) digits += '.';
     else             digits += src[start];
 
-    // littéraux hexadécimaux (0x..) et octaux (0o..) — entiers
+    // littéraux hexadécimaux (0x..), octaux (0o..) et binaires (0b..) — entiers
     // '_' autorisé uniquement entre deux chiffres (cf. grammar.ebnf)
     if (!leading_dot && src[start] == '0' && !atEnd()) {
         char p = peek();
-        if (p == 'x' || p == 'X' || p == 'o' || p == 'O') {
-            bool hex = (p == 'x' || p == 'X');
-            const char* kind = hex ? "hexadecimal" : "octal";
+        if (p == 'x' || p == 'X' || p == 'o' || p == 'O' || p == 'b' || p == 'B') {
+            char pl = (char)std::tolower((unsigned char)p);  // 'x', 'o' ou 'b'
+            const char* kind = pl == 'x' ? "hexadecimal" : pl == 'o' ? "octal" : "binary";
             auto invalid = [&]() {
                 throw std::runtime_error("line " + std::to_string(line) +
                     ": invalid " + kind + " literal");
             };
-            advance();                          // consomme x/o
-            digits += hex ? 'x' : 'o';
+            advance();                          // consomme x/o/b
+            digits += pl;
             auto is_base_digit = [&](char c) {
-                return hex ? (bool)std::isxdigit((unsigned char)c)
-                           : (c >= '0' && c <= '7');
+                if (pl == 'x') return (bool)std::isxdigit((unsigned char)c);
+                if (pl == 'o') return c >= '0' && c <= '7';
+                return c == '0' || c == '1';    // binaire
             };
             bool any = false, last_was_digit = false;
             while (!atEnd()) {

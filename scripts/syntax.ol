@@ -22,10 +22,14 @@ assert(n_fsep == 1000.12)   ## underscore ignoré dans float
 
 var n_hex   = 0xFF          ## hexadécimal → entier
 var n_oct   = 0o10          ## octal → entier
+var n_bin   = 0b1010        ## binaire → entier
 assert(n_hex == 255)
 assert(n_oct == 8)
+assert(n_bin == 10)
 assert(0xDEAD_BEEF == 3735928559)  ## underscores dans hex
 assert(0o7_7 == 63)                ## underscores dans octal
+assert(0b1111_1111 == 255)         ## underscores dans binaire
+assert(0b11111111 == 0xFF)         ## binaire == hexa
 assert((0xF0 | 0x0F) == 0xFF)      ## littéraux hex avec opérateurs bits
 assert(0xFFFFFFFFFFFFFFFF == -1)   ## motif de bits complet → wrapping int64
 

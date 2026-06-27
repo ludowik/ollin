@@ -784,11 +784,13 @@ std::unique_ptr<Expr> Parser::primary() {
         Token tok = advance();
         const std::string& lex = tok.lexeme;
         try {
-            // 0x.. / 0o.. : entiers base 16/8 (stoull → bit-pattern complet, wrapping int64)
+            // 0x.. / 0o.. / 0b.. : entiers base 16/8/2 (stoull → bit-pattern complet, wrapping int64)
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'x' || lex[1] == 'X'))
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 16)));
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'o' || lex[1] == 'O'))
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
+            if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'b' || lex[1] == 'B'))
+                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 2)));
             if (lex.find('.') == std::string::npos)
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
             return std::make_unique<NumberExpr>(std::stod(lex));
