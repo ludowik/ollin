@@ -1004,6 +1004,7 @@ m[<span class="num">1</span>] = <span class="str">"one"</span>
 <span class="kw">var</span> b = a <span class="cmt">## b pointe vers la même map</span>
 b.x = <span class="num">99</span>
 <span class="bi">assert</span>(a.x == <span class="num">99</span>) <span class="cmt">## a est modifié aussi</span></code></pre>
+<div class="callout">Conséquence : <code>==</code> compare les maps par <strong>référence</strong>, pas par contenu — <code>{} == {}</code> vaut <code>0</code>. Pour une égalité par valeur, voir <a href="#classes">Égalité et comparaison</a>.</div>
 </section>
 
 <!-- ── Itération ──────────────────────────────────────────────────────────── -->
@@ -1378,6 +1379,27 @@ var v1 = Vec2(1, 2)
 var v2 = Vec2(3, 4)
 var v3 = v1 + v2   ## appelle v1.__add(v2)
 print(v3)          ## Vec2(4,6)</code></pre>
+
+<h3>Égalité et comparaison</h3>
+<p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu (même modèle qu'en Lua). Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
+<pre><code><span class="cmt">## maps nues → comparaison par référence</span>
+<span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})   <span class="cmt">## 0 : contenu identique mais objets distincts</span>
+<span class="kw">var</span> m = {x: <span class="num">1</span>}
+<span class="bi">print</span>(m == m)             <span class="cmt">## 1 : même référence</span>
+
+<span class="cmt">## instance + __eq → comparaison par valeur</span>
+<span class="kw">class</span> Point
+    <span class="kw">func</span> init(x, y)
+        self.x = x
+        self.y = y
+    <span class="kw">end</span>
+    <span class="kw">func</span> __eq(other)
+        <span class="kw">return</span> self.x == other.x <span class="kw">and</span> self.y == other.y
+    <span class="kw">end</span>
+<span class="kw">end</span>
+<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))   <span class="cmt">## 1 : __eq compare les champs</span>
+<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))   <span class="cmt">## 0</span></code></pre>
+<div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité comme en Lua.</div>
 </section>
 
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->
