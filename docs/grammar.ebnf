@@ -141,7 +141,7 @@ call           = IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
                   nil       → aucun appel, l'expression vaut nil ;
                   callable  → appel (fonction, closure, builtin, classe) ;
                   autre     → erreur d'exécution (comme un appel normal).
-                Si l'appel n'a pas lieu (nil/erreur), les arguments ne sont PAS évalués.
+                Cas nil (appel ignoré) : les arguments ne sont PAS évalués.
                 S'applique à toutes les formes d'appel : f?(), expr?() (ex. m["cb"]?()),
                 obj.m?() (self injecté, méthode absente → nil) et super.m?(). *)
 

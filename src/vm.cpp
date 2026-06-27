@@ -355,8 +355,7 @@ void VM::runGoto(size_t stop_depth) {
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_MAKE_RANGE,
-        &&op_OPT_GUARD,
-        &&op_OPT_GUARD_METHOD,
+        &&op_JUMP_IF_NIL,
         &&op_HALT,
     };
 
@@ -795,21 +794,11 @@ op_LOAD_FUNC:
     regs[base + A] = Value::makeFunc((uint8_t)Bx);
     NEXT();
 
-op_OPT_GUARD: {
-    // appel optionnel f?() — R[A] = callee (et registre résultat), Bx = adresse de saut.
-    // nil → ip=Bx (R[A] reste nil = résultat) ; non-callable non-nil → erreur ;
-    // callable → continue (le code des args + CALL_DYN suit). Les args ne sont
-    // donc PAS évalués quand on saute.
-    if (regs[base + A].isNil()) { ip = Bx; NEXT(); }
-    if (!regs[base + A].isCallable())
-        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: call on non-function value");
-    NEXT();
-}
-op_OPT_GUARD_METHOD: {
-    // méthode optionnelle obj.m?() — R[A]=receiver, R[A+1]=méthode, Bx=saut.
-    if (regs[base + A + 1].isNil()) { regs[base + A] = Value{}; ip = Bx; NEXT(); }
-    if (!regs[base + A + 1].isCallable())
-        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
+op_JUMP_IF_NIL: {
+    // primitif générique : saute si R[A] est nil. Utilisé par l'appel optionnel
+    // f?() (skip → résultat nil, args non évalués). L'erreur sur valeur non
+    // appelable est laissée à l'appel standard (CALL_DYN/CALL_METHOD).
+    if (regs[base + A].isNil()) ip = Bx;
     NEXT();
 }
 op_CALL_DYN: {

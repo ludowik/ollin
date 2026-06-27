@@ -142,6 +142,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | EQ/NEQ/GT/LT/GE/LE | ABC | A=dst, B=lhs, C=rhs  | R[A] = 1.0 si vrai sinon 0.0                     |
 | JUMP          | Bx     | Bx=addr                    | ip = Bx                                          |
 | JUMP_IF_FALSE | ABx    | A=cond_reg, Bx=addr        | si falsy(R[A]) → ip = Bx                        |
+| JUMP_IF_NIL   | ABx    | A=cond_reg, Bx=addr        | si R[A] est nil → ip = Bx (appel optionnel f?()) |
 | CALL_FUNC     | ABC    | A=call_base, B=func_idx, C=argc | appel fonction utilisateur                   |
 | RETURN        | AB     | A=first_reg, B=count       | copie R[A..A+B-1]→R[0..B-1], pop frame          |
 | RETURN_V      | AB     | A=first_reg, B=n_explicit  | retourne n explicites + varargs, pop frame       |
