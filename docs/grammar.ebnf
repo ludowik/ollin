@@ -84,7 +84,8 @@ expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
 logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
 bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
-bitwiseXor     = bitwiseAnd { "^" bitwiseAnd } ;
+bitwiseXor     = bitwiseAnd { "~" bitwiseAnd } ;
+             (* "~" binaire = XOR bit-à-bit (modèle Lua) ; "~" unaire = NOT, voir unary *)
 bitwiseAnd     = comparison { "&" comparison } ;
 comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
              (* comparaisons chaînées : 1 < x < 10  ≡  (1 < x) and (x < 10), x évalué une fois *)
@@ -97,13 +98,14 @@ additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
              (* "+" : addition numérique ou concaténation de strings *)
              (* promotion : INT op INT → INT ; INT op FLOAT → FLOAT ; "/" → toujours FLOAT *)
              (* overflow int64 → wrapping silencieux *)
-multiplicative = power { ( "*" | "/" | "//" | "%" ) power } ;
+multiplicative = unary { ( "*" | "/" | "//" | "%" ) unary } ;
              (* "//" : division entière plancher (floor) — INT//INT → INT, FLOAT//FLOAT → FLOAT *)
-power          = unary ( "**" power ) ? ;
-             (* "**" : exponentiation, associatif à droite — INT**INT(≥0) → INT ; sinon FLOAT *)
-             (* 2**2**3 = 2**(2**3) = 256 *)
-unary          = ( "-" | "not" | "~" | "#" ) unary | primary ;
-             (* "#" : sucre syntaxique — "#expr" est équivalent à "len(expr)" *)
+unary          = ( "-" | "not" | "~" | "#" ) unary | power ;
+             (* "~" unaire = NOT bit-à-bit ; "#" : sucre syntaxique — "#expr" ≡ "len(expr)" *)
+power          = primary ( "^" unary ) ? ;
+             (* "^" : exponentiation (modèle Lua), associatif à droite — INT^INT(≥0) → INT ; sinon FLOAT *)
+             (* "^" lie plus fort que le moins unaire : -2^2 == -(2^2) == -4 ; 2^2^3 = 2^(2^3) = 256 ;
+                2 ^ -1 == 0.5. ('**' n'existe plus.) *)
 primary        = NUMBER
                | STRING
                | BOOL

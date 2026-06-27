@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 16:04</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 19:32</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 16:04</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 19:32</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -587,7 +587,9 @@ multi-lignes
 <tr><td>-</td><td>Soustraction / négation</td><td><code>10 - 3 == 7</code>, <code>-x</code></td></tr>
 <tr><td>*</td><td>Multiplication</td><td><code>6 * 7 == 42</code></td></tr>
 <tr><td>/</td><td>Division (toujours float)</td><td><code>7 / 2 == 3.5</code></td></tr>
+<tr><td>//</td><td>Division entière (plancher)</td><td><code>7 // 2 == 3</code></td></tr>
 <tr><td>%</td><td>Modulo</td><td><code>10 % 3 == 1</code></td></tr>
+<tr><td>^</td><td>Puissance (modèle Lua, assoc. droite)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
 </table>
 
 <h3>Comparaisons</h3>
@@ -610,14 +612,14 @@ multi-lignes
 <!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
 <section id="bitwise">
 <h2>Opérateurs bits</h2>
-<p>Ollin supporte les opérateurs bit-à-bit style C. Ils opèrent uniquement sur des <strong>entiers</strong>.</p>
+<p>Ollin suit le <strong>modèle Lua</strong> pour les opérateurs bit-à-bit. Ils opèrent uniquement sur des <strong>entiers</strong>. Le <code>~</code> est <strong>XOR</strong> en binaire et <strong>NOT</strong> en unaire ; <code>^</code> est réservé à la <strong>puissance</strong>.</p>
 
 <h3>Binaires</h3>
 <table>
 <tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
 <tr><td>&amp;</td><td>ET bit-à-bit</td><td><code>12 &amp; 10 == 8</code></td></tr>
 <tr><td>|</td><td>OU bit-à-bit</td><td><code>12 | 10 == 14</code></td></tr>
-<tr><td>^</td><td>XOR bit-à-bit</td><td><code>12 ^ 10 == 6</code></td></tr>
+<tr><td>~</td><td>XOR bit-à-bit</td><td><code>12 ~ 10 == 6</code></td></tr>
 <tr><td>&lt;&lt;</td><td>Décalage gauche</td><td><code>1 &lt;&lt; 3 == 8</code></td></tr>
 <tr><td>&gt;&gt;</td><td>Décalage droit (arithmétique)</td><td><code>16 &gt;&gt; 2 == 4</code></td></tr>
 </table>
@@ -625,12 +627,13 @@ multi-lignes
 <h3>Unaire</h3>
 <table>
 <tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
-<tr><td>~</td><td>Complément à 1</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
+<tr><td>~</td><td>NOT (complément à 1)</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
 </table>
+<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>) — comme en Lua. <code>^</code> ne fait plus partie des opérateurs bits : c'est la puissance.</div>
 
 <h3>Précédence</h3>
 <p>De la plus basse à la plus haute :</p>
-<pre><code>or  →  and  →  |  →  ^  →  &  →  comparaisons  →  &lt;&lt; &gt;&gt;  →  + -  →  * / %  →  ~ - not</code></pre>
+<pre><code>or  →  and  →  |  →  ~(xor)  →  &  →  comparaisons  →  &lt;&lt; &gt;&gt;  →  + -  →  * / %  →  ~(not) - not  →  ^</code></pre>
 
 <h3>Exemples</h3>
 <pre><code><span class="kw">var</span> flags = <span class="num">0</span>
@@ -641,7 +644,7 @@ flags = flags <span class="op">|</span> <span class="num">4</span> <span class="
 <span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">1</span>) == <span class="num">1</span>) <span class="cmt">## tester bit 0</span>
 <span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">2</span>) == <span class="num">0</span>) <span class="cmt">## bit 1 absent</span>
 
-flags = flags <span class="op">^</span> <span class="num">1</span> <span class="cmt">## basculer bit 0 → 4</span>
+flags = flags <span class="op">~</span> <span class="num">1</span> <span class="cmt">## XOR : basculer bit 0 → 4</span>
 <span class="bi">assert</span>(flags == <span class="num">4</span>)
 
 <span class="bi">assert</span>(<span class="num">1</span> <span class="op">&lt;&lt;</span> <span class="num">8</span> == <span class="num">256</span>)
@@ -649,7 +652,7 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
 <span class="bi">assert</span>(<span class="op">~</span><span class="num">0</span> == -<span class="num">1</span>)
 <span class="bi">assert</span>(<span class="num">255</span> <span class="op">&amp;</span> <span class="num">15</span> == <span class="num">15</span>)</code></pre>
 
-<div class="callout warn">Les opérateurs bit-à-bit nécessitent des opérandes entiers (<code>integer</code>). Appliquer <code>&amp;</code>, <code>|</code>, <code>^</code>, <code>~</code>, <code>&lt;&lt;</code> ou <code>&gt;&gt;</code> à un float lèvera une erreur à l'exécution.</div>
+<div class="callout warn">Les opérateurs bit-à-bit nécessitent des opérandes entiers (<code>integer</code>). Appliquer <code>&amp;</code>, <code>|</code>, <code>~</code>, <code>&lt;&lt;</code> ou <code>&gt;&gt;</code> à un float lèvera une erreur à l'exécution.</div>
 </section>
 
 <!-- ── Chaînes ─────────────────────────────────────────────────────────────── -->
@@ -1655,7 +1658,7 @@ const ollinLang = StreamLanguage.define({
     }
 
     // Operators (multi-char first)
-    if (stream.match(/^(\*\*|\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
+    if (stream.match(/^(\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
         stream.match(/^[+\-*/%><&|^~?\[\]{}:.]/)) return 'operator'
 
     stream.next()

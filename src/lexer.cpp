@@ -210,7 +210,9 @@ std::vector<Token> Lexer::tokenize() {
                 break;
             case '*':
                 if (!atEnd() && peek() == '=') { advance(); emit({TokenType::STAR_EQUAL, "*=", line}); }
-                else if (!atEnd() && peek() == '*') { advance(); emit({TokenType::STAR_STAR, "**", line}); }
+                else if (!atEnd() && peek() == '*')
+                    throw std::runtime_error("line " + std::to_string(line) +
+                        ": '**' n'existe plus — utilisez '^' pour la puissance");
                 else emit({TokenType::STAR, "*", line});
                 break;
             case '/':

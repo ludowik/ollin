@@ -531,7 +531,7 @@ std::unique_ptr<Expr> Parser::bitwiseXor() {
     auto left = bitwiseAnd();
     while (true) {
         skipSemis();
-        if (!check(TokenType::CARET)) break;
+        if (!check(TokenType::TILDE)) break;   // '~' binaire = XOR (modèle Lua)
         advance();
         skipSemis();
         left = std::make_unique<BinaryExpr>('x', std::move(left), bitwiseAnd());
@@ -613,26 +613,20 @@ std::unique_ptr<Expr> Parser::additive() {
 }
 
 std::unique_ptr<Expr> Parser::multiplicative() {
-    auto left = power();
+    auto left = unary();
     while (true) {
         skipSemis();
         if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) && !check(TokenType::PERCENT)) break;
         char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
         skipSemis();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), power());
+        left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
     }
     return left;
 }
 
-std::unique_ptr<Expr> Parser::power() {
-    auto left = unary();
-    skipSemis();
-    if (!check(TokenType::STAR_STAR)) return left;
-    advance();
-    skipSemis();
-    return std::make_unique<BinaryExpr>('p', std::move(left), power()); // right-associative
-}
-
+// Précédence (modèle Lua) : '^' (puissance) lie plus fort que le moins unaire.
+//   multiplicative → unary → power → primary
+//   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (droite)
 std::unique_ptr<Expr> Parser::unary() {
     if (check(TokenType::MINUS)) { advance(); return std::make_unique<UnaryExpr>('-', unary()); }
     if (check(TokenType::NOT))   { advance(); return std::make_unique<UnaryExpr>('!', unary()); }
@@ -644,7 +638,17 @@ std::unique_ptr<Expr> Parser::unary() {
         e->args.push_back(unary());
         return e;
     }
-    return primary();
+    return power();
+}
+
+std::unique_ptr<Expr> Parser::power() {
+    auto left = primary();
+    skipSemis();
+    if (!check(TokenType::CARET)) return left;   // '^' = puissance (modèle Lua)
+    advance();
+    skipSemis();
+    // opérande droit = unary → autorise 2 ^ -1 et associativité à droite (2^2^3)
+    return std::make_unique<BinaryExpr>('p', std::move(left), unary());
 }
 
 std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {

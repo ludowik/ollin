@@ -122,11 +122,13 @@ assert("x" + 1     == "x1")
 assert("v=" + 3.14 == "v=3.14")
 assert(42 + " !"   == "42 !")
 
-## division entière plancher (//) et exponentiation (**)
+## division entière plancher (//) et exponentiation (^)
 assert(7 // 2    == 3)         ## IDIV → plancher vers -∞
 assert(-7 // 2   == -4)
-assert(2 ** 8    == 256)       ## POW : INT**INT≥0 → INT
-assert(2.0 ** -1 == 0.5)       ## exposant négatif → float
+assert(2 ^ 8     == 256)       ## POW : INT^INT≥0 → INT (^ = puissance, modèle Lua)
+assert(2.0 ^ -1  == 0.5)       ## exposant négatif → float
+assert(-2 ^ 2    == -4)        ## ^ plus prioritaire que le moins unaire
+assert(2 ^ 2 ^ 3 == 256)       ## associatif à droite : 2^(2^3)
 
 ## ── 5. Comparaisons ──────────────────────────────────────────────────────────
 
@@ -177,10 +179,11 @@ assert(not not [1])    ## array non vide : truthy
 
 ## ── 7. Opérateurs bits ───────────────────────────────────────────────────────
 
-assert((12 & 10)  == 8)
-assert((12 | 10)  == 14)
-assert((12 ^ 10)  == 6)
-assert(~0         == -1)
+assert((12 & 10)  == 8)        ## ET
+assert((12 | 10)  == 14)       ## OU
+assert((12 ~ 10)  == 6)        ## XOR : '~' binaire (modèle Lua)
+assert(~0         == -1)       ## NOT : '~' unaire
+assert((5 ~ ~0)   == -6)       ## XOR de 5 et (NOT 0) = 5 ~ -1
 assert((1 << 3)   == 8)
 assert((16 >> 2)  == 4)
 
