@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-26 22:31</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 13:59</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-26 22:31</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 13:59</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -810,6 +810,23 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
 <span class="kw">end</span>
 
 <span class="bi">assert</span>(fact(<span class="num">10</span>) == <span class="num">3628800</span>)</code></pre>
+
+<h3>Appel optionnel — <code>f?()</code></h3>
+<p>La syntaxe <code>f?(args)</code> n'appelle <code>f</code> que si elle est <strong>appelable</strong> (fonction, closure, fonction intégrée, classe). Sinon — <code>nil</code> ou toute valeur non appelable — il n'y a <strong>aucun appel et aucune erreur</strong>, et l'expression vaut <code>nil</code>. Pratique pour des callbacks facultatifs.</p>
+<pre><code><span class="kw">func</span> greet() <span class="kw">return</span> <span class="str">"hello"</span> <span class="kw">end</span>
+<span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)   <span class="cmt">## appelable → appel normal</span>
+
+<span class="kw">var</span> cb = <span class="kw">nil</span>
+<span class="bi">assert</span>(cb?() == <span class="kw">nil</span>)          <span class="cmt">## nil → pas d'appel, pas d'erreur</span>
+
+<span class="kw">var</span> n = <span class="num">42</span>
+<span class="bi">assert</span>(n?() == <span class="kw">nil</span>)           <span class="cmt">## valeur non appelable → nil</span>
+
+<span class="cmt">## callback facultatif dans une map</span>
+<span class="kw">var</span> opts = {on_done: <span class="kw">func</span>() <span class="kw">return</span> <span class="str">"fini"</span> <span class="kw">end</span>}
+<span class="bi">assert</span>(opts[<span class="str">"on_done"</span>]?() == <span class="str">"fini"</span>)
+<span class="bi">assert</span>(opts[<span class="str">"on_error"</span>]?() == <span class="kw">nil</span>)   <span class="cmt">## clé absente → nil → ignoré</span></code></pre>
+<div class="callout">Sans le <code>?</code>, appeler une valeur non appelable (<code>cb()</code> avec <code>cb = nil</code>) lève une erreur d'exécution. Le <code>?</code> ne supprime l'appel que pour l'opérande immédiatement à sa gauche.</div>
 </section>
 
 <!-- ── Varargs ───────────────────────────────────────────────────────────── -->
@@ -1631,7 +1648,7 @@ const ollinLang = StreamLanguage.define({
 
     // Operators (multi-char first)
     if (stream.match(/^(\*\*|\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
-        stream.match(/^[+\-*/%><&|^~\[\]{}:.]/)) return 'operator'
+        stream.match(/^[+\-*/%><&|^~?\[\]{}:.]/)) return 'operator'
 
     stream.next()
     return null

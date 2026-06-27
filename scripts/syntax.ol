@@ -332,6 +332,21 @@ func add(a, b)
 end
 assert(add(3, 4) == 7)
 
+## appel optionnel f?() : appelle si callable, sinon nil sans erreur
+assert(add?(3, 4) == 7)     ## callable → appel normal
+var maybe = nil
+assert(maybe?() == nil)     ## nil → pas d'appel, pas d'erreur
+var notfn = 42
+assert(notfn?() == nil)     ## valeur non callable → nil
+assert(notfn?(1, 2) == nil) ## les arguments ne sont pas évalués en appel
+var cb = func(n) return n * 2 end
+assert(cb?(21) == 42)       ## closure en variable
+cb = nil
+assert(cb?(21) == nil)
+var holder = {fn: func() return "ok" end}
+assert(holder["fn"]?() == "ok")  ## appel optionnel sur expression
+assert(holder["absent"]?() == nil)
+
 ## retours multiples
 func minmax(a, b)
     if a < b then return a, b end

@@ -984,9 +984,9 @@ void Compiler::visit(const UnaryExpr& e) {
 }
 
 void Compiler::visit(const CallExpr& e) {
-    // Check if it's a user-defined function
+    // Check if it's a user-defined function (sauf appel optionnel : toujours dynamique)
     auto it = func_table.find(e.callee);
-    if (it != func_table.end()) {
+    if (!e.optional && it != func_table.end()) {
         int call_base = reg_top_;
         int argc = (int)e.args.size();
         for (int i = 0; i < argc; ++i) {
@@ -1047,8 +1047,8 @@ void Compiler::visit(const CallExpr& e) {
                 }
             }
         }
-        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
-                           (uint8_t)func_reg, (uint8_t)argc));
+        chunk.emit(makeABC((uint8_t)(e.optional ? Op::CALL_DYN_OPT : Op::CALL_DYN),
+                           (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         last_reg_ = call_base;
     }
 }
@@ -1073,8 +1073,8 @@ void Compiler::visit(const ExprCallExpr& e) {
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     compileInto(*e.callee, func_reg);
 
-    chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
-                       (uint8_t)func_reg, (uint8_t)argc));
+    chunk.emit(makeABC((uint8_t)(e.optional ? Op::CALL_DYN_OPT : Op::CALL_DYN),
+                       (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
     last_reg_ = call_base;
 }
 

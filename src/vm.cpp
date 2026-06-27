@@ -355,6 +355,7 @@ void VM::runGoto(size_t stop_depth) {
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_MAKE_RANGE,
+        &&op_CALL_DYN_OPT,
         &&op_HALT,
     };
 
@@ -793,6 +794,11 @@ op_LOAD_FUNC:
     regs[base + A] = Value::makeFunc((uint8_t)Bx);
     NEXT();
 
+op_CALL_DYN_OPT: {
+    // appel optionnel f?() : si R[B] n'est pas callable → R[A]=nil, pas d'appel
+    if (!regs[base + B].isCallable()) { regs[base + A] = Value{}; NEXT(); }
+    // sinon : tombe dans op_CALL_DYN
+}
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
     if (regs[base + B].isBuiltin()) {

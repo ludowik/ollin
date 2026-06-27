@@ -60,5 +60,6 @@ enum class Op : uint8_t {
     NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags (bit0=incl_right,bit1=has_step)
+    CALL_DYN_OPT,   // ABC: comme CALL_DYN mais si R[B] non callable → R[A]=nil (appel optionnel f?())
     HALT,
 };

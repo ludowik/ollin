@@ -120,6 +120,7 @@ struct ChainedCompareExpr : Expr {
 struct CallExpr : Expr {
     std::string callee;
     std::vector<std::unique_ptr<Expr>> args;
+    bool optional = false;   // f?() : n'appelle que si callable, sinon nil
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
@@ -303,6 +304,7 @@ struct FuncExpr : Expr {
 struct ExprCallExpr : Expr {
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
+    bool optional = false;   // expr?() : n'appelle que si callable, sinon nil
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

@@ -241,6 +241,7 @@ std::vector<Token> Lexer::tokenize() {
             case '[':  ++paren_depth; emit({TokenType::LBRACKET, "[", line}); break;
             case ']':  --paren_depth; emit({TokenType::RBRACKET, "]", line}); break;
             case ':':  emit({TokenType::COLON, ":", line}); break;
+            case '?':  emit({TokenType::QUESTION, "?", line}); break;
             case '"':  emit(string()); break;
             case '+':
                 if (!atEnd() && peek() == '=') { advance(); emit({TokenType::PLUS_EQUAL, "+=", line}); }

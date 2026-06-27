@@ -136,7 +136,10 @@ arrayLit       = "[" [ expr { "," expr } ] "]" ;
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
              (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)
              (* step optionnel [a;b;step] ; les ranges sont first-class et itérables *)
-call           = IDENT "(" [ expr { "," expr } ] ")" ;
+call           = IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
+             (* appel optionnel f?(args) : si f est callable (fonction, closure, builtin, classe)
+                l'appel a lieu ; sinon aucun appel, aucune erreur, l'expression vaut nil.
+                S'applique aussi à un appel sur expression : expr?(args) (ex. m["cb"]?()). *)
 
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;

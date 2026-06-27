@@ -648,7 +648,8 @@ std::unique_ptr<Expr> Parser::unary() {
 }
 
 std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
-    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN)) {
+    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) ||
+           (check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN)) {
         if (check(TokenType::LBRACKET)) {
             advance();
             auto key = expr();
@@ -679,10 +680,13 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
                 ie->key = std::make_unique<StringExpr>(field);
                 base = std::move(ie);
             }
-        } else { // LPAREN
-            advance();
+        } else { // LPAREN ou QUESTION+LPAREN (appel optionnel)
+            bool opt = false;
+            if (check(TokenType::QUESTION)) { advance(); opt = true; }
+            advance(); // consume LPAREN
             auto call = std::make_unique<ExprCallExpr>();
             call->callee = std::move(base);
+            call->optional = opt;
             if (!check(TokenType::RPAREN)) {
                 call->args.push_back(expr());
                 while (match(TokenType::COMMA))
@@ -816,9 +820,13 @@ std::unique_ptr<Expr> Parser::primary() {
             expect(TokenType::RPAREN);
             return parsePostfix(std::move(mc));
         }
+        // appel optionnel : F?()  → n'appelle que si F est callable, sinon nil
+        bool opt_call = check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN;
+        if (opt_call) advance(); // consume '?'
         if (match(TokenType::LPAREN)) {
             auto call = std::make_unique<CallExpr>();
             call->callee = name;
+            call->optional = opt_call;
             if (!check(TokenType::RPAREN)) {
                 call->args.push_back(expr());
                 while (match(TokenType::COMMA))
