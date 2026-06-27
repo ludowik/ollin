@@ -355,8 +355,8 @@ void VM::runGoto(size_t stop_depth) {
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_MAKE_RANGE,
-        &&op_CALL_DYN_OPT,
-        &&op_CALL_METHOD_OPT,
+        &&op_OPT_GUARD,
+        &&op_OPT_GUARD_METHOD,
         &&op_HALT,
     };
 
@@ -795,11 +795,22 @@ op_LOAD_FUNC:
     regs[base + A] = Value::makeFunc((uint8_t)Bx);
     NEXT();
 
-op_CALL_DYN_OPT: {
-    // appel optionnel f?() : nil → rien (R[A]=nil) ; callable → appel ;
-    // non-nil non-callable → tombe dans CALL_DYN qui lève l'erreur
-    if (regs[base + B].isNil()) { regs[base + A] = Value{}; NEXT(); }
-    // sinon : tombe dans op_CALL_DYN
+op_OPT_GUARD: {
+    // appel optionnel f?() — R[A] = callee (et registre résultat), Bx = adresse de saut.
+    // nil → ip=Bx (R[A] reste nil = résultat) ; non-callable non-nil → erreur ;
+    // callable → continue (le code des args + CALL_DYN suit). Les args ne sont
+    // donc PAS évalués quand on saute.
+    if (regs[base + A].isNil()) { ip = Bx; NEXT(); }
+    if (!regs[base + A].isCallable())
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: call on non-function value");
+    NEXT();
+}
+op_OPT_GUARD_METHOD: {
+    // méthode optionnelle obj.m?() — R[A]=receiver, R[A+1]=méthode, Bx=saut.
+    if (regs[base + A + 1].isNil()) { regs[base + A] = Value{}; ip = Bx; NEXT(); }
+    if (!regs[base + A + 1].isCallable())
+        throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: method call on non-function value");
+    NEXT();
 }
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
@@ -907,12 +918,6 @@ op_NEW_CLASS:
     regs[base + A] = Value::makeClass();
     NEXT();
 
-op_CALL_METHOD_OPT: {
-    // appel de méthode optionnel obj.m?() : méthode nil → R[A]=nil, pas d'appel ;
-    // callable → appel avec self ; non-nil non-callable → CALL_METHOD lève l'erreur
-    if (regs[base + A + 1].isNil()) { regs[base + A] = Value{}; NEXT(); }
-    // sinon : tombe dans op_CALL_METHOD
-}
 op_CALL_METHOD: {
     uint32_t fp_addr = 0;
     {

@@ -353,6 +353,18 @@ var bx = Box(7)
 assert(bx.get?() == 7)      ## self injecté
 assert(bx.missing?() == nil)## méthode absente → nil
 
+## court-circuit : les arguments ne sont PAS évalués si non appelable
+global opt_se
+opt_se = 0
+func opt_bump() opt_se = opt_se + 1 return opt_se end
+var nf = nil
+assert(nf?(opt_bump()) == nil)
+assert(opt_se == 0)          ## opt_bump() jamais appelé (callee nil)
+assert(bx.missing?(opt_bump()) == nil)
+assert(opt_se == 0)          ## idem pour une méthode absente
+assert(add?(opt_bump(), 10) == 11)  ## callable → args évalués (opt_bump→1)
+assert(opt_se == 1)
+
 ## retours multiples
 func minmax(a, b)
     if a < b then return a, b end

@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 14:29</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 14:45</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 14:29</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 14:45</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -818,7 +818,7 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
   <li><strong>appelable</strong> (fonction, closure, fonction intégrée, classe) → <strong>appel normal</strong> ;</li>
   <li><strong>toute autre valeur</strong> (entier, chaîne, map…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
 </ul>
-<p>Pratique pour des callbacks facultatifs : seul <code>nil</code> est ignoré, une valeur du mauvais type reste une erreur. S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; une méthode absente → <code>nil</code>) et <code>super.m?()</code>.</p>
+<p>Pratique pour des callbacks facultatifs : seul <code>nil</code> est ignoré, une valeur du mauvais type reste une erreur. S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; une méthode absente → <code>nil</code>) et <code>super.m?()</code>. Quand l'appel n'a pas lieu (cas <code>nil</code>), les <strong>arguments ne sont pas évalués</strong> — leurs effets de bord ne se produisent pas.</p>
 <pre><code><span class="kw">func</span> greet() <span class="kw">return</span> <span class="str">"hello"</span> <span class="kw">end</span>
 <span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)   <span class="cmt">## appelable → appel normal</span>
 

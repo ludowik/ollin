@@ -984,9 +984,45 @@ void Compiler::visit(const UnaryExpr& e) {
 }
 
 void Compiler::visit(const CallExpr& e) {
-    // Check if it's a user-defined function (sauf appel optionnel : toujours dynamique)
+    if (e.optional) {
+        // appel optionnel nommé : callee résolu AVANT les args, garde, puis args
+        int call_base = reg_top_;
+        int argc = (int)e.args.size();
+        int func_reg = call_base + argc;
+        reg_top_ = call_base + 1;
+        {
+            auto rit = local_regs_.find(e.callee);
+            if (rit != local_regs_.end()) {
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)rit->second, 0));
+            } else {
+                int uv = resolveUpvalue(e.callee);
+                if (uv >= 0)
+                    chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)call_base, (uint8_t)uv, 0));
+                else
+                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)call_base,
+                                       chunk.addIdentifier(e.callee)));
+            }
+        }
+        reg_top_ = func_reg + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        size_t skip = chunk.emitJump(Op::OPT_GUARD, (uint8_t)call_base);
+        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
+        for (int i = 0; i < argc; ++i) {
+            reg_top_ = func_reg + 1;
+            compileInto(*e.args[i], call_base + i);
+        }
+        reg_top_ = func_reg + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+        chunk.patchJump(skip, (uint16_t)chunk.currentPos());
+        reg_top_ = call_base + 1;
+        last_reg_ = call_base;
+        return;
+    }
+
+    // Check if it's a user-defined function
     auto it = func_table.find(e.callee);
-    if (!e.optional && it != func_table.end()) {
+    if (it != func_table.end()) {
         int call_base = reg_top_;
         int argc = (int)e.args.size();
         for (int i = 0; i < argc; ++i) {
@@ -1047,8 +1083,8 @@ void Compiler::visit(const CallExpr& e) {
                 }
             }
         }
-        chunk.emit(makeABC((uint8_t)(e.optional ? Op::CALL_DYN_OPT : Op::CALL_DYN),
-                           (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
+                           (uint8_t)func_reg, (uint8_t)argc));
         last_reg_ = call_base;
     }
 }
@@ -1056,6 +1092,28 @@ void Compiler::visit(const CallExpr& e) {
 void Compiler::visit(const ExprCallExpr& e) {
     int call_base = reg_top_;
     int argc = (int)e.args.size();
+
+    if (e.optional) {
+        // appel optionnel : évaluer le callee AVANT les args, garde, puis args
+        int func_reg = call_base + argc;
+        reg_top_ = call_base + 1;
+        compileInto(*e.callee, call_base);                 // callee dans call_base (check+résultat)
+        reg_top_ = func_reg + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        size_t skip = chunk.emitJump(Op::OPT_GUARD, (uint8_t)call_base);
+        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
+        for (int i = 0; i < argc; ++i) {                   // temps au-dessus de func_reg
+            reg_top_ = func_reg + 1;
+            compileInto(*e.args[i], call_base + i);
+        }
+        reg_top_ = func_reg + 1;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+        chunk.patchJump(skip, (uint16_t)chunk.currentPos());
+        reg_top_ = call_base + 1;
+        last_reg_ = call_base;
+        return;
+    }
 
     // Compile args into consecutive registers
     for (int i = 0; i < argc; ++i) {
@@ -1073,8 +1131,8 @@ void Compiler::visit(const ExprCallExpr& e) {
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     compileInto(*e.callee, func_reg);
 
-    chunk.emit(makeABC((uint8_t)(e.optional ? Op::CALL_DYN_OPT : Op::CALL_DYN),
-                       (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+    chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
+                       (uint8_t)func_reg, (uint8_t)argc));
     last_reg_ = call_base;
 }
 
@@ -1557,6 +1615,12 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     }
 
+    // appel optionnel obj.m?() : garde AVANT les args (la méthode est déjà
+    // résolue dans R[call_base+1]) → args non évalués si méthode nil/non-callable
+    size_t skip = 0;
+    if (e.optional)
+        skip = chunk.emitJump(Op::OPT_GUARD_METHOD, (uint8_t)call_base);
+
     // R[call_base+2..argc+1] = args
     for (int i = 0; i < argc; ++i) {
         int target = call_base + 2 + i;
@@ -1568,7 +1632,8 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     }
 
-    chunk.emit(makeABC((uint8_t)(e.optional ? Op::CALL_METHOD_OPT : Op::CALL_METHOD),
-                       (uint8_t)call_base, 0, (uint8_t)argc));
+    chunk.emit(makeABC((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
+    if (e.optional)
+        chunk.patchJump(skip, (uint16_t)chunk.currentPos());
     last_reg_ = call_base;
 }

@@ -60,7 +60,7 @@ enum class Op : uint8_t {
     NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags (bit0=incl_right,bit1=has_step)
-    CALL_DYN_OPT,   // ABC: comme CALL_DYN mais si R[B] est nil → R[A]=nil (appel optionnel f?())
-    CALL_METHOD_OPT,// ABC: comme CALL_METHOD mais si la méthode (R[A+1]) est nil → R[A]=nil (obj.m?())
+    OPT_GUARD,      // ABx: appel optionnel f?() — R[A]=callee/résultat : nil → ip=Bx (résultat nil) ; non-callable → erreur ; sinon continue (args non évalués si saut)
+    OPT_GUARD_METHOD,// ABx: méthode optionnelle obj.m?() — méthode=R[A+1] : nil → R[A]=nil, ip=Bx ; non-callable → erreur ; sinon continue
     HALT,
 };
