@@ -132,6 +132,7 @@ mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* accès : m["k"] et m.k sont équivalents (lecture, écriture, compound) *)
                  (* sémantique de copie : référence comptée (pas de clone) ; map vide → falsy (« le vide est faux ») *)
 arrayLit       = "[" [ expr { "," expr } ] "]" ;
+             (* partagé par référence (comptage de référence) ; array vide → falsy (« le vide est faux ») *)
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
              (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)
              (* step optionnel [a;b;step] ; les ranges sont first-class et itérables *)
