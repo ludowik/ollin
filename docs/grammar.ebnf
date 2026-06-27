@@ -137,12 +137,11 @@ rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
              (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)
              (* step optionnel [a;b;step] ; les ranges sont first-class et itérables *)
 call           = IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
-             (* appel optionnel f?(args) — trichotomie sur la valeur appelée :
-                  nil       → aucun appel, l'expression vaut nil ;
-                  callable  → appel (fonction, closure, builtin, classe) ;
-                  autre     → erreur d'exécution (comme un appel normal).
-                Cas nil (appel ignoré) : les arguments ne sont PAS évalués.
-                S'applique à toutes les formes d'appel : f?(), expr?() (ex. m["cb"]?()),
+             (* appel optionnel f?(args) ≡  if f then f(args) else nil .
+                f falsy (nil, 0, "", [], {}) → aucun appel, résultat nil, ARGS NON ÉVALUÉS ;
+                f appelable → appel ; f truthy non appelable → erreur (appel standard).
+                Implémenté avec JUMP_IF_FALSE + appel standard (pas d'opcode dédié).
+                S'applique à toutes les formes : f?(), expr?() (ex. m["cb"]?()),
                 obj.m?() (self injecté, méthode absente → nil) et super.m?(). *)
 
 line_comment   = "##" { any \ newline } ;

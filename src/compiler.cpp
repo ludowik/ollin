@@ -1005,7 +1005,9 @@ void Compiler::visit(const CallExpr& e) {
         }
         reg_top_ = func_reg + 1;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        size_t skip = chunk.emitJump(Op::JUMP_IF_NIL, (uint8_t)call_base);
+        // f?(args) ≡ if f then f(args) else nil  — JUMP_IF_FALSE (nil est falsy) saute
+        // les args : ils ne sont donc PAS évalués si f est falsy.
+        size_t to_nil = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
         chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
         for (int i = 0; i < argc; ++i) {
             reg_top_ = func_reg + 1;
@@ -1014,7 +1016,10 @@ void Compiler::visit(const CallExpr& e) {
         reg_top_ = func_reg + 1;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
-        chunk.patchJump(skip, (uint16_t)chunk.currentPos());
+        size_t to_end = chunk.emitJump(Op::JUMP);
+        chunk.patchJump(to_nil, (uint16_t)chunk.currentPos());
+        chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0));
+        chunk.patchJump(to_end, (uint16_t)chunk.currentPos());
         reg_top_ = call_base + 1;
         last_reg_ = call_base;
         return;
@@ -1100,7 +1105,8 @@ void Compiler::visit(const ExprCallExpr& e) {
         compileInto(*e.callee, call_base);                 // callee dans call_base (check+résultat)
         reg_top_ = func_reg + 1;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        size_t skip = chunk.emitJump(Op::JUMP_IF_NIL, (uint8_t)call_base);
+        // f?(args) ≡ if f then f(args) else nil — JUMP_IF_FALSE saute les args (non évalués)
+        size_t to_nil = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
         chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
         for (int i = 0; i < argc; ++i) {                   // temps au-dessus de func_reg
             reg_top_ = func_reg + 1;
@@ -1109,7 +1115,10 @@ void Compiler::visit(const ExprCallExpr& e) {
         reg_top_ = func_reg + 1;
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
-        chunk.patchJump(skip, (uint16_t)chunk.currentPos());
+        size_t to_end = chunk.emitJump(Op::JUMP);
+        chunk.patchJump(to_nil, (uint16_t)chunk.currentPos());
+        chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0));
+        chunk.patchJump(to_end, (uint16_t)chunk.currentPos());
         reg_top_ = call_base + 1;
         last_reg_ = call_base;
         return;
@@ -1615,11 +1624,11 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     }
 
-    // appel optionnel obj.m?() : saute AVANT les args si la méthode (R[call_base+1])
-    // est nil → args non évalués. Sinon CALL_METHOD appelle (ou erre si non-callable).
+    // obj.m?() ≡ if m then m(args) else nil : JUMP_IF_FALSE saute AVANT les args
+    // si la méthode (R[call_base+1]) est falsy → args non évalués.
     size_t skip = 0;
     if (e.optional)
-        skip = chunk.emitJump(Op::JUMP_IF_NIL, (uint8_t)(call_base + 1));
+        skip = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)(call_base + 1));
 
     // R[call_base+2..argc+1] = args
     for (int i = 0; i < argc; ++i) {

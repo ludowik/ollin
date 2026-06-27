@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 15:40</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 15:52</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 15:40</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 15:52</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -812,13 +812,13 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
 <span class="bi">assert</span>(fact(<span class="num">10</span>) == <span class="num">3628800</span>)</code></pre>
 
 <h3>Appel optionnel — <code>f?()</code></h3>
-<p>La syntaxe <code>f?(args)</code> décide selon la valeur appelée — <strong>trichotomie</strong> :</p>
+<p>La syntaxe <code>f?(args)</code> est exactement le sucre de <code>if f then f(args) else nil</code> :</p>
 <ul>
-  <li><code>nil</code> → <strong>aucun appel</strong>, l'expression vaut <code>nil</code> ;</li>
-  <li><strong>appelable</strong> (fonction, closure, fonction intégrée, classe) → <strong>appel normal</strong> ;</li>
-  <li><strong>toute autre valeur</strong> (entier, chaîne, map…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
+  <li><code>f</code> <strong>falsy</strong> (<code>nil</code>, <code>0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>) → <strong>aucun appel</strong>, résultat <code>nil</code>, et les <strong>arguments ne sont pas évalués</strong> (aucun effet de bord) ;</li>
+  <li><code>f</code> <strong>appelable</strong> → <strong>appel normal</strong> ;</li>
+  <li><code>f</code> truthy mais non appelable (entier, chaîne…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
 </ul>
-<p>Pratique pour des callbacks facultatifs : seul <code>nil</code> est ignoré, une valeur du mauvais type reste une erreur. S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; une méthode absente → <code>nil</code>) et <code>super.m?()</code>. Quand l'appel n'a pas lieu (cas <code>nil</code>), les <strong>arguments ne sont pas évalués</strong> — leurs effets de bord ne se produisent pas.</p>
+<p>Cas d'usage typique : callback facultatif (<code>nil</code> → ignoré sans rien exécuter). S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; méthode absente → <code>nil</code>) et <code>super.m?()</code>. Côté implémentation, c'est un simple <code>JUMP_IF_FALSE</code> suivi de l'appel standard — pas d'opcode dédié.</p>
 <pre><code><span class="kw">func</span> greet() <span class="kw">return</span> <span class="str">"hello"</span> <span class="kw">end</span>
 <span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)   <span class="cmt">## appelable → appel normal</span>
 
@@ -833,7 +833,7 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
 <span class="kw">var</span> b = Box(<span class="num">7</span>)
 <span class="bi">assert</span>(b.get?() == <span class="num">7</span>)         <span class="cmt">## self injecté</span>
 <span class="bi">assert</span>(b.missing?() == <span class="kw">nil</span>)     <span class="cmt">## méthode absente → nil</span></code></pre>
-<div class="callout warn">Une valeur non appelable et <strong>non nil</strong> reste une erreur : <code>(42)?()</code> lève « call on non-function value ». Le <code>?</code> ne neutralise que le cas <code>nil</code>, et seulement pour l'appel immédiatement à sa gauche.</div>
+<div class="callout warn">Une valeur <strong>truthy</strong> mais non appelable reste une erreur : <code>(42)?()</code> lève « call on non-function value » (42 est truthy → on tente l'appel). Seules les valeurs falsy sont ignorées. Le <code>?</code> n'agit que sur l'appel immédiatement à sa gauche.</div>
 </section>
 
 <!-- ── Varargs ───────────────────────────────────────────────────────────── -->

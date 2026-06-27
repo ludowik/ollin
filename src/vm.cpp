@@ -355,7 +355,6 @@ void VM::runGoto(size_t stop_depth) {
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_MAKE_RANGE,
-        &&op_JUMP_IF_NIL,
         &&op_HALT,
     };
 
@@ -794,13 +793,6 @@ op_LOAD_FUNC:
     regs[base + A] = Value::makeFunc((uint8_t)Bx);
     NEXT();
 
-op_JUMP_IF_NIL: {
-    // primitif générique : saute si R[A] est nil. Utilisé par l'appel optionnel
-    // f?() (skip → résultat nil, args non évalués). L'erreur sur valeur non
-    // appelable est laissée à l'appel standard (CALL_DYN/CALL_METHOD).
-    if (regs[base + A].isNil()) ip = Bx;
-    NEXT();
-}
 op_CALL_DYN: {
     // A=arg_base, B=func_val_reg, C=argc
     if (regs[base + B].isBuiltin()) {
