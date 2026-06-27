@@ -897,7 +897,10 @@ void Compiler::visit(const VarExpr& e) {
 
 void Compiler::visit(const BinaryExpr& e) {
     e.left->accept(*this);  int rL = last_reg_;
-    int saved_after_left = reg_top_;
+    // protéger le registre du résultat gauche : un appel 0-arg (ou toute expr
+    // qui laisse reg_top_ <= rL) verrait sinon l'opérande droit le réécraser.
+    if (reg_top_ <= rL) reg_top_ = rL + 1;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     e.right->accept(*this); int rR = last_reg_;
     last_reg_ = reg_top_++;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
@@ -925,7 +928,6 @@ void Compiler::visit(const BinaryExpr& e) {
         case 'r': chunk.emit(makeABC((uint8_t)Op::BRSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
         default:  throw std::runtime_error(std::string("unknown binary op: ") + e.op);
     }
-    (void)saved_after_left;
 }
 
 // a < b < c  →  chaque opérande dans un registre dédié, comparaisons pairées, AND final

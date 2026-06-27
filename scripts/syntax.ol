@@ -339,6 +339,16 @@ func add(a, b)
 end
 assert(add(3, 4) == 7)
 
+## appel (y compris 0-arg) comme opérande gauche d'un opérateur binaire :
+## le résultat de l'appel ne doit pas être écrasé par l'opérande droit
+func five() return 5 end
+func three() return 3 end
+assert(five() + 2 == 7)
+assert(five() * 2 == 10)
+assert(five() ^ 2 == 25)
+assert(five() + three() == 8)
+assert((five() < 10) == 1)
+
 ## appel optionnel f?() : nil → rien (nil), fonction → appel, autre → erreur
 assert(add?(3, 4) == 7)     ## callable → appel normal
 var maybe = nil
