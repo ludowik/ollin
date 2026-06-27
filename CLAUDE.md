@@ -218,7 +218,7 @@ En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.
 Implémentation : `Map { unordered_map<Value,Value,ValueHash,ValueEqual> data; int refcount; }` — pure hashmap, ref-counted.  
 Clés de tout type Value (ValueHash/ValueEqual : INTEGER(1)==FLOAT(1.0), strings par pointeur).  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
-`isFalsy(map)` → toujours `false`.  
+`isFalsy(map)` → `mapSize() == 0` (« le vide est faux » ; une instance a ≥1 clé `__class__` → truthy). Idem `isFalsy(array)` → `arraySize() == 0`.  
 Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.  
 Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 

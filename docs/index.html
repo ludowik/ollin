@@ -478,14 +478,15 @@ pre:hover .code-actions,
 </table>
 
 <h3>Règles de vérité (truthy/falsy)</h3>
+<p>Principe unique : <strong>le vide est faux</strong>. Une valeur est <em>falsy</em> si elle représente l'absence ou le vide (<code>nil</code>, <code>false</code>, zéro, chaîne/map/array vide) ; tout le reste est <em>truthy</em>.</p>
 <table>
 <tr><th>Valeur</th><th>Falsy si</th></tr>
 <tr><td>nil</td><td>toujours</td></tr>
 <tr><td>integer / bool</td><td>== 0</td></tr>
 <tr><td>float</td><td>== 0.0</td></tr>
 <tr><td>string</td><td>chaîne vide <code>""</code></td></tr>
-<tr><td>map</td><td>jamais (toujours truthy)</td></tr>
-<tr><td>array</td><td>jamais (toujours truthy)</td></tr>
+<tr><td>map</td><td>vide <code>{}</code></td></tr>
+<tr><td>array</td><td>vide <code>[]</code></td></tr>
 </table>
 
 <pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)        <span class="cmt">## true est stocké comme 1</span>
@@ -656,8 +657,8 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
 <h2>Chaînes</h2>
 <pre><code><span class="kw">var</span> s = <span class="str">"bonjour"</span>
 <span class="bi">assert</span>(s == <span class="str">"bonjour"</span>)
-<span class="bi">assert</span>(<span class="str">""</span> == <span class="bool">false</span>) <span class="cmt">## chaîne vide est falsy</span>
-<span class="bi">assert</span>(<span class="str">"texte"</span> == <span class="bool">true</span>) <span class="cmt">## non vide est truthy</span></code></pre>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)        <span class="cmt">## chaîne vide est falsy</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="kw">not</span> <span class="str">"texte"</span>) <span class="cmt">## non vide est truthy</span></code></pre>
 
 <p>La concaténation se fait avec <code>+</code> :</p>
 <pre><code><span class="kw">var</span> greeting = <span class="str">"Hello, "</span> + <span class="str">"world"</span> + <span class="str">"!"</span>

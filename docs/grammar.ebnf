@@ -130,7 +130,7 @@ mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* clé calculée : [expr] évalue expr à l'exécution et utilise sa valeur comme clé *)
                  (*   { [ref]: 12 } → clé = valeur de la variable ref (toute Value : string, int, …) *)
                  (* accès : m["k"] et m.k sont équivalents (lecture, écriture, compound) *)
-                 (* sémantique de copie : référence comptée (pas de clone) ; map toujours truthy *)
+                 (* sémantique de copie : référence comptée (pas de clone) ; map vide → falsy (« le vide est faux ») *)
 arrayLit       = "[" [ expr { "," expr } ] "]" ;
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
              (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)

@@ -159,13 +159,17 @@ assert(fa == 0)
 var fo = false or false
 assert(fo == 0)
 
-## vérité des types
+## vérité des types — principe « le vide est faux »
 assert(1    == true)
 assert(0    == false)
 assert(not not "x")    ## string non vide : truthy (== ne coerce pas les types)
 assert(not "")         ## string vide : falsy
 assert(not nil)        ## nil est falsy, mais nil <> false (types distincts)
 assert(nil <> false)   ## nil et false sont des types distincts
+assert(not {})         ## map vide : falsy
+assert(not [])         ## array vide : falsy
+assert(not not {a:1})  ## map non vide : truthy
+assert(not not [1])    ## array non vide : truthy
 
 ## ── 7. Opérateurs bits ───────────────────────────────────────────────────────
 

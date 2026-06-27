@@ -245,11 +245,14 @@ inline Value& Value::operator=(Value&& o) noexcept {
 inline Value::~Value() { release(); }
 
 inline bool isFalsy(const Value& v) {
+    // principe : « le vide est faux »
     if (v.isNil())     return true;
     if (v.isInteger()) return v.asInt() == 0;
     if (v.isFloat())   return v.asFloat() == 0.0;
     if (v.isString())  return v.asString().empty();
-    return false;  // map, array → toujours truthy
+    if (v.isArray())   return v.arraySize() == 0;
+    if (v.isMap())     return v.mapSize()   == 0;  // instance : ≥1 clé (__class__) → truthy
+    return false;      // T_CLASS, range, closure, function → truthy
 }
 
 inline Value numValue(double d) {
