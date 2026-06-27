@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 13:59</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-27 14:29</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 13:59</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-27 14:29</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -812,21 +812,28 @@ flags = flags <span class="op">^</span> <span class="num">1</span> <span class="
 <span class="bi">assert</span>(fact(<span class="num">10</span>) == <span class="num">3628800</span>)</code></pre>
 
 <h3>Appel optionnel — <code>f?()</code></h3>
-<p>La syntaxe <code>f?(args)</code> n'appelle <code>f</code> que si elle est <strong>appelable</strong> (fonction, closure, fonction intégrée, classe). Sinon — <code>nil</code> ou toute valeur non appelable — il n'y a <strong>aucun appel et aucune erreur</strong>, et l'expression vaut <code>nil</code>. Pratique pour des callbacks facultatifs.</p>
+<p>La syntaxe <code>f?(args)</code> décide selon la valeur appelée — <strong>trichotomie</strong> :</p>
+<ul>
+  <li><code>nil</code> → <strong>aucun appel</strong>, l'expression vaut <code>nil</code> ;</li>
+  <li><strong>appelable</strong> (fonction, closure, fonction intégrée, classe) → <strong>appel normal</strong> ;</li>
+  <li><strong>toute autre valeur</strong> (entier, chaîne, map…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
+</ul>
+<p>Pratique pour des callbacks facultatifs : seul <code>nil</code> est ignoré, une valeur du mauvais type reste une erreur. S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; une méthode absente → <code>nil</code>) et <code>super.m?()</code>.</p>
 <pre><code><span class="kw">func</span> greet() <span class="kw">return</span> <span class="str">"hello"</span> <span class="kw">end</span>
 <span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)   <span class="cmt">## appelable → appel normal</span>
 
 <span class="kw">var</span> cb = <span class="kw">nil</span>
 <span class="bi">assert</span>(cb?() == <span class="kw">nil</span>)          <span class="cmt">## nil → pas d'appel, pas d'erreur</span>
 
-<span class="kw">var</span> n = <span class="num">42</span>
-<span class="bi">assert</span>(n?() == <span class="kw">nil</span>)           <span class="cmt">## valeur non appelable → nil</span>
-
-<span class="cmt">## callback facultatif dans une map</span>
-<span class="kw">var</span> opts = {on_done: <span class="kw">func</span>() <span class="kw">return</span> <span class="str">"fini"</span> <span class="kw">end</span>}
-<span class="bi">assert</span>(opts[<span class="str">"on_done"</span>]?() == <span class="str">"fini"</span>)
-<span class="bi">assert</span>(opts[<span class="str">"on_error"</span>]?() == <span class="kw">nil</span>)   <span class="cmt">## clé absente → nil → ignoré</span></code></pre>
-<div class="callout">Sans le <code>?</code>, appeler une valeur non appelable (<code>cb()</code> avec <code>cb = nil</code>) lève une erreur d'exécution. Le <code>?</code> ne supprime l'appel que pour l'opérande immédiatement à sa gauche.</div>
+<span class="cmt">## callback facultatif + appel optionnel de méthode (self injecté)</span>
+<span class="kw">class</span> Box
+    <span class="kw">func</span> init(v) self.v = v <span class="kw">end</span>
+    <span class="kw">func</span> get() <span class="kw">return</span> self.v <span class="kw">end</span>
+<span class="kw">end</span>
+<span class="kw">var</span> b = Box(<span class="num">7</span>)
+<span class="bi">assert</span>(b.get?() == <span class="num">7</span>)         <span class="cmt">## self injecté</span>
+<span class="bi">assert</span>(b.missing?() == <span class="kw">nil</span>)     <span class="cmt">## méthode absente → nil</span></code></pre>
+<div class="callout warn">Une valeur non appelable et <strong>non nil</strong> reste une erreur : <code>(42)?()</code> lève « call on non-function value ». Le <code>?</code> ne neutralise que le cas <code>nil</code>, et seulement pour l'appel immédiatement à sa gauche.</div>
 </section>
 
 <!-- ── Varargs ───────────────────────────────────────────────────────────── -->

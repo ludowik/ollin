@@ -314,6 +314,7 @@ struct MethodCallExpr : Expr {
     std::string method;
     std::vector<std::unique_ptr<Expr>> args;
     bool is_super = false;
+    bool optional = false;   // obj.m?() : appelle si la méthode est callable, nil si absente
     void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 

@@ -88,6 +88,19 @@ check_error "decimal double point"       'print(1.2.3)'  "invalid number literal
 check_error "hex hors limites"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
 check_error "decimal hors limites"       'print(99999999999999999999999)' "out of range"
 
+# ── appel optionnel : non-nil non-callable → erreur (nil seul est ignoré) ──────
+check_error "appel optionnel sur entier" \
+    'var x = 42
+print(x?())' \
+    "call on non-function value"
+check_error "methode optionnelle sur champ data" \
+    'class A
+    func init() self.x = 7 end
+end
+var a = A()
+print(a.x?())' \
+    "method call on non-function value"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

@@ -1568,6 +1568,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (reg_top_ > reg_count_) reg_count_ = reg_top_;
     }
 
-    chunk.emit(makeABC((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
+    chunk.emit(makeABC((uint8_t)(e.optional ? Op::CALL_METHOD_OPT : Op::CALL_METHOD),
+                       (uint8_t)call_base, 0, (uint8_t)argc));
     last_reg_ = call_base;
 }

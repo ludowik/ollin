@@ -356,6 +356,7 @@ void VM::runGoto(size_t stop_depth) {
         &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_MAKE_RANGE,
         &&op_CALL_DYN_OPT,
+        &&op_CALL_METHOD_OPT,
         &&op_HALT,
     };
 
@@ -795,8 +796,9 @@ op_LOAD_FUNC:
     NEXT();
 
 op_CALL_DYN_OPT: {
-    // appel optionnel f?() : si R[B] n'est pas callable → R[A]=nil, pas d'appel
-    if (!regs[base + B].isCallable()) { regs[base + A] = Value{}; NEXT(); }
+    // appel optionnel f?() : nil → rien (R[A]=nil) ; callable → appel ;
+    // non-nil non-callable → tombe dans CALL_DYN qui lève l'erreur
+    if (regs[base + B].isNil()) { regs[base + A] = Value{}; NEXT(); }
     // sinon : tombe dans op_CALL_DYN
 }
 op_CALL_DYN: {
@@ -905,6 +907,12 @@ op_NEW_CLASS:
     regs[base + A] = Value::makeClass();
     NEXT();
 
+op_CALL_METHOD_OPT: {
+    // appel de méthode optionnel obj.m?() : méthode nil → R[A]=nil, pas d'appel ;
+    // callable → appel avec self ; non-nil non-callable → CALL_METHOD lève l'erreur
+    if (regs[base + A + 1].isNil()) { regs[base + A] = Value{}; NEXT(); }
+    // sinon : tombe dans op_CALL_METHOD
+}
 op_CALL_METHOD: {
     uint32_t fp_addr = 0;
     {

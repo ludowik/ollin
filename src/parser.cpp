@@ -661,12 +661,15 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
         } else if (check(TokenType::DOT)) {
             advance();
             std::string field = expect(TokenType::IDENTIFIER).lexeme;
-            if (check(TokenType::LPAREN)) {
+            bool opt_m = check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN;
+            if (check(TokenType::LPAREN) || opt_m) {
+                if (opt_m) advance(); // consume '?'
                 advance(); // consume LPAREN
                 auto mc = std::make_unique<MethodCallExpr>();
                 mc->receiver = std::move(base);
                 mc->method = field;
                 mc->is_super = false;
+                mc->optional = opt_m;
                 if (!check(TokenType::RPAREN)) {
                     mc->args.push_back(expr());
                     while (match(TokenType::COMMA))
@@ -804,6 +807,8 @@ std::unique_ptr<Expr> Parser::primary() {
         if (name == "super") {
             expect(TokenType::DOT);
             std::string method_name = expect(TokenType::IDENTIFIER).lexeme;
+            bool opt_super = check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN;
+            if (opt_super) advance(); // consume '?'
             if (!check(TokenType::LPAREN))
                 throw std::runtime_error("line " + std::to_string(peek().line) +
                                          ": super: seuls les appels de méthode sont supportés");
@@ -812,6 +817,7 @@ std::unique_ptr<Expr> Parser::primary() {
             mc->receiver = nullptr;
             mc->method = method_name;
             mc->is_super = true;
+            mc->optional = opt_super;
             if (!check(TokenType::RPAREN)) {
                 mc->args.push_back(expr());
                 while (match(TokenType::COMMA))
