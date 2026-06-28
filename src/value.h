@@ -60,6 +60,7 @@ private:
     explicit Value(Range*    p) : tag(T_RANGE),    str_hash(0), rptr(p) {}
     void release() noexcept;
     void release_cold() noexcept;   // chemin froid (types ref-comptés) — non inliné
+    void retain() const noexcept;
 
 public:
     Value()              : tag(T_NIL),     str_hash(0), ival(0) {}
@@ -191,17 +192,12 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
     }
 }
 
-inline Value Value::makeIterFrom(const Value& src) {
-    if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
-    if (src.isArray()) return Value(array_iter_pool().acquire(src.aptr));
-    if (src.isRange()) return Value(new RangeIterator(src.rptr));
-    throw std::runtime_error("runtime: for-in on non-iterable");
-}
-
-inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.ival) {
-    // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets) ; seul
-    // un type ref-compté (tag >= T_STRING) demande un retain.
-    if (tag < T_STRING) return;
+// Symétrique de release() : incrémente le refcount du type ref-compté pointé.
+// Corps trivial (++refcount) → reste inlinable AVEC le switch (pas de découpe
+// cold comme release, dont les corps sont lourds) ; T_FUNCTION/T_BUILTIN (tag
+// >= T_STRING mais non comptés) tombent sur default:break sans appel.
+inline void Value::retain() const noexcept {
+    if (tag < T_STRING) return;   // POD : rien à retenir (un seul test)
     switch (tag) {
         case T_STRING:   ++sptr->refcount; break;
         case T_MAP:
@@ -213,22 +209,22 @@ inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.i
         default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
     }
 }
+
+inline Value Value::makeIterFrom(const Value& src) {
+    if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
+    if (src.isArray()) return Value(array_iter_pool().acquire(src.aptr));
+    if (src.isRange()) return Value(new RangeIterator(src.rptr));
+    throw std::runtime_error("runtime: for-in on non-iterable");
+}
+
+inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.ival) {
+    // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets) ; seul
+    // un type ref-compté (tag >= T_STRING) demande un retain.
+    retain();
+}
 inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
-    // Retain d'abord (protège si this et o partagent la même ressource).
-    // Seul un type ref-compté (tag >= T_STRING) le nécessite ; POD → rien.
-    if (o.tag >= T_STRING) {
-        switch (o.tag) {
-            case T_STRING:   ++o.sptr->refcount; break;
-            case T_MAP:
-            case T_CLASS:    o.mptr->refcount++; break;
-            case T_ARRAY:    o.aptr->refcount++; break;
-            case T_ITERATOR: o.iptr->refcount++; break;
-            case T_CLOSURE:  o.cptr->refcount++; break;
-            case T_RANGE:    o.rptr->refcount++; break;
-            default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
-        }
-    }
+    o.retain();   // retain d'abord (protège si this et o partagent la même ressource)
     release();
     // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets)
     tag = o.tag; str_hash = o.str_hash; ival = o.ival;
