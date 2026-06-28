@@ -59,6 +59,7 @@ private:
     explicit Value(Closure*  p) : tag(T_CLOSURE),  str_hash(0), cptr(p) {}
     explicit Value(Range*    p) : tag(T_RANGE),    str_hash(0), rptr(p) {}
     void release() noexcept;
+    void release_cold() noexcept;   // chemin froid (types ref-comptés) — non inliné
 
 public:
     Value()              : tag(T_NIL),     str_hash(0), ival(0) {}
@@ -169,8 +170,15 @@ inline void  Value::arrayPush(const Value& v)                    { aptr->push(v)
 inline int64_t Value::arraySize()                          const { return (int64_t)aptr->items.size(); }
 inline int64_t Value::mapSize()                            const { return (int64_t)mptr->data.size(); }
 
+// Chemin chaud : pour nil/int/float (tag < T_STRING) il n'y a rien à libérer.
+// On garde ce test trivial inlinable à chaque site d'appel et on déporte le
+// switch ref-compté dans release_cold() (non inliné) → move-assign s'inline.
 inline void Value::release() noexcept {
-    if (tag < T_STRING) return;   // nil/int/float : POD, rien à libérer (un seul test)
+    if (tag < T_STRING) return;   // POD : rien à libérer (un seul test, inliné)
+    release_cold();
+}
+
+__attribute__((noinline)) inline void Value::release_cold() noexcept {
     switch (tag) {
         case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
         case T_MAP:
@@ -179,7 +187,7 @@ inline void Value::release() noexcept {
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
-        default: break;
+        default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
     }
 }
 
