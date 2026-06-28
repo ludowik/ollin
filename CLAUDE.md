@@ -95,6 +95,8 @@ Quand l'utilisateur dit **"perf"**, lancer : `bash bench/bench_all.sh`
 
 Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le tableau affiche : **temps absolu Lua** comme référence, **coefficient multiplicateur** (xN.NN) pour Ollin et Python.
 
+Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharger)** et on garde le **meilleur temps** : un run unique est trop sensible au bruit (contention CPU/cache) et peut afficher un coefficient faussé.
+
 | # | Benchmark | Script |
 |---|-----------|--------|
 | 1 | fib(35) récursif | `bench/bench_fib.*` |
