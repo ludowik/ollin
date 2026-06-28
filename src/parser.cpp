@@ -927,7 +927,8 @@ std::unique_ptr<Expr> Parser::primary() {
         auto e = expr();
         skipSemis();
         expect(TokenType::RPAREN);
-        return e;
+        // postfix sur une expression parenthésée : (expr)(args), (expr)[i], (expr).champ
+        return parsePostfix(std::move(e));
     }
     throw std::runtime_error("line " + std::to_string(peek().line) +
                              ": unexpected token '" + peek().lexeme + "'");

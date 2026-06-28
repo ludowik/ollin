@@ -349,6 +349,15 @@ assert(five() ^ 2 == 25)
 assert(five() + three() == 8)
 assert((five() < 10) == 1)
 
+## postfix sur expression parenthésée : (expr)(args), (expr)[i], (expr).champ
+assert((func(x) return x * 2 end)(21) == 42)   ## appel d'une lambda parenthésée
+assert(([10, 20, 30])[2] == 20)                 ## index
+assert(({a: 7}).a == 7)                         ## champ
+## capture par valeur via IIFE (échappatoire closures dans une boucle)
+var caps = []
+for i = 1, 3 do caps[i] = (func(x) return func() return x end end)(i) end
+assert(caps[1]() == 1 and caps[2]() == 2 and caps[3]() == 3)
+
 ## appel optionnel f?() : nil → rien (nil), fonction → appel, autre → erreur
 assert(add?(3, 4) == 7)     ## callable → appel normal
 var maybe = nil
