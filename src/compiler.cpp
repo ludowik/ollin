@@ -1345,9 +1345,9 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
                                    chunk.addConstant(Value((int64_t)1))));
     reg_top_ = ctl + 3;
 
-    size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl);   // Bx → FOR_LOOP (patché plus bas)
+    size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl);   // Bx → sortie si boucle vide (patché)
 
-    uint16_t body_addr = (uint16_t)chunk.currentPos();
+    uint16_t body_addr = (uint16_t)chunk.currentPos();          // FOR_PREP tombe ici si non vide
     bind(var1, ctl);                          // copie i dans la variable de boucle
 
     break_patches.push_back({});
@@ -1361,10 +1361,10 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
     uint16_t loop_addr = (uint16_t)chunk.currentPos();
     for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_addr);  // continue → FOR_LOOP
     continue_patches.pop_back();
-    chunk.patchJump(prep, loop_addr);
     chunk.emit(makeABx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
 
     uint16_t exit_addr = (uint16_t)chunk.currentPos();
+    chunk.patchJump(prep, exit_addr);         // FOR_PREP saute ici si la boucle est vide
     for (size_t p : break_patches.back()) chunk.patchJump(p, exit_addr);
     break_patches.pop_back();
 

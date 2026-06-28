@@ -962,7 +962,10 @@ op_MAKE_RANGE: {
 }
 
 op_FOR_PREP: {
-    // for numérique : R[A]=i, R[A+1]=limite, R[A+2]=pas (consécutifs, inclus aux 2 bornes)
+    // for numérique : R[A]=i, R[A+1]=limite, R[A+2]=pas (consécutifs, inclus aux 2 bornes).
+    // Valide, fige le type. Si la boucle est vide → ip=Bx (sortie). Sinon tombe dans le
+    // corps : i n'est PAS pré-décrémenté (évite le wrap à la borne basse).
+    bool empty;
     {
         Value& vi = regs[base + A];
         Value& vl = regs[base + A + 1];
@@ -973,17 +976,18 @@ op_FOR_PREP: {
         if (vi.isInteger() && vl.isInteger() && vs.isInteger()) {
             if (vs.asInt() == 0)
                 throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: for: le pas ne peut pas être 0");
-            regs[base + A] = Value(vi.asInt() - vs.asInt());   // pré-décrément (FOR_LOOP ré-ajoute)
+            empty = (vs.asInt() > 0) ? (vi.asInt() > vl.asInt()) : (vi.asInt() < vl.asInt());
         } else {
             double di = vi.asNum(), dl = vl.asNum(), ds = vs.asNum();
             if (ds == 0.0)
                 throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: for: le pas ne peut pas être 0");
-            regs[base + A]     = Value(di - ds);               // normalise tout en double
+            regs[base + A]     = Value(di);                    // normalise tout en double
             regs[base + A + 1] = Value(dl);
             regs[base + A + 2] = Value(ds);
+            empty = (ds > 0) ? (di > dl) : (di < dl);
         }
     }
-    ip = Bx;
+    if (empty) ip = Bx;   // boucle vide → sortie ; sinon on tombe dans le corps (1re itération)
     NEXT();
 }
 
@@ -994,13 +998,20 @@ op_FOR_LOOP: {
         Value& vl = regs[base + A + 1];
         Value& vs = regs[base + A + 2];
         if (vi.isInteger()) {                                  // type figé par FOR_PREP
-            int64_t ni = vi.asInt() + vs.asInt();
-            regs[base + A] = Value(ni);
-            cont = (vs.asInt() > 0) ? (ni <= vl.asInt()) : (ni >= vl.asInt());
+            int64_t i = vi.asInt(), st = vs.asInt(), lim = vl.asInt();
+            // garde anti-débordement : si i+st déborde, la prochaine valeur ne peut
+            // de toute façon pas rester dans la limite → fin de boucle (pas de wrap).
+            bool ovf = (st > 0) ? (i > INT64_MAX - st) : (i < INT64_MIN - st);
+            if (ovf) { cont = false; }
+            else {
+                int64_t ni = i + st;
+                cont = (st > 0) ? (ni <= lim) : (ni >= lim);
+                if (cont) regs[base + A] = Value(ni);
+            }
         } else {
             double ni = vi.asNum() + vs.asNum();
-            regs[base + A] = Value(ni);
             cont = (vs.asNum() > 0) ? (ni <= vl.asNum()) : (ni >= vl.asNum());
+            if (cont) regs[base + A] = Value(ni);
         }
     }
     if (cont) ip = Bx;   // → corps ; sinon on tombe sur la sortie
