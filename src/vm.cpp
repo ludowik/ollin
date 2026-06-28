@@ -355,6 +355,7 @@ void VM::runGoto(size_t stop_depth) {
         &&op_MAKE_CLOSURE, &&op_GET_UPVAL, &&op_SET_UPVAL,
         &&op_NEW_CLASS, &&op_CALL_METHOD,
         &&op_MAKE_RANGE,
+        &&op_FOR_PREP, &&op_FOR_LOOP,
         &&op_HALT,
     };
 
@@ -957,6 +958,52 @@ op_MAKE_RANGE: {
         Range* r = new Range{1, start, end, step, incl_right};
         regs[base + A] = Value::makeRange(r);
     }
+    NEXT();
+}
+
+op_FOR_PREP: {
+    // for numérique : R[A]=i, R[A+1]=limite, R[A+2]=pas (consécutifs, inclus aux 2 bornes)
+    {
+        Value& vi = regs[base + A];
+        Value& vl = regs[base + A + 1];
+        Value& vs = regs[base + A + 2];
+        if (!vi.isNumber() || !vl.isNumber() || !vs.isNumber())
+            throw std::runtime_error("line " + std::to_string(errLine()) +
+                ": runtime: for: bornes numériques attendues");
+        if (vi.isInteger() && vl.isInteger() && vs.isInteger()) {
+            if (vs.asInt() == 0)
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: for: le pas ne peut pas être 0");
+            regs[base + A] = Value(vi.asInt() - vs.asInt());   // pré-décrément (FOR_LOOP ré-ajoute)
+        } else {
+            double di = vi.asNum(), dl = vl.asNum(), ds = vs.asNum();
+            if (ds == 0.0)
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: for: le pas ne peut pas être 0");
+            regs[base + A]     = Value(di - ds);               // normalise tout en double
+            regs[base + A + 1] = Value(dl);
+            regs[base + A + 2] = Value(ds);
+        }
+    }
+    ip = Bx;
+    NEXT();
+}
+
+op_FOR_LOOP: {
+    bool cont;
+    {
+        Value& vi = regs[base + A];
+        Value& vl = regs[base + A + 1];
+        Value& vs = regs[base + A + 2];
+        if (vi.isInteger()) {                                  // type figé par FOR_PREP
+            int64_t ni = vi.asInt() + vs.asInt();
+            regs[base + A] = Value(ni);
+            cont = (vs.asInt() > 0) ? (ni <= vl.asInt()) : (ni >= vl.asInt());
+        } else {
+            double ni = vi.asNum() + vs.asNum();
+            regs[base + A] = Value(ni);
+            cont = (vs.asNum() > 0) ? (ni <= vl.asNum()) : (ni >= vl.asNum());
+        }
+    }
+    if (cont) ip = Bx;   // → corps ; sinon on tombe sur la sortie
     NEXT();
 }
 

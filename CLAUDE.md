@@ -162,6 +162,8 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | NEW_ARRAY     | A      | A=dest                     | R[A] = []  (array vide)                          |
 | ARRAY_PUSH    | AB     | A=arr, B=val               | R[A].push(R[B])                                  |
 | FOR_ITER_NEXT | ABx    | A=block_base, Bx=end_addr  | R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→Bx |
+| FOR_PREP      | ABx    | A=ctl, Bx=loop_addr        | for numérique : R[A..A+2]=i,limite,pas ; valide, fige int/float, i-=pas, ip=Bx |
+| FOR_LOOP      | ABx    | A=ctl, Bx=body_addr        | i+=pas ; si dans la limite → R[A]=i, ip=Bx (corps) ; sinon sortie |
 | LOAD_FUNC     | ABx    | A=dest, Bx=func_idx        | R[A] = T_FUNCTION (référence à funcs[Bx])        |
 | CALL_DYN      | ABC    | A=arg_base, B=func_reg, C=argc | appel via T_FUNCTION ou T_CLOSURE dans R[B]  |
 | MAKE_CLOSURE  | ABx    | A=dest, Bx=func_idx        | R[A] = Closure{func_idx, capture upvals depuis frame courant} |
@@ -195,9 +197,13 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 > Syntaxe et sémantique (formes numérique/itérateur, valeur primaire, step) : voir `grammar.ebnf` (`forStmt`).
 
-**Numérique** : step absent → step = 1 (condition `i <= end`) ; step présent → condition runtime `(end - i) * step >= 0` (valide dans les deux sens).  
-Dans une fonction : `i` = registre local, `end`/`step` = registres temporaires au-dessus de `locals_top_`.  
-En portée globale : `i`, `__for_end_N`, `__for_step_N` sont des globaux.
+**Désucrage** : `for i = a, b[, step]` est réécrit par le parser en `for i in [a;b[;step]]` (RangeExpr inclus aux deux bornes). Il n'existe qu'un nœud AST : `ForIterStmt`.
+
+**Chemin rapide numérique** (`compileNumericFor`) : déclenché quand `iter_expr` est un **RangeExpr littéral inclus aux deux bornes** (`incl_left && incl_right`) avec **1 variable** — couvre `for i = a, b[, step]` et `for i in [a;b]`. Pas de `Range` ni d'itérateur ni de dispatch virtuel.  
+- 3 registres consécutifs `ctl/ctl+1/ctl+2` = `i / limite / pas`.  
+- `FOR_PREP ctl, →FOR_LOOP` : valide (nombres, pas≠0), fige le type (tout int → int64 ; sinon tout converti en double), `i -= pas`, saute vers `FOR_LOOP`.  
+- `FOR_LOOP ctl, →corps` : `i += pas` ; si dans la limite (`≤` si pas>0, `≥` sinon) → `R[ctl]=i`, saut vers le corps ; sinon sortie. `bind(var1, ctl)` copie `i` dans la variable en tête de corps (modifier la variable dans le corps n'affecte pas l'itération).  
+Les ranges ouverts (`[a;b[`, `]a;b]`…) et `for k,v in …` gardent le chemin itérateur ci-dessous.
 
 **Itérateur** (`for [k,] v in expr`) : `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`.  
 - 2 vars : `FOR_ITER_NEXT` → `[block+1]`=key, `[block+2]`=val. 3 registres + 1 temp source.  

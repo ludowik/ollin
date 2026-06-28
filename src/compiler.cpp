@@ -1308,7 +1308,67 @@ void Compiler::compileIteratorLoop(const Expr& src,
 
 void Compiler::visit(const ForIterStmt& s) {
     if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    // chemin rapide : for i in <range littéral inclus aux deux bornes>, 1 variable
+    // (couvre la forme `for i = a, b[, step]`). Évite Range + itérateur + dispatch virtuel.
+    if (s.var2.empty()) {
+        if (auto* r = dynamic_cast<const RangeExpr*>(s.iter_expr.get())) {
+            if (r->incl_left && r->incl_right) {
+                compileNumericFor(*r, s.var1, s.body);
+                return;
+            }
+        }
+    }
     compileIteratorLoop(*s.iter_expr, s.var1, s.var2, s.body);
+}
+
+void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
+                                 const std::vector<std::unique_ptr<Stmt>>& body) {
+    auto bind = [&](const std::string& name, int src_reg) {
+        auto it = local_regs_.find(name);
+        if (it != local_regs_.end()) {
+            if (it->second != src_reg)
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)src_reg, 0));
+        } else {
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
+                               (uint8_t)src_reg, chunk.addIdentifier(name)));
+        }
+    };
+
+    int ctl = reg_top_;                       // ctl, ctl+1, ctl+2 = i, limite, pas
+    reg_top_ = ctl + 3;
+    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+
+    compileInto(*r.start, ctl);
+    compileInto(*r.end,   ctl + 1);
+    if (r.step) compileInto(*r.step, ctl + 2);
+    else        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(ctl + 2),
+                                   chunk.addConstant(Value((int64_t)1))));
+    reg_top_ = ctl + 3;
+
+    size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl);   // Bx → FOR_LOOP (patché plus bas)
+
+    uint16_t body_addr = (uint16_t)chunk.currentPos();
+    bind(var1, ctl);                          // copie i dans la variable de boucle
+
+    break_patches.push_back({});
+    continue_patches.push_back({});
+    for (auto& stmt : body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+
+    uint16_t loop_addr = (uint16_t)chunk.currentPos();
+    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_addr);  // continue → FOR_LOOP
+    continue_patches.pop_back();
+    chunk.patchJump(prep, loop_addr);
+    chunk.emit(makeABx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
+
+    uint16_t exit_addr = (uint16_t)chunk.currentPos();
+    for (size_t p : break_patches.back()) chunk.patchJump(p, exit_addr);
+    break_patches.pop_back();
+
+    reg_top_ = ctl;
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {

@@ -55,6 +55,9 @@ private:
     void    compileIteratorLoop(const Expr& src, const std::string& var1,
                                 const std::string& var2,
                                 const std::vector<std::unique_ptr<Stmt>>& body);
+    // chemin rapide for numérique (range littéral inclus aux 2 bornes, 1 variable)
+    void    compileNumericFor(const RangeExpr& r, const std::string& var1,
+                              const std::vector<std::unique_ptr<Stmt>>& body);
 
     int allocReg() {
         int r = reg_top_++;

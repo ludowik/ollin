@@ -60,5 +60,7 @@ enum class Op : uint8_t {
     NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags (bit0=incl_right,bit1=has_step)
+    FOR_PREP,       // ABx: for numérique — R[A]=i, R[A+1]=limite, R[A+2]=pas. valide, normalise int/float, i-=pas, ip=Bx (vers FOR_LOOP)
+    FOR_LOOP,       // ABx: i+=pas ; si dans la limite (incl) → R[A]=i, ip=Bx (corps) ; sinon continue (sortie)
     HALT,
 };
