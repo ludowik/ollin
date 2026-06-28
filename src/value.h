@@ -170,6 +170,7 @@ inline int64_t Value::arraySize()                          const { return (int64
 inline int64_t Value::mapSize()                            const { return (int64_t)mptr->data.size(); }
 
 inline void Value::release() noexcept {
+    if (tag < T_STRING) return;   // nil/int/float : POD, rien à libérer (un seul test)
     switch (tag) {
         case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
         case T_MAP:
@@ -189,51 +190,40 @@ inline Value Value::makeIterFrom(const Value& src) {
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
 
-inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(0) {
+inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.ival) {
+    // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets) ; seul
+    // un type ref-compté (tag >= T_STRING) demande un retain.
+    if (tag < T_STRING) return;
     switch (tag) {
-        case T_NIL:      break;
-        case T_INTEGER:  ival = o.ival; break;
-        case T_FLOAT:    dval = o.dval; break;
-        case T_STRING:   sptr = o.sptr; ++sptr->refcount; break;
-        case T_MAP:      mptr = o.mptr; mptr->refcount++; break;
-        case T_CLASS:    mptr = o.mptr; mptr->refcount++; break;
-        case T_ARRAY:    aptr = o.aptr; aptr->refcount++; break;
-        case T_ITERATOR: iptr = o.iptr; iptr->refcount++; break;
-        case T_FUNCTION: ival = o.ival; break;
-        case T_CLOSURE:  cptr = o.cptr; cptr->refcount++; break;
-        case T_BUILTIN:  ival = o.ival; break;
-        case T_RANGE:    rptr = o.rptr; rptr->refcount++; break;
+        case T_STRING:   ++sptr->refcount; break;
+        case T_MAP:
+        case T_CLASS:    mptr->refcount++; break;
+        case T_ARRAY:    aptr->refcount++; break;
+        case T_ITERATOR: iptr->refcount++; break;
+        case T_CLOSURE:  cptr->refcount++; break;
+        case T_RANGE:    rptr->refcount++; break;
+        default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
     }
 }
 inline Value& Value::operator=(const Value& o) {
     if (this == &o) return *this;
-    // Retain d'abord (protège si this et o partagent la même ressource)
-    switch (o.tag) {
-        case T_STRING:   ++o.sptr->refcount; break;
-        case T_MAP:      o.mptr->refcount++;             break;
-        case T_CLASS:    o.mptr->refcount++;             break;
-        case T_ARRAY:    o.aptr->refcount++;             break;
-        case T_ITERATOR: o.iptr->refcount++;             break;
-        case T_CLOSURE:  o.cptr->refcount++;             break;
-        case T_RANGE:    o.rptr->refcount++;             break;
-        default: break;
+    // Retain d'abord (protège si this et o partagent la même ressource).
+    // Seul un type ref-compté (tag >= T_STRING) le nécessite ; POD → rien.
+    if (o.tag >= T_STRING) {
+        switch (o.tag) {
+            case T_STRING:   ++o.sptr->refcount; break;
+            case T_MAP:
+            case T_CLASS:    o.mptr->refcount++; break;
+            case T_ARRAY:    o.aptr->refcount++; break;
+            case T_ITERATOR: o.iptr->refcount++; break;
+            case T_CLOSURE:  o.cptr->refcount++; break;
+            case T_RANGE:    o.rptr->refcount++; break;
+            default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
+        }
     }
     release();
-    tag = o.tag; str_hash = o.str_hash; ival = 0;
-    switch (tag) {
-        case T_NIL:      break;
-        case T_INTEGER:  ival = o.ival; break;
-        case T_FLOAT:    dval = o.dval; break;
-        case T_STRING:   sptr = o.sptr; break;
-        case T_MAP:      mptr = o.mptr; break;
-        case T_CLASS:    mptr = o.mptr; break;
-        case T_ARRAY:    aptr = o.aptr; break;
-        case T_ITERATOR: iptr = o.iptr; break;
-        case T_FUNCTION: ival = o.ival; break;
-        case T_CLOSURE:  cptr = o.cptr; break;
-        case T_BUILTIN:  ival = o.ival; break;
-        case T_RANGE:    rptr = o.rptr; break;
-    }
+    // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets)
+    tag = o.tag; str_hash = o.str_hash; ival = o.ival;
     return *this;
 }
 inline Value& Value::operator=(Value&& o) noexcept {
