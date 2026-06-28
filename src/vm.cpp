@@ -992,9 +992,20 @@ op_FOR_PREP: {
             throw std::runtime_error("line " + std::to_string(errLine()) +
                 ": runtime: for: bornes numériques attendues");
         if (vi.isInteger() && vl.isInteger() && vs.isInteger()) {
-            if (vs.asInt() == 0)
+            int64_t i0 = vi.asInt(), lim = vl.asInt(), st = vs.asInt();
+            if (st == 0)
                 throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: for: le pas ne peut pas être 0");
-            empty = (vs.asInt() > 0) ? (vi.asInt() > vl.asInt()) : (vi.asInt() < vl.asInt());
+            empty = (st > 0) ? (i0 > lim) : (i0 < lim);
+            if (!empty) {
+                // Compteur de tours RESTANTS (après la 1re itération), calculé une seule
+                // fois en arithmétique non signée → sûr au débordement, et FOR_LOOP n'a
+                // plus besoin de garde anti-débordement ni de comparer la limite. La
+                // limite (R[A+1]) est remplacée par ce compteur.
+                uint64_t ustep  = (st > 0) ? (uint64_t)st : (0ull - (uint64_t)st);
+                uint64_t urange = (st > 0) ? ((uint64_t)lim - (uint64_t)i0)
+                                           : ((uint64_t)i0 - (uint64_t)lim);
+                regs[base + A + 1] = Value((int64_t)(urange / ustep));
+            }
         } else {
             double di = vi.asNum(), dl = vl.asNum(), ds = vs.asNum();
             if (ds == 0.0)
@@ -1016,15 +1027,16 @@ op_FOR_LOOP: {
         Value& vl = regs[base + A + 1];
         Value& vs = regs[base + A + 2];
         if (vi.isInteger()) {                                  // type figé par FOR_PREP
-            int64_t i = vi.asInt(), st = vs.asInt(), lim = vl.asInt();
-            // garde anti-débordement : si i+st déborde, la prochaine valeur ne peut
-            // de toute façon pas rester dans la limite → fin de boucle (pas de wrap).
-            bool ovf = (st > 0) ? (i > INT64_MAX - st) : (i < INT64_MIN - st);
-            if (ovf) { cont = false; }
-            else {
-                int64_t ni = i + st;
-                cont = (st > 0) ? (ni <= lim) : (ni >= lim);
-                if (cont) regs[base + A] = Value(ni);
+            // R[A+1] = compteur de tours restants (posé par FOR_PREP). Tant qu'il est
+            // non nul : décrémenter, avancer i. Pas de garde anti-débordement : le
+            // compteur garantit que i + st reste dans la plage initiale.
+            uint64_t cnt = (uint64_t)vl.asInt();
+            if (cnt != 0) {
+                vl = Value((int64_t)(cnt - 1));
+                vi = Value(vi.asInt() + vs.asInt());
+                cont = true;
+            } else {
+                cont = false;
             }
         } else {
             double ni = vi.asNum() + vs.asNum();
