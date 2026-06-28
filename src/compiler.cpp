@@ -1321,6 +1321,64 @@ void Compiler::visit(const ForIterStmt& s) {
     compileIteratorLoop(*s.iter_expr, s.var1, s.var2, s.body);
 }
 
+// ── analyse de sûreté pour aliaser la variable de boucle au registre de contrôle ──
+// Vrai si l'expression contient une lambda (capture potentielle de la var de boucle).
+static bool exprHasLambda(const Expr* e) {
+    if (!e) return false;
+    if (dynamic_cast<const FuncExpr*>(e)) return true;
+    if (auto* b = dynamic_cast<const BinaryExpr*>(e))   return exprHasLambda(b->left.get()) || exprHasLambda(b->right.get());
+    if (auto* u = dynamic_cast<const UnaryExpr*>(e))    return exprHasLambda(u->operand.get());
+    if (auto* c = dynamic_cast<const CallExpr*>(e))     { for (auto& a : c->args) if (exprHasLambda(a.get())) return true; return false; }
+    if (auto* c = dynamic_cast<const ExprCallExpr*>(e)) { if (exprHasLambda(c->callee.get())) return true; for (auto& a : c->args) if (exprHasLambda(a.get())) return true; return false; }
+    if (auto* m = dynamic_cast<const MethodCallExpr*>(e)){ if (exprHasLambda(m->receiver.get())) return true; for (auto& a : m->args) if (exprHasLambda(a.get())) return true; return false; }
+    if (auto* i = dynamic_cast<const IndexExpr*>(e))    return exprHasLambda(i->obj.get()) || exprHasLambda(i->key.get());
+    if (auto* mp= dynamic_cast<const MapExpr*>(e))      { for (auto& en : mp->entries) if (exprHasLambda(en.key.get()) || exprHasLambda(en.value.get())) return true; return false; }
+    if (auto* ar= dynamic_cast<const ArrayExpr*>(e))    { for (auto& x : ar->elements) if (exprHasLambda(x.get())) return true; return false; }
+    if (auto* rg= dynamic_cast<const RangeExpr*>(e))    return exprHasLambda(rg->start.get()) || exprHasLambda(rg->end.get()) || exprHasLambda(rg->step.get());
+    if (auto* cc= dynamic_cast<const ChainedCompareExpr*>(e)) { for (auto& o : cc->operands) if (exprHasLambda(o.get())) return true; return false; }
+    if (dynamic_cast<const VarExpr*>(e) || dynamic_cast<const NumberExpr*>(e) ||
+        dynamic_cast<const StringExpr*>(e) || dynamic_cast<const BoolExpr*>(e) ||
+        dynamic_cast<const NilExpr*>(e) || dynamic_cast<const VarArgExpr*>(e)) return false;
+    return true;   // type inconnu → conservatif
+}
+
+// Vrai si le corps est sûr pour aliaser la var de boucle 'v' au registre de contrôle :
+// aucune réassignation de v, aucune lambda, aucune structure de contrôle imbriquée
+// (conservatif — couvre les corps « feuilles » comme s += i).
+static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& v) {
+    for (auto& sp : body) {
+        const Stmt* s = sp.get();
+        if (auto* a = dynamic_cast<const AssignStmt*>(s)) {
+            if (a->name == v) return false;
+            if (exprHasLambda(a->value.get())) return false;
+        } else if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) {
+            for (auto& t : m->targets) {
+                if (t.kind == LValue::VAR && t.name == v) return false;
+                if (t.key && exprHasLambda(t.key.get())) return false;
+            }
+            for (auto& val : m->values) if (exprHasLambda(val.get())) return false;
+        } else if (auto* d = dynamic_cast<const VarDeclStmt*>(s)) {
+            for (auto& n : d->names) if (n == v) return false;   // shadow
+            for (auto& val : d->values) if (exprHasLambda(val.get())) return false;
+        } else if (auto* e = dynamic_cast<const ExprStmt*>(s)) {
+            if (exprHasLambda(e->expr.get())) return false;
+        } else if (auto* r = dynamic_cast<const ReturnStmt*>(s)) {
+            for (auto& x : r->values) if (exprHasLambda(x.get())) return false;
+        } else if (auto* th = dynamic_cast<const ThrowStmt*>(s)) {
+            if (exprHasLambda(th->value.get())) return false;
+        } else if (auto* ia = dynamic_cast<const IndexAssignStmt*>(s)) {
+            // obj==v n'écrit pas v (écrit dans son conteneur) ; vérifier key/value
+            if (exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get())) return false;
+        } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
+                   dynamic_cast<const CommentStmt*>(s)) {
+            // sûr
+        } else {
+            return false;   // if/while/for/block/try/switch/funcdecl/… → conservatif
+        }
+    }
+    return true;
+}
+
 void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
                                  const std::vector<std::unique_ptr<Stmt>>& body) {
     auto bind = [&](const std::string& name, int src_reg) {
@@ -1338,6 +1396,7 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
     reg_top_ = ctl + 3;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
+    // bornes compilées AVANT l'alias (pour que `for i = i, …` lise l'ancien i)
     compileInto(*r.start, ctl);
     compileInto(*r.end,   ctl + 1);
     if (r.step) compileInto(*r.step, ctl + 2);
@@ -1345,10 +1404,17 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
                                    chunk.addConstant(Value((int64_t)1))));
     reg_top_ = ctl + 3;
 
+    // Optimisation : si le corps n'écrit jamais i (et que i est local), on aliase i
+    // au registre de contrôle ctl → pas de copie par itération. Sinon, copie isolée.
+    auto vit = local_regs_.find(var1);
+    bool can_alias = (vit != local_regs_.end()) && loopBodyAliasSafe(body, var1);
+    int saved_var_reg = -1;
+    if (can_alias) { saved_var_reg = vit->second; local_regs_[var1] = ctl; }
+
     size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl);   // Bx → sortie si boucle vide (patché)
 
     uint16_t body_addr = (uint16_t)chunk.currentPos();          // FOR_PREP tombe ici si non vide
-    bind(var1, ctl);                          // copie i dans la variable de boucle
+    if (!can_alias) bind(var1, ctl);          // copie i dans la variable (sinon i EST ctl)
 
     break_patches.push_back({});
     continue_patches.push_back({});
@@ -1368,6 +1434,11 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
     for (size_t p : break_patches.back()) chunk.patchJump(p, exit_addr);
     break_patches.pop_back();
 
+    if (can_alias) {
+        // restaure le mapping + préserve la fuite (dernière valeur dans le registre permanent)
+        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)saved_var_reg, (uint8_t)ctl, 0));
+        local_regs_[var1] = saved_var_reg;
+    }
     reg_top_ = ctl;
 }
 

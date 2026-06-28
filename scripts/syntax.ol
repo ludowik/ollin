@@ -262,6 +262,17 @@ for i = 5, 1, -1 do
 end
 assert(s4 == 15)
 
+## modifier la variable de boucle dans le corps n'affecte PAS l'itération
+## (la valeur de contrôle est isolée — chemin sans alias)
+var s4b = 0
+var cnt4 = 0
+for i = 1, 3 do
+    s4b += i
+    i = i + 100      ## sans effet sur l'itération
+    cnt4 += 1
+end
+assert(s4b == 6 and cnt4 == 3)
+
 ## break dans for range
 var s5 = 0
 for i in [1;100] do
