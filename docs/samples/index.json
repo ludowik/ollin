@@ -6,7 +6,7 @@
   { "name": "Classe Vec2",    "file": "vec2.ol" },
   { "name": "Colors",         "file": "colors.ol" },
   { "name": "Lignes animées", "file": "lignes_animees.ol" },
-  { "name": "Pixels",         "file": "pixels.ol" },
+  { "name": "Pixels animés",  "file": "pixels.ol" },
   { "name": "Primitives",     "file": "primitives.ol" },
   { "name": "Rectangles",     "file": "rectangles.ol" }
 ]

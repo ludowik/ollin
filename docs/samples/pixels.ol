@@ -1,21 +1,34 @@
 var W = window.width
 var H = window.height
 
-graphics.canvas(W, H, "Pixels")
-var canvas = image.create(W, H)
+## Canvas interne en basse résolution, recalculé pixel par pixel à CHAQUE frame
+## puis agrandi à la taille de la fenêtre par image.draw → animation fluide
+## malgré le coût d'un dessin complet par image.
+const CW = 128
+const CH = 96
 
-for y = 0, H-1 do
-    for x = 0, W-1 do
-        image.set_pixel(canvas, x, y, {r: x/W, g: y/H, b: 1-x/W, a: 1})
-    end
-end
-
-var c = image.get_pixel(canvas, 0, 0)
-print("(0,0) r=" + math.round(c.r * 100) / 100)
+graphics.canvas(W, H, "Pixels animés")
+var canvas = image.create(CW, CH)
 
 func frame()
+    var t = time()
+    ## composante bleue commune à toute la frame (hors boucle → calculée 1 fois)
+    var blue = 0.5 + 0.5 * math.sin(t)
+
+    image.begin_pixels(canvas)
+    for y = 0, CH-1 do
+        var sy = math.sin(y * 0.09 + t * 0.8)        ## terme en y, hors boucle x
+        for x = 0, CW-1 do
+            ## plasma : somme de sinus décalés par le temps → le motif évolue
+            var v = math.sin(x * 0.07 + t) + sy + math.sin((x + y) * 0.05 + t * 1.3)
+            var n = (v + 3) / 6                       ## normalise [-3;3] → [0;1]
+            image.set_pixel(canvas, x, y, {r: n, g: 1 - n, b: blue})
+        end
+    end
+    image.end_pixels(canvas)
+
     graphics.clear(colors.BLACK)
-    image.draw(canvas, 0, 0)
+    image.draw(canvas, 0, 0, W, H)                    ## agrandit le canvas à la fenêtre
     graphics.draw_text("FPS: " + graphics.fps(), 4, H-18, 13)
 end
 
