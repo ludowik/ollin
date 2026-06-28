@@ -254,19 +254,22 @@ offset 4-7 : uint32_t str_hash  (hash contenu, valide uniquement T_STRING)
 offset 8-15: union { int64_t ival; double dval; InternedStr* sptr; Map* mptr; Array* aptr; Iterator* iptr; Closure* cptr; Range* rptr; }
 ```
 
-| tag        | valeur (uint8_t) | union actif | plage              |
+**Ordre des tags = invariant de perf** : tous les types **non ref-comptés** d'abord (0..4), puis le pivot `T_STRING` et tous les **ref-comptés** contigus (5..11). Ainsi `tag < T_STRING` sépare en **un seul test** les valeurs sans gestion mémoire (nil/int/float/function/builtin) de celles à retain/release (`Value::retain()`/`release()`). Tout nouveau type ref-compté doit être ajouté **après** le pivot, tout type non compté **avant**.
+
+| tag        | valeur (uint8_t) | union actif | plage / note        |
 |------------|-----------------|-------------|---------------------|
-| T_NIL      | 0               | —           | —                   |
+| T_NIL      | 0               | —           | non ref-compté      |
 | T_INTEGER  | 1               | ival (int64_t) | ±2^63            |
 | T_FLOAT    | 2               | dval (double) | IEEE 754 double   |
-| T_STRING   | 3               | sptr (InternedStr*) | ref-counted, str_hash = sptr->hash |
-| T_MAP      | 4               | mptr (Map*) | —               |
-| T_ARRAY    | 5               | aptr (Array*) | —             |
-| T_ITERATOR | 6               | iptr (Iterator*) | —          |
-| T_FUNCTION | 7               | ival (int64_t, = func_idx) | index dans chunk.funcs |
-| T_CLOSURE  | 8               | cptr (Closure*) | ref-counted, holds func_idx + upvals |
-| T_CLASS    | 10              | mptr (Map*) | classe : même layout que T_MAP, mais distincte pour CALL_DYN |
-| T_RANGE    | 11              | rptr (Range*) | intervalle entier ref-counted        |
+| T_FUNCTION | 3               | ival (int64_t, = func_idx) | index dans chunk.funcs (non compté) |
+| T_BUILTIN  | 4               | ival (pointeur natif) | fonction native (non compté) |
+| T_STRING   | 5               | sptr (InternedStr*) | **pivot** — ref-counted, str_hash = sptr->hash |
+| T_MAP      | 6               | mptr (Map*) | ref-counted     |
+| T_ARRAY    | 7               | aptr (Array*) | ref-counted   |
+| T_ITERATOR | 8               | iptr (Iterator*) | ref-counted |
+| T_CLOSURE  | 9               | cptr (Closure*) | ref-counted, holds func_idx + upvals |
+| T_CLASS    | 10              | mptr (Map*) | ref-counted ; même layout que T_MAP, distinct pour CALL_DYN |
+| T_RANGE    | 11              | rptr (Range*) | ref-counted ; intervalle entier      |
 
 ## Closures / Upvalues
 

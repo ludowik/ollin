@@ -39,16 +39,22 @@ struct Value {
         Range*             rptr;
     };
 
-    static constexpr uint8_t T_NIL      = 0;
+    // Ordre des tags = INVARIANT de perf : tous les types NON ref-comptés
+    // d'abord (0..4), puis le pivot T_STRING et tous les types ref-comptés
+    // contigus (5..11). Ainsi `tag < T_STRING` sépare en UN test les valeurs
+    // sans gestion mémoire (nil/int/float/function/builtin) de celles à
+    // retain/release. Tout nouveau type ref-compté doit être ajouté APRÈS le
+    // pivot ; tout type non compté AVANT.
+    static constexpr uint8_t T_NIL      = 0;   // ── non ref-comptés (POD / valeur) ──
     static constexpr uint8_t T_INTEGER  = 1;
     static constexpr uint8_t T_FLOAT    = 2;
-    static constexpr uint8_t T_STRING   = 3;
-    static constexpr uint8_t T_MAP      = 4;
-    static constexpr uint8_t T_ARRAY    = 5;
-    static constexpr uint8_t T_ITERATOR = 6;
-    static constexpr uint8_t T_FUNCTION = 7;
-    static constexpr uint8_t T_CLOSURE  = 8;
-    static constexpr uint8_t T_BUILTIN  = 9;
+    static constexpr uint8_t T_FUNCTION = 3;   // func_idx dans ival (pas de tas)
+    static constexpr uint8_t T_BUILTIN  = 4;   // pointeur de fonction natif dans ival
+    static constexpr uint8_t T_STRING   = 5;   // ── pivot : ref-comptés à partir d'ici ──
+    static constexpr uint8_t T_MAP      = 6;
+    static constexpr uint8_t T_ARRAY    = 7;
+    static constexpr uint8_t T_ITERATOR = 8;
+    static constexpr uint8_t T_CLOSURE  = 9;
     static constexpr uint8_t T_CLASS    = 10;  // prototype de classe (Map* réutilisé)
     static constexpr uint8_t T_RANGE    = 11;  // range [a;b] (Range*, ref-counted)
 
@@ -188,16 +194,16 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
         case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
         case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
         case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
-        default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
+        default: break;   // défensif : seuls les tags >= T_STRING arrivent ici
     }
 }
 
 // Symétrique de release() : incrémente le refcount du type ref-compté pointé.
-// Corps trivial (++refcount) → reste inlinable AVEC le switch (pas de découpe
-// cold comme release, dont les corps sont lourds) ; T_FUNCTION/T_BUILTIN (tag
-// >= T_STRING mais non comptés) tombent sur default:break sans appel.
+// Corps trivial (++refcount) → reste inlinable AVEC le switch (pas besoin de la
+// découpe cold de release, dont les corps sont lourds). Grâce au pivot, les
+// types non comptés (dont T_FUNCTION/T_BUILTIN) sortent dès `tag < T_STRING`.
 inline void Value::retain() const noexcept {
-    if (tag < T_STRING) return;   // POD : rien à retenir (un seul test)
+    if (tag < T_STRING) return;   // POD / non comptés : rien à retenir (un seul test)
     switch (tag) {
         case T_STRING:   ++sptr->refcount; break;
         case T_MAP:
@@ -206,7 +212,7 @@ inline void Value::retain() const noexcept {
         case T_ITERATOR: iptr->refcount++; break;
         case T_CLOSURE:  cptr->refcount++; break;
         case T_RANGE:    rptr->refcount++; break;
-        default: break;   // T_FUNCTION, T_BUILTIN : pas de refcount
+        default: break;   // défensif : seuls les tags >= T_STRING arrivent ici
     }
 }
 
