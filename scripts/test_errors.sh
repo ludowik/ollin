@@ -105,6 +105,16 @@ var a = A()
 print(a.x?())' \
     "method call on non-function value"
 
+# ── la variable de boucle est locale à la boucle (pas de fuite après) ──────────
+check_error "var for numérique non visible après" \
+    'for i = 1, 3 do end
+print(i)' \
+    "undeclared variable 'i'"
+check_error "var for itérateur non visible après" \
+    'for k, v in {a: 1} do end
+print(k)' \
+    "undeclared variable 'k'"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

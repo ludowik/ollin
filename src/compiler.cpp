@@ -113,8 +113,9 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
             if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
                 add(f->name);
         if (auto* fi = dynamic_cast<const ForIterStmt*>(s.get())) {
-            add(fi->var1);
-            if (!fi->var2.empty()) add(fi->var2);
+            // var1/var2 ne sont PAS des locales permanentes : elles sont scopées à la
+            // boucle (registres alloués et liés par le compilateur de boucle, puis
+            // restaurés à la sortie) → pas de fuite après la boucle.
             collectLocals(fi->body, out, seen, collect_funcs);
         }
         if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
@@ -1251,41 +1252,42 @@ void Compiler::visit(const RangeExpr& e) {
     last_reg_ = dest;
 }
 
+static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body);  // défini plus bas
+
 void Compiler::compileIteratorLoop(const Expr& src,
                                    const std::string& var1,
                                    const std::string& var2,
                                    const std::vector<std::unique_ptr<Stmt>>& body) {
-    auto bind = [&](const std::string& name, int src_reg) {
-        auto it = local_regs_.find(name);
-        if (it != local_regs_.end()) {
-            if (it->second != src_reg)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)src_reg, 0));
-        } else {
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
-                               (uint8_t)src_reg, chunk.addIdentifier(name)));
-        }
-    };
-
     bool two_vars = !var2.empty();
     int block = reg_top_;
     int tmp_src = block + (two_vars ? 3 : 2);
     reg_top_ = tmp_src + 1;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
-    compileInto(src, tmp_src);
+    compileInto(src, tmp_src);   // src compilé AVANT de scoper les variables de boucle
     chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
     reg_top_ = tmp_src;
+
+    // Variables de boucle scopées : on les aliase directement sur les registres où
+    // FOR_ITER_NEXT écrit (block+1 = clé/primaire, block+2 = val). Pas de copie : la
+    // valeur est réécrite à chaque tour (modifier la variable dans le corps est donc
+    // sans effet). Liaisons sauvegardées puis restaurées → aucune fuite après la boucle.
+    auto saveBind = [&](const std::string& n, int reg, bool& had, int& old) {
+        auto it = local_regs_.find(n);
+        had = (it != local_regs_.end());
+        old = had ? it->second : -1;
+        local_regs_[n] = reg;
+    };
+    auto restoreBind = [&](const std::string& n, bool had, int old) {
+        if (had) local_regs_[n] = old; else local_regs_.erase(n);
+    };
+    bool had1, had2 = false; int old1, old2 = -1;
+    saveBind(var1, block + 1, had1, old1);
+    if (two_vars) saveBind(var2, block + 2, had2, old2);
 
     auto loop_start = (uint16_t)chunk.currentPos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
     size_t exit_patch = chunk.emitJump(iter_op, (uint8_t)block);
-
-    if (two_vars) {
-        bind(var1, block + 1);   // key / index
-        bind(var2, block + 2);   // val
-    } else {
-        bind(var1, block + 1);   // primary (val pour array/range, key pour map)
-    }
 
     break_patches.push_back({});
     continue_patches.push_back({});
@@ -1303,7 +1305,11 @@ void Compiler::compileIteratorLoop(const Expr& src,
     for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
     break_patches.pop_back();
 
-    reg_top_ = block;
+    restoreBind(var1, had1, old1);          // restaure la portée (pas de fuite)
+    if (two_vars) restoreBind(var2, had2, old2);
+    // recyclage : si une closure capture la variable de boucle, garder ses registres
+    // réservés (sinon réécrits après la boucle → upvalue corrompue).
+    reg_top_ = bodyHasFunc(body) ? (block + (two_vars ? 3 : 2)) : block;
 }
 
 void Compiler::visit(const ForIterStmt& s) {
@@ -1379,24 +1385,41 @@ static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, co
     return true;
 }
 
+// Vrai si le corps contient une fonction/closure (n'importe où, récursivement).
+// Sert à décider si on peut recycler les registres de boucle à la sortie : une
+// closure peut capturer (upvalue ouverte) le registre de la variable de boucle ;
+// dans ce cas on le garde réservé pour qu'il ne soit pas réécrit après la boucle.
+static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body);
+static bool stmtHasFunc(const Stmt* s) {
+    if (dynamic_cast<const FuncDeclStmt*>(s)) return true;
+    if (auto* a = dynamic_cast<const AssignStmt*>(s))      return exprHasLambda(a->value.get());
+    if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) { for (auto& v : m->values) if (exprHasLambda(v.get())) return true; for (auto& t : m->targets) if (t.key && exprHasLambda(t.key.get())) return true; return false; }
+    if (auto* d = dynamic_cast<const VarDeclStmt*>(s))     { for (auto& v : d->values) if (exprHasLambda(v.get())) return true; return false; }
+    if (auto* e = dynamic_cast<const ExprStmt*>(s))        return exprHasLambda(e->expr.get());
+    if (auto* r = dynamic_cast<const ReturnStmt*>(s))      { for (auto& v : r->values) if (exprHasLambda(v.get())) return true; return false; }
+    if (auto* th= dynamic_cast<const ThrowStmt*>(s))       return exprHasLambda(th->value.get());
+    if (auto* ia= dynamic_cast<const IndexAssignStmt*>(s)) return exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get());
+    if (auto* i = dynamic_cast<const IfStmt*>(s))          { if (exprHasLambda(i->cond.get()) || bodyHasFunc(i->then_body) || bodyHasFunc(i->else_body)) return true; for (auto& ei : i->else_ifs) if (exprHasLambda(ei.cond.get()) || bodyHasFunc(ei.body)) return true; return false; }
+    if (auto* w = dynamic_cast<const WhileStmt*>(s))       return exprHasLambda(w->cond.get()) || bodyHasFunc(w->body);
+    if (auto* fi= dynamic_cast<const ForIterStmt*>(s))     return exprHasLambda(fi->iter_expr.get()) || bodyHasFunc(fi->body);
+    if (auto* tc= dynamic_cast<const TryCatchStmt*>(s))    return bodyHasFunc(tc->try_body) || bodyHasFunc(tc->catch_body) || bodyHasFunc(tc->else_body);
+    if (auto* b = dynamic_cast<const BlockStmt*>(s))       return bodyHasFunc(b->stmts);
+    if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
+        dynamic_cast<const CommentStmt*>(s)) return false;
+    return true;   // SwitchStmt, ClassDeclStmt, type inconnu → conservatif
+}
+static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body) {
+    for (auto& s : body) if (stmtHasFunc(s.get())) return true;
+    return false;
+}
+
 void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
                                  const std::vector<std::unique_ptr<Stmt>>& body) {
-    auto bind = [&](const std::string& name, int src_reg) {
-        auto it = local_regs_.find(name);
-        if (it != local_regs_.end()) {
-            if (it->second != src_reg)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)src_reg, 0));
-        } else {
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL,
-                               (uint8_t)src_reg, chunk.addIdentifier(name)));
-        }
-    };
-
     int ctl = reg_top_;                       // ctl, ctl+1, ctl+2 = i, limite, pas
     reg_top_ = ctl + 3;
     if (reg_top_ > reg_count_) reg_count_ = reg_top_;
 
-    // bornes compilées AVANT l'alias (pour que `for i = i, …` lise l'ancien i)
+    // bornes compilées AVANT de scoper i (pour que `for i = i, …` lise l'ancien i)
     compileInto(*r.start, ctl);
     compileInto(*r.end,   ctl + 1);
     if (r.step) compileInto(*r.step, ctl + 2);
@@ -1404,17 +1427,24 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
                                    chunk.addConstant(Value((int64_t)1))));
     reg_top_ = ctl + 3;
 
-    // Optimisation : si le corps n'écrit jamais i (et que i est local), on aliase i
-    // au registre de contrôle ctl → pas de copie par itération. Sinon, copie isolée.
-    auto vit = local_regs_.find(var1);
-    bool can_alias = (vit != local_regs_.end()) && loopBodyAliasSafe(body, var1);
-    int saved_var_reg = -1;
-    if (can_alias) { saved_var_reg = vit->second; local_regs_[var1] = ctl; }
+    // Variable de boucle scopée. Si le corps n'écrit jamais i → aliasée sur ctl
+    // (pas de copie). Sinon → registre séparé + copie par tour (le corps peut
+    // modifier i sans toucher le compteur, comportement sans effet). Liaison
+    // restaurée à la sortie → aucune fuite après la boucle.
+    bool can_alias = loopBodyAliasSafe(body, var1);
+    int var_reg = ctl;
+    if (!can_alias) {
+        var_reg = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    }
+    bool had_old; int old_reg;
+    { auto it = local_regs_.find(var1); had_old = (it != local_regs_.end()); old_reg = had_old ? it->second : -1; }
+    local_regs_[var1] = var_reg;
 
     size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl);   // Bx → sortie si boucle vide (patché)
 
     uint16_t body_addr = (uint16_t)chunk.currentPos();          // FOR_PREP tombe ici si non vide
-    if (!can_alias) bind(var1, ctl);          // copie i dans la variable (sinon i EST ctl)
+    if (!can_alias) chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
     break_patches.push_back({});
     continue_patches.push_back({});
@@ -1434,12 +1464,10 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
     for (size_t p : break_patches.back()) chunk.patchJump(p, exit_addr);
     break_patches.pop_back();
 
-    if (can_alias) {
-        // restaure le mapping + préserve la fuite (dernière valeur dans le registre permanent)
-        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)saved_var_reg, (uint8_t)ctl, 0));
-        local_regs_[var1] = saved_var_reg;
-    }
-    reg_top_ = ctl;
+    if (had_old) local_regs_[var1] = old_reg; else local_regs_.erase(var1);   // restaure la portée
+    // recyclage des registres : si une closure du corps capture i, on garde son
+    // registre réservé (sinon il serait réécrit après la boucle → upvalue corrompue).
+    reg_top_ = bodyHasFunc(body) ? (var_reg + 1) : ctl;
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {

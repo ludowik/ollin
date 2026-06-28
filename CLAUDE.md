@@ -199,16 +199,19 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 **Désucrage** : `for i = a, b[, step]` est réécrit par le parser en `for i in [a;b[;step]]` (RangeExpr inclus aux deux bornes). Il n'existe qu'un nœud AST : `ForIterStmt`.
 
+**Portée des variables de boucle** : `var1`/`var2` sont **locales à la boucle** — pas collectées par `collectLocals` ; le compilateur les lie dans `local_regs_` le temps du corps puis **restaure** l'ancienne liaison (ou la supprime) → pas de fuite après la boucle (y référer = « undeclared variable »), une variable externe de même nom est masquée puis restaurée. Recyclage des registres : si `bodyHasFunc(body)` (une closure du corps peut capturer la variable via upvalue ouverte), les registres de boucle restent **réservés** après la sortie pour ne pas être réécrits (closures → valeur finale, cohérent) ; sinon ils sont recyclés.
+
 **Chemin rapide numérique** (`compileNumericFor`) : déclenché quand `iter_expr` est un **RangeExpr littéral inclus aux deux bornes** (`incl_left && incl_right`) avec **1 variable** — couvre `for i = a, b[, step]` et `for i in [a;b]`. Pas de `Range` ni d'itérateur ni de dispatch virtuel.  
 - 3 registres consécutifs `ctl/ctl+1/ctl+2` = `i / limite / pas`.  
 - `FOR_PREP ctl, →sortie` : valide (nombres, pas≠0), fige le type (tout int → int64 ; sinon tout converti en double) ; si la boucle est vide → saute à la sortie ; sinon **tombe dans le corps** (1re itération, `i` non pré-décrémenté → pas de wrap à la borne basse).  
 - `FOR_LOOP ctl, →corps` : `i += pas` (avec garde anti-débordement int64 : si `i+pas` déborde → fin) ; si dans la limite (`≤` si pas>0, `≥` sinon) → `R[ctl]=i`, saut vers le corps ; sinon sortie.  
-- **Alias de la variable** (`loopBodyAliasSafe`) : si le corps n'écrit jamais `i` (pas de réassignation, pas de lambda, pas de structure imbriquée) et que `i` est local, on aliase `local_regs_[var1] = ctl` → **pas de copie par itération** ; un seul `MOVE` à la sortie préserve la fuite. Sinon `bind(var1, ctl)` copie `i` en tête de corps à chaque tour (compteur isolé → modifier `i` dans le corps n'affecte pas l'itération). La règle « rejeter toute structure imbriquée » empêche aussi la corruption des boucles `for` imbriquées (l'externe n'est pas aliasée). Gain mesuré : ~−24 % sur la boucle `s += i` 10M.  
+- **Alias de la variable** (`loopBodyAliasSafe`) : si le corps n'écrit jamais `i` (pas de réassignation, pas de lambda, pas de structure imbriquée), `var1` est aliasée sur `ctl` → **pas de copie par itération**. Sinon un registre séparé `var_reg` reçoit `i` via un `MOVE` en tête de corps à chaque tour (compteur isolé → modifier `i` dans le corps n'affecte pas l'itération). La règle « rejeter toute structure imbriquée » empêche aussi la corruption des boucles `for` imbriquées (l'externe n'est pas aliasée). Gain mesuré : ~−24 % sur la boucle `s += i` 10M.  
 Les ranges ouverts (`[a;b[`, `]a;b]`…) et `for k,v in …` gardent le chemin itérateur ci-dessous.
 
 **Itérateur** (`for [k,] v in expr`) : `MAKE_ITER` crée l'itérateur (MapIterator snapshot, ArrayIterator ref, ou RangeIterator), stocké dans `[block+0]`.  
 - 2 vars : `FOR_ITER_NEXT` → `[block+1]`=key, `[block+2]`=val. 3 registres + 1 temp source.  
 - 1 var  : `FOR_ITER_NEXT1` → `[block+1]`=primary (val si `primary_is_val()`, sinon key). 2 registres + 1 temp source.  
+`var1`/`var2` sont aliasées directement sur `[block+1]`/`[block+2]` (pas de copie : `FOR_ITER_NEXT` les réécrit à chaque tour → modifier la variable dans le corps est sans effet).  
 `Iterator::primary_is_val()` : `ArrayIterator`=true, `RangeIterator`=true, `MapIterator`=false.
 
 ## Type range (implémentation)

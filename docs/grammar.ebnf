@@ -60,6 +60,10 @@ forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" 
                  (* itérateur : "for v in it" → valeur primaire (élément pour array/range, clé pour map) *)
                  (*             "for k,v in it" → clé/index + valeur *)
                  (* itérables : array, map (snapshot), range ; "break" valide partout *)
+                 (* la/les variable(s) de boucle sont LOCALES à la boucle : non visibles
+                    après (y référer = erreur) ; une variable externe de même nom est
+                    masquée puis restaurée. Les modifier dans le corps n'affecte pas
+                    l'itération. *)
 ifStmt         = "if" expr "then" { stmt }
                  { "elseif" expr "then" { stmt } }
                  [ "else" { stmt } ]
