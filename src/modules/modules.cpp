@@ -8,6 +8,7 @@ Value makeStringModule();
 Value makeColorsModule();
 Value makeWindowModule();
 Value makeImageModule();
+Value makeKeyboardModule();
 
 static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "core",     makeCoreModule     },
@@ -17,6 +18,7 @@ static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "colors",   makeColorsModule   },
     { "window",   makeWindowModule   },
     { "image",    makeImageModule    },
+    { "keyboard", makeKeyboardModule },
 };
 
 const std::vector<std::string>& builtinModuleNames() {

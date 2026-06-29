@@ -1,6 +1,7 @@
 #include "value.h"
 #include "vm.h"
 #include "image_module.h"
+#include "keyboard_module.h"
 #include <raylib.h>
 #include <rlgl.h>
 #include <stdexcept>
@@ -340,6 +341,7 @@ static void emscripten_frame() {
     if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
         rlViewport(0, 0, s_physW, s_physH);
     resetStyles();
+    keyboardPoll();
     VM::current()->callValue(s_run_callback);
     drawFpsOverlay();
     EndDrawing();
@@ -357,6 +359,7 @@ static Value gfx_run(Value* args, int argc) {
     while (!WindowShouldClose() && !s_quit) {
         BeginDrawing();
         resetStyles();
+        keyboardPoll();
         VM::current()->callValue(fn);
         drawFpsOverlay();
         EndDrawing();
