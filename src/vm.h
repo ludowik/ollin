@@ -15,6 +15,7 @@ public:
     static VM* current();                   // returns s_current_vm
     Value callValue(const Value& fn);                       // appelle une fonction Ollin (0 arg)
     Value callValue(const Value& fn, const Value& arg);     // appelle une fonction Ollin (1 arg)
+    Value callValue(const Value& fn, const Value& a, const Value& b); // 2 args
     Value getGlobal(const std::string& name) const; // returns nil if not found
 
 private:

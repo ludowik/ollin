@@ -312,6 +312,32 @@ Value VM::callValue(const Value& fn, const Value& arg) {
     return result;
 }
 
+Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
+    if (fn.isBuiltin()) { Value args[2] = { a, b }; return fn.asBuiltin()(args, 2); }
+    uint8_t fi;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
+    if (fn.isFuncVal()) {
+        fi = (uint8_t)fn.asInt();
+    } else if (fn.isClosure()) {
+        fi = fn.asClosure()->func_idx;
+        const auto& uvs = fn.asClosure()->upvals;
+        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+    } else {
+        throw std::runtime_error("callValue: not callable");
+    }
+    int call_base = (int)regs.size();
+    growRegs((size_t)(call_base + 2));
+    regs[call_base]     = a;          // R[0] = 1er argument
+    regs[call_base + 1] = b;          // R[1] = 2e argument
+    uint32_t saved_ip = ip;
+    ip = pushCallFrame(call_base, fi, 2, std::move(frame_upvals), saved_ip);
+    runGoto(call_stack.size() - 1);
+    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
+    regs.resize(call_base);
+    ip = saved_ip;
+    return result;
+}
+
 
 // ── pushCallFrame ─────────────────────────────────────────────────────────────
 // Point d'entrée unique pour toute construction de frame d'appel :

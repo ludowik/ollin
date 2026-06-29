@@ -44,7 +44,7 @@ if(EMSCRIPTEN)
         FetchContent_MakeAvailable(raylib)
     endif()
 
-    add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/window_module.cpp src/image_module.cpp)
+    add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/image_module.cpp)
     target_include_directories(ollin_wasm PRIVATE src libs)
     target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
@@ -70,7 +70,7 @@ if(EMSCRIPTEN)
 else()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/CMakeLists.txt")
         add_subdirectory(libs/raylib)
-        set(OLLIN_GRAPHICS_SOURCE src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/image_module.cpp)
+        set(OLLIN_GRAPHICS_SOURCE src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/image_module.cpp)
         set(OLLIN_GRAPHICS_LIB raylib)
         set(OLLIN_GRAPHICS_DEFINES OLLIN_HAS_RAYLIB)
     else()
@@ -91,7 +91,7 @@ else()
 
     find_program(EMCC emcc)
     if(EMCC)
-        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/window_module.cpp src/image_module.cpp)
+        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/image_module.cpp)
         add_custom_command(
             OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm
             DEPENDS ${WASM_SOURCES}
