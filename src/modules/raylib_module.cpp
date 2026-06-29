@@ -34,6 +34,7 @@ static Value colorInst(double r, double g, double b) {
 }
 
 static int s_physW = 0, s_physH = 0;
+static int s_logicalW = 0;   // largeur logique de la zone (pour l'overlay FPS en haut à droite)
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
@@ -70,6 +71,7 @@ static Value gfx_canvas(Value* args, int argc) {
     InitWindow(w, h, title);
     SetTargetFPS(60);
 #endif
+    s_logicalW = w;
     Value win = VM::current()->getGlobal("window");
     if (win.isMap()) {
         win.mapSet(Value(std::string("width")),  Value((int64_t)w));
@@ -308,6 +310,18 @@ static Value gfx_point(Value* args, int argc) {
 
 static bool s_quit = false;
 
+// Overlay FPS dessiné par le moteur après chaque frame (toujours en haut à
+// droite de la zone graphique). Couleur vive + ombre → lisible sur tout fond.
+static void drawFpsOverlay() {
+    const char* buf = TextFormat("FPS: %d", GetFPS());
+    const int size = 16, margin = 8;
+    int tw = MeasureText(buf, size);
+    int x = s_logicalW - tw - margin;
+    int y = margin;
+    DrawText(buf, x + 1, y + 1, size, BLACK);             // ombre (contraste)
+    DrawText(buf, x,     y,     size, {0, 228, 48, 255}); // vert vif (lime)
+}
+
 static Value gfx_quit(Value* args, int argc) {
     (void)args; (void)argc;
 #ifdef __EMSCRIPTEN__
@@ -327,6 +341,7 @@ static void emscripten_frame() {
         rlViewport(0, 0, s_physW, s_physH);
     resetStyles();
     VM::current()->callValue(s_run_callback);
+    drawFpsOverlay();
     EndDrawing();
 }
 #endif
@@ -343,6 +358,7 @@ static Value gfx_run(Value* args, int argc) {
         BeginDrawing();
         resetStyles();
         VM::current()->callValue(fn);
+        drawFpsOverlay();
         EndDrawing();
     }
     CloseWindow();

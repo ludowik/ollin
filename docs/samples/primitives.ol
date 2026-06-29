@@ -109,8 +109,6 @@ func frame()
     g.draw_text("draw_text", px(460), py(310), fs(13), dim)
     g.draw_text("size 16", px(460), py(328), fs(16), {r:0.9, g:0.9, b:1})
     g.draw_text("size 22", px(460), py(352), fs(22), {r:0.7, g:0.85, b:1})
-
-    g.draw_text("FPS: " + g.fps(), 4, H - 18, fs(13), {r:0.4, g:0.45, b:0.55})
 end
 
 graphics.run(frame)

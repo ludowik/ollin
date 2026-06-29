@@ -29,7 +29,6 @@ func frame()
 
     graphics.clear(colors.BLACK)
     image.draw(canvas, 0, 0, W, H)                    ## agrandit le canvas à la fenêtre
-    graphics.draw_text("FPS: " + graphics.fps(), 4, H-18, 13)
 end
 
 graphics.run(frame)

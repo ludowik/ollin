@@ -23,9 +23,6 @@ func frame()
     graphics.line(400, 0,   400, 600)
     graphics.stroke(graphics.GREEN)
     graphics.line(0,   300, 800, 300)
-
-    graphics.stroke(graphics.WHITE)
-    graphics.draw_text("FPS: " + graphics.fps(), 720, 580, 16)
 end
 
 graphics.run(frame)

@@ -81,7 +81,7 @@ func frame()
 
     g.stroke({r:1, g:1, b:1, a:0.7})
     g.strokeSize(1)
-    g.draw_text("sprite demo  FPS: " + g.fps(), 10, 570, 14)
+    g.draw_text("sprite demo", 10, 570, 14)
 end
 
 g.run(frame)

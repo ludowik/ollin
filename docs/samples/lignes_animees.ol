@@ -45,7 +45,6 @@ func frame()
         l.update()
         l.draw()
     end
-    graphics.draw_text("FPS: " + graphics.fps(), W-80, H-20, 16)
 end
 
 graphics.run(frame)
