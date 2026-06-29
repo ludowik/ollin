@@ -97,6 +97,8 @@ bitwiseXor     = bitwiseAnd { "~" bitwiseAnd } ;
 bitwiseAnd     = comparison { "&" comparison } ;
 comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
              (* comparaisons chaînées : 1 < x < 10  ≡  (1 < x) and (x < 10), x évalué une fois *)
+             (* < > <= >= : sur nombres (INT/FLOAT) OU sur deux strings (ordre
+                lexicographique par octets : "abc" < "abd", "abc" < "abcd") *)
              (* == / <> : valeurs scalaires comparées par valeur (INT==FLOAT si même nombre,
                 strings par contenu) ; map / array / classe comparés par RÉFÉRENCE (même objet).
                 {} == {} → faux. Égalité par valeur : instance de classe avec __eq (cherché sur

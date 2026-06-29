@@ -595,6 +595,10 @@ op_GT: {
         if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, cv, bv))
             { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
+    if (bv.isString() && cv.isString()) {             // ordre lexicographique
+        regs[base+A] = Value((int64_t)(bv.asString() > cv.asString()));
+        NEXT();
+    }
     regs[base+A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
     NEXT();
 }
@@ -608,6 +612,10 @@ op_LT: {
     if (isInstance(bv)) {
         if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, bv, cv))
             { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+    }
+    if (bv.isString() && cv.isString()) {             // ordre lexicographique
+        regs[base+A] = Value((int64_t)(bv.asString() < cv.asString()));
+        NEXT();
     }
     regs[base+A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
     NEXT();
@@ -624,6 +632,10 @@ op_GE: {
         if (uint32_t addr = tryMetaBinary(MK().le_, base+A, cv, bv))
             { ip = addr; base = call_stack.back().reg_base; NEXT(); }
     }
+    if (bv.isString() && cv.isString()) {             // ordre lexicographique
+        regs[base+A] = Value((int64_t)(bv.asString() >= cv.asString()));
+        NEXT();
+    }
     regs[base+A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
     NEXT();
 }
@@ -637,6 +649,10 @@ op_LE: {
     if (isInstance(bv)) {
         if (uint32_t addr = tryMetaBinary(MK().le_, base+A, bv, cv))
             { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+    }
+    if (bv.isString() && cv.isString()) {             // ordre lexicographique
+        regs[base+A] = Value((int64_t)(bv.asString() <= cv.asString()));
+        NEXT();
     }
     regs[base+A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
     NEXT();
