@@ -1,22 +1,37 @@
-## SUTOM — devine le mot. Clavier VIRTUEL (clics souris/tap) + clavier physique.
-## Responsive : la grille et le clavier s'adaptent à window.width / window.height.
-## Rouge = bien placé · Jaune = présent ailleurs · Bleu = absent.
+## SUTOM — devine le mot (façon sutom.nocle.fr). Clavier VIRTUEL (clic/tap) + physique.
+## Rouge = bien placé · Rond jaune = présent mal placé · Bleu = absent.
+## Mot hors dictionnaire = refusé (la ligne tremble). Responsive (window.width/height).
 
-global WORDS = ["MAISON","JARDIN","SOLEIL","BUREAU","GATEAU","ORANGE","BANANE","CERISE","SOURIS","POULET","CANARD","LEZARD","RENARD","TIGRES"]
+global WORDS = [
+  "MAISON","JARDIN","SOLEIL","BUREAU","GATEAU","ORANGE","BANANE","CERISE","SOURIS","POULET",
+  "CANARD","LEZARD","RENARD","TIGRES","FLEURS","PLANTE","GARAGE","GRANDE","PETITE","ROUGES",
+  "VERTES","JAUNES","PORTES","TABLES","LAMPES","CHAISE","MIROIR","ANIMAL","CHEVAL","MOUTON",
+  "LAPINS","POULES","VACHES","CHIENS","CHATON","SINGES","LIONNE","ZEBRES","NUAGES","ORAGES",
+  "PLUIES","NEIGES","ETOILE","FRUITS","POMMES","POIRES","RAISIN","MELONS","CITRON","FRAISE",
+  "PRUNES","LIVRES","STYLOS","CAHIER","GOMMES","REGLES","CARTES","ROUTES","PONTON","FLEUVE",
+  "VALLON","FORETS","VILLES","PLAGES","SABLES","VAGUES","MARINS","BATEAU","VOILES","DANSES",
+  "CHANTS","PIANOS","FLUTES","VIOLON","SPORTS","BALLON","COURSE","NAGEUR","MARCHE","SAUTER"
+]
 
 global W = 0
 global H = 0
 global ROWS = 6
 
-global secret   = ""
-global N        = 0
-global rows     = []      ## entrées soumises : { word, colors }
-global cur      = ""      ## ligne en cours de saisie
-global rowIndex = 0
-global state    = "playing"
-global keys     = []      ## touches virtuelles : { label, kind, x, y, w, h }
+global DICT       = {}    ## ensemble des mots valides (lookup O(1))
+global secret     = ""
+global N          = 0
+global rows       = []    ## { word, colors }
+global cur        = ""
+global rowIndex   = 0
+global state      = "playing"
+global keys       = []    ## { label, kind, x, y, w, h }
+global keyStatus  = {}    ## lettre -> (statut+1) : 1 absent, 2 présent, 3 bien placé
+global msg        = ""
+global msgUntil   = 0
+global shakeUntil = 0
+global ALPHA      = {}    ## ensemble A..Z (Ollin ne compare pas les chaînes avec </>)
 
-## layout calculé (layout())
+## layout
 global MARGIN = 0
 global GAP = 0
 global CELL = 0
@@ -29,6 +44,14 @@ global KBY = 0
 global TITLEY = 0
 global TITLESZ = 0
 
+## ── palette (proche sutom.nocle.fr) ─────────────────────────────────────
+func cRed()    return { r: 0.90, g: 0.10, b: 0.20 } end   ## bien placé
+func cBlue()   return { r: 0.20, g: 0.45, b: 0.72 } end   ## absent
+func cYellow() return { r: 1.0,  g: 0.78, b: 0.0  } end   ## présent (rond)
+func cBg()     return { r: 0.04, g: 0.06, b: 0.12 } end   ## fond
+func cCell()   return { r: 0.09, g: 0.13, b: 0.22 } end   ## case vide / clavier
+func cWhite()  return { r: 1, g: 1, b: 1 } end
+
 func start()
     secret   = WORDS[math.rand_int(1, len(WORDS))]
     N        = len(secret)
@@ -36,33 +59,11 @@ func start()
     rowIndex = 0
     state    = "playing"
     cur      = string.char(secret, 1)
+    keyStatus = {}
+    msg = ""
 end
 
-## ── layout responsive ───────────────────────────────────────────────────
-func layout()
-    MARGIN = math.max(8, math.floor(W * 0.03))
-    GAP    = math.max(4, math.floor(W * 0.012))
-    KG     = GAP
-    ## clavier : la rangée la plus large fait 10 touches
-    KW  = math.floor((W - 2 * MARGIN - 9 * KG) / 10)
-    KH  = math.floor(KW * 1.2)
-    var kbH = 4 * KH + 4 * KG          ## 3 rangées lettres + 1 rangée entrer/effacer
-    KBY = H - kbH - MARGIN
-    TITLESZ = math.max(20, math.floor(H * 0.05))
-    TITLEY  = MARGIN
-    var gridTop    = TITLEY + TITLESZ + GAP * 2
-    var gridAvailH = KBY - gridTop - GAP
-    var cellH = math.floor((gridAvailH - (ROWS - 1) * GAP) / ROWS)
-    var cellW = math.floor((W - 2 * MARGIN - (N - 1) * GAP) / N)
-    CELL = math.min(cellW, cellH)
-    var gridW = N * CELL + (N - 1) * GAP
-    GX = math.floor((W - gridW) / 2)
-    ## centre la grille verticalement dans l'espace au-dessus du clavier
-    var gridH = ROWS * CELL + (ROWS - 1) * GAP
-    GY = gridTop + math.max(0, math.floor((gridAvailH - gridH) / 2))
-end
-
-## ── coloration (gestion des doublons) ───────────────────────────────────
+## ── coloration (doublons gérés) : 0 absent, 1 présent, 2 bien placé ─────
 func scoreWord(guess)
     var res = []
     var counts = {}
@@ -91,6 +92,11 @@ func scoreWord(guess)
 end
 
 ## ── actions ─────────────────────────────────────────────────────────────
+func flash(text)
+    msg      = text
+    msgUntil = time() + 1.4
+end
+
 func addChar(ch)
     if state == "playing" and len(cur) < N then
         cur = cur + ch
@@ -104,13 +110,25 @@ func delChar()
 end
 
 func submit()
-    if state <> "playing" then
-        return
-    end
+    if state <> "playing" then return end
     if len(cur) < N then
+        flash("Complete le mot")
+        shakeUntil = time() + 0.4
         return
     end
-    rows[rowIndex + 1] = { word: cur, colors: scoreWord(cur) }
+    if not DICT[cur] then
+        flash("Mot inconnu")
+        shakeUntil = time() + 0.4
+        return
+    end
+    var colors = scoreWord(cur)
+    rows[rowIndex + 1] = { word: cur, colors: colors }
+    ## met à jour la couleur des touches (garde le meilleur statut connu)
+    for i = 1, N do
+        var c = string.char(cur, i)
+        var v = colors[i] + 1
+        if not keyStatus[c] or v > keyStatus[c] then keyStatus[c] = v end
+    end
     rowIndex = rowIndex + 1
     if cur == secret then
         state = "won"
@@ -130,13 +148,32 @@ func onKey(k)
         start()
     elseif len(k) == 1 then
         var up = string.upper(k)
-        if up >= "A" and up <= "Z" then
-            addChar(up)
-        end
+        if ALPHA[up] then addChar(up) end
     end
 end
 
-## ── clavier virtuel ─────────────────────────────────────────────────────
+## ── layout responsive ───────────────────────────────────────────────────
+func layout()
+    MARGIN = math.max(8, math.floor(W * 0.03))
+    GAP    = math.max(4, math.floor(W * 0.012))
+    KG     = GAP
+    KW  = math.floor((W - 2 * MARGIN - 9 * KG) / 10)
+    KH  = math.floor(KW * 1.2)
+    var kbH = 4 * KH + 4 * KG
+    KBY = H - kbH - MARGIN
+    TITLESZ = math.max(20, math.floor(H * 0.05))
+    TITLEY  = MARGIN
+    var gridTop    = TITLEY + TITLESZ + GAP * 2
+    var gridAvailH = KBY - gridTop - GAP
+    var cellH = math.floor((gridAvailH - (ROWS - 1) * GAP) / ROWS)
+    var cellW = math.floor((W - 2 * MARGIN - (N - 1) * GAP) / N)
+    CELL = math.min(cellW, cellH)
+    var gridW = N * CELL + (N - 1) * GAP
+    GX = math.floor((W - gridW) / 2)
+    var gridH = ROWS * CELL + (ROWS - 1) * GAP
+    GY = gridTop + math.max(0, math.floor((gridAvailH - gridH) / 2))
+end
+
 func buildKeys()
     keys = []
     var rowsKb = ["AZERTYUIOP", "QSDFGHJKLM", "WXCVBN"]
@@ -153,8 +190,8 @@ func buildKeys()
         ky = ky + KH + KG
     end
     var ew = math.floor((W - 2 * MARGIN - KG) / 2)
-    keys[len(keys) + 1] = { label: "ENTRER",  kind: "enter", x: MARGIN,             y: ky, w: ew, h: KH }
-    keys[len(keys) + 1] = { label: "EFFACER", kind: "del",   x: MARGIN + ew + KG,   y: ky, w: ew, h: KH }
+    keys[len(keys) + 1] = { label: "ENTRER",  kind: "enter", x: MARGIN,           y: ky, w: ew, h: KH }
+    keys[len(keys) + 1] = { label: "EFFACER", kind: "del",   x: MARGIN + ew + KG, y: ky, w: ew, h: KH }
 end
 
 func onClick(mx, my)
@@ -173,42 +210,52 @@ func onClick(mx, my)
 end
 
 ## ── rendu ───────────────────────────────────────────────────────────────
-func colorFor(c)
-    if c == 2 then return { r: 0.90, g: 0.0,  b: 0.16 } end
-    if c == 1 then return { r: 1.0,  g: 0.74, b: 0.0  } end
-    return { r: 0.05, g: 0.42, b: 0.65 }
-end
-
 func letterAt(letter, cx, cy)
     var fz = math.floor(CELL * 0.6)
-    graphics.draw_text(letter, cx + math.floor(CELL * 0.26), cy + math.floor(CELL * 0.16), fz, { r: 1, g: 1, b: 1 })
+    graphics.draw_text(letter, cx + math.floor(CELL * 0.26), cy + math.floor(CELL * 0.16), fz, cWhite())
+end
+
+func drawCell(cx, cy, c, letter)
+    if c == 2 then
+        graphics.fill(cRed())
+        graphics.stroke()
+        graphics.rect(cx, cy, CELL, CELL)
+    elseif c == 1 then
+        graphics.fill(cBlue())
+        graphics.stroke()
+        graphics.rect(cx, cy, CELL, CELL)
+        graphics.fill(cYellow())               ## rond jaune (présent mal placé)
+        graphics.stroke()
+        graphics.circle(cx + math.floor(CELL / 2), cy + math.floor(CELL / 2), math.floor(CELL * 0.36))
+    else
+        graphics.fill(cBlue())
+        graphics.stroke()
+        graphics.rect(cx, cy, CELL, CELL)
+    end
+    letterAt(letter, cx, cy)
 end
 
 func drawGrid()
+    var shaking = time() < shakeUntil
     for r = 0, ROWS - 1 do
         var cy = GY + r * (CELL + GAP)
+        var xoff = 0
+        if shaking and r == rowIndex then xoff = math.floor(math.sin(time() * 45) * CELL * 0.12) end
         for i = 1, N do
-            var cx = GX + (i - 1) * (CELL + GAP)
+            var cx = GX + (i - 1) * (CELL + GAP) + xoff
             if r < rowIndex then
                 var entry = rows[r + 1]
-                graphics.fill(colorFor(entry.colors[i]))
-                graphics.stroke()
-                graphics.rect(cx, cy, CELL, CELL)
-                letterAt(string.char(entry.word, i), cx, cy)
+                drawCell(cx, cy, entry.colors[i], string.char(entry.word, i))
             elseif r == rowIndex and state == "playing" then
-                graphics.fill()
-                graphics.stroke({ r: 0.4, g: 0.4, b: 0.5 }, 2)
+                graphics.fill(cCell())
+                graphics.stroke({ r: 0.4, g: 0.42, b: 0.5 }, 2)
                 graphics.rect(cx, cy, CELL, CELL)
-                if i <= len(cur) then
-                    letterAt(string.char(cur, i), cx, cy)
-                end
+                if i <= len(cur) then letterAt(string.char(cur, i), cx, cy) end
             else
-                graphics.fill()
-                graphics.stroke({ r: 0.28, g: 0.22, b: 0.28 }, 2)
+                graphics.fill(cCell())
+                graphics.stroke({ r: 0.2, g: 0.24, b: 0.32 }, 2)
                 graphics.rect(cx, cy, CELL, CELL)
-                if i == 1 then
-                    letterAt(string.char(secret, 1), cx, cy)
-                end
+                if i == 1 then letterAt(string.char(secret, 1), cx, cy) end
             end
         end
     end
@@ -218,37 +265,50 @@ func drawKeys()
     var charFz = math.floor(KH * 0.45)
     var wideFz = math.floor(KH * 0.34)
     for k in keys do
-        graphics.fill({ r: 0.20, g: 0.20, b: 0.28 })
+        var bg = cCell()
+        if k.kind == "char" and keyStatus[k.label] then
+            var st = keyStatus[k.label] - 1
+            if st == 2 then bg = cRed() elseif st == 1 then bg = cYellow() else bg = cBlue() end
+        end
+        graphics.fill(bg)
         graphics.stroke({ r: 0.45, g: 0.45, b: 0.55 }, 1)
         graphics.rect(k.x, k.y, k.w, k.h)
         if k.kind == "char" then
-            graphics.draw_text(k.label, k.x + math.floor(KW * 0.32), k.y + math.floor(KH * 0.28), charFz, { r: 1, g: 1, b: 1 })
+            graphics.draw_text(k.label, k.x + math.floor(KW * 0.32), k.y + math.floor(KH * 0.28), charFz, cWhite())
         else
-            graphics.draw_text(k.label, k.x + math.floor(k.w * 0.18), k.y + math.floor(KH * 0.32), wideFz, { r: 1, g: 1, b: 1 })
+            graphics.draw_text(k.label, k.x + math.floor(k.w * 0.18), k.y + math.floor(KH * 0.32), wideFz, cWhite())
         end
     end
 end
 
 func frame()
-    graphics.clear({ r: 0.10, g: 0.07, b: 0.10 })
-    graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, { r: 1, g: 0.74, b: 0 })
+    graphics.clear(cBg())
+    graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, cYellow())
     drawGrid()
     drawKeys()
+    ## message transitoire (mot inconnu, etc.)
+    if time() < msgUntil then
+        var mfz = math.floor(TITLESZ * 0.55)
+        graphics.draw_text(msg, math.floor(W / 2 - len(msg) * mfz * 0.28), GY - mfz - GAP, mfz, cWhite())
+    end
     if state == "won" or state == "lost" then
         var by = math.floor(H / 2 - CELL * 0.7)
-        graphics.fill({ r: 0, g: 0, b: 0, a: 0.8 })
+        graphics.fill({ r: 0, g: 0, b: 0, a: 0.82 })
         graphics.stroke({ r: 0.5, g: 0.5, b: 0.6 }, 1)
         graphics.rect(MARGIN, by, W - 2 * MARGIN, math.floor(CELL * 1.4))
-        var fz = math.floor(CELL * 0.4)
+        var efz = math.floor(CELL * 0.4)
         if state == "won" then
-            graphics.draw_text("GAGNE !  (Echap = rejouer)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), fz, { r: 0.2, g: 0.9, b: 0.3 })
+            graphics.draw_text("GAGNE !  (Echap = rejouer)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, { r: 0.2, g: 0.9, b: 0.3 })
         else
-            graphics.draw_text("PERDU : " + secret + "  (Echap)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), fz, { r: 1, g: 0.35, b: 0.35 })
+            graphics.draw_text("PERDU : " + secret + "  (Echap)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, { r: 1, g: 0.35, b: 0.35 })
         end
     end
 end
 
 ## ── init ────────────────────────────────────────────────────────────────
+for w in WORDS do DICT[w] = 1 end
+var ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+for i = 1, 26 do ALPHA[string.char(ABC, i)] = 1 end
 W = window.width
 H = window.height
 graphics.canvas(W, H, "SUTOM")
