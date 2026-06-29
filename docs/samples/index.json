@@ -8,5 +8,6 @@
   { "name": "Lignes animées", "file": "lignes_animees.ol" },
   { "name": "Pixels animés",  "file": "pixels.ol" },
   { "name": "Primitives",     "file": "primitives.ol" },
-  { "name": "Rectangles",     "file": "rectangles.ol" }
+  { "name": "Rectangles",     "file": "rectangles.ol" },
+  { "name": "SUTOM",          "file": "sutom.ol" }
 ]
