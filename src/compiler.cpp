@@ -897,6 +897,36 @@ void Compiler::visit(const VarExpr& e) {
 }
 
 void Compiler::visit(const BinaryExpr& e) {
+    // ── and (&) / or (|) : court-circuit — la droite n'est évaluée que si besoin.
+    // Sémantique valeur (modèle Lua) : `a and b` = a si a falsy, sinon b ;
+    // `a or b` = a si a truthy, sinon b. (Les opcodes AND/OR restent utilisés
+    // par les comparaisons chaînées, où les deux côtés sont déjà calculés.)
+    if (e.op == '&' || e.op == '|') {
+        e.left->accept(*this);
+        int rL = last_reg_;
+        if (reg_top_ <= rL) reg_top_ = rL + 1;
+        int dst = reg_top_++;
+        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)rL, 0));
+        if (e.op == '&') {
+            // a falsy → garder a (dans dst) et sauter l'évaluation de b
+            size_t skip = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)dst);
+            e.right->accept(*this);
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
+            chunk.patchJump(skip, (uint16_t)chunk.currentPos());
+        } else {
+            // a truthy → garder a ; a falsy → évaluer b
+            size_t evalRight = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)dst);
+            size_t done      = chunk.emitJump(Op::JUMP);
+            chunk.patchJump(evalRight, (uint16_t)chunk.currentPos());
+            e.right->accept(*this);
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
+            chunk.patchJump(done, (uint16_t)chunk.currentPos());
+        }
+        reg_top_  = dst + 1;
+        last_reg_ = dst;
+        return;
+    }
     e.left->accept(*this);  int rL = last_reg_;
     // protéger le registre du résultat gauche : un appel 0-arg (ou toute expr
     // qui laisse reg_top_ <= rL) verrait sinon l'opérande droit le réécraser.

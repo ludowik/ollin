@@ -140,7 +140,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | IDIV          | ABC    | A=dst, B=lhs, C=rhs        | R[A] = floor(R[B] / R[C])  (INT//INT → INT)      |
 | POW           | ABC    | A=dst, B=base, C=exp       | R[A] = R[B] ^ R[C]  (INT^INT(≥0) → INT ; sinon FLOAT ; '^' = puissance, modèle Lua) |
 | NEGATE / NOT  | AB     | A=dst, B=src               | R[A] = -R[B] / !R[B]                            |
-| AND / OR      | ABC    | A=dst, B=lhs, C=rhs        | R[A] = 1.0 si condition vraie sinon 0.0          |
+| AND / OR      | ABC    | A=dst, B=lhs, C=rhs        | R[A] = 1.0 si vrai sinon 0.0 — **réservé aux comparaisons chaînées** ; les opérateurs `and`/`or` du langage compilent en court-circuit (JUMP_IF_FALSE + MOVE, sémantique valeur Lua) |
 | EQ/NEQ/GT/LT/GE/LE | ABC | A=dst, B=lhs, C=rhs  | R[A] = 1.0 si vrai sinon 0.0                     |
 | JUMP          | Bx     | Bx=addr                    | ip = Bx                                          |
 | JUMP_IF_FALSE | ABx    | A=cond_reg, Bx=addr        | si falsy(R[A]) → ip = Bx (aussi : appel optionnel f?()) |

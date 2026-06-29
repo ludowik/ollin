@@ -87,6 +87,10 @@ exprStmt       = expr NL ;
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
 logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
+             (* "and"/"or" COURT-CIRCUITENT et renvoient une VALEUR (modèle Lua) :
+                "a and b" → a si a est falsy, sinon b (b non évalué si a falsy) ;
+                "a or b"  → a si a est truthy, sinon b (b non évalué si a truthy).
+                Donc `f and f()` ou `obj and obj.x` sont sûrs. Falsy : nil, 0, "", [], {}. *)
 bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
 bitwiseXor     = bitwiseAnd { "~" bitwiseAnd } ;
              (* "~" binaire = XOR bit-à-bit (modèle Lua) ; "~" unaire = NOT, voir unary *)
