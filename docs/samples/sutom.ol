@@ -2,15 +2,15 @@
 ## Rouge = bien placé · Rond jaune = présent mal placé · Bleu = absent.
 ## Mot hors dictionnaire = refusé (la ligne tremble). Responsive (window.width/height).
 
+## Longueurs variées (6 à 9) — le jeu s'adapte (N = longueur du mot tiré).
 global WORDS = [
-  "MAISON","JARDIN","SOLEIL","BUREAU","GATEAU","ORANGE","BANANE","CERISE","SOURIS","POULET",
-  "CANARD","LEZARD","RENARD","TIGRES","FLEURS","PLANTE","GARAGE","GRANDE","PETITE","ROUGES",
-  "VERTES","JAUNES","PORTES","TABLES","LAMPES","CHAISE","MIROIR","ANIMAL","CHEVAL","MOUTON",
-  "LAPINS","POULES","VACHES","CHIENS","CHATON","SINGES","LIONNE","ZEBRES","NUAGES","ORAGES",
-  "PLUIES","NEIGES","ETOILE","FRUITS","POMMES","POIRES","RAISIN","MELONS","CITRON","FRAISE",
-  "PRUNES","LIVRES","STYLOS","CAHIER","GOMMES","REGLES","CARTES","ROUTES","PONTON","FLEUVE",
-  "VALLON","FORETS","VILLES","PLAGES","SABLES","VAGUES","MARINS","BATEAU","VOILES","DANSES",
-  "CHANTS","PIANOS","FLUTES","VIOLON","SPORTS","BALLON","COURSE","NAGEUR","MARCHE","SAUTER"
+  "MAISON","JARDIN","SOLEIL","BUREAU","ORANGE","BANANE","CERISE","SOURIS","CANARD","RENARD",
+  "FLEURS","GARAGE","CHAISE","MIROIR","CHEVAL","BALLON","MELONS","CITRON","POMMES","FRAISE",
+  "VOITURE","FENETRE","CHAPEAU","MANTEAU","JOURNAL","CRAYONS","TROUSSE","FROMAGE","RIVIERE","JARDINS",
+  "GUITARE","TABLEAU","PINCEAU","CISEAUX","CHEMISE","ECHARPE","POULAIN","BALCONS","ETOILES","MAISONS",
+  "MONTAGNE","CAMPAGNE","VACANCES","BATIMENT","CHATEAUX","DRAPEAUX","TROTTOIR","AVENTURE","LUNETTES","CEINTURE",
+  "MANTEAUX","FENETRES","ESCALIER","PEINTRES","HORIZONS",
+  "BOUTEILLE","PARAPLUIE","CHOCOLATS","PAPILLONS","CROISSANT","TELEPHONE","FRAMBOISE","MANDARINE"
 ]
 
 global W = 0
@@ -29,7 +29,6 @@ global keyStatus  = {}    ## lettre -> (statut+1) : 1 absent, 2 présent, 3 bien
 global msg        = ""
 global msgUntil   = 0
 global shakeUntil = 0
-global ALPHA      = {}    ## ensemble A..Z (Ollin ne compare pas les chaînes avec </>)
 
 ## layout
 global MARGIN = 0
@@ -148,7 +147,7 @@ func onKey(k)
         start()
     elseif len(k) == 1 then
         var up = string.upper(k)
-        if ALPHA[up] then addChar(up) end
+        if up >= "A" and up <= "Z" then addChar(up) end
     end
 end
 
@@ -307,8 +306,6 @@ end
 
 ## ── init ────────────────────────────────────────────────────────────────
 for w in WORDS do DICT[w] = 1 end
-var ABC = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-for i = 1, 26 do ALPHA[string.char(ABC, i)] = 1 end
 W = window.width
 H = window.height
 graphics.canvas(W, H, "SUTOM")
