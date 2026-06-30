@@ -526,10 +526,17 @@ const dividerEl  = document.getElementById('divider')
 const outputHdr  = document.getElementById('output-header')
 
 // La zone de rendu (sortie + canvas) n'apparaît qu'en exécution/pause ;
-// au repos l'éditeur occupe tout l'espace.
+// au repos l'éditeur occupe TOUT l'espace.
 function setOutputVisible(visible) {
   outputPane.style.display = visible ? '' : 'none'
   if (dividerEl) dividerEl.style.display = visible ? '' : 'none'
+  if (visible) {
+    restoreSplit()                       // rétablir le découpage choisi
+  } else {
+    // éditeur plein écran : retirer les bases flex fixes posées par le drag
+    editorPane.style.flex = ''
+    outputPane.style.flex = ''
+  }
 }
 
 const runBtn   = document.getElementById('run-btn')
@@ -738,8 +745,17 @@ function applySplit(pct) {
   outputPane.style.flex = `0 0 ${100 - pct}%`
 }
 
-const savedSplit = parseFloat(localStorage.getItem(SPLIT_KEY))
-if (savedSplit >= 15 && savedSplit <= 85) applySplit(savedSplit)
+// Rétablit le découpage sauvegardé (appelé quand la zone de rendu réapparaît).
+// Au repos (zone masquée) on ne pose AUCUN flex → l'éditeur remplit tout.
+function restoreSplit() {
+  const pct = parseFloat(localStorage.getItem(SPLIT_KEY))
+  if (pct >= 15 && pct <= 85) {
+    applySplit(pct)
+  } else {
+    editorPane.style.flex = ''
+    outputPane.style.flex = ''
+  }
+}
 
 function startDrag(e) {
   dragging = true
