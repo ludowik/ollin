@@ -18,7 +18,7 @@ img.begin_draw(logo)
 
     ## outer ring r=74 filled with gold
     g.fill(gold)
-    g.stroke()
+    g.noStroke()
     g.circle(100, 100, 74, 64)
 
     ## punch inner r=52 with background color
@@ -33,7 +33,7 @@ img.begin_draw(logo)
 
     ## 8 stepped-pyramid rays pointing outward
     g.fill(gold)
-    g.stroke()
+    g.noStroke()
     var ray = [
         [91,27],[109,27],[109,21],[107,21],[107,15],[105,15],
         [105,9],[103,9],[103,5],[97,5],[97,9],[95,9],

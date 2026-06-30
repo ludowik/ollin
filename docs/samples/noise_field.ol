@@ -14,7 +14,7 @@ var CELL = 8        ## taille d'une cellule (px) — petit = plus de définition
 var SCALE = 0.01    ## zoom du bruit (petit = taches plus larges)
 
 func frame()
-    graphics.stroke()   ## désactive le contour → cellules jointives, sans bordure
+    graphics.noStroke()   ## pas de contour → cellules jointives, sans bordure
     var t = time() * 0.3
 
     var y = 0

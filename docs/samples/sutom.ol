@@ -228,18 +228,18 @@ end
 func drawCell(cx, cy, c, letter)
     if c == 2 then
         graphics.fill(RED)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.rect(cx, cy, CELL, CELL)
     elseif c == 1 then
         graphics.fill(BLUE)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.rect(cx, cy, CELL, CELL)
         graphics.fill(YELLOW)               ## rond jaune (présent mal placé)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.circle(cx + math.floor(CELL / 2), cy + math.floor(CELL / 2), math.floor(CELL * 0.36))
     else
         graphics.fill(BLUE)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.rect(cx, cy, CELL, CELL)
     end
     letterAt(letter, cx, cy)

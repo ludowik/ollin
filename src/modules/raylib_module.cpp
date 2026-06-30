@@ -149,11 +149,18 @@ static Value gfx_stroke_size(Value* args, int argc) {
 
 static Value gfx_stroke(Value* args, int argc) {
     if (argc > 0 && (args[0].isMap() || args[0].isClass()))
-        applyStroke(true, toColor(args[0]));
+        applyStroke(true, toColor(args[0]));   // couleur fournie
     else
-        applyStroke(false);
+        s_has_stroke = true;                   // sans couleur → (ré)active avec la couleur courante
     if (argc > 1 && args[1].isNumber())
         applyStrokeSize((float)args[1].asNum());
+    return Value{};
+}
+
+static Value gfx_no_stroke(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_has_stroke = false;                       // ne plus dessiner de contour (couleur conservée)
     return Value{};
 }
 
@@ -488,6 +495,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("clear")), Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
     m.mapSet(Value(std::string("stroke")), Value::makeBuiltin(gfx_stroke));
+    m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
     m.mapSet(Value(std::string("fill")), Value::makeBuiltin(gfx_fill));
     m.mapSet(Value(std::string("line")), Value::makeBuiltin(gfx_line));
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
