@@ -11,6 +11,7 @@
 // ── storage ───────────────────────────────────────────────────────────────────
 
 struct TexHandle {
+    int id = 0;
     bool is_render = false;
     bool pixels_open = false;
     Texture2D tex = {};
@@ -93,37 +94,18 @@ void image_reset() {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 static Value makeHandle(int id, int w, int h, TexHandle* ptr) {
-    static const Value
-        K_ID(std::string("id")), 
-        K_WIDTH(std::string("width")),        
-        K_HEIGHT(std::string("height")), 
-        K_PTR(std::string("ptr"));
+    static const Value K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
     Value m = Value::makeMap();
-    m.mapSet(K_ID, Value((int64_t)id));
+    m.mptr->userdata = ptr;
     m.mapSet(K_WIDTH, Value((int64_t)w));
     m.mapSet(K_HEIGHT, Value((int64_t)h));
-    m.mapSet(K_PTR, Value((int64_t)(intptr_t)ptr));
     return m;
 }
 
-static int handleId(const Value& v, const char* fn) {
-    static const Value K_ID(std::string("id"));
-    if (!v.isMap())
-        throw std::runtime_error(std::string(fn) + ": expected image handle");
-    Value id = v.mapGet(K_ID);
-    if (!id.isInteger())
-        throw std::runtime_error(std::string(fn) + ": invalid handle");
-    return (int)id.asInt();
-}
-
 static TexHandle& handlePtr(const Value& v, const char* fn) {
-    static const Value K_PTR(std::string("ptr"));
-    if (!v.isMap())
+    if (!v.isMap() || !v.mptr->userdata)
         throw std::runtime_error(std::string(fn) + ": expected image handle");
-    Value p = v.mapGet(K_PTR);
-    if (!p.isInteger())
-        throw std::runtime_error(std::string(fn) + ": invalid handle");
-    return *(TexHandle*)(intptr_t)p.asInt();
+    return *(TexHandle*)v.mptr->userdata;
 }
 
 static Color toColor(const Value& v) {
@@ -186,6 +168,7 @@ static Value img_load(Value* args, int argc) {
     }
     h.is_render = false;
     int id = s_next_id++;
+    h.id = id;
     int w = h.tex.width, hh = h.tex.height;
     auto uptr = std::make_unique<TexHandle>(std::move(h));
     TexHandle* ptr = uptr.get();
@@ -209,6 +192,7 @@ static Value img_load_data(Value* args, int argc) {
     h.tex = loadFromMemory(bytes, ext);
     h.is_render = false;
     int id = s_next_id++;
+    h.id = id;
     int w = h.tex.width, hh = h.tex.height;
     auto uptr = std::make_unique<TexHandle>(std::move(h));
     TexHandle* ptr = uptr.get();
@@ -226,6 +210,7 @@ static Value img_create(Value* args, int argc) {
     hnd.rtt = LoadRenderTexture(w, h);
     hnd.is_render = true;
     int id = s_next_id++;
+    hnd.id = id;
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
@@ -284,15 +269,15 @@ static Value img_draw(Value* args, int argc) {
 static Value img_unload(Value* args, int argc) {
     if (argc < 1)
         return Value{};
-    int id = handleId(args[0], "image.unload");
-    auto it = s_images.find(id);
+    if (!args[0].isMap() || !args[0].mptr->userdata)
+        return Value{};
+    TexHandle& h = *(TexHandle*)args[0].mptr->userdata;
+    auto it = s_images.find(h.id);
     if (it == s_images.end())
         return Value{};
-    TexHandle& h = *it->second;
-    if (h.pixels_open) {
+    args[0].mptr->userdata = nullptr;
+    if (h.pixels_open)
         UnloadImage(h.cpu);
-        h.pixels_open = false;
-    }
     if (h.is_render)
         UnloadRenderTexture(h.rtt);
     else

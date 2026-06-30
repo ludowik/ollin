@@ -13,6 +13,7 @@ struct ValueEqual {
 struct Map {
     robin_hood::unordered_map<Value, Value, ValueHash, ValueEqual> data;
     int refcount = 1;
+    void* userdata = nullptr;
 
     Value get(const Value& k) const;
     void set(const Value& k, const Value& v);
@@ -27,6 +28,7 @@ struct MapPool {
         if (n) {
             Map* m = buf[--n];
             m->refcount = 1;
+            m->userdata = nullptr;
             return m;
         }
         return new Map();
