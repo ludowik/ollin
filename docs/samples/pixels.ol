@@ -22,7 +22,7 @@ func frame()
             ## plasma : somme de sinus décalés par le temps → le motif évolue
             var v = math.sin(x * 0.07 + t) + sy + math.sin((x + y) * 0.05 + t * 1.3)
             var n = (v + 3) / 6                       ## normalise [-3;3] → [0;1]
-            image.set_pixel(canvas, x, y, {r: n, g: 1 - n, b: blue})
+            image.set_pixel(canvas, x, y, n, 1 - n, blue, 1)
         end
     end
     image.end_pixels(canvas)

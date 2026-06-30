@@ -1,6 +1,7 @@
 #include "image_module.h"
 #include "modules/module_utils.h"
 #include <cstdint>
+#include <memory>
 #include <raylib.h>
 #include <stdexcept>
 #include <string>
@@ -17,7 +18,7 @@ struct TexHandle {
     Image cpu = {};
 };
 
-static std::unordered_map<int, TexHandle> s_images;
+static std::unordered_map<int, std::unique_ptr<TexHandle>> s_images;
 static int s_next_id = 1;
 
 // preloaded bytes: name → (bytes, ext with dot e.g. ".png")
@@ -77,13 +78,13 @@ void image_reset() {
     for (auto& [id, h] : s_images) {
         if (!IsWindowReady())
             break;
-        if (h.pixels_open) {
-            UnloadImage(h.cpu);
+        if (h->pixels_open) {
+            UnloadImage(h->cpu);
         }
-        if (h.is_render)
-            UnloadRenderTexture(h.rtt);
+        if (h->is_render)
+            UnloadRenderTexture(h->rtt);
         else
-            UnloadTexture(h.tex);
+            UnloadTexture(h->tex);
     }
     s_images.clear();
     s_next_id = 1;
@@ -91,38 +92,49 @@ void image_reset() {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static Value makeHandle(int id, int w, int h) {
+static Value makeHandle(int id, int w, int h, TexHandle* ptr) {
+    static const Value
+        K_ID(std::string("id")), 
+        K_WIDTH(std::string("width")),        
+        K_HEIGHT(std::string("height")), 
+        K_PTR(std::string("ptr"));
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("id")), Value((int64_t)id));
-    m.mapSet(Value(std::string("width")), Value((int64_t)w));
-    m.mapSet(Value(std::string("height")), Value((int64_t)h));
+    m.mapSet(K_ID, Value((int64_t)id));
+    m.mapSet(K_WIDTH, Value((int64_t)w));
+    m.mapSet(K_HEIGHT, Value((int64_t)h));
+    m.mapSet(K_PTR, Value((int64_t)(intptr_t)ptr));
     return m;
 }
 
 static int handleId(const Value& v, const char* fn) {
+    static const Value K_ID(std::string("id"));
     if (!v.isMap())
         throw std::runtime_error(std::string(fn) + ": expected image handle");
-    Value id = v.mapGet(Value(std::string("id")));
+    Value id = v.mapGet(K_ID);
     if (!id.isInteger())
         throw std::runtime_error(std::string(fn) + ": invalid handle");
     return (int)id.asInt();
 }
 
-static TexHandle& findHandle(int id, const char* fn) {
-    auto it = s_images.find(id);
-    if (it == s_images.end())
-        throw std::runtime_error(std::string(fn) + ": unknown image id " + std::to_string(id));
-    return it->second;
+static TexHandle& handlePtr(const Value& v, const char* fn) {
+    static const Value K_PTR(std::string("ptr"));
+    if (!v.isMap())
+        throw std::runtime_error(std::string(fn) + ": expected image handle");
+    Value p = v.mapGet(K_PTR);
+    if (!p.isInteger())
+        throw std::runtime_error(std::string(fn) + ": invalid handle");
+    return *(TexHandle*)(intptr_t)p.asInt();
 }
 
 static Color toColor(const Value& v) {
+    static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
     if (!v.isMap())
         throw std::runtime_error("image: expected Color object");
-    auto gc = [&](const char* k, double def) -> uint8_t {
-        Value f = v.mapGet(Value(std::string(k)));
+    auto gc = [&](const Value& k, double def) -> uint8_t {
+        Value f = v.mapGet(k);
         return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0);
     };
-    return {gc("r", 1), gc("g", 1), gc("b", 1), gc("a", 1)};
+    return {gc(K_R, 1), gc(K_G, 1), gc(K_B, 1), gc(K_A, 1)};
 }
 
 static void pixelsOpen(TexHandle& h) {
@@ -175,8 +187,10 @@ static Value img_load(Value* args, int argc) {
     h.is_render = false;
     int id = s_next_id++;
     int w = h.tex.width, hh = h.tex.height;
-    s_images[id] = h;
-    return makeHandle(id, w, hh);
+    auto uptr = std::make_unique<TexHandle>(std::move(h));
+    TexHandle* ptr = uptr.get();
+    s_images[id] = std::move(uptr);
+    return makeHandle(id, w, hh, ptr);
 }
 
 // ── image.load_data(format, base64) ──────────────────────────────────────────
@@ -196,32 +210,37 @@ static Value img_load_data(Value* args, int argc) {
     h.is_render = false;
     int id = s_next_id++;
     int w = h.tex.width, hh = h.tex.height;
-    s_images[id] = h;
-    return makeHandle(id, w, hh);
+    auto uptr = std::make_unique<TexHandle>(std::move(h));
+    TexHandle* ptr = uptr.get();
+    s_images[id] = std::move(uptr);
+    return makeHandle(id, w, hh, ptr);
 }
 
 // ── image.create(w, h) ───────────────────────────────────────────────────────
 
 static Value img_create(Value* args, int argc) {
-    int w = (int)numArg(args, argc, 0, "image.create");
-    int h = (int)numArg(args, argc, 1, "image.create");
+    static constexpr const char* FN = "image.create";
+    int w = (int)numArg(args, argc, 0, FN);
+    int h = (int)numArg(args, argc, 1, FN);
     TexHandle hnd;
     hnd.rtt = LoadRenderTexture(w, h);
     hnd.is_render = true;
     int id = s_next_id++;
-    s_images[id] = hnd;
-    return makeHandle(id, w, h);
+    auto uptr = std::make_unique<TexHandle>(std::move(hnd));
+    TexHandle* ptr = uptr.get();
+    s_images[id] = std::move(uptr);
+    return makeHandle(id, w, h, ptr);
 }
 
 // ── image.begin_draw(img) ────────────────────────────────────────────────────
 
 static Value img_begin(Value* args, int argc) {
+    static constexpr const char* FN = "image.begin_draw";
     if (argc < 1)
-        throw std::runtime_error("image.begin_draw: expected image handle");
-    int id = handleId(args[0], "image.begin_draw");
-    TexHandle& h = findHandle(id, "image.begin_draw");
+        throw std::runtime_error(std::string(FN) + ": expected image handle");
+    TexHandle& h = handlePtr(args[0], FN);
     if (!h.is_render)
-        throw std::runtime_error("image.begin_draw: not a render texture — use image.create()");
+        throw std::runtime_error(std::string(FN) + ": not a render texture — use image.create()");
     pixelsClose(h);
     BeginTextureMode(h.rtt);
     return Value{};
@@ -239,17 +258,17 @@ static Value img_end(Value* args, int argc) {
 // ── image.draw(img, x, y [, w, h [, tint]]) ──────────────────────────────────
 
 static Value img_draw(Value* args, int argc) {
+    static constexpr const char* FN = "image.draw";
     if (argc < 3)
-        throw std::runtime_error("image.draw: expected img, x, y");
-    int id = handleId(args[0], "image.draw");
-    TexHandle& h = findHandle(id, "image.draw");
+        throw std::runtime_error(std::string(FN) + ": expected img, x, y");
+    TexHandle& h = handlePtr(args[0], FN);
     pixelsClose(h);
 
     Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
-    float x = (float)numArg(args, argc, 1, "image.draw");
-    float y = (float)numArg(args, argc, 2, "image.draw");
-    float dw = argc > 3 ? (float)numArg(args, argc, 3, "image.draw") : (float)tex.width;
-    float dh = argc > 4 ? (float)numArg(args, argc, 4, "image.draw") : (float)tex.height;
+    float x = (float)numArg(args, argc, 1, FN);
+    float y = (float)numArg(args, argc, 2, FN);
+    float dw = argc > 3 ? (float)numArg(args, argc, 3, FN) : (float)tex.width;
+    float dh = argc > 4 ? (float)numArg(args, argc, 4, FN) : (float)tex.height;
     Color tint = (argc > 5 && args[5].isMap()) ? toColor(args[5]) : WHITE;
 
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
@@ -269,7 +288,7 @@ static Value img_unload(Value* args, int argc) {
     auto it = s_images.find(id);
     if (it == s_images.end())
         return Value{};
-    TexHandle& h = it->second;
+    TexHandle& h = *it->second;
     if (h.pixels_open) {
         UnloadImage(h.cpu);
         h.pixels_open = false;
@@ -285,53 +304,71 @@ static Value img_unload(Value* args, int argc) {
 // ── image.begin_pixels(img) ──────────────────────────────────────────────────
 
 static Value img_begin_pixels(Value* args, int argc) {
+    static constexpr const char* FN = "image.begin_pixels";
     if (argc < 1)
-        throw std::runtime_error("image.begin_pixels: expected image handle");
-    int id = handleId(args[0], "image.begin_pixels");
-    pixelsOpen(findHandle(id, "image.begin_pixels"));
+        throw std::runtime_error(std::string(FN) + ": expected image handle");
+    pixelsOpen(handlePtr(args[0], FN));
     return Value{};
 }
 
 // ── image.end_pixels(img) ────────────────────────────────────────────────────
 
 static Value img_end_pixels(Value* args, int argc) {
+    static constexpr const char* FN = "image.end_pixels";
     if (argc < 1)
-        throw std::runtime_error("image.end_pixels: expected image handle");
-    int id = handleId(args[0], "image.end_pixels");
-    pixelsClose(findHandle(id, "image.end_pixels"));
+        throw std::runtime_error(std::string(FN) + ": expected image handle");
+    pixelsClose(handlePtr(args[0], FN));
     return Value{};
 }
 
 // ── image.get_pixel(img, x, y) ───────────────────────────────────────────────
 
 static Value img_get_pixel(Value* args, int argc) {
+    static constexpr const char* FN = "image.get_pixel";
+    static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
     if (argc < 3)
-        throw std::runtime_error("image.get_pixel: expected img, x, y");
-    int id = handleId(args[0], "image.get_pixel");
-    TexHandle& h = findHandle(id, "image.get_pixel");
-    int x = (int)numArg(args, argc, 1, "image.get_pixel");
-    int y = (int)numArg(args, argc, 2, "image.get_pixel");
+        throw std::runtime_error(std::string(FN) + ": expected img, x, y");
+    TexHandle& h = handlePtr(args[0], FN);
+    int x = (int)numArg(args, argc, 1, FN);
+    int y = (int)numArg(args, argc, 2, FN);
     pixelsOpen(h);
-    Color c = GetImageColor(h.cpu, x, y);
+    Color c;
+    if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        const uint8_t* px = (const uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
+        c = {px[0], px[1], px[2], px[3]};
+    } else {
+        c = GetImageColor(h.cpu, x, y);
+    }
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("r")), Value(c.r / 255.0));
-    m.mapSet(Value(std::string("g")), Value(c.g / 255.0));
-    m.mapSet(Value(std::string("b")), Value(c.b / 255.0));
-    m.mapSet(Value(std::string("a")), Value(c.a / 255.0));
+    m.mapSet(K_R, Value(c.r / 255.0));
+    m.mapSet(K_G, Value(c.g / 255.0));
+    m.mapSet(K_B, Value(c.b / 255.0));
+    m.mapSet(K_A, Value(c.a / 255.0));
     return m;
 }
 
-// ── image.set_pixel(img, x, y, color) ────────────────────────────────────────
+// ── image.set_pixel(img, x, y, color | r, g, b, a) ───────────────────────────
 
 static Value img_set_pixel(Value* args, int argc) {
+    static constexpr const char* FN = "image.set_pixel";
     if (argc < 4)
-        throw std::runtime_error("image.set_pixel: expected img, x, y, color");
-    int id = handleId(args[0], "image.set_pixel");
-    TexHandle& h = findHandle(id, "image.set_pixel");
-    int x = (int)numArg(args, argc, 1, "image.set_pixel");
-    int y = (int)numArg(args, argc, 2, "image.set_pixel");
+        throw std::runtime_error(std::string(FN) + ": expected img, x, y, color");
+    TexHandle& h = handlePtr(args[0], FN);
+    int x = (int)numArg(args, argc, 1, FN);
+    int y = (int)numArg(args, argc, 2, FN);
     pixelsOpen(h);
-    ImageDrawPixel(&h.cpu, x, y, toColor(args[3]));
+    Color c = (argc >= 7) ? Color{
+        (uint8_t)(numArg(args, argc, 3, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, argc, 4, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, argc, 5, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, argc, 6, FN) * 255.0 + 0.5),
+    } : toColor(args[3]);
+    if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+        uint8_t* px = (uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
+        px[0] = c.r; px[1] = c.g; px[2] = c.b; px[3] = c.a;
+    } else {
+        ImageDrawPixel(&h.cpu, x, y, c);
+    }
     return Value{};
 }
 
@@ -342,7 +379,7 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
     auto it = s_images.find(id);
     if (it == s_images.end())
         return;
-    const TexHandle& h = it->second;
+    const TexHandle& h = *it->second;
 
     Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
     if (dw == 0.0f)
