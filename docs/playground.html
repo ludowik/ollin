@@ -267,6 +267,47 @@ canvas#canvas {
   </div>
 </div>
 
+<div id="load-error" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,17,23,0.92);flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;font-family:system-ui,sans-serif">
+  <div style="font-size:15px;color:#f87171;font-weight:600">Le chargement de l'éditeur a échoué</div>
+  <div style="font-size:13px;color:#8a93b0;max-width:380px;line-height:1.5">Souvent dû à un réseau lent ou au CDN (CodeMirror) momentanément indisponible. Réessaie en vidant le cache.</div>
+  <button id="load-error-reload" style="background:#7c83ff;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+</div>
+
+<!-- Watchdog : script CLASSIQUE (s'exécute même si le module ES échoue à se
+     charger). Surveille l'init de l'éditeur et propose une relance claire au
+     lieu de laisser l'UI figée sur « Chargement ». -->
+<script>
+(function () {
+  var el = document.getElementById('load-error');
+  var shown = false;
+  function showLoadError() {
+    if (shown || window.__ollinReady) return;
+    shown = true;
+    el.style.display = 'flex';
+  }
+  document.getElementById('load-error-reload').addEventListener('click', function () {
+    var reload = function () { location.reload(); };
+    if ('caches' in window) {
+      caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }).then(reload).catch(reload);
+    } else {
+      reload();
+    }
+  });
+  // Échec de chargement d'une ressource (module/CDN/WASM)
+  window.addEventListener('error', function (e) {
+    if (e && e.target && e.target.tagName === 'SCRIPT') showLoadError();
+  }, true);
+  window.addEventListener('unhandledrejection', function () {
+    // un import ES qui échoue rejette ; on laisse une chance puis on vérifie
+    setTimeout(function () { if (!window.__ollinReady) showLoadError(); }, 1500);
+  });
+  // Filet de sécurité : si l'éditeur n'est pas monté après 8 s, c'est bloqué
+  setTimeout(function () {
+    if (!window.__ollinReady && !document.querySelector('#editor-wrap .cm-editor')) showLoadError();
+  }, 8000);
+})();
+</script>
+
 <script type="module">
 import { EditorState }                                                    from '@codemirror/state'
 import { EditorView, lineNumbers, keymap, drawSelection,
@@ -523,6 +564,8 @@ const view = new EditorView({
 })
 
 view.focus()
+window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
+{ const le = document.getElementById('load-error'); if (le) le.style.display = 'none' }
 localStorage.setItem('ollin-last-page', 'playground.html')
 
 // ── Examples ──────────────────────────────────────────────────────────────
