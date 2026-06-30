@@ -350,7 +350,10 @@ Value VM::callValue(const Value& fn) {
 }
 
 Value VM::callValue(const Value& fn, const Value& arg) {
-    if (fn.isBuiltin()) { Value a = arg; return fn.asBuiltin()(&a, 1); }
+    if (fn.isBuiltin()) {
+        Value a = arg;
+        return fn.asBuiltin()(&a, 1);
+    }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     if (fn.isFuncVal()) {
@@ -375,7 +378,10 @@ Value VM::callValue(const Value& fn, const Value& arg) {
 }
 
 Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
-    if (fn.isBuiltin()) { Value args[2] = { a, b }; return fn.asBuiltin()(args, 2); }
+    if (fn.isBuiltin()) {
+        Value args[2] = {a, b};
+        return fn.asBuiltin()(args, 2);
+    }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     if (fn.isFuncVal()) {
@@ -727,28 +733,36 @@ dispatch_loop:
 
 op_GT: {
     // GT(a,b) == LT(b,a): check __lt on rhs
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    const Value& bv = regs[base + B];
+    const Value& cv = regs[base + C];
     if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier > entier
         regs[base+A] = Value((int64_t)(bv.asInt() > cv.asInt()));
         NEXT();
     }
     if (isInstance(cv)) {
-        if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, cv, bv))
-            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+        if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv)) {
+            ip = addr;
+            base = call_stack.back().reg_base;
+            NEXT();
+        }
     }
     regs[base+A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
     NEXT();
 }
 
 op_LT: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    const Value& bv = regs[base + B];
+    const Value& cv = regs[base + C];
     if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier < entier
         regs[base+A] = Value((int64_t)(bv.asInt() < cv.asInt()));
         NEXT();
     }
     if (isInstance(bv)) {
-        if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, bv, cv))
-            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+        if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv)) {
+            ip = addr;
+            base = call_stack.back().reg_base;
+            NEXT();
+        }
     }
     regs[base+A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
     NEXT();
@@ -756,28 +770,36 @@ op_LT: {
 
 op_GE: {
     // GE(a,b) == LE(b,a): check __le on rhs
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    const Value& bv = regs[base + B];
+    const Value& cv = regs[base + C];
     if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier >= entier
         regs[base+A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
         NEXT();
     }
     if (isInstance(cv)) {
-        if (uint32_t addr = tryMetaBinary(MK().le_, base+A, cv, bv))
-            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+        if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv)) {
+            ip = addr;
+            base = call_stack.back().reg_base;
+            NEXT();
+        }
     }
     regs[base+A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
     NEXT();
 }
 
 op_LE: {
-    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    const Value& bv = regs[base + B];
+    const Value& cv = regs[base + C];
     if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier <= entier
         regs[base+A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
         NEXT();
     }
     if (isInstance(bv)) {
-        if (uint32_t addr = tryMetaBinary(MK().le_, base+A, bv, cv))
-            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+        if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv)) {
+            ip = addr;
+            base = call_stack.back().reg_base;
+            NEXT();
+        }
     }
     regs[base+A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
     NEXT();

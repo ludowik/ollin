@@ -1007,7 +1007,8 @@ void Compiler::visit(const BinaryExpr& e) {
         last_reg_ = dst;
         return;
     }
-    e.left->accept(*this);  int rL = last_reg_;
+    e.left->accept(*this);
+    int rL = last_reg_;
     // protéger le registre du résultat gauche : un appel 0-arg (ou toute expr
     // qui laisse reg_top_ <= rL) verrait sinon l'opérande droit le réécraser.
     if (reg_top_ <= rL)
