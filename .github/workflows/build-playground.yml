@@ -1,0 +1,45 @@
+name: Build playground bundle
+
+# Empaquette CodeMirror en local (docs/vendor/codemirror.js) pour supprimer la
+# dépendance au CDN esm.sh. GitHub Actions a le réseau ; le bundle est committé
+# sur main, d'où Pages le sert (aucun changement de réglage Pages requis).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'package.json'
+      - 'tools/cm-entry.js'
+      - '.github/workflows/build-playground.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build CodeMirror bundle
+        run: npm run build:cm
+
+      - name: Commit bundle if changed
+        run: |
+          if [ -n "$(git status --porcelain docs/vendor/codemirror.js)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add docs/vendor/codemirror.js
+            git commit -m "build: bundle CodeMirror (docs/vendor/codemirror.js) [skip ci]"
+            git push
+          else
+            echo "Bundle inchangé — rien à committer."
+          fi
