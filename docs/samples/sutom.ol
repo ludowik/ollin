@@ -43,13 +43,24 @@ global KBY = 0
 global TITLEY = 0
 global TITLESZ = 0
 
-## ── palette (proche sutom.nocle.fr) ─────────────────────────────────────
-func cRed()    return { r: 0.90, g: 0.10, b: 0.20 } end   ## bien placé
-func cBlue()   return { r: 0.20, g: 0.45, b: 0.72 } end   ## absent
-func cYellow() return { r: 1.0,  g: 0.78, b: 0.0  } end   ## présent (rond)
-func cBg()     return { r: 0.04, g: 0.06, b: 0.12 } end   ## fond
-func cCell()   return { r: 0.09, g: 0.13, b: 0.22 } end   ## case vide / clavier
-func cWhite()  return { r: 1, g: 1, b: 1 } end
+## ── palette : instances Color créées une fois (proche sutom.nocle.fr) ────
+global RED, BLUE, YELLOW, BG, CELLC, WHITE
+global B_CUR, B_EMPTY, B_KEY, B_OVL, OVERLAY, GREEN, REDISH
+func initColors()
+    RED     = Color(0.90, 0.10, 0.20)   ## bien placé
+    BLUE    = Color(0.20, 0.45, 0.72)   ## absent
+    YELLOW  = Color(1.0,  0.78, 0.0)    ## présent (rond)
+    BG      = Color(0.04, 0.06, 0.12)   ## fond
+    CELLC   = Color(0.09, 0.13, 0.22)   ## case vide / touche
+    WHITE   = Color(1, 1, 1)
+    B_CUR   = Color(0.40, 0.42, 0.50)   ## bord ligne courante
+    B_EMPTY = Color(0.20, 0.24, 0.32)   ## bord ligne vide
+    B_KEY   = Color(0.45, 0.45, 0.55)   ## bord touche
+    B_OVL   = Color(0.50, 0.50, 0.60)   ## bord overlay
+    OVERLAY = Color(0, 0, 0, 0.82)      ## voile overlay
+    GREEN   = Color(0.20, 0.90, 0.30)
+    REDISH  = Color(1.0, 0.35, 0.35)
+end
 
 func start()
     secret   = WORDS[math.rand_int(1, len(WORDS))]
@@ -211,23 +222,23 @@ end
 ## ── rendu ───────────────────────────────────────────────────────────────
 func letterAt(letter, cx, cy)
     var fz = math.floor(CELL * 0.6)
-    graphics.draw_text(letter, cx + math.floor(CELL * 0.26), cy + math.floor(CELL * 0.16), fz, cWhite())
+    graphics.draw_text(letter, cx + math.floor(CELL * 0.26), cy + math.floor(CELL * 0.16), fz, WHITE)
 end
 
 func drawCell(cx, cy, c, letter)
     if c == 2 then
-        graphics.fill(cRed())
+        graphics.fill(RED)
         graphics.stroke()
         graphics.rect(cx, cy, CELL, CELL)
     elseif c == 1 then
-        graphics.fill(cBlue())
+        graphics.fill(BLUE)
         graphics.stroke()
         graphics.rect(cx, cy, CELL, CELL)
-        graphics.fill(cYellow())               ## rond jaune (présent mal placé)
+        graphics.fill(YELLOW)               ## rond jaune (présent mal placé)
         graphics.stroke()
         graphics.circle(cx + math.floor(CELL / 2), cy + math.floor(CELL / 2), math.floor(CELL * 0.36))
     else
-        graphics.fill(cBlue())
+        graphics.fill(BLUE)
         graphics.stroke()
         graphics.rect(cx, cy, CELL, CELL)
     end
@@ -246,13 +257,13 @@ func drawGrid()
                 var entry = rows[r + 1]
                 drawCell(cx, cy, entry.colors[i], string.char(entry.word, i))
             elseif r == rowIndex and state == "playing" then
-                graphics.fill(cCell())
-                graphics.stroke({ r: 0.4, g: 0.42, b: 0.5 }, 2)
+                graphics.fill(CELLC)
+                graphics.stroke(B_CUR, 2)
                 graphics.rect(cx, cy, CELL, CELL)
                 if i <= len(cur) then letterAt(string.char(cur, i), cx, cy) end
             else
-                graphics.fill(cCell())
-                graphics.stroke({ r: 0.2, g: 0.24, b: 0.32 }, 2)
+                graphics.fill(CELLC)
+                graphics.stroke(B_EMPTY, 2)
                 graphics.rect(cx, cy, CELL, CELL)
                 if i == 1 then letterAt(string.char(secret, 1), cx, cy) end
             end
@@ -264,47 +275,48 @@ func drawKeys()
     var charFz = math.floor(KH * 0.45)
     var wideFz = math.floor(KH * 0.34)
     for k in keys do
-        var bg = cCell()
+        var bg = CELLC
         if k.kind == "char" and keyStatus[k.label] then
             var st = keyStatus[k.label] - 1
-            if st == 2 then bg = cRed() elseif st == 1 then bg = cYellow() else bg = cBlue() end
+            if st == 2 then bg = RED elseif st == 1 then bg = YELLOW else bg = BLUE end
         end
         graphics.fill(bg)
-        graphics.stroke({ r: 0.45, g: 0.45, b: 0.55 }, 1)
+        graphics.stroke(B_KEY, 1)
         graphics.rect(k.x, k.y, k.w, k.h)
         if k.kind == "char" then
-            graphics.draw_text(k.label, k.x + math.floor(KW * 0.32), k.y + math.floor(KH * 0.28), charFz, cWhite())
+            graphics.draw_text(k.label, k.x + math.floor(KW * 0.32), k.y + math.floor(KH * 0.28), charFz, WHITE)
         else
-            graphics.draw_text(k.label, k.x + math.floor(k.w * 0.18), k.y + math.floor(KH * 0.32), wideFz, cWhite())
+            graphics.draw_text(k.label, k.x + math.floor(k.w * 0.18), k.y + math.floor(KH * 0.32), wideFz, WHITE)
         end
     end
 end
 
 func frame()
-    graphics.clear(cBg())
-    graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, cYellow())
+    graphics.clear(BG)
+    graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, YELLOW)
     drawGrid()
     drawKeys()
     ## message transitoire (mot inconnu, etc.)
     if time() < msgUntil then
         var mfz = math.floor(TITLESZ * 0.55)
-        graphics.draw_text(msg, math.floor(W / 2 - len(msg) * mfz * 0.28), GY - mfz - GAP, mfz, cWhite())
+        graphics.draw_text(msg, math.floor(W / 2 - len(msg) * mfz * 0.28), GY - mfz - GAP, mfz, WHITE)
     end
     if state == "won" or state == "lost" then
         var by = math.floor(H / 2 - CELL * 0.7)
-        graphics.fill({ r: 0, g: 0, b: 0, a: 0.82 })
-        graphics.stroke({ r: 0.5, g: 0.5, b: 0.6 }, 1)
+        graphics.fill(OVERLAY)
+        graphics.stroke(B_OVL, 1)
         graphics.rect(MARGIN, by, W - 2 * MARGIN, math.floor(CELL * 1.4))
         var efz = math.floor(CELL * 0.4)
         if state == "won" then
-            graphics.draw_text("GAGNE !  (Echap = rejouer)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, { r: 0.2, g: 0.9, b: 0.3 })
+            graphics.draw_text("GAGNE !  (Echap = rejouer)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, GREEN)
         else
-            graphics.draw_text("PERDU : " + secret + "  (Echap)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, { r: 1, g: 0.35, b: 0.35 })
+            graphics.draw_text("PERDU : " + secret + "  (Echap)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, REDISH)
         end
     end
 end
 
 ## ── init ────────────────────────────────────────────────────────────────
+initColors()
 for w in WORDS do DICT[w] = 1 end
 W = window.width
 H = window.height
