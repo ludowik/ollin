@@ -259,8 +259,8 @@ canvas#canvas {
   <div id="editor-pane">
     <div id="editor-wrap"></div>
   </div>
-  <div id="divider"></div>
-  <div id="output-pane">
+  <div id="divider" style="display:none"></div>
+  <div id="output-pane" style="display:none">
     <div id="output">Prêt.</div>
     <canvas id="canvas"></canvas>
   </div>
@@ -522,7 +522,15 @@ sel.addEventListener('change', async () => {
 const outputEl   = document.getElementById('output')
 const canvasEl   = document.getElementById('canvas')
 const outputPane = document.getElementById('output-pane')
+const dividerEl  = document.getElementById('divider')
 const outputHdr  = document.getElementById('output-header')
+
+// La zone de rendu (sortie + canvas) n'apparaît qu'en exécution/pause ;
+// au repos l'éditeur occupe tout l'espace.
+function setOutputVisible(visible) {
+  outputPane.style.display = visible ? '' : 'none'
+  if (dividerEl) dividerEl.style.display = visible ? '' : 'none'
+}
 
 const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
@@ -560,6 +568,7 @@ function clearAndStop() {
   outputEl.className     = ''
   outputPane.style.overflow = ''
   setRunning(false)
+  setOutputVisible(false)   // retour éditeur plein écran
 }
 
 function showOutput(text) {
@@ -588,6 +597,9 @@ function run() {
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
+  // Afficher la zone AVANT execute : window.width lit le clientWidth de
+  // #output-pane (0 si display:none → graphics dimensionné à vide).
+  setOutputVisible(true)
   const code = view.state.doc.toString()
   const out  = ollin.execute(code)
   if (canvasEl.style.display === 'block') {
