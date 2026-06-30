@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-30 18:50</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-30 20:08</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-30 18:50</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-30 20:08</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1264,6 +1264,8 @@ apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="c
     <tr><td><code>math.sin(x)</code></td><td>fonction</td><td>Sinus (radians) → float</td></tr>
     <tr><td><code>math.cos(x)</code></td><td>fonction</td><td>Cosinus (radians) → float</td></tr>
     <tr><td><code>math.rand()</code></td><td>fonction</td><td>Nombre aléatoire dans [0, 1) — graine initialisée au démarrage</td></tr>
+    <tr><td><code>math.noise(x[, y[, z]])</code></td><td>fonction</td><td>Bruit de Perlin fractal (fBm) en 1, 2 ou 3 dimensions → float dans [0, 1], continu et déterministe</td></tr>
+    <tr><td><code>math.noise_seed(n)</code></td><td>fonction</td><td>Fixe la graine du bruit : même <code>n</code> → même bruit, graines différentes → bruits différents</td></tr>
   </tbody>
 </table>
 
@@ -1275,7 +1277,13 @@ apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="c
 
 <span class="bi">print</span>(math.sign(10)) <span class="cmt">## 1</span>
 <span class="bi">print</span>(math.sign(-7)) <span class="cmt">## -1</span>
-<span class="bi">print</span>(math.sign(0)) <span class="cmt">## 0</span></code></pre>
+<span class="bi">print</span>(math.sign(0)) <span class="cmt">## 0</span>
+
+<span class="cmt">## bruit de Perlin : continu, dans [0, 1] — idéal pour animer/texturer</span>
+<span class="kw">for</span> i = <span class="num">0</span>, <span class="num">3</span> <span class="kw">do</span>
+    <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))   <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
+<span class="kw">end</span>
+math.noise_seed(<span class="num">42</span>)            <span class="cmt">## bruit reproductible</span></code></pre>
 </section>
 
 <!-- ── Import ─────────────────────────────────────────────────────────── -->

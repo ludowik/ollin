@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 #include "module_utils.h"
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <ctime>
 #include <limits>
@@ -8,6 +9,92 @@
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
+// ── Bruit de Perlin (improved noise, Ken Perlin) + fBm ──────────────────────
+// Table de permutation de référence (256 valeurs), dupliquée en s_perm[512].
+static const unsigned char PERLIN_REF[256] = {
+    151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225, 140, 36,  103, 30,  69,  142,
+    8,   99,  37,  240, 21,  10,  23,  190, 6,   148, 247, 120, 234, 75,  0,   26,  197, 62,  94,  252, 219, 203,
+    117, 35,  11,  32,  57,  177, 33,  88,  237, 149, 56,  87,  174, 20,  125, 136, 171, 168, 68,  175, 74,  165,
+    71,  134, 139, 48,  27,  166, 77,  146, 158, 231, 83,  111, 229, 122, 60,  211, 133, 230, 220, 105, 92,  41,
+    55,  46,  245, 40,  244, 102, 143, 54,  65,  25,  63,  161, 1,   216, 80,  73,  209, 76,  132, 187, 208, 89,
+    18,  169, 200, 196, 135, 130, 116, 188, 159, 86,  164, 100, 109, 198, 173, 186, 3,   64,  52,  217, 226, 250,
+    124, 123, 5,   202, 38,  147, 118, 126, 255, 82,  85,  212, 207, 206, 59,  227, 47,  16,  58,  17,  182, 189,
+    28,  42,  223, 183, 170, 213, 119, 248, 152, 2,   44,  154, 163, 70,  221, 153, 101, 155, 167, 43,  172, 9,
+    129, 22,  39,  253, 19,  98,  108, 110, 79,  113, 224, 232, 178, 185, 112, 104, 218, 246, 97,  228, 251, 34,
+    242, 193, 238, 210, 144, 12,  191, 179, 162, 241, 81,  51,  145, 235, 249, 14,  239, 107, 49,  192, 214, 31,
+    181, 199, 106, 157, 184, 84,  204, 176, 115, 121, 50,  45,  127, 4,   150, 254, 138, 236, 205, 93,  222, 114,
+    67,  29,  24,  72,  243, 141, 128, 195, 78,  66,  215, 61,  156, 180};
+
+static int s_perm[512];
+
+static void noiseInitDefault() {
+    for (int i = 0; i < 256; i++) {
+        s_perm[i] = PERLIN_REF[i];
+        s_perm[256 + i] = PERLIN_REF[i];
+    }
+}
+
+// Rebat la table via un PRNG déterministe local (xorshift64), indépendant de
+// rand()/math.seed → le bruit et l'aléatoire ne s'influencent pas.
+static void noiseReseed(uint64_t seed) {
+    int p[256];
+    for (int i = 0; i < 256; i++)
+        p[i] = i;
+    uint64_t s = seed ? seed : 0x9E3779B97F4A7C15ULL;
+    for (int i = 255; i > 0; i--) {
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        int j = (int)(s % (uint64_t)(i + 1));
+        int tmp = p[i];
+        p[i] = p[j];
+        p[j] = tmp;
+    }
+    for (int i = 0; i < 256; i++) {
+        s_perm[i] = p[i];
+        s_perm[256 + i] = p[i];
+    }
+}
+
+static inline double noiseFade(double t) {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+static inline double noiseLerp(double t, double a, double b) {
+    return a + t * (b - a);
+}
+
+static inline double noiseGrad(int hash, double x, double y, double z) {
+    int h = hash & 15;
+    double u = h < 8 ? x : y;
+    double v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
+    return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+}
+
+static double perlin3(double x, double y, double z) {
+    int X = (int)std::floor(x) & 255;
+    int Y = (int)std::floor(y) & 255;
+    int Z = (int)std::floor(z) & 255;
+    x -= std::floor(x);
+    y -= std::floor(y);
+    z -= std::floor(z);
+    double u = noiseFade(x);
+    double v = noiseFade(y);
+    double w = noiseFade(z);
+    int A = s_perm[X] + Y, AA = s_perm[A] + Z, AB = s_perm[A + 1] + Z;
+    int B = s_perm[X + 1] + Y, BA = s_perm[B] + Z, BB = s_perm[B + 1] + Z;
+    return noiseLerp(
+        w,
+        noiseLerp(v, noiseLerp(u, noiseGrad(s_perm[AA], x, y, z), noiseGrad(s_perm[BA], x - 1, y, z)),
+                  noiseLerp(u, noiseGrad(s_perm[AB], x, y - 1, z), noiseGrad(s_perm[BB], x - 1, y - 1, z))),
+        noiseLerp(v, noiseLerp(u, noiseGrad(s_perm[AA + 1], x, y, z - 1), noiseGrad(s_perm[BA + 1], x - 1, y, z - 1)),
+                  noiseLerp(u, noiseGrad(s_perm[AB + 1], x, y - 1, z - 1),
+                            noiseGrad(s_perm[BB + 1], x - 1, y - 1, z - 1))));
+}
+
+static const int NOISE_OCTAVES = 4;
+static const double NOISE_FALLOFF = 0.5;
 
 #define MATH1(name, expr)                                                                                              \
     static Value math_##name(Value* args, int argc) {                                                                  \
@@ -159,8 +246,38 @@ static Value math_rand_int(Value* args, int argc) {
     return Value(lo + (int64_t)(rand() % (hi - lo + 1)));
 }
 
+// Bruit de Perlin fractal (fBm), 1/2/3 dimensions → FLOAT dans [0, 1].
+static Value math_noise(Value* args, int argc) {
+    if (argc < 1 || argc > 3)
+        throw std::runtime_error("math.noise: expects 1, 2 or 3 arguments");
+    double x = numArg(args, argc, 0, "math.noise");
+    double y = argc >= 2 ? numArg(args, argc, 1, "math.noise") : 0.0;
+    double z = argc >= 3 ? numArg(args, argc, 2, "math.noise") : 0.0;
+    double total = 0.0, amp = 0.5, freq = 1.0, maxAmp = 0.0;
+    for (int o = 0; o < NOISE_OCTAVES; o++) {
+        total += perlin3(x * freq, y * freq, z * freq) * amp;
+        maxAmp += amp;
+        freq *= 2.0;
+        amp *= NOISE_FALLOFF;
+    }
+    double n = (total / maxAmp + 1.0) * 0.5;
+    if (n < 0.0)
+        n = 0.0;
+    if (n > 1.0)
+        n = 1.0;
+    return Value(n);
+}
+
+// Rebat la table de permutation → bruit reproductible / variable.
+static Value math_noise_seed(Value* args, int argc) {
+    int64_t s = (int64_t)numArg(args, argc, 0, "math.noise_seed");
+    noiseReseed((uint64_t)s);
+    return Value();
+}
+
 Value makeMathModule() {
     srand((unsigned)time(nullptr));
+    noiseInitDefault();
     Value m = Value::makeMap();
     // constantes
     m.mapSet(Value(std::string("PI")), Value(M_PI));
@@ -203,5 +320,8 @@ Value makeMathModule() {
     m.mapSet(Value(std::string("rand")), Value::makeBuiltin(math_rand));
     m.mapSet(Value(std::string("rand_int")), Value::makeBuiltin(math_rand_int));
     m.mapSet(Value(std::string("seed")), Value::makeBuiltin(math_seed));
+    // bruit de Perlin
+    m.mapSet(Value(std::string("noise")), Value::makeBuiltin(math_noise));
+    m.mapSet(Value(std::string("noise_seed")), Value::makeBuiltin(math_noise_seed));
     return m;
 }
