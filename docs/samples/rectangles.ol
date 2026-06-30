@@ -8,14 +8,15 @@ class Rect
         self.h = math.rand_int(20, 80)
         self.x = math.rand_int(0, W - self.w)
         self.y = math.rand_int(0, H - self.h)
-        self.vx = math.rand(-2, 2)
-        self.vy = math.rand(-2, 2)
+        self.vx = math.rand(-120, 120)   ## pixels / seconde
+        self.vy = math.rand(-120, 120)
         self.fc = Color.random()
         self.sc = Color.random()
     end
 
-    func update()
-        self.x += self.vx self.y += self.vy
+    func update(dt)
+        self.x += self.vx * dt
+        self.y += self.vy * dt
         if self.x < 0 or self.x + self.w > W then self.vx = -self.vx end
         if self.y < 0 or self.y + self.h > H then self.vy = -self.vy end
         self.x = math.clamp(self.x, 0, W - self.w)
@@ -36,11 +37,18 @@ end
 
 graphics.canvas(W, H, "Rectangles")
 
-## `draw` est appelée automatiquement à chaque frame par le moteur.
+## `update(dt)` est appelée chaque frame AVANT `draw` ; dt = secondes écoulées
+## depuis la frame précédente → mouvement indépendant du framerate.
+func update(dt)
+    for r in rects do
+        r.update(dt)
+    end
+end
+
+## `draw` est appelée automatiquement après `update` pour le rendu.
 func draw()
     graphics.clear(colors.BLACK)
     for r in rects do
-        r.update()
         r.draw()
     end
 end

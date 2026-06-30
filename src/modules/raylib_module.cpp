@@ -387,6 +387,14 @@ static Value gfx_quit(Value* args, int argc) {
     return Value{};
 }
 
+// Si une fonction globale `update` existe, l'appeler avec le delta-time
+// (secondes écoulées depuis la frame précédente) AVANT le rendu.
+static Value s_update_callback;
+static void callUpdateIfAny() {
+    if (s_update_callback.isCallable())
+        VM::current()->callValue(s_update_callback, Value((double)GetFrameTime()));
+}
+
 #ifdef __EMSCRIPTEN__
 static Value s_run_callback;
 static void emscripten_frame() {
@@ -397,6 +405,7 @@ static void emscripten_frame() {
     resetStyles();
     keyboardPoll();
     mousePoll();
+    callUpdateIfAny();
     VM::current()->callValue(s_run_callback);
     drawFpsOverlay();
     EndDrawing();
@@ -407,6 +416,7 @@ static Value gfx_run(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.run: expected callback function");
     Value fn = args[0];
+    s_update_callback = VM::current()->getGlobal("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
     emscripten_set_main_loop(emscripten_frame, 0, 0);
@@ -417,6 +427,7 @@ static Value gfx_run(Value* args, int argc) {
         resetStyles();
         keyboardPoll();
         mousePoll();
+        callUpdateIfAny();
         VM::current()->callValue(fn);
         drawFpsOverlay();
         EndDrawing();

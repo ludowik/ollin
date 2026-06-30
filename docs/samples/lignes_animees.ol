@@ -1,7 +1,7 @@
 var W = window.width
 var H = window.height
 const N = 150
-const SPEED = 3
+const SPEED = 180   ## pixels / seconde
 
 class Line
     func init()
@@ -16,9 +16,11 @@ class Line
         self.col = Color.random()
     end
 
-    func update()
-        self.x1 += self.vx1 self.y1 += self.vy1
-        self.x2 += self.vx2 self.y2 += self.vy2
+    func update(dt)
+        self.x1 += self.vx1 * dt
+        self.y1 += self.vy1 * dt
+        self.x2 += self.vx2 * dt
+        self.y2 += self.vy2 * dt
         if self.x1 < 0 or self.x1 > W then self.vx1 = -self.vx1 end
         if self.y1 < 0 or self.y1 > H then self.vy1 = -self.vy1 end
         if self.x2 < 0 or self.x2 > W then self.vx2 = -self.vx2 end
@@ -38,12 +40,19 @@ end
 
 graphics.canvas(W, H, "Lignes animées")
 
-## `draw` est appelée automatiquement à chaque frame par le moteur.
+## `update(dt)` est appelée chaque frame AVANT `draw` ; dt = secondes écoulées
+## depuis la frame précédente → mouvement indépendant du framerate.
+func update(dt)
+    for l in lines do
+        l.update(dt)
+    end
+end
+
+## `draw` est appelée automatiquement après `update` pour le rendu.
 func draw()
     graphics.clear(colors.BLACK)
     graphics.strokeSize(1)
     for l in lines do
-        l.update()
         l.draw()
     end
 end
