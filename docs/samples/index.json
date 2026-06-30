@@ -9,5 +9,6 @@
   { "name": "Pixels animés",  "file": "pixels.ol" },
   { "name": "Primitives",     "file": "primitives.ol" },
   { "name": "Rectangles",     "file": "rectangles.ol" },
+  { "name": "Image (load_data)", "file": "image_demo.ol" },
   { "name": "SUTOM",          "file": "sutom.ol" }
 ]
