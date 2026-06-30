@@ -209,18 +209,6 @@ canvas#canvas {
   #run-btn, #stop-btn, #copy-btn { padding: 6px 8px !important; }
 }
 </style>
-<script type="importmap">
-{
-  "imports": {
-    "@codemirror/state":         "https://esm.sh/@codemirror/state@6",
-    "@codemirror/view":          "https://esm.sh/@codemirror/view@6",
-    "@codemirror/language":      "https://esm.sh/@codemirror/language@6",
-    "@codemirror/commands":      "https://esm.sh/@codemirror/commands@6",
-    "@codemirror/autocomplete":  "https://esm.sh/@codemirror/autocomplete@6",
-    "@lezer/highlight":          "https://esm.sh/@lezer/highlight@1"
-  }
-}
-</script>
 </head>
 <body>
 
@@ -309,14 +297,16 @@ canvas#canvas {
 </script>
 
 <script type="module">
-import { EditorState }                                                    from '@codemirror/state'
-import { EditorView, lineNumbers, keymap, drawSelection,
-         highlightActiveLine, highlightActiveLineGutter }                 from '@codemirror/view'
-import { defaultKeymap, historyKeymap, history, indentWithTab }           from '@codemirror/commands'
-import { StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit,
-         codeFolding, foldGutter, foldKeymap, foldService }                from '@codemirror/language'
-import { tags }                                                           from '@lezer/highlight'
-import { autocompletion, completionKeymap, acceptCompletion }             from '@codemirror/autocomplete'
+// CodeMirror servi en local (bundle esbuild) — plus aucune dépendance CDN.
+// Régénéré par .github/workflows/build-playground.yml (tools/cm-entry.js).
+import {
+  EditorState,
+  EditorView, lineNumbers, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter,
+  defaultKeymap, historyKeymap, history, indentWithTab,
+  StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
+  tags,
+  autocompletion, completionKeymap, acceptCompletion,
+} from './vendor/codemirror.js'
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
