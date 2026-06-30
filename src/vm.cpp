@@ -361,13 +361,14 @@ Value VM::callValue(const Value& fn, const Value& arg) {
     } else if (fn.isClosure()) {
         fi = fn.asClosure()->func_idx;
         const auto& uvs = fn.asClosure()->upvals;
-        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+        if (!uvs.empty())
+            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
     } else {
         throw std::runtime_error("callValue: not callable");
     }
     int call_base = (int)regs.size();
     growRegs((size_t)(call_base + 1));
-    regs[call_base] = arg;            // R[0] du nouveau frame = argument
+    regs[call_base] = arg; // R[0] du nouveau frame = argument
     uint32_t saved_ip = ip;
     ip = pushCallFrame(call_base, fi, 1, std::move(frame_upvals), saved_ip);
     runGoto(call_stack.size() - 1);
@@ -389,14 +390,15 @@ Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
     } else if (fn.isClosure()) {
         fi = fn.asClosure()->func_idx;
         const auto& uvs = fn.asClosure()->upvals;
-        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+        if (!uvs.empty())
+            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
     } else {
         throw std::runtime_error("callValue: not callable");
     }
     int call_base = (int)regs.size();
     growRegs((size_t)(call_base + 2));
-    regs[call_base]     = a;          // R[0] = 1er argument
-    regs[call_base + 1] = b;          // R[1] = 2e argument
+    regs[call_base] = a;     // R[0] = 1er argument
+    regs[call_base + 1] = b; // R[1] = 2e argument
     uint32_t saved_ip = ip;
     ip = pushCallFrame(call_base, fi, 2, std::move(frame_upvals), saved_ip);
     runGoto(call_stack.size() - 1);
@@ -405,7 +407,6 @@ Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
     ip = saved_ip;
     return result;
 }
-
 
 // ── pushCallFrame ─────────────────────────────────────────────────────────────
 // Point d'entrée unique pour toute construction de frame d'appel :
@@ -731,79 +732,95 @@ dispatch_loop:
         NEXT();
     }
 
-op_GT: {
-    // GT(a,b) == LT(b,a): check __lt on rhs
-    const Value& bv = regs[base + B];
-    const Value& cv = regs[base + C];
-    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier > entier
-        regs[base+A] = Value((int64_t)(bv.asInt() > cv.asInt()));
-        NEXT();
-    }
-    if (isInstance(cv)) {
-        if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv)) {
-            ip = addr;
-            base = call_stack.back().reg_base;
+    op_GT: {
+        // GT(a,b) == LT(b,a): check __lt on rhs
+        const Value& bv = regs[base + B];
+        const Value& cv = regs[base + C];
+        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier > entier
+            regs[base + A] = Value((int64_t)(bv.asInt() > cv.asInt()));
             NEXT();
         }
+        if (isInstance(cv)) {
+            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        }
+        if (bv.isString() && cv.isString()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.asString() > cv.asString()));
+            NEXT();
+        }
+        regs[base + A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
+        NEXT();
     }
-    regs[base+A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
-    NEXT();
-}
 
-op_LT: {
-    const Value& bv = regs[base + B];
-    const Value& cv = regs[base + C];
-    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier < entier
-        regs[base+A] = Value((int64_t)(bv.asInt() < cv.asInt()));
-        NEXT();
-    }
-    if (isInstance(bv)) {
-        if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv)) {
-            ip = addr;
-            base = call_stack.back().reg_base;
+    op_LT: {
+        const Value& bv = regs[base + B];
+        const Value& cv = regs[base + C];
+        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier < entier
+            regs[base + A] = Value((int64_t)(bv.asInt() < cv.asInt()));
             NEXT();
         }
+        if (isInstance(bv)) {
+            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        }
+        if (bv.isString() && cv.isString()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.asString() < cv.asString()));
+            NEXT();
+        }
+        regs[base + A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
+        NEXT();
     }
-    regs[base+A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
-    NEXT();
-}
 
-op_GE: {
-    // GE(a,b) == LE(b,a): check __le on rhs
-    const Value& bv = regs[base + B];
-    const Value& cv = regs[base + C];
-    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier >= entier
-        regs[base+A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
-        NEXT();
-    }
-    if (isInstance(cv)) {
-        if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv)) {
-            ip = addr;
-            base = call_stack.back().reg_base;
+    op_GE: {
+        // GE(a,b) == LE(b,a): check __le on rhs
+        const Value& bv = regs[base + B];
+        const Value& cv = regs[base + C];
+        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier >= entier
+            regs[base + A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
             NEXT();
         }
+        if (isInstance(cv)) {
+            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        }
+        if (bv.isString() && cv.isString()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.asString() >= cv.asString()));
+            NEXT();
+        }
+        regs[base + A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
+        NEXT();
     }
-    regs[base+A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
-    NEXT();
-}
 
-op_LE: {
-    const Value& bv = regs[base + B];
-    const Value& cv = regs[base + C];
-    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier <= entier
-        regs[base+A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
-        NEXT();
-    }
-    if (isInstance(bv)) {
-        if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv)) {
-            ip = addr;
-            base = call_stack.back().reg_base;
+    op_LE: {
+        const Value& bv = regs[base + B];
+        const Value& cv = regs[base + C];
+        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier <= entier
+            regs[base + A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
             NEXT();
         }
+        if (isInstance(bv)) {
+            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        }
+        if (bv.isString() && cv.isString()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.asString() <= cv.asString()));
+            NEXT();
+        }
+        regs[base + A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
+        NEXT();
     }
-    regs[base+A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
-    NEXT();
-}
 
     op_JUMP:
         ip = Bx;
