@@ -3,12 +3,14 @@ name: Build playground bundle
 # Empaquette CodeMirror en local (docs/vendor/codemirror.js) pour supprimer la
 # dépendance au CDN esm.sh. GitHub Actions a le réseau ; le bundle est committé
 # sur main, d'où Pages le sert (aucun changement de réglage Pages requis).
+#
+# package.json est gitignoré dans ce repo → le workflow est autonome : il
+# installe les dépendances explicitement (sans manifeste) et appelle esbuild.
 
 on:
   push:
     branches: [main]
     paths:
-      - 'package.json'
       - 'tools/cm-entry.js'
       - '.github/workflows/build-playground.yml'
   workflow_dispatch:
@@ -26,11 +28,22 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install build deps (sans manifeste)
+        run: >
+          npm install --no-save
+          esbuild@^0.24
+          @codemirror/state@^6
+          @codemirror/view@^6
+          @codemirror/language@^6
+          @codemirror/commands@^6
+          @codemirror/autocomplete@^6
+          @lezer/highlight@^1
 
       - name: Build CodeMirror bundle
-        run: npm run build:cm
+        run: >
+          npx esbuild tools/cm-entry.js
+          --bundle --format=esm --minify
+          --outfile=docs/vendor/codemirror.js
 
       - name: Commit bundle if changed
         run: |
