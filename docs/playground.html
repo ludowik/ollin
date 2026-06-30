@@ -229,6 +229,10 @@ canvas#canvas {
   <select id="examples" title="Charger un exemple" disabled><option>Chargement…</option></select>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
+  <button id="reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
+    <span class="btn-label">Recharger</span>
+  </button>
   <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
   <label for="img-file-input" id="img-btn" title="Charger des images (PNG, JPG…) pour image.load()" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;user-select:none">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 10l4-3 3 2.5 3-3.5 4 4"/><circle cx="11.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
@@ -638,6 +642,22 @@ standaloneBtn.addEventListener('click', () => {
     localStorage.setItem('ollin_run_images', JSON.stringify(imgs))
   } catch (_) {}
   window.open('run.html', '_blank')
+})
+
+// ── Recharger + vider le cache ──────────────────────────────────────────────
+// Vide le Cache API puis recharge (le code de l'éditeur est conservé dans
+// localStorage). Utile pour récupérer un WASM fraîchement déployé.
+const reloadBtn = document.getElementById('reload-btn')
+reloadBtn.addEventListener('click', () => {
+  const reload = () => location.reload()
+  if ('caches' in window) {
+    caches.keys()
+      .then(ks => Promise.all(ks.map(k => caches.delete(k))))
+      .then(reload)
+      .catch(reload)
+  } else {
+    reload()
+  }
 })
 
 // ── Image upload ──────────────────────────────────────────────────────────
