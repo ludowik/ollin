@@ -474,6 +474,7 @@ const view = new EditorView({
     doc: INIT_CODE,
     extensions: [
       ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme,
+      EditorView.lineWrapping,
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
       keymap.of([{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
       keymap.of([{ key: 'Alt-Enter', run: () => { run(); return true } }]),
