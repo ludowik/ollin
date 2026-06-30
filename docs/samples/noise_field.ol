@@ -27,8 +27,7 @@ func frame()
             v = math.clamp(v, 0, 1)
             ## dégradé continu : bleu profond → cyan → blanc
             graphics.fill(Color(0.1 + 0.9 * v * v, 0.2 + 0.8 * v, 0.4 + 0.6 * v))
-            ## +1 px pour éviter les coutures entre cellules
-            graphics.rect(x, y, CELL + 1, CELL + 1)
+            graphics.rect(x, y, CELL, CELL)
             x = x + CELL
         end
         y = y + CELL
