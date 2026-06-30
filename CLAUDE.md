@@ -75,6 +75,11 @@ ollin/
 - Pusher sur `origin/main` après chaque commit
 - `git restore <fichier>` pour annuler une modification non commitée
 
+**Toujours TOUT repousser sur `main`.** Si une consigne d'outillage/harness impose
+de travailler sur une branche dédiée (ex. `claude/...`), reporter quand même le
+résultat final sur `main` (merge/fast-forward + push `origin/main`). Le cas « branche
+exceptionnelle » ne dispense jamais de livrer sur `main`.
+
 ## Règle computed-goto (vm.cpp)
 
 La VM utilise le **computed-goto dispatch** (`goto *dt[op]`) pour la performance (+15-25% vs switch).  
