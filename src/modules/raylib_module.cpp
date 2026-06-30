@@ -166,9 +166,16 @@ static Value gfx_no_stroke(Value* args, int argc) {
 
 static Value gfx_fill(Value* args, int argc) {
     if (argc > 0 && (args[0].isMap() || args[0].isClass()))
-        applyFill(true, toColor(args[0]));
+        applyFill(true, toColor(args[0]));   // couleur fournie
     else
-        applyFill(false);
+        s_has_fill = true;                   // sans couleur → (ré)active avec la couleur courante
+    return Value{};
+}
+
+static Value gfx_no_fill(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_has_fill = false;                       // ne plus remplir (couleur conservée)
     return Value{};
 }
 
@@ -497,6 +504,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("stroke")), Value::makeBuiltin(gfx_stroke));
     m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
     m.mapSet(Value(std::string("fill")), Value::makeBuiltin(gfx_fill));
+    m.mapSet(Value(std::string("noFill")), Value::makeBuiltin(gfx_no_fill));
     m.mapSet(Value(std::string("line")), Value::makeBuiltin(gfx_line));
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));

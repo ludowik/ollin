@@ -28,7 +28,7 @@ img.begin_draw(logo)
     ## inner rim: thin luminous circle
     g.stroke({r:1, g:0.878, b:0.376, a:0.35})
     g.strokeSize(1.5)
-    g.fill()
+    g.noFill()
     g.circle(100, 100, 52, 64)
 
     ## 8 stepped-pyramid rays pointing outward
@@ -76,7 +76,7 @@ func frame()
     g.pop()
 
     ## small fixed copy top-left, no tint
-    g.fill()
+    g.noFill()
     g.sprite(logo, 20, 20, 80, 80)
 
     g.stroke({r:1, g:1, b:1, a:0.7})

@@ -30,7 +30,7 @@ func frame()
 
     ## rect (stroke)
     g.stroke(Color(1, 0.4, 0.4), fs(2))
-    g.fill()
+    g.noFill()
     g.rect(px(30), py(110), px(80), py(45))
     g.draw_text("rect", px(120), py(125), fs(13), dim)
 
