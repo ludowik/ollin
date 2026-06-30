@@ -1,5 +1,11 @@
-var W = window.width
-var H = window.height
+## Cycle de vie complet :
+##   setup()      → appelée une fois après le chargement (init)
+##   update(dt)   → logique, appelée chaque frame avant draw (dt = secondes)
+##   draw()       → rendu, appelée chaque frame
+
+global W = 0
+global H = 0
+global rects = []
 const N = 20
 
 class Rect
@@ -30,22 +36,24 @@ class Rect
     end
 end
 
-var rects = []
-for i = 1, N do
-    rects[i] = Rect()
+## init unique avant la boucle
+func setup()
+    W = window.width
+    H = window.height
+    graphics.canvas(W, H, "Rectangles")
+    for i = 1, N do
+        rects[i] = Rect()
+    end
 end
 
-graphics.canvas(W, H, "Rectangles")
-
-## `update(dt)` est appelée chaque frame AVANT `draw` ; dt = secondes écoulées
-## depuis la frame précédente → mouvement indépendant du framerate.
+## logique (mouvement indépendant du framerate)
 func update(dt)
     for r in rects do
         r.update(dt)
     end
 end
 
-## `draw` est appelée automatiquement après `update` pour le rendu.
+## rendu
 func draw()
     graphics.clear(colors.BLACK)
     for r in rects do

@@ -1,5 +1,11 @@
-var W = window.width
-var H = window.height
+## Cycle de vie complet :
+##   setup()      → appelée une fois après le chargement (init)
+##   update(dt)   → logique, appelée chaque frame avant draw (dt = secondes)
+##   draw()       → rendu, appelée chaque frame
+
+global W = 0
+global H = 0
+global lines = []
 const N = 150
 const SPEED = 180   ## pixels / seconde
 
@@ -33,22 +39,24 @@ class Line
     end
 end
 
-var lines = []
-for i = 1, N do
-    lines[i] = Line()
+## init unique avant la boucle
+func setup()
+    W = window.width
+    H = window.height
+    graphics.canvas(W, H, "Lignes animées")
+    for i = 1, N do
+        lines[i] = Line()
+    end
 end
 
-graphics.canvas(W, H, "Lignes animées")
-
-## `update(dt)` est appelée chaque frame AVANT `draw` ; dt = secondes écoulées
-## depuis la frame précédente → mouvement indépendant du framerate.
+## logique (mouvement indépendant du framerate)
 func update(dt)
     for l in lines do
         l.update(dt)
     end
 end
 
-## `draw` est appelée automatiquement après `update` pour le rendu.
+## rendu
 func draw()
     graphics.clear(colors.BLACK)
     graphics.strokeSize(1)

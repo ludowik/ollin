@@ -49,6 +49,10 @@ int main(int argc, char* argv[]) {
 
         VM vm;
         vm.execute(Compiler().compile(program));
+        // setup() : appelée une fois après le chargement, avant la boucle update/draw
+        Value setup = vm.getGlobal("setup");
+        if (setup.isCallable())
+            vm.callValue(setup);
         Value draw = vm.getGlobal("draw");
         if (draw.isCallable()) {
             Value gfx = vm.getGlobal("graphics");

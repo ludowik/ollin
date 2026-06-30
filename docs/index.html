@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-30 20:59</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-30 21:12</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-30 20:59</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-30 21:12</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1444,8 +1444,11 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. Le rendu fonctionne sur desktop et WASM.</p>
 
 <h3>Cycle de vie</h3>
-<p>Définis une fonction nommée <code>draw</code> : le moteur l'appelle <strong>automatiquement à chaque frame</strong>, sans rien d'autre à écrire.</p>
-<pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>) <span class="cmt">## ouvre la fenêtre</span>
+<p>Trois fonctions optionnelles, appelées automatiquement par le moteur : <code>setup()</code> une fois au démarrage, puis <code>update(dt)</code> et <code>draw()</code> à chaque frame.</p>
+<pre data-no-run><code><span class="cmt">## appelée UNE FOIS après le chargement, avant la boucle</span>
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>)
+<span class="kw">end</span>
 
 <span class="cmt">## appelée automatiquement à chaque frame</span>
 <span class="kw">func</span> draw()
@@ -1454,6 +1457,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="cmt">## dessin ici</span>
 
 <span class="kw">end</span></code></pre>
+<p>Ces trois fonctions sont indépendantes : tu peux n'en définir qu'une. (Tu peux aussi ouvrir la fenêtre au niveau du script plutôt que dans <code>setup</code>.)</p>
 <p>Pour séparer la logique du rendu, définis aussi <code>update(dt)</code> : le moteur l'appelle <strong>avant <code>draw</code></strong> à chaque frame, avec <code>dt</code> = nombre de secondes écoulées depuis la frame précédente. En multipliant les déplacements par <code>dt</code>, l'animation devient <strong>indépendante du framerate</strong>.</p>
 <pre data-no-run><code><span class="kw">var</span> x = <span class="num">0</span>
 
@@ -1474,6 +1478,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné (60 fps sur desktop, vsync navigateur sur WASM)</td></tr>
+    <tr><td><code>func setup()</code></td><td>Si elle existe, appelée une fois après le chargement du script, avant la boucle update/draw</td></tr>
     <tr><td><code>func draw()</code></td><td>Si une fonction globale <code>draw</code> existe, le moteur l'appelle automatiquement à chaque frame (rendu)</td></tr>
     <tr><td><code>func update(dt)</code></td><td>Si elle existe, appelée chaque frame <strong>avant</strong> <code>draw</code> ; <code>dt</code> = secondes écoulées depuis la frame précédente</td></tr>
     <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
