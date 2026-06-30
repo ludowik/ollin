@@ -1,33 +1,40 @@
-## math.noise — champ de bruit de Perlin animé.
-## La 3e dimension du bruit sert de temps : le motif évolue en douceur,
-## de façon continue et déterministe.
+## math.noise — champ de bruit de Perlin animé, redessiné à chaque frame.
+## La 3e dimension du bruit sert de temps : les motifs ondulent en douceur.
+## Le bruit fBm se resserre autour de 0.5 → on étire un peu le contraste, puis
+## on applique un dégradé continu (bleu → cyan → blanc) qui révèle la structure
+## lisse du bruit : de grandes taches molles qui se déforment dans le temps.
 
 var W = window.width
 var H = window.height
 graphics.canvas(W, H, "math.noise")
 
-var cell = 14        ## taille d'une cellule (px)
-var scale = 0.06     ## zoom du bruit : plus petit = motifs plus larges
+math.noise_seed(7)
 
-math.noise_seed(7)   ## bruit reproductible d'un lancement à l'autre
+var CELL = 8        ## taille d'une cellule (px) — petit = plus de définition
+var SCALE = 0.01    ## zoom du bruit (petit = taches plus larges)
 
 func frame()
-    var t = time() * 0.25
+    graphics.stroke()   ## désactive le contour → cellules jointives, sans bordure
+    var t = time() * 0.3
 
     var y = 0
     while y < H do
         var x = 0
         while x < W do
-            ## bruit dans [0, 1] piloté par la position ET le temps
-            var n = math.noise(x * scale, y * scale, t)
-            graphics.fill(Color(n, n * 0.6 + 0.2, 1 - n))
-            graphics.rect(x, y, cell, cell)
-            x = x + cell
+            var n = math.noise(x * SCALE, y * SCALE, t)
+            ## étirement de contraste autour de 0.5, borné dans [0, 1]
+            var v = (n - 0.5) * 2.0 + 0.5
+            v = math.clamp(v, 0, 1)
+            ## dégradé continu : bleu profond → cyan → blanc
+            graphics.fill(Color(0.1 + 0.9 * v * v, 0.2 + 0.8 * v, 0.4 + 0.6 * v))
+            ## +1 px pour éviter les coutures entre cellules
+            graphics.rect(x, y, CELL + 1, CELL + 1)
+            x = x + CELL
         end
-        y = y + cell
+        y = y + CELL
     end
 
-    graphics.draw_text("math.noise(x, y, temps)", 12, 12, 18, Color(1, 1, 1))
+    graphics.draw_text("math.noise(x, y, temps)", 14, 14, 18, Color(1, 1, 1))
 end
 
 graphics.run(frame)
