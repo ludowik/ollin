@@ -63,10 +63,13 @@ if(EMSCRIPTEN)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         target_link_options(ollin_wasm PRIVATE -sASSERTIONS=1)
     endif()
-    add_custom_command(TARGET ollin_wasm POST_BUILD
-        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/update_build_date.py
-        COMMENT "Updating build date in docs/index.html"
-    )
+    # Tampon de date optionnel : ne casse pas le build si le script est absent.
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/update_build_date.py")
+        add_custom_command(TARGET ollin_wasm POST_BUILD
+            COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/scripts/update_build_date.py
+            COMMENT "Updating build date in docs/index.html"
+        )
+    endif()
 else()
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/CMakeLists.txt")
         add_subdirectory(libs/raylib)
