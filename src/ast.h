@@ -67,28 +67,6 @@ struct StmtVisitor {
     virtual ~StmtVisitor() = default;
 };
 
-// Base pour les visiteurs lecture seule : méthodes non overridées = no-op.
-struct StmtQuery : StmtVisitor {
-    void visit(const CommentStmt&) override {}
-    void visit(const VarDeclStmt&) override {}
-    void visit(const WhileStmt&) override {}
-    void visit(const IfStmt&) override {}
-    void visit(const BreakStmt&) override {}
-    void visit(const ContinueStmt&) override {}
-    void visit(const AssignStmt&) override {}
-    void visit(const ExprStmt&) override {}
-    void visit(const ThrowStmt&) override {}
-    void visit(const TryCatchStmt&) override {}
-    void visit(const FuncDeclStmt&) override {}
-    void visit(const ReturnStmt&) override {}
-    void visit(const IndexAssignStmt&) override {}
-    void visit(const MultiAssignStmt&) override {}
-    void visit(const ForIterStmt&) override {}
-    void visit(const BlockStmt&) override {}
-    void visit(const ClassDeclStmt&) override {}
-    void visit(const SwitchStmt&) override {}
-};
-
 struct ExprVisitor {
     virtual void visit(const BoolExpr&) = 0;
     virtual void visit(const NumberExpr&) = 0;
@@ -115,6 +93,49 @@ struct Stmt {
     int line = 0;
     virtual void accept(StmtVisitor&) const = 0;
     virtual ~Stmt() = default;
+};
+// Base pour les visiteurs lecture seule : méthodes non overridées = no-op.
+struct StmtQuery : StmtVisitor {
+    void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
+        for (auto& s : stmts)
+            s->accept(*this);
+    }
+    void visit(const CommentStmt&) override {
+    }
+    void visit(const VarDeclStmt&) override {
+    }
+    void visit(const WhileStmt&) override {
+    }
+    void visit(const IfStmt&) override {
+    }
+    void visit(const BreakStmt&) override {
+    }
+    void visit(const ContinueStmt&) override {
+    }
+    void visit(const AssignStmt&) override {
+    }
+    void visit(const ExprStmt&) override {
+    }
+    void visit(const ThrowStmt&) override {
+    }
+    void visit(const TryCatchStmt&) override {
+    }
+    void visit(const FuncDeclStmt&) override {
+    }
+    void visit(const ReturnStmt&) override {
+    }
+    void visit(const IndexAssignStmt&) override {
+    }
+    void visit(const MultiAssignStmt&) override {
+    }
+    void visit(const ForIterStmt&) override {
+    }
+    void visit(const BlockStmt&) override {
+    }
+    void visit(const ClassDeclStmt&) override {
+    }
+    void visit(const SwitchStmt&) override {
+    }
 };
 struct Expr {
     int line = 0;

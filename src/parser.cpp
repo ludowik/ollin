@@ -129,9 +129,16 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
             advance();
             advance(); // ident . field
             if (check(TokenType::LBRACKET)) {
+                int depth = 1;
                 advance();
-                expr();
-                expect(TokenType::RBRACKET);
+                while (!check(TokenType::EOF_T) && depth > 0) {
+                    TokenType t = advance().type;
+                    if (t == TokenType::LBRACKET) {
+                        depth++;
+                    } else if (t == TokenType::RBRACKET) {
+                        depth--;
+                    }
+                }
             }
             bool is_multi = check(TokenType::COMMA);
             pos = saved;

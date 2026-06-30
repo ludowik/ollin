@@ -125,24 +125,22 @@ struct CollectLocalsVisitor : StmtQuery {
                          bool collect_funcs)
         : out(out), seen(seen), collect_funcs(collect_funcs) {}
 
-    void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
-        for (auto& s : stmts)
-            s->accept(*this);
-    }
-
     void visit(const VarDeclStmt& s) override {
-        if (!s.is_global) // 'global' → table des globaux, pas de registre
-                          // 'constant' → locale normale (immuable à la compilation)
+        if (!s.is_global) { // 'global' → table des globaux, pas de registre
+                            // 'constant' → locale normale (immuable à la compilation)
             for (auto& n : s.names) {
-                if (!seen.insert(n).second)
+                if (!seen.insert(n).second) {
                     throw std::runtime_error("local variable '" + n + "' already declared in this scope");
+                }
                 out.push_back(n);
             }
+        }
     }
     void visit(const FuncDeclStmt& s) override {
         // Ne pas descendre dans le corps : les locales d'une fonction sont dans sa propre portée.
-        if (collect_funcs && seen.insert(s.name).second)
+        if (collect_funcs && seen.insert(s.name).second) {
             out.push_back(s.name);
+        }
     }
     void visit(const ForIterStmt& s) override {
         // var1/var2 ne sont PAS des locales permanentes (scopées à la boucle).
@@ -159,8 +157,9 @@ struct CollectLocalsVisitor : StmtQuery {
     }
     void visit(const TryCatchStmt& s) override {
         run(s.try_body);
-        if (!s.catch_var.empty() && seen.insert(s.catch_var).second)
+        if (!s.catch_var.empty() && seen.insert(s.catch_var).second) {
             out.push_back(s.catch_var);
+        }
         run(s.catch_body);
         run(s.else_body);
     }
@@ -189,16 +188,14 @@ struct CollectGlobalsVisitor : StmtQuery {
 
     explicit CollectGlobalsVisitor(std::unordered_set<std::string>& out) : out(out) {}
 
-    void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
-        for (auto& s : stmts)
-            s->accept(*this);
-    }
-
     void visit(const VarDeclStmt& s) override {
-        if (s.is_global)
-            for (auto& n : s.names)
-                if (!out.insert(n).second)
+        if (s.is_global) {
+            for (auto& n : s.names) {
+                if (!out.insert(n).second) {
                     throw std::runtime_error("global variable '" + n + "' already declared");
+                }
+            }
+        }
     }
     void visit(const FuncDeclStmt& s) override {
         run(s.body);
