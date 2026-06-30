@@ -197,16 +197,15 @@ canvas#canvas {
   /* Scroll horizontal fluide sur iOS */
   #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  /* toolbar compact */
-  #toolbar { gap: 5px; padding: 0 8px; }
+  /* toolbar compact : icônes seules, repli sur 2 lignes si ça ne tient pas */
+  #toolbar { gap: 5px; padding: 5px 8px; height: auto; flex-wrap: wrap; }
+  .spacer { display: none; }            /* ne pas pousser les boutons hors écran */
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #examples { max-width: 90px; font-size: 11px; }
-  #img-btn  { padding: 6px 8px; }
-  #run-btn  { padding: 6px 10px; }
-  #stop-btn { padding: 6px 10px; }
-  #copy-btn { padding: 6px 10px !important; }
+  #examples { max-width: 130px; font-size: 11px; }
+  #reload-btn, #standalone-btn, #img-btn,
+  #run-btn, #stop-btn, #copy-btn { padding: 6px 8px !important; }
 }
 </style>
 <script type="importmap">
