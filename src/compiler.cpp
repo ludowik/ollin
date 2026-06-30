@@ -8,8 +8,10 @@
 
 int Compiler::resolveUpvalue(const std::string& name) {
     auto it = cur_upval_idx_.find(name);
-    if (it != cur_upval_idx_.end()) return it->second;
-    if (outer_scopes_.empty()) return -1;
+    if (it != cur_upval_idx_.end())
+        return it->second;
+    if (outer_scopes_.empty())
+        return -1;
     return resolveUpvalFrom((int)outer_scopes_.size() - 1, name);
 }
 
@@ -21,15 +23,17 @@ int Compiler::resolveUpvalFrom(int scope_idx, const std::string& name) {
     auto uv_it = scope.upval_idx.find(name);
     if (uv_it != scope.upval_idx.end())
         return captureUpvalChain(scope_idx, false, (uint8_t)uv_it->second, name);
-    if (scope_idx == 0) return -1;
+    if (scope_idx == 0)
+        return -1;
     int outer_uv = resolveUpvalFrom(scope_idx - 1, name);
-    if (outer_uv < 0) return -1;
+    if (outer_uv < 0)
+        return -1;
     return captureUpvalChain(scope_idx, false, (uint8_t)outer_uv, name);
 }
 
 int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name) {
     bool cur_is_local = is_local;
-    uint8_t cur_idx   = idx;
+    uint8_t cur_idx = idx;
 
     // Propagate through intermediate function scopes
     for (int i = scope_idx + 1; i < (int)outer_scopes_.size(); i++) {
@@ -50,9 +54,11 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
     // Add to current function
     {
         auto it = cur_upval_idx_.find(name);
-        if (it != cur_upval_idx_.end()) return it->second;
+        if (it != cur_upval_idx_.end())
+            return it->second;
     }
-    if (current_func_idx_ < 0) return -1;  // in main chunk, no FuncProto
+    if (current_func_idx_ < 0)
+        return -1; // in main chunk, no FuncProto
     int uv_i = (int)chunk.funcs[current_func_idx_].upvals.size();
     chunk.funcs[current_func_idx_].upvals.push_back({cur_is_local, cur_idx});
     cur_upval_idx_[name] = uv_i;
@@ -61,130 +67,178 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
 static Value evalConstant(const Expr& e) {
-    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) return n->is_integer ? Value(n->ival) : numValue(n->value);
-    if (auto* s = dynamic_cast<const StringExpr*>(&e)) return Value(s->value);
-    if (auto* b = dynamic_cast<const BoolExpr*>(&e))   return Value((int64_t)(b->value ? 1 : 0));
-    if (dynamic_cast<const NilExpr*>(&e))               return Value{};
+    if (auto* n = dynamic_cast<const NumberExpr*>(&e))
+        return n->is_integer ? Value(n->ival) : numValue(n->value);
+    if (auto* s = dynamic_cast<const StringExpr*>(&e))
+        return Value(s->value);
+    if (auto* b = dynamic_cast<const BoolExpr*>(&e))
+        return Value((int64_t)(b->value ? 1 : 0));
+    if (dynamic_cast<const NilExpr*>(&e))
+        return Value{};
     throw std::runtime_error("default values must be literal constants (not a runtime expression)");
 }
 
 // ── arithmetic op helpers ─────────────────────────────────────────────────────
 static Op charToOp(char op) {
     switch (op) {
-        case '+': return Op::ADD;
-        case '-': return Op::SUB;
-        case '*': return Op::MUL;
-        case '/': return Op::DIV;
-        case '%': return Op::MOD;
-        default:  throw std::runtime_error(std::string("unknown assign op: ") + op);
+    case '+':
+        return Op::ADD;
+    case '-':
+        return Op::SUB;
+    case '*':
+        return Op::MUL;
+    case '/':
+        return Op::DIV;
+    case '%':
+        return Op::MOD;
+    default:
+        throw std::runtime_error(std::string("unknown assign op: ") + op);
     }
 }
 static Op tokenToOp(TokenType op) {
     switch (op) {
-        case TokenType::PLUS_EQUAL:    return Op::ADD;
-        case TokenType::MINUS_EQUAL:   return Op::SUB;
-        case TokenType::STAR_EQUAL:    return Op::MUL;
-        case TokenType::SLASH_EQUAL:   return Op::DIV;
-        case TokenType::PERCENT_EQUAL: return Op::MOD;
-        default: throw std::runtime_error("unknown compound index assign op");
+    case TokenType::PLUS_EQUAL:
+        return Op::ADD;
+    case TokenType::MINUS_EQUAL:
+        return Op::SUB;
+    case TokenType::STAR_EQUAL:
+        return Op::MUL;
+    case TokenType::SLASH_EQUAL:
+        return Op::DIV;
+    case TokenType::PERCENT_EQUAL:
+        return Op::MOD;
+    default:
+        throw std::runtime_error("unknown compound index assign op");
     }
 }
 
 // ── pre-scan locals in a block (for register pre-allocation) ─────────────────
 // collect_funcs=true inside function bodies (nested FuncDecls need a local register)
 // collect_funcs=false at top level (top-level funcs are accessed via func_table)
-static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
-                          std::vector<std::string>& out,
-                          std::unordered_set<std::string>& seen,
-                          bool collect_funcs) {
-    auto add = [&](const std::string& n) {
-        if (seen.insert(n).second) out.push_back(n);
-    };
-    for (auto& s : stmts) {
-        if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
-            if (!v->is_global)   // 'global' → table des globaux, pas de registre
-                                 // 'constant' → locale normale (même registre, immuable à la compilation)
-                for (auto& n : v->names) {
-                    if (!seen.insert(n).second)
-                        throw std::runtime_error("local variable '" + n + "' already declared in this scope");
-                    out.push_back(n);
-                }
-        if (collect_funcs)
-            if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
-                add(f->name);
-        if (auto* fi = dynamic_cast<const ForIterStmt*>(s.get())) {
-            // var1/var2 ne sont PAS des locales permanentes : elles sont scopées à la
-            // boucle (registres alloués et liés par le compilateur de boucle, puis
-            // restaurés à la sortie) → pas de fuite après la boucle.
-            collectLocals(fi->body, out, seen, collect_funcs);
-        }
-        if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
-            collectLocals(w->body, out, seen, collect_funcs);
-        if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
-            collectLocals(i->then_body, out, seen, collect_funcs);
-            for (auto& ei : i->else_ifs) collectLocals(ei.body, out, seen, collect_funcs);
-            collectLocals(i->else_body, out, seen, collect_funcs);
-        }
-        if (auto* t = dynamic_cast<const TryCatchStmt*>(s.get())) {
-            collectLocals(t->try_body, out, seen, collect_funcs);
-            if (!t->catch_var.empty()) add(t->catch_var);
-            collectLocals(t->catch_body, out, seen, collect_funcs);
-            collectLocals(t->else_body, out, seen, collect_funcs);
-        }
-        if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
-            collectLocals(b->stmts, out, seen, collect_funcs);
-        if (auto* sw = dynamic_cast<const SwitchStmt*>(s.get())) {
-            for (auto& arm : sw->cases) collectLocals(arm.body, out, seen, collect_funcs);
-            collectLocals(sw->else_body, out, seen, collect_funcs);
-        }
-    }
-}
+// ── pre-scan local declarations ───────────────────────────────────────────────
+struct CollectLocalsVisitor : StmtQuery {
+    std::vector<std::string>& out;
+    std::unordered_set<std::string>& seen;
+    bool collect_funcs;
 
-static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts,
-                          std::vector<std::string>& out, bool collect_funcs = true) {
+    CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
+                         bool collect_funcs)
+        : out(out), seen(seen), collect_funcs(collect_funcs) {}
+
+    void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
+        for (auto& s : stmts)
+            s->accept(*this);
+    }
+
+    void visit(const VarDeclStmt& s) override {
+        if (!s.is_global) // 'global' → table des globaux, pas de registre
+                          // 'constant' → locale normale (immuable à la compilation)
+            for (auto& n : s.names) {
+                if (!seen.insert(n).second)
+                    throw std::runtime_error("local variable '" + n + "' already declared in this scope");
+                out.push_back(n);
+            }
+    }
+    void visit(const FuncDeclStmt& s) override {
+        // Ne pas descendre dans le corps : les locales d'une fonction sont dans sa propre portée.
+        if (collect_funcs && seen.insert(s.name).second)
+            out.push_back(s.name);
+    }
+    void visit(const ForIterStmt& s) override {
+        // var1/var2 ne sont PAS des locales permanentes (scopées à la boucle).
+        run(s.body);
+    }
+    void visit(const WhileStmt& s) override {
+        run(s.body);
+    }
+    void visit(const IfStmt& s) override {
+        run(s.then_body);
+        for (auto& ei : s.else_ifs)
+            run(ei.body);
+        run(s.else_body);
+    }
+    void visit(const TryCatchStmt& s) override {
+        run(s.try_body);
+        if (!s.catch_var.empty() && seen.insert(s.catch_var).second)
+            out.push_back(s.catch_var);
+        run(s.catch_body);
+        run(s.else_body);
+    }
+    void visit(const BlockStmt& s) override {
+        run(s.stmts);
+    }
+    void visit(const SwitchStmt& s) override {
+        for (auto& arm : s.cases)
+            run(arm.body);
+        run(s.else_body);
+    }
+};
+
+static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
+                          bool collect_funcs = true) {
     std::unordered_set<std::string> seen(out.begin(), out.end());
-    collectLocals(stmts, out, seen, collect_funcs);
+    CollectLocalsVisitor v(out, seen, collect_funcs);
+    v.run(stmts);
 }
 
 // ── pre-scan global declarations (program-wide, incl. nested in functions) ────
 // Les globaux déclarés avec 'global' sont visibles partout, quel que soit
 // l'endroit de leur déclaration → on les collecte tous avant la compilation.
+struct CollectGlobalsVisitor : StmtQuery {
+    std::unordered_set<std::string>& out;
+
+    explicit CollectGlobalsVisitor(std::unordered_set<std::string>& out) : out(out) {}
+
+    void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
+        for (auto& s : stmts)
+            s->accept(*this);
+    }
+
+    void visit(const VarDeclStmt& s) override {
+        if (s.is_global)
+            for (auto& n : s.names)
+                if (!out.insert(n).second)
+                    throw std::runtime_error("global variable '" + n + "' already declared");
+    }
+    void visit(const FuncDeclStmt& s) override {
+        run(s.body);
+    }
+    void visit(const ForIterStmt& s) override {
+        run(s.body);
+    }
+    void visit(const WhileStmt& s) override {
+        run(s.body);
+    }
+    void visit(const IfStmt& s) override {
+        run(s.then_body);
+        for (auto& ei : s.else_ifs)
+            run(ei.body);
+        run(s.else_body);
+    }
+    void visit(const TryCatchStmt& s) override {
+        run(s.try_body);
+        run(s.catch_body);
+        run(s.else_body);
+    }
+    void visit(const BlockStmt& s) override {
+        run(s.stmts);
+    }
+    void visit(const ClassDeclStmt& s) override {
+        out.insert(s.name); // classe visible par ses propres méthodes
+        for (auto& m : s.methods)
+            run(m->body);
+    }
+    void visit(const SwitchStmt& s) override {
+        for (auto& arm : s.cases)
+            run(arm.body);
+        run(s.else_body);
+    }
+};
+
 static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
                            std::unordered_set<std::string>& out) {
-    for (auto& s : stmts) {
-        if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get())) {
-            if (v->is_global)
-                for (auto& n : v->names)
-                    if (!out.insert(n).second)
-                        throw std::runtime_error("global variable '" + n + "' already declared");
-        }
-        if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
-            collectGlobals(f->body, out);
-        if (auto* fi = dynamic_cast<const ForIterStmt*>(s.get()))
-            collectGlobals(fi->body, out);
-        if (auto* w = dynamic_cast<const WhileStmt*>(s.get()))
-            collectGlobals(w->body, out);
-        if (auto* i = dynamic_cast<const IfStmt*>(s.get())) {
-            collectGlobals(i->then_body, out);
-            for (auto& ei : i->else_ifs) collectGlobals(ei.body, out);
-            collectGlobals(i->else_body, out);
-        }
-        if (auto* t = dynamic_cast<const TryCatchStmt*>(s.get())) {
-            collectGlobals(t->try_body, out);
-            collectGlobals(t->catch_body, out);
-            collectGlobals(t->else_body, out);
-        }
-        if (auto* b = dynamic_cast<const BlockStmt*>(s.get()))
-            collectGlobals(b->stmts, out);
-        if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get())) {
-            out.insert(c->name);  // classe visible par ses propres méthodes
-            for (auto& m : c->methods) collectGlobals(m->body, out);
-        }
-        if (auto* sw = dynamic_cast<const SwitchStmt*>(s.get())) {
-            for (auto& arm : sw->cases) collectGlobals(arm.body, out);
-            collectGlobals(sw->else_body, out);
-        }
-    }
+    CollectGlobalsVisitor v(out);
+    v.run(stmts);
 }
 
 // ── compile expression into a specific destination register ──────────────────
@@ -193,11 +247,9 @@ void Compiler::compileInto(const Expr& e, int dest) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
                            chunk.addConstant(n->is_integer ? Value(n->ival) : numValue(n->value))));
     } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                           chunk.addConstant(Value(s->value))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.addConstant(Value(s->value))));
     } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                           chunk.addConstant(Value((int64_t)(b->value ? 1 : 0)))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.addConstant(Value((int64_t)(b->value ? 1 : 0)))));
     } else if (dynamic_cast<const NilExpr*>(&e)) {
         chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
     } else {
@@ -214,8 +266,10 @@ Chunk Compiler::compile(const Program& prog) {
     reg_top_ = 0;
     reg_count_ = 8;
     collectGlobals(prog.stmts, declared_globals_);
-    for (auto& n : builtinModuleNames()) declared_globals_.insert(n);
-    for (auto& n : builtinFuncNames())   declared_globals_.insert(n);
+    for (auto& n : builtinModuleNames())
+        declared_globals_.insert(n);
+    for (auto& n : builtinFuncNames())
+        declared_globals_.insert(n);
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
@@ -223,7 +277,8 @@ Chunk Compiler::compile(const Program& prog) {
     for (auto& name : top_locals)
         local_regs_[name] = reg_top_++;
     locals_top_ = reg_top_;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
 
     for (auto& s : prog.stmts)
         s->accept(*this);
@@ -235,7 +290,10 @@ Chunk Compiler::compile(const Program& prog) {
 // ── statements ────────────────────────────────────────────────────────────────
 
 void Compiler::visit(const VarDeclStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
 
     // 'global' declaration → store into the VM-wide globals table
     if (s.is_global) {
@@ -250,14 +308,13 @@ void Compiler::visit(const VarDeclStmt& s) {
                         reg_top_ = target;
                         call->args[i]->accept(*this);
                         if (last_reg_ != target)
-                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                                               (uint8_t)last_reg_, 0));
+                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
                         reg_top_ = target + 1;
-                        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                        if (reg_top_ > reg_count_)
+                            reg_count_ = reg_top_;
                     }
                     const FuncInfo& fi = func_table.at(call->callee);
-                    chunk.emit(makeABC((uint8_t)Op::CALL_FUNC,
-                                       (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
+                    chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
                     for (int i = 0; i < (int)s.names.size(); ++i)
                         chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(call_base + i),
                                            chunk.addIdentifier(s.names[i])));
@@ -275,8 +332,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             } else {
                 chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)src, 0, 0));
             }
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)src,
-                               chunk.addIdentifier(s.names[i])));
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)src, chunk.addIdentifier(s.names[i])));
             reg_top_ = saved;
         }
         return;
@@ -293,19 +349,17 @@ void Compiler::visit(const VarDeclStmt& s) {
                     reg_top_ = target;
                     call->args[i]->accept(*this);
                     if (last_reg_ != target)
-                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                                           (uint8_t)last_reg_, 0));
+                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
                     reg_top_ = target + 1;
-                    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                    if (reg_top_ > reg_count_)
+                        reg_count_ = reg_top_;
                 }
                 const FuncInfo& fi = func_table.at(call->callee);
-                chunk.emit(makeABC((uint8_t)Op::CALL_FUNC,
-                                   (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
+                chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
                 for (int i = 0; i < (int)s.names.size(); ++i) {
                     int dest = local_regs_.at(s.names[i]);
                     if (call_base + i != dest)
-                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest,
-                                           (uint8_t)(call_base + i), 0));
+                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(call_base + i), 0));
                 }
                 reg_top_ = call_base;
                 return;
@@ -323,11 +377,15 @@ void Compiler::visit(const VarDeclStmt& s) {
     }
     // Register constants so any later assignment is caught at compile time
     if (s.is_constant)
-        for (auto& n : s.names) const_names_.insert(n);
+        for (auto& n : s.names)
+            const_names_.insert(n);
 }
 
 void Compiler::visit(const WhileStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     auto loop_start = (uint16_t)chunk.currentPos();
     int saved = reg_top_;
     s.cond->accept(*this);
@@ -343,16 +401,21 @@ void Compiler::visit(const WhileStmt& s) {
         reg_top_ = s2;
     }
     // continue → réévaluation de la condition
-    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
+    for (size_t p : continue_patches.back())
+        chunk.patchJump(p, loop_start);
     continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
     chunk.patchJump(exit_patch, (uint16_t)chunk.currentPos());
-    for (size_t p : break_patches.back()) chunk.patchJump(p, (uint16_t)chunk.currentPos());
+    for (size_t p : break_patches.back())
+        chunk.patchJump(p, (uint16_t)chunk.currentPos());
     break_patches.pop_back();
 }
 
 void Compiler::visit(const IfStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     std::vector<size_t> end_patches;
 
     int saved = reg_top_;
@@ -391,19 +454,23 @@ void Compiler::visit(const IfStmt& s) {
     }
 
     uint16_t end_addr = (uint16_t)chunk.currentPos();
-    for (size_t p : end_patches) chunk.patchJump(p, end_addr);
+    for (size_t p : end_patches)
+        chunk.patchJump(p, end_addr);
 }
 
 void Compiler::visit(const SwitchStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
 
     int saved = reg_top_;
     s.subject->accept(*this);
     int subj_r = last_reg_;
-    int above_subj = reg_top_;  // subj_r reste vivant pendant tous les bras
+    int above_subj = reg_top_; // subj_r reste vivant pendant tous les bras
 
     std::vector<size_t> end_patches;
-    break_patches.push_back({});  // break à l'intérieur du switch cible end_addr
+    break_patches.push_back({}); // break à l'intérieur du switch cible end_addr
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;
@@ -414,7 +481,7 @@ void Compiler::visit(const SwitchStmt& s) {
             reg_top_ = above_subj;
             arm.values[vi]->accept(*this);
             int val_r = last_reg_;
-            int cond_r = allocReg();  // allocReg() met à jour reg_count_
+            int cond_r = allocReg(); // allocReg() met à jour reg_count_
             reg_top_ = above_subj;   // libère le temporaire après EQ
             chunk.emit(makeABC((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
             if (!is_last) {
@@ -427,7 +494,8 @@ void Compiler::visit(const SwitchStmt& s) {
         }
 
         uint16_t body_addr = (uint16_t)chunk.currentPos();
-        for (size_t p : body_patches) chunk.patchJump(p, body_addr);
+        for (size_t p : body_patches)
+            chunk.patchJump(p, body_addr);
 
         reg_top_ = above_subj;
         for (auto& stmt : arm.body) {
@@ -447,8 +515,10 @@ void Compiler::visit(const SwitchStmt& s) {
     }
 
     uint16_t end_addr = (uint16_t)chunk.currentPos();
-    for (size_t p : end_patches) chunk.patchJump(p, end_addr);
-    for (size_t p : break_patches.back()) chunk.patchJump(p, end_addr);
+    for (size_t p : end_patches)
+        chunk.patchJump(p, end_addr);
+    for (size_t p : break_patches.back())
+        chunk.patchJump(p, end_addr);
     break_patches.pop_back();
     reg_top_ = saved;
 }
@@ -466,15 +536,18 @@ void Compiler::visit(const ContinueStmt& s) {
 }
 
 void Compiler::visit(const AssignStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     if (const_names_.count(s.name))
-        throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                                 + ": cannot assign to const '" + s.name + "'");
+        throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
+                                 ": cannot assign to const '" + s.name + "'");
     // Also block assignment when name is a constant captured from an outer scope
     for (auto& scope : outer_scopes_)
         if (scope.consts.count(s.name))
-            throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                                     + ": cannot assign to const '" + s.name + "'");
+            throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
+                                     ": cannot assign to const '" + s.name + "'");
     {
         auto it = local_regs_.find(s.name);
         if (it != local_regs_.end()) {
@@ -507,7 +580,8 @@ void Compiler::visit(const AssignStmt& s) {
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 int res = allocReg();
-                if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                if (reg_top_ > reg_count_)
+                    reg_count_ = reg_top_;
                 chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
                 chunk.emit(makeABC((uint8_t)Op::SET_UPVAL, (uint8_t)res, (uint8_t)uv, 0));
             }
@@ -520,37 +594,41 @@ void Compiler::visit(const AssignStmt& s) {
         int saved = reg_top_;
         if (s.op == '\0') {
             s.value->accept(*this);
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)last_reg_,
-                               chunk.addIdentifier(s.name)));
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)last_reg_, chunk.addIdentifier(s.name)));
         } else {
             int cur = allocReg();
-            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)cur,
-                               chunk.addIdentifier(s.name)));
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)cur, chunk.addIdentifier(s.name)));
             s.value->accept(*this);
             int rhs = last_reg_;
             int res = allocReg();
-            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
             chunk.emit(makeABC((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
-            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res,
-                               chunk.addIdentifier(s.name)));
+            chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res, chunk.addIdentifier(s.name)));
         }
         reg_top_ = saved;
         return;
     }
     // Global scope — assignment without var/global is not allowed
-    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                             + ": undeclared variable '" + s.name + "' (use 'var' or 'global')");
+    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) + ": undeclared variable '" +
+                             s.name + "' (use 'var' or 'global')");
 }
 
 void Compiler::visit(const ExprStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     int saved = reg_top_;
     s.expr->accept(*this);
     reg_top_ = saved;
 }
 
 void Compiler::visit(const ThrowStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     int saved = reg_top_;
     s.value->accept(*this);
     int r = last_reg_;
@@ -559,7 +637,10 @@ void Compiler::visit(const ThrowStmt& s) {
 }
 
 void Compiler::visit(const TryCatchStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     int catch_r = s.catch_var.empty() ? 0 : local_regs_.at(s.catch_var);
 
     size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
@@ -597,18 +678,21 @@ void Compiler::visit(const TryCatchStmt& s) {
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     // Save outer context
-    auto outer_regs    = std::move(local_regs_);
-    auto outer_upvals  = std::move(cur_upval_idx_);
-    int  outer_top     = reg_top_;
-    int  outer_count   = reg_count_;
-    int  outer_locals  = locals_top_;
-    auto outer_name    = current_func_name;
-    int  outer_fidx    = current_func_idx_;
-    bool is_nested     = !outer_name.empty();  // déclarée dans une autre fonction
+    auto outer_regs = std::move(local_regs_);
+    auto outer_upvals = std::move(cur_upval_idx_);
+    int outer_top = reg_top_;
+    int outer_count = reg_count_;
+    int outer_locals = locals_top_;
+    auto outer_name = current_func_name;
+    int outer_fidx = current_func_idx_;
+    bool is_nested = !outer_name.empty(); // déclarée dans une autre fonction
 
-    auto outer_consts = const_names_;   // copy (not move) — stays in OuterScope too
+    auto outer_consts = const_names_; // copy (not move) — stays in OuterScope too
     const_names_.clear();
 
     // Push outer scope for upvalue resolution
@@ -636,7 +720,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
             local_regs_[name] = reg_top_++;
     }
     locals_top_ = reg_top_;
-    reg_count_  = reg_top_;
+    reg_count_ = reg_top_;
 
     // Emit jump over function body
     size_t jump_patch = chunk.emitJump(Op::JUMP);
@@ -645,8 +729,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Build default values
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i])
-                  ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -668,10 +751,11 @@ void Compiler::visit(const FuncDeclStmt& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));  // implicit void return
+    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0)); // implicit void return
 
     // Update reg_count in FuncProto
-    if (reg_count_ > 255) throw std::runtime_error("function uses more than 255 registers");
+    if (reg_count_ > 255)
+        throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
 
     // Patch jump over body
@@ -679,14 +763,14 @@ void Compiler::visit(const FuncDeclStmt& s) {
 
     // Pop scope and restore outer context
     outer_scopes_.pop_back();
-    local_regs_        = std::move(outer_regs);
-    cur_upval_idx_     = std::move(outer_upvals);
-    const_names_       = std::move(outer_consts);
-    reg_top_           = outer_top;
-    reg_count_         = outer_count;
-    locals_top_        = outer_locals;
-    current_func_name  = outer_name;
-    current_func_idx_  = outer_fidx;
+    local_regs_ = std::move(outer_regs);
+    cur_upval_idx_ = std::move(outer_upvals);
+    const_names_ = std::move(outer_consts);
+    reg_top_ = outer_top;
+    reg_count_ = outer_count;
+    locals_top_ = outer_locals;
+    current_func_name = outer_name;
+    current_func_idx_ = outer_fidx;
 
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
@@ -703,10 +787,10 @@ void Compiler::visit(const FuncDeclStmt& s) {
         // Fonction top-level closure : MAKE_CLOSURE + STORE_GLOBAL
         func_table[s.name].is_closure = true;
         int tmp = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)tmp, func_idx));
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp,
-                           chunk.addIdentifier(s.name)));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.addIdentifier(s.name)));
         reg_top_--;
     } else {
         // Fonction top-level non-closure : LOAD_FUNC + STORE_GLOBAL.
@@ -714,22 +798,22 @@ void Compiler::visit(const FuncDeclStmt& s) {
         // (auto-détection WASM) et pour que la fonction soit accessible comme valeur.
         func_table[s.name].is_closure = false;
         int tmp = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)tmp, func_idx));
-        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp,
-                           chunk.addIdentifier(s.name)));
+        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.addIdentifier(s.name)));
         reg_top_--;
     }
 }
 
 void Compiler::visit(const FuncExpr& s) {
-    auto outer_regs   = std::move(local_regs_);
+    auto outer_regs = std::move(local_regs_);
     auto outer_upvals = std::move(cur_upval_idx_);
-    int  outer_top    = reg_top_;
-    int  outer_count  = reg_count_;
-    int  outer_locals = locals_top_;
-    auto outer_name   = current_func_name;
-    int  outer_fidx   = current_func_idx_;
+    int outer_top = reg_top_;
+    int outer_count = reg_count_;
+    int outer_locals = locals_top_;
+    auto outer_name = current_func_name;
+    int outer_fidx = current_func_idx_;
     auto outer_consts = const_names_;
     const_names_.clear();
 
@@ -738,7 +822,9 @@ void Compiler::visit(const FuncExpr& s) {
     current_func_name = "<lambda>";
     cur_upval_idx_.clear();
     local_regs_.clear();
-    reg_top_ = 0; reg_count_ = 0; locals_top_ = 0;
+    reg_top_ = 0;
+    reg_count_ = 0;
+    locals_top_ = 0;
 
     int n_fixed = (int)s.params.size();
     for (int i = 0; i < n_fixed; ++i)
@@ -748,17 +834,17 @@ void Compiler::visit(const FuncExpr& s) {
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
     collectLocals(s.body, body_locals);
     for (auto& nm : body_locals)
-        if (!local_regs_.count(nm)) local_regs_[nm] = reg_top_++;
+        if (!local_regs_.count(nm))
+            local_regs_[nm] = reg_top_++;
     locals_top_ = reg_top_;
-    reg_count_  = reg_top_;
+    reg_count_ = reg_top_;
 
     size_t jump_patch = chunk.emitJump(Op::JUMP);
     uint32_t func_addr = (uint32_t)chunk.currentPos();
 
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i])
-                  ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -771,30 +857,34 @@ void Compiler::visit(const FuncExpr& s) {
         reg_top_ = saved;
     }
     chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
-    if (reg_count_ > 255) throw std::runtime_error("function uses more than 255 registers");
+    if (reg_count_ > 255)
+        throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
     outer_scopes_.pop_back();
-    local_regs_       = std::move(outer_regs);
-    cur_upval_idx_    = std::move(outer_upvals);
-    const_names_      = std::move(outer_consts);
-    reg_top_          = outer_top;
-    reg_count_        = outer_count;
-    locals_top_       = outer_locals;
+    local_regs_ = std::move(outer_regs);
+    cur_upval_idx_ = std::move(outer_upvals);
+    const_names_ = std::move(outer_consts);
+    reg_top_ = outer_top;
+    reg_count_ = outer_count;
+    locals_top_ = outer_locals;
     current_func_name = outer_name;
     current_func_idx_ = outer_fidx;
 
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
     int dest = reg_top_++;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-    chunk.emit(makeABx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC,
-                       (uint8_t)dest, func_idx));
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
+    chunk.emit(makeABx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
     last_reg_ = dest;
 }
 
 void Compiler::visit(const ReturnStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     if (!inFunction())
         throw std::runtime_error("line " + std::to_string(s.line) + ": return outside function");
     if (s.spread_varargs) {
@@ -806,10 +896,10 @@ void Compiler::visit(const ReturnStmt& s) {
             if (last_reg_ != target)
                 chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
             reg_top_ = target + 1;
-            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
         }
-        chunk.emit(makeABC((uint8_t)Op::RETURN_V, (uint8_t)base,
-                           (uint8_t)s.values.size(), 0));
+        chunk.emit(makeABC((uint8_t)Op::RETURN_V, (uint8_t)base, (uint8_t)s.values.size(), 0));
     } else {
         int n = (int)s.values.size();
         if (n == 0) {
@@ -821,16 +911,15 @@ void Compiler::visit(const ReturnStmt& s) {
                 reg_top_ = target;
                 s.values[i]->accept(*this);
                 if (last_reg_ != target)
-                    chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                                       (uint8_t)last_reg_, 0));
+                    chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
                 reg_top_ = target + 1;
-                if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+                if (reg_top_ > reg_count_)
+                    reg_count_ = reg_top_;
             }
             chunk.emit(makeABC((uint8_t)Op::RETURN, (uint8_t)base, (uint8_t)n, 0));
         }
     }
 }
-
 
 // ── expressions ───────────────────────────────────────────────────────────────
 
@@ -842,14 +931,12 @@ void Compiler::visit(const NumberExpr& e) {
 
 void Compiler::visit(const StringExpr& e) {
     last_reg_ = allocReg();
-    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                       chunk.addConstant(Value(e.value))));
+    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.addConstant(Value(e.value))));
 }
 
 void Compiler::visit(const BoolExpr& e) {
     last_reg_ = allocReg();
-    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                       chunk.addConstant(Value((int64_t)(e.value ? 1 : 0)))));
+    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.addConstant(Value((int64_t)(e.value ? 1 : 0)))));
 }
 
 void Compiler::visit(const NilExpr&) {
@@ -871,11 +958,9 @@ void Compiler::visit(const VarExpr& e) {
     if (fit != func_table.end()) {
         last_reg_ = allocReg();
         if (fit->second.is_closure) {
-            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_,
-                               chunk.addIdentifier(e.name)));
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_, chunk.addIdentifier(e.name)));
         } else {
-            chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)last_reg_,
-                               fit->second.func_idx));
+            chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)last_reg_, fit->second.func_idx));
         }
         return;
     }
@@ -889,45 +974,89 @@ void Compiler::visit(const VarExpr& e) {
         }
     }
     if (!declared_globals_.count(e.name))
-        throw std::runtime_error("line " + std::to_string(current_line_)
-                                 + ": undeclared variable '" + e.name + "'");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": undeclared variable '" + e.name + "'");
     last_reg_ = allocReg();
-    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_,
-                       chunk.addIdentifier(e.name)));
+    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_, chunk.addIdentifier(e.name)));
 }
 
 void Compiler::visit(const BinaryExpr& e) {
-    e.left->accept(*this);  int rL = last_reg_;
+    e.left->accept(*this);
+    int rL = last_reg_;
     // protéger le registre du résultat gauche : un appel 0-arg (ou toute expr
     // qui laisse reg_top_ <= rL) verrait sinon l'opérande droit le réécraser.
-    if (reg_top_ <= rL) reg_top_ = rL + 1;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-    e.right->accept(*this); int rR = last_reg_;
+    if (reg_top_ <= rL)
+        reg_top_ = rL + 1;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
+    e.right->accept(*this);
+    int rR = last_reg_;
     last_reg_ = reg_top_++;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
 
     switch (e.op) {
-        case '+': chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '-': chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '*': chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '/': chunk.emit(makeABC((uint8_t)Op::DIV,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'q': chunk.emit(makeABC((uint8_t)Op::IDIV, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'p': chunk.emit(makeABC((uint8_t)Op::POW,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '%': chunk.emit(makeABC((uint8_t)Op::MOD,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '>': chunk.emit(makeABC((uint8_t)Op::GT,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '<': chunk.emit(makeABC((uint8_t)Op::LT,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'G': chunk.emit(makeABC((uint8_t)Op::GE,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'L': chunk.emit(makeABC((uint8_t)Op::LE,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'N': chunk.emit(makeABC((uint8_t)Op::NEQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '=': chunk.emit(makeABC((uint8_t)Op::EQ,  (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '|': chunk.emit(makeABC((uint8_t)Op::OR,      (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case '&': chunk.emit(makeABC((uint8_t)Op::AND,     (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'o': chunk.emit(makeABC((uint8_t)Op::BOR,     (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'b': chunk.emit(makeABC((uint8_t)Op::BAND,    (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'x': chunk.emit(makeABC((uint8_t)Op::BXOR,   (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'l': chunk.emit(makeABC((uint8_t)Op::BLSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        case 'r': chunk.emit(makeABC((uint8_t)Op::BRSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR)); break;
-        default:  throw std::runtime_error(std::string("unknown binary op: ") + e.op);
+    case '+':
+        chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '-':
+        chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '*':
+        chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '/':
+        chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'q':
+        chunk.emit(makeABC((uint8_t)Op::IDIV, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'p':
+        chunk.emit(makeABC((uint8_t)Op::POW, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '%':
+        chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '>':
+        chunk.emit(makeABC((uint8_t)Op::GT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '<':
+        chunk.emit(makeABC((uint8_t)Op::LT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'G':
+        chunk.emit(makeABC((uint8_t)Op::GE, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'L':
+        chunk.emit(makeABC((uint8_t)Op::LE, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'N':
+        chunk.emit(makeABC((uint8_t)Op::NEQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '=':
+        chunk.emit(makeABC((uint8_t)Op::EQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '|':
+        chunk.emit(makeABC((uint8_t)Op::OR, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case '&':
+        chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'o':
+        chunk.emit(makeABC((uint8_t)Op::BOR, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'b':
+        chunk.emit(makeABC((uint8_t)Op::BAND, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'x':
+        chunk.emit(makeABC((uint8_t)Op::BXOR, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'l':
+        chunk.emit(makeABC((uint8_t)Op::BLSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    case 'r':
+        chunk.emit(makeABC((uint8_t)Op::BRSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+        break;
+    default:
+        throw std::runtime_error(std::string("unknown binary op: ") + e.op);
     }
 }
 
@@ -941,35 +1070,47 @@ void Compiler::visit(const ChainedCompareExpr& e) {
     for (int i = 0; i < n; i++) {
         e.operands[i]->accept(*this);
         regs.push_back(last_reg_);
-        if (last_reg_ >= reg_top_) { reg_top_ = last_reg_ + 1; if (reg_top_ > reg_count_) reg_count_ = reg_top_; }
+        if (last_reg_ >= reg_top_) {
+            reg_top_ = last_reg_ + 1;
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
+        }
     }
 
     // allouer n-1 registres de résultat de comparaison
     int cmp_base = reg_top_;
     reg_top_ += n - 1;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
 
     static auto cmpOp = [](char op) -> uint8_t {
         switch (op) {
-            case '=': return (uint8_t)Op::EQ;
-            case 'N': return (uint8_t)Op::NEQ;
-            case '>': return (uint8_t)Op::GT;
-            case '<': return (uint8_t)Op::LT;
-            case 'G': return (uint8_t)Op::GE;
-            case 'L': return (uint8_t)Op::LE;
-            default:  throw std::runtime_error("unknown cmp op in chain");
+        case '=':
+            return (uint8_t)Op::EQ;
+        case 'N':
+            return (uint8_t)Op::NEQ;
+        case '>':
+            return (uint8_t)Op::GT;
+        case '<':
+            return (uint8_t)Op::LT;
+        case 'G':
+            return (uint8_t)Op::GE;
+        case 'L':
+            return (uint8_t)Op::LE;
+        default:
+            throw std::runtime_error("unknown cmp op in chain");
         }
     };
 
     for (int i = 0; i < n - 1; i++)
-        chunk.emit(makeABC(cmpOp(e.ops[i]), (uint8_t)(cmp_base+i), (uint8_t)regs[i], (uint8_t)regs[i+1]));
+        chunk.emit(makeABC(cmpOp(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i], (uint8_t)regs[i + 1]));
 
     // AND itératif des résultats partiels dans cmp_base
     for (int i = 1; i < n - 1; i++)
-        chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)cmp_base, (uint8_t)cmp_base, (uint8_t)(cmp_base+i)));
+        chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)cmp_base, (uint8_t)cmp_base, (uint8_t)(cmp_base + i)));
 
     last_reg_ = cmp_base;
-    reg_top_  = base_tmp; // libère tous les temporaires après l'expression
+    reg_top_ = base_tmp; // libère tous les temporaires après l'expression
 }
 
 void Compiler::visit(const UnaryExpr& e) {
@@ -1002,12 +1143,12 @@ void Compiler::visit(const CallExpr& e) {
                 if (uv >= 0)
                     chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)call_base, (uint8_t)uv, 0));
                 else
-                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)call_base,
-                                       chunk.addIdentifier(e.callee)));
+                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)call_base, chunk.addIdentifier(e.callee)));
             }
         }
         reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         // f?(args) ≡ if f then f(args) else nil  — JUMP_IF_FALSE (nil est falsy) saute
         // les args : ils ne sont donc PAS évalués si f est falsy.
         size_t to_nil = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
@@ -1017,7 +1158,8 @@ void Compiler::visit(const CallExpr& e) {
             compileInto(*e.args[i], call_base + i);
         }
         reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         size_t to_end = chunk.emitJump(Op::JUMP);
         chunk.patchJump(to_nil, (uint16_t)chunk.currentPos());
@@ -1038,21 +1180,19 @@ void Compiler::visit(const CallExpr& e) {
             reg_top_ = target;
             e.args[i]->accept(*this);
             if (last_reg_ != target)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                                   (uint8_t)last_reg_, 0));
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
             reg_top_ = target + 1;
-            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
         }
         if (it->second.is_closure) {
             int func_reg = reg_top_++;
-            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
-                               chunk.addIdentifier(e.callee)));
-            chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
-                               (uint8_t)func_reg, (uint8_t)argc));
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
+            chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg, chunk.addIdentifier(e.callee)));
+            chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         } else {
-            chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base,
-                               it->second.func_idx, (uint8_t)argc));
+            chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, it->second.func_idx, (uint8_t)argc));
         }
         last_reg_ = call_base;
         return;
@@ -1066,16 +1206,17 @@ void Compiler::visit(const CallExpr& e) {
         reg_top_ = target;
         e.args[i]->accept(*this);
         if (last_reg_ != target)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target,
-                               (uint8_t)last_reg_, 0));
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
         reg_top_ = target + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
 
     // Tous les appels passent par CALL_DYN — builtins sont des globaux T_BUILTIN
     {
         int func_reg = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         {
             auto rit = local_regs_.find(e.callee);
             if (rit != local_regs_.end()) {
@@ -1086,13 +1227,11 @@ void Compiler::visit(const CallExpr& e) {
                 if (uv >= 0) {
                     chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)func_reg, (uint8_t)uv, 0));
                 } else {
-                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg,
-                                       chunk.addIdentifier(e.callee)));
+                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg, chunk.addIdentifier(e.callee)));
                 }
             }
         }
-        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
-                           (uint8_t)func_reg, (uint8_t)argc));
+        chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         last_reg_ = call_base;
     }
 }
@@ -1105,18 +1244,20 @@ void Compiler::visit(const ExprCallExpr& e) {
         // appel optionnel : évaluer le callee AVANT les args, garde, puis args
         int func_reg = call_base + argc;
         reg_top_ = call_base + 1;
-        compileInto(*e.callee, call_base);                 // callee dans call_base (check+résultat)
+        compileInto(*e.callee, call_base); // callee dans call_base (check+résultat)
         reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         // f?(args) ≡ if f then f(args) else nil — JUMP_IF_FALSE saute les args (non évalués)
         size_t to_nil = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
         chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
-        for (int i = 0; i < argc; ++i) {                   // temps au-dessus de func_reg
+        for (int i = 0; i < argc; ++i) { // temps au-dessus de func_reg
             reg_top_ = func_reg + 1;
             compileInto(*e.args[i], call_base + i);
         }
         reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         size_t to_end = chunk.emitJump(Op::JUMP);
         chunk.patchJump(to_nil, (uint16_t)chunk.currentPos());
@@ -1135,16 +1276,17 @@ void Compiler::visit(const ExprCallExpr& e) {
         if (last_reg_ != target)
             chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
         reg_top_ = target + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
 
     // Compile callee into a temp register after args
     int func_reg = reg_top_++;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
     compileInto(*e.callee, func_reg);
 
-    chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base,
-                       (uint8_t)func_reg, (uint8_t)argc));
+    chunk.emit(makeABC((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
     last_reg_ = call_base;
 }
 
@@ -1162,7 +1304,7 @@ void Compiler::visit(const MapExpr& e) {
     for (auto& entry : e.entries) {
         int saved = reg_top_;
         int key_reg = allocReg();
-        compileInto(*entry.key, key_reg);        // StringExpr littéral OU clé calculée
+        compileInto(*entry.key, key_reg); // StringExpr littéral OU clé calculée
         int val_reg = allocReg();
         compileInto(*entry.value, val_reg);
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_reg, (uint8_t)val_reg));
@@ -1200,21 +1342,23 @@ void Compiler::visit(const ArrayExpr& e) {
 
 void Compiler::visit(const RangeExpr& e) {
     // Allocate dest first, then use temps above it
-    int dest = allocReg();   // dest = reg_top_-1
+    int dest = allocReg(); // dest = reg_top_-1
 
     // Temps: base = dest+1 for start, base+1 for end, base+2 for step
-    int base = reg_top_;     // = dest+1
+    int base = reg_top_; // = dest+1
 
     // Compile start
     int start_r = base;
     reg_top_ = base + 1;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
     compileInto(*e.start, start_r);
 
     // Compile end
     int end_r = base + 1;
     reg_top_ = base + 2;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
     compileInto(*e.end, end_r);
 
     // Compile step if present
@@ -1222,23 +1366,22 @@ void Compiler::visit(const RangeExpr& e) {
     if (has_step) {
         int step_r = base + 2;
         reg_top_ = base + 3;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         compileInto(*e.step, step_r);
     }
 
     // If open-left: adjust start = start + step_or_1
     if (!e.incl_left) {
         if (has_step) {
-            chunk.emit(makeABC((uint8_t)Op::ADD,
-                               (uint8_t)start_r, (uint8_t)start_r, (uint8_t)(base + 2)));
+            chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)start_r, (uint8_t)start_r, (uint8_t)(base + 2)));
         } else {
             int one_r = base + 2;
             reg_top_ = base + 3;
-            if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r,
-                               chunk.addConstant(Value((int64_t)1))));
-            chunk.emit(makeABC((uint8_t)Op::ADD,
-                               (uint8_t)start_r, (uint8_t)start_r, (uint8_t)one_r));
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
+            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)one_r, chunk.addConstant(Value((int64_t)1))));
+            chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)start_r, (uint8_t)start_r, (uint8_t)one_r));
         }
     }
 
@@ -1252,19 +1395,18 @@ void Compiler::visit(const RangeExpr& e) {
     last_reg_ = dest;
 }
 
-static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body);  // défini plus bas
+static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
 
-void Compiler::compileIteratorLoop(const Expr& src,
-                                   const std::string& var1,
-                                   const std::string& var2,
+void Compiler::compileIteratorLoop(const Expr& src, const std::string& var1, const std::string& var2,
                                    const std::vector<std::unique_ptr<Stmt>>& body) {
     bool two_vars = !var2.empty();
     int block = reg_top_;
     int tmp_src = block + (two_vars ? 3 : 2);
     reg_top_ = tmp_src + 1;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
 
-    compileInto(src, tmp_src);   // src compilé AVANT de scoper les variables de boucle
+    compileInto(src, tmp_src); // src compilé AVANT de scoper les variables de boucle
     chunk.emit(makeABC((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
     reg_top_ = tmp_src;
 
@@ -1279,11 +1421,16 @@ void Compiler::compileIteratorLoop(const Expr& src,
         local_regs_[n] = reg;
     };
     auto restoreBind = [&](const std::string& n, bool had, int old) {
-        if (had) local_regs_[n] = old; else local_regs_.erase(n);
+        if (had)
+            local_regs_[n] = old;
+        else
+            local_regs_.erase(n);
     };
-    bool had1, had2 = false; int old1, old2 = -1;
+    bool had1, had2 = false;
+    int old1, old2 = -1;
     saveBind(var1, block + 1, had1, old1);
-    if (two_vars) saveBind(var2, block + 2, had2, old2);
+    if (two_vars)
+        saveBind(var2, block + 2, had2, old2);
 
     auto loop_start = (uint16_t)chunk.currentPos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
@@ -1296,24 +1443,30 @@ void Compiler::compileIteratorLoop(const Expr& src,
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_start);
+    for (size_t p : continue_patches.back())
+        chunk.patchJump(p, loop_start);
     continue_patches.pop_back();
     chunk.emit(makeBx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit = (uint16_t)chunk.currentPos();
     chunk.patchJump(exit_patch, exit);
-    for (size_t p : break_patches.back()) chunk.patchJump(p, exit);
+    for (size_t p : break_patches.back())
+        chunk.patchJump(p, exit);
     break_patches.pop_back();
 
-    restoreBind(var1, had1, old1);          // restaure la portée (pas de fuite)
-    if (two_vars) restoreBind(var2, had2, old2);
+    restoreBind(var1, had1, old1); // restaure la portée (pas de fuite)
+    if (two_vars)
+        restoreBind(var2, had2, old2);
     // recyclage : si une closure capture la variable de boucle, garder ses registres
     // réservés (sinon réécrits après la boucle → upvalue corrompue).
     reg_top_ = bodyHasFunc(body) ? (block + (two_vars ? 3 : 2)) : block;
 }
 
 void Compiler::visit(const ForIterStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     // chemin rapide : for i in <range littéral inclus aux deux bornes>, 1 variable
     // (couvre la forme `for i = a, b[, step]`). Évite Range + itérateur + dispatch virtuel.
     if (s.var2.empty()) {
@@ -1330,22 +1483,62 @@ void Compiler::visit(const ForIterStmt& s) {
 // ── analyse de sûreté pour aliaser la variable de boucle au registre de contrôle ──
 // Vrai si l'expression contient une lambda (capture potentielle de la var de boucle).
 static bool exprHasLambda(const Expr* e) {
-    if (!e) return false;
-    if (dynamic_cast<const FuncExpr*>(e)) return true;
-    if (auto* b = dynamic_cast<const BinaryExpr*>(e))   return exprHasLambda(b->left.get()) || exprHasLambda(b->right.get());
-    if (auto* u = dynamic_cast<const UnaryExpr*>(e))    return exprHasLambda(u->operand.get());
-    if (auto* c = dynamic_cast<const CallExpr*>(e))     { for (auto& a : c->args) if (exprHasLambda(a.get())) return true; return false; }
-    if (auto* c = dynamic_cast<const ExprCallExpr*>(e)) { if (exprHasLambda(c->callee.get())) return true; for (auto& a : c->args) if (exprHasLambda(a.get())) return true; return false; }
-    if (auto* m = dynamic_cast<const MethodCallExpr*>(e)){ if (exprHasLambda(m->receiver.get())) return true; for (auto& a : m->args) if (exprHasLambda(a.get())) return true; return false; }
-    if (auto* i = dynamic_cast<const IndexExpr*>(e))    return exprHasLambda(i->obj.get()) || exprHasLambda(i->key.get());
-    if (auto* mp= dynamic_cast<const MapExpr*>(e))      { for (auto& en : mp->entries) if (exprHasLambda(en.key.get()) || exprHasLambda(en.value.get())) return true; return false; }
-    if (auto* ar= dynamic_cast<const ArrayExpr*>(e))    { for (auto& x : ar->elements) if (exprHasLambda(x.get())) return true; return false; }
-    if (auto* rg= dynamic_cast<const RangeExpr*>(e))    return exprHasLambda(rg->start.get()) || exprHasLambda(rg->end.get()) || exprHasLambda(rg->step.get());
-    if (auto* cc= dynamic_cast<const ChainedCompareExpr*>(e)) { for (auto& o : cc->operands) if (exprHasLambda(o.get())) return true; return false; }
-    if (dynamic_cast<const VarExpr*>(e) || dynamic_cast<const NumberExpr*>(e) ||
-        dynamic_cast<const StringExpr*>(e) || dynamic_cast<const BoolExpr*>(e) ||
-        dynamic_cast<const NilExpr*>(e) || dynamic_cast<const VarArgExpr*>(e)) return false;
-    return true;   // type inconnu → conservatif
+    if (!e)
+        return false;
+    if (dynamic_cast<const FuncExpr*>(e))
+        return true;
+    if (auto* b = dynamic_cast<const BinaryExpr*>(e))
+        return exprHasLambda(b->left.get()) || exprHasLambda(b->right.get());
+    if (auto* u = dynamic_cast<const UnaryExpr*>(e))
+        return exprHasLambda(u->operand.get());
+    if (auto* c = dynamic_cast<const CallExpr*>(e)) {
+        for (auto& a : c->args)
+            if (exprHasLambda(a.get()))
+                return true;
+        return false;
+    }
+    if (auto* c = dynamic_cast<const ExprCallExpr*>(e)) {
+        if (exprHasLambda(c->callee.get()))
+            return true;
+        for (auto& a : c->args)
+            if (exprHasLambda(a.get()))
+                return true;
+        return false;
+    }
+    if (auto* m = dynamic_cast<const MethodCallExpr*>(e)) {
+        if (exprHasLambda(m->receiver.get()))
+            return true;
+        for (auto& a : m->args)
+            if (exprHasLambda(a.get()))
+                return true;
+        return false;
+    }
+    if (auto* i = dynamic_cast<const IndexExpr*>(e))
+        return exprHasLambda(i->obj.get()) || exprHasLambda(i->key.get());
+    if (auto* mp = dynamic_cast<const MapExpr*>(e)) {
+        for (auto& en : mp->entries)
+            if (exprHasLambda(en.key.get()) || exprHasLambda(en.value.get()))
+                return true;
+        return false;
+    }
+    if (auto* ar = dynamic_cast<const ArrayExpr*>(e)) {
+        for (auto& x : ar->elements)
+            if (exprHasLambda(x.get()))
+                return true;
+        return false;
+    }
+    if (auto* rg = dynamic_cast<const RangeExpr*>(e))
+        return exprHasLambda(rg->start.get()) || exprHasLambda(rg->end.get()) || exprHasLambda(rg->step.get());
+    if (auto* cc = dynamic_cast<const ChainedCompareExpr*>(e)) {
+        for (auto& o : cc->operands)
+            if (exprHasLambda(o.get()))
+                return true;
+        return false;
+    }
+    if (dynamic_cast<const VarExpr*>(e) || dynamic_cast<const NumberExpr*>(e) || dynamic_cast<const StringExpr*>(e) ||
+        dynamic_cast<const BoolExpr*>(e) || dynamic_cast<const NilExpr*>(e) || dynamic_cast<const VarArgExpr*>(e))
+        return false;
+    return true; // type inconnu → conservatif
 }
 
 // Vrai si le corps est sûr pour aliaser la var de boucle 'v' au registre de contrôle :
@@ -1355,31 +1548,46 @@ static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, co
     for (auto& sp : body) {
         const Stmt* s = sp.get();
         if (auto* a = dynamic_cast<const AssignStmt*>(s)) {
-            if (a->name == v) return false;
-            if (exprHasLambda(a->value.get())) return false;
+            if (a->name == v)
+                return false;
+            if (exprHasLambda(a->value.get()))
+                return false;
         } else if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) {
             for (auto& t : m->targets) {
-                if (t.kind == LValue::VAR && t.name == v) return false;
-                if (t.key && exprHasLambda(t.key.get())) return false;
+                if (t.kind == LValue::VAR && t.name == v)
+                    return false;
+                if (t.key && exprHasLambda(t.key.get()))
+                    return false;
             }
-            for (auto& val : m->values) if (exprHasLambda(val.get())) return false;
+            for (auto& val : m->values)
+                if (exprHasLambda(val.get()))
+                    return false;
         } else if (auto* d = dynamic_cast<const VarDeclStmt*>(s)) {
-            for (auto& n : d->names) if (n == v) return false;   // shadow
-            for (auto& val : d->values) if (exprHasLambda(val.get())) return false;
+            for (auto& n : d->names)
+                if (n == v)
+                    return false; // shadow
+            for (auto& val : d->values)
+                if (exprHasLambda(val.get()))
+                    return false;
         } else if (auto* e = dynamic_cast<const ExprStmt*>(s)) {
-            if (exprHasLambda(e->expr.get())) return false;
+            if (exprHasLambda(e->expr.get()))
+                return false;
         } else if (auto* r = dynamic_cast<const ReturnStmt*>(s)) {
-            for (auto& x : r->values) if (exprHasLambda(x.get())) return false;
+            for (auto& x : r->values)
+                if (exprHasLambda(x.get()))
+                    return false;
         } else if (auto* th = dynamic_cast<const ThrowStmt*>(s)) {
-            if (exprHasLambda(th->value.get())) return false;
+            if (exprHasLambda(th->value.get()))
+                return false;
         } else if (auto* ia = dynamic_cast<const IndexAssignStmt*>(s)) {
             // obj==v n'écrit pas v (écrit dans son conteneur) ; vérifier key/value
-            if (exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get())) return false;
+            if (exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get()))
+                return false;
         } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
                    dynamic_cast<const CommentStmt*>(s)) {
             // sûr
         } else {
-            return false;   // if/while/for/block/try/switch/funcdecl/… → conservatif
+            return false; // if/while/for/block/try/switch/funcdecl/… → conservatif
         }
     }
     return true;
@@ -1390,41 +1598,106 @@ static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, co
 // closure peut capturer (upvalue ouverte) le registre de la variable de boucle ;
 // dans ce cas on le garde réservé pour qu'il ne soit pas réécrit après la boucle.
 static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body);
+struct HasFuncQuery : StmtQuery {
+    bool result = false;
+    void visit(const FuncDeclStmt&) override {
+        result = true;
+    }
+    void visit(const SwitchStmt&) override {
+        result = true; // conservatif
+    }
+    void visit(const ClassDeclStmt&) override {
+        result = true; // conservatif
+    }
+    void visit(const AssignStmt& s) override {
+        result = exprHasLambda(s.value.get());
+    }
+    void visit(const ExprStmt& s) override {
+        result = exprHasLambda(s.expr.get());
+    }
+    void visit(const ThrowStmt& s) override {
+        result = exprHasLambda(s.value.get());
+    }
+    void visit(const IndexAssignStmt& s) override {
+        result = exprHasLambda(s.key.get()) || exprHasLambda(s.value.get());
+    }
+    void visit(const MultiAssignStmt& s) override {
+        for (auto& v : s.values)
+            if (exprHasLambda(v.get())) {
+                result = true;
+                return;
+            }
+        for (auto& t : s.targets)
+            if (t.key && exprHasLambda(t.key.get())) {
+                result = true;
+                return;
+            }
+    }
+    void visit(const VarDeclStmt& s) override {
+        for (auto& v : s.values)
+            if (exprHasLambda(v.get())) {
+                result = true;
+                return;
+            }
+    }
+    void visit(const ReturnStmt& s) override {
+        for (auto& v : s.values)
+            if (exprHasLambda(v.get())) {
+                result = true;
+                return;
+            }
+    }
+    void visit(const WhileStmt& s) override {
+        result = exprHasLambda(s.cond.get()) || bodyHasFunc(s.body);
+    }
+    void visit(const ForIterStmt& s) override {
+        result = exprHasLambda(s.iter_expr.get()) || bodyHasFunc(s.body);
+    }
+    void visit(const TryCatchStmt& s) override {
+        result = bodyHasFunc(s.try_body) || bodyHasFunc(s.catch_body) || bodyHasFunc(s.else_body);
+    }
+    void visit(const BlockStmt& s) override {
+        result = bodyHasFunc(s.stmts);
+    }
+    void visit(const IfStmt& s) override {
+        if (exprHasLambda(s.cond.get()) || bodyHasFunc(s.then_body) || bodyHasFunc(s.else_body)) {
+            result = true;
+            return;
+        }
+        for (auto& ei : s.else_ifs)
+            if (exprHasLambda(ei.cond.get()) || bodyHasFunc(ei.body)) {
+                result = true;
+                return;
+            }
+    }
+    // BreakStmt, ContinueStmt, CommentStmt → no-op hérité de StmtQuery (result reste false)
+};
 static bool stmtHasFunc(const Stmt* s) {
-    if (dynamic_cast<const FuncDeclStmt*>(s)) return true;
-    if (auto* a = dynamic_cast<const AssignStmt*>(s))      return exprHasLambda(a->value.get());
-    if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) { for (auto& v : m->values) if (exprHasLambda(v.get())) return true; for (auto& t : m->targets) if (t.key && exprHasLambda(t.key.get())) return true; return false; }
-    if (auto* d = dynamic_cast<const VarDeclStmt*>(s))     { for (auto& v : d->values) if (exprHasLambda(v.get())) return true; return false; }
-    if (auto* e = dynamic_cast<const ExprStmt*>(s))        return exprHasLambda(e->expr.get());
-    if (auto* r = dynamic_cast<const ReturnStmt*>(s))      { for (auto& v : r->values) if (exprHasLambda(v.get())) return true; return false; }
-    if (auto* th= dynamic_cast<const ThrowStmt*>(s))       return exprHasLambda(th->value.get());
-    if (auto* ia= dynamic_cast<const IndexAssignStmt*>(s)) return exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get());
-    if (auto* i = dynamic_cast<const IfStmt*>(s))          { if (exprHasLambda(i->cond.get()) || bodyHasFunc(i->then_body) || bodyHasFunc(i->else_body)) return true; for (auto& ei : i->else_ifs) if (exprHasLambda(ei.cond.get()) || bodyHasFunc(ei.body)) return true; return false; }
-    if (auto* w = dynamic_cast<const WhileStmt*>(s))       return exprHasLambda(w->cond.get()) || bodyHasFunc(w->body);
-    if (auto* fi= dynamic_cast<const ForIterStmt*>(s))     return exprHasLambda(fi->iter_expr.get()) || bodyHasFunc(fi->body);
-    if (auto* tc= dynamic_cast<const TryCatchStmt*>(s))    return bodyHasFunc(tc->try_body) || bodyHasFunc(tc->catch_body) || bodyHasFunc(tc->else_body);
-    if (auto* b = dynamic_cast<const BlockStmt*>(s))       return bodyHasFunc(b->stmts);
-    if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
-        dynamic_cast<const CommentStmt*>(s)) return false;
-    return true;   // SwitchStmt, ClassDeclStmt, type inconnu → conservatif
+    HasFuncQuery q;
+    s->accept(q);
+    return q.result;
 }
 static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body) {
-    for (auto& s : body) if (stmtHasFunc(s.get())) return true;
+    for (auto& s : body)
+        if (stmtHasFunc(s.get()))
+            return true;
     return false;
 }
 
 void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
                                  const std::vector<std::unique_ptr<Stmt>>& body) {
-    int ctl = reg_top_;                       // ctl, ctl+1, ctl+2 = i, limite, pas
+    int ctl = reg_top_; // ctl, ctl+1, ctl+2 = i, limite, pas
     reg_top_ = ctl + 3;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
 
     // bornes compilées AVANT de scoper i (pour que `for i = i, …` lise l'ancien i)
     compileInto(*r.start, ctl);
-    compileInto(*r.end,   ctl + 1);
-    if (r.step) compileInto(*r.step, ctl + 2);
-    else        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(ctl + 2),
-                                   chunk.addConstant(Value((int64_t)1))));
+    compileInto(*r.end, ctl + 1);
+    if (r.step)
+        compileInto(*r.step, ctl + 2);
+    else
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)(ctl + 2), chunk.addConstant(Value((int64_t)1))));
     reg_top_ = ctl + 3;
 
     // Variable de boucle scopée. Si le corps n'écrit jamais i → aliasée sur ctl
@@ -1435,16 +1708,23 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
     int var_reg = ctl;
     if (!can_alias) {
         var_reg = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
-    bool had_old; int old_reg;
-    { auto it = local_regs_.find(var1); had_old = (it != local_regs_.end()); old_reg = had_old ? it->second : -1; }
+    bool had_old;
+    int old_reg;
+    {
+        auto it = local_regs_.find(var1);
+        had_old = (it != local_regs_.end());
+        old_reg = had_old ? it->second : -1;
+    }
     local_regs_[var1] = var_reg;
 
-    size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl);   // Bx → sortie si boucle vide (patché)
+    size_t prep = chunk.emitJump(Op::FOR_PREP, (uint8_t)ctl); // Bx → sortie si boucle vide (patché)
 
-    uint16_t body_addr = (uint16_t)chunk.currentPos();          // FOR_PREP tombe ici si non vide
-    if (!can_alias) chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
+    uint16_t body_addr = (uint16_t)chunk.currentPos(); // FOR_PREP tombe ici si non vide
+    if (!can_alias)
+        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
     break_patches.push_back({});
     continue_patches.push_back({});
@@ -1455,23 +1735,31 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
     }
 
     uint16_t loop_addr = (uint16_t)chunk.currentPos();
-    for (size_t p : continue_patches.back()) chunk.patchJump(p, loop_addr);  // continue → FOR_LOOP
+    for (size_t p : continue_patches.back())
+        chunk.patchJump(p, loop_addr); // continue → FOR_LOOP
     continue_patches.pop_back();
     chunk.emit(makeABx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
 
     uint16_t exit_addr = (uint16_t)chunk.currentPos();
-    chunk.patchJump(prep, exit_addr);         // FOR_PREP saute ici si la boucle est vide
-    for (size_t p : break_patches.back()) chunk.patchJump(p, exit_addr);
+    chunk.patchJump(prep, exit_addr); // FOR_PREP saute ici si la boucle est vide
+    for (size_t p : break_patches.back())
+        chunk.patchJump(p, exit_addr);
     break_patches.pop_back();
 
-    if (had_old) local_regs_[var1] = old_reg; else local_regs_.erase(var1);   // restaure la portée
+    if (had_old)
+        local_regs_[var1] = old_reg;
+    else
+        local_regs_.erase(var1); // restaure la portée
     // recyclage des registres : si une closure du corps capture i, on garde son
     // registre réservé (sinon il serait réécrit après la boucle → upvalue corrompue).
     reg_top_ = bodyHasFunc(body) ? (var_reg + 1) : ctl;
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     int saved = reg_top_;
 
     // Load the map object
@@ -1487,10 +1775,9 @@ void Compiler::visit(const IndexAssignStmt& s) {
                 chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
             } else {
                 if (!declared_globals_.count(s.obj))
-                    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_)
-                                             + ": undeclared variable '" + s.obj + "'");
-                chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
-                                   chunk.addIdentifier(s.obj)));
+                    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
+                                             ": undeclared variable '" + s.obj + "'");
+                chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.addIdentifier(s.obj)));
             }
         }
     }
@@ -1511,7 +1798,8 @@ void Compiler::visit(const IndexAssignStmt& s) {
         int rhs_r = allocReg();
         compileInto(*s.value, rhs_r);
         int result_r = allocReg();
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)tokenToOp(s.op), (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
     }
@@ -1519,7 +1807,10 @@ void Compiler::visit(const IndexAssignStmt& s) {
 }
 
 void Compiler::visit(const MultiAssignStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     int saved = reg_top_;
 
     // Évalue tous les RHS dans des registres temporaires consécutifs
@@ -1545,8 +1836,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
                 if (uv >= 0) {
                     chunk.emit(makeABC((uint8_t)Op::SET_UPVAL, (uint8_t)val_r, (uint8_t)uv, 0));
                 } else {
-                    chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)val_r,
-                                       chunk.addIdentifier(lv.name)));
+                    chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)val_r, chunk.addIdentifier(lv.name)));
                 }
             }
         } else {
@@ -1561,8 +1851,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
                 if (uv >= 0)
                     chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
                 else
-                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r,
-                                       chunk.addIdentifier(lv.name)));
+                    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.addIdentifier(lv.name)));
             }
             int key_r = allocReg();
             if (lv.kind == LValue::FIELD)
@@ -1577,19 +1866,20 @@ void Compiler::visit(const MultiAssignStmt& s) {
 }
 
 void Compiler::visit(const BlockStmt& s) {
-    for (auto& stmt : s.stmts) stmt->accept(*this);
+    for (auto& stmt : s.stmts)
+        stmt->accept(*this);
 }
 
 // ── compileMethodFunc : compile une méthode avec 'self' implicite en R[0] ──────
 uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
-    auto outer_regs   = std::move(local_regs_);
+    auto outer_regs = std::move(local_regs_);
     auto outer_upvals = std::move(cur_upval_idx_);
-    auto outer_consts = const_names_;   // copy — stays in OuterScope too
-    int  outer_top    = reg_top_;
-    int  outer_count  = reg_count_;
-    int  outer_locals = locals_top_;
-    auto outer_name   = current_func_name;
-    int  outer_fidx   = current_func_idx_;
+    auto outer_consts = const_names_; // copy — stays in OuterScope too
+    int outer_top = reg_top_;
+    int outer_count = reg_count_;
+    int outer_locals = locals_top_;
+    auto outer_name = current_func_name;
+    int outer_fidx = current_func_idx_;
     const_names_.clear();
 
     outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
@@ -1619,14 +1909,15 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     reg_top_ = n_fixed;
 
     std::vector<std::string> body_locals;
-    if (!s.is_static) body_locals.push_back("self");
+    if (!s.is_static)
+        body_locals.push_back("self");
     body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
     collectLocals(s.body, body_locals);
     for (auto& name : body_locals)
         if (!local_regs_.count(name))
             local_regs_[name] = reg_top_++;
     locals_top_ = reg_top_;
-    reg_count_  = reg_top_;
+    reg_count_ = reg_top_;
 
     size_t jump_patch = chunk.emitJump(Op::JUMP);
     uint32_t func_addr = (uint32_t)chunk.currentPos();
@@ -1635,8 +1926,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     std::vector<Value> defs(n_fixed);
     int defs_offset = s.is_static ? 0 : 1;
     for (int i = 0; i < n_params; ++i)
-        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i])
-                                 ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i]) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, s.is_static, defaults_idx, 0, {}};
@@ -1650,17 +1940,18 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     }
     chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
 
-    if (reg_count_ > 255) throw std::runtime_error("function uses more than 255 registers");
+    if (reg_count_ > 255)
+        throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
     outer_scopes_.pop_back();
-    local_regs_       = std::move(outer_regs);
-    cur_upval_idx_    = std::move(outer_upvals);
-    const_names_      = std::move(outer_consts);
-    reg_top_          = outer_top;
-    reg_count_        = outer_count;
-    locals_top_       = outer_locals;
+    local_regs_ = std::move(outer_regs);
+    cur_upval_idx_ = std::move(outer_upvals);
+    const_names_ = std::move(outer_consts);
+    reg_top_ = outer_top;
+    reg_count_ = outer_count;
+    locals_top_ = outer_locals;
     current_func_name = outer_name;
     current_func_idx_ = outer_fidx;
 
@@ -1669,22 +1960,25 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
 
 // ── visit(ClassDeclStmt) ──────────────────────────────────────────────────────
 void Compiler::visit(const ClassDeclStmt& s) {
-    if (s.line > 0) { current_line_ = s.line; chunk.setLine(s.line); }
+    if (s.line > 0) {
+        current_line_ = s.line;
+        chunk.setLine(s.line);
+    }
     int saved = reg_top_;
 
     // Créer la valeur classe (T_CLASS = map vide)
     int dest = reg_top_++;
-    if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
     chunk.emit(makeABC((uint8_t)Op::NEW_CLASS, (uint8_t)dest, 0, 0));
 
     // Stocker le nom de la classe comme __name__ (utile pour print/debug)
     {
         int key_r = reg_top_++, val_r = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(std::string("__name__")))));
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)val_r,
-                           chunk.addConstant(Value(s.name))));
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string("__name__")))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.addConstant(Value(s.name))));
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
         reg_top_ = dest + 1;
     }
@@ -1692,11 +1986,10 @@ void Compiler::visit(const ClassDeclStmt& s) {
     // Héritage : stocker la classe parente comme __parent__
     if (!s.parent.empty()) {
         int par_r = reg_top_++, key_r = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)par_r,
-                           chunk.addIdentifier(s.parent)));
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(std::string("__parent__")))));
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)par_r, chunk.addIdentifier(s.parent)));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string("__parent__")))));
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)par_r));
         reg_top_ = dest + 1;
     }
@@ -1709,30 +2002,29 @@ void Compiler::visit(const ClassDeclStmt& s) {
         if (method->is_static) {
             if (method->name == "init")
                 throw std::runtime_error("line " + std::to_string(method->line) +
-                    ": 'init' cannot be static (a constructor always has 'self')");
+                                         ": 'init' cannot be static (a constructor always has 'self')");
             if (method->name.size() >= 2 && method->name[0] == '_' && method->name[1] == '_')
-                throw std::runtime_error("line " + std::to_string(method->line) +
-                    ": metamethod '" + method->name + "' cannot be static (operators always have 'self')");
+                throw std::runtime_error("line " + std::to_string(method->line) + ": metamethod '" + method->name +
+                                         "' cannot be static (operators always have 'self')");
         }
         uint8_t func_idx = compileMethodFunc(*method);
         bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
         int func_r = reg_top_++, key_r = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         if (has_upvals)
             chunk.emit(makeABx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)func_r, func_idx));
         else
             chunk.emit(makeABx((uint8_t)Op::LOAD_FUNC, (uint8_t)func_r, func_idx));
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(method->name))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(method->name))));
         chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)func_r));
         reg_top_ = dest + 1;
     }
 
     // Stocker la classe comme global (le nom est déjà dans declared_globals_
     // via le pré-scan collectGlobals — source unique de vérité)
-    chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest,
-                       chunk.addIdentifier(s.name)));
+    chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.addIdentifier(s.name)));
 
     reg_top_ = saved;
 }
@@ -1748,41 +2040,43 @@ void Compiler::visit(const MethodCallExpr& e) {
         // self est en local_regs_["self"] — copier en call_base
         int self_src = local_regs_.at("self");
         reg_top_ = call_base + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)self_src, 0));
 
         // Temporaires pour remonter la chaîne : tmp=class_chain, key_r=clé
         int tmp = reg_top_++, key_r = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
 
         // tmp = self.__class__
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(std::string("__class__")))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string("__class__")))));
         chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)tmp, (uint8_t)call_base, (uint8_t)key_r));
         // tmp = tmp.__parent__
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(std::string("__parent__")))));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string("__parent__")))));
         chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)tmp, (uint8_t)tmp, (uint8_t)key_r));
         // R[call_base+1] = tmp.<method>
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(std::string(e.method)))));
-        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base+1), (uint8_t)tmp, (uint8_t)key_r));
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string(e.method)))));
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)tmp, (uint8_t)key_r));
         reg_top_ = call_base + 2;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     } else {
         // R[call_base] = receiver (self)
         compileInto(*e.receiver, call_base);
         reg_top_ = call_base + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
 
         // R[call_base+1] = GET_INDEX(receiver, method_name)
         int key_r = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r,
-                           chunk.addConstant(Value(std::string(e.method)))));
-        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base+1), (uint8_t)call_base, (uint8_t)key_r));
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
+        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string(e.method)))));
+        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)call_base, (uint8_t)key_r));
         reg_top_ = call_base + 2;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
 
     // obj.m?() ≡ if m then m(args) else nil : JUMP_IF_FALSE saute AVANT les args
@@ -1799,13 +2093,14 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (last_reg_ != target)
             chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
         reg_top_ = target + 1;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
 
     chunk.emit(makeABC((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
     if (e.optional) {
-        size_t end = chunk.emitJump(Op::JUMP);              // saute par-dessus le LOAD_NIL
-        chunk.patchJump(skip, (uint16_t)chunk.currentPos()); // cible du saut : méthode nil
+        size_t end = chunk.emitJump(Op::JUMP);                                // saute par-dessus le LOAD_NIL
+        chunk.patchJump(skip, (uint16_t)chunk.currentPos());                  // cible du saut : méthode nil
         chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0)); // résultat nil
         chunk.patchJump(end, (uint16_t)chunk.currentPos());
     }
