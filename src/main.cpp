@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
     try {
         auto imported = std::make_shared<std::unordered_set<std::string>>();
         Program program;
-        appendProgram(program, parseFile(dir + "prelude.ol"));
+        appendProgram(program, parseFile(dir + "config.ol"));
 
         std::ifstream main_file(scriptPath);
         if (!main_file) {
