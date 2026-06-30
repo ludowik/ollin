@@ -1,14 +1,15 @@
 #pragma once
+#include <cstdint>  // uint32_t/uint64_t requis par robin_hood.h
+#include "robin_hood.h"
 #include <string>
 #include <string_view>
-#include "robin_hood.h"
 
 // Objet d'internement : refcount + hash + contenu au même endroit.
 // retain = ++p->refcount (zéro lookup)
 // release = if (--p->refcount == 0) string_table().erase(p) (lookup seulement à la mort)
 struct InternedStr {
-    int         refcount = 1;
-    uint32_t    hash;
+    int refcount = 1;
+    uint32_t hash;
     std::string str;
     InternedStr(InternedStr&&) = delete;
     InternedStr& operator=(InternedStr&&) = delete;
@@ -21,19 +22,27 @@ struct StringTable {
 
     InternedStr* intern(std::string s) {
         auto it = table_.find(std::string_view(s));
-        if (it != table_.end()) { ++it->second->refcount; return it->second; }
+        if (it != table_.end()) {
+            ++it->second->refcount;
+            return it->second;
+        }
         auto h = (uint32_t)std::hash<std::string>{}(s);
         auto* p = new InternedStr{1, h, std::move(s)};
-        table_.emplace(std::string_view(p->str), p);  // view dans p->str, pas de copie
+        table_.emplace(std::string_view(p->str), p); // view dans p->str, pas de copie
         return p;
     }
 
     void erase(InternedStr* p) {
-        table_.erase(std::string_view(p->str));  // avant delete — view doit rester valide
+        table_.erase(std::string_view(p->str)); // avant delete — view doit rester valide
         delete p;
     }
 };
 
-inline StringTable& string_table() { static StringTable t; return t; }
+inline StringTable& string_table() {
+    static StringTable t;
+    return t;
+}
 
-inline InternedStr* intern(std::string s) { return string_table().intern(std::move(s)); }
+inline InternedStr* intern(std::string s) {
+    return string_table().intern(std::move(s));
+}

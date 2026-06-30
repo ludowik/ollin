@@ -15,22 +15,31 @@ struct Map {
     int refcount = 1;
 
     Value get(const Value& k) const;
-    void  set(const Value& k, const Value& v);
+    void set(const Value& k, const Value& v);
 };
 
 struct MapPool {
     static constexpr int CAP = 64;
     Map* buf[CAP];
-    int  n = 0;
+    int n = 0;
 
     Map* acquire() {
-        if (n) { Map* m = buf[--n]; m->refcount = 1; return m; }
+        if (n) {
+            Map* m = buf[--n];
+            m->refcount = 1;
+            return m;
+        }
         return new Map();
     }
     void release(Map* m) {
         m->data.clear();
-        if (n < CAP) buf[n++] = m;
-        else delete m;
+        if (n < CAP)
+            buf[n++] = m;
+        else
+            delete m;
     }
 };
-inline MapPool& map_pool() { static MapPool p; return p; }
+inline MapPool& map_pool() {
+    static MapPool p;
+    return p;
+}

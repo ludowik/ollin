@@ -10,7 +10,8 @@ uint16_t Chunk::addConstant(Value v) {
 
 uint16_t Chunk::addIdentifier(const std::string& name) {
     auto it = identifier_map_.find(name);
-    if (it != identifier_map_.end()) return it->second;
+    if (it != identifier_map_.end())
+        return it->second;
     if (identifiers.size() >= 0xFFFF)
         throw std::runtime_error("compile: too many identifiers (max 65535)");
     uint16_t idx = static_cast<uint16_t>(identifiers.size());

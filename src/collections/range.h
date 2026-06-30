@@ -3,37 +3,47 @@
 #include <cmath>
 
 struct Range {
-    int    refcount = 1;
+    int refcount = 1;
     double start;
     double end;
     double step;
-    bool   incl_right;
+    bool incl_right;
 };
 
 struct RangeIterator : Iterator {
     double current;
     double end;
     double step;
-    bool   incl_right;
+    bool incl_right;
 
-    explicit RangeIterator(Range* r)
-        : current(r->start), end(r->end), step(r->step), incl_right(r->incl_right) {}
+    explicit RangeIterator(Range* r) : current(r->start), end(r->end), step(r->step), incl_right(r->incl_right) {
+    }
 
-private:
+  private:
     bool advance(Value& out) {
-        bool done = (step > 0) ? (incl_right ? current > end : current >= end)
-                               : (incl_right ? current < end : current <= end);
-        if (done) return false;
+        bool done =
+            (step > 0) ? (incl_right ? current > end : current >= end) : (incl_right ? current < end : current <= end);
+        if (done)
+            return false;
         out = (current == std::floor(current) && current >= (double)INT64_MIN && current <= (double)INT64_MAX)
-              ? Value((int64_t)current) : Value(current);
+                  ? Value((int64_t)current)
+                  : Value(current);
         current += step;
         return true;
     }
-public:
 
+  public:
     bool next(Value& key, Value& val) override {
-        Value v; if (!advance(v)) return false; key = val = v; return true;
+        Value v;
+        if (!advance(v))
+            return false;
+        key = val = v;
+        return true;
     }
-    bool next_primary(Value& out) override { return advance(out); }
-    bool primary_is_val() const override { return true; }
+    bool next_primary(Value& out) override {
+        return advance(out);
+    }
+    bool primary_is_val() const override {
+        return true;
+    }
 };

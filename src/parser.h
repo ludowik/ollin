@@ -1,18 +1,18 @@
 #pragma once
-#include "token.h"
 #include "ast.h"
+#include "token.h"
 #include <memory>
 #include <string>
 #include <unordered_set>
 #include <vector>
 
 class Parser {
-public:
+  public:
     explicit Parser(std::vector<Token> tokens, std::string base_dir = "",
                     std::shared_ptr<std::unordered_set<std::string>> imported = nullptr);
     Program parse();
 
-private:
+  private:
     std::vector<Token> tokens;
     int pos = 0;
     std::string base_dir_;
@@ -27,7 +27,7 @@ private:
 
     TokenType peekNextType() const;
     TokenType peekAt(int offset) const;
-    void consumeSemi();   // absorbe un COMMENT optionnel
+    void consumeSemi(); // absorbe un COMMENT optionnel
 
     std::unique_ptr<Stmt> parseOneStmt();
     std::unique_ptr<Stmt> varDecl();
@@ -66,6 +66,6 @@ private:
     std::unique_ptr<Expr> primary();
 
     // Range parsing helpers
-    bool looksLikeRange() const;   // scan from current pos for SEMICOLON before COMMA/RBRACKET
-    std::unique_ptr<Expr> rangeExpr(bool incl_left);  // parse rest after [ or ]
+    bool looksLikeRange() const;                     // scan from current pos for SEMICOLON before COMMA/RBRACKET
+    std::unique_ptr<Expr> rangeExpr(bool incl_left); // parse rest after [ or ]
 };

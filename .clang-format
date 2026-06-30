@@ -1,0 +1,28 @@
+---
+BasedOnStyle: LLVM
+ColumnLimit: 120
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Accolades K&R : ouvrante sur la même ligne
+BreakBeforeBraces: Attach
+
+# Pas d'alignement colonne des déclarations/assignments
+AlignConsecutiveDeclarations: None
+AlignConsecutiveAssignments: None
+
+# Pas de corps de fonction sur une seule ligne
+AllowShortFunctionsOnASingleLine: None
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+
+# Pointeurs et références collés au type
+PointerAlignment: Left
+
+# Espace avant ( uniquement pour les mots-clés de contrôle (if, while, for…)
+SpaceBeforeParens: ControlStatements
+
+# Includes : ordre préservé tel quel (ne pas réordonner — robin_hood.h exige <cstdint> avant)
+IncludeBlocks: Preserve

@@ -1,10 +1,10 @@
 #pragma once
+#include "string_table.h"
 #include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
-#include "string_table.h"
 
 // Tagged union Value — 16 octets : tag(1) + _pad(3) + str_hash(4) + union(8).
 //
@@ -25,18 +25,18 @@ struct Iterator;
 struct Closure;
 
 struct Value {
-    uint8_t  tag;
-    uint8_t  _pad[3];    // padding explicite (anciennement implicite)
-    uint32_t str_hash;   // hash contenu mis en cache, valide uniquement pour T_STRING
+    uint8_t tag;
+    uint8_t _pad[3];   // padding explicite (anciennement implicite)
+    uint32_t str_hash; // hash contenu mis en cache, valide uniquement pour T_STRING
     union {
-        int64_t            ival;
-        double             dval;
-        InternedStr*       sptr;  // pointe vers l'objet interné (refcount géré inline)
-        Map*               mptr;
-        Array*             aptr;
-        Iterator*          iptr;
-        Closure*           cptr;
-        Range*             rptr;
+        int64_t ival;
+        double dval;
+        InternedStr* sptr; // pointe vers l'objet interné (refcount géré inline)
+        Map* mptr;
+        Array* aptr;
+        Iterator* iptr;
+        Closure* cptr;
+        Range* rptr;
     };
 
     // Ordre des tags = INVARIANT de perf : tous les types NON ref-comptés
@@ -45,104 +45,183 @@ struct Value {
     // sans gestion mémoire (nil/int/float/function/builtin) de celles à
     // retain/release. Tout nouveau type ref-compté doit être ajouté APRÈS le
     // pivot ; tout type non compté AVANT.
-    static constexpr uint8_t T_NIL      = 0;   // ── non ref-comptés (POD / valeur) ──
-    static constexpr uint8_t T_INTEGER  = 1;
-    static constexpr uint8_t T_FLOAT    = 2;
-    static constexpr uint8_t T_FUNCTION = 3;   // func_idx dans ival (pas de tas)
-    static constexpr uint8_t T_BUILTIN  = 4;   // pointeur de fonction natif dans ival
-    static constexpr uint8_t T_STRING   = 5;   // ── pivot : ref-comptés à partir d'ici ──
-    static constexpr uint8_t T_MAP      = 6;
-    static constexpr uint8_t T_ARRAY    = 7;
+    static constexpr uint8_t T_NIL = 0; // ── non ref-comptés (POD / valeur) ──
+    static constexpr uint8_t T_INTEGER = 1;
+    static constexpr uint8_t T_FLOAT = 2;
+    static constexpr uint8_t T_FUNCTION = 3; // func_idx dans ival (pas de tas)
+    static constexpr uint8_t T_BUILTIN = 4;  // pointeur de fonction natif dans ival
+    static constexpr uint8_t T_STRING = 5;   // ── pivot : ref-comptés à partir d'ici ──
+    static constexpr uint8_t T_MAP = 6;
+    static constexpr uint8_t T_ARRAY = 7;
     static constexpr uint8_t T_ITERATOR = 8;
-    static constexpr uint8_t T_CLOSURE  = 9;
-    static constexpr uint8_t T_CLASS    = 10;  // prototype de classe (Map* réutilisé)
-    static constexpr uint8_t T_RANGE    = 11;  // range [a;b] (Range*, ref-counted)
+    static constexpr uint8_t T_CLOSURE = 9;
+    static constexpr uint8_t T_CLASS = 10; // prototype de classe (Map* réutilisé)
+    static constexpr uint8_t T_RANGE = 11; // range [a;b] (Range*, ref-counted)
 
-private:
-    explicit Value(Map*      p) : tag(T_MAP),      str_hash(0), mptr(p) {}
-    explicit Value(Array*    p) : tag(T_ARRAY),    str_hash(0), aptr(p) {}
-    explicit Value(Iterator* p) : tag(T_ITERATOR), str_hash(0), iptr(p) {}
-    explicit Value(Closure*  p) : tag(T_CLOSURE),  str_hash(0), cptr(p) {}
-    explicit Value(Range*    p) : tag(T_RANGE),    str_hash(0), rptr(p) {}
+  private:
+    explicit Value(Map* p) : tag(T_MAP), str_hash(0), mptr(p) {
+    }
+    explicit Value(Array* p) : tag(T_ARRAY), str_hash(0), aptr(p) {
+    }
+    explicit Value(Iterator* p) : tag(T_ITERATOR), str_hash(0), iptr(p) {
+    }
+    explicit Value(Closure* p) : tag(T_CLOSURE), str_hash(0), cptr(p) {
+    }
+    explicit Value(Range* p) : tag(T_RANGE), str_hash(0), rptr(p) {
+    }
     void release() noexcept;
-    void release_cold() noexcept;   // chemin froid (types ref-comptés) — non inliné
+    void release_cold() noexcept; // chemin froid (types ref-comptés) — non inliné
     void retain() const noexcept;
 
-public:
-    Value()              : tag(T_NIL),     str_hash(0), ival(0) {}
-    Value(double d)      : tag(T_FLOAT),   str_hash(0), dval(d) {}
-    Value(int64_t v)     : tag(T_INTEGER), str_hash(0), ival(v) {}
-    Value(std::string v) : tag(T_STRING),  str_hash(0) {
+  public:
+    Value() : tag(T_NIL), str_hash(0), ival(0) {
+    }
+    Value(double d) : tag(T_FLOAT), str_hash(0), dval(d) {
+    }
+    Value(int64_t v) : tag(T_INTEGER), str_hash(0), ival(v) {
+    }
+    Value(std::string v) : tag(T_STRING), str_hash(0) {
         sptr = intern(std::move(v));
         str_hash = sptr->hash;
     }
 
     Value(const Value& o);
-    Value(Value&& o) noexcept : tag(o.tag), str_hash(o.str_hash), ival(o.ival) { o.tag = T_NIL; }
+    Value(Value&& o) noexcept : tag(o.tag), str_hash(o.str_hash), ival(o.ival) {
+        o.tag = T_NIL;
+    }
     Value& operator=(const Value& o);
     Value& operator=(Value&& o) noexcept;
     ~Value();
 
-    bool isNil()      const { return tag == T_NIL; }
-    bool isFloat()    const { return tag == T_FLOAT; }
-    bool isInteger()  const { return tag == T_INTEGER; }
-    bool isNumber()   const { return tag == T_INTEGER || tag == T_FLOAT; }
-    bool isString()   const { return tag == T_STRING; }
-    bool isMap()      const { return tag == T_MAP; }
-    bool isArray()    const { return tag == T_ARRAY; }
-    bool isIterator() const { return tag == T_ITERATOR; }
-    bool isFuncVal()  const { return tag == T_FUNCTION; }
-    bool isClosure()  const { return tag == T_CLOSURE; }
-    bool isBuiltin()  const { return tag == T_BUILTIN; }
-    bool isClass()    const { return tag == T_CLASS; }
-    bool isRange()    const { return tag == T_RANGE; }
-    bool isCallable() const { return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS; }
+    bool isNil() const {
+        return tag == T_NIL;
+    }
+    bool isFloat() const {
+        return tag == T_FLOAT;
+    }
+    bool isInteger() const {
+        return tag == T_INTEGER;
+    }
+    bool isNumber() const {
+        return tag == T_INTEGER || tag == T_FLOAT;
+    }
+    bool isString() const {
+        return tag == T_STRING;
+    }
+    bool isMap() const {
+        return tag == T_MAP;
+    }
+    bool isArray() const {
+        return tag == T_ARRAY;
+    }
+    bool isIterator() const {
+        return tag == T_ITERATOR;
+    }
+    bool isFuncVal() const {
+        return tag == T_FUNCTION;
+    }
+    bool isClosure() const {
+        return tag == T_CLOSURE;
+    }
+    bool isBuiltin() const {
+        return tag == T_BUILTIN;
+    }
+    bool isClass() const {
+        return tag == T_CLASS;
+    }
+    bool isRange() const {
+        return tag == T_RANGE;
+    }
+    bool isCallable() const {
+        return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS;
+    }
 
-    Closure* asClosure() const { return cptr; }
-    Map*     asMap()     const { return mptr; }
+    Closure* asClosure() const {
+        return cptr;
+    }
+    Map* asMap() const {
+        return mptr;
+    }
 
-    using BuiltinFn = Value(*)(Value*, int);
-    BuiltinFn asBuiltin() const { return (BuiltinFn)(intptr_t)ival; }
+    using BuiltinFn = Value (*)(Value*, int);
+    BuiltinFn asBuiltin() const {
+        return (BuiltinFn)(intptr_t)ival;
+    }
 
-    static Value makeFunc(uint8_t idx) { Value v; v.tag = T_FUNCTION; v.ival = idx; return v; }
-    static Value makeClosure(Closure* p) { return Value(p); }
-    static Value makeBuiltin(BuiltinFn fn) { Value v; v.tag = T_BUILTIN; v.ival = (int64_t)(intptr_t)fn; return v; }
+    static Value makeFunc(uint8_t idx) {
+        Value v;
+        v.tag = T_FUNCTION;
+        v.ival = idx;
+        return v;
+    }
+    static Value makeClosure(Closure* p) {
+        return Value(p);
+    }
+    static Value makeBuiltin(BuiltinFn fn) {
+        Value v;
+        v.tag = T_BUILTIN;
+        v.ival = (int64_t)(intptr_t)fn;
+        return v;
+    }
     static Value makeClass();
-    static Value makeRange(Range* r) { return Value(r); }
+    static Value makeRange(Range* r) {
+        return Value(r);
+    }
 
-    int64_t asInt()               const { return ival; }
-    double  asFloat()             const { return dval; }
-    double  asNum()               const { return isInteger() ? (double)ival : dval; }
-    const std::string& asString() const { return sptr->str; }
+    int64_t asInt() const {
+        return ival;
+    }
+    double asFloat() const {
+        return dval;
+    }
+    double asNum() const {
+        return isInteger() ? (double)ival : dval;
+    }
+    const std::string& asString() const {
+        return sptr->str;
+    }
 
     static Value makeMap();
-    Value        mapGet(const Value& key)              const;
-    void         mapSet(const Value& key, const Value& val);
+    Value mapGet(const Value& key) const;
+    void mapSet(const Value& key, const Value& val);
 
     static Value makeArray();
-    Value  arrayGet(int64_t idx)                    const; // 1-based
-    void   arraySet(int64_t idx, const Value& val);        // 1-based, grows if needed
-    void   arrayPush(const Value& val);
-    int64_t arraySize()                             const;
-    int64_t mapSize()                               const;
+    Value arrayGet(int64_t idx) const;            // 1-based
+    void arraySet(int64_t idx, const Value& val); // 1-based, grows if needed
+    void arrayPush(const Value& val);
+    int64_t arraySize() const;
+    int64_t mapSize() const;
 
     static Value makeIterFrom(const Value& src);
 
     const char* typeName() const {
         switch (tag) {
-            case T_NIL:      return "nil";
-            case T_INTEGER:  return "int";
-            case T_FLOAT:    return "float";
-            case T_STRING:   return "string";
-            case T_MAP:      return "map";
-            case T_ARRAY:    return "array";
-            case T_ITERATOR: return "iterator";
-            case T_FUNCTION: return "function";
-            case T_CLOSURE:  return "function";
-            case T_BUILTIN:  return "function";
-            case T_CLASS:    return "class";
-            case T_RANGE:    return "range";
-            default:         return "unknown";
+        case T_NIL:
+            return "nil";
+        case T_INTEGER:
+            return "int";
+        case T_FLOAT:
+            return "float";
+        case T_STRING:
+            return "string";
+        case T_MAP:
+            return "map";
+        case T_ARRAY:
+            return "array";
+        case T_ITERATOR:
+            return "iterator";
+        case T_FUNCTION:
+            return "function";
+        case T_CLOSURE:
+            return "function";
+        case T_BUILTIN:
+            return "function";
+        case T_CLASS:
+            return "class";
+        case T_RANGE:
+            return "range";
+        default:
+            return "unknown";
         }
     }
 };
@@ -164,37 +243,90 @@ public:
 
 // ── inline Value implementations (nécessitent Map, Array, Iterator complets) ─
 
-inline Value Value::makeMap()   { return Value(map_pool().acquire()); }
-inline Value Value::makeArray() { return Value(array_pool().acquire()); }
-inline Value Value::makeClass() { Value v; v.tag = T_CLASS; v.mptr = map_pool().acquire(); return v; }
+inline Value Value::makeMap() {
+    return Value(map_pool().acquire());
+}
+inline Value Value::makeArray() {
+    return Value(array_pool().acquire());
+}
+inline Value Value::makeClass() {
+    Value v;
+    v.tag = T_CLASS;
+    v.mptr = map_pool().acquire();
+    return v;
+}
 
-inline Value Value::mapGet(const Value& k)                  const { return mptr->get(k); }
-inline void  Value::mapSet(const Value& k, const Value& v)        { mptr->set(k, v); }
+inline Value Value::mapGet(const Value& k) const {
+    return mptr->get(k);
+}
+inline void Value::mapSet(const Value& k, const Value& v) {
+    mptr->set(k, v);
+}
 
-inline Value Value::arrayGet(int64_t idx)                  const { return aptr->get(idx); }
-inline void  Value::arraySet(int64_t idx, const Value& v)        { aptr->set(idx, v); }
-inline void  Value::arrayPush(const Value& v)                    { aptr->push(v); }
-inline int64_t Value::arraySize()                          const { return (int64_t)aptr->items.size(); }
-inline int64_t Value::mapSize()                            const { return (int64_t)mptr->data.size(); }
+inline Value Value::arrayGet(int64_t idx) const {
+    return aptr->get(idx);
+}
+inline void Value::arraySet(int64_t idx, const Value& v) {
+    aptr->set(idx, v);
+}
+inline void Value::arrayPush(const Value& v) {
+    aptr->push(v);
+}
+inline int64_t Value::arraySize() const {
+    return (int64_t)aptr->items.size();
+}
+inline int64_t Value::mapSize() const {
+    return (int64_t)mptr->data.size();
+}
 
 // Chemin chaud : pour nil/int/float (tag < T_STRING) il n'y a rien à libérer.
 // On garde ce test trivial inlinable à chaque site d'appel et on déporte le
 // switch ref-compté dans release_cold() (non inliné) → move-assign s'inline.
 inline void Value::release() noexcept {
-    if (tag < T_STRING) return;   // POD : rien à libérer (un seul test, inliné)
+    if (tag < T_STRING)
+        return; // POD : rien à libérer (un seul test, inliné)
     release_cold();
 }
 
 __attribute__((noinline)) inline void Value::release_cold() noexcept {
     switch (tag) {
-        case T_STRING:   if (--sptr->refcount == 0) string_table().erase(sptr); break;
-        case T_MAP:
-        case T_CLASS:    { Map*      mp = mptr; if (--mp->refcount == 0) map_pool().release(mp);   break; }
-        case T_ARRAY:    { Array*    ap = aptr; if (--ap->refcount == 0) array_pool().release(ap); break; }
-        case T_ITERATOR: { Iterator* ip = iptr; if (--ip->refcount == 0) ip->release();            break; }
-        case T_CLOSURE:  { Closure*  cp = cptr; if (--cp->refcount == 0) delete cp;               break; }
-        case T_RANGE:    { Range*    rp = rptr; if (--rp->refcount == 0) delete rp;               break; }
-        default: break;   // défensif : seuls les tags >= T_STRING arrivent ici
+    case T_STRING:
+        if (--sptr->refcount == 0)
+            string_table().erase(sptr);
+        break;
+    case T_MAP:
+    case T_CLASS: {
+        Map* mp = mptr;
+        if (--mp->refcount == 0)
+            map_pool().release(mp);
+        break;
+    }
+    case T_ARRAY: {
+        Array* ap = aptr;
+        if (--ap->refcount == 0)
+            array_pool().release(ap);
+        break;
+    }
+    case T_ITERATOR: {
+        Iterator* ip = iptr;
+        if (--ip->refcount == 0)
+            ip->release();
+        break;
+    }
+    case T_CLOSURE: {
+        Closure* cp = cptr;
+        if (--cp->refcount == 0)
+            delete cp;
+        break;
+    }
+    case T_RANGE: {
+        Range* rp = rptr;
+        if (--rp->refcount == 0)
+            delete rp;
+        break;
+    }
+    default:
+        break; // défensif : seuls les tags >= T_STRING arrivent ici
     }
 }
 
@@ -203,23 +335,40 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
 // découpe cold de release, dont les corps sont lourds). Grâce au pivot, les
 // types non comptés (dont T_FUNCTION/T_BUILTIN) sortent dès `tag < T_STRING`.
 inline void Value::retain() const noexcept {
-    if (tag < T_STRING) return;   // POD / non comptés : rien à retenir (un seul test)
+    if (tag < T_STRING)
+        return; // POD / non comptés : rien à retenir (un seul test)
     switch (tag) {
-        case T_STRING:   ++sptr->refcount; break;
-        case T_MAP:
-        case T_CLASS:    mptr->refcount++; break;
-        case T_ARRAY:    aptr->refcount++; break;
-        case T_ITERATOR: iptr->refcount++; break;
-        case T_CLOSURE:  cptr->refcount++; break;
-        case T_RANGE:    rptr->refcount++; break;
-        default: break;   // défensif : seuls les tags >= T_STRING arrivent ici
+    case T_STRING:
+        ++sptr->refcount;
+        break;
+    case T_MAP:
+    case T_CLASS:
+        mptr->refcount++;
+        break;
+    case T_ARRAY:
+        aptr->refcount++;
+        break;
+    case T_ITERATOR:
+        iptr->refcount++;
+        break;
+    case T_CLOSURE:
+        cptr->refcount++;
+        break;
+    case T_RANGE:
+        rptr->refcount++;
+        break;
+    default:
+        break; // défensif : seuls les tags >= T_STRING arrivent ici
     }
 }
 
 inline Value Value::makeIterFrom(const Value& src) {
-    if (src.isMap() || src.isClass()) return Value(new MapIterator(src.mptr));
-    if (src.isArray()) return Value(array_iter_pool().acquire(src.aptr));
-    if (src.isRange()) return Value(new RangeIterator(src.rptr));
+    if (src.isMap() || src.isClass())
+        return Value(new MapIterator(src.mptr));
+    if (src.isArray())
+        return Value(array_iter_pool().acquire(src.aptr));
+    if (src.isRange())
+        return Value(new RangeIterator(src.rptr));
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
 
@@ -229,34 +378,50 @@ inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.i
     retain();
 }
 inline Value& Value::operator=(const Value& o) {
-    if (this == &o) return *this;
-    o.retain();   // retain d'abord (protège si this et o partagent la même ressource)
+    if (this == &o)
+        return *this;
+    o.retain(); // retain d'abord (protège si this et o partagent la même ressource)
     release();
     // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets)
-    tag = o.tag; str_hash = o.str_hash; ival = o.ival;
+    tag = o.tag;
+    str_hash = o.str_hash;
+    ival = o.ival;
     return *this;
 }
 inline Value& Value::operator=(Value&& o) noexcept {
-    if (this == &o) return *this;
+    if (this == &o)
+        return *this;
     release();
-    tag = o.tag; str_hash = o.str_hash; ival = o.ival; o.tag = T_NIL;
+    tag = o.tag;
+    str_hash = o.str_hash;
+    ival = o.ival;
+    o.tag = T_NIL;
     return *this;
 }
-inline Value::~Value() { release(); }
+inline Value::~Value() {
+    release();
+}
 
 inline bool isFalsy(const Value& v) {
     // principe : « le vide est faux »
-    if (v.isNil())     return true;
-    if (v.isInteger()) return v.asInt() == 0;
-    if (v.isFloat())   return v.asFloat() == 0.0;
-    if (v.isString())  return v.asString().empty();
-    if (v.isArray())   return v.arraySize() == 0;
-    if (v.isMap())     return v.mapSize()   == 0;  // instance : ≥1 clé (__class__) → truthy
-    return false;      // T_CLASS, range, closure, function → truthy
+    if (v.isNil())
+        return true;
+    if (v.isInteger())
+        return v.asInt() == 0;
+    if (v.isFloat())
+        return v.asFloat() == 0.0;
+    if (v.isString())
+        return v.asString().empty();
+    if (v.isArray())
+        return v.arraySize() == 0;
+    if (v.isMap())
+        return v.mapSize() == 0; // instance : ≥1 clé (__class__) → truthy
+    return false;                // T_CLASS, range, closure, function → truthy
 }
 
 inline Value numValue(double d) {
     auto i = static_cast<int64_t>(d);
-    if (static_cast<double>(i) == d) return Value(i);
+    if (static_cast<double>(i) == d)
+        return Value(i);
     return Value(d);
 }

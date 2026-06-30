@@ -113,6 +113,29 @@ Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharge
 **Règles strictes pour les comparaisons :**
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
 
+## Style C++ (formatage)
+
+Les règles mécaniques sont dans `.clang-format` (référence autoritaire). Ce qui suit complète ce que clang-format ne couvre pas.
+
+| Règle | Valeur |
+|-------|--------|
+| Indentation | 4 espaces, pas de tabs |
+| Colonne max | 120 |
+| Accolades | K&R : ouvrante sur la même ligne |
+| Alignement colonne | Non : un seul espace entre type et nom |
+| One-liners | Interdits : corps de fonction toujours sur une nouvelle ligne indentée |
+| Une instruction par ligne | Strict : jamais deux `;` sur la même ligne — boucles, `if`, `return` toujours sur des lignes séparées |
+| Pointeurs/références | Collés au type : `int*`, `const Foo&` |
+| Espace avant `(` | Uniquement pour les mots-clés (`if`, `while`, `for`) — jamais pour les appels |
+| Includes | Header propre en premier (`"foo.h"`), puis STL (`<vector>`) |
+
+**Visitor/StmtQuery** : chaque `visit()` override sur sa propre ligne avec corps indenté, même si court :
+```cpp
+void visit(const WhileStmt& s) override {
+    run(s.body);
+}
+```
+
 ## Maintenance de CLAUDE.md
 
 Mettre à jour ce fichier dès qu'un point important doit être mémorisé : architecture, conventions, décisions, règles d'outillage.Ne pas documenter ce qui n'est pas encore implémenté.

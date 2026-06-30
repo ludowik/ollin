@@ -1,3 +1,5 @@
 #include "value.h"
 
-Value makeGraphicsModule() { return Value(); }
+Value makeGraphicsModule() {
+    return Value();
+}

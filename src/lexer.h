@@ -4,11 +4,11 @@
 #include <vector>
 
 class Lexer {
-public:
+  public:
     explicit Lexer(std::string source);
     std::vector<Token> tokenize();
 
-private:
+  private:
     std::string src;
     int pos = 0;
     int line = 1;

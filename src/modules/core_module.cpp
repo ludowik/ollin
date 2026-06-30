@@ -16,11 +16,13 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
                 if (spec.empty()) {
                     idx = auto_idx++;
                 } else {
-                    try { idx = std::stoi(spec); }
-                    catch (...) {
+                    try {
+                        idx = std::stoi(spec);
+                    } catch (...) {
                         throw std::runtime_error("printf: invalid index '{" + spec + "}'");
                     }
-                    if (idx < 0) throw std::runtime_error("printf: index must be >= 0 (got " + spec + ")");
+                    if (idx < 0)
+                        throw std::runtime_error("printf: index must be >= 0 (got " + spec + ")");
                 }
                 long long ai = (long long)idx + offset;
                 if (ai >= 0 && ai < (long long)args.size())
@@ -36,7 +38,8 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
 
 static Value core_print(Value* args, int argc) {
     for (int i = 0; i < argc; ++i) {
-        if (i) std::cout << ' ';
+        if (i)
+            std::cout << ' ';
         std::cout << valueToString(args[i]);
     }
     std::cout << '\n';
@@ -52,15 +55,16 @@ static Value core_printf(Value* args, int argc) {
 }
 
 static Value core_typeof(Value* args, int argc) {
-    if (argc < 1) return Value(std::string("nil"));
+    if (argc < 1)
+        return Value(std::string("nil"));
     return Value(std::string(args[0].typeName()));
 }
 
 Value makeCoreModule() {
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("print")),   Value::makeBuiltin(core_print));
-    m.mapSet(Value(std::string("printf")),  Value::makeBuiltin(core_printf));
-    m.mapSet(Value(std::string("typeof")),  Value::makeBuiltin(core_typeof));
-    m.mapSet(Value(std::string("Color")),   makeColorClass());
+    m.mapSet(Value(std::string("print")), Value::makeBuiltin(core_print));
+    m.mapSet(Value(std::string("printf")), Value::makeBuiltin(core_printf));
+    m.mapSet(Value(std::string("typeof")), Value::makeBuiltin(core_typeof));
+    m.mapSet(Value(std::string("Color")), makeColorClass());
     return m;
 }

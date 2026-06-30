@@ -9,7 +9,7 @@ Value makeWindowModule() {
     int w = pane["clientWidth"].as<int>();
     int h = pane["clientHeight"].as<int>();
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("width")),  Value((int64_t)w));
+    m.mapSet(Value(std::string("width")), Value((int64_t)w));
     m.mapSet(Value(std::string("height")), Value((int64_t)h));
     return m;
 }
@@ -18,13 +18,15 @@ Value makeWindowModule() {
 
 Value makeWindowModule() {
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("width")),  Value((int64_t)800));
+    m.mapSet(Value(std::string("width")), Value((int64_t)800));
     m.mapSet(Value(std::string("height")), Value((int64_t)600));
     return m;
 }
 
 #else
 
-Value makeWindowModule() { return Value(); }
+Value makeWindowModule() {
+    return Value();
+}
 
 #endif

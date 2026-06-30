@@ -1,6 +1,6 @@
+#include "compiler.h"
 #include "lexer.h"
 #include "parser.h"
-#include "compiler.h"
 #include "vm.h"
 #include <fstream>
 #include <iostream>
@@ -11,7 +11,8 @@
 
 static Program parseFile(const std::string& path) {
     std::ifstream f(path);
-    if (!f) return {};
+    if (!f)
+        return {};
     std::ostringstream ss;
     ss << f.rdbuf();
     return Parser(Lexer(ss.str()).tokenize()).parse();
