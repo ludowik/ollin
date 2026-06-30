@@ -22,7 +22,8 @@ end
 
 graphics.canvas(W, H, "Ollin — Lignes animées")
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     graphics.clear(graphics.BLACK)
     graphics.strokeSize(1)
 
@@ -45,5 +46,3 @@ func frame()
         graphics.line(x1[i], y1[i], x2[i], y2[i])
     end
 end
-
-graphics.run(frame)

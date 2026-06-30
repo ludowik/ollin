@@ -36,12 +36,11 @@ end
 
 graphics.canvas(W, H, "Rectangles")
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     graphics.clear(colors.BLACK)
     for r in rects do
         r.update()
         r.draw()
     end
 end
-
-graphics.run(frame)

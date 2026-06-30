@@ -56,7 +56,8 @@ var angle = 0.0
 var scale = 1.0
 var ds    = 0.005
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     g.clear({r:0.04, g:0.04, b:0.04, a:1})
 
     scale = scale + ds
@@ -83,5 +84,3 @@ func frame()
     g.strokeSize(1)
     g.draw_text("sprite demo", 10, 570, 14)
 end
-
-g.run(frame)

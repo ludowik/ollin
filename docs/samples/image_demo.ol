@@ -23,7 +23,8 @@ for i = 1, 10 do
     }
 end
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     graphics.clear(Color(0.08, 0.09, 0.14))
 
     for sp in sprites do
@@ -40,5 +41,3 @@ func frame()
 
     graphics.draw_text("image.load_data : PNG embarque (base64)", 12, 12, 18, Color(0.75, 0.8, 0.9))
 end
-
-graphics.run(frame)

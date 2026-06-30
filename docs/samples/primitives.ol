@@ -13,7 +13,7 @@ func px(v) return v * sx end
 func py(v) return v * sy end
 func fs(v) return v * ss end
 
-func frame()
+func draw()
     t += 0.02
     g.clear(Color(0.08, 0.09, 0.12))
     var dim = Color(0.6, 0.65, 0.75)
@@ -110,5 +110,3 @@ func frame()
     g.draw_text("size 16", px(460), py(328), fs(16), Color(0.9, 0.9, 1))
     g.draw_text("size 22", px(460), py(352), fs(22), Color(0.7, 0.85, 1))
 end
-
-graphics.run(frame)

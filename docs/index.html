@@ -1441,26 +1441,28 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->
 <section id="graphics">
 <h2>Graphics</h2>
-<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. <code>graphics.run(callback)</code> fonctionne sur desktop et WASM.</p>
+<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. Le rendu fonctionne sur desktop et WASM.</p>
 
 <h3>Cycle de vie</h3>
+<p>Définis une fonction nommée <code>draw</code> : le moteur l'appelle <strong>automatiquement à chaque frame</strong>, sans rien d'autre à écrire.</p>
 <pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>) <span class="cmt">## ouvre la fenêtre</span>
 
-<span class="kw">func</span> frame()
+<span class="cmt">## appelée automatiquement à chaque frame</span>
+<span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">graphics</span>.BLACK)
 
     <span class="cmt">## dessin ici</span>
 
-<span class="kw">end</span>
-
-<span class="bi">graphics</span>.run(frame) <span class="cmt">## boucle principale (compatible WASM)</span></code></pre>
+<span class="kw">end</span></code></pre>
+<p>Tu peux aussi piloter la boucle explicitement avec <code>graphics.run(callback)</code> si tu préfères nommer ta fonction autrement.</p>
 
 <h3>API</h3>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné (60 fps sur desktop, vsync navigateur sur WASM)</td></tr>
-    <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale ; appelle <code>callback()</code> chaque frame jusqu'à fermeture</td></tr>
+    <tr><td><code>func draw()</code></td><td>Si une fonction globale <code>draw</code> existe, le moteur l'appelle automatiquement à chaque frame</td></tr>
+    <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
     <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
     <tr><td><code>graphics.clear(color)</code></td><td>Efface l'écran avec la couleur donnée</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés (défaut : 2). Remis à 2 à chaque frame.</td></tr>

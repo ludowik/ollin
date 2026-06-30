@@ -13,7 +13,8 @@ math.noise_seed(7)
 var CELL = 8        ## taille d'une cellule (px) — petit = plus de définition
 var SCALE = 0.01    ## zoom du bruit (petit = taches plus larges)
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     graphics.noStroke()   ## pas de contour → cellules jointives, sans bordure
     var t = time() * 0.3
 
@@ -31,5 +32,3 @@ func frame()
 
     graphics.draw_text("math.noise(x, y, temps)", 14, 14, 18, Color(1, 1, 1))
 end
-
-graphics.run(frame)

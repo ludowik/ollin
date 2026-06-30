@@ -291,7 +291,7 @@ func drawKeys()
     end
 end
 
-func frame()
+func draw()
     graphics.clear(BG)
     graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, YELLOW)
     drawGrid()
@@ -326,4 +326,4 @@ layout()
 buildKeys()
 keyboard.enable(onKey)
 mouse.on_down(onClick)
-graphics.run(frame)
+## `draw` est appelée automatiquement à chaque frame par le moteur.
