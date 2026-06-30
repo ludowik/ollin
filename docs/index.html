@@ -589,7 +589,7 @@ multi-lignes
 <tr><td>/</td><td>Division (toujours float)</td><td><code>7 / 2 == 3.5</code></td></tr>
 <tr><td>//</td><td>Division entière (plancher)</td><td><code>7 // 2 == 3</code></td></tr>
 <tr><td>%</td><td>Modulo</td><td><code>10 % 3 == 1</code></td></tr>
-<tr><td>^</td><td>Puissance (modèle Lua, assoc. droite)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
+<tr><td>^</td><td>Puissance (associative à droite)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
 </table>
 
 <h3>Comparaisons</h3>
@@ -612,7 +612,7 @@ multi-lignes
 <!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
 <section id="bitwise">
 <h2>Opérateurs bits</h2>
-<p>Ollin suit le <strong>modèle Lua</strong> pour les opérateurs bit-à-bit. Ils opèrent uniquement sur des <strong>entiers</strong>. Le <code>~</code> est <strong>XOR</strong> en binaire et <strong>NOT</strong> en unaire ; <code>^</code> est réservé à la <strong>puissance</strong>.</p>
+<p>Les opérateurs bit-à-bit opèrent uniquement sur des <strong>entiers</strong>. Le <code>~</code> est <strong>XOR</strong> en binaire et <strong>NOT</strong> en unaire ; <code>^</code> est réservé à la <strong>puissance</strong>.</p>
 
 <h3>Binaires</h3>
 <table>
@@ -629,7 +629,7 @@ multi-lignes
 <tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
 <tr><td>~</td><td>NOT (complément à 1)</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
 </table>
-<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>) — comme en Lua. <code>^</code> ne fait plus partie des opérateurs bits : c'est la puissance.</div>
+<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>). <code>^</code> ne fait plus partie des opérateurs bits : c'est la puissance.</div>
 
 <h3>Précédence</h3>
 <p>De la plus basse à la plus haute :</p>
@@ -1409,7 +1409,7 @@ var v3 = v1 + v2   ## appelle v1.__add(v2)
 print(v3)          ## Vec2(4,6)</code></pre>
 
 <h3>Égalité et comparaison</h3>
-<p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu (même modèle qu'en Lua). Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
+<p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu. Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
 <pre><code><span class="cmt">## maps nues → comparaison par référence</span>
 <span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})   <span class="cmt">## 0 : contenu identique mais objets distincts</span>
 <span class="kw">var</span> m = {x: <span class="num">1</span>}
@@ -1427,7 +1427,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))   <span class="cmt">## 1 : __eq compare les champs</span>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))   <span class="cmt">## 0</span></code></pre>
-<div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité comme en Lua.</div>
+<div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité.</div>
 </section>
 
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->

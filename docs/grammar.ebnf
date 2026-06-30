@@ -87,13 +87,13 @@ exprStmt       = expr NL ;
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
 logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
-             (* "and"/"or" COURT-CIRCUITENT et renvoient une VALEUR (modèle Lua) :
+             (* "and"/"or" COURT-CIRCUITENT et renvoient une VALEUR :
                 "a and b" → a si a est falsy, sinon b (b non évalué si a falsy) ;
                 "a or b"  → a si a est truthy, sinon b (b non évalué si a truthy).
                 Donc `f and f()` ou `obj and obj.x` sont sûrs. Falsy : nil, 0, "", [], {}. *)
 bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
 bitwiseXor     = bitwiseAnd { "~" bitwiseAnd } ;
-             (* "~" binaire = XOR bit-à-bit (modèle Lua) ; "~" unaire = NOT, voir unary *)
+             (* "~" binaire = XOR bit-à-bit ; "~" unaire = NOT, voir unary *)
 bitwiseAnd     = comparison { "&" comparison } ;
 comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
              (* comparaisons chaînées : 1 < x < 10  ≡  (1 < x) and (x < 10), x évalué une fois *)
@@ -113,7 +113,7 @@ multiplicative = unary { ( "*" | "/" | "//" | "%" ) unary } ;
 unary          = ( "-" | "not" | "~" | "#" ) unary | power ;
              (* "~" unaire = NOT bit-à-bit ; "#" : sucre syntaxique — "#expr" ≡ "len(expr)" *)
 power          = primary ( "^" unary ) ? ;
-             (* "^" : exponentiation (modèle Lua), associatif à droite — INT^INT(≥0) → INT ; sinon FLOAT *)
+             (* "^" : exponentiation, associatif à droite — INT^INT(≥0) → INT ; sinon FLOAT *)
              (* "^" lie plus fort que le moins unaire : -2^2 == -(2^2) == -4 ; 2^2^3 = 2^(2^3) = 256 ;
                 2 ^ -1 == 0.5. ('**' n'existe plus.) *)
 primary        = NUMBER
