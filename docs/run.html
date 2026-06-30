@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ollin — exécution autonome</title>
+  <style>
+    :root { --bg:#0e0e12; --fg:#e6e6ee; --dim:#8a8a99; --accent:#7c83ff; --border:#2a2a36; }
+    * { box-sizing: border-box; }
+    html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+                 font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+    body { display:flex; flex-direction:column; }
+
+    /* Barre de menu — sous l'encoche (safe-area-inset-top). Ne fait PAS partie
+       de la zone graphique. */
+    #bar { flex:none; display:flex; align-items:center; gap:12px; font-size:13px;
+           padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
+           border-bottom:1px solid var(--border); }
+    #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
+    #bar a:hover { text-decoration:underline; }
+    #bar .sp { flex:1; }
+    #status { color:var(--dim); font-size:12px; }
+
+    /* Marges de sécurité (coins arrondis / barre home) exclues de la zone. */
+    #stage-wrap { flex:1; display:flex; min-height:0;
+                  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+
+    /* #output-pane = la ZONE GRAPHIQUE mesurée par window.width/height. */
+    #output-pane { flex:1; position:relative; overflow:hidden; min-width:0; min-height:0; }
+    canvas { display:none; position:absolute; top:0; left:0; right:0; bottom:0; margin:auto; background:#000; }
+    #out { display:none; position:absolute; inset:0; white-space:pre-wrap; overflow:auto;
+           font-size:13px; line-height:1.5; padding:12px; }
+    #out.err { color:#ff6b6b; }
+    #out.ok  { color:#b8f5c0; }
+  </style>
+</head>
+<body>
+  <div id="bar">
+    <a href="playground.html" title="Retour à l'éditeur">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
+      Éditeur
+    </a>
+    <span class="sp"></span>
+    <span id="status">Chargement…</span>
+  </div>
+  <div id="stage-wrap">
+    <div id="output-pane">
+      <canvas id="canvas" tabindex="0"></canvas>
+      <pre id="out"></pre>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const canvasEl = document.getElementById('canvas');
+    const outEl    = document.getElementById('out');
+    let   prints   = '';
+
+    function showText(text) {
+      outEl.style.display = 'block';
+      canvasEl.style.display = 'none';
+      const body = (text && String(text).length) ? String(text) : (prints || '(aucune sortie)');
+      outEl.textContent = body;
+      outEl.className = (text && String(text).startsWith('error:')) ? 'err' : 'ok';
+    }
+
+    const code = localStorage.getItem('ollin_run_code');
+    if (code === null) {
+      statusEl.textContent = '';
+      showText("error: aucun script. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).");
+    } else {
+      const wasmScript = document.createElement('script');
+      const cacheBust  = Date.now();
+      wasmScript.src   = 'wasm/ollin.js?' + cacheBust;
+      wasmScript.onload = () => {
+        const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '');
+        OllinModule({
+          locateFile: f => wasmDir + f + '?' + cacheBust,
+          canvas:   canvasEl,
+          print:    t => { prints += t + '\n'; },
+          printErr: t => { prints += t + '\n'; },
+        }).then(m => {
+          try {
+            const imgs = JSON.parse(localStorage.getItem('ollin_run_images') || '[]');
+            for (const im of imgs) m.preloadImage(im.name, im.b64, im.ext);
+          } catch (_) {}
+          statusEl.textContent = '';
+          let out;
+          try { out = m.execute(code); }
+          catch (e) { showText('error: ' + (e?.message ?? e)); return; }
+          if (canvasEl.style.display === 'block') {
+            statusEl.textContent = 'En cours…';
+          } else {
+            showText(out);
+          }
+        }).catch(err => {
+          statusEl.textContent = '';
+          showText('error: WASM — ' + (err?.message ?? err));
+        });
+      };
+      wasmScript.onerror = () => { statusEl.textContent = ''; showText('error: WASM introuvable'); };
+      document.head.appendChild(wasmScript);
+    }
+  </script>
+</body>
+</html>

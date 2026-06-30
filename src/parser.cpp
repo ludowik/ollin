@@ -394,7 +394,11 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
     s->line = line;
-    if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)) {
+    // retvals optionnels : pas de valeur si on est sur une fermeture de bloc
+    // (end/else/elseif/catch), un séparateur, un commentaire ou EOF.
+    if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)
+        && !check(TokenType::END) && !check(TokenType::ELSE)
+        && !check(TokenType::ELSEIF) && !check(TokenType::CATCH)) {
         if (check(TokenType::DOT_DOT_DOT)) {
             advance();
             s->spread_varargs = true;

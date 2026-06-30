@@ -349,6 +349,58 @@ Value VM::callValue(const Value& fn) {
     return result;
 }
 
+Value VM::callValue(const Value& fn, const Value& arg) {
+    if (fn.isBuiltin()) { Value a = arg; return fn.asBuiltin()(&a, 1); }
+    uint8_t fi;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
+    if (fn.isFuncVal()) {
+        fi = (uint8_t)fn.asInt();
+    } else if (fn.isClosure()) {
+        fi = fn.asClosure()->func_idx;
+        const auto& uvs = fn.asClosure()->upvals;
+        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+    } else {
+        throw std::runtime_error("callValue: not callable");
+    }
+    int call_base = (int)regs.size();
+    growRegs((size_t)(call_base + 1));
+    regs[call_base] = arg;            // R[0] du nouveau frame = argument
+    uint32_t saved_ip = ip;
+    ip = pushCallFrame(call_base, fi, 1, std::move(frame_upvals), saved_ip);
+    runGoto(call_stack.size() - 1);
+    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
+    regs.resize(call_base);
+    ip = saved_ip;
+    return result;
+}
+
+Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
+    if (fn.isBuiltin()) { Value args[2] = { a, b }; return fn.asBuiltin()(args, 2); }
+    uint8_t fi;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
+    if (fn.isFuncVal()) {
+        fi = (uint8_t)fn.asInt();
+    } else if (fn.isClosure()) {
+        fi = fn.asClosure()->func_idx;
+        const auto& uvs = fn.asClosure()->upvals;
+        if (!uvs.empty()) frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+    } else {
+        throw std::runtime_error("callValue: not callable");
+    }
+    int call_base = (int)regs.size();
+    growRegs((size_t)(call_base + 2));
+    regs[call_base]     = a;          // R[0] = 1er argument
+    regs[call_base + 1] = b;          // R[1] = 2e argument
+    uint32_t saved_ip = ip;
+    ip = pushCallFrame(call_base, fi, 2, std::move(frame_upvals), saved_ip);
+    runGoto(call_stack.size() - 1);
+    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
+    regs.resize(call_base);
+    ip = saved_ip;
+    return result;
+}
+
+
 // ── pushCallFrame ─────────────────────────────────────────────────────────────
 // Point d'entrée unique pour toute construction de frame d'appel :
 //   1. growRegs au minimum nécessaire
@@ -673,79 +725,63 @@ dispatch_loop:
         NEXT();
     }
 
-    op_GT: {
-        // GT(a,b) == LT(b,a): check __lt on rhs
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier > entier
-            regs[base + A] = Value((int64_t)(bv.asInt() > cv.asInt()));
-            NEXT();
-        }
-        if (isInstance(cv)) {
-            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
+op_GT: {
+    // GT(a,b) == LT(b,a): check __lt on rhs
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier > entier
+        regs[base+A] = Value((int64_t)(bv.asInt() > cv.asInt()));
         NEXT();
     }
+    if (isInstance(cv)) {
+        if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, cv, bv))
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+    }
+    regs[base+A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
+    NEXT();
+}
 
-    op_LT: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier < entier
-            regs[base + A] = Value((int64_t)(bv.asInt() < cv.asInt()));
-            NEXT();
-        }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
+op_LT: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier < entier
+        regs[base+A] = Value((int64_t)(bv.asInt() < cv.asInt()));
         NEXT();
     }
+    if (isInstance(bv)) {
+        if (uint32_t addr = tryMetaBinary(MK().lt_, base+A, bv, cv))
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+    }
+    regs[base+A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
+    NEXT();
+}
 
-    op_GE: {
-        // GE(a,b) == LE(b,a): check __le on rhs
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier >= entier
-            regs[base + A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
-            NEXT();
-        }
-        if (isInstance(cv)) {
-            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
+op_GE: {
+    // GE(a,b) == LE(b,a): check __le on rhs
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier >= entier
+        regs[base+A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
         NEXT();
     }
+    if (isInstance(cv)) {
+        if (uint32_t addr = tryMetaBinary(MK().le_, base+A, cv, bv))
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+    }
+    regs[base+A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
+    NEXT();
+}
 
-    op_LE: {
-        const Value& bv = regs[base + B];
-        const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier <= entier
-            regs[base + A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
-            NEXT();
-        }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv)) {
-                ip = addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
-        }
-        regs[base + A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
+op_LE: {
+    const Value& bv = regs[base+B]; const Value& cv = regs[base+C];
+    if (bv.isInteger() && cv.isInteger()) {           // chemin chaud : entier <= entier
+        regs[base+A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
         NEXT();
     }
+    if (isInstance(bv)) {
+        if (uint32_t addr = tryMetaBinary(MK().le_, base+A, bv, cv))
+            { ip = addr; base = call_stack.back().reg_base; NEXT(); }
+    }
+    regs[base+A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
+    NEXT();
+}
 
     op_JUMP:
         ip = Bx;
