@@ -73,20 +73,26 @@ std::string VM::invokeStr(Value obj) { // by value: regs.resize() ne invalide pa
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (str_fn.isFuncVal()) {
+    switch (str_fn.tag) {
+    case Value::T_FUNCTION:
         fi = (uint8_t)str_fn.asInt();
-    } else if (str_fn.isClosure()) {
+        break;
+    case Value::T_CLOSURE: {
         fi = str_fn.asClosure()->func_idx;
         const auto& uvs = str_fn.asClosure()->upvals;
         if (!uvs.empty())
             frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else if (str_fn.isBuiltin()) {
+        break;
+    }
+    case Value::T_BUILTIN: {
         Value self = obj;
         Value result = str_fn.asBuiltin()(&self, 1);
         return result.isString() ? result.asString() : "{object}";
-    } else {
+    }
+    default: {
         Value nm = cls.mapGet(MK().name_);
         return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
+    }
     }
     int call_base = (int)regs.size();
     growRegs((size_t)(call_base + std::max((int)ch->funcs[fi].reg_count, 1)));

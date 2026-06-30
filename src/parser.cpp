@@ -72,111 +72,92 @@ Program Parser::parse() {
 
 // ── dispatch ─────────────────────────────────────────────────────────────────
 
+static bool isAssignOp(TokenType t) {
+    return t == TokenType::EQUALS || t == TokenType::PLUS_EQUAL || t == TokenType::MINUS_EQUAL ||
+           t == TokenType::STAR_EQUAL || t == TokenType::SLASH_EQUAL || t == TokenType::PERCENT_EQUAL;
+}
+
 std::unique_ptr<Stmt> Parser::parseOneStmt() {
-    if (check(TokenType::COMMENT)) {
+    switch (peek().type) {
+    case TokenType::COMMENT: {
         std::string text = advance().lexeme;
         consumeSemi();
         return std::make_unique<CommentStmt>(std::move(text));
     }
-    if (check(TokenType::WHILE))
-        return whileStmt();
-    if (check(TokenType::IF))
-        return ifStmt();
-    if (check(TokenType::BREAK))
-        return breakStmt();
-    if (check(TokenType::CONTINUE))
-        return continueStmt();
-    if (check(TokenType::TRY))
-        return tryCatchStmt();
-    if (check(TokenType::THROW))
-        return throwStmt();
-    if (check(TokenType::FOR))
-        return forStmt();
-    if (check(TokenType::IMPORT))
-        return importStmt();
-    if (check(TokenType::CLASS))
-        return classDecl();
-    if (check(TokenType::SWITCH))
-        return switchStmt();
-    if (check(TokenType::FUNC))
-        return funcDeclStmt();
-    if (check(TokenType::RETURN))
-        return returnStmt();
-    if (check(TokenType::VAR))
-        return varDecl();
-    if (check(TokenType::GLOBAL))
-        return globalDecl();
-    if (check(TokenType::CONSTANT))
-        return constantDecl();
-    if (check(TokenType::IDENTIFIER)) {
+    case TokenType::WHILE:    return whileStmt();
+    case TokenType::IF:       return ifStmt();
+    case TokenType::BREAK:    return breakStmt();
+    case TokenType::CONTINUE: return continueStmt();
+    case TokenType::TRY:      return tryCatchStmt();
+    case TokenType::THROW:    return throwStmt();
+    case TokenType::FOR:      return forStmt();
+    case TokenType::IMPORT:   return importStmt();
+    case TokenType::CLASS:    return classDecl();
+    case TokenType::SWITCH:   return switchStmt();
+    case TokenType::FUNC:     return funcDeclStmt();
+    case TokenType::RETURN:   return returnStmt();
+    case TokenType::VAR:      return varDecl();
+    case TokenType::GLOBAL:   return globalDecl();
+    case TokenType::CONSTANT: return constantDecl();
+    case TokenType::IDENTIFIER: {
         TokenType nx = peekNextType();
-        // Multi-assign: a, b = x, y
         if (nx == TokenType::COMMA)
             return multiAssignStmt();
-        // Multi-assign starting with field: self.x, self.y = x, y
-        if (nx == TokenType::DOT && peekAt(2) == TokenType::IDENTIFIER && peekAt(3) == TokenType::COMMA)
-            return multiAssignStmt();
-        if (nx == TokenType::EQUALS || nx == TokenType::PLUS_EQUAL || nx == TokenType::MINUS_EQUAL ||
-            nx == TokenType::STAR_EQUAL || nx == TokenType::SLASH_EQUAL || nx == TokenType::PERCENT_EQUAL)
+        if (isAssignOp(nx))
             return assignStmt();
-        if (nx == TokenType::DOT && peekAt(2) == TokenType::IDENTIFIER) {
-            // check if it's a dot assignment: m.field op= val
-            TokenType after_field = peekAt(3);
-            bool is_assign = (after_field == TokenType::EQUALS || after_field == TokenType::PLUS_EQUAL ||
-                              after_field == TokenType::MINUS_EQUAL || after_field == TokenType::STAR_EQUAL ||
-                              after_field == TokenType::SLASH_EQUAL || after_field == TokenType::PERCENT_EQUAL);
-            if (is_assign) {
-                std::string obj_name = advance().lexeme; // consume IDENTIFIER
-                advance();                               // consume DOT
-                std::string field = advance().lexeme;    // consume field IDENTIFIER
-                TokenType op = advance().type;           // consume operator
-                auto val = expr();
-                consumeSemi();
-                auto s = std::make_unique<IndexAssignStmt>();
-                s->obj = obj_name;
-                s->key = std::make_unique<StringExpr>(field);
-                s->op = op;
-                s->value = std::move(val);
-                return s;
-            }
-        }
-        if (nx == TokenType::LBRACKET) {
-            // index assignment: obj["key"] op= val
-            std::string obj_name = advance().lexeme; // consume IDENTIFIER
-            advance();                               // consume [
-            auto key = expr();
-            expect(TokenType::RBRACKET);
-            TokenType op = TokenType::EQUALS;
-            if (check(TokenType::EQUALS)) {
-                advance();
-                op = TokenType::EQUALS;
-            } else if (check(TokenType::PLUS_EQUAL)) {
-                advance();
-                op = TokenType::PLUS_EQUAL;
-            } else if (check(TokenType::MINUS_EQUAL)) {
-                advance();
-                op = TokenType::MINUS_EQUAL;
-            } else if (check(TokenType::STAR_EQUAL)) {
-                advance();
-                op = TokenType::STAR_EQUAL;
-            } else if (check(TokenType::SLASH_EQUAL)) {
-                advance();
-                op = TokenType::SLASH_EQUAL;
-            } else if (check(TokenType::PERCENT_EQUAL)) {
-                advance();
-                op = TokenType::PERCENT_EQUAL;
-            } else
-                throw std::runtime_error("line " + std::to_string(peek().line) +
-                                         ": expected assignment operator after index");
+        auto makeIndexAssign = [&](std::string obj, std::unique_ptr<Expr> key, TokenType op) {
             auto val = expr();
             consumeSemi();
             auto s = std::make_unique<IndexAssignStmt>();
-            s->obj = obj_name;
+            s->obj = std::move(obj);
             s->key = std::move(key);
             s->op = op;
             s->value = std::move(val);
             return s;
+        };
+        if (nx == TokenType::DOT && peekAt(2) == TokenType::IDENTIFIER) {
+            if (isAssignOp(peekAt(3))) {
+                std::string obj_name = advance().lexeme;
+                advance(); // DOT
+                std::string field = advance().lexeme;
+                TokenType op = advance().type;
+                return makeIndexAssign(obj_name, std::make_unique<StringExpr>(field), op);
+            }
+            // scan spéculatif : ident.field[expr], ... → multi-assign (FIELD_INDEX)
+            int saved = pos;
+            advance();
+            advance();
+            advance(); // ident . field
+            if (check(TokenType::LBRACKET)) {
+                advance();
+                expr();
+                expect(TokenType::RBRACKET);
+            }
+            bool is_multi = check(TokenType::COMMA);
+            pos = saved;
+            if (is_multi)
+                return multiAssignStmt();
         }
+        if (nx == TokenType::LBRACKET) {
+            int saved = pos;
+            std::string obj_name = advance().lexeme;
+            advance(); // [
+            auto key = expr();
+            expect(TokenType::RBRACKET);
+            if (check(TokenType::COMMA)) {
+                pos = saved;
+                return multiAssignStmt();
+            }
+            if (isAssignOp(peek().type)) {
+                TokenType op = advance().type;
+                return makeIndexAssign(obj_name, std::move(key), op);
+            }
+            pos = saved;
+        }
+        break;
+    }
+    default:
+        break;
     }
     return exprStmt();
 }
@@ -431,19 +412,13 @@ std::unique_ptr<Stmt> Parser::assignStmt() {
     auto s = std::make_unique<AssignStmt>();
     s->line = line;
     s->name = advance().lexeme;
-    if (match(TokenType::PLUS_EQUAL))
-        s->op = '+';
-    else if (match(TokenType::MINUS_EQUAL))
-        s->op = '-';
-    else if (match(TokenType::STAR_EQUAL))
-        s->op = '*';
-    else if (match(TokenType::SLASH_EQUAL))
-        s->op = '/';
-    else if (match(TokenType::PERCENT_EQUAL))
-        s->op = '%';
-    else {
-        advance();
-        s->op = '\0';
+    switch (peek().type) {
+    case TokenType::PLUS_EQUAL:    advance(); s->op = '+'; break;
+    case TokenType::MINUS_EQUAL:   advance(); s->op = '-'; break;
+    case TokenType::STAR_EQUAL:    advance(); s->op = '*'; break;
+    case TokenType::SLASH_EQUAL:   advance(); s->op = '/'; break;
+    case TokenType::PERCENT_EQUAL: advance(); s->op = '%'; break;
+    default:                       advance(); s->op = '\0'; break;
     }
     s->value = expr();
     consumeSemi();
@@ -460,8 +435,15 @@ std::unique_ptr<Stmt> Parser::multiAssignStmt() {
         LValue lv;
         lv.name = expect(TokenType::IDENTIFIER).lexeme;
         if (match(TokenType::DOT)) {
-            lv.kind = LValue::FIELD;
             lv.field = expect(TokenType::IDENTIFIER).lexeme;
+            if (check(TokenType::LBRACKET)) {
+                advance();
+                lv.kind = LValue::FIELD_INDEX;
+                lv.key = expr();
+                expect(TokenType::RBRACKET);
+            } else {
+                lv.kind = LValue::FIELD;
+            }
         } else if (check(TokenType::LBRACKET)) {
             advance();
             lv.kind = LValue::INDEX;
@@ -1000,17 +982,20 @@ std::unique_ptr<Expr> Parser::primary() {
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
             std::unique_ptr<Expr> key;
-            if (check(TokenType::STRING))
+            switch (peek().type) {
+            case TokenType::STRING:
+            case TokenType::IDENTIFIER:
                 key = std::make_unique<StringExpr>(advance().lexeme);
-            else if (check(TokenType::IDENTIFIER))
-                key = std::make_unique<StringExpr>(advance().lexeme); // `ident:` = clé string littérale
-            else if (check(TokenType::LBRACKET)) {
-                advance();    // consume [
-                key = expr(); // clé calculée : valeur de l'expression à l'exécution
+                break;
+            case TokenType::LBRACKET:
+                advance();
+                key = expr();
                 expect(TokenType::RBRACKET);
-            } else
+                break;
+            default:
                 throw std::runtime_error("line " + std::to_string(peek().line) +
                                          ": expected string, identifier, or [expr] key in map literal");
+            }
             expect(TokenType::COLON);
             auto val = expr();
             map->entries.push_back({std::move(key), std::move(val)});

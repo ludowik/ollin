@@ -363,11 +363,11 @@ struct IndexAssignStmt : Stmt {
 };
 
 struct LValue {
-    enum Kind { VAR, FIELD, INDEX };
+    enum Kind { VAR, FIELD, INDEX, FIELD_INDEX };
     Kind kind = VAR;
-    std::string name;          // VAR: variable; FIELD/INDEX: object name
-    std::string field;         // FIELD only
-    std::unique_ptr<Expr> key; // INDEX only
+    std::string name;               // VAR: variable; FIELD/INDEX/FIELD_INDEX: object name
+    std::string field;              // FIELD et FIELD_INDEX: nom du champ
+    std::unique_ptr<Expr> key;      // INDEX et FIELD_INDEX: expression d'index
 };
 
 struct MultiAssignStmt : Stmt {

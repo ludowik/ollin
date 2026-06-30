@@ -1117,14 +1117,19 @@ void Compiler::visit(const UnaryExpr& e) {
     e.operand->accept(*this);
     int rIn = last_reg_;
     last_reg_ = allocReg();
-    if (e.op == '-')
+    switch (e.op) {
+    case '-':
         chunk.emit(makeABC((uint8_t)Op::NEGATE, (uint8_t)last_reg_, (uint8_t)rIn, 0));
-    else if (e.op == '!')
+        break;
+    case '!':
         chunk.emit(makeABC((uint8_t)Op::NOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
-    else if (e.op == '~')
+        break;
+    case '~':
         chunk.emit(makeABC((uint8_t)Op::BNOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
-    else
+        break;
+    default:
         throw std::runtime_error(std::string("unknown unary op: ") + e.op);
+    }
 }
 
 void Compiler::visit(const CallExpr& e) {
@@ -1853,12 +1858,22 @@ void Compiler::visit(const MultiAssignStmt& s) {
                 else
                     chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.addIdentifier(lv.name)));
             }
-            int key_r = allocReg();
-            if (lv.kind == LValue::FIELD)
-                compileInto(StringExpr(lv.field), key_r);
-            else
+            if (lv.kind == LValue::FIELD_INDEX) {
+                int field_r = allocReg();
+                compileInto(StringExpr(lv.field), field_r);
+                int inner_r = allocReg();
+                chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)inner_r, (uint8_t)obj_r, (uint8_t)field_r));
+                int key_r = allocReg();
                 compileInto(*lv.key, key_r);
-            chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
+                chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)inner_r, (uint8_t)key_r, (uint8_t)val_r));
+            } else {
+                int key_r = allocReg();
+                if (lv.kind == LValue::FIELD)
+                    compileInto(StringExpr(lv.field), key_r);
+                else
+                    compileInto(*lv.key, key_r);
+                chunk.emit(makeABC((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
+            }
         }
     }
 
