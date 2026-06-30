@@ -1018,7 +1018,7 @@ assert(sw_func(5) == "autre")
 
 ## ── 23. Module graphics (Raylib) ─────────────────────────────────────────────
 ##
-## Module natif (non disponible en WASM/headless). Voir scripts/graphics_demo.ol.
+## Module natif (non disponible en WASM/headless). Voir examples/graphics_demo.ol.
 ##
 ##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
 ##   graphics.run(func()
