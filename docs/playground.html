@@ -197,13 +197,14 @@ canvas#canvas {
   /* Scroll horizontal fluide sur iOS */
   #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  /* toolbar compact : icônes seules, repli sur 2 lignes si ça ne tient pas */
-  #toolbar { gap: 5px; padding: 5px 8px; height: auto; flex-wrap: wrap; }
-  .spacer { display: none; }            /* ne pas pousser les boutons hors écran */
+  /* toolbar compact : icônes seules, TOUJOURS sur une seule ligne.
+     Le menu d'exemples se rétrécit (min-width:0) pour absorber le manque de
+     place ; les boutons gardent leur taille, rien ne passe à la ligne. */
+  #toolbar { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #examples { max-width: 130px; font-size: 11px; }
+  #examples { flex: 0 1 auto; min-width: 0; max-width: 130px; font-size: 11px; }
   #reload-btn, #standalone-btn, #img-btn,
   #run-btn, #stop-btn, #copy-btn { padding: 6px 8px !important; }
 }
