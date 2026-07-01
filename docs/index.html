@@ -1642,15 +1642,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <div class="callout"><code>graphics.canvas()</code> doit être appelé <strong>avant</strong> toute opération image — le contexte GL doit exister.</div>
 
 <h3>Charger une image</h3>
-<pre><code><span class="kw">var</span> img = image
-<span class="kw">var</span> tex = img.load(<span class="str">"logo.png"</span>) <span class="cmt">## handle {id, width, height}</span>
-<span class="bi">graphics</span>.fill(<span class="bi">colors</span>.WHITE)
+<pre data-no-run><code><span class="kw">var</span> tex = image.load(<span class="str">"logo.png"</span>) <span class="cmt">## handle {id, width, height}</span>
 <span class="bi">graphics</span>.sprite(tex, <span class="num">100</span>, <span class="num">100</span>) <span class="cmt">## taille naturelle</span>
 <span class="bi">graphics</span>.sprite(tex, <span class="num">100</span>, <span class="num">100</span>, <span class="num">64</span>, <span class="num">64</span>) <span class="cmt">## redimensionné</span>
-img.unload(tex)</code></pre>
+image.unload(tex)</code></pre>
+<div class="callout warn"><code>image.load(nom)</code> lit un fichier : en <strong>natif</strong>, depuis le disque ; dans le <strong>playground</strong> (pas de système de fichiers), l'image doit d'abord être <strong>chargée via le bouton « Images »</strong> de la barre d'outils, puis <code>image.load("mon-image.png")</code>. Pour une image <strong>embarquée</strong> dans le script (portable partout), utiliser <code>image.load_data("png", base64)</code> — voir l'exemple « Image (load_data) » dans le playground.</div>
 
 <h3>Render texture (dessin hors-écran)</h3>
-<pre><code><span class="kw">var</span> rt = image.create(<span class="num">200</span>, <span class="num">200</span>) <span class="cmt">## render texture 200×200</span>
+<pre data-no-run><code><span class="kw">var</span> rt = image.create(<span class="num">200</span>, <span class="num">200</span>) <span class="cmt">## render texture 200×200</span>
 
 image.begin_draw(rt)
     <span class="bi">graphics</span>.clear({<span class="str">r</span>:<span class="num">0</span>, <span class="str">g</span>:<span class="num">0</span>, <span class="str">b</span>:<span class="num">0</span>, <span class="str">a</span>:<span class="num">1</span>})
@@ -1666,7 +1665,7 @@ image.end_draw()
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>image.load(path)</code></td><td>Charge une texture depuis un fichier — retourne un handle <code>{id, width, height}</code></td></tr>
+    <tr><td><code>image.load(nom)</code></td><td>Charge une texture depuis un fichier (natif : disque ; playground : image préchargée via « Images ») — retourne un handle <code>{id, width, height}</code></td></tr>
     <tr><td><code>image.load_data(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
     <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
     <tr><td><code>image.begin_draw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
@@ -1675,7 +1674,7 @@ image.end_draw()
     <tr><td><code>image.unload(handle)</code></td><td>Libère les ressources GPU de la texture</td></tr>
   </tbody>
 </table>
-<div class="callout tip"><code>graphics.sprite()</code> est l'alternative recommandée à <code>image.draw()</code> : elle respecte la matrice de transformation courante et prend la couleur <code>fill</code> comme teinte.</div>
+<div class="callout tip"><code>graphics.sprite()</code> est l'alternative recommandée à <code>image.draw()</code> : elle respecte la matrice de transformation courante et prend <code>graphics.tint</code> comme teinte (blanc si aucune).</div>
 </section>
 
 <section id="window">
