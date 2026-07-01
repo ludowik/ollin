@@ -7,6 +7,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#ifdef __EMSCRIPTEN__
+#include <cstdlib>
+#include <emscripten.h>
+#endif
 
 // ── teinte globale (graphics.tint / noTint) ─────────────────────────────────────
 static bool s_has_tint = false;
@@ -167,6 +171,49 @@ static Texture2D loadFromMemory(const std::vector<uint8_t>& bytes, const std::st
     return tex;
 }
 
+// Extension (avec le point) déduite du chemin ; ".png" par défaut.
+static std::string extOf(const std::string& path) {
+    auto dot = path.find_last_of('.');
+    return dot == std::string::npos ? std::string(".png") : path.substr(dot);
+}
+
+#ifdef __EMSCRIPTEN__
+// Récupère une ressource servie (même origine) de façon SYNCHRONE, pour garder
+// image.load() synchrone. XHR synchrone sur le thread principal n'autorise pas
+// responseType 'arraybuffer' → on lit responseText en binaire (x-user-defined).
+static std::vector<uint8_t> fetchBytesSync(const std::string& url) {
+    int len = 0;
+    char* data = (char*)EM_ASM_INT(
+        {
+            try {
+                var u = UTF8ToString($0);
+                var xhr = new XMLHttpRequest();
+                xhr.open('GET', u, false);
+                xhr.overrideMimeType('text/plain; charset=x-user-defined');
+                xhr.send(null);
+                if (xhr.status !== 200 && xhr.status !== 0)
+                    return 0;
+                var s = xhr.responseText;
+                var n = s.length;
+                var ptr = _malloc(n);
+                for (var i = 0; i < n; i++)
+                    HEAPU8[ptr + i] = s.charCodeAt(i) & 0xff;
+                HEAP32[$1 >> 2] = n;
+                return ptr;
+            } catch (e) {
+                return 0;
+            }
+        },
+        url.c_str(), &len);
+    std::vector<uint8_t> out;
+    if (data && len > 0) {
+        out.assign((uint8_t*)data, (uint8_t*)data + len);
+        free(data);
+    }
+    return out;
+}
+#endif
+
 // ── image.load(path) ──────────────────────────────────────────────────────────
 
 static Value img_load(Value* args, int argc) {
@@ -179,7 +226,15 @@ static Value img_load(Value* args, int argc) {
     if (it != s_preloaded.end()) {
         h.tex = loadFromMemory(it->second.first, it->second.second);
     } else {
+#ifdef __EMSCRIPTEN__
+        // Pas d'upload : tenter de récupérer la ressource servie (même origine),
+        // relative à la page (ex. image.load("logo.png") → <base>/logo.png).
+        std::vector<uint8_t> bytes = fetchBytesSync(path);
+        if (!bytes.empty())
+            h.tex = loadFromMemory(bytes, extOf(path));
+#else
         h.tex = LoadTexture(path.c_str());
+#endif
         if (h.tex.id == 0)
             throw std::runtime_error("image.load: cannot open '" + path + "'");
     }
