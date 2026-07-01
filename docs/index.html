@@ -1822,7 +1822,7 @@ const ollinTheme = EditorView.theme({
   '.cm-content[contenteditable="false"]': { cursor: 'default' },
 })
 
-const BASE_EXT = [ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme]
+const BASE_EXT = [ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme, EditorView.lineWrapping]
 
 function makeStaticEditor(parent, code) {
   return new EditorView({
