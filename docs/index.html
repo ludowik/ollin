@@ -1727,6 +1727,7 @@ import {
   StreamLanguage, syntaxHighlighting, HighlightStyle,
   tags,
 } from './vendor/codemirror.js'
+import { CODE_DISPLAY } from './cm-shared.js'
 
 // ── Ollin language — aligne sur ollin.tmLanguage.json (composant VSC) ────
 // keyword.control : var|global|const|while|do|for|in|if|then|elseif|end|
@@ -1810,9 +1811,8 @@ const ollinTheme = EditorView.theme({
   '&': { background: '#1a1d2e', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '8px', fontSize: 'var(--code-size)' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto', fontSize: 'var(--code-size)' },
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff', fontSize: 'var(--code-size)' },
-  '.cm-line': { padding: '0 18px' },
+  ...CODE_DISPLAY,   // réglages d'affichage partagés (cm-shared.js)
   '.cm-gutters': { background: '#1a1d2e', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150', borderRadius: '8px 0 0 8px' },
-  '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px', minWidth: '2.8em', fontSize: '11.5px', userSelect: 'none' },
   '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
   '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
   '&.cm-focused': { outline: 'none', borderColor: '#7c83ff' },
