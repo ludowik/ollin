@@ -115,9 +115,10 @@ void image_reset() {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 static Value makeHandle(int id, int w, int h, TexHandle* ptr) {
-    static const Value K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
+    static const Value K_ID(std::string("id")), K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
     Value m = Value::makeMap();
     m.mptr->userdata = ptr;
+    m.mapSet(K_ID, Value((int64_t)id));   // requis par graphics.sprite
     m.mapSet(K_WIDTH, Value((int64_t)w));
     m.mapSet(K_HEIGHT, Value((int64_t)h));
     return m;

@@ -380,9 +380,12 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 20:37</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 20:52</span></p>
   </div>
-  <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
+  <button onclick="hardReload()" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
+    Recharger
+  </button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
@@ -428,7 +431,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 20:37</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 20:52</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1642,10 +1645,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <div class="callout"><code>graphics.canvas()</code> doit être appelé <strong>avant</strong> toute opération image — le contexte GL doit exister.</div>
 
 <h3>Charger une image</h3>
-<pre data-no-run><code><span class="kw">var</span> tex = image.load(<span class="str">"logo.png"</span>) <span class="cmt">## handle {id, width, height}</span>
-<span class="bi">graphics</span>.sprite(tex, <span class="num">100</span>, <span class="num">100</span>) <span class="cmt">## taille naturelle</span>
-<span class="bi">graphics</span>.sprite(tex, <span class="num">100</span>, <span class="num">100</span>, <span class="num">64</span>, <span class="num">64</span>) <span class="cmt">## redimensionné</span>
-image.unload(tex)</code></pre>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">140</span>, <span class="str">"image.load"</span>)
+<span class="kw">var</span> tex = image.load(<span class="str">"assets/smiley.png"</span>) <span class="cmt">## handle {id, width, height} — ressource servie</span>
+
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.12</span>, <span class="num">0.2</span>))
+    <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)    <span class="cmt">## 64×64</span>
+    <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)   <span class="cmt">## redimensionné</span>
+<span class="kw">end</span></code></pre>
 <div class="callout"><code>image.load(nom)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.load_data("png", base64)</code> — voir l'exemple « Image (load_data) » du playground.</div>
 
 <h3>Render texture (dessin hors-écran)</h3>
@@ -2008,7 +2015,19 @@ document.querySelectorAll('section pre').forEach(pre => {
         outDiv.style.display = 'block'
         return
       }
+      // reset : graphics.canvas() remettra le canvas visible si l'exemple est graphique
+      const canvas = document.getElementById('canvas')
+      canvas.style.display = 'none'
       const out = ollin.execute(text)
+      if (canvas.style.display === 'block') {
+        // exemple graphique : afficher le canvas juste sous ce bloc
+        outDiv.style.display = 'none'
+        canvas.style.maxWidth = '100%'
+        canvas.style.borderRadius = '6px'
+        canvas.style.margin = '10px 0'
+        wrap.after(canvas)
+        return
+      }
       outDiv.style.display = 'block'
       if (!out || out === '') {
         outDiv.textContent = '(aucune sortie)'
