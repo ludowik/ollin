@@ -250,10 +250,10 @@ static Value img_draw(Value* args, int argc) {
     pixelsClose(h);
 
     Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
-    float x = (float)numArg(args, argc, 1, FN);
-    float y = (float)numArg(args, argc, 2, FN);
-    float dw = argc > 3 ? (float)numArg(args, argc, 3, FN) : (float)tex.width;
-    float dh = argc > 4 ? (float)numArg(args, argc, 4, FN) : (float)tex.height;
+    float x = (float)numArg(args, 1, FN);
+    float y = (float)numArg(args, 2, FN);
+    float dw = argc > 3 ? (float)numArg(args, 3, FN) : (float)tex.width;
+    float dh = argc > 4 ? (float)numArg(args, 4, FN) : (float)tex.height;
     Color tint = (argc > 5 && args[5].isMap()) ? toColor(args[5]) : WHITE;
 
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
@@ -314,8 +314,8 @@ static Value img_get_pixel(Value* args, int argc) {
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
     TexHandle& h = handlePtr(args[0], FN);
-    int x = (int)numArg(args, argc, 1, FN);
-    int y = (int)numArg(args, argc, 2, FN);
+    int x = (int)numArg(args, 1, FN);
+    int y = (int)numArg(args, 2, FN);
     pixelsOpen(h);
     Color c;
     if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
@@ -339,14 +339,14 @@ static Value img_set_pixel(Value* args, int argc) {
     if (argc < 4)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y, color");
     TexHandle& h = handlePtr(args[0], FN);
-    int x = (int)numArg(args, argc, 1, FN);
-    int y = (int)numArg(args, argc, 2, FN);
+    int x = (int)numArg(args, 1, FN);
+    int y = (int)numArg(args, 2, FN);
     pixelsOpen(h);
     Color c = (argc >= 7) ? Color{
-        (uint8_t)(numArg(args, argc, 3, FN) * 255.0 + 0.5),
-        (uint8_t)(numArg(args, argc, 4, FN) * 255.0 + 0.5),
-        (uint8_t)(numArg(args, argc, 5, FN) * 255.0 + 0.5),
-        (uint8_t)(numArg(args, argc, 6, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, 3, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, 4, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, 5, FN) * 255.0 + 0.5),
+        (uint8_t)(numArg(args, 6, FN) * 255.0 + 0.5),
     } : toColor(args[3]);
     if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
         uint8_t* px = (uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
