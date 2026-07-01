@@ -380,7 +380,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 19:41</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 19:47</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -426,7 +426,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 19:41</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 19:47</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -811,6 +811,14 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
 <span class="kw">end</span>
 
 <span class="bi">assert</span>(add(<span class="num">3</span>, <span class="num">4</span>) == <span class="num">7</span>)</code></pre>
+
+<h3>Fonction sur un champ de map</h3>
+<p><code>func obj.champ(...)</code> définit une fonction directement sur un champ de map ou de module — sucre pour <code>obj.champ = func(...) ... end</code>. Utile pour les hooks moteur (ex. <code>keyboard.keypressed</code>).</p>
+<pre><code><span class="kw">var</span> obj = {}
+<span class="kw">func</span> obj.salut(nom)
+    <span class="kw">return</span> <span class="str">"salut "</span> + nom
+<span class="kw">end</span>
+<span class="bi">assert</span>(obj.salut(<span class="str">"ollin"</span>) == <span class="str">"salut ollin"</span>)</code></pre>
 
 <h3>Retours multiples</h3>
 <pre><code><span class="kw">func</span> minmax(a, b)

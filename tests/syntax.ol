@@ -467,6 +467,18 @@ assert(r1 == 1 and r2 == 2 and r3 == 3)
 func double(x)  return x * 2  end
 assert(double(5) == 10)
 
+## définition sur un champ de map : `func obj.field(...)` = `obj.field = func(...)`
+var handlers = {}
+func handlers.greet(name)
+    return "salut " + name
+end
+assert(handlers.greet("ollin") == "salut ollin")
+func handlers.add(a, b = 5)   ## params + défaut fonctionnent aussi
+    return a + b
+end
+assert(handlers.add(10) == 15)
+assert(handlers.add(10, 20) == 30)
+
 ## ── 12. Closures ─────────────────────────────────────────────────────────────
 
 ## upvalue : variable de la portée englobante

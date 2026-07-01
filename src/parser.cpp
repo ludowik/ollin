@@ -358,34 +358,58 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
 std::unique_ptr<Stmt> Parser::funcDeclStmt() {
     int line = peek().line;
     advance(); // FUNC
+    std::string name = expect(TokenType::IDENTIFIER).lexeme;
+
+    // Parse "(" params ")" NL body "end" dans les champs fournis.
+    auto parseParamsBody = [&](std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,
+                               bool& variadic, std::vector<std::unique_ptr<Stmt>>& body) {
+        expect(TokenType::LPAREN);
+        while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
+            if (check(TokenType::DOT_DOT_DOT)) {
+                advance();
+                variadic = true;
+                break;
+            }
+            params.push_back(expect(TokenType::IDENTIFIER).lexeme);
+            if (match(TokenType::EQUALS))
+                defaults.push_back(expr());
+            else
+                defaults.push_back(nullptr);
+            if (!check(TokenType::RPAREN))
+                expect(TokenType::COMMA);
+        }
+        expect(TokenType::RPAREN);
+        consumeSemi();
+        while (true) {
+            skipSemis();
+            if (check(TokenType::END) || check(TokenType::EOF_T))
+                break;
+            body.push_back(parseOneStmt());
+        }
+        expect(TokenType::END);
+        consumeSemi();
+    };
+
+    // Définition sur un champ de map : func obj.field(params) ... end
+    // → desugar en  obj.field = func(params) ... end
+    if (check(TokenType::DOT)) {
+        advance(); // DOT
+        std::string field = expect(TokenType::IDENTIFIER).lexeme;
+        auto fe = std::make_unique<FuncExpr>();
+        parseParamsBody(fe->params, fe->defaults, fe->variadic, fe->body);
+        auto ia = std::make_unique<IndexAssignStmt>();
+        ia->line = line;
+        ia->obj = name;
+        ia->key = std::make_unique<StringExpr>(field);
+        ia->op = TokenType::EQUALS;
+        ia->value = std::move(fe);
+        return ia;
+    }
+
     auto s = std::make_unique<FuncDeclStmt>();
     s->line = line;
-    s->name = expect(TokenType::IDENTIFIER).lexeme;
-    expect(TokenType::LPAREN);
-    while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
-        if (check(TokenType::DOT_DOT_DOT)) {
-            advance();
-            s->variadic = true;
-            break;
-        }
-        s->params.push_back(expect(TokenType::IDENTIFIER).lexeme);
-        if (match(TokenType::EQUALS))
-            s->defaults.push_back(expr());
-        else
-            s->defaults.push_back(nullptr);
-        if (!check(TokenType::RPAREN))
-            expect(TokenType::COMMA);
-    }
-    expect(TokenType::RPAREN);
-    consumeSemi();
-    while (true) {
-        skipSemis();
-        if (check(TokenType::END) || check(TokenType::EOF_T))
-            break;
-        s->body.push_back(parseOneStmt());
-    }
-    expect(TokenType::END);
-    consumeSemi();
+    s->name = name;
+    parseParamsBody(s->params, s->defaults, s->variadic, s->body);
     return s;
 }
 

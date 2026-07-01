@@ -71,7 +71,10 @@ ifStmt         = "if" expr "then" { stmt }
 tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" NL ;
 switchStmt     = "switch" expr NL { "case" expr { "," expr } NL { stmt } } [ "else" NL { stmt } ] "end" NL ;
 throwStmt      = "throw" expr NL ;
-funcDecl       = "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
+funcDecl       = "func" IDENT [ "." IDENT ] "(" [ params ] ")" NL { stmt } "end" NL ;
+               (* "func obj.field(...) ... end" est un sucre pour
+                  "obj.field = func(...) ... end" : définit une fonction sur un champ
+                  de map/module (ex. func keyboard.keypressed(key) ... end) *)
 params         = param { "," param } [ "," "..." ] | "..." ;
 param          = IDENT [ "=" literal ] ;
 returnStmt     = "return" [ retvals ] NL ;
