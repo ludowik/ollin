@@ -205,7 +205,8 @@ func buildKeys()
     keys[len(keys) + 1] = { label: "EFFACER", kind: "del",   x: MARGIN + ew + KG, y: ky, w: ew, h: KH }
 end
 
-func onClick(mx, my)
+## Appelée par le moteur à chaque clic/tap (bouton gauche).
+func mouse.pressed(mx, my)
     for k in keys do
         if mx >= k.x and mx <= k.x + k.w and my >= k.y and my <= k.y + k.h then
             if k.kind == "char" then
@@ -325,5 +326,4 @@ graphics.canvas(W, H, "SUTOM")
 start()
 layout()
 buildKeys()
-mouse.on_down(onClick)
 ## `draw` est appelée automatiquement à chaque frame par le moteur.
