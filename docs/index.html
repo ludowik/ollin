@@ -1595,12 +1595,15 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 
-<h3>Couleur personnalisée</h3>
+<h3>Couleur personnalisée et aléatoire</h3>
 
-<pre data-no-run><code><span class="cmt">## couleur aléatoire claire</span>
-<span class="kw">func</span> rand_color()
-    <span class="kw">return</span> <span class="bi">Color</span>(math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>)
-<span class="kw">end</span></code></pre>
+<pre><code><span class="cmt">## couleur personnalisée (composantes dans [0,1])</span>
+<span class="kw">var</span> teal = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.6</span>, <span class="num">0.6</span>)
+<span class="bi">print</span>(teal)              <span class="cmt">## Color(0.000000,0.600000,0.600000,1.000000)</span>
+
+<span class="cmt">## couleur aléatoire : Color.random() (pas besoin de la réimplémenter)</span>
+<span class="kw">var</span> c = <span class="bi">Color</span>.random()
+<span class="bi">print</span>(c.r, c.g, c.b)</code></pre>
 </section>
 
 <!-- ── Clavier ────────────────────────────────────────────────────────────── -->
