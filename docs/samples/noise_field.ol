@@ -10,13 +10,13 @@ graphics.canvas(W, H, "math.noise")
 
 math.noise_seed(7)
 
-var CELL = 8        ## taille d'une cellule (px) — petit = plus de définition
-var SCALE = 0.01    ## zoom du bruit (petit = taches plus larges)
+var CELL = 8          ## taille d'une cellule (px) — petit = plus de définition
+var SCALE = 0.0102145 ## zoom du bruit (petit = taches plus larges)
 
 ## `draw` est appelée automatiquement à chaque frame par le moteur.
 func draw()
     graphics.noStroke()   ## pas de contour → cellules jointives, sans bordure
-    var t = time() * 0.3
+    var t = elapsedTime * 0.3
 
     for y = 0, H - 1, CELL do
         for x = 0, W - 1, CELL do

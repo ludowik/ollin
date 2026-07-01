@@ -315,6 +315,16 @@ VM* VM::current() {
     return s_current_vm;
 }
 
+void VM::setGlobal(const std::string& name, const Value& value) {
+    for (int i = 0; i < (int)owned_chunk.identifiers.size(); ++i) {
+        if (owned_chunk.identifiers[i] == name) {
+            globals[i] = value;
+            globals_init[i] = true;
+            return;
+        }
+    }
+}
+
 Value VM::getGlobal(const std::string& name) const {
     if (!ch)
         return Value{};
@@ -1393,6 +1403,11 @@ void VM::execute(Chunk chunk) {
                 }
         }
     }
+    for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
+        if (owned_chunk.identifiers[gi] == "deltaTime" || owned_chunk.identifiers[gi] == "elapsedTime") {
+            globals[gi] = Value(0.0);
+            globals_init[gi] = true;
+        }
     growRegs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     call_stack.push_back(Frame{});

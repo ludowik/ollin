@@ -72,8 +72,9 @@ ollin/
 
 - Branche unique : **`main`** — tout le développement se fait directement sur main
 - **Committer après chaque fonctionnalité complète** (feature atomique = 1 commit)
+- **Ne jamais mettre Co-Authored-By dans les commits- pas de référence à Claude dans l'historique git par exemple
 - Pusher sur `origin/main` après chaque commit
-- `git restore <fichier>` pour annuler une modification non commitée
+- `git restore <fichier>` pour annuler une modification non commitée, mais uniquement si tu respectes correctement les règles précédentes
 
 **Toujours TOUT repousser sur `main`.** Si une consigne d'outillage/harness impose
 de travailler sur une branche dédiée (ex. `claude/...`), reporter quand même le
@@ -208,12 +209,29 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
 | HALT          | —      |                            | arrêt                                            |
 
+## Globales moteur (engine-injected globals)
+
+Deux globales sont injectées par le moteur avant chaque cycle update/draw, sans déclaration `global` dans le script :
+
+| Nom | Type | Description |
+|-----|------|-------------|
+| `deltaTime` | FLOAT | Secondes écoulées depuis la frame précédente (`GetFrameTime()`) |
+| `elapsedTime` | FLOAT | Secondes écoulées depuis le démarrage du programme (somme des deltaTime) |
+
+**Implémentation** :
+- `declared_globals_` les contient (pré-ajoutés dans `Compiler::compile()`) → le compilateur accepte ces noms sans `global`.
+- `VM::execute()` les initialise à `0.0` si présents dans les identifiers.
+- `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `raylib_module.cpp` avant chaque frame.
+- `s_elapsed_time` (statique dans `raylib_module.cpp`) est remis à 0 à chaque `gfx_run()`.
+
+**Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
+
 ## Déclaration de variables (implémentation de l'enforcement)
 
 > Règle de langage (`var` = locale, `global` = globale, obligation de déclaration) : voir `grammar.ebnf` (`varDecl`, `globalDecl`, `assignStmt`).
 
 - Message d'erreur émis : `undeclared variable '<nom>' (use 'var' or 'global')`.
-- `declared_globals_` (set) contient : noms de classes, et tous les noms déclarés par `global`.
+- `declared_globals_` (set) contient : noms de classes, tous les noms déclarés par `global`, les modules et builtins, et les **globales moteur** (`deltaTime`, `elapsedTime`).
 - **Pré-scan** : `collectGlobals()` parcourt tout le programme (y compris l'intérieur des fonctions, classes, blocs) et remplit `declared_globals_` **avant** la compilation → les références en avant à un global fonctionnent.
 - `VarDeclStmt.is_global` : `collectLocals()` ignore ces déclarations (pas de registre) ; `visit(VarDeclStmt)` émet `STORE_GLOBAL` pour l'init.
 - Résolution d'un nom : local (`local_regs_`) → fonction (`func_table`) → upvalue (`resolveUpvalue`) → global (`declared_globals_` → `LOAD_GLOBAL`/`STORE_GLOBAL`) → sinon erreur. Une locale masque donc un global de même nom.

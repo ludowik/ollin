@@ -387,12 +387,19 @@ static Value gfx_quit(Value* args, int argc) {
     return Value{};
 }
 
-// Si une fonction globale `update` existe, l'appeler avec le delta-time
-// (secondes écoulées depuis la frame précédente) AVANT le rendu.
+// Temps accumulé depuis le démarrage du programme (remis à 0 à chaque gfx_run).
+static double s_elapsed_time = 0.0;
+
+// Met à jour deltaTime/elapsedTime dans la VM et appelle update(dt) si définie.
 static Value s_update_callback;
 static void callUpdateIfAny() {
+    double dt = (double)GetFrameTime();
+    s_elapsed_time += dt;
+    VM* vm = VM::current();
+    vm->setGlobal("deltaTime", Value(dt));
+    vm->setGlobal("elapsedTime", Value(s_elapsed_time));
     if (s_update_callback.isCallable())
-        VM::current()->callValue(s_update_callback, Value((double)GetFrameTime()));
+        vm->callValue(s_update_callback, Value(dt));
 }
 
 #ifdef __EMSCRIPTEN__
@@ -416,6 +423,7 @@ static Value gfx_run(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.run: expected callback function");
     Value fn = args[0];
+    s_elapsed_time = 0.0;
     s_update_callback = VM::current()->getGlobal("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;

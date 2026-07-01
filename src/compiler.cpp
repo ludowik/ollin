@@ -267,6 +267,8 @@ Chunk Compiler::compile(const Program& prog) {
         declared_globals_.insert(n);
     for (auto& n : builtinFuncNames())
         declared_globals_.insert(n);
+    declared_globals_.insert("deltaTime");
+    declared_globals_.insert("elapsedTime");
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;

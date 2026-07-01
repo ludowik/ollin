@@ -17,6 +17,7 @@ class VM {
     Value callValue(const Value& fn, const Value& arg);     // appelle une fonction Ollin (1 arg)
     Value callValue(const Value& fn, const Value& a, const Value& b); // 2 args
     Value getGlobal(const std::string& name) const; // returns nil if not found
+    void setGlobal(const std::string& name, const Value& value);
 
   private:
     int errLine() const;             // extracted from the lambda in execute()
