@@ -419,6 +419,8 @@ pre:hover .code-actions,
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
   <a href="#graphics">Graphics + Colors</a>
+  <a href="#keyboard">Clavier</a>
+  <a href="#mouse">Souris</a>
   <a href="#image">Module image</a>
   <a href="#window">Module window</a>
 </nav>
@@ -1585,6 +1587,52 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <pre data-no-run><code><span class="cmt">## couleur aléatoire claire</span>
 <span class="kw">func</span> rand_color()
     <span class="kw">return</span> <span class="bi">Color</span>(math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>, math.rand() * <span class="num">0.8</span> + <span class="num">0.2</span>)
+<span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── Clavier ────────────────────────────────────────────────────────────── -->
+<section id="keyboard">
+<h2>Module <code>keyboard</code></h2>
+<p>Le clavier suit le même principe que <code>setup</code>/<code>update</code>/<code>draw</code> : on affecte des fonctions <strong>au module <code>keyboard</code></strong> et le moteur les appelle si elles existent (aucune activation). Actif pendant la boucle de rendu.</p>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>keyboard.keypressed = func(key) … end</code></td><td>Appelée à chaque touche <strong>enfoncée</strong></td></tr>
+    <tr><td><code>keyboard.keyrelease = func(key) … end</code></td><td>Appelée à chaque touche <strong>relâchée</strong></td></tr>
+  </tbody>
+</table>
+<p><code>key</code> est un <strong>nom de touche</strong> : <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>.</p>
+<pre data-no-run><code><span class="kw">func</span> keyboard.keypressed(key)
+    <span class="kw">if</span> key == <span class="str">"space"</span> <span class="kw">then</span>
+        <span class="bi">print</span>(<span class="str">"saut"</span>)
+    <span class="kw">elseif</span> key == <span class="str">"escape"</span> <span class="kw">then</span>
+        graphics.quit()
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── Souris ─────────────────────────────────────────────────────────────── -->
+<section id="mouse">
+<h2>Module <code>mouse</code></h2>
+<p>Même principe pour le pointeur (souris ou tap tactile). Chaque callback reçoit la position <code>(x, y)</code> dans le repère de la zone graphique.</p>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>mouse.pressed = func(x, y) … end</code></td><td>Appui du bouton gauche / tap</td></tr>
+    <tr><td><code>mouse.released = func(x, y) … end</code></td><td>Relâché</td></tr>
+    <tr><td><code>mouse.moved = func(x, y) … end</code></td><td>Déplacement du pointeur</td></tr>
+  </tbody>
+</table>
+<pre data-no-run><code><span class="kw">global</span> px = <span class="num">0</span>
+<span class="kw">global</span> py = <span class="num">0</span>
+<span class="kw">func</span> mouse.pressed(x, y)
+    px = x
+    py = y
+<span class="kw">end</span>
+<span class="kw">func</span> draw()
+    graphics.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>))
+    graphics.fill(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
+    graphics.circle(px, py, <span class="num">10</span>)
 <span class="kw">end</span></code></pre>
 </section>
 
