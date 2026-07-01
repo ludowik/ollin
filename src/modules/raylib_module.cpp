@@ -29,6 +29,19 @@ static Color toColor(const Value& v) {
     return {getComp("r", 0), getComp("g", 0), getComp("b", 0), getComp("a", 1)};
 }
 
+// Composante [0,1] → octet [0,255] (bornée).
+static uint8_t comp01(double v) {
+    if (v < 0.0)
+        v = 0.0;
+    if (v > 1.0)
+        v = 1.0;
+    return (uint8_t)(v * 255.0 + 0.5);
+}
+
+static Color rgbaColor(double r, double g, double b, double a) {
+    return {comp01(r), comp01(g), comp01(b), comp01(a)};
+}
+
 static Value colorInst(double r, double g, double b) {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("r")), Value(r));
@@ -165,10 +178,14 @@ static Value gfx_no_stroke(Value* args, int argc) {
 }
 
 static Value gfx_fill(Value* args, int argc) {
-    if (argc > 0 && (args[0].isMap() || args[0].isClass()))
-        applyFill(true, toColor(args[0]));   // couleur fournie
-    else
-        s_has_fill = true;                   // sans couleur → (ré)active avec la couleur courante
+    if (argc >= 3 && args[0].isNumber() && args[1].isNumber() && args[2].isNumber()) {
+        double a = (argc > 3 && args[3].isNumber()) ? args[3].asNum() : 1.0;   // r, g, b [, a] directs
+        applyFill(true, rgbaColor(args[0].asNum(), args[1].asNum(), args[2].asNum(), a));
+    } else if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
+        applyFill(true, toColor(args[0]));   // objet Color
+    } else {
+        s_has_fill = true;                   // sans argument → (ré)active avec la couleur courante
+    }
     return Value{};
 }
 
