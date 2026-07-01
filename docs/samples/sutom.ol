@@ -149,7 +149,8 @@ func submit()
     end
 end
 
-func onKey(k)
+## `keypressed` est appelée automatiquement par le moteur à chaque touche.
+func keypressed(k)
     if k == "return" then
         submit()
     elseif k == "backspace" then
@@ -324,6 +325,5 @@ graphics.canvas(W, H, "SUTOM")
 start()
 layout()
 buildKeys()
-keyboard.enable(onKey)
 mouse.on_down(onClick)
 ## `draw` est appelée automatiquement à chaque frame par le moteur.

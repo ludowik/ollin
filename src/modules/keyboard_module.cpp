@@ -2,73 +2,86 @@
 #include "vm.h"
 #include "keyboard_module.h"
 #include <raylib.h>
-#include <stdexcept>
 #include <string>
 
-// ── Module keyboard ───────────────────────────────────────────────────────────
-// keyboard.enable(callback) : active la capture clavier. À chaque touche
-//   détectée pendant la boucle de rendu, le callback Ollin est appelé avec une
-//   chaîne : le caractère pour les touches imprimables, sinon un nom
-//   ("space", "return", "escape", "backspace").
-// keyboard.disable() : désactive la capture et oublie le callback.
+// ── Clavier ─────────────────────────────────────────────────────────────────
+// Modèle « fonctions globales appelées par le moteur » (comme setup/update/draw) :
+//   func keypressed(key)  → appelée à chaque touche enfoncée (si définie)
+//   func keyrelease(key)  → appelée à chaque touche relâchée (si définie)
+// `key` est un NOM de touche : "a".."z", "0".."9", "space", "return", "escape",
+//   "backspace", "tab", "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", etc.
+// Aucune activation nécessaire : il suffit de définir la (les) fonction(s).
 //
 // La détection a lieu dans keyboardPoll(), appelé une fois par frame par la
 // boucle de rendu (raylib_module.cpp) — le clavier ne fonctionne donc que
-// pendant un graphics.run(...).
+// pendant un graphics.run(...) (ou via la fonction draw auto-appelée).
 
-static bool  s_enabled = false;
-static Value s_callback;   // fonction Ollin (retenue par copie)
+// Nom lisible d'une touche raylib ; "" si non gérée (ignorée).
+static std::string keyName(int key) {
+    if (key >= KEY_A && key <= KEY_Z)
+        return std::string(1, (char)('a' + (key - KEY_A)));
+    if (key >= KEY_ZERO && key <= KEY_NINE)
+        return std::string(1, (char)('0' + (key - KEY_ZERO)));
+    switch (key) {
+        case KEY_SPACE:                     return "space";
+        case KEY_ENTER: case KEY_KP_ENTER:  return "return";
+        case KEY_ESCAPE:                    return "escape";
+        case KEY_BACKSPACE:                 return "backspace";
+        case KEY_TAB:                       return "tab";
+        case KEY_DELETE:                    return "delete";
+        case KEY_LEFT:                      return "left";
+        case KEY_RIGHT:                     return "right";
+        case KEY_UP:                        return "up";
+        case KEY_DOWN:                      return "down";
+        case KEY_LEFT_SHIFT: case KEY_RIGHT_SHIFT:     return "shift";
+        case KEY_LEFT_CONTROL: case KEY_RIGHT_CONTROL: return "ctrl";
+        case KEY_LEFT_ALT: case KEY_RIGHT_ALT:         return "alt";
+        default:                            return "";
+    }
+}
+
+// Touches actuellement enfoncées (pour émettre keyrelease). Indexé par keycode
+// raylib (< 512). Zéro-initialisé (durée de vie statique).
+static bool s_down[512];
 
 void keyboardPoll() {
-    if (!s_enabled || !s_callback.isCallable()) return;
-    Value cb = s_callback;   // capture : le callback peut appeler disable()
     VM* vm = VM::current();
+    Value pressed = vm->getGlobal("keypressed");
+    Value released = vm->getGlobal("keyrelease");
+    bool wantPress = pressed.isCallable();
+    bool wantRelease = released.isCallable();
 
-    // Touches nommées via la FILE des touches pressées (robuste au timing, comme
-    // la file des caractères ; IsKeyPressed serait basé sur l'état par frame et
-    // raterait un appui/relâché survenu entre deux frames). Les imprimables sont
-    // ignorées ici — elles passent par GetCharPressed ci-dessous.
+    // Appuis de la frame (file des touches — robuste au timing). On draine et on
+    // suit l'état « enfoncé » même sans callback keypressed, pour keyrelease.
     int key;
     while ((key = GetKeyPressed()) != 0) {
-        const char* name = nullptr;
-        switch (key) {
-            case KEY_SPACE:                   name = "space";     break;
-            case KEY_ENTER: case KEY_KP_ENTER: name = "return";    break;
-            case KEY_ESCAPE:                  name = "escape";    break;
-            case KEY_BACKSPACE:               name = "backspace"; break;
-            default: break;
+        std::string name = keyName(key);
+        if (name.empty())
+            continue;
+        if (key >= 0 && key < 512)
+            s_down[key] = true;
+        if (wantPress)
+            vm->callValue(pressed, Value(name));
+    }
+
+    // Relâchements : parcourt les touches suivies comme enfoncées.
+    for (int k = 0; k < 512; k++) {
+        if (!s_down[k])
+            continue;
+        if (IsKeyReleased(k)) {
+            s_down[k] = false;
+            if (wantRelease) {
+                std::string name = keyName(k);
+                if (!name.empty())
+                    vm->callValue(released, Value(name));
+            }
         }
-        if (name) vm->callValue(cb, Value(std::string(name)));
-    }
-
-    // Caractères imprimables (file d'attente raylib, dans l'ordre de frappe).
-    int c;
-    while ((c = GetCharPressed()) != 0) {
-        if (c == ' ') continue;   // espace déjà émis comme "space"
-        int sz = 0;
-        const char* u = CodepointToUTF8(c, &sz);
-        vm->callValue(cb, Value(std::string(u, sz)));
     }
 }
 
-static Value kbd_enable(Value* args, int argc) {
-    if (argc < 1 || !args[0].isCallable())
-        throw std::runtime_error("keyboard.enable: expected a callback function");
-    s_callback = args[0];
-    s_enabled  = true;
-    return Value{};
-}
-
-static Value kbd_disable(Value* args, int argc) {
-    (void)args; (void)argc;
-    s_enabled  = false;
-    s_callback = Value{};   // release
-    return Value{};
-}
-
+// Le module `keyboard` n'expose plus de fonction : le clavier est piloté par les
+// globales keypressed / keyrelease. Conservé (map vide) pour la cohérence des
+// modules injectés.
 Value makeKeyboardModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("enable")),  Value::makeBuiltin(kbd_enable));
-    m.mapSet(Value(std::string("disable")), Value::makeBuiltin(kbd_disable));
-    return m;
+    return Value::makeMap();
 }
