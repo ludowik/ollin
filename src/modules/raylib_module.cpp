@@ -42,15 +42,6 @@ static Color rgbaColor(double r, double g, double b, double a) {
     return {comp01(r), comp01(g), comp01(b), comp01(a)};
 }
 
-static Value colorInst(double r, double g, double b) {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("r")), Value(r));
-    m.mapSet(Value(std::string("g")), Value(g));
-    m.mapSet(Value(std::string("b")), Value(b));
-    m.mapSet(Value(std::string("a")), Value(1.0));
-    return m;
-}
-
 static int s_physW = 0, s_physH = 0;
 static int s_logicalW = 0; // largeur logique de la zone (pour l'overlay FPS en haut à droite)
 
@@ -602,12 +593,6 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("circle")), Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")), Value::makeBuiltin(gfx_point));
     m.mapSet(Value(std::string("sprite")), Value::makeBuiltin(gfx_sprite));
-    m.mapSet(Value(std::string("BLACK")), colorInst(0.0, 0.0, 0.0));
-    m.mapSet(Value(std::string("WHITE")), colorInst(1.0, 1.0, 1.0));
-    m.mapSet(Value(std::string("RED")), colorInst(230 / 255.0, 41 / 255.0, 55 / 255.0));
-    m.mapSet(Value(std::string("GREEN")), colorInst(0 / 255.0, 228 / 255.0, 48 / 255.0));
-    m.mapSet(Value(std::string("BLUE")), colorInst(0 / 255.0, 121 / 255.0, 241 / 255.0));
-    m.mapSet(Value(std::string("YELLOW")), colorInst(253 / 255.0, 249 / 255.0, 0 / 255.0));
-    m.mapSet(Value(std::string("GRAY")), colorInst(130 / 255.0, 130 / 255.0, 130 / 255.0));
+    // Les constantes couleur ne sont PAS ici : utiliser le module `colors`.
     return m;
 }
