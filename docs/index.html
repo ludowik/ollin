@@ -1484,17 +1484,19 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span></code></pre>
 <p>Ces trois fonctions sont indépendantes : tu peux n'en définir qu'une. (Tu peux aussi ouvrir la fenêtre au niveau du script plutôt que dans <code>setup</code>.)</p>
 <p>Pour séparer la logique du rendu, définis aussi <code>update(dt)</code> : le moteur l'appelle <strong>avant <code>draw</code></strong> à chaque frame, avec <code>dt</code> = nombre de secondes écoulées depuis la frame précédente. En multipliant les déplacements par <code>dt</code>, l'animation devient <strong>indépendante du framerate</strong>.</p>
-<pre data-no-run><code><span class="kw">var</span> x = <span class="num">0</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">140</span>, <span class="str">"cycle"</span>)
+<span class="kw">var</span> x = <span class="num">0</span>
 
 <span class="cmt">## logique : appelée AVANT draw, dt = secondes depuis la frame précédente</span>
 <span class="kw">func</span> update(dt)
     x = x + <span class="num">120</span> * dt   <span class="cmt">## 120 px/seconde, quel que soit le FPS</span>
+    <span class="kw">if</span> x > <span class="num">260</span> <span class="kw">then</span> x = <span class="num">0</span> <span class="kw">end</span>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">graphics</span>.BLACK)
     <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>))
-    <span class="bi">graphics</span>.circle(x, <span class="num">100</span>, <span class="num">20</span>)
+    <span class="bi">graphics</span>.circle(x, <span class="num">70</span>, <span class="num">20</span>)
 <span class="kw">end</span></code></pre>
 <p>Tu peux aussi piloter la boucle explicitement avec <code>graphics.run(callback)</code> si tu préfères nommer ta fonction de rendu autrement (<code>update</code> reste appelée avant).</p>
 
@@ -1545,12 +1547,16 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.resetTransform()</code></td><td>Réinitialise la matrice à l'identité</td></tr>
   </tbody>
 </table>
-<pre data-no-run><code><span class="bi">graphics</span>.push()
-<span class="bi">graphics</span>.translate(<span class="num">200</span>, <span class="num">200</span>)
-<span class="bi">graphics</span>.rotate(<span class="num">45</span>)
-<span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
-<span class="bi">graphics</span>.rect(<span class="num">-50</span>, <span class="num">-50</span>, <span class="num">100</span>, <span class="num">100</span>) <span class="cmt">## carré pivoté centré en (200,200)</span>
-<span class="bi">graphics</span>.pop()</code></pre>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">220</span>, <span class="num">180</span>, <span class="str">"transform"</span>)
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">graphics</span>.push()
+    <span class="bi">graphics</span>.translate(<span class="num">110</span>, <span class="num">90</span>)
+    <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">60</span>) <span class="cmt">## pivote au fil du temps</span>
+    <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
+    <span class="bi">graphics</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>) <span class="cmt">## carré pivoté centré</span>
+    <span class="bi">graphics</span>.pop()
+<span class="kw">end</span></code></pre>
 
 <h3>Couleurs — classe <code>Color</code></h3>
 <p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code>. L'alpha est optionnel (défaut : <code>1.0</code>). Les composantes sont clampées silencieusement.</p>
@@ -1605,12 +1611,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 <p><code>key</code> est un <strong>nom de touche</strong> : <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>.</p>
-<pre data-no-run><code><span class="kw">func</span> keyboard.keypressed(key)
-    <span class="kw">if</span> key == <span class="str">"space"</span> <span class="kw">then</span>
-        <span class="bi">print</span>(<span class="str">"saut"</span>)
-    <span class="kw">elseif</span> key == <span class="str">"escape"</span> <span class="kw">then</span>
-        graphics.quit()
-    <span class="kw">end</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"clavier"</span>) <span class="cmt">## clique le canvas puis tape</span>
+<span class="kw">global</span> last = <span class="str">"…"</span>
+<span class="kw">func</span> keyboard.keypressed(key)
+    last = key
+<span class="kw">end</span>
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">graphics</span>.draw_text(<span class="str">"touche : "</span> + last, <span class="num">16</span>, <span class="num">45</span>, <span class="num">26</span>, <span class="bi">colors</span>.WHITE)
 <span class="kw">end</span></code></pre>
 </section>
 
@@ -1626,8 +1634,9 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func mouse.moved(x, y)</code></td><td>Déplacement du pointeur</td></tr>
   </tbody>
 </table>
-<pre data-no-run><code><span class="kw">global</span> px = <span class="num">0</span>
-<span class="kw">global</span> py = <span class="num">0</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"souris"</span>) <span class="cmt">## clique dans le canvas</span>
+<span class="kw">global</span> px = <span class="num">130</span>
+<span class="kw">global</span> py = <span class="num">80</span>
 <span class="kw">func</span> mouse.pressed(x, y)
     px = x
     py = y
@@ -1656,17 +1665,19 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <div class="callout"><code>image.load(nom)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.load_data("png", base64)</code> — voir l'exemple « Image (load_data) » du playground.</div>
 
 <h3>Render texture (dessin hors-écran)</h3>
-<pre data-no-run><code><span class="kw">var</span> rt = image.create(<span class="num">200</span>, <span class="num">200</span>) <span class="cmt">## render texture 200×200</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
+<span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>) <span class="cmt">## render texture 120×120</span>
 
-image.begin_draw(rt)
-    <span class="bi">graphics</span>.clear({<span class="str">r</span>:<span class="num">0</span>, <span class="str">g</span>:<span class="num">0</span>, <span class="str">b</span>:<span class="num">0</span>, <span class="str">a</span>:<span class="num">1</span>})
+image.begin_draw(rt)                <span class="cmt">## on dessine DANS la texture (une fois)</span>
+    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.1</span>, <span class="num">0.15</span>))
     <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
-    <span class="bi">graphics</span>.circle(<span class="num">100</span>, <span class="num">100</span>, <span class="num">80</span>)
+    <span class="bi">graphics</span>.circle(<span class="num">60</span>, <span class="num">60</span>, <span class="num">50</span>)
 image.end_draw()
 
-<span class="cmt">## utiliser rt comme sprite dans la boucle principale</span>
-<span class="bi">graphics</span>.fill(<span class="bi">colors</span>.WHITE)
-<span class="bi">graphics</span>.sprite(rt, <span class="num">0</span>, <span class="num">0</span>)</code></pre>
+<span class="kw">func</span> draw()                        <span class="cmt">## puis on l'affiche comme un sprite</span>
+    <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
+    <span class="bi">graphics</span>.sprite(rt, <span class="num">30</span>, <span class="num">30</span>)
+<span class="kw">end</span></code></pre>
 
 <h3>API</h3>
 <table>
