@@ -66,7 +66,7 @@ func draw()
     angle = angle + 1.0
 
     var t = (m.sin(angle * 0.03) + 1) * 0.5
-    g.fill({r:1, g:0.5+t*0.5, b:t*0.3, a:1})
+    g.tint(1, 0.5 + t * 0.5, t * 0.3)   ## teinte du sprite (anciennement via fill)
 
     g.push()
     g.translate(300, 300)
@@ -77,7 +77,7 @@ func draw()
     g.pop()
 
     ## small fixed copy top-left, no tint
-    g.noFill()
+    g.noTint()
     g.sprite(logo, 20, 20, 80, 80)
 
     g.stroke({r:1, g:1, b:1, a:0.7})

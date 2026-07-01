@@ -8,6 +8,23 @@
 #include <unordered_map>
 #include <vector>
 
+// ── teinte globale (graphics.tint / noTint) ─────────────────────────────────────
+static bool s_has_tint = false;
+static Color s_tint = WHITE;
+
+void image_set_tint(bool has, unsigned char r, unsigned char g, unsigned char b, unsigned char a) {
+    s_has_tint = has;
+    s_tint = {r, g, b, a};
+}
+
+void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char* b, unsigned char* a) {
+    *has = s_has_tint;
+    *r = s_tint.r;
+    *g = s_tint.g;
+    *b = s_tint.b;
+    *a = s_tint.a;
+}
+
 // ── storage ───────────────────────────────────────────────────────────────────
 
 struct TexHandle {
@@ -254,7 +271,8 @@ static Value img_draw(Value* args, int argc) {
     float y = (float)numArg(args, 2, FN);
     float dw = argc > 3 ? (float)numArg(args, 3, FN) : (float)tex.width;
     float dh = argc > 4 ? (float)numArg(args, 4, FN) : (float)tex.height;
-    Color tint = (argc > 5 && args[5].isMap()) ? toColor(args[5]) : WHITE;
+    // teinte : argument explicite prioritaire, sinon teinte globale (graphics.tint)
+    Color tint = (argc > 5 && args[5].isMap()) ? toColor(args[5]) : (s_has_tint ? s_tint : WHITE);
 
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
     float sh = h.is_render ? -(float)tex.height : (float)tex.height;

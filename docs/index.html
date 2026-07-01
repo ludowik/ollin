@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 17:30</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 17:37</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 17:30</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 17:37</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1489,6 +1489,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
     <tr><td><code>graphics.fill([color | r, g, b [, a]])</code></td><td>Active le remplissage : un objet <code>Color</code>, ou 3-4 composantes directes dans [0,1] ; sans argument, réactive avec la couleur courante</td></tr>
     <tr><td><code>graphics.noFill()</code></td><td>Désactive le remplissage (défaut) — la couleur courante est conservée</td></tr>
+    <tr><td><code>graphics.tint(color | r, g, b [, a])</code></td><td>Teinte des images (<code>graphics.sprite</code> et <code>image.draw</code>) : objet <code>Color</code> ou composantes dans [0,1]</td></tr>
+    <tr><td><code>graphics.noTint()</code></td><td>Désactive la teinte des images (images dessinées telles quelles)</td></tr>
     <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
     <tr><td><code>graphics.rect(x, y, w, h)</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif</td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
@@ -1498,7 +1500,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>Ellipse de centre (x,y), largeur w et hauteur h — fill/stroke selon styles</td></tr>
     <tr><td><code>graphics.polygon(pts)</code></td><td>Polygone fermé — <code>pts</code> : tableau plat <code>[x1,y1,x2,y2,…]</code> ou tableau de paires <code>[[x1,y1],…]</code></td></tr>
     <tr><td><code>graphics.polyline(pts)</code></td><td>Polyligne ouverte (stroke uniquement) — mêmes formats que <code>polygon</code></td></tr>
-    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Affiche une texture (handle <code>image</code>) à (x,y) — tintée par la couleur <code>fill</code> courante ; respecte la matrice de transformation</td></tr>
+    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Affiche une texture (handle <code>image</code>) à (x,y) — teintée par <code>graphics.tint</code> courant (blanc si aucun) ; respecte la matrice de transformation</td></tr>
     <tr><td><code>graphics.quit()</code></td><td>Arrête la boucle <code>run()</code> sans fermer la fenêtre (safe sur WASM)</td></tr>
     <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
   </tbody>
@@ -1600,7 +1602,7 @@ image.end_draw()
     <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
     <tr><td><code>image.begin_draw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
     <tr><td><code>image.end_draw()</code></td><td>Termine le rendu hors-écran et restaure la cible par défaut</td></tr>
-    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture directement, sans passer par la couleur <code>fill</code></td></tr>
+    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture ; <code>tint</code> explicite (objet Color) prioritaire, sinon la teinte globale <code>graphics.tint</code></td></tr>
     <tr><td><code>image.unload(handle)</code></td><td>Libère les ressources GPU de la texture</td></tr>
   </tbody>
 </table>

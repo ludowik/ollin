@@ -151,6 +151,7 @@ static void resetStyles() {
     applyStrokeSize(2.0f);
     applyStroke(true, WHITE);
     applyFill(false);
+    image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
     rlLoadIdentity();
 }
 
@@ -197,6 +198,28 @@ static Value gfx_no_fill(Value* args, int argc) {
     (void)args;
     (void)argc;
     s_has_fill = false;                       // ne plus remplir (couleur conservée)
+    return Value{};
+}
+
+// Teinte globale des images (graphics.sprite / image.draw) : objet Color ou r,g,b[,a].
+static Value gfx_tint(Value* args, int argc) {
+    Color c;
+    if (argc >= 3 && args[0].isNumber() && args[1].isNumber() && args[2].isNumber()) {
+        double a = (argc > 3 && args[3].isNumber()) ? args[3].asNum() : 1.0;
+        c = rgbaColor(args[0].asNum(), args[1].asNum(), args[2].asNum(), a);
+    } else if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
+        c = toColor(args[0]);
+    } else {
+        return Value{};   // sans argument valide : ne change rien
+    }
+    image_set_tint(true, c.r, c.g, c.b, c.a);
+    return Value{};
+}
+
+static Value gfx_no_tint(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    image_set_tint(false, 255, 255, 255, 255);
     return Value{};
 }
 
@@ -528,8 +551,10 @@ static Value gfx_sprite(Value* args, int argc) {
     float dw = argc > 3 ? (float)args[3].asNum() : 0.0f;
     float dh = argc > 4 ? (float)args[4].asNum() : 0.0f;
 
-    Color tint = s_has_fill ? s_fill_color : WHITE;
-    image_draw_sprite(id, x, y, dw, dh, tint.r, tint.g, tint.b, tint.a);
+    bool has = false;
+    unsigned char r = 255, g = 255, b = 255, a = 255;
+    image_get_tint(&has, &r, &g, &b, &a);
+    image_draw_sprite(id, x, y, dw, dh, r, g, b, a);
     return Value{};
 }
 
@@ -545,6 +570,8 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
     m.mapSet(Value(std::string("fill")), Value::makeBuiltin(gfx_fill));
     m.mapSet(Value(std::string("noFill")), Value::makeBuiltin(gfx_no_fill));
+    m.mapSet(Value(std::string("tint")), Value::makeBuiltin(gfx_tint));
+    m.mapSet(Value(std::string("noTint")), Value::makeBuiltin(gfx_no_tint));
     m.mapSet(Value(std::string("line")), Value::makeBuiltin(gfx_line));
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));

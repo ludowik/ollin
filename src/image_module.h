@@ -21,3 +21,8 @@ void image_reset();
 // tint is RGBA 0-255 components.
 void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned char r, unsigned char g, unsigned char b,
                        unsigned char a);
+
+// Teinte globale (graphics.tint / noTint) : appliquée par défaut à image.draw et
+// graphics.sprite. RGBA 0-255. `has`=false → pas de teinte (blanc).
+void image_set_tint(bool has, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char* b, unsigned char* a);
