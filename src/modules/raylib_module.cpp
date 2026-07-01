@@ -161,12 +161,16 @@ static Value gfx_stroke_size(Value* args, int argc) {
 }
 
 static Value gfx_stroke(Value* args, int argc) {
-    if (argc > 0 && (args[0].isMap() || args[0].isClass()))
-        applyStroke(true, toColor(args[0]));   // couleur fournie
-    else
-        s_has_stroke = true;                   // sans couleur → (ré)active avec la couleur courante
-    if (argc > 1 && args[1].isNumber())
-        applyStrokeSize((float)args[1].asNum());
+    if (argc >= 3 && args[0].isNumber() && args[1].isNumber() && args[2].isNumber()) {
+        double a = (argc > 3 && args[3].isNumber()) ? args[3].asNum() : 1.0;   // r, g, b [, a] directs
+        applyStroke(true, rgbaColor(args[0].asNum(), args[1].asNum(), args[2].asNum(), a));
+    } else if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
+        applyStroke(true, toColor(args[0]));   // objet Color (+ taille optionnelle en 2e arg)
+        if (argc > 1 && args[1].isNumber())
+            applyStrokeSize((float)args[1].asNum());
+    } else {
+        s_has_stroke = true;                   // sans argument → (ré)active avec la couleur courante
+    }
     return Value{};
 }
 
