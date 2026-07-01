@@ -368,16 +368,6 @@ pre:hover .code-actions,
   td:first-child { white-space: normal; }
 }
 </style>
-<script type="importmap">
-{
-  "imports": {
-    "@codemirror/state":    "https://esm.sh/@codemirror/state@6",
-    "@codemirror/view":     "https://esm.sh/@codemirror/view@6",
-    "@codemirror/language": "https://esm.sh/@codemirror/language@6",
-    "@lezer/highlight":          "https://esm.sh/@lezer/highlight@1"
-  }
-}
-</script>
 </head>
 <body>
 
@@ -1627,10 +1617,13 @@ image.end_draw()
 </main>
 
 <script type="module">
-import { EditorState }                                         from '@codemirror/state'
-import { EditorView, lineNumbers }                            from '@codemirror/view'
-import { StreamLanguage, syntaxHighlighting, HighlightStyle } from '@codemirror/language'
-import { tags }                                               from '@lezer/highlight'
+// CodeMirror servi en local (même bundle que le playground) — plus de CDN.
+import {
+  EditorState,
+  EditorView, lineNumbers,
+  StreamLanguage, syntaxHighlighting, HighlightStyle,
+  tags,
+} from './vendor/codemirror.js'
 
 // ── Ollin language — aligne sur ollin.tmLanguage.json (composant VSC) ────
 // keyword.control : var|global|const|while|do|for|in|if|then|elseif|end|
