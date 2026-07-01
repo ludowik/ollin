@@ -5,12 +5,12 @@
 #include <string>
 
 // ── Clavier ─────────────────────────────────────────────────────────────────
-// Modèle « fonctions globales appelées par le moteur » (comme setup/update/draw) :
-//   func keypressed(key)  → appelée à chaque touche enfoncée (si définie)
-//   func keyrelease(key)  → appelée à chaque touche relâchée (si définie)
+// On affecte des fonctions au module `keyboard` ; le moteur les appelle si elles
+// existent (aucune activation nécessaire) :
+//   keyboard.keypressed = func(key) ... end   → touche enfoncée
+//   keyboard.keyrelease = func(key) ... end   → touche relâchée
 // `key` est un NOM de touche : "a".."z", "0".."9", "space", "return", "escape",
 //   "backspace", "tab", "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", etc.
-// Aucune activation nécessaire : il suffit de définir la (les) fonction(s).
 //
 // La détection a lieu dans keyboardPoll(), appelé une fois par frame par la
 // boucle de rendu (raylib_module.cpp) — le clavier ne fonctionne donc que
@@ -46,8 +46,12 @@ static bool s_down[512];
 
 void keyboardPoll() {
     VM* vm = VM::current();
-    Value pressed = vm->getGlobal("keypressed");
-    Value released = vm->getGlobal("keyrelease");
+    Value kbd = vm->getGlobal("keyboard");
+    Value pressed, released;
+    if (kbd.isMap()) {
+        pressed = kbd.mapGet(Value(std::string("keypressed")));
+        released = kbd.mapGet(Value(std::string("keyrelease")));
+    }
     bool wantPress = pressed.isCallable();
     bool wantRelease = released.isCallable();
 
@@ -79,9 +83,8 @@ void keyboardPoll() {
     }
 }
 
-// Le module `keyboard` n'expose plus de fonction : le clavier est piloté par les
-// globales keypressed / keyrelease. Conservé (map vide) pour la cohérence des
-// modules injectés.
+// Le module `keyboard` est une map vide : l'utilisateur y affecte keypressed /
+// keyrelease, lues par keyboardPoll().
 Value makeKeyboardModule() {
     return Value::makeMap();
 }
