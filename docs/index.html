@@ -1274,6 +1274,28 @@ apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="c
     <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))   <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
 <span class="kw">end</span>
 math.noise_seed(<span class="num">42</span>)            <span class="cmt">## bruit reproductible</span></code></pre>
+
+<h3 id="module-string">string</h3>
+<p>Manipulation de chaînes. Les index sont <strong>1-based</strong> (comme les tableaux).</p>
+
+<table>
+  <thead><tr><th>Nom</th><th>Type</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>string.upper(s)</code></td><td>fonction</td><td>Chaîne en majuscules</td></tr>
+    <tr><td><code>string.lower(s)</code></td><td>fonction</td><td>Chaîne en minuscules</td></tr>
+    <tr><td><code>string.trim(s [, chars])</code></td><td>fonction</td><td>Retire aux deux extrémités les caractères de <code>chars</code> (espace par défaut)</td></tr>
+    <tr><td><code>string.ltrim(s [, chars])</code></td><td>fonction</td><td>Idem, uniquement à gauche</td></tr>
+    <tr><td><code>string.rtrim(s [, chars])</code></td><td>fonction</td><td>Idem, uniquement à droite</td></tr>
+    <tr><td><code>string.char(s, i)</code></td><td>fonction</td><td>Caractère à l'index <code>i</code> (1-based) → chaîne d'1 caractère ; <code>""</code> si hors bornes</td></tr>
+    <tr><td><code>string.substr(s, start [, length])</code></td><td>fonction</td><td>Sous-chaîne à partir de <code>start</code> (1-based) ; <code>length</code> optionnel (jusqu'à la fin sinon), bornes ajustées</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
+<span class="bi">print</span>(string.lower(<span class="str">"HELLO"</span>))         <span class="cmt">## hello</span>
+<span class="bi">print</span>(string.trim(<span class="str">"  salut  "</span>))      <span class="cmt">## salut</span>
+<span class="bi">print</span>(string.char(<span class="str">"ollin"</span>, <span class="num">1</span>))       <span class="cmt">## o</span>
+<span class="bi">print</span>(string.substr(<span class="str">"ollin"</span>, <span class="num">2</span>, <span class="num">3</span>))  <span class="cmt">## lli</span></code></pre>
 </section>
 
 <!-- ── Import ─────────────────────────────────────────────────────────── -->
