@@ -124,6 +124,24 @@ Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharge
 **Règles strictes pour les comparaisons :**
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
 
+## Tests graphiques natifs (headless)
+
+Le build natif par défaut utilise le **stub graphique** (pas de fenêtre) — headless-safe.
+Pour tester réellement le rendu (graphics/keyboard/mouse/image) **sans navigateur**,
+on peut builder un binaire natif avec raylib et l'exécuter sous un affichage virtuel.
+
+- `tools/native-gfx.sh` — build natif **avec raylib** (`-DOLLIN_NATIVE_RAYLIB=ON`, défaut OFF)
+  dans `build-gfx/`. **Réutilise la source raylib déjà récupérée par le build WASM**
+  (`build*/_deps/raylib-src`) via `FETCHCONTENT_SOURCE_DIR_RAYLIB` : github est **bloqué
+  par la politique proxy**, donc on ne peut ni cloner ni FetchContent raylib à la volée,
+  et on **ne vendorise pas** raylib. Si aucune source en cache : lancer `wasm/build.sh` d'abord.
+- `tools/run-headless.sh <script.ol>` — exécute `build-gfx/ollin` sous `xvfb-run`
+  (GL logiciel llvmpipe). `graphics.screenshot("f.png")` (chemin relatif au CWD) capture
+  le rendu → vérification visuelle sans Playwright.
+
+Le WASM reste la cible de déploiement (playground) ; ce chemin natif sert à la mise au
+point rapide du code graphique. Ne rien committer de `build-gfx/` (ignoré par `build*/`).
+
 ## Style C++ (formatage)
 
 Les règles mécaniques sont dans `.clang-format` (référence autoritaire). Ce qui suit complète ce que clang-format ne couvre pas.

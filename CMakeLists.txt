@@ -13,6 +13,11 @@ endif()
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
 
+# Build natif AVEC raylib (fenêtre/graphique) au lieu du stub. OFF par défaut :
+# le build natif standard reste headless-safe. Activé par tools/native-gfx.sh
+# pour les tests graphiques natifs (raylib desktop + Xvfb).
+option(OLLIN_NATIVE_RAYLIB "Native build with raylib graphics (default: stub)" OFF)
+
 set(OLLIN_SOURCES
     src/chunk.cpp
     src/collections/array.cpp
@@ -71,13 +76,25 @@ if(EMSCRIPTEN)
         )
     endif()
 else()
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/CMakeLists.txt")
-        add_subdirectory(libs/raylib)
+    if(OLLIN_NATIVE_RAYLIB)
+        # raylib via libs/raylib s'il existe, sinon FetchContent (qui réutilise le
+        # cache si -DFETCHCONTENT_SOURCE_DIR_RAYLIB=<src> est passé — cf. native-gfx.sh).
+        if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/CMakeLists.txt")
+            add_subdirectory(libs/raylib)
+        else()
+            include(FetchContent)
+            FetchContent_Declare(raylib
+                GIT_REPOSITORY https://github.com/raysan5/raylib.git
+                GIT_TAG        6.0
+                GIT_SHALLOW    TRUE
+            )
+            FetchContent_MakeAvailable(raylib)
+        endif()
         set(OLLIN_GRAPHICS_SOURCE src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/image_module.cpp)
         set(OLLIN_GRAPHICS_LIB raylib)
         set(OLLIN_GRAPHICS_DEFINES OLLIN_HAS_RAYLIB)
     else()
-        message(STATUS "raylib not found — building with graphics stub (no window)")
+        message(STATUS "Native build with graphics stub (no window). Set -DOLLIN_NATIVE_RAYLIB=ON for raylib.")
         set(OLLIN_GRAPHICS_SOURCE src/modules/graphics_stub.cpp src/image_stub.cpp)
         set(OLLIN_GRAPHICS_LIB "")
         set(OLLIN_GRAPHICS_DEFINES "")
