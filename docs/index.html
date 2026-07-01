@@ -1593,12 +1593,12 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <!-- ── Clavier ────────────────────────────────────────────────────────────── -->
 <section id="keyboard">
 <h2>Module <code>keyboard</code></h2>
-<p>Le clavier suit le même principe que <code>setup</code>/<code>update</code>/<code>draw</code> : on affecte des fonctions <strong>au module <code>keyboard</code></strong> et le moteur les appelle si elles existent (aucune activation). Actif pendant la boucle de rendu.</p>
+<p>Le clavier suit le même principe que <code>setup</code>/<code>update</code>/<code>draw</code> : on <strong>déclare des fonctions directement sur le module <code>keyboard</code></strong> et le moteur les appelle si elles existent (aucune activation). Actif pendant la boucle de rendu.</p>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>keyboard.keypressed = func(key) … end</code></td><td>Appelée à chaque touche <strong>enfoncée</strong></td></tr>
-    <tr><td><code>keyboard.keyrelease = func(key) … end</code></td><td>Appelée à chaque touche <strong>relâchée</strong></td></tr>
+    <tr><td><code>func keyboard.keypressed(key)</code></td><td>Appelée à chaque touche <strong>enfoncée</strong></td></tr>
+    <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Appelée à chaque touche <strong>relâchée</strong></td></tr>
   </tbody>
 </table>
 <p><code>key</code> est un <strong>nom de touche</strong> : <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>.</p>
@@ -1614,13 +1614,13 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <!-- ── Souris ─────────────────────────────────────────────────────────────── -->
 <section id="mouse">
 <h2>Module <code>mouse</code></h2>
-<p>Même principe pour le pointeur (souris ou tap tactile). Chaque callback reçoit la position <code>(x, y)</code> dans le repère de la zone graphique.</p>
+<p>Même principe pour le pointeur (souris ou tap tactile) : on déclare les fonctions directement sur le module <code>mouse</code>. Chaque callback reçoit la position <code>(x, y)</code> dans le repère de la zone graphique.</p>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>mouse.pressed = func(x, y) … end</code></td><td>Appui du bouton gauche / tap</td></tr>
-    <tr><td><code>mouse.released = func(x, y) … end</code></td><td>Relâché</td></tr>
-    <tr><td><code>mouse.moved = func(x, y) … end</code></td><td>Déplacement du pointeur</td></tr>
+    <tr><td><code>func mouse.pressed(x, y)</code></td><td>Appui du bouton gauche / tap</td></tr>
+    <tr><td><code>func mouse.released(x, y)</code></td><td>Relâché</td></tr>
+    <tr><td><code>func mouse.moved(x, y)</code></td><td>Déplacement du pointeur</td></tr>
   </tbody>
 </table>
 <pre data-no-run><code><span class="kw">global</span> px = <span class="num">0</span>
