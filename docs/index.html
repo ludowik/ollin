@@ -1360,10 +1360,15 @@ math.noise_seed(<span class="num">42</span>)            <span class="cmt">## bru
     func __str()
         return "Animal(" + self.name + ")"
     end
-end</code></pre>
+end
+
+var a = Animal("Rex", "Woof")
+print(a)            ## Animal(Rex)   — affichage de l'instance via __str
+print(a.speak())    ## Rex says Woof</code></pre>
 <ul>
   <li><code>func init(...)</code> est le constructeur ; <code>self</code> est passé implicitement en premier paramètre.</li>
   <li>Toutes les méthodes reçoivent <code>self</code> automatiquement.</li>
+  <li><code>func __str()</code> définit l'affichage de l'instance : <code>print(obj)</code> et la concaténation <code>"…" + obj</code> l'utilisent.</li>
 </ul>
 
 <h3>Instanciation</h3>
