@@ -259,6 +259,16 @@ static Value gfx_fps(Value* args, int argc) {
     return Value((int64_t)GetFPS());
 }
 
+// Capture le framebuffer courant dans un PNG. À appeler pendant le rendu (dans
+// draw). Sur WASM, déclenche un téléchargement navigateur.
+static Value gfx_screenshot(Value* args, int argc) {
+    if (argc < 1 || !args[0].isString())
+        throw std::runtime_error("graphics.screenshot: expected a file path");
+    rlDrawRenderBatchActive();   // vide le batch en attente → le framebuffer contient la frame courante
+    TakeScreenshot(args[0].asString().c_str());
+    return Value{};
+}
+
 static Value gfx_draw_text(Value* args, int argc) {
     if (argc < 4)
         throw std::runtime_error("graphics.draw_text: expected text, x, y, size [, color]");
@@ -575,6 +585,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("line")), Value::makeBuiltin(gfx_line));
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));
+    m.mapSet(Value(std::string("screenshot")), Value::makeBuiltin(gfx_screenshot));
     m.mapSet(Value(std::string("draw_text")), Value::makeBuiltin(gfx_draw_text));
     m.mapSet(Value(std::string("close")), Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")), Value::makeBuiltin(gfx_quit));

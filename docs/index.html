@@ -380,7 +380,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 19:47</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 19:57</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -426,7 +426,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 19:47</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 19:57</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1514,6 +1514,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
     <tr><td><code>graphics.rect(x, y, w, h)</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif</td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
+    <tr><td><code>graphics.screenshot(fichier)</code></td><td>Capture le rendu courant dans un PNG (à appeler dans <code>draw</code>) ; sur WASM, déclenche un téléchargement</td></tr>
     <tr><td><code>graphics.draw_text(text, x, y, size [,color])</code></td><td>Affiche une chaîne — couleur stroke par défaut</td></tr>
     <tr><td><code>graphics.point(x, y)</code></td><td>Trace un point aux coordonnées données</td></tr>
     <tr><td><code>graphics.circle(x, y, r)</code></td><td>Cercle de centre (x,y) et rayon r — fill/stroke selon styles</td></tr>
