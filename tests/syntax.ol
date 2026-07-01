@@ -947,6 +947,26 @@ assert(math.sin(math.PI) > -0.001 and math.sin(math.PI) < 0.001)
 var rnd = math.rand()
 assert(rnd >= 0 and rnd < 1)
 
+## noise — bruit de Perlin fractal (fBm), 1/2/3 dimensions → [0, 1]
+var nz1 = math.noise(0.5)
+assert(nz1 >= 0 and nz1 <= 1)
+var nz2 = math.noise(0.5, 1.5)
+assert(nz2 >= 0 and nz2 <= 1)
+var nz3 = math.noise(0.5, 1.5, 2.5)
+assert(nz3 >= 0 and nz3 <= 1)
+## déterministe : même entrée → même sortie
+assert(math.noise(3.14) == math.noise(3.14))
+## noise_seed : reproductible après re-seed identique
+math.noise_seed(42)
+var na = math.noise(1.7)
+math.noise_seed(42)
+assert(math.noise(1.7) == na)
+## graines différentes → bruit différent
+math.noise_seed(1)
+var nb = math.noise(1.7)
+math.noise_seed(2)
+assert(math.noise(1.7) <> nb)
+
 ## ── 22. Switch ───────────────────────────────────────────────────────────────
 
 ## cas de base — valeur entière
@@ -1018,7 +1038,7 @@ assert(sw_func(5) == "autre")
 
 ## ── 23. Module graphics (Raylib) ─────────────────────────────────────────────
 ##
-## Module natif (non disponible en WASM/headless). Voir scripts/graphics_demo.ol.
+## Module natif (non disponible en WASM/headless). Voir examples/graphics_demo.ol.
 ##
 ##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
 ##   graphics.run(func()

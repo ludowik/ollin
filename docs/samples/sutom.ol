@@ -228,18 +228,18 @@ end
 func drawCell(cx, cy, c, letter)
     if c == 2 then
         graphics.fill(RED)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.rect(cx, cy, CELL, CELL)
     elseif c == 1 then
         graphics.fill(BLUE)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.rect(cx, cy, CELL, CELL)
         graphics.fill(YELLOW)               ## rond jaune (présent mal placé)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.circle(cx + math.floor(CELL / 2), cy + math.floor(CELL / 2), math.floor(CELL * 0.36))
     else
         graphics.fill(BLUE)
-        graphics.stroke()
+        graphics.noStroke()
         graphics.rect(cx, cy, CELL, CELL)
     end
     letterAt(letter, cx, cy)
@@ -291,7 +291,7 @@ func drawKeys()
     end
 end
 
-func frame()
+func draw()
     graphics.clear(BG)
     graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, YELLOW)
     drawGrid()
@@ -326,4 +326,4 @@ layout()
 buildKeys()
 keyboard.enable(onKey)
 mouse.on_down(onClick)
-graphics.run(frame)
+## `draw` est appelée automatiquement à chaque frame par le moteur.

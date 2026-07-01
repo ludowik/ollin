@@ -18,7 +18,7 @@ img.begin_draw(logo)
 
     ## outer ring r=74 filled with gold
     g.fill(gold)
-    g.stroke()
+    g.noStroke()
     g.circle(100, 100, 74, 64)
 
     ## punch inner r=52 with background color
@@ -28,12 +28,12 @@ img.begin_draw(logo)
     ## inner rim: thin luminous circle
     g.stroke({r:1, g:0.878, b:0.376, a:0.35})
     g.strokeSize(1.5)
-    g.fill()
+    g.noFill()
     g.circle(100, 100, 52, 64)
 
     ## 8 stepped-pyramid rays pointing outward
     g.fill(gold)
-    g.stroke()
+    g.noStroke()
     var ray = [
         [91,27],[109,27],[109,21],[107,21],[107,15],[105,15],
         [105,9],[103,9],[103,5],[97,5],[97,9],[95,9],
@@ -56,7 +56,8 @@ var angle = 0.0
 var scale = 1.0
 var ds    = 0.005
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     g.clear({r:0.04, g:0.04, b:0.04, a:1})
 
     scale = scale + ds
@@ -76,12 +77,10 @@ func frame()
     g.pop()
 
     ## small fixed copy top-left, no tint
-    g.fill()
+    g.noFill()
     g.sprite(logo, 20, 20, 80, 80)
 
     g.stroke({r:1, g:1, b:1, a:0.7})
     g.strokeSize(1)
     g.draw_text("sprite demo", 10, 570, 14)
 end
-
-g.run(frame)

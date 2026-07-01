@@ -5,7 +5,7 @@
 
 Avant d'écrire **tout** fichier `.ol`, lire dans cet ordre :
 1. `docs/grammar.ebnf` — syntaxe formelle du langage
-2. `scripts/syntax.ol` — exemples de référence
+2. `tests/syntax.ol` — exemples de référence
 
 Tester ensuite avec `./build/ollin <script>` avant tout build WASM.  
 Ces deux étapes sont **non négociables**, quelle que soit la taille du script.
@@ -36,17 +36,22 @@ Les types partagés (`token.h`, `ast.h`, `chunk.h`) n'ont aucune dépendance ent
 ollin/
 ├── CLAUDE.md
 ├── CMakeLists.txt
-└── src/
-    ├── token.h        types Token (partagé Lexer → Parser)
-    ├── ast.h          nœuds AST  (partagé Parser → Compiler)
-    ├── chunk.h/.cpp   bytecode   (partagé Compiler → VM)
-    ├── closure.h      Upvalue + Closure (inclus par chunk.h)
-    ├── map.h/.cpp     Map + ValueHash/ValueEqual (inclus par chunk.h)
-    ├── lexer.h/.cpp
-    ├── parser.h/.cpp
-    ├── compiler.h/.cpp
-    ├── vm.h/.cpp
-    └── main.cpp       pipeline : Lexer | Parser | Compiler | VM
+├── src/
+│   ├── token.h        types Token (partagé Lexer → Parser)
+│   ├── ast.h          nœuds AST  (partagé Parser → Compiler)
+│   ├── chunk.h/.cpp   bytecode   (partagé Compiler → VM)
+│   ├── closure.h      Upvalue + Closure (inclus par chunk.h)
+│   ├── map.h/.cpp     Map + ValueHash/ValueEqual (inclus par chunk.h)
+│   ├── lexer.h/.cpp
+│   ├── parser.h/.cpp
+│   ├── compiler.h/.cpp
+│   ├── vm.h/.cpp
+│   └── main.cpp       pipeline : Lexer | Parser | Compiler | VM
+├── tests/             suite de tests + fixtures (syntax.ol, test_errors.sh, utils_test*.ol, config.ol)
+├── examples/          démos exécutables (graphics_demo, lines_demo, sprite_demo)
+├── tools/             outillage build (update_build_date.py)
+├── bench/             benchmarks (.ol / .lua / .py)
+└── docs/              tutoriel, playground, samples, wasm
 ```
 
 ## Syntaxe
@@ -56,7 +61,7 @@ ollin/
 
 | Fichier | Propriétaire | Rôle |
 |---|---|---|
-| `scripts/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
+| `tests/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/index.html` | Claude | tutoriel HTML |
 | `ollin-vscode/` | Claude | extension VS Code (colorisation) |
@@ -69,6 +74,11 @@ ollin/
 - **Committer après chaque fonctionnalité complète** (feature atomique = 1 commit)
 - Pusher sur `origin/main` après chaque commit
 - `git restore <fichier>` pour annuler une modification non commitée
+
+**Toujours TOUT repousser sur `main`.** Si une consigne d'outillage/harness impose
+de travailler sur une branche dédiée (ex. `claude/...`), reporter quand même le
+résultat final sur `main` (merge/fast-forward + push `origin/main`). Le cas « branche
+exceptionnelle » ne dispense jamais de livrer sur `main`.
 
 ## Règle computed-goto (vm.cpp)
 

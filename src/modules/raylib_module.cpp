@@ -149,19 +149,33 @@ static Value gfx_stroke_size(Value* args, int argc) {
 
 static Value gfx_stroke(Value* args, int argc) {
     if (argc > 0 && (args[0].isMap() || args[0].isClass()))
-        applyStroke(true, toColor(args[0]));
+        applyStroke(true, toColor(args[0]));   // couleur fournie
     else
-        applyStroke(false);
+        s_has_stroke = true;                   // sans couleur → (ré)active avec la couleur courante
     if (argc > 1 && args[1].isNumber())
         applyStrokeSize((float)args[1].asNum());
     return Value{};
 }
 
+static Value gfx_no_stroke(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_has_stroke = false;                       // ne plus dessiner de contour (couleur conservée)
+    return Value{};
+}
+
 static Value gfx_fill(Value* args, int argc) {
     if (argc > 0 && (args[0].isMap() || args[0].isClass()))
-        applyFill(true, toColor(args[0]));
+        applyFill(true, toColor(args[0]));   // couleur fournie
     else
-        applyFill(false);
+        s_has_fill = true;                   // sans couleur → (ré)active avec la couleur courante
+    return Value{};
+}
+
+static Value gfx_no_fill(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_has_fill = false;                       // ne plus remplir (couleur conservée)
     return Value{};
 }
 
@@ -373,6 +387,14 @@ static Value gfx_quit(Value* args, int argc) {
     return Value{};
 }
 
+// Si une fonction globale `update` existe, l'appeler avec le delta-time
+// (secondes écoulées depuis la frame précédente) AVANT le rendu.
+static Value s_update_callback;
+static void callUpdateIfAny() {
+    if (s_update_callback.isCallable())
+        VM::current()->callValue(s_update_callback, Value((double)GetFrameTime()));
+}
+
 #ifdef __EMSCRIPTEN__
 static Value s_run_callback;
 static void emscripten_frame() {
@@ -383,6 +405,7 @@ static void emscripten_frame() {
     resetStyles();
     keyboardPoll();
     mousePoll();
+    callUpdateIfAny();
     VM::current()->callValue(s_run_callback);
     drawFpsOverlay();
     EndDrawing();
@@ -393,6 +416,7 @@ static Value gfx_run(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.run: expected callback function");
     Value fn = args[0];
+    s_update_callback = VM::current()->getGlobal("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
     emscripten_set_main_loop(emscripten_frame, 0, 0);
@@ -403,6 +427,7 @@ static Value gfx_run(Value* args, int argc) {
         resetStyles();
         keyboardPoll();
         mousePoll();
+        callUpdateIfAny();
         VM::current()->callValue(fn);
         drawFpsOverlay();
         EndDrawing();
@@ -488,7 +513,9 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("clear")), Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
     m.mapSet(Value(std::string("stroke")), Value::makeBuiltin(gfx_stroke));
+    m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
     m.mapSet(Value(std::string("fill")), Value::makeBuiltin(gfx_fill));
+    m.mapSet(Value(std::string("noFill")), Value::makeBuiltin(gfx_no_fill));
     m.mapSet(Value(std::string("line")), Value::makeBuiltin(gfx_line));
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));

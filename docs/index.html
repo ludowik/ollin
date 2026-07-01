@@ -390,7 +390,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-29 21:43</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-06-30 21:12</span></p>
   </div>
   <button onclick="hardReload()" style="margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">↺ Vider le cache</button>
   <a href="playground.html" style="font-weight:600;color:var(--accent)">▶ Playground</a>
@@ -436,7 +436,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-29 21:43</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-06-30 21:12</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -589,7 +589,7 @@ multi-lignes
 <tr><td>/</td><td>Division (toujours float)</td><td><code>7 / 2 == 3.5</code></td></tr>
 <tr><td>//</td><td>Division entière (plancher)</td><td><code>7 // 2 == 3</code></td></tr>
 <tr><td>%</td><td>Modulo</td><td><code>10 % 3 == 1</code></td></tr>
-<tr><td>^</td><td>Puissance (modèle Lua, assoc. droite)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
+<tr><td>^</td><td>Puissance (associative à droite)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
 </table>
 
 <h3>Comparaisons</h3>
@@ -612,7 +612,7 @@ multi-lignes
 <!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
 <section id="bitwise">
 <h2>Opérateurs bits</h2>
-<p>Ollin suit le <strong>modèle Lua</strong> pour les opérateurs bit-à-bit. Ils opèrent uniquement sur des <strong>entiers</strong>. Le <code>~</code> est <strong>XOR</strong> en binaire et <strong>NOT</strong> en unaire ; <code>^</code> est réservé à la <strong>puissance</strong>.</p>
+<p>Les opérateurs bit-à-bit opèrent uniquement sur des <strong>entiers</strong>. Le <code>~</code> est <strong>XOR</strong> en binaire et <strong>NOT</strong> en unaire ; <code>^</code> est réservé à la <strong>puissance</strong>.</p>
 
 <h3>Binaires</h3>
 <table>
@@ -629,7 +629,7 @@ multi-lignes
 <tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
 <tr><td>~</td><td>NOT (complément à 1)</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
 </table>
-<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>) — comme en Lua. <code>^</code> ne fait plus partie des opérateurs bits : c'est la puissance.</div>
+<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>). <code>^</code> ne fait plus partie des opérateurs bits : c'est la puissance.</div>
 
 <h3>Précédence</h3>
 <p>De la plus basse à la plus haute :</p>
@@ -1264,6 +1264,8 @@ apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="c
     <tr><td><code>math.sin(x)</code></td><td>fonction</td><td>Sinus (radians) → float</td></tr>
     <tr><td><code>math.cos(x)</code></td><td>fonction</td><td>Cosinus (radians) → float</td></tr>
     <tr><td><code>math.rand()</code></td><td>fonction</td><td>Nombre aléatoire dans [0, 1) — graine initialisée au démarrage</td></tr>
+    <tr><td><code>math.noise(x[, y[, z]])</code></td><td>fonction</td><td>Bruit de Perlin fractal (fBm) en 1, 2 ou 3 dimensions → float dans [0, 1], continu et déterministe</td></tr>
+    <tr><td><code>math.noise_seed(n)</code></td><td>fonction</td><td>Fixe la graine du bruit : même <code>n</code> → même bruit, graines différentes → bruits différents</td></tr>
   </tbody>
 </table>
 
@@ -1275,7 +1277,13 @@ apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="c
 
 <span class="bi">print</span>(math.sign(10)) <span class="cmt">## 1</span>
 <span class="bi">print</span>(math.sign(-7)) <span class="cmt">## -1</span>
-<span class="bi">print</span>(math.sign(0)) <span class="cmt">## 0</span></code></pre>
+<span class="bi">print</span>(math.sign(0)) <span class="cmt">## 0</span>
+
+<span class="cmt">## bruit de Perlin : continu, dans [0, 1] — idéal pour animer/texturer</span>
+<span class="kw">for</span> i = <span class="num">0</span>, <span class="num">3</span> <span class="kw">do</span>
+    <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))   <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
+<span class="kw">end</span>
+math.noise_seed(<span class="num">42</span>)            <span class="cmt">## bruit reproductible</span></code></pre>
 </section>
 
 <!-- ── Import ─────────────────────────────────────────────────────────── -->
@@ -1409,7 +1417,7 @@ var v3 = v1 + v2   ## appelle v1.__add(v2)
 print(v3)          ## Vec2(4,6)</code></pre>
 
 <h3>Égalité et comparaison</h3>
-<p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu (même modèle qu'en Lua). Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
+<p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu. Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
 <pre><code><span class="cmt">## maps nues → comparaison par référence</span>
 <span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})   <span class="cmt">## 0 : contenu identique mais objets distincts</span>
 <span class="kw">var</span> m = {x: <span class="num">1</span>}
@@ -1427,37 +1435,60 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))   <span class="cmt">## 1 : __eq compare les champs</span>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))   <span class="cmt">## 0</span></code></pre>
-<div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité comme en Lua.</div>
+<div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité.</div>
 </section>
 
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->
 <section id="graphics">
 <h2>Graphics</h2>
-<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. <code>graphics.run(callback)</code> fonctionne sur desktop et WASM.</p>
+<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. Le rendu fonctionne sur desktop et WASM.</p>
 
 <h3>Cycle de vie</h3>
-<pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>) <span class="cmt">## ouvre la fenêtre</span>
+<p>Trois fonctions optionnelles, appelées automatiquement par le moteur : <code>setup()</code> une fois au démarrage, puis <code>update(dt)</code> et <code>draw()</code> à chaque frame.</p>
+<pre data-no-run><code><span class="cmt">## appelée UNE FOIS après le chargement, avant la boucle</span>
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>)
+<span class="kw">end</span>
 
-<span class="kw">func</span> frame()
+<span class="cmt">## appelée automatiquement à chaque frame</span>
+<span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">graphics</span>.BLACK)
 
     <span class="cmt">## dessin ici</span>
 
+<span class="kw">end</span></code></pre>
+<p>Ces trois fonctions sont indépendantes : tu peux n'en définir qu'une. (Tu peux aussi ouvrir la fenêtre au niveau du script plutôt que dans <code>setup</code>.)</p>
+<p>Pour séparer la logique du rendu, définis aussi <code>update(dt)</code> : le moteur l'appelle <strong>avant <code>draw</code></strong> à chaque frame, avec <code>dt</code> = nombre de secondes écoulées depuis la frame précédente. En multipliant les déplacements par <code>dt</code>, l'animation devient <strong>indépendante du framerate</strong>.</p>
+<pre data-no-run><code><span class="kw">var</span> x = <span class="num">0</span>
+
+<span class="cmt">## logique : appelée AVANT draw, dt = secondes depuis la frame précédente</span>
+<span class="kw">func</span> update(dt)
+    x = x + <span class="num">120</span> * dt   <span class="cmt">## 120 px/seconde, quel que soit le FPS</span>
 <span class="kw">end</span>
 
-<span class="bi">graphics</span>.run(frame) <span class="cmt">## boucle principale (compatible WASM)</span></code></pre>
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(<span class="bi">graphics</span>.BLACK)
+    <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>))
+    <span class="bi">graphics</span>.circle(x, <span class="num">100</span>, <span class="num">20</span>)
+<span class="kw">end</span></code></pre>
+<p>Tu peux aussi piloter la boucle explicitement avec <code>graphics.run(callback)</code> si tu préfères nommer ta fonction de rendu autrement (<code>update</code> reste appelée avant).</p>
 
 <h3>API</h3>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné (60 fps sur desktop, vsync navigateur sur WASM)</td></tr>
-    <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale ; appelle <code>callback()</code> chaque frame jusqu'à fermeture</td></tr>
+    <tr><td><code>func setup()</code></td><td>Si elle existe, appelée une fois après le chargement du script, avant la boucle update/draw</td></tr>
+    <tr><td><code>func draw()</code></td><td>Si une fonction globale <code>draw</code> existe, le moteur l'appelle automatiquement à chaque frame (rendu)</td></tr>
+    <tr><td><code>func update(dt)</code></td><td>Si elle existe, appelée chaque frame <strong>avant</strong> <code>draw</code> ; <code>dt</code> = secondes écoulées depuis la frame précédente</td></tr>
+    <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
     <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
     <tr><td><code>graphics.clear(color)</code></td><td>Efface l'écran avec la couleur donnée</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés (défaut : 2). Remis à 2 à chaque frame.</td></tr>
-    <tr><td><code>graphics.stroke([color])</code></td><td>Couleur des tracés (défaut : blanc). Sans argument : désactive le tracé.</td></tr>
-    <tr><td><code>graphics.fill([color])</code></td><td>Couleur de remplissage (défaut : aucun). Sans argument : désactive le remplissage.</td></tr>
+    <tr><td><code>graphics.stroke([color])</code></td><td>Active le contour : avec une couleur, la définit ; sans argument, réactive le contour avec la couleur courante</td></tr>
+    <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
+    <tr><td><code>graphics.fill([color])</code></td><td>Active le remplissage : avec une couleur, la définit ; sans argument, réactive le remplissage avec la couleur courante</td></tr>
+    <tr><td><code>graphics.noFill()</code></td><td>Désactive le remplissage (défaut) — la couleur courante est conservée</td></tr>
     <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
     <tr><td><code>graphics.rect(x, y, w, h)</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif</td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>

@@ -1,7 +1,8 @@
 ## demo graphique : fenêtre, grille et diagonales
 graphics.canvas(800, 600, "Ollin Demo")
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     graphics.clear(graphics.BLACK)
 
     ## grille
@@ -24,5 +25,3 @@ func frame()
     graphics.stroke(graphics.GREEN)
     graphics.line(0,   300, 800, 300)
 end
-
-graphics.run(frame)

@@ -17,7 +17,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/ollin",
-            "args": ["${workspaceFolder}/scripts/syntax.ol"],
+            "args": ["${workspaceFolder}/tests/syntax.ol"],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "cmake: build",
             "terminal": "integrated",

@@ -1,7 +1,13 @@
-var W = window.width
-var H = window.height
+## Cycle de vie complet :
+##   setup()      → appelée une fois après le chargement (init)
+##   update(dt)   → logique, appelée chaque frame avant draw (dt = secondes)
+##   draw()       → rendu, appelée chaque frame
+
+global W = 0
+global H = 0
+global lines = []
 const N = 150
-const SPEED = 3
+const SPEED = 180   ## pixels / seconde
 
 class Line
     func init()
@@ -16,9 +22,11 @@ class Line
         self.col = Color.random()
     end
 
-    func update()
-        self.x1 += self.vx1 self.y1 += self.vy1
-        self.x2 += self.vx2 self.y2 += self.vy2
+    func update(dt)
+        self.x1 += self.vx1 * dt
+        self.y1 += self.vy1 * dt
+        self.x2 += self.vx2 * dt
+        self.y2 += self.vy2 * dt
         if self.x1 < 0 or self.x1 > W then self.vx1 = -self.vx1 end
         if self.y1 < 0 or self.y1 > H then self.vy1 = -self.vy1 end
         if self.x2 < 0 or self.x2 > W then self.vx2 = -self.vx2 end
@@ -31,20 +39,28 @@ class Line
     end
 end
 
-var lines = []
-for i = 1, N do
-    lines[i] = Line()
-end
-
-graphics.canvas(W, H, "Lignes animées")
-
-func frame()
-    graphics.clear(colors.BLACK)
-    graphics.strokeSize(1)
-    for l in lines do
-        l.update()
-        l.draw()
+## init unique avant la boucle
+func setup()
+    W = window.width
+    H = window.height
+    graphics.canvas(W, H, "Lignes animées")
+    for i = 1, N do
+        lines[i] = Line()
     end
 end
 
-graphics.run(frame)
+## logique (mouvement indépendant du framerate)
+func update(dt)
+    for l in lines do
+        l.update(dt)
+    end
+end
+
+## rendu
+func draw()
+    graphics.clear(colors.BLACK)
+    graphics.strokeSize(1)
+    for l in lines do
+        l.draw()
+    end
+end

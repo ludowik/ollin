@@ -197,30 +197,18 @@ canvas#canvas {
   /* Scroll horizontal fluide sur iOS */
   #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  /* toolbar compact */
-  #toolbar { gap: 5px; padding: 0 8px; }
+  /* toolbar compact : icônes seules, TOUJOURS sur une seule ligne.
+     Le menu d'exemples se rétrécit (min-width:0) pour absorber le manque de
+     place ; les boutons gardent leur taille, rien ne passe à la ligne. */
+  #toolbar { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #examples { max-width: 90px; font-size: 11px; }
-  #img-btn  { padding: 6px 8px; }
-  #run-btn  { padding: 6px 10px; }
-  #stop-btn { padding: 6px 10px; }
-  #copy-btn { padding: 6px 10px !important; }
+  #examples { flex: 0 1 auto; min-width: 0; max-width: 130px; font-size: 11px; }
+  #reload-btn, #standalone-btn, #img-btn,
+  #run-btn, #stop-btn, #copy-btn { padding: 6px 8px !important; }
 }
 </style>
-<script type="importmap">
-{
-  "imports": {
-    "@codemirror/state":         "https://esm.sh/@codemirror/state@6",
-    "@codemirror/view":          "https://esm.sh/@codemirror/view@6",
-    "@codemirror/language":      "https://esm.sh/@codemirror/language@6",
-    "@codemirror/commands":      "https://esm.sh/@codemirror/commands@6",
-    "@codemirror/autocomplete":  "https://esm.sh/@codemirror/autocomplete@6",
-    "@lezer/highlight":          "https://esm.sh/@lezer/highlight@1"
-  }
-}
-</script>
 </head>
 <body>
 
@@ -229,6 +217,10 @@ canvas#canvas {
   <select id="examples" title="Charger un exemple" disabled><option>Chargement…</option></select>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
+  <button id="reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
+    <span class="btn-label">Recharger</span>
+  </button>
   <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
   <label for="img-file-input" id="img-btn" title="Charger des images (PNG, JPG…) pour image.load()" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;user-select:none">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 10l4-3 3 2.5 3-3.5 4 4"/><circle cx="11.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
@@ -256,21 +248,65 @@ canvas#canvas {
   <div id="editor-pane">
     <div id="editor-wrap"></div>
   </div>
-  <div id="divider"></div>
-  <div id="output-pane">
+  <div id="divider" style="display:none"></div>
+  <div id="output-pane" style="display:none">
     <div id="output">Prêt.</div>
     <canvas id="canvas"></canvas>
   </div>
 </div>
 
+<div id="load-error" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,17,23,0.92);flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;font-family:system-ui,sans-serif">
+  <div style="font-size:15px;color:#f87171;font-weight:600">Le chargement de l'éditeur a échoué</div>
+  <div style="font-size:13px;color:#8a93b0;max-width:380px;line-height:1.5">Souvent dû à un réseau lent ou au CDN (CodeMirror) momentanément indisponible. Réessaie en vidant le cache.</div>
+  <button id="load-error-reload" style="background:#7c83ff;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+</div>
+
+<!-- Watchdog : script CLASSIQUE (s'exécute même si le module ES échoue à se
+     charger). Surveille l'init de l'éditeur et propose une relance claire au
+     lieu de laisser l'UI figée sur « Chargement ». -->
+<script>
+(function () {
+  var el = document.getElementById('load-error');
+  var shown = false;
+  function showLoadError() {
+    if (shown || window.__ollinReady) return;
+    shown = true;
+    el.style.display = 'flex';
+  }
+  document.getElementById('load-error-reload').addEventListener('click', function () {
+    var reload = function () { location.reload(); };
+    if ('caches' in window) {
+      caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }).then(reload).catch(reload);
+    } else {
+      reload();
+    }
+  });
+  // Échec de chargement d'une ressource (module/CDN/WASM)
+  window.addEventListener('error', function (e) {
+    if (e && e.target && e.target.tagName === 'SCRIPT') showLoadError();
+  }, true);
+  window.addEventListener('unhandledrejection', function () {
+    // un import ES qui échoue rejette ; on laisse une chance puis on vérifie
+    setTimeout(function () { if (!window.__ollinReady) showLoadError(); }, 1500);
+  });
+  // Filet de sécurité : si l'éditeur n'est pas monté après 8 s, c'est bloqué
+  setTimeout(function () {
+    if (!window.__ollinReady && !document.querySelector('#editor-wrap .cm-editor')) showLoadError();
+  }, 8000);
+})();
+</script>
+
 <script type="module">
-import { EditorState }                                                    from '@codemirror/state'
-import { EditorView, lineNumbers, keymap, drawSelection,
-         highlightActiveLine, highlightActiveLineGutter }                 from '@codemirror/view'
-import { defaultKeymap, historyKeymap, history, indentWithTab }           from '@codemirror/commands'
-import { StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit } from '@codemirror/language'
-import { tags }                                                           from '@lezer/highlight'
-import { autocompletion, completionKeymap, acceptCompletion }             from '@codemirror/autocomplete'
+// CodeMirror servi en local (bundle esbuild) — plus aucune dépendance CDN.
+// Régénéré par .github/workflows/build-playground.yml (tools/cm-entry.js).
+import {
+  EditorState,
+  EditorView, lineNumbers, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter,
+  defaultKeymap, historyKeymap, history, indentWithTab,
+  StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
+  tags,
+  autocompletion, completionKeymap, acceptCompletion,
+} from './vendor/codemirror.js'
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
@@ -327,9 +363,12 @@ const ollinTheme = EditorView.theme({
   '&': { background: '#1a1d2e', color: '#c9d1e0', fontSize: '13.5px', height: '100%' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65' },
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
-  '.cm-line': { padding: '0 18px' },
+  '.cm-line': { padding: '0 9px 4px', lineHeight: '1.12' },
   '.cm-gutters': { background: '#1a1d2e', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150' },
-  '.cm-lineNumbers .cm-gutterElement': { padding: '0 10px 0 8px', minWidth: '2.8em', fontSize: '11.5px' },
+  '.cm-lineNumbers .cm-gutterElement': { padding: '0 4px', minWidth: '1.8em', fontSize: '11.5px' },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0', color: '#566089', cursor: 'pointer' },
+  '.cm-foldGutter .cm-gutterElement:hover': { color: '#7c83ff' },
+  '.cm-foldPlaceholder': { background: '#242742', border: '1px solid #2e3150', color: '#7c85a2', borderRadius: '4px', padding: '0 6px', margin: '0 2px' },
   '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
   '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
   '&.cm-focused': { outline: 'none' },
@@ -459,6 +498,33 @@ function ollinComplete(context) {
   }
 }
 
+// ── Repliement de blocs (fold) ──────────────────────────────────────────────
+// Ollin est une StreamLanguage (pas d'arbre Lezer) → on fournit les bornes de
+// bloc via le facet standard `foldService`. Un bloc s'ouvre sur func/if/while/
+// for/class/try/switch et se ferme sur `end` ; on suit la profondeur.
+const FOLD_OPENERS = /\b(?:func|if|while|for|class|try|switch)\b/g
+const FOLD_ENDS    = /\bend\b/g
+const countMatches = (s, re) => (s.match(re) || []).length
+
+function ollinFoldRange(state, lineStart) {
+  const first = state.doc.lineAt(lineStart)
+  const head = first.text.replace(/##.*$/, '')          // ignorer les commentaires
+  let depth = countMatches(head, FOLD_OPENERS) - countMatches(head, FOLD_ENDS)
+  if (depth <= 0)
+    return null                                          // pas un ouvrant net (ou refermé sur la ligne)
+  for (let n = first.number + 1; n <= state.doc.lines; n++) {
+    const line = state.doc.line(n)
+    const body = line.text.replace(/##.*$/, '')
+    depth += countMatches(body, FOLD_OPENERS) - countMatches(body, FOLD_ENDS)
+    if (depth <= 0) {
+      const from = first.to                              // fin de la ligne d'ouverture
+      const to = state.doc.line(n - 1).to                // fin de la dernière ligne avant `end`
+      return to > from ? { from, to } : null
+    }
+  }
+  return null
+}
+
 // ── Editor ────────────────────────────────────────────────────────────────
 const CODE_KEY  = 'ollin-pg-code'
 const INIT_CODE = localStorage.getItem(CODE_KEY) ?? 'print("hello world!")\n'
@@ -470,8 +536,10 @@ const view = new EditorView({
     doc: INIT_CODE,
     extensions: [
       ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme,
+      EditorView.lineWrapping,
+      codeFolding(), foldGutter(), foldService.of(ollinFoldRange),
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
-      keymap.of([{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap]),
+      keymap.of([{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]),
       keymap.of([{ key: 'Alt-Enter', run: () => { run(); return true } }]),
       indentUnit.of('    '),
       autocompletion({ override: [ollinComplete], activateOnTyping: true }),
@@ -486,6 +554,8 @@ const view = new EditorView({
 })
 
 view.focus()
+window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
+{ const le = document.getElementById('load-error'); if (le) le.style.display = 'none' }
 localStorage.setItem('ollin-last-page', 'playground.html')
 
 // ── Examples ──────────────────────────────────────────────────────────────
@@ -519,7 +589,22 @@ sel.addEventListener('change', async () => {
 const outputEl   = document.getElementById('output')
 const canvasEl   = document.getElementById('canvas')
 const outputPane = document.getElementById('output-pane')
+const dividerEl  = document.getElementById('divider')
 const outputHdr  = document.getElementById('output-header')
+
+// La zone de rendu (sortie + canvas) n'apparaît qu'en exécution/pause ;
+// au repos l'éditeur occupe TOUT l'espace.
+function setOutputVisible(visible) {
+  outputPane.style.display = visible ? '' : 'none'
+  if (dividerEl) dividerEl.style.display = visible ? '' : 'none'
+  if (visible) {
+    restoreSplit()                       // rétablir le découpage choisi
+  } else {
+    // éditeur plein écran : retirer les bases flex fixes posées par le drag
+    editorPane.style.flex = ''
+    outputPane.style.flex = ''
+  }
+}
 
 const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
@@ -557,6 +642,7 @@ function clearAndStop() {
   outputEl.className     = ''
   outputPane.style.overflow = ''
   setRunning(false)
+  setOutputVisible(false)   // retour éditeur plein écran
 }
 
 function showOutput(text) {
@@ -585,6 +671,9 @@ function run() {
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
+  // Afficher la zone AVANT execute : window.width lit le clientWidth de
+  // #output-pane (0 si display:none → graphics dimensionné à vide).
+  setOutputVisible(true)
   const code = view.state.doc.toString()
   const out  = ollin.execute(code)
   if (canvasEl.style.display === 'block') {
@@ -638,6 +727,22 @@ standaloneBtn.addEventListener('click', () => {
     localStorage.setItem('ollin_run_images', JSON.stringify(imgs))
   } catch (_) {}
   window.open('run.html', '_blank')
+})
+
+// ── Recharger + vider le cache ──────────────────────────────────────────────
+// Vide le Cache API puis recharge (le code de l'éditeur est conservé dans
+// localStorage). Utile pour récupérer un WASM fraîchement déployé.
+const reloadBtn = document.getElementById('reload-btn')
+reloadBtn.addEventListener('click', () => {
+  const reload = () => location.reload()
+  if ('caches' in window) {
+    caches.keys()
+      .then(ks => Promise.all(ks.map(k => caches.delete(k))))
+      .then(reload)
+      .catch(reload)
+  } else {
+    reload()
+  }
 })
 
 // ── Image upload ──────────────────────────────────────────────────────────
@@ -707,8 +812,17 @@ function applySplit(pct) {
   outputPane.style.flex = `0 0 ${100 - pct}%`
 }
 
-const savedSplit = parseFloat(localStorage.getItem(SPLIT_KEY))
-if (savedSplit >= 15 && savedSplit <= 85) applySplit(savedSplit)
+// Rétablit le découpage sauvegardé (appelé quand la zone de rendu réapparaît).
+// Au repos (zone masquée) on ne pose AUCUN flex → l'éditeur remplit tout.
+function restoreSplit() {
+  const pct = parseFloat(localStorage.getItem(SPLIT_KEY))
+  if (pct >= 15 && pct <= 85) {
+    applySplit(pct)
+  } else {
+    editorPane.style.flex = ''
+    outputPane.style.flex = ''
+  }
+}
 
 function startDrag(e) {
   dragging = true

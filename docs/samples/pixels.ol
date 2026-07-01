@@ -10,7 +10,8 @@ const CH = 96
 graphics.canvas(W, H, "Pixels animés")
 var canvas = image.create(CW, CH)
 
-func frame()
+## `draw` est appelée automatiquement à chaque frame par le moteur.
+func draw()
     var t = time()
     ## composante bleue commune à toute la frame (hors boucle → calculée 1 fois)
     var blue = 0.5 + 0.5 * math.sin(t)
@@ -30,5 +31,3 @@ func frame()
     graphics.clear(colors.BLACK)
     image.draw(canvas, 0, 0, W, H)                    ## agrandit le canvas à la fenêtre
 end
-
-graphics.run(frame)

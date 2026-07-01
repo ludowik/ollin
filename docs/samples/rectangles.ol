@@ -1,5 +1,11 @@
-var W = window.width
-var H = window.height
+## Cycle de vie complet :
+##   setup()      → appelée une fois après le chargement (init)
+##   update(dt)   → logique, appelée chaque frame avant draw (dt = secondes)
+##   draw()       → rendu, appelée chaque frame
+
+global W = 0
+global H = 0
+global rects = []
 const N = 20
 
 class Rect
@@ -8,14 +14,15 @@ class Rect
         self.h = math.rand_int(20, 80)
         self.x = math.rand_int(0, W - self.w)
         self.y = math.rand_int(0, H - self.h)
-        self.vx = math.rand(-2, 2)
-        self.vy = math.rand(-2, 2)
+        self.vx = math.rand(-120, 120)   ## pixels / seconde
+        self.vy = math.rand(-120, 120)
         self.fc = Color.random()
         self.sc = Color.random()
     end
 
-    func update()
-        self.x += self.vx self.y += self.vy
+    func update(dt)
+        self.x += self.vx * dt
+        self.y += self.vy * dt
         if self.x < 0 or self.x + self.w > W then self.vx = -self.vx end
         if self.y < 0 or self.y + self.h > H then self.vy = -self.vy end
         self.x = math.clamp(self.x, 0, W - self.w)
@@ -29,19 +36,27 @@ class Rect
     end
 end
 
-var rects = []
-for i = 1, N do
-    rects[i] = Rect()
-end
-
-graphics.canvas(W, H, "Rectangles")
-
-func frame()
-    graphics.clear(colors.BLACK)
-    for r in rects do
-        r.update()
-        r.draw()
+## init unique avant la boucle
+func setup()
+    W = window.width
+    H = window.height
+    graphics.canvas(W, H, "Rectangles")
+    for i = 1, N do
+        rects[i] = Rect()
     end
 end
 
-graphics.run(frame)
+## logique (mouvement indépendant du framerate)
+func update(dt)
+    for r in rects do
+        r.update(dt)
+    end
+end
+
+## rendu
+func draw()
+    graphics.clear(colors.BLACK)
+    for r in rects do
+        r.draw()
+    end
+end

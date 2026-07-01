@@ -10,7 +10,17 @@ if ! command -v emcc &>/dev/null; then
         || { echo "emcc not found — run: source C:/Tools/emsdk/emsdk_env.sh"; exit 1; }
 fi
 
-emcmake cmake -S . -B build_wasm -DCMAKE_BUILD_TYPE=Release
+# Réutiliser un raylib déjà téléchargé (FetchContent) si présent — évite un clone
+# github à chaque build et permet de builder hors-ligne / proxy restreint.
+EXTRA=""
+for d in build_wasm/_deps/raylib-src build/_deps/raylib-src; do
+    if [ -f "$d/src/raylib.h" ]; then
+        EXTRA="-DFETCHCONTENT_SOURCE_DIR_RAYLIB=$(pwd)/$d"
+        break
+    fi
+done
+
+emcmake cmake -S . -B build_wasm -DCMAKE_BUILD_TYPE=Release $EXTRA
 cmake --build build_wasm
 mkdir -p docs/wasm
 cp build_wasm/ollin.js   docs/wasm/ollin.js
