@@ -1,5 +1,6 @@
 #include "parser.h"
 #include "lexer.h"
+#include "source_registry.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -1150,17 +1151,22 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     }
     imported_paths_->insert(resolved);
 
-    // Lire et parser le fichier importé
-    std::ifstream f(resolved);
-    if (!f)
-        throw std::runtime_error("import: cannot open '" + resolved + "'");
-    std::ostringstream ss;
-    ss << f.rdbuf();
+    // Lire le fichier importé : d'abord depuis le registre en mémoire (fourni
+    // par l'hôte, ex. le playground WASM), sinon depuis le disque.
+    std::string src_text;
+    if (!source_get(resolved, src_text) && !(resolved != path && source_get(path, src_text))) {
+        std::ifstream f(resolved);
+        if (!f)
+            throw std::runtime_error("import: cannot open '" + resolved + "'");
+        std::ostringstream ss;
+        ss << f.rdbuf();
+        src_text = ss.str();
+    }
 
     auto sep2 = resolved.find_last_of("/\\");
     std::string sub_dir = (sep2 != std::string::npos) ? resolved.substr(0, sep2 + 1) : base_dir_;
 
-    Parser sub_parser(Lexer(ss.str()).tokenize(), sub_dir, imported_paths_);
+    Parser sub_parser(Lexer(src_text).tokenize(), sub_dir, imported_paths_);
     Program sub_prog = sub_parser.parse();
 
     if (alias.empty()) {
