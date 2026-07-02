@@ -229,16 +229,18 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Globales moteur (engine-injected globals)
 
-Deux globales sont injectées par le moteur avant chaque cycle update/draw, sans déclaration `global` dans le script :
+Des globales sont injectées par le moteur, sans déclaration `global` dans le script :
 
 | Nom | Type | Description |
 |-----|------|-------------|
 | `deltaTime` | FLOAT | Secondes écoulées depuis la frame précédente (`GetFrameTime()`) |
 | `elapsedTime` | FLOAT | Secondes écoulées depuis le démarrage du programme (somme des deltaTime) |
+| `W` | INTEGER | Largeur de la zone de rendu (défaut : `window.width` selon l'environnement) |
+| `H` | INTEGER | Hauteur de la zone de rendu (défaut : `window.height`) |
 
 **Implémentation** :
 - `declared_globals_` les contient (pré-ajoutés dans `Compiler::compile()`) → le compilateur accepte ces noms sans `global`.
-- `VM::execute()` les initialise à `0.0` si présents dans les identifiers.
+- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, et `W`/`H` aux dimensions de `window` (lues via `makeBuiltinModule("window")`) **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
 - `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `raylib_module.cpp` avant chaque frame.
 - `s_elapsed_time` (statique dans `raylib_module.cpp`) est remis à 0 à chaque `gfx_run()`.
 

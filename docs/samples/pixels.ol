@@ -1,5 +1,3 @@
-var W = window.width
-var H = window.height
 
 ## Canvas interne en basse résolution, recalculé pixel par pixel à CHAQUE frame
 ## puis agrandi à la taille de la fenêtre par image.draw → animation fluide

@@ -1,6 +1,6 @@
 ## SUTOM — devine le mot (façon sutom.nocle.fr). Clavier VIRTUEL (clic/tap) + physique.
 ## Rouge = bien placé · Rond jaune = présent mal placé · Bleu = absent.
-## Mot hors dictionnaire = refusé (la ligne tremble). Responsive (window.width/height).
+## Mot hors dictionnaire = refusé (la ligne tremble). Responsive (dimensions W/H du moteur).
 
 ## Longueurs variées (6 à 9) — le jeu s'adapte (N = longueur du mot tiré).
 global WORDS = [
@@ -13,8 +13,7 @@ global WORDS = [
   "BOUTEILLE","PARAPLUIE","CHOCOLATS","PAPILLONS","CROISSANT","TELEPHONE","FRAMBOISE","MANDARINE"
 ]
 
-global W = 0
-global H = 0
+## W et H (dimensions de la zone de rendu) sont fournis par le moteur.
 global ROWS = 6
 
 global DICT       = {}    ## ensemble des mots valides (lookup O(1))
@@ -320,8 +319,6 @@ end
 ## ── init ────────────────────────────────────────────────────────────────
 initColors()
 for w in WORDS do DICT[w] = 1 end
-W = window.width
-H = window.height
 graphics.canvas(W, H, "SUTOM")
 start()
 layout()

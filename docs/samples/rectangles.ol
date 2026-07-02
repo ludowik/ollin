@@ -3,8 +3,7 @@
 ##   update(dt)   → logique, appelée chaque frame avant draw (dt = secondes)
 ##   draw()       → rendu, appelée chaque frame
 
-global W = 0
-global H = 0
+## W et H (dimensions de la zone de rendu) sont fournis par le moteur.
 global rects = []
 const N = 20
 
@@ -38,8 +37,6 @@ end
 
 ## init unique avant la boucle
 func setup()
-    W = window.width
-    H = window.height
     graphics.canvas(W, H, "Rectangles")
     for i = 1, N do
         rects[i] = Rect()

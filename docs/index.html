@@ -380,7 +380,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-01 21:40</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-02 14:22</span></p>
   </div>
   <button onclick="hardReload()" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -431,7 +431,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-01 21:40</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-02 14:22</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1712,8 +1712,9 @@ image.end_draw()
     <tr><td><code>window.height</code></td><td>int</td><td>Hauteur de la zone de rendu en pixels</td></tr>
   </tbody>
 </table>
-<div class="callout tip">Sur WASM (playground), <code>window.width/height</code> reflètent la taille du panneau de rendu avant création du canvas, puis se mettent à jour après <code>graphics.canvas()</code>. Sur desktop, ils valent 0 avant <code>graphics.canvas()</code> puis les dimensions de la fenêtre.</div>
-<pre data-no-run><code><span class="bi">graphics</span>.canvas(<span class="bi">window</span>.width, <span class="bi">window</span>.height, <span class="str">"Titre"</span>) <span class="cmt">## fenêtre pleine zone</span></code></pre>
+<div class="callout tip">Le plus souvent tu n'as pas besoin de <code>window</code> : le moteur fournit déjà les globales <code>W</code> et <code>H</code> (largeur/hauteur de la zone de rendu), initialisées depuis <code>window</code> avant l'exécution.</div>
+<pre data-no-run><code><span class="cmt">## W et H sont fournis par le moteur — pas besoin de window ici</span>
+<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Titre"</span>) <span class="cmt">## fenêtre pleine zone</span></code></pre>
 </section>
 
 

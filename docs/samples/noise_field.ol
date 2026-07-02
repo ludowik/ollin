@@ -4,8 +4,6 @@
 ## on applique un dégradé continu (bleu → cyan → blanc) qui révèle la structure
 ## lisse du bruit : de grandes taches molles qui se déforment dans le temps.
 
-var W = window.width
-var H = window.height
 graphics.canvas(W, H, "math.noise")
 
 math.noise_seed(7)

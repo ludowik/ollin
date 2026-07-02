@@ -1408,6 +1408,30 @@ void VM::execute(Chunk chunk) {
             globals[gi] = Value(0.0);
             globals_init[gi] = true;
         }
+    // W / H : dimensions de la zone de rendu, injectées par le moteur (défaut :
+    // window.width/height selon l'environnement). Lues avant le top-level pour
+    // que graphics.canvas(W, H) fonctionne directement.
+    {
+        int64_t win_w = 0, win_h = 0;
+        Value win = makeBuiltinModule("window");
+        if (win.isMap()) {
+            Value vw = win.mapGet(Value(std::string("width")));
+            Value vh = win.mapGet(Value(std::string("height")));
+            if (vw.isInteger())
+                win_w = vw.asInt();
+            if (vh.isInteger())
+                win_h = vh.asInt();
+        }
+        for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi) {
+            if (owned_chunk.identifiers[gi] == "W") {
+                globals[gi] = Value(win_w);
+                globals_init[gi] = true;
+            } else if (owned_chunk.identifiers[gi] == "H") {
+                globals[gi] = Value(win_h);
+                globals_init[gi] = true;
+            }
+        }
+    }
     growRegs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     call_stack.push_back(Frame{});

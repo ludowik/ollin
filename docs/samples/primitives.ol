@@ -1,5 +1,3 @@
-var W = window.width
-var H = window.height
 
 graphics.canvas(W, H, "Primitives")
 var g = graphics
