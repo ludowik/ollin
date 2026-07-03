@@ -261,13 +261,18 @@ export async function pushProject(project, message, opts = {}) {
   const { tree: remoteTree } = await fullTree()
 
   // Garde-fou : le dossier distant correspond-il à notre dernière synchro ?
-  // Conflit si le dossier existe déjà sur GitHub et que son empreinte ne
-  // correspond pas à `treeSha` — Y COMPRIS quand on n'a pas de référence
-  // (jamais synchronisé, ou projet synchronisé avant l'ajout du garde-fou, ou
-  // slug déjà pris sur le dépôt) : dans le doute, on alerte plutôt qu'écraser.
+  // Base = SHA du dernier commit du dossier, fourni PAR GitHub (pas une
+  // empreinte recalculée en relisant l'arbre — instable à cause de la cohérence
+  // ÉVENTUELLE de l'API juste après un push → faux conflits en mono-poste).
+  // Conflit si le dossier existe déjà sur GitHub (commit non nul) et que ce
+  // commit ne correspond pas à celui de notre dernière synchro (remote.commit)
+  // — Y COMPRIS sans référence connue (jamais synchronisé, ou slug déjà pris) :
+  // là, un push serait destructif, donc dans le doute on alerte plutôt qu'on
+  // écrase. Après notre propre push, remote.commit == commit du dossier → aucun
+  // faux positif ; l'alerte ne se déclenche que si un AUTRE commit y a touché.
   if (!opts.force) {
-    const current = slugFingerprint(remoteTree, trackedSlug)
-    const known = (project.remote && project.remote.treeSha) || null
+    const current = await folderCommit(base, branch, trackedSlug)
+    const known = (project.remote && project.remote.commit) || null
     if (current !== null && current !== known) {
       const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
       err.code = 'CONFLICT'
