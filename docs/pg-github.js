@@ -1,27 +1,28 @@
-// ── Ollin Playground — provider GitHub (dépôt ollin-projects) ───────────────
+// ── Ollin Playground — provider GitHub (dépôt de projets paramétrable) ──────
 //
-// Synchronise les projets avec un dépôt GitHub public `ollin-projects` (un
-// dossier par projet, miroir exact du modèle local de pg-store.js). Auth par
-// Personal Access Token (fine-grained, portée Contents sur ce repo) collé une
-// fois et rangé dans le localStorage du navigateur.
+// Synchronise les projets avec un dépôt GitHub (un dossier par projet, miroir
+// exact du modèle local de pg-store.js). Auth par Personal Access Token
+// (fine-grained, portée Contents) collé une fois et rangé dans le localStorage.
 //
-// Étape 2.1 = LECTURE : auth, ensureRepo, listRemoteProjects, pullProject.
-// (L'écriture — pushProject via Git Data API — arrive à l'étape 2.2.)
+// Le dépôt cible est paramétrable (getRepo/setRepo, défaut `ollin-projects`) :
+//   - "mon-repo"        → sous le compte de l'utilisateur authentifié
+//   - "owner/mon-repo"  → dépôt d'une orga / partagé (non créé automatiquement)
 //
 // api.github.com renvoie CORS ouvert pour les appels REST authentifiés → tout
 // marche depuis le navigateur, sans serveur intermédiaire.
 
-const API        = 'https://api.github.com'
-const REPO       = 'ollin-projects'
-const TOKEN_KEY  = 'ollin-gh-token'
-const MANIFEST   = 'ollin.project.json'
-const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
+const API          = 'https://api.github.com'
+const TOKEN_KEY    = 'ollin-gh-token'
+const REPO_KEY     = 'ollin-gh-repo'
+const DEFAULT_REPO = 'ollin-projects'
+const MANIFEST     = 'ollin.project.json'
+const IMAGE_EXTS   = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
 
 // ── token ─────────────────────────────────────────────────────────────────
 export function setToken(t) {
   if (t) localStorage.setItem(TOKEN_KEY, t.trim())
   else localStorage.removeItem(TOKEN_KEY)
-  _login = null   // invalider le cache d'identité
+  _login = null
 }
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY) || null
@@ -32,6 +33,16 @@ export function clearToken() {
 }
 export function isConnected() {
   return !!getToken()
+}
+
+// ── dépôt cible (paramétrable) ──────────────────────────────────────────────
+export function getRepo() {
+  return localStorage.getItem(REPO_KEY) || DEFAULT_REPO
+}
+export function setRepo(v) {
+  const s = (v || '').trim()
+  if (s && s !== DEFAULT_REPO) localStorage.setItem(REPO_KEY, s)
+  else localStorage.removeItem(REPO_KEY)
 }
 
 // ── requêtes bas niveau ───────────────────────────────────────────────────
@@ -67,27 +78,41 @@ function decodeUtf8(b64) {
   return new TextDecoder().decode(bytes)
 }
 
-// ── identité ────────────────────────────────────────────────────────────────
+// ── identité + cible ─────────────────────────────────────────────────────────
 let _login = null
 export async function getUser() {
   const u = await ghJson('/user')
   _login = u.login
   return u
 }
-async function owner() {
+async function login() {
   return _login || (await getUser()).login
 }
 
+// Résout le dépôt cible : { owner, repo, mine, base }.
+// mine=true si le dépôt appartient à l'utilisateur authentifié (créable).
+async function ctx() {
+  const val = getRepo()
+  if (val.includes('/')) {
+    const [owner, repo] = val.split('/')
+    return { owner, repo, mine: (owner === (await login())), base: `/repos/${owner}/${repo}` }
+  }
+  const owner = await login()
+  return { owner, repo: val, mine: true, base: `/repos/${owner}/${val}` }
+}
+
 // ── repo ──────────────────────────────────────────────────────────────────
-// Renvoie le repo ; le crée (public, auto-init) s'il n'existe pas encore.
+// Renvoie le dépôt ; le crée (public, auto-init) s'il n'existe pas ET qu'il
+// appartient à l'utilisateur. Chez un autre propriétaire : erreur explicite.
 export async function ensureRepo() {
-  const login = await owner()
-  const res = await gh(`/repos/${login}/${REPO}`)
+  const { owner, repo, mine, base } = await ctx()
+  const res = await gh(base)
   if (res.ok) return res.json()
   if (res.status === 404) {
+    if (!mine) throw new Error(`Dépôt ${owner}/${repo} introuvable — création impossible chez un autre propriétaire.`)
     return ghJson('/user/repos', {
       method: 'POST',
-      body: { name: REPO, private: false, auto_init: true, description: 'Projets Ollin (playground)' },
+      body: { name: repo, private: false, auto_init: true, description: 'Projets Ollin (playground)' },
     })
   }
   let msg = String(res.status)
@@ -95,26 +120,25 @@ export async function ensureRepo() {
   throw new Error('GitHub ' + msg)
 }
 
-// Arbre complet de la branche par défaut (login + branch + entrées).
+// Arbre complet de la branche par défaut (+ contexte du dépôt).
 async function fullTree() {
-  const login = await owner()
-  const repo = await ghJson(`/repos/${login}/${REPO}`)
-  const branch = repo.default_branch || 'main'
-  const t = await ghJson(`/repos/${login}/${REPO}/git/trees/${branch}?recursive=1`)
-  return { login, branch, tree: t.tree || [] }
+  const { owner, repo, base } = await ctx()
+  const info = await ghJson(base)
+  const branch = info.default_branch || 'main'
+  const t = await ghJson(`${base}/git/trees/${branch}?recursive=1`)
+  return { owner, repo, base, branch, tree: t.tree || [] }
 }
 
 // ── liste des projets distants ───────────────────────────────────────────────
-// Un projet = un dossier racine contenant `ollin.project.json`.
 export async function listRemoteProjects() {
-  const { login, tree } = await fullTree()
+  const { base, tree } = await fullTree()
   const out = []
   for (const e of tree) {
     if (e.type !== 'blob' || !/^[^/]+\/ollin\.project\.json$/.test(e.path)) continue
     const slug = e.path.split('/')[0]
     let name = slug
     try {
-      const blob = await ghJson(`/repos/${login}/${REPO}/git/blobs/${e.sha}`)
+      const blob = await ghJson(`${base}/git/blobs/${e.sha}`)
       const m = JSON.parse(decodeUtf8(blob.content))
       name = m.name || slug
     } catch (_) {}
@@ -124,16 +148,14 @@ export async function listRemoteProjects() {
 }
 
 // ── pull d'un projet ─────────────────────────────────────────────────────────
-// Reconstruit l'objet projet local à partir du dossier `<slug>/` du repo.
-// Distinction script/ressource par extension (image → resources, sinon files).
 export async function pullProject(slug) {
-  const { login, branch, tree } = await fullTree()
+  const { owner, repo, base, branch, tree } = await fullTree()
   const prefix = slug + '/'
   const files = {}, resources = {}
   for (const e of tree) {
     if (e.type !== 'blob' || !e.path.startsWith(prefix)) continue
     const rel = e.path.slice(prefix.length)
-    const blob = await ghJson(`/repos/${login}/${REPO}/git/blobs/${e.sha}`)
+    const blob = await ghJson(`${base}/git/blobs/${e.sha}`)
     const b64 = (blob.content || '').replace(/\n/g, '')
     const ext = rel.includes('.') ? rel.split('.').pop().toLowerCase() : ''
     if (IMAGE_EXTS.has(ext)) resources[rel] = { b64, ext }
@@ -146,28 +168,24 @@ export async function pullProject(slug) {
     entry = m.entry || entry
   } catch (_) {}
   const now = Date.now()
-  return { id: slug, name, entry, files, resources, remote: { repo: REPO, branch, slug }, createdAt: now, updatedAt: now }
+  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug }, createdAt: now, updatedAt: now }
 }
 
 // ── push d'un projet ─────────────────────────────────────────────────────────
-// Rend le dossier `<slug>/` du repo identique au projet local, en UN commit
-// atomique (Git Data API). Répercute ajouts, modifs ET suppressions ; si le
-// projet a été renommé (remote.slug ≠ slug), supprime aussi l'ancien dossier.
-// Renseigne project.remote = { repo, branch, slug, commit } et le renvoie.
+// Rend le dossier `<slug>/` identique au projet local, en UN commit atomique
+// (Git Data API). Répercute ajouts, modifs ET suppressions ; si le projet a été
+// renommé (remote.slug ≠ slug), supprime aussi l'ancien dossier.
 export async function pushProject(project, message) {
-  const login = await owner()
-  const repoInfo = await ghJson(`/repos/${login}/${REPO}`)
-  const branch = repoInfo.default_branch || 'main'
+  const { owner, repo, base } = await ctx()
+  const info = await ghJson(base)
+  const branch = info.default_branch || 'main'
   const slug = project.id
-  const base = `/repos/${login}/${REPO}`
 
-  // 1–2. tête courante → arbre de base
   const ref = await ghJson(`${base}/git/ref/heads/${branch}`)
   const baseSha = ref.object.sha
   const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
   const baseTree = baseCommit.tree.sha
 
-  // 3. blobs (scripts en utf-8, ressources en base64) → entrées d'arbre
   const tree = []
   for (const rel in (project.files || {})) {
     const blob = await ghJson(`${base}/git/blobs`, { method: 'POST', body: { content: project.files[rel], encoding: 'utf-8' } })
@@ -178,8 +196,6 @@ export async function pushProject(project, message) {
     tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
 
-  // 4. suppressions : fichiers distants (sous le slug courant + l'ancien slug si
-  //    renommage) qui n'existent plus localement → sha:null.
   const desired = new Set(tree.map(t => t.path))
   const scan = new Set([slug])
   const oldSlug = project.remote && project.remote.slug
@@ -191,7 +207,6 @@ export async function pushProject(project, message) {
     if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
   }
 
-  // 5–7. nouvel arbre → commit → avance la branche
   const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseTree, tree } })
   const commit = await ghJson(`${base}/git/commits`, {
     method: 'POST',
@@ -199,6 +214,6 @@ export async function pushProject(project, message) {
   })
   await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
 
-  project.remote = { repo: REPO, branch, slug, commit: commit.sha }
+  project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha }
   return project.remote
 }

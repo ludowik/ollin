@@ -976,6 +976,12 @@ function renderMenuRoot() {
     if (!ghLogin) {
       GH.getUser().then(u => { ghLogin = u.login; hdr.textContent = 'GitHub : @' + u.login }).catch(() => {})
     }
+    projectMenu.appendChild(menuItem('🗄 Dépôt : ' + GH.getRepo(), false, () => {
+      const v = prompt('Dépôt cible (nom, ou « owner/repo » pour un dépôt partagé) :', GH.getRepo())
+      if (v === null) return
+      GH.setRepo(v)
+      renderMenuRoot()
+    }))
     projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, ghPush))
     projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
     projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
@@ -1037,17 +1043,22 @@ function renderMenuConnect() {
     + '<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Créer un token ↗</a>'
   const input = document.createElement('input')
   input.type = 'password'; input.className = 'menu-input'; input.placeholder = 'github_pat_… / ghp_…'
+  const repo = document.createElement('input')
+  repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo()
+  repo.placeholder = 'dépôt : ollin-projects ou owner/repo'
+  repo.title = 'Dépôt cible (défaut ollin-projects). « owner/repo » pour un dépôt partagé.'
   const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = 'Connecter'
   const err = document.createElement('div'); err.className = 'menu-err'
   const connect = async () => {
     const t = input.value.trim(); if (!t) return
-    GH.setToken(t); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
+    GH.setToken(t); GH.setRepo(repo.value); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
     try { const u = await GH.getUser(); ghLogin = u.login; renderMenuRoot() }
     catch (e) { GH.clearToken(); err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = 'Connecter' }
   }
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
-  wrap.append(info, input, btn, err)
+  repo.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
+  wrap.append(info, input, repo, btn, err)
   projectMenu.appendChild(wrap)
   input.focus()
 }
