@@ -433,8 +433,10 @@ import {
   autocompletion, completionKeymap, acceptCompletion,
 } from './vendor/codemirror.js'
 import { CODE_DISPLAY } from './cm-shared.js'
-import * as Store from './pg-store.js'
-import * as GH from './pg-github.js'
+// Modules projet importés dynamiquement AVEC cache-buster : une mise à jour est
+// prise en compte dès le prochain chargement (pas de version figée en cache HTTP).
+const Store = await import('./pg-store.js?v=' + Date.now())
+const GH    = await import('./pg-github.js?v=' + Date.now())
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
@@ -1324,7 +1326,8 @@ standaloneBtn.addEventListener('click', () => {
 // localStorage). Utile pour récupérer un WASM fraîchement déployé.
 const reloadBtn = document.getElementById('reload-btn')
 reloadBtn.addEventListener('click', () => {
-  const reload = () => location.reload()
+  // Recharge une URL cache-bustée → force une page fraîche (cache HTTP contourné).
+  const reload = () => location.replace(location.pathname + '?t=' + Date.now())
   if ('caches' in window) {
     caches.keys()
       .then(ks => Promise.all(ks.map(k => caches.delete(k))))
