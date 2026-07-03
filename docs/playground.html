@@ -774,20 +774,23 @@ const view = new EditorView({
   parent: document.getElementById('editor-wrap'),
 })
 
-// ── Backspace/nav pendant une exécution graphique ──────────────────────────
-// Quand un projet graphique tourne (Run), le runtime raylib installe un
+// ── Backspace/nav quand le runtime graphique est armé ──────────────────────
+// Dès qu'un projet graphique tourne (Run), le runtime raylib installe un
 // écouteur keydown GLOBAL (window, phase capture) qui fait preventDefault sur
 // les touches « de jeu » (Backspace, flèches, Tab, Entrée…) pour empêcher le
-// navigateur de reculer/défiler. Or CodeMirror IGNORE tout keydown déjà
-// defaultPrevented → dans l'éditeur, Backspace « n'a plus d'effet » jusqu'au
-// refresh. On ne peut pas dé-préventDefault, ni retirer l'écouteur raylib.
-// Parade : un écouteur enregistré ICI (au chargement, donc AVANT celui de
-// raylib) en phase capture. Pendant un run, l'éditeur ayant le focus, on
-// exécute nous-mêmes la touche d'édition sur `view` puis on stoppe l'événement
-// (stopImmediatePropagation) → raylib ne le voit jamais. Hors run, inerte :
-// CodeMirror garde tout son comportement natif (auto-indentation, etc.).
+// navigateur de reculer/défiler. Cet écouteur RESTE en place même après un
+// Arrêt (raylib ne le retire pas — il ne part qu'au refresh de la page). Or
+// CodeMirror IGNORE tout keydown déjà defaultPrevented → dans l'éditeur,
+// Backspace « n'a plus d'effet ». On ne peut pas dé-préventDefault ni retirer
+// l'écouteur raylib. Parade : un écouteur enregistré ICI (au chargement, donc
+// AVANT celui de raylib) en phase capture. Tant que le runtime a été armé au
+// moins une fois (`runtimeArmed`), si l'éditeur a le focus on exécute nous-
+// mêmes la touche sur `view` puis on stoppe l'événement (stopImmediate
+// Propagation) → raylib ne le voit jamais. Avant tout run : inerte, CodeMirror
+// garde tout son comportement natif (auto-indentation, etc.).
+let runtimeArmed = false
 function editorKeyDuringRun(e) {
-  if (!isRunning || !view.hasFocus) return false
+  if (!runtimeArmed || !view.hasFocus) return false
   if (e.ctrlKey || e.metaKey || e.altKey) return false   // laisser les raccourcis à CM
   const state = view.state
   const doc   = state.doc
@@ -1466,6 +1469,7 @@ function run() {
   if (canvasEl.style.display === 'block') {
     outputPane.style.overflow = 'hidden'
     if (outputHdr) outputHdr.style.display = 'none'
+    runtimeArmed = true   // raylib a installé son écouteur clavier global (jusqu'au refresh)
     setRunning(true)
     return
   }
