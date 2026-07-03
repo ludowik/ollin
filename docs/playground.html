@@ -213,8 +213,15 @@ canvas#canvas {
   border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 500; cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
 }
+#project-btn { position: relative; }
 #project-btn:hover:not(:disabled) { border-color: var(--accent); }
 #project-btn:disabled { opacity: 0.5; cursor: default; }
+/* pastille « version plus récente sur GitHub » (persistante, visible mobile+PC) */
+#project-btn.sync-update::after {
+  content: ''; position: absolute; top: -3px; right: -3px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--yellow); border: 2px solid var(--surface);
+}
 #project-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #project-menu {
@@ -1086,6 +1093,7 @@ async function ghPush(force) {
     await GH.ensureRepo()
     await GH.pushProject(currentProject, null, { force })
     await Store.saveProject(currentProject)   // persister project.remote (dont treeSha)
+    projectBtn.classList.remove('sync-update')   // on est à jour
     setStatus('Poussé sur GitHub ✓', true)
   } catch (e) {
     if (e.code === 'CONFLICT') {
@@ -1129,9 +1137,10 @@ async function checkRemoteFreshness(project) {
   if (!project.remote || !project.remote.slug || !GH.isConnected()) return
   try {
     const cur = await GH.remoteTreeSha(project.remote.slug)
-    if (cur === null || cur === project.remote.treeSha) return   // absent ou déjà à jour
     if (!currentProject || currentProject.id !== project.id) return   // projet changé entre-temps
-    setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
+    const newer = cur !== null && cur !== project.remote.treeSha
+    projectBtn.classList.toggle('sync-update', newer)   // pastille persistante
+    if (newer) setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
   } catch (_) { /* hors-ligne / token invalide : silencieux */ }
 }
 
