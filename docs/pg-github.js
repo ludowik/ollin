@@ -146,5 +146,59 @@ export async function pullProject(slug) {
     entry = m.entry || entry
   } catch (_) {}
   const now = Date.now()
-  return { id: slug, name, entry, files, resources, remote: { repo: REPO, branch }, createdAt: now, updatedAt: now }
+  return { id: slug, name, entry, files, resources, remote: { repo: REPO, branch, slug }, createdAt: now, updatedAt: now }
+}
+
+// ── push d'un projet ─────────────────────────────────────────────────────────
+// Rend le dossier `<slug>/` du repo identique au projet local, en UN commit
+// atomique (Git Data API). Répercute ajouts, modifs ET suppressions ; si le
+// projet a été renommé (remote.slug ≠ slug), supprime aussi l'ancien dossier.
+// Renseigne project.remote = { repo, branch, slug, commit } et le renvoie.
+export async function pushProject(project, message) {
+  const login = await owner()
+  const repoInfo = await ghJson(`/repos/${login}/${REPO}`)
+  const branch = repoInfo.default_branch || 'main'
+  const slug = project.id
+  const base = `/repos/${login}/${REPO}`
+
+  // 1–2. tête courante → arbre de base
+  const ref = await ghJson(`${base}/git/ref/heads/${branch}`)
+  const baseSha = ref.object.sha
+  const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
+  const baseTree = baseCommit.tree.sha
+
+  // 3. blobs (scripts en utf-8, ressources en base64) → entrées d'arbre
+  const tree = []
+  for (const rel in (project.files || {})) {
+    const blob = await ghJson(`${base}/git/blobs`, { method: 'POST', body: { content: project.files[rel], encoding: 'utf-8' } })
+    tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
+  }
+  for (const rel in (project.resources || {})) {
+    const blob = await ghJson(`${base}/git/blobs`, { method: 'POST', body: { content: project.resources[rel].b64, encoding: 'base64' } })
+    tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
+  }
+
+  // 4. suppressions : fichiers distants (sous le slug courant + l'ancien slug si
+  //    renommage) qui n'existent plus localement → sha:null.
+  const desired = new Set(tree.map(t => t.path))
+  const scan = new Set([slug])
+  const oldSlug = project.remote && project.remote.slug
+  if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
+  const { tree: remoteTree } = await fullTree()
+  for (const e of remoteTree) {
+    if (e.type !== 'blob') continue
+    if (!scan.has(e.path.split('/')[0])) continue
+    if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
+  }
+
+  // 5–7. nouvel arbre → commit → avance la branche
+  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseTree, tree } })
+  const commit = await ghJson(`${base}/git/commits`, {
+    method: 'POST',
+    body: { message: message || `ollin: ${project.name}`, tree: newTree.sha, parents: [baseSha] },
+  })
+  await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
+
+  project.remote = { repo: REPO, branch, slug, commit: commit.sha }
+  return project.remote
 }
