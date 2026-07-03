@@ -84,11 +84,17 @@ function encodeUtf8(str) {
   return btoa(bin)
 }
 
-// sha du dossier <slug> dans un arbre récursif (empreinte de son contenu) ; null
-// si le dossier n'existe pas. Sert au garde-fou de conflit / fraîcheur.
-function slugTreeSha(tree, slug) {
-  const e = tree.find(x => x.type === 'tree' && x.path === slug)
-  return e ? e.sha : null
+// Empreinte du dossier <slug> = signature de ses FICHIERS (blobs) sous `slug/`
+// dans l'arbre récursif — toujours présents (contrairement aux entrées de type
+// « tree » qui ne sont pas garanties). Renvoie null si le dossier n'a aucun
+// fichier distant. Sert au garde-fou de conflit / fraîcheur.
+function slugFingerprint(tree, slug) {
+  const prefix = slug + '/'
+  const parts = tree
+    .filter(e => e.type === 'blob' && e.path.startsWith(prefix))
+    .map(e => e.path + ':' + e.sha)
+    .sort()
+  return parts.length ? parts.join('|') : null
 }
 
 // ── identité + cible ─────────────────────────────────────────────────────────
@@ -170,7 +176,7 @@ export async function listRemoteProjects() {
 // Empreinte actuelle du dossier <slug> distant (pour le garde-fou de fraîcheur).
 export async function remoteTreeSha(slug) {
   const { tree } = await fullTree()
-  return slugTreeSha(tree, slug)
+  return slugFingerprint(tree, slug)
 }
 
 // ── pull d'un projet ─────────────────────────────────────────────────────────
@@ -194,7 +200,7 @@ export async function pullProject(slug) {
     entry = m.entry || entry
   } catch (_) {}
   const now = Date.now()
-  const treeSha = slugTreeSha(tree, slug)
+  const treeSha = slugFingerprint(tree, slug)
   return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, treeSha }, createdAt: now, updatedAt: now }
 }
 
@@ -241,7 +247,7 @@ export async function pushProject(project, message, opts = {}) {
   // (jamais synchronisé, ou projet synchronisé avant l'ajout du garde-fou, ou
   // slug déjà pris sur le dépôt) : dans le doute, on alerte plutôt qu'écraser.
   if (!opts.force) {
-    const current = slugTreeSha(remoteTree, trackedSlug)
+    const current = slugFingerprint(remoteTree, trackedSlug)
     const known = (project.remote && project.remote.treeSha) || null
     if (current !== null && current !== known) {
       const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
@@ -280,6 +286,6 @@ export async function pushProject(project, message, opts = {}) {
 
   // Nouvelle empreinte du dossier après commit → base des prochains garde-fous.
   const after = await fullTree()
-  project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha, treeSha: slugTreeSha(after.tree, slug) }
+  project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha, treeSha: slugFingerprint(after.tree, slug) }
   return project.remote
 }
