@@ -230,6 +230,21 @@ canvas#canvas {
 .menu-arrow { color: var(--dim); font-size: 16px; }
 .menu-sep { height: 1px; background: var(--border); margin: 5px 4px; }
 .menu-empty { padding: 10px; font-size: 12px; color: var(--dim); font-style: italic; }
+.menu-form { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+.menu-info { font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+.menu-info a { color: var(--accent); text-decoration: none; }
+.menu-info code { font-family: var(--mono); color: var(--text); font-size: 11px; }
+.menu-input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 7px 9px; font-size: 12px; font-family: var(--mono); outline: none;
+}
+.menu-input:focus { border-color: var(--accent); }
+.menu-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.menu-btn:disabled { opacity: 0.6; cursor: default; }
+.menu-err { font-size: 11.5px; color: var(--red); }
 
 /* ── liste latérale de fichiers ───────────────────────────────────────────── */
 #editor-main { flex: 1; min-height: 0; display: flex; }
@@ -419,6 +434,7 @@ import {
 } from './vendor/codemirror.js'
 import { CODE_DISPLAY } from './cm-shared.js'
 import * as Store from './pg-store.js'
+import * as GH from './pg-github.js'
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
@@ -949,6 +965,24 @@ function renderMenuRoot() {
     if (list.length) await loadProject(list[0].id)
     else { const p = await Store.createProject('Sans titre'); await loadProject(p.id) }
   }))
+
+  // ── section GitHub ──
+  projectMenu.appendChild(menuSep())
+  if (GH.isConnected()) {
+    const hdr = document.createElement('div')
+    hdr.className = 'menu-header'
+    hdr.textContent = 'GitHub' + (ghLogin ? ' : @' + ghLogin : '')
+    projectMenu.appendChild(hdr)
+    if (!ghLogin) {
+      GH.getUser().then(u => { ghLogin = u.login; hdr.textContent = 'GitHub : @' + u.login }).catch(() => {})
+    }
+    projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, ghPush))
+    projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
+    projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
+    projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuRoot() }))
+  } else {
+    projectMenu.appendChild(menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
+  }
 }
 
 async function renderMenuOpen() {
@@ -978,6 +1012,101 @@ function renderMenuExamples() {
       p.files[p.entry] = code
       await Store.saveProject(p)
       closeMenu(); await switchProject(p.id)
+    }))
+  }
+}
+
+// ── GitHub : état + parcours ──────────────────────────────────────────────
+let ghLogin = null
+let statusTimer = null
+function setStatus(msg, transient, isError) {
+  const el = document.getElementById('status')
+  if (!el) return
+  el.textContent = msg
+  el.style.color = isError ? 'var(--red)' : ''
+  clearTimeout(statusTimer)
+  if (transient) statusTimer = setTimeout(() => { el.textContent = ''; el.style.color = '' }, 4000)
+}
+
+function renderMenuConnect() {
+  projectMenu.innerHTML = ''
+  projectMenu.appendChild(menuHeader('Se connecter à GitHub', renderMenuRoot))
+  const wrap = document.createElement('div'); wrap.className = 'menu-form'
+  const info = document.createElement('div'); info.className = 'menu-info'
+  info.innerHTML = 'Colle un <b>fine-grained token</b> (dépôt <code>ollin-projects</code>, permission Contents : lecture/écriture). '
+    + '<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Créer un token ↗</a>'
+  const input = document.createElement('input')
+  input.type = 'password'; input.className = 'menu-input'; input.placeholder = 'github_pat_… / ghp_…'
+  const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = 'Connecter'
+  const err = document.createElement('div'); err.className = 'menu-err'
+  const connect = async () => {
+    const t = input.value.trim(); if (!t) return
+    GH.setToken(t); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
+    try { const u = await GH.getUser(); ghLogin = u.login; renderMenuRoot() }
+    catch (e) { GH.clearToken(); err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = 'Connecter' }
+  }
+  btn.addEventListener('click', connect)
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
+  wrap.append(info, input, btn, err)
+  projectMenu.appendChild(wrap)
+  input.focus()
+}
+
+async function ghPush() {
+  closeMenu()
+  if (!currentProject) return
+  flushEditorToFile(); await Store.saveProject(currentProject)
+  setStatus('Envoi vers GitHub…')
+  try {
+    await GH.ensureRepo()
+    await GH.pushProject(currentProject)
+    await Store.saveProject(currentProject)   // persister project.remote
+    setStatus('Poussé sur GitHub ✓', true)
+  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
+}
+
+async function ghPull() {
+  closeMenu()
+  if (!currentProject) return
+  const slug = (currentProject.remote && currentProject.remote.slug) || currentProject.id
+  if (!confirm(`Récupérer « ${slug} » depuis GitHub et remplacer la version locale ?`)) return
+  setStatus('Récupération…')
+  try {
+    const p = await GH.pullProject(slug)
+    p.id = currentProject.id
+    await Store.saveProject(p)
+    await loadProject(p.id)
+    setStatus('Projet à jour ✓', true)
+  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
+}
+
+async function renderMenuRemote() {
+  projectMenu.innerHTML = ''
+  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuRoot))
+  const loading = document.createElement('div'); loading.className = 'menu-empty'; loading.textContent = 'Chargement…'
+  projectMenu.appendChild(loading)
+  let list
+  try { list = await GH.listRemoteProjects() }
+  catch (e) { loading.textContent = 'Erreur : ' + e.message; return }
+  loading.remove()
+  if (!list.length) {
+    const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun projet distant.'
+    projectMenu.appendChild(d); return
+  }
+  for (const r of list) {
+    projectMenu.appendChild(menuItem('📦 ' + r.name, false, async () => {
+      closeMenu()
+      const existing = await Store.getProject(r.slug)
+      if (existing && !confirm(`Un projet « ${r.slug} » existe déjà en local. L'écraser avec la version GitHub ?`)) return
+      flushEditorToFile()
+      if (currentProject && currentProject.id !== r.slug) await Store.saveProject(currentProject)
+      setStatus('Récupération…')
+      try {
+        const p = await GH.pullProject(r.slug)
+        await Store.saveProject(p)
+        await loadProject(p.id)
+        setStatus('Projet ouvert ✓', true)
+      } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
     }))
   }
 }
