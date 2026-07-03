@@ -34,7 +34,9 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
-  overflow-x: auto;              /* filet : jamais de bouton coupé hors d'atteinte */
+  /* PAS d'overflow ici : overflow-x:auto forcerait overflow-y:auto et
+     rognerait le menu déroulant (positionné sous la toolbar). Le mode
+     icônes-seules (@media ≤1080px) suffit à tout faire tenir. */
 }
 
 /* Toolbar large mais fenêtre étroite : boutons en icônes seules pour tout garder
