@@ -235,11 +235,15 @@ export async function pushProject(project, message, opts = {}) {
   const trackedSlug = oldSlug || slug
   const { tree: remoteTree } = await fullTree()
 
-  // Garde-fou : le dossier suivi a-t-il changé sur GitHub depuis notre dernière
-  // synchro ? Si oui (et pas de force) → conflit, on n'écrase pas en silence.
-  if (!opts.force && project.remote && project.remote.treeSha != null) {
+  // Garde-fou : le dossier distant correspond-il à notre dernière synchro ?
+  // Conflit si le dossier existe déjà sur GitHub et que son empreinte ne
+  // correspond pas à `treeSha` — Y COMPRIS quand on n'a pas de référence
+  // (jamais synchronisé, ou projet synchronisé avant l'ajout du garde-fou, ou
+  // slug déjà pris sur le dépôt) : dans le doute, on alerte plutôt qu'écraser.
+  if (!opts.force) {
     const current = slugTreeSha(remoteTree, trackedSlug)
-    if (current !== project.remote.treeSha) {
+    const known = (project.remote && project.remote.treeSha) || null
+    if (current !== null && current !== known) {
       const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
       err.code = 'CONFLICT'
       throw err
