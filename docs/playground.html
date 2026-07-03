@@ -973,6 +973,10 @@ projectBtn.addEventListener('click', e => {
   e.stopPropagation()
   if (projectMenu.style.display === 'block') closeMenu(); else openMenu()
 })
+// Les clics DANS le menu ne remontent pas au document : sinon, quand un item
+// reconstruit le menu (innerHTML=''), sa cible est détachée et le test
+// « clic à l'extérieur » ci-dessous fermerait le menu par erreur (drill-down).
+projectMenu.addEventListener('click', e => e.stopPropagation())
 document.addEventListener('click', e => {
   if (projectMenu.style.display === 'block' && !projectMenu.contains(e.target) && e.target !== projectBtn)
     closeMenu()
