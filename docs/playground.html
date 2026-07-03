@@ -463,7 +463,7 @@ const KEYWORDS = new Set([
   'import','as','or','and','not','class','extends','super','self',
   'switch','case','default'
 ])
-const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image'])
+const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image','keyboard','mouse'])
 
 const ollinLang = StreamLanguage.define({
   name: 'ollin',
@@ -555,6 +555,30 @@ const AC_BUILTINS = [
   fn('len',    'len(v) → int'),
 ]
 
+// Hooks de cycle de vie appelés par le moteur : insérés en squelette complet
+// (ou juste le nom si on est déjà après « func »). Évite les fautes de frappe.
+function lifecycle(name, params, detail) {
+  return {
+    label: name, type: 'function', detail,
+    apply: (view, c, from, to) => {
+      const line = view.state.doc.lineAt(from)
+      const before = view.state.doc.sliceString(line.from, from)
+      if (/\bfunc\s+\S*$/.test(before)) {
+        const ins = `${name}(${params})`
+        view.dispatch({ changes: { from, to, insert: ins }, selection: { anchor: from + ins.length } })
+      } else {
+        const head = `func ${name}(${params})\n    `
+        view.dispatch({ changes: { from, to, insert: head + '\nend' }, selection: { anchor: from + head.length } })
+      }
+    },
+  }
+}
+const AC_LIFECYCLE = [
+  lifecycle('setup',  '',   'moteur — une fois au démarrage'),
+  lifecycle('update', 'dt', 'moteur — logique, chaque frame'),
+  lifecycle('draw',   '',   'moteur — rendu, chaque frame'),
+]
+
 const MODULE_MEMBERS = {
   math: [
     cst('math.PI','3.14159…'), cst('math.TAU','6.28318…'), cst('math.E','2.71828…'), cst('math.INF','Infinity'),
@@ -562,11 +586,11 @@ const MODULE_MEMBERS = {
     fn('math.ceil','ceil(x)'),     fn('math.round','round(x)'),    fn('math.trunc','trunc(x)'),
     fn('math.sqrt','sqrt(x)'),     fn('math.pow','pow(x,n)'),      fn('math.clamp','clamp(x,lo,hi)'),
     fn('math.min','min(...)'),     fn('math.max','max(...)'),       fn('math.map','map(x,ilo,ihi,olo,ohi)'),
-    fn('math.exp','exp(x)'),       fn('math.log','log(x)'),        fn('math.log2','log2(x)'),
-    fn('math.log10','log10(x)'),   fn('math.logn','logn(x,n)'),   fn('math.frac','frac(x)'),
+    fn('math.exp','exp(x)'),       fn('math.log','log(x)'),        fn('math.logn','logn(x,n)'),
+    fn('math.frac','frac(x)'),     fn('math.noise','noise(x[,y[,z]])'), fn('math.noise_seed','noise_seed(n)'),
     fn('math.sin','sin(x)'),       fn('math.cos','cos(x)'),        fn('math.tan','tan(x)'),
     fn('math.asin','asin(x)'),     fn('math.acos','acos(x)'),      fn('math.atan','atan(x)'),
-    fn('math.atan2','atan2(y,x)'), fn('math.deg','deg(rad)'),      fn('math.rad','rad(deg)'),
+    fn('math.deg','deg(rad)'),      fn('math.rad','rad(deg)'),
     fn('math.is_nan','is_nan(x)'), fn('math.is_inf','is_inf(x)'),
     fn('math.rand','rand([lo,hi])'), fn('math.rand_int','rand_int([lo,]hi)'), fn('math.seed','seed(n)'),
   ],
@@ -574,7 +598,11 @@ const MODULE_MEMBERS = {
     fn('graphics.canvas','canvas(w,h,title)'),     fn('graphics.run','run(callback)'),
     fn('graphics.clear','clear(color)'),
     fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color])'),
-    fn('graphics.fill','fill([color])'),
+    fn('graphics.noStroke','noStroke()'),
+    fn('graphics.fill','fill([color])'),           fn('graphics.noFill','noFill()'),
+    fn('graphics.tint','tint([color])'),           fn('graphics.noTint','noTint()'),
+    fn('graphics.begin_draw','begin_draw()'),      fn('graphics.end_draw','end_draw()'),
+    fn('graphics.screenshot','screenshot(path)'),
     fn('graphics.line','line(x1,y1,x2,y2)'),       fn('graphics.rect','rect(x,y,w,h)'),
     fn('graphics.circle','circle(x,y,r)'),          fn('graphics.ellipse','ellipse(x,y,rx,ry)'),
     fn('graphics.point','point(x,y)'),
@@ -610,10 +638,20 @@ const MODULE_MEMBERS = {
   string: [
     fn('string.upper','upper(s)'), fn('string.lower','lower(s)'), fn('string.trim','trim(s)'),
     fn('string.ltrim','ltrim(s)'), fn('string.rtrim','rtrim(s)'),
+    fn('string.char','char(code)'), fn('string.substr','substr(s,i[,n])'),
   ],
   window: [
     cst('window.width','largeur de la zone de rendu (px)'),
     cst('window.height','hauteur de la zone de rendu (px)'),
+  ],
+  keyboard: [
+    fn('keyboard.keypressed','keypressed(key) — à définir : appelée à l\'appui'),
+    fn('keyboard.keyrelease','keyrelease(key) — à définir : appelée au relâchement'),
+  ],
+  mouse: [
+    fn('mouse.pressed','pressed(x,y) — à définir : appelée au clic'),
+    fn('mouse.released','released(x,y) — à définir : au relâchement'),
+    fn('mouse.moved','moved(x,y) — à définir : au déplacement'),
   ],
 }
 
@@ -637,7 +675,7 @@ function ollinComplete(context) {
   const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({ label: m, type: 'namespace' }))
   return {
     from: word.from,
-    options: [...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
+    options: [...AC_LIFECYCLE, ...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
     validFor: /^\w*$/,
   }
 }
