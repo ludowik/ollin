@@ -249,6 +249,14 @@ export async function pushProject(project, message, opts = {}) {
   if (!opts.force) {
     const current = slugFingerprint(remoteTree, trackedSlug)
     const known = (project.remote && project.remote.treeSha) || null
+    // Diagnostic temporaire : voir les valeurs comparées dans la console (F12).
+    console.log('[ollin sync] contrôle conflit', {
+      trackedSlug,
+      known,
+      current,
+      conflit: current !== null && current !== known,
+      blobsDistants: remoteTree.filter(e => e.type === 'blob').map(e => e.path),
+    })
     if (current !== null && current !== known) {
       const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
       err.code = 'CONFLICT'

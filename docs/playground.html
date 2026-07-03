@@ -1112,17 +1112,15 @@ async function ghPull() {
 
 // Garde-fou d'ouverture : à l'ouverture d'un projet lié à GitHub (connecté),
 // vérifie en arrière-plan si une version plus récente existe et propose un Pull.
+// PASSIF : aucune boîte de dialogue, aucun Pull automatique. On se contente
+// d'un message discret ; l'utilisateur garde le contrôle (Pull manuel au besoin).
 async function checkRemoteFreshness(project) {
   if (!project.remote || !project.remote.slug || !GH.isConnected()) return
   try {
     const cur = await GH.remoteTreeSha(project.remote.slug)
     if (cur === null || cur === project.remote.treeSha) return   // absent ou déjà à jour
-    if (!currentProject || currentProject.id !== project.id) return   // l'utilisateur a changé de projet entre-temps
-    if (confirm(`Une version plus récente de « ${project.name} » existe sur GitHub.\nLa récupérer maintenant (Pull) ? Tes modifications locales non poussées seront remplacées.`)) {
-      await doPull()
-    } else {
-      setStatus('Version plus récente sur GitHub — « Récupérer (Pull) » quand tu veux', true)
-    }
+    if (!currentProject || currentProject.id !== project.id) return   // projet changé entre-temps
+    setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
   } catch (_) { /* hors-ligne / token invalide : silencieux */ }
 }
 
