@@ -996,7 +996,7 @@ function renderMenuRoot() {
       GH.setRepo(v)
       renderMenuRoot()
     }))
-    projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, ghPush))
+    projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
     projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
     projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
     projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuRoot() }))
