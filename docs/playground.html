@@ -538,11 +538,43 @@ const ollinTheme = EditorView.theme({
 
 // ── Autocompletion ────────────────────────────────────────────────────────
 const kw  = label => ({ label, type: 'keyword' })
-const fn  = (label, detail) => ({ label, type: 'function', detail })
 const cst = (label, detail) => ({ label, type: 'constant', detail })
 
+// Fonction connue : à l'acceptation, insère l'appel avec ses paramètres de base
+// PRÉ-SAISIS (ex. circle → « circle(x, y, rayon) »), la liste des params étant
+// sélectionnée pour être remplacée directement. Sans paramètre → « name() »,
+// curseur après la parenthèse. Les params sont tirés de la signature (detail).
+const fn = (label, detail) => {
+  const mo = detail && detail.match(/\(([^]*)\)/)
+  let params = mo ? mo[1].trim() : ''
+  if (params === '...') params = ''            // varargs → parenthèses vides
+  return {
+    label, type: 'function', detail,
+    apply: (view, c, from, to) => {
+      const name = c.label
+      const insert = `${name}(${params})`
+      const open = from + name.length + 1
+      view.dispatch({
+        changes: { from, to, insert },
+        selection: params ? { anchor: open, head: open + params.length }   // params sélectionnés
+                          : { anchor: from + insert.length },              // curseur après ()
+      })
+    },
+  }
+}
+
+// « func » : insère le squelette complet d'une fonction, « end » compris,
+// curseur positionné sur le nom.
+const AC_FUNC = {
+  label: 'func', type: 'keyword', detail: 'définir une fonction … end',
+  apply: (view, c, from, to) => {
+    const head = 'func '
+    view.dispatch({ changes: { from, to, insert: head + '()\n    \nend' }, selection: { anchor: from + head.length } })
+  },
+}
+
 const AC_KEYWORDS = [
-  'var','global','const','func','if','then','else','elseif','end',
+  'var','global','const','if','then','else','elseif','end',
   'while','do','for','in','return','break','true','false','nil',
   'try','catch','throw','class','extends','super','self','import','as',
   'or','and','not','switch','case','default',
@@ -675,7 +707,7 @@ function ollinComplete(context) {
   const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({ label: m, type: 'namespace' }))
   return {
     from: word.from,
-    options: [...AC_LIFECYCLE, ...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
+    options: [AC_FUNC, ...AC_LIFECYCLE, ...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
     validFor: /^\w*$/,
   }
 }
