@@ -563,13 +563,13 @@ const fn = (label, detail) => {
   }
 }
 
-// « func » : insère le squelette complet d'une fonction, « end » compris,
-// curseur positionné sur le nom.
+// « func » : insère seulement « func » + espace (curseur après), prêt à taper
+// le nom. Le squelette complet (params + corps + end) est produit à l'acceptation
+// du NOM de fonction connu — sans jamais doubler les parenthèses.
 const AC_FUNC = {
-  label: 'func', type: 'keyword', detail: 'définir une fonction … end',
+  label: 'func', type: 'keyword', detail: 'définir une fonction',
   apply: (view, c, from, to) => {
-    const head = 'func '
-    view.dispatch({ changes: { from, to, insert: head + '()\n    \nend' }, selection: { anchor: from + head.length } })
+    view.dispatch({ changes: { from, to, insert: 'func ' }, selection: { anchor: from + 5 } })
   },
 }
 
@@ -587,21 +587,20 @@ const AC_BUILTINS = [
   fn('len',    'len(v) → int'),
 ]
 
-// Hooks de cycle de vie appelés par le moteur : insérés en squelette complet
-// (ou juste le nom si on est déjà après « func »). Évite les fautes de frappe.
+// Hooks de cycle de vie appelés par le moteur : insérés en squelette COMPLET
+// (func … end), le « func » n'étant pas répété s'il est déjà tapé. Le curseur
+// se place dans le corps (nouvelle ligne indentée). Évite les fautes de frappe.
 function lifecycle(name, params, detail) {
   return {
     label: name, type: 'function', detail,
     apply: (view, c, from, to) => {
-      const line = view.state.doc.lineAt(from)
-      const before = view.state.doc.sliceString(line.from, from)
-      if (/\bfunc\s+\S*$/.test(before)) {
-        const ins = `${name}(${params})`
-        view.dispatch({ changes: { from, to, insert: ins }, selection: { anchor: from + ins.length } })
-      } else {
-        const head = `func ${name}(${params})\n    `
-        view.dispatch({ changes: { from, to, insert: head + '\nend' }, selection: { anchor: from + head.length } })
-      }
+      const before = view.state.doc.sliceString(view.state.doc.lineAt(from).from, from)
+      const prefix = /\bfunc\s+\S*$/.test(before) ? '' : 'func '   // ne pas doubler « func »
+      const head = `${prefix}${name}(${params})\n    `
+      view.dispatch({
+        changes: { from, to, insert: head + '\nend' },
+        selection: { anchor: from + head.length },   // curseur dans le corps indenté
+      })
     },
   }
 }
