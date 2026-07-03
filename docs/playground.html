@@ -184,6 +184,16 @@ canvas#canvas {
 }
 #divider:hover, #divider.dragging { background: var(--accent); }
 
+/* ── bascule barre latérale ───────────────────────────────────────────────── */
+#rail-toggle {
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--border); color: var(--dim);
+  border-radius: 6px; padding: 6px 8px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#rail-toggle:hover { border-color: var(--accent); color: var(--accent); }
+#rail-toggle.active { color: var(--accent); border-color: var(--accent); }
+
 /* ── menu Projet (drill-down) ─────────────────────────────────────────────── */
 #project-wrap { position: relative; }
 #project-btn {
@@ -290,6 +300,9 @@ canvas#canvas {
 
 <div id="toolbar">
   <a href="index.html" class="logo">Ollin</a>
+  <button id="rail-toggle" title="Afficher / masquer les fichiers">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg>
+  </button>
   <div id="project-wrap">
     <button id="project-btn" title="Projets" disabled aria-haspopup="true" aria-expanded="false">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4.5A1 1 0 012.5 3.5H6l1.5 1.5H13.5a1 1 0 011 1v6a1 1 0 01-1 1h-11a1 1 0 01-1-1z"/></svg>
@@ -982,6 +995,23 @@ document.addEventListener('click', e => {
     closeMenu()
 })
 newFileBtn.addEventListener('click', newFile)
+
+// ── bascule de la barre latérale (état mémorisé) ──
+const railToggle = document.getElementById('rail-toggle')
+const fileRailEl = document.getElementById('file-rail')
+const RAIL_KEY   = 'ollin-pg-rail'
+function applyRail() {
+  const hidden = localStorage.getItem(RAIL_KEY) === 'hidden'
+  fileRailEl.style.display = hidden ? 'none' : ''
+  railToggle.classList.toggle('active', !hidden)
+  railToggle.setAttribute('aria-pressed', String(!hidden))
+}
+railToggle.addEventListener('click', () => {
+  const hidden = localStorage.getItem(RAIL_KEY) === 'hidden'
+  localStorage.setItem(RAIL_KEY, hidden ? 'shown' : 'hidden')
+  applyRail()
+})
+applyRail()
 
 // ── init ──
 async function initProjects() {
