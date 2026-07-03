@@ -77,6 +77,12 @@ function decodeUtf8(b64) {
   const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
   return new TextDecoder().decode(bytes)
 }
+function encodeUtf8(str) {
+  const bytes = new TextEncoder().encode(str)
+  let bin = ''
+  for (const b of bytes) bin += String.fromCharCode(b)
+  return btoa(bin)
+}
 
 // ── identité + cible ─────────────────────────────────────────────────────────
 let _login = null
@@ -188,19 +194,27 @@ export async function pushProject(project, message) {
   const branch = info.default_branch || 'main'
   const slug = project.id
 
-  // Tête courante — ou dépôt vide (aucun commit) → premier commit sans parent.
-  let baseSha = null, baseTree = null
-  const refRes = await gh(`${base}/git/ref/heads/${branch}`)
-  if (refRes.ok) {
-    const ref = await refRes.json()
-    baseSha = ref.object.sha
-    const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
-    baseTree = baseCommit.tree.sha
-  } else if (refRes.status !== 409 && refRes.status !== 404) {
-    let msg = String(refRes.status)
-    try { const e = await refRes.json(); if (e && e.message) msg = refRes.status + ' — ' + e.message } catch (_) {}
-    throw new Error('GitHub ' + msg)
+  // Dépôt vide (aucun commit) → l'initialiser via l'API Contents : un PUT crée
+  // le commit initial + la branche (la Git Data API refuse un dépôt vide → 409).
+  let refRes = await gh(`${base}/git/ref/heads/${branch}`)
+  if (!refRes.ok) {
+    if (refRes.status === 409 || refRes.status === 404) {
+      await ghJson(`${base}/contents/README.md`, {
+        method: 'PUT',
+        body: { message: 'Initialise ollin-projects', branch, content: encodeUtf8('# ollin-projects\n\nProjets du playground Ollin.\n') },
+      })
+      refRes = await gh(`${base}/git/ref/heads/${branch}`)
+    }
+    if (!refRes.ok) {
+      let msg = String(refRes.status)
+      try { const e = await refRes.json(); if (e && e.message) msg = refRes.status + ' — ' + e.message } catch (_) {}
+      throw new Error('GitHub ' + msg)
+    }
   }
+  const ref = await refRes.json()
+  const baseSha = ref.object.sha
+  const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
+  const baseTree = baseCommit.tree.sha
 
   const tree = []
   for (const rel in (project.files || {})) {
@@ -212,27 +226,25 @@ export async function pushProject(project, message) {
     tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
 
-  // Suppressions : seulement si le dépôt a déjà un contenu.
-  if (baseSha) {
-    const desired = new Set(tree.map(t => t.path))
-    const scan = new Set([slug])
-    const oldSlug = project.remote && project.remote.slug
-    if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
-    const { tree: remoteTree } = await fullTree()
-    for (const e of remoteTree) {
-      if (e.type !== 'blob') continue
-      if (!scan.has(e.path.split('/')[0])) continue
-      if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
-    }
+  // Suppressions : fichiers distants (slug courant + ancien slug si renommage)
+  // absents localement → sha:null.
+  const desired = new Set(tree.map(t => t.path))
+  const scan = new Set([slug])
+  const oldSlug = project.remote && project.remote.slug
+  if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
+  const { tree: remoteTree } = await fullTree()
+  for (const e of remoteTree) {
+    if (e.type !== 'blob') continue
+    if (!scan.has(e.path.split('/')[0])) continue
+    if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
   }
 
-  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: baseTree ? { base_tree: baseTree, tree } : { tree } })
+  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseTree, tree } })
   const commit = await ghJson(`${base}/git/commits`, {
     method: 'POST',
-    body: { message: message || `ollin: ${project.name}`, tree: newTree.sha, parents: baseSha ? [baseSha] : [] },
+    body: { message: message || `ollin: ${project.name}`, tree: newTree.sha, parents: [baseSha] },
   })
-  if (baseSha) await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
-  else await ghJson(`${base}/git/refs`, { method: 'POST', body: { ref: `refs/heads/${branch}`, sha: commit.sha } })
+  await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
 
   project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha }
   return project.remote
