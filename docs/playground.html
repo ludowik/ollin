@@ -34,6 +34,15 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
+  overflow-x: auto;              /* filet : jamais de bouton coupé hors d'atteinte */
+}
+
+/* Toolbar large mais fenêtre étroite : boutons en icônes seules pour tout garder
+   visible (dont Exécuter/Pause) bien avant le passage en layout mobile. */
+@media (max-width: 1080px) {
+  .btn-label { display: none; }
+  #run-btn kbd { display: none; }
+  #project-label { display: none; }
 }
 
 .logo {
