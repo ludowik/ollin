@@ -887,6 +887,7 @@ async function loadProject(id) {
   renderResources()
   updateImgBtn()
   view.focus()
+  checkRemoteFreshness(p)   // garde-fou d'ouverture (non bloquant)
 }
 
 async function switchProject(id) {
@@ -1065,24 +1066,32 @@ function renderMenuConnect() {
   input.focus()
 }
 
-async function ghPush() {
+async function ghPush(force) {
   closeMenu()
   if (!currentProject) return
   flushEditorToFile(); await Store.saveProject(currentProject)
   setStatus('Envoi vers GitHub…')
   try {
     await GH.ensureRepo()
-    await GH.pushProject(currentProject)
-    await Store.saveProject(currentProject)   // persister project.remote
+    await GH.pushProject(currentProject, null, { force })
+    await Store.saveProject(currentProject)   // persister project.remote (dont treeSha)
     setStatus('Poussé sur GitHub ✓', true)
-  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
+  } catch (e) {
+    if (e.code === 'CONFLICT') {
+      if (confirm('Le dépôt distant a été modifié depuis ta dernière synchro (sans doute depuis un autre poste).\n\nÉcraser avec ta version locale ?\nOK = écraser · Annuler = ne rien faire (fais « Récupérer / Pull » d\'abord).')) {
+        return ghPush(true)
+      }
+      setStatus('Push annulé — fais « Récupérer (Pull) » d\'abord', true)
+      return
+    }
+    setStatus('Erreur : ' + e.message, true, true)
+  }
 }
 
-async function ghPull() {
-  closeMenu()
+// Cœur du Pull (sans confirmation) — réutilisé par ghPull et le garde-fou d'ouverture.
+async function doPull() {
   if (!currentProject) return
   const slug = (currentProject.remote && currentProject.remote.slug) || currentProject.id
-  if (!confirm(`Récupérer « ${slug} » depuis GitHub et remplacer la version locale ?`)) return
   setStatus('Récupération…')
   try {
     const p = await GH.pullProject(slug)
@@ -1091,6 +1100,30 @@ async function ghPull() {
     await loadProject(p.id)
     setStatus('Projet à jour ✓', true)
   } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
+}
+
+async function ghPull() {
+  closeMenu()
+  if (!currentProject) return
+  const slug = (currentProject.remote && currentProject.remote.slug) || currentProject.id
+  if (!confirm(`Récupérer « ${slug} » depuis GitHub et remplacer la version locale ?`)) return
+  await doPull()
+}
+
+// Garde-fou d'ouverture : à l'ouverture d'un projet lié à GitHub (connecté),
+// vérifie en arrière-plan si une version plus récente existe et propose un Pull.
+async function checkRemoteFreshness(project) {
+  if (!project.remote || !project.remote.slug || !GH.isConnected()) return
+  try {
+    const cur = await GH.remoteTreeSha(project.remote.slug)
+    if (cur === null || cur === project.remote.treeSha) return   // absent ou déjà à jour
+    if (!currentProject || currentProject.id !== project.id) return   // l'utilisateur a changé de projet entre-temps
+    if (confirm(`Une version plus récente de « ${project.name} » existe sur GitHub.\nLa récupérer maintenant (Pull) ? Tes modifications locales non poussées seront remplacées.`)) {
+      await doPull()
+    } else {
+      setStatus('Version plus récente sur GitHub — « Récupérer (Pull) » quand tu veux', true)
+    }
+  } catch (_) { /* hors-ligne / token invalide : silencieux */ }
 }
 
 async function renderMenuRemote() {

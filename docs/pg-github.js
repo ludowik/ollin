@@ -84,6 +84,13 @@ function encodeUtf8(str) {
   return btoa(bin)
 }
 
+// sha du dossier <slug> dans un arbre récursif (empreinte de son contenu) ; null
+// si le dossier n'existe pas. Sert au garde-fou de conflit / fraîcheur.
+function slugTreeSha(tree, slug) {
+  const e = tree.find(x => x.type === 'tree' && x.path === slug)
+  return e ? e.sha : null
+}
+
 // ── identité + cible ─────────────────────────────────────────────────────────
 let _login = null
 export async function getUser() {
@@ -160,6 +167,12 @@ export async function listRemoteProjects() {
   return out
 }
 
+// Empreinte actuelle du dossier <slug> distant (pour le garde-fou de fraîcheur).
+export async function remoteTreeSha(slug) {
+  const { tree } = await fullTree()
+  return slugTreeSha(tree, slug)
+}
+
 // ── pull d'un projet ─────────────────────────────────────────────────────────
 export async function pullProject(slug) {
   const { owner, repo, base, branch, tree } = await fullTree()
@@ -181,14 +194,15 @@ export async function pullProject(slug) {
     entry = m.entry || entry
   } catch (_) {}
   const now = Date.now()
-  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug }, createdAt: now, updatedAt: now }
+  const treeSha = slugTreeSha(tree, slug)
+  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, treeSha }, createdAt: now, updatedAt: now }
 }
 
 // ── push d'un projet ─────────────────────────────────────────────────────────
 // Rend le dossier `<slug>/` identique au projet local, en UN commit atomique
 // (Git Data API). Répercute ajouts, modifs ET suppressions ; si le projet a été
 // renommé (remote.slug ≠ slug), supprime aussi l'ancien dossier.
-export async function pushProject(project, message) {
+export async function pushProject(project, message, opts = {}) {
   const { owner, repo, base } = await ctx()
   const info = await ghJson(base)
   const branch = info.default_branch || 'main'
@@ -216,6 +230,22 @@ export async function pushProject(project, message) {
   const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
   const baseTree = baseCommit.tree.sha
 
+  // État distant courant (sert au garde-fou de conflit ET aux suppressions).
+  const oldSlug = project.remote && project.remote.slug
+  const trackedSlug = oldSlug || slug
+  const { tree: remoteTree } = await fullTree()
+
+  // Garde-fou : le dossier suivi a-t-il changé sur GitHub depuis notre dernière
+  // synchro ? Si oui (et pas de force) → conflit, on n'écrase pas en silence.
+  if (!opts.force && project.remote && project.remote.treeSha != null) {
+    const current = slugTreeSha(remoteTree, trackedSlug)
+    if (current !== project.remote.treeSha) {
+      const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
+      err.code = 'CONFLICT'
+      throw err
+    }
+  }
+
   const tree = []
   for (const rel in (project.files || {})) {
     const blob = await ghJson(`${base}/git/blobs`, { method: 'POST', body: { content: project.files[rel], encoding: 'utf-8' } })
@@ -230,9 +260,7 @@ export async function pushProject(project, message) {
   // absents localement → sha:null.
   const desired = new Set(tree.map(t => t.path))
   const scan = new Set([slug])
-  const oldSlug = project.remote && project.remote.slug
   if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
-  const { tree: remoteTree } = await fullTree()
   for (const e of remoteTree) {
     if (e.type !== 'blob') continue
     if (!scan.has(e.path.split('/')[0])) continue
@@ -246,6 +274,8 @@ export async function pushProject(project, message) {
   })
   await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
 
-  project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha }
+  // Nouvelle empreinte du dossier après commit → base des prochains garde-fous.
+  const after = await fullTree()
+  project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha, treeSha: slugTreeSha(after.tree, slug) }
   return project.remote
 }
