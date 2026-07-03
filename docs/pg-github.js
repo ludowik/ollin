@@ -125,7 +125,14 @@ async function fullTree() {
   const { owner, repo, base } = await ctx()
   const info = await ghJson(base)
   const branch = info.default_branch || 'main'
-  const t = await ghJson(`${base}/git/trees/${branch}?recursive=1`)
+  const res = await gh(`${base}/git/trees/${branch}?recursive=1`)
+  if (!res.ok) {
+    if (res.status === 409 || res.status === 404) return { owner, repo, base, branch, tree: [] }  // dépôt vide
+    let msg = String(res.status)
+    try { const e = await res.json(); if (e && e.message) msg = res.status + ' — ' + e.message } catch (_) {}
+    throw new Error('GitHub ' + msg)
+  }
+  const t = await res.json()
   return { owner, repo, base, branch, tree: t.tree || [] }
 }
 
@@ -181,10 +188,19 @@ export async function pushProject(project, message) {
   const branch = info.default_branch || 'main'
   const slug = project.id
 
-  const ref = await ghJson(`${base}/git/ref/heads/${branch}`)
-  const baseSha = ref.object.sha
-  const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
-  const baseTree = baseCommit.tree.sha
+  // Tête courante — ou dépôt vide (aucun commit) → premier commit sans parent.
+  let baseSha = null, baseTree = null
+  const refRes = await gh(`${base}/git/ref/heads/${branch}`)
+  if (refRes.ok) {
+    const ref = await refRes.json()
+    baseSha = ref.object.sha
+    const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
+    baseTree = baseCommit.tree.sha
+  } else if (refRes.status !== 409 && refRes.status !== 404) {
+    let msg = String(refRes.status)
+    try { const e = await refRes.json(); if (e && e.message) msg = refRes.status + ' — ' + e.message } catch (_) {}
+    throw new Error('GitHub ' + msg)
+  }
 
   const tree = []
   for (const rel in (project.files || {})) {
@@ -196,23 +212,27 @@ export async function pushProject(project, message) {
     tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
 
-  const desired = new Set(tree.map(t => t.path))
-  const scan = new Set([slug])
-  const oldSlug = project.remote && project.remote.slug
-  if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
-  const { tree: remoteTree } = await fullTree()
-  for (const e of remoteTree) {
-    if (e.type !== 'blob') continue
-    if (!scan.has(e.path.split('/')[0])) continue
-    if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
+  // Suppressions : seulement si le dépôt a déjà un contenu.
+  if (baseSha) {
+    const desired = new Set(tree.map(t => t.path))
+    const scan = new Set([slug])
+    const oldSlug = project.remote && project.remote.slug
+    if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
+    const { tree: remoteTree } = await fullTree()
+    for (const e of remoteTree) {
+      if (e.type !== 'blob') continue
+      if (!scan.has(e.path.split('/')[0])) continue
+      if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
+    }
   }
 
-  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseTree, tree } })
+  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: baseTree ? { base_tree: baseTree, tree } : { tree } })
   const commit = await ghJson(`${base}/git/commits`, {
     method: 'POST',
-    body: { message: message || `ollin: ${project.name}`, tree: newTree.sha, parents: [baseSha] },
+    body: { message: message || `ollin: ${project.name}`, tree: newTree.sha, parents: baseSha ? [baseSha] : [] },
   })
-  await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
+  if (baseSha) await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
+  else await ghJson(`${base}/git/refs`, { method: 'POST', body: { ref: `refs/heads/${branch}`, sha: commit.sha } })
 
   project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha }
   return project.remote
