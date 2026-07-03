@@ -1126,22 +1126,23 @@ copyBtn.addEventListener('click', () => {
 })
 
 // ── Mode autonome (page dédiée plein écran) ─────────────────────────────────
-// Écrit le code courant (+ images chargées) dans localStorage puis ouvre
-// run.html dans un nouvel onglet, où le script s'exécute seul.
+// Écrit le PROJET COMPLET (fichiers + ressources + point d'entrée) dans
+// localStorage puis ouvre run.html, qui pousse le tout dans le runtime et
+// exécute le point d'entrée (imports multi-fichiers résolus, comme le Run).
+// run.html est ouvert avec un cache-buster → toujours la dernière version.
 const standaloneBtn = document.getElementById('standalone-btn')
 standaloneBtn.addEventListener('click', () => {
   try {
     flushEditorToFile()
-    // NB : run.html exécute le point d'entrée + ressources (mono-fichier pour
-    // l'instant ; le multi-fichiers autonome viendra en 1.5).
-    const code = currentProject ? (currentProject.files[currentProject.entry] ?? '') : view.state.doc.toString()
-    localStorage.setItem('ollin_run_code', code)
-    const imgs = currentProject
-      ? Object.entries(currentProject.resources || {}).map(([name, v]) => ({ name, b64: v.b64, ext: v.ext }))
-      : []
-    localStorage.setItem('ollin_run_images', JSON.stringify(imgs))
+    if (currentProject) {
+      localStorage.setItem('ollin_run_project', JSON.stringify({
+        entry:     currentProject.entry,
+        files:     currentProject.files,
+        resources: currentProject.resources || {},
+      }))
+    }
   } catch (_) {}
-  window.open('run.html', '_blank')
+  window.open('run.html?v=' + Date.now(), '_blank')
 })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────

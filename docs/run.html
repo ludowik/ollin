@@ -86,10 +86,15 @@
       outEl.className = (text && String(text).startsWith('error:')) ? 'err' : 'ok';
     }
 
-    const code = localStorage.getItem('ollin_run_code');
-    if (code === null) {
+    // Projet complet écrit par le playground : { entry, files, resources }.
+    const MANIFEST = 'ollin.project.json';
+    let project = null;
+    try { project = JSON.parse(localStorage.getItem('ollin_run_project') || 'null'); } catch (_) {}
+    const code = (project && project.files) ? (project.files[project.entry] ?? '') : null;
+
+    if (project === null || code === null) {
       statusEl.textContent = '';
-      showText("error: aucun script. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).");
+      showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).");
     } else {
       const wasmScript = document.createElement('script');
       const cacheBust  = Date.now();
@@ -102,9 +107,15 @@
           print:    t => { prints += t + '\n'; },
           printErr: t => { prints += t + '\n'; },
         }).then(m => {
+          // Pousser tout le projet dans le runtime (comme le Run du playground).
           try {
-            const imgs = JSON.parse(localStorage.getItem('ollin_run_images') || '[]');
-            for (const im of imgs) m.preloadImage(im.name, im.b64, im.ext);
+            if (m.resetSources) m.resetSources();
+            for (const path in project.files) {
+              if (path === MANIFEST) continue;
+              if (m.preloadSource) m.preloadSource(path, project.files[path]);
+            }
+            const res = project.resources || {};
+            for (const name in res) m.preloadImage(name, res[name].b64, res[name].ext);
           } catch (_) {}
           statusEl.textContent = '';
           let out;
