@@ -228,17 +228,20 @@ canvas#canvas {
   width: 172px; flex-shrink: 0; display: flex; flex-direction: column;
   background: var(--surface); border-right: 1px solid var(--border); overflow: hidden;
 }
-#file-rail-head {
-  display: flex; align-items: center; justify-content: space-between;
+.rail-head {
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
   padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--dim);
   text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border);
 }
-#new-file-btn {
+.rail-head-res { border-top: 1px solid var(--border); }
+.rail-head button {
   background: transparent; border: none; color: var(--accent); font-size: 16px; line-height: 1;
   cursor: pointer; padding: 0 4px; border-radius: 4px;
 }
-#new-file-btn:hover { background: var(--surface2); }
-#file-list { overflow-y: auto; padding: 4px; }
+.rail-head button:hover { background: var(--surface2); }
+#file-list { flex: 1 1 auto; overflow-y: auto; padding: 4px; }
+#res-list  { flex: 0 1 40%; overflow-y: auto; padding: 4px; }
+.rail-empty { padding: 6px 8px; font-size: 12px; color: var(--dim); font-style: italic; }
 .file-item {
   display: flex; align-items: center; justify-content: space-between; gap: 4px;
   padding: 6px 8px; border-radius: 5px; cursor: pointer; font-size: 12.5px;
@@ -328,11 +331,16 @@ canvas#canvas {
   <div id="editor-pane">
     <div id="editor-main">
       <aside id="file-rail">
-        <div id="file-rail-head">
+        <div class="rail-head">
           <span>Fichiers</span>
           <button id="new-file-btn" title="Nouveau fichier">＋</button>
         </div>
         <div id="file-list"></div>
+        <div class="rail-head rail-head-res">
+          <span>Ressources</span>
+          <button id="new-res-btn" title="Ajouter une image">＋</button>
+        </div>
+        <div id="res-list"></div>
       </aside>
       <div id="editor-wrap"></div>
     </div>
@@ -654,6 +662,8 @@ const projectLabel = document.getElementById('project-label')
 const projectMenu  = document.getElementById('project-menu')
 const fileRail     = document.getElementById('file-list')
 const newFileBtn   = document.getElementById('new-file-btn')
+const resList      = document.getElementById('res-list')
+const newResBtn    = document.getElementById('new-res-btn')
 
 let currentProject = null    // objet projet complet
 let currentFile    = null    // chemin du fichier ouvert
@@ -772,6 +782,63 @@ async function setEntry(path) {
   renderFiles()
 }
 
+// ── ressources (images) ──
+function renderResources() {
+  resList.innerHTML = ''
+  if (!currentProject) return
+  const names = Object.keys(currentProject.resources || {}).sort()
+  if (!names.length) {
+    const d = document.createElement('div'); d.className = 'rail-empty'; d.textContent = '(aucune)'
+    resList.appendChild(d); return
+  }
+  for (const name of names) {
+    const row = document.createElement('div')
+    row.className = 'file-item'; row.title = name
+    const label = document.createElement('span'); label.className = 'file-name'; label.textContent = name
+    row.appendChild(label)
+    const acts = document.createElement('span'); acts.className = 'file-acts'
+    acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameResource(name) }))
+    acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteResource(name) }))
+    row.appendChild(acts)
+    resList.appendChild(row)
+  }
+}
+
+async function renameResource(name) {
+  let n = prompt('Renommer la ressource :', name)
+  if (!n || n.trim() === name) return
+  n = n.trim()
+  if (currentProject.resources[n] !== undefined) { alert('Ce nom est déjà pris.'); return }
+  currentProject.resources[n] = currentProject.resources[name]
+  delete currentProject.resources[name]
+  await Store.saveProject(currentProject)
+  if (ollin && ollin.preloadImage) {
+    const r = currentProject.resources[n]
+    ollin.preloadImage(n, r.b64, r.ext)
+  }
+  renderResources(); updateImgBtn()
+}
+
+async function deleteResource(name) {
+  if (!confirm(`Supprimer la ressource « ${name} » ?`)) return
+  delete currentProject.resources[name]
+  await Store.saveProject(currentProject)
+  renderResources(); updateImgBtn()
+}
+
+// Pousse tout le projet (scripts + ressources) dans le runtime WASM avant un Run.
+function loadProjectIntoRuntime() {
+  if (!ollin || !currentProject) return
+  if (ollin.resetSources) ollin.resetSources()
+  for (const [path, content] of Object.entries(currentProject.files)) {
+    if (path === Store.MANIFEST) continue
+    if (ollin.preloadSource) ollin.preloadSource(path, content)
+  }
+  for (const [name, r] of Object.entries(currentProject.resources || {})) {
+    if (ollin.preloadImage) ollin.preloadImage(name, r.b64, r.ext)
+  }
+}
+
 // ── chargement / bascule de projet ──
 async function loadProject(id) {
   const p = await Store.getProject(id)
@@ -786,6 +853,8 @@ async function loadProject(id) {
   setEditorText(p.files[currentFile] ?? '')
   projectLabel.textContent = p.name
   renderFiles()
+  renderResources()
+  updateImgBtn()
   view.focus()
 }
 
@@ -1011,7 +1080,11 @@ function run() {
   // Afficher la zone AVANT execute : window.width lit le clientWidth de
   // #output-pane (0 si display:none → graphics dimensionné à vide).
   setOutputVisible(true)
-  const code = view.state.doc.toString()
+  // Pousser tout le projet dans le runtime puis exécuter le POINT D'ENTRÉE.
+  flushEditorToFile()
+  loadProjectIntoRuntime()
+  const code = currentProject ? (currentProject.files[currentProject.entry] ?? '')
+                              : view.state.doc.toString()
   const out  = ollin.execute(code)
   if (canvasEl.style.display === 'block') {
     outputPane.style.overflow = 'hidden'
@@ -1058,9 +1131,14 @@ copyBtn.addEventListener('click', () => {
 const standaloneBtn = document.getElementById('standalone-btn')
 standaloneBtn.addEventListener('click', () => {
   try {
-    localStorage.setItem('ollin_run_code', view.state.doc.toString())
-    const imgs = Array.from(loadedImages.entries())
-      .map(([name, v]) => ({ name, b64: v.b64, ext: v.ext }))
+    flushEditorToFile()
+    // NB : run.html exécute le point d'entrée + ressources (mono-fichier pour
+    // l'instant ; le multi-fichiers autonome viendra en 1.5).
+    const code = currentProject ? (currentProject.files[currentProject.entry] ?? '') : view.state.doc.toString()
+    localStorage.setItem('ollin_run_code', code)
+    const imgs = currentProject
+      ? Object.entries(currentProject.resources || {}).map(([name, v]) => ({ name, b64: v.b64, ext: v.ext }))
+      : []
     localStorage.setItem('ollin_run_images', JSON.stringify(imgs))
   } catch (_) {}
   window.open('run.html', '_blank')
@@ -1086,31 +1164,38 @@ reloadBtn.addEventListener('click', () => {
 const imgFileInput = document.getElementById('img-file-input')
 const imgBtnLabel  = document.getElementById('img-btn-label')
 const imgBtn       = document.getElementById('img-btn')
-const loadedImages = new Map()  // name → {b64, ext}
 
+// Reflète le nombre de ressources du projet actif sur le bouton Images.
+function updateImgBtn() {
+  const n = currentProject ? Object.keys(currentProject.resources || {}).length : 0
+  imgBtnLabel.textContent  = n ? (n + ' image' + (n > 1 ? 's' : '')) : 'Images'
+  imgBtn.style.borderColor = n ? 'var(--green)' : ''
+  imgBtn.style.color       = n ? 'var(--green)' : ''
+}
+
+// Les images chargées deviennent des RESSOURCES du projet actif (persistées).
 imgFileInput.addEventListener('change', () => {
   const files = Array.from(imgFileInput.files)
-  if (!files.length) return
-  let done = 0
+  if (!files.length || !currentProject) return
   files.forEach(file => {
     const ext  = file.name.split('.').pop().toLowerCase()
     const name = file.name
     const reader = new FileReader()
-    reader.onload = e => {
-      const dataUrl = e.target.result               // "data:image/png;base64,xxxx"
-      const b64     = dataUrl.split(',')[1] ?? ''
-      loadedImages.set(name, { b64, ext })
-      if (ollin) ollin.preloadImage(name, b64, ext)
-      done++
-      const n = loadedImages.size
-      imgBtnLabel.textContent = n + ' image' + (n > 1 ? 's' : '')
-      imgBtn.style.borderColor = 'var(--green)'
-      imgBtn.style.color       = 'var(--green)'
+    reader.onload = async e => {
+      const b64 = (e.target.result.split(',')[1]) ?? ''   // "data:...;base64,xxxx"
+      currentProject.resources[name] = { b64, ext }
+      await Store.saveProject(currentProject)
+      if (ollin && ollin.preloadImage) ollin.preloadImage(name, b64, ext)
+      renderResources()
+      updateImgBtn()
     }
     reader.readAsDataURL(file)
   })
   imgFileInput.value = ''
 })
+
+// Le « ＋ » de la section Ressources ouvre le même sélecteur de fichiers.
+newResBtn.addEventListener('click', () => imgFileInput.click())
 
 // ── WASM ──────────────────────────────────────────────────────────────────
 const statusEl = document.getElementById('status')
