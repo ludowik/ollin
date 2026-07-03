@@ -774,6 +774,73 @@ const view = new EditorView({
   parent: document.getElementById('editor-wrap'),
 })
 
+// ── Backspace/nav pendant une exécution graphique ──────────────────────────
+// Quand un projet graphique tourne (Run), le runtime raylib installe un
+// écouteur keydown GLOBAL (window, phase capture) qui fait preventDefault sur
+// les touches « de jeu » (Backspace, flèches, Tab, Entrée…) pour empêcher le
+// navigateur de reculer/défiler. Or CodeMirror IGNORE tout keydown déjà
+// defaultPrevented → dans l'éditeur, Backspace « n'a plus d'effet » jusqu'au
+// refresh. On ne peut pas dé-préventDefault, ni retirer l'écouteur raylib.
+// Parade : un écouteur enregistré ICI (au chargement, donc AVANT celui de
+// raylib) en phase capture. Pendant un run, l'éditeur ayant le focus, on
+// exécute nous-mêmes la touche d'édition sur `view` puis on stoppe l'événement
+// (stopImmediatePropagation) → raylib ne le voit jamais. Hors run, inerte :
+// CodeMirror garde tout son comportement natif (auto-indentation, etc.).
+function editorKeyDuringRun(e) {
+  if (!isRunning || !view.hasFocus) return false
+  if (e.ctrlKey || e.metaKey || e.altKey) return false   // laisser les raccourcis à CM
+  const state = view.state
+  const doc   = state.doc
+  const sel   = state.selection.main
+  const acOpen = !!view.dom.querySelector('.cm-tooltip-autocomplete')
+  const moveTo = pos => view.dispatch({ selection: { anchor: e.shiftKey ? sel.anchor : pos, head: pos }, scrollIntoView: true })
+  switch (e.key) {
+    case 'Backspace': {
+      if (!sel.empty) view.dispatch(state.update({ changes: { from: sel.from, to: sel.to }, selection: { anchor: sel.from }, userEvent: 'delete.backward', scrollIntoView: true }))
+      else if (sel.from > 0) view.dispatch(state.update({ changes: { from: sel.from - 1, to: sel.from }, selection: { anchor: sel.from - 1 }, userEvent: 'delete.backward', scrollIntoView: true }))
+      return true
+    }
+    case 'Delete': {
+      if (!sel.empty) view.dispatch(state.update({ changes: { from: sel.from, to: sel.to }, selection: { anchor: sel.from }, userEvent: 'delete.forward', scrollIntoView: true }))
+      else if (sel.to < doc.length) view.dispatch(state.update({ changes: { from: sel.to, to: sel.to + 1 }, selection: { anchor: sel.to }, userEvent: 'delete.forward', scrollIntoView: true }))
+      return true
+    }
+    case 'Enter': {
+      if (acOpen) return false   // laisser l'autocomplétion valider
+      const line = doc.lineAt(sel.from)
+      const indent = (line.text.match(/^\s*/) || [''])[0]
+      view.dispatch(state.update(state.replaceSelection('\n' + indent), { userEvent: 'input', scrollIntoView: true }))
+      return true
+    }
+    case 'Tab': {
+      if (acOpen) return false
+      view.dispatch(state.update(state.replaceSelection('    '), { userEvent: 'input', scrollIntoView: true }))
+      return true
+    }
+    case 'ArrowLeft':  moveTo(Math.max(0, sel.head - 1)); return true
+    case 'ArrowRight': moveTo(Math.min(doc.length, sel.head + 1)); return true
+    case 'ArrowUp': case 'ArrowDown': {
+      if (acOpen) return false   // navigation dans la liste de complétion
+      const line = doc.lineAt(sel.head)
+      const col  = sel.head - line.from
+      let target
+      if (e.key === 'ArrowUp') target = line.number <= 1 ? 0 : (n => n.from + Math.min(col, n.length))(doc.line(line.number - 1))
+      else                     target = line.number >= doc.lines ? doc.length : (n => n.from + Math.min(col, n.length))(doc.line(line.number + 1))
+      moveTo(target)
+      return true
+    }
+    case 'Home': moveTo(doc.lineAt(sel.head).from); return true
+    case 'End':  moveTo(doc.lineAt(sel.head).to);   return true
+    default: return false
+  }
+}
+window.addEventListener('keydown', e => {
+  if (editorKeyDuringRun(e)) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+  }
+}, true)   // capture + enregistré au chargement → passe avant l'écouteur raylib
+
 view.focus()
 window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
 { const le = document.getElementById('load-error'); if (le) le.style.display = 'none' }
