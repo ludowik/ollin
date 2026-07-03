@@ -719,6 +719,9 @@ const view = new EditorView({
     extensions: [
       ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme,
       EditorView.lineWrapping,
+      // iOS Safari : le texte prédictif/correction auto casse le Backspace et
+      // double des caractères dans un éditeur de code → on les désactive.
+      EditorView.contentAttributes.of({ autocorrect: 'off', autocapitalize: 'off', spellcheck: 'false' }),
       codeFolding(), foldGutter(), foldService.of(ollinFoldRange),
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
       keymap.of([{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]),
