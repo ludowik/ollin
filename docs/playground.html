@@ -1208,9 +1208,15 @@ async function ghPull() {
 async function checkRemoteFreshness(project) {
   if (!project.remote || !project.remote.slug || !GH.isConnected()) return
   try {
-    const cur = await GH.remoteTreeSha(project.remote.slug)
+    const cur = await GH.remoteCommit(project.remote.slug)
     if (!currentProject || currentProject.id !== project.id) return   // projet changé entre-temps
-    const newer = cur !== null && cur !== project.remote.treeSha
+    // Base de comparaison = SHA du commit du dossier fourni par GitHub lors de
+    // notre dernier push/pull. On ne signale QUE si l'on a une base fiable
+    // (known) ET qu'elle diffère du distant. Sans base connue (jamais synchro
+    // avec cette version), on reste SILENCIEUX : la pastille n'est qu'un
+    // rappel, pas une alerte — mieux vaut ne rien afficher qu'un faux positif.
+    const known = (project.remote && project.remote.commit) || null
+    const newer = cur !== null && known !== null && cur !== known
     projectBtn.classList.toggle('sync-update', newer)   // pastille persistante
     if (newer) setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
   } catch (_) { /* hors-ligne / token invalide : silencieux */ }

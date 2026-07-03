@@ -173,10 +173,28 @@ export async function listRemoteProjects() {
   return out
 }
 
-// Empreinte actuelle du dossier <slug> distant (pour le garde-fou de fraîcheur).
+// Empreinte actuelle du dossier <slug> distant (garde-fou de conflit au push).
 export async function remoteTreeSha(slug) {
   const { tree } = await fullTree()
   return slugFingerprint(tree, slug)
+}
+
+// SHA du dernier commit ayant touché le dossier <slug> sur la branche par
+// défaut. C'est un identifiant fourni PAR GitHub (pas une empreinte calculée
+// côté client) : stable d'une version de code à l'autre, et propre au dossier
+// (un commit sur un autre projet ne le change pas). Base du garde-fou de
+// fraîcheur à l'ouverture. Renvoie null si le dossier n'a aucun commit.
+async function folderCommit(base, branch, slug) {
+  const res = await gh(`${base}/commits?sha=${encodeURIComponent(branch)}&path=${encodeURIComponent(slug)}&per_page=1`)
+  if (!res.ok) return null
+  const arr = await res.json()
+  return (Array.isArray(arr) && arr.length) ? arr[0].sha : null
+}
+export async function remoteCommit(slug) {
+  const { base } = await ctx()
+  const info = await ghJson(base)
+  const branch = info.default_branch || 'main'
+  return folderCommit(base, branch, slug)
 }
 
 // ── pull d'un projet ─────────────────────────────────────────────────────────
@@ -201,7 +219,8 @@ export async function pullProject(slug) {
   } catch (_) {}
   const now = Date.now()
   const treeSha = slugFingerprint(tree, slug)
-  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, treeSha }, createdAt: now, updatedAt: now }
+  const commit = await folderCommit(base, branch, slug)
+  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, commit, treeSha }, createdAt: now, updatedAt: now }
 }
 
 // ── push d'un projet ─────────────────────────────────────────────────────────
