@@ -744,6 +744,11 @@ function ollinFoldRange(state, lineStart) {
 let saveTimer   = null
 let loadingFile = false   // true pendant un chargement programmatique → pas d'autosave
 
+// Keymap de l'éditeur, gardé en référence : réutilisé tel quel par le garde-fou
+// clavier « pendant un run » (voir plus bas) pour déléguer aux VRAIES commandes
+// CodeMirror au lieu de les réimplémenter.
+const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
+
 const view = new EditorView({
   state: EditorState.create({
     doc: '',
@@ -760,7 +765,7 @@ const view = new EditorView({
       }),
       codeFolding(), foldGutter(), foldService.of(ollinFoldRange),
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
-      keymap.of([{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]),
+      keymap.of(editKeymap),
       keymap.of([{ key: 'Alt-Enter', run: () => { run(); return true } }]),
       indentUnit.of('    '),
       autocompletion({ override: [ollinComplete], activateOnTyping: true }),
@@ -775,74 +780,45 @@ const view = new EditorView({
 })
 
 // ── Backspace/nav quand le runtime graphique est armé ──────────────────────
-// Dès qu'un projet graphique tourne (Run), le runtime raylib installe un
-// écouteur keydown GLOBAL (window, phase capture) qui fait preventDefault sur
-// les touches « de jeu » (Backspace, flèches, Tab, Entrée…) pour empêcher le
-// navigateur de reculer/défiler. Cet écouteur RESTE en place même après un
-// Arrêt (raylib ne le retire pas — il ne part qu'au refresh de la page). Or
-// CodeMirror IGNORE tout keydown déjà defaultPrevented → dans l'éditeur,
-// Backspace « n'a plus d'effet ». On ne peut pas dé-préventDefault ni retirer
-// l'écouteur raylib. Parade : un écouteur enregistré ICI (au chargement, donc
-// AVANT celui de raylib) en phase capture. Tant que le runtime a été armé au
-// moins une fois (`runtimeArmed`), si l'éditeur a le focus on exécute nous-
-// mêmes la touche sur `view` puis on stoppe l'événement (stopImmediate
-// Propagation) → raylib ne le voit jamais. Avant tout run : inerte, CodeMirror
-// garde tout son comportement natif (auto-indentation, etc.).
+// Dès qu'un projet graphique tourne (Run), le runtime raylib (couche GLFW
+// d'Emscripten) installe un écouteur keydown GLOBAL (window, phase capture) qui
+// fait preventDefault UNIQUEMENT sur Backspace et Tab (vérifié dans
+// wasm/ollin.js — GLFW.onKeydown) pour empêcher le navigateur de reculer/
+// défiler. Cet écouteur reste tant que le contexte graphique vit (un simple
+// Arrêt ne le retire pas). Or CodeMirror IGNORE tout keydown déjà
+// defaultPrevented → dans l'éditeur, Backspace et Tab « n'ont plus d'effet ».
+// Parade : un écouteur enregistré ICI (au chargement, donc AVANT celui de GLFW)
+// en phase capture. Tant que le runtime a été armé (`runtimeArmed`) et que
+// l'éditeur a le focus, on exécute Backspace/Tab via les VRAIES commandes
+// CodeMirror (le même `editKeymap` que l'éditeur → deleteCharBackward, delete
+// GroupBackward, indentMore/Less, acceptCompletion…), puis on stoppe
+// l'événement pour que GLFW ne le voie pas. On ne touche QU'À ces deux touches :
+// toutes les autres passent normalement à CodeMirror (GLFW ne les bloque pas),
+// donc aucune régression d'édition (multi-curseur, flèches, Entrée, Home…).
 let runtimeArmed = false
-function editorKeyDuringRun(e) {
-  if (!runtimeArmed || !view.hasFocus) return false
-  if (e.ctrlKey || e.metaKey || e.altKey) return false   // laisser les raccourcis à CM
-  const state = view.state
-  const doc   = state.doc
-  const sel   = state.selection.main
-  const acOpen = !!view.dom.querySelector('.cm-tooltip-autocomplete')
-  const moveTo = pos => view.dispatch({ selection: { anchor: e.shiftKey ? sel.anchor : pos, head: pos }, scrollIntoView: true })
-  switch (e.key) {
-    case 'Backspace': {
-      if (!sel.empty) view.dispatch(state.update({ changes: { from: sel.from, to: sel.to }, selection: { anchor: sel.from }, userEvent: 'delete.backward', scrollIntoView: true }))
-      else if (sel.from > 0) view.dispatch(state.update({ changes: { from: sel.from - 1, to: sel.from }, selection: { anchor: sel.from - 1 }, userEvent: 'delete.backward', scrollIntoView: true }))
-      return true
-    }
-    case 'Delete': {
-      if (!sel.empty) view.dispatch(state.update({ changes: { from: sel.from, to: sel.to }, selection: { anchor: sel.from }, userEvent: 'delete.forward', scrollIntoView: true }))
-      else if (sel.to < doc.length) view.dispatch(state.update({ changes: { from: sel.to, to: sel.to + 1 }, selection: { anchor: sel.to }, userEvent: 'delete.forward', scrollIntoView: true }))
-      return true
-    }
-    case 'Enter': {
-      if (acOpen) return false   // laisser l'autocomplétion valider
-      const line = doc.lineAt(sel.from)
-      const indent = (line.text.match(/^\s*/) || [''])[0]
-      view.dispatch(state.update(state.replaceSelection('\n' + indent), { userEvent: 'input', scrollIntoView: true }))
-      return true
-    }
-    case 'Tab': {
-      if (acOpen) return false
-      view.dispatch(state.update(state.replaceSelection('    '), { userEvent: 'input', scrollIntoView: true }))
-      return true
-    }
-    case 'ArrowLeft':  moveTo(Math.max(0, sel.head - 1)); return true
-    case 'ArrowRight': moveTo(Math.min(doc.length, sel.head + 1)); return true
-    case 'ArrowUp': case 'ArrowDown': {
-      if (acOpen) return false   // navigation dans la liste de complétion
-      const line = doc.lineAt(sel.head)
-      const col  = sel.head - line.from
-      let target
-      if (e.key === 'ArrowUp') target = line.number <= 1 ? 0 : (n => n.from + Math.min(col, n.length))(doc.line(line.number - 1))
-      else                     target = line.number >= doc.lines ? doc.length : (n => n.from + Math.min(col, n.length))(doc.line(line.number + 1))
-      moveTo(target)
-      return true
-    }
-    case 'Home': moveTo(doc.lineAt(sel.head).from); return true
-    case 'End':  moveTo(doc.lineAt(sel.head).to);   return true
-    default: return false
+// Exécute, pour l'événement `e`, le premier binding de `editKeymap` qui matche
+// (même sémantique de priorité que CodeMirror). Gère les modificateurs Mod/Alt
+// et la variante `shift` des bindings. Renvoie true si une commande a agi.
+function runEditKeymap(e) {
+  for (const b of editKeymap) {
+    if (!b.key) continue
+    const parts = b.key.split('-')
+    if (parts[parts.length - 1] !== e.key) continue
+    if ((parts.includes('Mod') || parts.includes('Ctrl') || parts.includes('Cmd')) !== (e.ctrlKey || e.metaKey)) continue
+    if (parts.includes('Alt') !== e.altKey) continue
+    const cmd = (e.shiftKey && b.shift) ? b.shift : b.run
+    if (cmd && cmd(view)) return true
   }
+  return false
 }
 window.addEventListener('keydown', e => {
-  if (editorKeyDuringRun(e)) {
+  if (!runtimeArmed || !view.hasFocus) return
+  if (e.key !== 'Backspace' && e.key !== 'Tab') return   // seules touches mangées par GLFW
+  if (runEditKeymap(e)) {
     e.preventDefault()
     e.stopImmediatePropagation()
   }
-}, true)   // capture + enregistré au chargement → passe avant l'écouteur raylib
+}, true)   // capture + enregistré au chargement → passe avant l'écouteur GLFW
 
 view.focus()
 window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
@@ -1239,7 +1215,7 @@ async function ghPush(force) {
   try {
     await GH.ensureRepo()
     await GH.pushProject(currentProject, null, { force })
-    await Store.saveProject(currentProject)   // persister project.remote (dont treeSha)
+    await Store.saveProject(currentProject)   // persister project.remote (dont commit)
     projectBtn.classList.remove('sync-update')   // on est à jour
     setStatus('Poussé sur GitHub ✓', true)
   } catch (e) {
@@ -1471,7 +1447,7 @@ function run() {
   if (canvasEl.style.display === 'block') {
     outputPane.style.overflow = 'hidden'
     if (outputHdr) outputHdr.style.display = 'none'
-    runtimeArmed = true   // raylib a installé son écouteur clavier global (jusqu'au refresh)
+    runtimeArmed = true   // GLFW a installé son écouteur clavier global (Backspace/Tab)
     setRunning(true)
     return
   }
