@@ -50,6 +50,14 @@ if(EMSCRIPTEN)
         FetchContent_MakeAvailable(raylib)
     endif()
 
+    # raylib désactive le JPG par défaut (config.h : SUPPORT_FILEFORMAT_JPG 0).
+    # On l'active pour que image.load accepte les .jpg/.jpeg — sans modifier la
+    # source raylib : la valeur 1 l'emporte sur le #ifndef de config.h, ce qui
+    # évite le #define STBI_NO_JPEG de rtextures.c.
+    if(TARGET raylib)
+        target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
+    endif()
+
     add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/image_module.cpp)
     target_include_directories(ollin_wasm PRIVATE src libs)
     target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
@@ -90,6 +98,10 @@ else()
                 GIT_SHALLOW    TRUE
             )
             FetchContent_MakeAvailable(raylib)
+        endif()
+        # Active le décodage JPG/JPEG dans raylib (désactivé par défaut).
+        if(TARGET raylib)
+            target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
         endif()
         set(OLLIN_GRAPHICS_SOURCE src/modules/raylib_module.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/image_module.cpp)
         set(OLLIN_GRAPHICS_LIB raylib)
