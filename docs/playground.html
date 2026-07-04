@@ -1453,6 +1453,14 @@ function run() {
   const code = currentProject ? (currentProject.files[currentProject.entry] ?? '')
                               : view.state.doc.toString()
   const out  = ollin.execute(code)
+  // Une erreur du haut-niveau (ex. image.load qui échoue) peut survenir APRÈS
+  // que graphics.canvas() a déjà affiché le canvas → on la traite en priorité,
+  // sinon elle serait masquée par la branche « canvas visible » et l'écran
+  // resterait muet.
+  if (typeof out === 'string' && out.startsWith('error:')) {
+    showOutput(out)   // masque le canvas et affiche l'erreur en rouge
+    return
+  }
   if (canvasEl.style.display === 'block') {
     outputPane.style.overflow = 'hidden'
     if (outputHdr) outputHdr.style.display = 'none'
