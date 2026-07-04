@@ -1215,7 +1215,7 @@ async function ghPush(force) {
   try {
     await GH.ensureRepo()
     await GH.pushProject(currentProject, null, { force })
-    await Store.saveProject(currentProject)   // persister project.remote (dont commit)
+    await Store.saveProject(currentProject)   // persister project.remote (dont folderSha)
     projectBtn.classList.remove('sync-update')   // on est à jour
     setStatus('Poussé sur GitHub ✓', true)
   } catch (e) {
@@ -1259,14 +1259,14 @@ async function ghPull() {
 async function checkRemoteFreshness(project) {
   if (!project.remote || !project.remote.slug || !GH.isConnected()) return
   try {
-    const cur = await GH.remoteCommit(project.remote.slug)
+    const cur = await GH.remoteFolderSha(project.remote.slug)
     if (!currentProject || currentProject.id !== project.id) return   // projet changé entre-temps
-    // Base de comparaison = SHA du commit du dossier fourni par GitHub lors de
-    // notre dernier push/pull. On ne signale QUE si l'on a une base fiable
-    // (known) ET qu'elle diffère du distant. Sans base connue (jamais synchro
-    // avec cette version), on reste SILENCIEUX : la pastille n'est qu'un
-    // rappel, pas une alerte — mieux vaut ne rien afficher qu'un faux positif.
-    const known = (project.remote && project.remote.commit) || null
+    // Base de comparaison = SHA du tree du dossier lu lors de notre dernier
+    // push/pull. On ne signale QUE si l'on a une base fiable (known) ET qu'elle
+    // diffère du distant. Sans base connue (jamais synchro avec cette version),
+    // on reste SILENCIEUX : la pastille n'est qu'un rappel, pas une alerte —
+    // mieux vaut ne rien afficher qu'un faux positif.
+    const known = (project.remote && project.remote.folderSha) || null
     // Même règle que le garde-fou de conflit (GH.folderMoved), + politique
     // pastille : muette si pas de base connue (rappel, pas alerte).
     const newer = known !== null && GH.folderMoved(cur, known)

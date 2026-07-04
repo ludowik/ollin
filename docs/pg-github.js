@@ -160,34 +160,35 @@ export async function listRemoteProjects() {
   return out
 }
 
-// SHA du dernier commit ayant touché le dossier <slug> sur la branche par
-// défaut. C'est un identifiant fourni PAR GitHub (pas une empreinte calculée
-// côté client) : stable d'une version de code à l'autre, et propre au dossier
-// (un commit sur un autre projet ne le change pas). Base du garde-fou de
-// fraîcheur à l'ouverture. Renvoie null si le dossier n'a aucun commit.
-// Renvoie null seulement si le dossier n'a AUCUN commit (réponse OK, liste vide).
-// LÈVE si l'API échoue (rate-limit, 5xx, réseau) : l'appelant ne doit pas
-// confondre « dossier absent » et « lecture impossible » (sinon le garde-fou de
-// conflit se croirait libre d'écraser).
-async function folderCommit(base, branch, slug) {
-  const res = await gh(`${base}/commits?sha=${encodeURIComponent(branch)}&path=${encodeURIComponent(slug)}&per_page=1`)
-  if (!res.ok) throw new Error('GitHub commits ' + res.status)
-  const arr = await res.json()
-  return (Array.isArray(arr) && arr.length) ? arr[0].sha : null
+// SHA de l'arbre (tree) Git du sous-dossier <slug> à la racine du dépôt.
+// Lu via l'API Git Data (git/trees) — FORTEMENT cohérente : juste après un
+// push, elle reflète immédiatement le nouvel état. (L'API de LISTE des commits,
+// git/commits?path=, est servie par un index EN RETARD → elle renvoyait un SHA
+// périmé juste après un push → conflit/pastille systématiques. À ne pas utiliser
+// pour ça.) Le tree sha change ssi le CONTENU du dossier change, et il est
+// propre au dossier (un push sur un autre projet ne le modifie pas).
+// Renvoie null si le dossier est absent du dépôt. LÈVE si l'API échoue :
+// l'appelant ne doit pas confondre « dossier absent » et « lecture impossible ».
+async function folderTreeSha(base, branch, slug) {
+  const res = await gh(`${base}/git/trees/${encodeURIComponent(branch)}`)
+  if (!res.ok) throw new Error('GitHub trees ' + res.status)
+  const root = await res.json()
+  const entry = (root.tree || []).find(e => e.path === slug && e.type === 'tree')
+  return entry ? entry.sha : null
 }
-export async function remoteCommit(slug) {
+export async function remoteFolderSha(slug) {
   const { base } = await ctx()
   const info = await ghJson(base)
   const branch = info.default_branch || 'main'
-  return folderCommit(base, branch, slug)
+  return folderTreeSha(base, branch, slug)
 }
 
 // RÈGLE UNIQUE « le dossier distant a bougé depuis notre dernière synchro ».
 // Seule définition partagée par les deux garde-fous : la pastille de fraîcheur
 // (à l'ouverture, playground) ET le garde-fou de conflit (au push, ci-dessous).
-// `current` = SHA du dernier commit du dossier (via folderCommit/remoteCommit),
-// `known` = SHA de notre dernière synchro (project.remote.commit). A bougé si le
-// dossier existe sur le distant (current non nul) et que son commit diffère.
+// `current` = SHA du tree du dossier (via folderTreeSha/remoteFolderSha),
+// `known` = SHA de notre dernière synchro (project.remote.folderSha). A bougé si
+// le dossier existe sur le distant (current non nul) et que son tree diffère.
 // NB : la POLITIQUE diffère selon l'appelant et reste à leur charge — la pastille
 // exige en plus `known` connu (rappel : silence si incertain), le push alerte
 // même sans `known` (anti-écrasement : dans le doute on prévient). Ce ne sont
@@ -217,14 +218,14 @@ export async function pullProject(slug) {
     entry = m.entry || entry
   } catch (_) {}
   const now = Date.now()
-  // Best-effort : si la lecture du commit échoue, on repart sans base (la
-  // pastille restera muette jusqu'au prochain push/pull) plutôt que d'échouer
-  // tout le pull alors que les fichiers sont déjà récupérés.
-  let commit = null
+  // Best-effort : si la lecture échoue, on repart sans base (la pastille restera
+  // muette jusqu'au prochain push/pull) plutôt que d'échouer tout le pull alors
+  // que les fichiers sont déjà récupérés.
+  let folderSha = null
   try {
-    commit = await folderCommit(base, branch, slug)
+    folderSha = await folderTreeSha(base, branch, slug)
   } catch (_) {}
-  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, commit }, createdAt: now, updatedAt: now }
+  return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, folderSha }, createdAt: now, updatedAt: now }
 }
 
 // ── push d'un projet ─────────────────────────────────────────────────────────
@@ -271,20 +272,20 @@ export async function pushProject(project, message, opts = {}) {
   if (!opts.force) {
     let current
     try {
-      current = await folderCommit(base, branch, trackedSlug)
+      current = await folderTreeSha(base, branch, trackedSlug)
     } catch (_) {
       // Lecture de l'état distant impossible : NE PAS écraser en silence.
       const err = new Error('Impossible de vérifier l’état du dépôt distant — réessaie.')
       err.code = 'VERIFY_FAILED'
       throw err
     }
-    const known  = (project.remote && project.remote.commit) || null
+    const known  = (project.remote && project.remote.folderSha) || null
     const linked = !!(project.remote && project.remote.slug)   // déjà synchronisé ≥ 1 fois
     // Politique push (anti-écrasement) : avec une base connue, alerter dès qu'elle
     // diffère du distant (autre poste). Sans base connue, deux cas : projet DÉJÀ
-    // lié par une version antérieure sans `commit` → on fait confiance (pas de
+    // lié par une version antérieure sans `folderSha` → on fait confiance (pas de
     // faux conflit) ; projet jamais lié dont le slug est déjà pris → on alerte
-    // (on écraserait le travail d'autrui). Après ce push, remote.commit est posé.
+    // (on écraserait le travail d'autrui). Après ce push, remote.folderSha est posé.
     const conflict = known !== null ? folderMoved(current, known) : (current !== null && !linked)
     if (conflict) {
       const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
@@ -321,8 +322,16 @@ export async function pushProject(project, message, opts = {}) {
   })
   await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
 
-  // Base des prochains garde-fous = le commit qu'on vient de créer (connu sans
-  // relecture réseau → pas de faux conflit au prochain push mono-poste).
-  project.remote = { repo: `${owner}/${repo}`, branch, slug, commit: commit.sha }
+  // Base des prochains garde-fous = le tree sha du dossier, lu dans la réponse
+  // du POST git/trees (entrées de 1er niveau) → aucune relecture réseau, et
+  // strictement le même identifiant que celui que relira folderTreeSha. Repli
+  // (Git Data fortement cohérent) si l'entrée n'y figurait pas.
+  let folderSha = (newTree.tree || []).find(e => e.path === slug && e.type === 'tree')?.sha || null
+  if (!folderSha) {
+    try {
+      folderSha = await folderTreeSha(base, branch, slug)
+    } catch (_) {}
+  }
+  project.remote = { repo: `${owner}/${repo}`, branch, slug, folderSha }
   return project.remote
 }
