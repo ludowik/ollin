@@ -1291,7 +1291,9 @@ async function checkRemoteFreshness(project) {
     // avec cette version), on reste SILENCIEUX : la pastille n'est qu'un
     // rappel, pas une alerte — mieux vaut ne rien afficher qu'un faux positif.
     const known = (project.remote && project.remote.commit) || null
-    const newer = cur !== null && known !== null && cur !== known
+    // Même règle que le garde-fou de conflit (GH.folderMoved), + politique
+    // pastille : muette si pas de base connue (rappel, pas alerte).
+    const newer = known !== null && GH.folderMoved(cur, known)
     projectBtn.classList.toggle('sync-update', newer)   // pastille persistante
     if (newer) setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
   } catch (_) { /* hors-ligne / token invalide : silencieux */ }

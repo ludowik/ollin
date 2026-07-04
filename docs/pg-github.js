@@ -197,6 +197,20 @@ export async function remoteCommit(slug) {
   return folderCommit(base, branch, slug)
 }
 
+// RÈGLE UNIQUE « le dossier distant a bougé depuis notre dernière synchro ».
+// Seule définition partagée par les deux garde-fous : la pastille de fraîcheur
+// (à l'ouverture, playground) ET le garde-fou de conflit (au push, ci-dessous).
+// `current` = SHA du dernier commit du dossier (via folderCommit/remoteCommit),
+// `known` = SHA de notre dernière synchro (project.remote.commit). A bougé si le
+// dossier existe sur le distant (current non nul) et que son commit diffère.
+// NB : la POLITIQUE diffère selon l'appelant et reste à leur charge — la pastille
+// exige en plus `known` connu (rappel : silence si incertain), le push alerte
+// même sans `known` (anti-écrasement : dans le doute on prévient). Ce ne sont
+// pas des duplications mais deux décisions volontairement distinctes.
+export function folderMoved(current, known) {
+  return current !== null && current !== (known || null)
+}
+
 // ── pull d'un projet ─────────────────────────────────────────────────────────
 export async function pullProject(slug) {
   const { owner, repo, base, branch, tree } = await fullTree()
@@ -272,8 +286,9 @@ export async function pushProject(project, message, opts = {}) {
   // faux positif ; l'alerte ne se déclenche que si un AUTRE commit y a touché.
   if (!opts.force) {
     const current = await folderCommit(base, branch, trackedSlug)
-    const known = (project.remote && project.remote.commit) || null
-    if (current !== null && current !== known) {
+    // Politique push : alerter dès que le dossier a bougé, même sans référence
+    // connue (slug déjà pris) — un push écrase, donc dans le doute on prévient.
+    if (folderMoved(current, project.remote && project.remote.commit)) {
       const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
       err.code = 'CONFLICT'
       throw err
