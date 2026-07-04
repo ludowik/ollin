@@ -1426,6 +1426,15 @@ function showOutput(text) {
   }
 }
 
+// Erreur d'exécution survenue DANS une frame graphique (update/draw), remontée
+// par le runtime WASM (emscripten_frame) : la boucle est déjà arrêtée côté C++ ;
+// ici on repasse en mode « sortie » et on affiche le message à la place du
+// canvas, plutôt que de laisser l'écran figé sans explication.
+window.__ollinFrameError = (msg) => {
+  setRunning(false)
+  showOutput('error: ' + (msg || 'erreur d\'exécution'))
+}
+
 // ── Run ───────────────────────────────────────────────────────────────────
 let ollin = null
 

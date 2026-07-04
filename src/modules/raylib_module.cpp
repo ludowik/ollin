@@ -450,17 +450,30 @@ static void callUpdateIfAny() {
 #ifdef __EMSCRIPTEN__
 static Value s_run_callback;
 static void emscripten_frame() {
-    BeginDrawing();
-    // Override viewport to physical canvas resolution so rendering is crisp on HiDPI displays
-    if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
-        rlViewport(0, 0, s_physW, s_physH);
-    resetStyles();
-    keyboardPoll();
-    mousePoll();
-    callUpdateIfAny();
-    VM::current()->callValue(s_run_callback);
-    drawFpsOverlay();
-    EndDrawing();
+    // Une erreur d'exécution dans update()/draw() survient ici, hors du try/catch
+    // de ollin_run (la boucle est asynchrone). Sans capture, l'exception ferait
+    // planter le WASM en silence (écran figé). On l'attrape, on stoppe la boucle
+    // et on remonte le message au playground pour l'afficher à la place du canvas.
+    try {
+        BeginDrawing();
+        // Override viewport to physical canvas resolution so rendering is crisp on HiDPI displays
+        if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
+            rlViewport(0, 0, s_physW, s_physH);
+        resetStyles();
+        keyboardPoll();
+        mousePoll();
+        callUpdateIfAny();
+        VM::current()->callValue(s_run_callback);
+        drawFpsOverlay();
+        EndDrawing();
+    } catch (const std::exception& e) {
+        EndDrawing();
+        emscripten_cancel_main_loop();
+        EM_ASM({
+            if (typeof window !== 'undefined' && window.__ollinFrameError)
+                window.__ollinFrameError(UTF8ToString($0));
+        }, e.what());
+    }
 }
 #endif
 
