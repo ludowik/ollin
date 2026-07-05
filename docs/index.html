@@ -1726,87 +1726,12 @@ image.end_draw()
 import {
   EditorState,
   EditorView, lineNumbers,
-  StreamLanguage, syntaxHighlighting, HighlightStyle,
-  tags,
+  syntaxHighlighting,
 } from './vendor/codemirror.js'
 import { CODE_DISPLAY } from './cm-shared.js'
-
-// ── Ollin language — aligne sur ollin.tmLanguage.json (composant VSC) ────
-// keyword.control : var|global|const|while|do|for|in|if|then|elseif|end|
-//                   break|true|false|nil|try|catch|throw|else|func|return|
-//                   import|as|or|and|not|class|extends|static|super|self|
-//                   switch|case
-// support.function.builtin : print|printf|time|assert
-// constant.numeric  : \.digit+ ou digit+(\.digit+)?
-// keyword.operator  : +=|-=|*=|/=|%=|==|>=|<=|<>|<<|>>|...|..|+-*/%><&|^~[]{}:.
-// comment.block     : ### ... ###
-// comment.line      : ## (pas ###)
-// string            : "..."
-
-const KEYWORDS = new Set([
-  'var','global','const','while','do','for','in','if','then','elseif','end',
-  'break','true','false','nil','try','catch','throw','else','func','return',
-  'import','as','or','and','not','class','extends','static','super','self',
-  'switch','case'
-])
-const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image'])
-
-const ollinLang = StreamLanguage.define({
-  name: 'ollin',
-  startState: () => ({ block: false }),
-  token(stream, state) {
-    // Block comment ### ... ###
-    if (state.block) {
-      if (stream.match('###')) { state.block = false; return 'comment' }
-      stream.next(); return 'comment'
-    }
-    if (stream.match('###')) { state.block = true; return 'comment' }
-
-    if (stream.eatSpace()) return null
-
-    // Line comment ##
-    if (stream.match('##')) { stream.skipToEnd(); return 'comment' }
-
-    // String
-    if (stream.peek() === '"') {
-      stream.next()
-      while (!stream.eol()) { const ch = stream.next(); if (ch === '"') break; if (ch === '\\') stream.next() }
-      return 'string'
-    }
-
-    // Number : hex 0x.. / octal 0o.. (avant le décimal), puis .5 / 42 / 42.0
-    if (stream.match(/^0[xX][\da-fA-F](?:_?[\da-fA-F])*/)) return 'number'
-    if (stream.match(/^0[oO][0-7](?:_?[0-7])*/)) return 'number'
-    if (stream.match(/^0[bB][01](?:_?[01])*/)) return 'number'
-    if (stream.match(/^\.\d[\d_]*/)) return 'number'
-    if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
-
-    // Identifier → keyword / builtin
-    if (stream.match(/^[a-zA-Z_]\w*/)) {
-      const w = stream.current()
-      if (KEYWORDS.has(w)) return 'keyword'
-      if (BUILTINS.has(w)) return 'atom'
-      return null
-    }
-
-    // Operators (multi-char first)
-    if (stream.match(/^(\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
-        stream.match(/^[+\-*/%><&|^~?\[\]{}:.]/)) return 'operator'
-
-    stream.next()
-    return null
-  }
-})
-
-// ── Highlight style — couleurs VS Code Dark+ ──────────────────────────────
-const ollinHighlight = HighlightStyle.define([
-  { tag: tags.keyword,  color: '#569CD6' },           // keyword.control
-  { tag: tags.atom,     color: '#DCDCAA' },           // support.function.builtin
-  { tag: tags.number,   color: '#B5CEA8' },           // constant.numeric
-  { tag: tags.string,   color: '#CE9178' },           // string.quoted.double
-  { tag: tags.comment,  color: '#6A9955', fontStyle: 'italic' }, // comment
-  { tag: tags.operator, color: '#c9d1e0' },           // keyword.operator (texte par défaut)
-])
+// Langage Ollin (tokenizer + highlight) : source unique partagée avec le
+// playground — voir docs/cm-lang.js.
+import { ollinLang, ollinHighlight } from './cm-lang.js'
 
 // ── Editor theme ──────────────────────────────────────────────────────────
 const ollinTheme = EditorView.theme({

@@ -451,11 +451,13 @@ import {
   EditorState,
   EditorView, lineNumbers, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter,
   defaultKeymap, historyKeymap, history, indentWithTab,
-  StreamLanguage, syntaxHighlighting, HighlightStyle, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
-  tags,
+  syntaxHighlighting, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
   autocompletion, completionKeymap, acceptCompletion,
 } from './vendor/codemirror.js'
 import { CODE_DISPLAY } from './cm-shared.js'
+// Langage Ollin (tokenizer + highlight) : source unique partagée avec le
+// tutoriel — voir docs/cm-lang.js.
+import { ollinLang, ollinHighlight } from './cm-lang.js'
 // Modules projet importés dynamiquement AVEC cache-buster : une mise à jour est
 // prise en compte dès le prochain chargement (pas de version figée en cache HTTP).
 const Store = await import('./pg-store.js?v=' + Date.now())
@@ -465,55 +467,7 @@ const Fmt   = await import('./pg-format.js?v=' + Date.now())   // formateur « �
 Run.bindFreshLinks()   // toute navigation inter-pages force une version fraîche (anti-cache)
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
-const KEYWORDS = new Set([
-  'var','global','const','while','do','for','in','if','then','elseif','end',
-  'break','true','false','nil','try','catch','throw','else','func','return',
-  'import','as','or','and','not','class','extends','super','self',
-  'switch','case','default'
-])
-const BUILTINS = new Set(['print','printf','time','assert','len','typeof','Color','math','graphics','string','colors','window','image','keyboard','mouse'])
-
-const ollinLang = StreamLanguage.define({
-  name: 'ollin',
-  startState: () => ({ block: false }),
-  token(stream, state) {
-    if (state.block) {
-      if (stream.match('###')) { state.block = false; return 'comment' }
-      stream.next(); return 'comment'
-    }
-    if (stream.match('###')) { state.block = true; return 'comment' }
-    if (stream.eatSpace()) return null
-    if (stream.match('##')) { stream.skipToEnd(); return 'comment' }
-    if (stream.peek() === '"') {
-      stream.next()
-      while (!stream.eol()) { const ch = stream.next(); if (ch === '"') break; if (ch === '\\') stream.next() }
-      return 'string'
-    }
-    if (stream.match(/^0[xX][\da-fA-F](?:_?[\da-fA-F])*/)) return 'number'
-    if (stream.match(/^0[oO][0-7](?:_?[0-7])*/)) return 'number'
-    if (stream.match(/^0[bB][01](?:_?[01])*/)) return 'number'
-    if (stream.match(/^\.\d[\d_]*/)) return 'number'
-    if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
-    if (stream.match(/^[a-zA-Z_]\w*/)) {
-      const w = stream.current()
-      if (KEYWORDS.has(w)) return 'keyword'
-      if (BUILTINS.has(w)) return 'atom'
-      return null
-    }
-    if (stream.match(/^(\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
-        stream.match(/^[+\-*/%><&|^~?\[\]{}:.]/)) return 'operator'
-    stream.next(); return null
-  }
-})
-
-const ollinHighlight = HighlightStyle.define([
-  { tag: tags.keyword,  color: '#569CD6' },
-  { tag: tags.atom,     color: '#DCDCAA' },
-  { tag: tags.number,   color: '#B5CEA8' },
-  { tag: tags.string,   color: '#CE9178' },
-  { tag: tags.comment,  color: '#6A9955', fontStyle: 'italic' },
-  { tag: tags.operator, color: '#c9d1e0' },
-])
+// KEYWORDS / BUILTINS / ollinLang / ollinHighlight : importés de cm-lang.js.
 
 const ollinTheme = EditorView.theme({
   '&': { background: '#000000', color: '#c9d1e0', fontSize: '14.5px', height: '100%' },
