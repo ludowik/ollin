@@ -1481,19 +1481,20 @@ copyBtn.addEventListener('click', () => {
 // localStorage puis ouvre run.html, qui pousse le tout dans le runtime et
 // exécute le point d'entrée (imports multi-fichiers résolus, comme le Run).
 // run.html est ouvert avec un cache-buster → toujours la dernière version.
+// Le projet complet (image incluse) transite par IndexedDB (pas localStorage,
+// limité à ~5 Mo → une image ≥ 4 Mo faisait échouer l'écriture en silence, d'où
+// « aucun projet » dans le mode autonome). On ne partage que l'id du projet
+// actif ; run.html recharge le projet depuis IndexedDB.
 const standaloneBtn = document.getElementById('standalone-btn')
 standaloneBtn.addEventListener('click', () => {
   try {
     flushEditorToFile()
     if (currentProject) {
-      localStorage.setItem('ollin_run_project', JSON.stringify({
-        entry:     currentProject.entry,
-        files:     currentProject.files,
-        resources: currentProject.resources || {},
-      }))
+      Store.setActiveId(currentProject.id)      // run.html chargera ce projet…
+      Store.saveProject(currentProject)          // …depuis IndexedDB (écriture immédiate)
     }
   } catch (_) {}
-  Run.openFresh('run.html', '_blank')   // version fraîche (même mécanisme partagé)
+  Run.openFresh('run.html', '_blank')   // synchrone → pas bloqué par le pop-up blocker
 })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────

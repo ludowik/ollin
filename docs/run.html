@@ -66,7 +66,8 @@
     let   prints   = '';
 
     // Rechargement dur + navigation fraîche partagés (pg-run.js) : identiques aux autres pages.
-    const Run = await import('./pg-run.js?v=' + Date.now());
+    const Run   = await import('./pg-run.js?v=' + Date.now());
+    const Store = await import('./pg-store.js?v=' + Date.now());
     document.getElementById('reload-btn').addEventListener('click', Run.hardReload);
     Run.bindFreshLinks();   // le lien retour vers le playground force une version fraîche
 
@@ -78,9 +79,20 @@
       outEl.className = (text && String(text).startsWith('error:')) ? 'err' : 'ok';
     }
 
-    // Projet complet écrit par le playground : { entry, files, resources }.
+    // Le projet complet (avec ses images) est stocké dans IndexedDB par le
+    // playground ; le mode autonome recharge le projet ACTIF depuis là. (Avant,
+    // il transitait par localStorage → échec silencieux dès qu'une image
+    // dépassait ~5 Mo, d'où « aucun projet ».) Repli sur l'ancien localStorage
+    // pour les projets non liés à IndexedDB.
     let project = null;
-    try { project = JSON.parse(localStorage.getItem('ollin_run_project') || 'null'); } catch (_) {}
+    try {
+      await Store.init();
+      const id = Store.getActiveId();
+      if (id) project = await Store.getProject(id);
+    } catch (_) {}
+    if (!project) {
+      try { project = JSON.parse(localStorage.getItem('ollin_run_project') || 'null'); } catch (_) {}
+    }
     const code = (project && project.files) ? (project.files[project.entry] ?? '') : null;
 
     if (project === null || code === null) {
