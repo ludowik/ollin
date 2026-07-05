@@ -64,3 +64,32 @@ export function hardReload() {
     go()
   }
 }
+
+// Ajoute un cache-buster unique à une URL → force une version fraîche.
+export function freshUrl(url) {
+  return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now()
+}
+
+// Ouvre une page (nouvel onglet/fenêtre) en forçant une version fraîche.
+export function openFresh(url, target) {
+  return window.open(freshUrl(url), target)
+}
+
+// Fait que TOUTE navigation via un lien interne (*.html) force une version
+// fraîche — comme le bouton Recharger et le mode autonome. Évite d'atterrir sur
+// une vieille page servie par le cache. Intercepte au clic (timestamp toujours
+// frais) en respectant Ctrl/Cmd/clic-milieu et target=_blank.
+export function bindFreshLinks() {
+  document.addEventListener('click', (e) => {
+    if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return
+    const a = e.target.closest && e.target.closest('a[href]')
+    if (!a) return
+    const href = a.getAttribute('href')
+    if (!href || /^(https?:|\/\/|#|mailto:|tel:)/.test(href)) return   // externe / ancre
+    if (!/\.html($|[?#])/.test(href)) return                            // pages HTML seulement
+    const target = a.getAttribute('target')
+    if (target && target !== '_self') { a.href = freshUrl(href.split('#')[0]); return }  // _blank : réécrit
+    e.preventDefault()
+    location.assign(freshUrl(href.split('#')[0]))
+  })
+}

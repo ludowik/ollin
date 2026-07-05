@@ -9,7 +9,7 @@
 ;(function(){
   var last = localStorage.getItem('ollin-last-page')
   if (last === 'playground.html' && !document.referrer.includes('playground.html'))
-    location.replace('playground.html')
+    location.replace('playground.html?t=' + Date.now())   // version fraîche (anti-cache)
 })()
 </script>
 <style>
@@ -1858,17 +1858,12 @@ const scrollObs    = new IntersectionObserver(entries => {
 }, { rootMargin: '-20% 0px -70% 0px' })
 document.querySelectorAll('section[id]').forEach(s => scrollObs.observe(s))
 
-// ── Hard reload ───────────────────────────────────────────────────────────
-// Même méthode que le playground/run (pg-run.hardReload) : vide le Cache API
-// puis recharge via une URL cache-bustée (contourne le cache HTTP de la page,
-// plus fiable que location.reload(true) qui est déprécié). index.html n'est pas
-// un module ES — on garde donc la logique en ligne, mais identique.
-window.hardReload = () => {
-  const go = () => location.replace(location.pathname + '?t=' + Date.now())
-  if ('caches' in window) {
-    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go).catch(go)
-  } else { go() }
-}
+// ── Navigation & rechargement : mécanismes PARTAGÉS (pg-run.js) ─────────────
+// Mêmes que le playground et le mode autonome : hardReload (bouton Recharger)
+// et bindFreshLinks (toute navigation inter-pages force une version fraîche).
+const Nav = await import('./pg-run.js?v=' + Date.now())
+window.hardReload = Nav.hardReload
+Nav.bindFreshLinks()
 
 // ── Pull-to-refresh (mobile) ────────────────────────────────────────────────
 // Tirer la page vers le bas en étant tout en haut → la page suit le geste,

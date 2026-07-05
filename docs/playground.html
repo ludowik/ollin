@@ -456,6 +456,7 @@ import { CODE_DISPLAY } from './cm-shared.js'
 const Store = await import('./pg-store.js?v=' + Date.now())
 const GH    = await import('./pg-github.js?v=' + Date.now())
 const Run   = await import('./pg-run.js?v=' + Date.now())   // exécution partagée avec run.html
+Run.bindFreshLinks()   // toute navigation inter-pages force une version fraîche (anti-cache)
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
@@ -1492,7 +1493,7 @@ standaloneBtn.addEventListener('click', () => {
       }))
     }
   } catch (_) {}
-  window.open('run.html?v=' + Date.now(), '_blank')
+  Run.openFresh('run.html', '_blank')   // version fraîche (même mécanisme partagé)
 })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────

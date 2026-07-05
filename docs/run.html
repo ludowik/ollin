@@ -65,9 +65,10 @@
     const outEl    = document.getElementById('out');
     let   prints   = '';
 
-    // Rechargement dur partagé (pg-run.js) : identique aux autres pages.
+    // Rechargement dur + navigation fraîche partagés (pg-run.js) : identiques aux autres pages.
     const Run = await import('./pg-run.js?v=' + Date.now());
     document.getElementById('reload-btn').addEventListener('click', Run.hardReload);
+    Run.bindFreshLinks();   // le lien retour vers le playground force une version fraîche
 
     function showText(text) {
       outEl.style.display = 'block';
