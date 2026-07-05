@@ -80,19 +80,15 @@
     }
 
     // Le projet complet (avec ses images) est stocké dans IndexedDB par le
-    // playground ; le mode autonome recharge le projet ACTIF depuis là. (Avant,
-    // il transitait par localStorage → échec silencieux dès qu'une image
-    // dépassait ~5 Mo, d'où « aucun projet ».) Repli sur l'ancien localStorage
-    // pour les projets non liés à IndexedDB.
+    // playground ; le mode autonome recharge le projet ACTIF depuis là — source
+    // unique (avant, il transitait par localStorage → échec silencieux dès qu'une
+    // image dépassait ~5 Mo, d'où « aucun projet »).
     let project = null;
     try {
       await Store.init();
       const id = Store.getActiveId();
       if (id) project = await Store.getProject(id);
     } catch (_) {}
-    if (!project) {
-      try { project = JSON.parse(localStorage.getItem('ollin_run_project') || 'null'); } catch (_) {}
-    }
     const code = (project && project.files) ? (project.files[project.entry] ?? '') : null;
 
     if (project === null || code === null) {

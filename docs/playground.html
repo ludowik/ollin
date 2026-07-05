@@ -1018,6 +1018,10 @@ async function loadProject(id) {
   renderResources()
   updateImgBtn()
   view.focus()
+  // Éteindre la pastille du projet précédent AVANT le contrôle async : sinon,
+  // pour un projet sans lien distant (ou hors-ligne), checkRemoteFreshness sort
+  // sans toucher la pastille → elle resterait allumée à tort sur ce projet.
+  projectBtn.classList.remove('sync-update')
   checkRemoteFreshness(p)   // garde-fou d'ouverture (non bloquant)
 }
 
@@ -1487,14 +1491,24 @@ copyBtn.addEventListener('click', () => {
 // actif ; run.html recharge le projet depuis IndexedDB.
 const standaloneBtn = document.getElementById('standalone-btn')
 standaloneBtn.addEventListener('click', () => {
-  try {
-    flushEditorToFile()
-    if (currentProject) {
-      Store.setActiveId(currentProject.id)      // run.html chargera ce projet…
-      Store.saveProject(currentProject)          // …depuis IndexedDB (écriture immédiate)
-    }
-  } catch (_) {}
-  Run.openFresh('run.html', '_blank')   // synchrone → pas bloqué par le pop-up blocker
+  // On ouvre la fenêtre SYNCHRONEMENT (conserve le user gesture → pas bloquée par
+  // le pop-up blocker), mais on n'y charge run.html qu'APRÈS que le projet soit
+  // COMMITÉ dans IndexedDB. Sinon run.html (autre connexion) pourrait lire une
+  // version périmée, voire « aucun projet » pour un projet neuf (écriture IDB
+  // asynchrone). saveProject est donc bien attendu ici.
+  const win = window.open('', '_blank')
+  ;(async () => {
+    try {
+      flushEditorToFile()
+      if (currentProject) {
+        Store.setActiveId(currentProject.id)
+        await Store.saveProject(currentProject)
+      }
+    } catch (_) {}
+    const url = Run.freshUrl('run.html')
+    if (win && !win.closed) win.location.replace(url)
+    else window.open(url, '_blank')   // repli si la fenêtre a été bloquée
+  })()
 })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────
