@@ -822,7 +822,56 @@ window.addEventListener('keydown', e => {
   }
 }, true)   // capture + enregistré au chargement → passe avant l'écouteur GLFW
 
+// ── Déplacement du curseur au glissement horizontal (tactile / mobile) ──────
+// L'éditeur est en retour-à-la-ligne → aucun scroll horizontal, on peut donc
+// utiliser le glissement HORIZONTAL du doigt pour déplacer le curseur : 1 cran
+// par largeur de glyphe glissée, déplacement LINÉAIRE dans le document (franchit
+// les fins de ligne). Appui long (immobile) PUIS glissement → étend la
+// sélection au lieu de déplacer. Le glissement vertical reste le scroll natif.
+;(function () {
+  const H_THRESHOLD = 8      // px avant de trancher la direction du geste
+  const LONG_PRESS  = 400    // ms d'immobilité → mode « étendre la sélection »
+  const dom = view.scrollDOM
+  let decided = false, active = false, selecting = false
+  let x0 = 0, y0 = 0, head0 = 0, longTimer = 0
+
+  dom.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return
+    x0 = e.touches[0].clientX
+    y0 = e.touches[0].clientY
+    head0 = view.state.selection.main.head
+    decided = false; active = false; selecting = false
+    clearTimeout(longTimer)
+    longTimer = setTimeout(() => { selecting = true }, LONG_PRESS)   // appui long armé
+  }, { passive: true })
+
+  dom.addEventListener('touchmove', (e) => {
+    if (e.touches.length !== 1) return
+    const dx = e.touches[0].clientX - x0
+    const dy = e.touches[0].clientY - y0
+    if (!decided) {
+      if (Math.abs(dx) < H_THRESHOLD && Math.abs(dy) < H_THRESHOLD) return
+      decided = true
+      active = Math.abs(dx) > Math.abs(dy)   // horizontal → on prend la main
+      if (!active) { clearTimeout(longTimer); selecting = false }   // vertical → scroll natif
+    }
+    if (!active) return
+    e.preventDefault()   // on gère : pas de scroll ni de sélection native
+    const cw = view.defaultCharacterWidth || 8
+    const pos = Math.max(0, Math.min(view.state.doc.length, head0 + Math.round(dx / cw)))
+    view.dispatch({
+      selection: selecting ? { anchor: head0, head: pos } : { anchor: pos },
+      scrollIntoView: true,
+    })
+  }, { passive: false })
+
+  const end = () => { clearTimeout(longTimer); decided = false; active = false; selecting = false }
+  dom.addEventListener('touchend', end, { passive: true })
+  dom.addEventListener('touchcancel', end, { passive: true })
+})()
+
 view.focus()
+window.__ollinView = view    // accès à l'éditeur pour le débogage/console
 window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
 { const le = document.getElementById('load-error'); if (le) le.style.display = 'none' }
 localStorage.setItem('ollin-last-page', 'playground.html')
