@@ -127,10 +127,17 @@ export async function ensureRepo() {
 }
 
 // Arbre complet de la branche par défaut (+ contexte du dépôt).
-async function fullTree() {
-  const { owner, repo, base } = await ctx()
-  const info = await ghJson(base)
-  const branch = info.default_branch || 'main'
+// `pre` (optionnel) = { owner, repo, base, branch } déjà résolus par l'appelant
+// (ex. pushProject) → évite de relire les métadonnées du dépôt une 2e fois.
+async function fullTree(pre) {
+  let owner, repo, base, branch
+  if (pre && pre.base && pre.branch) {
+    ({ owner, repo, base, branch } = pre)
+  } else {
+    ({ owner, repo, base } = await ctx())
+    const info = await ghJson(base)
+    branch = info.default_branch || 'main'
+  }
   const res = await gh(`${base}/git/trees/${branch}?recursive=1`)
   if (!res.ok) {
     if (res.status === 409 || res.status === 404) return { owner, repo, base, branch, tree: [] }  // dépôt vide
@@ -263,7 +270,7 @@ export async function pushProject(project, message, opts = {}) {
   // État distant courant (sert au garde-fou de conflit ET aux suppressions).
   const oldSlug = project.remote && project.remote.slug
   const trackedSlug = oldSlug || slug
-  const { tree: remoteTree } = await fullTree()
+  const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })   // réutilise le contexte déjà résolu
 
   // Garde-fou : le dossier distant correspond-il à notre dernière synchro ?
   // Base = SHA du dernier commit du dossier, fourni PAR GitHub (pas une

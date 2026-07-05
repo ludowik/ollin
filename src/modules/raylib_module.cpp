@@ -454,8 +454,10 @@ static void emscripten_frame() {
     // de ollin_run (la boucle est asynchrone). Sans capture, l'exception ferait
     // planter le WASM en silence (écran figé). On l'attrape, on stoppe la boucle
     // et on remonte le message au playground pour l'afficher à la place du canvas.
+    bool drawing = false;   // frame ouvert (BeginDrawing sans EndDrawing correspondant)
     try {
         BeginDrawing();
+        drawing = true;
         // Override viewport to physical canvas resolution so rendering is crisp on HiDPI displays
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
@@ -465,9 +467,11 @@ static void emscripten_frame() {
         callUpdateIfAny();
         VM::current()->callValue(s_run_callback);
         drawFpsOverlay();
+        drawing = false;   // on va clore le frame ci-dessous → ne pas re-clore dans le catch
         EndDrawing();
     } catch (const std::exception& e) {
-        EndDrawing();
+        if (drawing)       // ne fermer que si un frame est réellement ouvert (jamais 2× EndDrawing)
+            EndDrawing();
         emscripten_cancel_main_loop();
         EM_ASM({
             if (typeof window !== 'undefined' && window.__ollinFrameError)
