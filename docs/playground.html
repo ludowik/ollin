@@ -688,6 +688,10 @@ const MODULE_MEMBERS = {
   ],
 }
 
+// Commande « démarrer l'autocomplétion » (binding Ctrl-Space de CodeMirror) —
+// réutilisée pour rouvrir la liste après avoir complété un nom de module.
+const startCompletion = (completionKeymap.find(b => b.key === 'Ctrl-Space') || {}).run
+
 function ollinComplete(context) {
   const dotWord = context.matchBefore(/[a-zA-Z_]\w*\.\w*/)
   if (dotWord) {
@@ -705,7 +709,15 @@ function ollinComplete(context) {
   }
   const word = context.matchBefore(/\w+/)
   if (!word || (word.from === word.to && !context.explicit)) return null
-  const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({ label: m, type: 'namespace' }))
+  // Compléter un module (math, graphics…) insère « nom. » et rouvre aussitôt la
+  // liste sur ses membres — on n'a plus à taper le point à la main.
+  const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({
+    label: m, type: 'namespace',
+    apply: (view, c, from, to) => {
+      view.dispatch({ changes: { from, to, insert: m + '.' }, selection: { anchor: from + m.length + 1 } })
+      if (startCompletion) startCompletion(view)
+    },
+  }))
   return {
     from: word.from,
     options: [AC_FUNC, ...AC_LIFECYCLE, ...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
