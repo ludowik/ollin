@@ -1499,18 +1499,7 @@ standaloneBtn.addEventListener('click', () => {
 // Vide le Cache API puis recharge (le code de l'éditeur est conservé dans
 // localStorage). Utile pour récupérer un WASM fraîchement déployé.
 const reloadBtn = document.getElementById('reload-btn')
-reloadBtn.addEventListener('click', () => {
-  // Recharge une URL cache-bustée → force une page fraîche (cache HTTP contourné).
-  const reload = () => location.replace(location.pathname + '?t=' + Date.now())
-  if ('caches' in window) {
-    caches.keys()
-      .then(ks => Promise.all(ks.map(k => caches.delete(k))))
-      .then(reload)
-      .catch(reload)
-  } else {
-    reload()
-  }
-})
+reloadBtn.addEventListener('click', Run.hardReload)   // rechargement dur partagé (pg-run.js)
 
 // ── Image upload ──────────────────────────────────────────────────────────
 const imgFileInput = document.getElementById('img-file-input')

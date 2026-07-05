@@ -51,3 +51,16 @@ export function runProgram(m, code, canvasEl, hooks) {
     hooks.onOutput(out)
   }
 }
+
+// Rechargement « dur », PARTAGÉ par toutes les pages : vide le Cache API (Service
+// Worker) puis recharge via une URL cache-bustée, ce qui contourne aussi le cache
+// HTTP de la page elle-même (un simple location.reload() peut resservir l'ancienne
+// page). Garantit qu'on récupère bien le dernier code déployé.
+export function hardReload() {
+  const go = () => location.replace(location.pathname + '?t=' + Date.now())
+  if ('caches' in window) {
+    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go).catch(go)
+  } else {
+    go()
+  }
+}

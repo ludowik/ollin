@@ -1859,10 +1859,15 @@ const scrollObs    = new IntersectionObserver(entries => {
 document.querySelectorAll('section[id]').forEach(s => scrollObs.observe(s))
 
 // ── Hard reload ───────────────────────────────────────────────────────────
+// Même méthode que le playground/run (pg-run.hardReload) : vide le Cache API
+// puis recharge via une URL cache-bustée (contourne le cache HTTP de la page,
+// plus fiable que location.reload(true) qui est déprécié). index.html n'est pas
+// un module ES — on garde donc la logique en ligne, mais identique.
 window.hardReload = () => {
+  const go = () => location.replace(location.pathname + '?t=' + Date.now())
   if ('caches' in window) {
-    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(() => location.reload(true))
-  } else { location.reload(true) }
+    caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go).catch(go)
+  } else { go() }
 }
 
 // ── Pull-to-refresh (mobile) ────────────────────────────────────────────────

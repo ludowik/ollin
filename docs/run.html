@@ -65,18 +65,9 @@
     const outEl    = document.getElementById('out');
     let   prints   = '';
 
-    // Hardreload : vide le Cache API puis recharge (récupère le dernier WASM).
-    document.getElementById('reload-btn').addEventListener('click', () => {
-      const reload = () => location.reload();
-      if ('caches' in window) {
-        caches.keys()
-          .then(ks => Promise.all(ks.map(k => caches.delete(k))))
-          .then(reload)
-          .catch(reload);
-      } else {
-        reload();
-      }
-    });
+    // Rechargement dur partagé (pg-run.js) : identique aux autres pages.
+    const Run = await import('./pg-run.js?v=' + Date.now());
+    document.getElementById('reload-btn').addEventListener('click', Run.hardReload);
 
     function showText(text) {
       outEl.style.display = 'block';
@@ -85,10 +76,6 @@
       outEl.textContent = body;
       outEl.className = (text && String(text).startsWith('error:')) ? 'err' : 'ok';
     }
-
-    // Préchargement + exécution + gestion d'erreurs : logique PARTAGÉE avec le
-    // Run inline du playground via pg-run.js (une seule source de vérité).
-    const Run = await import('./pg-run.js?v=' + Date.now());
 
     // Projet complet écrit par le playground : { entry, files, resources }.
     let project = null;
