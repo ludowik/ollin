@@ -59,7 +59,7 @@
     </div>
   </div>
 
-  <script>
+  <script type="module">
     const statusEl = document.getElementById('status');
     const canvasEl = document.getElementById('canvas');
     const outEl    = document.getElementById('out');
@@ -86,8 +86,11 @@
       outEl.className = (text && String(text).startsWith('error:')) ? 'err' : 'ok';
     }
 
+    // Préchargement + exécution + gestion d'erreurs : logique PARTAGÉE avec le
+    // Run inline du playground via pg-run.js (une seule source de vérité).
+    const Run = await import('./pg-run.js?v=' + Date.now());
+
     // Projet complet écrit par le playground : { entry, files, resources }.
-    const MANIFEST = 'ollin.project.json';
     let project = null;
     try { project = JSON.parse(localStorage.getItem('ollin_run_project') || 'null'); } catch (_) {}
     const code = (project && project.files) ? (project.files[project.entry] ?? '') : null;
@@ -107,25 +110,13 @@
           print:    t => { prints += t + '\n'; },
           printErr: t => { prints += t + '\n'; },
         }).then(m => {
-          // Pousser tout le projet dans le runtime (comme le Run du playground).
-          try {
-            if (m.resetSources) m.resetSources();
-            for (const path in project.files) {
-              if (path === MANIFEST) continue;
-              if (m.preloadSource) m.preloadSource(path, project.files[path]);
-            }
-            const res = project.resources || {};
-            for (const name in res) m.preloadImage(name, res[name].b64, res[name].ext);
-          } catch (_) {}
+          Run.loadProjectIntoRuntime(m, project);
           statusEl.textContent = '';
-          let out;
-          try { out = m.execute(code); }
-          catch (e) { showText('error: ' + (e?.message ?? e)); return; }
-          if (canvasEl.style.display === 'block') {
-            statusEl.textContent = 'En cours…';
-          } else {
-            showText(out);
-          }
+          Run.runProgram(m, code, canvasEl, {
+            onError:   (msg) => { statusEl.textContent = ''; showText(msg); },
+            onRunning: () => { statusEl.textContent = 'En cours…'; },
+            onOutput:  (out) => showText(out),
+          });
         }).catch(err => {
           statusEl.textContent = '';
           showText('error: WASM — ' + (err?.message ?? err));

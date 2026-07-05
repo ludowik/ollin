@@ -455,6 +455,7 @@ import { CODE_DISPLAY } from './cm-shared.js'
 // prise en compte dès le prochain chargement (pas de version figée en cache HTTP).
 const Store = await import('./pg-store.js?v=' + Date.now())
 const GH    = await import('./pg-github.js?v=' + Date.now())
+const Run   = await import('./pg-run.js?v=' + Date.now())   // exécution partagée avec run.html
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 const KEYWORDS = new Set([
@@ -998,18 +999,6 @@ async function deleteResource(name) {
   renderResources(); updateImgBtn()
 }
 
-// Pousse tout le projet (scripts + ressources) dans le runtime WASM avant un Run.
-function loadProjectIntoRuntime() {
-  if (!ollin || !currentProject) return
-  if (ollin.resetSources) ollin.resetSources()
-  for (const [path, content] of Object.entries(currentProject.files)) {
-    if (path === Store.MANIFEST) continue
-    if (ollin.preloadSource) ollin.preloadSource(path, content)
-  }
-  for (const [name, r] of Object.entries(currentProject.resources || {})) {
-    if (ollin.preloadImage) ollin.preloadImage(name, r.b64, r.ext)
-  }
-}
 
 // ── chargement / bascule de projet ──
 async function loadProject(id) {
@@ -1426,15 +1415,6 @@ function showOutput(text) {
   }
 }
 
-// Erreur d'exécution survenue DANS une frame graphique (update/draw), remontée
-// par le runtime WASM (emscripten_frame) : la boucle est déjà arrêtée côté C++ ;
-// ici on repasse en mode « sortie » et on affiche le message à la place du
-// canvas, plutôt que de laisser l'écran figé sans explication.
-window.__ollinFrameError = (msg) => {
-  setRunning(false)
-  showOutput('error: ' + (msg || 'erreur d\'exécution'))
-}
-
 // ── Run ───────────────────────────────────────────────────────────────────
 let ollin = null
 
@@ -1447,28 +1427,22 @@ function run() {
   // Afficher la zone AVANT execute : window.width lit le clientWidth de
   // #output-pane (0 si display:none → graphics dimensionné à vide).
   setOutputVisible(true)
-  // Pousser tout le projet dans le runtime puis exécuter le POINT D'ENTRÉE.
   flushEditorToFile()
-  loadProjectIntoRuntime()
+  // Préchargement + exécution + gestion d'erreurs : logique PARTAGÉE avec le mode
+  // autonome (run.html) via pg-run.js — plus de duplication ni de divergence.
+  Run.loadProjectIntoRuntime(ollin, currentProject)
   const code = currentProject ? (currentProject.files[currentProject.entry] ?? '')
                               : view.state.doc.toString()
-  const out  = ollin.execute(code)
-  // Une erreur du haut-niveau (ex. image.load qui échoue) peut survenir APRÈS
-  // que graphics.canvas() a déjà affiché le canvas → on la traite en priorité,
-  // sinon elle serait masquée par la branche « canvas visible » et l'écran
-  // resterait muet.
-  if (typeof out === 'string' && out.startsWith('error:')) {
-    showOutput(out)   // masque le canvas et affiche l'erreur en rouge
-    return
-  }
-  if (canvasEl.style.display === 'block') {
-    outputPane.style.overflow = 'hidden'
-    if (outputHdr) outputHdr.style.display = 'none'
-    runtimeArmed = true   // GLFW a installé son écouteur clavier global (Backspace/Tab)
-    setRunning(true)
-    return
-  }
-  showOutput(out)
+  Run.runProgram(ollin, code, canvasEl, {
+    onError:   (msg) => { setRunning(false); showOutput(msg) },
+    onRunning: () => {
+      outputPane.style.overflow = 'hidden'
+      if (outputHdr) outputHdr.style.display = 'none'
+      runtimeArmed = true   // GLFW a installé son écouteur clavier global (Backspace/Tab)
+      setRunning(true)
+    },
+    onOutput:  (out) => showOutput(out),
+  })
 }
 
 runBtn.addEventListener('click', run)
