@@ -10,17 +10,17 @@ import {
   syntaxHighlighting, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
   autocompletion, completionKeymap, acceptCompletion,
 } from '../vendor/codemirror.js'
-import { CODE_DISPLAY } from '../cm-shared.js'
+import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../cm-shared.js'
 import { ollinLang, ollinHighlight } from '../cm-lang.js'
 
 export async function init(ctx) {
 const { getOllin, hardReload } = ctx
 const disposers = []   // écouteurs globaux à retirer au démontage
 
-const Store = await import('../pg-store.js?v=' + Date.now())
-const GH    = await import('../pg-github.js?v=' + Date.now())
-const Run   = await import('../pg-run.js?v=' + Date.now())   // exécution partagée avec run.html
-const Fmt   = await import('../pg-format.js?v=' + Date.now())   // formateur « à la demande »
+const Store = await import('../pg-store.js?v=' + ctx.v)
+const GH    = await import('../pg-github.js?v=' + ctx.v)
+const Run   = await import('../pg-run.js?v=' + ctx.v)   // exécution partagée avec run.html
+const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // formateur « à la demande »
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 // KEYWORDS / BUILTINS / ollinLang / ollinHighlight : importés de cm-lang.js.
@@ -31,12 +31,8 @@ const ollinTheme = EditorView.theme({
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
   ...CODE_DISPLAY,   // réglages d'affichage partagés (cm-shared.js)
   '.cm-gutters': { background: '#000000', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150' },
-  '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
-  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
+  ...CODE_THEME_BASE,   // ligne active, curseur, sélection (partagés cm-shared.js)
   '&.cm-focused': { outline: 'none' },
-  '&.cm-focused .cm-cursor': { borderLeftColor: '#7c83ff', borderLeftWidth: '2px' },
-  '.cm-selectionBackground': { background: 'rgba(255,255,255,0.18) !important' },
-  '&.cm-focused .cm-selectionBackground': { background: 'rgba(255,255,255,0.25) !important' },
 
   /* autocomplete dropdown */
   '.cm-tooltip.cm-tooltip-autocomplete': { background: '#1e2133', border: '1px solid #3a3f5c', borderRadius: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', padding: '2px 0' },
@@ -396,9 +392,7 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
 })()
 
 view.focus()
-window.__ollinView = view    // accès à l'éditeur pour le débogage/console
-window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
-{ const le = document.getElementById('load-error'); if (le) le.style.display = 'none' }
+window.__ollinView = view    // accès à l'éditeur pour le débogage/console (nettoyé au démontage)
 // (La réouverture de la dernière vue est gérée au niveau du routeur, app.js.)
 
 // ── Projets & fichiers ──────────────────────────────────────────────────────
@@ -1067,8 +1061,8 @@ document.getElementById('format-btn').addEventListener('click', doFormat)
 
 // ── Copy ──────────────────────────────────────────────────────────────────
 const copyBtn = document.getElementById('copy-btn')
-const ICON_COPY = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>'
-const ICON_OK   = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4 4 6-6"/></svg>'
+const ICON_COPY = ICONS.copy   // partagés (cm-shared.js)
+const ICON_OK   = ICONS.ok
 copyBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(view.state.doc.toString()).then(() => {
     copyBtn.innerHTML = ICON_OK + '<span class="btn-label"> Copié !</span>'
@@ -1114,10 +1108,6 @@ standaloneBtn.addEventListener('click', () => {
 // localStorage). Utile pour récupérer un WASM fraîchement déployé.
 const reloadBtn = document.getElementById('reload-btn')
 reloadBtn.addEventListener('click', hardReload)   // rechargement dur partagé (pg-run.js via ctx)
-// Overlay « chargement échoué » : bouton Recharger (l'ancien watchdog classique
-// n'existe plus en SPA — le module est importé par app.js).
-const loadErrReload = document.getElementById('load-error-reload')
-if (loadErrReload) loadErrReload.addEventListener('click', hardReload)
 
 // ── Image upload ──────────────────────────────────────────────────────────
 const imgFileInput = document.getElementById('img-file-input')
@@ -1235,11 +1225,14 @@ disposers.push(() => {
 })
 
 // Quitter la vue pendant une exécution graphique : mettre en pause la boucle
-// raylib (sinon elle continuerait de tourner sur un canvas détaché) et
-// désarmer l'interception clavier.
+// raylib (sinon elle continuerait de tourner sur un canvas détaché), désarmer
+// l'interception clavier, DÉTRUIRE l'éditeur CM6 (retire ses observers/listeners
+// globaux → pas de fuite à chaque re-visite) et libérer la référence de debug.
 disposers.push(() => {
   try { ollin && ollin.pauseMainLoop() } catch (_) {}
   runtimeArmed = false
+  try { view.destroy() } catch (_) {}
+  if (window.__ollinView === view) window.__ollinView = undefined
 })
 
 return () => { for (const d of disposers) d() }

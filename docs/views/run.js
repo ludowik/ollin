@@ -1,16 +1,18 @@
 // Vue RUN (exécution autonome plein écran) — init(ctx) appelée par app.js après
 // montage du fragment views/run.html.
-//   ctx = { root, getOllin, hardReload, navigate }
+//   ctx = { root, getOllin, hardReload, navigate, v }
 // Recharge le projet ACTIF depuis IndexedDB (écrit par le playground) et
 // l'exécute via la logique PARTAGÉE (pg-run.js) — mêmes préchargement et gestion
 // d'erreurs que le Run inline du playground.
 
 export async function init(ctx) {
   const { getOllin, hardReload } = ctx
+  let mod = null   // module WASM (capturé par stop() ; pas de global smuggling)
 
-  // Modules partagés (cache-bustés, comme partout dans le projet).
-  const Store = await import('../pg-store.js?v=' + Date.now())
-  const { loadProjectIntoRuntime, runProgram } = await import('../pg-run.js?v=' + Date.now())
+  // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
+  // session réutilise la même URL → pas de croissance du registre de modules).
+  const Store = await import('../pg-store.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, runProgram } = await import('../pg-run.js?v=' + ctx.v)
 
   const statusEl = document.getElementById('status')
   const outEl    = document.getElementById('out')
@@ -31,7 +33,7 @@ export async function init(ctx) {
   }
 
   const stop = () => {
-    try { window.__ollin && window.__ollin.pauseMainLoop && window.__ollin.pauseMainLoop() } catch (_) {}
+    try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
   }
 
@@ -50,21 +52,21 @@ export async function init(ctx) {
     return stop
   }
 
-  let m = null
   try {
-    m = await getOllin()
+    mod = await getOllin()
   } catch (err) {
     statusEl.textContent = ''
     showText('error: WASM — ' + (err?.message ?? err))
     return stop
   }
-  window.__ollin = m   // référence pour la pause au démontage
 
-  loadProjectIntoRuntime(m, project)
+  loadProjectIntoRuntime(mod, project)
   statusEl.textContent = ''
-  runProgram(m, code, canvasEl, {
+  runProgram(mod, code, canvasEl, {
     onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
-    onRunning: () => { statusEl.textContent = 'En cours…' },
+    // Programme graphique : donner le focus clavier au canvas (programmes
+    // interactifs lisant keyboard.*), comme l'ancien run.html (canvas tabindex).
+    onRunning: () => { statusEl.textContent = 'En cours…'; try { canvasEl.focus() } catch (_) {} },
     onOutput:  (out) => showText(out),
   })
 

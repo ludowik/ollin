@@ -9,7 +9,7 @@ import {
   EditorView, lineNumbers,
   syntaxHighlighting,
 } from '../vendor/codemirror.js'
-import { CODE_DISPLAY } from '../cm-shared.js'
+import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../cm-shared.js'
 import { ollinLang, ollinHighlight } from '../cm-lang.js'
 
 // ── Thème éditeur (blocs read-only du tutoriel) ─────────────────────────────
@@ -18,13 +18,9 @@ const ollinTheme = EditorView.theme({
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto', fontSize: 'var(--code-size)' },
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff', fontSize: 'var(--code-size)' },
   ...CODE_DISPLAY,
+  ...CODE_THEME_BASE,   // ligne active, curseur, sélection (partagés)
   '.cm-gutters': { background: '#1a1d2e', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150', borderRadius: '8px 0 0 8px' },
-  '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
-  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
   '&.cm-focused': { outline: 'none', borderColor: '#7c83ff' },
-  '&.cm-focused .cm-cursor': { borderLeftColor: '#7c83ff', borderLeftWidth: '2px' },
-  '.cm-selectionBackground': { background: 'rgba(255,255,255,0.18) !important' },
-  '&.cm-focused .cm-selectionBackground': { background: 'rgba(255,255,255,0.25) !important' },
   '.cm-content[contenteditable="false"]': { cursor: 'default' },
 })
 
@@ -37,30 +33,32 @@ function makeStaticEditor(parent, code) {
   })
 }
 
-// ── Icônes SVG ──────────────────────────────────────────────────────────────
-const ICON_RUN  = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M3 2l11 6-11 6V2z"/></svg>'
-const ICON_COPY = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>'
-const ICON_OK   = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 8l4 4 6-6"/></svg>'
+// Icônes SVG (run/copy/ok) : partagées via cm-shared.js.
 
 function makeCopyBtn(getText) {
   const btn = document.createElement('button')
   btn.className = 'code-btn copy'
   btn.title     = 'Copier'
-  btn.innerHTML = ICON_COPY
+  btn.innerHTML = ICONS.copy
   btn.addEventListener('click', () => {
     navigator.clipboard.writeText(getText()).then(() => {
-      btn.innerHTML         = ICON_OK
+      btn.innerHTML         = ICONS.ok
       btn.style.color       = '#4ade80'
       btn.style.borderColor = '#4ade80'
-      setTimeout(() => { btn.innerHTML = ICON_COPY; btn.style.color = ''; btn.style.borderColor = '' }, 1500)
+      setTimeout(() => { btn.innerHTML = ICONS.copy; btn.style.color = ''; btn.style.borderColor = '' }, 1500)
     })
   })
   return btn
 }
 
-export function init(ctx) {
+export async function init(ctx) {
   const root = ctx.root
   const disposers = []          // nettoyage au démontage de la vue
+  const editors   = []          // éditeurs CM6 statiques créés (à détruire au démontage)
+
+  // Exécution PARTAGÉE (pg-run.js) : mêmes préchargement/gestion d'erreurs que
+  // le playground et le mode autonome (try/catch, erreurs de frame graphique).
+  const Run = await import('../pg-run.js?v=' + ctx.v)
 
   // Le runtime WASM est PARTAGÉ (chargé une fois par app.js). On le « réchauffe »
   // dès l'entrée dans la vue ; les boutons Exécuter l'attendent s'il n'est pas prêt.
@@ -185,7 +183,7 @@ export function init(ctx) {
     wrap.className = 'cm-static-wrap'
     if (pre.closest('.two-col')) wrap.style.margin = '0'
 
-    makeStaticEditor(wrap, text)
+    editors.push(makeStaticEditor(wrap, text))
 
     const actions = document.createElement('div')
     actions.className = 'code-actions'
@@ -201,7 +199,7 @@ export function init(ctx) {
       const runBtn = document.createElement('button')
       runBtn.className = 'code-btn run'
       runBtn.title     = 'Exécuter'
-      runBtn.innerHTML = ICON_RUN
+      runBtn.innerHTML = ICONS.run
       runBtn.addEventListener('click', () => {
         if (!ollin) {
           outDiv.textContent   = 'Runtime en cours de chargement…'
@@ -210,32 +208,49 @@ export function init(ctx) {
           return
         }
         canvas.style.display = 'none'
-        const out = ollin.execute(text)
-        if (canvas.style.display === 'block') {
-          outDiv.style.display = 'none'
-          canvas.style.maxWidth = '100%'
-          canvas.style.borderRadius = '6px'
-          canvas.style.margin = '10px 0'
-          wrap.after(canvas)
-          return
-        }
-        outDiv.style.display = 'block'
-        if (!out || out === '') {
-          outDiv.textContent = '(aucune sortie)'
-          outDiv.className   = 'inline-output empty'
-        } else if (out.startsWith('error:')) {
-          outDiv.textContent = out
-          outDiv.className   = 'inline-output err'
-        } else {
-          outDiv.textContent = out
-          outDiv.className   = 'inline-output ok'
-        }
+        // Exécution partagée : gère try/catch, erreurs de frame graphique et
+        // erreur haut-niveau survenant après ouverture du canvas.
+        Run.runProgram(ollin, text, canvas, {
+          onRunning: () => {                       // programme graphique : canvas sous le bloc
+            outDiv.style.display = 'none'
+            canvas.style.maxWidth = '100%'
+            canvas.style.borderRadius = '6px'
+            canvas.style.margin = '10px 0'
+            wrap.after(canvas)
+          },
+          onOutput: (out) => {
+            outDiv.style.display = 'block'
+            if (!out || out === '') {
+              outDiv.textContent = '(aucune sortie)'
+              outDiv.className   = 'inline-output empty'
+            } else {
+              outDiv.textContent = out
+              outDiv.className   = 'inline-output ok'
+            }
+          },
+          onError: (msg) => {
+            outDiv.style.display = 'block'
+            outDiv.textContent   = msg
+            outDiv.className     = 'inline-output err'
+          },
+        })
       })
       actions.appendChild(runBtn)
     }
 
     pre.replaceWith(wrap)
     if (outDiv) wrap.after(outDiv)
+  })
+
+  // Détruire les éditeurs CM6 (retire leurs observers/listeners globaux → pas
+  // de fuite à chaque re-visite), mettre la boucle raylib en pause (un snippet
+  // graphique a pu la lancer) et couper le hook d'erreur de frame.
+  disposers.push(() => {
+    for (const ed of editors) {
+      try { ed.destroy() } catch (_) {}
+    }
+    try { ollin && ollin.pauseMainLoop() } catch (_) {}
+    window.__ollinFrameError = undefined
   })
 
   // Nettoyage appelé par le routeur avant de monter une autre vue.

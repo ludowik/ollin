@@ -7,7 +7,7 @@
 // Routage par hash :
 //   #/<vue>[/<ancre>]  → change de vue (ex. #/tutoriel, #/tutoriel/for)
 //   #<ancre> (sans /)  → ancre interne de la vue courante (défilement natif)
-//   (vide)             → vue par défaut (tutoriel)
+//   (vide)             → dernière vue visitée, sinon vue par défaut (tutoriel)
 // Le préfixe « #/ » distingue une route d'une simple ancre : les liens de
 // section du tutoriel (href="#intro") restent de simples ancres et ne
 // déclenchent pas de changement de vue.
@@ -15,8 +15,15 @@
 // Le runtime WASM est chargé UNE SEULE FOIS (getOllin) et partagé par toutes
 // les vues, de même que le <canvas> (déplacé dans la vue active, puis rendu au
 // shell au démontage).
-// Modules partagés importés avec cache-buster (politique anti-cache du projet).
-const { hardReload, freshUrl } = await import('./pg-run.js?v=' + Date.now())
+
+// Jeton de version UNIQUE pour ce chargement de page : sert de cache-buster à
+// TOUS les imports/fetch (routeur + vues + modules partagés via ctx.v). Un même
+// chargement réutilise donc la même URL de module (pas de copie neuve à chaque
+// navigation → pas de croissance non bornée du registre de modules), tandis
+// qu'un rechargement (ou hardReload) repart avec un jeton frais → dernière
+// version déployée. (Avant : Date.now() à chaque import → fuite par navigation.)
+const V = Date.now()
+const { hardReload } = await import('./pg-run.js?v=' + V)
 
 // ── Runtime WASM partagé (une instance pour toute la SPA) ───────────────────
 let ollinPromise = null
@@ -24,12 +31,11 @@ function getOllin() {
   if (ollinPromise) return ollinPromise
   ollinPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script')
-    const bust = Date.now()
-    s.src = 'wasm/ollin.js?' + bust
+    s.src = 'wasm/ollin.js?' + V
     s.onload = () => {
       const dir = s.src.replace(/\?.*$/, '').replace(/[^/]*$/, '')
       OllinModule({
-        locateFile: f => dir + f + '?' + bust,
+        locateFile: f => dir + f + '?' + V,
         canvas: document.getElementById('canvas'),
         print: () => {},
         printErr: () => {},
@@ -42,9 +48,6 @@ function getOllin() {
 }
 
 // ── Table des vues ──────────────────────────────────────────────────────────
-// Vues internes (fragment monté) : { html, js }.
-// Vues encore autonomes (migration incrémentale) : { external } → navigation
-// pleine page cache-vidée, en attendant leur intégration comme fragment.
 const ROUTES = {
   tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js' },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
@@ -52,12 +55,16 @@ const ROUTES = {
 }
 const DEFAULT_VIEW = 'tutoriel'
 const LAST_VIEW_KEY = 'ollin-last-view'   // réouverture de la dernière vue
+// Vues éligibles à la réouverture automatique : PAS `run`, qui exige un projet
+// actif et retomberait sinon sur l'écran « aucun projet » à l'ouverture du site.
+const RESTORABLE = new Set(['tutoriel', 'playground'])
 
 const viewEl     = document.getElementById('view')
 const canvasHome = document.getElementById('canvas-home')
 
 let currentView    = null
 let currentCleanup = null
+let navSeq         = 0     // garde de ré-entrance : identifie la navigation courante
 
 function parseHash() {
   const h = location.hash
@@ -69,46 +76,69 @@ function parseHash() {
   return { view: currentView || DEFAULT_VIEW, anchor: h.startsWith('#') ? h.slice(1) : '' }
 }
 
+// Range le <canvas> partagé dans le shell (masqué) et REMET SES STYLES À PLAT :
+// une vue peut poser des styles inline (le tutoriel : margin/borderRadius/…) ;
+// sans reset ils fuiraient sur la vue suivante (canvas décentré, etc.).
 function stowCanvas() {
   const canvas = document.getElementById('canvas')
   if (canvas && canvas.parentNode !== canvasHome) {
-    canvas.style.display = 'none'
+    canvas.style.cssText = 'display:none'
     canvasHome.appendChild(canvas)
   }
 }
 
-async function mount(view, anchor) {
-  const route = ROUTES[view] || ROUTES[DEFAULT_VIEW]
-
-  // Vue encore autonome → navigation pleine page (cache-vidée).
-  if (route.external) {
-    location.assign(freshUrl(route.external))
-    return
-  }
-
-  // Démonte la vue précédente proprement.
+async function teardownCurrent() {
   if (currentCleanup) {
     try { currentCleanup() } catch (e) { console.error('cleanup:', e) }
     currentCleanup = null
   }
   stowCanvas()
+}
 
-  // Charge le fragment (cache-busté : une mise à jour est prise dès le prochain
-  // rendu, cohérent avec la politique anti-cache du reste du projet).
-  const bust = Date.now()
+async function mount(view, anchor) {
+  const route = ROUTES[view] || ROUTES[DEFAULT_VIEW]
+  const seq = ++navSeq                 // toute navigation ultérieure invalide celle-ci
+  const stale = () => seq !== navSeq
+
+  await teardownCurrent()
+
   try {
-    const res  = await fetch(route.html + '?v=' + bust)
-    viewEl.innerHTML = await res.text()
+    const res  = await fetch(route.html + '?v=' + V)
+    const html = await res.text()
+    if (stale()) {
+      return
+    }
+    viewEl.innerHTML = html
 
-    const mod = await import(route.js + '?v=' + bust)
-    const ctx = { root: viewEl, getOllin, hardReload, navigate }
-    currentCleanup = (await mod.init(ctx)) || null
+    const mod = await import(route.js + '?v=' + V)
+    if (stale()) {
+      return
+    }
+    const ctx = { root: viewEl, getOllin, hardReload, navigate, v: V }
+    const cleanup = (await mod.init(ctx)) || null
+    if (stale()) {
+      // Une navigation plus récente a pris la main pendant l'init → nettoyer
+      // immédiatement cette vue périmée (sinon ses écouteurs globaux fuient).
+      if (cleanup) {
+        try { cleanup() } catch (_) {}
+      }
+      return
+    }
+    currentCleanup = cleanup
     currentView = view
-    try { localStorage.setItem(LAST_VIEW_KEY, view) } catch (_) {}   // pour la réouverture
+    if (RESTORABLE.has(view)) {
+      try { localStorage.setItem(LAST_VIEW_KEY, view) } catch (_) {}
+    }
 
-    if (anchor) scrollToAnchor(anchor)
-    else window.scrollTo(0, 0)
+    if (anchor) {
+      scrollToAnchor(anchor)
+    } else {
+      window.scrollTo(0, 0)
+    }
   } catch (e) {
+    if (stale()) {
+      return
+    }
     console.error('Échec de montage de la vue « ' + view + ' » :', e)
     viewEl.innerHTML = '<div style="padding:40px;text-align:center;font-family:system-ui,sans-serif;color:#c9d1e0">' +
       '<p style="color:#f87171;font-weight:600;margin-bottom:12px">Échec du chargement de la vue.</p>' +
@@ -119,7 +149,9 @@ async function mount(view, anchor) {
 
 function scrollToAnchor(id) {
   const el = document.getElementById(id)
-  if (el) el.scrollIntoView({ behavior: 'smooth' })
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth' })
+  }
 }
 
 // Navigation programmatique (utilisable par les vues via ctx.navigate).
@@ -130,8 +162,10 @@ function navigate(view, anchor) {
 async function route() {
   const { view, anchor } = parseHash()
   // Même vue déjà montée + simple ancre → défilement sans re-montage.
-  if (view === currentView && ROUTES[view] && !ROUTES[view].external) {
-    if (anchor) scrollToAnchor(anchor)
+  if (view === currentView && ROUTES[view]) {
+    if (anchor) {
+      scrollToAnchor(anchor)
+    }
     return
   }
   await mount(view, anchor)
@@ -140,12 +174,12 @@ async function route() {
 addEventListener('hashchange', route)
 
 // Démarrage : sans hash explicite, rouvrir la DERNIÈRE vue visitée (mémorisée
-// à chaque montage). Défaut = tutoriel. Une URL profonde (#/… ou #ancre) a
-// toujours priorité sur la dernière vue.
+// à chaque montage, hors `run`). Défaut = tutoriel. Une URL profonde (#/… ou
+// #ancre) a toujours priorité sur la dernière vue.
 function boot() {
   if (!location.hash) {
     const last = localStorage.getItem(LAST_VIEW_KEY)
-    if (last && ROUTES[last] && last !== DEFAULT_VIEW) {
+    if (last && RESTORABLE.has(last) && last !== DEFAULT_VIEW) {
       location.hash = '#/' + last   // déclenche hashchange → route()
       return
     }
