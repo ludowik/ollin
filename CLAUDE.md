@@ -146,6 +146,11 @@ abandonner ni redemander.
 ### A. Desktop raylib sous Xvfb (le plus simple, PRIVILÉGIER)
 Le build natif par défaut utilise le **stub graphique** (`graphics` = nil → un script
 graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigateur :
+- `build-gfx/ollin` est **construit automatiquement en tâche de fond au démarrage de
+  session** (hook `session-start.sh`), gitignoré donc reconstruit à chaque reprise.
+  **Avant un test xvfb**, vérifier qu'il est prêt : présence de `build-gfx/.ready`
+  (ou de `build-gfx/ollin`). Si absent (build de fond pas fini ou échoué), le
+  construire soi-même : `bash tools/native-gfx.sh` (rapide, source raylib en cache).
 - `bash tools/native-gfx.sh` → `build-gfx/ollin` (raylib desktop, `-DOLLIN_NATIVE_RAYLIB=ON`).
   Réutilise la source raylib du build WASM (`build*/_deps/raylib-src`, github bloqué par
   le proxy → ni clone ni FetchContent ; pas de vendoring). Compile aussi = valide le C++

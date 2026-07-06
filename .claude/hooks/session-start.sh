@@ -69,8 +69,12 @@ cmake --build "$CLAUDE_PROJECT_DIR/build" -j"$(nproc)"
 #  B. Playwright/chromium (/opt/pw-browsers/.../chrome) : file://PNG ou playground
 #     servi en local — inspection pixels par drawImage+getImageData.
 # build-gfx/ est gitignoré (perdu à chaque reprise du conteneur) → on le
-# reconstruit ici pour que la chaîne A soit prête d'emblée. Best-effort : réutilise
-# la source raylib récupérée par le build WASM ci-dessus ; n'échoue jamais le hook.
-bash "$CLAUDE_PROJECT_DIR/tools/native-gfx.sh" >/dev/null 2>&1 \
-  && echo "build-gfx prêt (tests graphiques xvfb via tools/run-headless.sh)" \
-  || echo "build-gfx différé — lancer tools/native-gfx.sh au besoin"
+# reconstruit pour que la chaîne A soit prête. Lancé en TÂCHE DE FOND détachée
+# (nohup) pour ne pas rallonger le démarrage : la compilation (~1 min) se fait
+# pendant le travail. Marqueur `build-gfx/.ready` écrit à la fin (source raylib
+# réutilisée du build WASM ci-dessus). Voir CLAUDE.md : avant un test xvfb,
+# vérifier build-gfx/ollin ; sinon lancer `bash tools/native-gfx.sh` (fallback).
+nohup bash -c 'bash "'"$CLAUDE_PROJECT_DIR"'/tools/native-gfx.sh" >/tmp/native-gfx.log 2>&1 \
+  && touch "'"$CLAUDE_PROJECT_DIR"'/build-gfx/.ready"' >/dev/null 2>&1 &
+disown 2>/dev/null || true
+echo "build-gfx : compilation raylib desktop en tâche de fond (tests xvfb) — log /tmp/native-gfx.log"
