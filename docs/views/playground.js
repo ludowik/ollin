@@ -275,6 +275,26 @@ let loadingFile = false   // true pendant un chargement programmatique → pas d
 // CodeMirror au lieu de les réimplémenter.
 const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
+// Entourer la sélection : taper un ouvrant «(», «[», «{» ou «"» alors qu'une
+// sélection existe l'ENTOURE (« (sélection) ») au lieu de la remplacer. Sans
+// sélection, insertion normale (on ne veut PAS d'auto-paire sur frappe simple).
+// Multi-curseur → comportement par défaut (on ne consomme pas l'événement).
+const SURROUND = { '(': ')', '[': ']', '{': '}', '"': '"' }
+const surroundSelection = EditorView.inputHandler.of((v, from, to, text) => {
+  const close = SURROUND[text]
+  if (!close) return false
+  const sel = v.state.selection
+  if (sel.ranges.length !== 1) return false
+  const r = sel.main
+  if (r.empty) return false
+  v.dispatch({
+    changes: [{ from: r.from, insert: text }, { from: r.to, insert: close }],
+    selection: { anchor: r.from + text.length, head: r.to + text.length },
+    userEvent: 'input.type',
+  })
+  return true
+})
+
 const view = new EditorView({
   state: EditorState.create({
     doc: '',
@@ -298,6 +318,7 @@ const view = new EditorView({
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
       ]),
       indentUnit.of('    '),
+      surroundSelection,   // «(» sur une sélection → l'entoure au lieu de la remplacer
       autocompletion({ override: [ollinComplete], activateOnTyping: true }),
       EditorView.updateListener.of(update => {
         if (!update.docChanged || loadingFile) return
