@@ -69,6 +69,47 @@ static Value color_random(Value* args, int argc) {
     return inst;
 }
 
+// ── pastel ────────────────────────────────────────────────────────────────────
+// args[0] = self  → retourne une nouvelle instance Color pastel (mélange 50% blanc)
+
+static Value color_pastel(Value* args, int argc) {
+    (void)argc;
+    const Value& self = args[0];
+    double r = colorField(self, "r").asNum();
+    double g = colorField(self, "g").asNum();
+    double b = colorField(self, "b").asNum();
+    double a = colorField(self, "a").asNum();
+    Value cls = self.mapGet(Value(std::string("__class__")));
+    Value inst = Value::makeMap();
+    inst.mapSet(Value(std::string("__class__")), cls);
+    inst.mapSet(Value(std::string("r")), Value(r * 0.5 + 0.5));
+    inst.mapSet(Value(std::string("g")), Value(g * 0.5 + 0.5));
+    inst.mapSet(Value(std::string("b")), Value(b * 0.5 + 0.5));
+    inst.mapSet(Value(std::string("a")), Value(a));
+    return inst;
+}
+
+// ── grayscale ─────────────────────────────────────────────────────────────────
+// args[0] = self  → retourne une nouvelle instance Color en niveaux de gris (luminance Rec. 601)
+
+static Value color_grayscale(Value* args, int argc) {
+    (void)argc;
+    const Value& self = args[0];
+    double r = colorField(self, "r").asNum();
+    double g = colorField(self, "g").asNum();
+    double b = colorField(self, "b").asNum();
+    double a = colorField(self, "a").asNum();
+    double lum = 0.299 * r + 0.587 * g + 0.114 * b;
+    Value cls = self.mapGet(Value(std::string("__class__")));
+    Value inst = Value::makeMap();
+    inst.mapSet(Value(std::string("__class__")), cls);
+    inst.mapSet(Value(std::string("r")), Value(lum));
+    inst.mapSet(Value(std::string("g")), Value(lum));
+    inst.mapSet(Value(std::string("b")), Value(lum));
+    inst.mapSet(Value(std::string("a")), Value(a));
+    return inst;
+}
+
 // ── makeColorClass ────────────────────────────────────────────────────────────
 
 Value makeColorClass() {
@@ -77,6 +118,8 @@ Value makeColorClass() {
     cls.mapSet(Value(std::string("init")), Value::makeBuiltin(color_init));
     cls.mapSet(Value(std::string("__str")), Value::makeBuiltin(color_str));
     cls.mapSet(Value(std::string("random")), Value::makeBuiltin(color_random));
+    cls.mapSet(Value(std::string("pastel")), Value::makeBuiltin(color_pastel));
+    cls.mapSet(Value(std::string("grayscale")), Value::makeBuiltin(color_grayscale));
     return cls;
 }
 
