@@ -37,19 +37,33 @@ export async function init(ctx) {
     window.__ollinFrameError = undefined
   }
 
-  // Projet ACTIF rechargé depuis IndexedDB.
+  // Deux sources : soit un EXEMPLE lu direct depuis le dépôt (route
+  // #/run/sample/<fichier>, rechargé frais → un refresh reprend la version du
+  // dépôt), soit le PROJET ACTIF depuis IndexedDB.
+  const exampleFile = (ctx.anchor || '').startsWith('sample/') ? ctx.anchor.slice(7) : null
   let project = null
-  try {
-    await Store.init()
-    const id = Store.getActiveId()
-    if (id) project = await Store.getProject(id)
-  } catch (_) {}
-  const code = (project && project.files) ? (project.files[project.entry] ?? '') : null
-
-  if (project === null || code === null) {
-    statusEl.textContent = ''
-    showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).")
-    return stop
+  let code = null
+  if (exampleFile) {
+    try {
+      code = await fetch('samples/' + exampleFile + '?v=' + ctx.v, { cache: 'no-cache' }).then(r => r.text())
+    } catch (_) {}
+    if (code === null) {
+      statusEl.textContent = ''
+      showText("error: exemple introuvable : " + exampleFile)
+      return stop
+    }
+  } else {
+    try {
+      await Store.init()
+      const id = Store.getActiveId()
+      if (id) project = await Store.getProject(id)
+    } catch (_) {}
+    code = (project && project.files) ? (project.files[project.entry] ?? '') : null
+    if (project === null || code === null) {
+      statusEl.textContent = ''
+      showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).")
+      return stop
+    }
   }
 
   try {

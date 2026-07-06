@@ -59,7 +59,8 @@ ollin/
 Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montées à la demande.
 
 - `docs/index.html` — **shell** minimal : `#view` (point de montage) + `<canvas id="canvas">` partagé (rangé dans `#canvas-home` hors exécution) ; charge `app.js`.
-- `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
+- `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). `ctx.anchor` = sous-chemin après la vue (ancre tutoriel, ou paramètre de vue). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
+- **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
 - `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutoriel`, `playground`, `run`.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
 - Modules partagés : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur).
@@ -174,6 +175,11 @@ graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigate
   MÊME commande shell peut faire échouer la commande (exit 144, bind réseau/sandbox).
   Contournements : `dangerouslyDisableSandbox`, `--bind 127.0.0.1`, ou **préférer la
   chaîne A (xvfb)** qui n'a pas besoin de serveur. Le `file://` d'un PNG, lui, marche.
+  **Le plus fiable pour tester le playground** : un **serveur HTTP node in-process**
+  dans le MÊME script que Playwright (`http.createServer` servant `docs/` avec les
+  bons MIME .js/.wasm/.json, puis `chromium.launch`) — évite le process python en
+  arrière-plan (exit 144). Charger `http://127.0.0.1:PORT/index.html#/…`, injecter du
+  code via `window.__ollinView.dispatch(...)`, cliquer `#run-btn`, lire `#canvas`.
 
 Le WASM reste la cible de déploiement (playground). Ne rien committer de `build-gfx/`
 (ignoré par `build*/`).

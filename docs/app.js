@@ -78,13 +78,16 @@ const canvasHome = document.getElementById('canvas-home')
 
 let currentView    = null
 let currentCleanup = null
+let currentAnchor  = ''    // sous-chemin de la vue courante (ancre tutoriel, ou ex/<fichier>)
 let navSeq         = 0     // garde de ré-entrance : identifie la navigation courante
 
 function parseHash() {
   const h = location.hash
   if (h.startsWith('#/')) {
     const parts = h.slice(2).split('/')
-    return { view: parts[0] || DEFAULT_VIEW, anchor: parts[1] || '' }
+    // anchor = tout ce qui suit la vue : ancre de section (tutoriel) OU sous-route
+    // paramétrée de la vue (ex. « ex/game_of_life.ol » pour le playground/run).
+    return { view: parts[0] || DEFAULT_VIEW, anchor: parts.slice(1).join('/') }
   }
   // Ancre nue (#intro) ou vide → vue courante/défaut, défilement sur l'ancre.
   return { view: currentView || DEFAULT_VIEW, anchor: h.startsWith('#') ? h.slice(1) : '' }
@@ -129,7 +132,7 @@ async function mount(view, anchor) {
     if (stale()) {
       return
     }
-    const ctx = { root: viewEl, getOllin, hardReload, navigate, v: V }
+    const ctx = { root: viewEl, getOllin, hardReload, navigate, v: V, anchor }
     const cleanup = (await mod.init(ctx)) || null
     if (stale()) {
       // Une navigation plus récente a pris la main pendant l'init → nettoyer
@@ -141,6 +144,7 @@ async function mount(view, anchor) {
     }
     currentCleanup = cleanup
     currentView = view
+    currentAnchor = anchor
     if (RESTORABLE.has(view)) {
       try { localStorage.setItem(LAST_VIEW_KEY, view) } catch (_) {}
     }
@@ -176,12 +180,19 @@ function navigate(view, anchor) {
 
 async function route() {
   const { view, anchor } = parseHash()
-  // Même vue déjà montée + simple ancre → défilement sans re-montage.
   if (view === currentView && ROUTES[view]) {
-    if (anchor) {
-      scrollToAnchor(anchor)
+    // Tutoriel : l'ancre est une section → défilement sans re-montage.
+    if (view === DEFAULT_VIEW) {
+      if (anchor) {
+        scrollToAnchor(anchor)
+      }
+      return
     }
-    return
+    // Autres vues (playground/run) : l'ancre est un paramètre (ex/<fichier>).
+    // Même paramètre → déjà monté ; changé (autre exemple) → re-monter.
+    if (anchor === currentAnchor) {
+      return
+    }
   }
   await mount(view, anchor)
 }

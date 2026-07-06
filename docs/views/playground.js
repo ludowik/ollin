@@ -17,6 +17,11 @@ import { ollinLang, ollinHighlight } from '../cm-lang.js'
 export async function init(ctx) {
 const { getOllin, hardReload } = ctx
 const disposers = []   // écouteurs globaux à retirer au démontage
+// Mode EXEMPLE : route #/playground/sample/<fichier> → on ouvre l'exemple
+// directement depuis le dépôt (samples/…), SANS copie ni persistance. Édition
+// libre à l'écran mais non enregistrée ; un refresh recharge la version du dépôt.
+// Bouton « Créer un projet » pour forker à la demande.
+const exampleFile = (ctx.anchor || '').startsWith('sample/') ? ctx.anchor.slice(7) : null
 
 const Store = await import('../pg-store.js?v=' + ctx.v)
 const GH    = await import('../pg-github.js?v=' + ctx.v)
@@ -607,6 +612,8 @@ async function deleteResource(name) {
 async function loadProject(id) {
   const p = await Store.getProject(id)
   if (!p) return
+  const eb = document.getElementById('example-banner')   // quitte le mode exemple
+  if (eb) eb.remove()
   flushEditorToFile()
   currentProject = p
   Store.setActiveId(id)
@@ -680,7 +687,7 @@ function renderMenuRoot() {
     const name = prompt('Nom du projet :', 'Sans titre'); if (!name) return
     const p = await Store.createProject(name.trim()); closeMenu(); await switchProject(p.id)
   }))
-  projectMenu.appendChild(menuItem('📄 Nouveau depuis un exemple', true, renderMenuExamples))
+  projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   projectMenu.appendChild(menuSep())
   projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
     const name = prompt('Nouveau nom :', currentProject.name); if (!name) return
@@ -745,19 +752,18 @@ async function renderMenuOpen() {
 
 function renderMenuExamples() {
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Nouveau depuis un exemple', renderMenuRoot))
+  projectMenu.appendChild(menuHeader('Ouvrir un exemple', renderMenuRoot))
   if (!examples.length) {
     const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun exemple.'
     projectMenu.appendChild(d); return
   }
+  // Ouvre l'exemple en LECTURE DIRECTE depuis le dépôt (route #/playground/
+  // sample/<fichier>) : pas de copie, un refresh recharge la version du dépôt.
+  // Pour garder/éditer, le bandeau propose « Créer un projet ».
   for (const ex of examples) {
-    projectMenu.appendChild(menuItem('📄 ' + ex.name, false, async () => {
-      const code = await fetch('samples/' + ex.file, { cache: 'no-cache' }).then(r => r.text())
-      const name = prompt('Nom du projet :', ex.name); if (!name) return
-      const p = await Store.createProject(name.trim())
-      p.files[p.entry] = code
-      await Store.saveProject(p)
-      closeMenu(); await switchProject(p.id)
+    projectMenu.appendChild(menuItem('📄 ' + ex.name, false, () => {
+      closeMenu()
+      ctx.navigate('playground', 'sample/' + ex.file)
     }))
   }
 }
@@ -935,15 +941,63 @@ railToggle.addEventListener('click', () => {
 })
 applyRail()
 
+// ── Mode exemple : lecture directe depuis le dépôt (sans copie) ─────────────
+// Bandeau au-dessus de l'éditeur signalant que rien n'est enregistré, avec un
+// bouton pour forker en projet éditable.
+function showExampleBanner(file) {
+  var old = document.getElementById('example-banner')
+  if (old) old.remove()
+  const bar = document.createElement('div')
+  bar.id = 'example-banner'
+  bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 12px;background:#1e2133;border-bottom:1px solid #2e3150;font-size:12px;color:#a9b2cf'
+  const txt = document.createElement('span')
+  txt.innerHTML = '📄 Exemple <b style="color:#c9d1e0">' + file + '</b> — non enregistré (un rafraîchissement recharge la version du dépôt)'
+  const btn = document.createElement('button')
+  btn.textContent = 'Créer un projet'
+  btn.style.cssText = 'margin-left:auto;background:var(--accent);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer'
+  btn.addEventListener('click', () => forkExampleToProject(file))
+  bar.appendChild(txt)
+  bar.appendChild(btn)
+  const pane = document.getElementById('editor-pane')
+  pane.insertBefore(bar, pane.firstChild)
+}
+
+async function loadExample(file) {
+  currentProject = null
+  currentFile = null
+  // ctx.v change à chaque chargement de page → un refresh re-fetch la version
+  // fraîche ; no-cache force la revalidation.
+  const code = await fetch('samples/' + file + '?v=' + ctx.v, { cache: 'no-cache' }).then(r => r.text())
+  setEditorText(code)
+  showExampleBanner(file)
+  const label = document.getElementById('project-label')
+  if (label) label.textContent = file
+}
+
+// Fork explicite : convertit l'exemple affiché en projet éditable persistant.
+async function forkExampleToProject(file) {
+  const name = prompt('Nom du projet :', file.replace(/\.ol$/, ''))
+  if (!name) return
+  const p = await Store.createProject(name.trim())
+  p.files[p.entry] = view.state.doc.toString()
+  await Store.saveProject(p)
+  Store.setActiveId(p.id)
+  ctx.navigate('playground')   // quitte le mode exemple → re-montage en mode projet
+}
+
 // ── init ──
 async function initProjects() {
   await Store.init()
   examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => [])
+  projectBtn.disabled = false
+  if (exampleFile) {
+    await loadExample(exampleFile)
+    return
+  }
   const active = Store.getActiveId()
   const list = await Store.listProjects()
   const id = (active && list.some(p => p.id === active)) ? active : (list[0] && list[0].id)
   if (id) await loadProject(id)
-  projectBtn.disabled = false
 }
 initProjects()
 
@@ -1143,14 +1197,20 @@ standaloneBtn.addEventListener('click', () => {
   // « aucun projet » pour un projet neuf). saveProject est donc bien attendu.
   const win = window.open('', '_blank')
   ;(async () => {
-    try {
-      flushEditorToFile()
-      if (currentProject) {
-        Store.setActiveId(currentProject.id)
-        await Store.saveProject(currentProject)
-      }
-    } catch (_) {}
-    const url = Run.freshUrl('index.html#/run')   // vue autonome de la SPA
+    let target = 'index.html#/run'
+    if (exampleFile) {
+      // Mode exemple : exécute le MÊME exemple frais en autonome (pas de projet).
+      target = 'index.html#/run/sample/' + exampleFile
+    } else {
+      try {
+        flushEditorToFile()
+        if (currentProject) {
+          Store.setActiveId(currentProject.id)
+          await Store.saveProject(currentProject)
+        }
+      } catch (_) {}
+    }
+    const url = Run.freshUrl(target)
     if (win && !win.closed) win.location.replace(url)
     else window.open(url, '_blank')   // repli si l'onglet a été bloqué
   })()
