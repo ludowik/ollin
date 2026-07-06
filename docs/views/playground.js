@@ -634,9 +634,25 @@ async function loadProject(id) {
 }
 
 async function switchProject(id) {
-  flushEditorToFile()                        // récupérer les dernières frappes
-  await Store.saveProject(currentProject)    // puis persister avant de quitter
+  if (currentProject) {                       // en mode exemple il n'y a rien à sauver
+    flushEditorToFile()                       // récupérer les dernières frappes
+    await Store.saveProject(currentProject)   // puis persister avant de quitter
+  }
   await loadProject(id)
+}
+
+// Ouvre un projet depuis le menu. En MODE EXEMPLE (aucun projet courant), on quitte
+// le mode par une NAVIGATION (comme forkExampleToProject) → re-montage propre en mode
+// projet et URL correcte (un refresh rouvre le projet, pas l'exemple). Sinon, bascule
+// en place. Corrige : en mode sample, ouvrir/créer un projet ne montrait rien alors
+// que le projet était bien créé (visible seulement après relance de l'app).
+async function openProject(id) {
+  if (exampleFile) {
+    Store.setActiveId(id)
+    ctx.navigate('playground')
+  } else {
+    await switchProject(id)
+  }
 }
 
 // ── menu Projet (drill-down) ──
@@ -684,33 +700,37 @@ function renderMenuRoot() {
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('✨ Nouveau projet vide', false, async () => {
     const name = prompt('Nom du projet :', 'Sans titre'); if (!name) return
-    const p = await Store.createProject(name.trim()); closeMenu(); await switchProject(p.id)
+    const p = await Store.createProject(name.trim()); closeMenu(); await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
-  projectMenu.appendChild(menuSep())
-  projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
-    const name = prompt('Nouveau nom :', currentProject.name); if (!name) return
-    flushEditorToFile(); await Store.saveProject(currentProject)
-    const p = await Store.renameProject(currentProject.id, name.trim())
-    closeMenu(); await loadProject(p.id)
-  }))
-  projectMenu.appendChild(menuItem('⧉ Dupliquer', false, async () => {
-    flushEditorToFile(); await Store.saveProject(currentProject)
-    const copy = await Store.createProject(currentProject.name + ' (copie)')
-    copy.files = { ...currentProject.files }; copy.entry = currentProject.entry
-    delete copy.files[Store.MANIFEST]
-    await Store.saveProject(copy)
-    closeMenu(); await switchProject(copy.id)
-  }))
-  projectMenu.appendChild(menuItem('🗑 Supprimer', false, async () => {
-    if (!confirm(`Supprimer le projet « ${currentProject.name} » ?`)) return
-    const gone = currentProject.id
-    await Store.deleteProject(gone)
-    const list = await Store.listProjects()
-    closeMenu()
-    if (list.length) await loadProject(list[0].id)
-    else { const p = await Store.createProject('Sans titre'); await loadProject(p.id) }
-  }))
+  // Actions sur le PROJET COURANT : masquées en mode exemple (currentProject null,
+  // rien à renommer/dupliquer/supprimer) — sinon elles planteraient sur null.
+  if (currentProject) {
+    projectMenu.appendChild(menuSep())
+    projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
+      const name = prompt('Nouveau nom :', currentProject.name); if (!name) return
+      flushEditorToFile(); await Store.saveProject(currentProject)
+      const p = await Store.renameProject(currentProject.id, name.trim())
+      closeMenu(); await loadProject(p.id)
+    }))
+    projectMenu.appendChild(menuItem('⧉ Dupliquer', false, async () => {
+      flushEditorToFile(); await Store.saveProject(currentProject)
+      const copy = await Store.createProject(currentProject.name + ' (copie)')
+      copy.files = { ...currentProject.files }; copy.entry = currentProject.entry
+      delete copy.files[Store.MANIFEST]
+      await Store.saveProject(copy)
+      closeMenu(); await switchProject(copy.id)
+    }))
+    projectMenu.appendChild(menuItem('🗑 Supprimer', false, async () => {
+      if (!confirm(`Supprimer le projet « ${currentProject.name} » ?`)) return
+      const gone = currentProject.id
+      await Store.deleteProject(gone)
+      const list = await Store.listProjects()
+      closeMenu()
+      if (list.length) await loadProject(list[0].id)
+      else { const p = await Store.createProject('Sans titre'); await loadProject(p.id) }
+    }))
+  }
 
   // ── section GitHub ──
   projectMenu.appendChild(menuSep())
@@ -728,8 +748,10 @@ function renderMenuRoot() {
       GH.setRepo(v)
       renderMenuRoot()
     }))
-    projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
-    projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
+    if (currentProject) {   // pousser/récupérer agit sur le projet courant (nul en mode exemple)
+      projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
+      projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
+    }
     projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
     projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuRoot() }))
   } else {
@@ -742,9 +764,10 @@ async function renderMenuOpen() {
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Ouvrir un projet', renderMenuRoot))
   for (const p of list) {
-    const check = p.id === currentProject.id ? '✓ ' : ''
+    const check = (currentProject && p.id === currentProject.id) ? '✓ ' : ''
     projectMenu.appendChild(menuItem(check + p.name, false, async () => {
-      closeMenu(); if (p.id !== currentProject.id) await switchProject(p.id)
+      closeMenu()
+      if (!currentProject || p.id !== currentProject.id) await openProject(p.id)
     }))
   }
 }
