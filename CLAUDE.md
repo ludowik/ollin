@@ -136,23 +136,42 @@ Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharge
 **Règles strictes pour les comparaisons :**
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
 
-## Tests graphiques natifs (headless)
+## Tests graphiques — DEUX chaînes qui MARCHENT (ne pas conclure « cassé »)
 
-Le build natif par défaut utilise le **stub graphique** (pas de fenêtre) — headless-safe.
-Pour tester réellement le rendu (graphics/keyboard/mouse/image) **sans navigateur**,
-on peut builder un binaire natif avec raylib et l'exécuter sous un affichage virtuel.
+**Mémo** : ces deux moyens de test fonctionnent dans l'environnement (Xvfb, chromium,
+GL logiciel et `build-gfx/` sont présents). Si un échec survient, c'est un détail
+(chemin, serveur, sandbox), PAS une impossibilité — corriger le détail, ne pas
+abandonner ni redemander.
 
-- `tools/native-gfx.sh` — build natif **avec raylib** (`-DOLLIN_NATIVE_RAYLIB=ON`, défaut OFF)
-  dans `build-gfx/`. **Réutilise la source raylib déjà récupérée par le build WASM**
-  (`build*/_deps/raylib-src`) via `FETCHCONTENT_SOURCE_DIR_RAYLIB` : github est **bloqué
-  par la politique proxy**, donc on ne peut ni cloner ni FetchContent raylib à la volée,
-  et on **ne vendorise pas** raylib. Si aucune source en cache : lancer `wasm/build.sh` d'abord.
-- `tools/run-headless.sh <script.ol>` — exécute `build-gfx/ollin` sous `xvfb-run`
-  (GL logiciel llvmpipe). `graphics.screenshot("f.png")` (chemin relatif au CWD) capture
-  le rendu → vérification visuelle sans Playwright.
+### A. Desktop raylib sous Xvfb (le plus simple, PRIVILÉGIER)
+Le build natif par défaut utilise le **stub graphique** (`graphics` = nil → un script
+graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigateur :
+- `bash tools/native-gfx.sh` → `build-gfx/ollin` (raylib desktop, `-DOLLIN_NATIVE_RAYLIB=ON`).
+  Réutilise la source raylib du build WASM (`build*/_deps/raylib-src`, github bloqué par
+  le proxy → ni clone ni FetchContent ; pas de vendoring). Compile aussi = valide le C++
+  raylib desktop.
+- `bash tools/run-headless.sh <script.ol>` → exécute sous `xvfb-run` (GL llvmpipe).
+- Capture : `graphics.screenshot("f.png")` — **chemin RELATIF** (raylib préfixe le CWD ;
+  un chemin absolu échoue). La capture est **différée en fin de frame** → elle contient
+  l'écran composé (pas la RenderTexture). Le script doit **terminer** (`graphics.quit()`
+  après la capture) sinon la boucle tourne à l'infini sous Xvfb.
+- Inspecter les pixels (pas de PIL/imagemagick) : via chromium (voir B) sur `file://…png`
+  → `drawImage` + `getImageData` (centroïde, bbox, couleur d'un pixel).
 
-Le WASM reste la cible de déploiement (playground) ; ce chemin natif sert à la mise au
-point rapide du code graphique. Ne rien committer de `build-gfx/` (ignoré par `build*/`).
+### B. Web / WASM via Playwright (chromium)
+- chromium : `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` ; `playwright` est dans
+  `node_modules` (lancer node depuis la racine du repo). `chromium.launch({ executablePath })`.
+- Charger une page/capture : `file://` marche direct (aucun réseau). Pour le playground,
+  servir `docs/` en local puis charger `http://127.0.0.1:PORT/index.html#/playground`,
+  injecter du code via `window.__ollinView.dispatch(...)`, cliquer `#run-btn`, puis lire
+  `#canvas` (drawImage→getImageData) = **vrai composite affiché**.
+- ⚠️ Piège : lancer le serveur HTTP en arrière-plan (`python3 -m http.server &`) dans la
+  MÊME commande shell peut faire échouer la commande (exit 144, bind réseau/sandbox).
+  Contournements : `dangerouslyDisableSandbox`, `--bind 127.0.0.1`, ou **préférer la
+  chaîne A (xvfb)** qui n'a pas besoin de serveur. Le `file://` d'un PNG, lui, marche.
+
+Le WASM reste la cible de déploiement (playground). Ne rien committer de `build-gfx/`
+(ignoré par `build*/`).
 
 ## Style C++ (formatage)
 
