@@ -1,0 +1,403 @@
+<!-- Vue PLAYGROUND — fragment monté par app.js dans #view.
+     <style> actif seulement monté (innerHTML remplacé → auto-nettoyé).
+     Le <canvas> est partagé (shell) : app.js le range/rend ; playground.js
+     le reparente dans #output-pane à l'init. -->
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0f1117;
+  --surface: #1a1d2e;
+  --surface2:#242742;
+  --border:  #2e3150;
+  --text:    #c9d1e0;
+  --dim:     #7c85a2;
+  --accent:  #7c83ff;
+  --green:   #4ade80;
+  --red:     #f87171;
+  --yellow:  #fbbf24;
+  --mono:    'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
+}
+
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+/* ── toolbar ─────────────────────────────────────────────────────────────── */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  /* PAS d'overflow ici : overflow-x:auto forcerait overflow-y:auto et
+     rognerait le menu déroulant (positionné sous la toolbar). Le mode
+     icônes-seules (@media ≤1080px) suffit à tout faire tenir. */
+}
+
+/* Toolbar large mais fenêtre étroite : boutons en icônes seules pour tout garder
+   visible (dont Exécuter/Pause) bien avant le passage en layout mobile. */
+@media (max-width: 1080px) {
+  .btn-label { display: none; }
+  #run-btn kbd { display: none; }
+  #project-label { display: none; }
+}
+
+.logo {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--accent);
+  letter-spacing: -0.3px;
+  margin-right: 4px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.sep { width: 1px; height: 20px; background: var(--border); }
+
+#examples {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  outline: none;
+  max-width: 180px;
+}
+#examples:focus { border-color: var(--accent); }
+
+.spacer { flex: 1; }
+
+#status { font-size: 12px; color: var(--dim); }
+
+#run-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+#run-btn:hover   { opacity: 0.85; }
+#run-btn:disabled{ opacity: 0.4; cursor: default; }
+#run-btn.running {
+  background: transparent;
+  border-color: var(--red);
+  color: var(--red);
+}
+#run-btn.running:hover { opacity: 1; background: rgba(248,113,113,0.12); }
+
+#stop-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+#stop-btn:disabled { opacity: 0.3; cursor: default; }
+#stop-btn:not(:disabled):hover { background: rgba(248,113,113,0.12); }
+
+#run-btn kbd {
+  font-size: 10px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+/* ── layout ──────────────────────────────────────────────────────────────── */
+#layout {
+  display: flex;
+  height: calc(100vh - 44px);
+}
+
+#editor-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+}
+
+#editor-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Make CM fill the pane */
+#editor-wrap .cm-editor { height: 100%; border-radius: 0; border: none; }
+#editor-wrap .cm-scroller { height: 100%; overflow: auto; }
+
+#output-pane {
+  flex: 1 1 50%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  overflow: auto;
+}
+
+
+
+#output {
+  flex: 1;
+  padding: 16px 18px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-y: auto;
+  color: var(--dim);
+  font-style: italic;
+}
+#output.ok  { color: var(--green); font-style: normal; }
+#output.err { color: var(--red);   font-style: normal; }
+
+canvas#canvas {
+  display: none;
+  margin: auto;
+}
+
+/* ── divider (drag to resize) ─────────────────────────────────────────────── */
+#divider {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+#divider:hover, #divider.dragging { background: var(--accent); }
+
+/* ── bascule barre latérale ───────────────────────────────────────────────── */
+#rail-toggle {
+  display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--border); color: var(--dim);
+  border-radius: 6px; padding: 6px 8px; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#rail-toggle:hover { border-color: var(--accent); color: var(--accent); }
+#rail-toggle.active { color: var(--accent); border-color: var(--accent); }
+
+/* ── menu Projet (drill-down) ─────────────────────────────────────────────── */
+#project-wrap { position: relative; }
+#project-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+#project-btn { position: relative; }
+#project-btn:hover:not(:disabled) { border-color: var(--accent); }
+#project-btn:disabled { opacity: 0.5; cursor: default; }
+/* pastille « version plus récente sur GitHub » (persistante, visible mobile+PC) */
+#project-btn.sync-update::after {
+  content: ''; position: absolute; top: -3px; right: -3px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--yellow); border: 2px solid var(--surface);
+}
+#project-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+#project-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  min-width: 240px; max-width: 320px; max-height: 70vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45); padding: 5px;
+}
+.menu-header {
+  display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px;
+  font-size: 11px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 0.4px;
+}
+.menu-back {
+  background: transparent; border: none; color: var(--accent); font-size: 18px; line-height: 1;
+  cursor: pointer; padding: 0 4px; border-radius: 4px;
+}
+.menu-back:hover { background: var(--surface2); }
+.menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  background: transparent; border: none; color: var(--text); text-align: left;
+  padding: 9px 10px; font-size: 13px; border-radius: 6px; cursor: pointer;
+}
+.menu-item:hover { background: var(--surface2); }
+.menu-arrow { color: var(--dim); font-size: 16px; }
+.menu-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+.menu-empty { padding: 10px; font-size: 12px; color: var(--dim); font-style: italic; }
+.menu-form { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+.menu-info { font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+.menu-info a { color: var(--accent); text-decoration: none; }
+.menu-info code { font-family: var(--mono); color: var(--text); font-size: 11px; }
+.menu-input {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  border-radius: 6px; padding: 7px 9px; font-size: 12px; font-family: var(--mono); outline: none;
+}
+.menu-input:focus { border-color: var(--accent); }
+.menu-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  padding: 7px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.menu-btn:disabled { opacity: 0.6; cursor: default; }
+.menu-err { font-size: 11.5px; color: var(--red); }
+
+/* ── liste latérale de fichiers ───────────────────────────────────────────── */
+#editor-main { flex: 1; min-height: 0; display: flex; }
+#editor-wrap { flex: 1; min-width: 0; }
+#file-rail {
+  width: 172px; flex-shrink: 0; display: flex; flex-direction: column;
+  background: var(--surface); border-right: 1px solid var(--border); overflow: hidden;
+}
+.rail-head {
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid var(--border);
+}
+.rail-head-res { border-top: 1px solid var(--border); }
+.rail-head button {
+  background: transparent; border: none; color: var(--accent); font-size: 16px; line-height: 1;
+  cursor: pointer; padding: 0 4px; border-radius: 4px;
+}
+.rail-head button:hover { background: var(--surface2); }
+#file-list { flex: 1 1 auto; overflow-y: auto; padding: 4px; }
+#res-list  { flex: 0 1 40%; overflow-y: auto; padding: 4px; }
+.rail-empty { padding: 6px 8px; font-size: 12px; color: var(--dim); font-style: italic; }
+.file-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  padding: 6px 8px; border-radius: 5px; cursor: pointer; font-size: 12.5px;
+  font-family: var(--mono); color: var(--text); white-space: nowrap; overflow: hidden;
+}
+.file-item:hover { background: var(--surface2); }
+.file-item.active { background: var(--surface2); box-shadow: inset 2px 0 0 var(--accent); }
+.file-name { overflow: hidden; text-overflow: ellipsis; }
+.file-item.entry .file-name { color: var(--accent); }
+.file-acts { display: none; flex-shrink: 0; }
+.file-item:hover .file-acts, .file-item.active .file-acts { display: inline-flex; gap: 1px; }
+.file-act {
+  background: transparent; border: none; color: var(--dim); cursor: pointer;
+  font-size: 11px; padding: 1px 3px; border-radius: 3px;
+}
+.file-act:hover { background: var(--border); color: var(--text); }
+
+/* ── mobile ──────────────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  #layout { flex-direction: column; }
+  #file-rail { width: 116px; }
+  #project-label { max-width: 84px; }
+  #project-menu { min-width: 220px; max-width: 82vw; }
+  .file-acts { display: inline-flex; gap: 1px; }   /* tactile : actions toujours visibles */
+  #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
+  #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
+  #divider { width: 100%; height: 6px; cursor: row-resize; }
+
+  /* Police réduite — maximum-scale=1.0 dans le viewport empêche le zoom iOS */
+  #editor-wrap .cm-editor  { font-size: 12px; }
+  #editor-wrap .cm-content { font-size: 12px; }
+  /* Scroll horizontal fluide sur iOS */
+  #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* toolbar compact : icônes seules, TOUJOURS sur une seule ligne. */
+  #toolbar { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
+  .btn-label { display: none; }
+  #run-btn kbd { display: none; }
+  #status { display: none; }
+  #project-btn, #reload-btn, #standalone-btn, #img-btn,
+  #run-btn, #stop-btn, #copy-btn { padding: 6px 8px !important; }
+}
+</style>
+
+<div id="toolbar">
+  <a href="#/tutoriel" class="logo">Ollin</a>
+  <button id="rail-toggle" title="Afficher / masquer les fichiers">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg>
+  </button>
+  <div id="project-wrap">
+    <button id="project-btn" title="Projets" disabled aria-haspopup="true" aria-expanded="false">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4.5A1 1 0 012.5 3.5H6l1.5 1.5H13.5a1 1 0 011 1v6a1 1 0 01-1 1h-11a1 1 0 01-1-1z"/></svg>
+      <span id="project-label" class="btn-label">Projet</span>
+      <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M3 6l5 5 5-5z"/></svg>
+    </button>
+    <div id="project-menu" role="menu"></div>
+  </div>
+  <div class="spacer"></div>
+  <span id="status">Chargement…</span>
+  <button id="reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
+    <span class="btn-label">Recharger</span>
+  </button>
+  <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
+  <label for="img-file-input" id="img-btn" title="Charger des images (PNG, JPG…) pour image.load()" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;user-select:none">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 10l4-3 3 2.5 3-3.5 4 4"/><circle cx="11.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
+    <span class="btn-label" id="img-btn-label">Images</span>
+  </label>
+  <button id="standalone-btn" title="Exécuter en plein écran dans une page dédiée" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
+    <span class="btn-label">Autonome</span>
+  </button>
+  <button id="format-btn" title="Reformater le code (indentation) — Alt+Maj+F" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3.5h12M6 6.5h8M6 9.5h8M2 12.5h12"/></svg>
+    <span class="btn-label">Formater</span>
+  </button>
+  <button id="copy-btn" title="Copier le code" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,opacity 0.15s" onmouseover="this.style.background='rgba(124,131,255,0.12)'" onmouseout="this.style.background='transparent'">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1h2.5"/></svg>
+    <span class="btn-label">Copier</span>
+  </button>
+  <button id="run-btn" disabled>
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
+    <span class="btn-label">Exécuter</span><kbd>Ctrl+↵</kbd>
+  </button>
+  <button id="stop-btn" disabled title="Pause / Reprendre" style="display:none">
+    <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
+    <span class="btn-label">Pause</span>
+  </button>
+</div>
+
+<div id="layout">
+  <div id="editor-pane">
+    <div id="editor-main">
+      <aside id="file-rail">
+        <div class="rail-head">
+          <span>Fichiers</span>
+          <button id="new-file-btn" title="Nouveau fichier">＋</button>
+        </div>
+        <div id="file-list"></div>
+        <div class="rail-head rail-head-res">
+          <span>Ressources</span>
+          <button id="new-res-btn" title="Ajouter une image">＋</button>
+        </div>
+        <div id="res-list"></div>
+      </aside>
+      <div id="editor-wrap"></div>
+    </div>
+  </div>
+  <div id="divider" style="display:none"></div>
+  <div id="output-pane" style="display:none">
+    <div id="output">Prêt.</div>
+  </div>
+</div>
+
+<div id="load-error" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(15,17,23,0.92);flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;font-family:system-ui,sans-serif">
+  <div style="font-size:15px;color:#f87171;font-weight:600">Le chargement de l'éditeur a échoué</div>
+  <div style="font-size:13px;color:#8a93b0;max-width:380px;line-height:1.5">Souvent dû à un réseau lent ou au CDN (CodeMirror) momentanément indisponible. Réessaie en vidant le cache.</div>
+  <button id="load-error-reload" style="background:#7c83ff;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:14px;font-weight:600;cursor:pointer">Recharger</button>
+</div>

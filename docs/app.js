@@ -46,8 +46,8 @@ function getOllin() {
 // Vues encore autonomes (migration incrémentale) : { external } → navigation
 // pleine page cache-vidée, en attendant leur intégration comme fragment.
 const ROUTES = {
-  tutoriel:   { html: 'views/tutoriel.html', js: './views/tutoriel.js' },
-  playground: { external: 'playground.html' },
+  tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js' },
+  playground: { html: 'views/playground.html', js: './views/playground.js' },
   run:        { external: 'run.html' },
 }
 const DEFAULT_VIEW = 'tutoriel'
@@ -95,16 +95,24 @@ async function mount(view, anchor) {
   // Charge le fragment (cache-busté : une mise à jour est prise dès le prochain
   // rendu, cohérent avec la politique anti-cache du reste du projet).
   const bust = Date.now()
-  const res  = await fetch(route.html + '?v=' + bust)
-  viewEl.innerHTML = await res.text()
+  try {
+    const res  = await fetch(route.html + '?v=' + bust)
+    viewEl.innerHTML = await res.text()
 
-  const mod = await import(route.js + '?v=' + bust)
-  const ctx = { root: viewEl, getOllin, hardReload, navigate }
-  currentCleanup = (await mod.init(ctx)) || null
-  currentView = view
+    const mod = await import(route.js + '?v=' + bust)
+    const ctx = { root: viewEl, getOllin, hardReload, navigate }
+    currentCleanup = (await mod.init(ctx)) || null
+    currentView = view
 
-  if (anchor) scrollToAnchor(anchor)
-  else window.scrollTo(0, 0)
+    if (anchor) scrollToAnchor(anchor)
+    else window.scrollTo(0, 0)
+  } catch (e) {
+    console.error('Échec de montage de la vue « ' + view + ' » :', e)
+    viewEl.innerHTML = '<div style="padding:40px;text-align:center;font-family:system-ui,sans-serif;color:#c9d1e0">' +
+      '<p style="color:#f87171;font-weight:600;margin-bottom:12px">Échec du chargement de la vue.</p>' +
+      '<button onclick="location.reload()" style="background:#7c83ff;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:14px;cursor:pointer">Recharger</button></div>'
+    currentView = null
+  }
 }
 
 function scrollToAnchor(id) {
