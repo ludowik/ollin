@@ -51,6 +51,10 @@ static int s_logicalH = 0; // hauteur logique de la zone
 // l'overlay FPS PAR-DESSUS (donc l'overlay reste net, il ne bave pas).
 static RenderTexture2D s_target{};
 static bool s_target_ready = false;
+static int s_targetW = 0, s_targetH = 0;   // taille réelle de la RT (physique × SSAA)
+// Supersampling : la RT est rendue à SSAA× la résolution physique puis réduite
+// (bilinéaire) au blit → anti-aliasing (bords lissés) sans FBO multi-échantillonné.
+static const int SSAA = 2;
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
@@ -103,13 +107,15 @@ static Value gfx_canvas(Value* args, int argc) {
 #endif
     s_logicalW = w;
     s_logicalH = h;
-    // Cible de rendu persistante en résolution PHYSIQUE (HiDPI) → rendu 1:1 avec
-    // le canvas, net comme le rendu direct (pas d'agrandissement). Les coordonnées
-    // logiques sont rétablies dans renderFrame via une projection [0,w]×[0,h].
-    // Effacée une seule fois ici → première frame sur fond noir même si draw()
-    // n'efface pas.
-    s_target = LoadRenderTexture(s_physW, s_physH);
-    SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);
+    // Cible de rendu persistante à SSAA× la résolution PHYSIQUE (HiDPI + anti-
+    // aliasing par supersampling) → rendu net, bords lissés à la réduction. Les
+    // coordonnées logiques sont rétablies dans renderFrame via une projection
+    // [0,w]×[0,h]. Effacée une seule fois ici → première frame sur fond noir même
+    // si draw() n'efface pas.
+    s_targetW = s_physW * SSAA;
+    s_targetH = s_physH * SSAA;
+    s_target = LoadRenderTexture(s_targetW, s_targetH);
+    SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // lissage à la réduction
     s_target_ready = true;
     BeginTextureMode(s_target);
     ClearBackground(BLACK);
@@ -147,6 +153,27 @@ static Value gfx_clear(Value* args, int argc) {
     return Value{};
 }
 
+// Mode de fusion des dessins suivants. Accepte une chaîne ("alpha", "add",
+// "multiply", "subtract", "add_colors", "premultiply") ou une constante du
+// module `blend`. Remis à "alpha" au début de chaque frame (resetStyles).
+static Value gfx_blend_mode(Value* args, int argc) {
+    int mode = BLEND_ALPHA;
+    if (argc > 0 && args[0].isString()) {
+        const std::string& s = args[0].asString();
+        if (s == "alpha") mode = BLEND_ALPHA;
+        else if (s == "add" || s == "additive") mode = BLEND_ADDITIVE;
+        else if (s == "multiply" || s == "multiplied") mode = BLEND_MULTIPLIED;
+        else if (s == "add_colors") mode = BLEND_ADD_COLORS;
+        else if (s == "subtract") mode = BLEND_SUBTRACT_COLORS;
+        else if (s == "premultiply") mode = BLEND_ALPHA_PREMULTIPLY;
+        else throw std::runtime_error("graphics.blendMode: mode inconnu '" + s + "'");
+    } else if (argc > 0 && args[0].isNumber()) {
+        mode = (int)args[0].asNum();   // constante du module `blend`
+    }
+    BeginBlendMode(mode);
+    return Value{};
+}
+
 // ── Style state ───────────────────────────────────────────────────────────────
 static float s_stroke_size = 2.0f;
 static bool s_has_stroke = true;
@@ -171,6 +198,7 @@ static void resetStyles() {
     applyStroke(true, WHITE);
     applyFill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
+    BeginBlendMode(BLEND_ALPHA);                  // mode de fusion remis par défaut chaque frame
     rlLoadIdentity();
 }
 
@@ -508,11 +536,12 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
-        // s_target est en pixels PHYSIQUES et stockée bottom-up → source = taille
-        // physique, hauteur négative pour l'afficher à l'endroit ; destination en
-        // coordonnées logiques (remplit l'écran via le viewport physique).
+        // s_target est en pixels SSAA×physiques et stockée bottom-up → source =
+        // taille réelle de la RT, hauteur négative pour l'afficher à l'endroit ;
+        // destination en coordonnées logiques (remplit l'écran via le viewport
+        // physique). La réduction SSAA→physique par le filtre bilinéaire lisse.
         DrawTexturePro(s_target.texture,
-                       Rectangle{0.0f, 0.0f, (float)s_physW, -(float)s_physH},
+                       Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
         drawFpsOverlay();
@@ -659,6 +688,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(gfx_begin_draw));
     m.mapSet(Value(std::string("end_draw")), Value::makeBuiltin(gfx_end_draw));
     m.mapSet(Value(std::string("clear")), Value::makeBuiltin(gfx_clear));
+    m.mapSet(Value(std::string("blendMode")), Value::makeBuiltin(gfx_blend_mode));
     m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
     m.mapSet(Value(std::string("stroke")), Value::makeBuiltin(gfx_stroke));
     m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
