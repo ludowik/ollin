@@ -51,18 +51,26 @@ static int s_logicalH = 0; // hauteur logique de la zone
 // l'overlay FPS PAR-DESSUS (donc l'overlay reste net, il ne bave pas).
 static RenderTexture2D s_target{};
 static bool s_target_ready = false;
-static int s_targetW = 0, s_targetH = 0;   // taille réelle de la RT (physique × SSAA)
-// Supersampling : la RT est rendue à SSAA× la résolution physique puis réduite
-// (bilinéaire) au blit → anti-aliasing (bords lissés) sans FBO multi-échantillonné.
+static int s_targetW = 0, s_targetH = 0;   // taille réelle de la RT (sur-échantillonnée)
+// Sur-échantillonnage visé RELATIF au logique (anti-aliasing), borné par la
+// résolution physique et un plafond (cf. gfx_canvas) — PAS multiplié par le DPR.
 static const int SSAA = 2;
 // Mode de fusion courant (choisi par graphics.blendMode), suivi pour pouvoir le
 // restaurer après un fondu (clear avec alpha) et le remettre à ALPHA chaque frame.
 static int s_blend_mode = BLEND_ALPHA;
+// Capture d'écran DIFFÉRÉE en fin de frame (draw() rend dans la RT ; la capture
+// doit lire l'écran composé). Remis à zéro à chaque gfx_canvas (pas de fuite
+// d'une requête d'un programme précédent dans l'instance WASM partagée).
+static std::string s_shot_path;
+static bool s_shot_pending = false;
+static void flushPendingScreenshot();   // défini plus bas (utilisé par gfx_end_draw)
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
     int h = argc > 1 ? toInt(args[1]) : 600;
     const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
+    s_shot_pending = false;   // nouveau programme → oublier une capture en attente
+    s_blend_mode = BLEND_ALPHA;
 #ifdef __EMSCRIPTEN__
     if (IsWindowReady()) {
         if (s_target_ready) {                 // libérer l'ancienne cible AVANT de perdre le contexte GL
@@ -110,19 +118,31 @@ static Value gfx_canvas(Value* args, int argc) {
 #endif
     s_logicalW = w;
     s_logicalH = h;
-    // Cible de rendu persistante à SSAA× la résolution PHYSIQUE (HiDPI + anti-
-    // aliasing par supersampling) → rendu net, bords lissés à la réduction. Les
-    // coordonnées logiques sont rétablies dans renderFrame via une projection
-    // [0,w]×[0,h]. Effacée une seule fois ici → première frame sur fond noir même
-    // si draw() n'efface pas.
-    s_targetW = s_physW * SSAA;
-    s_targetH = s_physH * SSAA;
+    // Cible de rendu persistante. On vise un sur-échantillonnage RELATIF au
+    // logique (~SSAA×) pour l'anti-aliasing, MAIS sans jamais descendre sous la
+    // résolution physique (netteté HiDPI). On NE multiplie donc PAS SSAA par le
+    // DPR (sinon sur mobile dpr≥2 la texture explosait : mémoire + dépassement de
+    // GL_MAX_TEXTURE_SIZE → écran noir). La taille est en plus plafonnée.
+    const int MAX_RT = 4096;   // borne sûre (≤ GL_MAX_TEXTURE_SIZE sur la plupart des GPU)
+    s_targetW = s_physW > s_logicalW * SSAA ? s_physW : s_logicalW * SSAA;
+    s_targetH = s_physH > s_logicalH * SSAA ? s_physH : s_logicalH * SSAA;
+    if (s_targetW > MAX_RT) {
+        s_targetW = MAX_RT;
+    }
+    if (s_targetH > MAX_RT) {
+        s_targetH = MAX_RT;
+    }
     s_target = LoadRenderTexture(s_targetW, s_targetH);
-    SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // lissage à la réduction
-    s_target_ready = true;
-    BeginTextureMode(s_target);
-    ClearBackground(BLACK);
-    EndTextureMode();
+    // Vérifie l'allocation : si le FBO/la texture n'a pas été créé (taille trop
+    // grande, VRAM insuffisante…), on reste en rendu DIRECT (renderFrame bascule
+    // sur le repli) au lieu d'échantillonner une texture invalide (écran noir).
+    s_target_ready = (s_target.id != 0 && s_target.texture.id != 0);
+    if (s_target_ready) {
+        SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // lissage à la réduction
+        BeginTextureMode(s_target);
+        ClearBackground(BLACK);
+        EndTextureMode();
+    }
     Value win = VM::current()->getGlobal("window");
     if (win.isMap()) {
         win.mapSet(Value(std::string("width")), Value((int64_t)w));
@@ -147,6 +167,7 @@ static Value gfx_begin_draw(Value* args, int argc) {
 static Value gfx_end_draw(Value* args, int argc) {
     (void)args;
     (void)argc;
+    flushPendingScreenshot();   // chemin manuel begin_draw/end_draw : capture ici
     EndDrawing();
     return Value{};
 }
@@ -160,7 +181,10 @@ static Value gfx_clear(Value* args, int argc) {
         // des traînées. On force ALPHA le temps du rectangle puis on restaure le
         // mode de fusion courant (celui posé par graphics.blendMode dans draw()).
         BeginBlendMode(BLEND_ALPHA);
+        rlPushMatrix();                 // fondu indépendant de la transfo courante
+        rlLoadIdentity();               // (comme ClearBackground) → couvre tout le canvas
         DrawRectangle(0, 0, s_logicalW, s_logicalH, c);
+        rlPopMatrix();
         BeginBlendMode(s_blend_mode);
     } else {
         ClearBackground(c);   // opaque → effacement net (glClear)
@@ -175,13 +199,21 @@ static Value gfx_blend_mode(Value* args, int argc) {
     int mode = BLEND_ALPHA;
     if (argc > 0 && args[0].isString()) {
         const std::string& s = args[0].asString();
-        if (s == "alpha") mode = BLEND_ALPHA;
-        else if (s == "add" || s == "additive") mode = BLEND_ADDITIVE;
-        else if (s == "multiply" || s == "multiplied") mode = BLEND_MULTIPLIED;
-        else if (s == "add_colors") mode = BLEND_ADD_COLORS;
-        else if (s == "subtract") mode = BLEND_SUBTRACT_COLORS;
-        else if (s == "premultiply") mode = BLEND_ALPHA_PREMULTIPLY;
-        else throw std::runtime_error("graphics.blendMode: mode inconnu '" + s + "'");
+        if (s == "alpha") {
+            mode = BLEND_ALPHA;
+        } else if (s == "add" || s == "additive") {
+            mode = BLEND_ADDITIVE;
+        } else if (s == "multiply" || s == "multiplied") {
+            mode = BLEND_MULTIPLIED;
+        } else if (s == "add_colors") {
+            mode = BLEND_ADD_COLORS;
+        } else if (s == "subtract") {
+            mode = BLEND_SUBTRACT_COLORS;
+        } else if (s == "premultiply") {
+            mode = BLEND_ALPHA_PREMULTIPLY;
+        } else {
+            throw std::runtime_error("graphics.blendMode: mode inconnu '" + s + "'");
+        }
     } else if (argc > 0 && args[0].isNumber()) {
         mode = (int)args[0].asNum();   // constante du module `blend`
     }
@@ -326,9 +358,8 @@ static Value gfx_fps(Value* args, int argc) {
 // Capture le framebuffer AFFICHÉ dans un PNG. Comme draw() rend dans la
 // RenderTexture persistante (liée pendant draw), on ne peut pas capturer l'écran
 // composité ici : on DIFFÈRE la capture à la fin de la frame (après composition),
-// dans renderFrame. Sur WASM, TakeScreenshot déclenche un téléchargement.
-static std::string s_shot_path;
-static bool s_shot_pending = false;
+// dans renderFrame (ou dans gfx_end_draw pour le chemin manuel). Sur WASM,
+// TakeScreenshot déclenche un téléchargement. (s_shot_path/s_shot_pending : voir haut.)
 static Value gfx_screenshot(Value* args, int argc) {
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("graphics.screenshot: expected a file path");
