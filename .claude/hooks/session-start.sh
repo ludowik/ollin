@@ -5,6 +5,28 @@ if [ "${CLAUDE_CODE_REMOTE:-}" != "true" ]; then
   exit 0
 fi
 
+# ── Resynchronise le dépôt sur le dernier origin/main ───────────────────────
+# Le conteneur distant est éphémère : à chaque reprise il repart d'un snapshot
+# figé au commit de départ, PAS du HEAD distant courant. Sans resync, HEAD est
+# périmé et committer par-dessus créerait une divergence. C'est sûr ici : le
+# conteneur est jetable et tout le travail validé est poussé sur origin. On
+# n'écrase JAMAIS de modifications locales non commitées (garde `status`).
+if [ -d "$CLAUDE_PROJECT_DIR/.git" ]; then
+  BR="main"
+  if git -C "$CLAUDE_PROJECT_DIR" fetch origin "$BR" --quiet 2>/dev/null; then
+    if [ -z "$(git -C "$CLAUDE_PROJECT_DIR" status --porcelain)" ]; then
+      git -C "$CLAUDE_PROJECT_DIR" checkout -q "$BR" 2>/dev/null || true
+      if git -C "$CLAUDE_PROJECT_DIR" reset --hard "origin/$BR" --quiet 2>/dev/null; then
+        echo "Resynchronisé sur origin/$BR ($(git -C "$CLAUDE_PROJECT_DIR" rev-parse --short HEAD))"
+      fi
+    else
+      echo "⚠ Modifications locales non commitées — resync ignorée (aucun écrasement)."
+    fi
+  else
+    echo "⚠ git fetch impossible (réseau) — HEAD peut être périmé, resynchroniser manuellement."
+  fi
+fi
+
 # Install missing Raylib system dependencies on Linux
 # (most are pre-installed in the remote image)
 if [ "$(uname)" = "Linux" ]; then
