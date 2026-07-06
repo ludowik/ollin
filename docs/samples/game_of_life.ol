@@ -138,7 +138,7 @@ func draw()
     graphics.noStroke()                          ## carrés pleins, sans bordure
     ## Légère persistance VISUELLE : au lieu d'effacer net, on estompe la frame
     ## précédente (fondu) → courte traînée. La simulation, elle, reste exacte.
-    graphics.clear(Color(0.05, 0.06, 0.10, 0.35))
+    graphics.clear(Color(0.05, 0.06, 0.10, 0.15))
     graphics.fill(BLEU)
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
