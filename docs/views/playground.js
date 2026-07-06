@@ -293,7 +293,8 @@ const view = new EditorView({
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
       keymap.of(editKeymap),
       keymap.of([
-        { key: 'Alt-Enter', run: () => { run(); return true } },
+        { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
+        { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
       ]),
       indentUnit.of('    '),
@@ -341,6 +342,22 @@ function runEditKeymap(e) {
   return false
 }
 const onGlobalKeydown = e => {
+  // Alt+Entrée : lance ou RELANCE l'exécution — géré en capture pour marcher
+  // même quand le focus est sur le CANVAS (programme graphique en cours), pas
+  // seulement dans l'éditeur.
+  if (e.key === 'Enter' && e.altKey) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    relaunch()
+    return
+  }
+  // Échap : stoppe l'exécution en cours (focus éditeur OU canvas).
+  if (e.key === 'Escape' && isRunning) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    stopExec()
+    return
+  }
   if (!runtimeArmed || !view.hasFocus) return
   if (e.key !== 'Backspace' && e.key !== 'Tab') return   // seules touches mangées par GLFW
   if (runEditKeymap(e)) {
@@ -998,9 +1015,9 @@ function showOutput(text) {
 // ── Run ───────────────────────────────────────────────────────────────────
 let ollin = null
 
-function run() {
+// Démarre l'exécution (à froid). Ne toggle pas : voir run()/relaunch()/stopExec().
+function launch() {
   if (!ollin) return
-  if (isRunning) { clearAndStop(); return }
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
@@ -1023,6 +1040,25 @@ function run() {
     },
     onOutput:  (out) => showOutput(out),
   })
+}
+
+// Bouton Exécuter : bascule (le bouton affiche « Arrêter » pendant l'exécution).
+function run() {
+  if (!ollin) return
+  if (isRunning) { clearAndStop(); return }
+  launch()
+}
+
+// Alt+Entrée : lance, ou RELANCE à froid si déjà en cours.
+function relaunch() {
+  if (!ollin) return
+  if (isRunning) clearAndStop()
+  launch()
+}
+
+// Échap : arrête l'exécution en cours (sinon sans effet).
+function stopExec() {
+  if (isRunning) clearAndStop()
 }
 
 runBtn.addEventListener('click', run)
