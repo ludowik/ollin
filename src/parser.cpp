@@ -6,15 +6,18 @@
 #include <stdexcept>
 
 Parser::Parser(std::vector<Token> tokens, std::string base_dir,
-               std::shared_ptr<std::unordered_set<std::string>> imported)
+               std::shared_ptr<std::unordered_set<std::string>> imported,
+               std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names)
     : tokens(std::move(tokens)), base_dir_(std::move(base_dir)),
-      imported_paths_(imported ? std::move(imported) : std::make_shared<std::unordered_set<std::string>>()) {
+      imported_paths_(imported ? std::move(imported) : std::make_shared<std::unordered_set<std::string>>()),
+      module_names_(module_names ? std::move(module_names)
+                                 : std::make_shared<std::unordered_map<std::string, std::vector<std::string>>>()) {
 }
 
-Token Parser::peek() const {
+const Token& Parser::peek() const {
     return tokens[pos];
 }
-Token Parser::advance() {
+const Token& Parser::advance() {
     return tokens[pos++];
 }
 bool Parser::check(TokenType t) const {
@@ -48,22 +51,39 @@ TokenType Parser::peekAt(int offset) const {
     return TokenType::EOF_T;
 }
 
-void Parser::skipSemis() {
+void Parser::skipComments() {
     while (check(TokenType::COMMENT))
         advance();
 }
 
-// absorbe un commentaire optionnel puis un SEMICOLON (inséré par ASI ou explicite)
-void Parser::consumeSemi() {
+// Absorbe un COMMENT optionnel en fin d'instruction. (Les instructions sont
+// séparées par des retours à la ligne, non tokenisés ; il n'y a pas d'ASI.)
+void Parser::consumeOptComment() {
     match(TokenType::COMMENT);
 }
+
+// Garde anti-débordement de pile : la descente récursive (parenthèses, appels,
+// blocs imbriqués) pouvait faire planter le processus sur une entrée très
+// imbriquée. On borne la profondeur et on lève une erreur propre à la place.
+namespace {
+struct DepthGuard {
+    int& d;
+    DepthGuard(int& depth, int line) : d(depth) {
+        if (++d > 256)
+            throw std::runtime_error("line " + std::to_string(line) + ": nesting too deep");
+    }
+    ~DepthGuard() {
+        --d;
+    }
+};
+} // namespace
 
 // ── entrée principale ────────────────────────────────────────────────────────
 
 Program Parser::parse() {
     Program prog;
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::EOF_T))
             break;
         prog.stmts.push_back(parseOneStmt());
@@ -79,12 +99,18 @@ static bool isAssignOp(TokenType t) {
 }
 
 std::unique_ptr<Stmt> Parser::parseOneStmt() {
+    DepthGuard guard(depth_, peek().line);
     switch (peek().type) {
     case TokenType::COMMENT: {
         std::string text = advance().lexeme;
-        consumeSemi();
+        consumeOptComment();
         return std::make_unique<CommentStmt>(std::move(text));
     }
+    case TokenType::SEMICOLON:
+        // ';' n'est valide qu'à l'intérieur d'un range [a;b] (consommé par
+        // rangeExpr). Au niveau instruction, c'est une erreur — message clair.
+        throw std::runtime_error("line " + std::to_string(peek().line) +
+                                 ": ';' is not valid syntax — statements are terminated by newlines");
     case TokenType::WHILE:    return whileStmt();
     case TokenType::IF:       return ifStmt();
     case TokenType::BREAK:    return breakStmt();
@@ -101,73 +127,76 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     case TokenType::GLOBAL:   return globalDecl();
     case TokenType::CONSTANT: return constantDecl();
     case TokenType::IDENTIFIER: {
-        TokenType nx = peekNextType();
-        if (nx == TokenType::COMMA)
+        // Une instruction débutant par un identifiant est soit une affectation
+        // (simple, indexée, ou chaînée), soit une multi-affectation, soit une
+        // instruction-expression. On parse une expression : selon ce qui suit
+        // (opérateur d'affectation, virgule, ou rien) on décide. La cible d'une
+        // affectation doit être une lvalue (VarExpr ou IndexExpr) — cela couvre
+        // uniformément a=, a.b=, a[i]=, a.b.c=, a[i][j]=, a.b[k]= (cf. grammaire).
+        int line = peek().line;
+        int saved = pos;
+        auto e = expr();
+        if (isAssignOp(peek().type))
+            return finishAssignFromExpr(std::move(e), line);
+        if (check(TokenType::COMMA)) {
+            pos = saved; // multi-affectation : re-parse via multiAssignStmt (LValue)
             return multiAssignStmt();
-        if (isAssignOp(nx))
-            return assignStmt();
-        auto makeIndexAssign = [&](std::string obj, std::unique_ptr<Expr> key, TokenType op) {
-            auto val = expr();
-            consumeSemi();
-            auto s = std::make_unique<IndexAssignStmt>();
-            s->obj = std::move(obj);
-            s->key = std::move(key);
-            s->op = op;
-            s->value = std::move(val);
-            return s;
-        };
-        if (nx == TokenType::DOT && peekAt(2) == TokenType::IDENTIFIER) {
-            if (isAssignOp(peekAt(3))) {
-                std::string obj_name = advance().lexeme;
-                advance(); // DOT
-                std::string field = advance().lexeme;
-                TokenType op = advance().type;
-                return makeIndexAssign(obj_name, std::make_unique<StringExpr>(field), op);
-            }
-            // scan spéculatif : ident.field[expr], ... → multi-assign (FIELD_INDEX)
-            int saved = pos;
-            advance();
-            advance();
-            advance(); // ident . field
-            if (check(TokenType::LBRACKET)) {
-                int depth = 1;
-                advance();
-                while (!check(TokenType::EOF_T) && depth > 0) {
-                    TokenType t = advance().type;
-                    if (t == TokenType::LBRACKET) {
-                        depth++;
-                    } else if (t == TokenType::RBRACKET) {
-                        depth--;
-                    }
-                }
-            }
-            bool is_multi = check(TokenType::COMMA);
-            pos = saved;
-            if (is_multi)
-                return multiAssignStmt();
         }
-        if (nx == TokenType::LBRACKET) {
-            int saved = pos;
-            std::string obj_name = advance().lexeme;
-            advance(); // [
-            auto key = expr();
-            expect(TokenType::RBRACKET);
-            if (check(TokenType::COMMA)) {
-                pos = saved;
-                return multiAssignStmt();
-            }
-            if (isAssignOp(peek().type)) {
-                TokenType op = advance().type;
-                return makeIndexAssign(obj_name, std::move(key), op);
-            }
-            pos = saved;
-        }
-        break;
+        consumeOptComment();
+        auto st = std::make_unique<ExprStmt>(std::move(e));
+        st->line = line;
+        return st;
     }
     default:
         break;
     }
     return exprStmt();
+}
+
+// Transforme une cible déjà parsée + l'opérateur d'affectation courant en
+// instruction. VarExpr → AssignStmt ; IndexExpr (a.b, a[i], et chaînes) →
+// IndexAssignStmt avec le conteneur en obj_expr.
+std::unique_ptr<Stmt> Parser::finishAssignFromExpr(std::unique_ptr<Expr> target, int line) {
+    TokenType opt = advance().type; // opérateur d'affectation
+    auto value = expr();
+    consumeOptComment();
+    if (auto* ve = dynamic_cast<VarExpr*>(target.get())) {
+        auto s = std::make_unique<AssignStmt>();
+        s->line = line;
+        s->name = ve->name;
+        switch (opt) {
+        case TokenType::PLUS_EQUAL:
+            s->op = '+';
+            break;
+        case TokenType::MINUS_EQUAL:
+            s->op = '-';
+            break;
+        case TokenType::STAR_EQUAL:
+            s->op = '*';
+            break;
+        case TokenType::SLASH_EQUAL:
+            s->op = '/';
+            break;
+        case TokenType::PERCENT_EQUAL:
+            s->op = '%';
+            break;
+        default:
+            s->op = '\0';
+            break;
+        }
+        s->value = std::move(value);
+        return s;
+    }
+    if (auto* ie = dynamic_cast<IndexExpr*>(target.get())) {
+        auto s = std::make_unique<IndexAssignStmt>();
+        s->line = line;
+        s->obj_expr = std::move(ie->obj); // conteneur (peut être lui-même chaîné)
+        s->key = std::move(ie->key);
+        s->op = opt;
+        s->value = std::move(value);
+        return s;
+    }
+    throw std::runtime_error("line " + std::to_string(line) + ": invalid assignment target");
 }
 
 // ── instructions ─────────────────────────────────────────────────────────────
@@ -186,7 +215,7 @@ std::unique_ptr<Stmt> Parser::varDecl() {
             s->values.push_back(expr());
     }
     // sans '=' → valeurs absentes → nil dans le compilateur
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -204,7 +233,7 @@ std::unique_ptr<Stmt> Parser::globalDecl() {
         while (match(TokenType::COMMA))
             s->values.push_back(expr());
     }
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -223,7 +252,7 @@ std::unique_ptr<Stmt> Parser::constantDecl() {
     s->values.push_back(expr());
     while (match(TokenType::COMMA))
         s->values.push_back(expr());
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -233,16 +262,16 @@ std::unique_ptr<Stmt> Parser::whileStmt() {
     auto s = std::make_unique<WhileStmt>();
     s->line = line;
     s->cond = expr();
-    skipSemis();
+    skipComments();
     expect(TokenType::DO);
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
         s->body.push_back(parseOneStmt());
     }
     expect(TokenType::END);
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -252,10 +281,10 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
     auto s = std::make_unique<IfStmt>();
     s->line = line;
     s->cond = expr();
-    skipSemis();
+    skipComments();
     expect(TokenType::THEN);
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) || check(TokenType::EOF_T))
             break;
         s->then_body.push_back(parseOneStmt());
@@ -268,10 +297,10 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
                 advance(); // IF
             ElseIfClause ei;
             ei.cond = expr();
-            skipSemis();
+            skipComments();
             expect(TokenType::THEN);
             while (true) {
-                skipSemis();
+                skipComments();
                 if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) ||
                     check(TokenType::EOF_T))
                     break;
@@ -279,9 +308,9 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
             }
             s->else_ifs.push_back(std::move(ei));
         } else {
-            consumeSemi();
+            consumeOptComment();
             while (true) {
-                skipSemis();
+                skipComments();
                 if (check(TokenType::END) || check(TokenType::EOF_T))
                     break;
                 s->else_body.push_back(parseOneStmt());
@@ -290,14 +319,14 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
         }
     }
     expect(TokenType::END);
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::breakStmt() {
     int line = peek().line;
     advance();
-    consumeSemi();
+    consumeOptComment();
     auto s = std::make_unique<BreakStmt>();
     s->line = line;
     return s;
@@ -306,7 +335,7 @@ std::unique_ptr<Stmt> Parser::breakStmt() {
 std::unique_ptr<Stmt> Parser::continueStmt() {
     int line = peek().line;
     advance();
-    consumeSemi();
+    consumeOptComment();
     auto s = std::make_unique<ContinueStmt>();
     s->line = line;
     return s;
@@ -317,7 +346,7 @@ std::unique_ptr<Stmt> Parser::throwStmt() {
     advance(); // throw
     auto s = std::make_unique<ThrowStmt>(expr());
     s->line = line;
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -326,33 +355,33 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
     s->line = line;
-    consumeSemi();
+    consumeOptComment();
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::CATCH) || check(TokenType::EOF_T))
             break;
         s->try_body.push_back(parseOneStmt());
     }
     expect(TokenType::CATCH);
     s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
-    consumeSemi();
+    consumeOptComment();
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T))
             break;
         s->catch_body.push_back(parseOneStmt());
     }
     if (match(TokenType::ELSE)) {
-        consumeSemi();
+        consumeOptComment();
         while (true) {
-            skipSemis();
+            skipComments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
             s->else_body.push_back(parseOneStmt());
         }
     }
     expect(TokenType::END);
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -380,15 +409,15 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
                 expect(TokenType::COMMA);
         }
         expect(TokenType::RPAREN);
-        consumeSemi();
+        consumeOptComment();
         while (true) {
-            skipSemis();
+            skipComments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
             body.push_back(parseOneStmt());
         }
         expect(TokenType::END);
-        consumeSemi();
+        consumeOptComment();
     };
 
     // Définition sur un champ de map : func obj.field(params) ... end
@@ -439,25 +468,7 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
             }
         }
     }
-    consumeSemi();
-    return s;
-}
-
-std::unique_ptr<Stmt> Parser::assignStmt() {
-    int line = peek().line;
-    auto s = std::make_unique<AssignStmt>();
-    s->line = line;
-    s->name = advance().lexeme;
-    switch (peek().type) {
-    case TokenType::PLUS_EQUAL:    advance(); s->op = '+'; break;
-    case TokenType::MINUS_EQUAL:   advance(); s->op = '-'; break;
-    case TokenType::STAR_EQUAL:    advance(); s->op = '*'; break;
-    case TokenType::SLASH_EQUAL:   advance(); s->op = '/'; break;
-    case TokenType::PERCENT_EQUAL: advance(); s->op = '%'; break;
-    default:                       advance(); s->op = '\0'; break;
-    }
-    s->value = expr();
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -501,7 +512,7 @@ std::unique_ptr<Stmt> Parser::multiAssignStmt() {
     while (match(TokenType::COMMA))
         s->values.push_back(expr());
 
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -521,20 +532,20 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         range->end = expr();
         if (match(TokenType::COMMA))
             range->step = expr();
-        skipSemis();
+        skipComments();
         expect(TokenType::DO);
         auto s = std::make_unique<ForIterStmt>();
         s->line = line;
         s->var1 = first_var;
         s->iter_expr = std::move(range);
         while (true) {
-            skipSemis();
+            skipComments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
             s->body.push_back(parseOneStmt());
         }
         expect(TokenType::END);
-        consumeSemi();
+        consumeOptComment();
         return s;
     }
 
@@ -546,7 +557,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     }
     expect(TokenType::IN);
     auto iter_e = expr();
-    skipSemis();
+    skipComments();
     expect(TokenType::DO);
     auto s = std::make_unique<ForIterStmt>();
     s->line = line;
@@ -554,20 +565,20 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     s->var2 = var2;
     s->iter_expr = std::move(iter_e);
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
         s->body.push_back(parseOneStmt());
     }
     expect(TokenType::END);
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::exprStmt() {
     int line = peek().line;
     auto e = expr();
-    consumeSemi();
+    consumeOptComment();
     auto s = std::make_unique<ExprStmt>(std::move(e));
     s->line = line;
     return s;
@@ -576,17 +587,18 @@ std::unique_ptr<Stmt> Parser::exprStmt() {
 // ── expressions ──────────────────────────────────────────────────────────────
 
 std::unique_ptr<Expr> Parser::expr() {
+    DepthGuard guard(depth_, peek().line);
     return logical();
 }
 
 std::unique_ptr<Expr> Parser::logical() {
     auto left = logicalAnd();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::OR))
             break;
         advance();
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>('|', std::move(left), logicalAnd());
     }
     return left;
@@ -595,11 +607,11 @@ std::unique_ptr<Expr> Parser::logical() {
 std::unique_ptr<Expr> Parser::logicalAnd() {
     auto left = bitwiseOr();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::AND))
             break;
         advance();
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>('&', std::move(left), bitwiseOr());
     }
     return left;
@@ -608,11 +620,11 @@ std::unique_ptr<Expr> Parser::logicalAnd() {
 std::unique_ptr<Expr> Parser::bitwiseOr() {
     auto left = bitwiseXor();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::PIPE))
             break;
         advance();
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>('o', std::move(left), bitwiseXor());
     }
     return left;
@@ -621,11 +633,11 @@ std::unique_ptr<Expr> Parser::bitwiseOr() {
 std::unique_ptr<Expr> Parser::bitwiseXor() {
     auto left = bitwiseAnd();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::TILDE))
             break; // '~' binaire = XOR (modèle Lua)
         advance();
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>('x', std::move(left), bitwiseAnd());
     }
     return left;
@@ -634,11 +646,11 @@ std::unique_ptr<Expr> Parser::bitwiseXor() {
 std::unique_ptr<Expr> Parser::bitwiseAnd() {
     auto left = comparison();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::AMP))
             break;
         advance();
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>('b', std::move(left), comparison());
     }
     return left;
@@ -664,7 +676,7 @@ static char cmpChar(TokenType t) {
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto first = shift();
-    skipSemis();
+    skipComments();
     if (!isCmpToken(peek().type))
         return first;
 
@@ -673,9 +685,9 @@ std::unique_ptr<Expr> Parser::comparison() {
     chain->operands.push_back(std::move(first));
     while (isCmpToken(peek().type)) {
         chain->ops.push_back(cmpChar(advance().type));
-        skipSemis();
+        skipComments();
         chain->operands.push_back(shift());
-        skipSemis();
+        skipComments();
     }
     // single comparison: return a plain BinaryExpr for simplicity
     if (chain->ops.size() == 1)
@@ -687,12 +699,12 @@ std::unique_ptr<Expr> Parser::comparison() {
 std::unique_ptr<Expr> Parser::shift() {
     auto left = additive();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::LSHIFT) && !check(TokenType::RSHIFT))
             break;
         char op = check(TokenType::LSHIFT) ? 'l' : 'r';
         advance();
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }
     return left;
@@ -701,11 +713,11 @@ std::unique_ptr<Expr> Parser::shift() {
 std::unique_ptr<Expr> Parser::additive() {
     auto left = multiplicative();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::PLUS) && !check(TokenType::MINUS))
             break;
         char op = advance().lexeme[0];
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
     }
     return left;
@@ -714,12 +726,12 @@ std::unique_ptr<Expr> Parser::additive() {
 std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = unary();
     while (true) {
-        skipSemis();
+        skipComments();
         if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) &&
             !check(TokenType::PERCENT))
             break;
         char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
-        skipSemis();
+        skipComments();
         left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
     }
     return left;
@@ -753,11 +765,11 @@ std::unique_ptr<Expr> Parser::unary() {
 
 std::unique_ptr<Expr> Parser::power() {
     auto left = primary();
-    skipSemis();
+    skipComments();
     if (!check(TokenType::CARET))
         return left; // '^' = puissance (modèle Lua)
     advance();
-    skipSemis();
+    skipComments();
     // opérande droit = unary → autorise 2 ^ -1 et associativité à droite (2^2^3)
     return std::make_unique<BinaryExpr>('p', std::move(left), unary());
 }
@@ -879,25 +891,8 @@ std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
         throw std::runtime_error("line " + std::to_string(peek().line) + ": expected ']' or '[' to close range");
     }
 
-    // If open-left, adjust start: start += step (or 1 if no step)
-    // We do this at the AST level by wrapping: start = start + step_expr
-    if (!incl_left) {
-        std::unique_ptr<Expr> step_expr;
-        if (node->step) {
-            // clone step - we just copy the node since it'll be owned by BinaryExpr
-            // We can't clone easily so instead store in a temp and recreate
-            // Actually: we need start = start + step. Let's build a BinaryExpr
-            // But step is unique_ptr already stored... we need a second reference.
-            // Simplest: compute at runtime. We'll use a special flag or just adjust here.
-            // Since we can't clone unique_ptr, let's just use a NumberExpr(1) as approximation
-            // for the open-left adjustment and apply the real step in the VM.
-            // Actually: the cleanest approach is to do the adjustment in the compiler.
-            // The compiler will handle incl_left=false by adding step.
-            // So we don't need to adjust here - let the compiler handle it.
-        }
-        (void)step_expr;
-    }
-
+    // Ajustement open-left (incl_left=false → start += step) : émis par le
+    // COMPILATEUR à partir du drapeau node->incl_left. Rien à faire ici.
     return node;
 }
 
@@ -1002,9 +997,9 @@ std::unique_ptr<Expr> Parser::primary() {
                 expect(TokenType::COMMA);
         }
         expect(TokenType::RPAREN);
-        consumeSemi();
+        consumeOptComment();
         while (true) {
-            skipSemis();
+            skipComments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
             fe->body.push_back(parseOneStmt());
@@ -1014,7 +1009,7 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::LBRACE)) {
         advance(); // consume {
-        skipSemis();
+        skipComments();
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
             std::unique_ptr<Expr> key;
@@ -1037,7 +1032,7 @@ std::unique_ptr<Expr> Parser::primary() {
             map->entries.push_back({std::move(key), std::move(val)});
             if (check(TokenType::COMMA))
                 advance();
-            skipSemis();
+            skipComments();
         }
         expect(TokenType::RBRACE);
         return parsePostfix(std::move(map));
@@ -1048,13 +1043,13 @@ std::unique_ptr<Expr> Parser::primary() {
         if (looksLikeRange()) {
             return rangeExpr(true); // incl_left=true
         }
-        skipSemis();
+        skipComments();
         auto arr = std::make_unique<ArrayExpr>();
         while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
             arr->elements.push_back(expr());
             if (check(TokenType::COMMA))
                 advance();
-            skipSemis();
+            skipComments();
         }
         expect(TokenType::RBRACKET);
         return parsePostfix(std::move(arr));
@@ -1065,9 +1060,9 @@ std::unique_ptr<Expr> Parser::primary() {
         return rangeExpr(false); // incl_left=false
     }
     if (match(TokenType::LPAREN)) {
-        skipSemis();
+        skipComments();
         auto e = expr();
-        skipSemis();
+        skipComments();
         expect(TokenType::RPAREN);
         // postfix sur une expression parenthésée : (expr)(args), (expr)[i], (expr).champ
         return parsePostfix(std::move(e));
@@ -1085,9 +1080,9 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         advance();
         s->parent = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consumeSemi();
+    consumeOptComment();
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
         bool is_static = false;
@@ -1097,12 +1092,22 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         }
         if (!check(TokenType::FUNC))
             throw std::runtime_error("line " + std::to_string(peek().line) + ": expected 'func' inside class body");
-        auto method = std::unique_ptr<FuncDeclStmt>(static_cast<FuncDeclStmt*>(funcDeclStmt().release()));
+        int method_line = peek().line;
+        // funcDeclStmt() renvoie un IndexAssignStmt pour la forme `func obj.field()`
+        // — invalide dans une classe. Vérifier le type au lieu d'un static_cast
+        // aveugle (qui provoquait un segfault).
+        auto raw = funcDeclStmt();
+        auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
+        if (!fd)
+            throw std::runtime_error("line " + std::to_string(method_line) +
+                                     ": une méthode de classe doit être 'func nom(...)' (pas 'func obj.champ(...)')");
+        raw.release();
+        auto method = std::unique_ptr<FuncDeclStmt>(fd);
         method->is_static = is_static;
         s->methods.push_back(std::move(method));
     }
     expect(TokenType::END);
-    consumeSemi();
+    consumeOptComment();
     return s;
 }
 
@@ -1114,6 +1119,8 @@ static std::vector<std::string> collectTopLevelNames(const std::vector<std::uniq
                 names.push_back(n);
         else if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
             names.push_back(f->name);
+        else if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get()))
+            names.push_back(c->name); // les classes sont aussi des noms exportés
     }
     return names;
 }
@@ -1130,7 +1137,7 @@ std::unique_ptr<Stmt> Parser::importStmt() {
         advance();
         alias = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consumeSemi();
+    consumeOptComment();
 
     // Résoudre le chemin par rapport au répertoire du script courant
     std::string resolved =
@@ -1138,14 +1145,31 @@ std::unique_ptr<Stmt> Parser::importStmt() {
 
     auto block = std::make_unique<BlockStmt>();
 
-    // Protection contre les imports circulaires
+    // Construit `var al = {}` puis `al[n] = n` pour chaque nom exporté (référence
+    // les globales déjà injectées). Partagé par le cas « déjà importé » et le
+    // cas frais.
+    auto emitAliasMap = [&](const std::string& al, const std::vector<std::string>& names) {
+        auto vd = std::make_unique<VarDeclStmt>();
+        vd->names.push_back(al);
+        vd->values.push_back(std::make_unique<MapExpr>());
+        block->stmts.push_back(std::move(vd));
+        for (auto& tname : names) {
+            auto ia = std::make_unique<IndexAssignStmt>();
+            ia->obj = al;
+            ia->key = std::make_unique<StringExpr>(tname);
+            ia->op = TokenType::EQUALS;
+            ia->value = std::make_unique<VarExpr>(tname);
+            block->stmts.push_back(std::move(ia));
+        }
+    };
+
+    // Déjà importé (dédup / rupture de cycle) : ne PAS ré-injecter les instructions.
+    // Si un alias est demandé, reconstruire sa map depuis les noms mis en cache au
+    // 1er import — sinon un 2e `import "m" as b` donnerait une map vide.
     if (imported_paths_->count(resolved)) {
         if (!alias.empty()) {
-            // Alias demandé mais déjà importé : créer une map vide
-            auto vd = std::make_unique<VarDeclStmt>();
-            vd->names.push_back(alias);
-            vd->values.push_back(std::make_unique<MapExpr>());
-            block->stmts.push_back(std::move(vd));
+            auto it = module_names_->find(resolved);
+            emitAliasMap(alias, it != module_names_->end() ? it->second : std::vector<std::string>{});
         }
         return block;
     }
@@ -1166,8 +1190,13 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     auto sep2 = resolved.find_last_of("/\\");
     std::string sub_dir = (sep2 != std::string::npos) ? resolved.substr(0, sep2 + 1) : base_dir_;
 
-    Parser sub_parser(Lexer(src_text).tokenize(), sub_dir, imported_paths_);
+    Parser sub_parser(Lexer(src_text).tokenize(), sub_dir, imported_paths_, module_names_);
     Program sub_prog = sub_parser.parse();
+
+    // Mémorise les noms exportés (même pour un import flat) → un import aliasé
+    // ultérieur du même module pourra reconstruire sa map.
+    auto top_names = collectTopLevelNames(sub_prog.stmts);
+    (*module_names_)[resolved] = top_names;
 
     if (alias.empty()) {
         // import flat : injecter directement toutes les instructions
@@ -1175,8 +1204,6 @@ std::unique_ptr<Stmt> Parser::importStmt() {
             block->stmts.push_back(std::move(s));
     } else {
         // import as name : var name = {}; <stmts>; name[k] = k pour chaque nom top-level
-        auto top_names = collectTopLevelNames(sub_prog.stmts);
-
         auto vd = std::make_unique<VarDeclStmt>();
         vd->names.push_back(alias);
         vd->values.push_back(std::make_unique<MapExpr>());
@@ -1203,22 +1230,22 @@ std::unique_ptr<Stmt> Parser::switchStmt() {
     auto s = std::make_unique<SwitchStmt>();
     s->line = line;
     s->subject = expr();
-    consumeSemi();
+    consumeOptComment();
 
     auto isArmStart = [&]() {
         return check(TokenType::CASE) || check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T);
     };
 
     while (true) {
-        skipSemis();
+        skipComments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
 
         if (check(TokenType::ELSE)) {
             advance(); // ELSE
-            consumeSemi();
+            consumeOptComment();
             while (!check(TokenType::END) && !check(TokenType::EOF_T)) {
-                skipSemis();
+                skipComments();
                 if (check(TokenType::END) || check(TokenType::EOF_T))
                     break;
                 s->else_body.push_back(parseOneStmt());
@@ -1233,9 +1260,9 @@ std::unique_ptr<Stmt> Parser::switchStmt() {
             advance(); // COMMA
             arm.values.push_back(expr());
         }
-        consumeSemi();
+        consumeOptComment();
         while (!isArmStart()) {
-            skipSemis();
+            skipComments();
             if (isArmStart())
                 break;
             arm.body.push_back(parseOneStmt());
@@ -1244,6 +1271,6 @@ std::unique_ptr<Stmt> Parser::switchStmt() {
     }
 
     expect(TokenType::END);
-    consumeSemi();
+    consumeOptComment();
     return s;
 }

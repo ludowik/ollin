@@ -167,7 +167,6 @@ Token Lexer::blockComment() {
 
 std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
-    int paren_depth = 0;
 
     auto emit = [&](Token t) { tokens.push_back(std::move(t)); };
 
@@ -192,11 +191,9 @@ std::vector<Token> Lexer::tokenize() {
             emit({TokenType::COMMA, ",", line});
             break;
         case '(':
-            ++paren_depth;
             emit({TokenType::LPAREN, "(", line});
             break;
         case ')':
-            --paren_depth;
             emit({TokenType::RPAREN, ")", line});
             break;
         case '.':
@@ -215,11 +212,11 @@ std::vector<Token> Lexer::tokenize() {
             }
             break;
         case ';':
-            if (paren_depth > 0)
-                emit({TokenType::SEMICOLON, ";", line});
-            else
-                throw std::runtime_error("line " + std::to_string(line) +
-                                         ": ';' is not valid syntax — statements are terminated by newlines");
+            // Toujours émis : le séparateur de range [a;b] en a besoin (y compris
+            // pour les ranges ouverts à gauche ]a;b] où le compteur de crochets ne
+            // pouvait pas distinguer ouverture/fermeture). Un ';' hors range est
+            // rejeté par le parser (message clair au niveau instruction).
+            emit({TokenType::SEMICOLON, ";", line});
             break;
         case '-':
             if (!atEnd() && peek() == '=') {
@@ -291,19 +288,15 @@ std::vector<Token> Lexer::tokenize() {
             emit({TokenType::TILDE, "~", line});
             break;
         case '{':
-            ++paren_depth;
             emit({TokenType::LBRACE, "{", line});
             break;
         case '}':
-            --paren_depth;
             emit({TokenType::RBRACE, "}", line});
             break;
         case '[':
-            ++paren_depth;
             emit({TokenType::LBRACKET, "[", line});
             break;
         case ']':
-            --paren_depth;
             emit({TokenType::RBRACKET, "]", line});
             break;
         case ':':

@@ -1617,7 +1617,9 @@ static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, co
                 return false;
         } else if (auto* ia = dynamic_cast<const IndexAssignStmt*>(s)) {
             // obj==v n'écrit pas v (écrit dans son conteneur) ; vérifier key/value
-            if (exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get()))
+            // et le conteneur chaîné éventuel (obj_expr).
+            if (exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get()) ||
+                (ia->obj_expr && exprHasLambda(ia->obj_expr.get())))
                 return false;
         } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
                    dynamic_cast<const CommentStmt*>(s)) {
@@ -1655,7 +1657,8 @@ struct HasFuncQuery : StmtQuery {
         result = exprHasLambda(s.value.get());
     }
     void visit(const IndexAssignStmt& s) override {
-        result = exprHasLambda(s.key.get()) || exprHasLambda(s.value.get());
+        result = exprHasLambda(s.key.get()) || exprHasLambda(s.value.get()) ||
+                 (s.obj_expr && exprHasLambda(s.obj_expr.get()));
     }
     void visit(const MultiAssignStmt& s) override {
         for (auto& v : s.values)
@@ -1798,9 +1801,15 @@ void Compiler::visit(const IndexAssignStmt& s) {
     }
     int saved = reg_top_;
 
-    // Load the map object
+    // Charge le conteneur (map/array) à indexer.
     int obj_r;
-    {
+    if (s.obj_expr) {
+        // Cible chaînée (a.b.c, a[i][j]…) : le conteneur est une expression, on
+        // l'évalue dans un registre. maps/arrays étant des références comptées,
+        // le SET_INDEX qui suit mute bien l'objet d'origine.
+        obj_r = allocReg();
+        compileInto(*s.obj_expr, obj_r);
+    } else {
         auto it = local_regs_.find(s.obj);
         if (it != local_regs_.end()) {
             obj_r = it->second;
@@ -2083,8 +2092,13 @@ void Compiler::visit(const MethodCallExpr& e) {
     int argc = (int)e.args.size();
 
     if (e.is_super) {
-        // self est en local_regs_["self"] — copier en call_base
-        int self_src = local_regs_.at("self");
+        // self est en local_regs_["self"] — copier en call_base. Hors méthode,
+        // 'self' n'existe pas → diagnostic propre plutôt qu'un crash (map::at).
+        auto self_it = local_regs_.find("self");
+        if (self_it == local_regs_.end())
+            throw std::runtime_error("line " + std::to_string(current_line_) +
+                                     ": 'super' n'est utilisable que dans une méthode");
+        int self_src = self_it->second;
         reg_top_ = call_base + 1;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;

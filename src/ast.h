@@ -374,7 +374,11 @@ struct IndexExpr : Expr {
 };
 
 struct IndexAssignStmt : Stmt {
-    std::string obj; // the map variable name
+    std::string obj; // nom de la variable conteneur (utilisé si obj_expr est nul)
+    // Conteneur sous forme d'EXPRESSION pour les cibles CHAÎNÉES (a.b.c, a[i][j],
+    // a.b[k]…). Si non nul, prime sur `obj` : le compilateur l'évalue pour obtenir
+    // la map/array à indexer. Sinon on retombe sur le nom simple `obj`.
+    std::unique_ptr<Expr> obj_expr;
     std::unique_ptr<Expr> key;
     TokenType op; // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
     std::unique_ptr<Expr> value;

@@ -1206,6 +1206,40 @@ dispatch_loop:
             int argc = C;
             bool is_instance = isInstance(regs[cb]) || regs[cb].isString();
             Value fn = regs[cb + 1];
+            // Membre = une CLASSE (ex. `mod.Widget()` via un import aliasé) →
+            // instanciation, comme CALL_DYN. Les args sont encore en cb+2.. (pas
+            // de décalage self appliqué). On les amène en cb+1.. avec l'instance
+            // en cb, puis on appelle init (si présent).
+            if (fn.isClass()) {
+                {
+                    Value inst = Value::makeMap();
+                    inst.mapSet(MK().class_, fn);
+                    Value init_fn = protoChainGet(fn, MK().init_);
+                    if (!init_fn.isCallable()) {
+                        regs[cb] = std::move(inst);
+                        goto call_method_done;
+                    }
+                    if (init_fn.isBuiltin()) {
+                        std::vector<Value> bargs(argc + 1);
+                        bargs[0] = inst;
+                        for (int i = 0; i < argc; ++i)
+                            bargs[1 + i] = regs[cb + 2 + i];
+                        init_fn.asBuiltin()(bargs.data(), argc + 1);
+                        regs[cb] = std::move(inst);
+                        goto call_method_done;
+                    }
+                    std::unique_ptr<std::vector<Upvalue*>> fuv;
+                    uint8_t fi = resolveFuncVal(init_fn, fuv);
+                    int total = argc + 1;
+                    growRegs((size_t)(cb + std::max((int)ch->funcs[fi].reg_count, total)));
+                    for (int i = 0; i < argc; ++i)
+                        regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);
+                    regs[cb + 0] = inst;
+                    fp_addr = pushCallFrame(cb, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
+                }
+                ip = fp_addr;
+                goto call_method_done;
+            }
             // méthode statique : pas d'injection de self, même si appelée sur une instance
             bool fn_is_static = false;
             if (fn.isFuncVal())
