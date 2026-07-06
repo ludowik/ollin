@@ -44,14 +44,26 @@ static Color rgbaColor(double r, double g, double b, double a) {
 
 static int s_physW = 0, s_physH = 0;
 static int s_logicalW = 0; // largeur logique de la zone (pour l'overlay FPS en haut à droite)
+static int s_logicalH = 0; // hauteur logique de la zone
+// Contexte de dessin PERSISTANT : draw() rend dans cette RenderTexture, qui n'est
+// PAS effacée entre les frames (c'est à draw() d'appeler graphics.clear() s'il
+// veut repartir d'un fond net). Elle est re-affichée à l'écran chaque frame, avec
+// l'overlay FPS PAR-DESSUS (donc l'overlay reste net, il ne bave pas).
+static RenderTexture2D s_target{};
+static bool s_target_ready = false;
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
     int h = argc > 1 ? toInt(args[1]) : 600;
     const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
 #ifdef __EMSCRIPTEN__
-    if (IsWindowReady())
+    if (IsWindowReady()) {
+        if (s_target_ready) {                 // libérer l'ancienne cible AVANT de perdre le contexte GL
+            UnloadRenderTexture(s_target);
+            s_target_ready = false;
+        }
         CloseWindow();
+    }
     double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
     s_physH = (int)(h * dpr + 0.5);
@@ -79,6 +91,10 @@ static Value gfx_canvas(Value* args, int argc) {
         },
         s_physW, s_physH, w, h);
 #else
+    if (IsWindowReady() && s_target_ready) {
+        UnloadRenderTexture(s_target);
+        s_target_ready = false;
+    }
     s_physW = w;
     s_physH = h;
     SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -86,6 +102,16 @@ static Value gfx_canvas(Value* args, int argc) {
     SetTargetFPS(60);
 #endif
     s_logicalW = w;
+    s_logicalH = h;
+    // Cible de rendu persistante (taille logique). Filtre bilinéaire pour un
+    // agrandissement propre vers la résolution physique (HiDPI). Effacée une
+    // seule fois ici → première frame sur fond noir même si draw() n'efface pas.
+    s_target = LoadRenderTexture(w, h);
+    SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);
+    s_target_ready = true;
+    BeginTextureMode(s_target);
+    ClearBackground(BLACK);
+    EndTextureMode();
     Value win = VM::current()->getGlobal("window");
     if (win.isMap()) {
         win.mapSet(Value(std::string("width")), Value((int64_t)w));
@@ -447,6 +473,54 @@ static void callUpdateIfAny() {
         vm->callValue(s_update_callback, Value(dt));
 }
 
+// Rend UNE frame. Le contexte n'est PAS effacé d'office : draw() dessine dans la
+// cible persistante s_target (c'est à draw() d'appeler graphics.clear() s'il veut
+// repartir d'un fond net), puis on ré-affiche s_target à l'écran et on pose
+// l'overlay FPS PAR-DESSUS (donc net, jamais accumulé). `tex`/`drawing` renvoient
+// l'état des blocs ouverts pour un nettoyage sûr si draw() lève (boucle web).
+static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
+    *tex = false;
+    *drawing = false;
+    if (s_target_ready) {
+        BeginTextureMode(s_target);   // lie le FBO + projection [0,w]×[0,h] ; N'EFFACE PAS
+        *tex = true;
+        resetStyles();
+        keyboardPoll();
+        mousePoll();
+        callUpdateIfAny();
+        VM::current()->callValue(const_cast<Value&>(drawFn));
+        *tex = false;
+        EndTextureMode();
+
+        BeginDrawing();
+        *drawing = true;
+        if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
+            rlViewport(0, 0, s_physW, s_physH);
+        // s_target est stockée bottom-up → hauteur source négative pour l'afficher à l'endroit.
+        DrawTexturePro(s_target.texture,
+                       Rectangle{0.0f, 0.0f, (float)s_logicalW, -(float)s_logicalH},
+                       Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
+                       Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        drawFpsOverlay();
+        *drawing = false;
+        EndDrawing();
+    } else {
+        // Repli : aucun canvas persistant configuré → rendu direct (ancien comportement).
+        BeginDrawing();
+        *drawing = true;
+        if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
+            rlViewport(0, 0, s_physW, s_physH);
+        resetStyles();
+        keyboardPoll();
+        mousePoll();
+        callUpdateIfAny();
+        VM::current()->callValue(const_cast<Value&>(drawFn));
+        drawFpsOverlay();
+        *drawing = false;
+        EndDrawing();
+    }
+}
+
 #ifdef __EMSCRIPTEN__
 static Value s_run_callback;
 static void emscripten_frame() {
@@ -454,23 +528,13 @@ static void emscripten_frame() {
     // de ollin_run (la boucle est asynchrone). Sans capture, l'exception ferait
     // planter le WASM en silence (écran figé). On l'attrape, on stoppe la boucle
     // et on remonte le message au playground pour l'afficher à la place du canvas.
-    bool drawing = false;   // frame ouvert (BeginDrawing sans EndDrawing correspondant)
+    bool tex = false, drawing = false;
     try {
-        BeginDrawing();
-        drawing = true;
-        // Override viewport to physical canvas resolution so rendering is crisp on HiDPI displays
-        if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
-            rlViewport(0, 0, s_physW, s_physH);
-        resetStyles();
-        keyboardPoll();
-        mousePoll();
-        callUpdateIfAny();
-        VM::current()->callValue(s_run_callback);
-        drawFpsOverlay();
-        drawing = false;   // on va clore le frame ci-dessous → ne pas re-clore dans le catch
-        EndDrawing();
+        renderFrame(s_run_callback, &tex, &drawing);
     } catch (const std::exception& e) {
-        if (drawing)       // ne fermer que si un frame est réellement ouvert (jamais 2× EndDrawing)
+        if (tex)                   // refermer les blocs restés ouverts (pas de 2× End…)
+            EndTextureMode();
+        if (drawing)
             EndDrawing();
         emscripten_cancel_main_loop();
         EM_ASM({
@@ -493,14 +557,12 @@ static Value gfx_run(Value* args, int argc) {
 #else
     s_quit = false;
     while (!WindowShouldClose() && !s_quit) {
-        BeginDrawing();
-        resetStyles();
-        keyboardPoll();
-        mousePoll();
-        callUpdateIfAny();
-        VM::current()->callValue(fn);
-        drawFpsOverlay();
-        EndDrawing();
+        bool tex = false, drawing = false;
+        renderFrame(fn, &tex, &drawing);
+    }
+    if (s_target_ready) {
+        UnloadRenderTexture(s_target);
+        s_target_ready = false;
     }
     CloseWindow();
 #endif
