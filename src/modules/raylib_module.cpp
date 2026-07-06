@@ -527,9 +527,26 @@ static Value gfx_point(Value* args, int argc) {
 
 static bool s_quit = false;
 
+// Delta de frame mesuré NOUS-MÊMES : horloge murale (GetTime()) lue à un point
+// UNIQUE par frame (entrée de renderFrame). On n'utilise PAS GetFrameTime()/
+// GetFPS() de raylib : dans notre boucle web (1 requestAnimationFrame par frame,
+// dessin dans une RenderTexture persistante), leur mesure frame = update + draw
+// ne compte pas l'attente rAF ENTRE deux frames → dt sous-évalué. Conséquences :
+// deltaTime trop petit (simulation au ralenti) et FPS sur-évalué (76 affiché
+// pour 60 réels). L'écart mur entre deux entrées de frame, lui, est exact.
+static double s_frame_dt = 0.0;          // durée de la dernière frame (secondes)
+static double s_last_frame_time = -1.0;  // horodatage de la frame précédente
+static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
+
 // Overlay FPS dessiné par le moteur après chaque frame (toujours en haut à
 // droite de la zone graphique). Couleur vive + ombre → lisible sur tout fond.
 static void drawFpsOverlay() {
+    // FPS calculé depuis NOTRE delta (fiable), lissé pour éviter le scintillement.
+    if (s_frame_dt > 0.0) {
+        double inst = 1.0 / s_frame_dt;
+        s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
+    }
+    int fps = (int)(s_fps_ema + 0.5);
 #ifdef __EMSCRIPTEN__
     // DIAGNOSTIC (temporaire) : cadence réelle de requestAnimationFrame, comptée
     // côté JS avec performance.now — indépendante de GetFrameTime. Si « rAF » ≈
@@ -551,9 +568,9 @@ static void drawFpsOverlay() {
         }
         return window.__ollinRafV;
     });
-    const char* buf = TextFormat("FPS: %d  rAF: %d", GetFPS(), jsfps);
+    const char* buf = TextFormat("FPS: %d  rAF: %d", fps, jsfps);
 #else
-    const char* buf = TextFormat("FPS: %d", GetFPS());
+    const char* buf = TextFormat("FPS: %d", fps);
 #endif
     const int size = 16, margin = 8;
     int tw = MeasureText(buf, size);
@@ -580,7 +597,7 @@ static double s_elapsed_time = 0.0;
 // Met à jour deltaTime/elapsedTime dans la VM et appelle update(dt) si définie.
 static Value s_update_callback;
 static void callUpdateIfAny() {
-    double dt = (double)GetFrameTime();
+    double dt = s_frame_dt;   // notre mesure fiable, pas GetFrameTime() (cf. plus haut)
     s_elapsed_time += dt;
     VM* vm = VM::current();
     vm->setGlobal("deltaTime", Value(dt));
@@ -607,6 +624,11 @@ static void runUserCallbacks(const Value& drawFn) {
 static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
     *tex = false;
     *drawing = false;
+    // Delta de frame : écart mur depuis l'entrée de la frame précédente (inclut
+    // l'attente rAF, contrairement à GetFrameTime). Première frame → dt = 0.
+    double now = GetTime();
+    s_frame_dt = (s_last_frame_time < 0.0) ? 0.0 : (now - s_last_frame_time);
+    s_last_frame_time = now;
     if (s_target_ready) {
         BeginTextureMode(s_target);   // lie le FBO ; N'EFFACE PAS
         *tex = true;
@@ -691,6 +713,8 @@ static Value gfx_run(Value* args, int argc) {
         throw std::runtime_error("graphics.run: expected callback function");
     Value fn = args[0];
     s_elapsed_time = 0.0;
+    s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
+    s_fps_ema = 0.0;
     s_update_callback = VM::current()->getGlobal("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
