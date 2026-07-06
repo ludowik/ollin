@@ -103,10 +103,12 @@ static Value gfx_canvas(Value* args, int argc) {
 #endif
     s_logicalW = w;
     s_logicalH = h;
-    // Cible de rendu persistante (taille logique). Filtre bilinéaire pour un
-    // agrandissement propre vers la résolution physique (HiDPI). Effacée une
-    // seule fois ici → première frame sur fond noir même si draw() n'efface pas.
-    s_target = LoadRenderTexture(w, h);
+    // Cible de rendu persistante en résolution PHYSIQUE (HiDPI) → rendu 1:1 avec
+    // le canvas, net comme le rendu direct (pas d'agrandissement). Les coordonnées
+    // logiques sont rétablies dans renderFrame via une projection [0,w]×[0,h].
+    // Effacée une seule fois ici → première frame sur fond noir même si draw()
+    // n'efface pas.
+    s_target = LoadRenderTexture(s_physW, s_physH);
     SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);
     s_target_ready = true;
     BeginTextureMode(s_target);
@@ -482,8 +484,18 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
     *tex = false;
     *drawing = false;
     if (s_target_ready) {
-        BeginTextureMode(s_target);   // lie le FBO + projection [0,w]×[0,h] ; N'EFFACE PAS
+        BeginTextureMode(s_target);   // lie le FBO ; N'EFFACE PAS
         *tex = true;
+        // La RT est en résolution physique, mais BeginTextureMode a posé une
+        // projection en pixels physiques. On la remplace par les extents LOGIQUES
+        // (origine haut-gauche, comme raylib) → draw() garde les coordonnées
+        // logiques [0,w]×[0,h] tout en rendant à pleine résolution physique.
+        // (Sur la PROJECTION, pas la modelview → survit à graphics.resetTransform.)
+        rlMatrixMode(RL_PROJECTION);
+        rlLoadIdentity();
+        rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
+        rlMatrixMode(RL_MODELVIEW);
+        rlLoadIdentity();
         resetStyles();
         keyboardPoll();
         mousePoll();
@@ -496,9 +508,11 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
-        // s_target est stockée bottom-up → hauteur source négative pour l'afficher à l'endroit.
+        // s_target est en pixels PHYSIQUES et stockée bottom-up → source = taille
+        // physique, hauteur négative pour l'afficher à l'endroit ; destination en
+        // coordonnées logiques (remplit l'écran via le viewport physique).
         DrawTexturePro(s_target.texture,
-                       Rectangle{0.0f, 0.0f, (float)s_logicalW, -(float)s_logicalH},
+                       Rectangle{0.0f, 0.0f, (float)s_physW, -(float)s_physH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
         drawFpsOverlay();
