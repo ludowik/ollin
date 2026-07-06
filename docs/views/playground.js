@@ -399,7 +399,7 @@ view.focus()
 window.__ollinView = view    // accès à l'éditeur pour le débogage/console
 window.__ollinReady = true   // l'éditeur est monté → désamorce le watchdog de chargement
 { const le = document.getElementById('load-error'); if (le) le.style.display = 'none' }
-localStorage.setItem('ollin-last-page', 'playground.html')
+// (La réouverture de la dernière vue est gérée au niveau du routeur, app.js.)
 
 // ── Projets & fichiers ──────────────────────────────────────────────────────
 // L'éditeur édite le fichier COURANT du projet ACTIF. Le menu Projet (drill-down)

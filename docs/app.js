@@ -51,6 +51,7 @@ const ROUTES = {
   run:        { html: 'views/run.html',        js: './views/run.js' },
 }
 const DEFAULT_VIEW = 'tutoriel'
+const LAST_VIEW_KEY = 'ollin-last-view'   // réouverture de la dernière vue
 
 const viewEl     = document.getElementById('view')
 const canvasHome = document.getElementById('canvas-home')
@@ -103,6 +104,7 @@ async function mount(view, anchor) {
     const ctx = { root: viewEl, getOllin, hardReload, navigate }
     currentCleanup = (await mod.init(ctx)) || null
     currentView = view
+    try { localStorage.setItem(LAST_VIEW_KEY, view) } catch (_) {}   // pour la réouverture
 
     if (anchor) scrollToAnchor(anchor)
     else window.scrollTo(0, 0)
@@ -136,4 +138,18 @@ async function route() {
 }
 
 addEventListener('hashchange', route)
-route()
+
+// Démarrage : sans hash explicite, rouvrir la DERNIÈRE vue visitée (mémorisée
+// à chaque montage). Défaut = tutoriel. Une URL profonde (#/… ou #ancre) a
+// toujours priorité sur la dernière vue.
+function boot() {
+  if (!location.hash) {
+    const last = localStorage.getItem(LAST_VIEW_KEY)
+    if (last && ROUTES[last] && last !== DEFAULT_VIEW) {
+      location.hash = '#/' + last   // déclenche hashchange → route()
+      return
+    }
+  }
+  route()
+}
+boot()
