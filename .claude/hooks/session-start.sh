@@ -60,3 +60,17 @@ fi
 cmake -S "$CLAUDE_PROJECT_DIR" -B "$CLAUDE_PROJECT_DIR/build" \
       -DCMAKE_BUILD_TYPE=Release -Wno-dev --log-level=WARNING
 cmake --build "$CLAUDE_PROJECT_DIR/build" -j"$(nproc)"
+
+# ── Chaînes de test graphique (mémo — voir CLAUDE.md « Tests graphiques ») ───
+# DEUX moyens FONCTIONNENT ici ; ne jamais conclure « environnement cassé » :
+#  A. Desktop raylib sous Xvfb : `bash tools/run-headless.sh <script.ol>`
+#     (build-gfx/ollin ; capture via graphics.screenshot("f.png") CHEMIN RELATIF,
+#      quitter avec graphics.quit() après la capture).
+#  B. Playwright/chromium (/opt/pw-browsers/.../chrome) : file://PNG ou playground
+#     servi en local — inspection pixels par drawImage+getImageData.
+# build-gfx/ est gitignoré (perdu à chaque reprise du conteneur) → on le
+# reconstruit ici pour que la chaîne A soit prête d'emblée. Best-effort : réutilise
+# la source raylib récupérée par le build WASM ci-dessus ; n'échoue jamais le hook.
+bash "$CLAUDE_PROJECT_DIR/tools/native-gfx.sh" >/dev/null 2>&1 \
+  && echo "build-gfx prêt (tests graphiques xvfb via tools/run-headless.sh)" \
+  || echo "build-gfx différé — lancer tools/native-gfx.sh au besoin"
