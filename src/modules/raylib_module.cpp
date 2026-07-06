@@ -570,6 +570,16 @@ static void callUpdateIfAny() {
 // repartir d'un fond net), puis on ré-affiche s_target à l'écran et on pose
 // l'overlay FPS PAR-DESSUS (donc net, jamais accumulé). `tex`/`drawing` renvoient
 // l'état des blocs ouverts pour un nettoyage sûr si draw() lève (boucle web).
+// Prélude commun d'une frame : styles par défaut, entrées, logique (update),
+// puis rendu utilisateur (draw). Partagé par les deux chemins de renderFrame.
+static void runUserCallbacks(const Value& drawFn) {
+    resetStyles();
+    keyboardPoll();
+    mousePoll();
+    callUpdateIfAny();
+    VM::current()->callValue(const_cast<Value&>(drawFn));
+}
+
 static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
     *tex = false;
     *drawing = false;
@@ -586,11 +596,7 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
-        resetStyles();
-        keyboardPoll();
-        mousePoll();
-        callUpdateIfAny();
-        VM::current()->callValue(const_cast<Value&>(drawFn));
+        runUserCallbacks(drawFn);
         *tex = false;
         EndTextureMode();
 
@@ -624,11 +630,7 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
-        resetStyles();
-        keyboardPoll();
-        mousePoll();
-        callUpdateIfAny();
-        VM::current()->callValue(const_cast<Value&>(drawFn));
+        runUserCallbacks(drawFn);
         flushPendingScreenshot();      // capture l'écran (avant l'overlay FPS)
         drawFpsOverlay();
         *drawing = false;
