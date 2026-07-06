@@ -57,7 +57,9 @@ export function runProgram(m, code, canvasEl, hooks) {
 // HTTP de la page elle-même (un simple location.reload() peut resservir l'ancienne
 // page). Garantit qu'on récupère bien le dernier code déployé.
 export function hardReload() {
-  const go = () => location.replace(location.pathname + '?t=' + Date.now())
+  // Conserver le fragment (#/vue/…) : sinon un rechargement dur perd la route
+  // courante (ex. un exemple #/playground/sample/…) et retombe sur la vue défaut.
+  const go = () => location.replace(location.pathname + '?t=' + Date.now() + location.hash)
   if ('caches' in window) {
     caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go).catch(go)
   } else {

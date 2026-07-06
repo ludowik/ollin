@@ -41,6 +41,11 @@ export async function init(ctx) {
   // #/run/sample/<fichier>, rechargé frais → un refresh reprend la version du
   // dépôt), soit le PROJET ACTIF depuis IndexedDB.
   const exampleFile = (ctx.anchor || '').startsWith('sample/') ? ctx.anchor.slice(7) : null
+  // Le lien « Éditeur » préserve l'exemple courant (sinon retour en mode projet).
+  if (exampleFile) {
+    const back = document.querySelector('#bar a')
+    if (back) back.setAttribute('href', '#/playground/sample/' + exampleFile)
+  }
   let project = null
   let code = null
   if (exampleFile) {
