@@ -65,7 +65,7 @@ export async function init(ctx) {
     code = (project && project.files) ? (project.files[project.entry] ?? '') : null
     if (project === null || code === null) {
       statusEl.textContent = ''
-      showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).")
+      showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Plein écran »).")
       return stop
     }
   }
