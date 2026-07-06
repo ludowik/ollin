@@ -59,6 +59,20 @@ const LAST_VIEW_KEY = 'ollin-last-view'   // réouverture de la dernière vue
 // actif et retomberait sinon sur l'écran « aucun projet » à l'ouverture du site.
 const RESTORABLE = new Set(['tutoriel', 'playground'])
 
+// Viewport par vue. Le playground et le mode run bloquent le zoom (maximum-scale)
+// pour éviter le zoom automatique d'iOS quand l'éditeur (police < 16px) prend le
+// focus — comportement de l'ancienne page autonome, perdu au passage en SPA (un
+// seul viewport partagé). Le tutoriel reste zoomable (lecture confortable).
+const VIEWPORT = {
+  tutoriel:   'width=device-width, initial-scale=1.0',
+  playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
+  run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
+}
+function applyViewport(view) {
+  const meta = document.querySelector('meta[name="viewport"]')
+  if (meta) meta.setAttribute('content', VIEWPORT[view] || VIEWPORT[DEFAULT_VIEW])
+}
+
 const viewEl     = document.getElementById('view')
 const canvasHome = document.getElementById('canvas-home')
 
@@ -101,6 +115,7 @@ async function mount(view, anchor) {
   const stale = () => seq !== navSeq
 
   await teardownCurrent()
+  applyViewport(view)   // AVANT le montage → en place quand l'éditeur prend le focus
 
   try {
     const res  = await fetch(route.html + '?v=' + V)
