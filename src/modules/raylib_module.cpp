@@ -55,6 +55,9 @@ static int s_targetW = 0, s_targetH = 0;   // taille réelle de la RT (physique 
 // Supersampling : la RT est rendue à SSAA× la résolution physique puis réduite
 // (bilinéaire) au blit → anti-aliasing (bords lissés) sans FBO multi-échantillonné.
 static const int SSAA = 2;
+// Mode de fusion courant (choisi par graphics.blendMode), suivi pour pouvoir le
+// restaurer après un fondu (clear avec alpha) et le remettre à ALPHA chaque frame.
+static int s_blend_mode = BLEND_ALPHA;
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
@@ -149,7 +152,19 @@ static Value gfx_end_draw(Value* args, int argc) {
 }
 
 static Value gfx_clear(Value* args, int argc) {
-    ClearBackground(argc > 0 ? toColor(args[0]) : BLACK);
+    Color c = argc > 0 ? toColor(args[0]) : BLACK;
+    if (c.a < 255) {
+        // Couleur semi-transparente → FONDU (comme p5.js background(r,g,b,a<255))
+        // et NON un effacement net : on peint un rectangle plein écran translucide
+        // en fusion ALPHA, qui estompe le contenu persistant vers `c`. Idéal pour
+        // des traînées. On force ALPHA le temps du rectangle puis on restaure le
+        // mode de fusion courant (celui posé par graphics.blendMode dans draw()).
+        BeginBlendMode(BLEND_ALPHA);
+        DrawRectangle(0, 0, s_logicalW, s_logicalH, c);
+        BeginBlendMode(s_blend_mode);
+    } else {
+        ClearBackground(c);   // opaque → effacement net (glClear)
+    }
     return Value{};
 }
 
@@ -170,6 +185,7 @@ static Value gfx_blend_mode(Value* args, int argc) {
     } else if (argc > 0 && args[0].isNumber()) {
         mode = (int)args[0].asNum();   // constante du module `blend`
     }
+    s_blend_mode = mode;
     BeginBlendMode(mode);
     return Value{};
 }
@@ -198,7 +214,8 @@ static void resetStyles() {
     applyStroke(true, WHITE);
     applyFill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
-    BeginBlendMode(BLEND_ALPHA);                  // mode de fusion remis par défaut chaque frame
+    s_blend_mode = BLEND_ALPHA;                   // mode de fusion remis par défaut chaque frame
+    BeginBlendMode(BLEND_ALPHA);
     rlLoadIdentity();
 }
 
@@ -536,6 +553,13 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
+        // Composition OPAQUE (src=ONE, dst=ZERO) : on recopie le RGB du RT tel
+        // quel, en ignorant SON canal alpha — sinon un RT à alpha faible (après un
+        // fondu clear(...,a) ou des dessins translucides) apparaîtrait fantomatique.
+        // Indispensable aussi pour ne PAS hériter du blend mode laissé par draw()
+        // (ex. ADD), qui fausserait la composition et l'overlay.
+        rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM);
         // s_target est en pixels SSAA×physiques et stockée bottom-up → source =
         // taille réelle de la RT, hauteur négative pour l'afficher à l'endroit ;
         // destination en coordonnées logiques (remplit l'écran via le viewport
@@ -544,6 +568,7 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        BeginBlendMode(BLEND_ALPHA);   // overlay FPS en fusion normale
         drawFpsOverlay();
         *drawing = false;
         EndDrawing();
