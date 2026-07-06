@@ -54,6 +54,18 @@ ollin/
 └── docs/              tutoriel, playground, samples, wasm
 ```
 
+## Web app monopage (docs/)
+
+Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montées à la demande.
+
+- `docs/index.html` — **shell** minimal : `#view` (point de montage) + `<canvas id="canvas">` partagé (rangé dans `#canvas-home` hors exécution) ; charge `app.js`.
+- `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
+- `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutoriel`, `playground`, `run`.
+- `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
+- Modules partagés : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur).
+
+**Règle** : `init(ctx)` doit retourner un `cleanup()` qui retire tout écouteur **global** (window/document) et met la boucle raylib en pause — sinon fuite/boucle fantôme au changement de vue.
+
 ## Syntaxe
 
 > **La syntaxe et la sémantique du langage sont décrites dans [`docs/grammar.ebnf`](docs/grammar.ebnf).**
@@ -63,10 +75,10 @@ ollin/
 |---|---|---|
 | `tests/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
-| `docs/index.html` | Claude | tutoriel HTML |
+| `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/index.html` et `ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/views/tutoriel.html` et `ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 ## Versionning
 
