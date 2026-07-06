@@ -48,7 +48,7 @@ function getOllin() {
 const ROUTES = {
   tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js' },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
-  run:        { external: 'run.html' },
+  run:        { html: 'views/run.html',        js: './views/run.js' },
 }
 const DEFAULT_VIEW = 'tutoriel'
 

@@ -1,126 +1,16 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Ollin — exécution autonome</title>
-  <style>
-    :root { --bg:#0e0e12; --fg:#e6e6ee; --dim:#8a8a99; --accent:#7c83ff; --border:#2a2a36; }
-    * { box-sizing: border-box; }
-    html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
-                 font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-    body { display:flex; flex-direction:column; }
-
-    /* Barre de menu — sous l'encoche (safe-area-inset-top). Ne fait PAS partie
-       de la zone graphique. */
-    #bar { flex:none; display:flex; align-items:center; gap:12px; font-size:13px;
-           padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
-           border-bottom:1px solid var(--border); }
-    #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
-    #bar a:hover { text-decoration:underline; }
-    #bar .sp { flex:1; }
-    #reload-btn { display:flex; align-items:center; gap:6px; background:transparent;
-                  border:1px solid var(--border); color:var(--dim); border-radius:6px;
-                  padding:5px 9px; font:inherit; font-size:12px; cursor:pointer;
-                  transition:border-color 0.15s, color 0.15s; }
-    #reload-btn:hover { border-color:var(--accent); color:var(--accent); }
-    #status { color:var(--dim); font-size:12px; }
-
-    /* Marges de sécurité (coins arrondis / barre home) exclues de la zone. */
-    #stage-wrap { flex:1; display:flex; min-height:0;
-                  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-
-    /* #output-pane = la ZONE GRAPHIQUE mesurée par window.width/height. */
-    #output-pane { flex:1; position:relative; overflow:hidden; min-width:0; min-height:0; }
-    canvas { display:none; position:absolute; top:0; left:0; right:0; bottom:0; margin:auto; background:#000; }
-    #out { display:none; position:absolute; inset:0; white-space:pre-wrap; overflow:auto;
-           font-size:13px; line-height:1.5; padding:12px; }
-    #out.err { color:#ff6b6b; }
-    #out.ok  { color:#b8f5c0; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ollin — exécution autonome</title>
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+<script>
+// Le mode autonome est désormais une VUE de la web app monopage (source unique :
+// docs/views/run.*). Cette page n'est conservée que comme redirection pour les
+// anciens liens/marque-pages. Cache-buster avant le fragment de route.
+location.replace('index.html?t=' + Date.now() + '#/run')
+</script>
 </head>
-<body>
-  <div id="bar">
-    <a href="playground.html" title="Retour à l'éditeur">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
-      Éditeur
-    </a>
-    <span class="sp"></span>
-    <span id="status">Chargement…</span>
-    <button id="reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)">
-      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
-      Recharger
-    </button>
-  </div>
-  <div id="stage-wrap">
-    <div id="output-pane">
-      <canvas id="canvas" tabindex="0"></canvas>
-      <pre id="out"></pre>
-    </div>
-  </div>
-
-  <script type="module">
-    const statusEl = document.getElementById('status');
-    const canvasEl = document.getElementById('canvas');
-    const outEl    = document.getElementById('out');
-    let   prints   = '';
-
-    // Rechargement dur + navigation fraîche partagés (pg-run.js) : identiques aux autres pages.
-    const Run   = await import('./pg-run.js?v=' + Date.now());
-    const Store = await import('./pg-store.js?v=' + Date.now());
-    document.getElementById('reload-btn').addEventListener('click', Run.hardReload);
-    Run.bindFreshLinks();   // le lien retour vers le playground force une version fraîche
-
-    function showText(text) {
-      outEl.style.display = 'block';
-      canvasEl.style.display = 'none';
-      const body = (text && String(text).length) ? String(text) : (prints || '(aucune sortie)');
-      outEl.textContent = body;
-      outEl.className = (text && String(text).startsWith('error:')) ? 'err' : 'ok';
-    }
-
-    // Le projet complet (avec ses images) est stocké dans IndexedDB par le
-    // playground ; le mode autonome recharge le projet ACTIF depuis là — source
-    // unique (avant, il transitait par localStorage → échec silencieux dès qu'une
-    // image dépassait ~5 Mo, d'où « aucun projet »).
-    let project = null;
-    try {
-      await Store.init();
-      const id = Store.getActiveId();
-      if (id) project = await Store.getProject(id);
-    } catch (_) {}
-    const code = (project && project.files) ? (project.files[project.entry] ?? '') : null;
-
-    if (project === null || code === null) {
-      statusEl.textContent = '';
-      showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Autonome »).");
-    } else {
-      const wasmScript = document.createElement('script');
-      const cacheBust  = Date.now();
-      wasmScript.src   = 'wasm/ollin.js?' + cacheBust;
-      wasmScript.onload = () => {
-        const wasmDir = wasmScript.src.replace(/\?.*$/, '').replace(/[^/]*$/, '');
-        OllinModule({
-          locateFile: f => wasmDir + f + '?' + cacheBust,
-          canvas:   canvasEl,
-          print:    t => { prints += t + '\n'; },
-          printErr: t => { prints += t + '\n'; },
-        }).then(m => {
-          Run.loadProjectIntoRuntime(m, project);
-          statusEl.textContent = '';
-          Run.runProgram(m, code, canvasEl, {
-            onError:   (msg) => { statusEl.textContent = ''; showText(msg); },
-            onRunning: () => { statusEl.textContent = 'En cours…'; },
-            onOutput:  (out) => showText(out),
-          });
-        }).catch(err => {
-          statusEl.textContent = '';
-          showText('error: WASM — ' + (err?.message ?? err));
-        });
-      };
-      wasmScript.onerror = () => { statusEl.textContent = ''; showText('error: WASM introuvable'); };
-      document.head.appendChild(wasmScript);
-    }
-  </script>
-</body>
+<body></body>
 </html>

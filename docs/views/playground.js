@@ -1082,22 +1082,18 @@ copyBtn.addEventListener('click', () => {
   })
 })
 
-// ── Mode autonome (page dédiée plein écran) ─────────────────────────────────
-// Écrit le PROJET COMPLET (fichiers + ressources + point d'entrée) dans
-// localStorage puis ouvre run.html, qui pousse le tout dans le runtime et
-// exécute le point d'entrée (imports multi-fichiers résolus, comme le Run).
-// run.html est ouvert avec un cache-buster → toujours la dernière version.
-// Le projet complet (image incluse) transite par IndexedDB (pas localStorage,
-// limité à ~5 Mo → une image ≥ 4 Mo faisait échouer l'écriture en silence, d'où
-// « aucun projet » dans le mode autonome). On ne partage que l'id du projet
-// actif ; run.html recharge le projet depuis IndexedDB.
+// ── Mode autonome (vue plein écran, nouvel onglet) ──────────────────────────
+// Ouvre la vue #/run dans un nouvel onglet (page dédiée plein écran). Le projet
+// complet (fichiers + ressources) est persisté dans IndexedDB ; on ne partage
+// que l'id du projet actif — la vue #/run le recharge depuis là. IndexedDB (pas
+// localStorage, limité à ~5 Mo → une image ≥ 4 Mo faisait échouer l'écriture en
+// silence, d'où « aucun projet »).
 const standaloneBtn = document.getElementById('standalone-btn')
 standaloneBtn.addEventListener('click', () => {
-  // On ouvre la fenêtre SYNCHRONEMENT (conserve le user gesture → pas bloquée par
-  // le pop-up blocker), mais on n'y charge run.html qu'APRÈS que le projet soit
-  // COMMITÉ dans IndexedDB. Sinon run.html (autre connexion) pourrait lire une
-  // version périmée, voire « aucun projet » pour un projet neuf (écriture IDB
-  // asynchrone). saveProject est donc bien attendu ici.
+  // Onglet ouvert SYNCHRONEMENT (conserve le user gesture → pas bloqué par le
+  // pop-up blocker), mais on n'y charge #/run qu'APRÈS que le projet soit COMMITÉ
+  // dans IndexedDB (sinon l'autre onglet pourrait lire une version périmée, voire
+  // « aucun projet » pour un projet neuf). saveProject est donc bien attendu.
   const win = window.open('', '_blank')
   ;(async () => {
     try {
@@ -1107,9 +1103,9 @@ standaloneBtn.addEventListener('click', () => {
         await Store.saveProject(currentProject)
       }
     } catch (_) {}
-    const url = Run.freshUrl('run.html')
+    const url = Run.freshUrl('index.html#/run')   // vue autonome de la SPA
     if (win && !win.closed) win.location.replace(url)
-    else window.open(url, '_blank')   // repli si la fenêtre a été bloquée
+    else window.open(url, '_blank')   // repli si l'onglet a été bloqué
   })()
 })
 
