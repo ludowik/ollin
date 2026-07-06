@@ -547,31 +547,7 @@ static void drawFpsOverlay() {
         s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
     }
     int fps = (int)(s_fps_ema + 0.5);
-#ifdef __EMSCRIPTEN__
-    // DIAGNOSTIC (temporaire) : cadence réelle de requestAnimationFrame, comptée
-    // côté JS avec performance.now — indépendante de GetFrameTime. Si « rAF » ≈
-    // « FPS », la boucle tourne vraiment à ce rythme (écran > 60 Hz, p.ex.
-    // ProMotion). Si « FPS » > « rAF », le moteur sur-évalue → bug de mesure.
-    int jsfps = EM_ASM_INT({
-        var t = performance.now();
-        if (window.__ollinRafT === undefined) {
-            window.__ollinRafT = t;
-            window.__ollinRafN = 0;
-            window.__ollinRafV = 0;
-        }
-        window.__ollinRafN++;
-        var d = t - window.__ollinRafT;
-        if (d >= 500) {
-            window.__ollinRafV = Math.round(window.__ollinRafN * 1000 / d);
-            window.__ollinRafT = t;
-            window.__ollinRafN = 0;
-        }
-        return window.__ollinRafV;
-    });
-    const char* buf = TextFormat("FPS: %d  rAF: %d", fps, jsfps);
-#else
     const char* buf = TextFormat("FPS: %d", fps);
-#endif
     const int size = 16, margin = 8;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
