@@ -468,15 +468,37 @@ static Value gfx_polyline(Value* args, int argc) {
     return Value{};
 }
 
+// Contour épais d'une ellipse = anneau triangulé entre un contour INTÉRIEUR
+// (r - épaisseur/2) et EXTÉRIEUR (r + épaisseur/2), l'épaisseur étant centrée sur
+// le tracé (sémantique p5.js). Auparavant on dessinait `segs` segments épais
+// (DrawLineEx) : à forte épaisseur, leurs coins non jointés dépassaient et
+// donnaient un aspect « roue dentée » (pointes). L'anneau, lui, reste lisse.
 static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
-    float prev_x = cx + rx, prev_y = cy;
-    for (int i = 1; i <= segs; i++) {
-        float a = (float)i / segs * 2.0f * PI;
-        float nx = cx + rx * cosf(a);
-        float ny = cy + ry * sinf(a);
-        DrawLineEx({prev_x, prev_y}, {nx, ny}, thick, color);
-        prev_x = nx;
-        prev_y = ny;
+    float h = thick * 0.5f;
+    float rxi = rx - h;
+    float ryi = ry - h;
+    if (rxi < 0.0f) {
+        rxi = 0.0f;
+    }
+    if (ryi < 0.0f) {
+        ryi = 0.0f;
+    }
+    float rxo = rx + h;
+    float ryo = ry + h;
+    for (int i = 0; i < segs; i++) {
+        float a0 = (float)i / segs * 2.0f * PI;
+        float a1 = (float)(i + 1) / segs * 2.0f * PI;
+        float c0 = cosf(a0);
+        float s0 = sinf(a0);
+        float c1 = cosf(a1);
+        float s1 = sinf(a1);
+        Vector2 o0 = {cx + rxo * c0, cy + ryo * s0};
+        Vector2 o1 = {cx + rxo * c1, cy + ryo * s1};
+        Vector2 i0 = {cx + rxi * c0, cy + ryi * s0};
+        Vector2 i1 = {cx + rxi * c1, cy + ryi * s1};
+        // Quad (o0,o1,i1,i0) → 2 triangles, même sens que drawEllipseFill.
+        DrawTriangle(o0, o1, i1, color);
+        DrawTriangle(o0, i1, i0, color);
     }
 }
 
@@ -492,8 +514,18 @@ static void drawEllipseFill(float cx, float cy, float rx, float ry, Color color,
 static void drawOval(float cx, float cy, float rx, float ry, int segs) {
     if (s_has_fill)
         drawEllipseFill(cx, cy, rx, ry, s_fill_color, segs);
-    if (s_has_stroke)
-        drawEllipseStroke(cx, cy, rx, ry, s_stroke_size, s_stroke_color, segs);
+    if (s_has_stroke) {
+        if (rx == ry) {
+            // Cercle : anneau natif raylib (contour lisse, épaisseur centrée sur r).
+            float inner = rx - s_stroke_size * 0.5f;
+            if (inner < 0.0f) {
+                inner = 0.0f;
+            }
+            DrawRing({cx, cy}, inner, rx + s_stroke_size * 0.5f, 0.0f, 360.0f, segs, s_stroke_color);
+        } else {
+            drawEllipseStroke(cx, cy, rx, ry, s_stroke_size, s_stroke_color, segs);
+        }
+    }
 }
 
 static Value gfx_ellipse(Value* args, int argc) {
