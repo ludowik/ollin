@@ -323,14 +323,28 @@ static Value gfx_fps(Value* args, int argc) {
     return Value((int64_t)GetFPS());
 }
 
-// Capture le framebuffer courant dans un PNG. À appeler pendant le rendu (dans
-// draw). Sur WASM, déclenche un téléchargement navigateur.
+// Capture le framebuffer AFFICHÉ dans un PNG. Comme draw() rend dans la
+// RenderTexture persistante (liée pendant draw), on ne peut pas capturer l'écran
+// composité ici : on DIFFÈRE la capture à la fin de la frame (après composition),
+// dans renderFrame. Sur WASM, TakeScreenshot déclenche un téléchargement.
+static std::string s_shot_path;
+static bool s_shot_pending = false;
 static Value gfx_screenshot(Value* args, int argc) {
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("graphics.screenshot: expected a file path");
-    rlDrawRenderBatchActive();   // vide le batch en attente → le framebuffer contient la frame courante
-    TakeScreenshot(args[0].asString().c_str());
+    s_shot_path = args[0].asString();
+    s_shot_pending = true;
     return Value{};
+}
+
+// Exécute une capture en attente : appelé en fin de frame par renderFrame, quand
+// le framebuffer par défaut contient l'image composée (écran réellement affiché).
+static void flushPendingScreenshot() {
+    if (!s_shot_pending)
+        return;
+    s_shot_pending = false;
+    rlDrawRenderBatchActive();
+    TakeScreenshot(s_shot_path.c_str());
 }
 
 static Value gfx_draw_text(Value* args, int argc) {
@@ -568,6 +582,7 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        flushPendingScreenshot();      // capture l'écran composé (avant l'overlay FPS)
         BeginBlendMode(BLEND_ALPHA);   // overlay FPS en fusion normale
         drawFpsOverlay();
         *drawing = false;
@@ -583,6 +598,7 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         mousePoll();
         callUpdateIfAny();
         VM::current()->callValue(const_cast<Value&>(drawFn));
+        flushPendingScreenshot();      // capture l'écran (avant l'overlay FPS)
         drawFpsOverlay();
         *drawing = false;
         EndDrawing();
