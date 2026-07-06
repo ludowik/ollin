@@ -13,4 +13,7 @@ export {
   codeFolding, foldGutter, foldKeymap, foldService,
 } from '@codemirror/language'
 export { tags } from '@lezer/highlight'
-export { autocompletion, completionKeymap, acceptCompletion } from '@codemirror/autocomplete'
+export {
+  autocompletion, completionKeymap, acceptCompletion,
+  closeBrackets, closeBracketsKeymap,
+} from '@codemirror/autocomplete'
