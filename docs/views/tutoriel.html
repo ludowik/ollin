@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-06 18:47</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-06 19:40</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-06 18:47</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-06 19:40</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1520,7 +1520,6 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func update(dt)</code></td><td>Si elle existe, appelée chaque frame <strong>avant</strong> <code>draw</code> ; <code>dt</code> = secondes écoulées depuis la frame précédente</td></tr>
     <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
     <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
-    <tr><td><code>graphics.width</code> / <code>graphics.height</code></td><td>Dimensions logiques de la zone de rendu (px)</td></tr>
     <tr><td><code>graphics.clear([color])</code></td><td>Couleur <strong>opaque</strong> → efface net ; couleur <strong>semi-transparente</strong> (alpha&nbsp;&lt;&nbsp;1) → <strong>fondu</strong> progressif (traînées, cf. contexte persistant ci-dessous). Sans argument : noir.</td></tr>
     <tr><td><code>graphics.blendMode(mode)</code></td><td>Mode de fusion des dessins suivants : chaîne (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) ou constante du module <code>blend</code>. Remis à <code>"alpha"</code> à chaque frame.</td></tr>
     <tr><td><code>graphics.begin_draw()</code> / <code>graphics.end_draw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>

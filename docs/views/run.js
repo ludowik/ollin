@@ -12,7 +12,7 @@ export async function init(ctx) {
   // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
   // session réutilise la même URL → pas de croissance du registre de modules).
   const Store = await import('../pg-store.js?v=' + ctx.v)
-  const { loadProjectIntoRuntime, runProgram } = await import('../pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample } = await import('../pg-run.js?v=' + ctx.v)
 
   const statusEl = document.getElementById('status')
   const outEl    = document.getElementById('out')
@@ -40,7 +40,7 @@ export async function init(ctx) {
   // Deux sources : soit un EXEMPLE lu direct depuis le dépôt (route
   // #/run/sample/<fichier>, rechargé frais → un refresh reprend la version du
   // dépôt), soit le PROJET ACTIF depuis IndexedDB.
-  const exampleFile = (ctx.anchor || '').startsWith('sample/') ? ctx.anchor.slice(7) : null
+  const exampleFile = sampleFromAnchor(ctx.anchor)
   // Le lien « Éditeur » préserve l'exemple courant (sinon retour en mode projet).
   if (exampleFile) {
     const back = document.querySelector('#bar a')
@@ -50,11 +50,10 @@ export async function init(ctx) {
   let code = null
   if (exampleFile) {
     try {
-      code = await fetch('samples/' + exampleFile + '?v=' + ctx.v, { cache: 'no-cache' }).then(r => r.text())
-    } catch (_) {}
-    if (code === null) {
+      code = await fetchSample(exampleFile, ctx.v)   // rejette sur 404 (pas d'exécution d'une page HTML)
+    } catch (e) {
       statusEl.textContent = ''
-      showText("error: exemple introuvable : " + exampleFile)
+      showText('error: ' + (e && e.message ? e.message : 'exemple introuvable : ' + exampleFile))
       return stop
     }
   } else {

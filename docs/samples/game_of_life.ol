@@ -131,13 +131,19 @@ func update(dt)
     end
 end
 
+const GAP = 3                                   ## espace entre cellules (px) — carrés bien détachés
+const BLEU = Color(0.62, 0.80, 0.98)            ## bleu pastel clair
+
 func draw()
-    graphics.clear(colors.BLACK)
-    graphics.fill(colors.LIME)
+    graphics.noStroke()                          ## carrés pleins, sans bordure
+    ## Légère persistance VISUELLE : au lieu d'effacer net, on estompe la frame
+    ## précédente (fondu) → courte traînée. La simulation, elle, reste exacte.
+    graphics.clear(Color(0.05, 0.06, 0.10, 0.35))
+    graphics.fill(BLEU)
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
             if cells[idx(x, y)] == 1 then
-                graphics.rect(x * CELL, y * CELL, CELL - 1, CELL - 1)
+                graphics.rect(x * CELL, y * CELL, CELL - GAP, CELL - GAP)
             end
         end
     end

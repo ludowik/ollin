@@ -17,16 +17,17 @@ import { ollinLang, ollinHighlight } from '../cm-lang.js'
 export async function init(ctx) {
 const { getOllin, hardReload } = ctx
 const disposers = []   // écouteurs globaux à retirer au démontage
-// Mode EXEMPLE : route #/playground/sample/<fichier> → on ouvre l'exemple
-// directement depuis le dépôt (samples/…), SANS copie ni persistance. Édition
-// libre à l'écran mais non enregistrée ; un refresh recharge la version du dépôt.
-// Bouton « Créer un projet » pour forker à la demande.
-const exampleFile = (ctx.anchor || '').startsWith('sample/') ? ctx.anchor.slice(7) : null
 
 const Store = await import('../pg-store.js?v=' + ctx.v)
 const GH    = await import('../pg-github.js?v=' + ctx.v)
 const Run   = await import('../pg-run.js?v=' + ctx.v)   // exécution partagée avec run.html
 const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // formateur « à la demande »
+
+// Mode EXEMPLE : route #/playground/sample/<fichier> → on ouvre l'exemple
+// directement depuis le dépôt (samples/…), SANS copie ni persistance. Édition
+// libre à l'écran mais non enregistrée ; un refresh recharge la version du dépôt.
+// Bouton « Créer un projet » pour forker à la demande. (parse partagé, pg-run.js)
+const exampleFile = Run.sampleFromAnchor(ctx.anchor)
 
 // ── Ollin syntax ──────────────────────────────────────────────────────────
 // KEYWORDS / BUILTINS / ollinLang / ollinHighlight : importés de cm-lang.js.
@@ -151,7 +152,6 @@ const MODULE_MEMBERS = {
     fn('graphics.canvas','canvas(w,h[,title])'),   fn('graphics.run','run(callback)'),
     fn('graphics.clear','clear([color]) — alpha<1 = fondu'),
     fn('graphics.blendMode','blendMode(mode) — "add"/blend.ADD…'),
-    cst('graphics.width','largeur logique (px)'),  cst('graphics.height','hauteur logique (px)'),
     fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color]|r,g,b)'),
     fn('graphics.noStroke','noStroke()'),
     fn('graphics.fill','fill([color])'),           fn('graphics.noFill','noFill()'),
@@ -612,8 +612,7 @@ async function deleteResource(name) {
 async function loadProject(id) {
   const p = await Store.getProject(id)
   if (!p) return
-  const eb = document.getElementById('example-banner')   // quitte le mode exemple
-  if (eb) eb.remove()
+  removeExampleBanner()   // quitte le mode exemple
   flushEditorToFile()
   currentProject = p
   Store.setActiveId(id)
@@ -944,9 +943,12 @@ applyRail()
 // ── Mode exemple : lecture directe depuis le dépôt (sans copie) ─────────────
 // Bandeau au-dessus de l'éditeur signalant que rien n'est enregistré, avec un
 // bouton pour forker en projet éditable.
+function removeExampleBanner() {
+  const b = document.getElementById('example-banner')
+  if (b) b.remove()
+}
 function showExampleBanner(file) {
-  var old = document.getElementById('example-banner')
-  if (old) old.remove()
+  removeExampleBanner()
   const bar = document.createElement('div')
   bar.id = 'example-banner'
   bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 12px;background:#1e2133;border-bottom:1px solid #2e3150;font-size:12px;color:#a9b2cf'
@@ -966,8 +968,16 @@ async function loadExample(file) {
   currentProject = null
   currentFile = null
   // ctx.v change à chaque chargement de page → un refresh re-fetch la version
-  // fraîche ; no-cache force la revalidation.
-  const code = await fetch('samples/' + file + '?v=' + ctx.v, { cache: 'no-cache' }).then(r => r.text())
+  // fraîche. fetchSample rejette sur 404 (pas de page d'erreur chargée en douce).
+  let code
+  try {
+    code = await Run.fetchSample(file, ctx.v)
+  } catch (e) {
+    removeExampleBanner()
+    setEditorText('## ' + (e && e.message ? e.message : 'exemple introuvable : ' + file))
+    setStatus('Exemple introuvable : ' + file, true, true)
+    return
+  }
   setEditorText(code)
   showExampleBanner(file)
   const label = document.getElementById('project-label')

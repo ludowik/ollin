@@ -9,9 +9,13 @@ export const MANIFEST = 'ollin.project.json'
 // Pousse fichiers (.ol) + ressources (images) d'un projet dans le runtime,
 // avant exécution. `m` = module WASM Ollin, `project` = { files, resources }.
 export function loadProjectIntoRuntime(m, project) {
-  if (!m || !project) return
+  if (!m) return
   try {
+    // Toujours repartir d'une table de sources PROPRE — y compris en mode exemple
+    // (project null) : sinon, dans l'instance WASM partagée, les sources d'un
+    // projet précédemment exécuté resteraient importables (imports périmés).
     if (m.resetSources) m.resetSources()
+    if (!project) return
     for (const path in (project.files || {})) {
       if (path === MANIFEST) continue
       if (m.preloadSource) m.preloadSource(path, project.files[path])
@@ -76,27 +80,16 @@ export function freshUrl(url) {
   return base + (base.includes('?') ? '&' : '?') + 't=' + Date.now() + frag
 }
 
-// Ouvre une page (nouvel onglet/fenêtre) en forçant une version fraîche.
-export function openFresh(url, target) {
-  return window.open(freshUrl(url), target)
+// ── Exemples lus direct depuis le dépôt (route #/<vue>/sample/<fichier>) ─────
+// Source unique du schéma de route + du fetch (utilisé par playground.js ET run.js).
+export function sampleFromAnchor(anchor) {
+  return (anchor || '').startsWith('sample/') ? anchor.slice('sample/'.length) : null
 }
 
-// Fait que TOUTE navigation via un lien interne (*.html) dans le MÊME onglet
-// force une version fraîche — comme le bouton Recharger et le mode autonome.
-// On n'intercepte QUE la navigation _self : les liens _blank/_top et les clics
-// avec modificateur (Ctrl/Cmd/Maj/clic-milieu) sont laissés au navigateur (pas
-// de réécriture du href → pas d'accumulation de ?t=).
-export function bindFreshLinks() {
-  document.addEventListener('click', (e) => {
-    if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return
-    const a = e.target.closest && e.target.closest('a[href]')
-    if (!a) return
-    const target = a.getAttribute('target')
-    if (target && target !== '_self') return                            // _blank/_top : navigateur
-    const href = a.getAttribute('href')
-    if (!href || /^(https?:|\/\/|#|mailto:|tel:)/.test(href)) return    // externe / ancre pure
-    if (!/\.html($|[?#])/.test(href)) return                            // pages HTML seulement
-    e.preventDefault()
-    location.assign(freshUrl(href))   // freshUrl préserve le #fragment
-  })
+// Récupère le code d'un exemple (frais : cache-buster + no-cache). Rejette si le
+// serveur ne renvoie pas 200 → évite d'exécuter/afficher un corps 404 (HTML).
+export async function fetchSample(file, v) {
+  const r = await fetch('samples/' + file + '?v=' + v, { cache: 'no-cache' })
+  if (!r.ok) throw new Error('exemple introuvable : ' + file)
+  return r.text()
 }

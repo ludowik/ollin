@@ -48,8 +48,11 @@ function getOllin() {
 }
 
 // ── Table des vues ──────────────────────────────────────────────────────────
+// anchorIsSection: l'ancre est un id de section à faire défiler (pas de
+// re-montage). Sinon l'ancre est un paramètre de vue (ex. sample/<fichier>) →
+// re-montage quand il change.
 const ROUTES = {
-  tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js' },
+  tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
   run:        { html: 'views/run.html',        js: './views/run.js' },
 }
@@ -181,15 +184,15 @@ function navigate(view, anchor) {
 async function route() {
   const { view, anchor } = parseHash()
   if (view === currentView && ROUTES[view]) {
-    // Tutoriel : l'ancre est une section → défilement sans re-montage.
-    if (view === DEFAULT_VIEW) {
+    // Ancre = section (tutoriel) → défilement sans re-montage.
+    if (ROUTES[view].anchorIsSection) {
       if (anchor) {
         scrollToAnchor(anchor)
       }
       return
     }
-    // Autres vues (playground/run) : l'ancre est un paramètre (ex/<fichier>).
-    // Même paramètre → déjà monté ; changé (autre exemple) → re-monter.
+    // Ancre = paramètre de vue (ex. sample/<fichier>) : même valeur → déjà monté ;
+    // changée (autre exemple) → re-monter.
     if (anchor === currentAnchor) {
       return
     }
