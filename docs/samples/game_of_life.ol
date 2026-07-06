@@ -2,12 +2,18 @@
 ## Règles B3/S23 : une cellule naît avec 3 voisines, survit avec 2 ou 3.
 ## Grille torique (les bords se rejoignent). Espace = pause, R = réinitialiser.
 
-const COLS = 60
-const ROWS = 40
-const CELL = 12          ## taille d'une cellule en pixels
+const CELL = 16          ## taille d'une cellule en pixels
 const STEP = 0.08        ## secondes entre deux générations
 
-global cells = []        ## grille courante, tableau plat 1-based : index = y*COLS + x + 1
+## La grille occupe TOUTE la zone de rendu (globales moteur W, H) → affichage
+## complet, format libre (pas forcément carré), quelle que soit la fenêtre.
+## COLS/ROWS sont dérivés de W, H (calculés après graphics.canvas, plus bas).
+global COLS = 0
+global ROWS = 0
+## Double buffer : deux grilles allouées UNE fois, échangées à chaque génération
+## (pas de réallocation par step). Tableau plat 1-based : index = y*COLS + x + 1.
+global cells = []        ## grille courante
+global back  = []        ## grille de travail (génération suivante)
 global paused = false
 global acc = 0.0         ## accumulateur de temps pour cadencer les générations
 
@@ -53,14 +59,16 @@ func block(g, ox, oy)
     set(g, ox + 1, oy + 1)
 end
 
+## motifs placés RELATIVEMENT à la taille de grille (set() ignore le hors-champ)
 func reset()
     cells = empty_grid()
-    glider(cells, 1, 1)          ## planeurs qui traversent la grille
-    glider(cells, 25, 3)
-    glider(cells, 45, 8)
-    blinker(cells, 10, 25)       ## oscillateurs
-    blinker(cells, 30, 30)
-    block(cells, 50, 32)         ## nature morte (stable)
+    back = empty_grid()                       ## alloué une fois ; réutilisé et échangé ensuite
+    glider(cells, 1, 1)                        ## planeurs
+    glider(cells, COLS // 2, 2)
+    glider(cells, COLS - 6, 4)
+    blinker(cells, COLS // 4, ROWS // 2)       ## oscillateurs
+    blinker(cells, (COLS * 3) // 4, ROWS // 2)
+    block(cells, COLS - 4, ROWS - 4)           ## nature morte (stable)
 end
 
 ## nombre de voisines vivantes (8-voisinage) avec bords toriques
@@ -78,24 +86,28 @@ func neighbors(x, y)
     return n
 end
 
-## calcule la génération suivante (double buffer)
+## calcule la génération suivante dans `back`, puis échange les deux buffers.
+## Chaque cellule est réécrite (0 ou 1) → pas besoin de ré-initialiser `back`.
 func step()
-    var nxt = empty_grid()
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
             var n = neighbors(x, y)
             var alive = cells[idx(x, y)] == 1
-            if alive and (n == 2 or n == 3) then
-                nxt[idx(x, y)] = 1        ## survie
-            elseif not alive and n == 3 then
-                nxt[idx(x, y)] = 1        ## naissance
+            if (alive and (n == 2 or n == 3)) or (not alive and n == 3) then
+                back[idx(x, y)] = 1      ## survie ou naissance
+            else
+                back[idx(x, y)] = 0      ## mort / reste morte
             end
         end
     end
-    cells = nxt
+    var tmp = cells                      ## échange des buffers (pas de réallocation)
+    cells = back
+    back = tmp
 end
 
-graphics.canvas(COLS * CELL, ROWS * CELL, "Jeu de la vie")
+graphics.canvas(W, H, "Jeu de la vie")   ## occupe toute la zone de rendu
+COLS = W // CELL                          ## grille dérivée de la zone (format libre)
+ROWS = H // CELL
 reset()
 
 ## Espace : pause/reprise — R : réinitialiser
