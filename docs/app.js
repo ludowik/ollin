@@ -57,10 +57,12 @@ const ROUTES = {
   run:        { html: 'views/run.html',        js: './views/run.js' },
 }
 const DEFAULT_VIEW = 'tutoriel'
-const LAST_VIEW_KEY = 'ollin-last-view'   // réouverture de la dernière vue
-// Vues éligibles à la réouverture automatique : PAS `run`, qui exige un projet
-// actif et retomberait sinon sur l'écran « aucun projet » à l'ouverture du site.
-const RESTORABLE = new Set(['tutoriel', 'playground'])
+// Dernière ROUTE complète visitée (vue + sous-chemin : ancre tutoriel, sample…),
+// mémorisée pour la rouvrir au prochain lancement. On stocke la route entière
+// (pas juste la vue) → on retrouve l'exemple/l'ancre exacts. `run` est EXCLU
+// (transitoire, exige un projet actif) : on conserve la dernière route
+// tutoriel/playground pour ne pas rouvrir sur « aucun projet ».
+const LAST_HASH_KEY = 'ollin-last-route'
 
 // Viewport par vue. Le playground et le mode run bloquent le zoom (maximum-scale)
 // pour éviter le zoom automatique d'iOS quand l'éditeur (police < 16px) prend le
@@ -148,8 +150,10 @@ async function mount(view, anchor) {
     currentCleanup = cleanup
     currentView = view
     currentAnchor = anchor
-    if (RESTORABLE.has(view)) {
-      try { localStorage.setItem(LAST_VIEW_KEY, view) } catch (_) {}
+    if (view !== 'run') {
+      try {
+        localStorage.setItem(LAST_HASH_KEY, '#/' + view + (anchor ? '/' + anchor : ''))
+      } catch (_) {}
     }
 
     if (anchor) {
@@ -202,16 +206,33 @@ async function route() {
 
 addEventListener('hashchange', route)
 
-// Démarrage : sans hash explicite, rouvrir la DERNIÈRE vue visitée (mémorisée
-// à chaque montage, hors `run`). Défaut = tutoriel. Une URL profonde (#/… ou
-// #ancre) a toujours priorité sur la dernière vue.
+// L'app est-elle lancée en mode « installé » (ajout à l'écran d'accueil iOS, ou
+// display-mode standalone) ? Dans ce cas l'OS relance TOUJOURS l'URL figée au
+// moment de l'installation (souvent #/playground), et NON la dernière position —
+// il faut donc restaurer explicitement la dernière route mémorisée.
+function isStandaloneApp() {
+  try {
+    return window.navigator.standalone === true ||
+           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+  } catch (_) {
+    return false
+  }
+}
+
+// Démarrage : rouvrir la DERNIÈRE route visitée (mémorisée à chaque montage, hors
+// `run`). On la restaure quand :
+//   • l'onglet est rouvert « nu » (aucune route explicite), OU
+//   • l'app est installée (URL de lancement figée, pas la dernière position).
+// Sinon — onglet navigateur avec une route explicite (lien profond, marque-page)
+// — cette route a priorité. Défaut (aucune route mémorisée) = tutoriel.
 function boot() {
-  if (!location.hash) {
-    const last = localStorage.getItem(LAST_VIEW_KEY)
-    if (last && RESTORABLE.has(last) && last !== DEFAULT_VIEW) {
-      location.hash = '#/' + last   // déclenche hashchange → route()
-      return
-    }
+  let last = null
+  try {
+    last = localStorage.getItem(LAST_HASH_KEY)
+  } catch (_) {}
+  if (last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
+    location.hash = last   // déclenche hashchange → route()
+    return
   }
   route()
 }
