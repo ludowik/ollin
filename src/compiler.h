@@ -71,7 +71,21 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         return r;
     }
 
+    // Enregistre la ligne source courante (pour les diagnostics runtime) — remplace
+    // le prologue `if (line > 0) { current_line_ = line; chunk.setLine(line); }`
+    // dupliqué dans chaque visit().
+    void noteLine(int line) {
+        if (line > 0) {
+            current_line_ = line;
+            chunk.setLine(line);
+        }
+    }
+
     void compileInto(const Expr& e, int dest);
+    // Compile chaque expression dans un registre CONSÉCUTIF base+i (MOVE si
+    // l'expression n'atterrit pas pile sur sa cible). Factorise le lowering des
+    // listes d'arguments d'appel et des valeurs de RETURN.
+    void compileConsecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);
 
     // StmtVisitor
     void visit(const CommentStmt&) override {

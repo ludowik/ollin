@@ -310,10 +310,7 @@ static bool isCallNode(const Expr* e) {
 }
 
 void Compiler::visit(const VarDeclStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
 
     // Multi-retour : plusieurs cibles, une seule valeur qui est un APPEL (de
     // n'importe quelle forme : fonction nommée, closure, appel dynamique, méthode).
@@ -373,10 +370,7 @@ void Compiler::visit(const VarDeclStmt& s) {
 }
 
 void Compiler::visit(const WhileStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     auto loop_start = (uint16_t)chunk.currentPos();
     int saved = reg_top_;
     s.cond->accept(*this);
@@ -403,10 +397,7 @@ void Compiler::visit(const WhileStmt& s) {
 }
 
 void Compiler::visit(const IfStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     std::vector<size_t> end_patches;
 
     int saved = reg_top_;
@@ -450,10 +441,7 @@ void Compiler::visit(const IfStmt& s) {
 }
 
 void Compiler::visit(const SwitchStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
 
     int saved = reg_top_;
     s.subject->accept(*this);
@@ -534,10 +522,7 @@ void Compiler::visit(const ContinueStmt& s) {
 }
 
 void Compiler::visit(const AssignStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     if (const_names_.count(s.name))
         throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
                                  ": cannot assign to const '" + s.name + "'");
@@ -613,20 +598,14 @@ void Compiler::visit(const AssignStmt& s) {
 }
 
 void Compiler::visit(const ExprStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     int saved = reg_top_;
     s.expr->accept(*this);
     reg_top_ = saved;
 }
 
 void Compiler::visit(const ThrowStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     int saved = reg_top_;
     s.value->accept(*this);
     int r = last_reg_;
@@ -635,10 +614,7 @@ void Compiler::visit(const ThrowStmt& s) {
 }
 
 void Compiler::visit(const TryCatchStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     int catch_r = s.catch_var.empty() ? 0 : local_regs_.at(s.catch_var);
 
     size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
@@ -676,10 +652,7 @@ void Compiler::visit(const TryCatchStmt& s) {
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     // Save outer context
     auto outer_regs = std::move(local_regs_);
     auto outer_upvals = std::move(cur_upval_idx_);
@@ -878,25 +851,27 @@ void Compiler::visit(const FuncExpr& s) {
     last_reg_ = dest;
 }
 
-void Compiler::visit(const ReturnStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
+// Compile chaque expression dans base+i (cf. déclaration).
+void Compiler::compileConsecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs) {
+    for (int i = 0; i < (int)exprs.size(); ++i) {
+        int target = base + i;
+        reg_top_ = target;
+        exprs[i]->accept(*this);
+        if (last_reg_ != target)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
+        reg_top_ = target + 1;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
+}
+
+void Compiler::visit(const ReturnStmt& s) {
+    noteLine(s.line);
     if (!inFunction())
         throw std::runtime_error("line " + std::to_string(s.line) + ": return outside function");
     if (s.spread_varargs) {
         int base = reg_top_;
-        for (int i = 0; i < (int)s.values.size(); ++i) {
-            int target = base + i;
-            reg_top_ = target;
-            s.values[i]->accept(*this);
-            if (last_reg_ != target)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-            reg_top_ = target + 1;
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
-        }
+        compileConsecutive(base, s.values);
         chunk.emit(makeABC((uint8_t)Op::RETURN_V, (uint8_t)base, (uint8_t)s.values.size(), 0));
     } else {
         int n = (int)s.values.size();
@@ -904,16 +879,7 @@ void Compiler::visit(const ReturnStmt& s) {
             chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
         } else {
             int base = reg_top_;
-            for (int i = 0; i < n; ++i) {
-                int target = base + i;
-                reg_top_ = target;
-                s.values[i]->accept(*this);
-                if (last_reg_ != target)
-                    chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-                reg_top_ = target + 1;
-                if (reg_top_ > reg_count_)
-                    reg_count_ = reg_top_;
-            }
+            compileConsecutive(base, s.values);
             chunk.emit(makeABC((uint8_t)Op::RETURN, (uint8_t)base, (uint8_t)n, 0));
         }
     }
@@ -1210,16 +1176,7 @@ void Compiler::visit(const CallExpr& e) {
     if (it != func_table.end()) {
         int call_base = reg_top_;
         int argc = (int)e.args.size();
-        for (int i = 0; i < argc; ++i) {
-            int target = call_base + i;
-            reg_top_ = target;
-            e.args[i]->accept(*this);
-            if (last_reg_ != target)
-                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-            reg_top_ = target + 1;
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
-        }
+        compileConsecutive(call_base, e.args);
         if (it->second.is_closure) {
             int func_reg = reg_top_++;
             if (reg_top_ > reg_count_)
@@ -1236,16 +1193,7 @@ void Compiler::visit(const CallExpr& e) {
     // Builtins
     int call_base = reg_top_;
     int argc = (int)e.args.size();
-    for (int i = 0; i < argc; ++i) {
-        int target = call_base + i;
-        reg_top_ = target;
-        e.args[i]->accept(*this);
-        if (last_reg_ != target)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reg_top_ = target + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-    }
+    compileConsecutive(call_base, e.args);
 
     // Tous les appels passent par CALL_DYN — builtins sont des globaux T_BUILTIN
     {
@@ -1304,16 +1252,7 @@ void Compiler::visit(const ExprCallExpr& e) {
     }
 
     // Compile args into consecutive registers
-    for (int i = 0; i < argc; ++i) {
-        int target = call_base + i;
-        reg_top_ = target;
-        e.args[i]->accept(*this);
-        if (last_reg_ != target)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reg_top_ = target + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-    }
+    compileConsecutive(call_base, e.args);
 
     // Compile callee into a temp register after args
     int func_reg = reg_top_++;
@@ -1505,10 +1444,7 @@ void Compiler::compileIteratorLoop(const Expr& src, const std::string& var1, con
 }
 
 void Compiler::visit(const ForIterStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     // chemin rapide : for i in <range littéral inclus aux deux bornes>, 1 variable
     // (couvre la forme `for i = a, b[, step]`). Évite Range + itérateur + dispatch virtuel.
     if (s.var2.empty()) {
@@ -1801,10 +1737,7 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     int saved = reg_top_;
 
     // Charge le conteneur (map/array) à indexer.
@@ -1858,10 +1791,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
 }
 
 void Compiler::visit(const MultiAssignStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     int saved = reg_top_;
 
     // Évalue tous les RHS dans des registres temporaires consécutifs
@@ -2021,10 +1951,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
 
 // ── visit(ClassDeclStmt) ──────────────────────────────────────────────────────
 void Compiler::visit(const ClassDeclStmt& s) {
-    if (s.line > 0) {
-        current_line_ = s.line;
-        chunk.setLine(s.line);
-    }
+    noteLine(s.line);
     int saved = reg_top_;
 
     // Créer la valeur classe (T_CLASS = map vide)
@@ -2161,16 +2088,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         skip = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)(call_base + 1));
 
     // R[call_base+2..argc+1] = args
-    for (int i = 0; i < argc; ++i) {
-        int target = call_base + 2 + i;
-        reg_top_ = target;
-        e.args[i]->accept(*this);
-        if (last_reg_ != target)
-            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reg_top_ = target + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-    }
+    compileConsecutive(call_base + 2, e.args);
 
     chunk.emit(makeABC((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
     if (e.optional) {
