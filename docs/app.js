@@ -230,7 +230,12 @@ function boot() {
   try {
     last = localStorage.getItem(LAST_HASH_KEY)
   } catch (_) {}
-  if (last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
+  // Ne JAMAIS écraser une navigation EXPLICITE vers #/run : le bouton « Plein
+  // écran » ouvre index.html#/run dans un nouveau contexte ; en mode installé, la
+  // restauration ci-dessous le remplacerait par la dernière route (qui n'inclut
+  // jamais `run`) → le plein écran ne se lancerait plus.
+  const explicitRun = location.hash.startsWith('#/run')
+  if (!explicitRun && last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
     location.hash = last   // déclenche hashchange → route()
     return
   }
