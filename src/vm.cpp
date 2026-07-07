@@ -216,6 +216,9 @@ static const struct {
     {"len", builtin_len},
 };
 
+// resolveFuncVal : func value → func_idx (+ upvals) ; défini plus bas.
+static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals);
+
 // ── Meta-method dispatch helpers ──────────────────────────────────────────────
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
 // The caller sets ip = addr, then dispatches (NEXT() or continue in switch).
@@ -224,16 +227,8 @@ uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs, bo
     Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
     if (!fn.isCallable())
         return 0;
-    uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    if (fn.isFuncVal())
-        fi = (uint8_t)fn.asInt();
-    else {
-        fi = fn.asClosure()->func_idx;
-        const auto& u = fn.asClosure()->upvals;
-        if (!u.empty())
-            fuv = std::make_unique<std::vector<Upvalue*>>(u);
-    }
+    uint8_t fi = resolveFuncVal(fn, fuv); // fn est callable (garde ci-dessus)
     int nb = (int)regs.size();
     growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb] = std::move(lhs);
@@ -248,20 +243,64 @@ uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
     Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
     if (!fn.isCallable())
         return 0;
-    uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    if (fn.isFuncVal())
-        fi = (uint8_t)fn.asInt();
-    else {
-        fi = fn.asClosure()->func_idx;
-        const auto& u = fn.asClosure()->upvals;
-        if (!u.empty())
-            fuv = std::make_unique<std::vector<Upvalue*>>(u);
-    }
+    uint8_t fi = resolveFuncVal(fn, fuv); // fn est callable (garde ci-dessus)
     int nb = (int)regs.size();
     growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[nb] = std::move(lhs);
     return pushCallFrame(nb, fi, 1, std::move(fuv), ip, false, dest);
+}
+
+// ── unwindToHandler : déroulé commun throw / erreur runtime C++ ───────────────
+void VM::unwindToHandler(const Handler& h, Value thrown) {
+    while (call_stack.size() > h.call_depth) {
+        closeUpvals();
+        call_stack.pop_back();
+    }
+    if (regs.size() > h.regs_size)
+        regs.resize(h.regs_size);
+    regs[h.reg_base + h.catch_reg] = std::move(thrown);
+    ip = h.catch_addr;
+    // NB : le caller restaure `base` (variable locale de la boucle de dispatch).
+}
+
+// ── instantiateClass : partagé par CALL_DYN et CALL_METHOD ────────────────────
+uint32_t VM::instantiateClass(int base_reg, int arg_off, int argc, Value cls, bool& done) {
+    done = false;
+    Value inst = Value::makeMap();
+    inst.mapSet(MK().class_, cls);
+    Value init_fn = protoChainGet(cls, MK().init_);
+    if (!init_fn.isCallable()) { // pas de constructeur → l'instance EST le résultat
+        regs[base_reg] = std::move(inst);
+        last_results_ = 1;
+        done = true;
+        return 0;
+    }
+    if (init_fn.isBuiltin()) {
+        std::vector<Value> bargs(argc + 1);
+        bargs[0] = inst;
+        for (int i = 0; i < argc; ++i)
+            bargs[1 + i] = regs[base_reg + arg_off + i];
+        init_fn.asBuiltin()(bargs.data(), argc + 1);
+        regs[base_reg] = std::move(inst);
+        last_results_ = 1;
+        done = true;
+        return 0;
+    }
+    std::unique_ptr<std::vector<Upvalue*>> fuv;
+    uint8_t fi = resolveFuncVal(init_fn, fuv);
+    int total = argc + 1;
+    growRegs((size_t)(base_reg + std::max((int)ch->funcs[fi].reg_count, total)));
+    // Décale les args pour insérer self en base_reg : base_reg+arg_off+i → base_reg+1+i.
+    // Sens de parcours selon dest vs src pour éviter d'écraser des args non déplacés.
+    if (arg_off >= 1)
+        for (int i = 0; i < argc; ++i)
+            regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
+    else
+        for (int i = argc - 1; i >= 0; --i)
+            regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
+    regs[base_reg + 0] = std::move(inst);
+    return pushCallFrame(base_reg, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
 }
 
 // ── closeUpvals : close and free all open upvalues of the top frame ──────────
@@ -688,8 +727,8 @@ dispatch_loop:
 
     op_POW: {
         {
-            Value bv = regs[base + B];
-            Value cv = regs[base + C];
+            const Value& bv = regs[base + B]; // lu avant l'écriture de R[A] → réf sûre
+            const Value& cv = regs[base + C];
             if (bv.isInteger() && cv.isInteger() && cv.asInt() >= 0) {
                 int64_t b = bv.asInt(), e = cv.asInt(), r = 1;
                 while (e > 0) {
@@ -991,16 +1030,9 @@ dispatch_loop:
                                          ": unhandled exception: " + valueToString(thrown));
             Handler h = handler_stack.back();
             handler_stack.pop_back();
-            while (call_stack.size() > h.call_depth) {
-                closeUpvals();
-                call_stack.pop_back();
-            }
-            if (regs.size() > h.regs_size)
-                regs.resize(h.regs_size);
-            regs[h.reg_base + h.catch_reg] = std::move(thrown);
-            ip = h.catch_addr;
-            base = call_stack.back().reg_base;
+            unwindToHandler(h, std::move(thrown));
         }
+        base = call_stack.back().reg_base;
         NEXT();
     }
 
@@ -1141,48 +1173,12 @@ dispatch_loop:
             NEXT();
         }
         if (regs[base + B].isClass()) {
-            // Instantiation
-            uint32_t ctor_addr = 0;
-            bool do_call = false;
-            {
-                int ctor_base = base + A;
-                int argc = C;
-                Value cls = regs[base + B];
-                Value inst = Value::makeMap();
-                inst.mapSet(MK().class_, cls);
-                Value init_fn = protoChainGet(cls, MK().init_);
-                if (!init_fn.isCallable()) {
-                    regs[ctor_base] = std::move(inst);
-                    last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
-                    goto call_dyn_done;
-                }
-                if (init_fn.isBuiltin()) {
-                    std::vector<Value> bargs(argc + 1);
-                    bargs[0] = inst;
-                    for (int i = 0; i < argc; ++i)
-                        bargs[1 + i] = regs[ctor_base + i];
-                    init_fn.asBuiltin()(bargs.data(), argc + 1);
-                    regs[ctor_base] = std::move(inst);
-                    last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
-                    goto call_dyn_done;
-                }
-                std::unique_ptr<std::vector<Upvalue*>> fuv;
-                uint8_t fi = resolveFuncVal(init_fn, fuv);
-                int total = argc + 1;
-                // grow AVANT le décalage d'args — pushCallFrame fera le même calcul (no-op),
-                // mais le décalage doit avoir lieu avant pushCallFrame, d'où ce grow explicite.
-                growRegs((size_t)(ctor_base + std::max((int)ch->funcs[fi].reg_count, total)));
-                for (int i = argc - 1; i >= 0; --i)
-                    regs[ctor_base + 1 + i] = std::move(regs[ctor_base + i]);
-                regs[ctor_base + 0] = inst;
-                ctor_addr = pushCallFrame(ctor_base, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
-                do_call = true;
-            }
-            if (do_call) {
-                ip = ctor_addr;
-                base = call_stack.back().reg_base;
-                NEXT();
-            }
+            // Instanciation (args en ctor_base+0.. → arg_off = 0).
+            bool done;
+            uint32_t addr = instantiateClass(base + A, 0, C, regs[base + B], done);
+            if (!done)
+                ip = addr;
+            goto call_dyn_done;
         }
         {
             // Regular function/closure call
@@ -1269,35 +1265,12 @@ dispatch_loop:
             // de décalage self appliqué). On les amène en cb+1.. avec l'instance
             // en cb, puis on appelle init (si présent).
             if (fn.isClass()) {
-                {
-                    Value inst = Value::makeMap();
-                    inst.mapSet(MK().class_, fn);
-                    Value init_fn = protoChainGet(fn, MK().init_);
-                    if (!init_fn.isCallable()) {
-                        regs[cb] = std::move(inst);
-                        last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
-                        goto call_method_done;
-                    }
-                    if (init_fn.isBuiltin()) {
-                        std::vector<Value> bargs(argc + 1);
-                        bargs[0] = inst;
-                        for (int i = 0; i < argc; ++i)
-                            bargs[1 + i] = regs[cb + 2 + i];
-                        init_fn.asBuiltin()(bargs.data(), argc + 1);
-                        regs[cb] = std::move(inst);
-                        last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
-                        goto call_method_done;
-                    }
-                    std::unique_ptr<std::vector<Upvalue*>> fuv;
-                    uint8_t fi = resolveFuncVal(init_fn, fuv);
-                    int total = argc + 1;
-                    growRegs((size_t)(cb + std::max((int)ch->funcs[fi].reg_count, total)));
-                    for (int i = 0; i < argc; ++i)
-                        regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);
-                    regs[cb + 0] = inst;
-                    fp_addr = pushCallFrame(cb, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
-                }
-                ip = fp_addr;
+                // Instanciation via un membre-classe (ex. mod.Widget()) : args en
+                // cb+2.. → arg_off = 2. Partagé avec CALL_DYN.
+                bool done;
+                uint32_t addr = instantiateClass(cb, 2, argc, fn, done);
+                if (!done)
+                    ip = addr;
                 goto call_method_done;
             }
             // méthode statique : pas d'injection de self, même si appelée sur une instance
@@ -1458,17 +1431,8 @@ dispatch_loop:
             throw;
         Handler h = handler_stack.back();
         handler_stack.pop_back();
-        while (call_stack.size() > h.call_depth) {
-            closeUpvals();
-            call_stack.pop_back();
-        }
-        if (regs.size() > h.regs_size)
-            regs.resize(h.regs_size);
-        regs[h.reg_base + h.catch_reg] = Value(std::string(e.what()));
-        ip = h.catch_addr;
-        // Restaurer la base de registres de la frame du handler (comme op_THROW) :
-        // sans ça, une erreur C++ levée depuis une frame plus profonde laisse `base`
-        // périmé → le corps du catch lit/écrit les mauvais registres.
+        unwindToHandler(h, Value(std::string(e.what())));
+        // base (local) restauré ici — comme op_THROW ; unwindToHandler a posé ip.
         base = call_stack.back().reg_base;
         goto dispatch_loop;
     }

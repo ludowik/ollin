@@ -63,8 +63,16 @@ class VM {
     static bool isInstance(const Value& v);
 
     uint32_t tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
+    // Instancie `cls` : instance en regs[base_reg], args en regs[base_reg+arg_off+i].
+    // done=true si aucun frame poussé (init absent/builtin, résultat déjà écrit) ;
+    // sinon retourne l'adresse du corps de init (frame constructeur poussé).
+    uint32_t instantiateClass(int base_reg, int arg_off, int argc, Value cls, bool& done);
     uint32_t tryMetaUnary(const Value& name, int dest, Value lhs);
     void closeUpvals();           // closes & frees all open upvalues of the top frame
+    // Déroule la pile jusqu'au handler `h`, remet regs à sa taille, écrit la valeur
+    // capturée dans le registre de catch et positionne `ip` sur le corps du catch.
+    // Partagé par op_THROW (throw utilisateur) et le catch(runtime_error) C++.
+    void unwindToHandler(const Handler& h, Value thrown);
     void growRegs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
 
     // Pousse un frame d'appel, remplit les défauts et varargs, retourne fp.addr.
