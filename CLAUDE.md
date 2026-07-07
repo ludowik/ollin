@@ -47,7 +47,7 @@ ollin/
 │   ├── compiler.h/.cpp
 │   ├── vm.h/.cpp
 │   └── main.cpp       pipeline : Lexer | Parser | Compiler | VM
-├── tests/             suite de tests + fixtures (syntax.ol, test_errors.sh, utils_test*.ol, config.ol)
+├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
 ├── examples/          démos exécutables (graphics_demo, lines_demo, sprite_demo)
 ├── tools/             outillage build (update_build_date.py)
 ├── bench/             benchmarks (.ol / .lua / .py)
@@ -75,6 +75,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 | Fichier | Propriétaire | Rôle |
 |---|---|---|
 | `tests/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
+| `tests/regressions.ol` | Claude | non-régression des bugs corrigés en revue (coins peu couverts par `syntax.ol` : multi-retour closure/méthode, `super` 3 niveaux, clobber de registre sur appel 0-arg, lvalues chaînées, range ouvert…) |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `ollin-vscode/` | Claude | extension VS Code (colorisation) |
