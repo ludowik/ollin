@@ -34,6 +34,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::unordered_set<std::string> declared_globals_; // globals déclarés (source + builtins + modules)
     std::unordered_set<std::string> const_names_;      // locals declared with 'const'
     std::string current_func_name;                     // "" = global scope
+    // Nom de la classe parente de la classe dont on compile actuellement une
+    // méthode ("" hors classe / classe sans parent). 'super' se résout par CETTE
+    // classe lexicale, pas par la classe dynamique de self (sinon récursion
+    // infinie dans une hiérarchie à 3+ niveaux).
+    std::string current_class_parent_;
     int current_func_idx_ = -1;                        // index in chunk.funcs (-1 = main chunk)
 
     bool inFunction() const {

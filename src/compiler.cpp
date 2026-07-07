@@ -44,6 +44,8 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
             cur_is_local = false;
         } else if (s.func_proto_idx >= 0) {
             int uv_i = (int)chunk.funcs[s.func_proto_idx].upvals.size();
+            if (uv_i > 255) // l'index d'upvalue est un opérande 8 bits
+                throw std::runtime_error("function captures more than 255 upvalues");
             chunk.funcs[s.func_proto_idx].upvals.push_back({cur_is_local, cur_idx});
             s.upval_idx[name] = uv_i;
             cur_idx = (uint8_t)uv_i;
@@ -60,6 +62,8 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
     if (current_func_idx_ < 0)
         return -1; // in main chunk, no FuncProto
     int uv_i = (int)chunk.funcs[current_func_idx_].upvals.size();
+    if (uv_i > 255) // l'index d'upvalue est un opérande 8 bits
+        throw std::runtime_error("function captures more than 255 upvalues");
     chunk.funcs[current_func_idx_].upvals.push_back({cur_is_local, cur_idx});
     cur_upval_idx_[name] = uv_i;
     return uv_i;
@@ -283,12 +287,27 @@ Chunk Compiler::compile(const Program& prog) {
 
     for (auto& s : prog.stmts)
         s->accept(*this);
+    // Même garde que pour les fonctions : les registres sont des opérandes 8 bits.
+    // Sans elle, un script top-level > 255 registres tronquait silencieusement.
+    if (reg_count_ > 255)
+        throw std::runtime_error("top-level code uses more than 255 registers");
     chunk.top_reg_count = (uint8_t)std::max(reg_count_, 8);
     chunk.emit(makeBx((uint8_t)Op::HALT, 0));
+    // Les cibles de saut sont des adresses absolues 16 bits (Bx). Au-delà de 65535
+    // instructions, elles seraient tronquées → saut vers une mauvaise adresse.
+    if (chunk.code.size() > 65535)
+        throw std::runtime_error("program too large (> 65535 instructions)");
     return std::move(chunk);
 }
 
 // ── statements ────────────────────────────────────────────────────────────────
+
+// Vrai si l'expression est un appel (toute forme) — utilisé pour la
+// destructuration multi-retour, qui doit lire plusieurs valeurs à la base.
+static bool isCallNode(const Expr* e) {
+    return dynamic_cast<const CallExpr*>(e) || dynamic_cast<const ExprCallExpr*>(e) ||
+           dynamic_cast<const MethodCallExpr*>(e);
+}
 
 void Compiler::visit(const VarDeclStmt& s) {
     if (s.line > 0) {
@@ -296,34 +315,33 @@ void Compiler::visit(const VarDeclStmt& s) {
         chunk.setLine(s.line);
     }
 
-    // 'global' declaration → store into the VM-wide globals table
-    if (s.is_global) {
-        // Multi-return from a user function call: global a, b = f(...)
-        if (s.names.size() > 1 && s.values.size() == 1) {
-            if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
-                if (func_table.count(call->callee)) {
-                    int call_base = reg_top_;
-                    int argc = (int)call->args.size();
-                    for (int i = 0; i < argc; ++i) {
-                        int target = call_base + i;
-                        reg_top_ = target;
-                        call->args[i]->accept(*this);
-                        if (last_reg_ != target)
-                            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-                        reg_top_ = target + 1;
-                        if (reg_top_ > reg_count_)
-                            reg_count_ = reg_top_;
-                    }
-                    const FuncInfo& fi = func_table.at(call->callee);
-                    chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
-                    for (int i = 0; i < (int)s.names.size(); ++i)
-                        chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(call_base + i),
-                                           chunk.addIdentifier(s.names[i])));
-                    reg_top_ = call_base;
-                    return;
-                }
+    // Multi-retour : plusieurs cibles, une seule valeur qui est un APPEL (de
+    // n'importe quelle forme : fonction nommée, closure, appel dynamique, méthode).
+    // On compile l'appel à une base connue ; la VM y laisse toutes les valeurs de
+    // retour (RETURN copie R[A..A+k-1] → base..base+k-1). On lit ensuite base+i.
+    // (Généralise l'ancien chemin qui ne gérait que CALL_FUNC nommé → corrige le
+    // crash sur closure et la perte de valeurs pour méthodes/appels dynamiques.)
+    if (s.names.size() > 1 && s.values.size() == 1 && isCallNode(s.values[0].get())) {
+        int base = reg_top_;
+        s.values[0]->accept(*this); // laisse k valeurs de retour en base..base+k-1
+        int n = (int)s.names.size();
+        if (base + n > reg_count_)
+            reg_count_ = base + n; // ces registres sont vivants (lus ci-dessous)
+        for (int i = 0; i < n; ++i) {
+            if (s.is_global) {
+                chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.addIdentifier(s.names[i])));
+            } else {
+                int dest = local_regs_.at(s.names[i]);
+                if (base + i != dest)
+                    chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(base + i), 0));
             }
         }
+        reg_top_ = base;
+        return;
+    }
+
+    // 'global' declaration → store into the VM-wide globals table
+    if (s.is_global) {
         // Normal: parallel assignment (or nil when no value)
         for (int i = 0; i < (int)s.names.size(); ++i) {
             int saved = reg_top_;
@@ -339,34 +357,6 @@ void Compiler::visit(const VarDeclStmt& s) {
         return;
     }
 
-    // Multi-return from user function call
-    if (s.names.size() > 1 && s.values.size() == 1) {
-        if (auto* call = dynamic_cast<const CallExpr*>(s.values[0].get())) {
-            if (func_table.count(call->callee)) {
-                int call_base = reg_top_;
-                int argc = (int)call->args.size();
-                for (int i = 0; i < argc; ++i) {
-                    int target = call_base + i;
-                    reg_top_ = target;
-                    call->args[i]->accept(*this);
-                    if (last_reg_ != target)
-                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-                    reg_top_ = target + 1;
-                    if (reg_top_ > reg_count_)
-                        reg_count_ = reg_top_;
-                }
-                const FuncInfo& fi = func_table.at(call->callee);
-                chunk.emit(makeABC((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, fi.func_idx, (uint8_t)argc));
-                for (int i = 0; i < (int)s.names.size(); ++i) {
-                    int dest = local_regs_.at(s.names[i]);
-                    if (call_base + i != dest)
-                        chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(call_base + i), 0));
-                }
-                reg_top_ = call_base;
-                return;
-            }
-        }
-    }
     // Normal: compile each value into its pre-allocated local register
     for (int i = 0; i < (int)s.names.size(); ++i) {
         int dest = local_regs_.at(s.names[i]);
@@ -468,6 +458,13 @@ void Compiler::visit(const SwitchStmt& s) {
     int saved = reg_top_;
     s.subject->accept(*this);
     int subj_r = last_reg_;
+    // Réserver le registre du sujet : un sujet appel 0-argument laisse
+    // reg_top_ == subj_r, donc sans cette garde l'évaluation des valeurs de 'case'
+    // réalloue et écrase le sujet (mauvaise branche prise). Ex. : switch f().
+    if (reg_top_ <= subj_r)
+        reg_top_ = subj_r + 1;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
     int above_subj = reg_top_; // subj_r reste vivant pendant tous les bras
 
     std::vector<size_t> end_patches;
@@ -988,9 +985,11 @@ void Compiler::visit(const BinaryExpr& e) {
     if (e.op == '&' || e.op == '|') {
         e.left->accept(*this);
         int rL = last_reg_;
-        if (reg_top_ <= rL) reg_top_ = rL + 1;
+        if (reg_top_ <= rL)
+            reg_top_ = rL + 1;
         int dst = reg_top_++;
-        if (reg_top_ > reg_count_) reg_count_ = reg_top_;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)rL, 0));
         if (e.op == '&') {
             // a falsy → garder a (dans dst) et sauter l'évaluation de b
@@ -1001,13 +1000,13 @@ void Compiler::visit(const BinaryExpr& e) {
         } else {
             // a truthy → garder a ; a falsy → évaluer b
             size_t evalRight = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)dst);
-            size_t done      = chunk.emitJump(Op::JUMP);
+            size_t done = chunk.emitJump(Op::JUMP);
             chunk.patchJump(evalRight, (uint16_t)chunk.currentPos());
             e.right->accept(*this);
             chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
             chunk.patchJump(done, (uint16_t)chunk.currentPos());
         }
-        reg_top_  = dst + 1;
+        reg_top_ = dst + 1;
         last_reg_ = dst;
         return;
     }
@@ -1353,6 +1352,13 @@ void Compiler::visit(const IndexExpr& e) {
     int saved = reg_top_;
     e.obj->accept(*this);
     int obj_r = last_reg_;
+    // Réserver le registre objet avant d'évaluer la clé : un appel 0-argument
+    // laisse reg_top_ == son registre résultat, donc sans cette garde l'évaluation
+    // de la clé réalloue et écrase l'objet (cf. BinaryExpr). Ex. : f().x, f()[i].
+    if (reg_top_ <= obj_r)
+        reg_top_ = obj_r + 1;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
     int saved2 = reg_top_;
     e.key->accept(*this);
     int key_r = last_reg_;
@@ -2049,6 +2055,10 @@ void Compiler::visit(const ClassDeclStmt& s) {
         reg_top_ = dest + 1;
     }
 
+    // 'super' dans ces méthodes se résout par la classe parente LEXICALE.
+    std::string saved_parent = current_class_parent_;
+    current_class_parent_ = s.parent;
+
     // Compiler chaque méthode et la stocker dans la map classe
     for (auto& method : s.methods) {
         // 'static' interdit sur init et sur les méta-méthodes : ces appels
@@ -2077,6 +2087,8 @@ void Compiler::visit(const ClassDeclStmt& s) {
         reg_top_ = dest + 1;
     }
 
+    current_class_parent_ = saved_parent;
+
     // Stocker la classe comme global (le nom est déjà dans declared_globals_
     // via le pré-scan collectGlobals — source unique de vérité)
     chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.addIdentifier(s.name)));
@@ -2098,23 +2110,26 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (self_it == local_regs_.end())
             throw std::runtime_error("line " + std::to_string(current_line_) +
                                      ": 'super' n'est utilisable que dans une méthode");
+        // La classe parente est fixée LEXICALEMENT (classe où la méthode est
+        // définie), et non via self.__class__.__parent__ : sinon B.m() exécuté sur
+        // une instance C reverrait toujours sur B → récursion infinie dans une
+        // hiérarchie à 3+ niveaux.
+        if (current_class_parent_.empty())
+            throw std::runtime_error("line " + std::to_string(current_line_) +
+                                     ": 'super' : la classe courante n'a pas de parent");
         int self_src = self_it->second;
         reg_top_ = call_base + 1;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
         chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)self_src, 0));
 
-        // Temporaires pour remonter la chaîne : tmp=class_chain, key_r=clé
+        // Temporaires : tmp = classe parente (globale), key_r = clé
         int tmp = reg_top_++, key_r = reg_top_++;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
 
-        // tmp = self.__class__
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string("__class__")))));
-        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)tmp, (uint8_t)call_base, (uint8_t)key_r));
-        // tmp = tmp.__parent__
-        chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string("__parent__")))));
-        chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)tmp, (uint8_t)tmp, (uint8_t)key_r));
+        // tmp = <classe parente lexicale>
+        chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)tmp, chunk.addIdentifier(current_class_parent_)));
         // R[call_base+1] = tmp.<method>
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.addConstant(Value(std::string(e.method)))));
         chunk.emit(makeABC((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)tmp, (uint8_t)key_r));
