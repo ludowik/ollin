@@ -268,6 +268,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | SET_UPVAL     | AB     | A=src, B=upval_idx         | upval[B] = R[A]                                  |
 | NEW_CLASS     | A      | A=dest                     | R[A] = nouvelle classe vide (T_CLASS)            |
 | CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
+| SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Globales moteur (engine-injected globals)
@@ -484,5 +485,15 @@ struct Frame {
     ...
     Value ctor_result;   // non-nil = frame constructeur ; RETURN place l'instance dans R[0]
     int   return_dest = -1; // >= 0 = frame méta-méthode ; RETURN copie R[0] dans regs[return_dest]
+    bool  negate_result = false; // RETURN nie (logique) R[0] avant return_dest
 };
 ```
+
+`negate_result` : utilisé par `<>` (via `__eq`) et par les comparaisons où
+l'instance est du côté « inverse » (`a > b` avec `a` instance ⟺ `not a.__le(b)`,
+`a >= b` ⟺ `not a.__lt(b)`, symétrique pour `<`/`<=`). Le résultat de la
+méta-méthode est nié avant d'être écrit dans `return_dest`.
+
+`VM::last_results_` : nombre de valeurs produites par le dernier appel/retour,
+consommé par `SPREAD_RESULTS` pour mettre à `nil` les cibles d'une
+destructuration multi-retour au-delà de ce que l'appel a réellement renvoyé.

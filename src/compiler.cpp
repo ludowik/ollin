@@ -324,6 +324,9 @@ void Compiler::visit(const VarDeclStmt& s) {
         int n = (int)s.names.size();
         if (base + n > reg_count_)
             reg_count_ = base + n; // ces registres sont vivants (lus ci-dessous)
+        // Met à nil les cibles au-delà de ce que l'appel a renvoyé (k < n) : sinon
+        // elles liraient des registres périmés (ex. var a,b = len(x) → b doit être nil).
+        chunk.emit(makeABC((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n, 0));
         for (int i = 0; i < n; ++i) {
             if (s.is_global) {
                 chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.addIdentifier(s.names[i])));

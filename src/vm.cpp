@@ -220,7 +220,7 @@ static const struct {
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
 // The caller sets ip = addr, then dispatches (NEXT() or continue in switch).
 
-uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs) {
+uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs, bool negate) {
     Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
     if (!fn.isCallable())
         return 0;
@@ -238,7 +238,10 @@ uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs) {
     growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb] = std::move(lhs);
     regs[nb + 1] = std::move(rhs);
-    return pushCallFrame(nb, fi, 2, std::move(fuv), ip, false, dest);
+    uint32_t addr = pushCallFrame(nb, fi, 2, std::move(fuv), ip, false, dest);
+    if (negate)
+        call_stack.back().negate_result = true;
+    return addr;
 }
 
 uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
@@ -525,6 +528,7 @@ void VM::runGoto(size_t stop_depth) {
         &&op_MAKE_RANGE,
         &&op_FOR_PREP,
         &&op_FOR_LOOP,
+        &&op_SPREAD_RESULTS,
         &&op_HALT,
     };
 
@@ -541,6 +545,7 @@ dispatch_loop:
 
     op_LOAD_NIL:
         regs[base + A] = Value{};
+        last_results_ = 1; // ex. branche nil d'un appel optionnel f?() (multi-retour)
         NEXT();
 
     op_MOVE:
@@ -566,7 +571,14 @@ dispatch_loop:
             NEXT();
         }
         if (bv.isString() || cv.isString()) {
-            regs[base + A] = Value(valueToString(bv) + valueToString(cv));
+            {
+                // Copier les opérandes AVANT valueToString : si l'un est une instance
+                // avec __str, invokeStr réalloue regs → les références bv/cv pendraient.
+                // Bloc interne : Value (destructeur non trivial) hors portée avant NEXT().
+                Value b2 = bv;
+                Value c2 = cv;
+                regs[base + A] = Value(valueToString(b2) + valueToString(c2));
+            }
             NEXT();
         }
         if (isInstance(bv)) {
@@ -737,8 +749,17 @@ dispatch_loop:
     }
 
     op_NEQ: {
-        // NEQ has no meta-method: __eq result can't be trivially inverted after return
-        regs[base + A] = Value((int64_t)(valuesEqual(regs[base + B], regs[base + C]) ? 0 : 1));
+        const Value& bv = regs[base + B];
+        const Value& cv = regs[base + C];
+        // a <> b via __eq puis négation (sinon == et <> seraient vrais en même temps).
+        if (isInstance(bv)) {
+            if (uint32_t addr = tryMetaBinary(MK().eq_, base + A, bv, cv, /*negate=*/true)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        }
+        regs[base + A] = Value((int64_t)(valuesEqual(bv, cv) ? 0 : 1));
         NEXT();
     }
 
@@ -750,8 +771,14 @@ dispatch_loop:
             regs[base + A] = Value((int64_t)(bv.asInt() > cv.asInt()));
             NEXT();
         }
-        if (isInstance(cv)) {
+        if (isInstance(cv)) { // instance à droite : a > b == b < a → b.__lt(a)
             if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        } else if (isInstance(bv)) { // instance à gauche : a > b == not(a <= b) → not a.__le(b)
+            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
@@ -772,8 +799,14 @@ dispatch_loop:
             regs[base + A] = Value((int64_t)(bv.asInt() < cv.asInt()));
             NEXT();
         }
-        if (isInstance(bv)) {
+        if (isInstance(bv)) { // instance à gauche : a < b → a.__lt(b)
             if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        } else if (isInstance(cv)) { // instance à droite : a < b == not(b <= a) → not b.__le(a)
+            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
@@ -795,8 +828,14 @@ dispatch_loop:
             regs[base + A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
             NEXT();
         }
-        if (isInstance(cv)) {
+        if (isInstance(cv)) { // instance à droite : a >= b == b <= a → b.__le(a)
             if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        } else if (isInstance(bv)) { // instance à gauche : a >= b == not(a < b) → not a.__lt(b)
+            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
@@ -817,8 +856,14 @@ dispatch_loop:
             regs[base + A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
             NEXT();
         }
-        if (isInstance(bv)) {
+        if (isInstance(bv)) { // instance à gauche : a <= b → a.__le(b)
             if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv)) {
+                ip = addr;
+                base = call_stack.back().reg_base;
+                NEXT();
+            }
+        } else if (isInstance(cv)) { // instance à droite : a <= b == not(b < a) → not b.__lt(a)
+            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
@@ -851,6 +896,7 @@ dispatch_loop:
         {
             closeUpvals();
             bool is_ctor_ = call_stack.back().is_ctor;
+            bool neg_ = call_stack.back().negate_result;
             Value ctor_val;
             if (is_ctor_)
                 ctor_val = regs[base + 0]; // save self before potential overwrite
@@ -864,8 +910,9 @@ dispatch_loop:
             if (is_ctor_)
                 regs[base + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = regs[base + 0];
+                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[base + 0]) ? 1 : 0)) : regs[base + 0];
             ip = rip;
+            last_results_ = is_ctor_ ? 1 : n; // pour SPREAD_RESULTS (multi-retour)
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -894,6 +941,7 @@ dispatch_loop:
         {
             closeUpvals();
             bool is_ctor_ = call_stack.back().is_ctor;
+            bool neg_ = call_stack.back().negate_result;
             Value ctor_val;
             if (is_ctor_)
                 ctor_val = regs[base + 0];
@@ -917,8 +965,9 @@ dispatch_loop:
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = regs[rbase + 0];
+                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
             ip = rip;
+            last_results_ = is_ctor_ ? 1 : total; // pour SPREAD_RESULTS (multi-retour)
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1088,6 +1137,7 @@ dispatch_loop:
         if (regs[base + B].isBuiltin()) {
             auto fn = regs[base + B].asBuiltin();
             regs[base + A] = fn(&regs[base + A], C);
+            last_results_ = 1; // builtin → 1 valeur (pour SPREAD_RESULTS)
             NEXT();
         }
         if (regs[base + B].isClass()) {
@@ -1103,6 +1153,7 @@ dispatch_loop:
                 Value init_fn = protoChainGet(cls, MK().init_);
                 if (!init_fn.isCallable()) {
                     regs[ctor_base] = std::move(inst);
+                    last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
                     goto call_dyn_done;
                 }
                 if (init_fn.isBuiltin()) {
@@ -1112,6 +1163,7 @@ dispatch_loop:
                         bargs[1 + i] = regs[ctor_base + i];
                     init_fn.asBuiltin()(bargs.data(), argc + 1);
                     regs[ctor_base] = std::move(inst);
+                    last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
                     goto call_dyn_done;
                 }
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
@@ -1144,8 +1196,13 @@ dispatch_loop:
     }
 
     op_MAKE_CLOSURE: {
+        // Bloc interne : le unique_ptr (destructeur non trivial) doit sortir de
+        // portée AVANT NEXT() (règle computed-goto).
+        {
         uint8_t fi = (uint8_t)Bx;
-        auto* cl = new Closure(fi);
+        // unique_ptr : si la capture lève (bytecode incohérent), le Closure est
+        // libéré au lieu de fuir (RAII sur le chemin d'exception).
+        auto cl = std::make_unique<Closure>(fi);
         for (auto& desc : ch->funcs[fi].upvals) {
             Upvalue* uv;
             if (desc.is_local) {
@@ -1176,7 +1233,8 @@ dispatch_loop:
             }
             cl->upvals.push_back(uv);
         }
-        regs[base + A] = Value::makeClosure(cl);
+        regs[base + A] = Value::makeClosure(cl.release());
+        }
         NEXT();
     }
 
@@ -1217,6 +1275,7 @@ dispatch_loop:
                     Value init_fn = protoChainGet(fn, MK().init_);
                     if (!init_fn.isCallable()) {
                         regs[cb] = std::move(inst);
+                        last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
                         goto call_method_done;
                     }
                     if (init_fn.isBuiltin()) {
@@ -1226,6 +1285,7 @@ dispatch_loop:
                             bargs[1 + i] = regs[cb + 2 + i];
                         init_fn.asBuiltin()(bargs.data(), argc + 1);
                         regs[cb] = std::move(inst);
+                        last_results_ = 1; // instance = 1 valeur (pour SPREAD_RESULTS)
                         goto call_method_done;
                     }
                     std::unique_ptr<std::vector<Upvalue*>> fuv;
@@ -1259,6 +1319,7 @@ dispatch_loop:
             }
             if (fn.isBuiltin()) {
                 regs[cb] = fn.asBuiltin()(&regs[cb], total);
+                last_results_ = 1; // builtin → 1 valeur (pour SPREAD_RESULTS)
                 goto call_method_done;
             }
             {
@@ -1379,6 +1440,14 @@ dispatch_loop:
         NEXT();
     }
 
+    op_SPREAD_RESULTS:
+        // Destructuration multi-retour : l'appel précédent a laissé last_results_
+        // valeurs en R[A..]. Met les cibles restantes (A+last_results_ .. A+B-1) à
+        // nil, sinon elles liraient des registres périmés.
+        for (int i = last_results_; i < B; ++i)
+            regs[base + A + i] = Value{};
+        NEXT();
+
     op_HALT:
         closeUpvals();
         call_stack.pop_back();
@@ -1397,6 +1466,10 @@ dispatch_loop:
             regs.resize(h.regs_size);
         regs[h.reg_base + h.catch_reg] = Value(std::string(e.what()));
         ip = h.catch_addr;
+        // Restaurer la base de registres de la frame du handler (comme op_THROW) :
+        // sans ça, une erreur C++ levée depuis une frame plus profonde laisse `base`
+        // périmé → le corps du catch lit/écrit les mauvais registres.
+        base = call_stack.back().reg_base;
         goto dispatch_loop;
     }
 

@@ -111,4 +111,62 @@ for i in ]1; 4] do
 end
 assert(openr == 9)     ## 2 + 3 + 4
 
+## ── VM : try/catch d'une erreur runtime venant d'une fonction APPELÉE ────────
+## (avant : `base` non restauré dans le catch C++ → variable de catch erronée)
+func vm_boom() assert(false, "kaboom") end
+global caught = "none"
+try
+    vm_boom()
+catch e
+    caught = e
+end
+assert(caught == "kaboom")
+
+## ── VM : destructuration multi-retour d'un appel à VALEUR UNIQUE → nil ───────
+## (régression : builtin / constructeur / appel optionnel laissaient des
+## registres périmés au lieu de nil)
+var mrx = [4, 5, 6]
+var la, lb = len(mrx)
+assert(la == 3)
+assert(lb == nil)
+class MrPt
+    func init(x, y) self.x = x self.y = y end
+end
+var pa, pb = MrPt(1, 2)
+assert(pa.x == 1)
+assert(pb == nil)
+var mrf = nil
+var oa, ob = mrf?()
+assert(oa == nil and ob == nil)
+
+## ── VM : <> respecte __eq (avant : == et <> vrais simultanément) ─────────────
+class EqV
+    func init(x) self.x = x end
+    func __eq(o) return self.x == o.x end
+end
+assert(EqV(1) == EqV(1))
+assert(not (EqV(1) <> EqV(1)))
+assert(EqV(1) <> EqV(2))
+
+## ── VM : comparaisons d'instances symétriques (__lt + __le) ──────────────────
+## (avant : instance à gauche de > / droite de < levait une erreur)
+class CmpN
+    func init(v) self.v = v end
+    func __lt(o) return self.v < o end
+    func __le(o) return self.v <= o end
+end
+var cn = CmpN(5)
+assert(cn < 9)
+assert(9 > cn)
+assert(cn > 3)      ## instance à GAUCHE de >
+assert(3 < cn)      ## instance à DROITE de <
+assert(cn >= 5)
+assert(cn <= 5)
+
+## ── VM : concaténation avec __str (pas de use-after-free) ────────────────────
+class StrP
+    func __str() return "SP" end
+end
+assert("x=" + StrP() == "x=SP")
+
 print("regressions ok")

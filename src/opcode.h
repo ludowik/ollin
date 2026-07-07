@@ -92,5 +92,6 @@ enum class Op : uint8_t {
     FOR_PREP, // ABx: for numérique — R[A]=i, R[A+1]=limite, R[A+2]=pas. valide, normalise int/float, i-=pas, ip=Bx
               // (vers FOR_LOOP)
     FOR_LOOP, // ABx: i+=pas ; si dans la limite (incl) → R[A]=i, ip=Bx (corps) ; sinon continue (sortie)
+    SPREAD_RESULTS, // AB: destructuration multi-retour — met R[A+last_results..A+B-1] à nil
     HALT,
 };

@@ -37,6 +37,8 @@ class VM {
         int n_varargs = 0;    // count of extra variadic args (0 if none)
         bool is_ctor = false; // true = frame is a constructor; RETURN overrides R[0] with instance
         int return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
+        bool negate_result = false; // true: RETURN nie (logique) le résultat avant return_dest
+                                    // (utilisé par <> via __eq, et par >/>=/</<= côté « inverse »)
         std::unique_ptr<std::vector<Upvalue*>> upvals;
         std::unique_ptr<std::vector<Upvalue*>> open_upvals;
     };
@@ -50,12 +52,17 @@ class VM {
     std::vector<Value> regs;
     std::vector<Frame> call_stack;
     std::vector<Handler> handler_stack;
+    // Nombre de valeurs produites par le dernier appel/retour. Consommé
+    // UNIQUEMENT par SPREAD_RESULTS (émis juste après un appel en destructuration
+    // multi-retour) pour mettre à nil les cibles au-delà de ce que l'appel a
+    // réellement renvoyé (sinon elles liraient des registres périmés).
+    int last_results_ = 1;
 
     static Value protoChainGet(const Value& obj, const Value& key);
 
     static bool isInstance(const Value& v);
 
-    uint32_t tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs);
+    uint32_t tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
     uint32_t tryMetaUnary(const Value& name, int dest, Value lhs);
     void closeUpvals();           // closes & frees all open upvalues of the top frame
     void growRegs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
