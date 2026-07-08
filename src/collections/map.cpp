@@ -23,10 +23,14 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
         return std::hash<void*>{}((void*)v.iptr);
     case Value::T_FUNCTION:
         return std::hash<int64_t>{}(v.ival);
+    case Value::T_BUILTIN:
+        return std::hash<int64_t>{}(v.ival);
     case Value::T_CLOSURE:
         return std::hash<void*>{}((void*)v.cptr);
     case Value::T_CLASS:
         return std::hash<void*>{}((void*)v.mptr);
+    case Value::T_RANGE:
+        return std::hash<void*>{}((void*)v.rptr);
     default:
         return 0;
     }
@@ -51,8 +55,14 @@ bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
             return a.iptr == b.iptr;
         case Value::T_FUNCTION:
             return a.ival == b.ival;
+        case Value::T_BUILTIN:
+            return a.ival == b.ival;
         case Value::T_CLOSURE:
             return a.cptr == b.cptr;
+        case Value::T_CLASS:
+            return a.mptr == b.mptr;
+        case Value::T_RANGE:
+            return a.rptr == b.rptr;
         default:
             return false;
         }

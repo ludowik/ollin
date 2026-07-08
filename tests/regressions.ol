@@ -191,4 +191,24 @@ assert(math.sqrt(-1) <> math.sqrt(-1))          ## nan ≠ nan → reste un nan 
 var big_f = 100000000000000000000.5
 assert(big_f > 1000000000000000000)             ## ~1e20 → reste flottant (pas de cast UB)
 
+## ── map : classes / ranges / builtins utilisables comme clés ────────────────
+## (avant : ValueEqual retournait false par défaut pour T_CLASS/T_BUILTIN/T_RANGE
+## → la clé insérée n'était jamais retrouvée)
+class MK_A end
+class MK_B end
+global mk = {}
+mk[MK_A] = 1
+mk[MK_B] = 2
+assert(mk[MK_A] == 1)
+assert(mk[MK_B] == 2)          ## deux classes distinctes = deux clés distinctes
+var mk_r = [1; 5]
+mk[mk_r] = 7
+assert(mk[mk_r] == 7)          ## range comme clé
+mk[print] = 9
+assert(mk[print] == 9)         ## builtin comme clé
+## int et float-entier restent la MÊME clé (1 == 1.0) — cohérence hash/equal
+global mk2 = {}
+mk2[1] = 10
+assert(mk2[1.0] == 10)
+
 print("regressions ok")
