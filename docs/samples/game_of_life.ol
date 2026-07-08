@@ -1,5 +1,6 @@
 ## Jeu de la vie de Conway — automate cellulaire.
 ## Règles B3/S23 : une cellule naît avec 3 voisines, survit avec 2 ou 3.
+## Au démarrage : un générateur (canon à planeurs de Gosper) + des motifs aléatoires.
 ## Grille torique (les bords se rejoignent). Espace = pause, R = réinitialiser.
 ## Souris/doigt (aussi sur iPhone, sans clavier) : un appui met en pause ET allume
 ## la cellule touchée ; GLISSER dessine des cellules en continu ; un DOUBLE tap
@@ -42,46 +43,87 @@ func set(g, x, y)
     end
 end
 
-## motifs classiques, posés à partir d'un coin (ox, oy)
-func glider(g, ox, oy)
-    set(g, ox + 1, oy + 0)
-    set(g, ox + 2, oy + 1)
-    set(g, ox + 0, oy + 2)
-    set(g, ox + 1, oy + 2)
-    set(g, ox + 2, oy + 2)
+## Pose la cellule d'offset (dx, dy) autour de (ox, oy) après rotation selon
+## l'orientation o ∈ 1..4 (droite/bas/gauche/haut = 0/90/180/270°). Permet de
+## poser un même motif dans les 4 orientations sans dupliquer les coordonnées.
+func put(g, ox, oy, dx, dy, o)
+    var rx = dx
+    var ry = dy
+    if o == 2 then          ## 90°  (rotation d'un quart de tour)
+        rx = -dy
+        ry = dx
+    elseif o == 3 then      ## 180°
+        rx = -dx
+        ry = -dy
+    elseif o == 4 then      ## 270°
+        rx = dy
+        ry = -dx
+    end
+    set(g, ox + rx, oy + ry)
 end
 
-func blinker(g, ox, oy)
-    set(g, ox + 0, oy)
-    set(g, ox + 1, oy)
-    set(g, ox + 2, oy)
+## motifs classiques, posés autour de (ox, oy) avec l'orientation o (1..4)
+func glider(g, ox, oy, o)
+    put(g, ox, oy, 1, 0, o)
+    put(g, ox, oy, 2, 1, o)
+    put(g, ox, oy, 0, 2, o)
+    put(g, ox, oy, 1, 2, o)
+    put(g, ox, oy, 2, 2, o)
 end
 
-func block(g, ox, oy)
-    set(g, ox, oy)
-    set(g, ox + 1, oy)
-    set(g, ox, oy + 1)
-    set(g, ox + 1, oy + 1)
+func blinker(g, ox, oy, o)
+    put(g, ox, oy, 0, 0, o)
+    put(g, ox, oy, 1, 0, o)
+    put(g, ox, oy, 2, 0, o)
 end
 
-## Démarrage : entre 5 et 10 motifs de base (planeur / oscillateur / nature morte)
-## posés ALÉATOIREMENT sur la grille (type et position tirés au hasard). Le RNG de
-## `math` est auto-initialisé → une configuration différente à chaque lancement.
-## set() ignore le hors-champ, donc une position près du bord est sans danger.
+func block(g, ox, oy, o)
+    put(g, ox, oy, 0, 0, o)
+    put(g, ox, oy, 1, 0, o)
+    put(g, ox, oy, 0, 1, o)
+    put(g, ox, oy, 1, 1, o)
+end
+
+## Canon à planeurs de Gosper — LE générateur : émet un planeur toutes les 30
+## générations. 36 cellules dans une boîte 36×9. Coordonnées relatives (x, y)
+## stockées à plat [x0,y0, x1,y1, …] et posées via set() (hors-champ ignoré).
+func gun(g, ox, oy)
+    var pts = [
+        0, 4,  0, 5,  1, 4,  1, 5,
+        10, 4, 10, 5, 10, 6, 11, 3, 11, 7, 12, 2, 12, 8, 13, 2, 13, 8, 14, 5,
+        15, 3, 15, 7, 16, 4, 16, 5, 16, 6, 17, 5,
+        20, 2, 20, 3, 20, 4, 21, 2, 21, 3, 21, 4, 22, 1, 22, 5,
+        24, 0, 24, 1, 24, 5, 24, 6,
+        34, 2, 34, 3, 35, 2, 35, 3
+    ]
+    var i = 1
+    while i <= len(pts) do
+        set(g, ox + pts[i], oy + pts[i + 1])
+        i += 2
+    end
+end
+
+## Démarrage : UN générateur (canon à planeurs) posé en haut à gauche, plus entre
+## 5 et 10 motifs de base (planeur / oscillateur / nature morte) posés ALÉATOIREMENT
+## (type, position ET orientation — haut/bas/gauche/droite — tirés au hasard). Le RNG
+## de `math` est auto-initialisé → une configuration différente à chaque lancement.
 func reset()
     cells = empty_grid()
     back = empty_grid()                       ## alloué une fois ; réutilisé et échangé ensuite
-    var count = math.rand_int(5, 10)          ## entre 5 et 10 objets de base
+    gun(cells, 2, 2)                          ## le générateur (émet des planeurs)
+    var count = math.rand_int(5, 10)          ## entre 5 et 10 motifs de base
     for i = 1, count do
-        var ox = math.rand_int(0, COLS - 3)
-        var oy = math.rand_int(0, ROWS - 3)
+        ## marge de 2 des deux côtés : la rotation peut décaler le motif de ±2
+        var ox = math.rand_int(2, COLS - 3)
+        var oy = math.rand_int(2, ROWS - 3)
         var kind = math.rand_int(1, 3)
+        var o = math.rand_int(1, 4)           ## orientation : haut/bas/gauche/droite
         if kind == 1 then
-            glider(cells, ox, oy)             ## planeur
+            glider(cells, ox, oy, o)          ## planeur
         elseif kind == 2 then
-            blinker(cells, ox, oy)            ## oscillateur
+            blinker(cells, ox, oy, o)         ## oscillateur
         else
-            block(cells, ox, oy)             ## nature morte (stable)
+            block(cells, ox, oy, o)           ## nature morte (stable)
         end
     end
 end
