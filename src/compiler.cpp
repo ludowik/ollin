@@ -116,6 +116,79 @@ static Op tokenToOp(TokenType op) {
     }
 }
 
+// Opcode d'un opérateur binaire NON court-circuit (arith / comparaison / bitwise).
+// '&' et '|' (and/or) sont exclus : ils compilent en court-circuit (JUMP_IF_FALSE),
+// jamais via cet opcode. Partagé par visit(BinaryExpr) et compileInto → évite de
+// dupliquer le switch (et supprime les anciens cas '&'/'|' morts).
+static Op binaryArithOpcode(char op) {
+    switch (op) {
+    case '+':
+        return Op::ADD;
+    case '-':
+        return Op::SUB;
+    case '*':
+        return Op::MUL;
+    case '/':
+        return Op::DIV;
+    case 'q':
+        return Op::IDIV;
+    case 'p':
+        return Op::POW;
+    case '%':
+        return Op::MOD;
+    case '>':
+        return Op::GT;
+    case '<':
+        return Op::LT;
+    case 'G':
+        return Op::GE;
+    case 'L':
+        return Op::LE;
+    case 'N':
+        return Op::NEQ;
+    case '=':
+        return Op::EQ;
+    case 'o':
+        return Op::BOR;
+    case 'b':
+        return Op::BAND;
+    case 'x':
+        return Op::BXOR;
+    case 'l':
+        return Op::BLSHIFT;
+    case 'r':
+        return Op::BRSHIFT;
+    default:
+        throw std::runtime_error(std::string("unknown binary op: ") + op);
+    }
+}
+
+static Op unaryOpcode(char op) {
+    switch (op) {
+    case '-':
+        return Op::NEGATE;
+    case '!':
+        return Op::NOT;
+    case '~':
+        return Op::BNOT;
+    default:
+        throw std::runtime_error(std::string("unknown unary op: ") + op);
+    }
+}
+
+// Épilogue void implicite d'une fonction/méthode. Omis si le corps se termine déjà
+// par un RETURN/RETURN_V : la dernière instruction retourne inconditionnellement,
+// donc un RETURN de plus serait inatteignable (code mort). Ne concerne PAS le
+// `return` explicite sans valeur, qui doit toujours être émis.
+static void emitImplicitReturn(Chunk& chunk) {
+    if (!chunk.code.empty()) {
+        Op last = (Op)iOP(chunk.code.back());
+        if (last == Op::RETURN || last == Op::RETURN_V)
+            return;
+    }
+    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
+}
+
 // ── pre-scan locals in a block (for register pre-allocation) ─────────────────
 // collect_funcs=true inside function bodies (nested FuncDecls need a local register)
 // collect_funcs=false at top level (top-level funcs are accessed via func_table)
@@ -253,6 +326,32 @@ void Compiler::compileInto(const Expr& e, int dest) {
         chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.addConstant(Value((int64_t)(b->value ? 1 : 0)))));
     } else if (dynamic_cast<const NilExpr*>(&e)) {
         chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
+    } else if (auto* bin = dynamic_cast<const BinaryExpr*>(&e); bin && bin->op != '&' && bin->op != '|') {
+        // Binaire non court-circuit : émettre l'op FINALE directement dans dest, sans
+        // temporaire+MOVE. Sûr : une instruction 3-adresses lit rL/rR AVANT d'écrire
+        // dest (aucun aliasing possible même si dest est aussi un opérande, ex.
+        // a = a - b → SUB Ra,Ra,Rb). dest < reg_top_ chez tous les appelants, donc les
+        // temporaires d'opérandes (alloués à reg_top_+) ne recouvrent jamais dest.
+        int saved = reg_top_;
+        bin->left->accept(*this);
+        int rL = last_reg_;
+        if (reg_top_ <= rL) // protège rL d'un appel 0-arg (cf. visit(BinaryExpr))
+            reg_top_ = rL + 1;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
+        bin->right->accept(*this);
+        int rR = last_reg_;
+        chunk.emit(makeABC((uint8_t)binaryArithOpcode(bin->op), (uint8_t)dest, (uint8_t)rL, (uint8_t)rR));
+        reg_top_ = saved;
+        last_reg_ = dest;
+    } else if (auto* un = dynamic_cast<const UnaryExpr*>(&e)) {
+        // Unaire : op directement dans dest (même sûreté que ci-dessus, un seul opérande).
+        int saved = reg_top_;
+        un->operand->accept(*this);
+        int rIn = last_reg_;
+        chunk.emit(makeABC((uint8_t)unaryOpcode(un->op), (uint8_t)dest, (uint8_t)rIn, 0));
+        reg_top_ = saved;
+        last_reg_ = dest;
     } else {
         int saved = reg_top_;
         e.accept(*this);
@@ -725,7 +824,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0)); // implicit void return
+    emitImplicitReturn(chunk); // implicit void return (omis si le corps finit déjà par RETURN)
 
     // Update reg_count in FuncProto
     if (reg_count_ > 255)
@@ -830,7 +929,7 @@ void Compiler::visit(const FuncExpr& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
+    emitImplicitReturn(chunk);
     if (reg_count_ > 255)
         throw std::runtime_error("function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
@@ -993,70 +1092,7 @@ void Compiler::visit(const BinaryExpr& e) {
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
 
-    switch (e.op) {
-    case '+':
-        chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '-':
-        chunk.emit(makeABC((uint8_t)Op::SUB, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '*':
-        chunk.emit(makeABC((uint8_t)Op::MUL, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '/':
-        chunk.emit(makeABC((uint8_t)Op::DIV, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'q':
-        chunk.emit(makeABC((uint8_t)Op::IDIV, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'p':
-        chunk.emit(makeABC((uint8_t)Op::POW, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '%':
-        chunk.emit(makeABC((uint8_t)Op::MOD, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '>':
-        chunk.emit(makeABC((uint8_t)Op::GT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '<':
-        chunk.emit(makeABC((uint8_t)Op::LT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'G':
-        chunk.emit(makeABC((uint8_t)Op::GE, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'L':
-        chunk.emit(makeABC((uint8_t)Op::LE, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'N':
-        chunk.emit(makeABC((uint8_t)Op::NEQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '=':
-        chunk.emit(makeABC((uint8_t)Op::EQ, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '|':
-        chunk.emit(makeABC((uint8_t)Op::OR, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case '&':
-        chunk.emit(makeABC((uint8_t)Op::AND, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'o':
-        chunk.emit(makeABC((uint8_t)Op::BOR, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'b':
-        chunk.emit(makeABC((uint8_t)Op::BAND, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'x':
-        chunk.emit(makeABC((uint8_t)Op::BXOR, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'l':
-        chunk.emit(makeABC((uint8_t)Op::BLSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    case 'r':
-        chunk.emit(makeABC((uint8_t)Op::BRSHIFT, (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
-        break;
-    default:
-        throw std::runtime_error(std::string("unknown binary op: ") + e.op);
-    }
+    chunk.emit(makeABC((uint8_t)binaryArithOpcode(e.op), (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
 }
 
 // a < b < c  →  chaque opérande dans un registre dédié, comparaisons pairées, AND final
@@ -1116,19 +1152,7 @@ void Compiler::visit(const UnaryExpr& e) {
     e.operand->accept(*this);
     int rIn = last_reg_;
     last_reg_ = allocReg();
-    switch (e.op) {
-    case '-':
-        chunk.emit(makeABC((uint8_t)Op::NEGATE, (uint8_t)last_reg_, (uint8_t)rIn, 0));
-        break;
-    case '!':
-        chunk.emit(makeABC((uint8_t)Op::NOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
-        break;
-    case '~':
-        chunk.emit(makeABC((uint8_t)Op::BNOT, (uint8_t)last_reg_, (uint8_t)rIn, 0));
-        break;
-    default:
-        throw std::runtime_error(std::string("unknown unary op: ") + e.op);
-    }
+    chunk.emit(makeABC((uint8_t)unaryOpcode(e.op), (uint8_t)last_reg_, (uint8_t)rIn, 0));
 }
 
 void Compiler::visit(const CallExpr& e) {
@@ -1932,7 +1956,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
         stmt->accept(*this);
         reg_top_ = sv;
     }
-    chunk.emit(makeABC((uint8_t)Op::RETURN, 0, 0, 0));
+    emitImplicitReturn(chunk);
 
     if (reg_count_ > 255)
         throw std::runtime_error("function uses more than 255 registers");
