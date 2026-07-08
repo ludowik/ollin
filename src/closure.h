@@ -24,4 +24,9 @@ struct Closure {
             if (--u->refcount == 0)
                 delete u;
     }
+    // Possède des Upvalue* ref-comptés : non copiable (une copie partagerait les
+    // pointeurs sans retain → double-free au 2e destructeur). Toujours manipulé
+    // via Closure* (new / refcount), jamais par valeur.
+    Closure(const Closure&) = delete;
+    Closure& operator=(const Closure&) = delete;
 };
