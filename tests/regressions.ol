@@ -184,4 +184,11 @@ var ck_s1 = "dup-const"
 var ck_s2 = "dup-const"
 assert(ck_s1 == ck_s2)
 
+## ── value : numValue ne fait plus de cast UB sur non-fini / hors plage ──────
+## (math.* peut produire inf/nan ; un littéral flottant énorme dépasse int64)
+assert(math.exp(1000) > 1000000000000000000)   ## inf → reste flottant, comparable
+assert(math.sqrt(-1) <> math.sqrt(-1))          ## nan ≠ nan → reste un nan flottant
+var big_f = 100000000000000000000.5
+assert(big_f > 1000000000000000000)             ## ~1e20 → reste flottant (pas de cast UB)
+
 print("regressions ok")

@@ -420,8 +420,15 @@ inline bool isFalsy(const Value& v) {
 }
 
 inline Value numValue(double d) {
-    auto i = static_cast<int64_t>(d);
-    if (static_cast<double>(i) == d)
-        return Value(i);
+    // Repli en entier si d est un entier exact représentable en int64. Garde AVANT
+    // le cast : static_cast<int64_t>(d) est un COMPORTEMENT INDÉFINI si d est
+    // NaN/inf ou hors plage int64 (ex. math.exp(1000)→inf, 1e20). Les comparaisons
+    // excluent NaN (toujours fausses) et les infinis (hors bornes) ; 2^63 exclu car
+    // non représentable en int64 (INT64_MIN = -2^63 l'est, d'où le >= à gauche).
+    if (d >= -9223372036854775808.0 && d < 9223372036854775808.0) {
+        int64_t i = static_cast<int64_t>(d);
+        if (static_cast<double>(i) == d)
+            return Value(i);
+    }
     return Value(d);
 }
