@@ -1,7 +1,8 @@
 ## Jeu de la vie de Conway — automate cellulaire.
 ## Règles B3/S23 : une cellule naît avec 3 voisines, survit avec 2 ou 3.
 ## Grille torique (les bords se rejoignent). Espace = pause, R = réinitialiser.
-## Souris/doigt : un appui met en pause ET allume la cellule touchée (dessin libre).
+## Souris/doigt (aussi sur iPhone, sans clavier) : un appui met en pause ET allume
+## la cellule touchée (dessin libre) ; un DOUBLE tap relance la simulation.
 
 const CELL = 8           ## taille d'une cellule en pixels (petites cellules)
 const STEP = 0.08        ## secondes entre deux générations
@@ -17,6 +18,7 @@ global cells = []        ## grille courante
 global back  = []        ## grille de travail (génération suivante)
 global paused = false
 global acc = 0.0         ## accumulateur de temps pour cadencer les générations
+global last_tap = -1.0   ## instant du dernier appui (détection du double tap)
 
 func idx(x, y)
     return y * COLS + x + 1
@@ -120,10 +122,19 @@ func keyboard.keypressed(key)
     end
 end
 
-## Appui souris / doigt : met l'application en PAUSE et allume la cellule touchée.
-## (x, y) sont en pixels dans le repère de la zone de rendu → conversion en case.
-## set() ignore les coordonnées hors grille. Reprendre avec Espace.
+## Appui souris / doigt (utile sur iPhone, sans clavier) :
+##  - simple appui  → PAUSE + allume la cellule touchée (dessin libre) ;
+##  - DOUBLE tap (deux appuis < 0,3 s) → relance la simulation (reprise).
+## (x, y) en pixels dans le repère de la zone de rendu → conversion en case ;
+## set() ignore les coordonnées hors grille.
+const DOUBLE_TAP = 0.3                          ## fenêtre du double tap (secondes)
 func mouse.pressed(x, y)
+    if last_tap >= 0.0 and elapsedTime - last_tap < DOUBLE_TAP then
+        paused = false                          ## double tap → relance
+        last_tap = -1.0                          ## évite qu'un 3e appui compte comme double
+        return
+    end
+    last_tap = elapsedTime
     paused = true
     set(cells, x // CELL, y // CELL)
 end
