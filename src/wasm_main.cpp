@@ -1,6 +1,6 @@
 #include "compiler.h"
-#include "image_module.h"
 #include "lexer.h"
+#include "modules/image_module.h"
 #include "modules/modules.h"
 #include "parser.h"
 #include "source_registry.h"

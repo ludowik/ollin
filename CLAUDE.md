@@ -39,14 +39,21 @@ ollin/
 ├── src/
 │   ├── token.h        types Token (partagé Lexer → Parser)
 │   ├── ast.h          nœuds AST  (partagé Parser → Compiler)
-│   ├── chunk.h/.cpp   bytecode   (partagé Compiler → VM)
-│   ├── closure.h      Upvalue + Closure (inclus par chunk.h)
-│   ├── map.h/.cpp     Map + ValueHash/ValueEqual (inclus par chunk.h)
+│   ├── opcode.h       format d'instruction 32-bit (make*/i*) + enum Op
+│   ├── chunk.h/.cpp   bytecode (code, constantes dédupliquées, identifiants, funcs) — Compiler → VM
+│   ├── value.h        Value taguée 16 o (ref-count, pivot T_STRING) + numValue/isFalsy
+│   ├── string_table.h internement des chaînes (InternedStr, refcount)
+│   ├── closure.h      Upvalue + Closure (inclus en bas de value.h)
 │   ├── lexer.h/.cpp
 │   ├── parser.h/.cpp
 │   ├── compiler.h/.cpp
 │   ├── vm.h/.cpp
-│   └── main.cpp       pipeline : Lexer | Parser | Compiler | VM
+│   ├── source_registry.h/.cpp  registre de sources en mémoire (imports, playground)
+│   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
+│   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
+│   │                  raylib (+ graphics_stub), image (+ image_stub), + modules.h/.cpp, module_utils.h
+│   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
+│   └── wasm_main.cpp  point d'entrée WASM (playground)
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
 ├── examples/          démos exécutables (graphics_demo, lines_demo, sprite_demo)
 ├── tools/             outillage build (update_build_date.py)
