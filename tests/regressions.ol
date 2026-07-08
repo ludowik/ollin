@@ -169,4 +169,19 @@ class StrP
 end
 assert("x=" + StrP() == "x=SP")
 
+## ── chunk : dédup des constantes STRICTE par type ───────────────────────────
+## int 0 / float 0.0 / nil ont des bits nuls identiques mais des tags distincts →
+## ne doivent PAS être fusionnés dans le pool (sinon nil deviendrait 0, etc.).
+var ck_i = 0
+var ck_f = 0.0
+var ck_n = nil
+assert(not (ck_i == ck_n))   ## int 0 n'est pas nil
+assert(not (ck_f == ck_n))   ## float 0.0 n'est pas nil
+assert(ck_i == ck_f)         ## 0 == 0.0 numériquement (2 constantes distinctes, mais égales)
+assert(ck_n == nil)
+## chaînes identiques → dédup (même contenu interné, une seule entrée de pool)
+var ck_s1 = "dup-const"
+var ck_s2 = "dup-const"
+assert(ck_s1 == ck_s2)
+
 print("regressions ok")

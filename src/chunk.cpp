@@ -1,11 +1,22 @@
 #include "chunk.h"
+#include <cstring>
 #include <stdexcept>
 
 uint16_t Chunk::addConstant(Value v) {
+    // Déduplication stricte par type : (tag, 8 octets bruts de l'union). Une même
+    // valeur littérale ne réserve qu'une entrée du pool (comme addIdentifier).
+    uint64_t bits;
+    std::memcpy(&bits, &v.ival, sizeof(bits)); // motif binaire de l'union (défini)
+    ConstKey key{v.tag, bits};
+    auto it = const_map_.find(key);
+    if (it != const_map_.end())
+        return it->second; // v (doublon) est libéré ici → refcount de la chaîne équilibré
     if (constants.size() >= 0xFFFF)
         throw std::runtime_error("compile: too many constants (max 65535)");
+    uint16_t idx = static_cast<uint16_t>(constants.size());
     constants.push_back(std::move(v));
-    return static_cast<uint16_t>(constants.size() - 1);
+    const_map_[key] = idx;
+    return idx;
 }
 
 uint16_t Chunk::addIdentifier(const std::string& name) {
@@ -30,7 +41,7 @@ uint16_t Chunk::addFuncDefaults(std::vector<Value> defs) {
 uint8_t Chunk::addFunc(FuncProto fp) {
     if (funcs.size() >= 0xFF)
         throw std::runtime_error("compile: too many functions (max 255)");
-    funcs.push_back(fp);
+    funcs.push_back(std::move(fp));
     return static_cast<uint8_t>(funcs.size() - 1);
 }
 
