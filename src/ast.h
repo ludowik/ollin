@@ -255,7 +255,7 @@ struct ExprStmt : Stmt {
 
 struct AssignStmt : Stmt {
     std::string name;
-    char op;
+    char op = '\0'; // '\0' = affectation simple ; '+','-','*','/','%' = compound
     std::unique_ptr<Expr> value;
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -380,7 +380,7 @@ struct IndexAssignStmt : Stmt {
     // la map/array à indexer. Sinon on retombe sur le nom simple `obj`.
     std::unique_ptr<Expr> obj_expr;
     std::unique_ptr<Expr> key;
-    TokenType op; // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
+    TokenType op = TokenType::EQUALS; // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
     std::unique_ptr<Expr> value;
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -396,7 +396,6 @@ struct LValue {
 };
 
 struct MultiAssignStmt : Stmt {
-    int line = 0;
     std::vector<LValue> targets;
     std::vector<std::unique_ptr<Expr>> values;
     void accept(StmtVisitor& v) const override {
@@ -432,8 +431,8 @@ struct ArrayExpr : Expr {
 };
 
 struct RangeExpr : Expr {
-    bool incl_left;  // '[' = true, ']' = false (open-left)
-    bool incl_right; // ']' = true, '[' = false (open-right)
+    bool incl_left = true;  // '[' = true, ']' = false (open-left)
+    bool incl_right = true; // ']' = true, '[' = false (open-right)
     std::unique_ptr<Expr> start;
     std::unique_ptr<Expr> end;
     std::unique_ptr<Expr> step; // nullptr if absent
