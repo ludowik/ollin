@@ -2,7 +2,8 @@
 ## Règles B3/S23 : une cellule naît avec 3 voisines, survit avec 2 ou 3.
 ## Grille torique (les bords se rejoignent). Espace = pause, R = réinitialiser.
 ## Souris/doigt (aussi sur iPhone, sans clavier) : un appui met en pause ET allume
-## la cellule touchée (dessin libre) ; un DOUBLE tap relance la simulation.
+## la cellule touchée ; GLISSER dessine des cellules en continu ; un DOUBLE tap
+## relance la simulation.
 
 const CELL = 8           ## taille d'une cellule en pixels (petites cellules)
 const STEP = 0.08        ## secondes entre deux générations
@@ -19,6 +20,7 @@ global back  = []        ## grille de travail (génération suivante)
 global paused = false
 global acc = 0.0         ## accumulateur de temps pour cadencer les générations
 global last_tap = -1.0   ## instant du dernier appui (détection du double tap)
+global drawing = false   ## true entre l'appui et le relâché → glisser = dessin
 
 func idx(x, y)
     return y * COLS + x + 1
@@ -62,16 +64,26 @@ func block(g, ox, oy)
     set(g, ox + 1, oy + 1)
 end
 
-## motifs placés RELATIVEMENT à la taille de grille (set() ignore le hors-champ)
+## Démarrage : entre 5 et 10 motifs de base (planeur / oscillateur / nature morte)
+## posés ALÉATOIREMENT sur la grille (type et position tirés au hasard). Le RNG de
+## `math` est auto-initialisé → une configuration différente à chaque lancement.
+## set() ignore le hors-champ, donc une position près du bord est sans danger.
 func reset()
     cells = empty_grid()
     back = empty_grid()                       ## alloué une fois ; réutilisé et échangé ensuite
-    glider(cells, 1, 1)                        ## planeurs
-    glider(cells, COLS // 2, 2)
-    glider(cells, COLS - 6, 4)
-    blinker(cells, COLS // 4, ROWS // 2)       ## oscillateurs
-    blinker(cells, (COLS * 3) // 4, ROWS // 2)
-    block(cells, COLS - 4, ROWS - 4)           ## nature morte (stable)
+    var count = math.rand_int(5, 10)          ## entre 5 et 10 objets de base
+    for i = 1, count do
+        var ox = math.rand_int(0, COLS - 3)
+        var oy = math.rand_int(0, ROWS - 3)
+        var kind = math.rand_int(1, 3)
+        if kind == 1 then
+            glider(cells, ox, oy)             ## planeur
+        elseif kind == 2 then
+            blinker(cells, ox, oy)            ## oscillateur
+        else
+            block(cells, ox, oy)             ## nature morte (stable)
+        end
+    end
 end
 
 ## nombre de voisines vivantes (8-voisinage) avec bords toriques
@@ -123,7 +135,8 @@ func keyboard.keypressed(key)
 end
 
 ## Appui souris / doigt (utile sur iPhone, sans clavier) :
-##  - simple appui  → PAUSE + allume la cellule touchée (dessin libre) ;
+##  - simple appui  → PAUSE + allume la cellule touchée, et arme le dessin ;
+##  - GLISSER (bouton/doigt maintenu) → dessine des cellules en continu ;
 ##  - DOUBLE tap (deux appuis < 0,3 s) → relance la simulation (reprise).
 ## (x, y) en pixels dans le repère de la zone de rendu → conversion en case ;
 ## set() ignore les coordonnées hors grille.
@@ -131,12 +144,27 @@ const DOUBLE_TAP = 0.3                          ## fenêtre du double tap (secon
 func mouse.pressed(x, y)
     if last_tap >= 0.0 and elapsedTime - last_tap < DOUBLE_TAP then
         paused = false                          ## double tap → relance
+        drawing = false
         last_tap = -1.0                          ## évite qu'un 3e appui compte comme double
         return
     end
     last_tap = elapsedTime
     paused = true
+    drawing = true                              ## arme le tracé (glisser dessinera)
     set(cells, x // CELL, y // CELL)
+end
+
+## Glisser : tant que le bouton/doigt est maintenu, chaque déplacement allume la
+## cellule survolée (le drapeau `drawing` évite de dessiner au simple survol desktop).
+func mouse.moved(x, y)
+    if drawing then
+        set(cells, x // CELL, y // CELL)
+    end
+end
+
+## Relâché : fin du tracé.
+func mouse.released(x, y)
+    drawing = false
 end
 
 ## logique cadencée : une génération tous les STEP, indépendamment du FPS
