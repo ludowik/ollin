@@ -1,8 +1,9 @@
 ## Jeu de la vie de Conway — automate cellulaire.
 ## Règles B3/S23 : une cellule naît avec 3 voisines, survit avec 2 ou 3.
 ## Grille torique (les bords se rejoignent). Espace = pause, R = réinitialiser.
+## Souris/doigt : un appui met en pause ET allume la cellule touchée (dessin libre).
 
-const CELL = 16          ## taille d'une cellule en pixels
+const CELL = 8           ## taille d'une cellule en pixels (petites cellules)
 const STEP = 0.08        ## secondes entre deux générations
 
 ## La grille occupe TOUTE la zone de rendu (globales moteur W, H) → affichage
@@ -119,6 +120,14 @@ func keyboard.keypressed(key)
     end
 end
 
+## Appui souris / doigt : met l'application en PAUSE et allume la cellule touchée.
+## (x, y) sont en pixels dans le repère de la zone de rendu → conversion en case.
+## set() ignore les coordonnées hors grille. Reprendre avec Espace.
+func mouse.pressed(x, y)
+    paused = true
+    set(cells, x // CELL, y // CELL)
+end
+
 ## logique cadencée : une génération tous les STEP, indépendamment du FPS
 func update(dt)
     if paused then
@@ -131,14 +140,14 @@ func update(dt)
     end
 end
 
-const GAP = 3                                   ## espace entre cellules (px) — carrés bien détachés
+const GAP = 2                                   ## espace entre cellules (px) — carrés bien détachés
 const BLEU = Color(0.62, 0.80, 0.98)            ## bleu pastel clair
 
 func draw()
     graphics.noStroke()                          ## carrés pleins, sans bordure
-    ## Légère persistance VISUELLE : au lieu d'effacer net, on estompe la frame
-    ## précédente (fondu) → courte traînée. La simulation, elle, reste exacte.
-    graphics.clear(Color(0.05, 0.06, 0.10, 0.15))
+    ## Faible persistance VISUELLE : on estompe la frame précédente à chaque frame
+    ## (alpha élevé = fondu rapide → traînée très courte). La simulation reste exacte.
+    graphics.clear(Color(0.05, 0.06, 0.10, 0.45))
     graphics.fill(BLEU)
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
