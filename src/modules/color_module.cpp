@@ -20,6 +20,14 @@ static double colorComponent(const Value& v, const char* name) {
     return d;
 }
 
+// Classe Color pour les fabriques statiques (random/gray) : la classe globale
+// (réutilisée, pas de nouvelle alloc, __class__ == Color), avec repli sur une classe
+// fraîche si le global n'est pas encore matérialisé.
+static Value colorClass() {
+    Value c = VM::current()->getGlobal("Color");
+    return c.isClass() ? c : makeColorClass();
+}
+
 static Value colorField(const Value& self, const char* name) {
     Value v = self.mapGet(Value(std::string(name)));
     if (v.isNil())
@@ -64,9 +72,7 @@ static Value color_str(Value* args, int argc) {
 static Value color_random(Value* args, int argc) {
     (void)args;
     (void)argc;
-    Value cls = VM::current()->getGlobal("Color");
-    if (!cls.isClass())
-        cls = makeColorClass();
+    Value cls = colorClass();
     auto rnd = []() { return (double)rand() / ((double)RAND_MAX + 1.0); };
     Value inst = Value::makeMap();
     inst.mapSet(Value(std::string("__class__")), cls);
@@ -126,9 +132,7 @@ static Value color_gray(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("Color.gray: expected a value");
     double v = colorComponent(args[0], "gray");
-    Value cls = VM::current()->getGlobal("Color");
-    if (!cls.isClass())
-        cls = makeColorClass();
+    Value cls = colorClass();
     Value inst = Value::makeMap();
     inst.mapSet(Value(std::string("__class__")), cls);
     inst.mapSet(Value(std::string("r")), Value(v));
