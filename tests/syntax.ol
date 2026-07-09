@@ -20,6 +20,14 @@ var n_sep   = 1_000_000     ## underscores ignorés
 var n_fsep  = 1_000.12
 assert(n_fsep == 1000.12)   ## underscore ignoré dans float
 
+var n_sci   = 6.022e23      ## notation scientifique → flottant
+var n_scin  = 2e-3          ## exposant négatif
+assert(1e3 == 1000)         ## exposant → 1000 (entier après repli numValue)
+assert(1E3 == 1000)         ## 'E' majuscule accepté
+assert(1.5e2 == 150)
+assert(n_scin == 0.002)
+assert(n_sci > 1e23)
+
 var n_hex   = 0xFF          ## hexadécimal → entier
 var n_oct   = 0o10          ## octal → entier
 var n_bin   = 0b1010        ## binaire → entier

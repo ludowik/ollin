@@ -167,13 +167,17 @@ block_comment  = "###" { any } "###" ;
    et accolades : un saut de ligne n'y termine pas le statement.
    ';' est le séparateur d'intervalle dans rangeLit ; interdit partout ailleurs. *)
 
-NUMBER         = ( digit { [ "_" ] digit } [ "." [ digit { [ "_" ] digit } ] ] )
-               | ( "." digit { [ "_" ] digit } )
+NUMBER         = ( digit { [ "_" ] digit } [ "." [ digit { [ "_" ] digit } ] ] [ exponent ] )
+               | ( "." digit { [ "_" ] digit } [ exponent ] )
                | ( ( "0x" | "0X" ) hexDigit { [ "_" ] hexDigit } )
                | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } )
                | ( ( "0b" | "0B" ) binDigit { [ "_" ] binDigit } ) ;
+exponent       = ( "e" | "E" ) [ "+" | "-" ] digit { digit } ;
              (* '_' uniquement entre deux chiffres (1_000 == 1000) ; littéraux entiers → int64, sinon float *)
-             (* 0x.. hexa, 0o.. octal, 0b.. binaire : toujours entiers (0xFF==255, 0o10==8, 0b1010==10) *)
+             (* notation scientifique : un exposant (e/E) rend le littéral flottant (1e3 == 1000.0,
+                6.022e23, 2e-3 == 0.002) ; l'exposant n'admet pas de '_' et exige au moins un chiffre *)
+             (* 0x.. hexa, 0o.. octal, 0b.. binaire : toujours entiers (0xFF==255, 0o10==8, 0b1010==10) ;
+                pas d'exposant sur ces bases *)
              (* un littéral suivi immédiatement d'un caractère alphanumérique, '.' ou '_' est une erreur *)
 hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;

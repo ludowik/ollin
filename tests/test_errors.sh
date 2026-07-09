@@ -89,6 +89,11 @@ check_error "decimal alnum colle"        'print(42abc)'  "invalid number literal
 check_error "decimal underscore final"   'print(1_)'     "invalid number literal"
 check_error "decimal underscore double"  'print(1__0)'   "invalid number literal"
 check_error "decimal double point"       'print(1.2.3)'  "invalid number literal"
+check_error "exposant sans chiffre"      'print(1e)'     "invalid number literal"
+check_error "exposant signe sans chiffre" 'print(1e+)'   "invalid number literal"
+check_error "exposant underscore avant"  'print(1_e5)'   "invalid number literal"
+check_error "double exposant"            'print(1e5e6)'  "invalid number literal"
+check_error "exposant puis point"        'print(1e5.0)'  "invalid number literal"
 check_error "hex hors limites"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
 check_error "decimal hors limites"       'print(99999999999999999999999)' "out of range"
 
