@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 22:02</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 22:09</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 22:02</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 22:09</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1313,7 +1313,7 @@ math.noise_seed(<span class="num">42</span>)             <span class="cmt">## br
   </tbody>
 </table>
 
-<div class="callout tip">Indexation par <strong>caractère (codepoint UTF-8)</strong>, pas par octet : <code>len</code>, <code>string.char</code> et <code>string.substr</code> comptent les caractères. Ex. <code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code> (le <code>é</code> occupe 2 octets mais reste 1 caractère).</div>
+<div class="callout tip">Tout est <strong>UTF-8, par caractère (codepoint)</strong>, pas par octet. <code>len</code>/<code>string.char</code>/<code>string.substr</code> comptent les caractères (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>) ; <code>string.trim</code> rogne par codepoint ; <code>string.upper</code>/<code>lower</code> gèrent les lettres accentuées latines (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Au-delà du latin (grec, cyrillique…), la casse laisse le texte inchangé.</div>
 
 <pre><code><span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
 <span class="bi">print</span>(string.lower(<span class="str">"HELLO"</span>))         <span class="cmt">## hello</span>

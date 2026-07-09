@@ -312,5 +312,11 @@ assert(string.substr("café", 4, 1) == "é")
 assert(string.substr("héllo", 2, 2) == "él")
 assert(len("hello") == 5)                     ## ASCII inchangé
 assert(string.char("café", 9) == "")         ## hors limites → ""
+## upper/lower : ASCII + Latin-1 accentué ; trim par codepoint
+assert(string.upper("café") == "CAFÉ")
+assert(string.lower("ÉÀÙÇ") == "éàùç")
+assert(string.upper("straße") == "STRASSE")  ## ß → SS
+assert(string.trim("··café··", "·") == "café")  ## trim par codepoint (· = 2 octets)
+assert(string.rtrim("«café»", "»") == "«café")
 
 print("regressions ok")

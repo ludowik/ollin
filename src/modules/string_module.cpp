@@ -1,8 +1,8 @@
 #include "module_utils.h"
 #include "utf8.h"
-#include <cctype>
 #include <climits>
 #include <cmath>
+#include <unordered_set>
 
 // (int)d est un COMPORTEMENT INDÉFINI (et trappe sur WASM) si d est NaN/inf ou
 // hors plage int. On borne le double AVANT le cast ; les contrôles de bornes des
@@ -17,42 +17,104 @@ static int toIntSafe(double d) {
     return (int)d;
 }
 
+// Casse par codepoint : ASCII + Latin-1 Supplement (lettres latines accentuées).
+// Au-delà (Latin étendu, grec, cyrillique…) : inchangé — la casse Unicode complète
+// nécessiterait des tables de données disproportionnées pour ce langage.
+static void appendUpper(uint32_t cp, std::string& out) {
+    if (cp < 0x80)
+        out += (char)((cp >= 'a' && cp <= 'z') ? cp - 32 : cp);
+    else if (cp == 0xDF) // ß → SS
+        out += "SS";
+    else if (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7) // à..þ (sauf ÷) → À..Þ
+        utf8Encode(cp - 0x20, out);
+    else if (cp == 0xFF) // ÿ → Ÿ (U+0178)
+        utf8Encode(0x178, out);
+    else
+        utf8Encode(cp, out);
+}
+
+static void appendLower(uint32_t cp, std::string& out) {
+    if (cp < 0x80)
+        out += (char)((cp >= 'A' && cp <= 'Z') ? cp + 32 : cp);
+    else if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7) // À..Þ (sauf ×) → à..þ
+        utf8Encode(cp + 0x20, out);
+    else if (cp == 0x178) // Ÿ → ÿ
+        utf8Encode(0xFF, out);
+    else
+        utf8Encode(cp, out);
+}
+
 static Value str_upper(Value* args, int argc) {
-    std::string s = strArg(args, argc, 0, "string.upper");
-    for (char& c : s)
-        c = (char)std::toupper((unsigned char)c);
-    return Value(std::move(s));
+    const std::string& s = strArg(args, argc, 0, "string.upper");
+    std::string out;
+    for (size_t i = 0; i < s.size();) {
+        size_t nb;
+        appendUpper(utf8Decode(s, i, &nb), out);
+        i += nb;
+    }
+    return Value(std::move(out));
 }
 
 static Value str_lower(Value* args, int argc) {
-    std::string s = strArg(args, argc, 0, "string.lower");
-    for (char& c : s)
-        c = (char)std::tolower((unsigned char)c);
-    return Value(std::move(s));
+    const std::string& s = strArg(args, argc, 0, "string.lower");
+    std::string out;
+    for (size_t i = 0; i < s.size();) {
+        size_t nb;
+        appendLower(utf8Decode(s, i, &nb), out);
+        i += nb;
+    }
+    return Value(std::move(out));
+}
+
+// Rogne les codepoints présents dans `chars` (par codepoint, pas par octet) aux
+// extrémités choisies (left/right).
+static std::string trimCp(const std::string& s, const std::string& chars, bool left, bool right) {
+    std::unordered_set<uint32_t> set;
+    for (size_t i = 0; i < chars.size();) {
+        size_t nb;
+        set.insert(utf8Decode(chars, i, &nb));
+        i += nb;
+    }
+    size_t b = 0, e = s.size();
+    if (left) {
+        while (b < s.size()) {
+            size_t nb;
+            uint32_t cp = utf8Decode(s, b, &nb);
+            if (!set.count(cp))
+                break;
+            b += nb;
+        }
+    }
+    if (right) {
+        size_t j = b, keep = b;
+        while (j < s.size()) {
+            size_t nb;
+            uint32_t cp = utf8Decode(s, j, &nb);
+            j += nb;
+            if (!set.count(cp))
+                keep = j; // fin (exclusive) après le dernier codepoint conservé
+        }
+        e = keep;
+    }
+    return (b >= e) ? std::string("") : s.substr(b, e - b);
 }
 
 static Value str_trim(Value* args, int argc) {
     const std::string& s = strArg(args, argc, 0, "string.trim");
-    const std::string chars = (argc >= 2) ? strArg(args, argc, 1, "string.trim") : " ";
-    size_t b = s.find_first_not_of(chars);
-    if (b == std::string::npos)
-        return Value(std::string(""));
-    size_t e = s.find_last_not_of(chars);
-    return Value(s.substr(b, e - b + 1));
+    std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.trim")) : " ";
+    return Value(trimCp(s, chars, true, true));
 }
 
 static Value str_ltrim(Value* args, int argc) {
     const std::string& s = strArg(args, argc, 0, "string.ltrim");
-    const std::string chars = (argc >= 2) ? strArg(args, argc, 1, "string.ltrim") : " ";
-    size_t b = s.find_first_not_of(chars);
-    return Value(b == std::string::npos ? std::string("") : s.substr(b));
+    std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.ltrim")) : " ";
+    return Value(trimCp(s, chars, true, false));
 }
 
 static Value str_rtrim(Value* args, int argc) {
     const std::string& s = strArg(args, argc, 0, "string.rtrim");
-    const std::string chars = (argc >= 2) ? strArg(args, argc, 1, "string.rtrim") : " ";
-    size_t e = s.find_last_not_of(chars);
-    return Value(e == std::string::npos ? std::string("") : s.substr(0, e + 1));
+    std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.rtrim")) : " ";
+    return Value(trimCp(s, chars, false, true));
 }
 
 // string.char(s, i) : i-ème CARACTÈRE (codepoint UTF-8), 1-based ; renvoyé sous
