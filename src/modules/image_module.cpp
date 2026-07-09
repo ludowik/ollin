@@ -392,7 +392,9 @@ static Value img_get_pixel(Value* args, int argc) {
     int y = (int)numArg(args, 2, FN);
     pixelsOpen(h);
     Color c;
-    if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
+    if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height) {
+        c = BLANK; // hors image → transparent (borne x,y ; sinon accès OOB dans le chemin rapide)
+    } else if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
         const uint8_t* px = (const uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
         c = {px[0], px[1], px[2], px[3]};
     } else {
@@ -416,6 +418,8 @@ static Value img_set_pixel(Value* args, int argc) {
     int x = (int)numArg(args, 1, FN);
     int y = (int)numArg(args, 2, FN);
     pixelsOpen(h);
+    if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height)
+        return Value{}; // hors image → ignore (borne x,y ; sinon écriture OOB dans le chemin rapide)
     Color c = (argc >= 7) ? Color{
         (uint8_t)(numArg(args, 3, FN) * 255.0 + 0.5),
         (uint8_t)(numArg(args, 4, FN) * 255.0 + 0.5),
