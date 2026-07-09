@@ -277,4 +277,14 @@ end
 print(PrUAF(1), 42, PrUAF(2), PrUAF(3))
 print(pr_deep(30), PrUAF(4), pr_deep(20))
 
+## ── math : cohérence int (clamp/pow/logn repliés comme MATH1/min-max) + map/0 ──
+assert(typeof(math.clamp(5, 0, 10)) == "int")   ## avant : float
+assert(math.clamp(5, 0, 10) == 5)
+assert(typeof(math.pow(2, 3)) == "int" and math.pow(2, 3) == 8)
+assert(typeof(math.pow(2, 0.5)) == "float")     ## non entier reste float
+assert(typeof(math.logn(8, 2)) == "int" and math.logn(8, 2) == 3)
+assert(math.map(5, 2, 2, 7, 99) == 7)           ## plage d'entrée nulle → out_lo (pas d'inf/nan)
+assert(not math.is_inf(math.map(5, 2, 2, 0, 10)))
+assert(math.map(5, 0, 10, 0, 100) == 50)
+
 print("regressions ok")

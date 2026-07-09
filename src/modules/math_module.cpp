@@ -131,26 +131,28 @@ static Value math_map(Value* args, int argc) {
     double in_hi = numArg(args, argc, 2, "math.map");
     double out_lo = numArg(args, argc, 3, "math.map");
     double out_hi = numArg(args, argc, 4, "math.map");
-    return Value(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo));
+    if (in_hi == in_lo)
+        return numValue(out_lo); // plage d'entrée dégénérée → borne basse (évite inf/nan)
+    return numValue(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo));
 }
 
 static Value math_atan2(Value* args, int argc) {
     double y = numArg(args, argc, 0, "math.atan2");
     double x = numArg(args, argc, 1, "math.atan2");
-    return Value(std::atan2(y, x));
+    return numValue(std::atan2(y, x));
 }
 
 static Value math_pow(Value* args, int argc) {
     double x = numArg(args, argc, 0, "math.pow");
     double n = numArg(args, argc, 1, "math.pow");
-    return Value(std::pow(x, n));
+    return numValue(std::pow(x, n));
 }
 
 static Value math_clamp(Value* args, int argc) {
     double x = numArg(args, argc, 0, "math.clamp");
     double lo = numArg(args, argc, 1, "math.clamp");
     double hi = numArg(args, argc, 2, "math.clamp");
-    return Value(x < lo ? lo : x > hi ? hi : x);
+    return numValue(x < lo ? lo : x > hi ? hi : x);
 }
 
 static Value math_seed(Value* args, int argc) {
@@ -162,7 +164,7 @@ static Value math_seed(Value* args, int argc) {
 static Value math_logn(Value* args, int argc) {
     double x = numArg(args, argc, 0, "math.logn");
     double n = numArg(args, argc, 1, "math.logn");
-    return Value(std::log(x) / std::log(n));
+    return numValue(std::log(x) / std::log(n));
 }
 
 static Value math_min(Value* args, int argc) {
