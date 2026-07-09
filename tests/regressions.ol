@@ -210,6 +210,13 @@ assert(mk[print] == 9)         ## builtin comme clé
 global mk2 = {}
 mk2[1] = 10
 assert(mk2[1.0] == 10)
+## clé float ENTIÈRE hors plage int64 (avant : ValueHash faisait un cast int64 UB —
+## trap sur WASM). doit fonctionner comme n'importe quelle clé.
+var mk_huge = math.pow(2.0, 100)     ## 2^100, float entier >> 2^63
+mk2[mk_huge] = 42
+assert(mk2[mk_huge] == 42)
+mk2[-mk_huge] = 43
+assert(mk2[-mk_huge] == 43)
 
 ## ── range : bornes non finies rejetées + itération (chemin itérateur dévirtualisé) ──
 ## (avant : MAKE_RANGE et FOR_PREP acceptaient inf/NaN → itération infinie / gel)

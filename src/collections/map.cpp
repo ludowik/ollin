@@ -8,9 +8,14 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
         return std::hash<int64_t>{}(v.asInt());
     case Value::T_FLOAT: {
         double d = v.asFloat();
-        auto i = static_cast<int64_t>(d);
-        if (static_cast<double>(i) == d)
-            return std::hash<int64_t>{}(i);
+        // Un float à valeur entière doit hacher comme l'INTEGER égal (cohérence avec
+        // ValueEqual). doubleFitsInt64 garde le cast : sans lui, une clé float hors
+        // plage int64 (m[1e300]) ferait un cast UB — trap sur WASM.
+        if (doubleFitsInt64(d)) {
+            int64_t i = static_cast<int64_t>(d);
+            if (static_cast<double>(i) == d)
+                return std::hash<int64_t>{}(i);
+        }
         return std::hash<double>{}(d);
     }
     case Value::T_STRING:

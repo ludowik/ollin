@@ -1,10 +1,21 @@
 #pragma once
 #include "string_table.h"
 #include <cstdint>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
+
+// static_cast<int64_t>(d) n'est DÉFINI que si la partie entière de d tient dans
+// int64 (sinon UB, et trap sur WASM). Piège : (double)INT64_MAX arrondit à 2^63,
+// qui n'est PAS un int64 valide → borne haute STRICTE. INT64_MIN = -2^63 est exact,
+// et -lo == 2^63. Source de vérité unique : numValue, ValueHash (clés float) et
+// RangeIterator s'appuient tous dessus (évite le littéral 2^63 dupliqué).
+inline bool doubleFitsInt64(double d) {
+    constexpr double lo = static_cast<double>(std::numeric_limits<int64_t>::min()); // -2^63 (exact)
+    return d >= lo && d < -lo;                                                      // -lo == 2^63, exclu
+}
 
 // Tagged union Value — 16 octets : tag(1) + _pad(3) + str_hash(4) + union(8).
 //
@@ -420,12 +431,9 @@ inline bool isFalsy(const Value& v) {
 }
 
 inline Value numValue(double d) {
-    // Repli en entier si d est un entier exact représentable en int64. Garde AVANT
-    // le cast : static_cast<int64_t>(d) est un COMPORTEMENT INDÉFINI si d est
-    // NaN/inf ou hors plage int64 (ex. math.exp(1000)→inf, 1e20). Les comparaisons
-    // excluent NaN (toujours fausses) et les infinis (hors bornes) ; 2^63 exclu car
-    // non représentable en int64 (INT64_MIN = -2^63 l'est, d'où le >= à gauche).
-    if (d >= -9223372036854775808.0 && d < 9223372036854775808.0) {
+    // Repli en entier si d est un entier exact représentable en int64. doubleFitsInt64
+    // garde le cast (UB sur NaN/inf/hors plage) ; le round-trip vérifie l'exactitude.
+    if (doubleFitsInt64(d)) {
         int64_t i = static_cast<int64_t>(d);
         if (static_cast<double>(i) == d)
             return Value(i);
