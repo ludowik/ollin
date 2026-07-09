@@ -51,7 +51,7 @@ ollin/
 │   ├── source_registry.h/.cpp  registre de sources en mémoire (imports, playground)
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
-│   │                  raylib (+ graphics_stub), image (+ image_stub), + modules.h/.cpp, module_utils.h
+│   │                  graphics (graphics_module + graphics_stub), image (+ image_stub), + modules.h/.cpp, module_utils.h
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
@@ -292,8 +292,8 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 **Implémentation** :
 - `declared_globals_` les contient (pré-ajoutés dans `Compiler::compile()`) → le compilateur accepte ces noms sans `global`.
 - `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, et `W`/`H` aux dimensions de `window` (lues via `makeBuiltinModule("window")`) **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
-- `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `raylib_module.cpp` avant chaque frame.
-- `s_elapsed_time` (statique dans `raylib_module.cpp`) est remis à 0 à chaque `gfx_run()`.
+- `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `graphics_module.cpp` avant chaque frame.
+- `s_elapsed_time` (statique dans `graphics_module.cpp`) est remis à 0 à chaque `gfx_run()`.
 
 **Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
 

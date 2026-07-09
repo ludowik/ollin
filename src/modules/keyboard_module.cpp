@@ -13,7 +13,7 @@
 //   "backspace", "tab", "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", etc.
 //
 // La détection a lieu dans keyboardPoll(), appelé une fois par frame par la
-// boucle de rendu (raylib_module.cpp) — le clavier ne fonctionne donc que
+// boucle de rendu (graphics_module.cpp) — le clavier ne fonctionne donc que
 // pendant un graphics.run(...) (ou via la fonction draw auto-appelée).
 
 // Nom lisible d'une touche raylib ; "" si non gérée (ignorée).

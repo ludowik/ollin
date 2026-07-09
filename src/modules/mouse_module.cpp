@@ -13,7 +13,7 @@
 //   mouse.moved    = func(x, y) ... end   → déplacement du pointeur
 //
 // La détection a lieu dans mousePoll(), appelé une fois par frame par la boucle
-// de rendu (raylib_module.cpp) — le pointeur ne fonctionne donc que pendant un
+// de rendu (graphics_module.cpp) — le pointeur ne fonctionne donc que pendant un
 // graphics.run(...) (ou via la fonction draw auto-appelée).
 
 void mousePoll() {
