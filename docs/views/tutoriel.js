@@ -92,6 +92,32 @@ export async function init(ctx) {
   root.querySelectorAll('section[id]').forEach(s => scrollObs.observe(s))
   disposers.push(() => scrollObs.disconnect())
 
+  // ── Mémoriser la position de lecture (restaurée au refresh) ───────────────
+  // Seule une entrée SANS ancre explicite (#/tutoriel nu, ou refresh) restaure
+  // cette position — un lien de section (#intro, #for…) garde la priorité.
+  const SCROLL_KEY = 'ollin-tutoriel-scrollY'
+  let scrollSaveQueued = false
+  const onScroll = () => {
+    if (scrollSaveQueued) return
+    scrollSaveQueued = true
+    requestAnimationFrame(() => {
+      scrollSaveQueued = false
+      try { localStorage.setItem(SCROLL_KEY, String(window.scrollY)) } catch (_) {}
+    })
+  }
+  addEventListener('scroll', onScroll, { passive: true })
+  disposers.push(() => removeEventListener('scroll', onScroll))
+
+  if (!ctx.anchor) {
+    let savedY = 0
+    try { savedY = parseInt(localStorage.getItem(SCROLL_KEY) || '0', 10) || 0 } catch (_) {}
+    if (savedY > 0) {
+      // Deux rAF : laisse le temps aux éditeurs CM6 (montés plus bas) de fixer
+      // la hauteur finale du contenu avant de calculer le scroll cible.
+      requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, savedY)))
+    }
+  }
+
   // ── Pull-to-refresh (mobile) ──────────────────────────────────────────────
   // Tirer la page vers le bas en étant tout en haut → rechargement cache-vidé.
   const content = root.querySelector('main')

@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 11:22</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 14:03</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 11:22</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 14:03</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -454,14 +454,14 @@ pre:hover .code-actions,
 <tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code>, <code class="num">0xFF</code>, <code class="num">0o17</code>, <code class="num">0b1010</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>). Bases : décimale, <code>0x</code> hexadécimale, <code>0o</code> octale, <code>0b</code> binaire.</td></tr>
 <tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Nombre à virgule flottante (double précision).</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>Chaîne UTF-8 immuable.</td></tr>
-<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident).</td></tr>
+<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident). Ajout d'un item sans guillemets : <code>m.b = 2</code> (équivalent à <code>m["b"] = 2</code>).</td></tr>
 <tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1.</td></tr>
 </table>
 
-<h3>Règles de vérité (truthy/falsy)</h3>
-<p>Principe unique : <strong>le vide est faux</strong>. Une valeur est <em>falsy</em> si elle représente l'absence ou le vide (<code>nil</code>, <code>false</code>, zéro, chaîne/map/array vide) ; tout le reste est <em>truthy</em>.</p>
+<h3>Règles de vérité (vrai/faux)</h3>
+<p>Principe unique : <strong>le vide est faux</strong>. Une valeur est <em>fausse</em> si elle représente l'absence ou le vide (<code>nil</code>, <code>false</code>, zéro, chaîne/map/array vide) ; tout le reste est <em>vrai</em>.</p>
 <table>
-<tr><th>Valeur</th><th>Falsy si</th></tr>
+<tr><th>Valeur</th><th>Fausse si</th></tr>
 <tr><td>nil</td><td>toujours</td></tr>
 <tr><td>integer / bool</td><td>== 0</td></tr>
 <tr><td>float</td><td>== 0.0</td></tr>
@@ -470,38 +470,41 @@ pre:hover .code-actions,
 <tr><td>array</td><td>vide <code>[]</code></td></tr>
 </table>
 
-<pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)        <span class="cmt">## true est stocké comme 1</span>
-<span class="bi">assert</span>(<span class="num">0</span> == <span class="bool">false</span>)       <span class="cmt">## false comme 0</span>
-<span class="cmt">## == compare type ET valeur ; pour tester la vérité d'une string, utiliser not</span>
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="kw">not</span> <span class="str">"non vide"</span>)  <span class="cmt">## string non vide => truthy</span>
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)              <span class="cmt">## string vide => falsy</span></code></pre>
+<pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)   <span class="cmt">## true est stocké comme 1</span>
+<span class="bi">assert</span>(<span class="num">0</span> == <span class="bool">false</span>)  <span class="cmt">## false comme 0</span>
+<span class="bi">assert</span>(<span class="str">"non vide"</span>)  <span class="cmt">## chaîne non vide => vrai</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)      <span class="cmt">## chaîne vide => faux</span></code></pre>
 
 <h3>Arithmétique des types numériques</h3>
-<div class="callout">INT op INT → INT · INT / INT → FLOAT · INT op FLOAT → FLOAT</div>
+<div class="callout">Deux entiers combinés donnent un entier — sauf la division <code>/</code>, qui donne toujours un flottant. Dès qu'un flottant intervient dans le calcul, le résultat est un flottant.</div>
 
-<pre><code><span class="bi">assert</span>(<span class="num">7</span> / <span class="num">2</span> == <span class="num">3.5</span>) <span class="cmt">## division => toujours float</span>
-<span class="bi">assert</span>(<span class="num">7</span> % <span class="num">2</span> == <span class="num">1</span>) <span class="cmt">## modulo => int si les deux sont int</span></code></pre>
+<pre><code><span class="bi">assert</span>(<span class="num">7</span> / <span class="num">2</span> == <span class="num">3.5</span>)  <span class="cmt">## division => toujours float</span>
+<span class="bi">assert</span>(<span class="num">7</span> % <span class="num">2</span> == <span class="num">1</span>)    <span class="cmt">## modulo => int si les deux sont int</span></code></pre>
 </section>
 
 <!-- ── Variables ──────────────────────────────────────────────────────────── -->
 <section id="variables">
 <h2>Variables</h2>
-<p>Toute variable <strong>doit</strong> être déclarée avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation. <code><span class="kw">var</span></code> crée une variable <strong>locale</strong> à la fonction courante ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible dans tout le programme.</p>
+<p>Toute variable <strong>doit</strong> être déclarée avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation.</p>
+<p><code><span class="kw">var</span></code> crée une variable <strong>locale</strong> à la fonction courante ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible dans tout le programme.</p>
+
+<h3>Nommage</h3>
+<p>Un nom commence par une <strong>lettre</strong> ou un <strong>underscore</strong>, suivi de lettres, chiffres ou underscores (<code>_compteur</code>, <code>x1</code>, <code>score_final</code>). Sensible à la casse (<code>score</code> ≠ <code>Score</code>) ; les accents ne sont pas supportés. Les mots-clés du langage (<code><span class="kw">var</span></code>, <code><span class="kw">if</span></code>, <code><span class="kw">end</span></code>…) ne peuvent pas servir de nom.</p>
 
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
 <span class="kw">var</span> b = <span class="num">2.5</span>
 <span class="kw">var</span> s = <span class="str">"bonjour"</span>
-<span class="kw">var</span> undef <span class="cmt">## pas d'initialisation => nil</span>
+<span class="kw">var</span> undef  <span class="cmt">## pas d'initialisation => nil</span>
 <span class="bi">assert</span>(undef == <span class="nil">nil</span>)</code></pre>
 
 <h3>Déclaration multiple</h3>
 <pre><code><span class="kw">var</span> x, y = <span class="num">1</span>, <span class="num">2</span>
-<span class="kw">var</span> p, q, r = <span class="num">10</span>, <span class="num">20</span> <span class="cmt">## r => nil (pas assez de valeurs)</span></code></pre>
+<span class="kw">var</span> p, q, r = <span class="num">10</span>, <span class="num">20</span>  <span class="cmt">## r => nil (pas assez de valeurs)</span></code></pre>
 
 <h3>Affectation</h3>
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
-a = <span class="num">42</span> <span class="cmt">## simple</span>
-a += <span class="num">1</span> <span class="cmt">## compound : += -= *= /= %=</span>
+a = <span class="num">42</span>  <span class="cmt">## simple</span>
+a += <span class="num">1</span>  <span class="cmt">## compound : += -= *= /= %=</span>
 a *= <span class="num">2</span>
 <span class="bi">assert</span>(a == <span class="num">86</span>)</code></pre>
 
@@ -512,13 +515,13 @@ a *= <span class="num">2</span>
 <pre><code><span class="kw">global</span> compteur = <span class="num">0</span>
 
 <span class="kw">func</span> incr()
-    compteur += <span class="num">1</span> <span class="cmt">## modifie le global depuis une fonction</span>
+    compteur += <span class="num">1</span>  <span class="cmt">## modifie le global depuis une fonction</span>
 <span class="kw">end</span>
 
 incr()
 incr()
 <span class="bi">assert</span>(compteur == <span class="num">2</span>)
-<span class="bi">print</span>(compteur) <span class="cmt">## 2</span></code></pre>
+<span class="bi">print</span>(compteur)    <span class="cmt">## 2</span></code></pre>
 
 <div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible partout. Affecter un nom non déclaré reste une erreur de compilation.</div>
 
@@ -535,12 +538,12 @@ incr()
     <span class="kw">return</span> DEUX_PI * r * r
 <span class="kw">end</span>
 
-<span class="bi">print</span>(aire(<span class="num">1</span>)) <span class="cmt">## 6.28318…</span></code></pre>
+<span class="bi">print</span>(aire(<span class="num">1</span>))  <span class="cmt">## 6.28318…</span></code></pre>
 
 <div class="callout warn">Les erreurs suivantes sont détectées à la <strong>compilation</strong> :
-<pre style="margin-top:8px"><code><span class="kw">const</span> x <span class="cmt">## ERROR: must be initialized</span>
+<pre style="margin-top:8px"><code><span class="kw">const</span> x  <span class="cmt">## ERROR: must be initialized</span>
 <span class="kw">const</span> x = <span class="num">1</span>
-x = <span class="num">2</span> <span class="cmt">## ERROR: cannot assign to const 'x'</span></code></pre>
+x = <span class="num">2</span>    <span class="cmt">## ERROR: cannot assign to const 'x'</span></code></pre>
 </div>
 </section>
 
@@ -549,7 +552,7 @@ x = <span class="num">2</span> <span class="cmt">## ERROR: cannot assign to cons
 <h2>Commentaires</h2>
 <pre><code><span class="cmt">## commentaire de fin de ligne</span>
 
-<span class="kw">var</span> x = <span class="num">10</span> <span class="cmt">## inline</span>
+<span class="kw">var</span> x = <span class="num">10</span>  <span class="cmt">## inline</span>
 
 <span class="cmt">###
 commentaire
@@ -582,12 +585,12 @@ multi-lignes
 </table>
 
 <h3>Logiques</h3>
-<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="cmt">## 1</span>
-<span class="kw">var</span> b = <span class="bool">true</span> <span class="kw">and</span> <span class="bool">false</span> <span class="cmt">## 0</span>
-<span class="kw">var</span> c = <span class="kw">not</span> <span class="bool">true</span> <span class="cmt">## 0</span>
+<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span>            <span class="cmt">## 1</span>
+<span class="kw">var</span> b = <span class="bool">true</span> <span class="kw">and</span> <span class="bool">false</span>           <span class="cmt">## 0</span>
+<span class="kw">var</span> c = <span class="kw">not</span> <span class="bool">true</span>                 <span class="cmt">## 0</span>
 
 <span class="cmt">## précédence : not > and > or</span>
-<span class="bi">assert</span>(<span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="kw">and</span> <span class="bool">false</span>) <span class="cmt">## true or (false and false)</span></code></pre>
+<span class="bi">assert</span>(<span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="kw">and</span> <span class="bool">false</span>)  <span class="cmt">## true or (false and false)</span></code></pre>
 </section>
 
 <!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
@@ -610,7 +613,7 @@ multi-lignes
 <tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
 <tr><td>~</td><td>NOT (complément à 1)</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
 </table>
-<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>). <code>^</code> ne fait plus partie des opérateurs bits : c'est la puissance.</div>
+<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>). <code>^</code> n'est pas un opérateur bit-à-bit : c'est la puissance (voir <a href="#operators">Opérateurs</a>).</div>
 
 <h3>Précédence</h3>
 <p>De la plus basse à la plus haute :</p>
@@ -618,14 +621,14 @@ multi-lignes
 
 <h3>Exemples</h3>
 <pre><code><span class="kw">var</span> flags = <span class="num">0</span>
-flags = flags <span class="op">|</span> <span class="num">1</span> <span class="cmt">## activer bit 0</span>
-flags = flags <span class="op">|</span> <span class="num">4</span> <span class="cmt">## activer bit 2</span>
-<span class="bi">assert</span>(flags == <span class="num">5</span>) <span class="cmt">## 0101</span>
+flags = flags <span class="op">|</span> <span class="num">1</span>         <span class="cmt">## activer bit 0</span>
+flags = flags <span class="op">|</span> <span class="num">4</span>         <span class="cmt">## activer bit 2</span>
+<span class="bi">assert</span>(flags == <span class="num">5</span>)        <span class="cmt">## 0101</span>
 
-<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">1</span>) == <span class="num">1</span>) <span class="cmt">## tester bit 0</span>
-<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">2</span>) == <span class="num">0</span>) <span class="cmt">## bit 1 absent</span>
+<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">1</span>) == <span class="num">1</span>)  <span class="cmt">## tester bit 0</span>
+<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">2</span>) == <span class="num">0</span>)  <span class="cmt">## bit 1 absent</span>
 
-flags = flags <span class="op">~</span> <span class="num">1</span> <span class="cmt">## XOR : basculer bit 0 => 4</span>
+flags = flags <span class="op">~</span> <span class="num">1</span>         <span class="cmt">## XOR : basculer bit 0 => 4</span>
 <span class="bi">assert</span>(flags == <span class="num">4</span>)
 
 <span class="bi">assert</span>(<span class="num">1</span> <span class="op">&lt;&lt;</span> <span class="num">8</span> == <span class="num">256</span>)
@@ -641,8 +644,8 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
 <h2>Chaînes</h2>
 <pre><code><span class="kw">var</span> s = <span class="str">"bonjour"</span>
 <span class="bi">assert</span>(s == <span class="str">"bonjour"</span>)
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)        <span class="cmt">## chaîne vide est falsy</span>
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="kw">not</span> <span class="str">"texte"</span>) <span class="cmt">## non vide est truthy</span></code></pre>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## chaîne vide est fausse</span>
+<span class="bi">assert</span>(<span class="str">"texte"</span>)  <span class="cmt">## non vide est vrai</span></code></pre>
 
 <p>La concaténation se fait avec <code>+</code> :</p>
 <pre><code><span class="kw">var</span> greeting = <span class="str">"Hello, "</span> + <span class="str">"world"</span> + <span class="str">"!"</span>
@@ -693,7 +696,8 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
     grade = <span class="str">"F"</span>
 <span class="kw">end</span>
 
-<span class="bi">assert</span>(grade == <span class="str">"C"</span>)</code></pre>
+<span class="bi">assert</span>(grade == <span class="str">"C"</span>)
+<span class="bi">print</span>(grade)  <span class="cmt">## C</span></code></pre>
 </section>
 
 <!-- ── While ─────────────────────────────────────────────────────────────── -->
@@ -717,7 +721,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
 <!-- ── For ───────────────────────────────────────────────────────────────── -->
 <section id="for">
 <h2>For</h2>
-<p>Trois variantes pour les boucles numériques, plus l'itération sur les maps et les arrays.</p>
+<p>Deux variantes pour les boucles numériques : par intervalle (<code>for i in [a;b]</code>) ou par bornes explicites (<code>for i=a,b</code>). Pour l'itération sur les maps et les arrays, voir <a href="#map-iter">Itération sur une map</a> et <a href="#arrays">Arrays</a>.</p>
 
 <h3>Range <code>[a;b]</code></h3>
 <p>Notation d'intervalles mathématiques — bornes inclusives ou exclusives, step optionnel.</p>
@@ -725,7 +729,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">10</span>] <span class="kw">do</span>
     sum += i
 <span class="kw">end</span>
-<span class="bi">assert</span>(sum == <span class="num">55</span>) <span class="cmt">## 1+2+…+10 (inclusif des deux côtés)</span>
+<span class="bi">assert</span>(sum == <span class="num">55</span>)  <span class="cmt">## 1+2+…+10 (inclusif des deux côtés)</span>
 
 <span class="cmt">## droit exclusif : 1,2,...,9</span>
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">10</span>[ <span class="kw">do</span>
@@ -740,30 +744,30 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
 <span class="cmt">## first-class : stockable dans une variable</span>
 <span class="kw">var</span> r = [<span class="num">1</span>;<span class="num">5</span>]
 <span class="kw">for</span> i <span class="kw">in</span> r <span class="kw">do</span>
-    <span class="bi">print</span>(i) <span class="cmt">## 1 2 3 4 5</span>
+    <span class="bi">print</span>(i)       <span class="cmt">## 1 2 3 4 5</span>
 <span class="kw">end</span></code></pre>
 
 <h3>Numérique <code>i=start,end[,step]</code></h3>
 <p>Step optionnel — positif ou négatif.</p>
 <pre><code><span class="cmt">## step implicite = 1</span>
 <span class="kw">for</span> i=<span class="num">1</span>,<span class="num">5</span> <span class="kw">do</span>
-    <span class="bi">print</span>(i) <span class="cmt">## 1 2 3 4 5</span>
+    <span class="bi">print</span>(i)  <span class="cmt">## 1 2 3 4 5</span>
 <span class="kw">end</span>
 
 <span class="cmt">## step positif (pairs)</span>
 <span class="kw">for</span> i=<span class="num">0</span>,<span class="num">10</span>,<span class="num">2</span> <span class="kw">do</span>
-    <span class="bi">print</span>(i) <span class="cmt">## 0 2 4 6 8 10</span>
+    <span class="bi">print</span>(i)  <span class="cmt">## 0 2 4 6 8 10</span>
 <span class="kw">end</span>
 
 <span class="cmt">## step négatif (compte à rebours)</span>
 <span class="kw">for</span> i=<span class="num">5</span>,<span class="num">1</span>,-<span class="num">1</span> <span class="kw">do</span>
-    <span class="bi">print</span>(i) <span class="cmt">## 5 4 3 2 1</span>
+    <span class="bi">print</span>(i)  <span class="cmt">## 5 4 3 2 1</span>
 <span class="kw">end</span></code></pre>
 
 <h3>Break dans for</h3>
 <pre><code><span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">100</span>] <span class="kw">do</span>
     <span class="kw">if</span> i > <span class="num">3</span> <span class="kw">then</span> <span class="kw">break</span> <span class="kw">end</span>
-    <span class="bi">print</span>(i) <span class="cmt">## 1 2 3</span>
+    <span class="bi">print</span>(i)  <span class="cmt">## 1 2 3</span>
 <span class="kw">end</span></code></pre>
 </section>
 
@@ -833,16 +837,16 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
 <h3>Appel optionnel — <code>f?()</code></h3>
 <p>La syntaxe <code>f?(args)</code> est exactement le sucre de <code>if f then f(args) else nil</code> :</p>
 <ul>
-  <li><code>f</code> <strong>falsy</strong> (<code>nil</code>, <code>0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>) → <strong>aucun appel</strong>, résultat <code>nil</code>, et les <strong>arguments ne sont pas évalués</strong> (aucun effet de bord) ;</li>
+  <li><code>f</code> <strong>fausse</strong> (<code>nil</code>, <code>0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>) → <strong>aucun appel</strong>, résultat <code>nil</code>, et les <strong>arguments ne sont pas évalués</strong> (aucun effet de bord) ;</li>
   <li><code>f</code> <strong>appelable</strong> → <strong>appel normal</strong> ;</li>
-  <li><code>f</code> truthy mais non appelable (entier, chaîne…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
+  <li><code>f</code> vraie mais non appelable (entier, chaîne…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
 </ul>
 <p>Cas d'usage typique : callback facultatif (<code>nil</code> → ignoré sans rien exécuter). S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; méthode absente → <code>nil</code>) et <code>super.m?()</code>. Côté implémentation, c'est un simple <code>JUMP_IF_FALSE</code> suivi de l'appel standard — pas d'opcode dédié.</p>
 <pre><code><span class="kw">func</span> greet() <span class="kw">return</span> <span class="str">"hello"</span> <span class="kw">end</span>
-<span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)   <span class="cmt">## appelable => appel normal</span>
+<span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)  <span class="cmt">## appelable => appel normal</span>
 
 <span class="kw">var</span> cb = <span class="kw">nil</span>
-<span class="bi">assert</span>(cb?() == <span class="kw">nil</span>)          <span class="cmt">## nil => pas d'appel, pas d'erreur</span>
+<span class="bi">assert</span>(cb?() == <span class="kw">nil</span>)         <span class="cmt">## nil => pas d'appel, pas d'erreur</span>
 
 <span class="cmt">## callback facultatif + appel optionnel de méthode (self injecté)</span>
 <span class="kw">class</span> Box
@@ -850,9 +854,9 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
     <span class="kw">func</span> get() <span class="kw">return</span> self.v <span class="kw">end</span>
 <span class="kw">end</span>
 <span class="kw">var</span> b = Box(<span class="num">7</span>)
-<span class="bi">assert</span>(b.get?() == <span class="num">7</span>)         <span class="cmt">## self injecté</span>
-<span class="bi">assert</span>(b.missing?() == <span class="kw">nil</span>)     <span class="cmt">## méthode absente => nil</span></code></pre>
-<div class="callout warn">Une valeur <strong>truthy</strong> mais non appelable reste une erreur : <code>(42)?()</code> lève « call on non-function value » (42 est truthy → on tente l'appel). Seules les valeurs falsy sont ignorées. Le <code>?</code> n'agit que sur l'appel immédiatement à sa gauche.</div>
+<span class="bi">assert</span>(b.get?() == <span class="num">7</span>)        <span class="cmt">## self injecté</span>
+<span class="bi">assert</span>(b.missing?() == <span class="kw">nil</span>)  <span class="cmt">## méthode absente => nil</span></code></pre>
+<div class="callout warn">Une valeur <strong>vraie</strong> mais non appelable reste une erreur : <code>(42)?()</code> lève « call on non-function value » (42 est vraie → on tente l'appel). Seules les valeurs fausses sont ignorées. Le <code>?</code> n'agit que sur l'appel immédiatement à sa gauche.</div>
 </section>
 
 <!-- ── Varargs ───────────────────────────────────────────────────────────── -->
@@ -865,11 +869,11 @@ flags = flags <span class="op">~</span> <span class="num">1</span> <span class="
     <span class="bi">print</span>(...)
 <span class="kw">end</span>
 
-log(<span class="str">"INFO"</span>, <span class="str">"démarrage"</span>, <span class="str">"ok"</span>) <span class="cmt">## [INFO] démarrage ok</span></code></pre>
+log(<span class="str">"INFO"</span>, <span class="str">"démarrage"</span>, <span class="str">"ok"</span>)  <span class="cmt">## [INFO] démarrage ok</span></code></pre>
 
 <h3>Passer les varargs à une autre fonction</h3>
 <pre><code><span class="kw">func</span> wrapper(a, ...)
-    <span class="kw">return</span> a, ... <span class="cmt">## propage les varargs</span>
+    <span class="kw">return</span> a, ...  <span class="cmt">## propage les varargs</span>
 <span class="kw">end</span>
 
 <span class="kw">var</span> x, y, z = wrapper(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)
@@ -885,16 +889,16 @@ log(<span class="str">"INFO"</span>, <span class="str">"démarrage"</span>, <spa
     <span class="bi">printf</span>(<span class="str">"{}, {} !"</span>, greeting, name)
 <span class="kw">end</span>
 
-greet(<span class="str">"Alice"</span>) <span class="cmt">## Bonjour, Alice !</span>
-greet(<span class="str">"Bob"</span>, <span class="str">"Salut"</span>) <span class="cmt">## Salut, Bob !</span></code></pre>
+greet(<span class="str">"Alice"</span>)         <span class="cmt">## Bonjour, Alice !</span>
+greet(<span class="str">"Bob"</span>, <span class="str">"Salut"</span>)  <span class="cmt">## Salut, Bob !</span></code></pre>
 
 <pre><code><span class="kw">func</span> connect(host=<span class="str">"localhost"</span>, port=<span class="num">8080</span>, debug=<span class="bool">false</span>)
     <span class="bi">printf</span>(<span class="str">"{}:{} debug={}"</span>, host, port, debug)
 <span class="kw">end</span>
 
-connect() <span class="cmt">## localhost:8080 debug=0</span>
-connect(<span class="str">"prod.example.com"</span>) <span class="cmt">## prod.example.com:8080 debug=0</span>
-connect(<span class="str">"prod"</span>, <span class="num">443</span>) <span class="cmt">## prod:443 debug=0</span></code></pre>
+connect()                    <span class="cmt">## localhost:8080 debug=0</span>
+connect(<span class="str">"prod.example.com"</span>)  <span class="cmt">## prod.example.com:8080 debug=0</span>
+connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <span class="cmt">## prod:443 debug=0</span></code></pre>
 </section>
 
 <!-- ── Closures ───────────────────────────────────────────────────────────── -->
@@ -913,11 +917,11 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>) <span cla
 <span class="kw">end</span>
 
 <span class="kw">var</span> c1 = make_counter()
-<span class="kw">var</span> c2 = make_counter() <span class="cmt">## état indépendant</span>
+<span class="kw">var</span> c2 = make_counter()  <span class="cmt">## état indépendant</span>
 
 <span class="bi">assert</span>(c1() == <span class="num">1</span>)
 <span class="bi">assert</span>(c1() == <span class="num">2</span>)
-<span class="bi">assert</span>(c2() == <span class="num">1</span>) <span class="cmt">## c2 repart de 0</span></code></pre>
+<span class="bi">assert</span>(c2() == <span class="num">1</span>)        <span class="cmt">## c2 repart de 0</span></code></pre>
 
 <h3>Fabrique de fonctions</h3>
 <pre><code><span class="kw">func</span> make_adder(x)
@@ -936,13 +940,13 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>) <span cla
 <h3>Fonctions imbriquées</h3>
 <p>Une fonction déclarée à l'intérieur d'une autre reste locale — elle n'est pas ajoutée à l'environnement global.</p>
 <pre><code><span class="kw">func</span> process(data)
-    <span class="kw">func</span> helper(x) <span class="cmt">## visible uniquement dans process</span>
+    <span class="kw">func</span> helper(x)        <span class="cmt">## visible uniquement dans process</span>
         <span class="kw">return</span> x * <span class="num">2</span>
     <span class="kw">end</span>
     <span class="kw">return</span> helper(data) + helper(data + <span class="num">1</span>)
 <span class="kw">end</span>
 
-<span class="bi">assert</span>(process(<span class="num">3</span>) == <span class="num">14</span>) <span class="cmt">## 3*2 + 4*2</span></code></pre>
+<span class="bi">assert</span>(process(<span class="num">3</span>) == <span class="num">14</span>)  <span class="cmt">## 3*2 + 4*2</span></code></pre>
 
 <h3>État partagé entre fonctions</h3>
 <pre><code><span class="kw">func</span> make_shared()
@@ -957,7 +961,7 @@ inc()
 inc()
 inc()
 <span class="bi">assert</span>(get() == <span class="num">3</span>)
-<span class="bi">print</span>(get()) <span class="cmt">## 3</span></code></pre>
+<span class="bi">print</span>(get())  <span class="cmt">## 3</span></code></pre>
 </section>
 
 <!-- ── Maps ──────────────────────────────────────────────────────────────── -->
@@ -979,14 +983,14 @@ inc()
 
 <h3>Clés littérales et clés calculées</h3>
 <p>Une clé écrite en <strong>identifiant</strong>, en <strong>chaîne</strong>, ou entre crochets autour d'une chaîne est la <em>même clé littérale</em> :</p>
-<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}        <span class="cmt">## clé = la string "ref"</span>
-<span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}      <span class="cmt">## identique</span>
-<span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}    <span class="cmt">## identique</span></code></pre>
+<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}      <span class="cmt">## clé = la string "ref"</span>
+<span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}    <span class="cmt">## identique</span>
+<span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}  <span class="cmt">## identique</span></code></pre>
 <p>Entre crochets, une <strong>expression</strong> est évaluée à l'exécution et sa valeur devient la clé :</p>
 <pre><code><span class="kw">var</span> ref = <span class="str">"couleur"</span>
-<span class="kw">var</span> m = {[ref]: <span class="str">"rouge"</span>}   <span class="cmt">## clé = valeur de ref => "couleur"</span>
+<span class="kw">var</span> m = {[ref]: <span class="str">"rouge"</span>}     <span class="cmt">## clé = valeur de ref => "couleur"</span>
 <span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>)
-<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)   <span class="cmt">## "ref" littéral n'est PAS une clé</span>
+<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## "ref" littéral n'est PAS une clé</span>
 
 <span class="cmt">## la clé calculée peut être de tout type</span>
 <span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"deux"</span>}
@@ -994,30 +998,30 @@ inc()
 <p>La même règle vaut pour <strong>l'accès</strong> : entre crochets, un littéral string désigne la clé telle quelle, une variable désigne sa valeur. Lecture, écriture et affectation composée sont identiques :</p>
 <pre><code><span class="kw">var</span> ref = <span class="str">"couleur"</span>
 <span class="kw">var</span> m = {}
-m[ref]     = <span class="str">"rouge"</span>   <span class="cmt">## écrit le slot "couleur" (valeur de ref)</span>
-m[<span class="str">"taille"</span>] = <span class="num">10</span>        <span class="cmt">## écrit le slot "taille" (littéral)</span>
-<span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>) <span class="cmt">## relu via littéral</span>
-<span class="bi">assert</span>(m.couleur     == <span class="str">"rouge"</span>) <span class="cmt">## ou via point</span>
+m[ref]     = <span class="str">"rouge"</span>              <span class="cmt">## écrit le slot "couleur" (valeur de ref)</span>
+m[<span class="str">"taille"</span>] = <span class="num">10</span>                  <span class="cmt">## écrit le slot "taille" (littéral)</span>
+<span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>)   <span class="cmt">## relu via littéral</span>
+<span class="bi">assert</span>(m.couleur     == <span class="str">"rouge"</span>)  <span class="cmt">## ou via point</span>
 m[<span class="str">"taille"</span>] += <span class="num">5</span>
 <span class="bi">assert</span>(m[<span class="str">"taille"</span>] == <span class="num">15</span>)</code></pre>
 
 <h3>Lecture</h3>
 <div class="two-col">
 <div><div class="label">Crochets</div>
-<pre><code>point[<span class="str">"x"</span>] <span class="cmt">## 10</span>
-point[<span class="str">"z"</span>] <span class="cmt">## nil</span></code></pre></div>
+<pre><code>point[<span class="str">"x"</span>]  <span class="cmt">## 10</span>
+point[<span class="str">"z"</span>]  <span class="cmt">## nil</span></code></pre></div>
 <div><div class="label">Point (équivalent)</div>
-<pre><code>point.x <span class="cmt">## 10</span>
-point.z <span class="cmt">## nil</span></code></pre></div>
+<pre><code>point.x  <span class="cmt">## 10</span>
+point.z  <span class="cmt">## nil</span></code></pre></div>
 </div>
 
 <h3>Écriture</h3>
 <pre><code><span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
-point[<span class="str">"z"</span>] = <span class="num">0</span> <span class="cmt">## nouvelle clé</span>
-point.z = <span class="num">5</span> <span class="cmt">## équivalent</span>
+point[<span class="str">"z"</span>] = <span class="num">0</span>   <span class="cmt">## nouvelle clé</span>
+point.z = <span class="num">5</span>      <span class="cmt">## équivalent</span>
 
-point[<span class="str">"x"</span>] += <span class="num">1</span> <span class="cmt">## compound via crochet</span>
-point.y *= <span class="num">2</span> <span class="cmt">## compound via point</span>
+point[<span class="str">"x"</span>] += <span class="num">1</span>  <span class="cmt">## compound via crochet</span>
+point.y *= <span class="num">2</span>     <span class="cmt">## compound via point</span>
 
 <span class="bi">assert</span>(point.x == <span class="num">11</span>)
 <span class="bi">assert</span>(point.y == <span class="num">40</span>)</code></pre>
@@ -1045,9 +1049,9 @@ m[<span class="num">1</span>] = <span class="str">"one"</span>
 <h3>Sémantique de copie</h3>
 <div class="callout warn">Les maps sont <strong>partagées par référence</strong> (comptage de référence). Affecter une map à une autre variable ne la clone pas.</div>
 <pre><code><span class="kw">var</span> a = {x: <span class="num">1</span>}
-<span class="kw">var</span> b = a <span class="cmt">## b pointe vers la même map</span>
+<span class="kw">var</span> b = a          <span class="cmt">## b pointe vers la même map</span>
 b.x = <span class="num">99</span>
-<span class="bi">assert</span>(a.x == <span class="num">99</span>) <span class="cmt">## a est modifié aussi</span></code></pre>
+<span class="bi">assert</span>(a.x == <span class="num">99</span>)  <span class="cmt">## a est modifié aussi</span></code></pre>
 <div class="callout">Conséquence : <code>==</code> compare les maps par <strong>référence</strong>, pas par contenu — <code>{} == {}</code> vaut <code>0</code>. Pour une égalité par valeur, voir <a href="#classes">Égalité et comparaison</a>.</div>
 </section>
 
@@ -1096,17 +1100,17 @@ b.x = <span class="num">99</span>
 
 <span class="kw">var</span> t = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]
 
-<span class="kw">var</span> calc = [<span class="num">1</span>+<span class="num">1</span>, <span class="num">2</span>*<span class="num">3</span>, <span class="num">10</span>-<span class="num">1</span>] <span class="cmt">## expressions autorisées</span></code></pre>
+<span class="kw">var</span> calc = [<span class="num">1</span>+<span class="num">1</span>, <span class="num">2</span>*<span class="num">3</span>, <span class="num">10</span>-<span class="num">1</span>]  <span class="cmt">## expressions autorisées</span></code></pre>
 
 <h3>Lecture / Écriture</h3>
-<pre><code><span class="bi">print</span>(t[<span class="num">1</span>]) <span class="cmt">## 10  (indexé à 1)</span>
-<span class="bi">print</span>(t[<span class="num">4</span>]) <span class="cmt">## nil (hors bounds => nil)</span>
+<pre><code><span class="bi">print</span>(t[<span class="num">1</span>])  <span class="cmt">## 10  (indexé à 1)</span>
+<span class="bi">print</span>(t[<span class="num">4</span>])  <span class="cmt">## nil (hors bounds => nil)</span>
 
-t[<span class="num">2</span>] = <span class="num">99</span> <span class="cmt">## set</span>
-t[<span class="num">2</span>] += <span class="num">1</span> <span class="cmt">## compound : += -= *= /= %=</span>
+t[<span class="num">2</span>] = <span class="num">99</span>    <span class="cmt">## set</span>
+t[<span class="num">2</span>] += <span class="num">1</span>    <span class="cmt">## compound : += -= *= /= %=</span>
 
 <span class="kw">var</span> a = []
-a[<span class="num">5</span>] = <span class="str">"x"</span> <span class="cmt">## grossit automatiquement (indices 1..4 => nil)</span></code></pre>
+a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt">## grossit automatiquement (indices 1..4 => nil)</span></code></pre>
 
 <h3>Itération — valeurs seules</h3>
 <pre><code><span class="kw">var</span> sum = <span class="num">0</span>
@@ -1168,17 +1172,17 @@ a[<span class="num">5</span>] = <span class="str">"x"</span> <span class="cmt">#
 
 <h3>print</h3>
 <p>Affiche tous les arguments séparés par des espaces, suivi d'un retour à la ligne.</p>
-<pre><code><span class="bi">print</span>(<span class="str">"a ="</span>, <span class="num">42</span>, <span class="bool">true</span>) <span class="cmt">## a = 42 1</span>
-<span class="bi">print</span>() <span class="cmt">## ligne vide</span></code></pre>
+<pre><code><span class="bi">print</span>(<span class="str">"a ="</span>, <span class="num">42</span>, <span class="bool">true</span>)  <span class="cmt">## a = 42 1</span>
+<span class="bi">print</span>()                 <span class="cmt">## ligne vide</span></code></pre>
 
 <h3>printf</h3>
 <p>Formatage avec <code>{}</code> pour substitution positionnelle ou <code>{n}</code> pour indexation explicite.</p>
-<pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>) <span class="cmt">## 1 + 2 = 3</span>
-<span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>) <span class="cmt">## oui et oui</span>
-<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, <span class="num">10</span>, <span class="num">20</span>) <span class="cmt">## index explicite</span></code></pre>
+<pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)      <span class="cmt">## 1 + 2 = 3</span>
+<span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>)          <span class="cmt">## oui et oui</span>
+<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## index explicite</span></code></pre>
 
 <h3>assert</h3>
-<p>Lève une exception si la condition est falsy. Message optionnel.</p>
+<p>Lève une exception si la condition est fausse. Message optionnel.</p>
 <pre><code><span class="kw">var</span> x = <span class="num">42</span>
 <span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
 <span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x doit être positif"</span>)</code></pre>
@@ -1207,29 +1211,29 @@ a[<span class="num">5</span>] = <span class="str">"x"</span> <span class="cmt">#
 
 <h3>len</h3>
 <p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments).</p>
-<pre><code><span class="bi">len</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]) <span class="cmt">## 3</span>
-<span class="bi">len</span>(<span class="str">"bonjour"</span>) <span class="cmt">## 7</span>
+<pre><code><span class="bi">len</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])  <span class="cmt">## 3</span>
+<span class="bi">len</span>(<span class="str">"bonjour"</span>)  <span class="cmt">## 7</span>
 <span class="kw">var</span> m = {<span class="str">"a"</span>: <span class="num">1</span>, <span class="str">"b"</span>: <span class="num">2</span>}
-<span class="bi">len</span>(m) <span class="cmt">## 2</span>
-<span class="bi">len</span>([<span class="num">1</span>;<span class="num">10</span>]) <span class="cmt">## 10 (range inclusif)</span></code></pre>
+<span class="bi">len</span>(m)          <span class="cmt">## 2</span>
+<span class="bi">len</span>([<span class="num">1</span>;<span class="num">10</span>])     <span class="cmt">## 10 (range inclusif)</span></code></pre>
 
 <h3>typeof</h3>
 <p>Retourne le type d'une valeur sous forme de string : <code>"nil"</code>, <code>"int"</code>, <code>"float"</code>, <code>"string"</code>, <code>"array"</code>, <code>"map"</code>, <code>"function"</code>, <code>"class"</code>, <code>"range"</code>.</p>
-<pre><code><span class="bi">typeof</span>(<span class="num">42</span>) <span class="cmt">## "int"</span>
-<span class="bi">typeof</span>(<span class="num">3.14</span>) <span class="cmt">## "float"</span>
-<span class="bi">typeof</span>(<span class="str">"hello"</span>) <span class="cmt">## "string"</span>
-<span class="bi">typeof</span>([<span class="num">1</span>, <span class="num">2</span>]) <span class="cmt">## "array"</span>
-<span class="bi">typeof</span>(<span class="bool">nil</span>) <span class="cmt">## "nil"</span></code></pre>
+<pre><code><span class="bi">typeof</span>(<span class="num">42</span>)       <span class="cmt">## "int"</span>
+<span class="bi">typeof</span>(<span class="num">3.14</span>)     <span class="cmt">## "float"</span>
+<span class="bi">typeof</span>(<span class="str">"hello"</span>)  <span class="cmt">## "string"</span>
+<span class="bi">typeof</span>([<span class="num">1</span>, <span class="num">2</span>])   <span class="cmt">## "array"</span>
+<span class="bi">typeof</span>(<span class="bool">nil</span>)      <span class="cmt">## "nil"</span></code></pre>
 
 <h3>Fonctions intégrées comme valeurs</h3>
 <p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>len</code> et <code>typeof</code> sont des valeurs de première classe — assignables, passables en argument :</p>
 <pre><code><span class="kw">var</span> f = <span class="bi">print</span>
-f(<span class="str">"hello"</span>) <span class="cmt">## hello</span>
+f(<span class="str">"hello"</span>)        <span class="cmt">## hello</span>
 
 <span class="kw">func</span> apply(fn, x)
     fn(x)
 <span class="kw">end</span>
-apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="cmt">## 42</span></code></pre>
+apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="cmt">## 42</span></code></pre>
 </section>
 
 <!-- ── Modules built-in ──────────────────────────────────────────────────── -->
@@ -1277,21 +1281,21 @@ apply(<span class="bi">print</span>, <span class="num">42</span>) <span class="c
   </tbody>
 </table>
 
-<pre><code><span class="bi">print</span>(math.PI) <span class="cmt">## 3.141592653589793</span>
-<span class="bi">print</span>(math.TAU) <span class="cmt">## 6.283185307179586</span>
+<pre><code><span class="bi">print</span>(math.PI)                  <span class="cmt">## 3.141592653589793</span>
+<span class="bi">print</span>(math.TAU)                 <span class="cmt">## 6.283185307179586</span>
 
-<span class="bi">print</span>(math.abs(-5)) <span class="cmt">## 5</span>
-<span class="bi">print</span>(math.abs(-3.14)) <span class="cmt">## 3.14</span>
+<span class="bi">print</span>(math.abs(-5))             <span class="cmt">## 5</span>
+<span class="bi">print</span>(math.abs(-3.14))          <span class="cmt">## 3.14</span>
 
-<span class="bi">print</span>(math.sign(10)) <span class="cmt">## 1</span>
-<span class="bi">print</span>(math.sign(-7)) <span class="cmt">## -1</span>
-<span class="bi">print</span>(math.sign(0)) <span class="cmt">## 0</span>
+<span class="bi">print</span>(math.sign(10))            <span class="cmt">## 1</span>
+<span class="bi">print</span>(math.sign(-7))            <span class="cmt">## -1</span>
+<span class="bi">print</span>(math.sign(0))             <span class="cmt">## 0</span>
 
 <span class="cmt">## bruit de Perlin : continu, dans [0, 1] — idéal pour animer/texturer</span>
 <span class="kw">for</span> i = <span class="num">0</span>, <span class="num">3</span> <span class="kw">do</span>
-    <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))   <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
+    <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))  <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
 <span class="kw">end</span>
-math.noise_seed(<span class="num">42</span>)            <span class="cmt">## bruit reproductible</span></code></pre>
+math.noise_seed(<span class="num">42</span>)             <span class="cmt">## bruit reproductible</span></code></pre>
 
 <h3 id="module-string">string</h3>
 <p>Manipulation de chaînes. Les index sont <strong>1-based</strong> (comme les tableaux).</p>
@@ -1332,14 +1336,14 @@ math.noise_seed(<span class="num">42</span>)            <span class="cmt">## bru
 
 <span class="cmt">## main.ol</span>
 <span class="kw">import</span> <span class="str">"utils"</span>
-<span class="bi">print</span>(add(<span class="num">2</span>, <span class="num">3</span>)) <span class="cmt">## 5</span>
-<span class="bi">print</span>(PI) <span class="cmt">## 3.14159</span></code></pre>
+<span class="bi">print</span>(add(<span class="num">2</span>, <span class="num">3</span>))  <span class="cmt">## 5</span>
+<span class="bi">print</span>(PI)         <span class="cmt">## 3.14159</span></code></pre>
 
 <h3>Import modulaire</h3>
 <p>Avec <code>as name</code>, toutes les définitions sont regroupées dans une map nommée.</p>
 <pre data-no-run><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> math
-<span class="bi">print</span>(math.add(<span class="num">10</span>, <span class="num">20</span>)) <span class="cmt">## 30</span>
-<span class="bi">print</span>(math.PI) <span class="cmt">## 3.14159</span></code></pre>
+<span class="bi">print</span>(math.add(<span class="num">10</span>, <span class="num">20</span>))  <span class="cmt">## 30</span>
+<span class="bi">print</span>(math.PI)           <span class="cmt">## 3.14159</span></code></pre>
 
 <h3>Règles</h3>
 <ul>
@@ -1454,9 +1458,9 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <h3>Égalité et comparaison</h3>
 <p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu. Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
 <pre><code><span class="cmt">## maps nues => comparaison par référence</span>
-<span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})   <span class="cmt">## 0 : contenu identique mais objets distincts</span>
+<span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})            <span class="cmt">## 0 : contenu identique mais objets distincts</span>
 <span class="kw">var</span> m = {x: <span class="num">1</span>}
-<span class="bi">print</span>(m == m)             <span class="cmt">## 1 : même référence</span>
+<span class="bi">print</span>(m == m)                      <span class="cmt">## 1 : même référence</span>
 
 <span class="cmt">## instance + __eq => comparaison par valeur</span>
 <span class="kw">class</span> Point
@@ -1468,8 +1472,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="kw">return</span> self.x == other.x <span class="kw">and</span> self.y == other.y
     <span class="kw">end</span>
 <span class="kw">end</span>
-<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))   <span class="cmt">## 1 : __eq compare les champs</span>
-<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))   <span class="cmt">## 0</span></code></pre>
+<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))  <span class="cmt">## 1 : __eq compare les champs</span>
+<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))  <span class="cmt">## 0</span></code></pre>
 <div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité.</div>
 </section>
 
@@ -1499,7 +1503,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <span class="cmt">## logique : appelée AVANT draw, dt = secondes depuis la frame précédente</span>
 <span class="kw">func</span> update(dt)
-    x = x + <span class="num">120</span> * dt   <span class="cmt">## 120 px/seconde, quel que soit le FPS</span>
+    x = x + <span class="num">120</span> * dt  <span class="cmt">## 120 px/seconde, quel que soit le FPS</span>
     <span class="kw">if</span> x > <span class="num">260</span> <span class="kw">then</span> x = <span class="num">0</span> <span class="kw">end</span>
 <span class="kw">end</span>
 
@@ -1564,9 +1568,9 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
     <span class="bi">graphics</span>.push()
     <span class="bi">graphics</span>.translate(<span class="num">110</span>, <span class="num">90</span>)
-    <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">60</span>) <span class="cmt">## pivote au fil du temps</span>
+    <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">60</span>)  <span class="cmt">## pivote au fil du temps</span>
     <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
-    <span class="bi">graphics</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>) <span class="cmt">## carré pivoté centré</span>
+    <span class="bi">graphics</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>)    <span class="cmt">## carré pivoté centré</span>
     <span class="bi">graphics</span>.pop()
 <span class="kw">end</span></code></pre>
 
@@ -1576,8 +1580,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">160</span>)
 <span class="kw">global</span> t = <span class="num">0</span>
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.blendMode(<span class="bi">blend</span>.ADD)          <span class="cmt">## fusion additive (lueur)</span>
-    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.08</span>))   <span class="cmt">## fondu léger → traînées</span>
+    <span class="bi">graphics</span>.blendMode(<span class="bi">blend</span>.ADD)         <span class="cmt">## fusion additive (lueur)</span>
+    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.08</span>))  <span class="cmt">## fondu léger → traînées</span>
     t = t + <span class="num">0.05</span>
     <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">0.2</span>, <span class="num">0.5</span>, <span class="num">1</span>))
     <span class="bi">graphics</span>.circle(<span class="num">120</span> + <span class="bi">math</span>.cos(t) * <span class="num">80</span>, <span class="num">80</span> + <span class="bi">math</span>.sin(t * <span class="num">1.3</span>) * <span class="num">50</span>, <span class="num">14</span>)
@@ -1585,9 +1589,9 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <h3>Couleurs — classe <code>Color</code></h3>
 <p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code>. L'alpha est optionnel (défaut : <code>1.0</code>). Les composantes sont clampées silencieusement.</p>
-<pre><code><span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>) <span class="cmt">## rouge opaque</span>
-<span class="kw">var</span> bleu  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>) <span class="cmt">## bleu semi-transparent</span>
-<span class="bi">print</span>(rouge) <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
+<pre><code><span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
+<span class="kw">var</span> bleu  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## bleu semi-transparent</span>
+<span class="bi">print</span>(rouge)                           <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
 
 <span class="cmt">## accès direct aux composantes</span>
 <span class="bi">print</span>(rouge.r, rouge.g, rouge.b, rouge.a)</code></pre>
@@ -1633,7 +1637,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <pre><code><span class="cmt">## couleur personnalisée (composantes dans [0,1])</span>
 <span class="kw">var</span> teal = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.6</span>, <span class="num">0.6</span>)
-<span class="bi">print</span>(teal)              <span class="cmt">## Color(0.000000,0.600000,0.600000,1.000000)</span>
+<span class="bi">print</span>(teal)  <span class="cmt">## Color(0.000000,0.600000,0.600000,1.000000)</span>
 
 <span class="cmt">## couleur aléatoire : Color.random() (pas besoin de la réimplémenter)</span>
 <span class="kw">var</span> c = <span class="bi">Color</span>.random()
@@ -1652,7 +1656,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 <p><code>key</code> est un <strong>nom de touche</strong> : <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>.</p>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"clavier"</span>) <span class="cmt">## clique le canvas puis tape</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"clavier"</span>)  <span class="cmt">## clique le canvas puis tape</span>
 <span class="kw">global</span> last = <span class="str">"…"</span>
 <span class="kw">func</span> keyboard.keypressed(key)
     last = key
@@ -1675,7 +1679,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func mouse.moved(x, y)</code></td><td>Déplacement du pointeur</td></tr>
   </tbody>
 </table>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"souris"</span>) <span class="cmt">## clique dans le canvas</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"souris"</span>)  <span class="cmt">## clique dans le canvas</span>
 <span class="kw">global</span> px = <span class="num">130</span>
 <span class="kw">global</span> py = <span class="num">80</span>
 <span class="kw">func</span> mouse.pressed(x, y)
@@ -1696,26 +1700,26 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <h3>Charger une image</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">140</span>, <span class="str">"image.load"</span>)
-<span class="kw">var</span> tex = image.load(<span class="str">"assets/smiley.png"</span>) <span class="cmt">## handle {id, width, height} — ressource servie</span>
+<span class="kw">var</span> tex = image.load(<span class="str">"assets/smiley.png"</span>)  <span class="cmt">## handle {id, width, height} — ressource servie</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.12</span>, <span class="num">0.2</span>))
-    <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)    <span class="cmt">## 64×64</span>
-    <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)   <span class="cmt">## redimensionné</span>
+    <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
+    <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## redimensionné</span>
 <span class="kw">end</span></code></pre>
 <div class="callout"><code>image.load(nom)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.load_data("png", base64)</code> — voir l'exemple « Image (load_data) » du playground.</div>
 
 <h3>Render texture (dessin hors-écran)</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
-<span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>) <span class="cmt">## render texture 120×120</span>
+<span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>)  <span class="cmt">## render texture 120×120</span>
 
-image.begin_draw(rt)                <span class="cmt">## on dessine DANS la texture (une fois)</span>
+image.begin_draw(rt)             <span class="cmt">## on dessine DANS la texture (une fois)</span>
     <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.1</span>, <span class="num">0.15</span>))
     <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
     <span class="bi">graphics</span>.circle(<span class="num">60</span>, <span class="num">60</span>, <span class="num">50</span>)
 image.end_draw()
 
-<span class="kw">func</span> draw()                        <span class="cmt">## puis on l'affiche comme un sprite</span>
+<span class="kw">func</span> draw()                      <span class="cmt">## puis on l'affiche comme un sprite</span>
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
     <span class="bi">graphics</span>.sprite(rt, <span class="num">30</span>, <span class="num">30</span>)
 <span class="kw">end</span></code></pre>
@@ -1752,7 +1756,7 @@ image.end_draw()
 </table>
 <div class="callout tip">Le plus souvent tu n'as pas besoin de <code>window</code> : le moteur fournit déjà les globales <code>W</code> et <code>H</code> (largeur/hauteur de la zone de rendu), initialisées depuis <code>window</code> avant l'exécution.</div>
 <pre data-no-run><code><span class="cmt">## W et H sont fournis par le moteur — pas besoin de window ici</span>
-<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Titre"</span>) <span class="cmt">## fenêtre pleine zone</span></code></pre>
+<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Titre"</span>)  <span class="cmt">## fenêtre pleine zone</span></code></pre>
 </section>
 
 
