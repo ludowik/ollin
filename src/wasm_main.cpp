@@ -27,16 +27,7 @@ static std::string ollin_run(const std::string& source) {
     try {
         auto imported = std::make_shared<std::unordered_set<std::string>>();
         s_vm->execute(Compiler().compile(Parser(Lexer(source).tokenize(), "", imported).parse()));
-        // setup() : appelée une fois après le chargement, avant la boucle update/draw
-        Value setup = s_vm->getGlobal("setup");
-        if (setup.isCallable())
-            s_vm->callValue(setup);
-        Value draw = s_vm->getGlobal("draw");
-        if (draw.isCallable()) {
-            Value run_fn = s_vm->getGlobal("graphics").mapGet(Value(std::string("run")));
-            if (run_fn.isBuiltin())
-                run_fn.asBuiltin()(&draw, 1);
-        }
+        s_vm->runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
         return std::string("error: ") + e.what();

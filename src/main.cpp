@@ -49,19 +49,7 @@ int main(int argc, char* argv[]) {
 
         VM vm;
         vm.execute(Compiler().compile(program));
-        // setup() : appelée une fois après le chargement, avant la boucle update/draw
-        Value setup = vm.getGlobal("setup");
-        if (setup.isCallable())
-            vm.callValue(setup);
-        Value draw = vm.getGlobal("draw");
-        if (draw.isCallable()) {
-            Value gfx = vm.getGlobal("graphics");
-            if (gfx.isMap()) {
-                Value run_fn = gfx.mapGet(Value(std::string("run")));
-                if (run_fn.isBuiltin())
-                    run_fn.asBuiltin()(&draw, 1);
-            }
-        }
+        vm.runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée natif/WASM)
     } catch (const std::exception& e) {
         std::cerr << scriptPath << ": " << e.what() << '\n';
         return 1;

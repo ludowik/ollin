@@ -376,6 +376,25 @@ Value VM::getGlobal(const std::string& name) const {
     return Value{};
 }
 
+void VM::runEntryHooks() {
+    // setup() : appelée une fois après le chargement, avant la boucle update/draw.
+    Value setup = getGlobal("setup");
+    if (setup.isCallable())
+        callValue(setup);
+    // draw() présent → lance la boucle graphique via graphics.run(draw).
+    Value draw = getGlobal("draw");
+    if (draw.isCallable()) {
+        // `graphics` peut être nil (stub natif, ou script sans référence à graphics)
+        // ou réassigné à un non-map → garde isMap() obligatoire avant mapGet.
+        Value gfx = getGlobal("graphics");
+        if (gfx.isMap()) {
+            Value run_fn = gfx.mapGet(Value(std::string("run")));
+            if (run_fn.isBuiltin())
+                run_fn.asBuiltin()(&draw, 1);
+        }
+    }
+}
+
 Value VM::callValue(const Value& fn) {
     if (fn.isBuiltin())
         return fn.asBuiltin()(nullptr, 0);

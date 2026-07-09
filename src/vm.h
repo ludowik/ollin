@@ -18,6 +18,10 @@ class VM {
     Value callValue(const Value& fn, const Value& a, const Value& b); // 2 args
     Value getGlobal(const std::string& name) const; // returns nil if not found
     void setGlobal(const std::string& name, const Value& value);
+    // Après execute() : appelle setup() une fois, puis lance la boucle graphique via
+    // graphics.run(draw) si un draw() est défini. Partagé par les points d'entrée
+    // natif et WASM (une seule version gardée : graphics peut être nil/non-map).
+    void runEntryHooks();
 
   private:
     int errLine() const;             // extracted from the lambda in execute()
