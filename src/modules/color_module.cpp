@@ -1,8 +1,11 @@
 #include "module_utils.h"
 #include "value.h"
+#include "vm.h"
 #include <cstdlib>
 #include <stdexcept>
 #include <string>
+
+Value makeColorClass(); // défini plus bas — utilisé par color_random (repli)
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -53,15 +56,17 @@ static Value color_str(Value* args, int argc) {
 }
 
 // ── random ────────────────────────────────────────────────────────────────────
-// Appel : Color.random() — args[0] = la classe Color (receiver), argc = 0.
-// Retourne une instance Color avec r, g, b aléatoires dans [0, 1] et a = 1.
+// Méthode STATIQUE : fabrique une Color r,g,b aléatoires dans [0,1], a = 1.
+// Comme `static func random() return Color(...) end` en Ollin, elle ne dépend
+// d'aucun receveur/argument : la classe vient du global `Color` (repli sur une
+// classe fraîche si le global n'est pas encore matérialisé).
 
 static Value color_random(Value* args, int argc) {
+    (void)args;
     (void)argc;
-    // Receveur = la classe (Color.random()) OU une instance (c.random(), self injecté).
-    // Classe correcte dans les deux cas : le receveur s'il est une classe, sinon sa __class__.
-    Value recv = args[0];
-    Value cls = recv.isClass() ? recv : recv.mapGet(Value(std::string("__class__")));
+    Value cls = VM::current()->getGlobal("Color");
+    if (!cls.isClass())
+        cls = makeColorClass();
     auto rnd = []() { return (double)rand() / ((double)RAND_MAX + 1.0); };
     Value inst = Value::makeMap();
     inst.mapSet(Value(std::string("__class__")), cls);
