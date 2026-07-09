@@ -9,3 +9,6 @@ Value makeKeyboardModule() {
 Value makeMouseModule() {
     return Value();
 }
+Value makeBlendModule() {
+    return Value();
+}

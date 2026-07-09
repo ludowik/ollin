@@ -11,15 +11,6 @@
 #include <emscripten.h>
 #endif
 
-// Le module `blend` (modules.cpp) expose les modes de fusion en littéraux 0..5
-// pour éviter d'inclure raylib.h dans un fichier qui compile aussi sans raylib.
-// Ce fichier-ci a raylib.h : on verrouille la correspondance à la COMPILATION.
-// Si raylib renumérote BlendMode, ce static_assert casse le build (au lieu d'un
-// mauvais mode appliqué silencieusement via graphics.blendMode(blend.*)).
-static_assert(BLEND_ALPHA == 0 && BLEND_ADDITIVE == 1 && BLEND_MULTIPLIED == 2 && BLEND_ADD_COLORS == 3 &&
-                  BLEND_SUBTRACT_COLORS == 4 && BLEND_ALPHA_PREMULTIPLY == 5,
-              "module blend (modules.cpp) : les littéraux ne correspondent plus à l'enum raylib BlendMode");
-
 static int toInt(const Value& v) {
     if (v.isInteger())
         return (int)v.asInt();
@@ -828,6 +819,20 @@ static Value gfx_sprite(Value* args, int argc) {
     image_get_tint(&has, &r, &g, &b, &a);
     image_draw_sprite(id, x, y, dw, dh, r, g, b, a);
     return Value{};
+}
+
+// Module `blend` : modes de fusion exposés via les enums raylib DIRECTEMENT
+// (source de vérité — pas de littéraux à maintenir/vérifier). Défini ici plutôt
+// que dans modules.cpp car ce dernier compile aussi sans raylib.
+Value makeBlendModule() {
+    Value m = Value::makeMap();
+    m.mapSet(Value(std::string("ALPHA")), Value((int64_t)BLEND_ALPHA));
+    m.mapSet(Value(std::string("ADD")), Value((int64_t)BLEND_ADDITIVE));
+    m.mapSet(Value(std::string("MULTIPLY")), Value((int64_t)BLEND_MULTIPLIED));
+    m.mapSet(Value(std::string("ADD_COLORS")), Value((int64_t)BLEND_ADD_COLORS));
+    m.mapSet(Value(std::string("SUBTRACT")), Value((int64_t)BLEND_SUBTRACT_COLORS));
+    m.mapSet(Value(std::string("PREMULTIPLY")), Value((int64_t)BLEND_ALPHA_PREMULTIPLY));
+    return m;
 }
 
 Value makeGraphicsModule() {
