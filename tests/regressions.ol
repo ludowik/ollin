@@ -249,4 +249,15 @@ var rng_t = 0
 for i in rng_r do rng_t += i end               ## range value → itérateur range
 assert(rng_t == 10)                            ## 1+2+3+4
 
+## ── builtin static : cohérence classe/instance (comme un `static func` Ollin) ──
+## Un builtin déclaré static ne reçoit pas self → son 1er param est en R[0], que
+## l'appel soit sur la classe ou sur une instance (avant : self injecté sur instance
+## → le param se retrouvait décalé et l'argument était mal interprété).
+var col_a = Color.gray(0.5)              ## fabrique statique paramétrée, sur la classe
+assert(col_a.r == 0.5 and col_a.b == 0.5)
+var col_c = Color(1, 0, 0)
+var col_b = col_c.gray(0.25)            ## MÊME méthode, sur une instance → param en R[0]
+assert(col_b.r == 0.25 and col_b.g == 0.25)
+assert(Color.random().a == 1 and col_c.random().a == 1)  ## random statique, deux modes
+
 print("regressions ok")

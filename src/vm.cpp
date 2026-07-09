@@ -1319,6 +1319,8 @@ dispatch_loop:
                 fn_is_static = ch->funcs[(uint8_t)fn.asInt()].is_static;
             else if (fn.isClosure())
                 fn_is_static = ch->funcs[fn.asClosure()->func_idx].is_static;
+            else if (fn.isStaticBuiltin()) // builtin déclaré static → traité comme un static Ollin
+                fn_is_static = true;
             bool inject_self = is_instance && !fn_is_static;
             int total;
             if (inject_self) {

@@ -174,6 +174,18 @@ struct Value {
         v.ival = (int64_t)(intptr_t)fn;
         return v;
     }
+    // Builtin déclaré STATIQUE (méthode de classe) : CALL_METHOD ne lui injecte pas
+    // self, comme un `static func` Ollin → mêmes règles pour les classes Ollin et
+    // builtin (arguments explicites en R[0..], sans receveur devant). Le marqueur est
+    // porté par str_hash (inutilisé pour T_BUILTIN, mais préservé à la copie — pas _pad).
+    static Value makeStaticBuiltin(BuiltinFn fn) {
+        Value v = makeBuiltin(fn);
+        v.str_hash = 1;
+        return v;
+    }
+    bool isStaticBuiltin() const {
+        return tag == T_BUILTIN && str_hash != 0;
+    }
     static Value makeClass();
     static Value makeRange(Range* r) {
         return Value(r);

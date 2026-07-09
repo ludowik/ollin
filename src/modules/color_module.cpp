@@ -118,6 +118,26 @@ static Value color_grayscale(Value* args, int argc) {
     return inst;
 }
 
+// ── gray (statique, AVEC paramètre) ──────────────────────────────────────────
+// Color.gray(v) → nouvelle Color grise de luminance v (clampée à [0,1]), a = 1.
+// Méthode statique avec un paramètre : grâce au flag static builtin, `v` est en
+// args[0] que l'appel soit Color.gray(x) OU c.gray(x) (aucun self injecté).
+static Value color_gray(Value* args, int argc) {
+    if (argc < 1)
+        throw std::runtime_error("Color.gray: expected a value");
+    double v = colorComponent(args[0], "gray");
+    Value cls = VM::current()->getGlobal("Color");
+    if (!cls.isClass())
+        cls = makeColorClass();
+    Value inst = Value::makeMap();
+    inst.mapSet(Value(std::string("__class__")), cls);
+    inst.mapSet(Value(std::string("r")), Value(v));
+    inst.mapSet(Value(std::string("g")), Value(v));
+    inst.mapSet(Value(std::string("b")), Value(v));
+    inst.mapSet(Value(std::string("a")), Value(1.0));
+    return inst;
+}
+
 // ── makeColorClass ────────────────────────────────────────────────────────────
 
 Value makeColorClass() {
@@ -125,7 +145,10 @@ Value makeColorClass() {
     cls.mapSet(Value(std::string("__name__")), Value(std::string("Color")));
     cls.mapSet(Value(std::string("init")), Value::makeBuiltin(color_init));
     cls.mapSet(Value(std::string("__str")), Value::makeBuiltin(color_str));
-    cls.mapSet(Value(std::string("random")), Value::makeBuiltin(color_random));
+    // Fabriques STATIQUES (pas de self) — cohérent avec `static func` en Ollin :
+    cls.mapSet(Value(std::string("random")), Value::makeStaticBuiltin(color_random));
+    cls.mapSet(Value(std::string("gray")), Value::makeStaticBuiltin(color_gray));
+    // Méthodes d'INSTANCE (reçoivent self) :
     cls.mapSet(Value(std::string("pastel")), Value::makeBuiltin(color_pastel));
     cls.mapSet(Value(std::string("grayscale")), Value::makeBuiltin(color_grayscale));
     return cls;
