@@ -1,6 +1,6 @@
+#include "mouse_module.h"
 #include "value.h"
 #include "vm.h"
-#include "mouse_module.h"
 #include <raylib.h>
 #include <string>
 

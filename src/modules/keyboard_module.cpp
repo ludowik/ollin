@@ -1,6 +1,6 @@
+#include "keyboard_module.h"
 #include "value.h"
 #include "vm.h"
-#include "keyboard_module.h"
 #include <raylib.h>
 #include <string>
 
