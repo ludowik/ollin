@@ -58,7 +58,10 @@ static Value color_str(Value* args, int argc) {
 
 static Value color_random(Value* args, int argc) {
     (void)argc;
-    Value cls = args[0]; // Color class — toujours valide comme receiver de méthode
+    // Receveur = la classe (Color.random()) OU une instance (c.random(), self injecté).
+    // Classe correcte dans les deux cas : le receveur s'il est une classe, sinon sa __class__.
+    Value recv = args[0];
+    Value cls = recv.isClass() ? recv : recv.mapGet(Value(std::string("__class__")));
     auto rnd = []() { return (double)rand() / ((double)RAND_MAX + 1.0); };
     Value inst = Value::makeMap();
     inst.mapSet(Value(std::string("__class__")), cls);
@@ -125,8 +128,11 @@ Value makeColorClass() {
 
 // ── makeColorsModule ──────────────────────────────────────────────────────────
 
-static Value makeColorInstance(double r, double g, double b, double a = 1.0) {
+// Chaque constante est une vraie instance Color (clé __class__ posée) → les méthodes
+// (pastel/grayscale/random) et __str fonctionnent dessus, comme sur Color(...).
+static Value makeColorInstance(const Value& cls, double r, double g, double b, double a = 1.0) {
     Value inst = Value::makeMap();
+    inst.mapSet(Value(std::string("__class__")), cls);
     inst.mapSet(Value(std::string("r")), Value(r));
     inst.mapSet(Value(std::string("g")), Value(g));
     inst.mapSet(Value(std::string("b")), Value(b));
@@ -136,20 +142,21 @@ static Value makeColorInstance(double r, double g, double b, double a = 1.0) {
 
 Value makeColorsModule() {
     Value m = Value::makeMap();
-    m.mapSet(Value(std::string("BLACK")), makeColorInstance(0.0, 0.0, 0.0));
-    m.mapSet(Value(std::string("WHITE")), makeColorInstance(1.0, 1.0, 1.0));
-    m.mapSet(Value(std::string("RED")), makeColorInstance(230 / 255.0, 41 / 255.0, 55 / 255.0));
-    m.mapSet(Value(std::string("GREEN")), makeColorInstance(0 / 255.0, 228 / 255.0, 48 / 255.0));
-    m.mapSet(Value(std::string("BLUE")), makeColorInstance(0 / 255.0, 121 / 255.0, 241 / 255.0));
-    m.mapSet(Value(std::string("YELLOW")), makeColorInstance(253 / 255.0, 249 / 255.0, 0 / 255.0));
-    m.mapSet(Value(std::string("GRAY")), makeColorInstance(130 / 255.0, 130 / 255.0, 130 / 255.0));
-    m.mapSet(Value(std::string("ORANGE")), makeColorInstance(255 / 255.0, 161 / 255.0, 0 / 255.0));
-    m.mapSet(Value(std::string("PINK")), makeColorInstance(255 / 255.0, 109 / 255.0, 194 / 255.0));
-    m.mapSet(Value(std::string("PURPLE")), makeColorInstance(200 / 255.0, 122 / 255.0, 255 / 255.0));
-    m.mapSet(Value(std::string("BROWN")), makeColorInstance(127 / 255.0, 106 / 255.0, 79 / 255.0));
-    m.mapSet(Value(std::string("DARKGRAY")), makeColorInstance(80 / 255.0, 80 / 255.0, 80 / 255.0));
-    m.mapSet(Value(std::string("SKYBLUE")), makeColorInstance(102 / 255.0, 191 / 255.0, 255 / 255.0));
-    m.mapSet(Value(std::string("LIME")), makeColorInstance(0 / 255.0, 158 / 255.0, 47 / 255.0));
-    m.mapSet(Value(std::string("MAGENTA")), makeColorInstance(255 / 255.0, 0 / 255.0, 255 / 255.0));
+    Value cls = makeColorClass(); // classe Color partagée par toutes les constantes de la palette
+    m.mapSet(Value(std::string("BLACK")), makeColorInstance(cls, 0.0, 0.0, 0.0));
+    m.mapSet(Value(std::string("WHITE")), makeColorInstance(cls, 1.0, 1.0, 1.0));
+    m.mapSet(Value(std::string("RED")), makeColorInstance(cls, 230 / 255.0, 41 / 255.0, 55 / 255.0));
+    m.mapSet(Value(std::string("GREEN")), makeColorInstance(cls, 0 / 255.0, 228 / 255.0, 48 / 255.0));
+    m.mapSet(Value(std::string("BLUE")), makeColorInstance(cls, 0 / 255.0, 121 / 255.0, 241 / 255.0));
+    m.mapSet(Value(std::string("YELLOW")), makeColorInstance(cls, 253 / 255.0, 249 / 255.0, 0 / 255.0));
+    m.mapSet(Value(std::string("GRAY")), makeColorInstance(cls, 130 / 255.0, 130 / 255.0, 130 / 255.0));
+    m.mapSet(Value(std::string("ORANGE")), makeColorInstance(cls, 255 / 255.0, 161 / 255.0, 0 / 255.0));
+    m.mapSet(Value(std::string("PINK")), makeColorInstance(cls, 255 / 255.0, 109 / 255.0, 194 / 255.0));
+    m.mapSet(Value(std::string("PURPLE")), makeColorInstance(cls, 200 / 255.0, 122 / 255.0, 255 / 255.0));
+    m.mapSet(Value(std::string("BROWN")), makeColorInstance(cls, 127 / 255.0, 106 / 255.0, 79 / 255.0));
+    m.mapSet(Value(std::string("DARKGRAY")), makeColorInstance(cls, 80 / 255.0, 80 / 255.0, 80 / 255.0));
+    m.mapSet(Value(std::string("SKYBLUE")), makeColorInstance(cls, 102 / 255.0, 191 / 255.0, 255 / 255.0));
+    m.mapSet(Value(std::string("LIME")), makeColorInstance(cls, 0 / 255.0, 158 / 255.0, 47 / 255.0));
+    m.mapSet(Value(std::string("MAGENTA")), makeColorInstance(cls, 255 / 255.0, 0 / 255.0, 255 / 255.0));
     return m;
 }
