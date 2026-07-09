@@ -83,12 +83,16 @@ struct ArrayIteratorPool {
         }
         return new ArrayIterator(a);
     }
+    // Comme ArrayPool : le snapshot `items` peut être volumineux et clear() ne
+    // libère pas la capacité → ne pooler que les petits, détruire les gros.
+    static constexpr size_t POOL_MAX_CAP = 4096;
     void release(ArrayIterator* it) {
-        it->items.clear();
-        if (n < CAP)
+        if (n < CAP && it->items.capacity() <= POOL_MAX_CAP) {
+            it->items.clear();
             buf[n++] = it;
-        else
+        } else {
             delete it;
+        }
     }
 };
 inline ArrayIteratorPool& array_iter_pool() {

@@ -44,12 +44,18 @@ struct ArrayPool {
         }
         return new Array();
     }
+    // clear() ne libère PAS la capacité du vector : ne pooler que les petits
+    // tableaux, sinon un tableau transitoire volumineux resterait épinglé dans ce
+    // pool static (mémoire jamais rendue, OOM possible sur WASM). Les gros sont
+    // détruits → buffer rendu à l'allocateur.
+    static constexpr size_t POOL_MAX_CAP = 4096;
     void release(Array* a) {
-        a->items.clear();
-        if (n < CAP)
+        if (n < CAP && a->items.capacity() <= POOL_MAX_CAP) {
+            a->items.clear();
             buf[n++] = a;
-        else
+        } else {
             delete a;
+        }
     }
 };
 inline ArrayPool& array_pool() {
