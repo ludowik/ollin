@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 21:53</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 22:02</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 21:53</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 22:02</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1308,10 +1308,12 @@ math.noise_seed(<span class="num">42</span>)             <span class="cmt">## br
     <tr><td><code>string.trim(s [, chars])</code></td><td>fonction</td><td>Retire aux deux extrémités les caractères de <code>chars</code> (espace par défaut)</td></tr>
     <tr><td><code>string.ltrim(s [, chars])</code></td><td>fonction</td><td>Idem, uniquement à gauche</td></tr>
     <tr><td><code>string.rtrim(s [, chars])</code></td><td>fonction</td><td>Idem, uniquement à droite</td></tr>
-    <tr><td><code>string.char(s, i)</code></td><td>fonction</td><td>Caractère à l'index <code>i</code> (1-based) → chaîne d'1 caractère ; <code>""</code> si hors bornes</td></tr>
-    <tr><td><code>string.substr(s, start [, length])</code></td><td>fonction</td><td>Sous-chaîne à partir de <code>start</code> (1-based) ; <code>length</code> optionnel (jusqu'à la fin sinon), bornes ajustées</td></tr>
+    <tr><td><code>string.char(s, i)</code></td><td>fonction</td><td>Caractère (codepoint UTF-8) à l'index <code>i</code> (1-based) → chaîne d'1 caractère ; <code>""</code> si hors bornes</td></tr>
+    <tr><td><code>string.substr(s, start [, length])</code></td><td>fonction</td><td>Sous-chaîne de <code>length</code> caractères à partir de <code>start</code> (1-based) ; <code>length</code> optionnel (jusqu'à la fin sinon), bornes ajustées</td></tr>
   </tbody>
 </table>
+
+<div class="callout tip">Indexation par <strong>caractère (codepoint UTF-8)</strong>, pas par octet : <code>len</code>, <code>string.char</code> et <code>string.substr</code> comptent les caractères. Ex. <code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code> (le <code>é</code> occupe 2 octets mais reste 1 caractère).</div>
 
 <pre><code><span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
 <span class="bi">print</span>(string.lower(<span class="str">"HELLO"</span>))         <span class="cmt">## hello</span>

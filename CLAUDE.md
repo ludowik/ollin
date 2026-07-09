@@ -43,6 +43,7 @@ ollin/
 │   ├── chunk.h/.cpp   bytecode (code, constantes dédupliquées, identifiants, funcs) — Compiler → VM
 │   ├── value.h        Value taguée 16 o (ref-count, pivot T_STRING) + numValue/isFalsy
 │   ├── string_table.h internement des chaînes (InternedStr, refcount)
+│   ├── utf8.h         décodage UTF-8 partagé (utf8Count/ByteOffset/Step) — len, string.char/substr par codepoint
 │   ├── closure.h      Upvalue + Closure (inclus en bas de value.h)
 │   ├── lexer.h/.cpp
 │   ├── parser.h/.cpp

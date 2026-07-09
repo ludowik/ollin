@@ -1,5 +1,6 @@
 #include "vm.h"
 #include "modules/modules.h"
+#include "utf8.h"
 #include <chrono>
 #include <cmath>
 #include <sstream>
@@ -216,7 +217,7 @@ static Value builtin_len(Value* args, int argc) {
     if (v.isMap() || v.isClass())
         return Value(v.mapSize());
     if (v.isString())
-        return Value((int64_t)v.asString().size());
+        return Value((int64_t)utf8Count(v.asString())); // longueur en caractères (codepoints), pas en octets
     if (v.isRange())
         return Value(range_len(v.rptr));
     return Value((int64_t)1);

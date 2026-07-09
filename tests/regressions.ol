@@ -301,4 +301,16 @@ catch e
 end
 assert(str_c == "x")
 
+## ── string : indexation par CARACTÈRE (codepoint UTF-8), pas par octet ────────
+assert(len("café") == 4)                     ## 4 caractères (é = 2 octets)
+assert(len("héllo") == 5)
+assert(len("a€b") == 3)                       ## € = 3 octets, 1 caractère
+assert(string.char("café", 4) == "é")        ## avant : fragment d'octet
+assert(string.char("a€b", 2) == "€")
+assert(string.substr("café", 1, 3) == "caf")
+assert(string.substr("café", 4, 1) == "é")
+assert(string.substr("héllo", 2, 2) == "él")
+assert(len("hello") == 5)                     ## ASCII inchangé
+assert(string.char("café", 9) == "")         ## hors limites → ""
+
 print("regressions ok")

@@ -1,4 +1,5 @@
 #include "module_utils.h"
+#include "utf8.h"
 #include <cctype>
 #include <climits>
 #include <cmath>
@@ -54,30 +55,38 @@ static Value str_rtrim(Value* args, int argc) {
     return Value(e == std::string::npos ? std::string("") : s.substr(0, e + 1));
 }
 
-// string.char(s, i) : caractère à l'index i (1-based, comme les tableaux),
-// renvoyé sous forme de string d'1 caractère ; "" si hors limites.
+// string.char(s, i) : i-ème CARACTÈRE (codepoint UTF-8), 1-based ; renvoyé sous
+// forme de string ; "" si hors limites. (Index par codepoint, pas par octet.)
 static Value str_char(Value* args, int argc) {
     const std::string& s = strArg(args, argc, 0, "string.char");
     int i = toIntSafe(numArg(args, argc, 1, "string.char"));
-    if (i < 1 || i > (int)s.size())
+    size_t cnt = utf8Count(s);
+    if (i < 1 || (size_t)i > cnt)
         return Value(std::string(""));
-    return Value(std::string(1, s[i - 1]));
+    size_t b0 = utf8ByteOffset(s, (size_t)i - 1);
+    size_t b1 = utf8ByteOffset(s, (size_t)i);
+    return Value(s.substr(b0, b1 - b0));
 }
 
-// string.substr(s, start[, length]) : sous-chaîne à partir de start (1-based),
-// de longueur length (jusqu'à la fin si omis) ; bornes ajustées, "" si hors plage.
+// string.substr(s, start[, length]) : sous-chaîne à partir du caractère start
+// (1-based), de length CARACTÈRES (jusqu'à la fin si omis) ; bornes ajustées, ""
+// si hors plage. (Comptage par codepoint UTF-8, pas par octet.)
 static Value str_substr(Value* args, int argc) {
     const std::string& s = strArg(args, argc, 0, "string.substr");
+    size_t cnt = utf8Count(s);
     int start = toIntSafe(numArg(args, argc, 1, "string.substr"));
-    int len = (argc >= 3) ? toIntSafe(numArg(args, argc, 2, "string.substr")) : (int)s.size();
+    int len = (argc >= 3) ? toIntSafe(numArg(args, argc, 2, "string.substr")) : (int)cnt;
     if (start < 1)
         start = 1;
-    if (len <= 0 || start > (int)s.size())
+    if (len <= 0 || (size_t)start > cnt)
         return Value(std::string(""));
-    int avail = (int)s.size() - (start - 1);
-    if (len > avail)
-        len = avail;
-    return Value(s.substr((size_t)(start - 1), (size_t)len));
+    size_t startCp = (size_t)start - 1;
+    size_t endCp = startCp + (size_t)len; // borné à cnt ci-dessous
+    if (endCp > cnt)
+        endCp = cnt;
+    size_t b0 = utf8ByteOffset(s, startCp);
+    size_t b1 = utf8ByteOffset(s, endCp);
+    return Value(s.substr(b0, b1 - b0));
 }
 
 Value makeStringModule() {
