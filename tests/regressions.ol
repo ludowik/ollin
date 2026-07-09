@@ -287,4 +287,18 @@ assert(math.map(5, 2, 2, 7, 99) == 7)           ## plage d'entrée nulle → out
 assert(not math.is_inf(math.map(5, 2, 2, 0, 10)))
 assert(math.map(5, 0, 10, 0, 100) == 50)
 
+## ── string/math : cast double→int gardé (avant : UB / trap WASM sur index géant) ──
+assert(string.char("abc", 1e300) == "")         ## index hors plage → "" (pas de trap)
+assert(string.char("abc", math.sqrt(-1)) == "") ## NaN
+assert(string.substr("hello", 1e300) == "")
+assert(string.substr("hello", 2, 1e300) == "ello")  ## len géant → clampé
+assert(string.char("abc", 2) == "b")            ## cas normal
+global str_c = "none"
+try
+    var r = math.rand_int(1e300)                ## arg hors plage int64 → erreur claire
+catch e
+    str_c = "x"
+end
+assert(str_c == "x")
+
 print("regressions ok")

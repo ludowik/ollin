@@ -232,17 +232,26 @@ static Value math_rand(Value* args, int argc) {
     return Value(lo + r * (hi - lo));
 }
 
+// Argument entier : (int64_t)numArg est UB (trap WASM) si le double est NaN/inf
+// ou hors plage int64. doubleFitsInt64 (value.h) garde le cast → erreur claire.
+static int64_t intArg(const Value* args, int argc, int i, const char* fn) {
+    double d = numArg(args, argc, i, fn);
+    if (!doubleFitsInt64(d))
+        throw std::runtime_error(std::string(fn) + ": argument entier hors plage");
+    return (int64_t)d;
+}
+
 static Value math_rand_int(Value* args, int argc) {
     if (argc == 0)
         throw std::runtime_error("math.rand_int: at least one argument required");
     if (argc == 1) {
-        int64_t hi = (int64_t)numArg(args, argc, 0, "math.rand_int");
+        int64_t hi = intArg(args, argc, 0, "math.rand_int");
         if (hi <= 0)
             throw std::runtime_error("math.rand_int: argument must be > 0");
         return Value((int64_t)(rand() % hi + 1));
     }
-    int64_t lo = (int64_t)numArg(args, argc, 0, "math.rand_int");
-    int64_t hi = (int64_t)numArg(args, argc, 1, "math.rand_int");
+    int64_t lo = intArg(args, argc, 0, "math.rand_int");
+    int64_t hi = intArg(args, argc, 1, "math.rand_int");
     if (lo > hi)
         throw std::runtime_error("math.rand_int: lo must be <= hi");
     return Value(lo + (int64_t)(rand() % (hi - lo + 1)));
