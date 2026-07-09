@@ -44,6 +44,14 @@ static std::string keyName(int key) {
 // raylib (< 512). Zéro-initialisé (durée de vie statique).
 static bool s_down[512];
 
+// Remet l'état « enfoncé » à zéro. Appelé au début de chaque gfx_run : sur
+// l'instance WASM partagée, s_down est statique et survivrait sinon d'un run au
+// suivant (touche tenue à travers un reset → keyrelease sans keypressed).
+void keyboardReset() {
+    for (int i = 0; i < 512; i++)
+        s_down[i] = false;
+}
+
 void keyboardPoll() {
     VM* vm = VM::current();
     Value kbd = vm->getGlobal("keyboard");

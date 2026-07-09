@@ -732,6 +732,7 @@ static Value gfx_run(Value* args, int argc) {
     s_elapsed_time = 0.0;
     s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
     s_fps_ema = 0.0;
+    keyboardReset();            // état clavier neuf (s_down statique persiste entre runs WASM)
     s_update_callback = VM::current()->getGlobal("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
