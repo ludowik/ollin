@@ -1,5 +1,6 @@
 #pragma once
 // Inclus par chunk.h après Map et Array — ne pas inclure directement.
+#include <cstdint> // uint8_t (underlying type de Iterator::Kind)
 #include <utility>
 #include <vector>
 
