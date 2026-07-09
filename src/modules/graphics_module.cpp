@@ -11,6 +11,15 @@
 #include <emscripten.h>
 #endif
 
+// Le module `blend` (modules.cpp) expose les modes de fusion en littéraux 0..5
+// pour éviter d'inclure raylib.h dans un fichier qui compile aussi sans raylib.
+// Ce fichier-ci a raylib.h : on verrouille la correspondance à la COMPILATION.
+// Si raylib renumérote BlendMode, ce static_assert casse le build (au lieu d'un
+// mauvais mode appliqué silencieusement via graphics.blendMode(blend.*)).
+static_assert(BLEND_ALPHA == 0 && BLEND_ADDITIVE == 1 && BLEND_MULTIPLIED == 2 && BLEND_ADD_COLORS == 3 &&
+                  BLEND_SUBTRACT_COLORS == 4 && BLEND_ALPHA_PREMULTIPLY == 5,
+              "module blend (modules.cpp) : les littéraux ne correspondent plus à l'enum raylib BlendMode");
+
 static int toInt(const Value& v) {
     if (v.isInteger())
         return (int)v.asInt();
