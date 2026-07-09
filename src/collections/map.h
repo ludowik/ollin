@@ -33,12 +33,17 @@ struct MapPool {
         }
         return new Map();
     }
+    // clear() ne libère pas les buckets de robin_hood → ne pooler que les petites
+    // maps, sinon une map transitoire volumineuse resterait épinglée dans ce pool
+    // static (mémoire jamais rendue). Cf. ArrayPool / ArrayIteratorPool.
+    static constexpr size_t POOL_MAX_SIZE = 1024;
     void release(Map* m) {
-        m->data.clear();
-        if (n < CAP)
+        if (n < CAP && m->data.size() <= POOL_MAX_SIZE) {
+            m->data.clear();
             buf[n++] = m;
-        else
+        } else {
             delete m;
+        }
     }
 };
 inline MapPool& map_pool() {

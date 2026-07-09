@@ -28,12 +28,10 @@ struct RangeIterator : Iterator {
             (step > 0) ? (incl_right ? current > end : current >= end) : (incl_right ? current < end : current <= end);
         if (done)
             return false;
-        // borne haute STRICTE (< 2^63) : (double)INT64_MAX arrondit à 2^63, non
-        // représentable en int64 → le cast serait UB. -2^63 (INT64_MIN) l'est.
-        out = (current == std::floor(current) && current >= -9223372036854775808.0 &&
-               current < 9223372036854775808.0)
-                  ? Value((int64_t)current)
-                  : Value(current);
+        // Repli en entier si current est un entier exact tenant dans int64
+        // (doubleFitsInt64 garde le cast — cf. value.h).
+        out = (doubleFitsInt64(current) && current == std::floor(current)) ? Value((int64_t)current)
+                                                                           : Value(current);
         current += step;
         return true;
     }

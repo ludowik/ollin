@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 14:03</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-09 15:44</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 14:03</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-09 15:44</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -452,7 +452,7 @@ pre:hover .code-actions,
 <tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
 <tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Booléens. <code>true</code> vaut 1, <code>false</code> vaut 0.</td></tr>
 <tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code>, <code class="num">0xFF</code>, <code class="num">0o17</code>, <code class="num">0b1010</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>). Bases : décimale, <code>0x</code> hexadécimale, <code>0o</code> octale, <code>0b</code> binaire.</td></tr>
-<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code></td><td>Nombre à virgule flottante (double précision).</td></tr>
+<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code>, <code class="num">6.022e23</code>, <code class="num">2e-3</code></td><td>Nombre à virgule flottante (double précision). Notation scientifique : un exposant <code>e</code>/<code>E</code> (signe optionnel) rend le littéral flottant (<code class="num">1e3</code> == 1000, <code class="num">2e-3</code> == 0.002).</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>Chaîne UTF-8 immuable.</td></tr>
 <tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident). Ajout d'un item sans guillemets : <code>m.b = 2</code> (équivalent à <code>m["b"] = 2</code>).</td></tr>
 <tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1.</td></tr>

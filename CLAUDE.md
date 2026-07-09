@@ -349,7 +349,7 @@ Les ranges ouverts (`[a;b[`, `]a;b]`…) et `for k,v in …` gardent le chemin i
 
 > Syntaxe littérale JSON-like, accès `m["k"]` / `m.k`, sémantique : voir `grammar.ebnf` (`mapLit`, `indexAssign`).
 
-Implémentation : `Map { unordered_map<Value,Value,ValueHash,ValueEqual> data; int refcount; }` — pure hashmap, ref-counted.  
+Implémentation : `Map { robin_hood::unordered_map<Value,Value,ValueHash,ValueEqual> data; int refcount; }` — hashmap **`robin_hood`** (mono-header vendorisé `libs/robin_hood.h`, même lib que le `StringTable` ; variante *node* car `Value` n'est pas trivialement copiable), ref-counted, recyclé via `MapPool`.  
 Clés de tout type Value (ValueHash/ValueEqual : INTEGER(1)==FLOAT(1.0), strings par pointeur).  
 Sémantique de copie : référence comptée (partage de la même map, pas clone).  
 `isFalsy(map)` → `mapSize() == 0` (« le vide est faux » ; une instance a ≥1 clé `__class__` → truthy). Idem `isFalsy(array)` → `arraySize() == 0`.  

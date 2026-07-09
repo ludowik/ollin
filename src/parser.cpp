@@ -908,7 +908,10 @@ std::unique_ptr<Expr> Parser::primary() {
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'b' || lex[1] == 'B'))
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 2)));
-            if (lex.find('.') == std::string::npos)
+            // flottant si '.' OU exposant scientifique ('e'/'E') ; sinon entier.
+            // (les préfixes hex/oct/bin sont déjà traités au-dessus.)
+            if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos &&
+                lex.find('E') == std::string::npos)
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
             return std::make_unique<NumberExpr>(std::stod(lex));
         } catch (const std::out_of_range&) {

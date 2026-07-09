@@ -116,6 +116,28 @@ Token Lexer::number(bool leading_dot) {
             break;
         }
     }
+    // exposant scientifique optionnel : [eE] [+-]? chiffres → le nombre est flottant.
+    // (les littéraux hex/oct/bin sont déjà retournés plus haut, jamais ici.)
+    if (!atEnd() && (peek() == 'e' || peek() == 'E')) {
+        if (prev_underscore) // '_' juste avant l'exposant → invalide (ex. 1_e5)
+            throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
+        digits += 'e';
+        advance();
+        if (!atEnd() && (peek() == '+' || peek() == '-')) {
+            digits += peek();
+            advance();
+        }
+        bool exp_digit = false;
+        while (!atEnd() && std::isdigit((unsigned char)peek())) {
+            digits += peek();
+            advance();
+            exp_digit = true;
+        }
+        if (!exp_digit) // 'e' sans chiffre (ex. 1e, 1e+)
+            throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
+        last_was_digit = true;
+        prev_underscore = false;
+    }
     // '_' final (ou non suivi d'un chiffre), ou caractère alphanumérique / '.' / '_' collé
     if (prev_underscore || (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '.' || peek() == '_')))
         throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
