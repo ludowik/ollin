@@ -1,7 +1,7 @@
 #include "image_module.h"
+#include "module_utils.h"
 #include "value.h"
 #include "vm.h"
-#include "image_module.h"
 #include "keyboard_module.h"
 #include "mouse_module.h"
 #include <raylib.h>
@@ -324,10 +324,10 @@ static Value gfx_line(Value* args, int argc) {
         throw std::runtime_error("graphics.line: expected x1, y1, x2, y2");
     if (!s_has_stroke)
         return Value{};
-    float x1 = (float)args[0].asNum();
-    float y1 = (float)args[1].asNum();
-    float x2 = (float)args[2].asNum();
-    float y2 = (float)args[3].asNum();
+    float x1 = (float)numArg(args, 0, "graphics.line");
+    float y1 = (float)numArg(args, 1, "graphics.line");
+    float x2 = (float)numArg(args, 2, "graphics.line");
+    float y2 = (float)numArg(args, 3, "graphics.line");
     if (s_stroke_size <= 1.0f)
         DrawLine((int)x1, (int)y1, (int)x2, (int)y2, s_stroke_color);
     else
@@ -420,30 +420,36 @@ static void polyFill(std::vector<Vector2> pts, Color color) {
         DrawTriangle(hub, pts[(i + 1) % n], pts[i], color);
 }
 
-static std::vector<Vector2> parsePoints(const Value& v) {
+static std::vector<Vector2> parsePoints(const Value& v, const char* fn) {
     std::vector<Vector2> pts;
     if (!v.isArray())
         return pts;
     const auto& items = v.aptr->items;
     if (items.empty())
         return pts;
+    auto req = [&](const Value& c) -> float {
+        if (!c.isNumber())
+            throw std::runtime_error(std::string(fn) + ": les coordonnées de point doivent être des nombres");
+        return (float)c.asNum();
+    };
     if (items[0].isArray()) {
         for (const auto& p : items) {
             if (!p.isArray() || p.aptr->items.size() < 2)
                 continue;
-            pts.push_back({(float)p.aptr->items[0].asNum(), (float)p.aptr->items[1].asNum()});
+            pts.push_back({req(p.aptr->items[0]), req(p.aptr->items[1])});
         }
     } else {
         for (size_t i = 0; i + 1 < items.size(); i += 2)
-            pts.push_back({(float)items[i].asNum(), (float)items[i + 1].asNum()});
+            pts.push_back({req(items[i]), req(items[i + 1])});
     }
     return pts;
 }
 
 static Value gfx_polygon(Value* args, int argc) {
+    static constexpr const char* FN = "graphics.polygon";
     if (argc < 1 || !args[0].isArray())
-        throw std::runtime_error("graphics.polygon: expected array of points");
-    auto pts = parsePoints(args[0]);
+        throw std::runtime_error(std::string(FN) + ": expected array of points");
+    auto pts = parsePoints(args[0], FN);
     if ((int)pts.size() < 3)
         return Value{};
     if (s_has_fill)
@@ -457,11 +463,12 @@ static Value gfx_polygon(Value* args, int argc) {
 }
 
 static Value gfx_polyline(Value* args, int argc) {
+    static constexpr const char* FN = "graphics.polyline";
     if (argc < 1 || !args[0].isArray())
-        throw std::runtime_error("graphics.polyline: expected array of points");
+        throw std::runtime_error(std::string(FN) + ": expected array of points");
     if (!s_has_stroke)
         return Value{};
-    auto pts = parsePoints(args[0]);
+    auto pts = parsePoints(args[0], FN);
     int n = (int)pts.size();
     for (int i = 0; i < n - 1; i++)
         DrawLineEx(pts[i], pts[i + 1], s_stroke_size, s_stroke_color);
@@ -532,8 +539,8 @@ static Value gfx_ellipse(Value* args, int argc) {
     if (argc < 4)
         throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
     int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : 32;
-    drawOval((float)args[0].asNum(), (float)args[1].asNum(), (float)args[2].asNum() * 0.5f,
-             (float)args[3].asNum() * 0.5f, segs);
+    drawOval((float)numArg(args, 0, "graphics.ellipse"), (float)numArg(args, 1, "graphics.ellipse"),
+             (float)numArg(args, 2, "graphics.ellipse") * 0.5f, (float)numArg(args, 3, "graphics.ellipse") * 0.5f, segs);
     return Value{};
 }
 
@@ -541,8 +548,8 @@ static Value gfx_circle(Value* args, int argc) {
     if (argc < 3)
         throw std::runtime_error("graphics.circle: expected x, y, radius");
     int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : 32;
-    float r = (float)args[2].asNum();
-    drawOval((float)args[0].asNum(), (float)args[1].asNum(), r, r, segs);
+    float r = (float)numArg(args, 2, "graphics.circle");
+    drawOval((float)numArg(args, 0, "graphics.circle"), (float)numArg(args, 1, "graphics.circle"), r, r, segs);
     return Value{};
 }
 
@@ -551,13 +558,15 @@ static Value gfx_point(Value* args, int argc) {
         throw std::runtime_error("graphics.point: expected x, y");
     if (!s_has_stroke)
         return Value{};
-    float x = (float)args[0].asNum();
-    float y = (float)args[1].asNum();
+    float x = (float)numArg(args, 0, "graphics.point");
+    float y = (float)numArg(args, 1, "graphics.point");
     DrawCircleV({x, y}, s_stroke_size, s_stroke_color);
     return Value{};
 }
 
-static bool s_quit = false;
+#ifndef __EMSCRIPTEN__
+static bool s_quit = false; // boucle native seulement (WASM : emscripten_cancel_main_loop)
+#endif
 
 // Delta de frame mesuré NOUS-MÊMES : horloge murale (GetTime()) lue à un point
 // UNIQUE par frame (entrée de renderFrame). On n'utilise PAS GetFrameTime()/
@@ -760,22 +769,22 @@ static Value gfx_pop(Value* args, int argc) {
 static Value gfx_translate(Value* args, int argc) {
     if (argc < 2)
         throw std::runtime_error("graphics.translate: expected x, y");
-    rlTranslatef((float)args[0].asNum(), (float)args[1].asNum(), 0.0f);
+    rlTranslatef((float)numArg(args, 0, "graphics.translate"), (float)numArg(args, 1, "graphics.translate"), 0.0f);
     return Value{};
 }
 
 static Value gfx_rotate(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.rotate: expected angle (degrees)");
-    rlRotatef((float)args[0].asNum(), 0.0f, 0.0f, 1.0f);
+    rlRotatef((float)numArg(args, 0, "graphics.rotate"), 0.0f, 0.0f, 1.0f);
     return Value{};
 }
 
 static Value gfx_scale(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.scale: expected sx [, sy]");
-    float sx = (float)args[0].asNum();
-    float sy = argc > 1 ? (float)args[1].asNum() : sx;
+    float sx = (float)numArg(args, 0, "graphics.scale");
+    float sy = argc > 1 ? (float)numArg(args, 1, "graphics.scale") : sx;
     rlScalef(sx, sy, 1.0f);
     return Value{};
 }
@@ -799,10 +808,10 @@ static Value gfx_sprite(Value* args, int argc) {
         throw std::runtime_error("graphics.sprite: invalid image handle");
     int id = (int)idv.asInt();
 
-    float x = (float)args[1].asNum();
-    float y = (float)args[2].asNum();
-    float dw = argc > 3 ? (float)args[3].asNum() : 0.0f;
-    float dh = argc > 4 ? (float)args[4].asNum() : 0.0f;
+    float x = (float)numArg(args, 1, "graphics.sprite");
+    float y = (float)numArg(args, 2, "graphics.sprite");
+    float dw = argc > 3 ? (float)numArg(args, 3, "graphics.sprite") : 0.0f;
+    float dh = argc > 4 ? (float)numArg(args, 4, "graphics.sprite") : 0.0f;
 
     bool has = false;
     unsigned char r = 255, g = 255, b = 255, a = 255;
