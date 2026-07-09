@@ -260,4 +260,21 @@ var col_b = col_c.gray(0.25)            ## MÊME méthode, sur une instance → 
 assert(col_b.r == 0.25 and col_b.g == 0.25)
 assert(Color.random().a == 1 and col_c.random().a == 1)  ## random statique, deux modes
 
+## ── core : print de plusieurs instances à __str (avant : use-after-free) ──────
+## valueToString(__str) exécute du bytecode et peut réallouer regs ; print lisait
+## args[i] directement dans regs → pointeur pendant pour les args suivants. Corrigé
+## en copiant les args (comme printf). On vérifie juste que ça ne crashe pas.
+class PrUAF
+    func init(n) self.n = n end
+    func __str() return "P" + self.n end
+end
+func pr_deep(d)
+    if d > 0 then
+        return pr_deep(d - 1)
+    end
+    return PrUAF(9)
+end
+print(PrUAF(1), 42, PrUAF(2), PrUAF(3))
+print(pr_deep(30), PrUAF(4), pr_deep(20))
+
 print("regressions ok")

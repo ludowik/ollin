@@ -37,10 +37,14 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
 }
 
 static Value core_print(Value* args, int argc) {
+    // Copie AVANT toute conversion : valueToString peut invoquer __str, qui exécute
+    // du bytecode et peut réallouer regs → `args` (pointeur dans regs) deviendrait
+    // pendant pour les arguments suivants. Même précaution que core_printf.
+    std::vector<Value> vargs(args, args + argc);
     for (int i = 0; i < argc; ++i) {
         if (i)
             std::cout << ' ';
-        std::cout << valueToString(args[i]);
+        std::cout << valueToString(vargs[i]);
     }
     std::cout << '\n';
     return Value{};
