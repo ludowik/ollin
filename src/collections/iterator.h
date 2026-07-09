@@ -4,7 +4,14 @@
 #include <vector>
 
 struct Iterator {
+    // Tag concret : permet à la VM (FOR_ITER_NEXT1) de dévirtualiser le cas range —
+    // appel direct inlinable au lieu d'un appel virtuel par élément — sans dupliquer
+    // la logique d'avancement (advance() reste l'unique implémentation).
+    enum Kind : uint8_t { KIND_MAP, KIND_ARRAY, KIND_RANGE };
+    Kind kind;
     int refcount = 1;
+    explicit Iterator(Kind k) : kind(k) {
+    }
     virtual bool next(Value& key, Value& val) = 0;
     virtual bool next_primary(Value& out) = 0; // FOR_ITER_NEXT1: retourne seulement la valeur primaire
     virtual bool primary_is_val() const = 0;   // true=val (array/range), false=key (map)
@@ -17,7 +24,7 @@ struct Iterator {
 struct MapIterator : Iterator {
     std::vector<std::pair<Value, Value>> snapshot;
     size_t pos = 0;
-    explicit MapIterator(Map* m) {
+    explicit MapIterator(Map* m) : Iterator(KIND_MAP) {
         snapshot.reserve(m->data.size());
         for (auto& [k, v] : m->data)
             snapshot.emplace_back(k, v);
@@ -45,7 +52,7 @@ struct MapIterator : Iterator {
 struct ArrayIterator : Iterator {
     std::vector<Value> items; // snapshot au moment du for-in (cohérent avec MapIterator)
     int64_t pos = 0;
-    explicit ArrayIterator(Array* a) : items(a->items) {
+    explicit ArrayIterator(Array* a) : Iterator(KIND_ARRAY), items(a->items) {
     }
     bool next(Value& key, Value& val) override {
         if (pos >= (int64_t)items.size())

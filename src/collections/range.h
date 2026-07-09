@@ -16,10 +16,13 @@ struct RangeIterator : Iterator {
     double step;
     bool incl_right;
 
-    explicit RangeIterator(Range* r) : current(r->start), end(r->end), step(r->step), incl_right(r->incl_right) {
+    explicit RangeIterator(Range* r)
+        : Iterator(KIND_RANGE), current(r->start), end(r->end), step(r->step), incl_right(r->incl_right) {
     }
 
-  private:
+    // public + non virtuel : appelé directement par FOR_ITER_NEXT1 (dévirtualisation
+    // via Iterator::kind) → inlinable. next()/next_primary() restent les points
+    // d'entrée du protocole virtuel générique et délèguent à advance().
     bool advance(Value& out) {
         bool done =
             (step > 0) ? (incl_right ? current > end : current >= end) : (incl_right ? current < end : current <= end);

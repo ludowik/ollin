@@ -211,4 +211,35 @@ global mk2 = {}
 mk2[1] = 10
 assert(mk2[1.0] == 10)
 
+## ── range : bornes non finies rejetées + itération (chemin itérateur dévirtualisé) ──
+## (avant : MAKE_RANGE et FOR_PREP acceptaient inf/NaN → itération infinie / gel)
+global rng_c1 = "none"
+try
+    for i = 0.0, math.exp(1000) do break end   ## for numérique, borne +inf
+catch e
+    rng_c1 = "x"
+end
+assert(rng_c1 == "x")                          ## doit lever, pas boucler
+global rng_c2 = "none"
+try
+    var rng_bad = ]0; math.exp(1000)]          ## range ouvert (MAKE_RANGE), borne +inf
+catch e
+    rng_c2 = "x"
+end
+assert(rng_c2 == "x")
+global rng_c3 = "none"
+try
+    var rng_nan = [0; math.sqrt(-1)]           ## borne NaN
+catch e
+    rng_c3 = "x"
+end
+assert(rng_c3 == "x")
+var rng_s = 0
+for i in ]1; 5] do rng_s += i end              ## open-left → itérateur range (dévirtualisé)
+assert(rng_s == 14)                            ## 2+3+4+5
+var rng_r = [1; 4]
+var rng_t = 0
+for i in rng_r do rng_t += i end               ## range value → itérateur range
+assert(rng_t == 10)                            ## 1+2+3+4
+
 print("regressions ok")

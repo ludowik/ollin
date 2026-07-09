@@ -8,6 +8,21 @@
 
 static VM* s_current_vm = nullptr;
 
+// Validation partagée des bornes d'un range / for numérique. Source de vérité
+// unique pour les deux voies d'itération (objet Range via MAKE_RANGE, et chemin
+// rapide via FOR_PREP branche float) : le pas doit être non nul, et les bornes
+// finies — une borne NaN/infinie ne satisferait jamais la condition de fin et
+// ferait boucler l'itération indéfiniment. (La branche int de FOR_PREP n'appelle
+// pas cette fonction : les entiers sont finis par construction, elle garde son
+// propre test de pas nul.)
+static void validateNumericRange(double start, double end, double step, int line) {
+    if (step == 0.0)
+        throw std::runtime_error("line " + std::to_string(line) + ": runtime: le pas ne peut pas être 0");
+    if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(step))
+        throw std::runtime_error("line " + std::to_string(line) +
+                                 ": runtime: bornes de range non finies (NaN/infini interdit)");
+}
+
 // ── Interned meta-key constants (initialized once, reused across all calls) ───
 struct MetaKeys {
     Value class_, parent_, str_, name_, init_;
@@ -1169,8 +1184,14 @@ dispatch_loop:
 
     op_FOR_ITER_NEXT1: {
         {
+            Iterator* it = regs[base + A].iptr;
             Value primary;
-            if (!regs[base + A].iptr->next_primary(primary)) {
+            // Cas range dévirtualisé : appel direct (inlinable) à advance(), sans
+            // indirection vtable par élément. Les autres itérateurs gardent la voie
+            // virtuelle. Même logique d'avancement (advance()), pas de duplication.
+            bool ok = (it->kind == Iterator::KIND_RANGE) ? static_cast<RangeIterator*>(it)->advance(primary)
+                                                         : it->next_primary(primary);
+            if (!ok) {
                 ip = Bx;
             } else {
                 regs[base + A + 1] = std::move(primary);
@@ -1351,8 +1372,7 @@ dispatch_loop:
             double start = toDouble_(regs[base + B]);
             double end = toDouble_(regs[base + B + 1]);
             double step = has_step ? toDouble_(regs[base + B + 2]) : 1.0;
-            if (step == 0.0)
-                throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range step cannot be zero");
+            validateNumericRange(start, end, step, line_);
             Range* r = new Range{1, start, end, step, incl_right};
             regs[base + A] = Value::makeRange(r);
         }
@@ -1388,9 +1408,7 @@ dispatch_loop:
                 }
             } else {
                 double di = vi.asNum(), dl = vl.asNum(), ds = vs.asNum();
-                if (ds == 0.0)
-                    throw std::runtime_error("line " + std::to_string(errLine()) +
-                                             ": runtime: for: le pas ne peut pas être 0");
+                validateNumericRange(di, dl, ds, errLine());
                 regs[base + A] = Value(di); // normalise tout en double
                 regs[base + A + 1] = Value(dl);
                 regs[base + A + 2] = Value(ds);
