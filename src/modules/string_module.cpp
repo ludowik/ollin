@@ -151,8 +151,17 @@ static Value str_substr(Value* args, int argc) {
     return Value(s.substr(b0, b1 - b0));
 }
 
+// string.len(s) : nombre de CARACTÈRES (codepoints UTF-8) de la chaîne. Contrairement
+// au builtin global len (polymorphe : array/map/string/range), celui-ci n'accepte
+// QU'une string — un autre type lève une erreur (via strArg).
+static Value str_len(Value* args, int argc) {
+    const std::string& s = strArg(args, argc, 0, "string.len");
+    return Value((int64_t)utf8Count(s));
+}
+
 Value makeStringModule() {
     Value m = Value::makeMap();
+    m.mapSet(Value(std::string("len")), Value::makeBuiltin(str_len));
     m.mapSet(Value(std::string("upper")), Value::makeBuiltin(str_upper));
     m.mapSet(Value(std::string("lower")), Value::makeBuiltin(str_lower));
     m.mapSet(Value(std::string("trim")), Value::makeBuiltin(str_trim));

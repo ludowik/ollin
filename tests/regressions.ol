@@ -318,5 +318,17 @@ assert(string.lower("ÉÀÙÇ") == "éàùç")
 assert(string.upper("straße") == "STRASSE")  ## ß → SS
 assert(string.trim("··café··", "·") == "café")  ## trim par codepoint (· = 2 octets)
 assert(string.rtrim("«café»", "»") == "«café")
+## string.len : longueur par codepoint, string uniquement (pas polymorphe comme len global)
+assert(string.len("café") == 4)               ## é = 2 octets, 1 caractère
+assert(string.len("a€b") == 3)                ## € = 3 octets, 1 caractère
+assert(string.len("") == 0)
+assert(string.len("hello") == len("hello"))   ## cohérent avec le len global sur string
+global str_len_err = "none"
+try
+    string.len([1, 2, 3])                     ## non-string → erreur (contrairement à len global)
+catch e
+    str_len_err = "caught"
+end
+assert(str_len_err == "caught")
 
 print("regressions ok")

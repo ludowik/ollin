@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-10 15:44</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-10 17:36</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-10 15:44</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-10 17:36</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1303,6 +1303,7 @@ math.noise_seed(<span class="num">42</span>)             <span class="cmt">## br
 <table>
   <thead><tr><th>Nom</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
+    <tr><td><code>string.len(s)</code></td><td>fonction</td><td>Nombre de caractères (codepoints UTF-8) de la chaîne — n'accepte qu'une <code>string</code> (contrairement au <code>len</code> global, polymorphe)</td></tr>
     <tr><td><code>string.upper(s)</code></td><td>fonction</td><td>Chaîne en majuscules</td></tr>
     <tr><td><code>string.lower(s)</code></td><td>fonction</td><td>Chaîne en minuscules</td></tr>
     <tr><td><code>string.trim(s [, chars])</code></td><td>fonction</td><td>Retire aux deux extrémités les caractères de <code>chars</code> (espace par défaut)</td></tr>
@@ -1315,7 +1316,8 @@ math.noise_seed(<span class="num">42</span>)             <span class="cmt">## br
 
 <div class="callout tip">Tout est <strong>UTF-8, par caractère (codepoint)</strong>, pas par octet. <code>len</code>/<code>string.char</code>/<code>string.substr</code> comptent les caractères (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>) ; <code>string.trim</code> rogne par codepoint ; <code>string.upper</code>/<code>lower</code> gèrent les lettres accentuées latines (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Au-delà du latin (grec, cyrillique…), la casse laisse le texte inchangé.</div>
 
-<pre><code><span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
+<pre><code><span class="bi">print</span>(string.len(<span class="str">"café"</span>))           <span class="cmt">## 4 (codepoints, pas octets)</span>
+<span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
 <span class="bi">print</span>(string.lower(<span class="str">"HELLO"</span>))         <span class="cmt">## hello</span>
 <span class="bi">print</span>(string.trim(<span class="str">"  salut  "</span>))      <span class="cmt">## salut</span>
 <span class="bi">print</span>(string.char(<span class="str">"ollin"</span>, <span class="num">1</span>))       <span class="cmt">## o</span>

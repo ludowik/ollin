@@ -199,6 +199,7 @@ const MODULE_MEMBERS = {
     fn('Color.random','random() → couleur aléatoire'),
   ],
   string: [
+    fn('string.len','len(s) → int'),
     fn('string.upper','upper(s)'), fn('string.lower','lower(s)'), fn('string.trim','trim(s[,chars])'),
     fn('string.ltrim','ltrim(s[,chars])'), fn('string.rtrim','rtrim(s[,chars])'),
     fn('string.char','char(s,i)'), fn('string.substr','substr(s,start[,len])'),
