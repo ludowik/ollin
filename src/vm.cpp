@@ -1540,6 +1540,12 @@ void VM::execute(Chunk chunk) {
             } else if (owned_chunk.identifiers[gi] == "H") {
                 globals[gi] = Value(win_h);
                 globals_init[gi] = true;
+            } else if (owned_chunk.identifiers[gi] == "CW") {
+                globals[gi] = Value(win_w / 2);
+                globals_init[gi] = true;
+            } else if (owned_chunk.identifiers[gi] == "CH") {
+                globals[gi] = Value(win_h / 2);
+                globals_init[gi] = true;
             }
         }
     }
