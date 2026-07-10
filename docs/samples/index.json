@@ -12,5 +12,6 @@
   { "name": "Image (load_data)", "file": "image_demo.ol" },
   { "name": "Bruit de Perlin", "file": "noise_field.ol" },
   { "name": "SUTOM",          "file": "sutom.ol" },
-  { "name": "Jeu de la vie",  "file": "game_of_life.ol" }
+  { "name": "Jeu de la vie",  "file": "game_of_life.ol" },
+  { "name": "Cube 3D",        "file": "cube_3d.ol" }
 ]

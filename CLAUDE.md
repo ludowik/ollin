@@ -303,6 +303,16 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 
 **Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
 
+## Affichage 3D (graphics_module.cpp)
+
+La 3D s'appuie **directement sur l'API 3D de raylib** (`Camera3D`, `BeginMode3D`/`EndMode3D`, `DrawCube`/`DrawSphere`/`DrawGrid`…) — aucun moteur maison. Elle fonctionne desktop **et** WebGL2/GLES3 (vérifié).
+
+- **Intégration frame** : `graphics.begin3d(cam)` appelle `BeginMode3D` (projection perspective + depth test), `graphics.end3d()` appelle `EndMode3D` (restaure la projection ortho 2D → un HUD 2D peut suivre dans la même frame). Le bloc est ouvert **à l'intérieur** de `draw()`, donc dans la `RenderTexture` `s_target`.
+- **Caméra** : valeur de 1re classe = map `{px,py,pz, tx,ty,tz, [ux,uy,uz,] fovy}` produite par `graphics.camera(...)` ; `cameraFromMap()` la reconstruit en `Camera3D` (up défaut +Y, projection perspective).
+- **Profondeur** : la RT de raylib porte un depth buffer (desktop + GLES). `graphics.clear(couleur opaque)` → `ClearBackground` → `rlClearScreenBuffers` efface couleur **+ depth** ⇒ un clear opaque en début de frame suffit au test de profondeur (le chemin fondu `alpha<1` n'efface PAS le depth).
+- **fill/stroke** : les formes 3D suivent l'état 2D (`s_has_fill`/`s_has_stroke`) — plein (`DrawCube`) si fill, fil de fer (`DrawCubeWires`) si stroke, les deux si les deux. Pas de fonction `*_wires` séparée.
+- **Garde-fou** : `s_in_3d` ; `runUserCallbacks` referme un `begin3d` laissé ouvert par `draw()` (rééquilibre la pile de matrices de `BeginMode3D`). `end3d` est idempotent.
+
 ## Déclaration de variables (implémentation de l'enforcement)
 
 > Règle de langage (`var` = locale, `global` = globale, obligation de déclaration) : voir `grammar.ebnf` (`varDecl`, `globalDecl`, `assignStmt`).

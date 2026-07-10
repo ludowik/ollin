@@ -169,6 +169,14 @@ const MODULE_MEMBERS = {
     fn('graphics.draw_text','draw_text(text,x,y,size[,color])'),
     fn('graphics.fps','fps()→int'),                fn('graphics.is_open','is_open()→bool'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
+    // ── 3D ──
+    fn('graphics.camera','camera(px,py,pz, tx,ty,tz [, fovy])'),
+    fn('graphics.begin3d','begin3d(cam)'),         fn('graphics.end3d','end3d()'),
+    fn('graphics.grid','grid(slices, spacing)'),
+    fn('graphics.cube','cube(x,y,z, w,h,l)'),      fn('graphics.sphere','sphere(x,y,z, r)'),
+    fn('graphics.cylinder','cylinder(x,y,z, rTop,rBottom,h [, slices])'),
+    fn('graphics.plane','plane(x,y,z, sx,sz)'),
+    fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
   ],
   image: [
     fn('image.load','load(path) → img'),

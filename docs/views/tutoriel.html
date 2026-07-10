@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-10 17:36</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-10 20:19</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-10 17:36</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-10 20:19</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1660,6 +1660,40 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="cmt">## couleur aléatoire : Color.random() (pas besoin de la réimplémenter)</span>
 <span class="kw">var</span> c = <span class="bi">Color</span>.random()
 <span class="bi">print</span>(c.r, c.g, c.b)</code></pre>
+
+<h3>3D</h3>
+<p>Le dessin 3D partage la même boucle et le même état que la 2D. On place une <strong>caméra</strong>, puis on dessine des formes entre <code>graphics.begin3d(cam)</code> et <code>graphics.end3d()</code>. Comme en 2D, <code>fill</code>/<code>stroke</code> pilotent le remplissage et le contour (fil de fer). Après <code>end3d()</code>, on peut dessiner un <strong>HUD 2D</strong> par-dessus dans la même frame.</p>
+
+<div class="callout tip">En 3D, appelle <code>graphics.clear(<em>couleur opaque</em>)</code> au début de chaque frame : un effacement opaque remet à zéro le <strong>tampon de profondeur</strong> (indispensable au test de profondeur), en plus de la couleur.</div>
+
+<table>
+  <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Caméra regardant <code>(tx,ty,tz)</code> depuis <code>(px,py,pz)</code> ; <code>fovy</code> = champ de vision vertical en degrés (45 par défaut). Renvoie un handle réutilisable</td></tr>
+    <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>Encadrent les dessins 3D dans <code>draw()</code></td></tr>
+    <tr><td><code>graphics.grid(slices, spacing)</code></td><td>Repère quadrillé au sol (plan XZ), centré sur l'origine (couleur grise fixe)</td></tr>
+    <tr><td><code>graphics.cube(x,y,z, w,h,l)</code></td><td>Cube centré en <code>(x,y,z)</code> — plein si <code>fill</code>, arêtes si <code>stroke</code></td></tr>
+    <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>Sphère — pleine si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
+    <tr><td><code>graphics.cylinder(x,y,z, rTop,rBottom,h [, slices])</code></td><td><code>(x,y,z)</code> = centre de la base — plein si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
+    <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>Plan horizontal (XZ) de taille <code>sx</code>×<code>sz</code>, rempli</td></tr>
+    <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>Segment 3D (couleur <code>stroke</code>)</td></tr>
+    <tr><td><code>graphics.point3d(x,y,z)</code></td><td>Point 3D (couleur <code>stroke</code>)</td></tr>
+  </tbody>
+</table>
+
+<pre><code><span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## efface couleur + profondeur</span>
+    <span class="cmt">## caméra en orbite autour de l'origine</span>
+    <span class="kw">var</span> a = elapsedTime * <span class="num">0.5</span>
+    <span class="kw">var</span> cam = <span class="bi">graphics</span>.camera(<span class="bi">math</span>.cos(a) * <span class="num">10</span>, <span class="num">6</span>, <span class="bi">math</span>.sin(a) * <span class="num">10</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
+    <span class="bi">graphics</span>.begin3d(cam)
+        <span class="bi">graphics</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
+        <span class="bi">graphics</span>.fill(colors.RED)
+        <span class="bi">graphics</span>.stroke(colors.BLACK)
+        <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
+    <span class="bi">graphics</span>.end3d()
+    <span class="bi">graphics</span>.draw_text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>, <span class="num">22</span>)   <span class="cmt">## HUD 2D par-dessus</span>
+<span class="kw">end</span></code></pre>
 </section>
 
 <!-- ── Clavier ────────────────────────────────────────────────────────────── -->

@@ -237,6 +237,7 @@ static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
 static Color s_fill_color = WHITE;
+static bool s_in_3d = false;   // vrai entre graphics.begin3d et end3d (garde-fou de la frame)
 
 static void applyStrokeSize(float sz) {
     s_stroke_size = sz;
@@ -645,6 +646,10 @@ static void runUserCallbacks(const Value& drawFn) {
     mousePoll();
     callUpdateIfAny();
     VM::current()->callValue(const_cast<Value&>(drawFn));
+    if (s_in_3d) {              // draw() a oublié graphics.end3d → refermer pour rééquilibrer la pile
+        EndMode3D();
+        s_in_3d = false;
+    }
 }
 
 static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
@@ -830,6 +835,145 @@ static Value gfx_sprite(Value* args, int argc) {
     return Value{};
 }
 
+// ── 3D ────────────────────────────────────────────────────────────────────────
+// L'affichage 3D s'appuie DIRECTEMENT sur l'API raylib (Camera3D / BeginMode3D…).
+// La caméra est une valeur de 1re classe (map) construite par graphics.camera ;
+// begin3d/end3d encadrent les dessins 3D dans draw(). Les formes suivent l'état
+// fill/stroke exactement comme les primitives 2D (plein si fill, fil de fer si
+// stroke, les deux si les deux). La profondeur est remise à neuf par un
+// graphics.clear(couleur opaque) en début de frame (ClearBackground efface le
+// tampon couleur ET le depth via rlClearScreenBuffers).
+
+// Reconstruit une Camera3D raylib depuis le handle map (graphics.camera). up par
+// défaut = +Y ; projection perspective ; near/far = valeurs par défaut de raylib.
+static Camera3D cameraFromMap(const Value& v, const char* fn) {
+    if (!v.isMap())
+        throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
+    auto get = [&](const char* k, double def) -> float {
+        Value f = v.mapGet(Value(std::string(k)));
+        return f.isNumber() ? (float)f.asNum() : (float)def;
+    };
+    Camera3D cam{};
+    cam.position = Vector3{get("px", 0), get("py", 0), get("pz", 0)};
+    cam.target = Vector3{get("tx", 0), get("ty", 0), get("tz", 0)};
+    cam.up = Vector3{get("ux", 0), get("uy", 1), get("uz", 0)};
+    cam.fovy = get("fovy", 45.0);
+    cam.projection = CAMERA_PERSPECTIVE;
+    return cam;
+}
+
+// graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : handle caméra (map). Regarde
+// (tx,ty,tz) depuis (px,py,pz), up = +Y, champ de vision vertical fovy (45° défaut).
+static Value gfx_camera(Value* args, int argc) {
+    Value cam = Value::makeMap();
+    cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.camera")));
+    cam.mapSet(Value(std::string("py")), Value(numArg(args, argc, 1, "graphics.camera")));
+    cam.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 2, "graphics.camera")));
+    cam.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 3, "graphics.camera")));
+    cam.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 4, "graphics.camera")));
+    cam.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 5, "graphics.camera")));
+    cam.mapSet(Value(std::string("fovy")), Value(argc > 6 ? numArg(args, argc, 6, "graphics.camera") : 45.0));
+    return cam;
+}
+
+static Value gfx_begin3d(Value* args, int argc) {
+    if (argc < 1)
+        throw std::runtime_error("graphics.begin3d: expected a camera (graphics.camera)");
+    Camera3D cam = cameraFromMap(args[0], "graphics.begin3d");
+    BeginMode3D(cam);
+    s_in_3d = true;
+    return Value{};
+}
+
+static Value gfx_end3d(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    if (s_in_3d) {   // idempotent : le garde-fou de frame a pu déjà refermer
+        EndMode3D();
+        s_in_3d = false;
+    }
+    return Value{};
+}
+
+// graphics.grid(slices, spacing) : repère quadrillé au sol (plan XZ), centré sur
+// l'origine. Couleur grise fixe de raylib (n'utilise ni fill ni stroke).
+static Value gfx_grid(Value* args, int argc) {
+    int slices = argc > 0 ? toInt(args[0]) : 10;
+    float spacing = argc > 1 ? (float)numArg(args, argc, 1, "graphics.grid") : 1.0f;
+    DrawGrid(slices, spacing);
+    return Value{};
+}
+
+// graphics.cube(x,y,z, w,h,l) : cube centré en (x,y,z). Plein si fill, arêtes si stroke.
+static Value gfx_cube(Value* args, int argc) {
+    Vector3 pos{(float)numArg(args, argc, 0, "graphics.cube"), (float)numArg(args, argc, 1, "graphics.cube"),
+                (float)numArg(args, argc, 2, "graphics.cube")};
+    Vector3 size{(float)numArg(args, argc, 3, "graphics.cube"), (float)numArg(args, argc, 4, "graphics.cube"),
+                 (float)numArg(args, argc, 5, "graphics.cube")};
+    if (s_has_fill)
+        DrawCubeV(pos, size, s_fill_color);
+    if (s_has_stroke)
+        DrawCubeWiresV(pos, size, s_stroke_color);
+    return Value{};
+}
+
+// graphics.sphere(x,y,z, r) : sphère centrée en (x,y,z). Pleine si fill, fil de fer si stroke.
+static Value gfx_sphere(Value* args, int argc) {
+    Vector3 pos{(float)numArg(args, argc, 0, "graphics.sphere"), (float)numArg(args, argc, 1, "graphics.sphere"),
+                (float)numArg(args, argc, 2, "graphics.sphere")};
+    float r = (float)numArg(args, argc, 3, "graphics.sphere");
+    if (s_has_fill)
+        DrawSphere(pos, r, s_fill_color);
+    if (s_has_stroke)
+        DrawSphereWires(pos, r, 16, 16, s_stroke_color);
+    return Value{};
+}
+
+// graphics.cylinder(x,y,z, rTop, rBottom, h [, slices]) : (x,y,z) = centre de la
+// base. Plein si fill, fil de fer si stroke. slices = subdivisions (16 défaut).
+static Value gfx_cylinder(Value* args, int argc) {
+    Vector3 pos{(float)numArg(args, argc, 0, "graphics.cylinder"), (float)numArg(args, argc, 1, "graphics.cylinder"),
+                (float)numArg(args, argc, 2, "graphics.cylinder")};
+    float rTop = (float)numArg(args, argc, 3, "graphics.cylinder");
+    float rBottom = (float)numArg(args, argc, 4, "graphics.cylinder");
+    float h = (float)numArg(args, argc, 5, "graphics.cylinder");
+    int slices = argc > 6 ? toInt(args[6]) : 16;
+    if (s_has_fill)
+        DrawCylinder(pos, rTop, rBottom, h, slices, s_fill_color);
+    if (s_has_stroke)
+        DrawCylinderWires(pos, rTop, rBottom, h, slices, s_stroke_color);
+    return Value{};
+}
+
+// graphics.plane(x,y,z, sx,sz) : plan horizontal centré en (x,y,z), taille sx×sz
+// (XZ). Rempli : raylib n'a pas de variante fil de fer → couleur fill si active,
+// sinon stroke (pour rester visible avec noFill).
+static Value gfx_plane(Value* args, int argc) {
+    Vector3 pos{(float)numArg(args, argc, 0, "graphics.plane"), (float)numArg(args, argc, 1, "graphics.plane"),
+                (float)numArg(args, argc, 2, "graphics.plane")};
+    Vector2 size{(float)numArg(args, argc, 3, "graphics.plane"), (float)numArg(args, argc, 4, "graphics.plane")};
+    DrawPlane(pos, size, s_has_fill ? s_fill_color : s_stroke_color);
+    return Value{};
+}
+
+// graphics.line3d(x1,y1,z1, x2,y2,z2) : segment 3D (couleur stroke).
+static Value gfx_line3d(Value* args, int argc) {
+    Vector3 a{(float)numArg(args, argc, 0, "graphics.line3d"), (float)numArg(args, argc, 1, "graphics.line3d"),
+              (float)numArg(args, argc, 2, "graphics.line3d")};
+    Vector3 b{(float)numArg(args, argc, 3, "graphics.line3d"), (float)numArg(args, argc, 4, "graphics.line3d"),
+              (float)numArg(args, argc, 5, "graphics.line3d")};
+    DrawLine3D(a, b, s_stroke_color);
+    return Value{};
+}
+
+// graphics.point3d(x,y,z) : point 3D (couleur stroke).
+static Value gfx_point3d(Value* args, int argc) {
+    Vector3 p{(float)numArg(args, argc, 0, "graphics.point3d"), (float)numArg(args, argc, 1, "graphics.point3d"),
+              (float)numArg(args, argc, 2, "graphics.point3d")};
+    DrawPoint3D(p, s_stroke_color);
+    return Value{};
+}
+
 // Module `blend` : modes de fusion exposés via les enums raylib DIRECTEMENT
 // (source de vérité — pas de littéraux à maintenir/vérifier). Défini ici plutôt
 // que dans modules.cpp car ce dernier compile aussi sans raylib.
@@ -879,6 +1023,17 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("circle")), Value::makeBuiltin(gfx_circle));
     m.mapSet(Value(std::string("point")), Value::makeBuiltin(gfx_point));
     m.mapSet(Value(std::string("sprite")), Value::makeBuiltin(gfx_sprite));
+    // ── 3D ──
+    m.mapSet(Value(std::string("camera")), Value::makeBuiltin(gfx_camera));
+    m.mapSet(Value(std::string("begin3d")), Value::makeBuiltin(gfx_begin3d));
+    m.mapSet(Value(std::string("end3d")), Value::makeBuiltin(gfx_end3d));
+    m.mapSet(Value(std::string("grid")), Value::makeBuiltin(gfx_grid));
+    m.mapSet(Value(std::string("cube")), Value::makeBuiltin(gfx_cube));
+    m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
+    m.mapSet(Value(std::string("cylinder")), Value::makeBuiltin(gfx_cylinder));
+    m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
+    m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
+    m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     // Les constantes couleur ne sont PAS ici : utiliser le module `colors`.
     return m;
 }
