@@ -56,7 +56,6 @@ ollin/
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
-├── examples/          démos exécutables (graphics_demo, lines_demo, sprite_demo)
 ├── tools/             outillage build (update_build_date.py)
 ├── bench/             benchmarks (.ol / .lua / .py)
 └── docs/              tutoriel, playground, samples, wasm
