@@ -1541,10 +1541,10 @@ void VM::execute(Chunk chunk) {
                 globals[gi] = Value(win_h);
                 globals_init[gi] = true;
             } else if (owned_chunk.identifiers[gi] == "CW") {
-                globals[gi] = Value(win_w / 2);
+                globals[gi] = Value((double)win_w / 2.0);
                 globals_init[gi] = true;
             } else if (owned_chunk.identifiers[gi] == "CH") {
-                globals[gi] = Value(win_h / 2);
+                globals[gi] = Value((double)win_h / 2.0);
                 globals_init[gi] = true;
             }
         }

@@ -118,6 +118,15 @@ static Value gfx_canvas(Value* args, int argc) {
 #endif
     s_logicalW = w;
     s_logicalH = h;
+    // Repositionne les globales moteur sur la taille réelle du canvas : W/H aux
+    // dimensions logiques, CW/CH au centre (float). Ainsi graphics.canvas(w, h)
+    // recalcule W/H/CW/CH même quand w/h diffèrent des valeurs initiales window.
+    if (VM* vm = VM::current()) {
+        vm->setGlobal("W", Value((int64_t)w));
+        vm->setGlobal("H", Value((int64_t)h));
+        vm->setGlobal("CW", Value((double)w / 2.0));
+        vm->setGlobal("CH", Value((double)h / 2.0));
+    }
     // Cible de rendu persistante. On vise un sur-échantillonnage RELATIF au
     // logique (~SSAA×) pour l'anti-aliasing, MAIS sans jamais descendre sous la
     // résolution physique (netteté HiDPI). On NE multiplie donc PAS SSAA par le

@@ -291,12 +291,13 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 | `elapsedTime` | FLOAT | Secondes écoulées depuis le démarrage du programme (somme des deltaTime) |
 | `W` | INTEGER | Largeur de la zone de rendu (défaut : `window.width` selon l'environnement) |
 | `H` | INTEGER | Hauteur de la zone de rendu (défaut : `window.height`) |
-| `CW` | INTEGER | Centre X de la zone de rendu (`W / 2`, division entière) |
-| `CH` | INTEGER | Centre Y de la zone de rendu (`H / 2`, division entière) |
+| `CW` | FLOAT | Centre X de la zone de rendu (`W / 2`) |
+| `CH` | FLOAT | Centre Y de la zone de rendu (`H / 2`) |
 
 **Implémentation** :
 - `declared_globals_` les contient (pré-ajoutés dans `Compiler::compile()`) → le compilateur accepte ces noms sans `global`.
-- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, `W`/`H` aux dimensions de `window` (lues via `makeBuiltinModule("window")`) et `CW`/`CH` à `W/2`/`H/2` (division entière) **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
+- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, `W`/`H` (int) aux dimensions de `window` (lues via `makeBuiltinModule("window")`) et `CW`/`CH` (float) à `W/2`/`H/2` **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
+- `gfx_canvas()` (graphics_module.cpp) **repositionne** `W`/`H`/`CW`/`CH` sur les dimensions logiques réelles à chaque `graphics.canvas(w, h)` (via `setGlobal`) → les globales suivent la taille effective du canvas, même si elle diffère du défaut `window`.
 - `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `graphics_module.cpp` avant chaque frame.
 - `s_elapsed_time` (statique dans `graphics_module.cpp`) est remis à 0 à chaque `gfx_run()`.
 
