@@ -6,8 +6,10 @@
 #include "mouse_module.h"
 #include <raylib.h>
 #include <rlgl.h>
+#include <raymath.h>
 #include <cmath>
 #include <stdexcept>
+#include <vector>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -239,6 +241,8 @@ static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
 static Color s_fill_color = WHITE;
 static bool s_in_3d = false;   // vrai entre graphics.begin3d et end3d (garde-fou de la frame)
+static void end3dInternal();   // flush des buckets 3D + EndMode3D (défini plus bas)
+static void reset3dLightingState();   // remet l'état d'éclairage 3D à zéro (défini plus bas)
 
 static void applyStrokeSize(float sz) {
     s_stroke_size = sz;
@@ -647,9 +651,8 @@ static void runUserCallbacks(const Value& drawFn) {
     mousePoll();
     callUpdateIfAny();
     VM::current()->callValue(const_cast<Value&>(drawFn));
-    if (s_in_3d) {              // draw() a oublié graphics.end3d → refermer pour rééquilibrer la pile
-        EndMode3D();
-        s_in_3d = false;
+    if (s_in_3d) {              // draw() a oublié graphics.end3d → flush + refermer (rééquilibre la pile)
+        end3dInternal();
     }
 }
 
@@ -745,6 +748,7 @@ static Value gfx_run(Value* args, int argc) {
         throw std::runtime_error("graphics.run: expected callback function");
     Value fn = args[0];
     s_elapsed_time = 0.0;
+    reset3dLightingState();   // les statiques d'éclairage 3D persistent entre runs WASM
     s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
     s_fps_ema = 0.0;
     keyboardReset();            // état clavier neuf (s_down statique persiste entre runs WASM)
@@ -957,11 +961,285 @@ static Value gfx_camera(Value* args, int argc) {
     return cam;
 }
 
+// ── Batcher 3D instancié + éclairé ──────────────────────────────────────────
+// begin3d ouvre la collecte ; cube/sphere/… EMPILENT une instance {transfo, tint}
+// dans le bucket de leur (mesh, texture) ; end3d résout chaque bucket en UN
+// DrawMeshInstanced custom (transfo + couleur PAR INSTANCE via 2 VBO d'instance)
+// avec le shader Blinn-Phong. → N formes de même (mesh,texture) = 1 draw call.
+
+enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_COUNT = 4 };
+
+struct Bucket3D {
+    int shape;
+    unsigned int texId;
+    std::vector<Matrix> xforms;
+    std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
+};
+static std::vector<Bucket3D> s_buckets;
+static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
+
+// Meshes unitaires en cache (normales + UV propres via GenMesh*).
+static Mesh s_shape_mesh[SH_COUNT];
+static bool s_shape_ready[SH_COUNT] = {false, false, false, false};
+static Mesh getShapeMesh(int shape) {
+    if (!s_shape_ready[shape]) {
+        switch (shape) {
+            case SH_CUBE:
+                s_shape_mesh[shape] = GenMeshCube(1.0f, 1.0f, 1.0f);
+                break;
+            case SH_SPHERE:
+                s_shape_mesh[shape] = GenMeshSphere(0.5f, 24, 24);
+                break;
+            case SH_CYLINDER:
+                s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, 16);
+                break;
+            default:
+                s_shape_mesh[shape] = GenMeshPlane(1.0f, 1.0f, 1, 1);
+                break;
+        }
+        s_shape_ready[shape] = true;
+    }
+    return s_shape_mesh[shape];
+}
+
+// Texture blanche 1×1 : « pas de texture » → échantillon blanc → texture×tint = tint.
+static Texture2D s_white_tex{};
+static bool s_white_ready = false;
+static unsigned int whiteTexId() {
+    if (!s_white_ready) {
+        Image img = GenImageColor(1, 1, WHITE);
+        s_white_tex = LoadTextureFromImage(img);
+        UnloadImage(img);
+        s_white_ready = true;
+    }
+    return s_white_tex.id;
+}
+static unsigned int s_cur_tex3d = 0;   // texture 3D courante (0 = blanche)
+
+// État d'éclairage (phase 1 : ambient + 1 lumière directionnelle). Opt-in : tant
+// qu'aucune lumière/ambient n'est posée, rendu PLAT (ambient blanc, lumière off).
+static bool s_lighting_used = false;
+static float s_amb3d[4] = {0.15f, 0.15f, 0.15f, 1.0f};
+static bool s_light_on = false;
+static int s_light_type = 0;   // 0 = directionnelle, 1 = ponctuelle
+static Vector3 s_light_pos = {0.0f, 0.0f, 0.0f};
+static Vector3 s_light_tgt = {0.0f, -1.0f, 0.0f};
+static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+// Shader Blinn-Phong instancié (transfo + couleur par instance) + texture.
+static Shader s_lit{};
+static bool s_lit_ready = false;
+static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
+static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
+
+static void loadLitShader() {
+    if (s_lit_ready) {
+        return;
+    }
+#ifdef __EMSCRIPTEN__
+    const char* HDR = "#version 300 es\nprecision highp float;\n";
+#else
+    const char* HDR = "#version 330\n";
+#endif
+    std::string vs = std::string(HDR) +
+        "in vec3 vertexPosition;\n"
+        "in vec2 vertexTexCoord;\n"
+        "in vec3 vertexNormal;\n"
+        "in mat4 instanceTransform;\n"
+        "in vec4 instanceColor;\n"
+        "uniform mat4 mvp;\n"
+        "out vec3 fragPosition;\n"
+        "out vec2 fragTexCoord;\n"
+        "out vec4 fragColor;\n"
+        "out vec3 fragNormal;\n"
+        "void main() {\n"
+        "    mat4 m = instanceTransform;\n"
+        "    vec4 wp = m * vec4(vertexPosition, 1.0);\n"
+        "    fragPosition = wp.xyz;\n"
+        "    fragTexCoord = vertexTexCoord;\n"
+        "    fragColor = instanceColor;\n"
+        "    fragNormal = normalize(mat3(m) * vertexNormal);\n"
+        "    gl_Position = mvp * wp;\n"
+        "}\n";
+    std::string fs = std::string(HDR) +
+        "in vec3 fragPosition;\n"
+        "in vec2 fragTexCoord;\n"
+        "in vec4 fragColor;\n"
+        "in vec3 fragNormal;\n"
+        "uniform sampler2D texture0;\n"
+        "uniform vec4 ambient;\n"
+        "uniform vec3 viewPos;\n"
+        "struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };\n"
+        "uniform Light light0;\n"
+        "out vec4 finalColor;\n"
+        "void main() {\n"
+        "    vec4 texel = texture(texture0, fragTexCoord);\n"
+        "    vec4 tint = fragColor;\n"
+        "    vec3 base = (texel * tint).rgb;\n"
+        "    vec3 normal = normalize(fragNormal);\n"
+        "    vec3 result = base * ambient.rgb;\n"
+        "    if (light0.enabled == 1) {\n"
+        "        vec3 l;\n"
+        "        if (light0.type == 0) l = -normalize(light0.target - light0.position);\n"
+        "        else l = normalize(light0.position - fragPosition);\n"
+        "        float ndl = max(dot(normal, l), 0.0);\n"
+        "        result += base * light0.color.rgb * ndl;\n"
+        "        if (ndl > 0.0) {\n"
+        "            vec3 viewD = normalize(viewPos - fragPosition);\n"
+        "            float spec = pow(max(dot(viewD, reflect(-l, normal)), 0.0), 16.0);\n"
+        "            result += light0.color.rgb * spec * 0.3;\n"
+        "        }\n"
+        "    }\n"
+        "    finalColor = vec4(result, texel.a * tint.a);\n"
+        "}\n";
+    s_lit = LoadShaderFromMemory(vs.c_str(), fs.c_str());
+    if (s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] <= 0) {
+        s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] = GetShaderLocationAttrib(s_lit, "instanceTransform");
+    }
+    s_loc_instcolor = GetShaderLocationAttrib(s_lit, "instanceColor");
+    s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
+    s_loc_ambient = GetShaderLocation(s_lit, "ambient");
+    s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
+    s_loc_l_type = GetShaderLocation(s_lit, "light0.type");
+    s_loc_l_pos = GetShaderLocation(s_lit, "light0.position");
+    s_loc_l_tgt = GetShaderLocation(s_lit, "light0.target");
+    s_loc_l_col = GetShaderLocation(s_lit, "light0.color");
+    s_lit_ready = true;
+}
+
+// Bucket courant pour (shape, texture courante) — créé à la demande.
+static Bucket3D& bucketFor(int shape) {
+    for (auto& b : s_buckets) {
+        if (b.shape == shape && b.texId == s_cur_tex3d) {
+            return b;
+        }
+    }
+    s_buckets.push_back(Bucket3D{shape, s_cur_tex3d, {}, {}});
+    return s_buckets.back();
+}
+
+// Empile une instance (transfo translate·scale + couleur fill) dans son bucket.
+static void pushInstance(int shape, Vector3 pos, Vector3 size, Color col) {
+    Bucket3D& b = bucketFor(shape);
+    b.xforms.push_back(MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z)));
+    b.colors.push_back(col.r / 255.0f);
+    b.colors.push_back(col.g / 255.0f);
+    b.colors.push_back(col.b / 255.0f);
+    b.colors.push_back(col.a / 255.0f);
+}
+
+// Résout un bucket en UN appel instancié (transfo + couleur par instance).
+static void flushBucket(const Bucket3D& b) {
+    int n = (int)b.xforms.size();
+    if (n == 0) {
+        return;
+    }
+    loadLitShader();
+    Mesh mesh = getShapeMesh(b.shape);
+    rlEnableShader(s_lit.id);
+
+    // Uniforms : MVP (sans la transfo d'instance, appliquée dans le shader), viewPos, ambient, lumière.
+    Matrix matView = rlGetMatrixModelview();
+    Matrix matProj = rlGetMatrixProjection();
+    Matrix mvp = MatrixMultiply(MatrixMultiply(rlGetMatrixTransform(), matView), matProj);
+    rlSetUniformMatrix(s_lit.locs[SHADER_LOC_MATRIX_MVP], mvp);
+    float vp[3] = {s_cam3d.position.x, s_cam3d.position.y, s_cam3d.position.z};
+    rlSetUniform(s_loc_viewpos, vp, RL_SHADER_UNIFORM_VEC3, 1);
+    float amb[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    int en = 0;
+    if (s_lighting_used) {
+        amb[0] = s_amb3d[0];
+        amb[1] = s_amb3d[1];
+        amb[2] = s_amb3d[2];
+        amb[3] = s_amb3d[3];
+        en = s_light_on ? 1 : 0;
+    }
+    rlSetUniform(s_loc_ambient, amb, RL_SHADER_UNIFORM_VEC4, 1);
+    rlSetUniform(s_loc_l_en, &en, RL_SHADER_UNIFORM_INT, 1);
+    rlSetUniform(s_loc_l_type, &s_light_type, RL_SHADER_UNIFORM_INT, 1);
+    float lp[3] = {s_light_pos.x, s_light_pos.y, s_light_pos.z};
+    rlSetUniform(s_loc_l_pos, lp, RL_SHADER_UNIFORM_VEC3, 1);
+    float lt[3] = {s_light_tgt.x, s_light_tgt.y, s_light_tgt.z};
+    rlSetUniform(s_loc_l_tgt, lt, RL_SHADER_UNIFORM_VEC3, 1);
+    rlSetUniform(s_loc_l_col, s_light_col, RL_SHADER_UNIFORM_VEC4, 1);
+
+    // VBO d'instance : transformations (mat4 = 4 attributs vec4, divisor 1).
+    std::vector<float16> xf(n);
+    for (int i = 0; i < n; i++) {
+        xf[i] = MatrixToFloatV(b.xforms[i]);
+    }
+    rlEnableVertexArray(mesh.vaoId);
+    unsigned int vboT = rlLoadVertexBuffer(xf.data(), n * (int)sizeof(float16), false);
+    int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
+    for (unsigned int i = 0; i < 4; i++) {
+        rlEnableVertexAttribute(locT + i);
+        rlSetVertexAttribute(locT + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
+        rlSetVertexAttributeDivisor(locT + i, 1);
+    }
+    // VBO d'instance : couleur (vec4, divisor 1).
+    unsigned int vboC = rlLoadVertexBuffer((void*)b.colors.data(), n * 4 * (int)sizeof(float), false);
+    if (s_loc_instcolor >= 0) {
+        rlEnableVertexAttribute(s_loc_instcolor);
+        rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
+        rlSetVertexAttributeDivisor(s_loc_instcolor, 1);
+    }
+    rlDisableVertexBuffer();
+    rlDisableVertexArray();
+
+    // Texture (slot 0).
+    rlActiveTextureSlot(0);
+    rlEnableTexture(b.texId ? b.texId : whiteTexId());
+    int slot = 0;
+    rlSetUniform(s_lit.locs[SHADER_LOC_MAP_DIFFUSE], &slot, RL_SHADER_UNIFORM_INT, 1);
+
+    // Dessin instancié (le VAO du mesh porte déjà position/uv/normale + indices).
+    rlEnableVertexArray(mesh.vaoId);
+    rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * 3, 0, n);
+    rlDisableVertexArray();
+
+    rlActiveTextureSlot(0);
+    rlDisableTexture();
+    rlDisableShader();
+    rlUnloadVertexBuffer(vboT);
+    rlUnloadVertexBuffer(vboC);
+}
+
+static void reset3dLightingState() {
+    s_lighting_used = false;
+    s_light_on = false;
+    s_cur_tex3d = 0;
+    s_amb3d[0] = 0.15f;
+    s_amb3d[1] = 0.15f;
+    s_amb3d[2] = 0.15f;
+    s_amb3d[3] = 1.0f;
+}
+
+static void flush3dBuckets() {
+    // Vider le batch immédiat en attente (fil de fer/grille dessinés pendant la
+    // collecte) avant nos draw calls instanciés → ordre cohérent.
+    rlDrawRenderBatchActive();
+    for (const auto& b : s_buckets) {
+        flushBucket(b);
+    }
+    s_buckets.clear();
+}
+
+static void end3dInternal() {
+    if (!s_in_3d) {
+        return;
+    }
+    flush3dBuckets();   // encore en Mode3D → matrices view/proj disponibles
+    EndMode3D();
+    s_in_3d = false;
+}
+
 static Value gfx_begin3d(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.begin3d: expected a camera (graphics.camera)");
-    Camera3D cam = cameraFromMap(args[0], "graphics.begin3d");
-    BeginMode3D(cam);
+    s_cam3d = cameraFromMap(args[0], "graphics.begin3d");
+    s_buckets.clear();
+    s_cur_tex3d = 0;   // texture par défaut (blanche) au début du bloc
+    BeginMode3D(s_cam3d);
     s_in_3d = true;
     return Value{};
 }
@@ -969,10 +1247,52 @@ static Value gfx_begin3d(Value* args, int argc) {
 static Value gfx_end3d(Value* args, int argc) {
     (void)args;
     (void)argc;
-    if (s_in_3d) {   // idempotent : le garde-fou de frame a pu déjà refermer
-        EndMode3D();
-        s_in_3d = false;
+    end3dInternal();   // idempotent
+    return Value{};
+}
+
+// graphics.ambient(v | couleur) : lumière ambiante (active le mode éclairé).
+static Value gfx_ambient(Value* args, int argc) {
+    if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
+        Color c = toColor(args[0]);
+        s_amb3d[0] = c.r / 255.0f;
+        s_amb3d[1] = c.g / 255.0f;
+        s_amb3d[2] = c.b / 255.0f;
+        s_amb3d[3] = 1.0f;
+    } else {
+        float v = argc > 0 ? (float)numArg(args, argc, 0, "graphics.ambient") : 0.15f;
+        s_amb3d[0] = v;
+        s_amb3d[1] = v;
+        s_amb3d[2] = v;
+        s_amb3d[3] = 1.0f;
     }
+    s_lighting_used = true;
+    return Value{};
+}
+
+// graphics.light("dir"|"point", x,y,z [, couleur]) : configure l'unique lumière
+// (phase 1). "dir" : (x,y,z) = direction de propagation ; "point" : position.
+static Value gfx_light(Value* args, int argc) {
+    std::string type = (argc > 0 && args[0].isString()) ? args[0].asString() : "dir";
+    float x = (float)numArg(args, argc, 1, "graphics.light");
+    float y = (float)numArg(args, argc, 2, "graphics.light");
+    float z = (float)numArg(args, argc, 3, "graphics.light");
+    Color c = (argc > 4 && (args[4].isMap() || args[4].isClass())) ? toColor(args[4]) : WHITE;
+    if (type == "point") {
+        s_light_type = 1;
+        s_light_pos = Vector3{x, y, z};
+        s_light_tgt = Vector3{0.0f, 0.0f, 0.0f};
+    } else {
+        s_light_type = 0;
+        s_light_pos = Vector3{0.0f, 0.0f, 0.0f};
+        s_light_tgt = Vector3{x, y, z};   // direction de propagation
+    }
+    s_light_col[0] = c.r / 255.0f;
+    s_light_col[1] = c.g / 255.0f;
+    s_light_col[2] = c.b / 255.0f;
+    s_light_col[3] = c.a / 255.0f;
+    s_light_on = true;
+    s_lighting_used = true;
     return Value{};
 }
 
@@ -985,14 +1305,33 @@ static Value gfx_grid(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.cube(x,y,z, w,h,l) : cube centré en (x,y,z). Plein si fill, arêtes si stroke.
+// graphics.texture(img) / graphics.noTexture() : texture 3D courante (handle image).
+static Value gfx_texture(Value* args, int argc) {
+    if (argc > 0 && args[0].isMap()) {
+        Value idv = args[0].mapGet(Value(std::string("tex_id")));
+        if (!idv.isInteger())
+            idv = args[0].mapGet(Value(std::string("id")));
+        s_cur_tex3d = idv.isInteger() ? (unsigned int)idv.asInt() : 0;
+    }
+    return Value{};
+}
+
+static Value gfx_no_texture(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_cur_tex3d = 0;
+    return Value{};
+}
+
+// graphics.cube(x,y,z, w,h,l) : cube centré en (x,y,z). Plein si fill (instancié,
+// éclairé, texturé), arêtes si stroke (immédiat, non éclairé).
 static Value gfx_cube(Value* args, int argc) {
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.cube"), (float)numArg(args, argc, 1, "graphics.cube"),
                 (float)numArg(args, argc, 2, "graphics.cube")};
     Vector3 size{(float)numArg(args, argc, 3, "graphics.cube"), (float)numArg(args, argc, 4, "graphics.cube"),
                  (float)numArg(args, argc, 5, "graphics.cube")};
     if (s_has_fill)
-        DrawCubeV(pos, size, s_fill_color);
+        pushInstance(SH_CUBE, pos, size, s_fill_color);
     if (s_has_stroke)
         DrawCubeWiresV(pos, size, s_stroke_color);
     return Value{};
@@ -1108,6 +1447,10 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("camera")), Value::makeBuiltin(gfx_camera));
     m.mapSet(Value(std::string("begin3d")), Value::makeBuiltin(gfx_begin3d));
     m.mapSet(Value(std::string("end3d")), Value::makeBuiltin(gfx_end3d));
+    m.mapSet(Value(std::string("ambient")), Value::makeBuiltin(gfx_ambient));
+    m.mapSet(Value(std::string("light")), Value::makeBuiltin(gfx_light));
+    m.mapSet(Value(std::string("texture")), Value::makeBuiltin(gfx_texture));
+    m.mapSet(Value(std::string("noTexture")), Value::makeBuiltin(gfx_no_texture));
     m.mapSet(Value(std::string("grid")), Value::makeBuiltin(gfx_grid));
     m.mapSet(Value(std::string("cube")), Value::makeBuiltin(gfx_cube));
     m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
