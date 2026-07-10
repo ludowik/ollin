@@ -56,7 +56,10 @@ ollin/
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
-├── tools/             outillage build (update_build_date.py)
+├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
+│                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
+│                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI)
+├── wasm/              build.sh — build WASM via emscripten (2ᵉ config CMake) → docs/wasm/ (cf. cible `wasm`)
 ├── bench/             benchmarks (.ol / .lua / .py)
 └── docs/              tutoriel, playground, samples, wasm
 ```
