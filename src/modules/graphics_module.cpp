@@ -6,6 +6,7 @@
 #include "mouse_module.h"
 #include <raylib.h>
 #include <rlgl.h>
+#include <cmath>
 #include <stdexcept>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -862,10 +863,90 @@ static Camera3D cameraFromMap(const Value& v, const char* fn) {
     return cam;
 }
 
-// graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : handle caméra (map). Regarde
-// (tx,ty,tz) depuis (px,py,pz), up = +Y, champ de vision vertical fovy (45° défaut).
+// ── Classe Camera (native, comme Color) ─────────────────────────────────────
+// Une caméra est une INSTANCE de classe (map avec __class__) portant les champs
+// px,py,pz (position), tx,ty,tz (cible), fovy. Comme toute instance reste un
+// T_MAP, cameraFromMap la relit sans changement. Les méthodes MUTENT self en
+// place (caméra mutable entre frames) et renvoient self → appels chaînables.
+static double camField(const Value& self, const char* k) {
+    Value v = self.mapGet(Value(std::string(k)));
+    return v.isNumber() ? v.asNum() : 0.0;
+}
+
+// cam.set_pos(x,y,z) : fixe la position de la caméra.
+static Value cam_set_pos(Value* args, int argc) {
+    Value self = args[0];
+    self.mapSet(Value(std::string("px")), Value(numArg(args, argc, 1, "Camera.set_pos")));
+    self.mapSet(Value(std::string("py")), Value(numArg(args, argc, 2, "Camera.set_pos")));
+    self.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 3, "Camera.set_pos")));
+    return self;
+}
+
+// cam.look_at(x,y,z) : réoriente la caméra vers le point cible (x,y,z).
+static Value cam_look_at(Value* args, int argc) {
+    Value self = args[0];
+    self.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 1, "Camera.look_at")));
+    self.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 2, "Camera.look_at")));
+    self.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 3, "Camera.look_at")));
+    return self;
+}
+
+// cam.move(dx,dy,dz) : translate la caméra ET sa cible du même delta → la
+// direction de visée est conservée (déplacement latéral/avant du point de vue).
+static Value cam_move(Value* args, int argc) {
+    Value self = args[0];
+    double dx = numArg(args, argc, 1, "Camera.move");
+    double dy = numArg(args, argc, 2, "Camera.move");
+    double dz = numArg(args, argc, 3, "Camera.move");
+    self.mapSet(Value(std::string("px")), Value(camField(self, "px") + dx));
+    self.mapSet(Value(std::string("py")), Value(camField(self, "py") + dy));
+    self.mapSet(Value(std::string("pz")), Value(camField(self, "pz") + dz));
+    self.mapSet(Value(std::string("tx")), Value(camField(self, "tx") + dx));
+    self.mapSet(Value(std::string("ty")), Value(camField(self, "ty") + dy));
+    self.mapSet(Value(std::string("tz")), Value(camField(self, "tz") + dz));
+    return self;
+}
+
+// cam.orbit(angle, rayon [, hauteur]) : place la caméra en orbite autour de sa
+// cible, sur un cercle du plan XZ de rayon `rayon`. `angle` en RADIANS (composable
+// avec elapsedTime / math.cos-sin). `hauteur` optionnelle = altitude AU-DESSUS de
+// la cible (par défaut : conserve la hauteur courante).
+static Value cam_orbit(Value* args, int argc) {
+    Value self = args[0];
+    double angle = numArg(args, argc, 1, "Camera.orbit");
+    double radius = numArg(args, argc, 2, "Camera.orbit");
+    double tx = camField(self, "tx");
+    double ty = camField(self, "ty");
+    double tz = camField(self, "tz");
+    double py = (argc > 3) ? ty + numArg(args, argc, 3, "Camera.orbit") : camField(self, "py");
+    self.mapSet(Value(std::string("px")), Value(tx + std::cos(angle) * radius));
+    self.mapSet(Value(std::string("py")), Value(py));
+    self.mapSet(Value(std::string("pz")), Value(tz + std::sin(angle) * radius));
+    return self;
+}
+
+static Value makeCameraClass() {
+    Value cls = Value::makeClass();
+    cls.mapSet(Value(std::string("__name__")), Value(std::string("Camera")));
+    cls.mapSet(Value(std::string("set_pos")), Value::makeBuiltin(cam_set_pos));
+    cls.mapSet(Value(std::string("look_at")), Value::makeBuiltin(cam_look_at));
+    cls.mapSet(Value(std::string("move")), Value::makeBuiltin(cam_move));
+    cls.mapSet(Value(std::string("orbit")), Value::makeBuiltin(cam_orbit));
+    return cls;
+}
+
+// Classe Camera partagée (construite une fois, réutilisée par chaque instance).
+static Value cameraClass() {
+    static Value cls = makeCameraClass();
+    return cls;
+}
+
+// graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : INSTANCE de classe Camera.
+// Regarde (tx,ty,tz) depuis (px,py,pz), up = +Y, fovy = champ de vision vertical
+// (45° défaut). Mutable via ses méthodes (set_pos/look_at/move/orbit).
 static Value gfx_camera(Value* args, int argc) {
     Value cam = Value::makeMap();
+    cam.mapSet(Value(std::string("__class__")), cameraClass());
     cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.camera")));
     cam.mapSet(Value(std::string("py")), Value(numArg(args, argc, 1, "graphics.camera")));
     cam.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 2, "graphics.camera")));

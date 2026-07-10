@@ -3,17 +3,20 @@
 ##   graphics.begin3d(cam) … graphics.end3d()      → bloc de dessin 3D
 ##   fill/stroke pilotent plein / fil de fer, comme en 2D.
 
+## La caméra est un objet (classe Camera) : créée une fois, pilotée par méthodes.
+global cam = nil
+
 func setup()
     graphics.canvas(W, H, "3D")
+    cam = graphics.camera(12, 7, 0,  0, 0, 0)   ## regarde l'origine
 end
 
 func draw()
     ## clear opaque = efface la couleur ET la profondeur (obligatoire en 3D)
     graphics.clear(colors.BLACK)
 
-    ## caméra en orbite autour de l'origine (rayon 12, hauteur 7)
-    var a = elapsedTime * 0.5
-    var cam = graphics.camera(math.cos(a) * 12, 7, math.sin(a) * 12,  0, 0, 0)
+    ## caméra en orbite autour de sa cible (rayon 12, hauteur 7) — angle en radians
+    cam.orbit(elapsedTime * 0.5, 12, 7)
 
     graphics.begin3d(cam)
         graphics.grid(12, 1)                  ## repère au sol
