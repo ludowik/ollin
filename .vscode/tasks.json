@@ -27,7 +27,7 @@
         {
             "label": "wasm: build",
             "type": "shell",
-            "command": "bash wasm/build.sh",
+            "command": "bash tools/build-wasm.sh",
             "group": "build",
             "presentation": { "reveal": "always", "panel": "shared", "clear": true },
             "problemMatcher": []

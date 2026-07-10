@@ -128,7 +128,7 @@ else()
         add_custom_command(
             OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm
             DEPENDS ${WASM_SOURCES}
-            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/wasm/build.sh
+            COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tools/build-wasm.sh
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Building WASM"
         )

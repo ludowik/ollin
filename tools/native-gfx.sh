@@ -19,7 +19,7 @@ done
 
 if [ -z "$RAYSRC" ]; then
     echo "Source raylib introuvable en cache."
-    echo "→ Lance d'abord le build WASM (bash wasm/build.sh) : il récupère raylib"
+    echo "→ Lance d'abord le build WASM (bash tools/build-wasm.sh) : il récupère raylib"
     echo "  dans build_wasm/_deps/raylib-src, réutilisé ici."
     echo "  (github étant bloqué par le proxy, on ne peut pas cloner raylib à la volée.)"
     exit 1

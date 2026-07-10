@@ -58,8 +58,8 @@ ollin/
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
 ├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
-│                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI)
-├── wasm/              build.sh — build WASM via emscripten (2ᵉ config CMake) → docs/wasm/ (cf. cible `wasm`)
+│                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
+│                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`)
 ├── bench/             benchmarks (.ol / .lua / .py)
 └── docs/              tutoriel, playground, samples, wasm
 ```
