@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-11 11:07</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-11 12:14</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-11 11:07</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-11 12:14</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1569,15 +1569,16 @@ print(v3)          ## Vec2(4,6)</code></pre>
 </table>
 
 <h3>Transformations matricielles</h3>
-<p>Les transformations s'appliquent à toutes les primitives suivantes jusqu'à <code>resetTransform()</code> ou <code>pop()</code>. La matrice est remise à l'identité automatiquement à chaque frame.</p>
+<p>Les transformations s'appliquent à toutes les primitives suivantes jusqu'à <code>resetTransform()</code> ou <code>pop()</code>. La matrice est remise à l'identité automatiquement à chaque frame. Elles marchent en <strong>2D et en 3D</strong> (voir la note 3D plus bas).</p>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.push()</code></td><td>Empile la matrice courante (sauvegarde l'état)</td></tr>
     <tr><td><code>graphics.pop()</code></td><td>Restaure la matrice précédente</td></tr>
-    <tr><td><code>graphics.translate(x, y)</code></td><td>Déplace l'origine de (x, y) pixels</td></tr>
-    <tr><td><code>graphics.rotate(angle)</code></td><td>Rotation en degrés (sens horaire en coords écran)</td></tr>
-    <tr><td><code>graphics.scale(sx [, sy])</code></td><td>Mise à l'échelle ; si <code>sy</code> absent, uniforme</td></tr>
+    <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Déplace l'origine ; <code>z</code> optionnel (3D)</td></tr>
+    <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>Rotation en degrés ; sans axe → autour de Z, sinon autour de l'axe <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>Rotation autour d'un axe principal (raccourcis 3D)</td></tr>
+    <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Échelle : 1 arg = uniforme (x,y,z) ; 2 args = (x,y) ; 3 args = (x,y,z)</td></tr>
     <tr><td><code>graphics.resetTransform()</code></td><td>Réinitialise la matrice à l'identité</td></tr>
   </tbody>
 </table>
@@ -1700,6 +1701,27 @@ print(v3)          ## Vec2(4,6)</code></pre>
 </table>
 
 <div class="callout tip">Phase 1 : une seule lumière active à la fois (directionnelle ou ponctuelle) + l'ambiante. Le fil de fer, la grille et les lignes ne sont pas éclairés.</div>
+
+<h4>Transformer les objets 3D</h4>
+<p>Les <a href="#/tutoriel/graphics">transformations</a> (<code>translate</code>/<code>rotate</code>/<code>scale</code>) agissent aussi sur les solides 3D — à condition de les <strong>encadrer par <code>push()</code>/<code>pop()</code></strong> (chaque objet capture ainsi sa propre transformation). <code>translate(x,y,z)</code> place, <code>rotate(deg, ax,ay,az)</code> (ou <code>rotateX/Y/Z</code>) oriente, <code>scale(...)</code> redimensionne.</p>
+<pre><code><span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(colors.BLACK)
+    <span class="bi">graphics</span>.begin3d(cam)
+        <span class="cmt">## chaque cube dans son propre bloc push/pop</span>
+        <span class="bi">graphics</span>.push()
+            <span class="bi">graphics</span>.translate(-<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
+            <span class="bi">graphics</span>.rotateY(elapsedTime * <span class="num">60</span>)   <span class="cmt">## tourne autour de Y</span>
+            <span class="bi">graphics</span>.fill(colors.RED)
+            <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
+        <span class="bi">graphics</span>.pop()
+        <span class="bi">graphics</span>.push()
+            <span class="bi">graphics</span>.translate(<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
+            <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">90</span>, <span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>)  <span class="cmt">## axe quelconque</span>
+            <span class="bi">graphics</span>.fill(colors.SKYBLUE)
+            <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
+        <span class="bi">graphics</span>.pop()
+    <span class="bi">graphics</span>.end3d()
+<span class="kw">end</span></code></pre>
 
 <pre><code><span class="cmt">## la caméra est un objet : créée une fois, pilotée par ses méthodes</span>
 <span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)

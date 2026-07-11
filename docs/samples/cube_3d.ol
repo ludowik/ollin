@@ -29,10 +29,15 @@ func draw()
             end
         end
 
-        ## une sphère éclairée qui flotte au centre
-        graphics.fill(colors.WHITE)
-        graphics.sphere(0, 6, 0,  1.5)
+        ## cube qui tourne au centre — transformations 3D via push/pop
+        graphics.push()
+            graphics.translate(0, 6, 0)
+            graphics.rotateY(elapsedTime * 60)
+            graphics.rotate(elapsedTime * 40, 1, 0, 1)   ## + un axe oblique
+            graphics.fill(colors.WHITE)
+            graphics.cube(0, 0, 0,  2, 2, 2)
+        graphics.pop()
     graphics.end3d()
 
-    graphics.draw_text("Ollin 3D — éclairage + instancing", 12, 12, 20, colors.WHITE)
+    graphics.draw_text("Ollin 3D — éclairage · instancing · transformations", 12, 12, 20, colors.WHITE)
 end

@@ -806,26 +806,63 @@ static Value gfx_pop(Value* args, int argc) {
     return Value{};
 }
 
+// graphics.translate(x, y [, z]) : z optionnel (défaut 0) → 2D et 3D.
 static Value gfx_translate(Value* args, int argc) {
     if (argc < 2)
-        throw std::runtime_error("graphics.translate: expected x, y");
-    rlTranslatef((float)numArg(args, 0, "graphics.translate"), (float)numArg(args, 1, "graphics.translate"), 0.0f);
+        throw std::runtime_error("graphics.translate: expected x, y [, z]");
+    float x = (float)numArg(args, 0, "graphics.translate");
+    float y = (float)numArg(args, 1, "graphics.translate");
+    float z = argc > 2 ? (float)numArg(args, 2, "graphics.translate") : 0.0f;
+    rlTranslatef(x, y, z);
     return Value{};
 }
 
+// graphics.rotate(deg [, ax, ay, az]) : sans axe → autour de Z (2D) ; avec axe →
+// rotation 3D autour de (ax,ay,az). Voir aussi rotateX/rotateY/rotateZ.
 static Value gfx_rotate(Value* args, int argc) {
     if (argc < 1)
-        throw std::runtime_error("graphics.rotate: expected angle (degrees)");
-    rlRotatef((float)numArg(args, 0, "graphics.rotate"), 0.0f, 0.0f, 1.0f);
+        throw std::runtime_error("graphics.rotate: expected angle (degrees) [, ax, ay, az]");
+    float deg = (float)numArg(args, 0, "graphics.rotate");
+    if (argc >= 4) {
+        rlRotatef(deg, (float)numArg(args, 1, "graphics.rotate"), (float)numArg(args, 2, "graphics.rotate"),
+                  (float)numArg(args, 3, "graphics.rotate"));
+    } else {
+        rlRotatef(deg, 0.0f, 0.0f, 1.0f);   // axe Z par défaut
+    }
     return Value{};
 }
 
+static Value gfx_rotate_x(Value* args, int argc) {
+    rlRotatef((float)numArg(args, argc, 0, "graphics.rotateX"), 1.0f, 0.0f, 0.0f);
+    return Value{};
+}
+static Value gfx_rotate_y(Value* args, int argc) {
+    rlRotatef((float)numArg(args, argc, 0, "graphics.rotateY"), 0.0f, 1.0f, 0.0f);
+    return Value{};
+}
+static Value gfx_rotate_z(Value* args, int argc) {
+    rlRotatef((float)numArg(args, argc, 0, "graphics.rotateZ"), 0.0f, 0.0f, 1.0f);
+    return Value{};
+}
+
+// graphics.scale(s | sx,sy | sx,sy,sz) : 1 arg = uniforme (s,s,s) ; 2 args =
+// (sx,sy,1) (2D) ; 3 args = (sx,sy,sz).
 static Value gfx_scale(Value* args, int argc) {
     if (argc < 1)
-        throw std::runtime_error("graphics.scale: expected sx [, sy]");
+        throw std::runtime_error("graphics.scale: expected s | sx, sy | sx, sy, sz");
     float sx = (float)numArg(args, 0, "graphics.scale");
-    float sy = argc > 1 ? (float)numArg(args, 1, "graphics.scale") : sx;
-    rlScalef(sx, sy, 1.0f);
+    float sy, sz;
+    if (argc >= 3) {
+        sy = (float)numArg(args, 1, "graphics.scale");
+        sz = (float)numArg(args, 2, "graphics.scale");
+    } else if (argc == 2) {
+        sy = (float)numArg(args, 1, "graphics.scale");
+        sz = 1.0f;
+    } else {
+        sy = sx;   // uniforme sur les 3 axes
+        sz = sx;
+    }
+    rlScalef(sx, sy, sz);
     return Value{};
 }
 
@@ -997,6 +1034,7 @@ struct Bucket3D {
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
+static Matrix s_view3d{};    // matrice vue figée au begin3d (immunise le MVP d'une transfo « nue » qui polluerait la modelview)
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
 static Mesh s_shape_mesh[SH_COUNT];
@@ -1161,7 +1199,12 @@ static Bucket3D& bucketFor(int shape) {
 // Empile une instance (transfo translate·scale + couleur fill) dans son bucket.
 static void pushInstance(int shape, Vector3 pos, Vector3 size, Color col) {
     Bucket3D& b = bucketFor(shape);
-    b.xforms.push_back(MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z)));
+    // Placement local (scale puis translate) PUIS la transfo courante de la pile
+    // (push/translate/rotate/scale) capturée ICI → chaque instance porte sa propre
+    // transfo. rlGetMatrixTransform() = identité hors push/pop (transfos « nues »
+    // sans effet sur les solides : cf. doc → encadrer les transfos 3D par push/pop).
+    Matrix local = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
+    b.xforms.push_back(MatrixMultiply(local, rlGetMatrixTransform()));
     b.colors.push_back(col.r / 255.0f);
     b.colors.push_back(col.g / 255.0f);
     b.colors.push_back(col.b / 255.0f);
@@ -1181,13 +1224,12 @@ static void flushBucket(const Bucket3D& b) {
     Mesh mesh = getShapeMesh(b.shape);
     rlEnableShader(s_lit.id);
 
-    // Uniforms : MVP = view·proj (la transfo d'instance est appliquée dans le shader).
-    // On N'inclut PAS rlGetMatrixTransform() : les solides instanciés sont positionnés
-    // par leur transfo d'instance figée (x,y,z,w,h,l) et n'héritent pas de la pile
-    // de matrices 2D (push/translate/rotate) — comportement prévisible et sans fuite.
-    Matrix matView = rlGetMatrixModelview();
+    // Uniforms : MVP = view·proj. La vue est celle FIGÉE au begin3d (s_view3d) — pas
+    // la modelview courante — pour qu'une transfo « nue » (hors push/pop, qui écrit
+    // dans la modelview) ne décale pas rétroactivement TOUS les buckets. La transfo
+    // par instance (pile push/pop) est appliquée dans le shader via instanceTransform.
     Matrix matProj = rlGetMatrixProjection();
-    Matrix mvp = MatrixMultiply(matView, matProj);
+    Matrix mvp = MatrixMultiply(s_view3d, matProj);
     rlSetUniformMatrix(s_lit.locs[SHADER_LOC_MATRIX_MVP], mvp);
     float vp[3] = {s_cam3d.position.x, s_cam3d.position.y, s_cam3d.position.z};
     rlSetUniform(s_loc_viewpos, vp, RL_SHADER_UNIFORM_VEC3, 1);
@@ -1331,6 +1373,7 @@ static Value gfx_begin3d(Value* args, int argc) {
     s_cam3d = cameraFromMap(args[0], "graphics.begin3d");
     s_buckets.clear();
     BeginMode3D(s_cam3d);
+    s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
     s_in_3d = true;
     return Value{};
 }
@@ -1614,6 +1657,9 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("pop")), Value::makeBuiltin(gfx_pop));
     m.mapSet(Value(std::string("translate")), Value::makeBuiltin(gfx_translate));
     m.mapSet(Value(std::string("rotate")), Value::makeBuiltin(gfx_rotate));
+    m.mapSet(Value(std::string("rotateX")), Value::makeBuiltin(gfx_rotate_x));
+    m.mapSet(Value(std::string("rotateY")), Value::makeBuiltin(gfx_rotate_y));
+    m.mapSet(Value(std::string("rotateZ")), Value::makeBuiltin(gfx_rotate_z));
     m.mapSet(Value(std::string("scale")), Value::makeBuiltin(gfx_scale));
     m.mapSet(Value(std::string("resetTransform")), Value::makeBuiltin(gfx_reset_transform));
     m.mapSet(Value(std::string("polygon")), Value::makeBuiltin(gfx_polygon));
