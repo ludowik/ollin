@@ -321,7 +321,7 @@ canvas#canvas {
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #project-btn, #reload-btn, #standalone-btn, #img-btn,
+  #project-btn, #reload-btn, #standalone-btn,
   #run-btn, #stop-btn, #copy-btn { padding: 6px 8px !important; }
 }
 </style>
@@ -345,11 +345,6 @@ canvas#canvas {
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="btn-label">Recharger</span>
   </button>
-  <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
-  <label for="img-file-input" id="img-btn" title="Charger des images (PNG, JPG…) pour image.load()" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s;user-select:none">
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 10l4-3 3 2.5 3-3.5 4 4"/><circle cx="11.5" cy="6.5" r="1.2" fill="currentColor" stroke="none"/></svg>
-    <span class="btn-label" id="img-btn-label">Images</span>
-  </label>
   <button id="standalone-btn" title="Exécuter en plein écran dans une page dédiée" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:6px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
     <span class="btn-label">Plein écran</span>
@@ -386,6 +381,7 @@ canvas#canvas {
           <button id="new-res-btn" title="Ajouter une image">＋</button>
         </div>
         <div id="res-list"></div>
+        <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp" multiple style="display:none">
       </aside>
       <div id="editor-wrap"></div>
     </div>

@@ -609,14 +609,14 @@ async function renameResource(name) {
     const r = currentProject.resources[n]
     ollin.preloadImage(n, r.b64, r.ext)
   }
-  renderResources(); updateImgBtn()
+  renderResources()
 }
 
 async function deleteResource(name) {
   if (!confirm(`Supprimer la ressource « ${name} » ?`)) return
   delete currentProject.resources[name]
   await Store.saveProject(currentProject)
-  renderResources(); updateImgBtn()
+  renderResources()
 }
 
 
@@ -636,7 +636,6 @@ async function loadProject(id) {
   projectLabel.textContent = p.name
   renderFiles()
   renderResources()
-  updateImgBtn()
   view.focus()
   // Éteindre la pastille du projet précédent AVANT le contrôle async : sinon,
   // pour un projet sans lien distant (ou hors-ligne), checkRemoteFreshness sort
@@ -1268,17 +1267,11 @@ const reloadBtn = document.getElementById('reload-btn')
 reloadBtn.addEventListener('click', hardReload)   // rechargement dur partagé (pg-run.js via ctx)
 
 // ── Image upload ──────────────────────────────────────────────────────────
+// Les images sont gérées UNIQUEMENT via la section « Ressources » du rail (comme
+// les fichiers) : le « ＋ » ouvre ce sélecteur (masqué). Pas de bouton dédié dans
+// la barre d'outils — cohérent avec les fichiers, et les ressources sont moins
+// utilisées.
 const imgFileInput = document.getElementById('img-file-input')
-const imgBtnLabel  = document.getElementById('img-btn-label')
-const imgBtn       = document.getElementById('img-btn')
-
-// Reflète le nombre de ressources du projet actif sur le bouton Images.
-function updateImgBtn() {
-  const n = currentProject ? Object.keys(currentProject.resources || {}).length : 0
-  imgBtnLabel.textContent  = n ? (n + ' image' + (n > 1 ? 's' : '')) : 'Images'
-  imgBtn.style.borderColor = n ? 'var(--green)' : ''
-  imgBtn.style.color       = n ? 'var(--green)' : ''
-}
 
 // Les images chargées deviennent des RESSOURCES du projet actif (persistées).
 imgFileInput.addEventListener('change', () => {
@@ -1294,7 +1287,6 @@ imgFileInput.addEventListener('change', () => {
       await Store.saveProject(currentProject)
       if (ollin && ollin.preloadImage) ollin.preloadImage(name, b64, ext)
       renderResources()
-      updateImgBtn()
     }
     reader.readAsDataURL(file)
   })
