@@ -67,6 +67,7 @@ static int s_blend_mode = BLEND_ALPHA;
 static std::string s_shot_path;
 static bool s_shot_pending = false;
 static void flushPendingScreenshot();   // défini plus bas (utilisé par gfx_end_draw)
+static void reset3dLightingState();      // défini plus bas (appelé par gfx_canvas)
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
@@ -74,6 +75,9 @@ static Value gfx_canvas(Value* args, int argc) {
     const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
     s_shot_pending = false;   // nouveau programme → oublier une capture en attente
     s_blend_mode = BLEND_ALPHA;
+    // Éclairage 3D remis à neuf ICI (avant que setup()/top-level ne pose ambient/
+    // light) — et non dans gfx_run, qui s'exécute APRÈS et effacerait la config.
+    reset3dLightingState();
 #ifdef __EMSCRIPTEN__
     if (IsWindowReady()) {
         if (s_target_ready) {                 // libérer l'ancienne cible AVANT de perdre le contexte GL
@@ -750,7 +754,6 @@ static Value gfx_run(Value* args, int argc) {
         throw std::runtime_error("graphics.run: expected callback function");
     Value fn = args[0];
     s_elapsed_time = 0.0;
-    reset3dLightingState();   // les statiques d'éclairage 3D persistent entre runs WASM
     s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
     s_fps_ema = 0.0;
     keyboardReset();            // état clavier neuf (s_down statique persiste entre runs WASM)
