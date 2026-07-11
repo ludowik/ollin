@@ -817,31 +817,37 @@ static Value gfx_translate(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.rotate(deg [, ax, ay, az]) : sans axe → autour de Z (2D) ; avec axe →
-// rotation 3D autour de (ax,ay,az). Voir aussi rotateX/rotateY/rotateZ.
+// Rotation de deg° (argument 0) autour de l'axe (ax,ay,az) — facteur commun de
+// rotate (axe Z par défaut) et de rotateX/rotateY/rotateZ.
+static void rotateAxis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
+    rlRotatef((float)numArg(args, argc, 0, fn), ax, ay, az);
+}
+
+// graphics.rotate(deg [, ax, ay, az]) : sans axe → autour de Z ; avec les 3
+// composantes → rotation 3D autour de (ax,ay,az). Un axe PARTIEL (2 ou 3 args)
+// est une ERREUR — on ne retombe pas silencieusement sur Z.
 static Value gfx_rotate(Value* args, int argc) {
-    if (argc < 1)
-        throw std::runtime_error("graphics.rotate: expected angle (degrees) [, ax, ay, az]");
-    float deg = (float)numArg(args, 0, "graphics.rotate");
-    if (argc >= 4) {
-        rlRotatef(deg, (float)numArg(args, 1, "graphics.rotate"), (float)numArg(args, 2, "graphics.rotate"),
-                  (float)numArg(args, 3, "graphics.rotate"));
+    if (argc == 1) {
+        rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // axe Z par défaut
+    } else if (argc >= 4) {
+        rlRotatef((float)numArg(args, argc, 0, "graphics.rotate"), (float)numArg(args, argc, 1, "graphics.rotate"),
+                  (float)numArg(args, argc, 2, "graphics.rotate"), (float)numArg(args, argc, 3, "graphics.rotate"));
     } else {
-        rlRotatef(deg, 0.0f, 0.0f, 1.0f);   // axe Z par défaut
+        throw std::runtime_error("graphics.rotate: expected deg [, ax, ay, az] (axe complet ou aucun)");
     }
     return Value{};
 }
 
 static Value gfx_rotate_x(Value* args, int argc) {
-    rlRotatef((float)numArg(args, argc, 0, "graphics.rotateX"), 1.0f, 0.0f, 0.0f);
+    rotateAxis(args, argc, 1.0f, 0.0f, 0.0f, "graphics.rotateX");
     return Value{};
 }
 static Value gfx_rotate_y(Value* args, int argc) {
-    rlRotatef((float)numArg(args, argc, 0, "graphics.rotateY"), 0.0f, 1.0f, 0.0f);
+    rotateAxis(args, argc, 0.0f, 1.0f, 0.0f, "graphics.rotateY");
     return Value{};
 }
 static Value gfx_rotate_z(Value* args, int argc) {
-    rlRotatef((float)numArg(args, argc, 0, "graphics.rotateZ"), 0.0f, 0.0f, 1.0f);
+    rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotateZ");
     return Value{};
 }
 
@@ -1034,7 +1040,7 @@ struct Bucket3D {
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
-static Matrix s_view3d{};    // matrice vue figée au begin3d (immunise le MVP d'une transfo « nue » qui polluerait la modelview)
+static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
 static Mesh s_shape_mesh[SH_COUNT];
@@ -1199,10 +1205,11 @@ static Bucket3D& bucketFor(int shape) {
 // Empile une instance (transfo translate·scale + couleur fill) dans son bucket.
 static void pushInstance(int shape, Vector3 pos, Vector3 size, Color col) {
     Bucket3D& b = bucketFor(shape);
-    // Placement local (scale puis translate) PUIS la transfo courante de la pile
-    // (push/translate/rotate/scale) capturée ICI → chaque instance porte sa propre
-    // transfo. rlGetMatrixTransform() = identité hors push/pop (transfos « nues »
-    // sans effet sur les solides : cf. doc → encadrer les transfos 3D par push/pop).
+    // Placement local (scale puis translate) PUIS la transfo courante capturée ICI
+    // → chaque instance fige sa propre transfo. begin3d ayant ouvert le mode
+    // transform, rlGetMatrixTransform() reflète translate/rotate/scale qu'ils soient
+    // encadrés par push/pop ou « nus » (accumulés sur le bloc) — même sémantique que
+    // les primitives immédiates.
     Matrix local = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
     b.xforms.push_back(MatrixMultiply(local, rlGetMatrixTransform()));
     b.colors.push_back(col.r / 255.0f);
@@ -1363,6 +1370,7 @@ static void end3dInternal() {
         return;
     }
     flush3dBuckets();   // encore en Mode3D → matrices view/proj disponibles
+    rlPopMatrix();      // referme le mode transform ouvert par begin3d (rlPushMatrix)
     EndMode3D();
     s_in_3d = false;
 }
@@ -1374,6 +1382,13 @@ static Value gfx_begin3d(Value* args, int argc) {
     s_buckets.clear();
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
+    // Entre dans le mode « transform » de rlgl pour TOUT le bloc 3D : ainsi
+    // translate/rotate/scale — AVEC OU SANS push/pop — écrivent dans
+    // RLGL.State.transform (espace monde, lu par rlGetMatrixTransform) au lieu de
+    // la modelview. Les solides instanciés (bake) ET les primitives immédiates
+    // (transformRequired) reçoivent alors la même transfo → cohérent, sans exiger
+    // push/pop. Refermé par le rlPopMatrix d'end3dInternal.
+    rlPushMatrix();
     s_in_3d = true;
     return Value{};
 }
