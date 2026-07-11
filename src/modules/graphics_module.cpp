@@ -68,6 +68,12 @@ static std::string s_shot_path;
 static bool s_shot_pending = false;
 static void flushPendingScreenshot();   // défini plus bas (utilisé par gfx_end_draw)
 static void reset3dLightingState();      // défini plus bas (appelé par gfx_canvas)
+// Un SEUL graphics.run par programme. Le moteur (runEntryHooks) appelle
+// graphics.run(draw) automatiquement si draw() existe ; si le script l'appelle
+// AUSSI explicitement, on aurait deux boucles → double CloseWindow (crash natif)
+// ou double emscripten_set_main_loop (WASM). Ce garde-fou ignore le 2ᵉ appel.
+// Remis à false dans gfx_canvas (début de programme) → re-run playground OK.
+static bool s_run_active = false;
 
 static Value gfx_canvas(Value* args, int argc) {
     int w = argc > 0 ? toInt(args[0]) : 800;
@@ -78,6 +84,7 @@ static Value gfx_canvas(Value* args, int argc) {
     // Éclairage 3D remis à neuf ICI (avant que setup()/top-level ne pose ambient/
     // light) — et non dans gfx_run, qui s'exécute APRÈS et effacerait la config.
     reset3dLightingState();
+    s_run_active = false;   // nouveau programme → autorise (un seul) graphics.run
 #ifdef __EMSCRIPTEN__
     if (IsWindowReady()) {
         if (s_target_ready) {                 // libérer l'ancienne cible AVANT de perdre le contexte GL
@@ -752,6 +759,9 @@ static void emscripten_frame() {
 static Value gfx_run(Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("graphics.run: expected callback function");
+    if (s_run_active)   // déjà lancé pour ce programme → ignorer le 2ᵉ appel (voir s_run_active)
+        return Value{};
+    s_run_active = true;
     Value fn = args[0];
     s_elapsed_time = 0.0;
     s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
