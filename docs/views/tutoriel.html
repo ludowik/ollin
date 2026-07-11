@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-11 18:10</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-11 18:15</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-11 18:10</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-11 18:15</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1740,6 +1740,35 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="bi">graphics</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
     <span class="bi">graphics</span>.end3d()
     <span class="bi">graphics</span>.draw_text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>, <span class="num">22</span>)   <span class="cmt">## HUD 2D par-dessus</span>
+<span class="kw">end</span></code></pre>
+
+<h4>Rotations par quaternion (<code>Quat</code>)</h4>
+<p>Les quaternions composent des orientations sans blocage de cardan et permettent surtout d'<strong>interpoler en douceur</strong> (slerp) entre deux orientations. Un <code>Quat</code> est un objet (angles en degrés).</p>
+<table>
+  <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.quat()</code></td><td>Quaternion identité (aucune rotation)</td></tr>
+    <tr><td><code>graphics.quat_axis(ax,ay,az, deg)</code></td><td>Rotation de <code>deg</code>° autour de l'axe <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>graphics.quat_euler(pitch,yaw,roll)</code></td><td>Depuis des angles d'Euler (degrés)</td></tr>
+    <tr><td><code>q.mul(autre)</code></td><td>Composition <code>q · autre</code> → nouveau <code>Quat</code></td></tr>
+    <tr><td><code>q.slerp(autre, t)</code></td><td>Interpolation sphérique, <code>t</code> ∈ [0,1] → nouveau <code>Quat</code></td></tr>
+    <tr><td><code>q.normalize()</code> · <code>q.inverse()</code></td><td>Quaternion normalisé / rotation inverse</td></tr>
+    <tr><td><code>q.rotate_vec(x,y,z)</code></td><td>Renvoie le vecteur <code>(x,y,z)</code> tourné, sous forme <code>[x,y,z]</code></td></tr>
+    <tr><td><code>graphics.rotateq(q)</code></td><td>Applique la rotation <code>q</code> (comme <code>rotate</code>, mais depuis un <code>Quat</code>)</td></tr>
+  </tbody>
+</table>
+<pre><code><span class="cmt">## interpole en douceur entre deux orientations</span>
+<span class="kw">global</span> qa = <span class="bi">graphics</span>.quat_axis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## départ</span>
+<span class="kw">global</span> qb = <span class="bi">graphics</span>.quat_axis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## arrivée</span>
+
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(colors.BLACK)
+    <span class="kw">var</span> t = (<span class="bi">math</span>.sin(elapsedTime) + <span class="num">1</span>) / <span class="num">2</span>   <span class="cmt">## va-et-vient 0↔1</span>
+    <span class="bi">graphics</span>.begin3d(cam)
+        <span class="bi">graphics</span>.rotateq(qa.slerp(qb, t))       <span class="cmt">## rotation interpolée</span>
+        <span class="bi">graphics</span>.fill(colors.ORANGE)
+        <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">3</span>, <span class="num">3</span>, <span class="num">3</span>)
+    <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
 </section>
 

@@ -2,6 +2,7 @@
 // les transforms sont dans graphics_module.cpp ; la frontière entre les deux
 // unités est graphics_internal.h. Compilé uniquement dans les builds raylib/WASM.
 #include "graphics_internal.h"
+#include "graphics_quat.h"
 #include "image_module.h"
 #include "module_utils.h"
 #include "value.h"
@@ -750,6 +751,18 @@ static Value gfx_point3d(Value* args, int argc) {
     return Value{};
 }
 
+// graphics.rotateq(q) : applique la rotation du quaternion q dans la pile de
+// transformation courante — comme rotate/rotateX-Y-Z mais depuis un Quat. Donc
+// composable, compatible push/pop, appliqué aux solides instanciés ET immédiats.
+// rlMultMatrixf gauche-multiplie (comme rlRotatef) → composition identique.
+static Value gfx_rotateq(Value* args, int argc) {
+    if (argc < 1)
+        throw std::runtime_error("graphics.rotateq: expected a Quat (graphics.quat…)");
+    Matrix m = QuaternionToMatrix(quatFromInstance(args[0], "graphics.rotateq"));
+    rlMultMatrixf(MatrixToFloatV(m).v);
+    return Value{};
+}
+
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
@@ -771,4 +784,6 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
+    m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));
+    registerQuat(m);   // quat / quat_axis / quat_euler (classe Quat, graphics_quat.cpp)
 }

@@ -182,6 +182,11 @@ const MODULE_MEMBERS = {
     fn('graphics.ambient','ambient(v | couleur)'),
     fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
     fn('graphics.texture','texture(img)'),         fn('graphics.noTexture','noTexture()'),
+    // quaternions
+    fn('graphics.quat','quat() → Quat (identité)'),
+    fn('graphics.quat_axis','quat_axis(ax,ay,az, deg) → Quat'),
+    fn('graphics.quat_euler','quat_euler(pitch,yaw,roll) → Quat'),
+    fn('graphics.rotateq','rotateq(q)'),
   ],
   image: [
     fn('image.load','load(path) → img'),
