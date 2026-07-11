@@ -68,6 +68,7 @@ static std::string s_shot_path;
 static bool s_shot_pending = false;
 static void flushPendingScreenshot();   // défini plus bas (utilisé par gfx_end_draw)
 static void reset3dLightingState();      // défini plus bas (appelé par gfx_canvas)
+static void reset3dGraphicsState();      // libère les ressources GL 3D (appelé par gfx_canvas avant CloseWindow)
 // Un SEUL graphics.run par programme. Le moteur (runEntryHooks) appelle
 // graphics.run(draw) automatiquement si draw() existe ; si le script l'appelle
 // AUSSI explicitement, on aurait deux boucles → double CloseWindow (crash natif)
@@ -91,6 +92,7 @@ static Value gfx_canvas(Value* args, int argc) {
             UnloadRenderTexture(s_target);
             s_target_ready = false;
         }
+        reset3dGraphicsState();               // libérer shader/meshes/textures/VBO 3D (contexte encore courant)
         CloseWindow();
     }
     double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
@@ -120,9 +122,12 @@ static Value gfx_canvas(Value* args, int argc) {
         },
         s_physW, s_physH, w, h);
 #else
-    if (IsWindowReady() && s_target_ready) {
-        UnloadRenderTexture(s_target);
-        s_target_ready = false;
+    if (IsWindowReady()) {
+        if (s_target_ready) {
+            UnloadRenderTexture(s_target);
+            s_target_ready = false;
+        }
+        reset3dGraphicsState();   // libérer les ressources GL 3D avant une éventuelle réinitialisation
     }
     s_physW = w;
     s_physH = h;
@@ -1046,6 +1051,26 @@ static bool s_lit_ready = false;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
+// VBO d'instance PERSISTANTS (transfo + couleur) : réutilisés d'une frame à
+// l'autre (mis à jour par glBufferSubData), au lieu d'être créés/détruits à
+// chaque bucket/frame. Capacités en octets ; agrandissement seulement.
+static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0;
+static int s_inst_cap_xform = 0, s_inst_cap_color = 0;
+
+// Crée (1re fois / agrandissement) ou met à jour un VBO d'instance ; laisse le
+// VBO lié en sortie (pour le rlSetVertexAttribute qui suit).
+static void uploadInstanceVBO(unsigned int& vbo, int& cap, const void* data, int bytes) {
+    if (vbo == 0 || bytes > cap) {
+        if (vbo != 0)
+            rlUnloadVertexBuffer(vbo);
+        vbo = rlLoadVertexBuffer(data, bytes, true);   // GL_DYNAMIC_DRAW, laisse lié
+        cap = bytes;
+    } else {
+        rlEnableVertexBuffer(vbo);
+        rlUpdateVertexBuffer(vbo, data, bytes, 0);
+    }
+}
+
 static void loadLitShader() {
     if (s_lit_ready) {
         return;
@@ -1072,7 +1097,8 @@ static void loadLitShader() {
         "    fragPosition = wp.xyz;\n"
         "    fragTexCoord = vertexTexCoord;\n"
         "    fragColor = instanceColor;\n"
-        "    fragNormal = normalize(mat3(m) * vertexNormal);\n"
+        "    mat3 nm = transpose(inverse(mat3(m)));\n"   // matrice de normale : correcte sous rotation / scale non uniforme
+        "    fragNormal = normalize(nm * vertexNormal);\n"
         "    gl_Position = mvp * wp;\n"
         "}\n";
     std::string fs = std::string(HDR) +
@@ -1149,13 +1175,19 @@ static void flushBucket(const Bucket3D& b) {
         return;
     }
     loadLitShader();
+    if (s_lit.id == 0) {   // shader indisponible (échec de compilation) → ne rien dessiner
+        return;
+    }
     Mesh mesh = getShapeMesh(b.shape);
     rlEnableShader(s_lit.id);
 
-    // Uniforms : MVP (sans la transfo d'instance, appliquée dans le shader), viewPos, ambient, lumière.
+    // Uniforms : MVP = view·proj (la transfo d'instance est appliquée dans le shader).
+    // On N'inclut PAS rlGetMatrixTransform() : les solides instanciés sont positionnés
+    // par leur transfo d'instance figée (x,y,z,w,h,l) et n'héritent pas de la pile
+    // de matrices 2D (push/translate/rotate) — comportement prévisible et sans fuite.
     Matrix matView = rlGetMatrixModelview();
     Matrix matProj = rlGetMatrixProjection();
-    Matrix mvp = MatrixMultiply(MatrixMultiply(rlGetMatrixTransform(), matView), matProj);
+    Matrix mvp = MatrixMultiply(matView, matProj);
     rlSetUniformMatrix(s_lit.locs[SHADER_LOC_MATRIX_MVP], mvp);
     float vp[3] = {s_cam3d.position.x, s_cam3d.position.y, s_cam3d.position.z};
     rlSetUniform(s_loc_viewpos, vp, RL_SHADER_UNIFORM_VEC3, 1);
@@ -1177,21 +1209,23 @@ static void flushBucket(const Bucket3D& b) {
     rlSetUniform(s_loc_l_tgt, lt, RL_SHADER_UNIFORM_VEC3, 1);
     rlSetUniform(s_loc_l_col, s_light_col, RL_SHADER_UNIFORM_VEC4, 1);
 
-    // VBO d'instance : transformations (mat4 = 4 attributs vec4, divisor 1).
+    // VBO d'instance PERSISTANTS (mis à jour, pas recréés) : transfo (mat4 = 4
+    // attributs vec4) puis couleur (vec4), tous deux divisor 1. Les attributs sont
+    // ré-attachés au VAO du mesh à chaque flush (le VBO peut avoir grossi) ; ils ne
+    // sont donc jamais laissés pendants sur un buffer libéré.
     std::vector<float16> xf(n);
     for (int i = 0; i < n; i++) {
         xf[i] = MatrixToFloatV(b.xforms[i]);
     }
     rlEnableVertexArray(mesh.vaoId);
-    unsigned int vboT = rlLoadVertexBuffer(xf.data(), n * (int)sizeof(float16), false);
+    uploadInstanceVBO(s_inst_vbo_xform, s_inst_cap_xform, xf.data(), n * (int)sizeof(float16));
     int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
     for (unsigned int i = 0; i < 4; i++) {
         rlEnableVertexAttribute(locT + i);
         rlSetVertexAttribute(locT + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
         rlSetVertexAttributeDivisor(locT + i, 1);
     }
-    // VBO d'instance : couleur (vec4, divisor 1).
-    unsigned int vboC = rlLoadVertexBuffer((void*)b.colors.data(), n * 4 * (int)sizeof(float), false);
+    uploadInstanceVBO(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
     if (s_loc_instcolor >= 0) {
         rlEnableVertexAttribute(s_loc_instcolor);
         rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
@@ -1218,8 +1252,8 @@ static void flushBucket(const Bucket3D& b) {
     rlActiveTextureSlot(0);
     rlDisableTexture();
     rlDisableShader();
-    rlUnloadVertexBuffer(vboT);
-    rlUnloadVertexBuffer(vboC);
+    // VBO d'instance NON déchargés ici : ils sont persistants (réutilisés la frame
+    // suivante), libérés seulement par reset3dGraphicsState (destruction du contexte).
 }
 
 static void reset3dLightingState() {
@@ -1230,6 +1264,46 @@ static void reset3dLightingState() {
     s_amb3d[1] = 0.15f;
     s_amb3d[2] = 0.15f;
     s_amb3d[3] = 1.0f;
+}
+
+// Libère TOUTES les ressources GL 3D en cache (shader, meshes unitaires, texture
+// blanche, VBO d'instance) et remet les caches à zéro. À appeler par gfx_canvas
+// AVANT de détruire le contexte GL (CloseWindow) : sinon les ids GL survivraient
+// dans les caches et pointeraient vers des objets d'un contexte détruit au run
+// suivant (playground) → 3D corrompue/plantage. Équivalent 3D de image_reset().
+// NB : ne fait des appels GL que si un contexte est courant (garde IsWindowReady
+// côté appelant) ; sur le 1er run les flags *_ready sont false → no-op.
+static void reset3dGraphicsState() {
+    if (s_lit_ready) {
+        UnloadShader(s_lit);
+        s_lit = Shader{};
+        s_lit_ready = false;
+    }
+    for (int i = 0; i < SH_COUNT; i++) {
+        if (s_shape_ready[i]) {
+            UnloadMesh(s_shape_mesh[i]);
+            s_shape_mesh[i] = Mesh{};
+            s_shape_ready[i] = false;
+        }
+    }
+    if (s_white_ready) {
+        UnloadTexture(s_white_tex);
+        s_white_tex = Texture2D{};
+        s_white_ready = false;
+    }
+    if (s_inst_vbo_xform != 0) {
+        rlUnloadVertexBuffer(s_inst_vbo_xform);
+        s_inst_vbo_xform = 0;
+        s_inst_cap_xform = 0;
+    }
+    if (s_inst_vbo_color != 0) {
+        rlUnloadVertexBuffer(s_inst_vbo_color);
+        s_inst_vbo_color = 0;
+        s_inst_cap_color = 0;
+    }
+    s_buckets.clear();
+    s_in_3d = false;
+    s_cur_tex3d = 0;
 }
 
 static void flush3dBuckets() {
@@ -1474,8 +1548,10 @@ static Value gfx_plane(Value* args, int argc) {
                 (float)numArg(args, argc, 2, "graphics.plane")};
     float sx = (float)numArg(args, argc, 3, "graphics.plane");
     float sz = (float)numArg(args, argc, 4, "graphics.plane");
-    Color c = s_has_fill ? s_fill_color : s_stroke_color;
-    pushInstance(SH_PLANE, pos, Vector3{sx, 1.0f, sz}, c);
+    if (s_has_fill || s_has_stroke) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
+        Color c = s_has_fill ? s_fill_color : s_stroke_color;
+        pushInstance(SH_PLANE, pos, Vector3{sx, 1.0f, sz}, c);
+    }
     return Value{};
 }
 
