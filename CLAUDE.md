@@ -52,7 +52,8 @@ ollin/
 │   ├── source_registry.h/.cpp  registre de sources en mémoire (imports, playground)
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
-│   │                  graphics (graphics_module + graphics_stub), image (+ image_stub), + modules.h/.cpp, module_utils.h
+│   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
+│   │                  image (+ image_stub), + modules.h/.cpp, module_utils.h
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
