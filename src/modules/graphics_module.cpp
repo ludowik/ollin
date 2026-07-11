@@ -241,6 +241,7 @@ static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
 static Color s_fill_color = WHITE;
 static bool s_in_3d = false;   // vrai entre graphics.begin3d et end3d (garde-fou de la frame)
+static unsigned int s_cur_tex3d = 0;   // texture 3D courante (0 = blanche) ; comme fill/stroke, remise à 0 chaque frame
 static void end3dInternal();   // flush des buckets 3D + EndMode3D (défini plus bas)
 static void reset3dLightingState();   // remet l'état d'éclairage 3D à zéro (défini plus bas)
 
@@ -262,6 +263,7 @@ static void resetStyles() {
     applyFill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
     s_blend_mode = BLEND_ALPHA;                   // mode de fusion remis par défaut chaque frame
+    s_cur_tex3d = 0;                              // texture 3D remise à « aucune » (blanche) chaque frame
     BeginBlendMode(BLEND_ALPHA);
     rlLoadIdentity();
 }
@@ -1014,7 +1016,6 @@ static unsigned int whiteTexId() {
     }
     return s_white_tex.id;
 }
-static unsigned int s_cur_tex3d = 0;   // texture 3D courante (0 = blanche)
 
 // État d'éclairage (phase 1 : ambient + 1 lumière directionnelle). Opt-in : tant
 // qu'aucune lumière/ambient n'est posée, rendu PLAT (ambient blanc, lumière off).
@@ -1192,9 +1193,13 @@ static void flushBucket(const Bucket3D& b) {
     int slot = 0;
     rlSetUniform(s_lit.locs[SHADER_LOC_MAP_DIFFUSE], &slot, RL_SHADER_UNIFORM_INT, 1);
 
-    // Dessin instancié (le VAO du mesh porte déjà position/uv/normale + indices).
+    // Dessin instancié (le VAO du mesh porte déjà position/uv/normale [+ indices]).
     rlEnableVertexArray(mesh.vaoId);
-    rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * 3, 0, n);
+    if (mesh.indices != nullptr) {
+        rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * 3, 0, n);
+    } else {
+        rlDrawVertexArrayInstanced(0, mesh.vertexCount, n);
+    }
     rlDisableVertexArray();
 
     rlActiveTextureSlot(0);
@@ -1238,7 +1243,6 @@ static Value gfx_begin3d(Value* args, int argc) {
         throw std::runtime_error("graphics.begin3d: expected a camera (graphics.camera)");
     s_cam3d = cameraFromMap(args[0], "graphics.begin3d");
     s_buckets.clear();
-    s_cur_tex3d = 0;   // texture par défaut (blanche) au début du bloc
     BeginMode3D(s_cam3d);
     s_in_3d = true;
     return Value{};
@@ -1270,30 +1274,117 @@ static Value gfx_ambient(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.light("dir"|"point", x,y,z [, couleur]) : configure l'unique lumière
-// (phase 1). "dir" : (x,y,z) = direction de propagation ; "point" : position.
+// ── Classe Light (native, comme Camera/Color) ───────────────────────────────
+// Phase 1 : une seule lumière active (directionnelle ou ponctuelle). Un objet
+// Light porte sa config (type, direction/position, couleur, activée) et, à chaque
+// mutation, la répercute sur l'état d'éclairage global (dernier écrit = actif).
+static double instField(const Value& self, const char* k, double def) {
+    Value v = self.mapGet(Value(std::string(k)));
+    return v.isNumber() ? v.asNum() : def;
+}
+
+static void applyLightFromInstance(const Value& self) {
+    int type = (int)instField(self, "type", 0);
+    float x = (float)instField(self, "dx", 0.0);
+    float y = (float)instField(self, "dy", -1.0);
+    float z = (float)instField(self, "dz", 0.0);
+    s_light_type = type;
+    if (type == 1) {
+        s_light_pos = Vector3{x, y, z};
+        s_light_tgt = Vector3{0.0f, 0.0f, 0.0f};
+    } else {
+        s_light_pos = Vector3{0.0f, 0.0f, 0.0f};
+        s_light_tgt = Vector3{x, y, z};
+    }
+    s_light_col[0] = (float)instField(self, "r", 1.0);
+    s_light_col[1] = (float)instField(self, "g", 1.0);
+    s_light_col[2] = (float)instField(self, "b", 1.0);
+    s_light_col[3] = (float)instField(self, "a", 1.0);
+    s_light_on = instField(self, "enabled", 1.0) != 0.0;
+    s_lighting_used = true;
+}
+
+// light.set_dir(x,y,z) : oriente une lumière directionnelle (direction de propagation).
+static Value light_set_dir(Value* args, int argc) {
+    Value self = args[0];
+    self.mapSet(Value(std::string("type")), Value((int64_t)0));
+    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.set_dir")));
+    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.set_dir")));
+    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.set_dir")));
+    applyLightFromInstance(self);
+    return self;
+}
+
+// light.set_pos(x,y,z) : positionne une lumière ponctuelle.
+static Value light_set_pos(Value* args, int argc) {
+    Value self = args[0];
+    self.mapSet(Value(std::string("type")), Value((int64_t)1));
+    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.set_pos")));
+    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.set_pos")));
+    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.set_pos")));
+    applyLightFromInstance(self);
+    return self;
+}
+
+// light.set_color(couleur) : couleur de la lumière.
+static Value light_set_color(Value* args, int argc) {
+    Value self = args[0];
+    if (argc > 1 && (args[1].isMap() || args[1].isClass())) {
+        Color c = toColor(args[1]);
+        self.mapSet(Value(std::string("r")), Value(c.r / 255.0));
+        self.mapSet(Value(std::string("g")), Value(c.g / 255.0));
+        self.mapSet(Value(std::string("b")), Value(c.b / 255.0));
+        self.mapSet(Value(std::string("a")), Value(c.a / 255.0));
+    }
+    applyLightFromInstance(self);
+    return self;
+}
+
+// light.enable(bool) : active/désactive la lumière (défaut : active).
+static Value light_enable(Value* args, int argc) {
+    Value self = args[0];
+    bool on = (argc > 1) ? !isFalsy(args[1]) : true;
+    self.mapSet(Value(std::string("enabled")), Value((int64_t)(on ? 1 : 0)));
+    applyLightFromInstance(self);
+    return self;
+}
+
+static Value makeLightClass() {
+    Value cls = Value::makeClass();
+    cls.mapSet(Value(std::string("__name__")), Value(std::string("Light")));
+    cls.mapSet(Value(std::string("set_dir")), Value::makeBuiltin(light_set_dir));
+    cls.mapSet(Value(std::string("set_pos")), Value::makeBuiltin(light_set_pos));
+    cls.mapSet(Value(std::string("set_color")), Value::makeBuiltin(light_set_color));
+    cls.mapSet(Value(std::string("enable")), Value::makeBuiltin(light_enable));
+    return cls;
+}
+
+static Value lightClass() {
+    static Value cls = makeLightClass();
+    return cls;
+}
+
+// graphics.light("dir"|"point", x,y,z [, couleur]) : crée un objet Light et
+// l'active. "dir" : (x,y,z) = direction de propagation ; "point" : position.
 static Value gfx_light(Value* args, int argc) {
     std::string type = (argc > 0 && args[0].isString()) ? args[0].asString() : "dir";
     float x = (float)numArg(args, argc, 1, "graphics.light");
     float y = (float)numArg(args, argc, 2, "graphics.light");
     float z = (float)numArg(args, argc, 3, "graphics.light");
     Color c = (argc > 4 && (args[4].isMap() || args[4].isClass())) ? toColor(args[4]) : WHITE;
-    if (type == "point") {
-        s_light_type = 1;
-        s_light_pos = Vector3{x, y, z};
-        s_light_tgt = Vector3{0.0f, 0.0f, 0.0f};
-    } else {
-        s_light_type = 0;
-        s_light_pos = Vector3{0.0f, 0.0f, 0.0f};
-        s_light_tgt = Vector3{x, y, z};   // direction de propagation
-    }
-    s_light_col[0] = c.r / 255.0f;
-    s_light_col[1] = c.g / 255.0f;
-    s_light_col[2] = c.b / 255.0f;
-    s_light_col[3] = c.a / 255.0f;
-    s_light_on = true;
-    s_lighting_used = true;
-    return Value{};
+    Value inst = Value::makeMap();
+    inst.mapSet(Value(std::string("__class__")), lightClass());
+    inst.mapSet(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
+    inst.mapSet(Value(std::string("dx")), Value((double)x));
+    inst.mapSet(Value(std::string("dy")), Value((double)y));
+    inst.mapSet(Value(std::string("dz")), Value((double)z));
+    inst.mapSet(Value(std::string("r")), Value(c.r / 255.0));
+    inst.mapSet(Value(std::string("g")), Value(c.g / 255.0));
+    inst.mapSet(Value(std::string("b")), Value(c.b / 255.0));
+    inst.mapSet(Value(std::string("a")), Value(c.a / 255.0));
+    inst.mapSet(Value(std::string("enabled")), Value((int64_t)1));
+    applyLightFromInstance(inst);
+    return inst;
 }
 
 // graphics.grid(slices, spacing) : repère quadrillé au sol (plan XZ), centré sur
@@ -1308,10 +1399,8 @@ static Value gfx_grid(Value* args, int argc) {
 // graphics.texture(img) / graphics.noTexture() : texture 3D courante (handle image).
 static Value gfx_texture(Value* args, int argc) {
     if (argc > 0 && args[0].isMap()) {
-        Value idv = args[0].mapGet(Value(std::string("tex_id")));
-        if (!idv.isInteger())
-            idv = args[0].mapGet(Value(std::string("id")));
-        s_cur_tex3d = idv.isInteger() ? (unsigned int)idv.asInt() : 0;
+        Value idv = args[0].mapGet(Value(std::string("id")));
+        s_cur_tex3d = idv.isInteger() ? image_gl_texid((int)idv.asInt()) : 0;
     }
     return Value{};
 }
@@ -1337,42 +1426,43 @@ static Value gfx_cube(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.sphere(x,y,z, r) : sphère centrée en (x,y,z). Pleine si fill, fil de fer si stroke.
+// graphics.sphere(x,y,z, r) : sphère centrée en (x,y,z). Pleine si fill (instanciée,
+// éclairée, texturée), fil de fer si stroke (immédiat). Mesh unitaire = rayon 0.5.
 static Value gfx_sphere(Value* args, int argc) {
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.sphere"), (float)numArg(args, argc, 1, "graphics.sphere"),
                 (float)numArg(args, argc, 2, "graphics.sphere")};
     float r = (float)numArg(args, argc, 3, "graphics.sphere");
     if (s_has_fill)
-        DrawSphere(pos, r, s_fill_color);
+        pushInstance(SH_SPHERE, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, s_fill_color);
     if (s_has_stroke)
         DrawSphereWires(pos, r, 16, 16, s_stroke_color);
     return Value{};
 }
 
-// graphics.cylinder(x,y,z, rTop, rBottom, h [, slices]) : (x,y,z) = centre de la
-// base. Plein si fill, fil de fer si stroke. slices = subdivisions (16 défaut).
+// graphics.cylinder(x,y,z, r, h) : cylindre, (x,y,z) = centre de la base, rayon r,
+// hauteur h (vers +Y). Plein si fill (instancié), fil de fer si stroke (immédiat).
+// Mono-rayon (contrainte de l'instancing : mesh unitaire figé, rayon 1 hauteur 1).
 static Value gfx_cylinder(Value* args, int argc) {
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.cylinder"), (float)numArg(args, argc, 1, "graphics.cylinder"),
                 (float)numArg(args, argc, 2, "graphics.cylinder")};
-    float rTop = (float)numArg(args, argc, 3, "graphics.cylinder");
-    float rBottom = (float)numArg(args, argc, 4, "graphics.cylinder");
-    float h = (float)numArg(args, argc, 5, "graphics.cylinder");
-    int slices = argc > 6 ? toInt(args[6]) : 16;
+    float r = (float)numArg(args, argc, 3, "graphics.cylinder");
+    float h = (float)numArg(args, argc, 4, "graphics.cylinder");
     if (s_has_fill)
-        DrawCylinder(pos, rTop, rBottom, h, slices, s_fill_color);
+        pushInstance(SH_CYLINDER, pos, Vector3{r, h, r}, s_fill_color);
     if (s_has_stroke)
-        DrawCylinderWires(pos, rTop, rBottom, h, slices, s_stroke_color);
+        DrawCylinderWires(pos, r, r, h, 16, s_stroke_color);
     return Value{};
 }
 
-// graphics.plane(x,y,z, sx,sz) : plan horizontal centré en (x,y,z), taille sx×sz
-// (XZ). Rempli : raylib n'a pas de variante fil de fer → couleur fill si active,
-// sinon stroke (pour rester visible avec noFill).
+// graphics.plane(x,y,z, sx,sz) : plan horizontal (XZ) centré en (x,y,z), taille
+// sx×sz. Instancié + éclairé (utilise la couleur fill ; sinon stroke pour rester visible).
 static Value gfx_plane(Value* args, int argc) {
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.plane"), (float)numArg(args, argc, 1, "graphics.plane"),
                 (float)numArg(args, argc, 2, "graphics.plane")};
-    Vector2 size{(float)numArg(args, argc, 3, "graphics.plane"), (float)numArg(args, argc, 4, "graphics.plane")};
-    DrawPlane(pos, size, s_has_fill ? s_fill_color : s_stroke_color);
+    float sx = (float)numArg(args, argc, 3, "graphics.plane");
+    float sz = (float)numArg(args, argc, 4, "graphics.plane");
+    Color c = s_has_fill ? s_fill_color : s_stroke_color;
+    pushInstance(SH_PLANE, pos, Vector3{sx, 1.0f, sz}, c);
     return Value{};
 }
 

@@ -174,9 +174,12 @@ const MODULE_MEMBERS = {
     fn('graphics.begin3d','begin3d(cam)'),         fn('graphics.end3d','end3d()'),
     fn('graphics.grid','grid(slices, spacing)'),
     fn('graphics.cube','cube(x,y,z, w,h,l)'),      fn('graphics.sphere','sphere(x,y,z, r)'),
-    fn('graphics.cylinder','cylinder(x,y,z, rTop,rBottom,h [, slices])'),
+    fn('graphics.cylinder','cylinder(x,y,z, r, h)'),
     fn('graphics.plane','plane(x,y,z, sx,sz)'),
     fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
+    fn('graphics.ambient','ambient(v | couleur)'),
+    fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
+    fn('graphics.texture','texture(img)'),         fn('graphics.noTexture','noTexture()'),
   ],
   image: [
     fn('image.load','load(path) → img'),

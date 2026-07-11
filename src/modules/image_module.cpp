@@ -43,6 +43,14 @@ struct TexHandle {
 static std::unordered_map<int, std::unique_ptr<TexHandle>> s_images;
 static int s_next_id = 1;
 
+unsigned int image_gl_texid(int id) {
+    auto it = s_images.find(id);
+    if (it == s_images.end())
+        return 0;
+    const TexHandle& h = *it->second;
+    return h.is_render ? h.rtt.texture.id : h.tex.id;
+}
+
 // preloaded bytes: name → (bytes, ext with dot e.g. ".png")
 static std::unordered_map<std::string, std::pair<std::vector<uint8_t>, std::string>> s_preloaded;
 

@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-10 21:46</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-11 07:06</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-10 21:46</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-11 07:06</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1678,24 +1678,44 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.grid(slices, spacing)</code></td><td>Repère quadrillé au sol (plan XZ), centré sur l'origine (couleur grise fixe)</td></tr>
     <tr><td><code>graphics.cube(x,y,z, w,h,l)</code></td><td>Cube centré en <code>(x,y,z)</code> — plein si <code>fill</code>, arêtes si <code>stroke</code></td></tr>
     <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>Sphère — pleine si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
-    <tr><td><code>graphics.cylinder(x,y,z, rTop,rBottom,h [, slices])</code></td><td><code>(x,y,z)</code> = centre de la base — plein si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
+    <tr><td><code>graphics.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> = centre de la base, rayon <code>r</code>, hauteur <code>h</code> — plein si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
     <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>Plan horizontal (XZ) de taille <code>sx</code>×<code>sz</code>, rempli</td></tr>
     <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>Segment 3D (couleur <code>stroke</code>)</td></tr>
     <tr><td><code>graphics.point3d(x,y,z)</code></td><td>Point 3D (couleur <code>stroke</code>)</td></tr>
   </tbody>
 </table>
 
+<h4>Éclairage &amp; texture</h4>
+<p>Les solides pleins (<code>fill</code>) sont dessinés par <strong>instancing</strong> avec un shader Blinn-Phong : toutes les formes d'un même type ne coûtent qu'<strong>un seul appel de dessin</strong>, et chacune garde sa propre couleur. L'éclairage est <strong>opt-in</strong> : tant qu'aucune lumière n'est déclarée, le rendu est plat (couleur unie). Dès qu'une lumière existe, les faces sont ombrées selon leur orientation.</p>
+<table>
+  <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(couleur)</code></td><td>Lumière ambiante (base uniforme). <code>v</code> ∈ [0,1]</td></tr>
+    <tr><td><code>graphics.light("dir", dx,dy,dz [, couleur])</code></td><td>Lumière directionnelle (<code>(dx,dy,dz)</code> = direction de propagation) → objet <code>Light</code></td></tr>
+    <tr><td><code>graphics.light("point", x,y,z [, couleur])</code></td><td>Lumière ponctuelle à la position <code>(x,y,z)</code> → objet <code>Light</code></td></tr>
+    <tr><td><code>lum.set_dir(x,y,z)</code> · <code>lum.set_pos(x,y,z)</code></td><td>Réoriente / repositionne la lumière</td></tr>
+    <tr><td><code>lum.set_color(couleur)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
+    <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applique une image (handle <code>image</code>) comme texture aux solides suivants ; <code>fill</code> devient une teinte multipliée</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip">Phase 1 : une seule lumière active à la fois (directionnelle ou ponctuelle) + l'ambiante. Le fil de fer, la grille et les lignes ne sont pas éclairés.</div>
+
 <pre><code><span class="cmt">## la caméra est un objet : créée une fois, pilotée par ses méthodes</span>
 <span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
+<span class="bi">graphics</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## éclairage : base ambiante…</span>
+<span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …+ un « soleil » directionnel</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## efface couleur + profondeur</span>
     cam.orbit(elapsedTime * <span class="num">0.5</span>, <span class="num">10</span>, <span class="num">6</span>)   <span class="cmt">## orbite autour de la cible (angle en radians)</span>
+    <span class="bi">graphics</span>.noStroke()
     <span class="bi">graphics</span>.begin3d(cam)
         <span class="bi">graphics</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
         <span class="bi">graphics</span>.fill(colors.RED)
-        <span class="bi">graphics</span>.stroke(colors.BLACK)
-        <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
+        <span class="bi">graphics</span>.cube(-<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)   <span class="cmt">## faces ombrées</span>
+        <span class="bi">graphics</span>.fill(colors.SKYBLUE)
+        <span class="bi">graphics</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
     <span class="bi">graphics</span>.end3d()
     <span class="bi">graphics</span>.draw_text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>, <span class="num">22</span>)   <span class="cmt">## HUD 2D par-dessus</span>
 <span class="kw">end</span></code></pre>

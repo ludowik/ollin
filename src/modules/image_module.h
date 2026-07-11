@@ -16,6 +16,10 @@ void image_preload_b64(const std::string& name, const std::string& b64, const st
 // Called at the start of each ollin_run() to release stale GL handles
 void image_reset();
 
+// Renvoie l'id GL de texture d'un handle image (0 si introuvable) — utilisé par
+// la 3D (graphics.texture) pour texturer les meshes avec une image du module.
+unsigned int image_gl_texid(int id);
+
 // Called by graphics.sprite() — draws image id at (x,y) scaled to (dw,dh).
 // Pass dw=0/dh=0 to use the image's natural size.
 // tint is RGBA 0-255 components.

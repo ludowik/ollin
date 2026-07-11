@@ -1,42 +1,38 @@
-## Affichage 3D — caméra qui tourne autour d'une scène de cubes et sphères.
-##   graphics.camera(px,py,pz, tx,ty,tz [, fovy]) → caméra (regarde la cible)
-##   graphics.begin3d(cam) … graphics.end3d()      → bloc de dessin 3D
-##   fill/stroke pilotent plein / fil de fer, comme en 2D.
+## Affichage 3D — éclairage + instancing.
+##   graphics.camera(...)                → caméra (objet, pilotée par méthodes)
+##   graphics.ambient / graphics.light   → éclairage Blinn-Phong (opt-in)
+##   graphics.begin3d(cam) … end3d()     → bloc 3D ; fill = couleur par instance
+## Les solides pleins de même type sont dessinés en UN appel (instancing) :
+## la grille de cubes ci-dessous ne coûte qu'un draw call, chacun sa couleur.
 
-## La caméra est un objet (classe Camera) : créée une fois, pilotée par méthodes.
-global cam = nil
+global cam = graphics.camera(14, 10, 14,  0, 0, 0)   ## regarde l'origine
 
 func setup()
     graphics.canvas(W, H, "3D")
-    cam = graphics.camera(12, 7, 0,  0, 0, 0)   ## regarde l'origine
+    graphics.ambient(0.2)                    ## base ambiante
+    graphics.light("dir", -1, -2, -0.5)      ## « soleil » directionnel
 end
 
 func draw()
-    ## clear opaque = efface la couleur ET la profondeur (obligatoire en 3D)
-    graphics.clear(colors.BLACK)
+    graphics.clear(colors.BLACK)             ## efface couleur + profondeur
+    cam.orbit(elapsedTime * 0.4, 16, 10)     ## orbite (angle en radians)
 
-    ## caméra en orbite autour de sa cible (rayon 12, hauteur 7) — angle en radians
-    cam.orbit(elapsedTime * 0.5, 12, 7)
-
+    graphics.noStroke()
     graphics.begin3d(cam)
-        graphics.grid(12, 1)                  ## repère au sol
+        ## grille de cubes colorés — 1 seul draw call malgré N cubes et N couleurs
+        for x = -4, 4 do
+            for z = -4, 4 do
+                var t = elapsedTime * 2 + x + z
+                var h = 1 + (math.sin(t) + 1) * 1.5
+                graphics.fill(Color((x + 4) / 8, (z + 4) / 8, 0.8))
+                graphics.cube(x * 2, h / 2, z * 2,  1.4, h, 1.4)
+            end
+        end
 
-        ## cube plein rouge, arêtes noires
-        graphics.fill(colors.RED)
-        graphics.stroke(colors.BLACK)
-        graphics.cube(-3, 1, 0,  2, 2, 2)
-
-        ## sphère pleine bleue (sans arêtes)
-        graphics.noStroke()
-        graphics.fill(colors.SKYBLUE)
-        graphics.sphere(3, 1, 0,  1.5)
-
-        ## cylindre fil de fer seulement
-        graphics.noFill()
-        graphics.stroke(colors.LIME)
-        graphics.cylinder(0, 0, 3,  0.2, 1.2, 3,  16)
+        ## une sphère éclairée qui flotte au centre
+        graphics.fill(colors.WHITE)
+        graphics.sphere(0, 6, 0,  1.5)
     graphics.end3d()
 
-    ## HUD 2D par-dessus la 3D (même frame)
-    graphics.draw_text("Ollin 3D", 12, 12, 22, colors.WHITE)
+    graphics.draw_text("Ollin 3D — éclairage + instancing", 12, 12, 20, colors.WHITE)
 end
