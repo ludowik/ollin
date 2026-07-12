@@ -12,5 +12,5 @@
   { "name": "SUTOM",          "file": "sutom.ol" },
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
-  { "name": "Quaternions (slerp)", "file": "quat_slerp.ol" }
+  { "name": "Quaternions (glisser)", "file": "quat_drag.ol" }
 ]
