@@ -8,7 +8,7 @@
 #include <raylib.h>
 
 // ── Helpers partagés ────────────────────────────────────────────────────────
-static inline int gfxToInt(const Value& v) {
+inline int gfxToInt(const Value& v) {
     if (v.isInteger())
         return (int)v.asInt();
     if (v.isFloat())

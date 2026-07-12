@@ -15,7 +15,12 @@ static double quatField(const Value& v, const char* k) {
 }
 
 Quaternion quatFromInstance(const Value& v, const char* fn) {
-    if (!v.isMap())
+    // Vérifie que c'est bien une instance Quat (et pas une autre map / un autre
+    // objet Camera, Light…) — sinon on fabriquerait un quaternion silencieusement
+    // faux (w manquant → 0). On contrôle __class__.__name__ == "Quat".
+    Value cls = v.isMap() ? v.mapGet(Value(std::string("__class__"))) : Value{};
+    Value name = cls.isClass() ? cls.mapGet(Value(std::string("__name__"))) : Value{};
+    if (!(name.isString() && name.asString() == "Quat"))
         throw std::runtime_error(std::string(fn) + ": expected a Quat (graphics.quat / quat_axis / quat_euler)");
     return Quaternion{(float)quatField(v, "x"), (float)quatField(v, "y"), (float)quatField(v, "z"),
                       (float)quatField(v, "w")};
@@ -110,6 +115,10 @@ static Value gfx_quat_axis(Value* args, int argc) {
     Vector3 axis = {(float)numArg(args, argc, 0, "graphics.quat_axis"),
                     (float)numArg(args, argc, 1, "graphics.quat_axis"),
                     (float)numArg(args, argc, 2, "graphics.quat_axis")};
+    // Axe nul (0,0,0) : aucune rotation définie → identité. Explicite ici plutôt
+    // que de dépendre du comportement interne de raymath.
+    if (axis.x == 0.0f && axis.y == 0.0f && axis.z == 0.0f)
+        return makeQuatInstance(QuaternionIdentity());
     float rad = (float)numArg(args, argc, 3, "graphics.quat_axis") * DEG2RAD;
     return makeQuatInstance(QuaternionFromAxisAngle(axis, rad));
 }
