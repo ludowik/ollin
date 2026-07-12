@@ -5,7 +5,7 @@
 ## Les solides pleins de même type sont dessinés en UN appel (instancing) :
 ## la grille de cubes ci-dessous ne coûte qu'un draw call, chacun sa couleur.
 
-global cam = graphics.camera(14, 10, 14,  0, 0, 0)   ## regarde l'origine
+global cam = graphics.camera(20, 15, 20,  0, 0, 0)   ## regarde l'origine (reculée)
 
 func setup()
     graphics.canvas(W, H, "3D")
@@ -15,7 +15,7 @@ end
 
 func draw()
     graphics.clear(colors.BLACK)             ## efface couleur + profondeur
-    cam.orbit(elapsedTime * 0.4, 16, 10)     ## orbite (angle en radians)
+    cam.orbit(elapsedTime * 0.4, 26, 16)     ## orbite reculée (angle en radians)
 
     graphics.noStroke()
     graphics.begin3d(cam)

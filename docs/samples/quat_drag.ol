@@ -3,7 +3,7 @@
 ## l'orientation courante : l'accumulation de quaternions donne un « trackball »
 ## fluide, sans blocage de cardan.
 
-global cam = graphics.camera(0, 0, 8,  0, 0, 0)
+global cam = graphics.camera(0, 0, 14,  0, 0, 0)   ## caméra reculée (cube bien cadré)
 global orient = graphics.quat()   ## orientation courante (identité au départ)
 global dragging = false
 global lastx = 0
