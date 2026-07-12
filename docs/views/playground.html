@@ -25,7 +25,12 @@
    défilerait et la barre d'outils s'échapperait vers le haut. overflow:hidden +
    body en flex colonne : la toolbar reste calée en haut, seul l'intérieur défile. */
 html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-body { display: flex; flex-direction: column; }
+/* position:fixed : sort l'app du flux de defilement. Sans ca, sur mobile,
+   l'ouverture du clavier (focus de l'editeur) fait defiler la page vers le haut
+   pour garder le curseur visible — ce que overflow:hidden n'empeche pas (scroll
+   initie par le navigateur, pas par l'utilisateur). Epingle a la fenetre, la
+   barre d'outils reste calee en haut ; le clavier recouvre simplement le bas. */
+body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
 #toolbar {
