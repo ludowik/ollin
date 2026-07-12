@@ -19,7 +19,13 @@
   --mono:    'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
 }
 
-html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* min-height:0 neutralise le `min-height:100vh` du shell (index.html) : sur
+   mobile 100vh = viewport LARGE (> zone visible sous la barre dynamique du
+   navigateur), ce qui rendrait le body plus haut que l'écran → la fenêtre
+   défilerait et la barre d'outils s'échapperait vers le haut. overflow:hidden +
+   body en flex colonne : la toolbar reste calée en haut, seul l'intérieur défile. */
+html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { display: flex; flex-direction: column; }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
 #toolbar {
@@ -127,7 +133,8 @@ html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(-
 /* ── layout ──────────────────────────────────────────────────────────────── */
 #layout {
   display: flex;
-  height: calc(100vh - 44px);
+  flex: 1;            /* remplit l'espace sous la toolbar (body en flex colonne) */
+  min-height: 0;      /* autorise les panneaux internes à défiler, pas la fenêtre */
 }
 
 #editor-pane {
