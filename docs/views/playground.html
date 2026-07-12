@@ -31,6 +31,13 @@ html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior:
    initie par le navigateur, pas par l'utilisateur). Epingle a la fenetre, la
    barre d'outils reste calee en haut ; le clavier recouvre simplement le bas. */
 body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
+/* touch-action:none sur les zones NON defilantes (barre d'outils, en-tetes de la
+   colonne de fichiers, gouttiere). Un glissement partant d'une de ces zones n'a
+   pas d'ancetre scrollable → sinon iOS fait rebondir/panoramiquer toute la fenetre.
+   On le pose DIRECTEMENT sur ces elements (touch-action ne s'herite pas) : un geste
+   qui y demarre est bloque, sans affecter les panneaux editeur/sortie qui defilent
+   normalement (ce ne sont pas leurs descendants). */
+#toolbar, .rail-head, #divider { touch-action: none; }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
 #toolbar {
