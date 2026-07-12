@@ -45,6 +45,7 @@ func draw()
     graphics.fill(colors.SKYBLUE)
     graphics.stroke(colors.BLACK)      ## arêtes → la rotation reste bien lisible
     graphics.begin3d(cam)
+        graphics.grid(12, 1)           ## repère au sol (avant la rotation → reste fixe)
         graphics.rotateq(orient)       ## applique l'orientation accumulée
         graphics.cube(0, 0, 0,  3, 3, 3)
     graphics.end3d()

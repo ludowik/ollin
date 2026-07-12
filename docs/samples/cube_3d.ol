@@ -19,6 +19,7 @@ func draw()
 
     graphics.noStroke()
     graphics.begin3d(cam)
+        graphics.grid(16, 2)         ## repère quadrillé au sol
         ## grille de cubes colorés — 1 seul draw call malgré N cubes et N couleurs
         for x = -4, 4 do
             for z = -4, 4 do
