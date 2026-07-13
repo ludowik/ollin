@@ -6,7 +6,7 @@
 // d'erreurs que le Run inline du playground.
 
 export async function init(ctx) {
-  const { getOllin, hardReload } = ctx
+  const { getOllin } = ctx
   let mod = null   // module WASM (capturé par stop() ; pas de global smuggling)
 
   // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
@@ -27,8 +27,6 @@ export async function init(ctx) {
   canvasEl.style.display = 'none'
   pane.appendChild(canvasEl)
 
-  document.getElementById('reload-btn').addEventListener('click', hardReload)
-
   function showText(text) {
     outEl.style.display    = 'block'
     canvasEl.style.display = 'none'
@@ -36,7 +34,7 @@ export async function init(ctx) {
     outEl.className   = (text && String(text).startsWith('error:')) ? 'err' : 'ok'
   }
 
-  // (Re)lance le programme courant. Réutilisé au démarrage ET par « Relancer ».
+  // (Re)lance le programme courant. Réutilisé au démarrage ET par « Recharger ».
   function launch() {
     statusEl.textContent = ''
     runProgram(mod, code, canvasEl, {
@@ -48,9 +46,12 @@ export async function init(ctx) {
     })
   }
 
-  // ── Contrôles d'exécution : Pause/Reprendre + Relancer ──────────────────────
+  // ── Contrôles d'exécution : Recharger (= relancer) + Pause/Reprendre ─────────
+  // « Recharger » ré-exécute le programme depuis le début (pas de rechargement de
+  // page : redondant avec ce relancement, et plus lourd). Le WASM est déjà à jour
+  // via le rechargement dur de l'éditeur.
+  const reloadBtn   = document.getElementById('reload-btn')
   const pauseBtn    = document.getElementById('pause-btn')
-  const relaunchBtn = document.getElementById('relaunch-btn')
   const ICON_PAUSE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>'
   const ICON_PLAY  = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>'
   let paused = false
@@ -72,8 +73,8 @@ export async function init(ctx) {
       setPauseUI()
     })
   }
-  if (relaunchBtn) {
-    relaunchBtn.addEventListener('click', () => {
+  if (reloadBtn) {
+    reloadBtn.addEventListener('click', () => {
       if (!mod || code == null) {
         return
       }
