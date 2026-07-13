@@ -768,6 +768,14 @@ void reset3dFrameState() {
     s_cur_tex3d = 0;
 }
 
+// Texture 3D courante — exposée pour la sauvegarde/restauration de style (push/pushStyle).
+unsigned int gfx3dGetTexture() {
+    return s_cur_tex3d;
+}
+void gfx3dSetTexture(unsigned int id) {
+    s_cur_tex3d = id;
+}
+
 // Enregistre les builtins 3D dans le module graphics (appelé par makeGraphicsModule).
 void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("camera")), Value::makeBuiltin(gfx_camera));

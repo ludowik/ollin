@@ -168,6 +168,8 @@ const MODULE_MEMBERS = {
     fn('graphics.point','point(x,y)'),
     fn('graphics.polygon','polygon(pts)'),          fn('graphics.polyline','polyline(pts)'),
     fn('graphics.push','push()'),                   fn('graphics.pop','pop()'),
+    fn('graphics.pushMatrix','pushMatrix()'),       fn('graphics.popMatrix','popMatrix()'),
+    fn('graphics.pushStyle','pushStyle()'),         fn('graphics.popStyle','popStyle()'),
     fn('graphics.translate','translate(x,y [,z])'), fn('graphics.rotate','rotate(deg [,ax,ay,az])'),
     fn('graphics.rotateX','rotateX(deg)'),          fn('graphics.rotateY','rotateY(deg)'),
     fn('graphics.rotateZ','rotateZ(deg)'),

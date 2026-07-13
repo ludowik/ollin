@@ -289,6 +289,48 @@ Color gfxStrokeColor() {
     return s_stroke_color;
 }
 
+// ── Contextes de style (pile) ───────────────────────────────────────────────
+// Capture/restaure TOUT l'état de dessin : trait, remplissage, mode de fusion,
+// teinte d'image (image_module) et texture 3D courante (graphics3d). Utilisé par
+// push/pop (matrice + style) et pushStyle/popStyle (style seul).
+struct StyleState {
+    float strokeSize;
+    bool  hasStroke;
+    Color strokeColor;
+    bool  hasFill;
+    Color fillColor;
+    int   blendMode;
+    bool  hasTint;
+    Color tint;
+    unsigned int tex3d;
+};
+static std::vector<StyleState> s_style_stack;
+
+static StyleState captureStyle() {
+    StyleState s;
+    s.strokeSize = s_stroke_size;
+    s.hasStroke = s_has_stroke;
+    s.strokeColor = s_stroke_color;
+    s.hasFill = s_has_fill;
+    s.fillColor = s_fill_color;
+    s.blendMode = s_blend_mode;
+    image_get_tint(&s.hasTint, &s.tint.r, &s.tint.g, &s.tint.b, &s.tint.a);
+    s.tex3d = gfx3dGetTexture();
+    return s;
+}
+
+static void restoreStyle(const StyleState& s) {
+    s_stroke_size = s.strokeSize;
+    s_has_stroke = s.hasStroke;
+    s_stroke_color = s.strokeColor;
+    s_has_fill = s.hasFill;
+    s_fill_color = s.fillColor;
+    s_blend_mode = s.blendMode;
+    BeginBlendMode(s.blendMode);
+    image_set_tint(s.hasTint, s.tint.r, s.tint.g, s.tint.b, s.tint.a);
+    gfx3dSetTexture(s.tex3d);
+}
+
 static void resetStyles() {
     applyStrokeSize(2.0f);
     applyStroke(true, WHITE);
@@ -296,6 +338,7 @@ static void resetStyles() {
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
     s_blend_mode = BLEND_ALPHA;                   // mode de fusion remis par défaut chaque frame
     reset3dFrameState();                          // texture 3D remise à « aucune » (blanche) chaque frame
+    s_style_stack.clear();                        // pile de style repartie à neuf chaque frame (push/pop équilibrés dans draw)
     BeginBlendMode(BLEND_ALPHA);
     rlLoadIdentity();
 }
@@ -805,18 +848,56 @@ static Value gfx_run(Value* args, int argc) {
     return Value{};
 }
 
-// ── Transformations matricielles ──────────────────────────────────────────────
+// ── Transformations matricielles + contextes de style ──────────────────────────
+// push/pop        : sauvent/restaurent À LA FOIS la matrice ET le style (Processing/p5).
+// pushMatrix/pop  : matrice seule.  pushStyle/pop : style seul.
 static Value gfx_push(Value* args, int argc) {
     (void)args;
     (void)argc;
     rlPushMatrix();
+    s_style_stack.push_back(captureStyle());
     return Value{};
 }
 
 static Value gfx_pop(Value* args, int argc) {
     (void)args;
     (void)argc;
+    if (!s_style_stack.empty()) {
+        restoreStyle(s_style_stack.back());
+        s_style_stack.pop_back();
+    }
     rlPopMatrix();
+    return Value{};
+}
+
+static Value gfx_push_matrix(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    rlPushMatrix();
+    return Value{};
+}
+
+static Value gfx_pop_matrix(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    rlPopMatrix();
+    return Value{};
+}
+
+static Value gfx_push_style(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_style_stack.push_back(captureStyle());
+    return Value{};
+}
+
+static Value gfx_pop_style(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    if (!s_style_stack.empty()) {
+        restoreStyle(s_style_stack.back());
+        s_style_stack.pop_back();
+    }
     return Value{};
 }
 
@@ -957,6 +1038,10 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("run")), Value::makeBuiltin(gfx_run));
     m.mapSet(Value(std::string("push")), Value::makeBuiltin(gfx_push));
     m.mapSet(Value(std::string("pop")), Value::makeBuiltin(gfx_pop));
+    m.mapSet(Value(std::string("pushMatrix")), Value::makeBuiltin(gfx_push_matrix));
+    m.mapSet(Value(std::string("popMatrix")), Value::makeBuiltin(gfx_pop_matrix));
+    m.mapSet(Value(std::string("pushStyle")), Value::makeBuiltin(gfx_push_style));
+    m.mapSet(Value(std::string("popStyle")), Value::makeBuiltin(gfx_pop_style));
     m.mapSet(Value(std::string("translate")), Value::makeBuiltin(gfx_translate));
     m.mapSet(Value(std::string("rotate")), Value::makeBuiltin(gfx_rotate));
     m.mapSet(Value(std::string("rotateX")), Value::makeBuiltin(gfx_rotate_x));

@@ -30,3 +30,7 @@ void reset3dLightingState();   // remet l'éclairage 3D à l'état par défaut
 void reset3dGraphicsState();   // libère les ressources GL 3D (avant destruction du contexte)
 void reset3dFrameState();      // remet la texture 3D courante (appelé chaque frame par resetStyles)
 void register3dGraphics(Value& m);   // enregistre les builtins 3D dans le module graphics
+
+// ── Texture 3D courante (état de style, sauvé/restauré par push/pushStyle) ──
+unsigned int gfx3dGetTexture();      // id GL de la texture 3D courante (0 = blanche)
+void gfx3dSetTexture(unsigned int id);

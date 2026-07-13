@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-13 10:45</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-13 12:21</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-13 10:45</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-13 12:21</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1573,8 +1573,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.push()</code></td><td>Empile la matrice courante (sauvegarde l'état)</td></tr>
-    <tr><td><code>graphics.pop()</code></td><td>Restaure la matrice précédente</td></tr>
+    <tr><td><code>graphics.push()</code></td><td>Sauvegarde <strong>matrice + style</strong> (trait, remplissage, teinte, mode de fusion…)</td></tr>
+    <tr><td><code>graphics.pop()</code></td><td>Restaure matrice + style de la dernière <code>push()</code></td></tr>
+    <tr><td><code>graphics.pushMatrix()</code> · <code>popMatrix()</code></td><td>Sauvegarde/restaure la <strong>matrice</strong> seule</td></tr>
+    <tr><td><code>graphics.pushStyle()</code> · <code>popStyle()</code></td><td>Sauvegarde/restaure le <strong>style</strong> seul (trait, remplissage, teinte, fusion)</td></tr>
     <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Déplace l'origine ; <code>z</code> optionnel (3D)</td></tr>
     <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>Rotation en degrés ; sans axe → autour de Z, sinon autour de l'axe <code>(ax,ay,az)</code></td></tr>
     <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>Rotation autour d'un axe principal (raccourcis 3D)</td></tr>
