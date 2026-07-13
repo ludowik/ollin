@@ -5,8 +5,8 @@
 ##     chacun avec ses couleurs, son relief et ses arbres.
 ##   • COMMANDES (3) : boutons à l'écran — ◄ tourner à gauche, ▲ avancer, ► tourner à droite.
 
-global CS = 8
-global NC = 12
+global CS = 16              ## côté d'un chunk (colonnes) — chunks plus gros
+global NC = 6               ## chunks par côté → monde de 96×96 colonnes
 global WORLD = CS * NC
 global SEA = 3
 global heights = []
@@ -273,7 +273,7 @@ func draw()
     var shown = 0
     graphics.begin3d(cam)
         for c in chunks do
-            if graphics.inFrustum(c.wx, 6, c.wz, CS) then
+            if graphics.inFrustum(c.wx, 10, c.wz, CS + 6) then   ## sphère englobante du chunk
                 shown = shown + 1
                 graphics.drawChunk(c)
             end
