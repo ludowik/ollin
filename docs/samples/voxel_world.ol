@@ -253,9 +253,9 @@ func draw()
         var sp = 5 * deltaTime           ## avance plus lente
         if ty >= turn_y() then
             if tx < W / 2 then
-                yaw = yaw - turn
+                yaw = yaw + turn       ## gauche = tourner à gauche
             else
-                yaw = yaw + turn
+                yaw = yaw - turn       ## droite = tourner à droite
             end
         else
             ## avance avec glissement : franchit les pentes douces, bute sur les murs
