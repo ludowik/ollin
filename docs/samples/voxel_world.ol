@@ -207,7 +207,10 @@ func setup()
 end
 
 func turn_y()
-    return H * 0.66
+    return H * 0.66           ## haut de la zone de commande
+end
+func adv_y()
+    return H * 0.78           ## séparation : au-dessus = avancer, en-dessous = tourner
 end
 func mouse.pressed(x, y)
     touching = true
@@ -224,41 +227,39 @@ end
 
 func draw_hud(shown)
     var y0 = turn_y()
-    var bh = H - y0
+    var ya = adv_y()
     graphics.fill(Color(1, 1, 1, 0.08))
-    graphics.rect(0, y0, W, bh)
-    if touching then
+    graphics.rect(0, y0, W, H - y0)
+    ## surbrillance de la sous-zone active
+    if touching and ty >= y0 then
         graphics.fill(Color(0.5, 0.6, 1.0, 0.25))
-        if ty >= y0 then
-            if tx < W / 2 then
-                graphics.rect(0, y0, W / 2, bh)
-            else
-                graphics.rect(W / 2, y0, W / 2, bh)
-            end
-        else
-            graphics.rect(0, 0, W, y0)
+        if ty < ya then
+            graphics.rect(0, y0, W, ya - y0)          ## avancer
+        end
+        if ty >= ya and tx < W / 2 then
+            graphics.rect(0, ya, W / 2, H - ya)       ## gauche
+        end
+        if ty >= ya and tx >= W / 2 then
+            graphics.rect(W / 2, ya, W / 2, H - ya)   ## droite
         end
     end
+    ## séparateurs
     graphics.fill(Color(1, 1, 1, 0.22))
-    graphics.rect(W / 2 - 1, y0, 2, bh)
-    graphics.draw_text("GAUCHE", 22, y0 + bh / 2 - 9, 18, colors.WHITE)
-    graphics.draw_text("DROITE", W - 92, y0 + bh / 2 - 9, 18, colors.WHITE)
-    graphics.draw_text("haut : avancer   ·   chunks affichés " + shown, 12, 12, 15, colors.WHITE)
+    graphics.rect(0, ya - 1, W, 2)
+    graphics.rect(W / 2 - 1, ya, 2, H - ya)
+    graphics.draw_text("AVANCER", W / 2 - 42, y0 + (ya - y0) / 2 - 9, 18, colors.WHITE)
+    graphics.draw_text("GAUCHE", 22, ya + (H - ya) / 2 - 9, 18, colors.WHITE)
+    graphics.draw_text("DROITE", W - 92, ya + (H - ya) / 2 - 9, 18, colors.WHITE)
+    graphics.draw_text("chunks affichés " + shown, 12, 12, 15, colors.WHITE)
 end
 
 func draw()
     graphics.clear(C_SKY)
-    if touching then
+    if touching and ty >= turn_y() then
         var turn = 0.8 * deltaTime       ## rotation plus lente
         var sp = 5 * deltaTime           ## avance plus lente
-        if ty >= turn_y() then
-            if tx < W / 2 then
-                yaw = yaw + turn       ## gauche = tourner à gauche
-            else
-                yaw = yaw - turn       ## droite = tourner à droite
-            end
-        else
-            ## avance avec glissement : franchit les pentes douces, bute sur les murs
+        if ty < adv_y() then
+            ## haut de la zone → avancer (glissement : franchit les pentes, bute sur les murs)
             var nx = camX + math.sin(yaw) * sp
             var nz = camZ + math.cos(yaw) * sp
             var g0 = ground(camX, camZ)
@@ -268,6 +269,13 @@ func draw()
             if ground(camX, nz) - g0 <= STEP then
                 camZ = nz
             end
+        end
+        ## bas de la zone → tourner
+        if ty >= adv_y() and tx < W / 2 then
+            yaw = yaw + turn             ## gauche = tourner à gauche
+        end
+        if ty >= adv_y() and tx >= W / 2 then
+            yaw = yaw - turn             ## droite = tourner à droite
         end
     end
     ## streaming : charge autour du joueur (budget/frame), décharge au changement de chunk
@@ -280,6 +288,7 @@ func draw()
         stream_unload(pcx, pcz)
     end
 
+    ## rester au-dessus du sol : toujours EYE au-dessus de la colonne courante
     camY = ground(camX, camZ) + EYE
     var dx = math.cos(PITCH) * math.sin(yaw)
     var dy = math.sin(PITCH)
