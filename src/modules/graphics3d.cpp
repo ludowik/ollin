@@ -172,6 +172,22 @@ struct PendingModel {
 };
 static std::map<std::string, PendingModel> s_model_bytes;   // octets préchargés (nom → données)
 static std::map<std::string, Model> s_model_cache;          // modèles chargés en GPU (paresseux)
+
+// ── Groupes d'instances CUITS (géométrie retenue) ───────────────────────────
+// beginChunk/endChunk enregistrent des cubes UNE fois dans des VBO persistants ;
+// drawChunk les redessine chaque frame en 1 appel — plus besoin de ré-émettre
+// chaque cube depuis Ollin à chaque frame (culling par chunk côté script).
+static bool s_recording = false;
+static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées
+static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés
+static Mesh s_rec_mesh{};             // mesh enregistré (cube)
+struct InstGroup {
+    Mesh mesh;
+    unsigned int vboX;   // VBO transfos (persistant)
+    unsigned int vboC;   // VBO couleurs (persistant)
+    int count;
+};
+static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
 static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
@@ -338,6 +354,19 @@ static Bucket3D& bucketFor(const Mesh& mesh, unsigned int texId) {
 
 // Empile une instance (transfo translate·scale + couleur) dans son bucket (mesh, texId).
 static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vector3 size, Color col) {
+    if (s_recording) {
+        // Mode enregistrement (beginChunk) : on cuit la transfo LOCALE (monde) et la
+        // couleur ; texId ignoré (groupe cuit = texture blanche + couleur par instance).
+        (void)texId;
+        s_rec_mesh = mesh;
+        s_rec_x.push_back(MatrixMultiply(MatrixScale(size.x, size.y, size.z),
+                                         MatrixTranslate(pos.x, pos.y, pos.z)));
+        s_rec_c.push_back(col.r / 255.0f);
+        s_rec_c.push_back(col.g / 255.0f);
+        s_rec_c.push_back(col.b / 255.0f);
+        s_rec_c.push_back(col.a / 255.0f);
+        return;
+    }
     Bucket3D& b = bucketFor(mesh, texId);
     // Placement local (scale puis translate) PUIS la transfo courante capturée ICI
     // → chaque instance fige sa propre transfo. begin3d ayant ouvert le mode
@@ -352,25 +381,16 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
     b.colors.push_back(col.a / 255.0f);
 }
 
-// Résout un bucket en UN appel instancié (transfo + couleur par instance).
-static void flushBucket(const Bucket3D& b) {
-    int n = (int)b.xforms.size();
-    if (n == 0) {
-        return;
-    }
+// Active le shader lit et pose les uniforms du frame (MVP = view·proj figée au
+// begin3d, position caméra, éclairage). Renvoie false si le shader est indisponible.
+// Partagé par flushBucket (instances collectées) ET drawChunk (groupe cuit).
+static bool litBeginDraw() {
     loadLitShader();
-    if (s_lit.id == 0) {   // shader indisponible (échec de compilation) → ne rien dessiner
-        return;
+    if (s_lit.id == 0) {
+        return false;
     }
-    Mesh mesh = b.mesh;
     rlEnableShader(s_lit.id);
-
-    // Uniforms : MVP = view·proj. La vue est celle FIGÉE au begin3d (s_view3d) — pas
-    // la modelview courante — pour qu'une transfo « nue » (hors push/pop, qui écrit
-    // dans la modelview) ne décale pas rétroactivement TOUS les buckets. La transfo
-    // par instance (pile push/pop) est appliquée dans le shader via instanceTransform.
-    Matrix matProj = rlGetMatrixProjection();
-    Matrix mvp = MatrixMultiply(s_view3d, matProj);
+    Matrix mvp = MatrixMultiply(s_view3d, rlGetMatrixProjection());
     rlSetUniformMatrix(s_lit.locs[SHADER_LOC_MATRIX_MVP], mvp);
     float vp[3] = {s_cam3d.position.x, s_cam3d.position.y, s_cam3d.position.z};
     rlSetUniform(s_loc_viewpos, vp, RL_SHADER_UNIFORM_VEC3, 1);
@@ -391,11 +411,58 @@ static void flushBucket(const Bucket3D& b) {
     float lt[3] = {s_light_tgt.x, s_light_tgt.y, s_light_tgt.z};
     rlSetUniform(s_loc_l_tgt, lt, RL_SHADER_UNIFORM_VEC3, 1);
     rlSetUniform(s_loc_l_col, s_light_col, RL_SHADER_UNIFORM_VEC4, 1);
+    return true;
+}
 
-    // VBO d'instance PERSISTANTS (mis à jour, pas recréés) : transfo (mat4 = 4
-    // attributs vec4) puis couleur (vec4), tous deux divisor 1. Les attributs sont
-    // ré-attachés au VAO du mesh à chaque flush (le VBO peut avoir grossi) ; ils ne
-    // sont donc jamais laissés pendants sur un buffer libéré.
+// Attache les attributs d'instance (transfo mat4 = 4 vec4, puis couleur vec4,
+// divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
+static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int vboC) {
+    rlEnableVertexArray(vaoId);
+    rlEnableVertexBuffer(vboX);
+    int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
+    for (unsigned int i = 0; i < 4; i++) {
+        rlEnableVertexAttribute(locT + i);
+        rlSetVertexAttribute(locT + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
+        rlSetVertexAttributeDivisor(locT + i, 1);
+    }
+    rlEnableVertexBuffer(vboC);
+    if (s_loc_instcolor >= 0) {
+        rlEnableVertexAttribute(s_loc_instcolor);
+        rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
+        rlSetVertexAttributeDivisor(s_loc_instcolor, 1);
+    }
+    rlDisableVertexBuffer();
+    rlDisableVertexArray();
+}
+
+// Dessin instancié (shader + attributs déjà en place). Lie la texture puis draw.
+static void litDrawInstanced(const Mesh& mesh, unsigned int texId, int n) {
+    rlActiveTextureSlot(0);
+    rlEnableTexture(texId ? texId : whiteTexId());
+    int slot = 0;
+    rlSetUniform(s_lit.locs[SHADER_LOC_MAP_DIFFUSE], &slot, RL_SHADER_UNIFORM_INT, 1);
+    rlEnableVertexArray(mesh.vaoId);
+    if (mesh.indices != nullptr) {
+        rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * 3, 0, n);
+    } else {
+        rlDrawVertexArrayInstanced(0, mesh.vertexCount, n);
+    }
+    rlDisableVertexArray();
+    rlActiveTextureSlot(0);
+    rlDisableTexture();
+}
+
+// Résout un bucket (instances collectées CETTE frame) en UN appel instancié.
+static void flushBucket(const Bucket3D& b) {
+    int n = (int)b.xforms.size();
+    if (n == 0) {
+        return;
+    }
+    if (!litBeginDraw()) {
+        return;
+    }
+    Mesh mesh = b.mesh;
+    // VBO d'instance PARTAGÉS persistants (upload par frame, pas recréés).
     std::vector<float16> xf(n);
     for (int i = 0; i < n; i++) {
         xf[i] = MatrixToFloatV(b.xforms[i]);
@@ -416,27 +483,8 @@ static void flushBucket(const Bucket3D& b) {
     }
     rlDisableVertexBuffer();
     rlDisableVertexArray();
-
-    // Texture (slot 0).
-    rlActiveTextureSlot(0);
-    rlEnableTexture(b.texId ? b.texId : whiteTexId());
-    int slot = 0;
-    rlSetUniform(s_lit.locs[SHADER_LOC_MAP_DIFFUSE], &slot, RL_SHADER_UNIFORM_INT, 1);
-
-    // Dessin instancié (le VAO du mesh porte déjà position/uv/normale [+ indices]).
-    rlEnableVertexArray(mesh.vaoId);
-    if (mesh.indices != nullptr) {
-        rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * 3, 0, n);
-    } else {
-        rlDrawVertexArrayInstanced(0, mesh.vertexCount, n);
-    }
-    rlDisableVertexArray();
-
-    rlActiveTextureSlot(0);
-    rlDisableTexture();
+    litDrawInstanced(mesh, b.texId, n);
     rlDisableShader();
-    // VBO d'instance NON déchargés ici : ils sont persistants (réutilisés la frame
-    // suivante), libérés seulement par reset3dGraphicsState (destruction du contexte).
 }
 
 void reset3dLightingState() {
@@ -475,6 +523,20 @@ void reset3dGraphicsState() {
         UnloadModel(kv.second);
     }
     s_model_cache.clear();
+    // Groupes d'instances cuits : VBO liés au contexte → libérer et vider (le script
+    // les recuit dans setup au prochain run).
+    for (auto& g : s_groups) {
+        if (g.vboX) {
+            rlUnloadVertexBuffer(g.vboX);
+        }
+        if (g.vboC) {
+            rlUnloadVertexBuffer(g.vboC);
+        }
+    }
+    s_groups.clear();
+    s_recording = false;
+    s_rec_x.clear();
+    s_rec_c.clear();
     if (s_white_ready) {
         UnloadTexture(s_white_tex);
         s_white_tex = Texture2D{};
@@ -976,6 +1038,71 @@ static Value gfx_in_frustum(Value* args, int argc) {
     return Value((int64_t)1);
 }
 
+// graphics.beginChunk() : démarre l'enregistrement d'un groupe de cubes. Les
+// graphics.cube(...) suivants sont CUITS (pas dessinés). Appeler dans setup (le
+// contexte GL doit être prêt : après graphics.canvas).
+static Value gfx_begin_chunk(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_recording = true;
+    s_rec_x.clear();
+    s_rec_c.clear();
+    return Value{};
+}
+
+// graphics.endChunk() : cuit les cubes enregistrés dans des VBO persistants et
+// renvoie un handle { id, count }. À redessiner chaque frame via drawChunk.
+static Value gfx_end_chunk(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    s_recording = false;
+    InstGroup g{};
+    g.mesh = s_rec_mesh;
+    g.count = (int)s_rec_x.size();
+    if (g.count > 0) {
+        std::vector<float16> xf(g.count);
+        for (int i = 0; i < g.count; i++) {
+            xf[i] = MatrixToFloatV(s_rec_x[i]);
+        }
+        g.vboX = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
+        g.vboC = rlLoadVertexBuffer(s_rec_c.data(), g.count * 4 * (int)sizeof(float), false);
+    }
+    s_groups.push_back(g);
+    s_rec_x.clear();
+    s_rec_c.clear();
+    Value h = Value::makeMap();
+    h.mapSet(Value(std::string("id")), Value((int64_t)s_groups.size()));
+    h.mapSet(Value(std::string("count")), Value((int64_t)g.count));
+    return h;
+}
+
+// graphics.drawChunk(handle) : redessine un groupe cuit en UN appel instancié
+// (éclairé). À appeler DANS un bloc begin3d. Ne ré-émet AUCUN cube depuis Ollin.
+static Value gfx_draw_chunk(Value* args, int argc) {
+    if (argc < 1 || !args[0].isMap()) {
+        throw std::runtime_error("graphics.drawChunk: expected a chunk handle (graphics.endChunk)");
+    }
+    Value idv = args[0].mapGet(Value(std::string("id")));
+    if (!idv.isInteger()) {
+        throw std::runtime_error("graphics.drawChunk: handle de chunk invalide");
+    }
+    int id = (int)idv.asInt();
+    if (id < 1 || id > (int)s_groups.size()) {
+        return Value{};
+    }
+    InstGroup& g = s_groups[id - 1];
+    if (g.count <= 0 || g.vboX == 0) {
+        return Value{};
+    }
+    if (!litBeginDraw()) {
+        return Value{};
+    }
+    litBindInstances(g.mesh.vaoId, g.vboX, g.vboC);
+    litDrawInstanced(g.mesh, 0, g.count);   // texId 0 → texture blanche (couleur par instance)
+    rlDisableShader();
+    return Value{};
+}
+
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
@@ -1008,6 +1135,9 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("modelSize")), Value::makeBuiltin(gfx_model_size));
     m.mapSet(Value(std::string("fitDistance")), Value::makeBuiltin(gfx_fit_distance));
     m.mapSet(Value(std::string("inFrustum")), Value::makeBuiltin(gfx_in_frustum));
+    m.mapSet(Value(std::string("beginChunk")), Value::makeBuiltin(gfx_begin_chunk));
+    m.mapSet(Value(std::string("endChunk")), Value::makeBuiltin(gfx_end_chunk));
+    m.mapSet(Value(std::string("drawChunk")), Value::makeBuiltin(gfx_draw_chunk));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));
