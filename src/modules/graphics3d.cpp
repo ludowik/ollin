@@ -1103,6 +1103,34 @@ static Value gfx_draw_chunk(Value* args, int argc) {
     return Value{};
 }
 
+// graphics.freeChunk(handle) : libère les VBO d'un groupe cuit (chunk lointain
+// déchargé) → mémoire GPU récupérée. Le handle devient un no-op au dessin. Permet
+// un monde INFINI : on cuit les chunks autour du joueur, on libère les autres.
+static Value gfx_free_chunk(Value* args, int argc) {
+    if (argc < 1 || !args[0].isMap()) {
+        return Value{};
+    }
+    Value idv = args[0].mapGet(Value(std::string("id")));
+    if (!idv.isInteger()) {
+        return Value{};
+    }
+    int id = (int)idv.asInt();
+    if (id < 1 || id > (int)s_groups.size()) {
+        return Value{};
+    }
+    InstGroup& g = s_groups[id - 1];
+    if (g.vboX) {
+        rlUnloadVertexBuffer(g.vboX);
+        g.vboX = 0;
+    }
+    if (g.vboC) {
+        rlUnloadVertexBuffer(g.vboC);
+        g.vboC = 0;
+    }
+    g.count = 0;
+    return Value{};
+}
+
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
@@ -1138,6 +1166,7 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("beginChunk")), Value::makeBuiltin(gfx_begin_chunk));
     m.mapSet(Value(std::string("endChunk")), Value::makeBuiltin(gfx_end_chunk));
     m.mapSet(Value(std::string("drawChunk")), Value::makeBuiltin(gfx_draw_chunk));
+    m.mapSet(Value(std::string("freeChunk")), Value::makeBuiltin(gfx_free_chunk));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));
