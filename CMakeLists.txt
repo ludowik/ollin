@@ -67,6 +67,14 @@ if(EMSCRIPTEN)
         -sMODULARIZE=1
         -sEXPORT_NAME=OllinModule
         -sALLOW_MEMORY_GROWTH=1
+        # Mémoire initiale généreuse (128 Mo) : sur iOS Safari, la croissance du
+        # tas WASM DÉTACHE l'ArrayBuffer (pas de resizable ArrayBuffer → repli
+        # emscripten), ce qui invalide la vue HEAPU8 passée à glTexImage2D →
+        # « srcData must be an instance of ArrayBufferView » dès le 1er run (upload
+        # de la texture blanche par défaut de raylib). Avec assez de tas au départ,
+        # l'usage courant ne grossit jamais → pas de détachement. La croissance
+        # reste autorisée en filet de sécurité pour les très gros programmes.
+        -sINITIAL_MEMORY=134217728
         -sNO_EXIT_RUNTIME=1
         -sDISABLE_EXCEPTION_CATCHING=0
         -sUSE_GLFW=3
