@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-13 13:37</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-13 14:21</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-13 13:37</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-13 14:21</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1683,8 +1683,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>Sphère — pleine si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
     <tr><td><code>graphics.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> = centre de la base, rayon <code>r</code>, hauteur <code>h</code> — plein si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
     <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>Plan horizontal (XZ) de taille <code>sx</code>×<code>sz</code>, rempli</td></tr>
-    <tr><td><code>graphics.model(name)</code></td><td>Charge un <strong>modèle externe</strong> (fichier <code>.obj</code>) ajouté dans <em>Ressources</em> → renvoie un handle</td></tr>
-    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Dessine le modèle à <code>(x,y,z)</code> (échelle optionnelle) — teinte = <code>fill</code>, éclairage appliqué</td></tr>
+    <tr><td><code>graphics.model(name)</code></td><td>Charge un <strong>modèle externe</strong> (<code>.obj</code>, ou <code>.glb</code> avec matériaux/textures embarqués) ajouté dans <em>Ressources</em> → renvoie un handle</td></tr>
+    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Dessine le modèle à <code>(x,y,z)</code> (échelle optionnelle), éclairé. Un <code>.glb</code> garde ses <strong>textures/couleurs</strong> ; <code>fill</code> = teinte globale (blanc → couleurs d'origine)</td></tr>
     <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>Segment 3D (couleur <code>stroke</code>)</td></tr>
     <tr><td><code>graphics.point3d(x,y,z)</code></td><td>Point 3D (couleur <code>stroke</code>)</td></tr>
   </tbody>

@@ -326,19 +326,19 @@ static void loadLitShader() {
 // Bucket courant pour (mesh, texture courante) — créé à la demande. Keyé par
 // mesh.vaoId → primitives unitaires ET meshes de modèles externes partagent le
 // même chemin instancié + éclairé (N formes de même (mesh,texture) = 1 draw call).
-static Bucket3D& bucketFor(const Mesh& mesh) {
+static Bucket3D& bucketFor(const Mesh& mesh, unsigned int texId) {
     for (auto& b : s_buckets) {
-        if (b.vaoId == mesh.vaoId && b.texId == s_cur_tex3d) {
+        if (b.vaoId == mesh.vaoId && b.texId == texId) {
             return b;
         }
     }
-    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, s_cur_tex3d, {}, {}});
+    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, {}, {}});
     return s_buckets.back();
 }
 
-// Empile une instance (transfo translate·scale + couleur fill) dans son bucket.
-static void pushInstance(const Mesh& mesh, Vector3 pos, Vector3 size, Color col) {
-    Bucket3D& b = bucketFor(mesh);
+// Empile une instance (transfo translate·scale + couleur) dans son bucket (mesh, texId).
+static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vector3 size, Color col) {
+    Bucket3D& b = bucketFor(mesh, texId);
     // Placement local (scale puis translate) PUIS la transfo courante capturée ICI
     // → chaque instance fige sa propre transfo. begin3d ayant ouvert le mode
     // transform, rlGetMatrixTransform() reflète translate/rotate/scale qu'ils soient
@@ -705,7 +705,7 @@ static Value gfx_cube(Value* args, int argc) {
     Vector3 size{(float)numArg(args, argc, 3, "graphics.cube"), (float)numArg(args, argc, 4, "graphics.cube"),
                  (float)numArg(args, argc, 5, "graphics.cube")};
     if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_CUBE), pos, size, gfxFillColor());
+        pushInstance(getShapeMesh(SH_CUBE), s_cur_tex3d, pos, size, gfxFillColor());
     if (gfxHasStroke())
         DrawCubeWiresV(pos, size, gfxStrokeColor());
     return Value{};
@@ -718,7 +718,7 @@ static Value gfx_sphere(Value* args, int argc) {
                 (float)numArg(args, argc, 2, "graphics.sphere")};
     float r = (float)numArg(args, argc, 3, "graphics.sphere");
     if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_SPHERE), pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfxFillColor());
+        pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfxFillColor());
     if (gfxHasStroke())
         DrawSphereWires(pos, r, 16, 16, gfxStrokeColor());
     return Value{};
@@ -733,7 +733,7 @@ static Value gfx_cylinder(Value* args, int argc) {
     float r = (float)numArg(args, argc, 3, "graphics.cylinder");
     float h = (float)numArg(args, argc, 4, "graphics.cylinder");
     if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_CYLINDER), pos, Vector3{r, h, r}, gfxFillColor());
+        pushInstance(getShapeMesh(SH_CYLINDER), s_cur_tex3d, pos, Vector3{r, h, r}, gfxFillColor());
     if (gfxHasStroke())
         DrawCylinderWires(pos, r, r, h, 16, gfxStrokeColor());
     return Value{};
@@ -748,7 +748,7 @@ static Value gfx_plane(Value* args, int argc) {
     float sz = (float)numArg(args, argc, 4, "graphics.plane");
     if (gfxHasFill() || gfxHasStroke()) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
         Color c = gfxHasFill() ? gfxFillColor() : gfxStrokeColor();
-        pushInstance(getShapeMesh(SH_PLANE), pos, Vector3{sx, 1.0f, sz}, c);
+        pushInstance(getShapeMesh(SH_PLANE), s_cur_tex3d, pos, Vector3{sx, 1.0f, sz}, c);
     }
     return Value{};
 }
@@ -867,9 +867,25 @@ static Value gfx_draw_model(Value* args, int argc) {
     float s = argc > 4 ? (float)numArg(args, argc, 4, "graphics.drawModel") : 1.0f;
     Vector3 pos{x, y, z};
     Vector3 size{s, s, s};
-    Color col = gfxHasFill() ? gfxFillColor() : WHITE;
+    // fill = teinte GLOBALE (multiplicateur). fill blanc → le modèle garde ses
+    // propres couleurs/textures ; fill coloré → il teinte le modèle.
+    Color fill = gfxHasFill() ? gfxFillColor() : WHITE;
     for (int i = 0; i < mdl->meshCount; i++) {
-        pushInstance(mdl->meshes[i], pos, size, col);
+        // Matériau du mesh (GLB/GLTF) : texture diffuse + couleur de base.
+        unsigned int texId = s_cur_tex3d;   // défaut : texture 3D courante (ou blanche)
+        Color base = WHITE;
+        int mi = mdl->meshMaterial ? mdl->meshMaterial[i] : 0;
+        if (mdl->materials && mi >= 0 && mi < mdl->materialCount) {
+            const MaterialMap& diff = mdl->materials[mi].maps[MATERIAL_MAP_DIFFUSE];
+            if (diff.texture.id != 0) {
+                texId = diff.texture.id;   // texture du matériau (prioritaire)
+            }
+            base = diff.color;             // baseColorFactor (glTF) — blanc par défaut (OBJ)
+        }
+        // tint = couleur de base du matériau × fill (composantes).
+        Color tint{(unsigned char)(base.r * fill.r / 255), (unsigned char)(base.g * fill.g / 255),
+                   (unsigned char)(base.b * fill.b / 255), (unsigned char)(base.a * fill.a / 255)};
+        pushInstance(mdl->meshes[i], texId, pos, size, tint);
     }
     return Value{};
 }
