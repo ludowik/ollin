@@ -890,6 +890,54 @@ static Value gfx_draw_model(Value* args, int argc) {
     return Value{};
 }
 
+// graphics.modelSize(handle) : dimensions du modèle (boîte englobante) →
+// map { w, h, d, cx, cy, cz, radius }. radius = rayon de la sphère englobante
+// (demi-diagonale). À appeler UNE fois (le parcours des sommets n'est pas gratuit).
+static Value gfx_model_size(Value* args, int argc) {
+    if (argc < 1 || !args[0].isMap()) {
+        throw std::runtime_error("graphics.modelSize: expected a model handle (graphics.model)");
+    }
+    Value nameV = args[0].mapGet(Value(std::string("name")));
+    if (!nameV.isString()) {
+        throw std::runtime_error("graphics.modelSize: handle de modèle invalide");
+    }
+    Model* mdl = modelGet(nameV.asString());
+    if (!mdl) {
+        throw std::runtime_error("graphics.modelSize: modèle introuvable : " + nameV.asString());
+    }
+    BoundingBox bb = GetModelBoundingBox(*mdl);
+    float w = bb.max.x - bb.min.x;
+    float h = bb.max.y - bb.min.y;
+    float d = bb.max.z - bb.min.z;
+    Value r = Value::makeMap();
+    r.mapSet(Value(std::string("w")), Value((double)w));
+    r.mapSet(Value(std::string("h")), Value((double)h));
+    r.mapSet(Value(std::string("d")), Value((double)d));
+    r.mapSet(Value(std::string("cx")), Value((double)((bb.min.x + bb.max.x) * 0.5f)));
+    r.mapSet(Value(std::string("cy")), Value((double)((bb.min.y + bb.max.y) * 0.5f)));
+    r.mapSet(Value(std::string("cz")), Value((double)((bb.min.z + bb.max.z) * 0.5f)));
+    r.mapSet(Value(std::string("radius")), Value((double)(0.5f * std::sqrt(w * w + h * h + d * d))));
+    return r;
+}
+
+// graphics.fitDistance(radius [, fovy]) : distance de caméra pour qu'une sphère de
+// rayon `radius` tienne ENTIÈREMENT dans la vue, selon le RATIO d'écran courant
+// (portrait/paysage) et le champ de vision vertical `fovy` (degrés, 45 défaut). En
+// paysage la contrainte est verticale ; en portrait, horizontale — on prend le plus
+// petit demi-angle. À appeler chaque frame (bon marché) → suit les rotations d'écran.
+static Value gfx_fit_distance(Value* args, int argc) {
+    double radius = numArg(args, argc, 0, "graphics.fitDistance");
+    double fovy = argc > 1 ? numArg(args, argc, 1, "graphics.fitDistance") : 45.0;
+    int sh = GetScreenHeight();
+    int sw = GetScreenWidth();
+    double aspect = (sh > 0) ? (double)sw / (double)sh : 1.0;
+    double halfV = fovy * DEG2RAD * 0.5;
+    double halfH = std::atan(std::tan(halfV) * aspect);
+    double half = halfV < halfH ? halfV : halfH;
+    double s = std::sin(half);
+    return Value((s > 1e-4) ? radius / s : radius * 10.0);
+}
+
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
@@ -919,6 +967,8 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
     m.mapSet(Value(std::string("model")), Value::makeBuiltin(gfx_model));
     m.mapSet(Value(std::string("drawModel")), Value::makeBuiltin(gfx_draw_model));
+    m.mapSet(Value(std::string("modelSize")), Value::makeBuiltin(gfx_model_size));
+    m.mapSet(Value(std::string("fitDistance")), Value::makeBuiltin(gfx_fit_distance));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));

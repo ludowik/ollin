@@ -186,6 +186,7 @@ const MODULE_MEMBERS = {
     fn('graphics.cylinder','cylinder(x,y,z, r, h)'),
     fn('graphics.plane','plane(x,y,z, sx,sz)'),
     fn('graphics.model','model(name)'),            fn('graphics.drawModel','drawModel(handle, x,y,z [, scale])'),
+    fn('graphics.modelSize','modelSize(handle)'),  fn('graphics.fitDistance','fitDistance(radius [, fovy])'),
     fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
     fn('graphics.ambient','ambient(v | couleur)'),
     fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
