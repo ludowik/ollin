@@ -14,12 +14,13 @@ global biomes = []
 global chunks = []
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 
-## caméra
+## caméra (à hauteur d'homme : les yeux suivent le sol, regard quasi horizontal)
+global EYE = 2.2           ## hauteur des yeux au-dessus du sol
 global camX = WORLD / 2
-global camY = 22
-global camZ = -6
+global camY = 10
+global camZ = WORLD / 2
 global yaw = 0.0
-global PITCH = -0.5         ## inclinaison fixe (regard plongeant → on voit le relief)
+global PITCH = -0.12       ## regard presque horizontal, un peu au loin
 global held = -1            ## bouton maintenu : 0 gauche, 1 avancer, 2 droite, -1 aucun
 
 ## palette
@@ -54,6 +55,13 @@ func height_at(x, z, b)
     if b == 1 then return math.floor(n * 6 + 1) end
     if b == 2 then return math.floor(n * 8 + 2) end
     return math.floor(n * n * 26 + 3)
+end
+
+## Hauteur du sol à (x, z) (au moins le niveau de la mer) — pour poser les yeux.
+func ground(x, z)
+    var ix = math.clamp(math.floor(x), 0, WORLD - 1)
+    var iz = math.clamp(math.floor(z), 0, WORLD - 1)
+    return math.max(heights[iz * WORLD + ix + 1], SEA)
 end
 
 func block_color(b, h, y)
@@ -134,6 +142,52 @@ func setup()
             bake_chunk(cx, cz)
         end
     end
+    ## spawn DÉGAGÉ, le plus proche du centre : un endroit BAS et sec, sans forêt ni
+    ## montagne ni arbre dans le voisinage 3×3 → vue à hauteur d'homme, horizon libre.
+    var bestd = 1000000
+    for z = 1, WORLD - 2 do
+        for x = 1, WORLD - 2 do
+            var i = z * WORLD + x + 1
+            if biomes[i] <= 1 and heights[i] > SEA and heights[i] < 6 then
+                var open = true
+                for dz = -1, 1 do
+                    for dx = -1, 1 do
+                        var nx = x + dx
+                        var nz = z + dz
+                        var nb = biomes[nz * WORLD + nx + 1]
+                        if nb == 2 or nb == 3 then open = false end       ## pas de forêt/montagne
+                        if nb == 1 and (nx * 131 + nz * 197) % 100 == 0 then open = false end  ## pas d'arbre
+                    end
+                end
+                if open then
+                    var cx = x - WORLD / 2
+                    var cz = z - WORLD / 2
+                    var d = cx * cx + cz * cz
+                    if d < bestd then
+                        bestd = d
+                        camX = x + 0.5
+                        camZ = z + 0.5
+                    end
+                end
+            end
+        end
+    end
+    ## orienter le regard vers la direction la plus DÉGAGÉE (terrain le plus bas)
+    ## → on regarde au loin sur le paysage plutôt que dans un mur d'arbres.
+    var bestSum = 1000000.0
+    for a = 0, 15 do
+        var ang = a / 16.0 * 6.28319
+        var sx = math.sin(ang)
+        var sz = math.cos(ang)
+        var sum = 0.0
+        for k = 3, 18, 3 do
+            sum = sum + ground(camX + sx * k, camZ + sz * k)
+        end
+        if sum < bestSum then
+            bestSum = sum
+            yaw = ang
+        end
+    end
 end
 
 ## ── Boutons de commande (3) ─────────────────────────────────────────────────
@@ -208,6 +262,7 @@ func draw()
         camX = camX + math.sin(yaw) * sp
         camZ = camZ + math.cos(yaw) * sp
     end
+    camY = ground(camX, camZ) + EYE        ## les yeux suivent le relief (marche au sol)
     var dx = math.cos(PITCH) * math.sin(yaw)
     var dy = math.sin(PITCH)
     var dz = math.cos(PITCH) * math.cos(yaw)
