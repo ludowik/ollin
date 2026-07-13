@@ -81,13 +81,20 @@ static Value gfx_canvas(Value* args, int argc) {
     reset3dLightingState();
     s_run_active = false;   // nouveau programme → autorise (un seul) graphics.run
 #ifdef __EMSCRIPTEN__
-    if (IsWindowReady()) {
-        if (s_target_ready) {                 // libérer l'ancienne cible AVANT de perdre le contexte GL
+    // RÉUTILISER le contexte WebGL entre deux runs (playground) au lieu de
+    // CloseWindow + InitWindow. Chaque InitWindow (re)crée un contexte WebGL sur le
+    // même canvas et recompile le shader par défaut de raylib ; à force de churn,
+    // iOS PERD les contextes et le chargement de ce shader échoue dès la première
+    // exécution suivante (« detachShader must be an instance of WebGLProgram »,
+    // même en 2D — c'est le shader par défaut, pas le nôtre). On garde donc UN
+    // seul contexte pour toute la session et on se contente de le redimensionner.
+    bool reuse = IsWindowReady();
+    if (reuse) {
+        if (s_target_ready) {                 // libérer l'ancienne cible (contexte réutilisé → ids valides)
             UnloadRenderTexture(s_target);
             s_target_ready = false;
         }
-        reset3dGraphicsState();               // libérer shader/meshes/textures/VBO 3D (contexte encore courant)
-        CloseWindow();
+        reset3dGraphicsState();               // libérer shader/meshes/textures/VBO 3D dans CE contexte
     }
     double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
@@ -98,9 +105,14 @@ static Value gfx_canvas(Value* args, int argc) {
         if (o)
             o.style.display = 'none';
     });
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(w, h, title);
-    SetTargetFPS(0);
+    if (reuse) {
+        SetWindowSize(w, h);                   // même contexte WebGL, nouvelle taille logique
+        SetWindowTitle(title);
+    } else {
+        SetConfigFlags(FLAG_MSAA_4X_HINT);
+        InitWindow(w, h, title);
+        SetTargetFPS(0);
+    }
     // Override canvas bitmap to physical resolution, CSS display to logical size
     // rlViewport in emscripten_frame will render to the full physical bitmap
     EM_ASM(
