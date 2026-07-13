@@ -230,6 +230,36 @@ canvas#canvas {
 }
 #divider:hover, #divider.dragging { background: var(--accent); }
 
+/* ── barre d'aide à la saisie (symboles, tactile) ──────────────────────────── */
+#kbar {
+  display: none;               /* affichée par JS (.show) au focus de l'éditeur, tactile only */
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  overflow-x: auto;
+  touch-action: pan-x;         /* défilement horizontal de la barre ; pas de pan de la fenêtre */
+  -webkit-overflow-scrolling: touch;
+}
+#kbar.show { display: flex; }
+.kbar-key {
+  flex: 0 0 auto;
+  min-width: 42px;
+  padding: 9px 0;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.kbar-key:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
 /* ── bascule barre latérale ───────────────────────────────────────────────── */
 #rail-toggle {
   display: flex; align-items: center; justify-content: center;
@@ -428,4 +458,15 @@ canvas#canvas {
   <div id="output-pane" style="display:none">
     <div id="output">Prêt.</div>
   </div>
+</div>
+
+<!-- Barre d'aide à la saisie (symboles) — affichée par JS au focus de l'éditeur
+     sur appareil tactile. Dernier enfant → bas de l'app = juste au-dessus du
+     clavier (grâce au calage visualViewport). data-ins = texte inséré,
+     data-back = recul du curseur (paires : curseur entre les deux). -->
+<div id="kbar" aria-hidden="true">
+  <button class="kbar-key" data-ins="()" data-back="1">(</button>
+  <button class="kbar-key" data-ins="[]" data-back="1">[</button>
+  <button class="kbar-key" data-ins="{}" data-back="1">{</button>
+  <button class="kbar-key" data-ins="=" data-back="0">=</button>
 </div>

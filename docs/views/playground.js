@@ -456,6 +456,43 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
   dom.addEventListener('touchcancel', end, { passive: true })
 })()
 
+// ── Barre d'aide à la saisie (symboles) — tactile uniquement ────────────────
+// Insère un symbole au curseur SANS voler le focus (sinon le clavier se ferme).
+// Affichée seulement sur appareil tactile, quand l'éditeur a le focus.
+;(function () {
+  const kbar = document.getElementById('kbar')
+  if (!kbar) return
+  const onDown = (e) => {
+    const key = e.target.closest('.kbar-key')
+    if (!key) return
+    e.preventDefault()   // garde le focus de l'éditeur → le clavier reste ouvert
+    const ins  = key.getAttribute('data-ins') || ''
+    const back = parseInt(key.getAttribute('data-back') || '0', 10) || 0
+    const sel  = view.state.selection.main
+    view.dispatch({
+      changes: { from: sel.from, to: sel.to, insert: ins },
+      selection: { anchor: sel.from + ins.length - back },
+      scrollIntoView: true,
+    })
+    view.focus()
+  }
+  kbar.addEventListener('pointerdown', onDown)
+  disposers.push(() => kbar.removeEventListener('pointerdown', onDown))
+
+  // Affichage/masquage : uniquement sur pointeur grossier (tactile), au focus.
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
+  if (coarse) {
+    const show = () => kbar.classList.add('show')
+    const hide = () => kbar.classList.remove('show')
+    view.contentDOM.addEventListener('focus', show)
+    view.contentDOM.addEventListener('blur', hide)
+    disposers.push(() => {
+      view.contentDOM.removeEventListener('focus', show)
+      view.contentDOM.removeEventListener('blur', hide)
+    })
+  }
+})()
+
 view.focus()
 window.__ollinView = view    // accès à l'éditeur pour le débogage/console (nettoyé au démontage)
 // (La réouverture de la dernière vue est gérée au niveau du routeur, app.js.)
