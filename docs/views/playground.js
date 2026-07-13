@@ -482,7 +482,15 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
   // Affichage/masquage : uniquement sur pointeur grossier (tactile), au focus.
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
   if (coarse) {
-    const show = () => kbar.classList.add('show')
+    // Uniquement en mode ÉDITION : pas pendant l'exécution. On lit l'état depuis
+    // le DOM (classe 'running' du bouton) — `isRunning` est déclaré plus bas et
+    // serait dans sa zone morte au 1er focus (init).
+    const runBtnEl = document.getElementById('run-btn')
+    const show = () => {
+      if (!runBtnEl || !runBtnEl.classList.contains('running')) {
+        kbar.classList.add('show')
+      }
+    }
     const hide = () => kbar.classList.remove('show')
     view.contentDOM.addEventListener('focus', show)
     view.contentDOM.addEventListener('blur', hide)
@@ -1139,6 +1147,7 @@ function setRunning(running) {
     runBtn.innerHTML = ICON_STOP + '<span class="btn-label"> Arrêter</span>'
     stopBtn.style.display = 'flex'
     stopBtn.disabled = false
+    document.getElementById('kbar')?.classList.remove('show')   // pas d'aide à la saisie pendant l'exécution
   } else {
     runBtn.classList.remove('running')
     runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Ctrl+↵</kbd>'

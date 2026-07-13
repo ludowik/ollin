@@ -235,8 +235,9 @@ canvas#canvas {
   display: none;               /* affichée par JS (.show) au focus de l'éditeur, tactile only */
   flex: none;
   align-items: center;
+  justify-content: flex-end;   /* touches cadrées à droite */
   gap: 6px;
-  padding: 6px 8px;
+  padding: 3px 8px;
   background: var(--surface);
   border-top: 1px solid var(--border);
   overflow-x: auto;
@@ -246,14 +247,14 @@ canvas#canvas {
 #kbar.show { display: flex; }
 .kbar-key {
   flex: 0 0 auto;
-  min-width: 42px;
-  padding: 9px 0;
+  min-width: 38px;
+  padding: 5px 0;
   background: var(--surface2);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text);
   font-family: var(--mono);
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   line-height: 1;
   cursor: pointer;
