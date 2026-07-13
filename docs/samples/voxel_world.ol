@@ -230,23 +230,24 @@ func draw_hud(shown)
     var ya = adv_y()
     graphics.fill(Color(1, 1, 1, 0.08))
     graphics.rect(0, y0, W, H - y0)
-    ## surbrillance de la sous-zone active
+    ## surbrillance active (les tuiles se superposent : haut+côté = avancer EN tournant)
+    var dead = W * 0.15
     if touching and ty >= y0 then
-        graphics.fill(Color(0.5, 0.6, 1.0, 0.25))
+        graphics.fill(Color(0.5, 0.6, 1.0, 0.22))
         if ty < ya then
             graphics.rect(0, y0, W, ya - y0)          ## avancer
         end
-        if ty >= ya and tx < W / 2 then
-            graphics.rect(0, ya, W / 2, H - ya)       ## gauche
+        if tx < W / 2 - dead then
+            graphics.rect(0, y0, W / 2, H - y0)       ## tourner à gauche (toute la bande)
         end
-        if ty >= ya and tx >= W / 2 then
-            graphics.rect(W / 2, ya, W / 2, H - ya)   ## droite
+        if tx > W / 2 + dead then
+            graphics.rect(W / 2, y0, W / 2, H - y0)   ## tourner à droite (toute la bande)
         end
     end
     ## séparateurs
     graphics.fill(Color(1, 1, 1, 0.22))
     graphics.rect(0, ya - 1, W, 2)
-    graphics.rect(W / 2 - 1, ya, 2, H - ya)
+    graphics.rect(W / 2 - 1, y0, 2, H - y0)
     graphics.draw_text("AVANCER", W / 2 - 42, y0 + (ya - y0) / 2 - 9, 18, colors.WHITE)
     graphics.draw_text("GAUCHE", 22, ya + (H - ya) / 2 - 9, 18, colors.WHITE)
     graphics.draw_text("DROITE", W - 92, ya + (H - ya) / 2 - 9, 18, colors.WHITE)
@@ -258,8 +259,16 @@ func draw()
     if touching and ty >= turn_y() then
         var turn = 0.8 * deltaTime       ## rotation plus lente
         var sp = 5 * deltaTime           ## avance plus lente
+        var dead = W * 0.15              ## zone morte centrale = tout droit
+        ## tourner : côté gauche/droit de TOUTE la bande → on peut avancer EN tournant
+        if tx < W / 2 - dead then
+            yaw = yaw + turn             ## gauche = tourner à gauche
+        end
+        if tx > W / 2 + dead then
+            yaw = yaw - turn             ## droite = tourner à droite
+        end
+        ## avancer : haut de la zone (glissement : franchit les pentes, bute sur les murs)
         if ty < adv_y() then
-            ## haut de la zone → avancer (glissement : franchit les pentes, bute sur les murs)
             var nx = camX + math.sin(yaw) * sp
             var nz = camZ + math.cos(yaw) * sp
             var g0 = ground(camX, camZ)
@@ -269,13 +278,6 @@ func draw()
             if ground(camX, nz) - g0 <= STEP then
                 camZ = nz
             end
-        end
-        ## bas de la zone → tourner
-        if ty >= adv_y() and tx < W / 2 then
-            yaw = yaw + turn             ## gauche = tourner à gauche
-        end
-        if ty >= adv_y() and tx >= W / 2 then
-            yaw = yaw - turn             ## droite = tourner à droite
         end
     end
     ## streaming : charge autour du joueur (budget/frame), décharge au changement de chunk
