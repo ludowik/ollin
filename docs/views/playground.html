@@ -91,6 +91,25 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 
 #status { font-size: 12px; color: var(--dim); }
 
+/* Boutons d'action de la barre (Recharger / Formater / Copier / Plein écran) :
+   un SEUL style → bordure, couleur, largeur et survol cohérents (évite la dérive
+   des styles inline divergents). Le bouton Exécuter reste distinct (plein accent). */
+.tool-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--dim);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.tool-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 #run-btn {
   display: flex;
   align-items: center;
@@ -340,8 +359,8 @@ canvas#canvas {
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  #project-btn, #reload-btn, #standalone-btn,
-  #run-btn, #stop-btn, #copy-btn { padding: 8px 8px !important; }
+  .tool-btn, #project-btn, #rail-toggle,
+  #run-btn, #stop-btn { padding: 8px 8px !important; }
 }
 </style>
 
@@ -360,16 +379,16 @@ canvas#canvas {
   </div>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
-  <button id="reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:8px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+  <button id="reload-btn" class="tool-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="btn-label">Recharger</span>
   </button>
-  <button id="format-btn" title="Reformater le code (indentation) — Alt+Maj+F" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:8px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+  <button id="format-btn" class="tool-btn" title="Reformater le code (indentation) — Alt+Maj+F">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3.5h12M6 6.5h8M6 9.5h8M2 12.5h12"/></svg>
     <span class="btn-label">Formater</span>
   </button>
-  <button id="copy-btn" title="Copier le code" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:8px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,opacity 0.15s" onmouseover="this.style.background='rgba(124,131,255,0.12)'" onmouseout="this.style.background='transparent'">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+  <button id="copy-btn" class="tool-btn" title="Copier le code">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
     <span class="btn-label">Copier</span>
   </button>
   <button id="run-btn" disabled>
@@ -380,7 +399,7 @@ canvas#canvas {
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
     <span class="btn-label">Pause</span>
   </button>
-  <button id="standalone-btn" title="Exécuter en plein écran dans une page dédiée" style="display:flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--border);color:var(--dim);border-radius:6px;padding:8px 12px;font-size:12px;font-weight:500;cursor:pointer;transition:background 0.15s,border-color 0.15s,color 0.15s">
+  <button id="standalone-btn" class="tool-btn" title="Exécuter en plein écran dans une page dédiée">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
     <span class="btn-label">Plein écran</span>
   </button>
