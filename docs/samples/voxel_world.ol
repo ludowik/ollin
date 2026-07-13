@@ -190,79 +190,72 @@ func setup()
     end
 end
 
-## ── Boutons de commande (3) ─────────────────────────────────────────────────
-func btn_s()
-    return 78
-end
-func btn_y()
-    return H - btn_s() - 28
-end
-func btn_x(i)
-    if i == 0 then return 28 end                      ## ◄ gauche
-    if i == 2 then return 28 + btn_s() + 16 end        ## ► droite (près de gauche)
-    return W - btn_s() - 28                            ## ▲ avancer (à droite)
-end
+## ── Contrôle par ZONES (pas de bouton) ──────────────────────────────────────
+## Bande du BAS : toucher à gauche → tourner à gauche, à droite → tourner à droite.
+## AU-DESSUS de cette bande : avancer. Appui maintenu = action continue.
+global touching = false
+global tx = 0
+global ty = 0
 
-func btn_hit(px, py)
-    var s = btn_s()
-    var y = btn_y()
-    if py < y or py > y + s then return -1 end
-    for i = 0, 2 do
-        var x = btn_x(i)
-        if px >= x and px <= x + s then return i end
-    end
-    return -1
+func turn_y()
+    return H * 0.66        ## sous cette hauteur = « tourner » ; au-dessus = « avancer »
 end
 
 func mouse.pressed(x, y)
-    held = btn_hit(x, y)
+    touching = true
+    tx = x
+    ty = y
 end
 func mouse.released(x, y)
-    held = -1
+    touching = false
 end
 func mouse.moved(x, y)
-    held = btn_hit(x, y)      ## glisser d'un bouton à l'autre suit le doigt
+    tx = x
+    ty = y
 end
 
-func draw_button(i, label_pts)
-    var s = btn_s()
-    var x = btn_x(i)
-    var y = btn_y()
-    if held == i then
-        graphics.fill(Color(0.49, 0.51, 1.0, 0.85))
-    else
-        graphics.fill(Color(1, 1, 1, 0.18))
+## Repères discrets des zones (sans bouton) + surbrillance de la zone active.
+func draw_hud(shown)
+    var y0 = turn_y()
+    var bh = H - y0
+    graphics.fill(Color(1, 1, 1, 0.08))
+    graphics.rect(0, y0, W, bh)                          ## bande « tourner »
+    if touching then
+        graphics.fill(Color(0.5, 0.6, 1.0, 0.25))       ## zone active en surbrillance
+        if ty >= y0 then
+            if tx < W / 2 then
+                graphics.rect(0, y0, W / 2, bh)
+            else
+                graphics.rect(W / 2, y0, W / 2, bh)
+            end
+        else
+            graphics.rect(0, 0, W, y0)
+        end
     end
-    graphics.rect(x, y, s, s)
-    graphics.fill(Color(1, 1, 1, 0.92))
-    graphics.polygon(label_pts)
-end
-
-func draw_buttons()
-    var s = btn_s()
-    var y = btn_y()
-    var xl = btn_x(0)
-    var xr = btn_x(2)
-    var xf = btn_x(1)
-    ## ◄ gauche
-    draw_button(0, [[xl + s * 0.62, y + s * 0.26], [xl + s * 0.62, y + s * 0.74], [xl + s * 0.30, y + s * 0.5]])
-    ## ► droite
-    draw_button(2, [[xr + s * 0.38, y + s * 0.26], [xr + s * 0.38, y + s * 0.74], [xr + s * 0.70, y + s * 0.5]])
-    ## ▲ avancer
-    draw_button(1, [[xf + s * 0.5, y + s * 0.28], [xf + s * 0.28, y + s * 0.72], [xf + s * 0.72, y + s * 0.72]])
+    graphics.fill(Color(1, 1, 1, 0.22))
+    graphics.rect(W / 2 - 1, y0, 2, bh)                  ## séparateur gauche/droite
+    graphics.draw_text("GAUCHE", 22, y0 + bh / 2 - 9, 18, colors.WHITE)
+    graphics.draw_text("DROITE", W - 92, y0 + bh / 2 - 9, 18, colors.WHITE)
+    graphics.draw_text("toucher le haut : avancer   ·   chunks " + shown + "/" + (NC * NC), 12, 12, 15, colors.WHITE)
 end
 
 func draw()
     graphics.clear(C_SKY)
-    var turn = 1.6 * deltaTime
-    var sp = 15 * deltaTime
-    if held == 0 then yaw = yaw - turn end
-    if held == 2 then yaw = yaw + turn end
-    if held == 1 then
-        camX = camX + math.sin(yaw) * sp
-        camZ = camZ + math.cos(yaw) * sp
+    if touching then
+        var turn = 1.6 * deltaTime
+        var sp = 15 * deltaTime
+        if ty >= turn_y() then                 ## bande du bas → tourner
+            if tx < W / 2 then
+                yaw = yaw - turn
+            else
+                yaw = yaw + turn
+            end
+        else                                    ## au-dessus → avancer
+            camX = camX + math.sin(yaw) * sp
+            camZ = camZ + math.cos(yaw) * sp
+        end
     end
-    camY = ground(camX, camZ) + EYE        ## les yeux suivent le relief (marche au sol)
+    camY = ground(camX, camZ) + EYE            ## les yeux suivent le relief
     var dx = math.cos(PITCH) * math.sin(yaw)
     var dy = math.sin(PITCH)
     var dz = math.cos(PITCH) * math.cos(yaw)
@@ -273,13 +266,12 @@ func draw()
     var shown = 0
     graphics.begin3d(cam)
         for c in chunks do
-            if graphics.inFrustum(c.wx, 10, c.wz, CS + 6) then   ## sphère englobante du chunk
+            if graphics.inFrustum(c.wx, 10, c.wz, CS + 6) then
                 shown = shown + 1
                 graphics.drawChunk(c)
             end
         end
     graphics.end3d()
 
-    draw_buttons()
-    graphics.draw_text("chunks : " + shown + " / " + (NC * NC), 12, 12, 16, colors.WHITE)
+    draw_hud(shown)
 end
