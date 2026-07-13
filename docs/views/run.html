@@ -24,12 +24,15 @@
     #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
     #bar a:hover { text-decoration:underline; }
     #bar .sp { flex:1; }
-    #reload-btn { display:flex; align-items:center; gap:6px; background:transparent;
-                  border:1px solid var(--border); color:var(--dim); border-radius:6px;
-                  padding:5px 9px; font:inherit; font-size:12px; cursor:pointer;
-                  transition:border-color 0.15s, color 0.15s; }
-    #reload-btn:hover { border-color:var(--accent); color:var(--accent); }
+    /* Boutons de la barre (Pause / Relancer / Recharger) : style unique. */
+    .bar-btn { display:flex; align-items:center; gap:6px; background:transparent;
+               border:1px solid var(--border); color:var(--dim); border-radius:6px;
+               padding:5px 9px; font:inherit; font-size:12px; cursor:pointer;
+               transition:border-color 0.15s, color 0.15s; }
+    .bar-btn:hover { border-color:var(--accent); color:var(--accent); }
     #status { color:var(--dim); font-size:12px; }
+    /* Écran étroit : icônes seules (les libellés seraient à l'étroit). */
+    @media (max-width: 600px) { #bar { gap:8px; } .bar-label { display:none; } }
 
     /* Marges de sécurité (coins arrondis / barre home) exclues de la zone. */
     #stage-wrap { flex:1; display:flex; min-height:0;
@@ -45,17 +48,26 @@
   </style>
 
   <div id="bar">
+    <!-- Contrôles d'exécution (à gauche) : mettre en pause / relancer le programme. -->
+    <button id="pause-btn" class="bar-btn" title="Pause / Reprendre">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>
+      <span class="bar-label">Pause</span>
+    </button>
+    <button id="relaunch-btn" class="bar-btn" title="Relancer le programme depuis le début">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2.4 8a5.6 5.6 0 1 0 1.7-4.1"/><path d="M1.9 2v3.4h3.4"/></svg>
+      <span class="bar-label">Relancer</span>
+    </button>
     <span class="sp"></span>
     <span id="status">Chargement…</span>
-    <button id="reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)">
+    <button id="reload-btn" class="bar-btn" title="Recharger en vidant le cache (récupère le dernier WASM)">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
-      Recharger
+      <span class="bar-label">Recharger</span>
     </button>
     <!-- Retour à l'éditeur : placé tout à DROITE, au même coin que le bouton
          « Plein écran » de l'éditeur (le même coin fait aller/retour). -->
     <a href="#/playground" title="Retour à l'éditeur">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
-      Éditeur
+      <span class="bar-label">Éditeur</span>
     </a>
   </div>
   <div id="stage-wrap">

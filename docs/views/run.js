@@ -36,6 +36,53 @@ export async function init(ctx) {
     outEl.className   = (text && String(text).startsWith('error:')) ? 'err' : 'ok'
   }
 
+  // (Re)lance le programme courant. Réutilisé au démarrage ET par « Relancer ».
+  function launch() {
+    statusEl.textContent = ''
+    runProgram(mod, code, canvasEl, {
+      onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
+      // Programme graphique : focus clavier au canvas (programmes interactifs).
+      // preventScroll : sinon mobile défile pour amener le canvas dans le viewport.
+      onRunning: () => { statusEl.textContent = ''; try { canvasEl.focus({ preventScroll: true }) } catch (_) {} },
+      onOutput:  (out) => showText(out),
+    })
+  }
+
+  // ── Contrôles d'exécution : Pause/Reprendre + Relancer ──────────────────────
+  const pauseBtn    = document.getElementById('pause-btn')
+  const relaunchBtn = document.getElementById('relaunch-btn')
+  const ICON_PAUSE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>'
+  const ICON_PLAY  = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>'
+  let paused = false
+  function setPauseUI() {
+    if (!pauseBtn) return
+    pauseBtn.innerHTML = paused ? ICON_PLAY + '<span class="bar-label">Reprendre</span>'
+                                : ICON_PAUSE + '<span class="bar-label">Pause</span>'
+  }
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', () => {
+      if (!mod) return
+      if (paused) {
+        try { mod.resumeMainLoop() } catch (_) {}
+        paused = false
+      } else {
+        try { mod.pauseMainLoop() } catch (_) {}
+        paused = true
+      }
+      setPauseUI()
+    })
+  }
+  if (relaunchBtn) {
+    relaunchBtn.addEventListener('click', () => {
+      if (!mod || code == null) {
+        return
+      }
+      paused = false
+      setPauseUI()
+      launch()
+    })
+  }
+
   const stop = () => {
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
@@ -84,16 +131,7 @@ export async function init(ctx) {
   }
 
   loadProjectIntoRuntime(mod, project)
-  statusEl.textContent = ''
-  runProgram(mod, code, canvasEl, {
-    onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
-    // Programme graphique : donner le focus clavier au canvas (programmes
-    // interactifs lisant keyboard.*), comme l'ancien run.html (canvas tabindex).
-    // preventScroll : sinon, sur mobile, le navigateur défile pour amener le
-    // canvas (en bas) dans le viewport → la barre de menu remonte d'un cran.
-    onRunning: () => { statusEl.textContent = ''; try { canvasEl.focus({ preventScroll: true }) } catch (_) {} },
-    onOutput:  (out) => showText(out),
-  })
+  launch()
 
   return stop
 }
