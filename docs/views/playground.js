@@ -22,6 +22,11 @@ const Store = await import('../pg-store.js?v=' + ctx.v)
 const GH    = await import('../pg-github.js?v=' + ctx.v)
 const Run   = await import('../pg-run.js?v=' + ctx.v)   // exécution partagée avec run.html
 const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // formateur « à la demande »
+const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
+
+// Barre d'outils collee au haut du VISIBLE quand le clavier mobile s'ouvre
+// (sinon elle derive/disparait sur iOS). Actif tant que la vue est montee.
+disposers.push(pinToVisualViewport())
 
 // Mode EXEMPLE : route #/playground/sample/<fichier> → on ouvre l'exemple
 // directement depuis le dépôt (samples/…), SANS copie ni persistance. Édition

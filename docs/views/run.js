@@ -13,6 +13,10 @@ export async function init(ctx) {
   // session réutilise la même URL → pas de croissance du registre de modules).
   const Store = await import('../pg-store.js?v=' + ctx.v)
   const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample } = await import('../pg-run.js?v=' + ctx.v)
+  const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
+
+  // Barre du plein ecran collee au haut du visible quand le clavier s'ouvre.
+  const unpinViewport = pinToVisualViewport()
 
   const statusEl = document.getElementById('status')
   const outEl    = document.getElementById('out')
@@ -35,6 +39,7 @@ export async function init(ctx) {
   const stop = () => {
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
+    unpinViewport()
   }
 
   // Deux sources : soit un EXEMPLE lu direct depuis le dépôt (route
