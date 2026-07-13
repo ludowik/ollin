@@ -14,5 +14,6 @@
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
   { "name": "Quaternions (glisser)", "file": "quat_drag.ol" },
   { "name": "Modèle 3D (.obj)", "file": "model_3d.ol" },
-  { "name": "Modèle GLB (texturé)", "file": "model_glb.ol" }
+  { "name": "Modèle GLB (texturé)", "file": "model_glb.ol" },
+  { "name": "Univers voxel (Minecraft)", "file": "voxel_world.ol" }
 ]
