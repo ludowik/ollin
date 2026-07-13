@@ -938,6 +938,44 @@ static Value gfx_fit_distance(Value* args, int argc) {
     return Value((s > 1e-4) ? radius / s : radius * 10.0);
 }
 
+// graphics.inFrustum(x, y, z [, radius]) : la sphère (centre, rayon) est-elle
+// (au moins partiellement) DANS le champ de vision de la caméra courante ? →
+// 1 (visible) / 0 (hors-champ). Sert au culling par chunk (on ne dessine que le
+// visible). À appeler DANS un bloc begin3d/end3d (la vue/projection du frame y
+// sont posées). Test exact : 6 plans du frustum extraits de view·projection.
+static Value gfx_in_frustum(Value* args, int argc) {
+    float x = (float)numArg(args, argc, 0, "graphics.inFrustum");
+    float y = (float)numArg(args, argc, 1, "graphics.inFrustum");
+    float z = (float)numArg(args, argc, 2, "graphics.inFrustum");
+    float r = argc > 3 ? (float)numArg(args, argc, 3, "graphics.inFrustum") : 0.0f;
+    Matrix vp = MatrixMultiply(s_view3d, rlGetMatrixProjection());
+    // Lignes de VP (clip.x/y/z/w = ligne · (x,y,z,1)), layout colonne-major raylib.
+    float rows[4][4] = {
+        {vp.m0, vp.m4, vp.m8, vp.m12},   // clip.x
+        {vp.m1, vp.m5, vp.m9, vp.m13},   // clip.y
+        {vp.m2, vp.m6, vp.m10, vp.m14},  // clip.z
+        {vp.m3, vp.m7, vp.m11, vp.m15},  // clip.w
+    };
+    // 6 plans = ligne_w ± ligne_i (gauche/droite, bas/haut, near/far).
+    for (int i = 0; i < 3; i++) {
+        for (int sgn = 0; sgn < 2; sgn++) {
+            float a = rows[3][0] + (sgn ? -rows[i][0] : rows[i][0]);
+            float b = rows[3][1] + (sgn ? -rows[i][1] : rows[i][1]);
+            float c = rows[3][2] + (sgn ? -rows[i][2] : rows[i][2]);
+            float d = rows[3][3] + (sgn ? -rows[i][3] : rows[i][3]);
+            float len = std::sqrt(a * a + b * b + c * c);
+            if (len < 1e-6f) {
+                continue;
+            }
+            float dist = (a * x + b * y + c * z + d) / len;
+            if (dist < -r) {
+                return Value((int64_t)0);   // entièrement du mauvais côté d'un plan → hors-champ
+            }
+        }
+    }
+    return Value((int64_t)1);
+}
+
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
@@ -969,6 +1007,7 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("drawModel")), Value::makeBuiltin(gfx_draw_model));
     m.mapSet(Value(std::string("modelSize")), Value::makeBuiltin(gfx_model_size));
     m.mapSet(Value(std::string("fitDistance")), Value::makeBuiltin(gfx_fit_distance));
+    m.mapSet(Value(std::string("inFrustum")), Value::makeBuiltin(gfx_in_frustum));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));
