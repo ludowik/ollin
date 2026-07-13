@@ -11,7 +11,10 @@
 #include <rlgl.h>
 #include <raymath.h>
 #include <cmath>
+#include <cstdio>
+#include <map>
 #include <stdexcept>
+#include <string>
 #include <vector>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -153,13 +156,22 @@ static Value gfx_camera(Value* args, int argc) {
 enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_COUNT = 4 };
 
 struct Bucket3D {
-    int shape;
+    unsigned int vaoId;          // clé mesh : identifie le mesh GPU (primitive OU modèle externe)
+    Mesh mesh;                   // mesh à dessiner (primitive unitaire ou mesh d'un modèle)
     unsigned int texId;
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
+
+// Modèles externes (déclarés ici car reset3dGraphicsState les référence ; défs plus bas).
+struct PendingModel {
+    std::vector<unsigned char> bytes;
+    std::string ext;   // avec le point, ex. ".obj"
+};
+static std::map<std::string, PendingModel> s_model_bytes;   // octets préchargés (nom → données)
+static std::map<std::string, Model> s_model_cache;          // modèles chargés en GPU (paresseux)
 static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
@@ -311,20 +323,22 @@ static void loadLitShader() {
     s_lit_ready = true;
 }
 
-// Bucket courant pour (shape, texture courante) — créé à la demande.
-static Bucket3D& bucketFor(int shape) {
+// Bucket courant pour (mesh, texture courante) — créé à la demande. Keyé par
+// mesh.vaoId → primitives unitaires ET meshes de modèles externes partagent le
+// même chemin instancié + éclairé (N formes de même (mesh,texture) = 1 draw call).
+static Bucket3D& bucketFor(const Mesh& mesh) {
     for (auto& b : s_buckets) {
-        if (b.shape == shape && b.texId == s_cur_tex3d) {
+        if (b.vaoId == mesh.vaoId && b.texId == s_cur_tex3d) {
             return b;
         }
     }
-    s_buckets.push_back(Bucket3D{shape, s_cur_tex3d, {}, {}});
+    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, s_cur_tex3d, {}, {}});
     return s_buckets.back();
 }
 
 // Empile une instance (transfo translate·scale + couleur fill) dans son bucket.
-static void pushInstance(int shape, Vector3 pos, Vector3 size, Color col) {
-    Bucket3D& b = bucketFor(shape);
+static void pushInstance(const Mesh& mesh, Vector3 pos, Vector3 size, Color col) {
+    Bucket3D& b = bucketFor(mesh);
     // Placement local (scale puis translate) PUIS la transfo courante capturée ICI
     // → chaque instance fige sa propre transfo. begin3d ayant ouvert le mode
     // transform, rlGetMatrixTransform() reflète translate/rotate/scale qu'ils soient
@@ -348,7 +362,7 @@ static void flushBucket(const Bucket3D& b) {
     if (s_lit.id == 0) {   // shader indisponible (échec de compilation) → ne rien dessiner
         return;
     }
-    Mesh mesh = getShapeMesh(b.shape);
+    Mesh mesh = b.mesh;
     rlEnableShader(s_lit.id);
 
     // Uniforms : MVP = view·proj. La vue est celle FIGÉE au begin3d (s_view3d) — pas
@@ -455,6 +469,12 @@ void reset3dGraphicsState() {
             s_shape_ready[i] = false;
         }
     }
+    // Modèles chargés en GPU : invalides avec le contexte détruit → décharger et
+    // vider le cache (rechargés paresseusement depuis les octets au prochain usage).
+    for (auto& kv : s_model_cache) {
+        UnloadModel(kv.second);
+    }
+    s_model_cache.clear();
     if (s_white_ready) {
         UnloadTexture(s_white_tex);
         s_white_tex = Texture2D{};
@@ -685,7 +705,7 @@ static Value gfx_cube(Value* args, int argc) {
     Vector3 size{(float)numArg(args, argc, 3, "graphics.cube"), (float)numArg(args, argc, 4, "graphics.cube"),
                  (float)numArg(args, argc, 5, "graphics.cube")};
     if (gfxHasFill())
-        pushInstance(SH_CUBE, pos, size, gfxFillColor());
+        pushInstance(getShapeMesh(SH_CUBE), pos, size, gfxFillColor());
     if (gfxHasStroke())
         DrawCubeWiresV(pos, size, gfxStrokeColor());
     return Value{};
@@ -698,7 +718,7 @@ static Value gfx_sphere(Value* args, int argc) {
                 (float)numArg(args, argc, 2, "graphics.sphere")};
     float r = (float)numArg(args, argc, 3, "graphics.sphere");
     if (gfxHasFill())
-        pushInstance(SH_SPHERE, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfxFillColor());
+        pushInstance(getShapeMesh(SH_SPHERE), pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfxFillColor());
     if (gfxHasStroke())
         DrawSphereWires(pos, r, 16, 16, gfxStrokeColor());
     return Value{};
@@ -713,7 +733,7 @@ static Value gfx_cylinder(Value* args, int argc) {
     float r = (float)numArg(args, argc, 3, "graphics.cylinder");
     float h = (float)numArg(args, argc, 4, "graphics.cylinder");
     if (gfxHasFill())
-        pushInstance(SH_CYLINDER, pos, Vector3{r, h, r}, gfxFillColor());
+        pushInstance(getShapeMesh(SH_CYLINDER), pos, Vector3{r, h, r}, gfxFillColor());
     if (gfxHasStroke())
         DrawCylinderWires(pos, r, r, h, 16, gfxStrokeColor());
     return Value{};
@@ -728,7 +748,7 @@ static Value gfx_plane(Value* args, int argc) {
     float sz = (float)numArg(args, argc, 4, "graphics.plane");
     if (gfxHasFill() || gfxHasStroke()) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
         Color c = gfxHasFill() ? gfxFillColor() : gfxStrokeColor();
-        pushInstance(SH_PLANE, pos, Vector3{sx, 1.0f, sz}, c);
+        pushInstance(getShapeMesh(SH_PLANE), pos, Vector3{sx, 1.0f, sz}, c);
     }
     return Value{};
 }
@@ -763,6 +783,97 @@ static Value gfx_rotateq(Value* args, int argc) {
     return Value{};
 }
 
+// ── Modèles externes (OBJ/GLTF…) ────────────────────────────────────────────
+// raylib n'a pas de LoadModel depuis mémoire : on stocke les OCTETS préchargés
+// (par nom) puis, au 1er usage (contexte GL prêt), on écrit dans le FS et LoadModel.
+// Le chargement GPU est PARESSEUX (après graphics.canvas → InitWindow) et mis en
+// cache. Le rendu réutilise le batcher : drawModel empile les meshes du modèle
+// comme instances → mêmes éclairage/fill/instancing que les primitives.
+// (PendingModel/s_model_bytes/s_model_cache sont déclarés plus haut car
+// reset3dGraphicsState les référence.)
+
+// Préchargement depuis JS/natif : mémorise les octets bruts (chargement GPU différé).
+void model_preload_bytes(const std::string& name, std::vector<unsigned char> bytes, const std::string& ext) {
+    s_model_bytes[name] = PendingModel{std::move(bytes), ext};
+}
+
+// Récupère (et charge en GPU à la demande) le modèle `name`. Cherche : cache →
+// octets préchargés (écriture FS + LoadModel) → chemin de fichier direct (natif /
+// asset écrit dans MEMFS). Renvoie nullptr si introuvable/illisible.
+static Model* modelGet(const std::string& name) {
+    auto c = s_model_cache.find(name);
+    if (c != s_model_cache.end()) {
+        return &c->second;
+    }
+    Model m{};
+    auto p = s_model_bytes.find(name);
+    if (p != s_model_bytes.end()) {
+        // raylib LoadModel lit un FICHIER → on écrit les octets dans le FS (MEMFS
+        // sur WASM) puis on charge, et on nettoie le fichier de travail.
+        std::string path = std::string("ollin_model") + p->second.ext;
+        FILE* f = fopen(path.c_str(), "wb");
+        if (!f) {
+            return nullptr;
+        }
+        fwrite(p->second.bytes.data(), 1, p->second.bytes.size(), f);
+        fclose(f);
+        m = LoadModel(path.c_str());
+        remove(path.c_str());
+    } else {
+        // Repli : charger directement depuis un chemin (natif, ou asset en MEMFS).
+        m = LoadModel(name.c_str());
+    }
+    if (m.meshCount <= 0) {
+        UnloadModel(m);
+        return nullptr;
+    }
+    s_model_cache[name] = m;
+    return &s_model_cache[name];
+}
+
+// graphics.model(name) : renvoie un handle {name} vers un modèle préchargé (ou un
+// chemin chargeable). Déclenche le chargement (erreur si introuvable).
+static Value gfx_model(Value* args, int argc) {
+    if (argc < 1 || !args[0].isString()) {
+        throw std::runtime_error("graphics.model: expected a model name (string)");
+    }
+    const std::string& name = args[0].asString();
+    if (!modelGet(name)) {
+        throw std::runtime_error("graphics.model: modèle introuvable ou illisible : " + name);
+    }
+    Value h = Value::makeMap();
+    h.mapSet(Value(std::string("name")), Value(name));
+    return h;
+}
+
+// graphics.drawModel(handle [, x, y, z [, scale]]) : dans un bloc begin3d, empile
+// les meshes du modèle comme instances (transfo courante · translate · scale,
+// teinte = fill) → éclairage + instancing du batcher.
+static Value gfx_draw_model(Value* args, int argc) {
+    if (argc < 1 || !args[0].isMap()) {
+        throw std::runtime_error("graphics.drawModel: expected a model handle (graphics.model)");
+    }
+    Value nameV = args[0].mapGet(Value(std::string("name")));
+    if (!nameV.isString()) {
+        throw std::runtime_error("graphics.drawModel: handle de modèle invalide");
+    }
+    Model* mdl = modelGet(nameV.asString());
+    if (!mdl) {
+        throw std::runtime_error("graphics.drawModel: modèle introuvable : " + nameV.asString());
+    }
+    float x = argc > 1 ? (float)numArg(args, argc, 1, "graphics.drawModel") : 0.0f;
+    float y = argc > 2 ? (float)numArg(args, argc, 2, "graphics.drawModel") : 0.0f;
+    float z = argc > 3 ? (float)numArg(args, argc, 3, "graphics.drawModel") : 0.0f;
+    float s = argc > 4 ? (float)numArg(args, argc, 4, "graphics.drawModel") : 1.0f;
+    Vector3 pos{x, y, z};
+    Vector3 size{s, s, s};
+    Color col = gfxHasFill() ? gfxFillColor() : WHITE;
+    for (int i = 0; i < mdl->meshCount; i++) {
+        pushInstance(mdl->meshes[i], pos, size, col);
+    }
+    return Value{};
+}
+
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
@@ -790,6 +901,8 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
     m.mapSet(Value(std::string("cylinder")), Value::makeBuiltin(gfx_cylinder));
     m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
+    m.mapSet(Value(std::string("model")), Value::makeBuiltin(gfx_model));
+    m.mapSet(Value(std::string("drawModel")), Value::makeBuiltin(gfx_draw_model));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));

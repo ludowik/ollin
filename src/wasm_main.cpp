@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "lexer.h"
+#include "modules/graphics_internal.h"
 #include "modules/image_module.h"
 #include "modules/modules.h"
 #include "parser.h"
@@ -42,6 +43,12 @@ static void preload_image_js(const std::string& name, const std::string& b64, co
     image_preload_b64(name, b64, ext);
 }
 
+// Preload a 3D model from JS so graphics.model(name) works on WASM.
+// ext: extension without dot, e.g. "obj", "glb".
+static void preload_model_js(const std::string& name, const std::string& b64, const std::string& ext) {
+    model_preload_bytes(name, image_b64_decode(b64), std::string(".") + ext);
+}
+
 // Preload a .ol source file from JS so `import "path"` resolves against it
 // (used to run multi-file projects in the playground). Key = project-relative
 // path, e.g. "utils.ol" or "lib/helper.ol".
@@ -52,6 +59,7 @@ static void preload_source_js(const std::string& path, const std::string& conten
 EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("execute", &ollin_run);
     emscripten::function("preloadImage", &preload_image_js);
+    emscripten::function("preloadModel", &preload_model_js);
     emscripten::function("preloadSource", &preload_source_js);
     emscripten::function("resetSources", &source_reset);
 }

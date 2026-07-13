@@ -22,7 +22,13 @@ export function loadProjectIntoRuntime(m, project) {
     }
     const res = project.resources || {}
     for (const name in res) {
-      if (m.preloadImage) m.preloadImage(name, res[name].b64, res[name].ext)
+      const ext = (res[name].ext || '').toLowerCase()
+      // Modèles 3D (OBJ/GLTF/GLB) → preloadModel ; sinon image.
+      if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && m.preloadModel) {
+        m.preloadModel(name, res[name].b64, ext)
+      } else if (m.preloadImage) {
+        m.preloadImage(name, res[name].b64, ext)
+      }
     }
   } catch (_) { /* préchargement best-effort */ }
 }

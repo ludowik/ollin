@@ -185,6 +185,7 @@ const MODULE_MEMBERS = {
     fn('graphics.cube','cube(x,y,z, w,h,l)'),      fn('graphics.sphere','sphere(x,y,z, r)'),
     fn('graphics.cylinder','cylinder(x,y,z, r, h)'),
     fn('graphics.plane','plane(x,y,z, sx,sz)'),
+    fn('graphics.model','model(name)'),            fn('graphics.drawModel','drawModel(handle, x,y,z [, scale])'),
     fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
     fn('graphics.ambient','ambient(v | couleur)'),
     fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
@@ -1354,7 +1355,14 @@ imgFileInput.addEventListener('change', () => {
       const b64 = (e.target.result.split(',')[1]) ?? ''   // "data:...;base64,xxxx"
       currentProject.resources[name] = { b64, ext }
       await Store.saveProject(currentProject)
-      if (ollin && ollin.preloadImage) ollin.preloadImage(name, b64, ext)
+      if (ollin) {
+        // Modèles 3D → preloadModel ; images → preloadImage.
+        if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && ollin.preloadModel) {
+          ollin.preloadModel(name, b64, ext)
+        } else if (ollin.preloadImage) {
+          ollin.preloadImage(name, b64, ext)
+        }
+      }
       renderResources()
     }
     reader.readAsDataURL(file)

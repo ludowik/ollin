@@ -34,3 +34,8 @@ void register3dGraphics(Value& m);   // enregistre les builtins 3D dans le modul
 // ── Texture 3D courante (état de style, sauvé/restauré par push/pushStyle) ──
 unsigned int gfx3dGetTexture();      // id GL de la texture 3D courante (0 = blanche)
 void gfx3dSetTexture(unsigned int id);
+
+// ── Modèles externes : préchargement des octets (chargement GPU différé) ────
+#include <string>
+#include <vector>
+void model_preload_bytes(const std::string& name, std::vector<unsigned char> bytes, const std::string& ext);

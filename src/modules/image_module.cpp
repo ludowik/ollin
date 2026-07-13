@@ -56,6 +56,12 @@ static std::unordered_map<std::string, std::pair<std::vector<uint8_t>, std::stri
 
 // ── base64 decode ─────────────────────────────────────────────────────────────
 
+static std::vector<uint8_t> b64decode(const std::string& s);
+// Wrapper public (déclaré dans image_module.h) — réutilisé pour d'autres ressources.
+std::vector<uint8_t> image_b64_decode(const std::string& b64) {
+    return b64decode(b64);
+}
+
 static std::vector<uint8_t> b64decode(const std::string& s) {
     static const int8_t T[256] = {
         -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, // 0-15
