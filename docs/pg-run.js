@@ -62,6 +62,37 @@ export function runProgram(m, code, canvasEl, hooks) {
   }
 }
 
+// Octets → base64 (par blocs pour ne pas dépasser la pile d'arguments).
+function bytesToB64(bytes) {
+  let bin = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK))
+  }
+  return btoa(bin)
+}
+
+// Mode EXEMPLE : précharge les modèles 3D référencés par graphics.model("x.obj")
+// en les récupérant depuis samples/ (les projets utilisateur, eux, passent par
+// leurs ressources). Best-effort : un modèle introuvable est simplement ignoré.
+export async function preloadSampleModels(m, code, v) {
+  if (!m || !m.preloadModel || typeof code !== 'string') return
+  const re = /model\s*\(\s*["']([^"']+\.(?:obj|glb|gltf))["']\s*\)/gi
+  const seen = new Set()
+  let match
+  while ((match = re.exec(code))) {
+    const file = match[1]
+    if (seen.has(file)) continue
+    seen.add(file)
+    try {
+      const r = await fetch('samples/' + file + '?v=' + v, { cache: 'no-cache' })
+      if (!r.ok) continue
+      const bytes = new Uint8Array(await r.arrayBuffer())
+      m.preloadModel(file, bytesToB64(bytes), file.split('.').pop().toLowerCase())
+    } catch (_) { /* best-effort */ }
+  }
+}
+
 // Rechargement « dur », PARTAGÉ par toutes les pages : vide le Cache API (Service
 // Worker) puis recharge via une URL cache-bustée, ce qui contourne aussi le cache
 // HTTP de la page elle-même (un simple location.reload() peut resservir l'ancienne

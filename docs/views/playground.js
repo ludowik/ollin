@@ -1201,7 +1201,7 @@ function showOutput(text) {
 let ollin = null
 
 // Démarre l'exécution (à froid). Ne toggle pas : voir run()/relaunch()/stopExec().
-function launch() {
+async function launch() {
   if (!ollin) return
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
@@ -1215,6 +1215,11 @@ function launch() {
   Run.loadProjectIntoRuntime(ollin, currentProject)
   const code = currentProject ? (currentProject.files[currentProject.entry] ?? '')
                               : view.state.doc.toString()
+  // Mode exemple/brouillon : modèles 3D référencés (graphics.model("x.obj"))
+  // préchargés depuis samples/ (les projets utilisateur passent par leurs ressources).
+  if (!currentProject) {
+    await Run.preloadSampleModels(ollin, code, ctx.v)
+  }
   Run.runProgram(ollin, code, canvasEl, {
     onError:   (msg) => { setRunning(false); showOutput(msg) },
     onRunning: () => {
