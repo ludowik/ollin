@@ -31,20 +31,44 @@ export function loadProjectIntoRuntime(m, project) {
 //   hooks.onError(msg)   erreur (top-level OU frame graphique), chaîne « error: … »
 //   hooks.onRunning()    le programme a ouvert un canvas (boucle graphique lancée)
 //   hooks.onOutput(text) sortie texte d'un programme non graphique
-// DIAGNOSTIC (temporaire) : état du contexte WebGL du canvas au moment d'une
-// erreur. Permet de distinguer « contexte perdu » (déplacement du canvas dans le
-// DOM sur iOS) d'un vrai bug d'appel GL. À retirer une fois la cause identifiée.
-function glDiag(canvasEl) {
-  try {
-    const gl = canvasEl && (canvasEl.getContext('webgl2') || canvasEl.getContext('webgl'))
-    if (!gl) return ' [gl: aucun contexte]'
-    return gl.isContextLost() ? ' [gl: CONTEXTE PERDU]' : ' [gl: contexte OK]'
-  } catch (e) {
-    return ' [gl: ' + (e && e.message ? e.message : e) + ']'
+// DIAGNOSTIC (temporaire) : capte les PARAMÈTRES de l'appel texImage2D qui échoue
+// (format/type/taille) pour identifier précisément quelle texture pose problème
+// sur iOS. Patch posé une seule fois sur le prototype WebGL2.
+function installTexDiag() {
+  if (typeof WebGL2RenderingContext === 'undefined') return
+  const proto = WebGL2RenderingContext.prototype
+  if (proto.__ollinTexPatched) return
+  proto.__ollinTexPatched = true
+  const orig = proto.texImage2D
+  proto.texImage2D = function (...a) {
+    try {
+      return orig.apply(this, a)
+    } catch (e) {
+      // a = target, level, internalformat, width, height, border, format, type, srcData
+      const hex = n => '0x' + ((n | 0) >>> 0).toString(16)
+      window.__ollinTexFail = 'texImage2D ifmt=' + hex(a[2]) + ' fmt=' + hex(a[6]) +
+        ' type=' + hex(a[7]) + ' ' + a[3] + 'x' + a[4] +
+        ' srcData=' + (a[8] === null ? 'null' : (a[8] === undefined ? 'undefined' : typeof a[8]))
+      throw e
+    }
   }
 }
 
+// État du contexte WebGL + paramètres de la dernière texture fautive.
+function glDiag(canvasEl) {
+  let s = ''
+  try {
+    const gl = canvasEl && (canvasEl.getContext('webgl2') || canvasEl.getContext('webgl'))
+    s = gl ? (gl.isContextLost() ? ' [gl: CONTEXTE PERDU]' : ' [gl: contexte OK]') : ' [gl: aucun contexte]'
+  } catch (e) {
+    s = ' [gl: ' + (e && e.message ? e.message : e) + ']'
+  }
+  if (window.__ollinTexFail) s += ' [' + window.__ollinTexFail + ']'
+  return s
+}
+
 export function runProgram(m, code, canvasEl, hooks) {
+  installTexDiag()   // capte les paramètres d'un texImage2D fautif (diagnostic)
   // Écouteur de perte de contexte (diagnostic) : surface l'événement s'il survient.
   if (canvasEl && !canvasEl.__lostHook) {
     canvasEl.__lostHook = true
