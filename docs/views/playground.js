@@ -479,24 +479,33 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
   kbar.addEventListener('pointerdown', onDown)
   disposers.push(() => kbar.removeEventListener('pointerdown', onDown))
 
-  // Affichage/masquage : uniquement sur pointeur grossier (tactile), au focus.
+  // Affichage/masquage : tactile uniquement, et SEULEMENT quand le CLAVIER est
+  // réellement ouvert. On ne se fie PAS au focus seul : au lancement, l'init fait
+  // un view.focus() programmatique qui N'OUVRE PAS le clavier (iOS) → la barre ne
+  // doit pas apparaître. On détecte le clavier via visualViewport (la zone visible
+  // rétrécit franchement quand il s'ouvre).
   const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
   if (coarse) {
-    // Uniquement en mode ÉDITION : pas pendant l'exécution. On lit l'état depuis
-    // le DOM (classe 'running' du bouton) — `isRunning` est déclaré plus bas et
-    // serait dans sa zone morte au 1er focus (init).
     const runBtnEl = document.getElementById('run-btn')
-    const show = () => {
-      if (!runBtnEl || !runBtnEl.classList.contains('running')) {
-        kbar.classList.add('show')
-      }
+    const vv = window.visualViewport
+    // Clavier ouvert ≈ la zone visible perd > 120px par rapport au layout viewport.
+    const keyboardOpen = () => (vv ? (window.innerHeight - vv.height > 120) : false)
+    const update = () => {
+      const editing = document.activeElement === view.contentDOM
+      const running = runBtnEl && runBtnEl.classList.contains('running')
+      kbar.classList.toggle('show', editing && keyboardOpen() && !running)
     }
-    const hide = () => kbar.classList.remove('show')
-    view.contentDOM.addEventListener('focus', show)
-    view.contentDOM.addEventListener('blur', hide)
+    view.contentDOM.addEventListener('focus', update)
+    view.contentDOM.addEventListener('blur', update)
+    if (vv) {
+      vv.addEventListener('resize', update)
+    }
     disposers.push(() => {
-      view.contentDOM.removeEventListener('focus', show)
-      view.contentDOM.removeEventListener('blur', hide)
+      view.contentDOM.removeEventListener('focus', update)
+      view.contentDOM.removeEventListener('blur', update)
+      if (vv) {
+        vv.removeEventListener('resize', update)
+      }
     })
   }
 })()
