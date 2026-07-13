@@ -68,15 +68,10 @@ const LAST_HASH_KEY = 'ollin-last-route'
 // pour éviter le zoom automatique d'iOS quand l'éditeur (police < 16px) prend le
 // focus — comportement de l'ancienne page autonome, perdu au passage en SPA (un
 // seul viewport partagé). Le tutoriel reste zoomable (lecture confortable).
-// interactive-widget=resizes-content : a l'ouverture du clavier, le navigateur
-// RETRECIT le viewport (au lieu de faire glisser une page pleine hauteur sous le
-// clavier). Notre app en position:fixed reste alors calee sur la zone visible →
-// la barre d'outils ne remonte pas au focus et ne decroche pas au scroll clavier
-// ouvert. Ignore sans effet la ou ce n'est pas supporte.
 const VIEWPORT = {
   tutoriel:   'width=device-width, initial-scale=1.0',
-  playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, interactive-widget=resizes-content',
-  run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content',
+  playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
+  run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
 }
 function applyViewport(view) {
   const meta = document.querySelector('meta[name="viewport"]')
