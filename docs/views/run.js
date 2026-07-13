@@ -91,7 +91,7 @@ export async function init(ctx) {
     // interactifs lisant keyboard.*), comme l'ancien run.html (canvas tabindex).
     // preventScroll : sinon, sur mobile, le navigateur défile pour amener le
     // canvas (en bas) dans le viewport → la barre de menu remonte d'un cran.
-    onRunning: () => { statusEl.textContent = 'En cours…'; try { canvasEl.focus({ preventScroll: true }) } catch (_) {} },
+    onRunning: () => { statusEl.textContent = ''; try { canvasEl.focus({ preventScroll: true }) } catch (_) {} },
     onOutput:  (out) => showText(out),
   })
 
