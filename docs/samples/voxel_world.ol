@@ -15,13 +15,20 @@ global VIEW_MAX = 6        ## borne haute du rayon adaptatif
 
 ## ── Auto-adaptation de la distance de vue ────────────────────────────────────
 ## En vsync verrouillé, deltaTime ne révèle PAS la marge (il reste à ~1/cadence
-## tant qu'on tient) : il ne monte QUE quand une frame déborde. On déduit donc la
-## marge empiriquement — on SONDE en montant VIEW jusqu'au décrochage, puis on
-## recule et on retient ce plafond. La cadence max (60 ou 120) est auto-calibrée.
-global fps_ema = 60.0      ## FPS lissé (moyenne glissante = 1/deltaTime)
-global fps_cap = 60.0      ## cadence max observée (auto : 60 sur iPhone, 120 ProMotion…)
-global view_ceiling = 99   ## rayon appris comme trop lourd → plafond (anti-oscillation)
-global adapt_t = 0.0       ## secondes accumulées depuis la dernière évaluation
+## tant qu'on tient) : il ne monte QUE quand des frames débordent. On compte donc,
+## sur une fenêtre, la PART de frames LENTES : trop de lentes → on réduit la
+## distance ; aucune lente → on sonde plus loin.
+## CRUCIAL : les frames « irréelles » (> STALL_DT, ≈ moins de 3 fps) sont IGNORÉES.
+## Elles ne viennent jamais d'une vraie surcharge de rendu mais du navigateur qui
+## bride le requestAnimationFrame quand la page passe en arrière-plan / au retour
+## d'une autre appli — les compter ferait rétrécir la vue À TORT (le bug précédent).
+global SLOW_DT  = 0.021    ## frame « lente » : au-dessus de ~48 fps de période
+global STALL_DT = 0.30     ## au-delà = arrière-plan/reprise, PAS une frame réelle → ignorée
+global fps_ema  = 60.0     ## FPS lissé — AFFICHAGE seulement (aucune décision dessus)
+global adapt_t  = 0.0      ## secondes mesurées dans la fenêtre courante
+global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
+global adapt_slow = 0      ## dont frames lentes
+global cooldown = 0.0      ## délai avant de re-sonder après une réduction (anti-oscillation)
 global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
 global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
@@ -330,27 +337,33 @@ func draw()
         streaming = false
     end
 
-    ## auto-adaptation de la distance : FPS lissé, évalué en régime stable seulement
-    ## (pas pendant la cuisson, dont les à-coups fausseraient la mesure).
-    if deltaTime > 0 then
-        fps_ema = fps_ema * 0.9 + (1.0 / deltaTime) * 0.1
-    end
-    if streaming then
-        adapt_t = 0.0                                  ## on ne mesure pas pendant la cuisson
-    else
-        if fps_ema > fps_cap then
-            fps_cap = fps_ema                          ## calibre la cadence max (60/120)
+    ## auto-adaptation de la distance (voir en-tête). On IGNORE les frames irréelles
+    ## (> STALL_DT : arrière-plan/reprise) et on ne mesure pas pendant la cuisson,
+    ## dont les à-coups fausseraient le compte.
+    if deltaTime > 0 and deltaTime < STALL_DT then
+        fps_ema = fps_ema * 0.9 + (1.0 / deltaTime) * 0.1     ## affichage uniquement
+        if cooldown > 0 then
+            cooldown = cooldown - deltaTime
         end
-        adapt_t = adapt_t + deltaTime
-        if adapt_t >= 1.0 then
-            adapt_t = 0.0
-            if fps_ema < fps_cap * 0.85 and VIEW > VIEW_MIN then
-                view_ceiling = VIEW - 1                ## ce rayon décroche → plafond
-                VIEW = VIEW - 1
-                stream_unload(pcx, pcz)                ## libère l'anneau lointain aussitôt
-            elseif fps_ema > fps_cap * 0.96 and VIEW < VIEW_MAX and VIEW < view_ceiling then
-                VIEW = VIEW + 1                        ## marge dispo → on sonde plus loin
-                streaming = true                       ## charge le nouvel anneau
+        if not streaming then
+            adapt_t = adapt_t + deltaTime
+            adapt_n = adapt_n + 1
+            if deltaTime > SLOW_DT then
+                adapt_slow = adapt_slow + 1
+            end
+            if adapt_t >= 1.5 then
+                ## > 25% de frames lentes → on réduit ; aucune lente → on sonde plus loin
+                if adapt_slow * 4 > adapt_n and VIEW > VIEW_MIN then
+                    VIEW = VIEW - 1
+                    stream_unload(pcx, pcz)            ## libère l'anneau lointain aussitôt
+                    cooldown = 8.0                     ## pause avant de re-tenter (anti-oscillation)
+                elseif adapt_slow == 0 and cooldown <= 0 and VIEW < VIEW_MAX then
+                    VIEW = VIEW + 1
+                    streaming = true                   ## charge le nouvel anneau
+                end
+                adapt_t = 0.0
+                adapt_n = 0
+                adapt_slow = 0
             end
         end
     end
