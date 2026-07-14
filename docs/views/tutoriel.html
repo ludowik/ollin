@@ -698,6 +698,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <span class="bi">assert</span>(grade == <span class="str">"C"</span>)
 <span class="bi">print</span>(grade)  <span class="cmt">## C</span></code></pre>
+<div class="callout tip">Pour enchaîner des conditions, utilise <code>elseif</code>. Il n'y a <strong>pas</strong> de sucre « <code>else if</code> » : un <code>else</code> suivi d'un <code>if</code> est une branche <code>else</code> contenant un <strong>bloc <code>if</code> imbriqué</strong> (avec son propre <code>end</code>).</div>
 </section>
 
 <!-- ── While ─────────────────────────────────────────────────────────────── -->
@@ -1692,8 +1693,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>Sphère — pleine si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
     <tr><td><code>graphics.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> = centre de la base, rayon <code>r</code>, hauteur <code>h</code> — plein si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
     <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>Plan horizontal (XZ) de taille <code>sx</code>×<code>sz</code>, rempli</td></tr>
-    <tr><td><code>graphics.model(name)</code></td><td>Charge un <strong>modèle externe</strong> (<code>.obj</code>, ou <code>.glb</code> avec matériaux/textures embarqués) ajouté dans <em>Ressources</em> → renvoie un handle</td></tr>
+    <tr><td><code>graphics.model(name)</code></td><td>Charge un <strong>modèle externe</strong> (<code>.obj</code>, ou <code>.glb</code> avec matériaux/textures embarqués) → renvoie un handle. Dans un projet : ajouté dans <em>Ressources</em> ; dans un exemple/brouillon : chargé automatiquement depuis <code>samples/</code></td></tr>
     <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Dessine le modèle à <code>(x,y,z)</code> (échelle optionnelle), éclairé. Un <code>.glb</code> garde ses <strong>textures/couleurs</strong> ; <code>fill</code> = teinte globale (blanc → couleurs d'origine)</td></tr>
+    <tr><td><code>graphics.modelSize(handle)</code></td><td>Dimensions du modèle → map <code>{ w, h, d, cx, cy, cz, radius }</code> (taille, centre, rayon englobant)</td></tr>
+    <tr><td><code>graphics.fitDistance(radius [, fovy])</code></td><td>Distance de caméra pour qu'une sphère de rayon <code>radius</code> tienne à l'écran (suit le ratio portrait/paysage) — utile pour cadrer un modèle</td></tr>
     <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>Segment 3D (couleur <code>stroke</code>)</td></tr>
     <tr><td><code>graphics.point3d(x,y,z)</code></td><td>Point 3D (couleur <code>stroke</code>)</td></tr>
   </tbody>
@@ -1709,7 +1712,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.light("point", x,y,z [, couleur])</code></td><td>Lumière ponctuelle à la position <code>(x,y,z)</code> → objet <code>Light</code></td></tr>
     <tr><td><code>lum.set_dir(x,y,z)</code> · <code>lum.set_pos(x,y,z)</code></td><td>Réoriente / repositionne la lumière</td></tr>
     <tr><td><code>lum.set_color(couleur)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
-    <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applique une image (handle <code>image</code>) comme texture aux solides suivants ; <code>fill</code> devient une teinte multipliée</td></tr>
+    <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applique une image (handle <code>image</code>) comme texture aux solides suivants ; <code>fill</code> devient une teinte multipliée. Pour un terrain multi-matières, voir l'<a href="#voxel">atlas de tuiles</a> plus bas</td></tr>
   </tbody>
 </table>
 
@@ -1783,6 +1786,66 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">3</span>, <span class="num">3</span>, <span class="num">3</span>)
     <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
+
+<h4 id="voxel">Terrain voxel : géométrie retenue &amp; culling</h4>
+<p>Pour un monde fait de milliers de cubes (type Minecraft), ré-émettre chaque cube à chaque frame est trop coûteux. Ollin propose une <strong>géométrie retenue</strong> : on <strong>cuit</strong> les cubes d'un « chunk » une seule fois dans des tampons GPU, puis on le redessine en <strong>un seul appel</strong> par frame. On ne dessine que les chunks <strong>visibles</strong> (test de frustum), et on <strong>libère</strong> les lointains → mémoire bornée, monde potentiellement infini.</p>
+<table>
+  <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.beginChunk()</code></td><td>Ouvre l'enregistrement : les <code>graphics.cube</code>/<code>plane</code> suivants sont <strong>cuits</strong> (enregistrés), pas dessinés</td></tr>
+    <tr><td><code>graphics.endChunk()</code></td><td>Termine et renvoie un <strong>handle</strong> à redessiner chaque frame : map <code>{ id, idw, count, wcount }</code></td></tr>
+    <tr><td><code>graphics.drawChunk(handle)</code></td><td>Redessine la partie <strong>opaque</strong> d'un chunk cuit en un seul appel (dans <code>begin3d</code>)</td></tr>
+    <tr><td><code>graphics.drawChunkAlpha(handle)</code></td><td>Dessine la partie <strong>transparente</strong> (instances à <code>fill</code> alpha &lt; 1, ex. eau). À appeler APRÈS tout l'opaque</td></tr>
+    <tr><td><code>graphics.freeChunk(handle)</code></td><td>Libère les tampons GPU d'un chunk (lointain) → mémoire récupérée</td></tr>
+    <tr><td><code>graphics.inFrustum(x,y,z [, rayon])</code></td><td>La sphère (centre, rayon) est-elle (au moins en partie) visible par la caméra ? → <code>1</code>/<code>0</code>. Sert au culling par chunk ; à appeler dans <code>begin3d</code></td></tr>
+  </tbody>
+</table>
+<p>Un chunk est automatiquement <strong>scindé</strong> en deux groupes selon l'alpha du <code>fill</code> : opaque (<code>drawChunk</code>) et transparent (<code>drawChunkAlpha</code>). <strong>Ordre obligatoire</strong> : dessine TOUT l'opaque, PUIS TOUTE la transparence — sinon le mélange alpha est incorrect.</p>
+
+<h4>Atlas de tuiles (texture par face)</h4>
+<p>Pour texturer un terrain sans un appel de dessin par matière, on utilise un <strong>atlas</strong> : une seule image en grille de tuiles. Chaque cube porte un triplet de tuiles (<strong>dessus / côté / dessous</strong>) ; le shader choisit selon la face (herbe dessus, terre sur les côtés…). L'atlas se génère en Ollin avec le module <a href="#/tutoriel/stdlib">image</a> (pixels) ou se charge depuis une image.</p>
+<table>
+  <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.tileset(img, cols, rows)</code></td><td>Déclare l'atlas de tuiles (grille <code>cols</code>×<code>rows</code>, filtrage NEAREST = pixels nets)</td></tr>
+    <tr><td><code>graphics.tile(t)</code></td><td>Même tuile <code>t</code> sur les 6 faces du prochain cube (état, comme <code>fill</code>) ; <code>-1</code> = aucune (couleur pleine)</td></tr>
+    <tr><td><code>graphics.tiles(dessus, côté, dessous)</code></td><td>Tuiles distinctes par face (indices dans l'atlas)</td></tr>
+    <tr><td><code>graphics.tileAnim(t)</code></td><td>Désigne une tuile dont l'UV <strong>défile</strong> dans le temps (eau qui ondule)</td></tr>
+  </tbody>
+</table>
+<div class="callout tip">Avec un atlas actif, donne une tuile à <strong>chaque</strong> cube du chunk (<code>tile</code>/<code>tiles</code>) : un cube sans tuile échantillonnerait la tuile 0 au lieu d'une couleur pleine.</div>
+
+<pre><code><span class="cmt">## chunk voxel : cuisson UNIQUE dans setup(), redessin en 1 appel par frame</span>
+<span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">26</span>, <span class="num">20</span>, <span class="num">26</span>,  <span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>)
+<span class="kw">global</span> chunk = <span class="bool">nil</span>
+
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(W, H, <span class="str">"voxel"</span>)
+    <span class="bi">graphics</span>.ambient(<span class="num">0.5</span>)
+    <span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">0.5</span>, -<span class="num">1</span>, -<span class="num">0.35</span>)
+    <span class="bi">graphics</span>.beginChunk()                 <span class="cmt">## début de la cuisson</span>
+    <span class="bi">graphics</span>.fill(colors.WHITE)
+    <span class="kw">for</span> x = <span class="num">0</span>, <span class="num">15</span> <span class="kw">do</span>
+        <span class="kw">for</span> z = <span class="num">0</span>, <span class="num">15</span> <span class="kw">do</span>
+            <span class="kw">var</span> h = <span class="bi">math</span>.floor(<span class="bi">math</span>.noise(x * <span class="num">0.12</span>, z * <span class="num">0.12</span>) * <span class="num">6</span>) + <span class="num">1</span>
+            <span class="kw">for</span> y = <span class="num">0</span>, h <span class="kw">do</span>
+                <span class="bi">graphics</span>.cube(x, y, z,  <span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
+            <span class="kw">end</span>
+        <span class="kw">end</span>
+    <span class="kw">end</span>
+    chunk = <span class="bi">graphics</span>.endChunk()           <span class="cmt">## handle persistant</span>
+<span class="kw">end</span>
+
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(Color(<span class="num">0.55</span>, <span class="num">0.8</span>, <span class="num">0.95</span>))
+    cam.orbit(elapsedTime * <span class="num">0.3</span>, <span class="num">26</span>, <span class="num">20</span>)
+    <span class="bi">graphics</span>.begin3d(cam)
+        <span class="kw">if</span> <span class="bi">graphics</span>.inFrustum(<span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>, <span class="num">20</span>) <span class="kw">then</span>   <span class="cmt">## dessiné seulement si visible</span>
+            <span class="bi">graphics</span>.drawChunk(chunk)                 <span class="cmt">## 1 appel = tout le chunk</span>
+        <span class="kw">end</span>
+    <span class="bi">graphics</span>.end3d()
+<span class="kw">end</span></code></pre>
+<div class="callout tip">L'exemple complet <strong>Univers voxel</strong> (streaming infini de chunks, biomes, atlas herbe/roche/neige, eau translucide animée, joystick tactile) est dans le playground → menu <em>Exemples</em>.</div>
 </section>
 
 <!-- ── Clavier ────────────────────────────────────────────────────────────── -->
