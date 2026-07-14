@@ -307,8 +307,6 @@ func draw_hud(shown)
         graphics.fill(Color(0.45, 0.65, 1.0, 0.85))
         graphics.circle(tx, ty, 20)
     end
-    graphics.draw_text("<  tourner  >", ax - 52, H - 24, 16, colors.WHITE)
-    graphics.draw_text("avancer (haut)", 16, y0 + 8, 16, colors.WHITE)
     graphics.draw_text("chunks affichés " + shown, 12, 12, 15, colors.WHITE)
 end
 
