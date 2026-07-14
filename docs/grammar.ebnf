@@ -68,6 +68,9 @@ ifStmt         = "if" expr "then" { stmt }
                  { "elseif" expr "then" { stmt } }
                  [ "else" { stmt } ]
                  "end" NL ;
+             (* pas de sucre "else if" : un elseif s'écrit 'elseif'. Un 'else' suivi
+                d'un 'if' est une branche else contenant un bloc if imbriqué (statement
+                normal, avec son propre 'end'). *)
 tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" NL ;
 switchStmt     = "switch" expr NL { "case" expr { "," expr } NL { stmt } } [ "else" NL { stmt } ] "end" NL ;
 throwStmt      = "throw" expr NL ;

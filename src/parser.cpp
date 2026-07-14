@@ -292,9 +292,9 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
     while (check(TokenType::ELSE) || check(TokenType::ELSEIF)) {
         bool is_elif = check(TokenType::ELSEIF);
         advance(); // ELSE or ELSEIF
-        if (is_elif || check(TokenType::IF)) {
-            if (!is_elif)
-                advance(); // IF
+        // Pas de sucre "else if" : pour un elseif on écrit 'elseif'. Un 'else' suivi
+        // d'un 'if' est une branche else contenant un bloc if imbriqué (statement normal).
+        if (is_elif) {
             ElseIfClause ei;
             ei.cond = expr();
             skipComments();

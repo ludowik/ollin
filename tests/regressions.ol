@@ -331,4 +331,25 @@ catch e
 end
 assert(str_len_err == "caught")
 
+## if imbriqué en 1re position d'une branche else (pas de sucre "else if" → elseif)
+var ei = "?"
+if false then
+    ei = "then"
+else
+    if true then
+        ei = "else>if"
+    end
+end
+assert(ei == "else>if")
+## elseif reste distinct et fonctionnel
+var ec = 0
+if false then
+    ec = 1
+elseif true then
+    ec = 2
+else
+    ec = 3
+end
+assert(ec == 2)
+
 print("regressions ok")
