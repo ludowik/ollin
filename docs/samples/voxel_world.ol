@@ -10,7 +10,19 @@ import "joystick.ol"       ## classe Joystick (contrôle analogique)
 
 global CS = 16             ## côté d'un chunk
 global RES = 0.5           ## taille d'un cube (définition) : 0.5 = terrain 2× plus fin
-global VIEW = 2            ## rayon de chunks chargés (réduit : cubes 0.5 = ×8 de géométrie)
+global VIEW = 2            ## rayon de chunks chargés — ADAPTATIF (voir bloc auto-adapt)
+global VIEW_MIN = 1        ## borne basse du rayon adaptatif
+global VIEW_MAX = 6        ## borne haute du rayon adaptatif
+
+## ── Auto-adaptation de la distance de vue ────────────────────────────────────
+## En vsync verrouillé, deltaTime ne révèle PAS la marge (il reste à ~1/cadence
+## tant qu'on tient) : il ne monte QUE quand une frame déborde. On déduit donc la
+## marge empiriquement — on SONDE en montant VIEW jusqu'au décrochage, puis on
+## recule et on retient ce plafond. La cadence max (60 ou 120) est auto-calibrée.
+global fps_ema = 60.0      ## FPS lissé (moyenne glissante = 1/deltaTime)
+global fps_cap = 60.0      ## cadence max observée (auto : 60 sur iPhone, 120 ProMotion…)
+global view_ceiling = 99   ## rayon appris comme trop lourd → plafond (anti-oscillation)
+global adapt_t = 0.0       ## secondes accumulées depuis la dernière évaluation
 global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
 global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
@@ -329,6 +341,31 @@ func draw()
         streaming = false
     end
 
+    ## auto-adaptation de la distance : FPS lissé, évalué en régime stable seulement
+    ## (pas pendant la cuisson, dont les à-coups fausseraient la mesure).
+    if deltaTime > 0 then
+        fps_ema = fps_ema * 0.9 + (1.0 / deltaTime) * 0.1
+    end
+    if streaming then
+        adapt_t = 0.0                                  ## on ne mesure pas pendant la cuisson
+    else
+        if fps_ema > fps_cap then
+            fps_cap = fps_ema                          ## calibre la cadence max (60/120)
+        end
+        adapt_t = adapt_t + deltaTime
+        if adapt_t >= 1.0 then
+            adapt_t = 0.0
+            if fps_ema < fps_cap * 0.85 and VIEW > VIEW_MIN then
+                view_ceiling = VIEW - 1                ## ce rayon décroche → plafond
+                VIEW = VIEW - 1
+                stream_unload(pcx, pcz)                ## libère l'anneau lointain aussitôt
+            elseif fps_ema > fps_cap * 0.96 and VIEW < VIEW_MAX and VIEW < view_ceiling then
+                VIEW = VIEW + 1                        ## marge dispo → on sonde plus loin
+                streaming = true                       ## charge le nouvel anneau
+            end
+        end
+    end
+
     ## rester au-dessus du sol : toujours EYE au-dessus de la colonne courante
     camY = ground(camX, camZ) + EYE
     var dx = math.cos(PITCH) * math.sin(yaw)
@@ -357,5 +394,5 @@ func draw()
     graphics.end3d()
 
     pad.draw()                        ## HUD du joystick (classe réutilisable)
-    graphics.draw_text("chunks affichés " + #vis, 12, 12, 15, colors.WHITE)
+    graphics.draw_text("fps " + math.floor(fps_ema + 0.5) + "   vue " + VIEW + "   chunks " + #vis, 12, 12, 15, colors.WHITE)
 end
