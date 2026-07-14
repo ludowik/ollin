@@ -188,9 +188,12 @@ static std::map<std::string, Model> s_model_cache;          // modèles chargés
 // drawChunk les redessine chaque frame en 1 appel — plus besoin de ré-émettre
 // chaque cube depuis Ollin à chaque frame (culling par chunk côté script).
 static bool s_recording = false;
-static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées
-static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés
-static std::vector<float> s_rec_t;    // tuiles (3 floats/instance) enregistrées
+static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées (OPAQUE)
+static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés (OPAQUE)
+static std::vector<float> s_rec_t;    // tuiles (3 floats/instance) enregistrées (OPAQUE)
+static std::vector<Matrix> s_rec_xw;  // idem, cubes TRANSPARENTS (alpha < 1, ex. eau)
+static std::vector<float> s_rec_cw;
+static std::vector<float> s_rec_tw;
 static Mesh s_rec_mesh{};             // mesh enregistré (cube)
 struct InstGroup {
     Mesh mesh;
@@ -397,8 +400,20 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
         // couleur ; texId ignoré (groupe cuit = texture blanche + couleur par instance).
         (void)texId;
         s_rec_mesh = mesh;
-        s_rec_x.push_back(MatrixMultiply(MatrixScale(size.x, size.y, size.z),
-                                         MatrixTranslate(pos.x, pos.y, pos.z)));
+        Matrix rm = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
+        // Routage OPAQUE vs TRANSPARENT selon l'alpha de la couleur (eau = alpha<1).
+        if (col.a < 250) {
+            s_rec_xw.push_back(rm);
+            s_rec_cw.push_back(col.r / 255.0f);
+            s_rec_cw.push_back(col.g / 255.0f);
+            s_rec_cw.push_back(col.b / 255.0f);
+            s_rec_cw.push_back(col.a / 255.0f);
+            s_rec_tw.push_back(s_cur_tile[0]);
+            s_rec_tw.push_back(s_cur_tile[1]);
+            s_rec_tw.push_back(s_cur_tile[2]);
+            return;
+        }
+        s_rec_x.push_back(rm);
         s_rec_c.push_back(col.r / 255.0f);
         s_rec_c.push_back(col.g / 255.0f);
         s_rec_c.push_back(col.b / 255.0f);
@@ -607,6 +622,9 @@ void reset3dGraphicsState() {
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
+    s_rec_xw.clear();
+    s_rec_cw.clear();
+    s_rec_tw.clear();
     if (s_white_ready) {
         UnloadTexture(s_white_tex);
         s_white_tex = Texture2D{};
@@ -1170,34 +1188,55 @@ static Value gfx_begin_chunk(Value* args, int argc) {
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
+    s_rec_xw.clear();
+    s_rec_cw.clear();
+    s_rec_tw.clear();
     return Value{};
 }
 
+// Construit un InstGroup (VBO persistants) depuis des vecteurs d'instances cuits.
+static InstGroup buildGroup(const std::vector<Matrix>& xs, const std::vector<float>& cs,
+                            const std::vector<float>& ts) {
+    InstGroup g{};
+    g.mesh = s_rec_mesh;
+    g.count = (int)xs.size();
+    if (g.count > 0) {
+        std::vector<float16> xf(g.count);
+        for (int i = 0; i < g.count; i++) {
+            xf[i] = MatrixToFloatV(xs[i]);
+        }
+        g.vboX = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
+        g.vboC = rlLoadVertexBuffer(cs.data(), g.count * 4 * (int)sizeof(float), false);
+        g.vboT = rlLoadVertexBuffer(ts.data(), g.count * 3 * (int)sizeof(float), false);
+    }
+    return g;
+}
+
 // graphics.endChunk() : cuit les cubes enregistrés dans des VBO persistants et
-// renvoie un handle { id, count }. À redessiner chaque frame via drawChunk.
+// renvoie un handle { id, idw, count, wcount }. `id` = groupe OPAQUE, `idw` = groupe
+// TRANSPARENT (eau). À redessiner chaque frame : drawChunk (opaque) puis, après TOUT
+// l'opaque, drawChunkAlpha (eau).
 static Value gfx_end_chunk(Value* args, int argc) {
     (void)args;
     (void)argc;
     s_recording = false;
-    InstGroup g{};
-    g.mesh = s_rec_mesh;
-    g.count = (int)s_rec_x.size();
-    if (g.count > 0) {
-        std::vector<float16> xf(g.count);
-        for (int i = 0; i < g.count; i++) {
-            xf[i] = MatrixToFloatV(s_rec_x[i]);
-        }
-        g.vboX = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
-        g.vboC = rlLoadVertexBuffer(s_rec_c.data(), g.count * 4 * (int)sizeof(float), false);
-        g.vboT = rlLoadVertexBuffer(s_rec_t.data(), g.count * 3 * (int)sizeof(float), false);
-    }
+    InstGroup g = buildGroup(s_rec_x, s_rec_c, s_rec_t);
+    InstGroup w = buildGroup(s_rec_xw, s_rec_cw, s_rec_tw);
     s_groups.push_back(g);
+    int idO = (int)s_groups.size();
+    s_groups.push_back(w);
+    int idW = (int)s_groups.size();
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
+    s_rec_xw.clear();
+    s_rec_cw.clear();
+    s_rec_tw.clear();
     Value h = Value::makeMap();
-    h.mapSet(Value(std::string("id")), Value((int64_t)s_groups.size()));
+    h.mapSet(Value(std::string("id")), Value((int64_t)idO));
+    h.mapSet(Value(std::string("idw")), Value((int64_t)idW));
     h.mapSet(Value(std::string("count")), Value((int64_t)g.count));
+    h.mapSet(Value(std::string("wcount")), Value((int64_t)w.count));
     return h;
 }
 
@@ -1229,20 +1268,48 @@ static Value gfx_draw_chunk(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.freeChunk(handle) : libère les VBO d'un groupe cuit (chunk lointain
-// déchargé) → mémoire GPU récupérée. Le handle devient un no-op au dessin. Permet
-// un monde INFINI : on cuit les chunks autour du joueur, on libère les autres.
-static Value gfx_free_chunk(Value* args, int argc) {
+// graphics.drawChunkAlpha(handle) : dessine le groupe TRANSPARENT du chunk (eau) en
+// mélange alpha (on voit le fond opaque déjà dessiné à travers). Depth test+write
+// gardés → la surface d'eau s'occlude proprement (pas d'accumulation entre couches).
+// À appeler DANS begin3d APRÈS avoir dessiné TOUT l'opaque (drawChunk) des chunks.
+static Value gfx_draw_chunk_alpha(Value* args, int argc) {
     if (argc < 1 || !args[0].isMap()) {
         return Value{};
     }
-    Value idv = args[0].mapGet(Value(std::string("id")));
+    Value idv = args[0].mapGet(Value(std::string("idw")));
     if (!idv.isInteger()) {
         return Value{};
     }
     int id = (int)idv.asInt();
     if (id < 1 || id > (int)s_groups.size()) {
         return Value{};
+    }
+    InstGroup& g = s_groups[id - 1];
+    if (g.count <= 0 || g.vboX == 0) {
+        return Value{};
+    }
+    if (!litBeginDraw()) {
+        return Value{};
+    }
+    BeginBlendMode(BLEND_ALPHA);
+    litBindInstances(g.mesh.vaoId, g.vboX, g.vboC, g.vboT);
+    litDrawInstanced(g.mesh, s_atlas_texid, g.count);
+    rlDisableShader();
+    EndBlendMode();
+    return Value{};
+}
+
+// graphics.freeChunk(handle) : libère les VBO d'un groupe cuit (chunk lointain
+// déchargé) → mémoire GPU récupérée. Le handle devient un no-op au dessin. Permet
+// un monde INFINI : on cuit les chunks autour du joueur, on libère les autres.
+static void freeGroupById(Value& handle, const char* key) {
+    Value idv = handle.mapGet(Value(std::string(key)));
+    if (!idv.isInteger()) {
+        return;
+    }
+    int id = (int)idv.asInt();
+    if (id < 1 || id > (int)s_groups.size()) {
+        return;
     }
     InstGroup& g = s_groups[id - 1];
     if (g.vboX) {
@@ -1258,6 +1325,14 @@ static Value gfx_free_chunk(Value* args, int argc) {
         g.vboT = 0;
     }
     g.count = 0;
+}
+
+static Value gfx_free_chunk(Value* args, int argc) {
+    if (argc < 1 || !args[0].isMap()) {
+        return Value{};
+    }
+    freeGroupById(args[0], "id");    // groupe opaque
+    freeGroupById(args[0], "idw");   // groupe transparent (eau)
     return Value{};
 }
 
@@ -1303,6 +1378,7 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("beginChunk")), Value::makeBuiltin(gfx_begin_chunk));
     m.mapSet(Value(std::string("endChunk")), Value::makeBuiltin(gfx_end_chunk));
     m.mapSet(Value(std::string("drawChunk")), Value::makeBuiltin(gfx_draw_chunk));
+    m.mapSet(Value(std::string("drawChunkAlpha")), Value::makeBuiltin(gfx_draw_chunk_alpha));
     m.mapSet(Value(std::string("freeChunk")), Value::makeBuiltin(gfx_free_chunk));
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));

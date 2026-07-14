@@ -180,9 +180,11 @@ func bake_chunk(cx, cz)
             end
             if h < SEA then
                 graphics.tile(T_WATER)
+                graphics.fill(Color(1, 1, 1, 0.7))    ## eau semi-transparente (voir le fond)
                 for wy = h + 1, SEA do
                     graphics.cube(x, wy, z,  1, 1, 1)
                 end
+                graphics.fill(WHITE)                  ## retour opaque (arbres, colonnes suivantes)
             end
             var hash = (x * 131 + z * 197) % 100
             var tree = (b == 2 and hash < 5) or (b == 1 and hash == 0)
@@ -382,10 +384,17 @@ func draw()
     graphics.noStroke()
     var shown = 0
     graphics.begin3d(cam)
+        ## passe 1 : opaque (terrain, arbres)
         for k, c in loaded do
             if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
                 shown = shown + 1
                 graphics.drawChunk(c)
+            end
+        end
+        ## passe 2 : eau transparente, APRÈS tout l'opaque
+        for k, c in loaded do
+            if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
+                graphics.drawChunkAlpha(c)
             end
         end
     graphics.end3d()
