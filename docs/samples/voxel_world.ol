@@ -85,67 +85,39 @@ func biome_at(x, z)
     return 3
 end
 
-func clampf(v, a, b)
-    if v < a then return a end
-    if v > b then return b end
-    return v
+## Élévation continue et LISSE (0..1). math.noise fait déjà du fBm multi-octave ;
+## on garde UNE grande échelle (collines larges) + un léger détail. Une seule
+## source → aucune discontinuité, pentes douces (pas de terrain haché ni de
+## falaises aléatoires). Le biome n'intervient PAS ici (sinon cliffs aux frontières).
+func elevation(x, z)
+    return math.noise(x * 0.013, z * 0.013) * 0.82
+         + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-## élévation ∈ [-1;1] : bruit multi-octave, normalisé, puis REDISTRIBUÉ (|u|^0.55)
-## pour repousser le relief vers les extrêmes → vallées creusées + pics marqués.
-func unit(x, z)
-    var n = math.noise(x * 0.045, z * 0.045) * 0.6
-          + math.noise(x * 0.11, z * 0.11) * 0.3
-          + math.noise(x * 0.24, z * 0.24) * 0.1
-    var u = clampf((n - 0.5) / 0.5, -1.0, 1.0)
-    if u >= 0 then
-        return u ^ 0.55
-    end
-    return 0 - ((0 - u) ^ 0.55)
-end
-
-func height_at(x, z, b)
-    var u = unit(x, z)
-    switch b
-    case 0
-        return math.floor(SEA + u * 6 + 1)     ## désert : dunes basses
-    case 1
-        return math.floor(SEA + u * 10)        ## plaine : creuse en océans, monte en collines
-    case 2
-        return math.floor(SEA + u * 13 + 1)    ## forêt : vallonné
-    else
-        var m = u
-        if m < 0 then m = 0 end
-        return math.floor(SEA + 3 + m * 26)    ## montagne : pics hauts
-    end
+## Hauteur du terrain : fonction CONTINUE de la position. Centrée (≈13% sous la
+## mer), amplitude étalée sur de larges reliefs → collines/vallées douces.
+func height_at(x, z)
+    return math.floor((elevation(x, z) - 0.42) * 60 + SEA)
 end
 
 func ground(x, z)
-    var ix = math.floor(x)
-    var iz = math.floor(z)
-    var b = biome_at(ix, iz)
-    return math.max(height_at(ix, iz, b), SEA)
+    return math.max(height_at(math.floor(x), math.floor(z)), SEA)
 end
 
-## Fixe les tuiles (dessus/côté/dessous) du bloc courant selon biome/altitude.
+## Fixe les tuiles (dessus/côté/dessous) selon l'ALTITUDE (logique : plage → herbe
+## → roche → neige) ; le biome ne sert qu'à distinguer le désert (bas et sec).
 func set_block_tiles(b, h, y)
     if y >= h then
-        if h < SEA then
-            graphics.tile(T_SAND)                     ## fond marin → sable
+        if h < SEA + 1 then
+            graphics.tile(T_SAND)                     ## fond marin + plage
+        elseif h >= SEA + 13 then
+            graphics.tiles(T_SNOW, T_SNOW, T_ROCK)    ## sommets enneigés
+        elseif h >= SEA + 8 then
+            graphics.tile(T_ROCK)                     ## roche en altitude
         elseif b == 0 then
-            graphics.tile(T_SAND)                     ## désert
-        elseif b == 2 then
-            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)   ## forêt : herbe dessus, terre côtés
-        elseif b == 3 then
-            if h >= SEA + 13 then
-                graphics.tiles(T_SNOW, T_SNOW, T_ROCK)   ## sommet enneigé
-            elseif h >= SEA + 5 then
-                graphics.tile(T_ROCK)                    ## roche
-            else
-                graphics.tiles(T_GRASS, T_DIRT, T_DIRT)  ## base herbeuse
-            end
+            graphics.tile(T_SAND)                     ## désert (bas, sec)
         else
-            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)   ## plaine
+            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)   ## herbe dessus, terre sur les côtés
         end
         return
     end
@@ -173,7 +145,7 @@ func bake_chunk(cx, cz)
     for z = z0, z0 + CS - 1 do
         for x = x0, x0 + CS - 1 do
             var b = biome_at(x, z)
-            var h = height_at(x, z, b)
+            var h = height_at(x, z)
             for y = 0, h do
                 set_block_tiles(b, h, y)
                 graphics.cube(x, y, z,  1, 1, 1)
@@ -187,8 +159,10 @@ func bake_chunk(cx, cz)
                 graphics.fill(WHITE)                  ## retour opaque (arbres, colonnes suivantes)
             end
             var hash = (x * 131 + z * 197) % 100
-            var tree = (b == 2 and hash < 5) or (b == 1 and hash == 0)
-            if tree and h > SEA then
+            ## arbres uniquement sur l'herbe (au-dessus de la mer, sous la roche, hors désert)
+            var grassy = h > SEA and h < SEA + 8 and b <> 0
+            var tree = grassy and ((b == 2 and hash < 6) or hash == 0)
+            if tree then
                 graphics.tile(T_TRUNK)
                 for k = 1, 4 do
                     graphics.cube(x, h + k, z,  1, 1, 1)
@@ -249,23 +223,19 @@ func setup()
     graphics.light("dir", -0.5, -1, -0.35)
     math.noise_seed(7)
     build_atlas()                 ## génère l'atlas de textures (herbe/terre/roche/…)
-    ## spawn dégagé près de l'origine (bas, sec, sans forêt/montagne autour)
+    ## spawn sur la terre ferme basse la plus proche de l'origine (au-dessus de la mer)
     var bestd = 1000000
-    for z = 0, 48 do
-        for x = 0, 48 do
-            var b = biome_at(x, z)
-            if b <= 1 and height_at(x, z, b) > SEA and height_at(x, z, b) < SEA + 4 then
-                var open = biome_at(x + 1, z) <= 1 and biome_at(x - 1, z) <= 1
-                          and biome_at(x, z + 1) <= 1 and biome_at(x, z - 1) <= 1
-                if open then
-                    var cx = x - 24
-                    var cz = z - 24
-                    var d = cx * cx + cz * cz
-                    if d < bestd then
-                        bestd = d
-                        camX = x + 0.5
-                        camZ = z + 0.5
-                    end
+    for z = 0, 60 do
+        for x = 0, 60 do
+            var h = height_at(x, z)
+            if h > SEA and h < SEA + 4 then
+                var cx = x - 30
+                var cz = z - 30
+                var d = cx * cx + cz * cz
+                if d < bestd then
+                    bestd = d
+                    camX = x + 0.5
+                    camZ = z + 0.5
                 end
             end
         end
