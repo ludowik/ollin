@@ -26,6 +26,14 @@
 static bool s_in_3d = false;
 static unsigned int s_cur_tex3d = 0;
 
+// Atlas de tuiles (terrain voxel) : une texture en grille (cols×rows). Chaque cube
+// porte un triplet de tuiles (dessus/côté/dessous) ; le shader choisit selon la
+// normale et échantillonne l'atlas. s_cur_tile = tuiles du prochain cube (état,
+// comme fill) ; -1 = pas de tuile (couleur pleine / texture0 classique).
+static unsigned int s_atlas_texid = 0;
+static float s_atlas_grid[2] = {1.0f, 1.0f};
+static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
+
 // ── 3D ────────────────────────────────────────────────────────────────────────
 // L'affichage 3D s'appuie DIRECTEMENT sur l'API raylib (Camera3D / BeginMode3D…).
 // La caméra est une valeur de 1re classe (map) construite par graphics.camera ;
@@ -161,6 +169,7 @@ struct Bucket3D {
     unsigned int texId;
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
+    std::vector<float> tiles;    // 3 floats (top/side/bottom, -1 = aucune) par instance
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
@@ -180,11 +189,13 @@ static std::map<std::string, Model> s_model_cache;          // modèles chargés
 static bool s_recording = false;
 static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées
 static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés
+static std::vector<float> s_rec_t;    // tuiles (3 floats/instance) enregistrées
 static Mesh s_rec_mesh{};             // mesh enregistré (cube)
 struct InstGroup {
     Mesh mesh;
     unsigned int vboX;   // VBO transfos (persistant)
     unsigned int vboC;   // VBO couleurs (persistant)
+    unsigned int vboT;   // VBO tuiles (persistant, 3 floats/instance)
     int count;
 };
 static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
@@ -241,13 +252,14 @@ static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 static Shader s_lit{};
 static bool s_lit_ready = false;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
+static int s_loc_insttile = -1, s_loc_atlasgrid = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
 // VBO d'instance PERSISTANTS (transfo + couleur) : réutilisés d'une frame à
 // l'autre (mis à jour par glBufferSubData), au lieu d'être créés/détruits à
 // chaque bucket/frame. Capacités en octets ; agrandissement seulement.
-static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0;
-static int s_inst_cap_xform = 0, s_inst_cap_color = 0;
+static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0, s_inst_vbo_tile = 0;
+static int s_inst_cap_xform = 0, s_inst_cap_color = 0, s_inst_cap_tile = 0;
 
 // Crée (1re fois / agrandissement) ou met à jour un VBO d'instance ; laisse le
 // VBO lié en sortie (pour le rlSetVertexAttribute qui suit).
@@ -278,17 +290,20 @@ static void loadLitShader() {
         "in vec3 vertexNormal;\n"
         "in mat4 instanceTransform;\n"
         "in vec4 instanceColor;\n"
+        "in vec3 instanceTile;\n"
         "uniform mat4 mvp;\n"
         "out vec3 fragPosition;\n"
         "out vec2 fragTexCoord;\n"
         "out vec4 fragColor;\n"
         "out vec3 fragNormal;\n"
+        "flat out vec3 fragTile;\n"
         "void main() {\n"
         "    mat4 m = instanceTransform;\n"
         "    vec4 wp = m * vec4(vertexPosition, 1.0);\n"
         "    fragPosition = wp.xyz;\n"
         "    fragTexCoord = vertexTexCoord;\n"
         "    fragColor = instanceColor;\n"
+        "    fragTile = instanceTile;\n"
         "    mat3 nm = transpose(inverse(mat3(m)));\n"   // matrice de normale : correcte sous rotation / scale non uniforme
         "    fragNormal = normalize(nm * vertexNormal);\n"
         "    gl_Position = mvp * wp;\n"
@@ -298,14 +313,29 @@ static void loadLitShader() {
         "in vec2 fragTexCoord;\n"
         "in vec4 fragColor;\n"
         "in vec3 fragNormal;\n"
+        "flat in vec3 fragTile;\n"
         "uniform sampler2D texture0;\n"
+        "uniform vec2 atlasGrid;\n"
         "uniform vec4 ambient;\n"
         "uniform vec3 viewPos;\n"
         "struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };\n"
         "uniform Light light0;\n"
         "out vec4 finalColor;\n"
         "void main() {\n"
-        "    vec4 texel = texture(texture0, fragTexCoord);\n"
+        "    vec4 texel;\n"
+        "    if (fragTile.x >= 0.0) {\n"                 // cube d'atlas : tuile selon la face (normale)
+        "        float t = fragTile.y;\n"                //   côté par défaut
+        "        if (fragNormal.y > 0.5) t = fragTile.x;\n"   // dessus
+        "        else if (fragNormal.y < -0.5) t = fragTile.z;\n" // dessous
+        "        float cols = atlasGrid.x;\n"
+        "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
+        "        vec2 uv = fract(fragTexCoord);\n"
+        "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
+        "        vec2 auv = (cell + uv) / atlasGrid;\n"
+        "        texel = texture(texture0, auv);\n"
+        "    } else {\n"                                 // chemin classique (modèles, texture immédiate)
+        "        texel = texture(texture0, fragTexCoord);\n"
+        "    }\n"
         "    vec4 tint = fragColor;\n"
         "    vec3 base = (texel * tint).rgb;\n"
         "    vec3 normal = normalize(fragNormal);\n"
@@ -329,6 +359,8 @@ static void loadLitShader() {
         s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] = GetShaderLocationAttrib(s_lit, "instanceTransform");
     }
     s_loc_instcolor = GetShaderLocationAttrib(s_lit, "instanceColor");
+    s_loc_insttile = GetShaderLocationAttrib(s_lit, "instanceTile");
+    s_loc_atlasgrid = GetShaderLocation(s_lit, "atlasGrid");
     s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
     s_loc_ambient = GetShaderLocation(s_lit, "ambient");
     s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
@@ -348,7 +380,7 @@ static Bucket3D& bucketFor(const Mesh& mesh, unsigned int texId) {
             return b;
         }
     }
-    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, {}, {}});
+    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, {}, {}, {}});
     return s_buckets.back();
 }
 
@@ -365,6 +397,9 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
         s_rec_c.push_back(col.g / 255.0f);
         s_rec_c.push_back(col.b / 255.0f);
         s_rec_c.push_back(col.a / 255.0f);
+        s_rec_t.push_back(s_cur_tile[0]);
+        s_rec_t.push_back(s_cur_tile[1]);
+        s_rec_t.push_back(s_cur_tile[2]);
         return;
     }
     Bucket3D& b = bucketFor(mesh, texId);
@@ -379,6 +414,9 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
     b.colors.push_back(col.g / 255.0f);
     b.colors.push_back(col.b / 255.0f);
     b.colors.push_back(col.a / 255.0f);
+    b.tiles.push_back(s_cur_tile[0]);
+    b.tiles.push_back(s_cur_tile[1]);
+    b.tiles.push_back(s_cur_tile[2]);
 }
 
 // Active le shader lit et pose les uniforms du frame (MVP = view·proj figée au
@@ -411,12 +449,15 @@ static bool litBeginDraw() {
     float lt[3] = {s_light_tgt.x, s_light_tgt.y, s_light_tgt.z};
     rlSetUniform(s_loc_l_tgt, lt, RL_SHADER_UNIFORM_VEC3, 1);
     rlSetUniform(s_loc_l_col, s_light_col, RL_SHADER_UNIFORM_VEC4, 1);
+    if (s_loc_atlasgrid >= 0) {
+        rlSetUniform(s_loc_atlasgrid, s_atlas_grid, RL_SHADER_UNIFORM_VEC2, 1);
+    }
     return true;
 }
 
 // Attache les attributs d'instance (transfo mat4 = 4 vec4, puis couleur vec4,
 // divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
-static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int vboC) {
+static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int vboC, unsigned int vboT) {
     rlEnableVertexArray(vaoId);
     rlEnableVertexBuffer(vboX);
     int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
@@ -430,6 +471,12 @@ static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int
         rlEnableVertexAttribute(s_loc_instcolor);
         rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
         rlSetVertexAttributeDivisor(s_loc_instcolor, 1);
+    }
+    if (s_loc_insttile >= 0 && vboT != 0) {
+        rlEnableVertexBuffer(vboT);
+        rlEnableVertexAttribute(s_loc_insttile);
+        rlSetVertexAttribute(s_loc_insttile, 3, RL_FLOAT, 0, 0, 0);
+        rlSetVertexAttributeDivisor(s_loc_insttile, 1);
     }
     rlDisableVertexBuffer();
     rlDisableVertexArray();
@@ -480,6 +527,12 @@ static void flushBucket(const Bucket3D& b) {
         rlEnableVertexAttribute(s_loc_instcolor);
         rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
         rlSetVertexAttributeDivisor(s_loc_instcolor, 1);
+    }
+    uploadInstanceVBO(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
+    if (s_loc_insttile >= 0) {
+        rlEnableVertexAttribute(s_loc_insttile);
+        rlSetVertexAttribute(s_loc_insttile, 3, RL_FLOAT, 0, 0, 0);
+        rlSetVertexAttributeDivisor(s_loc_insttile, 1);
     }
     rlDisableVertexBuffer();
     rlDisableVertexArray();
@@ -532,11 +585,15 @@ void reset3dGraphicsState() {
         if (g.vboC) {
             rlUnloadVertexBuffer(g.vboC);
         }
+        if (g.vboT) {
+            rlUnloadVertexBuffer(g.vboT);
+        }
     }
     s_groups.clear();
     s_recording = false;
     s_rec_x.clear();
     s_rec_c.clear();
+    s_rec_t.clear();
     if (s_white_ready) {
         UnloadTexture(s_white_tex);
         s_white_tex = Texture2D{};
@@ -552,9 +609,20 @@ void reset3dGraphicsState() {
         s_inst_vbo_color = 0;
         s_inst_cap_color = 0;
     }
+    if (s_inst_vbo_tile != 0) {
+        rlUnloadVertexBuffer(s_inst_vbo_tile);
+        s_inst_vbo_tile = 0;
+        s_inst_cap_tile = 0;
+    }
     s_buckets.clear();
     s_in_3d = false;
     s_cur_tex3d = 0;
+    s_atlas_texid = 0;
+    s_atlas_grid[0] = 1.0f;
+    s_atlas_grid[1] = 1.0f;
+    s_cur_tile[0] = -1.0f;
+    s_cur_tile[1] = -1.0f;
+    s_cur_tile[2] = -1.0f;
 }
 
 static void flush3dBuckets() {
@@ -756,6 +824,40 @@ static Value gfx_no_texture(Value* args, int argc) {
     (void)args;
     (void)argc;
     s_cur_tex3d = 0;
+    return Value{};
+}
+
+// graphics.tileset(img, cols, rows) : déclare l'atlas de tuiles (terrain voxel).
+// Une seule texture en grille, échantillonnée par tuile selon la face du cube.
+static Value gfx_tileset(Value* args, int argc) {
+    if (argc > 0 && args[0].isMap()) {
+        Value idv = args[0].mapGet(Value(std::string("id")));
+        s_atlas_texid = idv.isInteger() ? image_gl_texid((int)idv.asInt()) : 0;
+    }
+    s_atlas_grid[0] = argc > 1 ? (float)numArg(args, argc, 1, "graphics.tileset") : 1.0f;
+    s_atlas_grid[1] = argc > 2 ? (float)numArg(args, argc, 2, "graphics.tileset") : 1.0f;
+    if (s_atlas_texid != 0) {
+        // pixels nets (look voxel) : filtrage NEAREST, pas de mipmap.
+        rlTextureParameters(s_atlas_texid, RL_TEXTURE_MAG_FILTER, RL_TEXTURE_FILTER_NEAREST);
+        rlTextureParameters(s_atlas_texid, RL_TEXTURE_MIN_FILTER, RL_TEXTURE_FILTER_NEAREST);
+    }
+    return Value{};
+}
+
+// graphics.tiles(top, side, bottom) : tuiles du prochain cube (état, comme fill).
+static Value gfx_tiles(Value* args, int argc) {
+    s_cur_tile[0] = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tiles") : -1.0f;
+    s_cur_tile[1] = argc > 1 ? (float)numArg(args, argc, 1, "graphics.tiles") : s_cur_tile[0];
+    s_cur_tile[2] = argc > 2 ? (float)numArg(args, argc, 2, "graphics.tiles") : s_cur_tile[1];
+    return Value{};
+}
+
+// graphics.tile(t) : même tuile sur les 6 faces (raccourci). tile(-1) = aucune.
+static Value gfx_tile(Value* args, int argc) {
+    float t = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tile") : -1.0f;
+    s_cur_tile[0] = t;
+    s_cur_tile[1] = t;
+    s_cur_tile[2] = t;
     return Value{};
 }
 
@@ -1047,6 +1149,7 @@ static Value gfx_begin_chunk(Value* args, int argc) {
     s_recording = true;
     s_rec_x.clear();
     s_rec_c.clear();
+    s_rec_t.clear();
     return Value{};
 }
 
@@ -1066,10 +1169,12 @@ static Value gfx_end_chunk(Value* args, int argc) {
         }
         g.vboX = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
         g.vboC = rlLoadVertexBuffer(s_rec_c.data(), g.count * 4 * (int)sizeof(float), false);
+        g.vboT = rlLoadVertexBuffer(s_rec_t.data(), g.count * 3 * (int)sizeof(float), false);
     }
     s_groups.push_back(g);
     s_rec_x.clear();
     s_rec_c.clear();
+    s_rec_t.clear();
     Value h = Value::makeMap();
     h.mapSet(Value(std::string("id")), Value((int64_t)s_groups.size()));
     h.mapSet(Value(std::string("count")), Value((int64_t)g.count));
@@ -1097,8 +1202,9 @@ static Value gfx_draw_chunk(Value* args, int argc) {
     if (!litBeginDraw()) {
         return Value{};
     }
-    litBindInstances(g.mesh.vaoId, g.vboX, g.vboC);
-    litDrawInstanced(g.mesh, 0, g.count);   // texId 0 → texture blanche (couleur par instance)
+    litBindInstances(g.mesh.vaoId, g.vboX, g.vboC, g.vboT);
+    // Atlas lié si déclaré (tuiles≥0 échantillonnent l'atlas) ; sinon blanc (couleur pleine).
+    litDrawInstanced(g.mesh, s_atlas_texid, g.count);
     rlDisableShader();
     return Value{};
 }
@@ -1127,6 +1233,10 @@ static Value gfx_free_chunk(Value* args, int argc) {
         rlUnloadVertexBuffer(g.vboC);
         g.vboC = 0;
     }
+    if (g.vboT) {
+        rlUnloadVertexBuffer(g.vboT);
+        g.vboT = 0;
+    }
     g.count = 0;
     return Value{};
 }
@@ -1134,6 +1244,9 @@ static Value gfx_free_chunk(Value* args, int argc) {
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
 void reset3dFrameState() {
     s_cur_tex3d = 0;
+    s_cur_tile[0] = -1.0f;
+    s_cur_tile[1] = -1.0f;
+    s_cur_tile[2] = -1.0f;
 }
 
 // Texture 3D courante — exposée pour la sauvegarde/restauration de style (push/pushStyle).
@@ -1153,6 +1266,9 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("light")), Value::makeBuiltin(gfx_light));
     m.mapSet(Value(std::string("texture")), Value::makeBuiltin(gfx_texture));
     m.mapSet(Value(std::string("noTexture")), Value::makeBuiltin(gfx_no_texture));
+    m.mapSet(Value(std::string("tileset")), Value::makeBuiltin(gfx_tileset));
+    m.mapSet(Value(std::string("tiles")), Value::makeBuiltin(gfx_tiles));
+    m.mapSet(Value(std::string("tile")), Value::makeBuiltin(gfx_tile));
     m.mapSet(Value(std::string("grid")), Value::makeBuiltin(gfx_grid));
     m.mapSet(Value(std::string("cube")), Value::makeBuiltin(gfx_cube));
     m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));

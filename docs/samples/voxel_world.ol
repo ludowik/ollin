@@ -26,19 +26,55 @@ global touching = false
 global tx = 0
 global ty = 0
 
-## palette
 global C_SKY   = Color(0.55, 0.80, 0.95)
-global C_SAND  = Color(0.86, 0.79, 0.53)
-global C_SANDD = Color(0.72, 0.63, 0.40)
-global C_GRASS = Color(0.45, 0.70, 0.30)
-global C_FOREST= Color(0.24, 0.52, 0.22)
-global C_ROCK  = Color(0.47, 0.46, 0.45)
-global C_SNOW  = Color(0.97, 0.98, 1.0)
-global C_DIRT  = Color(0.46, 0.33, 0.20)
-global C_STONE = Color(0.36, 0.36, 0.40)
-global C_WATER = Color(0.20, 0.45, 0.80)
-global C_TRUNK = Color(0.40, 0.26, 0.13)
-global C_LEAF  = Color(0.18, 0.42, 0.16)
+global WHITE   = Color(1, 1, 1)
+
+## Atlas de tuiles (grille 4×4 de tuiles 16×16 px). Chaque cube porte un triplet
+## de tuiles (dessus/côté/dessous) ; le shader échantillonne l'atlas par face.
+global TILE = 16
+global ACOLS = 4
+global AROWS = 4
+global atlas = nil
+global T_GRASS = 0
+global T_DIRT  = 1
+global T_SAND  = 2
+global T_ROCK  = 3
+global T_SNOW  = 4
+global T_WATER = 5
+global T_TRUNK = 6
+global T_LEAF  = 7
+global T_STONE = 8
+global T_SANDD = 9
+
+## Remplit une tuile de l'atlas : couleur de base + mouchetis (bruit) → matière.
+func put_tile(idx, br, bg, bb, jit)
+    var cx = (idx % ACOLS) * TILE
+    var cy = math.floor(idx / ACOLS) * TILE
+    for py = 0, TILE - 1 do
+        for px = 0, TILE - 1 do
+            var n = (math.noise((cx + px) * 1.7 + 9, (cy + py) * 1.7 + 9) - 0.5) * 2 * jit
+            image.set_pixel(atlas, cx + px, cy + py,
+                math.clamp(br + n, 0, 1), math.clamp(bg + n, 0, 1), math.clamp(bb + n, 0, 1), 1)
+        end
+    end
+end
+
+func build_atlas()
+    atlas = image.create(ACOLS * TILE, AROWS * TILE)
+    image.begin_pixels(atlas)
+    put_tile(T_GRASS, 0.42, 0.68, 0.30, 0.10)
+    put_tile(T_DIRT,  0.46, 0.33, 0.20, 0.10)
+    put_tile(T_SAND,  0.86, 0.79, 0.53, 0.07)
+    put_tile(T_ROCK,  0.47, 0.46, 0.45, 0.13)
+    put_tile(T_SNOW,  0.95, 0.97, 1.00, 0.05)
+    put_tile(T_WATER, 0.20, 0.45, 0.80, 0.10)
+    put_tile(T_TRUNK, 0.40, 0.26, 0.13, 0.12)
+    put_tile(T_LEAF,  0.18, 0.42, 0.16, 0.16)
+    put_tile(T_STONE, 0.36, 0.36, 0.40, 0.11)
+    put_tile(T_SANDD, 0.72, 0.63, 0.40, 0.08)
+    image.end_pixels(atlas)
+    graphics.tileset(atlas, ACOLS, AROWS)
+end
 
 func biome_at(x, z)
     var b = math.noise(x * 0.026 + 50, z * 0.026 + 50)
@@ -90,27 +126,37 @@ func ground(x, z)
     return math.max(height_at(ix, iz, b), SEA)
 end
 
-func block_color(b, h, y)
+## Fixe les tuiles (dessus/côté/dessous) du bloc courant selon biome/altitude.
+func set_block_tiles(b, h, y)
     if y >= h then
-        if h < SEA then return C_SAND end   ## fond marin (sous la mer) → sable
-        switch b
-        case 0
-            return C_SAND                   ## désert
-        case 2
-            return C_FOREST                 ## forêt
-        case 3
-            if h >= SEA + 13 then return C_SNOW end
-            if h >= SEA + 5 then return C_ROCK end
-            return C_GRASS                  ## montagne : neige/roche/herbe selon altitude
+        if h < SEA then
+            graphics.tile(T_SAND)                     ## fond marin → sable
+        elseif b == 0 then
+            graphics.tile(T_SAND)                     ## désert
+        elseif b == 2 then
+            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)   ## forêt : herbe dessus, terre côtés
+        elseif b == 3 then
+            if h >= SEA + 13 then
+                graphics.tiles(T_SNOW, T_SNOW, T_ROCK)   ## sommet enneigé
+            elseif h >= SEA + 5 then
+                graphics.tile(T_ROCK)                    ## roche
+            else
+                graphics.tiles(T_GRASS, T_DIRT, T_DIRT)  ## base herbeuse
+            end
         else
-            return C_GRASS                  ## plaine
+            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)   ## plaine
         end
+        return
     end
     if y >= h - 2 then
-        if b == 0 then return C_SANDD end
-        return C_DIRT
+        if b == 0 then
+            graphics.tile(T_SANDD)                    ## sous-sol désert
+        else
+            graphics.tile(T_DIRT)
+        end
+        return
     end
-    return C_STONE
+    graphics.tile(T_STONE)                            ## roche profonde
 end
 
 func ckey(cx, cz)
@@ -120,6 +166,7 @@ end
 ## Génère + cuit le chunk (cx,cz) depuis le bruit → handle persistant.
 func bake_chunk(cx, cz)
     graphics.beginChunk()
+    graphics.fill(WHITE)          ## teinte neutre : l'atlas fournit la couleur
     var x0 = cx * CS
     var z0 = cz * CS
     for z = z0, z0 + CS - 1 do
@@ -127,11 +174,11 @@ func bake_chunk(cx, cz)
             var b = biome_at(x, z)
             var h = height_at(x, z, b)
             for y = 0, h do
-                graphics.fill(block_color(b, h, y))
+                set_block_tiles(b, h, y)
                 graphics.cube(x, y, z,  1, 1, 1)
             end
             if h < SEA then
-                graphics.fill(C_WATER)
+                graphics.tile(T_WATER)
                 for wy = h + 1, SEA do
                     graphics.cube(x, wy, z,  1, 1, 1)
                 end
@@ -139,11 +186,11 @@ func bake_chunk(cx, cz)
             var hash = (x * 131 + z * 197) % 100
             var tree = (b == 2 and hash < 5) or (b == 1 and hash == 0)
             if tree and h > SEA then
-                graphics.fill(C_TRUNK)
+                graphics.tile(T_TRUNK)
                 for k = 1, 4 do
                     graphics.cube(x, h + k, z,  1, 1, 1)
                 end
-                graphics.fill(C_LEAF)
+                graphics.tile(T_LEAF)
                 for ly = 4, 5 do
                     for lx = -1, 1 do
                         for lz = -1, 1 do
@@ -198,6 +245,7 @@ func setup()
     graphics.ambient(0.5)
     graphics.light("dir", -0.5, -1, -0.35)
     math.noise_seed(7)
+    build_atlas()                 ## génère l'atlas de textures (herbe/terre/roche/…)
     ## spawn dégagé près de l'origine (bas, sec, sans forêt/montagne autour)
     var bestd = 1000000
     for z = 0, 48 do
