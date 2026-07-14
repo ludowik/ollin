@@ -21,10 +21,13 @@ global PITCH = -0.12
 global lastcx = 999999
 global lastcz = 999999
 
-## commande par zones
+## commande analogique (joystick ancré en bas-centre de la zone)
 global touching = false
 global tx = 0
 global ty = 0
+global TURN_MAX = 1.8      ## rad/s à l'inclinaison horizontale maximale
+global SPEED_MAX = 8.0     ## blocs/s à la poussée verticale maximale
+global DEAD = 0.06         ## zone morte du virage (près du centre = tout droit)
 
 global C_SKY   = Color(0.55, 0.80, 0.95)
 global WHITE   = Color(1, 1, 1)
@@ -262,8 +265,17 @@ end
 func turn_y()
     return H * 0.66           ## haut de la zone de commande
 end
-func adv_y()
-    return H * 0.78           ## séparation : au-dessus = avancer, en-dessous = tourner
+## virage ∈ [-1;1] : distance horizontale du doigt au MILIEU (zone morte au centre)
+func steer()
+    var s = (tx - W / 2) / (W / 2)
+    if s > 0 - DEAD and s < DEAD then
+        return 0.0
+    end
+    return math.clamp(s, -1.0, 1.0)
+end
+## poussée ∈ [0;1] : distance verticale du doigt AU-DESSUS du bas de la zone
+func throttle()
+    return math.clamp((H - ty) / (H - turn_y()), 0.0, 1.0)
 end
 func mouse.pressed(x, y)
     touching = true
@@ -280,48 +292,35 @@ end
 
 func draw_hud(shown)
     var y0 = turn_y()
-    var ya = adv_y()
-    graphics.fill(Color(1, 1, 1, 0.08))
+    var ax = W / 2            ## ancre horizontale = centre (tout droit)
+    ## fond de la zone de commande
+    graphics.fill(Color(1, 1, 1, 0.06))
     graphics.rect(0, y0, W, H - y0)
-    ## surbrillance active (les tuiles se superposent : haut+côté = avancer EN tournant)
-    var dead = W * 0.15
+    ## axe central (tout droit) + repère du niveau bas (vitesse nulle)
+    graphics.fill(Color(1, 1, 1, 0.14))
+    graphics.rect(ax - 1, y0, 2, H - y0)
+    ## poignée du joystick : suit le doigt, dosage visible (distance = intensité)
     if touching and ty >= y0 then
-        graphics.fill(Color(0.5, 0.6, 1.0, 0.22))
-        if ty < ya then
-            graphics.rect(0, y0, W, ya - y0)          ## avancer
-        end
-        if tx < W / 2 - dead then
-            graphics.rect(0, y0, W / 2, H - y0)       ## tourner à gauche (toute la bande)
-        end
-        if tx > W / 2 + dead then
-            graphics.rect(W / 2, y0, W / 2, H - y0)   ## tourner à droite (toute la bande)
-        end
+        graphics.stroke(Color(1, 1, 1, 0.45))
+        graphics.line(ax, H - 4, tx, ty)     ## ancre bas-centre → doigt
+        graphics.noStroke()
+        graphics.fill(Color(0.45, 0.65, 1.0, 0.85))
+        graphics.circle(tx, ty, 20)
     end
-    ## séparateurs
-    graphics.fill(Color(1, 1, 1, 0.22))
-    graphics.rect(0, ya - 1, W, 2)
-    graphics.rect(W / 2 - 1, y0, 2, H - y0)
-    graphics.draw_text("AVANCER", W / 2 - 42, y0 + (ya - y0) / 2 - 9, 18, colors.WHITE)
-    graphics.draw_text("GAUCHE", 22, ya + (H - ya) / 2 - 9, 18, colors.WHITE)
-    graphics.draw_text("DROITE", W - 92, ya + (H - ya) / 2 - 9, 18, colors.WHITE)
+    graphics.draw_text("<  tourner  >", ax - 52, H - 24, 16, colors.WHITE)
+    graphics.draw_text("avancer (haut)", 16, y0 + 8, 16, colors.WHITE)
     graphics.draw_text("chunks affichés " + shown, 12, 12, 15, colors.WHITE)
 end
 
 func draw()
     graphics.clear(C_SKY)
     if touching and ty >= turn_y() then
-        var turn = 0.8 * deltaTime       ## rotation plus lente
-        var sp = 5 * deltaTime           ## avance plus lente
-        var dead = W * 0.15              ## zone morte centrale = tout droit
-        ## tourner : côté gauche/droit de TOUTE la bande → on peut avancer EN tournant
-        if tx < W / 2 - dead then
-            yaw = yaw + turn             ## gauche = tourner à gauche
-        end
-        if tx > W / 2 + dead then
-            yaw = yaw - turn             ## droite = tourner à droite
-        end
-        ## avancer : haut de la zone (glissement : franchit les pentes, bute sur les murs)
-        if ty < adv_y() then
+        ## analogique : virage dosé par la distance au centre, vitesse par la
+        ## distance au bas de la zone (steer < 0 = gauche → yaw augmente).
+        yaw = yaw - steer() * TURN_MAX * deltaTime
+        var sp = throttle() * SPEED_MAX * deltaTime
+        if sp > 0 then
+            ## avance avec glissement (franchit les pentes, bute sur les murs)
             var nx = camX + math.sin(yaw) * sp
             var nz = camZ + math.cos(yaw) * sp
             var g0 = ground(camX, camZ)
