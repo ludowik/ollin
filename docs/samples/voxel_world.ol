@@ -179,11 +179,11 @@ func bake_chunk(cx, cz)
                 graphics.cube(x, y, z,  1, 1, 1)
             end
             if h < SEA then
+                ## surface d'eau = UN plan au niveau de la mer (pas une pile de cubes) :
+                ## surface continue, semi-transparente → on voit le fond, sans faces internes.
                 graphics.tile(T_WATER)
-                graphics.fill(Color(1, 1, 1, 0.7))    ## eau semi-transparente (voir le fond)
-                for wy = h + 1, SEA do
-                    graphics.cube(x, wy, z,  1, 1, 1)
-                end
+                graphics.fill(Color(1, 1, 1, 0.72))
+                graphics.plane(x, SEA + 0.45, z,  1, 1)
                 graphics.fill(WHITE)                  ## retour opaque (arbres, colonnes suivantes)
             end
             var hash = (x * 131 + z * 197) % 100

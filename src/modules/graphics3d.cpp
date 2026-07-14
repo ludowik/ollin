@@ -191,10 +191,11 @@ static bool s_recording = false;
 static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées (OPAQUE)
 static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés (OPAQUE)
 static std::vector<float> s_rec_t;    // tuiles (3 floats/instance) enregistrées (OPAQUE)
-static std::vector<Matrix> s_rec_xw;  // idem, cubes TRANSPARENTS (alpha < 1, ex. eau)
+static std::vector<Matrix> s_rec_xw;  // idem, instances TRANSPARENTES (alpha < 1, ex. eau)
 static std::vector<float> s_rec_cw;
 static std::vector<float> s_rec_tw;
-static Mesh s_rec_mesh{};             // mesh enregistré (cube)
+static Mesh s_rec_mesh{};             // mesh enregistré, groupe OPAQUE (cube)
+static Mesh s_rec_mesh_w{};           // mesh enregistré, groupe TRANSPARENT (ex. plane pour l'eau)
 struct InstGroup {
     Mesh mesh;
     unsigned int vboX;   // VBO transfos (persistant)
@@ -399,10 +400,10 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
         // Mode enregistrement (beginChunk) : on cuit la transfo LOCALE (monde) et la
         // couleur ; texId ignoré (groupe cuit = texture blanche + couleur par instance).
         (void)texId;
-        s_rec_mesh = mesh;
         Matrix rm = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
         // Routage OPAQUE vs TRANSPARENT selon l'alpha de la couleur (eau = alpha<1).
         if (col.a < 250) {
+            s_rec_mesh_w = mesh;
             s_rec_xw.push_back(rm);
             s_rec_cw.push_back(col.r / 255.0f);
             s_rec_cw.push_back(col.g / 255.0f);
@@ -413,6 +414,7 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
             s_rec_tw.push_back(s_cur_tile[2]);
             return;
         }
+        s_rec_mesh = mesh;
         s_rec_x.push_back(rm);
         s_rec_c.push_back(col.r / 255.0f);
         s_rec_c.push_back(col.g / 255.0f);
@@ -1195,10 +1197,10 @@ static Value gfx_begin_chunk(Value* args, int argc) {
 }
 
 // Construit un InstGroup (VBO persistants) depuis des vecteurs d'instances cuits.
-static InstGroup buildGroup(const std::vector<Matrix>& xs, const std::vector<float>& cs,
+static InstGroup buildGroup(const Mesh& mesh, const std::vector<Matrix>& xs, const std::vector<float>& cs,
                             const std::vector<float>& ts) {
     InstGroup g{};
-    g.mesh = s_rec_mesh;
+    g.mesh = mesh;
     g.count = (int)xs.size();
     if (g.count > 0) {
         std::vector<float16> xf(g.count);
@@ -1220,8 +1222,8 @@ static Value gfx_end_chunk(Value* args, int argc) {
     (void)args;
     (void)argc;
     s_recording = false;
-    InstGroup g = buildGroup(s_rec_x, s_rec_c, s_rec_t);
-    InstGroup w = buildGroup(s_rec_xw, s_rec_cw, s_rec_tw);
+    InstGroup g = buildGroup(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t);
+    InstGroup w = buildGroup(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw);
     s_groups.push_back(g);
     int idO = (int)s_groups.size();
     s_groups.push_back(w);
