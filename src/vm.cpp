@@ -208,12 +208,9 @@ static Value builtin_time(Value* args, int argc) {
     return Value(std::chrono::duration<double>(now.time_since_epoch()).count());
 }
 
-// mem() : octets de tas actuellement utilisés par le process (valeurs Ollin +
-// runtime + libs). Renvoie un entier. Par plateforme : octets « in use » de
+// Mémoire tas en cours d'usage (octets) — par plateforme : octets « in use » de
 // l'allocateur (WASM/macOS/glibc) ou working set (Windows) ; 0 si indisponible.
-static Value builtin_mem(Value* args, int argc) {
-    (void)args;
-    (void)argc;
+uint64_t ollinHeapBytes() {
     uint64_t bytes = 0;
 #if defined(__EMSCRIPTEN__)
     struct mallinfo mi = mallinfo();            // uordblks (arène) + hblkhd (blocs mmap)
@@ -230,7 +227,15 @@ static Value builtin_mem(Value* args, int argc) {
     if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
         bytes = (uint64_t)pmc.WorkingSetSize;
 #endif
-    return Value((int64_t)bytes);
+    return bytes;
+}
+
+// mem() : octets de tas actuellement utilisés par le process (valeurs Ollin +
+// runtime + libs). Renvoie un entier.
+static Value builtin_mem(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    return Value((int64_t)ollinHeapBytes());
 }
 
 static int64_t range_len(const Range* r) {

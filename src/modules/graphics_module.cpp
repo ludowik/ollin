@@ -680,7 +680,10 @@ static void drawFpsOverlay() {
         s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
     }
     int fps = (int)(s_fps_ema + 0.5);
-    const char* buf = TextFormat("FPS: %d", fps);
+    // Mémoire utilisée à côté du FPS (Ko sous 1 Mo, sinon Mo).
+    double kb = ollinHeapBytes() / 1024.0;
+    const char* buf = (kb >= 1024.0) ? TextFormat("%.1f Mo  FPS: %d", kb / 1024.0, fps)
+                                     : TextFormat("%.0f Ko  FPS: %d", kb, fps);
     const int size = 16, margin = 8;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;

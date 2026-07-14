@@ -1,5 +1,6 @@
 #pragma once
 #include "chunk.h"
+#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -7,6 +8,10 @@
 #include <vector>
 
 std::string valueToString(const Value& v);
+
+// Mémoire tas en cours d'usage (octets), multi-plateforme. Base de la builtin mem()
+// et de l'overlay mémoire du moteur graphique.
+uint64_t ollinHeapBytes();
 
 class VM {
   public:
