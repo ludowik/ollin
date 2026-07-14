@@ -1,6 +1,14 @@
 # Ollin — Scripting Language
 > Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable
 
+## Collaboration
+
+Avant d'agir, délimiter le périmètre exact de la demande. Si plusieurs
+interprétations raisonnables divergent — surtout si l'une déborde de la cible —
+poser une question de clarification **brève** avant de coder ; ne pas deviner
+large. Ne modifier que ce qui est demandé (pas de refactor/nettoyage collatéral
+non sollicité). Agir sans confirmation seulement si l'intention est univoque.
+
 ## Règle obligatoire : écrire du code Ollin
 
 Avant d'écrire **tout** fichier `.ol`, lire dans cet ordre :
