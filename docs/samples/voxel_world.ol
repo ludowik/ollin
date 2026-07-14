@@ -23,6 +23,7 @@ global lastcz = 999999
 
 ## commande analogique (joystick ancré en bas-centre de la zone)
 global touching = false
+global ctrl = false        ## vrai si le doigt a été posé DANS la zone (reste actif s'il en sort)
 global tx = 0
 global ty = 0
 global TURN_MAX = 1.8      ## rad/s à l'inclinaison horizontale maximale
@@ -279,11 +280,13 @@ func throttle()
 end
 func mouse.pressed(x, y)
     touching = true
+    ctrl = y >= turn_y()      ## contrôle armé seulement si on démarre dans la zone…
     tx = x
     ty = y
 end
 func mouse.released(x, y)
     touching = false
+    ctrl = false              ## …et désarmé au relâchement (même si le doigt était sorti)
 end
 func mouse.moved(x, y)
     tx = x
@@ -300,7 +303,7 @@ func draw_hud(shown)
     graphics.fill(Color(1, 1, 1, 0.14))
     graphics.rect(ax - 1, y0, 2, H - y0)
     ## poignée du joystick : suit le doigt, dosage visible (distance = intensité)
-    if touching and ty >= y0 then
+    if ctrl then
         graphics.stroke(Color(1, 1, 1, 0.45))
         graphics.line(ax, H - 4, tx, ty)     ## ancre bas-centre → doigt
         graphics.noStroke()
@@ -312,9 +315,10 @@ end
 
 func draw()
     graphics.clear(C_SKY)
-    if touching and ty >= turn_y() then
+    if ctrl then
         ## analogique : virage dosé par la distance au centre, vitesse par la
         ## distance au bas de la zone (steer < 0 = gauche → yaw augmente).
+        ## Reste actif même si le doigt sort de la zone → throttle clampé à 1 = vitesse max.
         yaw = yaw - steer() * TURN_MAX * deltaTime
         var sp = throttle() * SPEED_MAX * deltaTime
         if sp > 0 then
