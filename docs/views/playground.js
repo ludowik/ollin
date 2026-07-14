@@ -1033,16 +1033,16 @@ newFileBtn.addEventListener('click', newFile)
 // ── bascule de la barre latérale (état mémorisé) ──
 const railToggle = document.getElementById('rail-toggle')
 const fileRailEl = document.getElementById('file-rail')
-const RAIL_KEY   = 'ollin-pg-rail'
+// La barre des fichiers démarre TOUJOURS fermée à l'ouverture de l'éditeur ;
+// le bouton l'ouvre/ferme pour la session en cours (pas de déploiement par défaut).
+let railHidden = true
 function applyRail() {
-  const hidden = localStorage.getItem(RAIL_KEY) === 'hidden'
-  fileRailEl.style.display = hidden ? 'none' : ''
-  railToggle.classList.toggle('active', !hidden)
-  railToggle.setAttribute('aria-pressed', String(!hidden))
+  fileRailEl.style.display = railHidden ? 'none' : ''
+  railToggle.classList.toggle('active', !railHidden)
+  railToggle.setAttribute('aria-pressed', String(!railHidden))
 }
 railToggle.addEventListener('click', () => {
-  const hidden = localStorage.getItem(RAIL_KEY) === 'hidden'
-  localStorage.setItem(RAIL_KEY, hidden ? 'shown' : 'hidden')
+  railHidden = !railHidden
   applyRail()
 })
 applyRail()
