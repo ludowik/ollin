@@ -9,7 +9,8 @@
 import "joystick.ol"       ## classe Joystick (contrôle analogique)
 
 global CS = 16             ## côté d'un chunk
-global VIEW = 4            ## rayon de chunks chargés (9×9 autour du joueur)
+global RES = 0.5           ## taille d'un cube (définition) : 0.5 = terrain 2× plus fin
+global VIEW = 2            ## rayon de chunks chargés (réduit : cubes 0.5 = ×8 de géométrie)
 global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
 global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
@@ -100,14 +101,17 @@ func elevation(x, z)
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-## Hauteur du terrain : fonction CONTINUE de la position. Centrée (≈13% sous la
-## mer), amplitude étalée sur de larges reliefs → collines/vallées douces.
+## Hauteur du terrain : fonction CONTINUE de la position, quantifiée au pas RES
+## (marches de la taille d'un cube). Centrée (≈13% sous la mer), reliefs doux.
 func height_at(x, z)
-    return math.floor((elevation(x, z) - 0.42) * 60 + SEA)
+    var raw = (elevation(x, z) - 0.42) * 60 + SEA
+    return math.floor(raw / RES) * RES
 end
 
 func ground(x, z)
-    return math.max(height_at(math.floor(x), math.floor(z)), SEA)
+    var qx = math.floor(x / RES) * RES
+    var qz = math.floor(z / RES) * RES
+    return math.max(height_at(qx, qz), SEA)
 end
 
 ## Fixe les tuiles (dessus/côté/dessous) selon l'ALTITUDE (logique : plage → herbe
@@ -148,40 +152,47 @@ func bake_chunk(cx, cz)
     graphics.fill(WHITE)          ## teinte neutre : l'atlas fournit la couleur
     var x0 = cx * CS
     var z0 = cz * CS
-    for z = z0, z0 + CS - 1 do
-        for x = x0, x0 + CS - 1 do
-            var b = biome_at(x, z)
-            var h = height_at(x, z)
-            for y = 0, math.max(h, 0) do   ## au moins un fond (y=0) même si h<0 → pas de trou sous l'eau
+    var n = math.floor(CS / RES)      ## sous-cellules par axe (16 / 0.5 = 32)
+    for iz = 0, n - 1 do
+        for ix = 0, n - 1 do
+            var wx = x0 + ix * RES
+            var wz = z0 + iz * RES
+            var b = biome_at(wx, wz)
+            var h = height_at(wx, wz)
+            for y = 0, math.max(h, 0), RES do   ## colonne de cubes RES (fond à y=0 même si h<0)
                 set_block_tiles(b, h, y)
-                graphics.cube(x, y, z,  1, 1, 1)
+                graphics.cube(wx + RES / 2, y + RES / 2, wz + RES / 2,  RES, RES, RES)
             end
             if h < SEA then
                 ## surface d'eau = UN plan au niveau de la mer (pas une pile de cubes) :
                 ## surface continue, semi-transparente → on voit le fond, sans faces internes.
                 graphics.tile(T_WATER)
                 graphics.fill(Color(1, 1, 1, 0.72))
-                graphics.plane(x, SEA + 0.45, z,  1, 1)
+                graphics.plane(wx + RES / 2, SEA + 0.45, wz + RES / 2,  RES, RES)
                 graphics.fill(WHITE)                  ## retour opaque (arbres, colonnes suivantes)
             end
-            var hash = math.abs(x * 131 + z * 197) % 100    ## abs : % signé sinon ~53% (au lieu de 6%)
-            ## arbres uniquement sur l'herbe (au-dessus de la mer, sous la roche, hors désert)
-            var grassy = h > SEA and h < SEA + 8 and b <> 0
-            var tree = grassy and ((b == 2 and hash < 6) or hash == 0)
-            if tree then
-                graphics.tile(T_TRUNK)
-                for k = 1, 4 do
-                    graphics.cube(x, h + k, z,  1, 1, 1)
-                end
-                graphics.tile(T_LEAF)
-                for ly = 4, 5 do
-                    for lx = -1, 1 do
-                        for lz = -1, 1 do
-                            graphics.cube(x + lx, h + ly, z + lz,  1, 1, 1)
+            ## arbres : seulement sur les cellules à coords ENTIÈRES (densité ~1/unité,
+            ## sinon ×4 d'arbres) ; cubes de taille 1 (troncs/feuillage lisibles).
+            var onGrid = wx == math.floor(wx) and wz == math.floor(wz)
+            if onGrid then
+                var hash = math.abs(math.floor(wx) * 131 + math.floor(wz) * 197) % 100
+                var grassy = h > SEA and h < SEA + 8 and b <> 0
+                var tree = grassy and ((b == 2 and hash < 6) or hash == 0)
+                if tree then
+                    graphics.tile(T_TRUNK)
+                    for k = 1, 4 do
+                        graphics.cube(wx, h + k, wz,  1, 1, 1)
+                    end
+                    graphics.tile(T_LEAF)
+                    for ly = 4, 5 do
+                        for lx = -1, 1 do
+                            for lz = -1, 1 do
+                                graphics.cube(wx + lx, h + ly, wz + lz,  1, 1, 1)
+                            end
                         end
                     end
+                    graphics.cube(wx, h + 6, wz,  1, 1, 1)
                 end
-                graphics.cube(x, h + 6, z,  1, 1, 1)
             end
         end
     end
@@ -265,10 +276,13 @@ func setup()
             yaw = ang
         end
     end
-    ## cuisson initiale COMPLÈTE du rayon (le monde est là dès le départ)
+    ## cuisson initiale : chunk du joueur tout de suite (sol présent au spawn),
+    ## le reste du rayon streamé sur les frames suivantes (budget/frame → pas de gel
+    ## du thread, crucial en RES=0.5 où un chunk = ~30K cubes).
     lastcx = math.floor(camX / CS)
     lastcz = math.floor(camZ / CS)
-    stream_load(lastcx, lastcz, 9999)
+    loaded[ckey(lastcx, lastcz)] = bake_chunk(lastcx, lastcz)
+    streaming = true
 end
 
 ## relais d'entrée vers le joystick (les callbacks mouse.* sont globaux au moteur)
@@ -311,7 +325,7 @@ func draw()
         stream_unload(pcx, pcz)
         streaming = true
     end
-    if streaming and stream_load(pcx, pcz, 2) == 0 then
+    if streaming and stream_load(pcx, pcz, 1) == 0 then
         streaming = false
     end
 
