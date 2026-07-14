@@ -1037,7 +1037,7 @@ const fileRailEl = document.getElementById('file-rail')
 // le bouton l'ouvre/ferme pour la session en cours (pas de déploiement par défaut).
 let railHidden = true
 function applyRail() {
-  fileRailEl.style.display = railHidden ? 'none' : ''
+  fileRailEl.classList.toggle('rail-hidden', railHidden)
   railToggle.classList.toggle('active', !railHidden)
   railToggle.setAttribute('aria-pressed', String(!railHidden))
 }
