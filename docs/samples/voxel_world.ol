@@ -52,10 +52,16 @@ func height_at(x, z, b)
     var n = math.noise(x * 0.05, z * 0.05) * 0.6
           + math.noise(x * 0.12, z * 0.12) * 0.3
           + math.noise(x * 0.25, z * 0.25) * 0.1
-    if b == 0 then return math.floor(n * 4 + 1) end
-    if b == 1 then return math.floor(n * 6 + 1) end
-    if b == 2 then return math.floor(n * 8 + 2) end
-    return math.floor(n * n * 26 + 3)
+    switch b
+    case 0
+        return math.floor(n * 4 + 1)       ## désert : plat
+    case 1
+        return math.floor(n * 6 + 1)       ## plaine
+    case 2
+        return math.floor(n * 8 + 2)       ## forêt : vallonné
+    else
+        return math.floor(n * n * 26 + 3)  ## montagne : pics
+    end
 end
 
 func ground(x, z)
@@ -67,14 +73,18 @@ end
 
 func block_color(b, h, y)
     if y >= h then
-        if b == 0 then return C_SAND end
-        if b == 3 then
+        switch b
+        case 0
+            return C_SAND                   ## désert
+        case 2
+            return C_FOREST                 ## forêt
+        case 3
             if h >= 13 then return C_SNOW end
             if h >= 8 then return C_ROCK end
-            return C_GRASS
+            return C_GRASS                  ## montagne : neige/roche/herbe selon altitude
+        else
+            return C_GRASS                  ## plaine
         end
-        if b == 2 then return C_FOREST end
-        return C_GRASS
     end
     if y >= h - 2 then
         if b == 0 then return C_SANDD end
