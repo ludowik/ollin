@@ -93,6 +93,39 @@ export async function preloadSampleModels(m, code, v) {
   }
 }
 
+// Mode EXEMPLE : précharge les fichiers .ol IMPORTÉS (import "x.ol") depuis
+// samples/ dans le registre de sources du runtime, pour que `import` se résolve
+// quand on lance un exemple direct (les projets utilisateur préchargent déjà tous
+// leurs fichiers). Suit les imports en chaîne (BFS). Best-effort : introuvable = ignoré.
+export async function preloadSampleImports(m, code, v) {
+  if (!m || !m.preloadSource || typeof code !== 'string') return
+  const findImports = (src) => {
+    const re = /(?:^|\n)\s*import\s+["']([^"']+)["']/g
+    const out = []
+    let mm
+    while ((mm = re.exec(src))) {
+      let p = mm[1]
+      if (!p.endsWith('.ol')) p += '.ol'
+      out.push(p)
+    }
+    return out
+  }
+  const seen = new Set()
+  let queue = findImports(code)
+  while (queue.length) {
+    const path = queue.shift()
+    if (seen.has(path)) continue
+    seen.add(path)
+    try {
+      const r = await fetch('samples/' + path + '?v=' + v, { cache: 'no-cache' })
+      if (!r.ok) continue
+      const src = await r.text()
+      m.preloadSource(path, src)      // clé = chemin tel que résolu par l'import (base_dir vide)
+      for (const dep of findImports(src)) queue.push(dep)
+    } catch (_) { /* best-effort */ }
+  }
+}
+
 // Rechargement « dur », PARTAGÉ par toutes les pages : vide le Cache API (Service
 // Worker) puis recharge via une URL cache-bustée, ce qui contourne aussi le cache
 // HTTP de la page elle-même (un simple location.reload() peut resservir l'ancienne

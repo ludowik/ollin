@@ -12,7 +12,7 @@ export async function init(ctx) {
   // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
   // session réutilise la même URL → pas de croissance du registre de modules).
   const Store = await import('../pg-store.js?v=' + ctx.v)
-  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels } = await import('../pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
 
   // Barre du plein ecran collee au haut du visible quand le clavier s'ouvre.
@@ -39,6 +39,7 @@ export async function init(ctx) {
     statusEl.textContent = ''
     // Modèles 3D référencés → préchargés depuis samples/ (best-effort ; sans effet
     // pour un projet dont les modèles sont déjà dans ses ressources).
+    await preloadSampleImports(mod, code, ctx.v)
     await preloadSampleModels(mod, code, ctx.v)
     runProgram(mod, code, canvasEl, {
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },

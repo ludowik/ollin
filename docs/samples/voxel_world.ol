@@ -3,7 +3,9 @@
 ##   • On CUIT (beginChunk/endChunk) les chunks autour du joueur et on LIBÈRE
 ##     (freeChunk) les lointains → mémoire bornée, univers qui s'étend en marchant.
 ##   • On ne dessine que les chunks VISIBLES (inFrustum). BIOMES : désert/plaine/
-##     forêt/montagne. COMMANDES : bas gauche/droite = tourner, haut = avancer.
+##     forêt/montagne. DÉPLACEMENT : joystick analogique tactile (classe réutilisable).
+
+import "joystick.ol"       ## classe Joystick (contrôle analogique)
 
 global CS = 16             ## côté d'un chunk
 global VIEW = 4            ## rayon de chunks chargés (9×9 autour du joueur)
@@ -21,14 +23,10 @@ global PITCH = -0.12
 global lastcx = 999999
 global lastcz = 999999
 
-## commande analogique (joystick ancré en bas-centre de la zone)
-global touching = false
-global ctrl = false        ## vrai si le doigt a été posé DANS la zone (reste actif s'il en sort)
-global tx = 0
-global ty = 0
+## déplacement : joystick analogique réutilisable (joystick.ol)
+global pad = Joystick()
 global TURN_MAX = 1.8      ## rad/s à l'inclinaison horizontale maximale
 global SPEED_MAX = 8.0     ## blocs/s à la poussée verticale maximale
-global DEAD = 0.06         ## zone morte du virage (près du centre = tout droit)
 
 global C_SKY   = Color(0.55, 0.80, 0.95)
 global WHITE   = Color(1, 1, 1)
@@ -263,75 +261,33 @@ func setup()
     stream_load(lastcx, lastcz, 9999)
 end
 
-func turn_y()
-    return H * 0.66           ## haut de la zone de commande
-end
-## virage ∈ [-1;1] : distance horizontale du doigt au MILIEU (zone morte au centre)
-func steer()
-    var s = (tx - W / 2) / (W / 2)
-    if s > 0 - DEAD and s < DEAD then
-        return 0.0
-    end
-    return math.clamp(s, -1.0, 1.0)
-end
-## poussée ∈ [0;1] : distance verticale du doigt AU-DESSUS du bas de la zone
-func throttle()
-    return math.clamp((H - ty) / (H - turn_y()), 0.0, 1.0)
-end
+## relais d'entrée vers le joystick (les callbacks mouse.* sont globaux au moteur)
 func mouse.pressed(x, y)
-    touching = true
-    ctrl = y >= turn_y()      ## contrôle armé seulement si on démarre dans la zone…
-    tx = x
-    ty = y
+    pad.press(x, y)
 end
 func mouse.released(x, y)
-    touching = false
-    ctrl = false              ## …et désarmé au relâchement (même si le doigt était sorti)
+    pad.release()
 end
 func mouse.moved(x, y)
-    tx = x
-    ty = y
-end
-
-func draw_hud(shown)
-    var y0 = turn_y()
-    var ax = W / 2            ## ancre horizontale = centre (tout droit)
-    ## fond de la zone de commande
-    graphics.fill(Color(1, 1, 1, 0.06))
-    graphics.rect(0, y0, W, H - y0)
-    ## axe central (tout droit) + repère du niveau bas (vitesse nulle)
-    graphics.fill(Color(1, 1, 1, 0.14))
-    graphics.rect(ax - 1, y0, 2, H - y0)
-    ## poignée du joystick : suit le doigt, dosage visible (distance = intensité)
-    if ctrl then
-        graphics.stroke(Color(1, 1, 1, 0.45))
-        graphics.line(ax, H - 4, tx, ty)     ## ancre bas-centre → doigt
-        graphics.noStroke()
-        graphics.fill(Color(0.45, 0.65, 1.0, 0.85))
-        graphics.circle(tx, ty, 20)
-    end
-    graphics.draw_text("chunks affichés " + shown, 12, 12, 15, colors.WHITE)
+    pad.move(x, y)
 end
 
 func draw()
     graphics.clear(C_SKY)
-    if ctrl then
-        ## analogique : virage dosé par la distance au centre, vitesse par la
-        ## distance au bas de la zone (steer < 0 = gauche → yaw augmente).
-        ## Reste actif même si le doigt sort de la zone → throttle clampé à 1 = vitesse max.
-        yaw = yaw - steer() * TURN_MAX * deltaTime
-        var sp = throttle() * SPEED_MAX * deltaTime
-        if sp > 0 then
-            ## avance avec glissement (franchit les pentes, bute sur les murs)
-            var nx = camX + math.sin(yaw) * sp
-            var nz = camZ + math.cos(yaw) * sp
-            var g0 = ground(camX, camZ)
-            if ground(nx, camZ) - g0 <= STEP then
-                camX = nx
-            end
-            if ground(camX, nz) - g0 <= STEP then
-                camZ = nz
-            end
+    ## déplacement analogique : virage dosé par steer(), vitesse par throttle()
+    ## (nuls si le joystick n'est pas actif → aucun mouvement).
+    yaw = yaw - pad.steer() * TURN_MAX * deltaTime
+    var sp = pad.throttle() * SPEED_MAX * deltaTime
+    if sp > 0 then
+        ## avance avec glissement (franchit les pentes, bute sur les murs)
+        var nx = camX + math.sin(yaw) * sp
+        var nz = camZ + math.cos(yaw) * sp
+        var g0 = ground(camX, camZ)
+        if ground(nx, camZ) - g0 <= STEP then
+            camX = nx
+        end
+        if ground(camX, nz) - g0 <= STEP then
+            camZ = nz
         end
     end
     ## streaming : charge autour du joueur (budget/frame), décharge au changement de chunk
@@ -370,5 +326,6 @@ func draw()
         end
     graphics.end3d()
 
-    draw_hud(shown)
+    pad.draw()                        ## HUD du joystick (classe réutilisable)
+    graphics.draw_text("chunks affichés " + shown, 12, 12, 15, colors.WHITE)
 end

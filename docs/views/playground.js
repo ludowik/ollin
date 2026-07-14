@@ -1226,6 +1226,7 @@ async function launch() {
   // Mode exemple/brouillon : modèles 3D référencés (graphics.model("x.obj"))
   // préchargés depuis samples/ (les projets utilisateur passent par leurs ressources).
   if (!currentProject) {
+    await Run.preloadSampleImports(ollin, code, ctx.v)
     await Run.preloadSampleModels(ollin, code, ctx.v)
   }
   Run.runProgram(ollin, code, canvasEl, {
