@@ -2,15 +2,16 @@
 ##   • Le terrain vient d'un bruit de Perlin (défini partout) → monde illimité.
 ##   • On CUIT (beginChunk/endChunk) les chunks autour du joueur et on LIBÈRE
 ##     (freeChunk) les lointains → mémoire bornée, univers qui s'étend en marchant.
-##   • On ne dessine que les chunks VISIBLES (inFrustum). BIOMES : désert/plaine/
-##     forêt/montagne. DÉPLACEMENT : joystick analogique tactile (classe réutilisable).
+##   • On ne dessine que les chunks VISIBLES (inFrustum). Biomes de surface :
+##     désert/plaine/forêt ; relief (roche/neige) selon l'altitude. DÉPLACEMENT :
+##     joystick analogique tactile (classe réutilisable, joystick.ol).
 
 import "joystick.ol"       ## classe Joystick (contrôle analogique)
 
 global CS = 16             ## côté d'un chunk
 global VIEW = 4            ## rayon de chunks chargés (9×9 autour du joueur)
 global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
-global loaded = {}         ## "cx,cz" → { id, wx, wz, cx, cz }
+global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 
 global EYE = 2.2
@@ -22,6 +23,7 @@ global yaw = 0.0
 global PITCH = -0.12
 global lastcx = 999999
 global lastcz = 999999
+global streaming = false   ## vrai tant qu'il reste des chunks à charger (évite le balayage à vide)
 
 ## déplacement : joystick analogique réutilisable (joystick.ol)
 global pad = Joystick()
@@ -79,12 +81,14 @@ func build_atlas()
     graphics.tileAnim(T_WATER)    ## l'eau ondule (UV qui défile)
 end
 
+## Biome de SURFACE uniquement (la hauteur vient de l'altitude, cf. height_at) :
+## 0 = désert (sable, sec), 1 = plaine (herbe), 2 = forêt (herbe + arbres denses).
+## Le relief « montagne » (roche/neige) est purement fonction de l'altitude.
 func biome_at(x, z)
     var b = math.noise(x * 0.026 + 50, z * 0.026 + 50)
-    if b < 0.36 then return 0 end
-    if b < 0.56 then return 1 end
-    if b < 0.76 then return 2 end
-    return 3
+    if b < 0.38 then return 0 end
+    if b < 0.62 then return 1 end
+    return 2
 end
 
 ## Élévation continue et LISSE (0..1). math.noise fait déjà du fBm multi-octave ;
@@ -160,7 +164,7 @@ func bake_chunk(cx, cz)
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
                 graphics.fill(WHITE)                  ## retour opaque (arbres, colonnes suivantes)
             end
-            var hash = (x * 131 + z * 197) % 100
+            var hash = math.abs(x * 131 + z * 197) % 100    ## abs : % signé sinon ~53% (au lieu de 6%)
             ## arbres uniquement sur l'herbe (au-dessus de la mer, sous la roche, hors désert)
             var grassy = h > SEA and h < SEA + 8 and b <> 0
             var tree = grassy and ((b == 2 and hash < 6) or hash == 0)
@@ -190,7 +194,9 @@ func bake_chunk(cx, cz)
 end
 
 ## Charge les chunks manquants dans le rayon (budget limité par frame → pas de à-coups).
+## Renvoie le nombre de chunks cuits ce tour (0 = rayon complet → plus rien à charger).
 func stream_load(pcx, pcz, budget)
+    var baked = 0
     for dz = -VIEW, VIEW do
         for dx = -VIEW, VIEW do
             if budget > 0 then
@@ -200,10 +206,12 @@ func stream_load(pcx, pcz, budget)
                 if loaded[k] == nil then
                     loaded[k] = bake_chunk(cx, cz)
                     budget = budget - 1
+                    baked = baked + 1
                 end
             end
         end
     end
+    return baked
 end
 
 ## Décharge (libère les VBO) les chunks hors du rayon → mémoire bornée.
@@ -225,17 +233,19 @@ func setup()
     graphics.light("dir", -0.5, -1, -0.35)
     math.noise_seed(7)
     build_atlas()                 ## génère l'atlas de textures (herbe/terre/roche/…)
-    ## spawn sur la terre ferme basse la plus proche de l'origine (au-dessus de la mer)
-    var bestd = 1000000
+    ## spawn : meilleure terre ferme (au-dessus de la mer), score = proximité de
+    ## l'origine + forte pénalité d'altitude → on choisit TOUJOURS un point sec, bas
+    ## et proche (pas de repli sous l'eau si aucune bande de hauteur précise n'existe).
+    var best = 1000000000.0
     for z = 0, 60 do
         for x = 0, 60 do
             var h = height_at(x, z)
-            if h > SEA and h < SEA + 4 then
+            if h > SEA then
                 var cx = x - 30
                 var cz = z - 30
-                var d = cx * cx + cz * cz
-                if d < bestd then
-                    bestd = d
+                var score = cx * cx + cz * cz + (h - SEA) * (h - SEA) * 40
+                if score < best then
+                    best = score
                     camX = x + 0.5
                     camZ = z + 0.5
                 end
@@ -290,14 +300,19 @@ func draw()
             camZ = nz
         end
     end
-    ## streaming : charge autour du joueur (budget/frame), décharge au changement de chunk
+    ## streaming : au changement de chunk on décharge le lointain et on (ré)active le
+    ## chargement ; on ne balaie le voisinage QUE tant qu'il reste des chunks à cuire
+    ## (budget/frame → pas d'à-coups). En régime stable : aucun balayage (pas de churn).
     var pcx = math.floor(camX / CS)
     var pcz = math.floor(camZ / CS)
-    stream_load(pcx, pcz, 2)
     if pcx <> lastcx or pcz <> lastcz then
         lastcx = pcx
         lastcz = pcz
         stream_unload(pcx, pcz)
+        streaming = true
+    end
+    if streaming and stream_load(pcx, pcz, 2) == 0 then
+        streaming = false
     end
 
     ## rester au-dessus du sol : toujours EYE au-dessus de la colonne courante
@@ -309,23 +324,24 @@ func draw()
     cam.look_at(camX + dx, camY + dy, camZ + dz)
 
     graphics.noStroke()
-    var shown = 0
+    ## culling une seule fois : liste des chunks visibles (inFrustum est coûteux)
+    var vis = []
+    for k, c in loaded do
+        if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
+            vis[#vis + 1] = c
+        end
+    end
     graphics.begin3d(cam)
         ## passe 1 : opaque (terrain, arbres)
-        for k, c in loaded do
-            if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
-                shown = shown + 1
-                graphics.drawChunk(c)
-            end
+        for i = 1, #vis do
+            graphics.drawChunk(vis[i])
         end
         ## passe 2 : eau transparente, APRÈS tout l'opaque
-        for k, c in loaded do
-            if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
-                graphics.drawChunkAlpha(c)
-            end
+        for i = 1, #vis do
+            graphics.drawChunkAlpha(vis[i])
         end
     graphics.end3d()
 
     pad.draw()                        ## HUD du joystick (classe réutilisable)
-    graphics.draw_text("chunks affichés " + shown, 12, 12, 15, colors.WHITE)
+    graphics.draw_text("chunks affichés " + #vis, 12, 12, 15, colors.WHITE)
 end

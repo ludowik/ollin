@@ -47,7 +47,7 @@ class Joystick
 
     ## Virage ∈ [-1;1] : distance horizontale du doigt au centre (zone morte au milieu).
     func steer()
-        if not self.active then
+        if not self.active or W <= 0 then
             return 0.0
         end
         var s = (self.px - W / 2) / (W / 2)
@@ -60,7 +60,7 @@ class Joystick
     ## Poussée ∈ [0;1] : distance verticale du doigt au bas de la zone (hors zone par
     ## le haut → clampé à 1 = plein avant).
     func throttle()
-        if not self.active then
+        if not self.active or H <= 0 then
             return 0.0
         end
         return math.clamp((H - self.py) / (H - self.top()), 0.0, 1.0)
