@@ -50,10 +50,12 @@ export async function init(ctx) {
     })
   }
 
-  // ── Contrôles d'exécution : Recharger (= relancer) + Pause/Reprendre ─────────
-  // « Recharger » ré-exécute le programme depuis le début (pas de rechargement de
-  // page : redondant avec ce relancement, et plus lourd). Le WASM est déjà à jour
-  // via le rechargement dur de l'éditeur.
+  // ── Contrôles d'exécution : Recharger + Pause/Reprendre ─────────────────────
+  // « Recharger » recharge la PAGE → nouvelle instance WASM (module frais). On ne
+  // ré-exécute PAS le module partagé : après une longue session graphique (streaming
+  // de chunks) l'état accumulé peut être corrompu, et un simple ré-execute() plante
+  // alors (« memory access out of bounds »). Repartir d'un module neuf garantit un
+  // relancement propre. location.reload() conserve le hash (#/run/sample/…).
   const reloadBtn   = document.getElementById('reload-btn')
   const pauseBtn    = document.getElementById('pause-btn')
   const ICON_PAUSE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>'
@@ -79,12 +81,7 @@ export async function init(ctx) {
   }
   if (reloadBtn) {
     reloadBtn.addEventListener('click', () => {
-      if (!mod || code == null) {
-        return
-      }
-      paused = false
-      setPauseUI()
-      launch()
+      location.reload()   // module WASM neuf (évite le plantage sur état corrompu)
     })
   }
 
