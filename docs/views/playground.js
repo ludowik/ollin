@@ -1034,21 +1034,23 @@ document.addEventListener('click', onDocClick)
 disposers.push(() => document.removeEventListener('click', onDocClick))
 newFileBtn.addEventListener('click', newFile)
 
-// ── bascule de la barre latérale (état mémorisé) ──
+// ── bascule de la barre latérale (état NON mémorisé : fermée à chaque ouverture) ──
 const railToggle = document.getElementById('rail-toggle')
 const fileRailEl = document.getElementById('file-rail')
 // La barre des fichiers démarre TOUJOURS fermée à l'ouverture de l'éditeur ;
-// le bouton l'ouvre/ferme pour la session en cours (pas de déploiement par défaut).
+// le bouton l'ouvre/ferme pour la session en cours (pas de persistance).
 let railHidden = true
 function applyRail() {
   fileRailEl.classList.toggle('rail-hidden', railHidden)
   railToggle.classList.toggle('active', !railHidden)
   railToggle.setAttribute('aria-pressed', String(!railHidden))
 }
-railToggle.addEventListener('click', () => {
+const onRailToggle = () => {
   railHidden = !railHidden
   applyRail()
-})
+}
+railToggle.addEventListener('click', onRailToggle)
+disposers.push(() => railToggle.removeEventListener('click', onRailToggle))
 applyRail()
 
 // ── Mode exemple : lecture directe depuis le dépôt (sans copie) ─────────────
@@ -1226,8 +1228,8 @@ async function launch() {
   // Mode exemple/brouillon : modèles 3D référencés (graphics.model("x.obj"))
   // préchargés depuis samples/ (les projets utilisateur passent par leurs ressources).
   if (!currentProject) {
-    await Run.preloadSampleImports(ollin, code, ctx.v)
-    await Run.preloadSampleModels(ollin, code, ctx.v)
+    const imported = await Run.preloadSampleImports(ollin, code, ctx.v)
+    await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // modèles des imports aussi
   }
   Run.runProgram(ollin, code, canvasEl, {
     onError:   (msg) => { setRunning(false); showOutput(msg) },

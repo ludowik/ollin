@@ -39,8 +39,8 @@ export async function init(ctx) {
     statusEl.textContent = ''
     // Modèles 3D référencés → préchargés depuis samples/ (best-effort ; sans effet
     // pour un projet dont les modèles sont déjà dans ses ressources).
-    await preloadSampleImports(mod, code, ctx.v)
-    await preloadSampleModels(mod, code, ctx.v)
+    const imported = await preloadSampleImports(mod, code, ctx.v)
+    await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // modèles des imports aussi
     runProgram(mod, code, canvasEl, {
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
       // Programme graphique : focus clavier au canvas (programmes interactifs).

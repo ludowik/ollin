@@ -93,12 +93,19 @@ export async function preloadSampleModels(m, code, v) {
   }
 }
 
-// Mode EXEMPLE : précharge les fichiers .ol IMPORTÉS (import "x.ol") depuis
-// samples/ dans le registre de sources du runtime, pour que `import` se résolve
-// quand on lance un exemple direct (les projets utilisateur préchargent déjà tous
-// leurs fichiers). Suit les imports en chaîne (BFS). Best-effort : introuvable = ignoré.
+// Cache de sources .ol importées (chemin résolu → texte) pour la session : évite
+// de re-télécharger à chaque relance (page reload = module frais = cache vidé).
+const _importSrcCache = new Map()
+
+// Mode EXEMPLE : précharge les fichiers .ol IMPORTÉS (import "x.ol") depuis samples/
+// dans le registre de sources du runtime, pour que `import` se résolve quand on lance
+// un exemple direct (les projets utilisateur préchargent déjà tous leurs fichiers).
+// Suit les imports en chaîne (BFS) en RÉSOLVANT chaque chemin comme le parseur
+// (relatif au dossier du fichier importateur) → clé de registre cohérente, y compris
+// en sous-dossier. Renvoie la CONCATÉNATION des sources importées (pour que
+// l'appelant y précharge aussi les modèles/assets référencés). Best-effort.
 export async function preloadSampleImports(m, code, v) {
-  if (!m || !m.preloadSource || typeof code !== 'string') return
+  if (!m || !m.preloadSource || typeof code !== 'string') return ''
   const findImports = (src) => {
     const re = /(?:^|\n)\s*import\s+["']([^"']+)["']/g
     const out = []
@@ -110,20 +117,31 @@ export async function preloadSampleImports(m, code, v) {
     }
     return out
   }
+  const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
+  // Résolution identique au parseur : base_dir + chemin (concat naïve), sauf chemin absolu.
+  const resolve = (parentDir, imp) => (imp[0] === '/' ? imp : parentDir + imp)
   const seen = new Set()
-  let queue = findImports(code)
+  const collected = []
+  let queue = findImports(code).map((imp) => resolve('', imp))   // entrée : base_dir vide
   while (queue.length) {
-    const path = queue.shift()
-    if (seen.has(path)) continue
-    seen.add(path)
-    try {
-      const r = await fetch('samples/' + path + '?v=' + v, { cache: 'no-cache' })
-      if (!r.ok) continue
-      const src = await r.text()
-      m.preloadSource(path, src)      // clé = chemin tel que résolu par l'import (base_dir vide)
-      for (const dep of findImports(src)) queue.push(dep)
-    } catch (_) { /* best-effort */ }
+    const key = queue.shift()
+    if (seen.has(key)) continue
+    seen.add(key)
+    let src = _importSrcCache.get(key)
+    if (src === undefined) {
+      try {
+        const r = await fetch('samples/' + key + '?v=' + v, { cache: 'no-cache' })
+        if (!r.ok) continue
+        src = await r.text()
+        _importSrcCache.set(key, src)
+      } catch (_) { continue }
+    }
+    m.preloadSource(key, src)          // clé = chemin résolu (= ce que source_get() cherche)
+    collected.push(src)
+    const pdir = dirOf(key)
+    for (const imp of findImports(src)) queue.push(resolve(pdir, imp))
   }
+  return collected.join('\n')
 }
 
 // Rechargement « dur », PARTAGÉ par toutes les pages : vide le Cache API (Service
