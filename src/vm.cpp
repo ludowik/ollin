@@ -3,9 +3,22 @@
 #include "utf8.h"
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+
+// mem() : mesure de la mémoire tas utilisée — API par plateforme.
+#if defined(__EMSCRIPTEN__)
+#include <malloc.h>
+#elif defined(__APPLE__)
+#include <malloc/malloc.h>
+#elif defined(__GLIBC__)
+#include <malloc.h>
+#elif defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>
+#endif
 
 static VM* s_current_vm = nullptr;
 
@@ -195,6 +208,31 @@ static Value builtin_time(Value* args, int argc) {
     return Value(std::chrono::duration<double>(now.time_since_epoch()).count());
 }
 
+// mem() : octets de tas actuellement utilisés par le process (valeurs Ollin +
+// runtime + libs). Renvoie un entier. Par plateforme : octets « in use » de
+// l'allocateur (WASM/macOS/glibc) ou working set (Windows) ; 0 si indisponible.
+static Value builtin_mem(Value* args, int argc) {
+    (void)args;
+    (void)argc;
+    uint64_t bytes = 0;
+#if defined(__EMSCRIPTEN__)
+    struct mallinfo mi = mallinfo();            // uordblks (arène) + hblkhd (blocs mmap)
+    bytes = (uint64_t)(unsigned)mi.uordblks + (uint64_t)(unsigned)mi.hblkhd;
+#elif defined(__APPLE__)
+    malloc_statistics_t s;
+    malloc_zone_statistics(malloc_default_zone(), &s);
+    bytes = (uint64_t)s.size_in_use;
+#elif defined(__GLIBC__)
+    struct mallinfo2 mi = mallinfo2();          // glibc ≥ 2.33 : champs size_t
+    bytes = (uint64_t)mi.uordblks + (uint64_t)mi.hblkhd;   // arène + gros blocs mmap
+#elif defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+        bytes = (uint64_t)pmc.WorkingSetSize;
+#endif
+    return Value((int64_t)bytes);
+}
+
 static int64_t range_len(const Range* r) {
     if (r->step == 0.0)
         return 0;
@@ -229,6 +267,7 @@ static const struct {
 } k_builtins[] = {
     {"assert", builtin_assert},
     {"time", builtin_time},
+    {"mem", builtin_mem},
     {"len", builtin_len},
 };
 

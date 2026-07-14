@@ -352,4 +352,14 @@ else
 end
 assert(ec == 2)
 
+## mem() : mémoire tas utilisée (octets, entier) — croît avec les allocations
+assert(typeof(mem()) == "int")
+assert(mem() > 0)
+var mem_before = mem()
+var big = []
+for i = 1, 20000 do
+    big[i] = i
+end
+assert(mem() >= mem_before)     ## l'allocation d'un grand array n'a pas fait baisser la mémoire
+
 print("regressions ok")

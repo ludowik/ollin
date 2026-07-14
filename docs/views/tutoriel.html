@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-14 10:39</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-14 11:02</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-14 10:39</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-14 11:02</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1209,6 +1209,15 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <span class="kw">var</span> t1 = <span class="bi">time</span>()
 <span class="bi">printf</span>(<span class="str">"somme = {}  temps = {} s"</span>, s, t1 - t0)</code></pre>
 
+<h3>mem</h3>
+<p>Retourne la mémoire tas actuellement utilisée par le programme, en <strong>octets</strong> (entier). Utile pour surveiller les allocations. La valeur reflète l'ensemble du process (valeurs Ollin + runtime) — regarde surtout sa <em>variation</em>.</p>
+<pre><code><span class="kw">var</span> avant = <span class="bi">mem</span>()
+<span class="kw">var</span> a = []
+<span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">100000</span>] <span class="kw">do</span>
+    a[i] = i
+<span class="kw">end</span>
+<span class="bi">printf</span>(<span class="str">"array : {} Ko"</span>, (<span class="bi">mem</span>() - avant) / <span class="num">1024</span>)</code></pre>
+
 <h3>len</h3>
 <p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments).</p>
 <pre><code><span class="bi">len</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])  <span class="cmt">## 3</span>
@@ -1226,7 +1235,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <span class="bi">typeof</span>(<span class="bool">nil</span>)      <span class="cmt">## "nil"</span></code></pre>
 
 <h3>Fonctions intégrées comme valeurs</h3>
-<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>len</code> et <code>typeof</code> sont des valeurs de première classe — assignables, passables en argument :</p>
+<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>mem</code>, <code>len</code> et <code>typeof</code> sont des valeurs de première classe — assignables, passables en argument :</p>
 <pre><code><span class="kw">var</span> f = <span class="bi">print</span>
 f(<span class="str">"hello"</span>)        <span class="cmt">## hello</span>
 

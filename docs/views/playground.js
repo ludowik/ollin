@@ -110,7 +110,7 @@ const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
   fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(r, g, b [, a])'),
-  fn('len',    'len(v) → int'),
+  fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (octets utilisés)'),
 ]
 
 // Hooks de cycle de vie appelés par le moteur : insérés en squelette COMPLET
