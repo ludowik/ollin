@@ -7,7 +7,7 @@
 
 global CS = 16             ## côté d'un chunk
 global VIEW = 4            ## rayon de chunks chargés (9×9 autour du joueur)
-global SEA = 3
+global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
 global loaded = {}         ## "cx,cz" → { id, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 
@@ -48,19 +48,38 @@ func biome_at(x, z)
     return 3
 end
 
+func clampf(v, a, b)
+    if v < a then return a end
+    if v > b then return b end
+    return v
+end
+
+## élévation ∈ [-1;1] : bruit multi-octave, normalisé, puis REDISTRIBUÉ (|u|^0.55)
+## pour repousser le relief vers les extrêmes → vallées creusées + pics marqués.
+func unit(x, z)
+    var n = math.noise(x * 0.045, z * 0.045) * 0.6
+          + math.noise(x * 0.11, z * 0.11) * 0.3
+          + math.noise(x * 0.24, z * 0.24) * 0.1
+    var u = clampf((n - 0.5) / 0.5, -1.0, 1.0)
+    if u >= 0 then
+        return u ^ 0.55
+    end
+    return 0 - ((0 - u) ^ 0.55)
+end
+
 func height_at(x, z, b)
-    var n = math.noise(x * 0.05, z * 0.05) * 0.6
-          + math.noise(x * 0.12, z * 0.12) * 0.3
-          + math.noise(x * 0.25, z * 0.25) * 0.1
+    var u = unit(x, z)
     switch b
     case 0
-        return math.floor(n * 4 + 1)       ## désert : plat
+        return math.floor(SEA + u * 6 + 1)     ## désert : dunes basses
     case 1
-        return math.floor(n * 6 + 1)       ## plaine
+        return math.floor(SEA + u * 10)        ## plaine : creuse en océans, monte en collines
     case 2
-        return math.floor(n * 8 + 2)       ## forêt : vallonné
+        return math.floor(SEA + u * 13 + 1)    ## forêt : vallonné
     else
-        return math.floor(n * n * 26 + 3)  ## montagne : pics
+        var m = u
+        if m < 0 then m = 0 end
+        return math.floor(SEA + 3 + m * 26)    ## montagne : pics hauts
     end
 end
 
@@ -73,14 +92,15 @@ end
 
 func block_color(b, h, y)
     if y >= h then
+        if h < SEA then return C_SAND end   ## fond marin (sous la mer) → sable
         switch b
         case 0
             return C_SAND                   ## désert
         case 2
             return C_FOREST                 ## forêt
         case 3
-            if h >= 13 then return C_SNOW end
-            if h >= 8 then return C_ROCK end
+            if h >= SEA + 13 then return C_SNOW end
+            if h >= SEA + 5 then return C_ROCK end
             return C_GRASS                  ## montagne : neige/roche/herbe selon altitude
         else
             return C_GRASS                  ## plaine
@@ -112,7 +132,9 @@ func bake_chunk(cx, cz)
             end
             if h < SEA then
                 graphics.fill(C_WATER)
-                graphics.cube(x, SEA, z,  1, 1, 1)
+                for wy = h + 1, SEA do
+                    graphics.cube(x, wy, z,  1, 1, 1)
+                end
             end
             var hash = (x * 131 + z * 197) % 100
             var tree = (b == 2 and hash < 5) or (b == 1 and hash == 0)
@@ -181,7 +203,7 @@ func setup()
     for z = 0, 48 do
         for x = 0, 48 do
             var b = biome_at(x, z)
-            if b <= 1 and height_at(x, z, b) > SEA and height_at(x, z, b) < 6 then
+            if b <= 1 and height_at(x, z, b) > SEA and height_at(x, z, b) < SEA + 4 then
                 var open = biome_at(x + 1, z) <= 1 and biome_at(x - 1, z) <= 1
                           and biome_at(x, z + 1) <= 1 and biome_at(x, z - 1) <= 1
                 if open then
@@ -312,7 +334,7 @@ func draw()
     var shown = 0
     graphics.begin3d(cam)
         for k, c in loaded do
-            if graphics.inFrustum(c.wx, 10, c.wz, CS + 6) then
+            if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
                 shown = shown + 1
                 graphics.drawChunk(c)
             end
