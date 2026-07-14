@@ -29,6 +29,13 @@ global adapt_t  = 0.0      ## secondes mesurées dans la fenêtre courante
 global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
 global adapt_slow = 0      ## dont frames lentes
 global cooldown = 0.0      ## délai avant de re-sonder après une réduction (anti-oscillation)
+
+## Réglage MANUEL de la distance : deux boutons tactiles − / + en haut à droite.
+## Toucher un bouton passe en mode manuel → l'auto-adaptation se met en retrait
+## (elle ne contre plus ton réglage). Pratique pour tester l'impact de la distance.
+global manual = false      ## true dès qu'on a touché un bouton
+global BTN = 54            ## côté d'un bouton (cible tactile)
+global BTN_Y = 12          ## ordonnée des boutons
 global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
 global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
@@ -293,8 +300,49 @@ func setup()
     streaming = true
 end
 
+## Boutons de distance (haut-droite) : renvoie +1 (bouton +), -1 (bouton −), 0 sinon.
+func dist_btn_hit(x, y)
+    if y < BTN_Y or y > BTN_Y + BTN then
+        return 0
+    end
+    var xp = W - BTN - 12          ## bouton +
+    var xm = xp - BTN - 10         ## bouton −
+    if x >= xp and x <= xp + BTN then
+        return 1
+    end
+    if x >= xm and x <= xm + BTN then
+        return -1
+    end
+    return 0
+end
+
+## Dessine les deux boutons − / + et le mode courant.
+func draw_dist_buttons()
+    var xp = W - BTN - 12
+    var xm = xp - BTN - 10
+    graphics.noStroke()
+    graphics.fill(Color(0, 0, 0, 0.38))
+    graphics.rect(xm, BTN_Y, BTN, BTN)
+    graphics.rect(xp, BTN_Y, BTN, BTN)
+    graphics.draw_text("-", xm + BTN / 2 - 6, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
+    graphics.draw_text("+", xp + BTN / 2 - 9, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
+end
+
 ## relais d'entrée vers le joystick (les callbacks mouse.* sont globaux au moteur)
 func mouse.pressed(x, y)
+    ## un appui sur un bouton de distance = réglage manuel (l'auto-adapt se retire)
+    var hit = dist_btn_hit(x, y)
+    if hit <> 0 then
+        manual = true
+        if hit > 0 and VIEW < VIEW_MAX then
+            VIEW = VIEW + 1
+            streaming = true                   ## charge le nouvel anneau
+        elseif hit < 0 and VIEW > VIEW_MIN then
+            VIEW = VIEW - 1
+            stream_unload(lastcx, lastcz)       ## libère l'anneau lointain aussitôt
+        end
+        return
+    end
     pad.press(x, y)
 end
 func mouse.released(x, y)
@@ -345,7 +393,7 @@ func draw()
         if cooldown > 0 then
             cooldown = cooldown - deltaTime
         end
-        if not streaming then
+        if not streaming and not manual then
             adapt_t = adapt_t + deltaTime
             adapt_n = adapt_n + 1
             if deltaTime > SLOW_DT then
@@ -396,5 +444,10 @@ func draw()
     graphics.end3d()
 
     pad.draw()                        ## HUD du joystick (classe réutilisable)
-    graphics.draw_text("fps " + math.floor(fps_ema + 0.5) + "   vue " + VIEW + "   chunks " + #vis, 12, 12, 15, colors.WHITE)
+    draw_dist_buttons()               ## boutons − / + de distance (réglage manuel)
+    var mode = "auto"
+    if manual then
+        mode = "manuel"
+    end
+    graphics.draw_text("fps " + math.floor(fps_ema + 0.5) + "   vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
 end
