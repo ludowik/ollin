@@ -192,6 +192,7 @@ const MODULE_MEMBERS = {
     fn('graphics.drawChunk','drawChunk(handle)'),  fn('graphics.freeChunk','freeChunk(handle)'),
     fn('graphics.tileset','tileset(img, cols, rows)'),
     fn('graphics.tiles','tiles(top, side, bottom)'), fn('graphics.tile','tile(t)'),
+    fn('graphics.tileAnim','tileAnim(t)'),
     fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
     fn('graphics.ambient','ambient(v | couleur)'),
     fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),

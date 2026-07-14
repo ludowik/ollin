@@ -74,6 +74,7 @@ func build_atlas()
     put_tile(T_SANDD, 0.72, 0.63, 0.40, 0.08)
     image.end_pixels(atlas)
     graphics.tileset(atlas, ACOLS, AROWS)
+    graphics.tileAnim(T_WATER)    ## l'eau ondule (UV qui défile)
 end
 
 func biome_at(x, z)

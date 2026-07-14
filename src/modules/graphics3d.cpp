@@ -33,6 +33,7 @@ static unsigned int s_cur_tex3d = 0;
 static unsigned int s_atlas_texid = 0;
 static float s_atlas_grid[2] = {1.0f, 1.0f};
 static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
+static float s_anim_tile = -1.0f;   // tuile animée (UV qui défile, ex. eau) ; -1 = aucune
 
 // ── 3D ────────────────────────────────────────────────────────────────────────
 // L'affichage 3D s'appuie DIRECTEMENT sur l'API raylib (Camera3D / BeginMode3D…).
@@ -252,7 +253,7 @@ static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 static Shader s_lit{};
 static bool s_lit_ready = false;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
-static int s_loc_insttile = -1, s_loc_atlasgrid = -1;
+static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
 // VBO d'instance PERSISTANTS (transfo + couleur) : réutilisés d'une frame à
@@ -316,6 +317,8 @@ static void loadLitShader() {
         "flat in vec3 fragTile;\n"
         "uniform sampler2D texture0;\n"
         "uniform vec2 atlasGrid;\n"
+        "uniform float uTime;\n"
+        "uniform float animTile;\n"
         "uniform vec4 ambient;\n"
         "uniform vec3 viewPos;\n"
         "struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };\n"
@@ -330,6 +333,7 @@ static void loadLitShader() {
         "        float cols = atlasGrid.x;\n"
         "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
         "        vec2 uv = fract(fragTexCoord);\n"
+        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) uv = fract(uv + vec2(uTime * 0.04, uTime * 0.02));\n" // tuile animée (eau)
         "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
         "        vec2 auv = (cell + uv) / atlasGrid;\n"
         "        texel = texture(texture0, auv);\n"
@@ -361,6 +365,8 @@ static void loadLitShader() {
     s_loc_instcolor = GetShaderLocationAttrib(s_lit, "instanceColor");
     s_loc_insttile = GetShaderLocationAttrib(s_lit, "instanceTile");
     s_loc_atlasgrid = GetShaderLocation(s_lit, "atlasGrid");
+    s_loc_utime = GetShaderLocation(s_lit, "uTime");
+    s_loc_animtile = GetShaderLocation(s_lit, "animTile");
     s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
     s_loc_ambient = GetShaderLocation(s_lit, "ambient");
     s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
@@ -451,6 +457,13 @@ static bool litBeginDraw() {
     rlSetUniform(s_loc_l_col, s_light_col, RL_SHADER_UNIFORM_VEC4, 1);
     if (s_loc_atlasgrid >= 0) {
         rlSetUniform(s_loc_atlasgrid, s_atlas_grid, RL_SHADER_UNIFORM_VEC2, 1);
+    }
+    if (s_loc_utime >= 0) {
+        float tm = (float)GetTime();
+        rlSetUniform(s_loc_utime, &tm, RL_SHADER_UNIFORM_FLOAT, 1);
+    }
+    if (s_loc_animtile >= 0) {
+        rlSetUniform(s_loc_animtile, &s_anim_tile, RL_SHADER_UNIFORM_FLOAT, 1);
     }
     return true;
 }
@@ -623,6 +636,7 @@ void reset3dGraphicsState() {
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;
     s_cur_tile[2] = -1.0f;
+    s_anim_tile = -1.0f;
 }
 
 static void flush3dBuckets() {
@@ -858,6 +872,12 @@ static Value gfx_tile(Value* args, int argc) {
     s_cur_tile[0] = t;
     s_cur_tile[1] = t;
     s_cur_tile[2] = t;
+    return Value{};
+}
+
+// graphics.tileAnim(t) : tuile dont l'UV défile dans le temps (eau). -1 = aucune.
+static Value gfx_tile_anim(Value* args, int argc) {
+    s_anim_tile = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tileAnim") : -1.0f;
     return Value{};
 }
 
@@ -1269,6 +1289,7 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("tileset")), Value::makeBuiltin(gfx_tileset));
     m.mapSet(Value(std::string("tiles")), Value::makeBuiltin(gfx_tiles));
     m.mapSet(Value(std::string("tile")), Value::makeBuiltin(gfx_tile));
+    m.mapSet(Value(std::string("tileAnim")), Value::makeBuiltin(gfx_tile_anim));
     m.mapSet(Value(std::string("grid")), Value::makeBuiltin(gfx_grid));
     m.mapSet(Value(std::string("cube")), Value::makeBuiltin(gfx_cube));
     m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
