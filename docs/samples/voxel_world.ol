@@ -152,7 +152,7 @@ func bake_chunk(cx, cz)
         for x = x0, x0 + CS - 1 do
             var b = biome_at(x, z)
             var h = height_at(x, z)
-            for y = 0, h do
+            for y = 0, math.max(h, 0) do   ## au moins un fond (y=0) même si h<0 → pas de trou sous l'eau
                 set_block_tiles(b, h, y)
                 graphics.cube(x, y, z,  1, 1, 1)
             end

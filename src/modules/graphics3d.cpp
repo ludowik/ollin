@@ -204,6 +204,7 @@ struct InstGroup {
     int count;
 };
 static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
+static std::vector<int> s_free_groups;    // slots libérés réutilisables → borne s_groups en streaming
 static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
@@ -487,10 +488,12 @@ static bool litBeginDraw() {
 
 // Attache les attributs d'instance (transfo mat4 = 4 vec4, puis couleur vec4,
 // divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
-static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int vboC, unsigned int vboT) {
-    rlEnableVertexArray(vaoId);
-    rlEnableVertexBuffer(vboX);
+// Attache les attributs d'instance (transfo mat4 = 4 vec4, couleur vec4, tuiles
+// vec3 ; divisor 1) depuis des VBO DÉJÀ REMPLIS. VAO supposé déjà actif. Partagé
+// par litBindInstances (groupe cuit) et flushBucket (VBO partagés).
+static void bindInstanceVBOs(unsigned int vboX, unsigned int vboC, unsigned int vboT) {
     int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
+    rlEnableVertexBuffer(vboX);
     for (unsigned int i = 0; i < 4; i++) {
         rlEnableVertexAttribute(locT + i);
         rlSetVertexAttribute(locT + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
@@ -508,6 +511,12 @@ static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int
         rlSetVertexAttribute(s_loc_insttile, 3, RL_FLOAT, 0, 0, 0);
         rlSetVertexAttributeDivisor(s_loc_insttile, 1);
     }
+}
+
+// divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
+static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int vboC, unsigned int vboT) {
+    rlEnableVertexArray(vaoId);
+    bindInstanceVBOs(vboX, vboC, vboT);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
 }
@@ -539,31 +548,18 @@ static void flushBucket(const Bucket3D& b) {
         return;
     }
     Mesh mesh = b.mesh;
-    // VBO d'instance PARTAGÉS persistants (upload par frame, pas recréés).
-    std::vector<float16> xf(n);
+    // Tampon scratch réutilisé (pas d'alloc par bucket/frame) + VBO d'instance
+    // PARTAGÉS persistants (upload par frame, pas recréés).
+    static std::vector<float16> xf;
+    xf.resize(n);
     for (int i = 0; i < n; i++) {
         xf[i] = MatrixToFloatV(b.xforms[i]);
     }
     rlEnableVertexArray(mesh.vaoId);
     uploadInstanceVBO(s_inst_vbo_xform, s_inst_cap_xform, xf.data(), n * (int)sizeof(float16));
-    int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
-    for (unsigned int i = 0; i < 4; i++) {
-        rlEnableVertexAttribute(locT + i);
-        rlSetVertexAttribute(locT + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
-        rlSetVertexAttributeDivisor(locT + i, 1);
-    }
     uploadInstanceVBO(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
-    if (s_loc_instcolor >= 0) {
-        rlEnableVertexAttribute(s_loc_instcolor);
-        rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
-        rlSetVertexAttributeDivisor(s_loc_instcolor, 1);
-    }
     uploadInstanceVBO(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
-    if (s_loc_insttile >= 0) {
-        rlEnableVertexAttribute(s_loc_insttile);
-        rlSetVertexAttribute(s_loc_insttile, 3, RL_FLOAT, 0, 0, 0);
-        rlSetVertexAttributeDivisor(s_loc_insttile, 1);
-    }
+    bindInstanceVBOs(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
     litDrawInstanced(mesh, b.texId, n);
@@ -620,6 +616,7 @@ void reset3dGraphicsState() {
         }
     }
     s_groups.clear();
+    s_free_groups.clear();
     s_recording = false;
     s_rec_x.clear();
     s_rec_c.clear();
@@ -1214,20 +1211,34 @@ static InstGroup buildGroup(const Mesh& mesh, const std::vector<Matrix>& xs, con
     return g;
 }
 
+// Range un groupe cuit dans s_groups en réutilisant un slot libéré si dispo (borne
+// la croissance en streaming infini) ; sinon agrandit. Renvoie l'id 1-based.
+static int placeGroup(const InstGroup& g) {
+    if (!s_free_groups.empty()) {
+        int idx = s_free_groups.back();
+        s_free_groups.pop_back();
+        s_groups[idx] = g;
+        return idx + 1;
+    }
+    s_groups.push_back(g);
+    return (int)s_groups.size();
+}
+
 // graphics.endChunk() : cuit les cubes enregistrés dans des VBO persistants et
 // renvoie un handle { id, idw, count, wcount }. `id` = groupe OPAQUE, `idw` = groupe
-// TRANSPARENT (eau). À redessiner chaque frame : drawChunk (opaque) puis, après TOUT
-// l'opaque, drawChunkAlpha (eau).
+// TRANSPARENT (eau, idw=0 si aucune eau). À redessiner chaque frame : drawChunk
+// (opaque) puis, après TOUT l'opaque, drawChunkAlpha (eau).
 static Value gfx_end_chunk(Value* args, int argc) {
     (void)args;
     (void)argc;
     s_recording = false;
     InstGroup g = buildGroup(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t);
     InstGroup w = buildGroup(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw);
-    s_groups.push_back(g);
-    int idO = (int)s_groups.size();
-    s_groups.push_back(w);
-    int idW = (int)s_groups.size();
+    int idO = placeGroup(g);
+    int idW = 0;                       // pas de slot si pas d'eau (évite un groupe vide)
+    if (w.count > 0) {
+        idW = placeGroup(w);
+    }
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
@@ -1264,7 +1275,10 @@ static Value gfx_draw_chunk(Value* args, int argc) {
         return Value{};
     }
     litBindInstances(g.mesh.vaoId, g.vboX, g.vboC, g.vboT);
-    // Atlas lié si déclaré (tuiles≥0 échantillonnent l'atlas) ; sinon blanc (couleur pleine).
+    // Atlas lié si déclaré (tuiles≥0 échantillonnent l'atlas) ; sinon blanc (couleur
+    // pleine). CONTRAT : avec un tileset actif, donner une tuile à CHAQUE cube du
+    // chunk — un cube à tuile -1 échantillonnerait l'atlas @ fragTexCoord (tuile 0)
+    // au lieu d'une couleur pleine.
     litDrawInstanced(g.mesh, s_atlas_texid, g.count);
     rlDisableShader();
     return Value{};
@@ -1314,6 +1328,7 @@ static void freeGroupById(Value& handle, const char* key) {
         return;
     }
     InstGroup& g = s_groups[id - 1];
+    bool live = g.vboX != 0 || g.vboC != 0 || g.vboT != 0 || g.count != 0;
     if (g.vboX) {
         rlUnloadVertexBuffer(g.vboX);
         g.vboX = 0;
@@ -1327,6 +1342,11 @@ static void freeGroupById(Value& handle, const char* key) {
         g.vboT = 0;
     }
     g.count = 0;
+    // slot rendu au pool UNIQUEMENT s'il était vivant → double-free idempotent
+    // (2ᵉ libération du même handle = no-op, pas de slot dupliqué dans le pool).
+    if (live) {
+        s_free_groups.push_back(id - 1);
+    }
 }
 
 static Value gfx_free_chunk(Value* args, int argc) {
