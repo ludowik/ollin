@@ -16,19 +16,35 @@
 // VM persists across ollin_run() calls so graphics frame callbacks remain valid.
 static std::unique_ptr<VM> s_vm;
 
+// Jalon de diagnostic (TEMPORAIRE) : pousse une ligne dans le tampon stderr de
+// l'overlay de crash (window.__ollinCrash.noteStderr) → à l'apparition de
+// l'overlay, sa section « stderr » montre la DERNIÈRE phase atteinte avant le
+// trap. Sert à localiser la phase du re-exécute (relance) qui plante sur iOS.
+#define OLLIN_MILE(s) EM_ASM({ if (window.__ollinCrash) window.__ollinCrash.noteStderr("MILE " + UTF8ToString($0)); }, s)
+
 static std::string ollin_run(const std::string& source) {
+    OLLIN_MILE("A image_reset");
     // Release stale GL texture handles before GL context may be reset.
     image_reset();
+    OLLIN_MILE("B cancel_main_loop");
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
+    OLLIN_MILE("C destroy old VM");
+    s_vm.reset();   // détruire l'ancienne VM AVANT d'en construire une neuve (isole la phase)
+    OLLIN_MILE("D new VM");
     s_vm = std::make_unique<VM>();
 
     std::ostringstream out;
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
     try {
+        OLLIN_MILE("E parse+compile");
         auto imported = std::make_shared<std::unordered_set<std::string>>();
-        s_vm->execute(Compiler().compile(Parser(Lexer(source).tokenize(), "", imported).parse()));
+        Chunk chunk = Compiler().compile(Parser(Lexer(source).tokenize(), "", imported).parse());
+        OLLIN_MILE("F execute");
+        s_vm->execute(std::move(chunk));
+        OLLIN_MILE("G runEntryHooks");
         s_vm->runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
+        OLLIN_MILE("H done");
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
         return std::string("error: ") + e.what();

@@ -60,10 +60,11 @@ if(EMSCRIPTEN)
 
     add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp)
     target_include_directories(ollin_wasm PRIVATE src libs)
-    target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
+    target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions --profiling-funcs)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
     target_link_libraries(ollin_wasm PRIVATE raylib)
     target_link_options(ollin_wasm PRIVATE
+        --profiling-funcs
         -sMODULARIZE=1
         -sEXPORT_NAME=OllinModule
         # Mémoire FIXE (pas de croissance) — IMPÉRATIF pour iOS/WebKit. Depuis emsdk
