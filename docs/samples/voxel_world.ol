@@ -11,14 +11,14 @@ import "joystick.ol"       ## classe Joystick (contrôle analogique)
 global CS = 16             ## côté d'un chunk
 global VIEW = 4            ## rayon de chunks chargés — ADAPTATIF (voir bloc auto-adapt)
 global VIEW_MIN = 1        ## borne basse du rayon adaptatif
-global VIEW_MAX = 24       ## garde-fou MÉMOIRE seulement (évite l'emballement) — PAS un plafond
-                          ## de perf : en pratique le FPS décroche et limite bien avant.
+global VIEW_MAX = 24       ## filet de sécurité DUR (évite l'emballement). La vraie limite
+                          ## est atteinte avant, par le FPS OU la mémoire (voir MEM_MAX).
 
 ## ── Auto-adaptation de la distance de vue ────────────────────────────────────
 ## En vsync verrouillé, deltaTime ne révèle PAS la marge (il reste à ~1/cadence
 ## tant qu'on tient) : il ne monte QUE quand des frames débordent. On compte donc,
-## sur une fenêtre, la PART de frames LENTES : trop de lentes → on réduit la
-## distance ; aucune lente → on sonde plus loin.
+## sur une fenêtre, la PART de frames LENTES : >25% → on réduit la distance ;
+## <10% (tolère la gigue) → on sonde plus loin ; entre les deux → on tient.
 ## CRUCIAL : les frames « irréelles » (> STALL_DT, ≈ moins de 3 fps) sont IGNORÉES.
 ## Elles ne viennent jamais d'une vraie surcharge de rendu mais du navigateur qui
 ## bride le requestAnimationFrame quand la page passe en arrière-plan / au retour
@@ -32,7 +32,13 @@ global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
 global adapt_slow = 0      ## dont frames lentes
 global grow_step = 1       ## amplitude de la prochaine montée : DOUBLE à chaque fenêtre fluide
                           ## (1,2,4,8…) → on atteint la limite du device en quelques fenêtres
-global view_cap = 999      ## plafond APPRIS au décrochage → on n'y remonte plus (anti-oscillation)
+global view_cap = 999      ## plafond appris au décrochage ; se RELÂCHE après un temps stable
+global view_good = 4       ## dernier rayon confirmé fluide → point de repli d'un dépassement
+global stable_t = 0.0      ## temps fluide passé au plafond → sert à relâcher view_cap
+global GROW_SLOW = 0.10    ## on monte si < 10% de frames lentes (tolère la gigue)
+global DROP_SLOW = 0.25    ## on décroche si > 25% de frames lentes
+global RELAX_T  = 8.0      ## secondes stables avant de re-sonder un cran plus loin
+global MEM_MAX  = 110000000 ## garde mémoire (octets) : au-delà on ne monte plus / on recule
 
 ## Réglage MANUEL de la distance : deux boutons tactiles − / + en haut à droite.
 ## Toucher un bouton passe en mode manuel → l'auto-adaptation se met en retrait
@@ -228,10 +234,17 @@ end
 ## PROCHE. Score bas = prioritaire ; on cuit les `budget` plus prioritaires par frame.
 ## Renvoie le nombre de chunks cuits ce tour (0 = rayon complet → plus rien à charger).
 func stream_load(pcx, pcz, budget)
-    ## 1) collecte des chunks manquants + score de priorité.
-    var mcx = []
-    var mcz = []
-    var msc = []
+    if budget < 1 then
+        return 0
+    end
+    ## Une SEULE passe : on retient au fil de l'eau les `budget` chunks manquants les
+    ## plus prioritaires (buffer trié borné). Score bas = prioritaire : DEVANT la
+    ## caméra d'abord, puis le PLUS PROCHE. Évite de bâtir la liste complète + de
+    ## la re-balayer `budget` fois.
+    var bcx = []
+    var bcz = []
+    var bsc = []
+    var cnt = 0
     var fdx = math.sin(yaw)          ## direction du regard (plan XZ)
     var fdz = math.cos(yaw)
     for dz = -VIEW, VIEW do
@@ -243,41 +256,44 @@ func stream_load(pcx, pcz, budget)
                 if dx * fdx + dz * fdz < 0 then
                     score = score + 100000             ## derrière la caméra → après
                 end
-                mcx[#mcx + 1] = cx
-                mcz[#mcz + 1] = cz
-                msc[#msc + 1] = score
+                ## insère dans le buffer trié croissant si assez prioritaire
+                if cnt < budget or score < bsc[cnt] then
+                    var p = budget
+                    if cnt < budget then
+                        cnt = cnt + 1
+                        p = cnt                        ## nouvelle place en fin
+                    end
+                    ## remonte tant que l'élément au-dessus est moins prioritaire
+                    while p > 1 and bsc[p - 1] > score do
+                        bcx[p] = bcx[p - 1]
+                        bcz[p] = bcz[p - 1]
+                        bsc[p] = bsc[p - 1]
+                        p = p - 1
+                    end
+                    bcx[p] = cx
+                    bcz[p] = cz
+                    bsc[p] = score
+                end
             end
         end
     end
-    ## 2) cuit les `budget` plus prioritaires (sélection du min, pas de tri complet).
+    ## cuit les retenus (déjà triés du plus prioritaire au moins prioritaire)
     var baked = 0
-    var n = #mcx
-    while budget > 0 do
-        var best = -1
-        var bestsc = 1000000000
-        for i = 1, n do
-            if msc[i] >= 0 and msc[i] < bestsc then
-                bestsc = msc[i]
-                best = i
-            end
-        end
-        if best < 0 then
-            budget = 0                                 ## plus aucun manquant
-        else
-            loaded[ckey(mcx[best], mcz[best])] = bake_chunk(mcx[best], mcz[best])
-            msc[best] = 0 - 1                          ## marqué cuit
-            budget = budget - 1
-            baked = baked + 1
-        end
+    for i = 1, cnt do
+        loaded[ckey(bcx[i], bcz[i])] = bake_chunk(bcx[i], bcz[i])
+        baked = baked + 1
     end
     return baked
 end
 
 ## Décharge (libère les VBO) les chunks hors du rayon → mémoire bornée.
-func stream_unload(pcx, pcz)
+## margin = hystérésis : 1 en déplacement (garde un anneau tampon → pas de churn si
+## on recule d'un pas), 0 lors d'une RÉDUCTION de distance (libère l'anneau extérieur
+## tout de suite → allège rendu ET mémoire dès le premier cran).
+func stream_unload(pcx, pcz, margin)
     var keep = {}
     for k, c in loaded do
-        if math.abs(c.cx - pcx) <= VIEW + 1 and math.abs(c.cz - pcz) <= VIEW + 1 then
+        if math.abs(c.cx - pcx) <= VIEW + margin and math.abs(c.cz - pcz) <= VIEW + margin then
             keep[k] = c
         else
             graphics.freeChunk(c)
@@ -372,7 +388,7 @@ func mouse.pressed(x, y)
             streaming = true                   ## charge le nouvel anneau
         elseif hit < 0 and VIEW > VIEW_MIN then
             VIEW = VIEW - 1
-            stream_unload(lastcx, lastcz)       ## libère l'anneau lointain aussitôt
+            stream_unload(lastcx, lastcz, 0)    ## réduction manuelle → libère aussitôt
         end
         return
     end
@@ -411,7 +427,7 @@ func draw()
     if pcx <> lastcx or pcz <> lastcz then
         lastcx = pcx
         lastcz = pcz
-        stream_unload(pcx, pcz)
+        stream_unload(pcx, pcz, 1)              ## déplacement → garde un anneau tampon
         streaming = true
     end
     ## budget de cuisson/frame : 6 en auto (charge vite les gros anneaux d'une montée
@@ -436,29 +452,53 @@ func draw()
                 adapt_slow = adapt_slow + 1
             end
             if adapt_t >= ADAPT_WIN then
-                ## > 25% de frames lentes → DÉCROCHAGE : on recule d'un cran et on
-                ## RETIENT ce rayon comme plafond (view_cap) → on n'y remonte plus.
-                ## Fenêtre entièrement fluide → on sonde plus loin par paliers qui
-                ## DOUBLENT (1,2,4,8…) → on atteint la vraie limite du device en
-                ## quelques fenêtres au lieu de grimper 1 par 1. Aucun plafond de
-                ## perf codé en dur : seule VIEW_MAX (garde-fou mémoire) borne.
-                if adapt_slow * 4 > adapt_n and VIEW > VIEW_MIN then
-                    view_cap = VIEW - 1                ## on décroche à VIEW → plafond appris
-                    VIEW = VIEW - 1
-                    stream_unload(pcx, pcz)            ## libère l'anneau lointain aussitôt
-                    grow_step = 1                      ## on repart d'un petit pas
-                elseif adapt_slow == 0 and VIEW < VIEW_MAX and VIEW < view_cap then
-                    VIEW = VIEW + grow_step
-                    if VIEW > VIEW_MAX then
-                        VIEW = VIEW_MAX
+                ## Bilan de la fenêtre. La limite réelle = FPS OU mémoire.
+                ## - Mémoire pleine OU >25% de frames lentes → DÉCROCHAGE : on revient
+                ##   au dernier palier confirmé fluide (view_good) — ce qui annule un
+                ##   dépassement d'un coup au lieu de redescendre 1 par 1 — et on
+                ##   RETIENT ce rayon (view_cap), en libérant tout de suite (marge 0).
+                ## - <10% de frames lentes (tolère la gigue) ET mémoire OK → on monte
+                ##   par paliers qui DOUBLENT (1,2,4,8…). Au plafond, on compte le temps
+                ##   stable : après RELAX_T, on relâche view_cap d'un cran (re-sonde).
+                ## - Entre les deux (10–25%) → on tient le palier.
+                var mem_full = mem() > MEM_MAX
+                if (mem_full or adapt_slow > adapt_n * DROP_SLOW) and VIEW > VIEW_MIN then
+                    view_cap = VIEW - 1               ## ce rayon décroche → plafond appris
+                    var back = (view_good + VIEW) // 2 ## repli à mi-chemin (dichotomie)
+                    if back > VIEW - 1 then
+                        back = VIEW - 1               ## au moins un cran de moins
                     end
-                    if VIEW > view_cap then
-                        VIEW = view_cap
+                    if back < VIEW_MIN then
+                        back = VIEW_MIN
                     end
-                    grow_step = grow_step * 2          ## prochaine montée deux fois plus grande
-                    streaming = true                   ## charge les nouveaux anneaux
+                    VIEW = back
+                    stream_unload(pcx, pcz, 0)        ## libère l'anneau extérieur aussitôt
+                    grow_step = 1
+                    stable_t = 0.0
+                elseif adapt_slow < adapt_n * GROW_SLOW then
+                    view_good = VIEW                  ## ce palier vient d'être fluide
+                    if VIEW < VIEW_MAX and VIEW < view_cap and not mem_full then
+                        VIEW = VIEW + grow_step
+                        if VIEW > VIEW_MAX then
+                            VIEW = VIEW_MAX
+                        end
+                        if VIEW > view_cap then
+                            VIEW = view_cap
+                        end
+                        grow_step = grow_step * 2     ## prochaine montée deux fois plus grande
+                        streaming = true
+                        stable_t = 0.0
+                    else
+                        grow_step = 1                 ## au plafond : on mesure le temps stable
+                        stable_t = stable_t + adapt_t
+                        if VIEW == view_cap and stable_t >= RELAX_T and not mem_full then
+                            view_cap = view_cap + 1   ## relâche : re-sonde un cran plus loin
+                            stable_t = 0.0
+                        end
+                    end
                 else
-                    grow_step = 1                      ## fenêtre mitigée (bruit) → on coupe la lancée
+                    grow_step = 1                     ## zone morte (gigue) → on tient le palier
+                    stable_t = 0.0
                 end
                 adapt_t = 0.0
                 adapt_n = 0
