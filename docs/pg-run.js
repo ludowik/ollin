@@ -45,6 +45,10 @@ export function runProgram(m, code, canvasEl, hooks) {
   try {
     out = m.execute(code)
   } catch (e) {
+    // Trap dur SYNCHRONE (relance in-place iOS) : rattrapé ici → surface l'overlay
+    // de diagnostic AVEC la stack (nom de la fonction fautive), que le message
+    // texte seul perdrait. N'ouvre l'overlay que pour une faute dure.
+    try { window.__ollinCrash && window.__ollinCrash.captureError('execute (relance)', e) } catch (_) {}
     hooks.onError('error: ' + (e && e.message ? e.message : e))
     return
   }

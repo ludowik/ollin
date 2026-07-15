@@ -98,6 +98,23 @@ function show(title, message, stack) {
   el.style.display = 'block'
 }
 
+// Ouvre l'overlay pour une exception JS/WASM SI elle est une faute dure (garde
+// la stack, indispensable : elle nomme la fonction qui a fauté — getWasmTableEntry,
+// index de fonction…). Une erreur de script Ollin ordinaire (« undeclared
+// variable »…) n'est PAS fatale → reste dans la zone de sortie, pas d'overlay.
+// Renvoie true si l'overlay a été ouvert. Appelé notamment par runProgram, car un
+// trap SYNCHRONE pendant m.execute() (relance in-place) est rattrapé par son
+// try/catch et n'atteindrait donc jamais le handler window 'error'.
+export function captureError(title, err) {
+  const msg = (err && err.message) || String(err)
+  const stack = (err && err.stack) || ''
+  if (FATAL_RE.test(msg) || FATAL_RE.test(stack)) {
+    show(title, msg, stack)
+    return true
+  }
+  return false
+}
+
 // Enregistre une ligne stderr dans le tampon glissant ; déclenche l'overlay si
 // la ligne est une faute dure (l'abort emscripten passe souvent par printErr).
 export function noteStderr(line) {
@@ -131,6 +148,10 @@ let installed = false
 export function installCrashOverlay() {
   if (installed) return
   installed = true
+  // Exposé global : pg-run.js est chargé sous une URL cache-bustée (?v) distincte
+  // → instance de module séparée. On partage donc l'état de l'overlay (latch
+  // « premier crash gagne », tampon stderr) via window plutôt que par import.
+  window.__ollinCrash = { captureError, noteStderr }
   window.addEventListener('error', (e) => {
     const err = e.error
     const msg = (err && err.message) || e.message || 'error'
