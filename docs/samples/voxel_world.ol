@@ -24,10 +24,12 @@ global VIEW_MAX = 12       ## borne haute du rayon (sécurité mémoire ; monte 
 ## d'une autre appli — les compter ferait rétrécir la vue À TORT (le bug précédent).
 global SLOW_DT  = 0.021    ## frame « lente » : au-dessus de ~48 fps de période
 global STALL_DT = 0.30     ## au-delà = arrière-plan/reprise, PAS une frame réelle → ignorée
+global ADAPT_WIN = 0.6     ## durée d'une fenêtre d'évaluation (courte → réactif)
 global fps_ema  = 60.0     ## FPS lissé — AFFICHAGE seulement (aucune décision dessus)
 global adapt_t  = 0.0      ## secondes mesurées dans la fenêtre courante
 global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
 global adapt_slow = 0      ## dont frames lentes
+global grow_streak = 0     ## fenêtres fluides consécutives → montée accélérée (1,2,3,… crans)
 global cooldown = 0.0      ## délai avant de re-sonder après une réduction (anti-oscillation)
 
 ## Réglage MANUEL de la distance : deux boutons tactiles − / + en haut à droite.
@@ -381,9 +383,9 @@ func draw()
         stream_unload(pcx, pcz)
         streaming = true
     end
-    ## budget de cuisson/frame : 2 en auto (pas d'à-coups), plus large en manuel
-    ## pour que le changement de distance apparaisse tout de suite au toucher.
-    var budget = 2
+    ## budget de cuisson/frame : 3 en auto (charge vite les anneaux d'une montée
+    ## accélérée sans à-coups), plus large en manuel pour un retour immédiat au toucher.
+    var budget = 3
     if manual then
         budget = 8
     end
@@ -405,15 +407,29 @@ func draw()
             if deltaTime > SLOW_DT then
                 adapt_slow = adapt_slow + 1
             end
-            if adapt_t >= 1.5 then
-                ## > 25% de frames lentes → on réduit ; aucune lente → on sonde plus loin
+            if adapt_t >= ADAPT_WIN then
+                ## > 25% de frames lentes → on réduit ; fenêtre entièrement fluide →
+                ## on sonde plus loin, par paliers ACCÉLÉRÉS (plus il y a de fenêtres
+                ## fluides d'affilée, plus on saute de crans) → on atteint vite la
+                ## vraie limite au lieu de grimper 1 par 1.
                 if adapt_slow * 4 > adapt_n and VIEW > VIEW_MIN then
                     VIEW = VIEW - 1
                     stream_unload(pcx, pcz)            ## libère l'anneau lointain aussitôt
-                    cooldown = 8.0                     ## pause avant de re-tenter (anti-oscillation)
+                    cooldown = 6.0                     ## pause avant de re-tenter (anti-oscillation)
+                    grow_streak = 0                    ## on a dépassé → on repart doucement
                 elseif adapt_slow == 0 and cooldown <= 0 and VIEW < VIEW_MAX then
-                    VIEW = VIEW + 1
-                    streaming = true                   ## charge le nouvel anneau
+                    grow_streak = grow_streak + 1
+                    var step = grow_streak
+                    if step > 3 then
+                        step = 3                       ## +3 crans max par fenêtre
+                    end
+                    VIEW = VIEW + step
+                    if VIEW > VIEW_MAX then
+                        VIEW = VIEW_MAX
+                    end
+                    streaming = true                   ## charge les nouveaux anneaux
+                else
+                    grow_streak = 0                    ## fenêtre mitigée (bruit) → on coupe la lancée
                 end
                 adapt_t = 0.0
                 adapt_n = 0
