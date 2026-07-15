@@ -25,6 +25,11 @@
 const V = Date.now()
 const { hardReload } = await import('./pg-run.js?v=' + V)
 
+// Capture de crash à l'écran (diagnostic device — iOS plein écran sans console).
+// Installé AVANT tout chargement WASM pour attraper aussi les fautes dures.
+const { installCrashOverlay, wireModule } = await import('./pg-crashlog.js?v=' + V)
+installCrashOverlay()
+
 // ── Runtime WASM partagé (une instance pour toute la SPA) ───────────────────
 let ollinPromise = null
 function getOllin() {
@@ -34,12 +39,12 @@ function getOllin() {
     s.src = 'wasm/ollin.js?' + V
     s.onload = () => {
       const dir = s.src.replace(/\?.*$/, '').replace(/[^/]*$/, '')
-      OllinModule({
+      OllinModule(wireModule({
         locateFile: f => dir + f + '?' + V,
         canvas: document.getElementById('canvas'),
         print: () => {},
         printErr: () => {},
-      }).then(resolve).catch(reject)
+      })).then(resolve).catch(reject)
     }
     s.onerror = () => reject(new Error('WASM introuvable'))
     document.head.appendChild(s)
