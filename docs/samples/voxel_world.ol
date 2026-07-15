@@ -11,7 +11,8 @@ import "joystick.ol"       ## classe Joystick (contrôle analogique)
 global CS = 16             ## côté d'un chunk
 global VIEW = 4            ## rayon de chunks chargés — ADAPTATIF (voir bloc auto-adapt)
 global VIEW_MIN = 1        ## borne basse du rayon adaptatif
-global VIEW_MAX = 12       ## borne haute du rayon (sécurité mémoire ; monte en manuel pour tester)
+global VIEW_MAX = 24       ## garde-fou MÉMOIRE seulement (évite l'emballement) — PAS un plafond
+                          ## de perf : en pratique le FPS décroche et limite bien avant.
 
 ## ── Auto-adaptation de la distance de vue ────────────────────────────────────
 ## En vsync verrouillé, deltaTime ne révèle PAS la marge (il reste à ~1/cadence
@@ -24,13 +25,14 @@ global VIEW_MAX = 12       ## borne haute du rayon (sécurité mémoire ; monte 
 ## d'une autre appli — les compter ferait rétrécir la vue À TORT (le bug précédent).
 global SLOW_DT  = 0.021    ## frame « lente » : au-dessus de ~48 fps de période
 global STALL_DT = 0.30     ## au-delà = arrière-plan/reprise, PAS une frame réelle → ignorée
-global ADAPT_WIN = 0.6     ## durée d'une fenêtre d'évaluation (courte → réactif)
+global ADAPT_WIN = 0.5     ## durée d'une fenêtre d'évaluation (courte → réactif)
 global fps_ema  = 60.0     ## FPS lissé — AFFICHAGE seulement (aucune décision dessus)
 global adapt_t  = 0.0      ## secondes mesurées dans la fenêtre courante
 global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
 global adapt_slow = 0      ## dont frames lentes
-global grow_streak = 0     ## fenêtres fluides consécutives → montée accélérée (1,2,3,… crans)
-global cooldown = 0.0      ## délai avant de re-sonder après une réduction (anti-oscillation)
+global grow_step = 1       ## amplitude de la prochaine montée : DOUBLE à chaque fenêtre fluide
+                          ## (1,2,4,8…) → on atteint la limite du device en quelques fenêtres
+global view_cap = 999      ## plafond APPRIS au décrochage → on n'y remonte plus (anti-oscillation)
 
 ## Réglage MANUEL de la distance : deux boutons tactiles − / + en haut à droite.
 ## Toucher un bouton passe en mode manuel → l'auto-adaptation se met en retrait
@@ -383,11 +385,11 @@ func draw()
         stream_unload(pcx, pcz)
         streaming = true
     end
-    ## budget de cuisson/frame : 3 en auto (charge vite les anneaux d'une montée
-    ## accélérée sans à-coups), plus large en manuel pour un retour immédiat au toucher.
-    var budget = 3
+    ## budget de cuisson/frame : 6 en auto (charge vite les gros anneaux d'une montée
+    ## exponentielle), plus large en manuel pour un retour immédiat au toucher.
+    var budget = 6
     if manual then
-        budget = 8
+        budget = 10
     end
     if streaming and stream_load(pcx, pcz, budget) == 0 then
         streaming = false
@@ -398,9 +400,6 @@ func draw()
     ## dont les à-coups fausseraient le compte.
     if deltaTime > 0 and deltaTime < STALL_DT then
         fps_ema = fps_ema * 0.9 + (1.0 / deltaTime) * 0.1     ## affichage uniquement
-        if cooldown > 0 then
-            cooldown = cooldown - deltaTime
-        end
         if not streaming and not manual then
             adapt_t = adapt_t + deltaTime
             adapt_n = adapt_n + 1
@@ -408,28 +407,29 @@ func draw()
                 adapt_slow = adapt_slow + 1
             end
             if adapt_t >= ADAPT_WIN then
-                ## > 25% de frames lentes → on réduit ; fenêtre entièrement fluide →
-                ## on sonde plus loin, par paliers ACCÉLÉRÉS (plus il y a de fenêtres
-                ## fluides d'affilée, plus on saute de crans) → on atteint vite la
-                ## vraie limite au lieu de grimper 1 par 1.
+                ## > 25% de frames lentes → DÉCROCHAGE : on recule d'un cran et on
+                ## RETIENT ce rayon comme plafond (view_cap) → on n'y remonte plus.
+                ## Fenêtre entièrement fluide → on sonde plus loin par paliers qui
+                ## DOUBLENT (1,2,4,8…) → on atteint la vraie limite du device en
+                ## quelques fenêtres au lieu de grimper 1 par 1. Aucun plafond de
+                ## perf codé en dur : seule VIEW_MAX (garde-fou mémoire) borne.
                 if adapt_slow * 4 > adapt_n and VIEW > VIEW_MIN then
+                    view_cap = VIEW - 1                ## on décroche à VIEW → plafond appris
                     VIEW = VIEW - 1
                     stream_unload(pcx, pcz)            ## libère l'anneau lointain aussitôt
-                    cooldown = 6.0                     ## pause avant de re-tenter (anti-oscillation)
-                    grow_streak = 0                    ## on a dépassé → on repart doucement
-                elseif adapt_slow == 0 and cooldown <= 0 and VIEW < VIEW_MAX then
-                    grow_streak = grow_streak + 1
-                    var step = grow_streak
-                    if step > 3 then
-                        step = 3                       ## +3 crans max par fenêtre
-                    end
-                    VIEW = VIEW + step
+                    grow_step = 1                      ## on repart d'un petit pas
+                elseif adapt_slow == 0 and VIEW < VIEW_MAX and VIEW < view_cap then
+                    VIEW = VIEW + grow_step
                     if VIEW > VIEW_MAX then
                         VIEW = VIEW_MAX
                     end
+                    if VIEW > view_cap then
+                        VIEW = view_cap
+                    end
+                    grow_step = grow_step * 2          ## prochaine montée deux fois plus grande
                     streaming = true                   ## charge les nouveaux anneaux
                 else
-                    grow_streak = 0                    ## fenêtre mitigée (bruit) → on coupe la lancée
+                    grow_step = 1                      ## fenêtre mitigée (bruit) → on coupe la lancée
                 end
                 adapt_t = 0.0
                 adapt_n = 0
