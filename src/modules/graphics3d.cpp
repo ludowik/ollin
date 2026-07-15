@@ -206,6 +206,7 @@ struct InstGroup {
 static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
 static std::vector<int> s_free_groups;    // slots libérés réutilisables → borne s_groups en streaming
 static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
+static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au begin3d — pour inFrustum appelé HORS du bloc 3D (où rlGetMatrixProjection renvoie l'ortho 2D restaurée par end3d)
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
 static Mesh s_shape_mesh[SH_COUNT];
@@ -683,6 +684,7 @@ static Value gfx_begin3d(Value* args, int argc) {
     s_buckets.clear();
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
+    s_proj3d = rlGetMatrixProjection();  // projection perspective figée → inFrustum correct même appelé hors du bloc 3D
     // Entre dans le mode « transform » de rlgl pour TOUT le bloc 3D : ainsi
     // translate/rotate/scale — AVEC OU SANS push/pop — écrivent dans
     // RLGL.State.transform (espace monde, lu par rlGetMatrixTransform) au lieu de
@@ -1149,7 +1151,11 @@ static Value gfx_in_frustum(Value* args, int argc) {
     float y = (float)numArg(args, argc, 1, "graphics.inFrustum");
     float z = (float)numArg(args, argc, 2, "graphics.inFrustum");
     float r = argc > 3 ? (float)numArg(args, argc, 3, "graphics.inFrustum") : 0.0f;
-    Matrix vp = MatrixMultiply(s_view3d, rlGetMatrixProjection());
+    // Utilise la projection FIGÉE au begin3d (s_proj3d), pas rlGetMatrixProjection()
+    // en direct : le culling par chunk est fait AVANT begin3d, où la projection
+    // courante est l'ortho 2D restaurée par le end3d précédent → frustum faux
+    // (chunks lointains cullés à tort ; ils « apparaissent » en approchant).
+    Matrix vp = MatrixMultiply(s_view3d, s_proj3d);
     // Lignes de VP (clip.x/y/z/w = ligne · (x,y,z,1)), layout colonne-major raylib.
     float rows[4][4] = {
         {vp.m0, vp.m4, vp.m8, vp.m12},   // clip.x
