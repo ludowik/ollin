@@ -11,7 +11,7 @@ import "joystick.ol"       ## classe Joystick (contrôle analogique)
 global CS = 16             ## côté d'un chunk
 global VIEW = 4            ## rayon de chunks chargés — ADAPTATIF (voir bloc auto-adapt)
 global VIEW_MIN = 1        ## borne basse du rayon adaptatif
-global VIEW_MAX = 6        ## borne haute du rayon adaptatif
+global VIEW_MAX = 12       ## borne haute du rayon (sécurité mémoire ; monte en manuel pour tester)
 
 ## ── Auto-adaptation de la distance de vue ────────────────────────────────────
 ## En vsync verrouillé, deltaTime ne révèle PAS la marge (il reste à ~1/cadence
@@ -381,7 +381,13 @@ func draw()
         stream_unload(pcx, pcz)
         streaming = true
     end
-    if streaming and stream_load(pcx, pcz, 2) == 0 then
+    ## budget de cuisson/frame : 2 en auto (pas d'à-coups), plus large en manuel
+    ## pour que le changement de distance apparaisse tout de suite au toucher.
+    var budget = 2
+    if manual then
+        budget = 8
+    end
+    if streaming and stream_load(pcx, pcz, budget) == 0 then
         streaming = false
     end
 
