@@ -44,7 +44,7 @@ global MEM_MAX  = 110000000 ## garde mémoire (octets) : au-delà on ne monte pl
 ## (elle ne contre plus ton réglage). Pratique pour tester l'impact de la distance.
 global manual = false      ## true dès qu'on a touché un bouton
 global BTN = 54            ## côté d'un bouton (cible tactile)
-global BTN_Y = 12          ## ordonnée des boutons
+global BTN_Y = 40          ## ordonnée des boutons (sous l'overlay FPS/mémoire du moteur)
 global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
 global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
