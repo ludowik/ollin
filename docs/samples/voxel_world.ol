@@ -223,22 +223,51 @@ func bake_chunk(cx, cz)
     return g
 end
 
-## Charge les chunks manquants dans le rayon (budget limité par frame → pas de à-coups).
+## Charge les chunks manquants dans le rayon, budget limité par frame (pas d'à-coups),
+## en PRIORISANT ce qui compte : d'abord ce qui est DEVANT la caméra, puis le PLUS
+## PROCHE. Score bas = prioritaire ; on cuit les `budget` plus prioritaires par frame.
 ## Renvoie le nombre de chunks cuits ce tour (0 = rayon complet → plus rien à charger).
 func stream_load(pcx, pcz, budget)
-    var baked = 0
+    ## 1) collecte des chunks manquants + score de priorité.
+    var mcx = []
+    var mcz = []
+    var msc = []
+    var fdx = math.sin(yaw)          ## direction du regard (plan XZ)
+    var fdz = math.cos(yaw)
     for dz = -VIEW, VIEW do
         for dx = -VIEW, VIEW do
-            if budget > 0 then
-                var cx = pcx + dx
-                var cz = pcz + dz
-                var k = ckey(cx, cz)
-                if loaded[k] == nil then
-                    loaded[k] = bake_chunk(cx, cz)
-                    budget = budget - 1
-                    baked = baked + 1
+            var cx = pcx + dx
+            var cz = pcz + dz
+            if loaded[ckey(cx, cz)] == nil then
+                var score = dx * dx + dz * dz          ## distance² (proche d'abord)
+                if dx * fdx + dz * fdz < 0 then
+                    score = score + 100000             ## derrière la caméra → après
                 end
+                mcx[#mcx + 1] = cx
+                mcz[#mcz + 1] = cz
+                msc[#msc + 1] = score
             end
+        end
+    end
+    ## 2) cuit les `budget` plus prioritaires (sélection du min, pas de tri complet).
+    var baked = 0
+    var n = #mcx
+    while budget > 0 do
+        var best = -1
+        var bestsc = 1000000000
+        for i = 1, n do
+            if msc[i] >= 0 and msc[i] < bestsc then
+                bestsc = msc[i]
+                best = i
+            end
+        end
+        if best < 0 then
+            budget = 0                                 ## plus aucun manquant
+        else
+            loaded[ckey(mcx[best], mcz[best])] = bake_chunk(mcx[best], mcz[best])
+            msc[best] = 0 - 1                          ## marqué cuit
+            budget = budget - 1
+            baked = baked + 1
         end
     end
     return baked
