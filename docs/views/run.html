@@ -24,7 +24,7 @@
     #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
     #bar a:hover { text-decoration:underline; }
     #bar .sp { flex:1; }
-    /* Boutons de la barre (Pause / Relancer / Recharger) : style unique. */
+    /* Boutons de la barre (Recharger / Relancer / Pause) : style unique. */
     .bar-btn { display:flex; align-items:center; gap:6px; background:transparent;
                border:1px solid var(--border); color:var(--dim); border-radius:6px;
                padding:5px 9px; font:inherit; font-size:12px; cursor:pointer;
@@ -51,9 +51,13 @@
     <!-- Tout est cadré à droite : Recharger · Relancer · Pause · Éditeur. -->
     <span class="sp"></span>
     <span id="status">Chargement…</span>
-    <button id="reload-btn" class="bar-btn" title="Relancer le programme depuis le début">
+    <button id="reload-btn" class="bar-btn" title="Recharger la page (instance WASM neuve, chemin sûr)">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
       <span class="bar-label">Recharger</span>
+    </button>
+    <button id="relaunch-btn" class="bar-btn" title="Relancer dans la même instance WASM (test de ré-exécution)">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
+      <span class="bar-label">Relancer</span>
     </button>
     <button id="pause-btn" class="bar-btn" title="Pause / Reprendre">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>

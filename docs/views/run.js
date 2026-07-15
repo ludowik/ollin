@@ -50,13 +50,15 @@ export async function init(ctx) {
     })
   }
 
-  // ── Contrôles d'exécution : Recharger + Pause/Reprendre ─────────────────────
-  // « Recharger » recharge la PAGE → nouvelle instance WASM (module frais). On ne
-  // ré-exécute PAS le module partagé : après une longue session graphique (streaming
-  // de chunks) l'état accumulé peut être corrompu, et un simple ré-execute() plante
-  // alors (« memory access out of bounds »). Repartir d'un module neuf garantit un
-  // relancement propre. location.reload() conserve le hash (#/run/sample/…).
+  // ── Contrôles d'exécution : Recharger + Relancer + Pause/Reprendre ──────────
+  // DEUX relances distinctes :
+  //  • « Recharger » recharge la PAGE → nouvelle instance WASM (module frais). C'est
+  //    le chemin SÛR : repartir d'un module neuf évite tout état accumulé corrompu.
+  //  • « Relancer » ré-exécute DANS LA MÊME instance WASM (sans reload). C'est le
+  //    chemin qui, après une longue session graphique, avait pu déclencher un crash
+  //    au ré-execute — gardé pour pouvoir TESTER s'il se reproduit (ex. plein écran).
   const reloadBtn   = document.getElementById('reload-btn')
+  const relaunchBtn = document.getElementById('relaunch-btn')
   const pauseBtn    = document.getElementById('pause-btn')
   const ICON_PAUSE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>'
   const ICON_PLAY  = '<svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>'
@@ -81,7 +83,18 @@ export async function init(ctx) {
   }
   if (reloadBtn) {
     reloadBtn.addEventListener('click', () => {
-      location.reload()   // module WASM neuf (évite le plantage sur état corrompu)
+      location.reload()   // module WASM neuf (chemin sûr, conserve le hash #/run/…)
+    })
+  }
+  if (relaunchBtn) {
+    relaunchBtn.addEventListener('click', () => {
+      // relance IN-PLACE : ré-exécute dans la MÊME instance WASM (pas de reload page)
+      if (paused) {
+        try { mod && mod.resumeMainLoop() } catch (_) {}
+        paused = false
+        setPauseUI()
+      }
+      launch()
     })
   }
 
