@@ -26,7 +26,6 @@ global VIEW_MAX = 24       ## filet de sécurité DUR (évite l'emballement). La
 global SLOW_DT  = 0.021    ## frame « lente » : au-dessus de ~48 fps de période
 global STALL_DT = 0.30     ## au-delà = arrière-plan/reprise, PAS une frame réelle → ignorée
 global ADAPT_WIN = 0.5     ## durée d'une fenêtre d'évaluation (courte → réactif)
-global fps_ema  = 60.0     ## FPS lissé — AFFICHAGE seulement (aucune décision dessus)
 global adapt_t  = 0.0      ## secondes mesurées dans la fenêtre courante
 global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
 global adapt_slow = 0      ## dont frames lentes
@@ -444,7 +443,6 @@ func draw()
     ## (> STALL_DT : arrière-plan/reprise) et on ne mesure pas pendant la cuisson,
     ## dont les à-coups fausseraient le compte.
     if deltaTime > 0 and deltaTime < STALL_DT then
-        fps_ema = fps_ema * 0.9 + (1.0 / deltaTime) * 0.1     ## affichage uniquement
         if not streaming and not manual then
             adapt_t = adapt_t + deltaTime
             adapt_n = adapt_n + 1
@@ -540,5 +538,5 @@ func draw()
     if manual then
         mode = "manuel"
     end
-    graphics.draw_text("fps " + math.floor(fps_ema + 0.5) + "   vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
+    graphics.draw_text("vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
 end
