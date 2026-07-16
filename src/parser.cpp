@@ -1193,8 +1193,20 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     auto sep2 = resolved.find_last_of("/\\");
     std::string sub_dir = (sep2 != std::string::npos) ? resolved.substr(0, sep2 + 1) : base_dir_;
 
-    Parser sub_parser(Lexer(src_text).tokenize(), sub_dir, imported_paths_, module_names_);
-    Program sub_prog = sub_parser.parse();
+    // Parse le fichier importé en préfixant son chemin aux erreurs lex/parse :
+    // sinon « line N » serait ambigu (on ne saurait pas DANS QUEL fichier). Un
+    // import plus profond ayant déjà préfixé (message contenant « .ol: ») n'est
+    // pas re-préfixé → on garde le fichier le plus interne (la vraie source).
+    Program sub_prog;
+    try {
+        Parser sub_parser(Lexer(src_text).tokenize(), sub_dir, imported_paths_, module_names_);
+        sub_prog = sub_parser.parse();
+    } catch (const std::exception& e) {
+        std::string msg = e.what();
+        if (msg.find(".ol:") != std::string::npos)
+            throw; // déjà attribué à un fichier importé plus profond
+        throw std::runtime_error(resolved + ": " + msg);
+    }
 
     // Mémorise les noms exportés (même pour un import flat) → un import aliasé
     // ultérieur du même module pourra reconstruire sa map.

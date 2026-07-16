@@ -1239,6 +1239,33 @@ function showOutput(text) {
   }
 }
 
+// Sur une erreur portant une ligne (« error: [<fichier>: ]line N: … », lex/parse
+// ou runtime VM), ouvre le fichier fautif si besoin et positionne le curseur sur
+// la ligne (sélectionnée → surlignée jusqu'à la prochaine frappe). Sans fichier
+// nommé → fichier courant/d'entrée. Ligne clampée aux bornes du document.
+function gotoError(msg) {
+  const m = /(?:([\w./-]+\.ol)\s*:\s*)?line\s+(\d+)/.exec(msg || '')
+  if (!m) return
+  const wantLine = parseInt(m[2], 10)
+  let file = m[1] || null
+  // Résout le fichier nommé (chemin de l'import) vers une clé du projet : match
+  // exact, sinon par nom de base (les clés projet peuvent différer du résolu).
+  if (file && currentProject) {
+    if (currentProject.files[file] === undefined) {
+      const base = file.split('/').pop()
+      file = scripts(currentProject).find(f => f === file || f.split('/').pop() === base) || null
+    }
+  } else {
+    file = null
+  }
+  if (file && file !== currentFile) openFile(file)
+  const doc = view.state.doc
+  const n = Math.max(1, Math.min(wantLine, doc.lines))
+  const ln = doc.line(n)
+  view.dispatch({ selection: { anchor: ln.from, head: ln.to }, scrollIntoView: true })
+  view.focus()
+}
+
 // ── Run ───────────────────────────────────────────────────────────────────
 let ollin = null
 
@@ -1264,7 +1291,7 @@ async function launch() {
     await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // modèles des imports aussi
   }
   Run.runProgram(ollin, code, canvasEl, {
-    onError:   (msg) => { setRunning(false); showOutput(msg) },
+    onError:   (msg) => { setRunning(false); showOutput(msg); gotoError(msg) },
     onRunning: () => {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
