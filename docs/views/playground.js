@@ -351,8 +351,11 @@ const view = new EditorView({
         { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
         // Chord (Alt+K puis C/U) : commenter / dé-commenter les lignes sélectionnées.
+        // Deux variantes : Alt relâché avant la 2e touche, OU Alt maintenu (Alt+K Alt+C).
         { key: 'Alt-k c', run: (v) => toggleLineComment(v, true) },
         { key: 'Alt-k u', run: (v) => toggleLineComment(v, false) },
+        { key: 'Alt-k Alt-c', run: (v) => toggleLineComment(v, true) },
+        { key: 'Alt-k Alt-u', run: (v) => toggleLineComment(v, false) },
       ]),
       indentUnit.of('    '),
       // Auto-paires natives : «(» insère «()», entoure la sélection si elle
