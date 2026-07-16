@@ -11,7 +11,7 @@
 // + l'abort emscripten (wireModule), et on garde un tampon glissant de stderr.
 
 const STDERR_RING = []          // dernières lignes printErr (contexte)
-const RING_MAX = 60
+const RING_MAX = 400             // large : un rapport AddressSanitizer fait ~30-60 lignes
 let overlayEl = null
 let shown = false
 
