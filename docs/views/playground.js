@@ -329,10 +329,10 @@ let loadingFile = false   // true pendant un chargement programmatique → pas d
 // closeBracketsKeymap en tête : Backspace supprime une paire vide «()» d'un coup.
 const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
-const view = new EditorView({
-  state: EditorState.create({
-    doc: '',
-    extensions: [
+// Extensions de l'éditeur, réutilisées pour recréer un état VIERGE à chaque
+// chargement de fichier (setEditorText) → historique d'annulation propre par
+// fichier (cf. setEditorText).
+const editorExtensions = [
       ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme,
       EditorView.lineWrapping,
       // iOS Safari : la barre prédictive « QuickType » intercepte le 1er
@@ -367,8 +367,10 @@ const view = new EditorView({
         clearTimeout(saveTimer)
         saveTimer = setTimeout(scheduleSave, 500)
       }),
-    ]
-  }),
+]
+
+const view = new EditorView({
+  state: EditorState.create({ doc: '', extensions: editorExtensions }),
   parent: document.getElementById('editor-wrap'),
 })
 
@@ -576,7 +578,11 @@ const scripts = p => Object.keys(p.files).filter(f => f !== Store.MANIFEST).sort
 
 function setEditorText(text) {
   loadingFile = true
-  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
+  // Recrée l'état complet → historique d'annulation VIERGE. Charger un fichier ne
+  // doit pas être annulable (sinon Ctrl+Z vide le fichier), et chaque fichier a son
+  // propre historique (sinon Ctrl+Z après changement de fichier ferait resurgir le
+  // contenu du fichier précédent). setState remplace doc + historique d'un coup.
+  view.setState(EditorState.create({ doc: text, extensions: editorExtensions }))
   loadingFile = false
 }
 
