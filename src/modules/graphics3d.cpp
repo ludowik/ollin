@@ -339,7 +339,7 @@ static void loadLitShader() {
         "        float cols = atlasGrid.x;\n"
         "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
         "        vec2 uv = fract(fragTexCoord);\n"
-        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) uv = fract(uv + vec2(uTime * 0.04, uTime * 0.02));\n" // tuile animée (eau)
+        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) uv = fract(uv + vec2(uTime * 0.09 + sin(uTime * 1.6 + fragTexCoord.y * 8.0) * 0.045, uTime * 0.06 + cos(uTime * 1.3 + fragTexCoord.x * 8.0) * 0.045));\n" // tuile animée (eau) : défilement + ondulation sinusoïdale
         "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
         "        vec2 auv = (cell + uv) / atlasGrid;\n"
         "        texel = texture(texture0, auv);\n"

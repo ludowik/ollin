@@ -1,56 +1,41 @@
-## Univers VOXEL INFINI — chunks générés à la volée en se déplaçant.
-##   • Le terrain vient d'un bruit de Perlin (défini partout) → monde illimité.
-##   • On CUIT (beginChunk/endChunk) les chunks autour du joueur et on LIBÈRE
-##     (freeChunk) les lointains → mémoire bornée, univers qui s'étend en marchant.
-##   • On ne dessine que les chunks VISIBLES (inFrustum). Biomes de surface :
-##     désert/plaine/forêt ; relief (roche/neige) selon l'altitude. DÉPLACEMENT :
-##     joystick analogique tactile (classe réutilisable, joystick.ol).
+## Univers voxel infini — chunks générés à la volée par bruit de Perlin, cuits
+## autour du joueur (beginChunk/endChunk) et libérés au loin (freeChunk). Distance
+## de vue auto-adaptative (voir adapt_view). Déplacement : joystick tactile.
 
-import "joystick.ol"       ## classe Joystick (contrôle analogique)
+import "joystick.ol"
 
-global CS = 16             ## côté d'un chunk
-global VIEW = 4            ## rayon de chunks chargés — ADAPTATIF (voir bloc auto-adapt)
-global VIEW_MIN = 1        ## borne basse du rayon adaptatif
-global VIEW_MAX = 24       ## filet de sécurité DUR (évite l'emballement). La vraie limite
-                          ## est atteinte avant, par le FPS OU la mémoire (voir MEM_MAX).
+global CS = 16
+global VIEW = 4
+global VIEW_MIN = 1
+global VIEW_MAX = 24        ## filet de sécurité ; la vraie limite vient du FPS ou de la mémoire
 
-## ── Auto-adaptation de la distance de vue ────────────────────────────────────
-## En vsync verrouillé, deltaTime ne révèle PAS la marge (il reste à ~1/cadence
-## tant qu'on tient) : il ne monte QUE quand des frames débordent. On compte donc,
-## sur une fenêtre, la PART de frames LENTES : >25% → on réduit la distance ;
-## <10% (tolère la gigue) → on sonde plus loin ; entre les deux → on tient.
-## CRUCIAL : les frames « irréelles » (> STALL_DT, ≈ moins de 3 fps) sont IGNORÉES.
-## Elles ne viennent jamais d'une vraie surcharge de rendu mais du navigateur qui
-## bride le requestAnimationFrame quand la page passe en arrière-plan / au retour
-## d'une autre appli — les compter ferait rétrécir la vue À TORT (le bug précédent).
-global SLOW_DT  = 0.021    ## frame « lente » : au-dessus de ~48 fps de période
-global STALL_DT = 0.30     ## au-delà = arrière-plan/reprise, PAS une frame réelle → ignorée
-global ADAPT_WIN = 0.5     ## durée d'une fenêtre d'évaluation (courte → réactif)
-global adapt_t  = 0.0      ## secondes mesurées dans la fenêtre courante
-global adapt_n  = 0        ## frames réelles comptées dans la fenêtre
-global adapt_slow = 0      ## dont frames lentes
-global grow_step = 1       ## amplitude de la prochaine montée : DOUBLE à chaque fenêtre fluide
-                          ## (1,2,4,8…) → on atteint la limite du device en quelques fenêtres
-global view_cap = 999      ## plafond appris au décrochage ; se RELÂCHE après un temps stable
-global view_good = 4       ## dernier rayon confirmé fluide → point de repli d'un dépassement
-global stable_t = 0.0      ## temps fluide passé au plafond → sert à relâcher view_cap
-global GROW_SLOW = 0.10    ## on monte si < 10% de frames lentes (tolère la gigue)
-global DROP_SLOW = 0.25    ## on décroche si > 25% de frames lentes
-global RELAX_T  = 8.0      ## secondes stables avant de re-sonder un cran plus loin
-global MEM_MAX  = 110000000 ## garde mémoire (octets) : au-delà on ne monte plus / on recule
+## Auto-adaptation : en vsync verrouillé, deltaTime ne révèle la marge que quand des
+## frames débordent. On mesure la PART de frames lentes sur une fenêtre. Les frames
+## irréelles (> STALL_DT, arrière-plan/reprise) sont ignorées.
+global SLOW_DT  = 0.021
+global STALL_DT = 0.30
+global ADAPT_WIN = 0.5
+global adapt_t  = 0.0
+global adapt_n  = 0
+global adapt_slow = 0
+global grow_step = 1        ## montée qui double à chaque fenêtre fluide (1,2,4,8…)
+global view_cap = 999       ## plafond appris au décrochage ; relâché après RELAX_T stable
+global view_good = 4        ## dernier rayon confirmé fluide (repli d'un dépassement)
+global stable_t = 0.0
+global GROW_SLOW = 0.10
+global DROP_SLOW = 0.25
+global RELAX_T  = 8.0
+global MEM_MAX  = 110000000
 
-## Réglage MANUEL de la distance : deux boutons tactiles − / + en haut à droite.
-## Toucher un bouton passe en mode manuel → l'auto-adaptation se met en retrait
-## (elle ne contre plus ton réglage). Pratique pour tester l'impact de la distance.
-global manual = false      ## true dès qu'on a touché un bouton
-global BTN = 54            ## côté d'un bouton (cible tactile)
-global BTN_Y = 40          ## ordonnée des boutons (sous l'overlay FPS/mémoire du moteur)
-global SEA = 9             ## niveau de la mer (marge sous la mer pour les océans)
-global loaded = {}         ## "cx,cz" → handle endChunk { id, idw, count, wcount, wx, wz, cx, cz }
+global manual = false       ## true dès qu'on touche un bouton − / + (auto-adapt en retrait)
+global BTN = 54
+global BTN_Y = 40
+global SEA = 9
+global loaded = {}          ## "cx,cz" → handle endChunk
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 
 global EYE = 2.2
-global STEP = 1.2          ## marche franchissable ; au-delà = mur (falaise/montagne)
+global STEP = 1.2           ## marche franchissable ; au-delà = mur
 global camX = 8.5
 global camY = 10
 global camZ = 8.5
@@ -58,18 +43,15 @@ global yaw = 0.0
 global PITCH = -0.12
 global lastcx = 999999
 global lastcz = 999999
-global streaming = false   ## vrai tant qu'il reste des chunks à charger (évite le balayage à vide)
+global streaming = false
 
-## déplacement : joystick analogique réutilisable (joystick.ol)
 global pad = Joystick()
-global TURN_MAX = 1.8      ## rad/s à l'inclinaison horizontale maximale
-global SPEED_MAX = 8.0     ## blocs/s à la poussée verticale maximale
+global TURN_MAX = 1.8
+global SPEED_MAX = 8.0
 
-global C_SKY   = Color(0.55, 0.80, 0.95)
-global WHITE   = Color(1, 1, 1)
+global C_SKY = Color(0.55, 0.80, 0.95)
+global WHITE = Color(1, 1, 1)
 
-## Atlas de tuiles (grille 4×4 de tuiles 16×16 px). Chaque cube porte un triplet
-## de tuiles (dessus/côté/dessous) ; le shader échantillonne l'atlas par face.
 global TILE = 16
 global ACOLS = 4
 global AROWS = 4
@@ -85,15 +67,20 @@ global T_LEAF  = 7
 global T_STONE = 8
 global T_SANDD = 9
 
-## Remplit une tuile de l'atlas : couleur de base + mouchetis (bruit) → matière.
+## Couleur de base + bruit INDÉPENDANT par canal → variation de teinte, pas seulement
+## de luminosité (les tuiles paraissent moins plates).
 func put_tile(idx, br, bg, bb, jit)
     var cx = (idx % ACOLS) * TILE
     var cy = math.floor(idx / ACOLS) * TILE
     for py = 0, TILE - 1 do
         for px = 0, TILE - 1 do
-            var n = (math.noise((cx + px) * 1.7 + 9, (cy + py) * 1.7 + 9) - 0.5) * 2 * jit
+            var wx = (cx + px) * 1.7
+            var wy = (cy + py) * 1.7
+            var nr = (math.noise(wx + 9,  wy + 9)   - 0.5) * 2 * jit
+            var ng = (math.noise(wx + 41, wy + 67)  - 0.5) * 2 * jit
+            var nb = (math.noise(wx + 113, wy + 151) - 0.5) * 2 * jit
             image.setPixel(atlas, cx + px, cy + py,
-                math.clamp(br + n, 0, 1), math.clamp(bg + n, 0, 1), math.clamp(bb + n, 0, 1), 1)
+                math.clamp(br + nr, 0, 1), math.clamp(bg + ng, 0, 1), math.clamp(bb + nb, 0, 1), 1)
         end
     end
 end
@@ -101,24 +88,23 @@ end
 func build_atlas()
     atlas = image.create(ACOLS * TILE, AROWS * TILE)
     image.beginPixels(atlas)
-    put_tile(T_GRASS, 0.42, 0.68, 0.30, 0.10)
-    put_tile(T_DIRT,  0.46, 0.33, 0.20, 0.10)
-    put_tile(T_SAND,  0.86, 0.79, 0.53, 0.07)
-    put_tile(T_ROCK,  0.47, 0.46, 0.45, 0.13)
-    put_tile(T_SNOW,  0.95, 0.97, 1.00, 0.05)
-    put_tile(T_WATER, 0.20, 0.45, 0.80, 0.10)
-    put_tile(T_TRUNK, 0.40, 0.26, 0.13, 0.12)
-    put_tile(T_LEAF,  0.18, 0.42, 0.16, 0.16)
-    put_tile(T_STONE, 0.36, 0.36, 0.40, 0.11)
-    put_tile(T_SANDD, 0.72, 0.63, 0.40, 0.08)
+    put_tile(T_GRASS, 0.42, 0.68, 0.30, 0.16)
+    put_tile(T_DIRT,  0.46, 0.33, 0.20, 0.15)
+    put_tile(T_SAND,  0.86, 0.79, 0.53, 0.11)
+    put_tile(T_ROCK,  0.47, 0.46, 0.45, 0.18)
+    put_tile(T_SNOW,  0.95, 0.97, 1.00, 0.07)
+    put_tile(T_WATER, 0.20, 0.45, 0.80, 0.14)
+    put_tile(T_TRUNK, 0.40, 0.26, 0.13, 0.16)
+    put_tile(T_LEAF,  0.18, 0.42, 0.16, 0.22)
+    put_tile(T_STONE, 0.36, 0.36, 0.40, 0.16)
+    put_tile(T_SANDD, 0.72, 0.63, 0.40, 0.12)
     image.endPixels(atlas)
     graphics.tileset(atlas, ACOLS, AROWS)
-    graphics.tileAnim(T_WATER)    ## l'eau ondule (UV qui défile)
+    graphics.tileAnim(T_WATER)
 end
 
-## Biome de SURFACE uniquement (la hauteur vient de l'altitude, cf. height_at) :
-## 0 = désert (sable, sec), 1 = plaine (herbe), 2 = forêt (herbe + arbres denses).
-## Le relief « montagne » (roche/neige) est purement fonction de l'altitude.
+## Biome de surface : 0 = désert, 1 = plaine, 2 = forêt. Le relief (roche/neige) vient
+## de l'altitude, pas du biome.
 func biome_at(x, z)
     var b = math.noise(x * 0.026 + 50, z * 0.026 + 50)
     if b < 0.38 then return 0 end
@@ -126,17 +112,13 @@ func biome_at(x, z)
     return 2
 end
 
-## Élévation continue et LISSE (0..1). math.noise fait déjà du fBm multi-octave ;
-## on garde UNE grande échelle (collines larges) + un léger détail. Une seule
-## source → aucune discontinuité, pentes douces (pas de terrain haché ni de
-## falaises aléatoires). Le biome n'intervient PAS ici (sinon cliffs aux frontières).
+## Élévation lisse : une grande échelle (collines larges) + un léger détail. Source
+## unique → pentes douces, aucune falaise aléatoire.
 func elevation(x, z)
     return math.noise(x * 0.013, z * 0.013) * 0.82
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-## Hauteur du terrain : fonction CONTINUE de la position. Centrée (≈13% sous la
-## mer), amplitude étalée sur de larges reliefs → collines/vallées douces.
 func height_at(x, z)
     return math.floor((elevation(x, z) - 0.42) * 60 + SEA)
 end
@@ -145,39 +127,38 @@ func ground(x, z)
     return math.max(height_at(math.floor(x), math.floor(z)), SEA)
 end
 
-## Fixe les tuiles (dessus/côté/dessous) selon l'ALTITUDE (logique : plage → herbe
-## → roche → neige) ; le biome ne sert qu'à distinguer le désert (bas et sec).
+## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
+## le biome ne distingue que le désert.
 func set_block_tiles(b, h, y)
     if y >= h then
         if h < SEA + 1 then
-            graphics.tile(T_SAND)                     ## fond marin + plage
+            graphics.tile(T_SAND)
         elseif h >= SEA + 13 then
-            graphics.tiles(T_SNOW, T_SNOW, T_ROCK)    ## sommets enneigés
+            graphics.tiles(T_SNOW, T_SNOW, T_ROCK)
         elseif h >= SEA + 8 then
-            graphics.tile(T_ROCK)                     ## roche en altitude
+            graphics.tile(T_ROCK)
         elseif b == 0 then
-            graphics.tile(T_SAND)                     ## désert (bas, sec)
+            graphics.tile(T_SAND)
         else
-            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)   ## herbe dessus, terre sur les côtés
+            graphics.tiles(T_GRASS, T_DIRT, T_DIRT)
         end
         return
     end
     if y >= h - 2 then
         if b == 0 then
-            graphics.tile(T_SANDD)                    ## sous-sol désert
+            graphics.tile(T_SANDD)
         else
             graphics.tile(T_DIRT)
         end
         return
     end
-    graphics.tile(T_STONE)                            ## roche profonde
+    graphics.tile(T_STONE)
 end
 
 func ckey(cx, cz)
     return cx + "," + cz
 end
 
-## Génère + cuit le chunk (cx,cz) depuis le bruit → handle persistant.
 func bake_chunk(cx, cz)
     graphics.beginChunk()
     graphics.fill(WHITE)          ## teinte neutre : l'atlas fournit la couleur
@@ -187,20 +168,19 @@ func bake_chunk(cx, cz)
         for x = x0, x0 + CS - 1 do
             var b = biome_at(x, z)
             var h = height_at(x, z)
-            for y = 0, math.max(h, 0) do   ## au moins un fond (y=0) même si h<0 → pas de trou sous l'eau
+            for y = 0, math.max(h, 0) do   ## au moins un fond (y=0) même si h<0
                 set_block_tiles(b, h, y)
                 graphics.cube(x, y, z,  1, 1, 1)
             end
             if h < SEA then
-                ## surface d'eau = UN plan au niveau de la mer (pas une pile de cubes) :
-                ## surface continue, semi-transparente → on voit le fond, sans faces internes.
+                ## eau = UN plan semi-transparent au niveau de la mer (surface continue,
+                ## pas une pile de cubes → on voit le fond, sans faces internes).
                 graphics.tile(T_WATER)
                 graphics.fill(Color(1, 1, 1, 0.72))
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
-                graphics.fill(WHITE)                  ## retour opaque (arbres, colonnes suivantes)
+                graphics.fill(WHITE)
             end
-            var hash = math.abs(x * 131 + z * 197) % 100    ## abs : % signé sinon ~53% (au lieu de 6%)
-            ## arbres uniquement sur l'herbe (au-dessus de la mer, sous la roche, hors désert)
+            var hash = math.abs(x * 131 + z * 197) % 100    ## abs : % signé sinon ~53%
             var grassy = h > SEA and h < SEA + 8 and b <> 0
             var tree = grassy and ((b == 2 and hash < 6) or hash == 0)
             if tree then
@@ -228,41 +208,33 @@ func bake_chunk(cx, cz)
     return g
 end
 
-## Charge les chunks manquants dans le rayon, budget limité par frame (pas d'à-coups),
-## en PRIORISANT ce qui compte : d'abord ce qui est DEVANT la caméra, puis le PLUS
-## PROCHE. Score bas = prioritaire ; on cuit les `budget` plus prioritaires par frame.
-## Renvoie le nombre de chunks cuits ce tour (0 = rayon complet → plus rien à charger).
+## Cuit les chunks manquants du rayon, `budget` par frame, en priorisant ce qui est
+## devant la caméra puis le plus proche (buffer trié borné). Renvoie le nombre cuit.
 func stream_load(pcx, pcz, budget)
     if budget < 1 then
         return 0
     end
-    ## Une SEULE passe : on retient au fil de l'eau les `budget` chunks manquants les
-    ## plus prioritaires (buffer trié borné). Score bas = prioritaire : DEVANT la
-    ## caméra d'abord, puis le PLUS PROCHE. Évite de bâtir la liste complète + de
-    ## la re-balayer `budget` fois.
     var bcx = []
     var bcz = []
     var bsc = []
     var cnt = 0
-    var fdx = math.sin(yaw)          ## direction du regard (plan XZ)
+    var fdx = math.sin(yaw)
     var fdz = math.cos(yaw)
     for dz = -VIEW, VIEW do
         for dx = -VIEW, VIEW do
             var cx = pcx + dx
             var cz = pcz + dz
             if loaded[ckey(cx, cz)] == nil then
-                var score = dx * dx + dz * dz          ## distance² (proche d'abord)
+                var score = dx * dx + dz * dz
                 if dx * fdx + dz * fdz < 0 then
                     score = score + 100000             ## derrière la caméra → après
                 end
-                ## insère dans le buffer trié croissant si assez prioritaire
                 if cnt < budget or score < bsc[cnt] then
                     var p = budget
                     if cnt < budget then
                         cnt = cnt + 1
-                        p = cnt                        ## nouvelle place en fin
+                        p = cnt
                     end
-                    ## remonte tant que l'élément au-dessus est moins prioritaire
                     while p > 1 and bsc[p - 1] > score do
                         bcx[p] = bcx[p - 1]
                         bcz[p] = bcz[p - 1]
@@ -276,7 +248,6 @@ func stream_load(pcx, pcz, budget)
             end
         end
     end
-    ## cuit les retenus (déjà triés du plus prioritaire au moins prioritaire)
     var baked = 0
     for i = 1, cnt do
         loaded[ckey(bcx[i], bcz[i])] = bake_chunk(bcx[i], bcz[i])
@@ -285,10 +256,8 @@ func stream_load(pcx, pcz, budget)
     return baked
 end
 
-## Décharge (libère les VBO) les chunks hors du rayon → mémoire bornée.
-## margin = hystérésis : 1 en déplacement (garde un anneau tampon → pas de churn si
-## on recule d'un pas), 0 lors d'une RÉDUCTION de distance (libère l'anneau extérieur
-## tout de suite → allège rendu ET mémoire dès le premier cran).
+## Libère les chunks hors rayon. margin = hystérésis : 1 en déplacement (anneau tampon,
+## pas de churn en reculant d'un pas), 0 en réduction (libère aussitôt).
 func stream_unload(pcx, pcz, margin)
     var keep = {}
     for k, c in loaded do
@@ -301,15 +270,67 @@ func stream_unload(pcx, pcz, margin)
     loaded = keep
 end
 
+## Ajuste VIEW selon la part de frames lentes sur la fenêtre écoulée. Décrochage
+## (mémoire pleine ou > DROP_SLOW) → repli dichotomique vers view_good + plafond appris.
+## Fluide (< GROW_SLOW) → montée qui double ; au plafond, relâche view_cap après RELAX_T.
+## Entre les deux → on tient. Ne mesure ni pendant la cuisson ni en manuel.
+func adapt_view(pcx, pcz)
+    if deltaTime <= 0 or deltaTime >= STALL_DT then
+        return
+    end
+    if streaming or manual then
+        return
+    end
+    adapt_t = adapt_t + deltaTime
+    adapt_n = adapt_n + 1
+    if deltaTime > SLOW_DT then
+        adapt_slow = adapt_slow + 1
+    end
+    if adapt_t < ADAPT_WIN then
+        return
+    end
+    var mem_full = mem() > MEM_MAX
+    if (mem_full or adapt_slow > adapt_n * DROP_SLOW) and VIEW > VIEW_MIN then
+        view_cap = VIEW - 1
+        var back = (view_good + VIEW) // 2
+        if back > VIEW - 1 then back = VIEW - 1 end
+        if back < VIEW_MIN then back = VIEW_MIN end
+        VIEW = back
+        stream_unload(pcx, pcz, 0)
+        grow_step = 1
+        stable_t = 0.0
+    elseif adapt_slow < adapt_n * GROW_SLOW then
+        view_good = VIEW
+        if VIEW < VIEW_MAX and VIEW < view_cap and not mem_full then
+            VIEW = math.min(VIEW + grow_step, math.min(VIEW_MAX, view_cap))
+            grow_step = grow_step * 2
+            streaming = true
+            stable_t = 0.0
+        else
+            grow_step = 1
+            stable_t = stable_t + adapt_t
+            if VIEW == view_cap and stable_t >= RELAX_T and not mem_full then
+                view_cap = view_cap + 1
+                stable_t = 0.0
+            end
+        end
+    else
+        grow_step = 1
+        stable_t = 0.0
+    end
+    adapt_t = 0.0
+    adapt_n = 0
+    adapt_slow = 0
+end
+
 func setup()
     graphics.canvas(W, H, "Voxel infini")
     graphics.ambient(0.5)
     graphics.light("dir", -0.5, -1, -0.35)
     math.noiseSeed(7)
-    build_atlas()                 ## génère l'atlas de textures (herbe/terre/roche/…)
-    ## spawn : meilleure terre ferme (au-dessus de la mer), score = proximité de
-    ## l'origine + forte pénalité d'altitude → on choisit TOUJOURS un point sec, bas
-    ## et proche (pas de repli sous l'eau si aucune bande de hauteur précise n'existe).
+    build_atlas()
+    ## spawn : terre ferme, basse et proche de l'origine (pénalité forte sur l'altitude
+    ## → jamais sous l'eau).
     var best = 1000000000.0
     for z = 0, 60 do
         for x = 0, 60 do
@@ -326,7 +347,7 @@ func setup()
             end
         end
     end
-    ## regard vers la direction la plus dégagée
+    ## regard vers la direction la plus dégagée (somme d'altitude minimale)
     var bestSum = 1000000.0
     for a = 0, 15 do
         var ang = a / 16.0 * 6.28319
@@ -339,32 +360,24 @@ func setup()
             yaw = ang
         end
     end
-    ## cuisson initiale : chunk du joueur tout de suite (sol présent au spawn),
-    ## le reste du rayon streamé sur les frames suivantes (budget/frame → pas de gel
-    ## du thread au démarrage, d'autant que VIEW démarre à 4).
     lastcx = math.floor(camX / CS)
     lastcz = math.floor(camZ / CS)
-    loaded[ckey(lastcx, lastcz)] = bake_chunk(lastcx, lastcz)
+    loaded[ckey(lastcx, lastcz)] = bake_chunk(lastcx, lastcz)   ## sol présent dès le spawn
     streaming = true
 end
 
-## Boutons de distance (haut-droite) : renvoie +1 (bouton +), -1 (bouton −), 0 sinon.
+## Boutons de distance (haut-droite) : +1 (bouton +), -1 (bouton −), 0 sinon.
 func dist_btn_hit(x, y)
     if y < BTN_Y or y > BTN_Y + BTN then
         return 0
     end
-    var xp = W - BTN - 12          ## bouton +
-    var xm = xp - BTN - 10         ## bouton −
-    if x >= xp and x <= xp + BTN then
-        return 1
-    end
-    if x >= xm and x <= xm + BTN then
-        return -1
-    end
+    var xp = W - BTN - 12
+    var xm = xp - BTN - 10
+    if x >= xp and x <= xp + BTN then return 1 end
+    if x >= xm and x <= xm + BTN then return -1 end
     return 0
 end
 
-## Dessine les deux boutons − / + et le mode courant.
 func draw_dist_buttons()
     var xp = W - BTN - 12
     var xm = xp - BTN - 10
@@ -376,18 +389,16 @@ func draw_dist_buttons()
     graphics.drawText("+", xp + BTN / 2 - 9, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
 end
 
-## relais d'entrée vers le joystick (les callbacks mouse.* sont globaux au moteur)
 func mouse.pressed(x, y)
-    ## un appui sur un bouton de distance = réglage manuel (l'auto-adapt se retire)
     var hit = dist_btn_hit(x, y)
     if hit <> 0 then
         manual = true
         if hit > 0 and VIEW < VIEW_MAX then
             VIEW = VIEW + 1
-            streaming = true                   ## charge le nouvel anneau
+            streaming = true
         elseif hit < 0 and VIEW > VIEW_MIN then
             VIEW = VIEW - 1
-            stream_unload(lastcx, lastcz, 0)    ## réduction manuelle → libère aussitôt
+            stream_unload(lastcx, lastcz, 0)
         end
         return
     end
@@ -400,121 +411,47 @@ func mouse.moved(x, y)
     pad.move(x, y)
 end
 
-func draw()
-    graphics.clear(C_SKY)
-    ## déplacement analogique : virage dosé par steer(), vitesse par throttle()
-    ## (nuls si le joystick n'est pas actif → aucun mouvement).
+## Avance le joueur (virage + vitesse du joystick), avec glissement sur les pentes
+## franchissables et blocage sur les murs.
+func move_player()
     yaw = yaw - pad.steer() * TURN_MAX * deltaTime
     var sp = pad.throttle() * SPEED_MAX * deltaTime
-    if sp > 0 then
-        ## avance avec glissement (franchit les pentes, bute sur les murs)
-        var nx = camX + math.sin(yaw) * sp
-        var nz = camZ + math.cos(yaw) * sp
-        var g0 = ground(camX, camZ)
-        if ground(nx, camZ) - g0 <= STEP then
-            camX = nx
-        end
-        if ground(camX, nz) - g0 <= STEP then
-            camZ = nz
-        end
+    if sp <= 0 then
+        return
     end
-    ## streaming : au changement de chunk on décharge le lointain et on (ré)active le
-    ## chargement ; on ne balaie le voisinage QUE tant qu'il reste des chunks à cuire
-    ## (budget/frame → pas d'à-coups). En régime stable : aucun balayage (pas de churn).
+    var nx = camX + math.sin(yaw) * sp
+    var nz = camZ + math.cos(yaw) * sp
+    var g0 = ground(camX, camZ)
+    if ground(nx, camZ) - g0 <= STEP then camX = nx end
+    if ground(camX, nz) - g0 <= STEP then camZ = nz end
+end
+
+func draw()
+    graphics.clear(C_SKY)
+    move_player()
+
     var pcx = math.floor(camX / CS)
     var pcz = math.floor(camZ / CS)
     if pcx <> lastcx or pcz <> lastcz then
         lastcx = pcx
         lastcz = pcz
-        stream_unload(pcx, pcz, 1)              ## déplacement → garde un anneau tampon
+        stream_unload(pcx, pcz, 1)
         streaming = true
     end
-    ## budget de cuisson/frame : 6 en auto (charge vite les gros anneaux d'une montée
-    ## exponentielle), plus large en manuel pour un retour immédiat au toucher.
     var budget = 6
-    if manual then
-        budget = 10
-    end
+    if manual then budget = 10 end
     if streaming and stream_load(pcx, pcz, budget) == 0 then
         streaming = false
     end
+    adapt_view(pcx, pcz)
 
-    ## auto-adaptation de la distance (voir en-tête). On IGNORE les frames irréelles
-    ## (> STALL_DT : arrière-plan/reprise) et on ne mesure pas pendant la cuisson,
-    ## dont les à-coups fausseraient le compte.
-    if deltaTime > 0 and deltaTime < STALL_DT then
-        if not streaming and not manual then
-            adapt_t = adapt_t + deltaTime
-            adapt_n = adapt_n + 1
-            if deltaTime > SLOW_DT then
-                adapt_slow = adapt_slow + 1
-            end
-            if adapt_t >= ADAPT_WIN then
-                ## Bilan de la fenêtre. La limite réelle = FPS OU mémoire.
-                ## - Mémoire pleine OU >25% de frames lentes → DÉCROCHAGE : on revient
-                ##   au dernier palier confirmé fluide (view_good) — ce qui annule un
-                ##   dépassement d'un coup au lieu de redescendre 1 par 1 — et on
-                ##   RETIENT ce rayon (view_cap), en libérant tout de suite (marge 0).
-                ## - <10% de frames lentes (tolère la gigue) ET mémoire OK → on monte
-                ##   par paliers qui DOUBLENT (1,2,4,8…). Au plafond, on compte le temps
-                ##   stable : après RELAX_T, on relâche view_cap d'un cran (re-sonde).
-                ## - Entre les deux (10–25%) → on tient le palier.
-                var mem_full = mem() > MEM_MAX
-                if (mem_full or adapt_slow > adapt_n * DROP_SLOW) and VIEW > VIEW_MIN then
-                    view_cap = VIEW - 1               ## ce rayon décroche → plafond appris
-                    var back = (view_good + VIEW) // 2 ## repli à mi-chemin (dichotomie)
-                    if back > VIEW - 1 then
-                        back = VIEW - 1               ## au moins un cran de moins
-                    end
-                    if back < VIEW_MIN then
-                        back = VIEW_MIN
-                    end
-                    VIEW = back
-                    stream_unload(pcx, pcz, 0)        ## libère l'anneau extérieur aussitôt
-                    grow_step = 1
-                    stable_t = 0.0
-                elseif adapt_slow < adapt_n * GROW_SLOW then
-                    view_good = VIEW                  ## ce palier vient d'être fluide
-                    if VIEW < VIEW_MAX and VIEW < view_cap and not mem_full then
-                        VIEW = VIEW + grow_step
-                        if VIEW > VIEW_MAX then
-                            VIEW = VIEW_MAX
-                        end
-                        if VIEW > view_cap then
-                            VIEW = view_cap
-                        end
-                        grow_step = grow_step * 2     ## prochaine montée deux fois plus grande
-                        streaming = true
-                        stable_t = 0.0
-                    else
-                        grow_step = 1                 ## au plafond : on mesure le temps stable
-                        stable_t = stable_t + adapt_t
-                        if VIEW == view_cap and stable_t >= RELAX_T and not mem_full then
-                            view_cap = view_cap + 1   ## relâche : re-sonde un cran plus loin
-                            stable_t = 0.0
-                        end
-                    end
-                else
-                    grow_step = 1                     ## zone morte (gigue) → on tient le palier
-                    stable_t = 0.0
-                end
-                adapt_t = 0.0
-                adapt_n = 0
-                adapt_slow = 0
-            end
-        end
-    end
-
-    ## rester au-dessus du sol : toujours EYE au-dessus de la colonne courante
     camY = ground(camX, camZ) + EYE
-    var dx = math.cos(PITCH) * math.sin(yaw)
-    var dy = math.sin(PITCH)
-    var dz = math.cos(PITCH) * math.cos(yaw)
     cam.setPos(camX, camY, camZ)
-    cam.lookAt(camX + dx, camY + dy, camZ + dz)
+    cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),
+               camY + math.sin(PITCH),
+               camZ + math.cos(PITCH) * math.cos(yaw))
 
     graphics.noStroke()
-    ## culling une seule fois : liste des chunks visibles (inFrustum est coûteux)
     var vis = []
     for k, c in loaded do
         if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
@@ -522,21 +459,17 @@ func draw()
         end
     end
     graphics.begin3d(cam)
-        ## passe 1 : opaque (terrain, arbres)
         for i = 1, #vis do
             graphics.drawChunk(vis[i])
         end
-        ## passe 2 : eau transparente, APRÈS tout l'opaque
-        for i = 1, #vis do
+        for i = 1, #vis do          ## eau transparente après tout l'opaque
             graphics.drawChunkAlpha(vis[i])
         end
     graphics.end3d()
 
-    pad.draw()                        ## HUD du joystick (classe réutilisable)
-    draw_dist_buttons()               ## boutons − / + de distance (réglage manuel)
+    pad.draw()
+    draw_dist_buttons()
     var mode = "auto"
-    if manual then
-        mode = "manuel"
-    end
+    if manual then mode = "manuel" end
     graphics.drawText("vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
 end
