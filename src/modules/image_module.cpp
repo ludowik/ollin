@@ -263,17 +263,17 @@ static Value img_load(Value* args, int argc) {
     return makeHandle(id, w, hh, ptr);
 }
 
-// ── image.load_data(format, base64) ──────────────────────────────────────────
+// ── image.loadData(format, base64) ──────────────────────────────────────────
 
 static Value img_load_data(Value* args, int argc) {
     if (argc < 2 || !args[0].isString() || !args[1].isString())
-        throw std::runtime_error("image.load_data: expected format string and base64 string");
+        throw std::runtime_error("image.loadData: expected format string and base64 string");
     std::string ext = args[0].asString();
     if (ext[0] != '.')
         ext = "." + ext;
     auto bytes = b64decode(args[1].asString());
     if (bytes.empty())
-        throw std::runtime_error("image.load_data: empty or invalid base64 data");
+        throw std::runtime_error("image.loadData: empty or invalid base64 data");
 
     TexHandle h;
     h.tex = loadFromMemory(bytes, ext);
@@ -304,10 +304,10 @@ static Value img_create(Value* args, int argc) {
     return makeHandle(id, w, h, ptr);
 }
 
-// ── image.begin_draw(img) ────────────────────────────────────────────────────
+// ── image.beginDraw(img) ────────────────────────────────────────────────────
 
 static Value img_begin(Value* args, int argc) {
-    static constexpr const char* FN = "image.begin_draw";
+    static constexpr const char* FN = "image.beginDraw";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
     TexHandle& h = handlePtr(args[0], FN);
@@ -318,7 +318,7 @@ static Value img_begin(Value* args, int argc) {
     return Value{};
 }
 
-// ── image.end_draw() ─────────────────────────────────────────────────────────
+// ── image.endDraw() ─────────────────────────────────────────────────────────
 
 static Value img_end(Value* args, int argc) {
     (void)args;
@@ -374,30 +374,30 @@ static Value img_unload(Value* args, int argc) {
     return Value{};
 }
 
-// ── image.begin_pixels(img) ──────────────────────────────────────────────────
+// ── image.beginPixels(img) ──────────────────────────────────────────────────
 
 static Value img_begin_pixels(Value* args, int argc) {
-    static constexpr const char* FN = "image.begin_pixels";
+    static constexpr const char* FN = "image.beginPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
     pixelsOpen(handlePtr(args[0], FN));
     return Value{};
 }
 
-// ── image.end_pixels(img) ────────────────────────────────────────────────────
+// ── image.endPixels(img) ────────────────────────────────────────────────────
 
 static Value img_end_pixels(Value* args, int argc) {
-    static constexpr const char* FN = "image.end_pixels";
+    static constexpr const char* FN = "image.endPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
     pixelsClose(handlePtr(args[0], FN));
     return Value{};
 }
 
-// ── image.get_pixel(img, x, y) ───────────────────────────────────────────────
+// ── image.getPixel(img, x, y) ───────────────────────────────────────────────
 
 static Value img_get_pixel(Value* args, int argc) {
-    static constexpr const char* FN = "image.get_pixel";
+    static constexpr const char* FN = "image.getPixel";
     static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
@@ -422,10 +422,10 @@ static Value img_get_pixel(Value* args, int argc) {
     return m;
 }
 
-// ── image.set_pixel(img, x, y, color | r, g, b, a) ───────────────────────────
+// ── image.setPixel(img, x, y, color | r, g, b, a) ───────────────────────────
 
 static Value img_set_pixel(Value* args, int argc) {
-    static constexpr const char* FN = "image.set_pixel";
+    static constexpr const char* FN = "image.setPixel";
     if (argc < 4)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y, color");
     TexHandle& h = handlePtr(args[0], FN);
@@ -477,15 +477,15 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
 Value makeImageModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("load")), Value::makeBuiltin(img_load));
-    m.mapSet(Value(std::string("load_data")), Value::makeBuiltin(img_load_data));
+    m.mapSet(Value(std::string("loadData")), Value::makeBuiltin(img_load_data));
     m.mapSet(Value(std::string("create")), Value::makeBuiltin(img_create));
-    m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(img_begin));
-    m.mapSet(Value(std::string("end_draw")), Value::makeBuiltin(img_end));
+    m.mapSet(Value(std::string("beginDraw")), Value::makeBuiltin(img_begin));
+    m.mapSet(Value(std::string("endDraw")), Value::makeBuiltin(img_end));
     m.mapSet(Value(std::string("draw")), Value::makeBuiltin(img_draw));
     m.mapSet(Value(std::string("unload")), Value::makeBuiltin(img_unload));
-    m.mapSet(Value(std::string("begin_pixels")), Value::makeBuiltin(img_begin_pixels));
-    m.mapSet(Value(std::string("end_pixels")), Value::makeBuiltin(img_end_pixels));
-    m.mapSet(Value(std::string("get_pixel")), Value::makeBuiltin(img_get_pixel));
-    m.mapSet(Value(std::string("set_pixel")), Value::makeBuiltin(img_set_pixel));
+    m.mapSet(Value(std::string("beginPixels")), Value::makeBuiltin(img_begin_pixels));
+    m.mapSet(Value(std::string("endPixels")), Value::makeBuiltin(img_end_pixels));
+    m.mapSet(Value(std::string("getPixel")), Value::makeBuiltin(img_get_pixel));
+    m.mapSet(Value(std::string("setPixel")), Value::makeBuiltin(img_set_pixel));
     return m;
 }

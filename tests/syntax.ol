@@ -976,15 +976,15 @@ var nz3 = math.noise(0.5, 1.5, 2.5)
 assert(nz3 >= 0 and nz3 <= 1)
 ## déterministe : même entrée → même sortie
 assert(math.noise(3.14) == math.noise(3.14))
-## noise_seed : reproductible après re-seed identique
-math.noise_seed(42)
+## noiseSeed : reproductible après re-seed identique
+math.noiseSeed(42)
 var na = math.noise(1.7)
-math.noise_seed(42)
+math.noiseSeed(42)
 assert(math.noise(1.7) == na)
 ## graines différentes → bruit différent
-math.noise_seed(1)
+math.noiseSeed(1)
 var nb = math.noise(1.7)
-math.noise_seed(2)
+math.noiseSeed(2)
 assert(math.noise(1.7) <> nb)
 
 ## ── 22. Switch ───────────────────────────────────────────────────────────────
@@ -1069,4 +1069,4 @@ assert(sw_func(5) == "autre")
 ## Couleurs prédéfinies : module `colors` (colors.BLACK, colors.WHITE, colors.RED…)
 ## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
 ## FPS : graphics.fps() → entier
-## Texte : graphics.draw_text(text, x, y, size [, color])
+## Texte : graphics.drawText(text, x, y, size [, color])

@@ -122,8 +122,8 @@ MATH1(atan, std::atan(x))
 MATH1(deg, x * (180.0 / M_PI))
 MATH1(rad, x*(M_PI / 180.0))
 MATH1(frac, x - std::floor(x))
-MATH1(is_nan, std::isnan(x) ? 1.0 : 0.0)
-MATH1(is_inf, std::isinf(x) ? 1.0 : 0.0)
+MATH1(isNan, std::isnan(x) ? 1.0 : 0.0)
+MATH1(isInf, std::isinf(x) ? 1.0 : 0.0)
 
 static Value math_map(Value* args, int argc) {
     double x = numArg(args, argc, 0, "math.map");
@@ -241,19 +241,19 @@ static int64_t intArg(const Value* args, int argc, int i, const char* fn) {
     return (int64_t)d;
 }
 
-static Value math_rand_int(Value* args, int argc) {
+static Value math_randInt(Value* args, int argc) {
     if (argc == 0)
-        throw std::runtime_error("math.rand_int: at least one argument required");
+        throw std::runtime_error("math.randInt: at least one argument required");
     if (argc == 1) {
-        int64_t hi = intArg(args, argc, 0, "math.rand_int");
+        int64_t hi = intArg(args, argc, 0, "math.randInt");
         if (hi <= 0)
-            throw std::runtime_error("math.rand_int: argument must be > 0");
+            throw std::runtime_error("math.randInt: argument must be > 0");
         return Value((int64_t)(rand() % hi + 1));
     }
-    int64_t lo = intArg(args, argc, 0, "math.rand_int");
-    int64_t hi = intArg(args, argc, 1, "math.rand_int");
+    int64_t lo = intArg(args, argc, 0, "math.randInt");
+    int64_t hi = intArg(args, argc, 1, "math.randInt");
     if (lo > hi)
-        throw std::runtime_error("math.rand_int: lo must be <= hi");
+        throw std::runtime_error("math.randInt: lo must be <= hi");
     return Value(lo + (int64_t)(rand() % (hi - lo + 1)));
 }
 
@@ -280,8 +280,8 @@ static Value math_noise(Value* args, int argc) {
 }
 
 // Rebat la table de permutation → bruit reproductible / variable.
-static Value math_noise_seed(Value* args, int argc) {
-    int64_t s = (int64_t)numArg(args, argc, 0, "math.noise_seed");
+static Value math_noiseSeed(Value* args, int argc) {
+    int64_t s = (int64_t)numArg(args, argc, 0, "math.noiseSeed");
     noiseReseed((uint64_t)s);
     return Value();
 }
@@ -324,15 +324,15 @@ Value makeMathModule() {
     m.mapSet(Value(std::string("deg")), Value::makeBuiltin(math_deg));
     m.mapSet(Value(std::string("rad")), Value::makeBuiltin(math_rad));
     m.mapSet(Value(std::string("frac")), Value::makeBuiltin(math_frac));
-    m.mapSet(Value(std::string("is_nan")), Value::makeBuiltin(math_is_nan));
-    m.mapSet(Value(std::string("is_inf")), Value::makeBuiltin(math_is_inf));
+    m.mapSet(Value(std::string("isNan")), Value::makeBuiltin(math_isNan));
+    m.mapSet(Value(std::string("isInf")), Value::makeBuiltin(math_isInf));
     m.mapSet(Value(std::string("map")), Value::makeBuiltin(math_map));
     // aléatoire
     m.mapSet(Value(std::string("rand")), Value::makeBuiltin(math_rand));
-    m.mapSet(Value(std::string("rand_int")), Value::makeBuiltin(math_rand_int));
+    m.mapSet(Value(std::string("randInt")), Value::makeBuiltin(math_randInt));
     m.mapSet(Value(std::string("seed")), Value::makeBuiltin(math_seed));
     // bruit de Perlin
     m.mapSet(Value(std::string("noise")), Value::makeBuiltin(math_noise));
-    m.mapSet(Value(std::string("noise_seed")), Value::makeBuiltin(math_noise_seed));
+    m.mapSet(Value(std::string("noiseSeed")), Value::makeBuiltin(math_noiseSeed));
     return m;
 }

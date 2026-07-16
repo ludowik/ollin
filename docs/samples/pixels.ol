@@ -16,17 +16,17 @@ func draw()
     ## composante bleue commune à toute la frame (hors boucle → calculée 1 fois)
     var blue = 0.5 + 0.5 * math.sin(t)
 
-    image.begin_pixels(canvas)
+    image.beginPixels(canvas)
     for y = 0, LOW_H-1 do
         var sy = math.sin(y * 0.09 + t * 0.8)        ## terme en y, hors boucle x
         for x = 0, LOW_W-1 do
             ## plasma : somme de sinus décalés par le temps → le motif évolue
             var v = math.sin(x * 0.07 + t) + sy + math.sin((x + y) * 0.05 + t * 1.3)
             var n = (v + 3) / 6                       ## normalise [-3;3] → [0;1]
-            image.set_pixel(canvas, x, y, n, 1 - n, blue, 1)
+            image.setPixel(canvas, x, y, n, 1 - n, blue, 1)
         end
     end
-    image.end_pixels(canvas)
+    image.endPixels(canvas)
 
     graphics.clear(colors.BLACK)
     image.draw(canvas, 0, 0, W, H)                    ## agrandit le canvas à la fenêtre

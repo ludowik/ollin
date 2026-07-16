@@ -111,13 +111,13 @@ func reset()
     cells = empty_grid()
     back = empty_grid()                       ## alloué une fois ; réutilisé et échangé ensuite
     gun(cells, 2, 2)                          ## le générateur (émet des planeurs)
-    var count = math.rand_int(5, 10)          ## entre 5 et 10 motifs de base
+    var count = math.randInt(5, 10)          ## entre 5 et 10 motifs de base
     for i = 1, count do
         ## marge de 2 des deux côtés : la rotation peut décaler le motif de ±2
-        var ox = math.rand_int(2, COLS - 3)
-        var oy = math.rand_int(2, ROWS - 3)
-        var kind = math.rand_int(1, 3)
-        var o = math.rand_int(1, 4)           ## orientation : haut/bas/gauche/droite
+        var ox = math.randInt(2, COLS - 3)
+        var oy = math.randInt(2, ROWS - 3)
+        var kind = math.randInt(1, 3)
+        var o = math.randInt(1, 4)           ## orientation : haut/bas/gauche/droite
         if kind == 1 then
             glider(cells, ox, oy, o)          ## planeur
         elseif kind == 2 then

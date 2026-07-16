@@ -21,7 +21,7 @@ Quaternion quatFromInstance(const Value& v, const char* fn) {
     Value cls = v.isMap() ? v.mapGet(Value(std::string("__class__"))) : Value{};
     Value name = cls.isClass() ? cls.mapGet(Value(std::string("__name__"))) : Value{};
     if (!(name.isString() && name.asString() == "Quat"))
-        throw std::runtime_error(std::string(fn) + ": expected a Quat (graphics.quat / quat_axis / quat_euler)");
+        throw std::runtime_error(std::string(fn) + ": expected a Quat (graphics.quat / quatAxis / quatEuler)");
     return Quaternion{(float)quatField(v, "x"), (float)quatField(v, "y"), (float)quatField(v, "z"),
                       (float)quatField(v, "w")};
 }
@@ -73,11 +73,11 @@ static Value quat_inverse(Value* args, int argc) {
     return makeQuatInstance(QuaternionInvert(quatFromInstance(args[0], "Quat.inverse")));
 }
 
-// q.rotate_vec(x, y, z) : renvoie le vecteur (x,y,z) tourné par q, sous forme [x,y,z].
+// q.rotateVec(x, y, z) : renvoie le vecteur (x,y,z) tourné par q, sous forme [x,y,z].
 static Value quat_rotate_vec(Value* args, int argc) {
-    Quaternion q = quatFromInstance(args[0], "Quat.rotate_vec");
-    Vector3 v = {(float)numArg(args, argc, 1, "Quat.rotate_vec"), (float)numArg(args, argc, 2, "Quat.rotate_vec"),
-                 (float)numArg(args, argc, 3, "Quat.rotate_vec")};
+    Quaternion q = quatFromInstance(args[0], "Quat.rotateVec");
+    Vector3 v = {(float)numArg(args, argc, 1, "Quat.rotateVec"), (float)numArg(args, argc, 2, "Quat.rotateVec"),
+                 (float)numArg(args, argc, 3, "Quat.rotateVec")};
     Vector3 r = Vector3RotateByQuaternion(v, q);
     Value arr = Value::makeArray();
     arr.arrayPush(Value((double)r.x));
@@ -93,7 +93,7 @@ static Value makeQuatClass() {
     cls.mapSet(Value(std::string("slerp")), Value::makeBuiltin(quat_slerp));
     cls.mapSet(Value(std::string("normalize")), Value::makeBuiltin(quat_normalize));
     cls.mapSet(Value(std::string("inverse")), Value::makeBuiltin(quat_inverse));
-    cls.mapSet(Value(std::string("rotate_vec")), Value::makeBuiltin(quat_rotate_vec));
+    cls.mapSet(Value(std::string("rotateVec")), Value::makeBuiltin(quat_rotate_vec));
     return cls;
 }
 
@@ -110,29 +110,29 @@ static Value gfx_quat(Value* args, int argc) {
     return makeQuatInstance(QuaternionIdentity());
 }
 
-// graphics.quat_axis(ax, ay, az, deg) : rotation de deg° autour de l'axe (ax,ay,az).
+// graphics.quatAxis(ax, ay, az, deg) : rotation de deg° autour de l'axe (ax,ay,az).
 static Value gfx_quat_axis(Value* args, int argc) {
-    Vector3 axis = {(float)numArg(args, argc, 0, "graphics.quat_axis"),
-                    (float)numArg(args, argc, 1, "graphics.quat_axis"),
-                    (float)numArg(args, argc, 2, "graphics.quat_axis")};
+    Vector3 axis = {(float)numArg(args, argc, 0, "graphics.quatAxis"),
+                    (float)numArg(args, argc, 1, "graphics.quatAxis"),
+                    (float)numArg(args, argc, 2, "graphics.quatAxis")};
     // Axe nul (0,0,0) : aucune rotation définie → identité. Explicite ici plutôt
     // que de dépendre du comportement interne de raymath.
     if (axis.x == 0.0f && axis.y == 0.0f && axis.z == 0.0f)
         return makeQuatInstance(QuaternionIdentity());
-    float rad = (float)numArg(args, argc, 3, "graphics.quat_axis") * DEG2RAD;
+    float rad = (float)numArg(args, argc, 3, "graphics.quatAxis") * DEG2RAD;
     return makeQuatInstance(QuaternionFromAxisAngle(axis, rad));
 }
 
-// graphics.quat_euler(pitch, yaw, roll) : depuis des angles d'Euler (en degrés).
+// graphics.quatEuler(pitch, yaw, roll) : depuis des angles d'Euler (en degrés).
 static Value gfx_quat_euler(Value* args, int argc) {
-    float pitch = (float)numArg(args, argc, 0, "graphics.quat_euler") * DEG2RAD;
-    float yaw = (float)numArg(args, argc, 1, "graphics.quat_euler") * DEG2RAD;
-    float roll = (float)numArg(args, argc, 2, "graphics.quat_euler") * DEG2RAD;
+    float pitch = (float)numArg(args, argc, 0, "graphics.quatEuler") * DEG2RAD;
+    float yaw = (float)numArg(args, argc, 1, "graphics.quatEuler") * DEG2RAD;
+    float roll = (float)numArg(args, argc, 2, "graphics.quatEuler") * DEG2RAD;
     return makeQuatInstance(QuaternionFromEuler(pitch, yaw, roll));
 }
 
 void registerQuat(Value& m) {
     m.mapSet(Value(std::string("quat")), Value::makeBuiltin(gfx_quat));
-    m.mapSet(Value(std::string("quat_axis")), Value::makeBuiltin(gfx_quat_axis));
-    m.mapSet(Value(std::string("quat_euler")), Value::makeBuiltin(gfx_quat_euler));
+    m.mapSet(Value(std::string("quatAxis")), Value::makeBuiltin(gfx_quat_axis));
+    m.mapSet(Value(std::string("quatEuler")), Value::makeBuiltin(gfx_quat_euler));
 }

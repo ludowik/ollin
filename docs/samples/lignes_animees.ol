@@ -10,10 +10,10 @@ const SPEED = 180   ## pixels / seconde
 
 class Line
     func init()
-        self.x1 = math.rand_int(0, W)
-        self.y1 = math.rand_int(0, H)
-        self.x2 = math.rand_int(0, W)
-        self.y2 = math.rand_int(0, H)
+        self.x1 = math.randInt(0, W)
+        self.y1 = math.randInt(0, H)
+        self.x2 = math.randInt(0, W)
+        self.y2 = math.randInt(0, H)
         self.vx1 = math.rand(-SPEED, SPEED)
         self.vy1 = math.rand(-SPEED, SPEED)
         self.vx2 = math.rand(-SPEED, SPEED)

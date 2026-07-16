@@ -62,7 +62,7 @@ func initColors()
 end
 
 func start()
-    secret   = WORDS[math.rand_int(1, len(WORDS))]
+    secret   = WORDS[math.randInt(1, len(WORDS))]
     N        = len(secret)
     rows     = []
     rowIndex = 0
@@ -223,7 +223,7 @@ end
 ## ── rendu ───────────────────────────────────────────────────────────────
 func letterAt(letter, cx, cy)
     var fz = math.floor(CELL * 0.6)
-    graphics.draw_text(letter, cx + math.floor(CELL * 0.26), cy + math.floor(CELL * 0.16), fz, WHITE)
+    graphics.drawText(letter, cx + math.floor(CELL * 0.26), cy + math.floor(CELL * 0.16), fz, WHITE)
 end
 
 func drawCell(cx, cy, c, letter)
@@ -285,22 +285,22 @@ func drawKeys()
         graphics.stroke(B_KEY, 1)
         graphics.rect(k.x, k.y, k.w, k.h)
         if k.kind == "char" then
-            graphics.draw_text(k.label, k.x + math.floor(KW * 0.32), k.y + math.floor(KH * 0.28), charFz, WHITE)
+            graphics.drawText(k.label, k.x + math.floor(KW * 0.32), k.y + math.floor(KH * 0.28), charFz, WHITE)
         else
-            graphics.draw_text(k.label, k.x + math.floor(k.w * 0.18), k.y + math.floor(KH * 0.32), wideFz, WHITE)
+            graphics.drawText(k.label, k.x + math.floor(k.w * 0.18), k.y + math.floor(KH * 0.32), wideFz, WHITE)
         end
     end
 end
 
 func draw()
     graphics.clear(BG)
-    graphics.draw_text("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, YELLOW)
+    graphics.drawText("SUTOM", math.floor(W / 2 - TITLESZ * 1.6), TITLEY, TITLESZ, YELLOW)
     drawGrid()
     drawKeys()
     ## message transitoire (mot inconnu, etc.)
     if time() < msgUntil then
         var mfz = math.floor(TITLESZ * 0.55)
-        graphics.draw_text(msg, math.floor(W / 2 - len(msg) * mfz * 0.28), GY - mfz - GAP, mfz, WHITE)
+        graphics.drawText(msg, math.floor(W / 2 - len(msg) * mfz * 0.28), GY - mfz - GAP, mfz, WHITE)
     end
     if state == "won" or state == "lost" then
         var by = math.floor(H / 2 - CELL * 0.7)
@@ -309,9 +309,9 @@ func draw()
         graphics.rect(MARGIN, by, W - 2 * MARGIN, math.floor(CELL * 1.4))
         var efz = math.floor(CELL * 0.4)
         if state == "won" then
-            graphics.draw_text("GAGNE !  (Echap = rejouer)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, GREEN)
+            graphics.drawText("GAGNE !  (Echap = rejouer)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, GREEN)
         else
-            graphics.draw_text("PERDU : " + secret + "  (Echap)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, REDISH)
+            graphics.drawText("PERDU : " + secret + "  (Echap)", MARGIN + GAP * 2, by + math.floor(CELL * 0.45), efz, REDISH)
         end
     end
 end

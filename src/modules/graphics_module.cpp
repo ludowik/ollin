@@ -201,7 +201,7 @@ static Value gfx_begin_draw(Value* args, int argc) {
 static Value gfx_end_draw(Value* args, int argc) {
     (void)args;
     (void)argc;
-    flushPendingScreenshot();   // chemin manuel begin_draw/end_draw : capture ici
+    flushPendingScreenshot();   // chemin manuel beginDraw/endDraw : capture ici
     EndDrawing();
     return Value{};
 }
@@ -472,7 +472,7 @@ static void flushPendingScreenshot() {
 
 static Value gfx_draw_text(Value* args, int argc) {
     if (argc < 4)
-        throw std::runtime_error("graphics.draw_text: expected text, x, y, size [, color]");
+        throw std::runtime_error("graphics.drawText: expected text, x, y, size [, color]");
     const char* text = args[0].isString() ? args[0].asString().c_str() : "";
     DrawText(text, gfxToInt(args[1]), gfxToInt(args[2]), gfxToInt(args[3]), argc > 4 ? gfxToColor(args[4]) : s_stroke_color);
     return Value{};
@@ -1019,9 +1019,9 @@ Value makeBlendModule() {
 Value makeGraphicsModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("canvas")), Value::makeBuiltin(gfx_canvas));
-    m.mapSet(Value(std::string("is_open")), Value::makeBuiltin(gfx_is_open));
-    m.mapSet(Value(std::string("begin_draw")), Value::makeBuiltin(gfx_begin_draw));
-    m.mapSet(Value(std::string("end_draw")), Value::makeBuiltin(gfx_end_draw));
+    m.mapSet(Value(std::string("isOpen")), Value::makeBuiltin(gfx_is_open));
+    m.mapSet(Value(std::string("beginDraw")), Value::makeBuiltin(gfx_begin_draw));
+    m.mapSet(Value(std::string("endDraw")), Value::makeBuiltin(gfx_end_draw));
     m.mapSet(Value(std::string("clear")), Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("blendMode")), Value::makeBuiltin(gfx_blend_mode));
     m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
@@ -1035,7 +1035,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));
     m.mapSet(Value(std::string("screenshot")), Value::makeBuiltin(gfx_screenshot));
-    m.mapSet(Value(std::string("draw_text")), Value::makeBuiltin(gfx_draw_text));
+    m.mapSet(Value(std::string("drawText")), Value::makeBuiltin(gfx_draw_text));
     m.mapSet(Value(std::string("close")), Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")), Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")), Value::makeBuiltin(gfx_run));

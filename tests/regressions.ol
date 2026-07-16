@@ -284,7 +284,7 @@ assert(typeof(math.pow(2, 3)) == "int" and math.pow(2, 3) == 8)
 assert(typeof(math.pow(2, 0.5)) == "float")     ## non entier reste float
 assert(typeof(math.logn(8, 2)) == "int" and math.logn(8, 2) == 3)
 assert(math.map(5, 2, 2, 7, 99) == 7)           ## plage d'entrée nulle → out_lo (pas d'inf/nan)
-assert(not math.is_inf(math.map(5, 2, 2, 0, 10)))
+assert(not math.isInf(math.map(5, 2, 2, 0, 10)))
 assert(math.map(5, 0, 10, 0, 100) == 50)
 
 ## ── string/math : cast double→int gardé (avant : UB / trap WASM sur index géant) ──
@@ -295,7 +295,7 @@ assert(string.substr("hello", 2, 1e300) == "ello")  ## len géant → clampé
 assert(string.char("abc", 2) == "b")            ## cas normal
 global str_c = "none"
 try
-    var r = math.rand_int(1e300)                ## arg hors plage int64 → erreur claire
+    var r = math.randInt(1e300)                ## arg hors plage int64 → erreur claire
 catch e
     str_c = "x"
 end

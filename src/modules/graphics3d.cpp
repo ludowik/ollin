@@ -72,21 +72,21 @@ static double camField(const Value& self, const char* k) {
     return v.isNumber() ? v.asNum() : 0.0;
 }
 
-// cam.set_pos(x,y,z) : fixe la position de la caméra.
+// cam.setPos(x,y,z) : fixe la position de la caméra.
 static Value cam_set_pos(Value* args, int argc) {
     Value self = args[0];
-    self.mapSet(Value(std::string("px")), Value(numArg(args, argc, 1, "Camera.set_pos")));
-    self.mapSet(Value(std::string("py")), Value(numArg(args, argc, 2, "Camera.set_pos")));
-    self.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 3, "Camera.set_pos")));
+    self.mapSet(Value(std::string("px")), Value(numArg(args, argc, 1, "Camera.setPos")));
+    self.mapSet(Value(std::string("py")), Value(numArg(args, argc, 2, "Camera.setPos")));
+    self.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 3, "Camera.setPos")));
     return self;
 }
 
-// cam.look_at(x,y,z) : réoriente la caméra vers le point cible (x,y,z).
+// cam.lookAt(x,y,z) : réoriente la caméra vers le point cible (x,y,z).
 static Value cam_look_at(Value* args, int argc) {
     Value self = args[0];
-    self.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 1, "Camera.look_at")));
-    self.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 2, "Camera.look_at")));
-    self.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 3, "Camera.look_at")));
+    self.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 1, "Camera.lookAt")));
+    self.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 2, "Camera.lookAt")));
+    self.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 3, "Camera.lookAt")));
     return self;
 }
 
@@ -127,8 +127,8 @@ static Value cam_orbit(Value* args, int argc) {
 static Value makeCameraClass() {
     Value cls = Value::makeClass();
     cls.mapSet(Value(std::string("__name__")), Value(std::string("Camera")));
-    cls.mapSet(Value(std::string("set_pos")), Value::makeBuiltin(cam_set_pos));
-    cls.mapSet(Value(std::string("look_at")), Value::makeBuiltin(cam_look_at));
+    cls.mapSet(Value(std::string("setPos")), Value::makeBuiltin(cam_set_pos));
+    cls.mapSet(Value(std::string("lookAt")), Value::makeBuiltin(cam_look_at));
     cls.mapSet(Value(std::string("move")), Value::makeBuiltin(cam_move));
     cls.mapSet(Value(std::string("orbit")), Value::makeBuiltin(cam_orbit));
     return cls;
@@ -142,7 +142,7 @@ static Value cameraClass() {
 
 // graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : INSTANCE de classe Camera.
 // Regarde (tx,ty,tz) depuis (px,py,pz), up = +Y, fovy = champ de vision vertical
-// (45° défaut). Mutable via ses méthodes (set_pos/look_at/move/orbit).
+// (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit).
 static Value gfx_camera(Value* args, int argc) {
     Value cam = Value::makeMap();
     cam.mapSet(Value(std::string("__class__")), cameraClass());
@@ -752,29 +752,29 @@ static void applyLightFromInstance(const Value& self) {
     s_lighting_used = true;
 }
 
-// light.set_dir(x,y,z) : oriente une lumière directionnelle (direction de propagation).
+// light.setDir(x,y,z) : oriente une lumière directionnelle (direction de propagation).
 static Value light_set_dir(Value* args, int argc) {
     Value self = args[0];
     self.mapSet(Value(std::string("type")), Value((int64_t)0));
-    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.set_dir")));
-    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.set_dir")));
-    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.set_dir")));
+    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.setDir")));
+    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.setDir")));
+    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.setDir")));
     applyLightFromInstance(self);
     return self;
 }
 
-// light.set_pos(x,y,z) : positionne une lumière ponctuelle.
+// light.setPos(x,y,z) : positionne une lumière ponctuelle.
 static Value light_set_pos(Value* args, int argc) {
     Value self = args[0];
     self.mapSet(Value(std::string("type")), Value((int64_t)1));
-    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.set_pos")));
-    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.set_pos")));
-    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.set_pos")));
+    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.setPos")));
+    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.setPos")));
+    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.setPos")));
     applyLightFromInstance(self);
     return self;
 }
 
-// light.set_color(couleur) : couleur de la lumière.
+// light.setColor(couleur) : couleur de la lumière.
 static Value light_set_color(Value* args, int argc) {
     Value self = args[0];
     if (argc > 1 && (args[1].isMap() || args[1].isClass())) {
@@ -800,9 +800,9 @@ static Value light_enable(Value* args, int argc) {
 static Value makeLightClass() {
     Value cls = Value::makeClass();
     cls.mapSet(Value(std::string("__name__")), Value(std::string("Light")));
-    cls.mapSet(Value(std::string("set_dir")), Value::makeBuiltin(light_set_dir));
-    cls.mapSet(Value(std::string("set_pos")), Value::makeBuiltin(light_set_pos));
-    cls.mapSet(Value(std::string("set_color")), Value::makeBuiltin(light_set_color));
+    cls.mapSet(Value(std::string("setDir")), Value::makeBuiltin(light_set_dir));
+    cls.mapSet(Value(std::string("setPos")), Value::makeBuiltin(light_set_pos));
+    cls.mapSet(Value(std::string("setColor")), Value::makeBuiltin(light_set_color));
     cls.mapSet(Value(std::string("enable")), Value::makeBuiltin(light_enable));
     return cls;
 }
@@ -1411,5 +1411,5 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
     m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
     m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));
-    registerQuat(m);   // quat / quat_axis / quat_euler (classe Quat, graphics_quat.cpp)
+    registerQuat(m);   // quat / quatAxis / quatEuler (classe Quat, graphics_quat.cpp)
 }

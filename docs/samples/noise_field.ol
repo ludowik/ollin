@@ -6,7 +6,7 @@
 
 graphics.canvas(W, H, "math.noise")
 
-math.noise_seed(7)
+math.noiseSeed(7)
 
 var CELL = 8          ## taille d'une cellule (px) — petit = plus de définition
 var SCALE = 0.0102145 ## zoom du bruit (petit = taches plus larges)
@@ -28,5 +28,5 @@ func draw()
         end
     end
 
-    graphics.draw_text("math.noise(x, y, temps)", 14, 14, 18, Color(1, 1, 1))
+    graphics.drawText("math.noise(x, y, temps)", 14, 14, 18, Color(1, 1, 1))
 end

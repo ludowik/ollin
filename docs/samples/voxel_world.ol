@@ -92,7 +92,7 @@ func put_tile(idx, br, bg, bb, jit)
     for py = 0, TILE - 1 do
         for px = 0, TILE - 1 do
             var n = (math.noise((cx + px) * 1.7 + 9, (cy + py) * 1.7 + 9) - 0.5) * 2 * jit
-            image.set_pixel(atlas, cx + px, cy + py,
+            image.setPixel(atlas, cx + px, cy + py,
                 math.clamp(br + n, 0, 1), math.clamp(bg + n, 0, 1), math.clamp(bb + n, 0, 1), 1)
         end
     end
@@ -100,7 +100,7 @@ end
 
 func build_atlas()
     atlas = image.create(ACOLS * TILE, AROWS * TILE)
-    image.begin_pixels(atlas)
+    image.beginPixels(atlas)
     put_tile(T_GRASS, 0.42, 0.68, 0.30, 0.10)
     put_tile(T_DIRT,  0.46, 0.33, 0.20, 0.10)
     put_tile(T_SAND,  0.86, 0.79, 0.53, 0.07)
@@ -111,7 +111,7 @@ func build_atlas()
     put_tile(T_LEAF,  0.18, 0.42, 0.16, 0.16)
     put_tile(T_STONE, 0.36, 0.36, 0.40, 0.11)
     put_tile(T_SANDD, 0.72, 0.63, 0.40, 0.08)
-    image.end_pixels(atlas)
+    image.endPixels(atlas)
     graphics.tileset(atlas, ACOLS, AROWS)
     graphics.tileAnim(T_WATER)    ## l'eau ondule (UV qui défile)
 end
@@ -305,7 +305,7 @@ func setup()
     graphics.canvas(W, H, "Voxel infini")
     graphics.ambient(0.5)
     graphics.light("dir", -0.5, -1, -0.35)
-    math.noise_seed(7)
+    math.noiseSeed(7)
     build_atlas()                 ## génère l'atlas de textures (herbe/terre/roche/…)
     ## spawn : meilleure terre ferme (au-dessus de la mer), score = proximité de
     ## l'origine + forte pénalité d'altitude → on choisit TOUJOURS un point sec, bas
@@ -372,8 +372,8 @@ func draw_dist_buttons()
     graphics.fill(Color(0, 0, 0, 0.38))
     graphics.rect(xm, BTN_Y, BTN, BTN)
     graphics.rect(xp, BTN_Y, BTN, BTN)
-    graphics.draw_text("-", xm + BTN / 2 - 6, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
-    graphics.draw_text("+", xp + BTN / 2 - 9, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
+    graphics.drawText("-", xm + BTN / 2 - 6, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
+    graphics.drawText("+", xp + BTN / 2 - 9, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
 end
 
 ## relais d'entrée vers le joystick (les callbacks mouse.* sont globaux au moteur)
@@ -510,8 +510,8 @@ func draw()
     var dx = math.cos(PITCH) * math.sin(yaw)
     var dy = math.sin(PITCH)
     var dz = math.cos(PITCH) * math.cos(yaw)
-    cam.set_pos(camX, camY, camZ)
-    cam.look_at(camX + dx, camY + dy, camZ + dz)
+    cam.setPos(camX, camY, camZ)
+    cam.lookAt(camX + dx, camY + dy, camZ + dz)
 
     graphics.noStroke()
     ## culling une seule fois : liste des chunks visibles (inFrustum est coûteux)
@@ -538,5 +538,5 @@ func draw()
     if manual then
         mode = "manuel"
     end
-    graphics.draw_text("vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
+    graphics.drawText("vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
 end

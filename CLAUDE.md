@@ -227,6 +227,19 @@ void visit(const WhileStmt& s) override {
 }
 ```
 
+## Conventions de nommage
+
+| Surface | Convention | Exemples |
+|---|---|---|
+| **API Ollin** (fonctions/méthodes de modules exposées aux scripts) | **camelCase** | `beginDraw`, `drawText`, `setPos`, `noiseSeed`, `getPixel` |
+| **API Ollin** (constructeurs / classes) | **PascalCase** | `Color`, `Quat`, `Camera`, `Light` |
+| **Interne C++** (fonctions) | snake_case, préfixe module | `gfx_begin3d`, `cam_set_pos`, `math_rand` |
+| **Interne C++** (statiques de fichier) | préfixe `s_` | `s_target`, `s_run_active` |
+
+- **Règle stricte, côté API Ollin : jamais de `snake_case`.** Le nom exposé (1ᵉʳ argument de `mapSet(..., makeBuiltin(...))`) peut différer du nom C++ interne (ex. exposé `setPos` ↔ interne `cam_set_pos`). Les méta-méthodes (`__str`, `__add`, `init`, clés `__class__`/`__name__`) sont exemptées.
+- **Garde-fou** : `tests/check_naming.sh` (inclus dans `tests/run.sh`) échoue si un builtin exposé contient un `_`. Ajouté après l'unification snake→camel de l'API (graphics/math/image).
+- **Code utilisateur** (`.ol`) : aucune contrainte imposée par le langage (le nommage des variables/fonctions de l'utilisateur est libre).
+
 ## Maintenance de CLAUDE.md
 
 Mettre à jour ce fichier dès qu'un point important doit être mémorisé : architecture, conventions, décisions, règles d'outillage.Ne pas documenter ce qui n'est pas encore implémenté.

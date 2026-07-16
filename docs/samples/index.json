@@ -7,7 +7,7 @@
   { "name": "Lignes animées", "file": "lignes_animees.ol" },
   { "name": "Pixels animés",  "file": "pixels.ol" },
   { "name": "Primitives",     "file": "primitives.ol" },
-  { "name": "Image (load_data)", "file": "image_demo.ol" },
+  { "name": "Image (loadData)", "file": "image_demo.ol" },
   { "name": "Bruit de Perlin", "file": "noise_field.ol" },
   { "name": "SUTOM",          "file": "sutom.ol" },
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },

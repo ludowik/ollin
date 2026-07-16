@@ -13,7 +13,7 @@ func setup()
     graphics.ambient(0.5)
     graphics.light("dir", -1, -1, -0.5)
     sz = graphics.modelSize(graphics.model("cube_tex.glb"))   ## dimensions (une fois)
-    cam.look_at(sz.cx, sz.cy, sz.cz)                          ## viser le centre
+    cam.lookAt(sz.cx, sz.cy, sz.cz)                          ## viser le centre
 end
 
 func draw()
@@ -26,5 +26,5 @@ func draw()
         graphics.drawModel(graphics.model("cube_tex.glb"), 0, 0, 0, 1)
     graphics.end3d()
 
-    graphics.draw_text("Modèle GLB — cadrage auto", 12, 12, 18, colors.WHITE)
+    graphics.drawText("Modèle GLB — cadrage auto", 12, 12, 18, colors.WHITE)
 end

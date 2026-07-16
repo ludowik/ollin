@@ -1282,12 +1282,12 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
     <tr><td><code>math.clamp(x, lo, hi)</code></td><td>fonction</td><td>Borne <code>x</code> dans l'intervalle [lo, hi]</td></tr>
     <tr><td><code>math.min(...)</code> / <code>math.max(...)</code></td><td>fonction</td><td>Minimum / maximum d'une liste d'arguments</td></tr>
     <tr><td><code>math.map(x, ilo, ihi, olo, ohi)</code></td><td>fonction</td><td>Ré-échelonne <code>x</code> de [ilo, ihi] vers [olo, ohi]</td></tr>
-    <tr><td><code>math.is_nan(x)</code> / <code>math.is_inf(x)</code></td><td>fonction</td><td>Teste NaN / infini</td></tr>
+    <tr><td><code>math.isNan(x)</code> / <code>math.isInf(x)</code></td><td>fonction</td><td>Teste NaN / infini</td></tr>
     <tr><td><code>math.rand([lo, hi])</code></td><td>fonction</td><td>Aléatoire float dans [0, 1) ; ou dans [lo, hi] si fourni</td></tr>
-    <tr><td><code>math.rand_int([lo,] hi)</code></td><td>fonction</td><td>Entier aléatoire dans [0, hi] ; ou [lo, hi]</td></tr>
+    <tr><td><code>math.randInt([lo,] hi)</code></td><td>fonction</td><td>Entier aléatoire dans [0, hi] ; ou [lo, hi]</td></tr>
     <tr><td><code>math.seed(n)</code></td><td>fonction</td><td>Fixe la graine du générateur aléatoire (reproductible)</td></tr>
     <tr><td><code>math.noise(x[, y[, z]])</code></td><td>fonction</td><td>Bruit de Perlin fractal (fBm) en 1, 2 ou 3 dimensions → float dans [0, 1], continu et déterministe</td></tr>
-    <tr><td><code>math.noise_seed(n)</code></td><td>fonction</td><td>Fixe la graine du bruit : même <code>n</code> → même bruit</td></tr>
+    <tr><td><code>math.noiseSeed(n)</code></td><td>fonction</td><td>Fixe la graine du bruit : même <code>n</code> → même bruit</td></tr>
   </tbody>
 </table>
 
@@ -1305,7 +1305,7 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
 <span class="kw">for</span> i = <span class="num">0</span>, <span class="num">3</span> <span class="kw">do</span>
     <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))  <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
 <span class="kw">end</span>
-math.noise_seed(<span class="num">42</span>)             <span class="cmt">## bruit reproductible</span></code></pre>
+math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## bruit reproductible</span></code></pre>
 
 <h3 id="module-string">string</h3>
 <p>Manipulation de chaînes. Les index sont <strong>1-based</strong> (comme les tableaux).</p>
@@ -1551,10 +1551,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func draw()</code></td><td>Si une fonction globale <code>draw</code> existe, le moteur l'appelle automatiquement à chaque frame (rendu)</td></tr>
     <tr><td><code>func update(dt)</code></td><td>Si elle existe, appelée chaque frame <strong>avant</strong> <code>draw</code> ; <code>dt</code> = secondes écoulées depuis la frame précédente</td></tr>
     <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
-    <tr><td><code>graphics.is_open()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
+    <tr><td><code>graphics.isOpen()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
     <tr><td><code>graphics.clear([color])</code></td><td>Couleur <strong>opaque</strong> → efface net ; couleur <strong>semi-transparente</strong> (alpha&nbsp;&lt;&nbsp;1) → <strong>fondu</strong> progressif (traînées, cf. contexte persistant ci-dessous). Sans argument : noir.</td></tr>
     <tr><td><code>graphics.blendMode(mode)</code></td><td>Mode de fusion des dessins suivants : chaîne (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) ou constante du module <code>blend</code>. Remis à <code>"alpha"</code> à chaque frame.</td></tr>
-    <tr><td><code>graphics.begin_draw()</code> / <code>graphics.end_draw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>
+    <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés (défaut : 2). Remis à 2 à chaque frame.</td></tr>
     <tr><td><code>graphics.stroke([color | r, g, b [, a]])</code></td><td>Active le contour : un objet <code>Color</code> (+ taille optionnelle en 2e arg), ou 3-4 composantes directes dans [0,1] ; sans argument, réactive avec la couleur courante</td></tr>
     <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
@@ -1566,7 +1566,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.rect(x, y, w, h)</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif</td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
     <tr><td><code>graphics.screenshot(fichier)</code></td><td>Capture le rendu courant dans un PNG (à appeler dans <code>draw</code>) ; sur WASM, déclenche un téléchargement</td></tr>
-    <tr><td><code>graphics.draw_text(text, x, y, size [,color])</code></td><td>Affiche une chaîne — couleur stroke par défaut</td></tr>
+    <tr><td><code>graphics.drawText(text, x, y, size [,color])</code></td><td>Affiche une chaîne — couleur stroke par défaut</td></tr>
     <tr><td><code>graphics.point(x, y)</code></td><td>Trace un point aux coordonnées données</td></tr>
     <tr><td><code>graphics.circle(x, y, r)</code></td><td>Cercle de centre (x,y) et rayon r — fill/stroke selon styles</td></tr>
     <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>Ellipse de centre (x,y), largeur w et hauteur h — fill/stroke selon styles</td></tr>
@@ -1677,7 +1677,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <h3>3D</h3>
 <p>Le dessin 3D partage la même boucle et le même état que la 2D. On place une <strong>caméra</strong>, puis on dessine des formes entre <code>graphics.begin3d(cam)</code> et <code>graphics.end3d()</code>. Comme en 2D, <code>fill</code>/<code>stroke</code> pilotent le remplissage et le contour (fil de fer). Après <code>end3d()</code>, on peut dessiner un <strong>HUD 2D</strong> par-dessus dans la même frame.</p>
 
-<p>La caméra est un <strong>objet</strong> (classe <code>Camera</code>, comme <code>Color</code>) : on la crée une fois puis on la pilote par ses méthodes. <code>cam.set_pos(x,y,z)</code> fixe la position, <code>cam.look_at(x,y,z)</code> réoriente vers une cible, <code>cam.move(dx,dy,dz)</code> translate la caméra et sa cible (visée conservée), <code>cam.orbit(angle, rayon [, hauteur])</code> la place en orbite autour de sa cible (<code>angle</code> en radians).</p>
+<p>La caméra est un <strong>objet</strong> (classe <code>Camera</code>, comme <code>Color</code>) : on la crée une fois puis on la pilote par ses méthodes. <code>cam.setPos(x,y,z)</code> fixe la position, <code>cam.lookAt(x,y,z)</code> réoriente vers une cible, <code>cam.move(dx,dy,dz)</code> translate la caméra et sa cible (visée conservée), <code>cam.orbit(angle, rayon [, hauteur])</code> la place en orbite autour de sa cible (<code>angle</code> en radians).</p>
 
 <div class="callout tip">En 3D, appelle <code>graphics.clear(<em>couleur opaque</em>)</code> au début de chaque frame : un effacement opaque remet à zéro le <strong>tampon de profondeur</strong> (indispensable au test de profondeur), en plus de la couleur.</div>
 
@@ -1685,7 +1685,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Crée une caméra (objet <code>Camera</code>) regardant <code>(tx,ty,tz)</code> depuis <code>(px,py,pz)</code> ; <code>fovy</code> = champ de vision vertical en degrés (45 par défaut)</td></tr>
-    <tr><td><code>cam.set_pos(x,y,z)</code> · <code>cam.look_at(x,y,z)</code></td><td>Fixe la position / la cible de la caméra</td></tr>
+    <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Fixe la position / la cible de la caméra</td></tr>
     <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, rayon [, hauteur])</code></td><td>Translate la caméra (visée conservée) / la met en orbite autour de sa cible (<code>angle</code> en radians)</td></tr>
     <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>Encadrent les dessins 3D dans <code>draw()</code></td></tr>
     <tr><td><code>graphics.grid(slices, spacing)</code></td><td>Repère quadrillé au sol (plan XZ), centré sur l'origine (couleur grise fixe)</td></tr>
@@ -1710,8 +1710,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(couleur)</code></td><td>Lumière ambiante (base uniforme). <code>v</code> ∈ [0,1]</td></tr>
     <tr><td><code>graphics.light("dir", dx,dy,dz [, couleur])</code></td><td>Lumière directionnelle (<code>(dx,dy,dz)</code> = direction de propagation) → objet <code>Light</code></td></tr>
     <tr><td><code>graphics.light("point", x,y,z [, couleur])</code></td><td>Lumière ponctuelle à la position <code>(x,y,z)</code> → objet <code>Light</code></td></tr>
-    <tr><td><code>lum.set_dir(x,y,z)</code> · <code>lum.set_pos(x,y,z)</code></td><td>Réoriente / repositionne la lumière</td></tr>
-    <tr><td><code>lum.set_color(couleur)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
+    <tr><td><code>lum.setDir(x,y,z)</code> · <code>lum.setPos(x,y,z)</code></td><td>Réoriente / repositionne la lumière</td></tr>
+    <tr><td><code>lum.setColor(couleur)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
     <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applique une image (handle <code>image</code>) comme texture aux solides suivants ; <code>fill</code> devient une teinte multipliée. Pour un terrain multi-matières, voir l'<a href="#voxel">atlas de tuiles</a> plus bas</td></tr>
   </tbody>
 </table>
@@ -1755,7 +1755,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="bi">graphics</span>.fill(colors.SKYBLUE)
         <span class="bi">graphics</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
     <span class="bi">graphics</span>.end3d()
-    <span class="bi">graphics</span>.draw_text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>, <span class="num">22</span>)   <span class="cmt">## HUD 2D par-dessus</span>
+    <span class="bi">graphics</span>.drawText(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>, <span class="num">22</span>)   <span class="cmt">## HUD 2D par-dessus</span>
 <span class="kw">end</span></code></pre>
 
 <h4>Rotations par quaternion (<code>Quat</code>)</h4>
@@ -1764,18 +1764,18 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.quat()</code></td><td>Quaternion identité (aucune rotation)</td></tr>
-    <tr><td><code>graphics.quat_axis(ax,ay,az, deg)</code></td><td>Rotation de <code>deg</code>° autour de l'axe <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.quat_euler(pitch,yaw,roll)</code></td><td>Depuis des angles d'Euler (degrés)</td></tr>
+    <tr><td><code>graphics.quatAxis(ax,ay,az, deg)</code></td><td>Rotation de <code>deg</code>° autour de l'axe <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>graphics.quatEuler(pitch,yaw,roll)</code></td><td>Depuis des angles d'Euler (degrés)</td></tr>
     <tr><td><code>q.mul(autre)</code></td><td>Composition <code>q · autre</code> → nouveau <code>Quat</code></td></tr>
     <tr><td><code>q.slerp(autre, t)</code></td><td>Interpolation sphérique, <code>t</code> ∈ [0,1] → nouveau <code>Quat</code></td></tr>
     <tr><td><code>q.normalize()</code> · <code>q.inverse()</code></td><td>Quaternion normalisé / rotation inverse</td></tr>
-    <tr><td><code>q.rotate_vec(x,y,z)</code></td><td>Renvoie le vecteur <code>(x,y,z)</code> tourné, sous forme <code>[x,y,z]</code></td></tr>
+    <tr><td><code>q.rotateVec(x,y,z)</code></td><td>Renvoie le vecteur <code>(x,y,z)</code> tourné, sous forme <code>[x,y,z]</code></td></tr>
     <tr><td><code>graphics.rotateq(q)</code></td><td>Applique la rotation <code>q</code> (comme <code>rotate</code>, mais depuis un <code>Quat</code>)</td></tr>
   </tbody>
 </table>
 <pre><code><span class="cmt">## interpole en douceur entre deux orientations</span>
-<span class="kw">global</span> qa = <span class="bi">graphics</span>.quat_axis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## départ</span>
-<span class="kw">global</span> qb = <span class="bi">graphics</span>.quat_axis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## arrivée</span>
+<span class="kw">global</span> qa = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## départ</span>
+<span class="kw">global</span> qb = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## arrivée</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
@@ -1867,7 +1867,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span>
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
-    <span class="bi">graphics</span>.draw_text(<span class="str">"touche : "</span> + last, <span class="num">16</span>, <span class="num">45</span>, <span class="num">26</span>, <span class="bi">colors</span>.WHITE)
+    <span class="bi">graphics</span>.drawText(<span class="str">"touche : "</span> + last, <span class="num">16</span>, <span class="num">45</span>, <span class="num">26</span>, <span class="bi">colors</span>.WHITE)
 <span class="kw">end</span></code></pre>
 </section>
 
@@ -1911,17 +1911,17 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
     <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## redimensionné</span>
 <span class="kw">end</span></code></pre>
-<div class="callout"><code>image.load(nom)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.load_data("png", base64)</code> — voir l'exemple « Image (load_data) » du playground.</div>
+<div class="callout"><code>image.load(nom)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.loadData("png", base64)</code> — voir l'exemple « Image (loadData) » du playground.</div>
 
 <h3>Render texture (dessin hors-écran)</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
 <span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>)  <span class="cmt">## render texture 120×120</span>
 
-image.begin_draw(rt)             <span class="cmt">## on dessine DANS la texture (une fois)</span>
+image.beginDraw(rt)             <span class="cmt">## on dessine DANS la texture (une fois)</span>
     <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.1</span>, <span class="num">0.15</span>))
     <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
     <span class="bi">graphics</span>.circle(<span class="num">60</span>, <span class="num">60</span>, <span class="num">50</span>)
-image.end_draw()
+image.endDraw()
 
 <span class="kw">func</span> draw()                      <span class="cmt">## puis on l'affiche comme un sprite</span>
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
@@ -1933,16 +1933,16 @@ image.end_draw()
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>image.load(nom)</code></td><td>Charge une texture (natif : disque ; WASM : image « Images » ou ressource servie même origine) — retourne un handle <code>{id, width, height}</code></td></tr>
-    <tr><td><code>image.load_data(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
+    <tr><td><code>image.loadData(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
     <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
-    <tr><td><code>image.begin_draw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
-    <tr><td><code>image.end_draw()</code></td><td>Termine le rendu hors-écran et restaure la cible par défaut</td></tr>
+    <tr><td><code>image.beginDraw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
+    <tr><td><code>image.endDraw()</code></td><td>Termine le rendu hors-écran et restaure la cible par défaut</td></tr>
     <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture ; <code>tint</code> explicite (objet Color) prioritaire, sinon la teinte globale <code>graphics.tint</code></td></tr>
     <tr><td><code>image.unload(handle)</code></td><td>Libère les ressources GPU de la texture</td></tr>
-    <tr><td><code>image.begin_pixels(handle)</code></td><td>Ouvre l'accès pixel-par-pixel à la texture (à recalculer chaque frame)</td></tr>
-    <tr><td><code>image.set_pixel(handle, x, y, color)</code></td><td>Écrit un pixel — objet <code>Color</code> ou composantes <code>r, g, b [, a]</code> dans [0,1]. Entre <code>begin_pixels</code>/<code>end_pixels</code>.</td></tr>
-    <tr><td><code>image.get_pixel(handle, x, y)</code></td><td>Lit un pixel → objet <code>Color</code></td></tr>
-    <tr><td><code>image.end_pixels(handle)</code></td><td>Valide les écritures pixel et referme l'accès</td></tr>
+    <tr><td><code>image.beginPixels(handle)</code></td><td>Ouvre l'accès pixel-par-pixel à la texture (à recalculer chaque frame)</td></tr>
+    <tr><td><code>image.setPixel(handle, x, y, color)</code></td><td>Écrit un pixel — objet <code>Color</code> ou composantes <code>r, g, b [, a]</code> dans [0,1]. Entre <code>beginPixels</code>/<code>endPixels</code>.</td></tr>
+    <tr><td><code>image.getPixel(handle, x, y)</code></td><td>Lit un pixel → objet <code>Color</code></td></tr>
+    <tr><td><code>image.endPixels(handle)</code></td><td>Valide les écritures pixel et referme l'accès</td></tr>
   </tbody>
 </table>
 <div class="callout tip"><code>graphics.sprite()</code> est l'alternative recommandée à <code>image.draw()</code> : elle respecte la matrice de transformation courante et prend <code>graphics.tint</code> comme teinte (blanc si aucune).</div>

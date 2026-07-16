@@ -39,6 +39,11 @@ if ! bash tests/test_errors.sh; then
     fails=$((fails + 1))
 fi
 
+echo "── garde-fou nommage API ─────────────────────────"
+if ! bash tests/check_naming.sh; then
+    fails=$((fails + 1))
+fi
+
 echo "──────────────────────────────────────────────────"
 if [ $fails -eq 0 ]; then
     echo "TOUT VERT"

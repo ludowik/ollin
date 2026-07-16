@@ -36,7 +36,7 @@ func mouse.moved(x, y)
     lasty = y
     ## glissement horizontal → rotation autour de Y ; vertical → autour de X.
     ## On compose la nouvelle rotation À GAUCHE (repère écran) → effet trackball.
-    var spin = graphics.quat_axis(0, 1, 0, dx * 0.5).mul(graphics.quat_axis(1, 0, 0, dy * 0.5))
+    var spin = graphics.quatAxis(0, 1, 0, dx * 0.5).mul(graphics.quatAxis(1, 0, 0, dy * 0.5))
     orient = spin.mul(orient)
 end
 
@@ -49,5 +49,5 @@ func draw()
         graphics.rotateq(orient)       ## applique l'orientation accumulée
         graphics.cube(0, 0, 0,  3, 3, 3)
     graphics.end3d()
-    graphics.draw_text("Glisse pour tourner", 12, 12, 20, colors.WHITE)
+    graphics.drawText("Glisse pour tourner", 12, 12, 20, colors.WHITE)
 end
