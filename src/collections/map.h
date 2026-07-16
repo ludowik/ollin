@@ -1,6 +1,9 @@
 #pragma once
 // Inclus par chunk.h après la définition de Value — ne pas inclure directement.
 #include "robin_hood.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>   // DIAG: détecteur de double-free
+#endif
 
 struct ValueHash {
     std::size_t operator()(const Value& v) const noexcept;
@@ -14,6 +17,7 @@ struct Map {
     robin_hood::unordered_map<Value, Value, ValueHash, ValueEqual> data;
     int refcount = 1;
     void* userdata = nullptr;
+    bool freed = false;   // DIAG: true quand rendu au pool → détecte double-free
 
     Value get(const Value& k) const;
     void set(const Value& k, const Value& v);
@@ -29,6 +33,7 @@ struct MapPool {
             Map* m = buf[--n];
             m->refcount = 1;
             m->userdata = nullptr;
+            m->freed = false;
             return m;
         }
         return new Map();
@@ -38,6 +43,13 @@ struct MapPool {
     // static (mémoire jamais rendue). Cf. ArrayPool / ArrayIteratorPool.
     static constexpr size_t POOL_MAX_SIZE = 1024;
     void release(Map* m) {
+#ifdef __EMSCRIPTEN__
+        if (m->freed) {
+            EM_ASM({ var s="POISON map double-free ptr=0x"+($0>>>0).toString(16); if(window.__ollinCrash)window.__ollinCrash.noteStderr(s); console.error(s); }, (int)(intptr_t)m);
+            return;   // ne pas ré-ajouter au pool (évite d'aggraver + le log survit)
+        }
+        m->freed = true;
+#endif
         if (n < CAP && m->data.size() <= POOL_MAX_SIZE) {
             m->data.clear();
             buf[n++] = m;

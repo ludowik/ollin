@@ -1,5 +1,8 @@
 #pragma once
 #include "string_table.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>   // DIAG: détecteur de pointeur corrompu (release)
+#endif
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
@@ -312,6 +315,28 @@ inline void Value::release() noexcept {
 }
 
 __attribute__((noinline)) inline void Value::release_cold() noexcept {
+#ifdef __EMSCRIPTEN__
+    // SONDE (diagnostic) : le crash observé est ICI — release_cold suit un pointeur
+    // corrompu (écrit hors-bornes pendant un run graphique, dépendant du GPU). On
+    // valide le pointeur ref-compté AVANT de le déréférencer : hors de la plage du
+    // tas fixe (128 Mo, growth=0) → poubelle. On journalise tag + valeur du pointeur
+    // (indice sur ce qui a écrasé) et on N'Y TOUCHE PAS (le log survit au lieu de
+    // planter). Fuite volontaire d'1 objet en échange du diagnostic.
+    {
+        uintptr_t p = (uintptr_t)mptr;   // union : sptr/aptr/cptr/rptr aliasent ces octets
+        if (p < 1024u || p >= 0x8000000u) {
+            EM_ASM(
+                {
+                    var m = "POISON release tag=" + $0 + " ptr=0x" + ($1 >>> 0).toString(16);
+                    if (window.__ollinCrash)
+                        window.__ollinCrash.noteStderr(m);
+                    console.error(m);
+                },
+                (int)tag, (int)p);
+            return;
+        }
+    }
+#endif
     switch (tag) {
     case T_STRING:
         if (--sptr->refcount == 0)
