@@ -31,48 +31,24 @@ const { installCrashOverlay, wireModule } = await import('./pg-crashlog.js?v=' +
 installCrashOverlay()
 
 // ── Runtime WASM partagé (une instance pour toute la SPA) ───────────────────
-// Le script (factory OllinModule, MODULARIZE=1) n'est chargé qu'UNE fois ; chaque
-// appel OllinModule() instancie ensuite un module NEUF (mémoire linéaire + contexte
-// WebGL frais).
 let ollinPromise = null
-let ollinScriptPromise = null
-let ollinDir = 'wasm/'
-function loadOllinScript() {
-  if (ollinScriptPromise) return ollinScriptPromise
-  ollinScriptPromise = new Promise((resolve, reject) => {
+function getOllin() {
+  if (ollinPromise) return ollinPromise
+  ollinPromise = new Promise((resolve, reject) => {
     const s = document.createElement('script')
     s.src = 'wasm/ollin.js?' + V
     s.onload = () => {
-      ollinDir = s.src.replace(/\?.*$/, '').replace(/[^/]*$/, '')
-      resolve()
+      const dir = s.src.replace(/\?.*$/, '').replace(/[^/]*$/, '')
+      OllinModule(wireModule({
+        locateFile: f => dir + f + '?' + V,
+        canvas: document.getElementById('canvas'),
+        print: () => {},
+        printErr: () => {},
+      })).then(resolve).catch(reject)
     }
     s.onerror = () => reject(new Error('WASM introuvable'))
     document.head.appendChild(s)
   })
-  return ollinScriptPromise
-}
-async function instantiateOllin() {
-  await loadOllinScript()
-  return OllinModule(wireModule({
-    locateFile: f => ollinDir + f + '?' + V,
-    canvas: document.getElementById('canvas'),
-    print: () => {},
-    printErr: () => {},
-  }))
-}
-function getOllin() {
-  if (!ollinPromise) ollinPromise = instantiateOllin()
-  return ollinPromise
-}
-// Instance WASM NEUVE pour une ré-exécution SÛRE. Réutiliser la même instance après
-// un run graphique reporte une corruption mémoire dépendante du pilote GPU (écriture
-// hors-bornes côté GL sur GPU réels — reproduite sur Windows et iOS, masquée par le
-// rasteriseur logiciel) : elle détonne au ré-execute (reconstruction des modules).
-// Repartir d'une instance neuve = mémoire + contexte GL vierges → aucune corruption
-// reportée. `prev` : instance à mettre en pause (sa boucle rAF) avant de la lâcher.
-async function freshOllin(prev) {
-  try { if (prev && prev.pauseMainLoop) prev.pauseMainLoop() } catch (_) {}
-  ollinPromise = instantiateOllin()
   return ollinPromise
 }
 
@@ -166,7 +142,7 @@ async function mount(view, anchor) {
     if (stale()) {
       return
     }
-    const ctx = { root: viewEl, getOllin, freshOllin, hardReload, navigate, v: V, anchor }
+    const ctx = { root: viewEl, getOllin, hardReload, navigate, v: V, anchor }
     const cleanup = (await mod.init(ctx)) || null
     if (stale()) {
       // Une navigation plus récente a pris la main pendant l'init → nettoyer

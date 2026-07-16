@@ -6,7 +6,7 @@
 // d'erreurs que le Run inline du playground.
 
 export async function init(ctx) {
-  const { getOllin, freshOllin } = ctx
+  const { getOllin } = ctx
   let mod = null   // module WASM (capturé par stop() ; pas de global smuggling)
 
   // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
@@ -87,19 +87,12 @@ export async function init(ctx) {
     })
   }
   if (relaunchBtn) {
-    relaunchBtn.addEventListener('click', async () => {
-      // Relance sur une instance WASM NEUVE (mémoire + contexte GL frais) : réutiliser
-      // l'instance après un run graphique reporte une corruption dépendante du pilote
-      // GPU qui plante au ré-execute (Windows/iOS). Une instance neuve l'évite.
-      paused = false
-      setPauseUI()
-      try {
-        mod = await freshOllin(mod)
-        loadProjectIntoRuntime(mod, project)   // re-précharger les sources dans l'instance neuve
-      } catch (e) {
-        statusEl.textContent = ''
-        showText('error: WASM — ' + (e?.message ?? e))
-        return
+    relaunchBtn.addEventListener('click', () => {
+      // relance IN-PLACE : ré-exécute dans la MÊME instance WASM (pas de reload page)
+      if (paused) {
+        try { mod && mod.resumeMainLoop() } catch (_) {}
+        paused = false
+        setPauseUI()
       }
       launch()
     })
