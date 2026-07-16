@@ -214,6 +214,9 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 }
 #output.ok  { color: var(--green); font-style: normal; }
 #output.err { color: var(--red);   font-style: normal; }
+/* « fichier:ligne » cliquable dans un message d'erreur → va à la ligne fautive. */
+#output .err-link { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-weight: 600; }
+#output .err-link:hover { background: rgba(255,255,255,0.08); border-radius: 3px; }
 
 canvas#canvas {
   display: none;
