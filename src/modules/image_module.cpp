@@ -165,30 +165,6 @@ static void pixelsOpen(TexHandle& h) {
     // that has never been drawn to — fall back to a zeroed CPU image.
     if (!h.cpu.data)
         h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
-#ifdef __EMSCRIPTEN__
-    // SONDE (diagnostic) : ce readback GPU→CPU est le SEUL transfert GL→mémoire du
-    // moteur. Sur GPU réel (Windows/iOS), un format/taille inattendu ici trahirait
-    // l'écriture hors-bornes recherchée (le rasteriseur logiciel de CI la masque).
-    // On journalise tout écart dims/format/taille dans l'overlay (window.__ollinCrash)
-    // et la console. Purement observationnel : aucun changement de comportement.
-    {
-        int tw = h.rtt.texture.width, th = h.rtt.texture.height;
-        int expBytes = tw * th * 4;   // RGBA8 attendu (format des render textures raylib)
-        int gotBytes = GetPixelDataSize(h.cpu.width, h.cpu.height, h.cpu.format);
-        if (h.cpu.width != tw || h.cpu.height != th ||
-            h.cpu.format != PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 || gotBytes != expBytes) {
-            EM_ASM(
-                {
-                    var m = "SONDE readback tex=" + $0 + "x" + $1 + " cpu=" + $2 + "x" + $3 + " fmt=" + $4 +
-                            " got=" + $5 + "o exp=" + $6 + "o";
-                    if (window.__ollinCrash)
-                        window.__ollinCrash.noteStderr(m);
-                    console.error(m);
-                },
-                tw, th, h.cpu.width, h.cpu.height, (int)h.cpu.format, gotBytes, expBytes);
-        }
-    }
-#endif
     h.pixels_open = true;
 }
 

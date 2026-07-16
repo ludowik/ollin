@@ -95,8 +95,16 @@ struct ArrayIteratorPool {
     // libère pas la capacité → ne pooler que les petits, détruire les gros.
     static constexpr size_t POOL_MAX_CAP = 4096;
     void release(ArrayIterator* it) {
-        if (n < CAP && it->items.capacity() <= POOL_MAX_CAP) {
-            it->items.clear();
+        // RÉ-ENTRANCE : it->items.clear() libère les valeurs du snapshot, ce qui peut
+        // ré-entrer les pools (une valeur map/array → release → buf[n++]) et faire
+        // croître n ici. On vide AVANT, puis on (re)teste la capacité — sinon buf[n++]
+        // déborderait sur &n. (Cf. MapPool / ArrayPool.)
+        if (it->items.capacity() > POOL_MAX_CAP) {
+            delete it;
+            return;
+        }
+        it->items.clear();
+        if (n < CAP) {
             buf[n++] = it;
         } else {
             delete it;

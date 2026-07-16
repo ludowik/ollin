@@ -11,13 +11,13 @@
 // + l'abort emscripten (wireModule), et on garde un tampon glissant de stderr.
 
 const STDERR_RING = []          // dernières lignes printErr (contexte)
-const RING_MAX = 400             // large : un rapport AddressSanitizer fait ~30-60 lignes
+const RING_MAX = 60
 let overlayEl = null
 let shown = false
 
 // Une faute dure a une signature reconnaissable ; le reste (avertissements du
 // pilote GL, etc.) ne doit PAS déclencher l'overlay.
-const FATAL_RE = /POISON|AddressSanitizer|heap-buffer-overflow|heap-use-after-free|stack-buffer-overflow|SUMMARY:|memory access out of bounds|table index is out of bounds|out of bounds|RuntimeError|\babort(ed)?\b|Assertion failed|null function or function signature mismatch|unreachable/i
+const FATAL_RE = /memory access out of bounds|table index is out of bounds|out of bounds|RuntimeError|\babort(ed)?\b|Assertion failed|null function or function signature mismatch|unreachable/i
 
 function ensureOverlay() {
   if (overlayEl) return overlayEl

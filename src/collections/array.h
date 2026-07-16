@@ -3,14 +3,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>   // DIAG: détecteur de double-free
-#endif
 
 struct Array {
     std::vector<Value> items;
     int refcount = 1;
-    bool freed = false;   // DIAG: true quand rendu au pool → détecte double-free
 
     Value get(int64_t idx) const {
         int64_t i = idx - 1;
@@ -44,7 +40,6 @@ struct ArrayPool {
         if (n) {
             Array* a = buf[--n];
             a->refcount = 1;
-            a->freed = false;
             return a;
         }
         return new Array();
@@ -55,18 +50,19 @@ struct ArrayPool {
     // détruits → buffer rendu à l'allocateur.
     static constexpr size_t POOL_MAX_CAP = 4096;
     void release(Array* a) {
-#ifdef __EMSCRIPTEN__
-        if (a->freed) {
-            EM_ASM({ var s="POISON array double-free ptr=0x"+($0>>>0).toString(16); if(window.__ollinCrash)window.__ollinCrash.noteStderr(s); console.error(s); }, (int)(intptr_t)a);
-            return;   // ne pas ré-ajouter au pool (évite d'aggraver + le log survit)
+        // RÉ-ENTRANCE : a->items.clear() libère les éléments, ce qui peut ré-entrer le
+        // pool (un élément array → release → buf[n++]) et faire CROÎTRE n. On vide donc
+        // AVANT, puis on (re)teste la capacité avec le n à jour — sinon buf[n++] écrirait
+        // buf[CAP] (= &n) quand un release imbriqué a rempli le pool pendant le clear.
+        if (a->items.capacity() > POOL_MAX_CAP) {
+            delete a; // gros tableau : jamais poolé
+            return;
         }
-        a->freed = true;
-#endif
-        if (n < CAP && a->items.capacity() <= POOL_MAX_CAP) {
-            a->items.clear();
-            buf[n++] = a;
+        a->items.clear(); // peut ré-entrer le pool (releases imbriqués) → n peut changer
+        if (n < CAP) {
+            buf[n++] = a; // n RELU après clear
         } else {
-            delete a;
+            delete a; // items déjà vidés
         }
     }
 };

@@ -807,28 +807,6 @@ static void emscripten_frame() {
     bool tex = false, drawing = false;
     try {
         renderFrame(s_run_callback, &tex, &drawing);
-        // SONDE : le pool de maps est corrompu (n hors plage). On vérifie son
-        // intégrité APRÈS chaque frame → la 1re frame fautive dit QUAND (donc quelle
-        // opération graphique) corrompt le pool, pendant le run 1 (avant tout re-run).
-        {
-            static int s_diag_frame = 0;
-            static bool s_diag_hit = false;
-            s_diag_frame++;
-            if (!s_diag_hit) {
-                int d = map_pool().diag();
-                if (d) {
-                    s_diag_hit = true;
-                    EM_ASM(
-                        {
-                            var s = "POISON pool corrompu APRES frame " + $0 + " code=" + $1 + " n=" + $2;
-                            if (window.__ollinCrash)
-                                window.__ollinCrash.noteStderr(s);
-                            console.error(s);
-                        },
-                        s_diag_frame, d, map_pool().n);
-                }
-            }
-        }
     } catch (const std::exception& e) {
         if (tex)                   // refermer les blocs restés ouverts (pas de 2× End…)
             EndTextureMode();
