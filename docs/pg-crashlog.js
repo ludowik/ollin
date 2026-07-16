@@ -17,7 +17,7 @@ let shown = false
 
 // Une faute dure a une signature reconnaissable ; le reste (avertissements du
 // pilote GL, etc.) ne doit PAS déclencher l'overlay.
-const FATAL_RE = /POISON|memory access out of bounds|table index is out of bounds|out of bounds|RuntimeError|\babort(ed)?\b|Assertion failed|null function or function signature mismatch|unreachable/i
+const FATAL_RE = /POISON|AddressSanitizer|heap-buffer-overflow|heap-use-after-free|stack-buffer-overflow|SUMMARY:|memory access out of bounds|table index is out of bounds|out of bounds|RuntimeError|\babort(ed)?\b|Assertion failed|null function or function signature mismatch|unreachable/i
 
 function ensureOverlay() {
   if (overlayEl) return overlayEl

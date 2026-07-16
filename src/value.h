@@ -324,7 +324,9 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
     // planter). Fuite volontaire d'1 objet en échange du diagnostic.
     {
         uintptr_t p = (uintptr_t)mptr;   // union : sptr/aptr/cptr/rptr aliasent ces octets
-        if (p < 1024u || p >= 0x8000000u) {
+        // NUL / quasi-nul = poubelle sûre (indépendant de la taille du tas, donc OK
+        // même en growth=1 pour la build ASan). Le signal confirmé est ptr=0.
+        if (p < 1024u) {
             EM_ASM(
                 {
                     var m = "POISON release tag=" + $0 + " ptr=0x" + ($1 >>> 0).toString(16);
