@@ -76,10 +76,11 @@ if(EMSCRIPTEN)
         # bug iOS-only). Une mémoire fixe garantit un ArrayBuffer classique, dont les
         # vues sont acceptées. 128 Mo = large pour le playground (interpréteur +
         # raylib ~40 Mo + données utilisateur).
-        # DIAG ASan : growth=1 requis par AddressSanitizer (shadow memory). Casse iOS
-        # (bug ArrayBufferView) mais on teste sur Windows Chrome. À REVERTIR ensuite.
-        -sALLOW_MEMORY_GROWTH=1
-        -sINITIAL_MEMORY=134217728
+        # DIAG ASan avec mémoire FIXE (growth=0) : growth=1 rend l'ArrayBuffer
+        # redimensionnable → texImage2D le refuse (Chrome 148 + iOS). On garde donc
+        # growth=0 mais on agrandit INITIAL_MEMORY pour loger le shadow ASan. À REVERTIR.
+        -sALLOW_MEMORY_GROWTH=0
+        -sINITIAL_MEMORY=805306368
         -fsanitize=address
         --profiling-funcs
         -sASSERTIONS=1
