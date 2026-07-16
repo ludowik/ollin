@@ -3,6 +3,12 @@
 
 ## Collaboration
 
+**Langue et format de réponse (règle permanente)** : répondre **toujours en
+français**. Les rapports, revues de code, synthèses et résultats sont rendus en
+**texte lisible** (titres, listes, prose) — **jamais** de JSON brut ni de dump de
+structure de données comme livrable à l'utilisateur, même si un outil/skill
+produit du JSON en interne (le convertir en rapport lisible avant de le présenter).
+
 Avant d'agir, délimiter le périmètre exact de la demande. Si plusieurs
 interprétations raisonnables divergent — surtout si l'une déborde de la cible —
 poser une question de clarification **brève** avant de coder ; ne pas deviner
