@@ -52,11 +52,10 @@ export async function init(ctx) {
 
   // ── Contrôles d'exécution : Recharger + Relancer + Pause/Reprendre ──────────
   // DEUX relances distinctes :
-  //  • « Recharger » recharge la PAGE → nouvelle instance WASM (module frais). C'est
-  //    le chemin SÛR : repartir d'un module neuf évite tout état accumulé corrompu.
-  //  • « Relancer » ré-exécute DANS LA MÊME instance WASM (sans reload). C'est le
-  //    chemin qui, après une longue session graphique, avait pu déclencher un crash
-  //    au ré-execute — gardé pour pouvoir TESTER s'il se reproduit (ex. plein écran).
+  //  • « Recharger » recharge la PAGE → nouvelle instance WASM (module frais).
+  //  • « Relancer » ré-exécute DANS LA MÊME instance WASM (sans reload) : plus
+  //    rapide (pas de flash de rechargement), et sûr depuis la correction de la
+  //    ré-entrance des pools d'objets (voir MapPool::release).
   const reloadBtn   = document.getElementById('reload-btn')
   const relaunchBtn = document.getElementById('relaunch-btn')
   const pauseBtn    = document.getElementById('pause-btn')

@@ -390,6 +390,8 @@ Sémantique de copie : référence comptée (partage de la même map, pas clone)
 Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.  
 Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 
+**Invariant pools (`MapPool`/`ArrayPool`/`ArrayIteratorPool`) — RÉ-ENTRANCE** : `release()` doit vider (`data.clear()`/`items.clear()`) **AVANT** de tester la capacité `n < CAP`, puis relire `n`. Le clear libère les entrées, et une entrée map/array **ré-entre** le pool (`release` → `buf[n++]`) → `n` peut grandir pendant le clear. Tester `n < CAP` *avant* le clear puis faire `buf[n++]` avec le `n` à jour écrit `buf[CAP]` (= `&n`) et corrompt la free-list (bug du crash au re-run corrigé). Ne jamais remettre le test de capacité avant le clear.
+
 ## Type entier natif (implémentation)
 
 > Règles de promotion (INT/FLOAT) et littéraux : voir `grammar.ebnf` (`additive`, `NUMBER`).
