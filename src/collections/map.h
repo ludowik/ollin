@@ -30,6 +30,20 @@ struct MapPool {
     int n = 0;
     unsigned magic1 = 0x600DCAFEu;   // DIAG : sentinelle APRÈS n
 
+    // DIAG : 0 = pool sain ; sinon code (1=magic0, 2=magic1, 3=n hors plage, 4=slot nul).
+    int diag() const {
+        if (magic0 != 0x600DCAFEu)
+            return 1;
+        if (magic1 != 0x600DCAFEu)
+            return 2;
+        if (n < 0 || n > CAP)
+            return 3;
+        for (int i = 0; i < n; i++)
+            if (buf[i] == nullptr)
+                return 4;
+        return 0;
+    }
+
     Map* acquire() {
         if (n) {
 #ifdef __EMSCRIPTEN__
