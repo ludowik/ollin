@@ -1,35 +1,13 @@
 ## Univers voxel infini — chunks générés à la volée par bruit de Perlin, cuits
 ## autour du joueur (beginChunk/endChunk) et libérés au loin (freeChunk). Distance
-## de vue auto-adaptative (voir adapt_view). Déplacement : joystick tactile.
+## de vue auto-adaptative (classe ViewDistance, view_distance.ol). Joystick tactile.
 
 import "joystick.ol"
+import "view_distance.ol"
 
 global CS = 16
-global VIEW = 4
-global VIEW_MIN = 1
-global VIEW_MAX = 24        ## filet de sécurité ; la vraie limite vient du FPS ou de la mémoire
+global vd = ViewDistance(4, 1, 24)   ## rayon de chunks : auto-adaptatif + boutons − / +
 
-## Auto-adaptation : en vsync verrouillé, deltaTime ne révèle la marge que quand des
-## frames débordent. On mesure la PART de frames lentes sur une fenêtre. Les frames
-## irréelles (> STALL_DT, arrière-plan/reprise) sont ignorées.
-global SLOW_DT  = 0.021
-global STALL_DT = 0.30
-global ADAPT_WIN = 0.5
-global adapt_t  = 0.0
-global adapt_n  = 0
-global adapt_slow = 0
-global grow_step = 1        ## montée qui double à chaque fenêtre fluide (1,2,4,8…)
-global view_cap = 999       ## plafond appris au décrochage ; relâché après RELAX_T stable
-global view_good = 4        ## dernier rayon confirmé fluide (repli d'un dépassement)
-global stable_t = 0.0
-global GROW_SLOW = 0.10
-global DROP_SLOW = 0.25
-global RELAX_T  = 8.0
-global MEM_MAX  = 110000000
-
-global manual = false       ## true dès qu'on touche un bouton − / + (auto-adapt en retrait)
-global BTN = 54
-global BTN_Y = 40
 global SEA = 9
 global loaded = {}          ## "cx,cz" → handle endChunk
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
@@ -220,8 +198,8 @@ func stream_load(pcx, pcz, budget)
     var cnt = 0
     var fdx = math.sin(yaw)
     var fdz = math.cos(yaw)
-    for dz = -VIEW, VIEW do
-        for dx = -VIEW, VIEW do
+    for dz = -vd.radius, vd.radius do
+        for dx = -vd.radius, vd.radius do
             var cx = pcx + dx
             var cz = pcz + dz
             if loaded[ckey(cx, cz)] == nil then
@@ -261,66 +239,13 @@ end
 func stream_unload(pcx, pcz, margin)
     var keep = {}
     for k, c in loaded do
-        if math.abs(c.cx - pcx) <= VIEW + margin and math.abs(c.cz - pcz) <= VIEW + margin then
+        if math.abs(c.cx - pcx) <= vd.radius + margin and math.abs(c.cz - pcz) <= vd.radius + margin then
             keep[k] = c
         else
             graphics.freeChunk(c)
         end
     end
     loaded = keep
-end
-
-## Ajuste VIEW selon la part de frames lentes sur la fenêtre écoulée. Décrochage
-## (mémoire pleine ou > DROP_SLOW) → repli dichotomique vers view_good + plafond appris.
-## Fluide (< GROW_SLOW) → montée qui double ; au plafond, relâche view_cap après RELAX_T.
-## Entre les deux → on tient. Ne mesure ni pendant la cuisson ni en manuel.
-func adapt_view(pcx, pcz)
-    if deltaTime <= 0 or deltaTime >= STALL_DT then
-        return
-    end
-    if streaming or manual then
-        return
-    end
-    adapt_t = adapt_t + deltaTime
-    adapt_n = adapt_n + 1
-    if deltaTime > SLOW_DT then
-        adapt_slow = adapt_slow + 1
-    end
-    if adapt_t < ADAPT_WIN then
-        return
-    end
-    var mem_full = mem() > MEM_MAX
-    if (mem_full or adapt_slow > adapt_n * DROP_SLOW) and VIEW > VIEW_MIN then
-        view_cap = VIEW - 1
-        var back = (view_good + VIEW) // 2
-        if back > VIEW - 1 then back = VIEW - 1 end
-        if back < VIEW_MIN then back = VIEW_MIN end
-        VIEW = back
-        stream_unload(pcx, pcz, 0)
-        grow_step = 1
-        stable_t = 0.0
-    elseif adapt_slow < adapt_n * GROW_SLOW then
-        view_good = VIEW
-        if VIEW < VIEW_MAX and VIEW < view_cap and not mem_full then
-            VIEW = math.min(VIEW + grow_step, math.min(VIEW_MAX, view_cap))
-            grow_step = grow_step * 2
-            streaming = true
-            stable_t = 0.0
-        else
-            grow_step = 1
-            stable_t = stable_t + adapt_t
-            if VIEW == view_cap and stable_t >= RELAX_T and not mem_full then
-                view_cap = view_cap + 1
-                stable_t = 0.0
-            end
-        end
-    else
-        grow_step = 1
-        stable_t = 0.0
-    end
-    adapt_t = 0.0
-    adapt_n = 0
-    adapt_slow = 0
 end
 
 func setup()
@@ -366,43 +291,15 @@ func setup()
     streaming = true
 end
 
-## Boutons de distance (haut-droite) : +1 (bouton +), -1 (bouton −), 0 sinon.
-func dist_btn_hit(x, y)
-    if y < BTN_Y or y > BTN_Y + BTN then
-        return 0
-    end
-    var xp = W - BTN - 12
-    var xm = xp - BTN - 10
-    if x >= xp and x <= xp + BTN then return 1 end
-    if x >= xm and x <= xm + BTN then return -1 end
-    return 0
-end
-
-func draw_dist_buttons()
-    var xp = W - BTN - 12
-    var xm = xp - BTN - 10
-    graphics.noStroke()
-    graphics.fill(Color(0, 0, 0, 0.38))
-    graphics.rect(xm, BTN_Y, BTN, BTN)
-    graphics.rect(xp, BTN_Y, BTN, BTN)
-    graphics.drawText("-", xm + BTN / 2 - 6, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
-    graphics.drawText("+", xp + BTN / 2 - 9, BTN_Y + BTN / 2 - 16, 30, colors.WHITE)
-end
-
 func mouse.pressed(x, y)
-    var hit = dist_btn_hit(x, y)
-    if hit <> 0 then
-        manual = true
-        if hit > 0 and VIEW < VIEW_MAX then
-            VIEW = VIEW + 1
-            streaming = true
-        elseif hit < 0 and VIEW > VIEW_MIN then
-            VIEW = VIEW - 1
-            stream_unload(lastcx, lastcz, 0)
-        end
-        return
+    var ev = vd.hit(x, y)              ## boutons − / + gérés par ViewDistance
+    if ev == 1 then
+        streaming = true               ## rayon agrandi → charger le nouvel anneau
+    elseif ev == -1 then
+        stream_unload(lastcx, lastcz, 0)   ## rayon réduit → libérer aussitôt
+    else
+        pad.press(x, y)                ## hors boutons → joystick
     end
-    pad.press(x, y)
 end
 func mouse.released(x, y)
     pad.release()
@@ -439,11 +336,16 @@ func draw()
         streaming = true
     end
     var budget = 6
-    if manual then budget = 10 end
+    if vd.manual then budget = 10 end
     if streaming and stream_load(pcx, pcz, budget) == 0 then
         streaming = false
     end
-    adapt_view(pcx, pcz)
+    var ev = vd.update(deltaTime, streaming, mem())
+    if ev == 1 then
+        streaming = true
+    elseif ev == -1 then
+        stream_unload(pcx, pcz, 0)
+    end
 
     camY = ground(camX, camZ) + EYE
     cam.setPos(camX, camY, camZ)
@@ -468,8 +370,6 @@ func draw()
     graphics.end3d()
 
     pad.draw()
-    draw_dist_buttons()
-    var mode = "auto"
-    if manual then mode = "manuel" end
-    graphics.drawText("vue " + VIEW + " (" + mode + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
+    vd.draw()                          ## boutons − / + (ViewDistance)
+    graphics.drawText("vue " + vd.radius + " (" + vd.mode() + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
 end
