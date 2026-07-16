@@ -297,8 +297,8 @@ func mouse.pressed(x, y)
         streaming = true               ## rayon agrandi → charger le nouvel anneau
     elseif ev == -1 then
         stream_unload(lastcx, lastcz, 0)   ## rayon réduit → libérer aussitôt
-    else
-        pad.press(x, y)                ## hors boutons → joystick
+    elseif ev == 0 then
+        pad.press(x, y)                ## hors boutons → joystick (ev == 2 : borne atteinte, rien)
     end
 end
 func mouse.released(x, y)
@@ -340,7 +340,7 @@ func draw()
     if streaming and stream_load(pcx, pcz, budget) == 0 then
         streaming = false
     end
-    var ev = vd.update(deltaTime, streaming, mem())
+    var ev = vd.update(deltaTime, streaming)
     if ev == 1 then
         streaming = true
     elseif ev == -1 then

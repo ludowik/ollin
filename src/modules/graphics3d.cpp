@@ -34,6 +34,9 @@ static unsigned int s_atlas_texid = 0;
 static float s_atlas_grid[2] = {1.0f, 1.0f};
 static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
 static float s_anim_tile = -1.0f;   // tuile animée (UV qui défile, ex. eau) ; -1 = aucune
+// paramètres de l'ondulation de la tuile animée : {défilement, vitesse d'onde, fréquence
+// spatiale, amplitude}. Défauts = look eau ; réglables via graphics.tileAnim(t, ...).
+static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
 
 // ── 3D ────────────────────────────────────────────────────────────────────────
 // L'affichage 3D s'appuie DIRECTEMENT sur l'API raylib (Camera3D / BeginMode3D…).
@@ -260,6 +263,7 @@ static Shader s_lit{};
 static bool s_lit_ready = false;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
+static int s_loc_animparams = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
 // VBO d'instance PERSISTANTS (transfo + couleur) : réutilisés d'une frame à
@@ -325,6 +329,7 @@ static void loadLitShader() {
         "uniform vec2 atlasGrid;\n"
         "uniform float uTime;\n"
         "uniform float animTile;\n"
+        "uniform vec4 animParams;\n"
         "uniform vec4 ambient;\n"
         "uniform vec3 viewPos;\n"
         "struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };\n"
@@ -339,7 +344,12 @@ static void loadLitShader() {
         "        float cols = atlasGrid.x;\n"
         "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
         "        vec2 uv = fract(fragTexCoord);\n"
-        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) uv = fract(uv + vec2(uTime * 0.09 + sin(uTime * 1.6 + fragTexCoord.y * 8.0) * 0.045, uTime * 0.06 + cos(uTime * 1.3 + fragTexCoord.x * 8.0) * 0.045));\n" // tuile animée (eau) : défilement + ondulation sinusoïdale
+        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) {\n"           // tuile animée (eau) : défilement + ondulation sinusoïdale
+        "            float sc = animParams.x; float ws = animParams.y;\n"        //   sc=défilement, ws=vitesse d'onde
+        "            float wf = animParams.z; float wa = animParams.w;\n"        //   wf=fréquence spatiale, wa=amplitude
+        "            uv = fract(uv + vec2(uTime * sc + sin(uTime * ws + fragPosition.z * wf) * wa,\n" // phase en coord. MONDE (fragPosition)
+        "                                 uTime * sc * 0.66 + cos(uTime * ws * 0.8 + fragPosition.x * wf) * wa));\n" // → continue d'une tuile à l'autre
+        "        }\n"
         "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
         "        vec2 auv = (cell + uv) / atlasGrid;\n"
         "        texel = texture(texture0, auv);\n"
@@ -373,6 +383,7 @@ static void loadLitShader() {
     s_loc_atlasgrid = GetShaderLocation(s_lit, "atlasGrid");
     s_loc_utime = GetShaderLocation(s_lit, "uTime");
     s_loc_animtile = GetShaderLocation(s_lit, "animTile");
+    s_loc_animparams = GetShaderLocation(s_lit, "animParams");
     s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
     s_loc_ambient = GetShaderLocation(s_lit, "ambient");
     s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
@@ -483,6 +494,9 @@ static bool litBeginDraw() {
     }
     if (s_loc_animtile >= 0) {
         rlSetUniform(s_loc_animtile, &s_anim_tile, RL_SHADER_UNIFORM_FLOAT, 1);
+    }
+    if (s_loc_animparams >= 0) {
+        rlSetUniform(s_loc_animparams, s_anim_params, RL_SHADER_UNIFORM_VEC4, 1);
     }
     return true;
 }
@@ -655,6 +669,10 @@ void reset3dGraphicsState() {
     s_cur_tile[1] = -1.0f;
     s_cur_tile[2] = -1.0f;
     s_anim_tile = -1.0f;
+    s_anim_params[0] = 0.09f;
+    s_anim_params[1] = 1.6f;
+    s_anim_params[2] = 8.0f;
+    s_anim_params[3] = 0.045f;
 }
 
 static void flush3dBuckets() {
@@ -894,9 +912,23 @@ static Value gfx_tile(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.tileAnim(t) : tuile dont l'UV défile dans le temps (eau). -1 = aucune.
+// graphics.tileAnim(t [, defilement, vitesse, frequence, amplitude]) : tuile dont l'UV
+// défile/ondule dans le temps (eau). -1 = aucune. Les 4 paramètres optionnels règlent
+// l'ondulation (défauts = look eau) ; la phase spatiale est en coordonnées monde.
 static Value gfx_tile_anim(Value* args, int argc) {
     s_anim_tile = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tileAnim") : -1.0f;
+    if (argc > 1) {
+        s_anim_params[0] = (float)numArg(args, argc, 1, "graphics.tileAnim");
+    }
+    if (argc > 2) {
+        s_anim_params[1] = (float)numArg(args, argc, 2, "graphics.tileAnim");
+    }
+    if (argc > 3) {
+        s_anim_params[2] = (float)numArg(args, argc, 3, "graphics.tileAnim");
+    }
+    if (argc > 4) {
+        s_anim_params[3] = (float)numArg(args, argc, 4, "graphics.tileAnim");
+    }
     return Value{};
 }
 

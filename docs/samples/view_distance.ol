@@ -6,9 +6,11 @@
 ## arrière-plan/reprise) sont ignorées. Possède aussi les deux boutons − / + (haut-droite)
 ## qui basculent en réglage manuel.
 ##
-## update() et hit() renvoient :  1 = le rayon a GRANDI (relancer le streaming),
-##                               -1 = le rayon a RÉTRÉCI (décharger l'anneau extérieur),
-##                                0 = inchangé.
+## update() renvoie :  1 = le rayon a GRANDI (relancer le streaming),
+##                    -1 = le rayon a RÉTRÉCI (décharger l'anneau extérieur),
+##                     0 = inchangé.
+## hit() renvoie :     1 / -1 (idem), 2 = bouton consommé sans changement (borne
+##                     atteinte), 0 = hors boutons (à traiter ailleurs, ex. joystick).
 ##
 ## Câblage côté hôte :
 ##   import "view_distance.ol"
@@ -17,10 +19,10 @@
 ##       var ev = vd.hit(x, y)
 ##       if ev == 1 then streaming = true
 ##       elseif ev == -1 then stream_unload(lastcx, lastcz, 0)
-##       else pad.press(x, y) end
+##       elseif ev == 0 then pad.press(x, y) end   ## ev == 2 : rien à faire
 ##   end
 ##   ## dans draw() : boucler sur vd.radius, puis
-##   ##   var ev = vd.update(deltaTime, streaming, mem())
+##   ##   var ev = vd.update(deltaTime, streaming)
 ##   ##   if ev == 1 then streaming = true elseif ev == -1 then stream_unload(pcx, pcz, 0) end
 ##   ##   ... vd.draw()  (boutons)  ...  vd.mode() → "auto"/"manuel"
 
@@ -57,7 +59,7 @@ class ViewDistance
     ## ni pendant la cuisson (streaming) ni en manuel. Décrochage (mémoire pleine ou
     ## > DROP) → repli dichotomique vers `good` + plafond appris. Fluide (< GROW) →
     ## montée qui double ; au plafond, relâche après RELAX. Entre les deux → on tient.
-    func update(dt, streaming, memBytes)
+    func update(dt, streaming)
         if dt <= 0 or dt >= self.STALL_DT or streaming or self.manual then
             return 0
         end
@@ -65,7 +67,7 @@ class ViewDistance
         self.n = self.n + 1
         if dt > self.SLOW_DT then self.slow = self.slow + 1 end
         if self.t < self.WIN then return 0 end
-        var mem_full = memBytes > self.MEM_MAX
+        var mem_full = mem() > self.MEM_MAX   ## lu une fois par fenêtre, pas à chaque frame
         var ev = 0
         if (mem_full or self.slow > self.n * self.DROP) and self.radius > self.lo then
             self.cap = self.radius - 1
@@ -101,37 +103,38 @@ class ViewDistance
         return ev
     end
 
-    func btn_x_plus()   return W - self.BTN - 12 end
-    func btn_x_minus()  return self.btn_x_plus() - self.BTN - 10 end
+    func btnXPlus()   return W - self.BTN - 12 end
+    func btnXMinus()  return self.btnXPlus() - self.BTN - 10 end
 
     ## Traite un appui : bouton + / − → passe en manuel et ajuste le rayon (borné).
-    ## Renvoie 1 (grandi) / -1 (rétréci) / 0 (aucun bouton → à traiter ailleurs).
+    ## Renvoie 1 (grandi) / -1 (rétréci) / 2 (bouton mais borne atteinte) /
+    ## 0 (aucun bouton → à traiter ailleurs).
     func hit(x, y)
         if y < self.BTN_Y or y > self.BTN_Y + self.BTN then
             return 0
         end
-        if x >= self.btn_x_plus() and x <= self.btn_x_plus() + self.BTN then
+        if x >= self.btnXPlus() and x <= self.btnXPlus() + self.BTN then
             self.manual = true
             if self.radius < self.hi then
                 self.radius = self.radius + 1
                 return 1
             end
-            return 0
+            return 2
         end
-        if x >= self.btn_x_minus() and x <= self.btn_x_minus() + self.BTN then
+        if x >= self.btnXMinus() and x <= self.btnXMinus() + self.BTN then
             self.manual = true
             if self.radius > self.lo then
                 self.radius = self.radius - 1
                 return -1
             end
-            return 0
+            return 2
         end
         return 0
     end
 
     func draw()
-        var xp = self.btn_x_plus()
-        var xm = self.btn_x_minus()
+        var xp = self.btnXPlus()
+        var xm = self.btnXMinus()
         graphics.noStroke()
         graphics.fill(Color(0, 0, 0, 0.38))
         graphics.rect(xm, self.BTN_Y, self.BTN, self.BTN)
