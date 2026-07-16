@@ -264,11 +264,17 @@ function ollinComplete(context) {
     const prefix = dotWord.text.slice(0, dot)
     const members = MODULE_MEMBERS[prefix]
     if (members) {
-      return {
-        from: dotWord.from + dot + 1,
-        options: members.map(m => ({ ...m, label: m.label.slice(prefix.length + 1) })),
-        validFor: /^\w*$/,
-      }
+      // Filtre + tri ALPHABÉTIQUE nous-mêmes, et `filter: false` pour que CodeMirror
+      // conserve NOTRE ordre au lieu de re-classer par « pertinence floue » (qui
+      // donnait un ordre déroutant : endChunk, drawChunk, freeChunk, beginChunk…).
+      // Sans validFor → CM ré-interroge à chaque frappe et re-filtre. Sous-chaîne,
+      // insensible à la casse, pour rester tolérant comme avant.
+      const q = dotWord.text.slice(dot + 1).toLowerCase()
+      const opts = members
+        .map(m => ({ ...m, label: m.label.slice(prefix.length + 1) }))
+        .filter(m => m.label.toLowerCase().includes(q))
+        .sort((a, b) => a.label.localeCompare(b.label))
+      return { from: dotWord.from + dot + 1, options: opts, filter: false }
     }
     return null
   }
