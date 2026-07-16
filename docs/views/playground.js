@@ -264,17 +264,19 @@ function ollinComplete(context) {
     const prefix = dotWord.text.slice(0, dot)
     const members = MODULE_MEMBERS[prefix]
     if (members) {
-      // Filtre + tri ALPHABÉTIQUE nous-mêmes, et `filter: false` pour que CodeMirror
-      // conserve NOTRE ordre au lieu de re-classer par « pertinence floue » (qui
-      // donnait un ordre déroutant : endChunk, drawChunk, freeChunk, beginChunk…).
-      // Sans validFor → CM ré-interroge à chaque frappe et re-filtre. Sous-chaîne,
-      // insensible à la casse, pour rester tolérant comme avant.
-      const q = dotWord.text.slice(dot + 1).toLowerCase()
-      const opts = members
-        .map(m => ({ ...m, label: m.label.slice(prefix.length + 1) }))
-        .filter(m => m.label.toLowerCase().includes(q))
-        .sort((a, b) => a.label.localeCompare(b.label))
-      return { from: dotWord.from + dot + 1, options: opts, filter: false }
+      // On veut l'ordre ALPHABÉTIQUE (CM classe par « pertinence floue » sinon →
+      // ordre déroutant) MAIS en gardant le filtrage CM (donc le surlignage gras de
+      // la sous-chaîne matchée). Levier : le tri CM se fait sur `score + boost` ; on
+      // pose un `boost` dominant, décroissant selon le rang alphabétique → l'ordre
+      // devient alphabétique, et le surlignage (issu du filtrage CM) est conservé.
+      const opts = members.map(m => ({ ...m, label: m.label.slice(prefix.length + 1) }))
+      const rank = new Map(
+        [...opts].sort((a, b) => a.label.localeCompare(b.label)).map((o, i) => [o.label, i]))
+      return {
+        from: dotWord.from + dot + 1,
+        options: opts.map(o => ({ ...o, boost: (opts.length - rank.get(o.label)) * 1000 })),
+        validFor: /^\w*$/,
+      }
     }
     return null
   }
