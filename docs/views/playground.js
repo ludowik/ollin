@@ -1209,11 +1209,24 @@ function showOutput(text) {
 
 // ── Run ───────────────────────────────────────────────────────────────────
 let ollin = null
+let ollinUsed = false   // l'instance courante a-t-elle déjà exécuté un programme ?
 
 // Démarre l'exécution (à froid). Ne toggle pas : voir run()/relaunch()/stopExec().
 async function launch() {
   if (!ollin) return
   try { ollin.pauseMainLoop() } catch(_) {}
+  // Ré-exécution : repartir d'une instance WASM NEUVE (mémoire + contexte GL frais).
+  // Réutiliser l'instance après un run graphique reporte une corruption mémoire
+  // dépendante du pilote GPU qui plante à la reconstruction des modules (Windows/iOS).
+  if (ollinUsed) {
+    try {
+      ollin = await ctx.freshOllin(ollin)
+    } catch (e) {
+      showOutput('error: WASM — ' + (e?.message ?? e))
+      return
+    }
+  }
+  ollinUsed = true
   setRunning(false)
   outputEl.className = ''
   // Afficher la zone AVANT execute : window.width lit le clientWidth de
