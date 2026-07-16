@@ -56,12 +56,11 @@ if(EMSCRIPTEN)
     # évite le #define STBI_NO_JPEG de rtextures.c.
     if(TARGET raylib)
         target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
-        target_compile_options(raylib PRIVATE -fsanitize=address --profiling-funcs)   # DIAG ASan : instrumente raylib (OOB dans le chemin GL)
     endif()
 
     add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp)
     target_include_directories(ollin_wasm PRIVATE src libs)
-    target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions -fsanitize=address --profiling-funcs)   # DIAG ASan
+    target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
     target_link_libraries(ollin_wasm PRIVATE raylib)
     target_link_options(ollin_wasm PRIVATE
@@ -76,14 +75,8 @@ if(EMSCRIPTEN)
         # bug iOS-only). Une mémoire fixe garantit un ArrayBuffer classique, dont les
         # vues sont acceptées. 128 Mo = large pour le playground (interpréteur +
         # raylib ~40 Mo + données utilisateur).
-        # DIAG ASan avec mémoire FIXE (growth=0) : growth=1 rend l'ArrayBuffer
-        # redimensionnable → texImage2D le refuse (Chrome 148 + iOS). On garde donc
-        # growth=0 mais on agrandit INITIAL_MEMORY pour loger le shadow ASan. À REVERTIR.
         -sALLOW_MEMORY_GROWTH=0
-        -sINITIAL_MEMORY=805306368
-        -fsanitize=address
-        --profiling-funcs
-        -sASSERTIONS=1
+        -sINITIAL_MEMORY=134217728
         -sNO_EXIT_RUNTIME=1
         -sDISABLE_EXCEPTION_CATCHING=0
         -sUSE_GLFW=3

@@ -25,19 +25,31 @@ struct Map {
 
 struct MapPool {
     static constexpr int CAP = 64;
+    unsigned magic0 = 0x600DCAFEu;   // DIAG : sentinelle AVANT buf (détecte un débordement dans le pool)
     Map* buf[CAP];
     int n = 0;
+    unsigned magic1 = 0x600DCAFEu;   // DIAG : sentinelle APRÈS n
 
     Map* acquire() {
         if (n) {
+#ifdef __EMSCRIPTEN__
+            // SONDE : la free-list du pool est corrompue (source du 'tag=6 ptr=0').
+            // On distingue le MODE de corruption : sentinelle écrasée (débordement
+            // d'un buffer voisin DANS le pool), n hors plage, ou slot nul.
+            if (magic0 != 0x600DCAFEu || magic1 != 0x600DCAFEu)
+                EM_ASM({ var s = "POISON pool magic clobbered m0=0x" + ($0 >>> 0).toString(16) + " m1=0x" + ($1 >>> 0).toString(16) + " n=" + $2; if (window.__ollinCrash) window.__ollinCrash.noteStderr(s); console.error(s); }, (int)magic0, (int)magic1, n);
+            if (n < 0 || n > CAP)
+                EM_ASM({ var s = "POISON pool n hors plage n=" + $0; if (window.__ollinCrash) window.__ollinCrash.noteStderr(s); console.error(s); }, n);
+#endif
             Map* m = buf[--n];
 #ifdef __EMSCRIPTEN__
-            // SONDE : une map recyclée DOIT être vide (data.clear() à la libération)
-            // et non nulle. Sinon la free-list du pool a été corrompue (écriture
-            // hors-bornes sur une map inactive pendant un run graphique) → c'est la
-            // source du 'tag=6 ptr=0' relâché ensuite.
             if (m == nullptr) {
-                EM_ASM({ if (window.__ollinCrash) window.__ollinCrash.noteStderr("POISON acquire: NULL map dans le pool"); console.error("POISON acquire NULL map"); });
+                int nulls = 0;
+                for (int i = 0; i < CAP; i++)
+                    if (buf[i] == nullptr)
+                        nulls++;
+                EM_ASM({ var s = "POISON acquire NULL map: n(apres)=" + $0 + " nulls=" + $1 + "/64 m0ok=" + $2 + " m1ok=" + $3; if (window.__ollinCrash) window.__ollinCrash.noteStderr(s); console.error(s); },
+                       n, nulls, magic0 == 0x600DCAFEu ? 1 : 0, magic1 == 0x600DCAFEu ? 1 : 0);
                 return new Map();
             }
             if (!m->data.empty())
