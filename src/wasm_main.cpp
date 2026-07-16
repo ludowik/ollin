@@ -22,17 +22,38 @@ static std::unique_ptr<VM> s_vm;
 // trap. Sert à localiser la phase du re-exécute (relance) qui plante sur iOS.
 #define OLLIN_MILE(s) EM_ASM({ if (window.__ollinCrash) window.__ollinCrash.noteStderr("MILE " + UTF8ToString($0)); }, s)
 
+// SONDE (TEMPORAIRE) : reconstruit un module `math` jetable = chemin EXACT du
+// crash (makeBuiltinModule("math") → makeMathModule, qui lit des pointeurs de
+// fonctions et alloue via les pools/table de chaînes globaux). Posée après
+// chaque phase du re-exécute : si la mémoire persistante est empoisonnée, la
+// sonde tombe ICI et le dernier jalon « probe<phase> » sans « probeOK<phase> »
+// localise la phase fautive. Un trap dur n'est PAS rattrapable (unwind JS) →
+// c'est le jalon manquant, pas une exception, qui parle.
+static void probe_math(const char* phase) {
+    OLLIN_MILE(("probe " + std::string(phase)).c_str());
+    {
+        Value v = makeBuiltinModule("math");
+        (void)v;
+    }
+    OLLIN_MILE(("probeOK " + std::string(phase)).c_str());
+}
+
 static std::string ollin_run(const std::string& source) {
+    probe_math("0 entry");
     OLLIN_MILE("A image_reset");
     // Release stale GL texture handles before GL context may be reset.
     image_reset();
+    probe_math("A image_reset");
     OLLIN_MILE("B cancel_main_loop");
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
+    probe_math("B cancel_main_loop");
     OLLIN_MILE("C destroy old VM");
     s_vm.reset();   // détruire l'ancienne VM AVANT d'en construire une neuve (isole la phase)
+    probe_math("C destroy old VM");
     OLLIN_MILE("D new VM");
     s_vm = std::make_unique<VM>();
+    probe_math("D new VM");
 
     std::ostringstream out;
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
@@ -40,6 +61,7 @@ static std::string ollin_run(const std::string& source) {
         OLLIN_MILE("E parse+compile");
         auto imported = std::make_shared<std::unordered_set<std::string>>();
         Chunk chunk = Compiler().compile(Parser(Lexer(source).tokenize(), "", imported).parse());
+        probe_math("E parse+compile");
         OLLIN_MILE("F execute");
         s_vm->execute(std::move(chunk));
         OLLIN_MILE("G runEntryHooks");
