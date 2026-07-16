@@ -350,6 +350,9 @@ const view = new EditorView({
         { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
         { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
+        // Chord (Alt+K puis C/U) : commenter / dé-commenter les lignes sélectionnées.
+        { key: 'Alt-k c', run: (v) => toggleLineComment(v, true) },
+        { key: 'Alt-k u', run: (v) => toggleLineComment(v, false) },
       ]),
       indentUnit.of('    '),
       // Auto-paires natives : «(» insère «()», entoure la sélection si elle
@@ -365,6 +368,32 @@ const view = new EditorView({
   }),
   parent: document.getElementById('editor-wrap'),
 })
+
+// Commente (add=true) / dé-commente (add=false) les lignes couvertes par la
+// sélection. Préfixe de commentaire Ollin = '## ' (cf. grammar.ebnf line_comment).
+// Insertion/retrait au 1er caractère non-blanc → l'indentation est préservée ;
+// les lignes vides sont ignorées à l'ajout. Raccourcis : Alt+K puis C / U.
+function toggleLineComment(v, add) {
+  const { state } = v
+  const { from, to } = state.selection.main
+  const first = state.doc.lineAt(from).number
+  const last = state.doc.lineAt(to).number
+  const changes = []
+  for (let n = first; n <= last; n++) {
+    const line = state.doc.line(n)
+    const indent = line.text.length - line.text.trimStart().length
+    if (add) {
+      if (line.text.trim() === '') continue   // ne pas commenter une ligne vide
+      changes.push({ from: line.from + indent, insert: '## ' })
+    } else {
+      const rest = line.text.slice(indent)
+      const rm = rest.startsWith('## ') ? 3 : rest.startsWith('##') ? 2 : 0
+      if (rm) changes.push({ from: line.from + indent, to: line.from + indent + rm })
+    }
+  }
+  if (changes.length) v.dispatch({ changes, userEvent: add ? 'input.comment' : 'delete.uncomment' })
+  return true
+}
 
 // ── Backspace/nav quand le runtime graphique est armé ──────────────────────
 // Dès qu'un projet graphique tourne (Run), le runtime raylib (couche GLFW
