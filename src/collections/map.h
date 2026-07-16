@@ -31,6 +31,18 @@ struct MapPool {
     Map* acquire() {
         if (n) {
             Map* m = buf[--n];
+#ifdef __EMSCRIPTEN__
+            // SONDE : une map recyclée DOIT être vide (data.clear() à la libération)
+            // et non nulle. Sinon la free-list du pool a été corrompue (écriture
+            // hors-bornes sur une map inactive pendant un run graphique) → c'est la
+            // source du 'tag=6 ptr=0' relâché ensuite.
+            if (m == nullptr) {
+                EM_ASM({ if (window.__ollinCrash) window.__ollinCrash.noteStderr("POISON acquire: NULL map dans le pool"); console.error("POISON acquire NULL map"); });
+                return new Map();
+            }
+            if (!m->data.empty())
+                EM_ASM({ var s = "POISON acquire: map recyclee NON vide size=" + $0; if (window.__ollinCrash) window.__ollinCrash.noteStderr(s); console.error(s); }, (int)m->data.size());
+#endif
             m->refcount = 1;
             m->userdata = nullptr;
             m->freed = false;
