@@ -247,3 +247,53 @@ function boot() {
   route()
 }
 boot()
+
+// ── État du déploiement GitHub Pages (une vérif, non bloquante) ──────────────
+// V = Date.now() → un chargement récupère TOUJOURS le dernier déploiement RÉUSSI.
+// Il suffit donc de regarder le STATUT du dernier déploiement github-pages :
+//   in_progress/queued → une nouvelle version arrive (proposer de recharger)
+//   failure/error      → le dernier déploiement a échoué (on voit la version d'avant)
+//   success (ou API injoignable / rate-limit) → silencieux (on est à jour).
+// Anonyme (repo public, CORS ouvert sur api.github.com), best-effort.
+const DEPLOY_REPO = 'ludowik/ollin'
+async function checkPagesDeploy() {
+  try {
+    const api = (p) => fetch('https://api.github.com/repos/' + DEPLOY_REPO + p,
+      { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' })
+      .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+    const deps = await api('/deployments?environment=github-pages&per_page=1')
+    if (!Array.isArray(deps) || !deps.length) return
+    const st = await api('/deployments/' + deps[0].id + '/statuses?per_page=1')
+    const state = Array.isArray(st) && st[0] ? st[0].state : null
+    if (['in_progress', 'queued', 'pending', 'waiting'].includes(state)) {
+      showDeployBanner('⏳ Une nouvelle version se déploie — recharge dans un instant.', true)
+    } else if (state === 'failure' || state === 'error') {
+      showDeployBanner('⚠ Le dernier déploiement a échoué — tu vois la version précédente.', false)
+    }
+  } catch (_) { /* hors ligne / rate-limit / privé : silencieux */ }
+}
+
+function showDeployBanner(msg, offerReload) {
+  if (document.getElementById('deploy-banner')) return
+  const bar = document.createElement('div')
+  bar.id = 'deploy-banner'
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#242742;' +
+    'color:#c9d1e0;border-bottom:1px solid #2e3150;font:13px system-ui,-apple-system,sans-serif;' +
+    'padding:8px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,.45)'
+  const txt = document.createElement('span'); txt.textContent = msg; txt.style.flex = '1'
+  bar.appendChild(txt)
+  if (offerReload) {
+    const rb = document.createElement('button')
+    rb.textContent = 'Recharger'
+    rb.style.cssText = 'background:#7c83ff;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:13px;cursor:pointer'
+    rb.addEventListener('click', () => hardReload())
+    bar.appendChild(rb)
+  }
+  const close = document.createElement('button')
+  close.textContent = '✕'; close.title = 'Fermer'
+  close.style.cssText = 'background:none;border:none;color:#7c85a2;font-size:16px;cursor:pointer;line-height:1'
+  close.addEventListener('click', () => bar.remove())
+  bar.appendChild(close)
+  document.body.appendChild(bar)
+}
+checkPagesDeploy()
