@@ -669,6 +669,7 @@ function openFile(path) {
 }
 
 async function newFile() {
+  if (!currentProject || isExample()) return   // aucun projet éditable (ex. exemple 404)
   let name = prompt('Nom du nouveau fichier (.ol) :', 'nouveau.ol')
   if (!name) return
   name = name.trim()
@@ -878,6 +879,7 @@ function renderMenuRoot() {
       const dupName = await askFreeProjectName(currentProject.name + ' (copie)'); if (!dupName) return
       const copy = await Store.createProject(dupName)
       copy.files = { ...currentProject.files }; copy.entry = currentProject.entry
+      copy.resources = { ...currentProject.resources }   // dupliquer AUSSI les assets
       delete copy.files[Store.MANIFEST]
       await Store.saveProject(copy)
       closeMenu()
@@ -1208,21 +1210,22 @@ async function loadExample(file) {
 // connecté. `exclude` = { id, slug } à ignorer (le projet lui-même lors d'un renommage).
 // Récupéré une seule fois → la boucle de saisie ne re-télécharge pas à chaque essai.
 async function takenProjectNames(exclude = {}) {
-  const set = new Set()
+  const names = new Set()
+  let remoteFailed = false
   for (const p of await Store.listProjects()) {
     if (p.id === exclude.id) continue
-    set.add((p.name || '').trim().toLowerCase())
+    names.add((p.name || '').trim().toLowerCase())
   }
   if (GH.isConnected()) {
     try {
       for (const r of await GH.listRemoteProjects()) {
         if (r.slug === exclude.slug) continue
-        set.add((r.name || '').trim().toLowerCase())
+        names.add((r.name || '').trim().toLowerCase())
       }
-    } catch (_) { /* distant injoignable → on se base sur le local seul */ }
+    } catch (_) { remoteFailed = true }   // distant injoignable → signalé à l'appelant
   }
-  set.delete('')
-  return set
+  names.delete('')
+  return { names, remoteFailed }
 }
 
 // Demande un nom de projet LIBRE (ni en local ni sur le dépôt distant) : reboucle
@@ -1231,13 +1234,17 @@ async function takenProjectNames(exclude = {}) {
 async function askFreeProjectName(defName, opts = {}) {
   const label = opts.label || 'Nom du projet :'
   if (GH.isConnected()) setStatus('Vérification des noms…')
-  const taken = await takenProjectNames(opts.exclude)
+  const { names, remoteFailed } = await takenProjectNames(opts.exclude)
+  // Nettoie le « Vérification… » : avertissement transitoire si le distant a échoué,
+  // sinon efface (sinon le message resterait affiché après annulation/renommage).
+  if (remoteFailed) setStatus('Noms distants non vérifiés (dépôt injoignable)', true, true)
+  else if (GH.isConnected()) setStatus('')
   let name = prompt(label, defName)
   while (name !== null) {
     const clean = name.trim()
     if (!clean) {
       name = prompt('Le nom ne peut pas être vide. ' + label, defName)
-    } else if (taken.has(clean.toLowerCase())) {
+    } else if (names.has(clean.toLowerCase())) {
       name = prompt(`Un projet « ${clean} » existe déjà (local ou GitHub). Choisis un autre nom :`, clean)
     } else {
       return clean
@@ -1345,6 +1352,7 @@ function clearAndStop() {
   if (outputHdr) outputHdr.style.display = 'flex'
   outputEl.textContent   = ''
   outputEl.className     = ''
+  lastErrorLoc = null   // sortie vidée → plus de cible F4 périmée
   outputPane.style.overflow = ''
   setRunning(false)
   setOutputVisible(false)   // retour éditeur plein écran
@@ -1431,6 +1439,7 @@ async function launch() {
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
+  lastErrorLoc = null   // nouvelle exécution : F4 ne doit plus viser l'erreur précédente
   // Afficher la zone AVANT execute : window.width lit le clientWidth de
   // #output-pane (0 si display:none → graphics dimensionné à vide).
   setOutputVisible(true)

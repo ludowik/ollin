@@ -157,6 +157,16 @@ function findModels(code) {
   return out
 }
 
+// Références d'images EXTERNES (image.load("x.png")) → liste de noms de fichiers.
+// image.loadData (base64 embarqué) n'a pas d'asset à collecter → non concerné.
+function findImages(code) {
+  const re = /image\.load\s*\(\s*["']([^"']+\.(?:png|jpg|jpeg|gif|webp|bmp))["']\s*\)/gi
+  const out = []
+  let mm
+  while ((mm = re.exec(code))) out.push(mm[1])
+  return out
+}
+
 // Construit un PROJET complet à partir d'un exemple du dépôt : le fichier d'entrée,
 // tous ses imports .ol transitifs (→ files), et les modèles 3D référencés (→ resources
 // binaires base64). Sert à ouvrir un exemple comme un vrai projet multi-fichiers et à
@@ -187,11 +197,13 @@ export async function collectSampleProject(entryFile, v) {
     const pdir = dirOf(key)
     for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
   }
+  // Assets binaires référencés : modèles 3D (model("x.obj")) ET images externes
+  // (image.load("x.png")) → ressources base64 du projet.
   const allCode = Object.values(files).join('\n')
-  const mseen = new Set()
-  for (const name of findModels(allCode)) {
-    if (mseen.has(name)) continue
-    mseen.add(name)
+  const seenAsset = new Set()
+  for (const name of [...findModels(allCode), ...findImages(allCode)]) {
+    if (seenAsset.has(name)) continue
+    seenAsset.add(name)
     try {
       const r = await fetch('samples/' + name + '?v=' + v, { cache: 'no-cache' })
       if (!r.ok) continue
