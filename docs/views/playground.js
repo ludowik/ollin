@@ -853,7 +853,10 @@ function renderMenuRoot() {
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('✨ Nouveau projet vide', false, async () => {
     const name = prompt('Nom du projet :', 'Sans titre'); if (!name) return
-    const p = await Store.createProject(name.trim()); closeMenu(); await openProject(p.id)
+    const p = await Store.createProject(name.trim())
+    closeMenu()
+    await autoPushNewProject(p)   // dépôt paramétré → créé sur GitHub
+    await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
@@ -872,7 +875,9 @@ function renderMenuRoot() {
       copy.files = { ...currentProject.files }; copy.entry = currentProject.entry
       delete copy.files[Store.MANIFEST]
       await Store.saveProject(copy)
-      closeMenu(); await switchProject(copy.id)
+      closeMenu()
+      await autoPushNewProject(copy)   // dépôt paramétré → créé sur GitHub
+      await switchProject(copy.id)
     }))
     projectMenu.appendChild(menuItem('🗑 Supprimer', false, async () => {
       if (!confirm(`Supprimer le projet « ${currentProject.name} » ?`)) return
@@ -982,6 +987,23 @@ function renderMenuConnect() {
   wrap.append(info, input, repo, btn, err)
   projectMenu.appendChild(wrap)
   input.focus()
+}
+
+// Si GitHub est connecté (dépôt paramétré), tout NOUVEAU projet est aussitôt créé
+// sur le dépôt. Best-effort : en cas d'échec (réseau/permissions/conflit de slug),
+// le projet reste en local et un message le signale — « Pousser vers GitHub » reste
+// disponible pour réessayer.
+async function autoPushNewProject(p) {
+  if (!GH.isConnected()) return
+  setStatus('Création sur GitHub…')
+  try {
+    await GH.ensureRepo()
+    await GH.pushProject(p, null, {})
+    await Store.saveProject(p)   // persiste project.remote (slug, folderSha)
+    setStatus('Projet créé sur GitHub ✓', true)
+  } catch (e) {
+    setStatus('Créé en local — GitHub : ' + (e && e.message ? e.message : e), true, true)
+  }
 }
 
 async function ghPush(force) {
@@ -1211,6 +1233,7 @@ async function forkExampleToProject(file) {
     p.files[p.entry] = view.state.doc.toString()
   }
   await Store.saveProject(p)
+  await autoPushNewProject(p)   // dépôt paramétré → créé sur GitHub
   Store.setActiveId(p.id)
   ctx.navigate('playground')   // quitte le mode exemple → re-montage en mode projet
 }
