@@ -39,9 +39,9 @@ const exampleFile = Run.sampleFromAnchor(ctx.anchor)
 // KEYWORDS / BUILTINS / ollinLang / ollinHighlight : importés de cm-lang.js.
 
 const ollinTheme = EditorView.theme({
-  // Taille de base = version NAVIGATEUR (13.5px). Le mobile la redéfinit
+  // Taille de base = version NAVIGATEUR (13px). Le mobile la redéfinit
   // (playground.html, @media max-width:640px → 12px, anti-zoom iOS).
-  '&': { background: '#000000', color: '#c9d1e0', fontSize: '13.5px', height: '100%' },
+  '&': { background: '#000000', color: '#c9d1e0', fontSize: '13px', height: '100%' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65' },
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
   ...CODE_DISPLAY,   // réglages d'affichage partagés (cm-shared.js)
@@ -69,7 +69,7 @@ const ollinTheme = EditorView.theme({
   '.cm-panels.cm-panels-top': { borderBottom: '1px solid #2e3150' },
   '.cm-search': { padding: '6px 8px' },
   '.cm-search label': { color: '#7c85a2', fontSize: '12px' },
-  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', width: '280px', maxWidth: '55vw' },
+  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', width: '420px', maxWidth: '55vw' },
   '.cm-button': { background: '#242742', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', backgroundImage: 'none' },
   '.cm-button:hover': { background: '#2d3259' },
   '.cm-panel.cm-search [name=close]': { color: '#7c85a2', fontSize: '18px' },
