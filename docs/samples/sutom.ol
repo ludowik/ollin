@@ -2,7 +2,6 @@
 ## Rouge = bien placé · Rond jaune = présent mal placé · Bleu = absent.
 ## Mot hors dictionnaire = refusé (la ligne tremble). Responsive (dimensions W/H du moteur).
 
-## Longueurs variées (6 à 9) — le jeu s'adapte (N = longueur du mot tiré).
 global WORDS = [
   "MAISON","JARDIN","SOLEIL","BUREAU","ORANGE","BANANE","CERISE","SOURIS","CANARD","RENARD",
   "FLEURS","GARAGE","CHAISE","MIROIR","CHEVAL","BALLON","MELONS","CITRON","POMMES","FRAISE",
@@ -13,7 +12,6 @@ global WORDS = [
   "BOUTEILLE","PARAPLUIE","CHOCOLATS","PAPILLONS","CROISSANT","TELEPHONE","FRAMBOISE","MANDARINE"
 ]
 
-## W et H (dimensions de la zone de rendu) sont fournis par le moteur.
 global ROWS = 6
 
 global DICT       = {}    ## ensemble des mots valides (lookup O(1))
@@ -148,7 +146,6 @@ func submit()
     end
 end
 
-## Appelée par le moteur à chaque touche enfoncée.
 func keyboard.keypressed(k)
     if k == "return" then
         submit()
@@ -204,7 +201,6 @@ func buildKeys()
     keys[len(keys) + 1] = { label: "EFFACER", kind: "del",   x: MARGIN + ew + KG, y: ky, w: ew, h: KH }
 end
 
-## Appelée par le moteur à chaque clic/tap (bouton gauche).
 func mouse.pressed(mx, my)
     for k in keys do
         if mx >= k.x and mx <= k.x + k.w and my >= k.y and my <= k.y + k.h then
@@ -323,4 +319,3 @@ graphics.canvas(W, H, "SUTOM")
 start()
 layout()
 buildKeys()
-## `draw` est appelée automatiquement à chaque frame par le moteur.

@@ -1,9 +1,6 @@
-## Chargement d'un MODÈLE EXTERNE (.obj) — CADRAGE AUTOMATIQUE.
-##   La caméra s'éloigne selon la TAILLE du modèle ET le RATIO de l'écran
-##   (portrait / paysage) → le modèle reste toujours visible en entier.
-##   graphics.modelSize(handle) → { w, h, d, cx, cy, cz, radius }
-##   graphics.fitDistance(rayon [, fovy]) → distance pour tout voir (ratio courant)
-## Pour charger le tien : ajoute un .obj dans « Ressources » (＋) et change le nom.
+## Modèle externe (.obj) avec cadrage automatique : modelSize + fitDistance
+## éloignent la caméra selon la taille du modèle ET le ratio de l'écran → toujours
+## visible en entier. (Playground : ajoute un .obj dans « Ressources » et change le nom.)
 
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global sz = nil
@@ -12,14 +9,14 @@ func setup()
     graphics.canvas(W, H, "Modèle 3D")
     graphics.ambient(0.25)
     graphics.light("dir", -1, -1, -0.6)
-    sz = graphics.modelSize(graphics.model("knot.obj"))   ## dimensions (une seule fois)
-    cam.lookAt(sz.cx, sz.cy, sz.cz)                       ## viser le centre du modèle
+    sz = graphics.modelSize(graphics.model("knot.obj"))
+    cam.lookAt(sz.cx, sz.cy, sz.cz)
 end
 
 func draw()
     graphics.clear(colors.BLACK)
-    var dist = graphics.fitDistance(sz.radius) * 1.15      ## +15% de marge ; suit le ratio
-    cam.orbit(elapsedTime * 0.5, dist, dist * 0.3)         ## orbite auto-cadrée
+    var dist = graphics.fitDistance(sz.radius) * 1.15      ## +15% de marge
+    cam.orbit(elapsedTime * 0.5, dist, dist * 0.3)
 
     graphics.begin3d(cam)
         graphics.fill(colors.ORANGE)

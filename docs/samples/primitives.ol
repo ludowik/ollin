@@ -1,4 +1,5 @@
-
+## Panorama des primitives 2D. px/py/fs mettent tout à l'échelle de la fenêtre
+## (dessin conçu pour 700x420). Chaque bloc dessine une primitive + son étiquette.
 graphics.canvas(W, H, "Primitives")
 var g = graphics
 var t = 0
@@ -16,35 +17,29 @@ func draw()
     g.clear(Color(0.08, 0.09, 0.12))
     var dim = Color(0.6, 0.65, 0.75)
 
-    ## point
     g.stroke(Color(1, 0.85, 0.2), fs(8))
     g.point(px(55), py(45))
     g.drawText("point", px(75), py(38), fs(13), dim)
 
-    ## line
     g.stroke(Color(0.4, 0.8, 1), fs(2))
     g.line(px(30), py(85), px(160), py(85))
     g.drawText("line", px(170), py(78), fs(13), dim)
 
-    ## rect (stroke)
     g.stroke(Color(1, 0.4, 0.4), fs(2))
     g.noFill()
     g.rect(px(30), py(110), px(80), py(45))
     g.drawText("rect", px(120), py(125), fs(13), dim)
 
-    ## rect (fill)
     g.noStroke()
     g.fill(Color(0.3, 0.8, 0.45))
     g.rect(px(30), py(170), px(80), py(45))
     g.drawText("fill", px(120), py(185), fs(13), dim)
 
-    ## rect (stroke+fill)
     g.stroke(Color(1, 0.6, 0), fs(2))
     g.fill(Color(1, 0.6, 0, 0.25))
     g.rect(px(30), py(230), px(80), py(45))
     g.drawText("stroke+fill", px(120), py(245), fs(13), dim)
 
-    ## polyline (animée)
     g.stroke(Color(0.5, 0.9, 1), fs(2))
     var wave = []
     for i = 0, 9 do
@@ -54,19 +49,16 @@ func draw()
     g.polyline(wave)
     g.drawText("polyline", px(30), py(340), fs(13), dim)
 
-    ## circle
     g.stroke(Color(0.7, 0.5, 1), fs(2))
     g.fill(Color(0.7, 0.5, 1, 0.2))
     g.circle(px(310), py(55), fs(38))
     g.drawText("circle", px(355), py(48), fs(13), dim)
 
-    ## ellipse
     g.stroke(Color(0.3, 1, 0.7), fs(2))
     g.fill(Color(0.3, 1, 0.7, 0.2))
     g.ellipse(px(310), py(155), px(120), py(50))
     g.drawText("ellipse", px(375), py(148), fs(13), dim)
 
-    ## polygon (rotation animée)
     g.stroke(Color(1, 0.8, 0.3), fs(2))
     g.fill(Color(1, 0.8, 0.3, 0.2))
     var pts = []
@@ -78,14 +70,12 @@ func draw()
     g.polygon(pts)
     g.drawText("polygon", px(358), py(250), fs(13), dim)
 
-    ## strokeSize
     for i = 1, 4 do
         g.stroke(Color(0.9, 0.6, 0.3), fs(i * 2))
         g.line(px(470), py(65 + i * 28), px(640), py(65 + i * 28))
     end
     g.drawText("strokeSize", px(470), py(48), fs(13), dim)
 
-    ## push/pop/translate/rotate/scale
     g.push()
     g.translate(px(560), py(200))
     g.rotate(t * 57.3)
@@ -103,7 +93,6 @@ func draw()
     g.drawText("push/pop/translate", px(476), py(246), fs(13), dim)
     g.drawText("rotate/scale", px(490), py(262), fs(13), dim)
 
-    ## drawText
     g.drawText("drawText", px(460), py(310), fs(13), dim)
     g.drawText("size 16", px(460), py(328), fs(16), Color(0.9, 0.9, 1))
     g.drawText("size 22", px(460), py(352), fs(22), Color(0.7, 0.85, 1))

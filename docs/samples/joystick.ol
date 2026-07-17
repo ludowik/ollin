@@ -26,12 +26,10 @@ class Joystick
         self.dead = 0.06         ## zone morte du virage (près du centre = tout droit)
     end
 
-    ## Ordonnée du haut de la zone active (px).
     func top()
         return H * self.zone_top
     end
 
-    ## Relais d'entrée — à brancher sur mouse.pressed/moved/released.
     func press(x, y)
         self.px = x
         self.py = y
@@ -71,7 +69,6 @@ class Joystick
         return math.clamp((H - self.py) / (H - self.top()), 0.0, 1.0)
     end
 
-    ## Retour visuel : axe central + poignée reliée à l'ancre bas-centre (si actif).
     func draw()
         var y0 = self.top()
         var ax = W / 2

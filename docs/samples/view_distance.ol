@@ -131,7 +131,7 @@ class ViewDistance
             return 2
         end
         if x >= self.btnXAuto() and x <= self.btnXAuto() + self.BTN then
-            self.manual = false          ## retour à l'auto-adaptation
+            self.manual = false
             return 2
         end
         return 0

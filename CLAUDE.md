@@ -246,6 +246,18 @@ void visit(const WhileStmt& s) override {
 - **Garde-fou** : `tests/check_naming.sh` (inclus dans `tests/run.sh`) échoue si un builtin exposé contient un `_`. Ajouté après l'unification snake→camel de l'API (graphics/math/image).
 - **Code utilisateur** (`.ol`) : aucune contrainte imposée par le langage (le nommage des variables/fonctions de l'utilisateur est libre).
 
+## Commentaires (règle générale — moteur C++ ET code Ollin)
+
+**Minimiser les commentaires : le code doit s'auto-documenter** (noms explicites, petites
+fonctions, découpage clair) plutôt que d'être paraphrasé.
+
+- **Garder** uniquement les commentaires à valeur ajoutée : le **pourquoi** — intention,
+  invariant, piège non évident, décision/contrainte, ordre requis, référence.
+- **Supprimer le bruit** : commentaire qui répète ce que le code dit déjà (le *quoi*),
+  redite du nom d'une fonction/variable, évidence, commentaire périmé, séparateurs décoratifs.
+- S'applique à **tout code écrit ou édité** (C++ du moteur comme `.ol`). Ne pas ré-ajouter de
+  bruit lors d'une modification. Cette règle prime sur le style verbeux hérité.
+
 ## Maintenance de CLAUDE.md
 
 Mettre à jour ce fichier dès qu'un point important doit être mémorisé : architecture, conventions, décisions, règles d'outillage.Ne pas documenter ce qui n'est pas encore implémenté.
