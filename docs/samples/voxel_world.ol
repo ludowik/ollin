@@ -11,6 +11,11 @@ global vd = ViewDistance(4, 1, 24)   ## rayon de chunks : auto-adaptatif + bouto
 global SEA = 9
 global loaded = {}          ## "cx,cz" → handle endChunk
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
+## Caméra de CONTRÔLE (debug) : vue de haut regardant vers le bas, orientée comme la
+## caméra du joueur, pour VÉRIFIER de l'extérieur que seuls les chunks visibles (frustum
+## de la caméra du joueur) sont dessinés. Bascule avec la touche « C ».
+global ctrlCam = graphics.camera(0, 0, 10,  0, 0, 0)
+global debugCam = false
 
 global EYE = 2.2
 global STEP = 1.2           ## marche franchissable ; au-delà = mur
@@ -335,6 +340,12 @@ end
 func mouse.released(x, y)
     pad.release()
 end
+## Touche C : bascule la caméra de contrôle (vue de haut pour vérifier le culling).
+func keyboard.keypressed(key)
+    if key == "c" then
+        debugCam = not debugCam
+    end
+end
 func mouse.moved(x, y)
     pad.move(x, y)
 end
@@ -384,6 +395,12 @@ func draw()
                camY + math.sin(PITCH),
                camZ + math.cos(PITCH) * math.cos(yaw))
 
+    ## Le culling est TOUJOURS calculé sur le frustum de la caméra du JOUEUR : on le fige
+    ## via un bloc 3D vide (begin3d/end3d ne dessine rien mais gèle vue+projection lues
+    ## ensuite par inFrustum). En mode contrôle on rend d'une AUTRE caméra, mais la
+    ## sélection des chunks reste celle du joueur → on voit d'en haut ce qu'il dessine.
+    graphics.begin3d(cam)
+    graphics.end3d()
     graphics.noStroke()
     var vis = []
     for k, c in loaded do
@@ -391,7 +408,20 @@ func draw()
             vis[#vis + 1] = c
         end
     end
-    graphics.begin3d(cam)
+
+    ## Caméra de rendu : joueur, ou caméra de contrôle en hauteur (regard vers le bas,
+    ## up = direction d'avancée du joueur → même orientation à l'écran).
+    var rcam = cam
+    if debugCam then
+        var high = vd.radius * CS * 2.0 + 40
+        ctrlCam.setPos(camX, camY + high, camZ)
+        ctrlCam.lookAt(camX, camY, camZ)
+        ctrlCam.ux = math.sin(yaw)
+        ctrlCam.uy = 0
+        ctrlCam.uz = math.cos(yaw)
+        rcam = ctrlCam
+    end
+    graphics.begin3d(rcam)
         for i = 1, #vis do
             graphics.drawChunk(vis[i])
         end
@@ -402,5 +432,7 @@ func draw()
 
     pad.draw()
     vd.draw()                          ## boutons − / + (ViewDistance)
-    graphics.drawText("vue " + vd.radius + " (" + vd.mode() + ")   chunks " + #vis, 12, 12, 15, colors.WHITE)
+    var camlbl = "joueur"
+    if debugCam then camlbl = "contrôle (haut)" end
+    graphics.drawText("vue " + vd.radius + " (" + vd.mode() + ")   chunks " + #vis + "   cam : " + camlbl + " [C]", 12, 12, 15, colors.WHITE)
 end
