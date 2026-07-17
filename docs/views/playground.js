@@ -1131,7 +1131,7 @@ function showExampleBanner(file) {
   bar.id = 'example-banner'
   bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 12px;background:#1e2133;border-bottom:1px solid #2e3150;font-size:12px;color:#a9b2cf'
   const txt = document.createElement('span')
-  txt.innerHTML = '📄 Exemple <b style="color:#c9d1e0">' + file + '</b> — non enregistré (un rafraîchissement recharge la version du dépôt)'
+  txt.innerHTML = '📄 Exemple <b style="color:#c9d1e0">' + file + '</b> — non enregistré (un rafraîchissement recharge l\'exemple)'
   const btn = document.createElement('button')
   btn.textContent = 'Créer un projet'
   btn.style.cssText = 'margin-left:auto;background:var(--accent);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer'
