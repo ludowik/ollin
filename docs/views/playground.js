@@ -65,15 +65,16 @@ const ollinTheme = EditorView.theme({
   '[aria-selected] .cm-completionDetail': { color: '#a0aabf' },
 
   /* panneau de recherche (Ctrl+F) accordé au thème sombre */
-  '.cm-panels': { background: '#1a1d2e', color: '#c9d1e0', fontSize: '14px' },
+  // fontSize: inherit → toute la barre suit la taille de fonte de l'éditeur (13px
+  // navigateur / 12px mobile) ; la hauteur des champs en découle. Largeur laissée par défaut.
+  '.cm-panels': { background: '#1a1d2e', color: '#c9d1e0', fontSize: 'inherit' },
   '.cm-panels.cm-panels-top': { borderBottom: '1px solid #2e3150' },
-  '.cm-search': { padding: '10px 8px' },
-  '.cm-search label': { color: '#7c85a2', fontSize: '13px' },
-  // champs plus HAUTS et texte plus GROS → meilleure lisibilité
-  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', width: '340px', maxWidth: '55vw', fontSize: '14px', padding: '6px 9px' },
-  '.cm-button': { background: '#242742', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', backgroundImage: 'none', fontSize: '13px', padding: '5px 10px' },
+  '.cm-search': { padding: '8px' },
+  '.cm-search label': { color: '#7c85a2' },
+  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', fontSize: 'inherit', padding: '3px 6px' },
+  '.cm-button': { background: '#242742', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', backgroundImage: 'none', fontSize: 'inherit' },
   '.cm-button:hover': { background: '#2d3259' },
-  '.cm-panel.cm-search [name=close]': { color: '#7c85a2', fontSize: '20px', padding: '0 8px' },
+  '.cm-panel.cm-search [name=close]': { color: '#7c85a2', fontSize: '18px', padding: '0 8px' },
 })
 
 // ── Autocompletion ────────────────────────────────────────────────────────
