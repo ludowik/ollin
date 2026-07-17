@@ -22,6 +22,20 @@ body { background: #0f1117; color: #c9d1e0; font-family: system-ui, -apple-syste
 /* Le canvas WASM est PARTAGÉ : rangé ici (masqué) hors exécution, déplacé dans
    la vue active quand elle en a besoin. */
 #canvas-home { display: none; }
+
+/* Bandeau d'état du déploiement Pages (app.js) — ancré EN BAS pour ne pas
+   recouvrir la barre d'outils. Style ici (pas d'inline verbeux dans app.js). */
+#deploy-banner {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px;
+  background: #242742; color: #c9d1e0; border-top: 1px solid #2e3150;
+  font: 13px system-ui, -apple-system, sans-serif;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.45);
+}
+#deploy-banner .msg { flex: 1; }
+#deploy-banner button { border: none; cursor: pointer; }
+#deploy-banner .reload { background: #7c83ff; color: #fff; border-radius: 5px; padding: 5px 12px; font-size: 13px; }
+#deploy-banner .close  { background: none; color: #7c85a2; font-size: 16px; line-height: 1; padding: 0 4px; }
 </style>
 </head>
 <body>

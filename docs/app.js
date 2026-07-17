@@ -261,10 +261,14 @@ boot()
 //    en cours) n'est PAS mis en cache → « Recharger » revoit toujours l'état frais.
 const DEPLOY_REPO = 'ludowik/ollin'
 const DEPLOY_CACHE_KEY = 'ollin-deploy-state'
+const DEPLOY_DISMISS_KEY = 'ollin-deploy-dismissed'
 const DEPLOY_TTL = 120000
 const TRANSIENT = ['in_progress', 'queued', 'pending']
 
 async function checkPagesDeploy() {
+  // #6 : inutile sur le mode plein écran run (exécution d'un programme) — pas de
+  // bandeau par-dessus, et on évite les appels API sur cette vue.
+  if (location.hash.startsWith('#/run')) return
   let state = null
   try {
     const cached = JSON.parse(sessionStorage.getItem(DEPLOY_CACHE_KEY) || 'null')
@@ -287,34 +291,37 @@ async function checkPagesDeploy() {
       }
     }
   } catch (_) { return /* hors ligne / rate-limit / privé : silencieux */ }
+  // #3 : ne pas re-harceler — si l'utilisateur a fermé le bandeau pour CET état, on
+  // n'insiste plus de la session (un changement d'état réaffiche).
+  let dismissed = null
+  try { dismissed = sessionStorage.getItem(DEPLOY_DISMISS_KEY) } catch (_) {}
+  if (dismissed === state) return
   if (TRANSIENT.includes(state)) {
-    showDeployBanner('⏳ Une nouvelle version se déploie — recharge dans un instant.', true)
+    showDeployBanner('⏳ Une nouvelle version se déploie — recharge dans un instant.', true, state)
   } else if (state === 'failure' || state === 'error') {
-    showDeployBanner('⚠ Le dernier déploiement a échoué — tu vois la version précédente.', false)
+    showDeployBanner('⚠ Le dernier déploiement a échoué — tu vois la version précédente.', false, state)
   }
 }
 
-// Bandeau ancré EN BAS (ne recouvre pas la barre d'outils du haut) ; dismissible.
-function showDeployBanner(msg, offerReload) {
+// Bandeau ancré EN BAS (ne recouvre pas la barre d'outils) ; style dans index.html.
+function showDeployBanner(msg, offerReload, state) {
   if (document.getElementById('deploy-banner')) return
   const bar = document.createElement('div')
   bar.id = 'deploy-banner'
-  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#242742;' +
-    'color:#c9d1e0;border-top:1px solid #2e3150;font:13px system-ui,-apple-system,sans-serif;' +
-    'padding:8px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 -2px 10px rgba(0,0,0,.45)'
-  const txt = document.createElement('span'); txt.textContent = msg; txt.style.flex = '1'
+  const txt = document.createElement('span'); txt.className = 'msg'; txt.textContent = msg
   bar.appendChild(txt)
   if (offerReload) {
     const rb = document.createElement('button')
-    rb.textContent = 'Recharger'
-    rb.style.cssText = 'background:#7c83ff;color:#fff;border:none;border-radius:5px;padding:5px 12px;font-size:13px;cursor:pointer'
+    rb.className = 'reload'; rb.textContent = 'Recharger'
     rb.addEventListener('click', () => hardReload())
     bar.appendChild(rb)
   }
   const close = document.createElement('button')
-  close.textContent = '✕'; close.title = 'Fermer'
-  close.style.cssText = 'background:none;border:none;color:#7c85a2;font-size:16px;cursor:pointer;line-height:1'
-  close.addEventListener('click', () => bar.remove())
+  close.className = 'close'; close.textContent = '✕'; close.title = 'Fermer'
+  close.addEventListener('click', () => {
+    bar.remove()
+    try { sessionStorage.setItem(DEPLOY_DISMISS_KEY, state) } catch (_) {}
+  })
   bar.appendChild(close)
   document.body.appendChild(bar)
 }
