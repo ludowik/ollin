@@ -583,8 +583,20 @@ let currentProject = null    // objet projet complet
 let currentFile    = null    // chemin du fichier ouvert
 let examples       = []      // [{name, file}] pour « Nouveau depuis un exemple »
 
+// Mode exemple : le projet courant est TRANSITOIRE (chargé depuis le dépôt, jamais
+// persisté). On voit/navigue tous ses fichiers, mais aucune écriture en base ni
+// mutation de structure (créer/renommer/supprimer) — « Créer un projet » pour éditer.
+const isExample = () => !!(currentProject && currentProject.example)
+
 const fileKey = id => 'ollin-pg-file:' + id           // dernier fichier ouvert / projet
 const scripts = p => Object.keys(p.files).filter(f => f !== Store.MANIFEST).sort()
+
+// Affiche/masque les boutons de MUTATION de structure (＋ fichier / ＋ ressource) :
+// masqués en mode exemple (projet transitoire non éditable), visibles sinon.
+function setStructuralUI(enabled) {
+  newFileBtn.style.display = enabled ? '' : 'none'
+  newResBtn.style.display  = enabled ? '' : 'none'
+}
 
 function setEditorText(text) {
   loadingFile = true
@@ -602,7 +614,7 @@ function flushEditorToFile() {
 }
 
 function scheduleSave() {
-  if (!currentProject) return
+  if (!currentProject || isExample()) return   // un exemple ne se persiste jamais
   flushEditorToFile()
   Store.saveProject(currentProject).catch(e => console.error('saveProject', e))
 }
@@ -622,13 +634,15 @@ function renderFiles() {
     if (isEntry) row.classList.add('entry')
     row.appendChild(label)
 
-    const acts = document.createElement('span')
-    acts.className = 'file-acts'
-    acts.appendChild(iconBtn(isEntry ? '★' : '☆', isEntry ? 'Point d\'entrée' : 'Définir comme point d\'entrée',
-      e => { e.stopPropagation(); setEntry(path) }))
-    acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameFile(path) }))
-    acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteFile(path) }))
-    row.appendChild(acts)
+    if (!isExample()) {   // exemple : lecture/navigation seule, pas de mutation
+      const acts = document.createElement('span')
+      acts.className = 'file-acts'
+      acts.appendChild(iconBtn(isEntry ? '★' : '☆', isEntry ? 'Point d\'entrée' : 'Définir comme point d\'entrée',
+        e => { e.stopPropagation(); setEntry(path) }))
+      acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameFile(path) }))
+      acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteFile(path) }))
+      row.appendChild(acts)
+    }
 
     row.addEventListener('click', () => openFile(path))
     fileRail.appendChild(row)
@@ -649,7 +663,7 @@ function openFile(path) {
   flushEditorToFile()
   currentFile = path
   setEditorText(currentProject.files[path] ?? '')
-  localStorage.setItem(fileKey(currentProject.id), path)
+  if (!isExample()) localStorage.setItem(fileKey(currentProject.id), path)
   renderFiles()
   view.focus()
 }
@@ -714,10 +728,12 @@ function renderResources() {
     row.className = 'file-item'; row.title = name
     const label = document.createElement('span'); label.className = 'file-name'; label.textContent = name
     row.appendChild(label)
-    const acts = document.createElement('span'); acts.className = 'file-acts'
-    acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameResource(name) }))
-    acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteResource(name) }))
-    row.appendChild(acts)
+    if (!isExample()) {
+      const acts = document.createElement('span'); acts.className = 'file-acts'
+      acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameResource(name) }))
+      acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteResource(name) }))
+      row.appendChild(acts)
+    }
     resList.appendChild(row)
   }
 }
@@ -750,6 +766,7 @@ async function loadProject(id) {
   const p = await Store.getProject(id)
   if (!p) return
   removeExampleBanner()   // quitte le mode exemple
+  setStructuralUI(true)   // projet réel → mutations autorisées
   flushEditorToFile()
   currentProject = p
   Store.setActiveId(id)
@@ -770,7 +787,7 @@ async function loadProject(id) {
 }
 
 async function switchProject(id) {
-  if (currentProject) {                       // en mode exemple il n'y a rien à sauver
+  if (currentProject && !isExample()) {       // un exemple (transitoire) n'a rien à sauver
     flushEditorToFile()                       // récupérer les dernières frappes
     await Store.saveProject(currentProject)   // puis persister avant de quitter
   }
@@ -839,9 +856,9 @@ function renderMenuRoot() {
     const p = await Store.createProject(name.trim()); closeMenu(); await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
-  // Actions sur le PROJET COURANT : masquées en mode exemple (currentProject null,
-  // rien à renommer/dupliquer/supprimer) — sinon elles planteraient sur null.
-  if (currentProject) {
+  // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
+  // rien à renommer/dupliquer/supprimer en base).
+  if (currentProject && !isExample()) {
     projectMenu.appendChild(menuSep())
     projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
       const name = prompt('Nouveau nom :', currentProject.name); if (!name) return
@@ -884,7 +901,7 @@ function renderMenuRoot() {
       GH.setRepo(v)
       renderMenuRoot()
     }))
-    if (currentProject) {   // pousser/récupérer agit sur le projet courant (nul en mode exemple)
+    if (currentProject && !isExample()) {   // pousser/récupérer agit sur un projet réel
       projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
       projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
     }
@@ -1129,28 +1146,70 @@ async function loadExample(file) {
   currentProject = null
   currentFile = null
   // ctx.v change à chaque chargement de page → un refresh re-fetch la version
-  // fraîche. fetchSample rejette sur 404 (pas de page d'erreur chargée en douce).
-  let code
+  // fraîche. collectSampleProject rejette sur 404 du fichier d'entrée.
+  let bundle
   try {
-    code = await Run.fetchSample(file, ctx.v)
+    bundle = await Run.collectSampleProject(file, ctx.v)
   } catch (e) {
     removeExampleBanner()
+    setStructuralUI(true)
     setEditorText('## ' + (e && e.message ? e.message : 'exemple introuvable : ' + file))
     setStatus('Exemple introuvable : ' + file, true, true)
     return
   }
-  setEditorText(code)
+  // Projet TRANSITOIRE : entrée + imports + assets, visibles et navigables, mais non
+  // persistés (marqueur `example`). Un refresh recharge la version du dépôt.
+  currentProject = {
+    id: '__exemple__', name: file, entry: bundle.entry,
+    files: bundle.files, resources: bundle.resources, example: true,
+  }
+  currentFile = bundle.entry
+  setEditorText(currentProject.files[bundle.entry] ?? '')
+  setStructuralUI(false)         // pas de création/renommage/suppression sur un exemple
+  renderFiles()
+  renderResources()
   showExampleBanner(file)
-  const label = document.getElementById('project-label')
-  if (label) label.textContent = file
+  projectLabel.textContent = file
+  // Multi-fichiers → ouvrir le rail pour montrer d'emblée tous les fichiers du projet.
+  if (scripts(currentProject).length > 1 || Object.keys(currentProject.resources).length) {
+    railHidden = false
+    applyRail()
+  }
 }
 
-// Fork explicite : convertit l'exemple affiché en projet éditable persistant.
+// Demande un nom de projet LIBRE : reboucle tant que le nom est vide ou déjà pris.
+// Renvoie le nom validé, ou null si l'utilisateur annule.
+async function askFreeProjectName(defName) {
+  let name = prompt('Nom du projet :', defName)
+  while (name !== null) {
+    name = name.trim()
+    if (!name) {
+      name = prompt('Le nom ne peut pas être vide. Nom du projet :', defName)
+    } else if (await Store.nameExists(name)) {
+      name = prompt(`Un projet « ${name} » existe déjà. Choisis un autre nom :`, name)
+    } else {
+      return name
+    }
+  }
+  return null
+}
+
+// Fork explicite : convertit l'exemple affiché en projet éditable persistant, en
+// copiant TOUS ses fichiers (entrée + imports) et ses ressources (assets), pas
+// seulement le fichier ouvert.
 async function forkExampleToProject(file) {
-  const name = prompt('Nom du projet :', file.replace(/\.ol$/, ''))
+  flushEditorToFile()   // capter les frappes non enregistrées du fichier courant
+  const name = await askFreeProjectName(file.replace(/\.ol$/, ''))
   if (!name) return
-  const p = await Store.createProject(name.trim())
-  p.files[p.entry] = view.state.doc.toString()
+  const p = await Store.createProject(name)
+  if (isExample()) {
+    p.files     = { ...currentProject.files }
+    p.resources = { ...currentProject.resources }
+    p.entry     = currentProject.entry
+    delete p.files[Store.MANIFEST]   // régénéré par saveProject
+  } else {
+    p.files[p.entry] = view.state.doc.toString()
+  }
   await Store.saveProject(p)
   Store.setActiveId(p.id)
   ctx.navigate('playground')   // quitte le mode exemple → re-montage en mode projet
@@ -1465,7 +1524,7 @@ const imgFileInput = document.getElementById('img-file-input')
 // Les images chargées deviennent des RESSOURCES du projet actif (persistées).
 imgFileInput.addEventListener('change', () => {
   const files = Array.from(imgFileInput.files)
-  if (!files.length || !currentProject) return
+  if (!files.length || !currentProject || isExample()) return
   files.forEach(file => {
     const ext  = file.name.split('.').pop().toLowerCase()
     const name = file.name

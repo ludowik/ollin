@@ -101,6 +101,17 @@ export async function getProject(id) {
   return (await reqAsync(store.get(id))) || null
 }
 
+// Vrai si un projet porte déjà ce nom (comparaison insensible à la casse/espaces).
+// Sert à refuser un nom déjà pris à la création (l'id/slug, lui, est toujours rendu
+// unique par uniqueId ; ce garde-fou porte sur le NOM affiché).
+export async function nameExists(name) {
+  const n = (name || '').trim().toLowerCase()
+  if (!n) return false
+  const store = await tx('readonly')
+  const all = await reqAsync(store.getAll())
+  return all.some(p => (p.name || '').trim().toLowerCase() === n)
+}
+
 // Génère un id (slug) unique en base à partir du nom : mon-jeu, mon-jeu-2, …
 // `exclude` : id à ignorer dans le test d'unicité (le projet lui-même, lors d'un
 // renommage) → renommer vers le même slug ne produit pas de suffixe -2.

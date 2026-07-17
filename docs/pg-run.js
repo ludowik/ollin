@@ -81,11 +81,8 @@ function bytesToB64(bytes) {
 // leurs ressources). Best-effort : un modèle introuvable est simplement ignoré.
 export async function preloadSampleModels(m, code, v) {
   if (!m || !m.preloadModel || typeof code !== 'string') return
-  const re = /model\s*\(\s*["']([^"']+\.(?:obj|glb|gltf))["']\s*\)/gi
   const seen = new Set()
-  let match
-  while ((match = re.exec(code))) {
-    const file = match[1]
+  for (const file of findModels(code)) {
     if (seen.has(file)) continue
     seen.add(file)
     try {
@@ -110,23 +107,9 @@ const _importSrcCache = new Map()
 // l'appelant y précharge aussi les modèles/assets référencés). Best-effort.
 export async function preloadSampleImports(m, code, v) {
   if (!m || !m.preloadSource || typeof code !== 'string') return ''
-  const findImports = (src) => {
-    const re = /(?:^|\n)\s*import\s+["']([^"']+)["']/g
-    const out = []
-    let mm
-    while ((mm = re.exec(src))) {
-      let p = mm[1]
-      if (!p.endsWith('.ol')) p += '.ol'
-      out.push(p)
-    }
-    return out
-  }
-  const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
-  // Résolution identique au parseur : base_dir + chemin (concat naïve), sauf chemin absolu.
-  const resolve = (parentDir, imp) => (imp[0] === '/' ? imp : parentDir + imp)
   const seen = new Set()
   const collected = []
-  let queue = findImports(code).map((imp) => resolve('', imp))   // entrée : base_dir vide
+  let queue = findImports(code).map((imp) => resolveImport('', imp))   // entrée : base_dir vide
   while (queue.length) {
     const key = queue.shift()
     if (seen.has(key)) continue
@@ -143,9 +126,80 @@ export async function preloadSampleImports(m, code, v) {
     m.preloadSource(key, src)          // clé = chemin résolu (= ce que source_get() cherche)
     collected.push(src)
     const pdir = dirOf(key)
-    for (const imp of findImports(src)) queue.push(resolve(pdir, imp))
+    for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
   }
   return collected.join('\n')
+}
+
+// Helpers de résolution d'imports, PARTAGÉS (préchargement runtime ET collecte de
+// projet-exemple) → une seule règle, identique au parseur.
+function findImports(src) {
+  const re = /(?:^|\n)\s*import\s+["']([^"']+)["']/g
+  const out = []
+  let mm
+  while ((mm = re.exec(src))) {
+    let p = mm[1]
+    if (!p.endsWith('.ol')) p += '.ol'
+    out.push(p)
+  }
+  return out
+}
+const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
+// Résolution identique au parseur : base_dir + chemin (concat naïve), sauf chemin absolu.
+const resolveImport = (parentDir, imp) => (imp[0] === '/' ? imp : parentDir + imp)
+
+// Références de modèles 3D dans du code Ollin → liste de noms de fichiers (.obj/.glb/.gltf).
+function findModels(code) {
+  const re = /model\s*\(\s*["']([^"']+\.(?:obj|glb|gltf))["']\s*\)/gi
+  const out = []
+  let mm
+  while ((mm = re.exec(code))) out.push(mm[1])
+  return out
+}
+
+// Construit un PROJET complet à partir d'un exemple du dépôt : le fichier d'entrée,
+// tous ses imports .ol transitifs (→ files), et les modèles 3D référencés (→ resources
+// binaires base64). Sert à ouvrir un exemple comme un vrai projet multi-fichiers et à
+// le forker fidèlement. Rejette si le fichier d'entrée est introuvable ; les imports/
+// assets manquants sont ignorés (best-effort). Renvoie { files, resources, entry }.
+export async function collectSampleProject(entryFile, v) {
+  const files = {}
+  const resources = {}
+  const seen = new Set()
+  let queue = [entryFile]
+  while (queue.length) {
+    const key = queue.shift()
+    if (seen.has(key)) continue
+    seen.add(key)
+    let src
+    try {
+      const r = await fetch('samples/' + key + '?v=' + v, { cache: 'no-cache' })
+      if (!r.ok) {
+        if (key === entryFile) throw new Error('exemple introuvable : ' + key)
+        continue
+      }
+      src = await r.text()
+    } catch (e) {
+      if (key === entryFile) throw e
+      continue
+    }
+    files[key] = src
+    const pdir = dirOf(key)
+    for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
+  }
+  const allCode = Object.values(files).join('\n')
+  const mseen = new Set()
+  for (const name of findModels(allCode)) {
+    if (mseen.has(name)) continue
+    mseen.add(name)
+    try {
+      const r = await fetch('samples/' + name + '?v=' + v, { cache: 'no-cache' })
+      if (!r.ok) continue
+      const bytes = new Uint8Array(await r.arrayBuffer())
+      resources[name] = { b64: bytesToB64(bytes), ext: name.split('.').pop().toLowerCase() }
+    } catch (_) { /* asset manquant → ignoré */ }
+  }
+  return { files, resources, entry: entryFile }
 }
 
 // Rechargement « dur », PARTAGÉ par toutes les pages : vide le Cache API (Service
