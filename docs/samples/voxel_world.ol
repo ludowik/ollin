@@ -102,8 +102,25 @@ func elevation(x, z)
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-func height_at(x, z)
+func raw_height(x, z)
     return math.floor((elevation(x, z) - 0.42) * 60 + SEA)
+end
+
+## Élimine les extrema d'1 colonne : un pic isolé (plus haut que ses 4 voisins) est
+## rabaissé au plus haut voisin, un puits isolé (plus bas que ses 4 voisins) est
+## remonté au plus bas voisin → ni cube ni trou solitaire. Fonction pure de (x, z)
+## → même hauteur pour le culling, la collision et le spawn (pas de jointure incohérente).
+func height_at(x, z)
+    var h = raw_height(x, z)
+    var e = raw_height(x + 1, z)
+    var w = raw_height(x - 1, z)
+    var n = raw_height(x, z + 1)
+    var s = raw_height(x, z - 1)
+    var hi = math.max(math.max(e, w), math.max(n, s))
+    var lo = math.min(math.min(e, w), math.min(n, s))
+    if h > hi then return hi end   ## cube solitaire → éliminé
+    if h < lo then return lo end   ## trou solitaire → rempli
+    return h
 end
 
 func ground(x, z)
