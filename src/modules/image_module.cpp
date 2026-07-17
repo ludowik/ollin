@@ -35,6 +35,7 @@ struct TexHandle {
     int id = 0;
     bool is_render = false;
     bool pixels_open = false;
+    bool gpu_dirty = false;   // le GPU a été dessiné (beginDraw) → resync CPU au prochain accès pixel
     Texture2D tex = {};
     RenderTexture2D rtt = {};
     Image cpu = {};
@@ -111,12 +112,12 @@ void image_preload_b64(const std::string& name, const std::string& b64, const st
 }
 
 void image_reset() {
+    bool gl = IsWindowReady();
     for (auto& [id, h] : s_images) {
-        if (!IsWindowReady())
-            break;
-        if (h->cpu.data) {
-            UnloadImage(h->cpu);   // ombre CPU persistante
-        }
+        if (h->cpu.data)
+            UnloadImage(h->cpu);   // mémoire CPU : toujours libérée (indépendante du GL)
+        if (!gl)
+            continue;              // fenêtre partie : sauter les appels GPU, PAS le free CPU
         if (h->is_render)
             UnloadRenderTexture(h->rtt);
         else
@@ -160,7 +161,18 @@ static void pixelsOpen(TexHandle& h) {
         return;
     if (!h.is_render)
         throw std::runtime_error("image: pixel access requires a render texture (use image.create())");
-    // L'ombre CPU est persistante (allouée à la création) → aucun readback GPU.
+    // Chemin normal : l'ombre CPU est persistante (allouée à la création) → AUCUN readback
+    // GPU (le glReadPixels en cours de frame casse le rendu WebGL). Readback uniquement si
+    // le GPU a été dessiné via beginDraw depuis le dernier accès pixel (cas mixte, rare).
+    if (h.gpu_dirty) {
+        Image fresh = LoadImageFromTexture(h.rtt.texture);
+        if (fresh.data) {
+            if (h.cpu.data)
+                UnloadImage(h.cpu);
+            h.cpu = fresh;
+        }
+        h.gpu_dirty = false;
+    }
     if (!h.cpu.data)
         h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
     h.pixels_open = true;
@@ -315,6 +327,7 @@ static Value img_begin(Value* args, int argc) {
     if (!h.is_render)
         throw std::runtime_error(std::string(FN) + ": not a render texture — use image.create()");
     pixelsClose(h);
+    h.gpu_dirty = true;   // le dessin GPU va diverger de l'ombre CPU → resync au prochain accès pixel
     BeginTextureMode(h.rtt);
     return Value{};
 }

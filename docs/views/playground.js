@@ -1086,18 +1086,27 @@ function hashStr(str) {
 // Empreinte du contenu local d'un projet : entry + name + fichiers (hors MANIFEST,
 // régénéré à chaque save → instable) + ressources. Identique après un push et après
 // un pull du même contenu → base fiable pour « le local a-t-il changé depuis ? ».
+// Les ressources (base64, potentiellement plusieurs Mo) ne sont re-hashées que si leur
+// signature (clés + tailles) change → l'appel par frappe (scheduleSave) ne re-hashe que
+// les fichiers .ol, pas les gros assets qui ne bougent pas quand on édite du code.
+let _resHashCache = { sig: '', hash: '' }
 function localContentSha(project) {
   const parts = ['entry:' + (project.entry || ''), 'name:' + (project.name || '')]
   const files = project.files || {}
   for (const k of Object.keys(files).sort()) {
     if (k === Store.MANIFEST) continue
-    parts.push('F:' + k + '\0' + files[k])
+    parts.push('F:' + k + '|' + files[k])
   }
   const res = project.resources || {}
-  for (const k of Object.keys(res).sort()) {
-    parts.push('R:' + k + '\0' + (res[k].b64 || ''))
+  const keys = Object.keys(res).sort()
+  let sig = ''
+  for (const k of keys) sig += k + ':' + (res[k].b64 || '').length + ';'
+  if (sig !== _resHashCache.sig) {   // ressources modifiées (ajout/retrait/remplacement) → re-hash
+    const rparts = []
+    for (const k of keys) rparts.push('R:' + k + '|' + (res[k].b64 || ''))
+    _resHashCache = { sig, hash: hashStr(rparts.join('\n')) }
   }
-  return hashStr(parts.join(''))
+  return hashStr(parts.join('\n') + '|R#' + _resHashCache.hash)
 }
 
 function setSyncDot(state) {
@@ -1119,8 +1128,10 @@ function updateSyncBadge() {
     setSyncDot('remote')
     return
   }
+  // base absente (jamais synchronisé avec cette version, ou hors ligne au dernier open) →
+  // on ne peut pas affirmer « à jour » : traiter comme local en avance (inciter à pousser).
   const base = p.remote.localSha
-  const localChanged = base != null && localContentSha(p) !== base
+  const localChanged = base == null || localContentSha(p) !== base
   setSyncDot(localChanged ? 'local' : 'ok')
 }
 
