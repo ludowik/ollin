@@ -190,6 +190,16 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 #editor-wrap .cm-editor { height: 100%; border-radius: 0; border: none; }
 #editor-wrap .cm-scroller { height: 100%; overflow: auto; }
 
+/* Barre de défilement de l'éditeur : fond (piste) transparent, barre blanche. */
+#editor-wrap .cm-scroller { scrollbar-width: thin; scrollbar-color: #ffffff transparent; }
+#editor-wrap .cm-scroller::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
+#editor-wrap .cm-scroller::-webkit-scrollbar-track { background: transparent; }
+#editor-wrap .cm-scroller::-webkit-scrollbar-corner { background: transparent; }
+#editor-wrap .cm-scroller::-webkit-scrollbar-thumb {
+  background: #ffffff; border-radius: 5px;
+  border: 2px solid transparent; background-clip: padding-box;   /* léger retrait → barre fine détachée des bords */
+}
+
 #output-pane {
   flex: 1 1 50%;
   min-width: 0;
