@@ -358,6 +358,8 @@ const editorExtensions = [
         { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
         { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
+        // F4 : aller à la première erreur de syntaxe/exécution (lien de la zone sortie).
+        { key: 'F4', run: () => { if (lastErrorLoc) { gotoError(lastErrorLoc); return true } return false } },
         // Chord (Alt+K puis C/U) : commenter / dé-commenter les lignes sélectionnées.
         // Deux variantes : Alt relâché avant la 2e touche, OU Alt maintenu (Alt+K Alt+C).
         { key: 'Alt-k c', run: (v) => toggleLineComment(v, true) },
@@ -1236,6 +1238,10 @@ function clearAndStop() {
   setOutputVisible(false)   // retour éditeur plein écran
 }
 
+// Localisation de la dernière erreur affichée (null si la sortie n'est pas une
+// erreur) → cible du raccourci F4 « aller à la première erreur ».
+let lastErrorLoc = null
+
 function showOutput(text) {
   canvasEl.style.display = 'none'
   outputEl.style.display = 'block'
@@ -1244,12 +1250,14 @@ function showOutput(text) {
   if (!text) {
     outputEl.textContent = '(aucune sortie)'
     outputEl.className   = ''
+    lastErrorLoc = null
   } else if (text.startsWith('error:')) {
     outputEl.className = 'err'
     renderErrorWithLink(text)
   } else {
     outputEl.textContent = text
     outputEl.className   = 'ok'
+    lastErrorLoc = null
   }
 }
 
@@ -1266,13 +1274,14 @@ function errLoc(text) {
 // un LIEN cliquable qui amène à la ligne fautive (pas de saut automatique).
 function renderErrorWithLink(text) {
   const loc = errLoc(text)
+  lastErrorLoc = loc
   if (!loc) { outputEl.textContent = text; return }
   outputEl.textContent = ''
   outputEl.appendChild(document.createTextNode(text.slice(0, loc.index)))
   const link = document.createElement('span')
   link.className = 'err-link'
   link.textContent = loc.str
-  link.title = 'Aller à la ligne fautive'
+  link.title = 'Aller à la ligne fautive (F4)'
   link.addEventListener('click', () => gotoError(loc))
   outputEl.appendChild(link)
   outputEl.appendChild(document.createTextNode(text.slice(loc.index + loc.str.length)))
