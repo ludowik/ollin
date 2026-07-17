@@ -251,35 +251,57 @@ boot()
 // ── État du déploiement GitHub Pages (une vérif, non bloquante) ──────────────
 // V = Date.now() → un chargement récupère TOUJOURS le dernier déploiement RÉUSSI.
 // Il suffit donc de regarder le STATUT du dernier déploiement github-pages :
-//   in_progress/queued → une nouvelle version arrive (proposer de recharger)
-//   failure/error      → le dernier déploiement a échoué (on voit la version d'avant)
+//   in_progress/queued/pending → une nouvelle version arrive (proposer de recharger)
+//   failure/error              → le dernier déploiement a échoué (on voit la version d'avant)
 //   success (ou API injoignable / rate-limit) → silencieux (on est à jour).
-// Anonyme (repo public, CORS ouvert sur api.github.com), best-effort.
+// Repo public, CORS ouvert sur api.github.com. Best-effort :
+//  - token GitHub (auteur, via pg-github) utilisé s'il est présent → 5000 req/h au lieu de 60 ;
+//  - résultat TERMINAL mis en cache 2 min (sessionStorage) → évite de re-taper l'API à
+//    chaque rechargement (utile derrière un NAT partagé). L'état transitoire (déploiement
+//    en cours) n'est PAS mis en cache → « Recharger » revoit toujours l'état frais.
 const DEPLOY_REPO = 'ludowik/ollin'
+const DEPLOY_CACHE_KEY = 'ollin-deploy-state'
+const DEPLOY_TTL = 120000
+const TRANSIENT = ['in_progress', 'queued', 'pending']
+
 async function checkPagesDeploy() {
+  let state = null
   try {
-    const api = (p) => fetch('https://api.github.com/repos/' + DEPLOY_REPO + p,
-      { headers: { Accept: 'application/vnd.github+json' }, cache: 'no-store' })
-      .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
-    const deps = await api('/deployments?environment=github-pages&per_page=1')
-    if (!Array.isArray(deps) || !deps.length) return
-    const st = await api('/deployments/' + deps[0].id + '/statuses?per_page=1')
-    const state = Array.isArray(st) && st[0] ? st[0].state : null
-    if (['in_progress', 'queued', 'pending', 'waiting'].includes(state)) {
-      showDeployBanner('⏳ Une nouvelle version se déploie — recharge dans un instant.', true)
-    } else if (state === 'failure' || state === 'error') {
-      showDeployBanner('⚠ Le dernier déploiement a échoué — tu vois la version précédente.', false)
+    const cached = JSON.parse(sessionStorage.getItem(DEPLOY_CACHE_KEY) || 'null')
+    if (cached && (Date.now() - cached.t) < DEPLOY_TTL) {
+      state = cached.state
+    } else {
+      const token = localStorage.getItem('ollin-gh-token')   // auteur → limite 5000/h
+      const headers = { Accept: 'application/vnd.github+json' }
+      if (token) headers.Authorization = 'Bearer ' + token
+      const api = (p) => fetch('https://api.github.com/repos/' + DEPLOY_REPO + p, { headers, cache: 'no-store' })
+        .then(r => (r.ok ? r.json() : Promise.reject(r.status)))
+      const deps = await api('/deployments?environment=github-pages&per_page=1')
+      if (Array.isArray(deps) && deps.length) {
+        const st = await api('/deployments/' + deps[0].id + '/statuses?per_page=1')
+        state = Array.isArray(st) && st[0] ? st[0].state : null
+      }
+      // ne cacher que les états stables → l'état « en cours » reste toujours revérifié
+      if (state && !TRANSIENT.includes(state)) {
+        try { sessionStorage.setItem(DEPLOY_CACHE_KEY, JSON.stringify({ t: Date.now(), state })) } catch (_) {}
+      }
     }
-  } catch (_) { /* hors ligne / rate-limit / privé : silencieux */ }
+  } catch (_) { return /* hors ligne / rate-limit / privé : silencieux */ }
+  if (TRANSIENT.includes(state)) {
+    showDeployBanner('⏳ Une nouvelle version se déploie — recharge dans un instant.', true)
+  } else if (state === 'failure' || state === 'error') {
+    showDeployBanner('⚠ Le dernier déploiement a échoué — tu vois la version précédente.', false)
+  }
 }
 
+// Bandeau ancré EN BAS (ne recouvre pas la barre d'outils du haut) ; dismissible.
 function showDeployBanner(msg, offerReload) {
   if (document.getElementById('deploy-banner')) return
   const bar = document.createElement('div')
   bar.id = 'deploy-banner'
-  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#242742;' +
-    'color:#c9d1e0;border-bottom:1px solid #2e3150;font:13px system-ui,-apple-system,sans-serif;' +
-    'padding:8px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 10px rgba(0,0,0,.45)'
+  bar.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:9999;background:#242742;' +
+    'color:#c9d1e0;border-top:1px solid #2e3150;font:13px system-ui,-apple-system,sans-serif;' +
+    'padding:8px 14px;display:flex;align-items:center;gap:12px;box-shadow:0 -2px 10px rgba(0,0,0,.45)'
   const txt = document.createElement('span'); txt.textContent = msg; txt.style.flex = '1'
   bar.appendChild(txt)
   if (offerReload) {
