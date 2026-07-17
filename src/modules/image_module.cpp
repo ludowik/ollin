@@ -114,8 +114,8 @@ void image_reset() {
     for (auto& [id, h] : s_images) {
         if (!IsWindowReady())
             break;
-        if (h->pixels_open) {
-            UnloadImage(h->cpu);
+        if (h->cpu.data) {
+            UnloadImage(h->cpu);   // ombre CPU persistante
         }
         if (h->is_render)
             UnloadRenderTexture(h->rtt);
@@ -160,9 +160,7 @@ static void pixelsOpen(TexHandle& h) {
         return;
     if (!h.is_render)
         throw std::runtime_error("image: pixel access requires a render texture (use image.create())");
-    h.cpu = LoadImageFromTexture(h.rtt.texture);
-    // WebGL/WASM: glReadPixels via temp FBO may fail on a fresh render texture
-    // that has never been drawn to — fall back to a zeroed CPU image.
+    // L'ombre CPU est persistante (allouée à la création) → aucun readback GPU.
     if (!h.cpu.data)
         h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
     h.pixels_open = true;
@@ -171,10 +169,8 @@ static void pixelsOpen(TexHandle& h) {
 static void pixelsClose(TexHandle& h) {
     if (!h.pixels_open)
         return;
-    UpdateTexture(h.rtt.texture, h.cpu.data);
-    UnloadImage(h.cpu);
-    h.cpu = {};
-    h.pixels_open = false;
+    UpdateTexture(h.rtt.texture, h.cpu.data);   // pousse l'ombre CPU vers la texture
+    h.pixels_open = false;                       // l'ombre CPU reste allouée (persistante)
 }
 
 static Texture2D loadFromMemory(const std::vector<uint8_t>& bytes, const std::string& ext) {
@@ -296,6 +292,11 @@ static Value img_create(Value* args, int argc) {
     TexHandle hnd;
     hnd.rtt = LoadRenderTexture(w, h);
     hnd.is_render = true;
+    // Ombre CPU PERSISTANTE (RGBA8) : source de vérité des pixels. Évite tout
+    // glReadPixels en cours de frame (LoadImageFromTexture) — qui casse le rendu
+    // WebGL/WASM (FBO courant perdu) — et accélère begin/setPixel/endPixels.
+    hnd.cpu = GenImageColor(w, h, BLANK);
+    UpdateTexture(hnd.rtt.texture, hnd.cpu.data);   // texture initiale = transparente
     int id = s_next_id++;
     hnd.id = id;
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
@@ -364,8 +365,8 @@ static Value img_unload(Value* args, int argc) {
     if (it == s_images.end())
         return Value{};
     args[0].mptr->userdata = nullptr;
-    if (h.pixels_open)
-        UnloadImage(h.cpu);
+    if (h.cpu.data)
+        UnloadImage(h.cpu);   // ombre CPU persistante
     if (h.is_render)
         UnloadRenderTexture(h.rtt);
     else
