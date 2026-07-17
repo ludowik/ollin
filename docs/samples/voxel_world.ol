@@ -32,6 +32,12 @@ global streaming = false
 global pad = Joystick()
 global TURN_MAX = 1.8
 global SPEED_MAX = 8.0
+## Flèches du clavier (état maintenu : press → vrai, release → faux) — déplacement
+## en complément du joystick tactile.
+global kUp = false
+global kDown = false
+global kLeft = false
+global kRight = false
 
 global C_SKY = Color(0.55, 0.80, 0.95)
 
@@ -378,24 +384,43 @@ end
 func mouse.released(x, y)
     pad.release()
 end
-## Touche C : bascule la caméra de contrôle (vue de haut pour vérifier le culling).
+## Touche C : bascule la caméra de contrôle. Flèches : déplacement (état maintenu).
 func keyboard.keypressed(key)
     if string.upper(key) == "C" then
         debugCam = not debugCam
+    elseif key == "up" then    kUp = true
+    elseif key == "down" then  kDown = true
+    elseif key == "left" then  kLeft = true
+    elseif key == "right" then kRight = true
+    end
+end
+func keyboard.keyrelease(key)
+    if key == "up" then        kUp = false
+    elseif key == "down" then  kDown = false
+    elseif key == "left" then  kLeft = false
+    elseif key == "right" then kRight = false
     end
 end
 func mouse.moved(x, y)
     pad.move(x, y)
 end
 
-## Avance le joueur (virage + vitesse du joystick), avec glissement sur les pentes
-## franchissables et blocage sur les murs.
+## Avance le joueur (virage + vitesse), joystick tactile ET flèches clavier combinés,
+## avec glissement sur les pentes franchissables et blocage sur les murs.
 func move_player()
-    yaw = yaw - pad.steer() * TURN_MAX * deltaTime
-    var sp = pad.throttle() * SPEED_MAX * deltaTime
-    if sp <= 0 then
+    var turn = pad.steer()
+    if kLeft then turn = turn - 1 end
+    if kRight then turn = turn + 1 end
+    yaw = yaw - math.clamp(turn, -1, 1) * TURN_MAX * deltaTime
+
+    var thr = pad.throttle()      ## joystick : [0;1] (avant)
+    if kUp then thr = thr + 1 end
+    if kDown then thr = thr - 1 end   ## flèche bas = marche arrière
+    thr = math.clamp(thr, -1, 1)
+    if thr == 0 then
         return
     end
+    var sp = thr * SPEED_MAX * deltaTime
     var nx = camX + math.sin(yaw) * sp
     var nz = camZ + math.cos(yaw) * sp
     var g0 = ground(camX, camZ)
