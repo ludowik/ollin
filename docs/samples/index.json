@@ -1,12 +1,10 @@
 [
   { "name": "Hello world",    "file": "hello_world.ol" },
   { "name": "Fibonacci",      "file": "fibonacci.ol" },
-  { "name": "FizzBuzz",       "file": "fizzbuzz.ol" },
   { "name": "Closure",        "file": "closure.ol" },
   { "name": "Classe Vec2",    "file": "vec2.ol" },
-  { "name": "Lignes animées", "file": "lignes_animees.ol" },
   { "name": "Pixels animés",  "file": "pixels.ol" },
-  { "name": "Primitives",     "file": "primitives.ol" },
+  { "name": "Primitives 2D",  "file": "primitives.ol" },
   { "name": "Image (loadData)", "file": "image_demo.ol" },
   { "name": "Bruit de Perlin", "file": "noise_field.ol" },
   { "name": "SUTOM",          "file": "sutom.ol" },
