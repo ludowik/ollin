@@ -16,6 +16,7 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 ## de la caméra du joueur) sont dessinés. Bascule avec la touche « C ».
 global ctrlCam = graphics.camera(0, 0, 10,  0, 0, 0)
 global debugCam = false
+global CAMBTN = 46          ## bouton « C » (bascule caméra de contrôle), coin haut-gauche
 
 global EYE = 2.2
 global STEP = 1.2           ## marche franchissable ; au-delà = mur
@@ -327,7 +328,27 @@ func setup()
     streaming = true
 end
 
+## Bouton caméra (bascule debug) : carré en haut-gauche, sous le HUD.
+func cam_btn_hit(x, y)
+    return x >= 12 and x <= 12 + CAMBTN and y >= 36 and y <= 36 + CAMBTN
+end
+
+func draw_cam_button()
+    graphics.noStroke()
+    graphics.fill(Color(0, 0, 0, 0.38))
+    graphics.rect(12, 36, CAMBTN, CAMBTN)
+    if debugCam then                   ## allumé = caméra de contrôle active
+        graphics.fill(Color(0.30, 0.70, 1.00, 0.55))
+        graphics.rect(12, 36, CAMBTN, CAMBTN)
+    end
+    graphics.drawText("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15, 28, colors.WHITE)
+end
+
 func mouse.pressed(x, y)
+    if cam_btn_hit(x, y) then          ## bouton caméra → bascule (accessible tactile)
+        debugCam = not debugCam
+        return
+    end
     var ev = vd.hit(x, y)              ## boutons − / + gérés par ViewDistance
     if ev == 1 then
         streaming = true               ## rayon agrandi → charger le nouvel anneau
@@ -342,7 +363,7 @@ func mouse.released(x, y)
 end
 ## Touche C : bascule la caméra de contrôle (vue de haut pour vérifier le culling).
 func keyboard.keypressed(key)
-    if key == "c" then
+    if string.upper(key) == "C" then
         debugCam = not debugCam
     end
 end
@@ -395,24 +416,17 @@ func draw()
                camY + math.sin(PITCH),
                camZ + math.cos(PITCH) * math.cos(yaw))
 
-    ## Le culling est TOUJOURS calculé sur le frustum de la caméra du JOUEUR : on le fige
-    ## via un bloc 3D vide (begin3d/end3d ne dessine rien mais gèle vue+projection lues
-    ## ensuite par inFrustum). En mode contrôle on rend d'une AUTRE caméra, mais la
-    ## sélection des chunks reste celle du joueur → on voit d'en haut ce qu'il dessine.
-    graphics.begin3d(cam)
-    graphics.end3d()
     graphics.noStroke()
-    var vis = []
-    for k, c in loaded do
-        if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
-            vis[#vis + 1] = c
-        end
-    end
-
     ## Caméra de rendu : joueur, ou caméra de contrôle en hauteur (regard vers le bas,
-    ## up = direction d'avancée du joueur → même orientation à l'écran).
+    ## up = direction d'avancée du joueur → même orientation à l'écran). Le culling reste
+    ## TOUJOURS celui du joueur : en mode contrôle on rend d'une AUTRE caméra, alors on
+    ## fige d'abord le frustum du joueur (bloc 3D vide → gèle vue+projection lues par
+    ## inFrustum). En mode joueur, inutile : inFrustum réutilise le frustum figé par le
+    ## rendu de la frame précédente (donc pas de passe 3D vide sur le chemin normal).
     var rcam = cam
     if debugCam then
+        graphics.begin3d(cam)
+        graphics.end3d()
         var high = vd.radius * CS * 2.0 + 40
         ctrlCam.setPos(camX, camY + high, camZ)
         ctrlCam.lookAt(camX, camY, camZ)
@@ -420,6 +434,13 @@ func draw()
         ctrlCam.uy = 0
         ctrlCam.uz = math.cos(yaw)
         rcam = ctrlCam
+    end
+
+    var vis = []
+    for k, c in loaded do
+        if graphics.inFrustum(c.wx, SEA, c.wz, CS + 24) then
+            vis[#vis + 1] = c
+        end
     end
     graphics.begin3d(rcam)
         for i = 1, #vis do
@@ -432,7 +453,8 @@ func draw()
 
     pad.draw()
     vd.draw()                          ## boutons − / + (ViewDistance)
+    draw_cam_button()                  ## bouton « C » (bascule caméra de contrôle)
     var camlbl = "joueur"
-    if debugCam then camlbl = "contrôle (haut)" end
-    graphics.drawText("vue " + vd.radius + " (" + vd.mode() + ")   chunks " + #vis + "   cam : " + camlbl + " [C]", 12, 12, 15, colors.WHITE)
+    if debugCam then camlbl = "contrôle" end
+    graphics.drawText("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12, 15, colors.WHITE)
 end
