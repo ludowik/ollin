@@ -616,6 +616,7 @@ function flushEditorToFile() {
 function scheduleSave() {
   if (!currentProject || isExample()) return   // un exemple ne se persiste jamais
   flushEditorToFile()
+  updateSyncBadge()   // une frappe non poussée → pastille bleue (local plus récent)
   Store.saveProject(currentProject).catch(e => console.error('saveProject', e))
 }
 
@@ -780,10 +781,8 @@ async function loadProject(id) {
   renderFiles()
   renderResources()
   view.focus()
-  // Éteindre la pastille du projet précédent AVANT le contrôle async : sinon,
-  // pour un projet sans lien distant (ou hors-ligne), checkRemoteFreshness sort
-  // sans toucher la pastille → elle resterait allumée à tort sur ce projet.
-  projectBtn.classList.remove('sync-update')
+  // Pastille de synchro : checkRemoteFreshness la (ré)initialise dès son entrée
+  // (état local immédiat, puis verdict distant après le contrôle réseau).
   checkRemoteFreshness(p)   // garde-fou d'ouverture (non bloquant)
 }
 
@@ -1006,7 +1005,8 @@ async function autoPushNewProject(p) {
   try {
     await GH.ensureRepo()
     await GH.pushProject(p, null, {})
-    await Store.saveProject(p)   // persiste project.remote (slug, folderSha)
+    p.remote.localSha = localContentSha(p)   // base locale = ce qui vient d'être poussé
+    await Store.saveProject(p)   // persiste project.remote (slug, folderSha, localSha)
     setStatus('Projet créé sur GitHub ✓', true)
   } catch (e) {
     setStatus('Créé en local — GitHub : ' + (e && e.message ? e.message : e), true, true)
@@ -1021,8 +1021,10 @@ async function ghPush(force) {
   try {
     await GH.ensureRepo()
     await GH.pushProject(currentProject, null, { force })
-    await Store.saveProject(currentProject)   // persister project.remote (dont folderSha)
-    projectBtn.classList.remove('sync-update')   // on est à jour
+    currentProject.remote.localSha = localContentSha(currentProject)   // base locale = poussée
+    await Store.saveProject(currentProject)   // persister project.remote (folderSha, localSha)
+    syncRemoteAhead = false
+    updateSyncBadge()   // à jour → pastille verte
     setStatus('Poussé sur GitHub ✓', true)
   } catch (e) {
     if (e.code === 'CONFLICT') {
@@ -1044,6 +1046,7 @@ async function doPull() {
   try {
     const p = await GH.pullProject(slug)
     p.id = currentProject.id
+    p.remote.localSha = localContentSha(p)   // base locale = ce qui vient d'être récupéré
     await Store.saveProject(p)
     await loadProject(p.id)
     setStatus('Projet à jour ✓', true)
@@ -1058,27 +1061,87 @@ async function ghPull() {
   await doPull()
 }
 
-// Garde-fou d'ouverture : à l'ouverture d'un projet lié à GitHub (connecté),
-// vérifie en arrière-plan si une version plus récente existe et propose un Pull.
-// PASSIF : aucune boîte de dialogue, aucun Pull automatique. On se contente
-// d'un message discret ; l'utilisateur garde le contrôle (Pull manuel au besoin).
+// ── Pastille d'état de synchro GitHub (tri-état) ────────────────────────────
+// jaune = distant plus récent (Pull) · bleu = local plus récent (Push) · vert = à jour.
+// `syncRemoteAhead` = dernier verdict RÉSEAU (le distant a-t-il bougé depuis notre
+// dernière synchro ?) ; l'avance LOCALE se déduit sans réseau en comparant le hash
+// du contenu courant à `remote.localSha` (posé à chaque push/pull).
+let syncRemoteAhead = false
+
+// Hash 53 bits déterministe (cyrb53) — comparaison de contenu, pas de crypto.
+function hashStr(str) {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ c, 2654435761)
+    h2 = Math.imul(h2 ^ c, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16)
+}
+
+// Empreinte du contenu local d'un projet : entry + name + fichiers (hors MANIFEST,
+// régénéré à chaque save → instable) + ressources. Identique après un push et après
+// un pull du même contenu → base fiable pour « le local a-t-il changé depuis ? ».
+function localContentSha(project) {
+  const parts = ['entry:' + (project.entry || ''), 'name:' + (project.name || '')]
+  const files = project.files || {}
+  for (const k of Object.keys(files).sort()) {
+    if (k === Store.MANIFEST) continue
+    parts.push('F:' + k + '\0' + files[k])
+  }
+  const res = project.resources || {}
+  for (const k of Object.keys(res).sort()) {
+    parts.push('R:' + k + '\0' + (res[k].b64 || ''))
+  }
+  return hashStr(parts.join(''))
+}
+
+function setSyncDot(state) {
+  projectBtn.classList.toggle('sync-remote', state === 'remote')
+  projectBtn.classList.toggle('sync-local',  state === 'local')
+  projectBtn.classList.toggle('sync-ok',     state === 'ok')
+}
+
+// Rafraîchit la pastille depuis l'état courant (sans réseau) : distant en avance →
+// jaune ; sinon local modifié → bleu ; sinon à jour → vert. Aucune pastille si le
+// projet n'est pas lié à GitHub (ou déconnecté, ou exemple).
+function updateSyncBadge() {
+  const p = currentProject
+  if (!p || isExample() || !p.remote || !p.remote.slug || !GH.isConnected()) {
+    setSyncDot(null)
+    return
+  }
+  if (syncRemoteAhead) {
+    setSyncDot('remote')
+    return
+  }
+  const base = p.remote.localSha
+  const localChanged = base != null && localContentSha(p) !== base
+  setSyncDot(localChanged ? 'local' : 'ok')
+}
+
+// Garde-fou d'ouverture : vérifie en arrière-plan si le distant a bougé, met à jour
+// la pastille et (si distant plus récent) affiche un rappel Pull. PASSIF : aucun Pull
+// automatique. Backfille `remote.localSha` pour les projets synchronisés avant cette
+// fonctionnalité (base absente + distant à jour → le local EST la base).
 async function checkRemoteFreshness(project) {
+  syncRemoteAhead = false
+  updateSyncBadge()   // affiche déjà vert/bleu selon le local en attendant le réseau
   if (!project.remote || !project.remote.slug || !GH.isConnected()) return
   try {
     const cur = await GH.remoteFolderSha(project.remote.slug)
     if (!currentProject || currentProject.id !== project.id) return   // projet changé entre-temps
-    // Base de comparaison = SHA du tree du dossier lu lors de notre dernier
-    // push/pull. On ne signale QUE si l'on a une base fiable (known) ET qu'elle
-    // diffère du distant. Sans base connue (jamais synchro avec cette version),
-    // on reste SILENCIEUX : la pastille n'est qu'un rappel, pas une alerte —
-    // mieux vaut ne rien afficher qu'un faux positif.
-    const known = (project.remote && project.remote.folderSha) || null
-    // Même règle que le garde-fou de conflit (GH.folderMoved), + politique
-    // pastille : muette si pas de base connue (rappel, pas alerte).
-    const newer = known !== null && GH.folderMoved(cur, known)
-    projectBtn.classList.toggle('sync-update', newer)   // pastille persistante
-    if (newer) setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
-  } catch (_) { /* hors-ligne / token invalide : silencieux */ }
+    const known = project.remote.folderSha || null
+    syncRemoteAhead = known !== null && GH.folderMoved(cur, known)
+    if (!syncRemoteAhead && known !== null && project.remote.localSha == null) {
+      project.remote.localSha = localContentSha(project)   // backfill de la base locale
+      Store.saveProject(project).catch(() => {})
+    }
+    updateSyncBadge()
+    if (syncRemoteAhead) setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » pour l\'obtenir')
+  } catch (_) { /* hors-ligne / token invalide : on garde l'état local */ }
 }
 
 async function renderMenuRemote() {
@@ -1104,6 +1167,7 @@ async function renderMenuRemote() {
       setStatus('Récupération…')
       try {
         const p = await GH.pullProject(r.slug)
+        p.remote.localSha = localContentSha(p)   // base locale = ce qui vient d'être récupéré
         await Store.saveProject(p)
         await loadProject(p.id)
         setStatus('Projet ouvert ✓', true)

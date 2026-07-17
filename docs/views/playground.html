@@ -16,6 +16,7 @@
   --green:   #4ade80;
   --red:     #f87171;
   --yellow:  #fbbf24;
+  --blue:    #3b82f6;
   --mono:    'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
 }
 
@@ -285,12 +286,18 @@ canvas#canvas {
 #project-btn { position: relative; }
 #project-btn:hover:not(:disabled) { border-color: var(--accent); }
 #project-btn:disabled { opacity: 0.5; cursor: default; }
-/* pastille « version plus récente sur GitHub » (persistante, visible mobile+PC) */
-#project-btn.sync-update::after {
+/* pastille d'état de synchro GitHub (persistante, visible mobile+PC) :
+   jaune = distant plus récent (Pull) · bleu = local plus récent (Push) · vert = à jour */
+#project-btn.sync-remote::after,
+#project-btn.sync-local::after,
+#project-btn.sync-ok::after {
   content: ''; position: absolute; top: -3px; right: -3px;
   width: 9px; height: 9px; border-radius: 50%;
-  background: var(--yellow); border: 2px solid var(--surface);
+  border: 2px solid var(--surface);
 }
+#project-btn.sync-remote::after { background: var(--yellow); }
+#project-btn.sync-local::after  { background: var(--blue); }
+#project-btn.sync-ok::after     { background: var(--green); }
 #project-label { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 #project-menu {
