@@ -39,9 +39,9 @@ const exampleFile = Run.sampleFromAnchor(ctx.anchor)
 // KEYWORDS / BUILTINS / ollinLang / ollinHighlight : importés de cm-lang.js.
 
 const ollinTheme = EditorView.theme({
-  // Taille de base = version NAVIGATEUR (réduite : 13px). Le mobile la redéfinit
+  // Taille de base = version NAVIGATEUR (13.5px). Le mobile la redéfinit
   // (playground.html, @media max-width:640px → 12px, anti-zoom iOS).
-  '&': { background: '#000000', color: '#c9d1e0', fontSize: '13px', height: '100%' },
+  '&': { background: '#000000', color: '#c9d1e0', fontSize: '13.5px', height: '100%' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65' },
   '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
   ...CODE_DISPLAY,   // réglages d'affichage partagés (cm-shared.js)
