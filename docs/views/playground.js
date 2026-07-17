@@ -852,8 +852,8 @@ function renderMenuRoot() {
   projectMenu.appendChild(menuHeader('Projet : ' + (currentProject ? currentProject.name : '—')))
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('✨ Nouveau projet vide', false, async () => {
-    const name = prompt('Nom du projet :', 'Sans titre'); if (!name) return
-    const p = await Store.createProject(name.trim())
+    const name = await askFreeProjectName('Sans titre'); if (!name) return
+    const p = await Store.createProject(name)
     closeMenu()
     await autoPushNewProject(p)   // dépôt paramétré → créé sur GitHub
     await openProject(p.id)
@@ -864,14 +864,19 @@ function renderMenuRoot() {
   if (currentProject && !isExample()) {
     projectMenu.appendChild(menuSep())
     projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
-      const name = prompt('Nouveau nom :', currentProject.name); if (!name) return
+      const name = await askFreeProjectName(currentProject.name, {
+        label: 'Nouveau nom :',
+        exclude: { id: currentProject.id, slug: (currentProject.remote && currentProject.remote.slug) || currentProject.id },
+      })
+      if (!name) return
       flushEditorToFile(); await Store.saveProject(currentProject)
-      const p = await Store.renameProject(currentProject.id, name.trim())
+      const p = await Store.renameProject(currentProject.id, name)
       closeMenu(); await loadProject(p.id)
     }))
     projectMenu.appendChild(menuItem('⧉ Dupliquer', false, async () => {
       flushEditorToFile(); await Store.saveProject(currentProject)
-      const copy = await Store.createProject(currentProject.name + ' (copie)')
+      const dupName = await askFreeProjectName(currentProject.name + ' (copie)'); if (!dupName) return
+      const copy = await Store.createProject(dupName)
       copy.files = { ...currentProject.files }; copy.entry = currentProject.entry
       delete copy.files[Store.MANIFEST]
       await Store.saveProject(copy)
@@ -1199,18 +1204,43 @@ async function loadExample(file) {
   }
 }
 
-// Demande un nom de projet LIBRE : reboucle tant que le nom est vide ou déjà pris.
-// Renvoie le nom validé, ou null si l'utilisateur annule.
-async function askFreeProjectName(defName) {
-  let name = prompt('Nom du projet :', defName)
+// Ensemble des noms de projets DÉJÀ PRIS (en minuscules), local + distant GitHub si
+// connecté. `exclude` = { id, slug } à ignorer (le projet lui-même lors d'un renommage).
+// Récupéré une seule fois → la boucle de saisie ne re-télécharge pas à chaque essai.
+async function takenProjectNames(exclude = {}) {
+  const set = new Set()
+  for (const p of await Store.listProjects()) {
+    if (p.id === exclude.id) continue
+    set.add((p.name || '').trim().toLowerCase())
+  }
+  if (GH.isConnected()) {
+    try {
+      for (const r of await GH.listRemoteProjects()) {
+        if (r.slug === exclude.slug) continue
+        set.add((r.name || '').trim().toLowerCase())
+      }
+    } catch (_) { /* distant injoignable → on se base sur le local seul */ }
+  }
+  set.delete('')
+  return set
+}
+
+// Demande un nom de projet LIBRE (ni en local ni sur le dépôt distant) : reboucle
+// tant que le nom est vide ou déjà pris. Renvoie le nom validé, ou null si annulé.
+// `opts` : { label, exclude:{id,slug} } (exclusion = le projet lui-même en renommage).
+async function askFreeProjectName(defName, opts = {}) {
+  const label = opts.label || 'Nom du projet :'
+  if (GH.isConnected()) setStatus('Vérification des noms…')
+  const taken = await takenProjectNames(opts.exclude)
+  let name = prompt(label, defName)
   while (name !== null) {
-    name = name.trim()
-    if (!name) {
-      name = prompt('Le nom ne peut pas être vide. Nom du projet :', defName)
-    } else if (await Store.nameExists(name)) {
-      name = prompt(`Un projet « ${name} » existe déjà. Choisis un autre nom :`, name)
+    const clean = name.trim()
+    if (!clean) {
+      name = prompt('Le nom ne peut pas être vide. ' + label, defName)
+    } else if (taken.has(clean.toLowerCase())) {
+      name = prompt(`Un projet « ${clean} » existe déjà (local ou GitHub). Choisis un autre nom :`, clean)
     } else {
-      return name
+      return clean
     }
   }
   return null
