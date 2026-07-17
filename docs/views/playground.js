@@ -69,7 +69,7 @@ const ollinTheme = EditorView.theme({
   '.cm-panels.cm-panels-top': { borderBottom: '1px solid #2e3150' },
   '.cm-search': { padding: '6px 8px' },
   '.cm-search label': { color: '#7c85a2', fontSize: '12px' },
-  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px' },
+  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', width: '280px', maxWidth: '55vw' },
   '.cm-button': { background: '#242742', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', backgroundImage: 'none' },
   '.cm-button:hover': { background: '#2d3259' },
   '.cm-panel.cm-search [name=close]': { color: '#7c85a2', fontSize: '18px' },
@@ -1293,11 +1293,7 @@ async function loadExample(file) {
   renderResources()
   showExampleBanner(file)
   projectLabel.textContent = file
-  // Multi-fichiers → ouvrir le rail pour montrer d'emblée tous les fichiers du projet.
-  if (scripts(currentProject).length > 1 || Object.keys(currentProject.resources).length) {
-    railHidden = false
-    applyRail()
-  }
+  // Le rail reste FERMÉ par défaut (comme pour un projet) — le bouton latéral l'ouvre.
 }
 
 // Ensemble des noms de projets DÉJÀ PRIS (en minuscules), local + distant GitHub si
