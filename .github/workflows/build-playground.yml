@@ -37,6 +37,7 @@ jobs:
           @codemirror/language@^6
           @codemirror/commands@^6
           @codemirror/autocomplete@^6
+          @codemirror/search@^6
           @lezer/highlight@^1
 
       - name: Build CodeMirror bundle

@@ -17,3 +17,6 @@ export {
   autocompletion, completionKeymap, acceptCompletion,
   closeBrackets, closeBracketsKeymap,
 } from '@codemirror/autocomplete'
+export {
+  search, searchKeymap, highlightSelectionMatches, openSearchPanel,
+} from '@codemirror/search'

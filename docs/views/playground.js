@@ -10,6 +10,7 @@ import {
   syntaxHighlighting, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
   autocompletion, completionKeymap, acceptCompletion,
   closeBrackets, closeBracketsKeymap,
+  search, searchKeymap, highlightSelectionMatches,
 } from '../vendor/codemirror.js'
 import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../cm-shared.js'
 import { ollinLang, ollinHighlight } from '../cm-lang.js'
@@ -62,6 +63,16 @@ const ollinTheme = EditorView.theme({
   '.cm-completionIcon-namespace': { color: '#C586C0' },
   '[aria-selected] .cm-completionLabel': { color: '#ffffff' },
   '[aria-selected] .cm-completionDetail': { color: '#a0aabf' },
+
+  /* panneau de recherche (Ctrl+F) accordé au thème sombre */
+  '.cm-panels': { background: '#1a1d2e', color: '#c9d1e0' },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid #2e3150' },
+  '.cm-search': { padding: '6px 8px' },
+  '.cm-search label': { color: '#7c85a2', fontSize: '12px' },
+  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px' },
+  '.cm-button': { background: '#242742', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', backgroundImage: 'none' },
+  '.cm-button:hover': { background: '#2d3259' },
+  '.cm-panel.cm-search [name=close]': { color: '#7c85a2', fontSize: '18px' },
 })
 
 // ── Autocompletion ────────────────────────────────────────────────────────
@@ -355,6 +366,11 @@ const editorExtensions = [
       }),
       codeFolding(), foldGutter(), foldService.of(ollinFoldRange),
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
+      // Recherche CodeMirror : Ctrl+F ouvre le panneau et scanne TOUT le document (le
+      // modèle, pas le DOM — CM ne rend que les lignes visibles, donc la recherche
+      // native du navigateur manquait le reste du fichier). highlightSelectionMatches
+      // surligne les autres occurrences du mot sélectionné.
+      search({ top: true }), highlightSelectionMatches(),
       keymap.of(editKeymap),
       keymap.of([
         { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
@@ -369,6 +385,7 @@ const editorExtensions = [
         { key: 'Alt-k Alt-c', run: (v) => toggleLineComment(v, true) },
         { key: 'Alt-k Alt-u', run: (v) => toggleLineComment(v, false) },
       ]),
+      keymap.of(searchKeymap),   // Ctrl+F (rechercher), Ctrl+G (suivant), etc.
       indentUnit.of('    '),
       // Auto-paires natives : «(» insère «()», entoure la sélection si elle
       // existe, et Backspace supprime la paire vide (closeBracketsKeymap).
