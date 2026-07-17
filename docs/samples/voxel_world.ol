@@ -28,7 +28,6 @@ global TURN_MAX = 1.8
 global SPEED_MAX = 8.0
 
 global C_SKY = Color(0.55, 0.80, 0.95)
-global WHITE = Color(1, 1, 1)
 
 global TILE = 16
 global ACOLS = 4
@@ -139,16 +138,37 @@ end
 
 func bake_chunk(cx, cz)
     graphics.beginChunk()
-    graphics.fill(WHITE)          ## teinte neutre : l'atlas fournit la couleur
+    graphics.fill(colors.WHITE)   ## teinte neutre : l'atlas fournit la couleur
     var x0 = cx * CS
     var z0 = cz * CS
-    for z = z0, z0 + CS - 1 do
-        for x = x0, x0 + CS - 1 do
+    ## Hauteurs BRUTES sur la zone + une bordure de 1 (indices -1..CS), pour le culling
+    ## des faces cachées : on ne cuit un cube que si une face touche le vide (sommet de
+    ## colonne, ou voisin plus bas) → seule la surface est instanciée, pas le volume.
+    var W2 = CS + 2
+    var hg = []
+    for lz = -1, CS do
+        for lx = -1, CS do
+            hg[(lz + 1) * W2 + (lx + 1) + 1] = height_at(x0 + lx, z0 + lz)
+        end
+    end
+    for lz = 0, CS - 1 do
+        for lx = 0, CS - 1 do
+            var x = x0 + lx
+            var z = z0 + lz
             var b = biome_at(x, z)
-            var h = height_at(x, z)
-            for y = 0, math.max(h, 0) do   ## au moins un fond (y=0) même si h<0
-                set_block_tiles(b, h, y)
-                graphics.cube(x, y, z,  1, 1, 1)
+            var h = hg[(lz + 1) * W2 + (lx + 1) + 1]
+            var top = math.max(h, 0)
+            ## hauteurs des 4 voisins, clampées comme les colonnes cuites (>= 0)
+            var he = math.max(hg[(lz + 1) * W2 + (lx + 2) + 1], 0)
+            var hw = math.max(hg[(lz + 1) * W2 + lx + 1], 0)
+            var hs = math.max(hg[(lz + 2) * W2 + (lx + 1) + 1], 0)
+            var hn = math.max(hg[lz * W2 + (lx + 1) + 1], 0)
+            var mn = math.min(math.min(he, hw), math.min(hs, hn))
+            for y = 0, top do
+                if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
+                    set_block_tiles(b, h, y)
+                    graphics.cube(x, y, z,  1, 1, 1)
+                end
             end
             if h < SEA then
                 ## eau = UN plan semi-transparent au niveau de la mer (surface continue,
@@ -156,7 +176,7 @@ func bake_chunk(cx, cz)
                 graphics.tile(T_WATER)
                 graphics.fill(Color(1, 1, 1, 0.72))
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
-                graphics.fill(WHITE)
+                graphics.fill(colors.WHITE)
             end
             var hash = math.abs(x * 131 + z * 197) % 100    ## abs : % signé sinon ~53%
             var grassy = h > SEA and h < SEA + 8 and b <> 0
@@ -168,9 +188,9 @@ func bake_chunk(cx, cz)
                 end
                 graphics.tile(T_LEAF)
                 for ly = 4, 5 do
-                    for lx = -1, 1 do
-                        for lz = -1, 1 do
-                            graphics.cube(x + lx, h + ly, z + lz,  1, 1, 1)
+                    for tx = -1, 1 do
+                        for tz = -1, 1 do
+                            graphics.cube(x + tx, h + ly, z + tz,  1, 1, 1)
                         end
                     end
                 end
@@ -198,40 +218,51 @@ func stream_load(pcx, pcz, budget)
     var cnt = 0
     var fdx = math.sin(yaw)
     var fdz = math.cos(yaw)
-    for dz = -vd.radius, vd.radius do
-        for dx = -vd.radius, vd.radius do
-            var cx = pcx + dx
-            var cz = pcz + dz
-            if loaded[ckey(cx, cz)] == nil then
-                var score = dx * dx + dz * dz
-                if dx * fdx + dz * fdz < 0 then
-                    score = score + 100000             ## derrière la caméra → après
-                end
-                if cnt < budget or score < bsc[cnt] then
-                    var p = budget
-                    if cnt < budget then
-                        cnt = cnt + 1
-                        p = cnt
+    ## Balayage en anneaux (Chebyshev) croissants, du plus proche au plus loin. On ne
+    ## parcourt que le PÉRIMÈTRE de chaque anneau (O(r²) total, comme un carré plein) ;
+    ## dès que le tampon est plein et que l'anneau courant ne peut plus battre le pire
+    ## score retenu (d² > bsc[cnt]), on arrête — plus de rebalayage de toute la grille.
+    for d = 0, vd.radius do
+        if cnt >= budget and d * d > bsc[cnt] then
+            break
+        end
+        for dz = -d, d do
+            var stepx = 1
+            if d > 0 and dz > -d and dz < d then
+                stepx = 2 * d       ## lignes du milieu : seulement les colonnes ±d
+            end
+            for dx = -d, d, stepx do
+                var cx = pcx + dx
+                var cz = pcz + dz
+                if loaded[ckey(cx, cz)] == nil then
+                    var score = dx * dx + dz * dz
+                    if dx * fdx + dz * fdz < 0 then
+                        score = score + 100000         ## derrière la caméra → après
                     end
-                    while p > 1 and bsc[p - 1] > score do
-                        bcx[p] = bcx[p - 1]
-                        bcz[p] = bcz[p - 1]
-                        bsc[p] = bsc[p - 1]
-                        p = p - 1
+                    if cnt < budget or score < bsc[cnt] then
+                        var p = budget
+                        if cnt < budget then
+                            cnt = cnt + 1
+                            p = cnt
+                        end
+                        while p > 1 and bsc[p - 1] > score do
+                            bcx[p] = bcx[p - 1]
+                            bcz[p] = bcz[p - 1]
+                            bsc[p] = bsc[p - 1]
+                            p = p - 1
+                        end
+                        bcx[p] = cx
+                        bcz[p] = cz
+                        bsc[p] = score
                     end
-                    bcx[p] = cx
-                    bcz[p] = cz
-                    bsc[p] = score
                 end
             end
         end
     end
-    var baked = 0
     for i = 1, cnt do
         loaded[ckey(bcx[i], bcz[i])] = bake_chunk(bcx[i], bcz[i])
-        baked = baked + 1
     end
-    return baked
+    return cnt
 end
 
 ## Libère les chunks hors rayon. margin = hystérésis : 1 en déplacement (anneau tampon,

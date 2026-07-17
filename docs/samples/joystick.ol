@@ -54,7 +54,12 @@ class Joystick
         if s > 0 - self.dead and s < self.dead then
             return 0.0
         end
-        return math.clamp(s, -1.0, 1.0)
+        ## remise à l'échelle : 0 juste après la zone morte, ±1 au bord → pas de saut
+        var sign = 1.0
+        if s < 0 then
+            sign = -1.0
+        end
+        return sign * math.clamp((math.abs(s) - self.dead) / (1.0 - self.dead), 0.0, 1.0)
     end
 
     ## Poussée ∈ [0;1] : distance verticale du doigt au bas de la zone (hors zone par

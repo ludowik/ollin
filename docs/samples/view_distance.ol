@@ -3,8 +3,8 @@
 ## Encapsule le rayon courant, ses bornes, le mode manuel et l'auto-adaptation : en
 ## vsync verrouillé, deltaTime ne révèle la marge que quand des frames débordent, donc
 ## on mesure la PART de frames lentes sur une fenêtre. Les frames irréelles (> STALL_DT,
-## arrière-plan/reprise) sont ignorées. Possède aussi les deux boutons − / + (haut-droite)
-## qui basculent en réglage manuel.
+## arrière-plan/reprise) sont ignorées. Possède aussi trois boutons (haut-droite) :
+## − / + basculent en réglage manuel, A rebascule en auto-adaptation.
 ##
 ## update() renvoie :  1 = le rayon a GRANDI (relancer le streaming),
 ##                    -1 = le rayon a RÉTRÉCI (décharger l'anneau extérieur),
@@ -105,10 +105,11 @@ class ViewDistance
 
     func btnXPlus()   return W - self.BTN - 12 end
     func btnXMinus()  return self.btnXPlus() - self.BTN - 10 end
+    func btnXAuto()   return self.btnXMinus() - self.BTN - 10 end
 
-    ## Traite un appui : bouton + / − → passe en manuel et ajuste le rayon (borné).
-    ## Renvoie 1 (grandi) / -1 (rétréci) / 2 (bouton mais borne atteinte) /
-    ## 0 (aucun bouton → à traiter ailleurs).
+    ## Traite un appui : + / − → passe en manuel et ajuste le rayon (borné) ; A → rebascule
+    ## en auto-adaptation. Renvoie 1 (grandi) / -1 (rétréci) / 2 (bouton consommé sans
+    ## changement de rayon) / 0 (aucun bouton → à traiter ailleurs).
     func hit(x, y)
         if y < self.BTN_Y or y > self.BTN_Y + self.BTN then
             return 0
@@ -129,16 +130,27 @@ class ViewDistance
             end
             return 2
         end
+        if x >= self.btnXAuto() and x <= self.btnXAuto() + self.BTN then
+            self.manual = false          ## retour à l'auto-adaptation
+            return 2
+        end
         return 0
     end
 
     func draw()
-        var xp = self.btnXPlus()
+        var xa = self.btnXAuto()
         var xm = self.btnXMinus()
+        var xp = self.btnXPlus()
         graphics.noStroke()
         graphics.fill(Color(0, 0, 0, 0.38))
+        graphics.rect(xa, self.BTN_Y, self.BTN, self.BTN)
         graphics.rect(xm, self.BTN_Y, self.BTN, self.BTN)
         graphics.rect(xp, self.BTN_Y, self.BTN, self.BTN)
+        if not self.manual then
+            graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## A allumé = auto actif
+            graphics.rect(xa, self.BTN_Y, self.BTN, self.BTN)
+        end
+        graphics.drawText("A", xa + self.BTN / 2 - 9, self.BTN_Y + self.BTN / 2 - 16, 30, colors.WHITE)
         graphics.drawText("-", xm + self.BTN / 2 - 6, self.BTN_Y + self.BTN / 2 - 16, 30, colors.WHITE)
         graphics.drawText("+", xp + self.BTN / 2 - 9, self.BTN_Y + self.BTN / 2 - 16, 30, colors.WHITE)
     end
