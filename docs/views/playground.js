@@ -424,6 +424,7 @@ const editorExtensions = [
       autocompletion({ override: [ollinComplete], activateOnTyping: true }),
       EditorView.updateListener.of(update => {
         if (!update.docChanged || loadingFile) return
+        if (isRunning) clearAndStop()   // script modifié → la prévisualisation en cours est obsolète
         clearTimeout(saveTimer)
         saveTimer = setTimeout(scheduleSave, 500)
         // Mode Auto : chaque modif réarme un compte à rebours ; 2 s d'inactivité → relance.
@@ -736,6 +737,7 @@ function setStructuralUI(enabled) {
 }
 
 function setEditorText(text) {
+  if (isRunning) clearAndStop()   // charger un autre script ferme la prévisualisation obsolète
   loadingFile = true
   // Recrée l'état complet → historique d'annulation VIERGE. Charger un fichier ne
   // doit pas être annulable (sinon Ctrl+Z vide le fichier), et chaque fichier a son
