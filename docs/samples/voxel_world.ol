@@ -159,6 +159,49 @@ func ckey(cx, cz)
     return cx + "," + cz
 end
 
+## Hash 2D bien mélangé (≠ x*a + z*b linéaire, qui alignait les arbres en diagonales).
+## `salt` donne des flux indépendants (position / hauteur / forme) pour la même colonne.
+func tree_hash(x, z, salt)
+    var h = (x * 374761393) ~ (z * 668265263) ~ (salt * 2246822519)
+    h = (h ~ (h >> 15)) * 2654435761
+    h = h ~ (h >> 13)
+    return h & 2147483647
+end
+
+## Un niveau de houppier : carré de rayon r ; round=true retire les coins (arrondi).
+func canopy(x, y, z, r, round)
+    for tx = -r, r do
+        for tz = -r, r do
+            if not (round and math.abs(tx) == r and math.abs(tz) == r) then
+                graphics.cube(x + tx, y, z + tz,  1, 1, 1)
+            end
+        end
+    end
+end
+
+## Arbre à la colonne (x,z), sol en h. Hauteur de tronc et forme du houppier variées,
+## dérivées du hash (déterministe par colonne) → chaque arbre diffère.
+func put_tree(x, z, h)
+    var th = 3 + tree_hash(x, z, 1) % 4      ## tronc : 3..6 cubes
+    var shape = tree_hash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
+    graphics.tile(T_TRUNK)
+    for k = 1, th do
+        graphics.cube(x, h + k, z,  1, 1, 1)
+    end
+    graphics.tile(T_LEAF)
+    var top = h + th
+    if shape == 2 then
+        canopy(x, top - 1, z, 1, true)       ## conique : base arrondie + flèche
+        graphics.cube(x, top, z,  1, 1, 1)
+        graphics.cube(x, top + 1, z,  1, 1, 1)
+    else
+        var round = shape == 0               ## rond (coins retirés) ou touffu (plein)
+        canopy(x, top - 1, z, 1, round)
+        canopy(x, top, z, 1, round)
+        graphics.cube(x, top + 1, z,  1, 1, 1)
+    end
+end
+
 func bake_chunk(cx, cz)
     graphics.beginChunk()
     graphics.fill(colors.WHITE)   ## teinte neutre : l'atlas fournit la couleur
@@ -201,23 +244,11 @@ func bake_chunk(cx, cz)
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
                 graphics.fill(colors.WHITE)
             end
-            var hash = math.abs(x * 131 + z * 197) % 100    ## abs : % signé sinon ~53%
+            var hp = tree_hash(x, z, 0) % 100    ## placement dispersé (hash mélangé)
             var grassy = h > SEA and h < SEA + 8 and b <> 0
-            var tree = grassy and ((b == 2 and hash < 6) or hash == 0)
+            var tree = grassy and ((b == 2 and hp < 6) or hp == 0)
             if tree then
-                graphics.tile(T_TRUNK)
-                for k = 1, 4 do
-                    graphics.cube(x, h + k, z,  1, 1, 1)
-                end
-                graphics.tile(T_LEAF)
-                for ly = 4, 5 do
-                    for tx = -1, 1 do
-                        for tz = -1, 1 do
-                            graphics.cube(x + tx, h + ly, z + tz,  1, 1, 1)
-                        end
-                    end
-                end
-                graphics.cube(x, h + 6, z,  1, 1, 1)
+                put_tree(x, z, h)
             end
         end
     end
