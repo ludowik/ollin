@@ -108,6 +108,10 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 
 **Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/views/tutoriel.html` et `tools/ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
+**Règle** : après toute évolution du moteur (VM, compilateur, modules natifs…), exécuter
+`bash tests/run.sh` (couvre `syntax.ol`, `regressions.ol`, `test_errors.sh`, `check_naming.sh`)
+pour valider l'absence de régression avant de considérer le changement terminé.
+
 ## Versionning
 
 - Branche unique : **`main`** — tout le développement se fait directement sur main
