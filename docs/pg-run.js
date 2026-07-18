@@ -60,6 +60,11 @@ export function runProgram(m, code, canvasEl, hooks) {
     return
   }
   if (canvasEl && canvasEl.style.display === 'block') {
+    // Un canvas s'est ouvert → GLFW (glue Emscripten) a posé son écouteur keydown
+    // GLOBAL (window) qui mange Backspace/Tab. Il n'est jamais retiré ensuite (runtime
+    // partagé). On le signale au niveau PAGE pour que la parade clavier de l'éditeur
+    // (playground) reste armée même si le run a eu lieu dans la vue #/run.
+    window.__ollinGfxKbdArmed = true
     hooks.onRunning()
   } else {
     hooks.onOutput(out)

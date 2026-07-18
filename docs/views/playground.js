@@ -1593,8 +1593,7 @@ async function launch() {
     onRunning: () => {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
-      window.__ollinGfxKbdArmed = true   // GLFW a installé son écouteur clavier global (persiste page-wide)
-      setRunning(true)
+      setRunning(true)   // le drapeau __ollinGfxKbdArmed est posé par runProgram (pg-run.js)
     },
     onOutput:  (out) => showOutput(out),
   })
@@ -1684,37 +1683,26 @@ copyBtn.addEventListener('click', () => {
   })
 })
 
-// ── Mode autonome (vue plein écran, nouvel onglet) ──────────────────────────
-// Ouvre la vue #/run dans un nouvel onglet (page dédiée plein écran). Le projet
-// complet (fichiers + ressources) est persisté dans IndexedDB ; on ne partage
-// que l'id du projet actif — la vue #/run le recharge depuis là. IndexedDB (pas
-// localStorage, limité à ~5 Mo → une image ≥ 4 Mo faisait échouer l'écriture en
-// silence, d'où « aucun projet »).
+// ── Mode plein écran (vue #/run, MÊME fenêtre) ──────────────────────────────
+// Bascule vers la vue #/run DANS la fenêtre courante (pas de nouvel onglet : un
+// nouvel onglet crée un contexte GLFW distinct dont l'écouteur clavier casse
+// Backspace/Tab au retour éditeur). Le projet actif est commité dans IndexedDB
+// avant la bascule — la vue #/run le recharge depuis là.
 const standaloneBtn = document.getElementById('standalone-btn')
-standaloneBtn.addEventListener('click', () => {
-  // Onglet ouvert SYNCHRONEMENT (conserve le user gesture → pas bloqué par le
-  // pop-up blocker), mais on n'y charge #/run qu'APRÈS que le projet soit COMMITÉ
-  // dans IndexedDB (sinon l'autre onglet pourrait lire une version périmée, voire
-  // « aucun projet » pour un projet neuf). saveProject est donc bien attendu.
-  const win = window.open('', '_blank')
-  ;(async () => {
-    let target = 'index.html#/run'
-    if (exampleFile) {
-      // Mode exemple : exécute le MÊME exemple frais en autonome (pas de projet).
-      target = 'index.html#/run/sample/' + exampleFile
-    } else {
-      try {
-        flushEditorToFile()
-        if (currentProject) {
-          Store.setActiveId(currentProject.id)
-          await Store.saveProject(currentProject)
-        }
-      } catch (_) {}
+standaloneBtn.addEventListener('click', async () => {
+  if (exampleFile) {
+    // Mode exemple : exécute le MÊME exemple frais en autonome (pas de projet).
+    ctx.navigate('run', 'sample/' + exampleFile)
+    return
+  }
+  try {
+    flushEditorToFile()
+    if (currentProject) {
+      Store.setActiveId(currentProject.id)
+      await Store.saveProject(currentProject)
     }
-    const url = Run.freshUrl(target)
-    if (win && !win.closed) win.location.replace(url)
-    else window.open(url, '_blank')   // repli si l'onglet a été bloqué
-  })()
+  } catch (_) {}
+  ctx.navigate('run')
 })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────
