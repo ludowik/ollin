@@ -15,6 +15,12 @@ poser une question de clarification **brève** avant de coder ; ne pas deviner
 large. Ne modifier que ce qui est demandé (pas de refactor/nettoyage collatéral
 non sollicité). Agir sans confirmation seulement si l'intention est univoque.
 
+**Plan ⇒ pas d'implémentation sans GO explicite (règle permanente).** Une demande
+de *plan* (ou « plan pour… ») n'autorise JAMAIS à coder. Ne commencer l'implémentation
+qu'après un **GO explicite** de l'utilisateur (« GO », « implémente », « vas-y »).
+Répondre à mes questions de cadrage/design **ne vaut pas** GO. En cas de doute,
+demander — ne pas deviner.
+
 ## Règle obligatoire : écrire du code Ollin
 
 Avant d'écrire **tout** fichier `.ol`, lire dans cet ordre :
