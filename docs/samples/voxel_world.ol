@@ -242,8 +242,13 @@ func bake_chunk(cx, cz)
             if h < SEA then
                 ## eau = UN plan semi-transparent au niveau de la mer (surface continue,
                 ## pas une pile de cubes → on voit le fond, sans faces internes).
+                ## Plus le fond est PROFOND, plus l'eau est sombre et opaque → la
+                ## visibilité du fond décroît avec la profondeur (absorption).
+                var d = math.clamp((SEA - h) / 12.0, 0, 1)
+                var tint = 1.0 - d * 0.55       ## assombrit avec la profondeur
+                var a = 0.55 + d * 0.4          ## 0.55 (haut-fond) → 0.95 (profond) : masque le fond
                 graphics.tile(T_WATER)
-                graphics.fill(Color(1, 1, 1, 0.72))
+                graphics.fill(Color(tint, tint, tint, a))
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
                 graphics.fill(colors.WHITE)
             end
