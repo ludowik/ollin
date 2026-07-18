@@ -236,21 +236,22 @@ func bake_chunk(cx, cz)
             for y = 0, top do
                 if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
                     set_block_tiles(b, h, y)
+                    ## Cube IMMERGÉ : assombri selon sa profondeur (moins de lumière au fond).
+                    ## C'est le FOND qui s'assombrit avec la profondeur, pas l'eau (uniforme).
+                    if y < SEA then
+                        var dk = math.clamp((SEA - y) / 10.0, 0, 0.75)
+                        graphics.fill(Color(1 - dk, 1 - dk, 1 - dk))
+                    else
+                        graphics.fill(colors.WHITE)
+                    end
                     graphics.cube(x, y, z,  1, 1, 1)
                 end
             end
             if h < SEA then
-                ## eau = UN plan semi-transparent au niveau de la mer (surface continue,
-                ## pas une pile de cubes → on voit le fond, sans faces internes).
-                ## Plus le fond est PROFOND, plus l'eau est sombre et opaque → la
-                ## visibilité du fond décroît avec la profondeur (absorption).
-                ## profondeur des fonds ≈ 1..16 (surtout 1..9) → ramper sur /8 pour un
-                ## contraste net entre haut-fond (clair) et fond (sombre, quasi masqué).
-                var d = math.clamp((SEA - h) / 8.0, 0, 1)
-                var tint = 1.0 - d * 0.72       ## assombrit fortement avec la profondeur
-                var a = 0.5 + d * 0.47          ## 0.5 (haut-fond, clair) → 0.97 (profond) : masque le fond
+                ## eau = UN plan semi-transparent UNIFORME au niveau de la mer (surface
+                ## continue) ; l'atténuation avec la profondeur est portée par les cubes du fond.
                 graphics.tile(T_WATER)
-                graphics.fill(Color(tint, tint, tint, a))
+                graphics.fill(Color(1, 1, 1, 0.72))
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
                 graphics.fill(colors.WHITE)
             end
