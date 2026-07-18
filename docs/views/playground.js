@@ -8,7 +8,7 @@ import {
   EditorView, lineNumbers, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter,
   defaultKeymap, historyKeymap, history, indentWithTab,
   syntaxHighlighting, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
-  autocompletion, completionKeymap,
+  autocompletion, completionKeymap, acceptCompletion,
   closeBrackets, closeBracketsKeymap,
   search, searchKeymap, highlightSelectionMatches,
 } from '../vendor/codemirror.js'
@@ -351,9 +351,7 @@ let loadingFile = false   // true pendant un chargement programmatique → pas d
 // clavier « pendant un run » (voir plus bas) pour déléguer aux VRAIES commandes
 // CodeMirror au lieu de les réimplémenter.
 // closeBracketsKeymap en tête : Backspace supprime une paire vide «()» d'un coup.
-// Tab = indentation (4 espaces) TOUJOURS ; une complétion s'accepte avec Entrée
-// (completionKeymap) — sinon la popup ouverte (activateOnTyping) mange le Tab.
-const editKeymap = [...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
+const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
 // Extensions de l'éditeur, réutilisées pour recréer un état VIERGE à chaque
 // chargement de fichier (setEditorText) → historique d'annulation propre par
@@ -448,15 +446,20 @@ function toggleLineComment(v, add) {
 // défiler. Cet écouteur reste tant que le contexte graphique vit (un simple
 // Arrêt ne le retire pas). Or CodeMirror IGNORE tout keydown déjà
 // defaultPrevented → dans l'éditeur, Backspace et Tab « n'ont plus d'effet ».
-// Parade : un écouteur enregistré ICI (au chargement, donc AVANT celui de GLFW)
-// en phase capture. Tant que le runtime a été armé (`runtimeArmed`) et que
-// l'éditeur a le focus, on exécute Backspace/Tab via les VRAIES commandes
-// CodeMirror (le même `editKeymap` que l'éditeur → deleteCharBackward, delete
-// GroupBackward, indentMore/Less…), puis on stoppe
-// l'événement pour que GLFW ne le voie pas. On ne touche QU'À ces deux touches :
-// toutes les autres passent normalement à CodeMirror (GLFW ne les bloque pas),
-// donc aucune régression d'édition (multi-curseur, flèches, Entrée, Home…).
-let runtimeArmed = false
+// Parade : un écouteur enregistré ICI en phase capture. Tant que le runtime a été
+// armé (un programme graphique a tourné) et que l'éditeur a le focus, on exécute
+// Backspace/Tab via les VRAIES commandes CodeMirror (le même `editKeymap` que
+// l'éditeur → deleteCharBackward, deleteGroupBackward, indentMore/Less,
+// acceptCompletion…), puis on stoppe l'événement pour que GLFW ne le voie pas. On
+// ne touche QU'À ces deux touches : toutes les autres passent normalement à
+// CodeMirror (GLFW ne les bloque pas), donc aucune régression d'édition.
+//
+// Le drapeau « armé » vit au niveau PAGE (window), pas au niveau vue : l'écouteur
+// GLFW est global et n'est JAMAIS retiré au changement de vue (runtime WASM
+// partagé, aucun CloseWindow). Un drapeau par-vue repartirait à false à chaque
+// remontage → après un run puis un aller-retour de vue, GLFW mangerait encore
+// Backspace/Tab alors que la parade serait éteinte (bug intermittent).
+const isRuntimeArmed = () => !!window.__ollinGfxKbdArmed
 // Exécute, pour l'événement `e`, le premier binding de `editKeymap` qui matche
 // (même sémantique de priorité que CodeMirror). Gère les modificateurs Mod/Alt
 // et la variante `shift` des bindings. Renvoie true si une commande a agi.
@@ -489,7 +492,7 @@ const onGlobalKeydown = e => {
     stopExec()
     return
   }
-  if (!runtimeArmed || !view.hasFocus) return
+  if (!isRuntimeArmed() || !view.hasFocus) return
   if (e.key !== 'Backspace' && e.key !== 'Tab') return   // seules touches mangées par GLFW
   if (runEditKeymap(e)) {
     e.preventDefault()
@@ -1571,7 +1574,7 @@ async function launch() {
     onRunning: () => {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
-      runtimeArmed = true   // GLFW a installé son écouteur clavier global (Backspace/Tab)
+      window.__ollinGfxKbdArmed = true   // GLFW a installé son écouteur clavier global (persiste page-wide)
       setRunning(true)
     },
     onOutput:  (out) => showOutput(out),
@@ -1822,7 +1825,8 @@ disposers.push(() => {
 // globaux → pas de fuite à chaque re-visite) et libérer la référence de debug.
 disposers.push(() => {
   try { ollin && ollin.pauseMainLoop() } catch (_) {}
-  runtimeArmed = false
+  // NB : on ne remet PAS __ollinGfxKbdArmed à false — l'écouteur GLFW reste posé
+  // sur window après le démontage, la parade doit donc rester armée page-wide.
   clearTimeout(autoexecTimer)   // pas de relance fantôme après le démontage de la vue
   try { view.destroy() } catch (_) {}
   if (window.__ollinView === view) window.__ollinView = undefined
