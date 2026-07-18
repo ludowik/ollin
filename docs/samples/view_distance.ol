@@ -14,7 +14,7 @@
 ##
 ## Câblage côté hôte :
 ##   import "view_distance.ol"
-##   global vd = ViewDistance(4, 1, 24)
+##   global vd = ViewDistance(4, 1, 24)       ## 4e arg = FPS cible (défaut 60 ; ex. 30)
 ##   func mouse.pressed(x, y)
 ##       var ev = vd.hit(x, y)
 ##       if ev == 1 then streaming = true
@@ -27,13 +27,14 @@
 ##   ##   ... vd.draw()  (boutons)  ...  vd.mode() → "auto"/"manuel"
 
 class ViewDistance
-    func init(start, lo, hi)
+    func init(start, lo, hi, fps = 60)
         self.radius = start
         self.lo = lo
         self.hi = hi          ## filet de sécurité ; la vraie limite vient du FPS/mémoire
         self.manual = false
-        self.SLOW_DT = 0.021
-        self.STALL_DT = 0.30
+        var budget = 1.0 / fps            ## durée cible d'une frame (60→16,7ms, 30→33,3ms)
+        self.SLOW_DT = budget * 1.25      ## au-delà = frame « en retard » (+25% de marge)
+        self.STALL_DT = math.max(0.30, budget * 4)
         self.WIN = 0.5
         self.GROW = 0.10
         self.DROP = 0.25
