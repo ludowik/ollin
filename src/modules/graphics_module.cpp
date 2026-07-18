@@ -270,6 +270,18 @@ static Color s_fill_color = WHITE;
 static void applyStrokeSize(float sz) {
     s_stroke_size = sz;
 }
+
+// Trait sous-pixel : la RenderTexture n'a pas de MSAA → une épaisseur < 1 rend des
+// pointillés (couverture partielle non lissée). On approxime l'anti-aliasing en
+// gardant un trait CONTINU de 1px et en modulant l'alpha par la couverture
+// (l'épaisseur) → trait fin, continu, de plus en plus pâle quand la taille baisse.
+static void subpixelStroke(float& w, Color& c) {
+    if (w < 1.0f) {
+        float cov = w < 0.0f ? 0.0f : w;
+        c.a = (unsigned char)(c.a * cov + 0.5f);
+        w = 1.0f;
+    }
+}
 static void applyStroke(bool en, Color c = WHITE) {
     s_has_stroke = en;
     s_stroke_color = c;
@@ -422,7 +434,10 @@ static Value gfx_line(Value* args, int argc) {
     float y1 = (float)numArg(args, 1, "graphics.line");
     float x2 = (float)numArg(args, 2, "graphics.line");
     float y2 = (float)numArg(args, 3, "graphics.line");
-    DrawLineEx({x1, y1}, {x2, y2}, s_stroke_size, s_stroke_color);   // épaisseur réelle (y compris < 1)
+    float w = s_stroke_size;
+    Color c = s_stroke_color;
+    subpixelStroke(w, c);   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
+    DrawLineEx({x1, y1}, {x2, y2}, w, c);
     return Value{};
 }
 
@@ -435,8 +450,12 @@ static Value gfx_rect(Value* args, int argc) {
     int h = gfxToInt(args[3]);
     if (s_has_fill)
         DrawRectangle(x, y, w, h, s_fill_color);
-    if (s_has_stroke)
-        DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, s_stroke_size, s_stroke_color);
+    if (s_has_stroke) {
+        float sw = s_stroke_size;
+        Color sc = s_stroke_color;
+        subpixelStroke(sw, sc);
+        DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, sw, sc);
+    }
     return Value{};
 }
 
@@ -546,9 +565,12 @@ static Value gfx_polygon(Value* args, int argc) {
     if (s_has_fill)
         polyFill(pts, s_fill_color);
     if (s_has_stroke) {
+        float w = s_stroke_size;
+        Color c = s_stroke_color;
+        subpixelStroke(w, c);
         int n = (int)pts.size();
         for (int i = 0; i < n; i++)
-            DrawLineEx(pts[i], pts[(i + 1) % n], s_stroke_size, s_stroke_color);
+            DrawLineEx(pts[i], pts[(i + 1) % n], w, c);
     }
     return Value{};
 }
@@ -560,9 +582,12 @@ static Value gfx_polyline(Value* args, int argc) {
     if (!s_has_stroke)
         return Value{};
     auto pts = parsePoints(args[0], FN);
+    float w = s_stroke_size;
+    Color c = s_stroke_color;
+    subpixelStroke(w, c);
     int n = (int)pts.size();
     for (int i = 0; i < n - 1; i++)
-        DrawLineEx(pts[i], pts[i + 1], s_stroke_size, s_stroke_color);
+        DrawLineEx(pts[i], pts[i + 1], w, c);
     return Value{};
 }
 
@@ -613,15 +638,18 @@ static void drawOval(float cx, float cy, float rx, float ry, int segs) {
     if (s_has_fill)
         drawEllipseFill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke) {
+        float sw = s_stroke_size;
+        Color sc = s_stroke_color;
+        subpixelStroke(sw, sc);
         if (rx == ry) {
             // Cercle : anneau natif raylib (contour lisse, épaisseur centrée sur r).
-            float inner = rx - s_stroke_size * 0.5f;
+            float inner = rx - sw * 0.5f;
             if (inner < 0.0f) {
                 inner = 0.0f;
             }
-            DrawRing({cx, cy}, inner, rx + s_stroke_size * 0.5f, 0.0f, 360.0f, segs, s_stroke_color);
+            DrawRing({cx, cy}, inner, rx + sw * 0.5f, 0.0f, 360.0f, segs, sc);
         } else {
-            drawEllipseStroke(cx, cy, rx, ry, s_stroke_size, s_stroke_color, segs);
+            drawEllipseStroke(cx, cy, rx, ry, sw, sc, segs);
         }
     }
 }
