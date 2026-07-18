@@ -43,12 +43,12 @@ global AMB = 0.5              ## ambiant du terrain (restauré après le rendu b
 ## bruit et les cubes d'un pavé de ciel hors-champ.
 global CLOUD_Y = SEA + 40     ## altitude (au-dessus des sommets)
 global CLOUD_SIZE = 4         ## côté d'un bloc-nuage
-global CLOUD_TH = 3           ## épaisseur
+global CLOUD_TH = 2           ## épaisseur
 global CLOUD_STEP = 4         ## pas de la grille (= CLOUD_SIZE → blocs jointifs)
 global CLOUD_SEC = 32         ## côté d'un secteur (8 cellules) pour le cull frustum
 global CLOUD_MARGIN = 96      ## marge au-delà du terrain chargé (nuages jusqu'à l'horizon)
 global CLOUD_SCALE = 0.05     ## fréquence du bruit de placement
-global CLOUD_THRESH = 0.58    ## seuil de couverture (plus haut = moins de nuages)
+global CLOUD_THRESH = 0.67    ## seuil de couverture (plus haut = moins de nuages)
 global CLOUD_SPEED = 1.2      ## dérive (blocs/s)
 global CLOUD_ALPHA = 0.9
 global CLOUD_TEX = 16         ## côté de la texture mouchetée des nuages
@@ -112,7 +112,7 @@ func build_cloud_tex()
     image.beginPixels(cloudTex)
     for py = 0, CLOUD_TEX - 1 do
         for px = 0, CLOUD_TEX - 1 do
-            var v = 0.9 + math.noise(px * 0.6 + 3, py * 0.6 + 7) * 0.1   ## ~0.9 → 1.0
+            var v = 0.78 + math.noise(px * 0.22 + 3, py * 0.22 + 7) * 0.22   ## ~0.78 → 1.0, basse fréquence → dégradé doux
             image.setPixel(cloudTex, px, py, v, v, v, 1)
         end
     end
@@ -511,8 +511,8 @@ func draw_clouds()
     var drift = elapsedTime * CLOUD_SPEED
     var reach = vd.radius * CS + CLOUD_MARGIN   ## suit la distance d'affichage du terrain
     graphics.noStroke()
-    graphics.ambient(1)                          ## nuages en BLANC PLAT : sans ça, la sous-face
-    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (vue d'en bas) n'aurait que l'ambiant → grise
+    graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle crée un dégradé
+    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (haut clair, sous-face plus douce) : donne du volume
     graphics.texture(cloudTex)                    ## moucheté doux (casse le blanc plat)
     var s0x = math.floor((camX - drift - reach) / CLOUD_SEC) * CLOUD_SEC
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
