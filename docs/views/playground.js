@@ -347,11 +347,28 @@ let saveTimer   = null
 let autoexecTimer = null  // mode Auto : relance différée après la dernière modif
 let loadingFile = false   // true pendant un chargement programmatique → pas d'autosave
 
+// Tab sur un CURSEUR SIMPLE : insère des espaces jusqu'au prochain multiple de 4
+// (tab stop) À LA POSITION DU CURSEUR — pas d'indentation de ligne. Sur une
+// sélection, renvoie false → indentWithTab prend le relais (indente le bloc ;
+// Maj+Tab désindente).
+const softTab = (view) => {
+    const state = view.state
+    if (state.selection.ranges.some(r => !r.empty))
+        return false
+    const head = state.selection.main.head
+    const col = head - state.doc.lineAt(head).from
+    const n = 4 - (col % 4)
+    view.dispatch(state.update(state.replaceSelection(' '.repeat(n)), { scrollIntoView: true, userEvent: 'input' }))
+    return true
+}
+
 // Keymap de l'éditeur, gardé en référence : réutilisé tel quel par le garde-fou
 // clavier « pendant un run » (voir plus bas) pour déléguer aux VRAIES commandes
 // CodeMirror au lieu de les réimplémenter.
-// closeBracketsKeymap en tête : Backspace supprime une paire vide «()» d'un coup.
-const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
+// Tab : accepte une complétion si popup, sinon insère au curseur (softTab), sinon
+// (sélection) indente le bloc. closeBracketsKeymap ensuite : Backspace supprime
+// une paire vide «()» d'un coup.
+const editKeymap = [{ key: 'Tab', run: acceptCompletion }, { key: 'Tab', run: softTab }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
 // Extensions de l'éditeur, réutilisées pour recréer un état VIERGE à chaque
 // chargement de fichier (setEditorText) → historique d'annulation propre par
@@ -470,7 +487,9 @@ function runEditKeymap(e) {
     if (parts[parts.length - 1] !== e.key) continue
     if ((parts.includes('Mod') || parts.includes('Ctrl') || parts.includes('Cmd')) !== (e.ctrlKey || e.metaKey)) continue
     if (parts.includes('Alt') !== e.altKey) continue
-    const cmd = (e.shiftKey && b.shift) ? b.shift : b.run
+    // Sémantique CM : avec Maj on n'exécute QUE b.shift (jamais b.run), sinon un
+    // binding sans variante Maj (ex. softTab) se déclencherait à tort sur Maj+Tab.
+    const cmd = e.shiftKey ? b.shift : b.run
     if (cmd && cmd(view)) return true
   }
   return false
