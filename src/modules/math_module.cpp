@@ -271,7 +271,13 @@ static Value math_noise(Value* args, int argc) {
         freq *= 2.0;
         amp *= NOISE_FALLOFF;
     }
-    double n = (total / maxAmp + 1.0) * 0.5;
+    // Le bruit de Perlin amélioré ne couvre PAS ±1 : la moyenne fBm 4 octaves se tasse
+    // autour de 0, d'autant plus qu'il y a peu de dimensions. Amplitude PRATIQUE mesurée
+    // (max |moyenne| sur un grand échantillon) : ~0,38 en 1D, ~0,56 en 2D, ~0,63 en 3D.
+    // On normalise par cette amplitude (selon la dimension) puis on clampe → chaque forme
+    // couvre réellement [0,1] au lieu de rester tassée vers 0,5.
+    double amp01 = argc >= 3 ? 0.62 : (argc == 2 ? 0.55 : 0.37);
+    double n = (total / maxAmp / amp01 + 1.0) * 0.5;
     if (n < 0.0)
         n = 0.0;
     if (n > 1.0)
