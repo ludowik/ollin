@@ -238,7 +238,7 @@ void visit(const WhileStmt& s) override {
 
 | Surface | Convention | Exemples |
 |---|---|---|
-| **API Ollin** (fonctions/méthodes de modules exposées aux scripts) | **camelCase** | `beginDraw`, `drawText`, `setPos`, `noiseSeed`, `getPixel` |
+| **API Ollin** (fonctions/méthodes de modules exposées aux scripts) | **camelCase** | `beginDraw`, `strokeSize`, `setPos`, `noiseSeed`, `getPixel` |
 | **API Ollin** (constructeurs / classes) | **PascalCase** | `Color`, `Quat`, `Camera`, `Light` |
 | **Interne C++** (fonctions) | snake_case, préfixe module | `gfx_begin3d`, `cam_set_pos`, `math_rand` |
 | **Interne C++** (statiques de fichier) | préfixe `s_` | `s_target`, `s_run_active` |

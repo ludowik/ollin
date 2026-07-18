@@ -201,7 +201,7 @@ const MODULE_MEMBERS = {
     fn('graphics.rotateZ','rotateZ(deg)'),
     fn('graphics.scale','scale(s | sx,sy | sx,sy,sz)'), fn('graphics.resetTransform','resetTransform()'),
     fn('graphics.sprite','sprite(img,x,y[,w,h])'),
-    fn('graphics.drawText','drawText(text,x,y,size[,color])'),
+    fn('graphics.text','text(str,x,y,size[,color])'),
     fn('graphics.fps','fps()→int'),                fn('graphics.isOpen','isOpen()→bool'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
     // ── 3D ──
