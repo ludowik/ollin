@@ -1032,6 +1032,8 @@ function renderMenuRoot() {
   } else {
     projectMenu.appendChild(menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
   }
+  projectMenu.appendChild(menuSep())
+  projectMenu.appendChild(menuItem('⌨ Raccourcis clavier (F1)', false, () => { closeMenu(); openHelp() }))
 }
 
 async function renderMenuOpen() {
@@ -1788,7 +1790,6 @@ function closeHelp() {
 function toggleHelp() {
   helpOpen() ? closeHelp() : openHelp()
 }
-document.getElementById('help-btn')?.addEventListener('click', openHelp)
 document.getElementById('help-close')?.addEventListener('click', closeHelp)
 helpOverlay?.addEventListener('click', e => { if (e.target === helpOverlay) closeHelp() })
 
