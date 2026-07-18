@@ -408,6 +408,10 @@ const editorExtensions = [
         // réservé par macOS pour la source de saisie).
         { key: 'Alt-Space', run: (v) => (startCompletion ? startCompletion(v) : false) },
         { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
+        // Changer de fichier (projet multi-fichiers) : Ctrl+Tab est réservé par le
+        // navigateur → Alt+PageUp/PageDown (analogue web-safe).
+        { key: 'Alt-PageUp', run: () => { cycleFile(-1); return true } },
+        { key: 'Alt-PageDown', run: () => { cycleFile(1); return true } },
         { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
         // F4 : aller à la première erreur de syntaxe/exécution (lien de la zone sortie).
@@ -467,6 +471,10 @@ const SHORTCUTS = [
   { cat: 'Pliage', items: [
     { keys: ['Ctrl', 'Maj', '['], desc: 'Plier le bloc' },
     { keys: ['Ctrl', 'Maj', ']'], desc: 'Déplier le bloc' },
+  ]},
+  { cat: 'Fichiers', items: [
+    { keys: ['Alt', 'Page↑'], desc: 'Fichier précédent (projet multi-fichiers)' },
+    { keys: ['Alt', 'Page↓'], desc: 'Fichier suivant' },
   ]},
   { cat: 'Aide', items: [
     { keys: ['F1'], desc: 'Afficher / masquer cette aide' },
@@ -809,6 +817,17 @@ function openFile(path) {
   if (!isExample()) localStorage.setItem(fileKey(currentProject.id), path)
   renderFiles()
   view.focus()
+}
+
+// Bascule au fichier précédent (dir=-1) / suivant (dir=+1) du projet, en boucle.
+// Sans effet en mode exemple ou pour un projet à un seul fichier.
+function cycleFile(dir) {
+  if (!currentProject || isExample()) return
+  const list = scripts(currentProject)
+  if (list.length < 2) return
+  let i = list.indexOf(currentFile)
+  if (i < 0) i = 0
+  openFile(list[(i + dir + list.length) % list.length])
 }
 
 async function newFile() {
