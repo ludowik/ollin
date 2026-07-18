@@ -282,6 +282,18 @@ static void subpixelStroke(float& w, Color& c) {
         w = 1.0f;
     }
 }
+
+// Épaisseur + couleur de contour courantes, ajustées pour le rendu sous-pixel.
+struct StrokeWC {
+    float w;
+    Color c;
+};
+static StrokeWC strokeParams() {
+    float w = s_stroke_size;
+    Color c = s_stroke_color;
+    subpixelStroke(w, c);
+    return {w, c};
+}
 static void applyStroke(bool en, Color c = WHITE) {
     s_has_stroke = en;
     s_stroke_color = c;
@@ -405,15 +417,10 @@ static Value gfx_no_fill(Value* args, int argc) {
 
 // Teinte globale des images (graphics.sprite / image.draw) : objet Color ou r,g,b[,a].
 static Value gfx_tint(Value* args, int argc) {
-    Color c;
-    if (argc >= 3 && args[0].isNumber() && args[1].isNumber() && args[2].isNumber()) {
-        double a = (argc > 3 && args[3].isNumber()) ? args[3].asNum() : 1.0;
-        c = rgbaColor(args[0].asNum(), args[1].asNum(), args[2].asNum(), a);
-    } else if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
-        c = gfxToColor(args[0]);
-    } else {
-        return Value{};   // sans argument valide : ne change rien
-    }
+    if (argc == 0)
+        return Value{};   // sans argument : ne change rien
+    ColorRGBA k = parseColor(args, argc, "tint");   // même signature que clear/fill/stroke
+    Color c = rgbaColor(k.r, k.g, k.b, k.a);
     image_set_tint(true, c.r, c.g, c.b, c.a);
     return Value{};
 }
@@ -434,10 +441,8 @@ static Value gfx_line(Value* args, int argc) {
     float y1 = (float)numArg(args, 1, "graphics.line");
     float x2 = (float)numArg(args, 2, "graphics.line");
     float y2 = (float)numArg(args, 3, "graphics.line");
-    float w = s_stroke_size;
-    Color c = s_stroke_color;
-    subpixelStroke(w, c);   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
-    DrawLineEx({x1, y1}, {x2, y2}, w, c);
+    StrokeWC s = strokeParams();   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
+    DrawLineEx({x1, y1}, {x2, y2}, s.w, s.c);
     return Value{};
 }
 
@@ -451,10 +456,8 @@ static Value gfx_rect(Value* args, int argc) {
     if (s_has_fill)
         DrawRectangle(x, y, w, h, s_fill_color);
     if (s_has_stroke) {
-        float sw = s_stroke_size;
-        Color sc = s_stroke_color;
-        subpixelStroke(sw, sc);
-        DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, sw, sc);
+        StrokeWC s = strokeParams();
+        DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, s.w, s.c);
     }
     return Value{};
 }
@@ -565,12 +568,10 @@ static Value gfx_polygon(Value* args, int argc) {
     if (s_has_fill)
         polyFill(pts, s_fill_color);
     if (s_has_stroke) {
-        float w = s_stroke_size;
-        Color c = s_stroke_color;
-        subpixelStroke(w, c);
+        StrokeWC s = strokeParams();
         int n = (int)pts.size();
         for (int i = 0; i < n; i++)
-            DrawLineEx(pts[i], pts[(i + 1) % n], w, c);
+            DrawLineEx(pts[i], pts[(i + 1) % n], s.w, s.c);
     }
     return Value{};
 }
@@ -582,12 +583,10 @@ static Value gfx_polyline(Value* args, int argc) {
     if (!s_has_stroke)
         return Value{};
     auto pts = parsePoints(args[0], FN);
-    float w = s_stroke_size;
-    Color c = s_stroke_color;
-    subpixelStroke(w, c);
+    StrokeWC s = strokeParams();
     int n = (int)pts.size();
     for (int i = 0; i < n - 1; i++)
-        DrawLineEx(pts[i], pts[i + 1], w, c);
+        DrawLineEx(pts[i], pts[i + 1], s.w, s.c);
     return Value{};
 }
 
@@ -638,18 +637,16 @@ static void drawOval(float cx, float cy, float rx, float ry, int segs) {
     if (s_has_fill)
         drawEllipseFill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke) {
-        float sw = s_stroke_size;
-        Color sc = s_stroke_color;
-        subpixelStroke(sw, sc);
+        StrokeWC s = strokeParams();
         if (rx == ry) {
             // Cercle : anneau natif raylib (contour lisse, épaisseur centrée sur r).
-            float inner = rx - sw * 0.5f;
+            float inner = rx - s.w * 0.5f;
             if (inner < 0.0f) {
                 inner = 0.0f;
             }
-            DrawRing({cx, cy}, inner, rx + sw * 0.5f, 0.0f, 360.0f, segs, sc);
+            DrawRing({cx, cy}, inner, rx + s.w * 0.5f, 0.0f, 360.0f, segs, s.c);
         } else {
-            drawEllipseStroke(cx, cy, rx, ry, sw, sc, segs);
+            drawEllipseStroke(cx, cy, rx, ry, s.w, s.c, segs);
         }
     }
 }

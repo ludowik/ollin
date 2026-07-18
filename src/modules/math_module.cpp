@@ -95,6 +95,13 @@ static double perlin3(double x, double y, double z) {
 
 static const int NOISE_OCTAVES = 4;
 static const double NOISE_FALLOFF = 0.5;
+// Amplitude PRATIQUE de la moyenne fBm ci-dessus (max |moyenne| mesuré) : dépend de
+// OCTAVES/FALLOFF et de la dimension. On divise par elle pour que la sortie couvre
+// [0,1]. À re-mesurer si OCTAVES/FALLOFF changent ; le clamp [0,1] en aval reste le
+// garde-fou si l'amplitude réelle dépasse légèrement.
+static const double NOISE_AMP_1D = 0.37;
+static const double NOISE_AMP_2D = 0.55;
+static const double NOISE_AMP_3D = 0.62;
 
 #define MATH1(name, expr)                                                                                              \
     static Value math_##name(Value* args, int argc) {                                                                  \
@@ -271,12 +278,9 @@ static Value math_noise(Value* args, int argc) {
         freq *= 2.0;
         amp *= NOISE_FALLOFF;
     }
-    // Le bruit de Perlin amélioré ne couvre PAS ±1 : la moyenne fBm 4 octaves se tasse
-    // autour de 0, d'autant plus qu'il y a peu de dimensions. Amplitude PRATIQUE mesurée
-    // (max |moyenne| sur un grand échantillon) : ~0,38 en 1D, ~0,56 en 2D, ~0,63 en 3D.
-    // On normalise par cette amplitude (selon la dimension) puis on clampe → chaque forme
-    // couvre réellement [0,1] au lieu de rester tassée vers 0,5.
-    double amp01 = argc >= 3 ? 0.62 : (argc == 2 ? 0.55 : 0.37);
+    // Le bruit de Perlin amélioré ne couvre PAS ±1 : on normalise par l'amplitude
+    // pratique selon la dimension (voir NOISE_AMP_*), puis on clampe → couvre [0,1].
+    double amp01 = argc >= 3 ? NOISE_AMP_3D : (argc == 2 ? NOISE_AMP_2D : NOISE_AMP_1D);
     double n = (total / maxAmp / amp01 + 1.0) * 0.5;
     if (n < 0.0)
         n = 0.0;

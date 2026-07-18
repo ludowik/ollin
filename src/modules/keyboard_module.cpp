@@ -12,7 +12,12 @@
 // l'éditeur alimenterait aussi le programme graphique en cours. La page pose
 // window.__ollinKbdBlocked=true quand l'ÉDITEUR a le focus → on ignore alors les
 // entrées côté jeu. Hors web (natif), pas d'éditeur : jamais bloqué.
-static bool keyboardBlocked() {
+//
+// Le drapeau est mis en cache par keyboardPoll (1×/frame) : interroger le DOM
+// (EM_ASM) à chaque isDown serait coûteux (chemin chaud).
+static bool s_blocked = false;
+
+static bool queryBlocked() {
 #ifdef __EMSCRIPTEN__
     return EM_ASM_INT({ return window.__ollinKbdBlocked ? 1 : 0; }) != 0;
 #else
@@ -86,7 +91,7 @@ static int keyCode(std::string name) {
 // keyboard.isDown(key) : la touche est-elle enfoncée à cet instant ? true/false.
 // shift/ctrl/alt testent les deux côtés du clavier.
 static Value kbd_is_down(Value* args, int argc) {
-    if (keyboardBlocked())
+    if (s_blocked)
         return Value((int64_t)0);   // éditeur focalisé → le jeu ne lit pas le clavier
     if (argc < 1 || !args[0].isString())
         return Value((int64_t)0);
@@ -121,8 +126,7 @@ void keyboardReset() {
 }
 
 void keyboardPoll() {
-    if (keyboardBlocked())
-        return;   // éditeur focalisé → pas d'événements keypressed/keyrelease vers le jeu
+    s_blocked = queryBlocked();   // rafraîchi 1×/frame ; lu par isDown sans re-interroger le DOM
     VM* vm = VM::current();
     Value kbd = vm->getGlobal("keyboard");
     Value pressed, released;
@@ -132,6 +136,25 @@ void keyboardPoll() {
     }
     bool wantPress = pressed.isCallable();
     bool wantRelease = released.isCallable();
+
+    if (s_blocked) {
+        // Éditeur focalisé : le jeu ne reçoit plus le clavier. On RELÂCHE proprement les
+        // touches encore suivies (keyrelease + clear) pour ne pas les laisser « coincées »,
+        // et on draine la file d'appuis pour ne pas les rejouer au déblocage.
+        for (int k = 0; k < 512; k++) {
+            if (!s_down[k])
+                continue;
+            s_down[k] = false;
+            if (wantRelease) {
+                std::string name = keyName(k);
+                if (!name.empty())
+                    vm->callValue(released, Value(name));
+            }
+        }
+        while (GetKeyPressed() != 0) {
+        }
+        return;
+    }
 
     // Appuis de la frame (file des touches — robuste au timing). On draine et on
     // suit l'état « enfoncé » même sans callback keypressed, pour keyrelease.
