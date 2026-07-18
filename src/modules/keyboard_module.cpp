@@ -1,14 +1,17 @@
 #include "keyboard_module.h"
 #include "value.h"
 #include "vm.h"
+#include <cctype>
 #include <raylib.h>
 #include <string>
 
 // ── Clavier ─────────────────────────────────────────────────────────────────
 // On affecte des fonctions au module `keyboard` ; le moteur les appelle si elles
 // existent (aucune activation nécessaire) :
-//   keyboard.keypressed = func(key) ... end   → touche enfoncée
-//   keyboard.keyrelease = func(key) ... end   → touche relâchée
+//   keyboard.keypressed = func(key) ... end   → touche enfoncée (événement)
+//   keyboard.keyrelease = func(key) ... end   → touche relâchée (événement)
+// Et un builtin d'état MAINTENU (pour un déplacement continu) :
+//   keyboard.isDown(key) → true/false selon que la touche est enfoncée maintenant.
 // `key` est un NOM de touche : "a".."z", "0".."9", "space", "return", "escape",
 //   "backspace", "tab", "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", etc.
 //
@@ -38,6 +41,54 @@ static std::string keyName(int key) {
         case KEY_LEFT_ALT: case KEY_RIGHT_ALT:         return "alt";
         default:                            return "";
     }
+}
+
+// Nom de touche → keycode raylib (inverse de keyName) ; -1 si inconnu.
+static int keyCode(std::string name) {
+    for (char& c : name)
+        c = (char)std::tolower((unsigned char)c);
+    if (name.size() == 1) {
+        char c = name[0];
+        if (c >= 'a' && c <= 'z')
+            return KEY_A + (c - 'a');
+        if (c >= '0' && c <= '9')
+            return KEY_ZERO + (c - '0');
+        return -1;
+    }
+    if (name == "space")     return KEY_SPACE;
+    if (name == "return" || name == "enter") return KEY_ENTER;
+    if (name == "escape")    return KEY_ESCAPE;
+    if (name == "backspace") return KEY_BACKSPACE;
+    if (name == "tab")       return KEY_TAB;
+    if (name == "delete")    return KEY_DELETE;
+    if (name == "left")      return KEY_LEFT;
+    if (name == "right")     return KEY_RIGHT;
+    if (name == "up")        return KEY_UP;
+    if (name == "down")      return KEY_DOWN;
+    return -1;
+}
+
+// keyboard.isDown(key) : la touche est-elle enfoncée à cet instant ? true/false.
+// shift/ctrl/alt testent les deux côtés du clavier.
+static Value kbd_is_down(Value* args, int argc) {
+    if (argc < 1 || !args[0].isString())
+        return Value((int64_t)0);
+    std::string name = args[0].asString();
+    for (char& c : name)
+        c = (char)std::tolower((unsigned char)c);
+    bool down = false;
+    if (name == "shift")
+        down = IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    else if (name == "ctrl")
+        down = IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    else if (name == "alt")
+        down = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+    else {
+        int code = keyCode(name);
+        if (code >= 0)
+            down = IsKeyDown(code);
+    }
+    return Value((int64_t)(down ? 1 : 0));
 }
 
 // Touches actuellement enfoncées (pour émettre keyrelease). Indexé par keycode
@@ -91,8 +142,10 @@ void keyboardPoll() {
     }
 }
 
-// Le module `keyboard` est une map vide : l'utilisateur y affecte keypressed /
-// keyrelease, lues par keyboardPoll().
+// Le module `keyboard` expose isDown() ; l'utilisateur y affecte en plus
+// keypressed / keyrelease, lues par keyboardPoll().
 Value makeKeyboardModule() {
-    return Value::makeMap();
+    Value m = Value::makeMap();
+    m.mapSet(Value(std::string("isDown")), Value::makeBuiltin(kbd_is_down));
+    return m;
 }
