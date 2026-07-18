@@ -1677,7 +1677,11 @@ if (autoexecWrap && window.matchMedia && window.matchMedia('(pointer: fine)').ma
   autoexecWrap.style.display = ''
   const onAutoexec = () => {
     autoexecWrap.classList.toggle('on', autoexecChk.checked)
-    if (!autoexecChk.checked) clearTimeout(autoexecTimer)   // décoché → annule une relance en attente
+    if (!autoexecChk.checked) {
+      clearTimeout(autoexecTimer)   // décoché → annule une relance en attente
+      return
+    }
+    if (!isRunning) relaunch()      // coché → lance tout de suite si le script ne tourne pas déjà
   }
   autoexecChk.addEventListener('change', onAutoexec)
   disposers.push(() => autoexecChk.removeEventListener('change', onAutoexec))
