@@ -1631,6 +1631,7 @@ let ollin = null
 // Démarre l'exécution (à froid). Ne toggle pas : voir run()/relaunch()/stopExec().
 async function launch() {
   if (!ollin) return
+  clearTimeout(autoexecTimer)   // tout lancement (bouton, Alt+Entrée, auto) vaut relance → annule celle en attente
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
