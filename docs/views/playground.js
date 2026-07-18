@@ -980,6 +980,7 @@ function renderMenuRoot() {
     await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
+  projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, () => (GH.isConnected() ? renderMenuRemote() : renderMenuConnect())))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
   // rien à renommer/dupliquer/supprimer en base).
@@ -1050,7 +1051,6 @@ function renderMenuGithub() {
     projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
     projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
   }
-  projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
   projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
@@ -1288,7 +1288,7 @@ async function checkRemoteFreshness(project) {
 
 async function renderMenuRemote() {
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuGithub))
+  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuRoot))
   const loading = document.createElement('div'); loading.className = 'menu-empty'; loading.textContent = 'Chargement…'
   projectMenu.appendChild(loading)
   let list
