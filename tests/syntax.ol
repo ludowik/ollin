@@ -751,7 +751,7 @@ assert(#la == len(la))
 ## ── 17. Import ───────────────────────────────────────────────────────────────
 
 ## import plat : les symboles du fichier sont injectés dans le scope courant
-import "utils_test"
+import "utils_test1"
 assert(CONST == 42)
 
 ## import modulaire (fichier différent) : symboles regroupés dans une map
