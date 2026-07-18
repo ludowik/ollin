@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "lexer.h"
+#include "modules/data_module.h"
 #include "modules/graphics_internal.h"
 #include "modules/image_module.h"
 #include "modules/modules.h"
@@ -56,10 +57,17 @@ static void preload_source_js(const std::string& path, const std::string& conten
     source_preload(path, content);
 }
 
+// Charge les données persistées (module `data`) avant un run. La SPA lit
+// localStorage (portée projet + globale) et passe les deux blobs JSON.
+static void data_load_js(const std::string& projectBlob, const std::string& globalBlob) {
+    dataLoad(projectBlob, globalBlob);
+}
+
 EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("execute", &ollin_run);
     emscripten::function("preloadImage", &preload_image_js);
     emscripten::function("preloadModel", &preload_model_js);
     emscripten::function("preloadSource", &preload_source_js);
     emscripten::function("resetSources", &source_reset);
+    emscripten::function("dataLoad", &data_load_js);
 }

@@ -1,7 +1,9 @@
 #include "compiler.h"
 #include "lexer.h"
+#include "modules/data_module.h"
 #include "parser.h"
 #include "vm.h"
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -27,6 +29,13 @@ int main(int argc, char* argv[]) {
     std::string scriptPath = (argc < 2) ? "main.ol" : argv[1];
     auto sep = scriptPath.find_last_of("/\\");
     std::string dir = (sep != std::string::npos) ? scriptPath.substr(0, sep + 1) : "";
+
+    // Persistance `data` : sidecar « <script>.data.json » (projet) + fichier home (global).
+    {
+        const char* home = std::getenv("HOME");
+        std::string global = (home ? std::string(home) + "/" : "") + ".ollin-data-global.json";
+        dataSetNativePaths(scriptPath + ".data.json", global);
+    }
 
     try {
         auto imported = std::make_shared<std::unordered_set<std::string>>();

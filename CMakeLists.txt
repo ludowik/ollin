@@ -33,6 +33,7 @@ set(OLLIN_SOURCES
     src/modules/color_module.cpp
     src/modules/math_module.cpp
     src/modules/string_module.cpp
+    src/modules/data_module.cpp
 )
 
 if(EMSCRIPTEN)

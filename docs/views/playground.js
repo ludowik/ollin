@@ -277,6 +277,15 @@ const MODULE_MEMBERS = {
     fn('mouse.released','released(x,y) — à définir : au relâchement'),
     fn('mouse.moved','moved(x,y) — à définir : au déplacement'),
   ],
+  data: [
+    fn('data.get','get(clé [, défaut]) — valeur persistée'),
+    fn('data.set','set(clé, valeur) — nombre/chaîne/booléen'),
+    fn('data.has','has(clé) → bool'),
+    fn('data.delete','delete(clé)'),
+    fn('data.keys','keys() → array'),
+    fn('data.clear','clear() — efface la portée projet'),
+    cst('data.shared','portée partagée entre projets (data.shared.get/set…)'),
+  ],
 }
 
 // Commande « démarrer l'autocomplétion » (binding Ctrl-Space de CodeMirror) —
@@ -1696,6 +1705,8 @@ async function launch() {
     const imported = await Run.preloadSampleImports(ollin, code, ctx.v)
     await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // modèles des imports aussi
   }
+  // Portée « projet » du module `data` : id du projet, ou 'sample:<fichier>' pour un exemple.
+  window.__ollinDataProject = isExample() ? ('sample:' + exampleFile) : (currentProject ? currentProject.id : '_')
   Run.runProgram(ollin, code, canvasEl, {
     onError:   (msg) => { setRunning(false); showOutput(msg) },
     onRunning: () => {

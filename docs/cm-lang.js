@@ -17,7 +17,7 @@ export const KEYWORDS = new Set([
 ])
 export const BUILTINS = new Set([
   'print', 'printf', 'time', 'assert', 'len', 'typeof', 'Color',
-  'math', 'graphics', 'string', 'colors', 'blend', 'window', 'image', 'keyboard', 'mouse',
+  'math', 'graphics', 'string', 'colors', 'blend', 'window', 'image', 'keyboard', 'mouse', 'data',
 ])
 
 export const ollinLang = StreamLanguage.define({

@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-18 20:00</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-18 21:14</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -411,6 +411,7 @@ pre:hover .code-actions,
   <a href="#graphics">Graphics + Colors</a>
   <a href="#keyboard">Clavier</a>
   <a href="#mouse">Souris</a>
+  <a href="#data">Module data</a>
   <a href="#image">Module image</a>
   <a href="#window">Module window</a>
 </nav>
@@ -418,7 +419,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-18 20:00</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-18 21:14</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1909,6 +1910,29 @@ print(v3)          ## Vec2(4,6)</code></pre>
     graphics.fill(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
     graphics.circle(px, py, <span class="num">10</span>)
 <span class="kw">end</span></code></pre>
+</section>
+
+<section id="data">
+<h2>Module <code>data</code></h2>
+<p>Persiste des <strong>paramètres/variables d'un lancement à l'autre</strong>. Deux portées : <code>data</code> (propre au <strong>projet</strong>, isolée) et <code>data.shared</code> (<strong>partagée</strong> entre tous les projets). Valeurs : nombre, chaîne, booléen. Disponible sans <code>import</code>. Persistance automatique (localStorage sur le web, fichier à côté du script en natif).</p>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>data.set(clé, valeur)</code></td><td>Écrit et persiste (<code>set(clé, nil)</code> supprime la clé)</td></tr>
+    <tr><td><code>data.get(clé [, défaut])</code></td><td>Lit la valeur, ou <code>défaut</code> (ou <code>nil</code>) si absente</td></tr>
+    <tr><td><code>data.has(clé)</code></td><td><code>true</code>/<code>false</code></td></tr>
+    <tr><td><code>data.delete(clé)</code></td><td>Supprime la clé</td></tr>
+    <tr><td><code>data.keys()</code></td><td>Tableau des clés</td></tr>
+    <tr><td><code>data.clear()</code></td><td>Efface toute la portée</td></tr>
+    <tr><td><code>data.shared.*</code></td><td>Mêmes fonctions, en portée <strong>partagée</strong> (ex. <code>data.shared.get("theme")</code>)</td></tr>
+  </tbody>
+</table>
+<pre><code><span class="cmt">## compteur de lancements, persistant par projet</span>
+<span class="kw">var</span> n = <span class="bi">data</span>.get(<span class="str">"runs"</span>, <span class="num">0</span>)
+<span class="bi">print</span>(<span class="str">"lancement n° "</span> + (n + <span class="num">1</span>))
+<span class="bi">data</span>.set(<span class="str">"runs"</span>, n + <span class="num">1</span>)
+
+<span class="bi">data</span>.shared.set(<span class="str">"theme"</span>, <span class="str">"dark"</span>)   <span class="cmt">## partagé entre tous les projets</span></code></pre>
 </section>
 
 <section id="image">

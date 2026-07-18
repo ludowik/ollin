@@ -6,6 +6,30 @@
 
 export const MANIFEST = 'ollin.project.json'
 
+// ── Persistance du module `data` (localStorage) ─────────────────────────────
+// Portées : 0 = projet (clé = window.__ollinDataProject, posé par la vue avant le
+// run), 1 = partagée (« data.shared »). Le moteur (C++) appelle
+// window.__ollinData.save(scope, blob) à CHAQUE écriture ; on (re)charge les deux
+// blobs avant chaque execute via mod.dataLoad(...).
+const DATA_PREFIX = 'ollin-data:'
+function dataKey(scope) {
+  if (scope === 1) return DATA_PREFIX + 'shared'
+  return DATA_PREFIX + 'p:' + (window.__ollinDataProject || '_')
+}
+if (typeof window !== 'undefined' && !window.__ollinData) {
+  window.__ollinData = {
+    save(scope, blob) { try { localStorage.setItem(dataKey(scope), blob) } catch (_) {} },
+  }
+}
+// Charge les données persistées dans le runtime avant un run (no-op si dataLoad absent).
+export function loadDataInto(m) {
+  if (!m || typeof m.dataLoad !== 'function') return
+  let p = '', g = ''
+  try { p = localStorage.getItem(dataKey(0)) || '' } catch (_) {}
+  try { g = localStorage.getItem(dataKey(1)) || '' } catch (_) {}
+  m.dataLoad(p, g)
+}
+
 // Pousse fichiers (.ol) + ressources (images) d'un projet dans le runtime,
 // avant exécution. `m` = module WASM Ollin, `project` = { files, resources }.
 export function loadProjectIntoRuntime(m, project) {
@@ -41,6 +65,7 @@ export function runProgram(m, code, canvasEl, hooks) {
   // Erreur dans une frame (update/draw) : le runtime WASM (emscripten_frame) a
   // déjà arrêté la boucle et nous remonte le message ici.
   window.__ollinFrameError = (msg) => hooks.onError('error: ' + (msg || "erreur d'exécution"))
+  loadDataInto(m)   // restaure les données persistées (module `data`) avant le run
   let out
   try {
     out = m.execute(code)
