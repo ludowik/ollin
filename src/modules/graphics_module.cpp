@@ -654,7 +654,7 @@ static void drawOval(float cx, float cy, float rx, float ry, int segs) {
 static Value gfx_ellipse(Value* args, int argc) {
     if (argc < 4)
         throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
-    int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : 32;
+    int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : 64;
     drawOval((float)numArg(args, 0, "graphics.ellipse"), (float)numArg(args, 1, "graphics.ellipse"),
              (float)numArg(args, 2, "graphics.ellipse") * 0.5f, (float)numArg(args, 3, "graphics.ellipse") * 0.5f, segs);
     return Value{};
@@ -663,7 +663,7 @@ static Value gfx_ellipse(Value* args, int argc) {
 static Value gfx_circle(Value* args, int argc) {
     if (argc < 3)
         throw std::runtime_error("graphics.circle: expected x, y, radius");
-    int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : 32;
+    int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : 64;
     float r = (float)numArg(args, 2, "graphics.circle");
     drawOval((float)numArg(args, 0, "graphics.circle"), (float)numArg(args, 1, "graphics.circle"), r, r, segs);
     return Value{};
