@@ -35,6 +35,7 @@ global TURN_MAX = 1.8
 global SPEED_MAX = 8.0
 
 global C_SKY = Color(0.55, 0.80, 0.95)
+global AMB = 0.5              ## ambiant du terrain (restauré après le rendu blanc des nuages)
 
 ## Nuages : couche de cubes blancs semi-transparents, dérivant en +x. Dessinés en
 ## IMMÉDIAT chaque frame (ils bougent → pas de chunk/cuisson). 1 seul draw call
@@ -45,11 +46,11 @@ global CLOUD_SIZE = 4         ## côté d'un bloc-nuage
 global CLOUD_TH = 3           ## épaisseur
 global CLOUD_STEP = 4         ## pas de la grille (= CLOUD_SIZE → blocs jointifs)
 global CLOUD_SEC = 32         ## côté d'un secteur (8 cellules) pour le cull frustum
-global CLOUD_R = 80           ## rayon couvert autour du joueur
+global CLOUD_MARGIN = 96      ## marge au-delà du terrain chargé (nuages jusqu'à l'horizon)
 global CLOUD_SCALE = 0.05     ## fréquence du bruit de placement
 global CLOUD_THRESH = 0.58    ## seuil de couverture (plus haut = moins de nuages)
 global CLOUD_SPEED = 1.2      ## dérive (blocs/s)
-global CLOUD_ALPHA = 0.85
+global CLOUD_ALPHA = 0.9
 
 global TILE = 16
 global ACOLS = 4
@@ -361,7 +362,7 @@ end
 
 func setup()
     graphics.canvas(W, H, "Voxel infini")
-    graphics.ambient(0.5)
+    graphics.ambient(AMB)
     graphics.light("dir", -0.5, -1, -0.35)
     math.noiseSeed(7)
     build_atlas()
@@ -491,12 +492,14 @@ end
 ## rendu décalé de `drift` en x → translation continue et lisse. Cull par secteur.
 func draw_clouds()
     var drift = elapsedTime * CLOUD_SPEED
+    var reach = vd.radius * CS + CLOUD_MARGIN   ## suit la distance d'affichage du terrain
     graphics.noStroke()
-    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))
-    var s0x = math.floor((camX - drift - CLOUD_R) / CLOUD_SEC) * CLOUD_SEC
-    var s0z = math.floor((camZ - CLOUD_R) / CLOUD_SEC) * CLOUD_SEC
-    for sx = s0x, camX - drift + CLOUD_R, CLOUD_SEC do
-        for sz = s0z, camZ + CLOUD_R, CLOUD_SEC do
+    graphics.ambient(1)                          ## nuages en BLANC PLAT : sans ça, la sous-face
+    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (vue d'en bas) n'aurait que l'ambiant → grise
+    var s0x = math.floor((camX - drift - reach) / CLOUD_SEC) * CLOUD_SEC
+    var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
+    for sx = s0x, camX - drift + reach, CLOUD_SEC do
+        for sz = s0z, camZ + reach, CLOUD_SEC do
             ## bbox du secteur EN MONDE (x décalé par le drift) testée en frustum
             if graphics.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, sz + CLOUD_SEC / 2, CLOUD_SEC * 0.72 + 4) then
                 for cx = sx, sx + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
@@ -578,6 +581,7 @@ func draw()
         end
         draw_clouds()               ## nuages (semi-transparents) au-dessus de tout
     graphics.end3d()
+    graphics.ambient(AMB)           ## draw_clouds a mis l'ambiant à blanc → on rétablit
 
     pad.draw()
     vd.draw()                          ## boutons − / + (ViewDistance)
