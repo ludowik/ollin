@@ -24,12 +24,7 @@ static void appendProgram(Program& dst, Program src) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "usage: ollin <file.ol>\n";
-        return 1;
-    }
-
-    std::string scriptPath(argv[1]);
+    std::string scriptPath = (argc < 2) ? "main.ol" : argv[1];
     auto sep = scriptPath.find_last_of("/\\");
     std::string dir = (sep != std::string::npos) ? scriptPath.substr(0, sep + 1) : "";
 

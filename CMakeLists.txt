@@ -14,8 +14,9 @@ set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
 
 # Build natif AVEC raylib (fenêtre/graphique) au lieu du stub. OFF par défaut :
-# le build natif standard reste headless-safe. Activé par tools/native-gfx.sh
-# pour les tests graphiques natifs (raylib desktop + Xvfb).
+# le build natif standard reste headless-safe (nécessaire pour les environnements
+# distants sans accès réseau à raylib). Activer localement via -DOLLIN_NATIVE_RAYLIB=ON
+# (cache CMake local à build/, non partagé) ou tools/native-gfx.sh (build-gfx/, tests Xvfb).
 option(OLLIN_NATIVE_RAYLIB "Native build with raylib graphics (default: stub)" OFF)
 
 set(OLLIN_SOURCES
