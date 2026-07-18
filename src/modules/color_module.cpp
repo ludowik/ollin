@@ -36,16 +36,18 @@ static Value colorField(const Value& self, const char* name) {
 }
 
 // ── init ──────────────────────────────────────────────────────────────────────
-// args[0] = self, args[1]=r, args[2]=g, args[3]=b, args[4]=a (opt, default 1.0)
+// args[0] = self ; args[1..] = forme couleur flexible (voir parseColor) :
+//   Color(gris) · Color(gris, a) · Color(r, g, b) · Color(r, g, b, a) · Color(autreColor)
 
 static Value color_init(Value* args, int argc) {
-    if (argc < 4)
-        throw std::runtime_error("Color: expected r, g, b [, a]");
+    if (argc < 2)
+        throw std::runtime_error("Color: expected 1 to 4 numbers (or a Color)");
     Value& self = args[0];
-    self.mapSet(Value(std::string("r")), Value(colorComponent(args[1], "r")));
-    self.mapSet(Value(std::string("g")), Value(colorComponent(args[2], "g")));
-    self.mapSet(Value(std::string("b")), Value(colorComponent(args[3], "b")));
-    self.mapSet(Value(std::string("a")), Value(argc > 4 ? colorComponent(args[4], "a") : 1.0));
+    ColorRGBA c = parseColor(args + 1, argc - 1, "Color");
+    self.mapSet(Value(std::string("r")), Value(c.r));
+    self.mapSet(Value(std::string("g")), Value(c.g));
+    self.mapSet(Value(std::string("b")), Value(c.b));
+    self.mapSet(Value(std::string("a")), Value(c.a));
     return Value{};
 }
 

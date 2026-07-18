@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-18 08:13</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-18 10:38</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -418,7 +418,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-18 08:13</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-18 10:38</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1552,13 +1552,13 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func update(dt)</code></td><td>Si elle existe, appelée chaque frame <strong>avant</strong> <code>draw</code> ; <code>dt</code> = secondes écoulées depuis la frame précédente</td></tr>
     <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
     <tr><td><code>graphics.isOpen()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
-    <tr><td><code>graphics.clear([color])</code></td><td>Couleur <strong>opaque</strong> → efface net ; couleur <strong>semi-transparente</strong> (alpha&nbsp;&lt;&nbsp;1) → <strong>fondu</strong> progressif (traînées, cf. contexte persistant ci-dessous). Sans argument : noir.</td></tr>
+    <tr><td><code>graphics.clear([gris | r,g,b | color …])</code></td><td>Efface le fond. Même signature que <code>Color</code> (1 à 4 nombres, ou un objet <code>Color</code>). Couleur <strong>opaque</strong> → efface net ; <strong>semi-transparente</strong> (alpha&nbsp;&lt;&nbsp;1) → <strong>fondu</strong> progressif (traînées, cf. contexte persistant ci-dessous). Sans argument : noir.</td></tr>
     <tr><td><code>graphics.blendMode(mode)</code></td><td>Mode de fusion des dessins suivants : chaîne (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) ou constante du module <code>blend</code>. Remis à <code>"alpha"</code> à chaque frame.</td></tr>
     <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés (défaut : 2). Remis à 2 à chaque frame.</td></tr>
-    <tr><td><code>graphics.stroke([color | r, g, b [, a]])</code></td><td>Active le contour : un objet <code>Color</code> (+ taille optionnelle en 2e arg), ou 3-4 composantes directes dans [0,1] ; sans argument, réactive avec la couleur courante</td></tr>
+    <tr><td><code>graphics.stroke([gris | r,g,b | color …])</code></td><td>Active le contour. Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code> (+ taille optionnelle en 2e arg) ; sans argument, réactive avec la couleur courante</td></tr>
     <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
-    <tr><td><code>graphics.fill([color | r, g, b [, a]])</code></td><td>Active le remplissage : un objet <code>Color</code>, ou 3-4 composantes directes dans [0,1] ; sans argument, réactive avec la couleur courante</td></tr>
+    <tr><td><code>graphics.fill([gris | r,g,b | color …])</code></td><td>Active le remplissage. Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code> ; sans argument, réactive avec la couleur courante</td></tr>
     <tr><td><code>graphics.noFill()</code></td><td>Désactive le remplissage (défaut) — la couleur courante est conservée</td></tr>
     <tr><td><code>graphics.tint(color | r, g, b [, a])</code></td><td>Teinte des images (<code>graphics.sprite</code> et <code>image.draw</code>) : objet <code>Color</code> ou composantes dans [0,1]</td></tr>
     <tr><td><code>graphics.noTint()</code></td><td>Désactive la teinte des images (images dessinées telles quelles)</td></tr>
@@ -1619,13 +1619,26 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span></code></pre>
 
 <h3>Couleurs — classe <code>Color</code></h3>
-<p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code>. L'alpha est optionnel (défaut : <code>1.0</code>). Les composantes sont clampées silencieusement.</p>
-<pre><code><span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
+<p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code> (clampées silencieusement). Le constructeur accepte <strong>1 à 4 nombres</strong> selon le nombre d'arguments :</p>
+<table>
+  <thead><tr><th>Appel</th><th>Résultat</th></tr></thead>
+  <tbody>
+    <tr><td><code>Color(gris)</code></td><td>niveau de gris opaque → <code>(gris, gris, gris, 1)</code></td></tr>
+    <tr><td><code>Color(gris, a)</code></td><td>gris + alpha → <code>(gris, gris, gris, a)</code></td></tr>
+    <tr><td><code>Color(r, g, b)</code></td><td>couleur opaque → <code>(r, g, b, 1)</code></td></tr>
+    <tr><td><code>Color(r, g, b, a)</code></td><td>couleur + alpha</td></tr>
+    <tr><td><code>Color(autre)</code></td><td>copie d'un objet <code>Color</code></td></tr>
+  </tbody>
+</table>
+<pre><code><span class="kw">var</span> gris  = <span class="bi">Color</span>(<span class="num">0.5</span>)                <span class="cmt">## gris moyen opaque</span>
+<span class="kw">var</span> voile = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0.3</span>)             <span class="cmt">## noir à 30% (gris + alpha)</span>
+<span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
 <span class="kw">var</span> bleu  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## bleu semi-transparent</span>
 <span class="bi">print</span>(rouge)                           <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
 
 <span class="cmt">## accès direct aux composantes</span>
 <span class="bi">print</span>(rouge.r, rouge.g, rouge.b, rouge.a)</code></pre>
+<p><code>graphics.clear</code>, <code>graphics.fill</code> et <code>graphics.stroke</code> acceptent <strong>la même signature</strong> que <code>Color</code> (1 à 4 nombres), ou un objet <code>Color</code>.</p>
 
 <h3>Module <code>colors</code></h3>
 <p>Palette de constantes prédéfinies, disponible sans <code>import</code>. Chaque constante est un objet <code>Color</code>.</p>

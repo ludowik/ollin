@@ -207,7 +207,11 @@ static Value gfx_end_draw(Value* args, int argc) {
 }
 
 static Value gfx_clear(Value* args, int argc) {
-    Color c = argc > 0 ? gfxToColor(args[0]) : BLACK;
+    Color c = BLACK;
+    if (argc > 0) {
+        ColorRGBA k = parseColor(args, argc, "clear");
+        c = rgbaColor(k.r, k.g, k.b, k.a);
+    }
     if (c.a < 255) {
         // Couleur semi-transparente → FONDU (comme p5.js background(r,g,b,a<255))
         // et NON un effacement net : on peint un rectangle plein écran translucide
@@ -350,16 +354,16 @@ static Value gfx_stroke_size(Value* args, int argc) {
 }
 
 static Value gfx_stroke(Value* args, int argc) {
-    if (argc >= 3 && args[0].isNumber() && args[1].isNumber() && args[2].isNumber()) {
-        double a = (argc > 3 && args[3].isNumber()) ? args[3].asNum() : 1.0;   // r, g, b [, a] directs
-        applyStroke(true, rgbaColor(args[0].asNum(), args[1].asNum(), args[2].asNum(), a));
-    } else if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
-        applyStroke(true, gfxToColor(args[0]));   // objet Color (+ taille optionnelle en 2e arg)
-        if (argc > 1 && args[1].isNumber())
-            applyStrokeSize((float)args[1].asNum());
-    } else {
+    if (argc == 0) {
         s_has_stroke = true;                   // sans argument → (ré)active avec la couleur courante
+        return Value{};
     }
+    ColorRGBA k = parseColor(args, argc, "stroke");
+    applyStroke(true, rgbaColor(k.r, k.g, k.b, k.a));
+    // Taille optionnelle : seulement avec un objet Color en 1er arg — stroke(Color, taille).
+    // (Pour les formes numériques, utiliser graphics.strokeSize : les nombres = couleur.)
+    if ((args[0].isMap() || args[0].isClass()) && argc > 1 && args[1].isNumber())
+        applyStrokeSize((float)args[1].asNum());
     return Value{};
 }
 
@@ -371,14 +375,12 @@ static Value gfx_no_stroke(Value* args, int argc) {
 }
 
 static Value gfx_fill(Value* args, int argc) {
-    if (argc >= 3 && args[0].isNumber() && args[1].isNumber() && args[2].isNumber()) {
-        double a = (argc > 3 && args[3].isNumber()) ? args[3].asNum() : 1.0;   // r, g, b [, a] directs
-        applyFill(true, rgbaColor(args[0].asNum(), args[1].asNum(), args[2].asNum(), a));
-    } else if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
-        applyFill(true, gfxToColor(args[0]));   // objet Color
-    } else {
+    if (argc == 0) {
         s_has_fill = true;                   // sans argument → (ré)active avec la couleur courante
+        return Value{};
     }
+    ColorRGBA k = parseColor(args, argc, "fill");
+    applyFill(true, rgbaColor(k.r, k.g, k.b, k.a));
     return Value{};
 }
 
