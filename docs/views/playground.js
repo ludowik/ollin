@@ -8,7 +8,7 @@ import {
   EditorView, lineNumbers, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter,
   defaultKeymap, historyKeymap, history, indentWithTab,
   syntaxHighlighting, indentUnit, codeFolding, foldGutter, foldKeymap, foldService,
-  autocompletion, completionKeymap, acceptCompletion,
+  autocompletion, completionKeymap,
   closeBrackets, closeBracketsKeymap,
   search, searchKeymap, highlightSelectionMatches,
 } from '../vendor/codemirror.js'
@@ -351,7 +351,9 @@ let loadingFile = false   // true pendant un chargement programmatique → pas d
 // clavier « pendant un run » (voir plus bas) pour déléguer aux VRAIES commandes
 // CodeMirror au lieu de les réimplémenter.
 // closeBracketsKeymap en tête : Backspace supprime une paire vide «()» d'un coup.
-const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
+// Tab = indentation (4 espaces) TOUJOURS ; une complétion s'accepte avec Entrée
+// (completionKeymap) — sinon la popup ouverte (activateOnTyping) mange le Tab.
+const editKeymap = [...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
 // Extensions de l'éditeur, réutilisées pour recréer un état VIERGE à chaque
 // chargement de fichier (setEditorText) → historique d'annulation propre par
@@ -450,7 +452,7 @@ function toggleLineComment(v, add) {
 // en phase capture. Tant que le runtime a été armé (`runtimeArmed`) et que
 // l'éditeur a le focus, on exécute Backspace/Tab via les VRAIES commandes
 // CodeMirror (le même `editKeymap` que l'éditeur → deleteCharBackward, delete
-// GroupBackward, indentMore/Less, acceptCompletion…), puis on stoppe
+// GroupBackward, indentMore/Less…), puis on stoppe
 // l'événement pour que GLFW ne le voie pas. On ne touche QU'À ces deux touches :
 // toutes les autres passent normalement à CodeMirror (GLFW ne les bloque pas),
 // donc aucune régression d'édition (multi-curseur, flèches, Entrée, Home…).
