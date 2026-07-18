@@ -239,7 +239,7 @@ func bake_chunk(cx, cz)
                     ## Cube IMMERGÉ : assombri selon sa profondeur (moins de lumière au fond).
                     ## C'est le FOND qui s'assombrit avec la profondeur, pas l'eau (uniforme).
                     if y < SEA then
-                        var dk = math.clamp((SEA - y) / 10.0, 0, 0.75)
+                        var dk = math.clamp((SEA - y) / 5.0, 0, 0.85)   ## assombrit plus tôt et plus fort
                         graphics.fill(Color(1 - dk, 1 - dk, 1 - dk))
                     else
                         graphics.fill(colors.WHITE)
