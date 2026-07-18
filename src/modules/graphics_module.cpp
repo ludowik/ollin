@@ -422,10 +422,7 @@ static Value gfx_line(Value* args, int argc) {
     float y1 = (float)numArg(args, 1, "graphics.line");
     float x2 = (float)numArg(args, 2, "graphics.line");
     float y2 = (float)numArg(args, 3, "graphics.line");
-    if (s_stroke_size <= 1.0f)
-        DrawLine((int)x1, (int)y1, (int)x2, (int)y2, s_stroke_color);
-    else
-        DrawLineEx({x1, y1}, {x2, y2}, s_stroke_size, s_stroke_color);
+    DrawLineEx({x1, y1}, {x2, y2}, s_stroke_size, s_stroke_color);   // épaisseur réelle (y compris < 1)
     return Value{};
 }
 
