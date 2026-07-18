@@ -280,6 +280,74 @@ canvas#canvas {
 }
 .kbar-key:active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
+/* ── Popup d'aide (raccourcis) ──────────────────────────────────────────────── */
+#help-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
+}
+#help-overlay[hidden] { display: none; }
+#help-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+.help-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+.help-head h2 { margin: 0; font-size: 15px; font-weight: 600; color: var(--text); }
+#help-close {
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+#help-close:hover { color: var(--text); background: var(--surface2); }
+#help-body { padding: 8px 18px 18px; }
+.help-cat { margin-top: 16px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
+.help-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.help-row:last-child { border-bottom: none; }
+.help-desc { color: var(--text); font-size: 13px; }
+.help-keys { flex: 0 0 auto; white-space: nowrap; }
+.help-keys kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: var(--text);
+}
+.help-keys .plus { color: var(--dim); font-size: 11px; margin: 0 2px; }
+
 /* ── bascule barre latérale ───────────────────────────────────────────────── */
 #rail-toggle {
   display: flex; align-items: center; justify-content: center;
@@ -436,6 +504,10 @@ canvas#canvas {
   </div>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
+  <button id="help-btn" class="tool-btn" title="Raccourcis clavier (F1)" aria-haspopup="dialog">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M6.1 6.1a1.9 1.9 0 1 1 2.6 1.8c-.5.2-.7.5-.7 1v.3"/><circle cx="8" cy="11.4" r="0.5" fill="currentColor" stroke="none"/></svg>
+    <span class="btn-label">Aide</span>
+  </button>
   <button id="reload-btn" class="tool-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="btn-label">Recharger</span>
@@ -454,7 +526,7 @@ canvas#canvas {
   </label>
   <button id="run-btn" disabled>
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
-    <span class="btn-label">Exécuter</span><kbd>Ctrl+↵</kbd>
+    <span class="btn-label">Exécuter</span><kbd>Alt+↵</kbd>
   </button>
   <button id="stop-btn" disabled title="Pause / Reprendre" style="display:none">
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
@@ -502,4 +574,16 @@ canvas#canvas {
   <button class="kbar-key" data-ins="=" data-back="0">=</button>
   <button class="kbar-key" data-move="-1" aria-label="Curseur à gauche">←</button>
   <button class="kbar-key" data-move="1" aria-label="Curseur à droite">→</button>
+</div>
+
+<!-- Popup d'aide : raccourcis clavier. Ouverte par le bouton « Aide » ou F1.
+     Le contenu (#help-body) est rendu par JS depuis la liste SHORTCUTS. -->
+<div id="help-overlay" hidden>
+  <div id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="help-head">
+      <h2 id="help-title">Raccourcis clavier</h2>
+      <button id="help-close" title="Fermer (Échap)" aria-label="Fermer">✕</button>
+    </div>
+    <div id="help-body"></div>
+  </div>
 </div>

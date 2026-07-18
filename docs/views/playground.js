@@ -424,6 +424,40 @@ const editorExtensions = [
       }),
 ]
 
+// Raccourcis affichés par la popup d'aide (F1 / bouton « Aide »).
+// ⚠ SOURCE UNIQUE : à garder synchronisé avec les keymaps ci-dessus (editKeymap,
+// le keymap.of([...]) Alt-Enter/F4/Alt-k…, searchKeymap, foldKeymap, historyKeymap)
+// et le raccourci d'exécution géré dans onGlobalKeydown.
+const SHORTCUTS = [
+  { cat: 'Exécution', items: [
+    { keys: ['Alt', '↵'],   desc: 'Exécuter / relancer le script' },
+    { keys: ['Échap'],      desc: 'Arrêter l’exécution en cours' },
+    { keys: ['F4'],         desc: 'Aller à la première erreur' },
+  ]},
+  { cat: 'Édition', items: [
+    { keys: ['Tab'],            desc: 'Indenter au curseur (ou accepter la complétion si la popup est ouverte)' },
+    { keys: ['Maj', 'Tab'],     desc: 'Désindenter' },
+    { keys: ['Ctrl', 'Espace'], desc: 'Déclencher l’autocomplétion' },
+    { keys: ['Alt+K', 'C'], sep: ' puis ', desc: 'Commenter les lignes sélectionnées' },
+    { keys: ['Alt+K', 'U'], sep: ' puis ', desc: 'Décommenter les lignes sélectionnées' },
+    { keys: ['Alt', 'Maj', 'F'],desc: 'Reformater le code (indentation)' },
+    { keys: ['Ctrl', 'Z'],      desc: 'Annuler' },
+    { keys: ['Ctrl', 'Y'],      desc: 'Rétablir (ou Ctrl+Maj+Z)' },
+  ]},
+  { cat: 'Recherche', items: [
+    { keys: ['Ctrl', 'F'],      desc: 'Rechercher dans le fichier' },
+    { keys: ['Ctrl', 'G'],      desc: 'Occurrence suivante' },
+    { keys: ['Maj', 'Ctrl', 'G'], desc: 'Occurrence précédente' },
+  ]},
+  { cat: 'Pliage', items: [
+    { keys: ['Ctrl', 'Maj', '['], desc: 'Plier le bloc' },
+    { keys: ['Ctrl', 'Maj', ']'], desc: 'Déplier le bloc' },
+  ]},
+  { cat: 'Aide', items: [
+    { keys: ['F1'], desc: 'Afficher / masquer cette aide' },
+  ]},
+]
+
 const view = new EditorView({
   state: EditorState.create({ doc: '', extensions: editorExtensions }),
   parent: document.getElementById('editor-wrap'),
@@ -495,6 +529,21 @@ function runEditKeymap(e) {
   return false
 }
 const onGlobalKeydown = e => {
+  // F1 : bascule la popup d'aide (raccourcis). En capture → marche quel que soit
+  // le focus ; preventDefault pour couper l'aide native du navigateur.
+  if (e.key === 'F1') {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    toggleHelp()
+    return
+  }
+  // Échap ferme d'abord l'aide si elle est ouverte (avant d'arrêter un run).
+  if (e.key === 'Escape' && helpOpen()) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    closeHelp()
+    return
+  }
   // Alt+Entrée : lance ou RELANCE l'exécution — géré en capture pour marcher
   // même quand le focus est sur le CANVAS (programme graphique en cours), pas
   // seulement dans l'éditeur.
@@ -1470,7 +1519,7 @@ function setRunning(running) {
     document.getElementById('kbar')?.classList.remove('show')   // pas d'aide à la saisie pendant l'exécution
   } else {
     runBtn.classList.remove('running')
-    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Ctrl+↵</kbd>'
+    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Alt+↵</kbd>'
     stopBtn.style.display = 'none'
     stopBtn.disabled = true
     isPaused = false
@@ -1704,6 +1753,40 @@ standaloneBtn.addEventListener('click', async () => {
   } catch (_) {}
   ctx.navigate('run')
 })
+
+// ── Popup d'aide (raccourcis) ────────────────────────────────────────────────
+// Rendue une fois depuis SHORTCUTS ; ouverte par le bouton « Aide » ou F1.
+const helpOverlay = document.getElementById('help-overlay')
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function renderHelp() {
+  const body = document.getElementById('help-body')
+  if (!body) return
+  body.innerHTML = SHORTCUTS.map(group => {
+    const rows = group.items.map(it => {
+      const keys = it.keys.map(k => '<kbd>' + esc(k) + '</kbd>')
+        .join(it.sep ? '<span class="plus">' + esc(it.sep) + '</span>' : '<span class="plus">+</span>')
+      return '<div class="help-row"><span class="help-desc">' + esc(it.desc) + '</span><span class="help-keys">' + keys + '</span></div>'
+    }).join('')
+    return '<div class="help-cat">' + esc(group.cat) + '</div>' + rows
+  }).join('')
+}
+function helpOpen() {
+  return helpOverlay && !helpOverlay.hasAttribute('hidden')
+}
+function openHelp() {
+  if (!helpOverlay) return
+  renderHelp()
+  helpOverlay.removeAttribute('hidden')
+}
+function closeHelp() {
+  if (helpOverlay) helpOverlay.setAttribute('hidden', '')
+}
+function toggleHelp() {
+  helpOpen() ? closeHelp() : openHelp()
+}
+document.getElementById('help-btn')?.addEventListener('click', openHelp)
+document.getElementById('help-close')?.addEventListener('click', closeHelp)
+helpOverlay?.addEventListener('click', e => { if (e.target === helpOverlay) closeHelp() })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────
 // Vide le Cache API puis recharge (le code de l'éditeur est conservé dans
