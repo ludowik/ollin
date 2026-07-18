@@ -1,9 +1,9 @@
-## Joystick analogique tactile RÉUTILISABLE.
+## Joystick analogique tactile RÉUTILISABLE — zone CIRCULAIRE, neutre au centre.
 ##
-## Zone active = bas de l'écran (à partir de zone_top × H). Un doigt posé DANS la
-## zone arme le contrôle et le garde actif même s'il en sort (valeurs clampées).
-##   steer()    → [-1;1]  distance horizontale au centre  (<0 = gauche, >0 = droite)
-##   throttle() → [0;1]   distance verticale au bas de la zone (1 = plein avant)
+## Un doigt posé DANS le disque arme le contrôle et le garde actif même s'il en sort
+## (valeurs clampées). Le neutre est le CENTRE du disque :
+##   steer()    → [-1;1]  décalage horizontal au centre (<0 = gauche, >0 = droite)
+##   throttle() → [-1;1]  décalage vertical au centre   (>0 = avant, <0 = arrière)
 ##
 ## Câblage côté programme hôte (les callbacks mouse.* sont GLOBAUX au moteur, un
 ## module ne peut pas les capter lui-même → 3 relais + un draw) :
@@ -14,26 +14,35 @@
 ##   func mouse.moved(x, y)    pad.move(x, y)   end
 ##   func mouse.released(x, y) pad.release()    end
 ##   ## dans draw() : yaw -= pad.steer() * VITESSE_ROT * deltaTime
-##   ##              avancer de  pad.throttle() * VITESSE * deltaTime
+##   ##              avancer de  pad.throttle() * VITESSE * deltaTime  (négatif = arrière)
 ##   ## et à la fin : pad.draw()
 
 class Joystick
     func init()
-        self.active = false      ## armé (doigt posé dans la zone), reste vrai s'il en sort
-        self.px = 0              ## position courante du doigt
+        self.active = false       ## armé (doigt posé dans le disque), reste vrai s'il en sort
+        self.px = 0               ## position courante du doigt
         self.py = 0
-        self.zone_top = 0.66     ## haut de la zone (fraction de H)
-        self.dead = 0.06         ## zone morte du virage (près du centre = tout droit)
+        self.center_frac = 0.66   ## centre (neutre) vertical, fraction de H
+        self.radius_frac = 0.17   ## rayon du disque, fraction de H
+        self.dead = 0.10          ## zone morte (neutre) autour du centre, fraction du rayon
     end
 
-    func top()
-        return H * self.zone_top
+    func cx()
+        return W / 2
+    end
+    func cy()
+        return H * self.center_frac
+    end
+    func radius()
+        return H * self.radius_frac
     end
 
     func press(x, y)
         self.px = x
         self.py = y
-        self.active = y >= self.top()     ## armé seulement si on démarre DANS la zone
+        var dx = x - self.cx()
+        var dy = y - self.cy()
+        self.active = (dx * dx + dy * dy) <= self.radius() * self.radius()   ## armé si DANS le disque
     end
     func move(x, y)
         self.px = x
@@ -43,45 +52,59 @@ class Joystick
         self.active = false
     end
 
-    ## Virage ∈ [-1;1] : distance horizontale du doigt au centre (zone morte au milieu).
+    ## Zone morte au centre + remise à l'échelle : 0 dans la zone morte, ±1 au bord.
+    func shape(v)
+        if v > 0 - self.dead and v < self.dead then
+            return 0.0
+        end
+        var sign = 1.0
+        if v < 0 then
+            sign = -1.0
+        end
+        return sign * math.clamp((math.abs(v) - self.dead) / (1.0 - self.dead), 0.0, 1.0)
+    end
+
+    ## Virage ∈ [-1;1] : décalage horizontal du doigt au centre.
     func steer()
         if not self.active or W <= 0 then
             return 0.0
         end
-        var s = (self.px - W / 2) / (W / 2)
-        if s > 0 - self.dead and s < self.dead then
-            return 0.0
-        end
-        ## remise à l'échelle : 0 juste après la zone morte, ±1 au bord → pas de saut
-        var sign = 1.0
-        if s < 0 then
-            sign = -1.0
-        end
-        return sign * math.clamp((math.abs(s) - self.dead) / (1.0 - self.dead), 0.0, 1.0)
+        return self.shape((self.px - self.cx()) / self.radius())
     end
 
-    ## Poussée ∈ [0;1] : distance verticale du doigt au bas de la zone (hors zone par
-    ## le haut → clampé à 1 = plein avant).
+    ## Poussée ∈ [-1;1] : décalage vertical au centre (haut = avant, bas = arrière).
     func throttle()
         if not self.active or H <= 0 then
             return 0.0
         end
-        return math.clamp((H - self.py) / (H - self.top()), 0.0, 1.0)
+        return self.shape((self.cy() - self.py) / self.radius())
     end
 
     func draw()
-        var y0 = self.top()
-        var ax = W / 2
+        var cx = self.cx()
+        var cy = self.cy()
+        var r = self.radius()
+        graphics.noStroke()
         graphics.fill(Color(1, 1, 1, 0.06))
-        graphics.rect(0, y0, W, H - y0)
-        graphics.fill(Color(1, 1, 1, 0.14))
-        graphics.rect(ax - 1, y0, 2, H - y0)
+        graphics.circle(cx, cy, r)                    ## zone circulaire (reflète le fonctionnement réel)
+        graphics.fill(Color(1, 1, 1, 0.16))
+        graphics.circle(cx, cy, r * self.dead + 4)    ## repère du neutre au centre
         if self.active then
+            ## pouce bridé au bord du disque (comme un vrai stick)
+            var dx = self.px - cx
+            var dy = self.py - cy
+            var d = math.sqrt(dx * dx + dy * dy)
+            var kx = self.px
+            var ky = self.py
+            if d > r then
+                kx = cx + dx / d * r
+                ky = cy + dy / d * r
+            end
             graphics.stroke(Color(1, 1, 1, 0.45))
-            graphics.line(ax, H - 4, self.px, self.py)
+            graphics.line(cx, cy, kx, ky)
             graphics.noStroke()
             graphics.fill(Color(0.45, 0.65, 1.0, 0.85))
-            graphics.circle(self.px, self.py, 20)
+            graphics.circle(kx, ky, 20)
         end
     end
 end

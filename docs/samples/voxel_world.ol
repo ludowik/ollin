@@ -427,7 +427,7 @@ func move_player()
     if keyboard.isDown("right") then turn = turn + 1 end
     yaw = yaw - math.clamp(turn, -1, 1) * TURN_MAX * deltaTime
 
-    var thr = pad.throttle()      ## joystick : [0;1] (avant)
+    var thr = pad.throttle()      ## joystick : [-1;1] (avant / arrière)
     if keyboard.isDown("up") then thr = thr + 1 end
     if keyboard.isDown("down") then thr = thr - 1 end   ## flèche bas = marche arrière
     thr = math.clamp(thr, -1, 1)
