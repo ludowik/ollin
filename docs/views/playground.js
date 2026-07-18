@@ -344,13 +344,31 @@ function ollinFoldRange(state, lineStart) {
 // Le contenu est piloté par le projet actif (voir la section « Projets » plus
 // bas) : l'éditeur démarre vide puis reçoit le fichier courant après Store.init.
 let saveTimer   = null
+let autoexecTimer = null  // mode Auto : relance différée après la dernière modif
 let loadingFile = false   // true pendant un chargement programmatique → pas d'autosave
+
+// Tab sur un CURSEUR SIMPLE : insère des espaces jusqu'au prochain multiple de 4
+// (tab stop) À LA POSITION DU CURSEUR — pas d'indentation de ligne. Sur une
+// sélection, renvoie false → indentWithTab prend le relais (indente le bloc ;
+// Maj+Tab désindente).
+const softTab = (view) => {
+    const state = view.state
+    if (state.selection.ranges.some(r => !r.empty))
+        return false
+    const head = state.selection.main.head
+    const col = head - state.doc.lineAt(head).from
+    const n = 4 - (col % 4)
+    view.dispatch(state.update(state.replaceSelection(' '.repeat(n)), { scrollIntoView: true, userEvent: 'input' }))
+    return true
+}
 
 // Keymap de l'éditeur, gardé en référence : réutilisé tel quel par le garde-fou
 // clavier « pendant un run » (voir plus bas) pour déléguer aux VRAIES commandes
 // CodeMirror au lieu de les réimplémenter.
-// closeBracketsKeymap en tête : Backspace supprime une paire vide «()» d'un coup.
-const editKeymap = [{ key: 'Tab', run: acceptCompletion }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
+// Tab : accepte une complétion si popup, sinon insère au curseur (softTab), sinon
+// (sélection) indente le bloc. closeBracketsKeymap ensuite : Backspace supprime
+// une paire vide «()» d'un coup.
+const editKeymap = [{ key: 'Tab', run: acceptCompletion }, { key: 'Tab', run: softTab }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
 // Extensions de l'éditeur, réutilisées pour recréer un état VIERGE à chaque
 // chargement de fichier (setEditorText) → historique d'annulation propre par
@@ -397,7 +415,47 @@ const editorExtensions = [
         if (!update.docChanged || loadingFile) return
         clearTimeout(saveTimer)
         saveTimer = setTimeout(scheduleSave, 500)
+        // Mode Auto : chaque modif réarme un compte à rebours ; 2 s d'inactivité → relance.
+        const chk = document.getElementById('autoexec-chk')
+        if (chk && chk.checked) {
+          clearTimeout(autoexecTimer)
+          autoexecTimer = setTimeout(() => relaunch(), 2000)
+        }
       }),
+]
+
+// Raccourcis affichés par la popup d'aide (F1 / bouton « Aide »).
+// ⚠ SOURCE UNIQUE : à garder synchronisé avec les keymaps ci-dessus (editKeymap,
+// le keymap.of([...]) Alt-Enter/F4/Alt-k…, searchKeymap, foldKeymap, historyKeymap)
+// et le raccourci d'exécution géré dans onGlobalKeydown.
+const SHORTCUTS = [
+  { cat: 'Exécution', items: [
+    { keys: ['Alt', '↵'],   desc: 'Exécuter / relancer le script' },
+    { keys: ['Échap'],      desc: 'Arrêter l’exécution en cours' },
+    { keys: ['F4'],         desc: 'Aller à la première erreur' },
+  ]},
+  { cat: 'Édition', items: [
+    { keys: ['Tab'],            desc: 'Indenter au curseur (ou accepter la complétion si la popup est ouverte)' },
+    { keys: ['Maj', 'Tab'],     desc: 'Désindenter' },
+    { keys: ['Ctrl', 'Espace'], desc: 'Déclencher l’autocomplétion' },
+    { keys: ['Alt+K', 'C'], sep: ' puis ', desc: 'Commenter les lignes sélectionnées' },
+    { keys: ['Alt+K', 'U'], sep: ' puis ', desc: 'Décommenter les lignes sélectionnées' },
+    { keys: ['Alt', 'Maj', 'F'],desc: 'Reformater le code (indentation)' },
+    { keys: ['Ctrl', 'Z'],      desc: 'Annuler' },
+    { keys: ['Ctrl', 'Y'],      desc: 'Rétablir (ou Ctrl+Maj+Z)' },
+  ]},
+  { cat: 'Recherche', items: [
+    { keys: ['Ctrl', 'F'],      desc: 'Rechercher dans le fichier' },
+    { keys: ['Ctrl', 'G'],      desc: 'Occurrence suivante' },
+    { keys: ['Maj', 'Ctrl', 'G'], desc: 'Occurrence précédente' },
+  ]},
+  { cat: 'Pliage', items: [
+    { keys: ['Ctrl', 'Maj', '['], desc: 'Plier le bloc' },
+    { keys: ['Ctrl', 'Maj', ']'], desc: 'Déplier le bloc' },
+  ]},
+  { cat: 'Aide', items: [
+    { keys: ['F1'], desc: 'Afficher / masquer cette aide' },
+  ]},
 ]
 
 const view = new EditorView({
@@ -439,15 +497,20 @@ function toggleLineComment(v, add) {
 // défiler. Cet écouteur reste tant que le contexte graphique vit (un simple
 // Arrêt ne le retire pas). Or CodeMirror IGNORE tout keydown déjà
 // defaultPrevented → dans l'éditeur, Backspace et Tab « n'ont plus d'effet ».
-// Parade : un écouteur enregistré ICI (au chargement, donc AVANT celui de GLFW)
-// en phase capture. Tant que le runtime a été armé (`runtimeArmed`) et que
-// l'éditeur a le focus, on exécute Backspace/Tab via les VRAIES commandes
-// CodeMirror (le même `editKeymap` que l'éditeur → deleteCharBackward, delete
-// GroupBackward, indentMore/Less, acceptCompletion…), puis on stoppe
-// l'événement pour que GLFW ne le voie pas. On ne touche QU'À ces deux touches :
-// toutes les autres passent normalement à CodeMirror (GLFW ne les bloque pas),
-// donc aucune régression d'édition (multi-curseur, flèches, Entrée, Home…).
-let runtimeArmed = false
+// Parade : un écouteur enregistré ICI en phase capture. Tant que le runtime a été
+// armé (un programme graphique a tourné) et que l'éditeur a le focus, on exécute
+// Backspace/Tab via les VRAIES commandes CodeMirror (le même `editKeymap` que
+// l'éditeur → deleteCharBackward, deleteGroupBackward, indentMore/Less,
+// acceptCompletion…), puis on stoppe l'événement pour que GLFW ne le voie pas. On
+// ne touche QU'À ces deux touches : toutes les autres passent normalement à
+// CodeMirror (GLFW ne les bloque pas), donc aucune régression d'édition.
+//
+// Le drapeau « armé » vit au niveau PAGE (window), pas au niveau vue : l'écouteur
+// GLFW est global et n'est JAMAIS retiré au changement de vue (runtime WASM
+// partagé, aucun CloseWindow). Un drapeau par-vue repartirait à false à chaque
+// remontage → après un run puis un aller-retour de vue, GLFW mangerait encore
+// Backspace/Tab alors que la parade serait éteinte (bug intermittent).
+const isRuntimeArmed = () => !!window.__ollinGfxKbdArmed
 // Exécute, pour l'événement `e`, le premier binding de `editKeymap` qui matche
 // (même sémantique de priorité que CodeMirror). Gère les modificateurs Mod/Alt
 // et la variante `shift` des bindings. Renvoie true si une commande a agi.
@@ -458,12 +521,29 @@ function runEditKeymap(e) {
     if (parts[parts.length - 1] !== e.key) continue
     if ((parts.includes('Mod') || parts.includes('Ctrl') || parts.includes('Cmd')) !== (e.ctrlKey || e.metaKey)) continue
     if (parts.includes('Alt') !== e.altKey) continue
-    const cmd = (e.shiftKey && b.shift) ? b.shift : b.run
+    // Sémantique CM : avec Maj on n'exécute QUE b.shift (jamais b.run), sinon un
+    // binding sans variante Maj (ex. softTab) se déclencherait à tort sur Maj+Tab.
+    const cmd = e.shiftKey ? b.shift : b.run
     if (cmd && cmd(view)) return true
   }
   return false
 }
 const onGlobalKeydown = e => {
+  // F1 : bascule la popup d'aide (raccourcis). En capture → marche quel que soit
+  // le focus ; preventDefault pour couper l'aide native du navigateur.
+  if (e.key === 'F1') {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    toggleHelp()
+    return
+  }
+  // Échap ferme d'abord l'aide si elle est ouverte (avant d'arrêter un run).
+  if (e.key === 'Escape' && helpOpen()) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    closeHelp()
+    return
+  }
   // Alt+Entrée : lance ou RELANCE l'exécution — géré en capture pour marcher
   // même quand le focus est sur le CANVAS (programme graphique en cours), pas
   // seulement dans l'éditeur.
@@ -480,7 +560,7 @@ const onGlobalKeydown = e => {
     stopExec()
     return
   }
-  if (!runtimeArmed || !view.hasFocus) return
+  if (!isRuntimeArmed() || !view.hasFocus) return
   if (e.key !== 'Backspace' && e.key !== 'Tab') return   // seules touches mangées par GLFW
   if (runEditKeymap(e)) {
     e.preventDefault()
@@ -540,6 +620,16 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
     const key = e.target.closest('.kbar-key')
     if (!key) return
     e.preventDefault()   // garde le focus de l'éditeur → le clavier reste ouvert
+    const move = key.getAttribute('data-move')
+    if (move) {
+      const forward = move === '1'
+      const sel = view.state.selection.main
+      // Sélection : on la replie sur le bord visé (comme les flèches) ; curseur : ±1 caractère.
+      const anchor = sel.empty ? view.moveByChar(sel, forward).head : (forward ? sel.to : sel.from)
+      view.dispatch({ selection: { anchor }, scrollIntoView: true })
+      view.focus()
+      return
+    }
     const ins  = key.getAttribute('data-ins') || ''
     const back = parseInt(key.getAttribute('data-back') || '0', 10) || 0
     const sel  = view.state.selection.main
@@ -942,6 +1032,8 @@ function renderMenuRoot() {
   } else {
     projectMenu.appendChild(menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
   }
+  projectMenu.appendChild(menuSep())
+  projectMenu.appendChild(menuItem('⌨ Raccourcis clavier (F1)', false, () => { closeMenu(); openHelp() }))
 }
 
 async function renderMenuOpen() {
@@ -1429,7 +1521,7 @@ function setRunning(running) {
     document.getElementById('kbar')?.classList.remove('show')   // pas d'aide à la saisie pendant l'exécution
   } else {
     runBtn.classList.remove('running')
-    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Ctrl+↵</kbd>'
+    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Alt+↵</kbd>'
     stopBtn.style.display = 'none'
     stopBtn.disabled = true
     isPaused = false
@@ -1552,8 +1644,7 @@ async function launch() {
     onRunning: () => {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
-      runtimeArmed = true   // GLFW a installé son écouteur clavier global (Backspace/Tab)
-      setRunning(true)
+      setRunning(true)   // le drapeau __ollinGfxKbdArmed est posé par runProgram (pg-run.js)
     },
     onOutput:  (out) => showOutput(out),
   })
@@ -1579,6 +1670,24 @@ function stopExec() {
 }
 
 runBtn.addEventListener('click', run)
+
+// ── Mode Auto (relance différée) — navigateur desktop uniquement (souris) ──────
+// Révélé seulement sur pointeur fin : caché sur tactile/mobile pour l'instant.
+const autoexecWrap = document.getElementById('autoexec-wrap')
+const autoexecChk  = document.getElementById('autoexec-chk')
+if (autoexecWrap && window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+  autoexecWrap.style.display = ''
+  const onAutoexec = () => {
+    autoexecWrap.classList.toggle('on', autoexecChk.checked)
+    if (!autoexecChk.checked) {
+      clearTimeout(autoexecTimer)   // décoché → annule une relance en attente
+      return
+    }
+    if (!isRunning) relaunch()      // coché → lance tout de suite si le script ne tourne pas déjà
+  }
+  autoexecChk.addEventListener('change', onAutoexec)
+  disposers.push(() => autoexecChk.removeEventListener('change', onAutoexec))
+}
 stopBtn.addEventListener('click', () => {
   if (isPaused) {
     try { ollin.resumeMainLoop() } catch(_) {}
@@ -1629,38 +1738,60 @@ copyBtn.addEventListener('click', () => {
   })
 })
 
-// ── Mode autonome (vue plein écran, nouvel onglet) ──────────────────────────
-// Ouvre la vue #/run dans un nouvel onglet (page dédiée plein écran). Le projet
-// complet (fichiers + ressources) est persisté dans IndexedDB ; on ne partage
-// que l'id du projet actif — la vue #/run le recharge depuis là. IndexedDB (pas
-// localStorage, limité à ~5 Mo → une image ≥ 4 Mo faisait échouer l'écriture en
-// silence, d'où « aucun projet »).
+// ── Mode plein écran (vue #/run, MÊME fenêtre) ──────────────────────────────
+// Bascule vers la vue #/run DANS la fenêtre courante (pas de nouvel onglet : un
+// nouvel onglet crée un contexte GLFW distinct dont l'écouteur clavier casse
+// Backspace/Tab au retour éditeur). Le projet actif est commité dans IndexedDB
+// avant la bascule — la vue #/run le recharge depuis là.
 const standaloneBtn = document.getElementById('standalone-btn')
-standaloneBtn.addEventListener('click', () => {
-  // Onglet ouvert SYNCHRONEMENT (conserve le user gesture → pas bloqué par le
-  // pop-up blocker), mais on n'y charge #/run qu'APRÈS que le projet soit COMMITÉ
-  // dans IndexedDB (sinon l'autre onglet pourrait lire une version périmée, voire
-  // « aucun projet » pour un projet neuf). saveProject est donc bien attendu.
-  const win = window.open('', '_blank')
-  ;(async () => {
-    let target = 'index.html#/run'
-    if (exampleFile) {
-      // Mode exemple : exécute le MÊME exemple frais en autonome (pas de projet).
-      target = 'index.html#/run/sample/' + exampleFile
-    } else {
-      try {
-        flushEditorToFile()
-        if (currentProject) {
-          Store.setActiveId(currentProject.id)
-          await Store.saveProject(currentProject)
-        }
-      } catch (_) {}
+standaloneBtn.addEventListener('click', async () => {
+  if (exampleFile) {
+    // Mode exemple : exécute le MÊME exemple frais en autonome (pas de projet).
+    ctx.navigate('run', 'sample/' + exampleFile)
+    return
+  }
+  try {
+    flushEditorToFile()
+    if (currentProject) {
+      Store.setActiveId(currentProject.id)
+      await Store.saveProject(currentProject)
     }
-    const url = Run.freshUrl(target)
-    if (win && !win.closed) win.location.replace(url)
-    else window.open(url, '_blank')   // repli si l'onglet a été bloqué
-  })()
+  } catch (_) {}
+  ctx.navigate('run')
 })
+
+// ── Popup d'aide (raccourcis) ────────────────────────────────────────────────
+// Rendue une fois depuis SHORTCUTS ; ouverte par le bouton « Aide » ou F1.
+const helpOverlay = document.getElementById('help-overlay')
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+function renderHelp() {
+  const body = document.getElementById('help-body')
+  if (!body) return
+  body.innerHTML = SHORTCUTS.map(group => {
+    const rows = group.items.map(it => {
+      const keys = it.keys.map(k => '<kbd>' + esc(k) + '</kbd>')
+        .join(it.sep ? '<span class="plus">' + esc(it.sep) + '</span>' : '<span class="plus">+</span>')
+      return '<div class="help-row"><span class="help-desc">' + esc(it.desc) + '</span><span class="help-keys">' + keys + '</span></div>'
+    }).join('')
+    return '<div class="help-cat">' + esc(group.cat) + '</div>' + rows
+  }).join('')
+}
+function helpOpen() {
+  return helpOverlay && !helpOverlay.hasAttribute('hidden')
+}
+function openHelp() {
+  if (!helpOverlay) return
+  renderHelp()
+  helpOverlay.removeAttribute('hidden')
+}
+function closeHelp() {
+  if (helpOverlay) helpOverlay.setAttribute('hidden', '')
+}
+function toggleHelp() {
+  helpOpen() ? closeHelp() : openHelp()
+}
+document.getElementById('help-close')?.addEventListener('click', closeHelp)
+helpOverlay?.addEventListener('click', e => { if (e.target === helpOverlay) closeHelp() })
 
 // ── Recharger + vider le cache ──────────────────────────────────────────────
 // Vide le Cache API puis recharge (le code de l'éditeur est conservé dans
@@ -1789,7 +1920,9 @@ disposers.push(() => {
 // globaux → pas de fuite à chaque re-visite) et libérer la référence de debug.
 disposers.push(() => {
   try { ollin && ollin.pauseMainLoop() } catch (_) {}
-  runtimeArmed = false
+  // NB : on ne remet PAS __ollinGfxKbdArmed à false — l'écouteur GLFW reste posé
+  // sur window après le démontage, la parade doit donc rester armée page-wide.
+  clearTimeout(autoexecTimer)   // pas de relance fantôme après le démontage de la vue
   try { view.destroy() } catch (_) {}
   if (window.__ollinView === view) window.__ollinView = undefined
 })

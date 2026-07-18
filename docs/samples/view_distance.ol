@@ -14,7 +14,7 @@
 ##
 ## Câblage côté hôte :
 ##   import "view_distance.ol"
-##   global vd = ViewDistance(4, 1, 24)
+##   global vd = ViewDistance(4, 1, 24)       ## 4e arg = FPS cible (défaut 60 ; ex. 30)
 ##   func mouse.pressed(x, y)
 ##       var ev = vd.hit(x, y)
 ##       if ev == 1 then streaming = true
@@ -27,17 +27,18 @@
 ##   ##   ... vd.draw()  (boutons)  ...  vd.mode() → "auto"/"manuel"
 
 class ViewDistance
-    func init(start, lo, hi)
+    func init(start, lo, hi, fps = 60)
         self.radius = start
         self.lo = lo
         self.hi = hi          ## filet de sécurité ; la vraie limite vient du FPS/mémoire
         self.manual = false
-        self.SLOW_DT = 0.021
-        self.STALL_DT = 0.30
+        var budget = 1.0 / fps            ## durée cible d'une frame (60→16,7ms, 30→33,3ms)
+        self.SLOW_DT = budget * 1.25      ## au-delà = frame « en retard » (+25% de marge)
+        self.STALL_DT = math.max(0.30, budget * 4)
         self.WIN = 0.5
-        self.GROW = 0.10
-        self.DROP = 0.25
-        self.RELAX = 8.0
+        self.GROW = 0.03      ## ne grandit que si TRÈS peu de frames lentes → garde de la marge
+        self.DROP = 0.25      ## large zone morte [GROW;DROP] = ne chasse pas la limite, n'oscille pas
+        self.RELAX = 20.0     ## re-teste le plafond appris rarement (évite le va-et-vient)
         self.MEM_MAX = 110000000
         self.t = 0.0
         self.n = 0
@@ -48,11 +49,12 @@ class ViewDistance
         self.stable = 0.0
         self.BTN = 54
         self.BTN_Y = 40
+        self.MARGIN = 12      ## marge bord droit
+        self.GAP = 10         ## écart entre boutons
     end
 
     func mode()
-        if self.manual then return "manuel" end
-        return "auto"
+        return self.manual and "manuel" or "auto"
     end
 
     ## Ajuste le rayon selon la part de frames lentes de la fenêtre écoulée. Ne mesure
@@ -71,10 +73,7 @@ class ViewDistance
         var ev = 0
         if (mem_full or self.slow > self.n * self.DROP) and self.radius > self.lo then
             self.cap = self.radius - 1
-            var back = (self.good + self.radius) // 2
-            if back > self.radius - 1 then back = self.radius - 1 end
-            if back < self.lo then back = self.lo end
-            self.radius = back
+            self.radius = math.clamp((self.good + self.radius) // 2, self.lo, self.radius - 1)
             self.step = 1
             self.stable = 0.0
             ev = -1
@@ -103,9 +102,8 @@ class ViewDistance
         return ev
     end
 
-    func btnXPlus()   return W - self.BTN - 12 end
-    func btnXMinus()  return self.btnXPlus() - self.BTN - 10 end
-    func btnXAuto()   return self.btnXMinus() - self.BTN - 10 end
+    ## Boutons alignés de droite à gauche : 0 = +, 1 = −, 2 = A.
+    func btnX(i)   return W - self.MARGIN - self.BTN - i * (self.BTN + self.GAP) end
 
     ## Traite un appui : + / − → passe en manuel et ajuste le rayon (borné) ; A → rebascule
     ## en auto-adaptation. Renvoie 1 (grandi) / -1 (rétréci) / 2 (bouton consommé sans
@@ -114,7 +112,8 @@ class ViewDistance
         if y < self.BTN_Y or y > self.BTN_Y + self.BTN then
             return 0
         end
-        if x >= self.btnXPlus() and x <= self.btnXPlus() + self.BTN then
+        var xp = self.btnX(0)
+        if x >= xp and x <= xp + self.BTN then
             self.manual = true
             if self.radius < self.hi then
                 self.radius = self.radius + 1
@@ -122,7 +121,8 @@ class ViewDistance
             end
             return 2
         end
-        if x >= self.btnXMinus() and x <= self.btnXMinus() + self.BTN then
+        var xm = self.btnX(1)
+        if x >= xm and x <= xm + self.BTN then
             self.manual = true
             if self.radius > self.lo then
                 self.radius = self.radius - 1
@@ -130,7 +130,8 @@ class ViewDistance
             end
             return 2
         end
-        if x >= self.btnXAuto() and x <= self.btnXAuto() + self.BTN then
+        var xa = self.btnX(2)
+        if x >= xa and x <= xa + self.BTN then
             self.manual = false
             return 2
         end
@@ -138,20 +139,18 @@ class ViewDistance
     end
 
     func draw()
-        var xa = self.btnXAuto()
-        var xm = self.btnXMinus()
-        var xp = self.btnXPlus()
+        ## [index bouton, libellé, nudge X du glyphe] — le "−" est plus étroit
+        var btns = [[0, "+", -9], [1, "-", -6], [2, "A", -9]]
+        var ty = self.BTN_Y + self.BTN / 2 - 16
         graphics.noStroke()
-        graphics.fill(Color(0, 0, 0, 0.38))
-        graphics.rect(xa, self.BTN_Y, self.BTN, self.BTN)
-        graphics.rect(xm, self.BTN_Y, self.BTN, self.BTN)
-        graphics.rect(xp, self.BTN_Y, self.BTN, self.BTN)
-        if not self.manual then
-            graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## A allumé = auto actif
-            graphics.rect(xa, self.BTN_Y, self.BTN, self.BTN)
+        for b in btns do
+            var x = self.btnX(b[1])
+            graphics.fill(Color(0, 0, 0, 0.38))
+            if b[2] == "A" and not self.manual then
+                graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## A allumé = auto actif
+            end
+            graphics.rect(x, self.BTN_Y, self.BTN, self.BTN)
+            graphics.drawText(b[2], x + self.BTN / 2 + b[3], ty, 30, colors.WHITE)
         end
-        graphics.drawText("A", xa + self.BTN / 2 - 9, self.BTN_Y + self.BTN / 2 - 16, 30, colors.WHITE)
-        graphics.drawText("-", xm + self.BTN / 2 - 6, self.BTN_Y + self.BTN / 2 - 16, 30, colors.WHITE)
-        graphics.drawText("+", xp + self.BTN / 2 - 9, self.BTN_Y + self.BTN / 2 - 16, 30, colors.WHITE)
     end
 end

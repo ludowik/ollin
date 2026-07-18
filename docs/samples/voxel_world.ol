@@ -102,8 +102,25 @@ func elevation(x, z)
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-func height_at(x, z)
+func raw_height(x, z)
     return math.floor((elevation(x, z) - 0.42) * 60 + SEA)
+end
+
+## Élimine les extrema d'1 colonne : un pic isolé (plus haut que ses 4 voisins) est
+## rabaissé au plus haut voisin, un puits isolé (plus bas que ses 4 voisins) est
+## remonté au plus bas voisin → ni cube ni trou solitaire. Fonction pure de (x, z)
+## → même hauteur pour le culling, la collision et le spawn (pas de jointure incohérente).
+func height_at(x, z)
+    var h = raw_height(x, z)
+    var e = raw_height(x + 1, z)
+    var w = raw_height(x - 1, z)
+    var n = raw_height(x, z + 1)
+    var s = raw_height(x, z - 1)
+    var hi = math.max(math.max(e, w), math.max(n, s))
+    var lo = math.min(math.min(e, w), math.min(n, s))
+    if h > hi then return hi end   ## cube solitaire → éliminé
+    if h < lo then return lo end   ## trou solitaire → rempli
+    return h
 end
 
 func ground(x, z)
@@ -361,7 +378,7 @@ end
 func mouse.released(x, y)
     pad.release()
 end
-## Touche C : bascule la caméra de contrôle (vue de haut pour vérifier le culling).
+## Touche C : bascule la caméra de contrôle (le déplacement, lui, lit keyboard.isDown).
 func keyboard.keypressed(key)
     if string.upper(key) == "C" then
         debugCam = not debugCam
@@ -371,14 +388,22 @@ func mouse.moved(x, y)
     pad.move(x, y)
 end
 
-## Avance le joueur (virage + vitesse du joystick), avec glissement sur les pentes
-## franchissables et blocage sur les murs.
+## Avance le joueur (virage + vitesse), joystick tactile ET flèches clavier combinés,
+## avec glissement sur les pentes franchissables et blocage sur les murs.
 func move_player()
-    yaw = yaw - pad.steer() * TURN_MAX * deltaTime
-    var sp = pad.throttle() * SPEED_MAX * deltaTime
-    if sp <= 0 then
+    var turn = pad.steer()
+    if keyboard.isDown("left") then turn = turn - 1 end
+    if keyboard.isDown("right") then turn = turn + 1 end
+    yaw = yaw - math.clamp(turn, -1, 1) * TURN_MAX * deltaTime
+
+    var thr = pad.throttle()      ## joystick : [0;1] (avant)
+    if keyboard.isDown("up") then thr = thr + 1 end
+    if keyboard.isDown("down") then thr = thr - 1 end   ## flèche bas = marche arrière
+    thr = math.clamp(thr, -1, 1)
+    if thr == 0 then
         return
     end
+    var sp = thr * SPEED_MAX * deltaTime
     var nx = camX + math.sin(yaw) * sp
     var nz = camZ + math.cos(yaw) * sp
     var g0 = ground(camX, camZ)
