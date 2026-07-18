@@ -760,7 +760,7 @@ assert(u.mul(3, 4) == 12)
 assert(u.VERSION == 2)
 
 ## import circulaire : ignoré silencieusement (déjà importé)
-import "utils_test"
+import "utils_test1"
 assert(CONST == 42)   ## toujours disponible
 
 ## ── 18. Classes ──────────────────────────────────────────────────────────────
