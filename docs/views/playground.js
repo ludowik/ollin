@@ -972,7 +972,6 @@ function menuSep() {
 function renderMenuRoot() {
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Projet : ' + (currentProject ? currentProject.name : '—')))
-  projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('✨ Nouveau projet vide', false, async () => {
     const name = await askFreeProjectName('Sans titre'); if (!name) return
     const p = await Store.createProject(name)
@@ -980,6 +979,7 @@ function renderMenuRoot() {
     await autoPushNewProject(p)   // dépôt paramétré → créé sur GitHub
     await openProject(p.id)
   }))
+  projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
   // rien à renommer/dupliquer/supprimer en base).
@@ -1018,33 +1018,40 @@ function renderMenuRoot() {
     }))
   }
 
-  // ── section GitHub ──
   projectMenu.appendChild(menuSep())
-  if (GH.isConnected()) {
-    const hdr = document.createElement('div')
-    hdr.className = 'menu-header'
-    hdr.textContent = 'GitHub' + (ghLogin ? ' : @' + ghLogin : '')
-    projectMenu.appendChild(hdr)
-    if (!ghLogin) {
-      GH.getUser().then(u => { ghLogin = u.login; hdr.textContent = 'GitHub : @' + u.login }).catch(() => {})
-    }
-    projectMenu.appendChild(menuItem('🗄 Dépôt : ' + GH.getRepo(), false, () => {
-      const v = prompt('Dépôt cible (nom, ou « owner/repo » pour un dépôt partagé) :', GH.getRepo())
-      if (v === null) return
-      GH.setRepo(v)
-      renderMenuRoot()
-    }))
-    if (currentProject && !isExample()) {   // pousser/récupérer agit sur un projet réel
-      projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
-      projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
-    }
-    projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
-    projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuRoot() }))
-  } else {
-    projectMenu.appendChild(menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
-  }
+  const ghLabel = GH.isConnected() ? ('🐙 GitHub' + (ghLogin ? ' : @' + ghLogin : '')) : '🐙 GitHub'
+  projectMenu.appendChild(menuItem(ghLabel, true, renderMenuGithub))
   projectMenu.appendChild(menuSep())
   projectMenu.appendChild(menuItem('⌨ Raccourcis clavier (F1)', false, () => { closeMenu(); openHelp() }))
+}
+
+// Sous-menu GitHub : regroupe toutes les fonctionnalités (connexion, dépôt,
+// pousser/récupérer, ouvrir, déconnexion). Accédé depuis « 🐙 GitHub » à la racine.
+function renderMenuGithub() {
+  projectMenu.innerHTML = ''
+  if (!GH.isConnected()) {
+    projectMenu.appendChild(menuHeader('GitHub', renderMenuRoot))
+    projectMenu.appendChild(menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
+    return
+  }
+  const hdr = menuHeader('GitHub' + (ghLogin ? ' : @' + ghLogin : ''), renderMenuRoot)
+  projectMenu.appendChild(hdr)
+  if (!ghLogin) {
+    const span = hdr.querySelector('span')
+    GH.getUser().then(u => { ghLogin = u.login; if (span) span.textContent = 'GitHub : @' + u.login }).catch(() => {})
+  }
+  projectMenu.appendChild(menuItem('🗄 Dépôt : ' + GH.getRepo(), false, () => {
+    const v = prompt('Dépôt cible (nom, ou « owner/repo » pour un dépôt partagé) :', GH.getRepo())
+    if (v === null) return
+    GH.setRepo(v)
+    renderMenuGithub()
+  }))
+  if (currentProject && !isExample()) {   // pousser/récupérer agit sur un projet réel
+    projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
+    projectMenu.appendChild(menuItem('⬇ Récupérer (Pull)', false, ghPull))
+  }
+  projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, renderMenuRemote))
+  projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
 async function renderMenuOpen() {
@@ -1092,7 +1099,7 @@ function setStatus(msg, transient, isError) {
 
 function renderMenuConnect() {
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Se connecter à GitHub', renderMenuRoot))
+  projectMenu.appendChild(menuHeader('Se connecter à GitHub', renderMenuGithub))
   const wrap = document.createElement('div'); wrap.className = 'menu-form'
   const info = document.createElement('div'); info.className = 'menu-info'
   info.innerHTML = 'Colle un <b>fine-grained token</b> (dépôt <code>ollin-projects</code>, permission Contents : lecture/écriture). '
@@ -1281,7 +1288,7 @@ async function checkRemoteFreshness(project) {
 
 async function renderMenuRemote() {
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuRoot))
+  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuGithub))
   const loading = document.createElement('div'); loading.className = 'menu-empty'; loading.textContent = 'Chargement…'
   projectMenu.appendChild(loading)
   let list
