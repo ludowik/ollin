@@ -24,6 +24,7 @@ global camX = 8.5
 global camY = 10
 global camZ = 8.5
 global yaw = 0.0
+global save_acc = 0.0        ## accumulateur pour throttler la sauvegarde de position
 global PITCH = -0.12
 global lastcx = 999999
 global lastcz = 999999
@@ -372,6 +373,12 @@ func setup()
             yaw = ang
         end
     end
+    ## restaure la position mémorisée (module data) si présente → écrase le spawn par défaut
+    if data.has("camX") then
+        camX = data.get("camX", camX)
+        camZ = data.get("camZ", camZ)
+        yaw = data.get("yaw", yaw)
+    end
     lastcx = math.floor(camX / CS)
     lastcz = math.floor(camZ / CS)
     loaded[ckey(lastcx, lastcz)] = bake_chunk(lastcx, lastcz)   ## sol présent dès le spawn
@@ -444,9 +451,23 @@ func move_player()
     if ground(camX, nz) - g0 <= STEP then camZ = nz end
 end
 
+## Mémorise la position (module data) au plus une fois par seconde (throttle) : éviter
+## une écriture localStorage/fichier à chaque frame.
+func save_player()
+    save_acc = save_acc + deltaTime
+    if save_acc < 1.0 then
+        return
+    end
+    save_acc = 0.0
+    data.set("camX", camX)
+    data.set("camZ", camZ)
+    data.set("yaw", yaw)
+end
+
 func draw()
     graphics.clear(C_SKY)
     move_player()
+    save_player()
 
     var pcx = math.floor(camX / CS)
     var pcz = math.floor(camZ / CS)
