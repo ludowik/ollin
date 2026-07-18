@@ -506,26 +506,43 @@ func save_player()
 end
 
 ## Nuages : pattern de bruit FIGÉ échantillonné aux positions « maison » (cx,cz),
-## rendu décalé de `drift` en x → translation continue et lisse. Cull par secteur.
-func draw_clouds()
+## rendu décalé de `drift` en x → translation continue et lisse.
+##
+## Cull par SECTEUR fait ICI, comme les chunks : AVANT begin3d(rcam), donc contre le
+## frustum FIGÉ du JOUEUR. Sinon, en caméra de contrôle (rendu depuis ctrlCam),
+## inFrustum lirait le frustum de la caméra de contrôle → aucun secteur rejeté.
+## Renvoie un tableau plat [sx0, sz0, sx1, sz1, …] des secteurs visibles.
+func cull_cloud_sectors()
     var drift = elapsedTime * CLOUD_SPEED
     var reach = vd.radius * CS + CLOUD_MARGIN   ## suit la distance d'affichage du terrain
-    graphics.noStroke()
-    graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle crée un dégradé
-    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (haut clair, sous-face plus douce) : donne du volume
-    graphics.texture(cloudTex)                    ## moucheté doux (casse le blanc plat)
+    var secs = []
     var s0x = math.floor((camX - drift - reach) / CLOUD_SEC) * CLOUD_SEC
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
     for sx = s0x, camX - drift + reach, CLOUD_SEC do
         for sz = s0z, camZ + reach, CLOUD_SEC do
             ## bbox du secteur EN MONDE (x décalé par le drift) testée en frustum
             if graphics.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, sz + CLOUD_SEC / 2, CLOUD_SEC * 0.72 + 4) then
-                for cx = sx, sx + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
-                    for cz = sz, sz + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
-                        if math.noise(cx * CLOUD_SCALE, cz * CLOUD_SCALE) > CLOUD_THRESH then
-                            graphics.cube(cx + drift, CLOUD_Y, cz,  CLOUD_SIZE, CLOUD_TH, CLOUD_SIZE)
-                        end
-                    end
+                secs[#secs + 1] = sx
+                secs[#secs + 1] = sz
+            end
+        end
+    end
+    return secs
+end
+
+func draw_clouds(secs)
+    var drift = elapsedTime * CLOUD_SPEED
+    graphics.noStroke()
+    graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle crée un dégradé
+    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (haut clair, sous-face plus douce) : donne du volume
+    graphics.texture(cloudTex)                    ## moucheté doux (casse le blanc plat)
+    for i = 1, #secs, 2 do
+        var sx = secs[i]
+        var sz = secs[i + 1]
+        for cx = sx, sx + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
+            for cz = sz, sz + CLOUD_SEC - CLOUD_STEP, CLOUD_STEP do
+                if math.noise(cx * CLOUD_SCALE, cz * CLOUD_SCALE) > CLOUD_THRESH then
+                    graphics.cube(cx + drift, CLOUD_Y, cz,  CLOUD_SIZE, CLOUD_TH, CLOUD_SIZE)
                 end
             end
         end
@@ -591,6 +608,7 @@ func draw()
             vis[#vis + 1] = c
         end
     end
+    var cloudSecs = cull_cloud_sectors()   ## cull ICI (frustum joueur), comme les chunks
     graphics.begin3d(rcam)
         for i = 1, #vis do
             graphics.drawChunk(vis[i])
@@ -598,7 +616,7 @@ func draw()
         for i = 1, #vis do          ## eau transparente après tout l'opaque
             graphics.drawChunkAlpha(vis[i])
         end
-        draw_clouds()               ## nuages (semi-transparents) au-dessus de tout
+        draw_clouds(cloudSecs)      ## nuages (semi-transparents) au-dessus de tout
     graphics.end3d()
     graphics.ambient(AMB)           ## draw_clouds a mis l'ambiant à blanc → on rétablit
 
