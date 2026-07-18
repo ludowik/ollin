@@ -491,9 +491,9 @@ static void flushPendingScreenshot() {
     TakeScreenshot(s_shot_path.c_str());
 }
 
-static Value gfx_draw_text(Value* args, int argc) {
+static Value gfx_text(Value* args, int argc) {
     if (argc < 4)
-        throw std::runtime_error("graphics.drawText: expected text, x, y, size [, color]");
+        throw std::runtime_error("graphics.text: expected text, x, y, size [, color]");
     const char* text = args[0].isString() ? args[0].asString().c_str() : "";
     DrawText(text, gfxToInt(args[1]), gfxToInt(args[2]), gfxToInt(args[3]), argc > 4 ? gfxToColor(args[4]) : s_stroke_color);
     return Value{};
@@ -1059,7 +1059,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
     m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));
     m.mapSet(Value(std::string("screenshot")), Value::makeBuiltin(gfx_screenshot));
-    m.mapSet(Value(std::string("drawText")), Value::makeBuiltin(gfx_draw_text));
+    m.mapSet(Value(std::string("text")), Value::makeBuiltin(gfx_text));
     m.mapSet(Value(std::string("close")), Value::makeBuiltin(gfx_close));
     m.mapSet(Value(std::string("quit")), Value::makeBuiltin(gfx_quit));
     m.mapSet(Value(std::string("run")), Value::makeBuiltin(gfx_run));

@@ -150,7 +150,7 @@ class ViewDistance
                 graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## A allumé = auto actif
             end
             graphics.rect(x, self.BTN_Y, self.BTN, self.BTN)
-            graphics.drawText(b[2], x + self.BTN / 2 + b[3], ty, 30, colors.WHITE)
+            graphics.text(b[2], x + self.BTN / 2 + b[3], ty, 30, colors.WHITE)
         end
     end
 end

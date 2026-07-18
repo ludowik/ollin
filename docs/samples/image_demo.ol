@@ -30,5 +30,5 @@ func draw()
     var big = 110 + math.sin(time() * 2) * 28
     image.draw(img, W / 2 - big / 2, H / 2 - big / 2, big, big)
 
-    graphics.drawText("image.loadData : PNG embarque (base64)", 12, 12, 18, Color(0.75, 0.8, 0.9))
+    graphics.text("image.loadData : PNG embarque (base64)", 12, 12, 18, Color(0.75, 0.8, 0.9))
 end

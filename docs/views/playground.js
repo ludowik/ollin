@@ -201,7 +201,7 @@ const MODULE_MEMBERS = {
     fn('graphics.rotateZ','rotateZ(deg)'),
     fn('graphics.scale','scale(s | sx,sy | sx,sy,sz)'), fn('graphics.resetTransform','resetTransform()'),
     fn('graphics.sprite','sprite(img,x,y[,w,h])'),
-    fn('graphics.drawText','drawText(text,x,y,size[,color])'),
+    fn('graphics.text','text(str,x,y,size[,color])'),
     fn('graphics.fps','fps()→int'),                fn('graphics.isOpen','isOpen()→bool'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
     // ── 3D ──
@@ -404,7 +404,14 @@ const editorExtensions = [
       search({ top: true }), highlightSelectionMatches(),
       keymap.of(editKeymap),
       keymap.of([
+        // Alt+Espace : déclenche l'autocomplétion (alternative portable à Ctrl+Espace,
+        // réservé par macOS pour la source de saisie).
+        { key: 'Alt-Space', run: (v) => (startCompletion ? startCompletion(v) : false) },
         { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
+        // Changer de fichier (projet multi-fichiers) : Ctrl+Tab est réservé par le
+        // navigateur → Alt+PageUp/PageDown (analogue web-safe).
+        { key: 'Alt-PageUp', run: () => { cycleFile(-1); return true } },
+        { key: 'Alt-PageDown', run: () => { cycleFile(1); return true } },
         { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
         // F4 : aller à la première erreur de syntaxe/exécution (lien de la zone sortie).
@@ -448,7 +455,7 @@ const SHORTCUTS = [
   { cat: 'Édition', items: [
     { keys: ['Tab'],            desc: 'Indenter au curseur (ou accepter la complétion si la popup est ouverte)' },
     { keys: ['Maj', 'Tab'],     desc: 'Désindenter' },
-    { keys: ['Ctrl', 'Espace'], desc: 'Déclencher l’autocomplétion' },
+    { keys: ['Alt', 'Espace'], desc: 'Déclencher l’autocomplétion' },
     { keys: ['Alt+K', 'C'], sep: ' puis ', desc: 'Commenter les lignes sélectionnées' },
     { keys: ['Alt+K', 'U'], sep: ' puis ', desc: 'Décommenter les lignes sélectionnées' },
     { keys: ['Alt', 'Maj', 'F'],desc: 'Reformater le code (indentation)' },
@@ -463,6 +470,10 @@ const SHORTCUTS = [
   { cat: 'Pliage', items: [
     { keys: ['Ctrl', 'Maj', '['], desc: 'Plier le bloc' },
     { keys: ['Ctrl', 'Maj', ']'], desc: 'Déplier le bloc' },
+  ]},
+  { cat: 'Fichiers', items: [
+    { keys: ['Alt', 'Page↑'], desc: 'Fichier précédent (projet multi-fichiers)' },
+    { keys: ['Alt', 'Page↓'], desc: 'Fichier suivant' },
   ]},
   { cat: 'Aide', items: [
     { keys: ['F1'], desc: 'Afficher / masquer cette aide' },
@@ -806,6 +817,17 @@ function openFile(path) {
   view.focus()
 }
 
+// Bascule au fichier précédent (dir=-1) / suivant (dir=+1) du projet, en boucle.
+// Marche aussi en mode exemple (navigation en lecture ; openFile n'y persiste rien).
+function cycleFile(dir) {
+  if (!currentProject) return
+  const list = scripts(currentProject)
+  if (list.length < 2) return
+  let i = list.indexOf(currentFile)
+  if (i < 0) i = 0
+  openFile(list[(i + dir + list.length) % list.length])
+}
+
 async function newFile() {
   if (!currentProject || isExample()) return   // aucun projet éditable (ex. exemple 404)
   let name = prompt('Nom du nouveau fichier (.ol) :', 'nouveau.ol')
@@ -904,6 +926,7 @@ async function deleteResource(name) {
 async function loadProject(id) {
   const p = await Store.getProject(id)
   if (!p) return
+  if (isRunning) clearAndStop()   // changer de PROJET = autre script → ferme la prévisualisation
   removeExampleBanner()   // quitte le mode exemple
   setStructuralUI(true)   // projet réel → mutations autorisées
   flushEditorToFile()
@@ -1798,14 +1821,18 @@ standaloneBtn.addEventListener('click', async () => {
 // Rendue une fois depuis SHORTCUTS ; ouverte par le bouton « Aide » ou F1.
 const helpOverlay = document.getElementById('help-overlay')
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+// Sur macOS, CodeMirror mappe Ctrl→⌘ (spec Mod-) ; on affiche donc les symboles Mac
+// (⌘ ⌥ ⇧) pour que l'aide corresponde aux vraies touches. Ailleurs : Ctrl/Alt/Maj.
+const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '')
+const osKey = k => IS_MAC ? k.replace(/Ctrl\+?/g, '⌘').replace(/Alt\+?/g, '⌥').replace(/Maj\+?/g, '⇧') : k
 function renderHelp() {
   const body = document.getElementById('help-body')
   if (!body) return
   body.innerHTML = SHORTCUTS.map(group => {
     const rows = group.items.map(it => {
-      const keys = it.keys.map(k => '<kbd>' + esc(k) + '</kbd>')
+      const keys = it.keys.map(k => '<kbd>' + esc(osKey(k)) + '</kbd>')
         .join(it.sep ? '<span class="plus">' + esc(it.sep) + '</span>' : '<span class="plus">+</span>')
-      return '<div class="help-row"><span class="help-desc">' + esc(it.desc) + '</span><span class="help-keys">' + keys + '</span></div>'
+      return '<div class="help-row"><span class="help-desc">' + esc(osKey(it.desc)) + '</span><span class="help-keys">' + keys + '</span></div>'
     }).join('')
     return '<div class="help-cat">' + esc(group.cat) + '</div>' + rows
   }).join('')

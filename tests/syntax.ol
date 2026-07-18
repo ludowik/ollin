@@ -1069,4 +1069,4 @@ assert(sw_func(5) == "autre")
 ## Couleurs prédéfinies : module `colors` (colors.BLACK, colors.WHITE, colors.RED…)
 ## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
 ## FPS : graphics.fps() → entier
-## Texte : graphics.drawText(text, x, y, size [, color])
+## Texte : graphics.text(text, x, y, size [, color])
