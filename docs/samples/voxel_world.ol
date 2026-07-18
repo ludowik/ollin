@@ -244,9 +244,11 @@ func bake_chunk(cx, cz)
                 ## pas une pile de cubes → on voit le fond, sans faces internes).
                 ## Plus le fond est PROFOND, plus l'eau est sombre et opaque → la
                 ## visibilité du fond décroît avec la profondeur (absorption).
-                var d = math.clamp((SEA - h) / 12.0, 0, 1)
-                var tint = 1.0 - d * 0.55       ## assombrit avec la profondeur
-                var a = 0.55 + d * 0.4          ## 0.55 (haut-fond) → 0.95 (profond) : masque le fond
+                ## profondeur des fonds ≈ 1..16 (surtout 1..9) → ramper sur /8 pour un
+                ## contraste net entre haut-fond (clair) et fond (sombre, quasi masqué).
+                var d = math.clamp((SEA - h) / 8.0, 0, 1)
+                var tint = 1.0 - d * 0.72       ## assombrit fortement avec la profondeur
+                var a = 0.5 + d * 0.47          ## 0.5 (haut-fond, clair) → 0.97 (profond) : masque le fond
                 graphics.tile(T_WATER)
                 graphics.fill(Color(tint, tint, tint, a))
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
