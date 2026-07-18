@@ -344,6 +344,7 @@ function ollinFoldRange(state, lineStart) {
 // Le contenu est piloté par le projet actif (voir la section « Projets » plus
 // bas) : l'éditeur démarre vide puis reçoit le fichier courant après Store.init.
 let saveTimer   = null
+let autoexecTimer = null  // mode Auto : relance différée après la dernière modif
 let loadingFile = false   // true pendant un chargement programmatique → pas d'autosave
 
 // Keymap de l'éditeur, gardé en référence : réutilisé tel quel par le garde-fou
@@ -397,6 +398,12 @@ const editorExtensions = [
         if (!update.docChanged || loadingFile) return
         clearTimeout(saveTimer)
         saveTimer = setTimeout(scheduleSave, 500)
+        // Mode Auto : chaque modif réarme un compte à rebours ; 2 s d'inactivité → relance.
+        const chk = document.getElementById('autoexec-chk')
+        if (chk && chk.checked) {
+          clearTimeout(autoexecTimer)
+          autoexecTimer = setTimeout(() => relaunch(), 2000)
+        }
       }),
 ]
 
@@ -1589,6 +1596,20 @@ function stopExec() {
 }
 
 runBtn.addEventListener('click', run)
+
+// ── Mode Auto (relance différée) — navigateur desktop uniquement (souris) ──────
+// Révélé seulement sur pointeur fin : caché sur tactile/mobile pour l'instant.
+const autoexecWrap = document.getElementById('autoexec-wrap')
+const autoexecChk  = document.getElementById('autoexec-chk')
+if (autoexecWrap && window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+  autoexecWrap.style.display = ''
+  const onAutoexec = () => {
+    autoexecWrap.classList.toggle('on', autoexecChk.checked)
+    if (!autoexecChk.checked) clearTimeout(autoexecTimer)   // décoché → annule une relance en attente
+  }
+  autoexecChk.addEventListener('change', onAutoexec)
+  disposers.push(() => autoexecChk.removeEventListener('change', onAutoexec))
+}
 stopBtn.addEventListener('click', () => {
   if (isPaused) {
     try { ollin.resumeMainLoop() } catch(_) {}
@@ -1800,6 +1821,7 @@ disposers.push(() => {
 disposers.push(() => {
   try { ollin && ollin.pauseMainLoop() } catch (_) {}
   runtimeArmed = false
+  clearTimeout(autoexecTimer)   // pas de relance fantôme après le démontage de la vue
   try { view.destroy() } catch (_) {}
   if (window.__ollinView === view) window.__ollinView = undefined
 })

@@ -111,6 +111,11 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 }
 .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+/* Bascule « Auto » (relance automatique) — desktop uniquement, révélée par JS. */
+#autoexec-wrap { user-select: none; }
+#autoexec-wrap input { margin: 0; width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
+#autoexec-wrap.on { border-color: var(--accent); color: var(--accent); }
+
 #run-btn {
   display: flex;
   align-items: center;
@@ -443,6 +448,10 @@ canvas#canvas {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
     <span class="btn-label">Copier</span>
   </button>
+  <label id="autoexec-wrap" class="tool-btn" title="Relance automatique 2 s après la dernière modification" style="display:none">
+    <input type="checkbox" id="autoexec-chk">
+    <span class="btn-label">Auto</span>
+  </label>
   <button id="run-btn" disabled>
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
     <span class="btn-label">Exécuter</span><kbd>Ctrl+↵</kbd>
