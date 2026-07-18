@@ -581,6 +581,21 @@ const onGlobalKeydown = e => {
 window.addEventListener('keydown', onGlobalKeydown, true)   // capture + avant l'écouteur GLFW
 disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true))
 
+// L'écouteur clavier GLFW est global (window) : sans garde, taper/naviguer dans
+// l'éditeur piloterait aussi un programme graphique en cours (ex. le sample voxel).
+// On signale au moteur (keyboard_module) d'ignorer le clavier tant que l'ÉDITEUR a
+// le focus ; dès qu'il le perd (canvas/bouton), le jeu reçoit de nouveau les touches.
+const onEditorFocus = () => { window.__ollinKbdBlocked = true }
+const onEditorBlur  = () => { window.__ollinKbdBlocked = false }
+view.contentDOM.addEventListener('focus', onEditorFocus)
+view.contentDOM.addEventListener('blur', onEditorBlur)
+window.__ollinKbdBlocked = (document.activeElement === view.contentDOM)
+disposers.push(() => {
+  view.contentDOM.removeEventListener('focus', onEditorFocus)
+  view.contentDOM.removeEventListener('blur', onEditorBlur)
+  window.__ollinKbdBlocked = false   // quitte la vue → ne pas bloquer le run autonome
+})
+
 // ── Déplacement du curseur au glissement horizontal (tactile / mobile) ──────
 // L'éditeur est en retour-à-la-ligne → aucun scroll horizontal, on utilise donc
 // le glissement HORIZONTAL du doigt pour déplacer le curseur : 1 cran par

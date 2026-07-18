@@ -4,6 +4,21 @@
 #include <cctype>
 #include <raylib.h>
 #include <string>
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+// Le clavier GLFW est GLOBAL (window) : dans le playground, taper/naviguer dans
+// l'éditeur alimenterait aussi le programme graphique en cours. La page pose
+// window.__ollinKbdBlocked=true quand l'ÉDITEUR a le focus → on ignore alors les
+// entrées côté jeu. Hors web (natif), pas d'éditeur : jamais bloqué.
+static bool keyboardBlocked() {
+#ifdef __EMSCRIPTEN__
+    return EM_ASM_INT({ return window.__ollinKbdBlocked ? 1 : 0; }) != 0;
+#else
+    return false;
+#endif
+}
 
 // ── Clavier ─────────────────────────────────────────────────────────────────
 // On affecte des fonctions au module `keyboard` ; le moteur les appelle si elles
@@ -71,6 +86,8 @@ static int keyCode(std::string name) {
 // keyboard.isDown(key) : la touche est-elle enfoncée à cet instant ? true/false.
 // shift/ctrl/alt testent les deux côtés du clavier.
 static Value kbd_is_down(Value* args, int argc) {
+    if (keyboardBlocked())
+        return Value((int64_t)0);   // éditeur focalisé → le jeu ne lit pas le clavier
     if (argc < 1 || !args[0].isString())
         return Value((int64_t)0);
     std::string name = args[0].asString();
@@ -104,6 +121,8 @@ void keyboardReset() {
 }
 
 void keyboardPoll() {
+    if (keyboardBlocked())
+        return;   // éditeur focalisé → pas d'événements keypressed/keyrelease vers le jeu
     VM* vm = VM::current();
     Value kbd = vm->getGlobal("keyboard");
     Value pressed, released;
