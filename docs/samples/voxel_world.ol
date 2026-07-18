@@ -102,8 +102,10 @@ func elevation(x, z)
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
+## Amplitude 44 (et non 60) : depuis la normalisation de math.noise sur [0,1], le bruit
+## s'étale ~1,35× plus → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
 func raw_height(x, z)
-    return math.floor((elevation(x, z) - 0.42) * 60 + SEA)
+    return math.floor((elevation(x, z) - 0.42) * 44 + SEA)
 end
 
 ## Élimine les extrema d'1 colonne : un pic isolé (plus haut que ses 4 voisins) est
