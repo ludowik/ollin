@@ -820,9 +820,9 @@ function openFile(path) {
 }
 
 // Bascule au fichier précédent (dir=-1) / suivant (dir=+1) du projet, en boucle.
-// Sans effet en mode exemple ou pour un projet à un seul fichier.
+// Marche aussi en mode exemple (navigation en lecture ; openFile n'y persiste rien).
 function cycleFile(dir) {
-  if (!currentProject || isExample()) return
+  if (!currentProject) return
   const list = scripts(currentProject)
   if (list.length < 2) return
   let i = list.indexOf(currentFile)
