@@ -51,6 +51,8 @@ global CLOUD_SCALE = 0.05     ## fréquence du bruit de placement
 global CLOUD_THRESH = 0.58    ## seuil de couverture (plus haut = moins de nuages)
 global CLOUD_SPEED = 1.2      ## dérive (blocs/s)
 global CLOUD_ALPHA = 0.9
+global CLOUD_TEX = 16         ## côté de la texture mouchetée des nuages
+global cloudTex = nil
 
 global TILE = 16
 global ACOLS = 4
@@ -101,6 +103,20 @@ func build_atlas()
     image.endPixels(atlas)
     graphics.tileset(atlas, ACOLS, AROWS)
     graphics.tileAnim(T_WATER)
+end
+
+## Texture de nuage : blanc légèrement moucheté (bruit de luminosité), alpha plein.
+## Casse le blanc plat des cubes sans créer de trou.
+func build_cloud_tex()
+    cloudTex = image.create(CLOUD_TEX, CLOUD_TEX)
+    image.beginPixels(cloudTex)
+    for py = 0, CLOUD_TEX - 1 do
+        for px = 0, CLOUD_TEX - 1 do
+            var v = 0.9 + math.noise(px * 0.6 + 3, py * 0.6 + 7) * 0.1   ## ~0.9 → 1.0
+            image.setPixel(cloudTex, px, py, v, v, v, 1)
+        end
+    end
+    image.endPixels(cloudTex)
 end
 
 ## Biome de surface : 0 = désert, 1 = plaine, 2 = forêt. Le relief (roche/neige) vient
@@ -366,6 +382,7 @@ func setup()
     graphics.light("dir", -0.5, -1, -0.35)
     math.noiseSeed(7)
     build_atlas()
+    build_cloud_tex()
     ## spawn : terre ferme, basse et proche de l'origine (pénalité forte sur l'altitude
     ## → jamais sous l'eau).
     var best = 1000000000.0
@@ -496,6 +513,7 @@ func draw_clouds()
     graphics.noStroke()
     graphics.ambient(1)                          ## nuages en BLANC PLAT : sans ça, la sous-face
     graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (vue d'en bas) n'aurait que l'ambiant → grise
+    graphics.texture(cloudTex)                    ## moucheté doux (casse le blanc plat)
     var s0x = math.floor((camX - drift - reach) / CLOUD_SEC) * CLOUD_SEC
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
     for sx = s0x, camX - drift + reach, CLOUD_SEC do
@@ -512,6 +530,7 @@ func draw_clouds()
             end
         end
     end
+    graphics.noTexture()
     graphics.fill(colors.WHITE)
 end
 
