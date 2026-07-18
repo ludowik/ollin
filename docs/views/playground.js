@@ -540,6 +540,16 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
     const key = e.target.closest('.kbar-key')
     if (!key) return
     e.preventDefault()   // garde le focus de l'éditeur → le clavier reste ouvert
+    const move = key.getAttribute('data-move')
+    if (move) {
+      const forward = move === '1'
+      const sel = view.state.selection.main
+      // Sélection : on la replie sur le bord visé (comme les flèches) ; curseur : ±1 caractère.
+      const anchor = sel.empty ? view.moveByChar(sel, forward).head : (forward ? sel.to : sel.from)
+      view.dispatch({ selection: { anchor }, scrollIntoView: true })
+      view.focus()
+      return
+    }
     const ins  = key.getAttribute('data-ins') || ''
     const back = parseInt(key.getAttribute('data-back') || '0', 10) || 0
     const sel  = view.state.selection.main
