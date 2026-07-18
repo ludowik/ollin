@@ -124,8 +124,19 @@ const AC_KEYWORDS = [
 const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
   fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
-  fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(r, g, b [, a])'),
+  fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(gris | r, g, b [, a])'),
   fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (octets utilisés)'),
+]
+
+// Globales injectées par le moteur (disponibles sans déclaration) — cf. CLAUDE.md.
+const glob = (label, detail) => ({ label, type: 'variable', detail })
+const AC_GLOBALS = [
+  glob('deltaTime',   'moteur — secondes depuis la frame précédente'),
+  glob('elapsedTime', 'moteur — secondes depuis le démarrage'),
+  glob('W',  'moteur — largeur de la zone de rendu'),
+  glob('H',  'moteur — hauteur de la zone de rendu'),
+  glob('CW', 'moteur — centre X (W / 2)'),
+  glob('CH', 'moteur — centre Y (H / 2)'),
 ]
 
 // Hooks de cycle de vie appelés par le moteur : insérés en squelette COMPLET
@@ -308,7 +319,7 @@ function ollinComplete(context) {
   }))
   return {
     from: word.from,
-    options: [AC_FUNC, ...AC_LIFECYCLE, ...AC_KEYWORDS, ...AC_BUILTINS, ...moduleNames],
+    options: [AC_FUNC, ...AC_LIFECYCLE, ...AC_KEYWORDS, ...AC_BUILTINS, ...AC_GLOBALS, ...moduleNames],
     validFor: /^\w*$/,
   }
 }
