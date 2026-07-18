@@ -74,7 +74,8 @@ ollin/
 ├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
-│                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`)
+│                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
+│                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py)
 └── docs/              tutoriel, playground, samples, wasm
 ```
@@ -103,9 +104,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 | `tests/regressions.ol` | Claude | non-régression des bugs corrigés en revue (coins peu couverts par `syntax.ol` : multi-retour closure/méthode, `super` 3 niveaux, clobber de registre sur appel 0-arg, lvalues chaînées, range ouvert…) |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
-| `ollin-vscode/` | Claude | extension VS Code (colorisation) |
+| `tools/ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/views/tutoriel.html` et `ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/views/tutoriel.html` et `tools/ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 ## Versionning
 
