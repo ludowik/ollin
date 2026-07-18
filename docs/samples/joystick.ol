@@ -22,8 +22,8 @@ class Joystick
         self.active = false       ## armé (doigt posé dans le disque), reste vrai s'il en sort
         self.px = 0               ## position courante du doigt
         self.py = 0
-        self.center_frac = 0.66   ## centre (neutre) vertical, fraction de H
-        self.radius_frac = 0.17   ## rayon du disque, fraction de H
+        self.center_frac = 0.72   ## centre (neutre) vertical, fraction de H (abaissé)
+        self.radius_frac = 0.22   ## rayon du disque, fraction de H (agrandi)
         self.dead = 0.10          ## zone morte (neutre) autour du centre, fraction du rayon
     end
 
