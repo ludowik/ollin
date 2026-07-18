@@ -11,7 +11,8 @@ static inline double numArg(const Value* args, int i, const char* fn) {
         return (double)v.asInt();
     if (v.isFloat())
         return v.asFloat();
-    throw std::runtime_error(std::string(fn) + ": expected number");
+    throw std::runtime_error(std::string(fn) + ": argument " + std::to_string(i + 1) + " attendu nombre, reçu " +
+                             v.typeName());
 }
 
 static inline double numArg(const Value* args, int argc, int i, const char* fn) {

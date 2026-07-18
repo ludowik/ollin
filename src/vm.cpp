@@ -1511,8 +1511,15 @@ dispatch_loop:
         return;
 
     } catch (const std::runtime_error& e) {
-        if (handler_stack.empty())
+        if (handler_stack.empty()) {
+            // Erreur NON rattrapée : préfixer la ligne source courante si le message
+            // n'en porte pas déjà une (les builtins lèvent sans localisation). Les
+            // erreurs rattrapées par try/catch gardent leur message brut (ci-dessous).
+            std::string msg = e.what();
+            if (msg.compare(0, 5, "line ") != 0)
+                throw std::runtime_error("line " + std::to_string(errLine()) + ": " + msg);
             throw;
+        }
         Handler h = handler_stack.back();
         handler_stack.pop_back();
         unwindToHandler(h, Value(std::string(e.what())));
