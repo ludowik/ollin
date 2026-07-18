@@ -36,9 +36,9 @@ class ViewDistance
         self.SLOW_DT = budget * 1.25      ## au-delà = frame « en retard » (+25% de marge)
         self.STALL_DT = math.max(0.30, budget * 4)
         self.WIN = 0.5
-        self.GROW = 0.10
-        self.DROP = 0.25
-        self.RELAX = 8.0
+        self.GROW = 0.03      ## ne grandit que si TRÈS peu de frames lentes → garde de la marge
+        self.DROP = 0.25      ## large zone morte [GROW;DROP] = ne chasse pas la limite, n'oscille pas
+        self.RELAX = 20.0     ## re-teste le plafond appris rarement (évite le va-et-vient)
         self.MEM_MAX = 110000000
         self.t = 0.0
         self.n = 0
