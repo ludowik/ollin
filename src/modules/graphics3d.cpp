@@ -211,47 +211,47 @@ static std::vector<int> s_free_groups;    // slots libérés réutilisables → 
 static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
 static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au begin3d — pour inFrustum appelé HORS du bloc 3D (où rlGetMatrixProjection renvoie l'ortho 2D restaurée par end3d)
 
-// Meshes unitaires en cache (normales + UV propres via GenMesh*).
-static Mesh s_shape_mesh[SH_COUNT];
-static bool s_shape_ready[SH_COUNT] = {false, false, false, false, false, false};
+// Cache de meshes indexé par (shape, segments) — plusieurs résolutions coexistent
+// (ex. push→segments(8)→sphère + pop n'invalide pas la sphère 64 segments du même frame).
+static std::map<std::pair<int,int>, Mesh> s_shape_cache;
 
 void reset3dShapeCache() {
-    for (int i = 0; i < SH_COUNT; i++) {
-        if (s_shape_ready[i]) {
-            UnloadMesh(s_shape_mesh[i]);
-            s_shape_ready[i] = false;
-        }
-    }
+    for (auto& kv : s_shape_cache)
+        UnloadMesh(kv.second);
+    s_shape_cache.clear();
 }
 
 static Mesh getShapeMesh(int shape) {
-    if (!s_shape_ready[shape]) {
-        int seg = gfxSegments();
-        switch (shape) {
-            case SH_CUBE:
-                s_shape_mesh[shape] = GenMeshCube(1.0f, 1.0f, 1.0f);
-                break;
-            case SH_SPHERE:
-                s_shape_mesh[shape] = GenMeshSphere(0.5f, seg, seg);
-                break;
-            case SH_CYLINDER:
-                s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, seg);
-                break;
-            case SH_CONE:
-                s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, seg);
-                break;
-            case SH_TORUS:
-                // major=1, tube=0.3, size=2 → par_shapes_scale×1 → no shrink
-                // The ring lies in the XY plane; XY scale = major radius, Z = tube
-                s_shape_mesh[shape] = GenMeshTorus(0.3f, 2.0f, seg, seg);
-                break;
-            default:
-                s_shape_mesh[shape] = GenMeshPlane(1.0f, 1.0f, 1, 1);
-                break;
-        }
-        s_shape_ready[shape] = true;
+    int seg = gfxSegments();
+    auto key = std::make_pair(shape, seg);
+    auto it = s_shape_cache.find(key);
+    if (it != s_shape_cache.end())
+        return it->second;
+    Mesh mesh{};
+    switch (shape) {
+        case SH_CUBE:
+            mesh = GenMeshCube(1.0f, 1.0f, 1.0f);
+            break;
+        case SH_SPHERE:
+            mesh = GenMeshSphere(0.5f, seg, seg);
+            break;
+        case SH_CYLINDER:
+            mesh = GenMeshCylinder(1.0f, 1.0f, seg);
+            break;
+        case SH_CONE:
+            mesh = GenMeshCone(1.0f, 1.0f, seg);
+            break;
+        case SH_TORUS:
+            // major=1, tube=0.3, size=2 → par_shapes_scale×1 → no shrink
+            // The ring lies in the XY plane; XY scale = major radius, Z = tube
+            mesh = GenMeshTorus(0.3f, 2.0f, seg, seg);
+            break;
+        default:
+            mesh = GenMeshPlane(1.0f, 1.0f, 1, 1);
+            break;
     }
-    return s_shape_mesh[shape];
+    s_shape_cache[key] = mesh;
+    return s_shape_cache[key];
 }
 
 // Texture blanche 1×1 : « pas de texture » → échantillon blanc → texture×tint = tint.
@@ -623,13 +623,7 @@ void reset3dGraphicsState() {
         s_lit = Shader{};
         s_lit_ready = false;
     }
-    for (int i = 0; i < SH_COUNT; i++) {
-        if (s_shape_ready[i]) {
-            UnloadMesh(s_shape_mesh[i]);
-            s_shape_mesh[i] = Mesh{};
-            s_shape_ready[i] = false;
-        }
-    }
+    reset3dShapeCache();
     // Modèles chargés en GPU : invalides avec le contexte détruit → décharger et
     // vider le cache (rechargés paresseusement depuis les octets au prochain usage).
     for (auto& kv : s_model_cache) {

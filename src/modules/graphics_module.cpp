@@ -366,10 +366,7 @@ static void restoreStyle(const StyleState& s) {
     BeginBlendMode(s.blendMode);
     image_set_tint(s.hasTint, s.tint.r, s.tint.g, s.tint.b, s.tint.a);
     gfx3dSetTexture(s.tex3d);
-    if (s.segments != s_segments) {
-        s_segments = s.segments;
-        reset3dShapeCache();
-    }
+    s_segments = s.segments;
 }
 
 static void resetStyles() {
@@ -391,13 +388,8 @@ static Value gfx_stroke_size(Value* args, int argc) {
 }
 
 static Value gfx_segments(Value* args, int argc) {
-    if (argc > 0 && args[0].isNumber()) {
-        int n = std::max(3, (int)args[0].asNum());
-        if (n != s_segments) {
-            s_segments = n;
-            reset3dShapeCache();
-        }
-    }
+    if (argc > 0 && args[0].isNumber())
+        s_segments = std::max(3, (int)args[0].asNum());
     return Value{};
 }
 

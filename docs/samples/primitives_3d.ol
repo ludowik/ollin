@@ -149,14 +149,24 @@ func draw()
             graphics.torus(0, 0, 0,  1.1, 0.4)
         graphics.pop()
 
+        ## segments(8) — même sphère, basse définition (idx 7)
+        p = cell_pos(gc(7), gr(7), cols, rows)
+        graphics.push()
+            graphics.translate(p[1], p[2], 0)
+            graphics.rotateq(orient)
+            graphics.segments(8)
+            graphics.fill(Color(0.3, 0.7, 0.9))
+            graphics.sphere(0, 0, 0,  1.4)
+        graphics.pop()
+
     graphics.end3d()
 
     ## Labels 2D
     var lc = Color(1, 1, 1, 0.75)
     var fs = 13
-    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus"]
-    var offsets = [-14, -20, -26, -18, -42, -14, -16]
-    for i = 1, 7 do
+    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(8)"]
+    var offsets = [-14, -20, -26, -18, -42, -14, -16, -34]
+    for i = 1, 8 do
         var idx = i - 1
         var col = idx % cols
         var row = idx // cols
