@@ -266,6 +266,7 @@ static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
 static Color s_fill_color = WHITE;
+static int s_segments = 64;
 
 static void applyStrokeSize(float sz) {
     s_stroke_size = sz;
@@ -318,6 +319,9 @@ Color gfxStrokeColor() {
 }
 float gfxStrokeSize() {
     return s_stroke_size;
+}
+int gfxSegments() {
+    return s_segments;
 }
 
 // ── Contextes de style (pile) ───────────────────────────────────────────────
@@ -377,6 +381,17 @@ static void resetStyles() {
 static Value gfx_stroke_size(Value* args, int argc) {
     if (argc > 0 && args[0].isNumber())
         applyStrokeSize((float)args[0].asNum());
+    return Value{};
+}
+
+static Value gfx_segments(Value* args, int argc) {
+    if (argc > 0 && args[0].isNumber()) {
+        int n = std::max(3, (int)args[0].asNum());
+        if (n != s_segments) {
+            s_segments = n;
+            reset3dShapeCache();
+        }
+    }
     return Value{};
 }
 
@@ -657,7 +672,7 @@ static void drawOval(float cx, float cy, float rx, float ry, int segs) {
 static Value gfx_ellipse(Value* args, int argc) {
     if (argc < 4)
         throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
-    int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : 64;
+    int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : s_segments;
     drawOval((float)numArg(args, 0, "graphics.ellipse"), (float)numArg(args, 1, "graphics.ellipse"),
              (float)numArg(args, 2, "graphics.ellipse") * 0.5f, (float)numArg(args, 3, "graphics.ellipse") * 0.5f, segs);
     return Value{};
@@ -666,7 +681,7 @@ static Value gfx_ellipse(Value* args, int argc) {
 static Value gfx_circle(Value* args, int argc) {
     if (argc < 3)
         throw std::runtime_error("graphics.circle: expected x, y, radius");
-    int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : 64;
+    int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : s_segments;
     float r = (float)numArg(args, 2, "graphics.circle");
     drawOval((float)numArg(args, 0, "graphics.circle"), (float)numArg(args, 1, "graphics.circle"), r, r, segs);
     return Value{};
@@ -735,7 +750,7 @@ static Value gfx_arc(Value* args, int argc) {
         span = 2.0f * PI;
         stop = start + span;
     }
-    int segs = (int)ceilf(64.0f * span / (2.0f * PI));
+    int segs = (int)ceilf((float)s_segments * span / (2.0f * PI));
     if (segs < 2) {
         segs = 2;
     }
@@ -1128,6 +1143,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("clear")), Value::makeBuiltin(gfx_clear));
     m.mapSet(Value(std::string("blendMode")), Value::makeBuiltin(gfx_blend_mode));
     m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
+    m.mapSet(Value(std::string("segments")), Value::makeBuiltin(gfx_segments));
     m.mapSet(Value(std::string("stroke")), Value::makeBuiltin(gfx_stroke));
     m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
     m.mapSet(Value(std::string("fill")), Value::makeBuiltin(gfx_fill));

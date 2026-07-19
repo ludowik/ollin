@@ -214,25 +214,36 @@ static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
 static Mesh s_shape_mesh[SH_COUNT];
 static bool s_shape_ready[SH_COUNT] = {false, false, false, false, false, false};
+
+void reset3dShapeCache() {
+    for (int i = 0; i < SH_COUNT; i++) {
+        if (s_shape_ready[i]) {
+            UnloadMesh(s_shape_mesh[i]);
+            s_shape_ready[i] = false;
+        }
+    }
+}
+
 static Mesh getShapeMesh(int shape) {
     if (!s_shape_ready[shape]) {
+        int seg = gfxSegments();
         switch (shape) {
             case SH_CUBE:
                 s_shape_mesh[shape] = GenMeshCube(1.0f, 1.0f, 1.0f);
                 break;
             case SH_SPHERE:
-                s_shape_mesh[shape] = GenMeshSphere(0.5f, 64, 64);
+                s_shape_mesh[shape] = GenMeshSphere(0.5f, seg, seg);
                 break;
             case SH_CYLINDER:
-                s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, 64);
+                s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, seg);
                 break;
             case SH_CONE:
-                s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, 64);
+                s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, seg);
                 break;
             case SH_TORUS:
                 // major=1, tube=0.3, size=2 → par_shapes_scale×1 → no shrink
                 // The ring lies in the XY plane; XY scale = major radius, Z = tube
-                s_shape_mesh[shape] = GenMeshTorus(0.3f, 2.0f, 64, 64);
+                s_shape_mesh[shape] = GenMeshTorus(0.3f, 2.0f, seg, seg);
                 break;
             default:
                 s_shape_mesh[shape] = GenMeshPlane(1.0f, 1.0f, 1, 1);
