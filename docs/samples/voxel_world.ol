@@ -517,7 +517,7 @@ end
 ## scalaire avec la direction de regard f). On ne retire que des secteurs derrière la
 ## caméra — que inFrustum rejetait déjà — donc couverture visible inchangée.
 ## Renvoie un tableau plat [sx0, sz0, sx1, sz1, …] des secteurs visibles.
-global cloudStats = {tested=0, kept=0}
+global cloudStats = {"tested": 0, "kept": 0, "full": 0}
 
 func cull_cloud_sectors()
     var drift = elapsedTime * CLOUD_SPEED
