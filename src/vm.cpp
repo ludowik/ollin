@@ -1180,7 +1180,8 @@ dispatch_loop:
                     });
                 else if (m == "insert")
                     regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
-                        if (n >= 3 && a[1].isInteger()) a[0].arrayInsert(a[1].asInt(), a[2]);
+                        if (n == 2) a[0].arrayPush(a[1]);                         // insert(v) = push
+                        else if (n >= 3 && a[1].isInteger()) a[0].arrayInsert(a[1].asInt(), a[2]); // insert(i, v)
                         return a[0];
                     });
                 else if (m == "delete")
