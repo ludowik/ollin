@@ -36,7 +36,9 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
     return out;
 }
 
-static Value core_print(Value* args, int argc) {
+static Value core_print(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     // Copie AVANT toute conversion : valueToString peut invoquer __str, qui exécute
     // du bytecode et peut réallouer regs → `args` (pointeur dans regs) deviendrait
     // pendant pour les arguments suivants. Même précaution que core_printf.
@@ -50,7 +52,9 @@ static Value core_print(Value* args, int argc) {
     return Value{};
 }
 
-static Value core_printf(Value* args, int argc) {
+static Value core_printf(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("printf: first arg must be string");
     std::vector<Value> vargs(args, args + argc);
@@ -58,7 +62,9 @@ static Value core_printf(Value* args, int argc) {
     return Value{};
 }
 
-static Value core_typeof(Value* args, int argc) {
+static Value core_typeof(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc < 1)
         return Value(std::string("nil"));
     return Value(std::string(args[0].typeName()));

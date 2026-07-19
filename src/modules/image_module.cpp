@@ -239,7 +239,8 @@ static std::vector<uint8_t> fetchBytesSync(const std::string& url) {
 
 // ── image.load(path) ──────────────────────────────────────────────────────────
 
-static Value img_load(Value* args, int argc) {
+static Value img_load(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("image.load: expected path string");
     const std::string& path = args[0].asString();
@@ -273,7 +274,8 @@ static Value img_load(Value* args, int argc) {
 
 // ── image.loadData(format, base64) ──────────────────────────────────────────
 
-static Value img_load_data(Value* args, int argc) {
+static Value img_load_data(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     if (argc < 2 || !args[0].isString() || !args[1].isString())
         throw std::runtime_error("image.loadData: expected format string and base64 string");
     std::string ext = args[0].asString();
@@ -297,7 +299,8 @@ static Value img_load_data(Value* args, int argc) {
 
 // ── image.create(w, h) ───────────────────────────────────────────────────────
 
-static Value img_create(Value* args, int argc) {
+static Value img_create(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.create";
     int w = (int)numArg(args, argc, 0, FN);
     int h = (int)numArg(args, argc, 1, FN);
@@ -319,7 +322,8 @@ static Value img_create(Value* args, int argc) {
 
 // ── image.beginDraw(img) ────────────────────────────────────────────────────
 
-static Value img_begin(Value* args, int argc) {
+static Value img_begin(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.beginDraw";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
@@ -334,7 +338,8 @@ static Value img_begin(Value* args, int argc) {
 
 // ── image.endDraw() ─────────────────────────────────────────────────────────
 
-static Value img_end(Value* args, int argc) {
+static Value img_end(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     (void)args;
     (void)argc;
     EndTextureMode();
@@ -343,7 +348,8 @@ static Value img_end(Value* args, int argc) {
 
 // ── image.draw(img, x, y [, w, h [, tint]]) ──────────────────────────────────
 
-static Value img_draw(Value* args, int argc) {
+static Value img_draw(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.draw";
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
@@ -368,7 +374,8 @@ static Value img_draw(Value* args, int argc) {
 
 // ── image.unload(img) ────────────────────────────────────────────────────────
 
-static Value img_unload(Value* args, int argc) {
+static Value img_unload(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     if (argc < 1)
         return Value{};
     if (!args[0].isMap() || !args[0].mptr->userdata)
@@ -390,7 +397,8 @@ static Value img_unload(Value* args, int argc) {
 
 // ── image.beginPixels(img) ──────────────────────────────────────────────────
 
-static Value img_begin_pixels(Value* args, int argc) {
+static Value img_begin_pixels(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.beginPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
@@ -400,7 +408,8 @@ static Value img_begin_pixels(Value* args, int argc) {
 
 // ── image.endPixels(img) ────────────────────────────────────────────────────
 
-static Value img_end_pixels(Value* args, int argc) {
+static Value img_end_pixels(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.endPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
@@ -410,7 +419,8 @@ static Value img_end_pixels(Value* args, int argc) {
 
 // ── image.getPixel(img, x, y) ───────────────────────────────────────────────
 
-static Value img_get_pixel(Value* args, int argc) {
+static Value img_get_pixel(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.getPixel";
     static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
     if (argc < 3)
@@ -438,7 +448,8 @@ static Value img_get_pixel(Value* args, int argc) {
 
 // ── image.setPixel(img, x, y, color | r, g, b, a) ───────────────────────────
 
-static Value img_set_pixel(Value* args, int argc) {
+static Value img_set_pixel(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     static constexpr const char* FN = "image.setPixel";
     if (argc < 4)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y, color");

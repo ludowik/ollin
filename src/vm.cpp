@@ -115,7 +115,8 @@ std::string VM::invokeStr(Value obj) { // by value: regs.resize() ne invalide pa
     }
     case Value::T_BUILTIN: {
         Value self = obj;
-        Value result = str_fn.asBuiltin()(&self, 1);
+        CallCtx ctx{this, &self, 1};
+        Value result = str_fn.asBuiltin()(ctx);
         return result.isString() ? result.asString() : "{object}";
     }
     default: {
@@ -193,7 +194,8 @@ std::string valueToString(const Value& v) {
 
 // ── Builtins ──────────────────────────────────────────────────────────────────
 
-static Value builtin_assert(Value* args, int argc) {
+static Value builtin_assert(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0 || isFalsy(args[0])) {
         std::string msg = (argc >= 2 && args[1].isString()) ? args[1].asString() : "assertion failed";
         throw std::runtime_error(msg);
@@ -201,9 +203,8 @@ static Value builtin_assert(Value* args, int argc) {
     return Value{};
 }
 
-static Value builtin_time(Value* args, int argc) {
-    (void)args;
-    (void)argc;
+static Value builtin_time(CallCtx& ctx) {
+    (void)ctx;
     auto now = std::chrono::system_clock::now();
     return Value(std::chrono::duration<double>(now.time_since_epoch()).count());
 }
@@ -232,9 +233,8 @@ uint64_t ollinHeapBytes() {
 
 // mem() : octets de tas actuellement utilisés par le process (valeurs Ollin +
 // runtime + libs). Renvoie un entier.
-static Value builtin_mem(Value* args, int argc) {
-    (void)args;
-    (void)argc;
+static Value builtin_mem(CallCtx& ctx) {
+    (void)ctx;
     return Value((int64_t)ollinHeapBytes());
 }
 
@@ -249,7 +249,8 @@ static int64_t range_len(const Range* r) {
     return n <= 0.0 ? 0 : (int64_t)n;
 }
 
-static Value builtin_len(Value* args, int argc) {
+static Value builtin_len(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
         throw std::runtime_error("len() requires 1 argument");
     const Value& v = args[0];
@@ -341,7 +342,7 @@ uint32_t VM::instantiateClass(int base_reg, int arg_off, int argc, Value cls, bo
         bargs[0] = inst;
         for (int i = 0; i < argc; ++i)
             bargs[1 + i] = regs[base_reg + arg_off + i];
-        init_fn.asBuiltin()(bargs.data(), argc + 1);
+        { CallCtx ctx{this, bargs.data(), argc + 1}; init_fn.asBuiltin()(ctx); }
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
@@ -449,15 +450,19 @@ void VM::runEntryHooks() {
         Value gfx = getGlobal("graphics");
         if (gfx.isMap()) {
             Value run_fn = gfx.mapGet(Value(std::string("run")));
-            if (run_fn.isBuiltin())
-                run_fn.asBuiltin()(&draw, 1);
+            if (run_fn.isBuiltin()) {
+                CallCtx ctx{this, &draw, 1};
+                run_fn.asBuiltin()(ctx);
+            }
         }
     }
 }
 
 Value VM::callValue(const Value& fn) {
-    if (fn.isBuiltin())
-        return fn.asBuiltin()(nullptr, 0);
+    if (fn.isBuiltin()) {
+        CallCtx ctx{this, nullptr, 0};
+        return fn.asBuiltin()(ctx);
+    }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     if (fn.isFuncVal()) {
@@ -483,7 +488,8 @@ Value VM::callValue(const Value& fn) {
 Value VM::callValue(const Value& fn, const Value& arg) {
     if (fn.isBuiltin()) {
         Value a = arg;
-        return fn.asBuiltin()(&a, 1);
+        CallCtx ctx{this, &a, 1};
+        return fn.asBuiltin()(ctx);
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
@@ -512,7 +518,8 @@ Value VM::callValue(const Value& fn, const Value& arg) {
 Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
     if (fn.isBuiltin()) {
         Value args[2] = {a, b};
-        return fn.asBuiltin()(args, 2);
+        CallCtx ctx{this, args, 2};
+        return fn.asBuiltin()(ctx);
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
@@ -542,7 +549,8 @@ Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
 Value VM::callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d) {
     if (fn.isBuiltin()) {
         Value args[4] = {a, b, c, d};
-        return fn.asBuiltin()(args, 4);
+        CallCtx ctx{this, args, 4};
+        return fn.asBuiltin()(ctx);
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
@@ -1162,30 +1170,36 @@ dispatch_loop:
             if (key.isString()) {
                 const std::string& m = key.asString();
                 if (m == "len")
-                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        Value* a = ctx.args; int n = ctx.argc;
                         return Value((int64_t)(n > 0 ? a[0].arraySize() : 0));
                     });
                 else if (m == "push" || m == "enqueue")
-                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        Value* a = ctx.args; int n = ctx.argc;
                         if (n >= 2) a[0].arrayPush(a[1]);
                         return a[0];
                     });
                 else if (m == "pop")
-                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        Value* a = ctx.args; int n = ctx.argc;
                         return n > 0 ? a[0].arrayPop() : Value{};
                     });
                 else if (m == "dequeue")
-                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        Value* a = ctx.args; int n = ctx.argc;
                         return n > 0 ? a[0].arrayShift() : Value{};
                     });
                 else if (m == "insert")
-                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        Value* a = ctx.args; int n = ctx.argc;
                         if (n == 2) a[0].arrayPush(a[1]);                         // insert(v) = push
                         else if (n >= 3 && a[1].isInteger()) a[0].arrayInsert(a[1].asInt(), a[2]); // insert(i, v)
                         return a[0];
                     });
                 else if (m == "delete")
-                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        Value* a = ctx.args; int n = ctx.argc;
                         if (n >= 2 && a[1].isInteger()) return a[0].arrayRemove(a[1].asInt());
                         return Value{};
                     });
@@ -1320,7 +1334,7 @@ dispatch_loop:
         // A=arg_base, B=func_val_reg, C=argc
         if (regs[base + B].isBuiltin()) {
             auto fn = regs[base + B].asBuiltin();
-            regs[base + A] = fn(&regs[base + A], C);
+            { CallCtx ctx{this, &regs[base + A], C}; regs[base + A] = fn(ctx); }
             last_results_ = 1; // builtin → 1 valeur (pour SPREAD_RESULTS)
             NEXT();
         }
@@ -1445,7 +1459,7 @@ dispatch_loop:
                 total = argc;
             }
             if (fn.isBuiltin()) {
-                regs[cb] = fn.asBuiltin()(&regs[cb], total);
+                { CallCtx ctx{this, &regs[cb], total}; regs[cb] = fn.asBuiltin()(ctx); }
                 last_results_ = 1; // builtin → 1 valeur (pour SPREAD_RESULTS)
                 goto call_method_done;
             }

@@ -90,7 +90,8 @@ static int keyCode(std::string name) {
 
 // keyboard.isDown(key) : la touche est-elle enfoncée à cet instant ? true/false.
 // shift/ctrl/alt testent les deux côtés du clavier.
-static Value kbd_is_down(Value* args, int argc) {
+static Value kbd_is_down(CallCtx& ctx) {
+    Value* a = ctx.args; int n = ctx.argc;
     if (s_blocked)
         return Value((int64_t)0);   // éditeur focalisé → le jeu ne lit pas le clavier
     if (argc < 1 || !args[0].isString())

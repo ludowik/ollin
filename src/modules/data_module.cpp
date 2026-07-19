@@ -182,7 +182,7 @@ static Value dataSet(int scope, Value* args, int argc) {
         throw std::runtime_error("data.set: expected a string key and a value");
     const std::string& k = args[0].asString();
     if (args[1].isNil())
-        s_store[scope].erase(k);   // set(clé, nil) = suppression
+        s_store[scope].erase(k);
     else
         s_store[scope][k] = encodeValue(args[1]);
     persist(scope);
@@ -201,16 +201,14 @@ static Value dataDelete(int scope, Value* args, int argc) {
     return Value();
 }
 static Value dataKeys(int scope, Value* args, int argc) {
-    (void)args;
-    (void)argc;
+    (void)args; (void)argc;
     Value arr = Value::makeArray();
     for (auto& kv : s_store[scope])
         arr.arrayPush(Value(kv.first));
     return arr;
 }
 static Value dataClear(int scope, Value* args, int argc) {
-    (void)args;
-    (void)argc;
+    (void)args; (void)argc;
     s_store[scope].clear();
     persist(scope);
     return Value();
@@ -247,19 +245,19 @@ void dataSetNativePaths(const std::string& projectFile, const std::string& globa
 // pointeurs de fonction ; la portée est figée par une fonction dédiée par portée).
 static void fillScope(Value& m, int scope) {
     if (scope == S_PROJECT) {
-        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](Value* a, int n) { return dataGet(S_PROJECT, a, n); }));
-        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](Value* a, int n) { return dataSet(S_PROJECT, a, n); }));
-        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](Value* a, int n) { return dataHas(S_PROJECT, a, n); }));
-        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](Value* a, int n) { return dataDelete(S_PROJECT, a, n); }));
-        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](Value* a, int n) { return dataKeys(S_PROJECT, a, n); }));
-        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](Value* a, int n) { return dataClear(S_PROJECT, a, n); }));
+        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return dataGet(S_PROJECT, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return dataSet(S_PROJECT, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return dataHas(S_PROJECT, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return dataDelete(S_PROJECT, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return dataKeys(S_PROJECT, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return dataClear(S_PROJECT, ctx.args, ctx.argc); }));
     } else {
-        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](Value* a, int n) { return dataGet(S_GLOBAL, a, n); }));
-        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](Value* a, int n) { return dataSet(S_GLOBAL, a, n); }));
-        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](Value* a, int n) { return dataHas(S_GLOBAL, a, n); }));
-        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](Value* a, int n) { return dataDelete(S_GLOBAL, a, n); }));
-        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](Value* a, int n) { return dataKeys(S_GLOBAL, a, n); }));
-        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](Value* a, int n) { return dataClear(S_GLOBAL, a, n); }));
+        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return dataGet(S_GLOBAL, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return dataSet(S_GLOBAL, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return dataHas(S_GLOBAL, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return dataDelete(S_GLOBAL, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return dataKeys(S_GLOBAL, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return dataClear(S_GLOBAL, ctx.args, ctx.argc); }));
     }
 }
 

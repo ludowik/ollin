@@ -44,7 +44,9 @@ static void appendLower(uint32_t cp, std::string& out) {
         utf8Encode(cp, out);
 }
 
-static Value str_upper(Value* args, int argc) {
+static Value str_upper(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.upper");
     std::string out;
     for (size_t i = 0; i < s.size();) {
@@ -55,7 +57,9 @@ static Value str_upper(Value* args, int argc) {
     return Value(std::move(out));
 }
 
-static Value str_lower(Value* args, int argc) {
+static Value str_lower(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.lower");
     std::string out;
     for (size_t i = 0; i < s.size();) {
@@ -99,19 +103,25 @@ static std::string trimCp(const std::string& s, const std::string& chars, bool l
     return (b >= e) ? std::string("") : s.substr(b, e - b);
 }
 
-static Value str_trim(Value* args, int argc) {
+static Value str_trim(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.trim");
     std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.trim")) : " ";
     return Value(trimCp(s, chars, true, true));
 }
 
-static Value str_ltrim(Value* args, int argc) {
+static Value str_ltrim(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.ltrim");
     std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.ltrim")) : " ";
     return Value(trimCp(s, chars, true, false));
 }
 
-static Value str_rtrim(Value* args, int argc) {
+static Value str_rtrim(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.rtrim");
     std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.rtrim")) : " ";
     return Value(trimCp(s, chars, false, true));
@@ -119,7 +129,9 @@ static Value str_rtrim(Value* args, int argc) {
 
 // string.char(s, i) : i-ème CARACTÈRE (codepoint UTF-8), 1-based ; renvoyé sous
 // forme de string ; "" si hors limites. (Index par codepoint, pas par octet.)
-static Value str_char(Value* args, int argc) {
+static Value str_char(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.char");
     int i = toIntSafe(numArg(args, argc, 1, "string.char"));
     size_t cnt = utf8Count(s);
@@ -133,7 +145,9 @@ static Value str_char(Value* args, int argc) {
 // string.substr(s, start[, length]) : sous-chaîne à partir du caractère start
 // (1-based), de length CARACTÈRES (jusqu'à la fin si omis) ; bornes ajustées, ""
 // si hors plage. (Comptage par codepoint UTF-8, pas par octet.)
-static Value str_substr(Value* args, int argc) {
+static Value str_substr(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.substr");
     size_t cnt = utf8Count(s);
     int start = toIntSafe(numArg(args, argc, 1, "string.substr"));
@@ -154,7 +168,9 @@ static Value str_substr(Value* args, int argc) {
 // string.len(s) : nombre de CARACTÈRES (codepoints UTF-8) de la chaîne. Contrairement
 // au builtin global len (polymorphe : array/map/string/range), celui-ci n'accepte
 // QU'une string — un autre type lève une erreur (via strArg).
-static Value str_len(Value* args, int argc) {
+static Value str_len(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.len");
     return Value((int64_t)utf8Count(s));
 }

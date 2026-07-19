@@ -39,7 +39,9 @@ static Value colorField(const Value& self, const char* name) {
 // args[0] = self ; args[1..] = forme couleur flexible (voir parseColor) :
 //   Color(gris) · Color(gris, a) · Color(r, g, b) · Color(r, g, b, a) · Color(autreColor)
 
-static Value color_init(Value* args, int argc) {
+static Value color_init(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc < 2)
         throw std::runtime_error("Color: expected 1 to 4 numbers (or a Color)");
     Value& self = args[0];
@@ -53,7 +55,9 @@ static Value color_init(Value* args, int argc) {
 
 // ── __str ─────────────────────────────────────────────────────────────────────
 
-static Value color_str(Value* args, int argc) {
+static Value color_str(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc < 1)
         return Value(std::string("Color(0,0,0,1)"));
     const Value& self = args[0];
@@ -71,7 +75,9 @@ static Value color_str(Value* args, int argc) {
 // d'aucun receveur/argument : la classe vient du global `Color` (repli sur une
 // classe fraîche si le global n'est pas encore matérialisé).
 
-static Value color_random(Value* args, int argc) {
+static Value color_random(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     (void)args;
     (void)argc;
     Value cls = colorClass();
@@ -88,7 +94,9 @@ static Value color_random(Value* args, int argc) {
 // ── pastel ────────────────────────────────────────────────────────────────────
 // args[0] = self  → retourne une nouvelle instance Color pastel (mélange 50% blanc)
 
-static Value color_pastel(Value* args, int argc) {
+static Value color_pastel(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     (void)argc;
     const Value& self = args[0];
     double r = colorField(self, "r").asNum();
@@ -108,7 +116,9 @@ static Value color_pastel(Value* args, int argc) {
 // ── grayscale ─────────────────────────────────────────────────────────────────
 // args[0] = self  → retourne une nouvelle instance Color en niveaux de gris (luminance Rec. 601)
 
-static Value color_grayscale(Value* args, int argc) {
+static Value color_grayscale(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     (void)argc;
     const Value& self = args[0];
     double r = colorField(self, "r").asNum();
@@ -130,7 +140,9 @@ static Value color_grayscale(Value* args, int argc) {
 // Color.gray(v) → nouvelle Color grise de luminance v (clampée à [0,1]), a = 1.
 // Méthode statique avec un paramètre : grâce au flag static builtin, `v` est en
 // args[0] que l'appel soit Color.gray(x) OU c.gray(x) (aucun self injecté).
-static Value color_gray(Value* args, int argc) {
+static Value color_gray(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("Color.gray: expected a value");
     double v = colorComponent(args[0], "gray");

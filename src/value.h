@@ -34,6 +34,13 @@ struct Array;
 struct Range;
 struct Iterator;
 struct Closure;
+struct Value;
+class VM;
+struct CallCtx {
+    VM*    vm;
+    Value* args;
+    int    argc;
+};
 
 struct Value {
     uint8_t tag;
@@ -154,7 +161,7 @@ struct Value {
         return mptr;
     }
 
-    using BuiltinFn = Value (*)(Value*, int);
+    using BuiltinFn = Value (*)(CallCtx&);
     BuiltinFn asBuiltin() const {
         return (BuiltinFn)(intptr_t)ival;
     }

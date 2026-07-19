@@ -104,7 +104,9 @@ static const double NOISE_AMP_2D = 0.55;
 static const double NOISE_AMP_3D = 0.62;
 
 #define MATH1(name, expr)                                                                                              \
-    static Value math_##name(Value* args, int argc) {                                                                  \
+    static Value math_##name(CallCtx& ctx) {                                                                           \
+        Value* args = ctx.args;                                                                                        \
+        int argc = ctx.argc;                                                                                           \
         double x = numArg(args, argc, 0, "math." #name);                                                               \
         return numValue(expr);                                                                                         \
     }
@@ -132,7 +134,9 @@ MATH1(frac, x - std::floor(x))
 MATH1(isNan, std::isnan(x) ? 1.0 : 0.0)
 MATH1(isInf, std::isinf(x) ? 1.0 : 0.0)
 
-static Value math_map(Value* args, int argc) {
+static Value math_map(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.map");
     double in_lo = numArg(args, argc, 1, "math.map");
     double in_hi = numArg(args, argc, 2, "math.map");
@@ -143,38 +147,50 @@ static Value math_map(Value* args, int argc) {
     return numValue(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo));
 }
 
-static Value math_atan2(Value* args, int argc) {
+static Value math_atan2(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     double y = numArg(args, argc, 0, "math.atan2");
     double x = numArg(args, argc, 1, "math.atan2");
     return numValue(std::atan2(y, x));
 }
 
-static Value math_pow(Value* args, int argc) {
+static Value math_pow(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.pow");
     double n = numArg(args, argc, 1, "math.pow");
     return numValue(std::pow(x, n));
 }
 
-static Value math_clamp(Value* args, int argc) {
+static Value math_clamp(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.clamp");
     double lo = numArg(args, argc, 1, "math.clamp");
     double hi = numArg(args, argc, 2, "math.clamp");
     return numValue(x < lo ? lo : x > hi ? hi : x);
 }
 
-static Value math_seed(Value* args, int argc) {
+static Value math_seed(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     int64_t s = (int64_t)numArg(args, argc, 0, "math.seed");
     srand((unsigned)s);
     return Value();
 }
 
-static Value math_logn(Value* args, int argc) {
+static Value math_logn(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.logn");
     double n = numArg(args, argc, 1, "math.logn");
     return numValue(std::log(x) / std::log(n));
 }
 
-static Value math_min(Value* args, int argc) {
+static Value math_min(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc == 0)
         throw std::runtime_error("math.min: at least one argument required");
     bool all_int = true;
@@ -201,7 +217,9 @@ static Value math_min(Value* args, int argc) {
     return Value(result);
 }
 
-static Value math_max(Value* args, int argc) {
+static Value math_max(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc == 0)
         throw std::runtime_error("math.max: at least one argument required");
     bool all_int = true;
@@ -228,7 +246,9 @@ static Value math_max(Value* args, int argc) {
     return Value(result);
 }
 
-static Value math_rand(Value* args, int argc) {
+static Value math_rand(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     double r = (double)rand() / ((double)RAND_MAX + 1.0);
     if (argc == 0)
         return Value(r);
@@ -248,7 +268,9 @@ static int64_t intArg(const Value* args, int argc, int i, const char* fn) {
     return (int64_t)d;
 }
 
-static Value math_randInt(Value* args, int argc) {
+static Value math_randInt(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc == 0)
         throw std::runtime_error("math.randInt: at least one argument required");
     if (argc == 1) {
@@ -265,7 +287,9 @@ static Value math_randInt(Value* args, int argc) {
 }
 
 // Bruit de Perlin fractal (fBm), 1/2/3 dimensions → FLOAT dans [0, 1].
-static Value math_noise(Value* args, int argc) {
+static Value math_noise(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     if (argc < 1 || argc > 3)
         throw std::runtime_error("math.noise: expects 1, 2 or 3 arguments");
     double x = numArg(args, argc, 0, "math.noise");
@@ -290,7 +314,9 @@ static Value math_noise(Value* args, int argc) {
 }
 
 // Rebat la table de permutation → bruit reproductible / variable.
-static Value math_noiseSeed(Value* args, int argc) {
+static Value math_noiseSeed(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     int64_t s = (int64_t)numArg(args, argc, 0, "math.noiseSeed");
     noiseReseed((uint64_t)s);
     return Value();
