@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-19 19:52</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-19 20:49</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -419,7 +419,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-19 19:52</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-19 20:49</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1699,9 +1699,11 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Crée une caméra (objet <code>Camera</code>) regardant <code>(tx,ty,tz)</code> depuis <code>(px,py,pz)</code> ; <code>fovy</code> = champ de vision vertical en degrés (45 par défaut)</td></tr>
+    <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Crée une caméra perspective (objet <code>Camera</code>) regardant <code>(tx,ty,tz)</code> depuis <code>(px,py,pz)</code> ; <code>fovy</code> = champ de vision vertical en degrés (45 par défaut)</td></tr>
+    <tr><td><code>graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>Caméra orthographique — projection sans perspective ; <code>size</code> = nombre d'unités visibles en hauteur (10 par défaut). Mêmes méthodes que <code>camera()</code></td></tr>
     <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Fixe la position / la cible de la caméra</td></tr>
     <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, rayon [, hauteur])</code></td><td>Translate la caméra (visée conservée) / la met en orbite autour de sa cible (<code>angle</code> en radians)</td></tr>
+    <tr><td><code>cam.zoom(factor)</code></td><td>Multiplie la taille visible (ortho : ajuste <code>size</code> ; perspective : rapproche/éloigne le long de l'axe de visée)</td></tr>
     <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>Encadrent les dessins 3D dans <code>draw()</code></td></tr>
     <tr><td><code>graphics.grid(slices, spacing)</code></td><td>Repère quadrillé au sol (plan XZ), centré sur l'origine (couleur grise fixe)</td></tr>
     <tr><td><code>graphics.cube(x,y,z, w,h,l)</code></td><td>Cube centré en <code>(x,y,z)</code> — plein si <code>fill</code>, arêtes si <code>stroke</code></td></tr>

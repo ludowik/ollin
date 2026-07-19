@@ -56,12 +56,13 @@ static Camera3D cameraFromMap(const Value& v, const char* fn) {
         Value f = v.mapGet(Value(std::string(k)));
         return f.isNumber() ? (float)f.asNum() : (float)def;
     };
+    bool ortho = v.mapGet(Value(std::string("ortho"))).isNumber() && v.mapGet(Value(std::string("ortho"))).asNum() != 0.0;
     Camera3D cam{};
     cam.position = Vector3{get("px", 0), get("py", 0), get("pz", 0)};
     cam.target = Vector3{get("tx", 0), get("ty", 0), get("tz", 0)};
     cam.up = Vector3{get("ux", 0), get("uy", 1), get("uz", 0)};
-    cam.fovy = get("fovy", 45.0);
-    cam.projection = CAMERA_PERSPECTIVE;
+    cam.fovy = get("fovy", ortho ? 10.0f : 45.0f);
+    cam.projection = ortho ? CAMERA_ORTHOGRAPHIC : CAMERA_PERSPECTIVE;
     return cam;
 }
 
@@ -109,6 +110,27 @@ static Value cam_move(Value* args, int argc) {
     return self;
 }
 
+// cam.zoom(factor) : multiplie la taille du monde visible (ortho: fovy *= factor,
+// perspective: rapproche/éloigne la position le long de l'axe de visée).
+static Value cam_zoom(Value* args, int argc) {
+    Value self = args[0];
+    double factor = numArg(args, argc, 1, "Camera.zoom");
+    if (factor <= 0.0) return self;
+    bool ortho = self.mapGet(Value(std::string("ortho"))).isNumber() && self.mapGet(Value(std::string("ortho"))).asNum() != 0.0;
+    if (ortho) {
+        double fovy = camField(self, "fovy");
+        self.mapSet(Value(std::string("fovy")), Value(std::max(0.01, fovy * factor)));
+    } else {
+        double tx = camField(self, "tx"), ty = camField(self, "ty"), tz = camField(self, "tz");
+        double px = camField(self, "px"), py = camField(self, "py"), pz = camField(self, "pz");
+        double dx = px - tx, dy = py - ty, dz = pz - tz;
+        self.mapSet(Value(std::string("px")), Value(tx + dx * factor));
+        self.mapSet(Value(std::string("py")), Value(ty + dy * factor));
+        self.mapSet(Value(std::string("pz")), Value(tz + dz * factor));
+    }
+    return self;
+}
+
 // cam.orbit(angle, rayon [, hauteur]) : place la caméra en orbite autour de sa
 // cible, sur un cercle du plan XZ de rayon `rayon`. `angle` en RADIANS (composable
 // avec elapsedTime / math.cos-sin). `hauteur` optionnelle = altitude AU-DESSUS de
@@ -134,6 +156,7 @@ static Value makeCameraClass() {
     cls.mapSet(Value(std::string("lookAt")), Value::makeBuiltin(cam_look_at));
     cls.mapSet(Value(std::string("move")), Value::makeBuiltin(cam_move));
     cls.mapSet(Value(std::string("orbit")), Value::makeBuiltin(cam_orbit));
+    cls.mapSet(Value(std::string("zoom")), Value::makeBuiltin(cam_zoom));
     return cls;
 }
 
@@ -145,7 +168,7 @@ static Value cameraClass() {
 
 // graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : INSTANCE de classe Camera.
 // Regarde (tx,ty,tz) depuis (px,py,pz), up = +Y, fovy = champ de vision vertical
-// (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit).
+// (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit/zoom).
 static Value gfx_camera(Value* args, int argc) {
     Value cam = Value::makeMap();
     cam.mapSet(Value(std::string("__class__")), cameraClass());
@@ -156,6 +179,23 @@ static Value gfx_camera(Value* args, int argc) {
     cam.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 4, "graphics.camera")));
     cam.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 5, "graphics.camera")));
     cam.mapSet(Value(std::string("fovy")), Value(argc > 6 ? numArg(args, argc, 6, "graphics.camera") : 45.0));
+    return cam;
+}
+
+// graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size]) : caméra orthographique.
+// Projection sans perspective — taille du monde visible = size unités en hauteur
+// (défaut 10). Mêmes méthodes que camera() ; zoom() ajuste size.
+static Value gfx_camera_ortho(Value* args, int argc) {
+    Value cam = Value::makeMap();
+    cam.mapSet(Value(std::string("__class__")), cameraClass());
+    cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.cameraOrtho")));
+    cam.mapSet(Value(std::string("py")), Value(numArg(args, argc, 1, "graphics.cameraOrtho")));
+    cam.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 2, "graphics.cameraOrtho")));
+    cam.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 3, "graphics.cameraOrtho")));
+    cam.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 4, "graphics.cameraOrtho")));
+    cam.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 5, "graphics.cameraOrtho")));
+    cam.mapSet(Value(std::string("fovy")), Value(argc > 6 ? numArg(args, argc, 6, "graphics.cameraOrtho") : 10.0));
+    cam.mapSet(Value(std::string("ortho")), Value((int64_t)1));
     return cam;
 }
 
@@ -1460,6 +1500,7 @@ void gfx3dSetTexture(unsigned int id) {
 // Enregistre les builtins 3D dans le module graphics (appelé par makeGraphicsModule).
 void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("camera")), Value::makeBuiltin(gfx_camera));
+    m.mapSet(Value(std::string("cameraOrtho")), Value::makeBuiltin(gfx_camera_ortho));
     m.mapSet(Value(std::string("begin3d")), Value::makeBuiltin(gfx_begin3d));
     m.mapSet(Value(std::string("end3d")), Value::makeBuiltin(gfx_end3d));
     m.mapSet(Value(std::string("ambient")), Value::makeBuiltin(gfx_ambient));

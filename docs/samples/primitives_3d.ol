@@ -1,7 +1,7 @@
 ## Primitives 3D : cube, sphère, cylindre, plan, ligne, point, cône, tore.
 ## Glisse pour faire tourner chaque primitive sur elle-même.
 
-global cam = graphics.camera(0, 0, 24,  0, 0, 0)
+global cam = graphics.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
 global orient = graphics.quat()
 global dragging = false
 global lastx = 0
