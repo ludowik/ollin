@@ -9,14 +9,20 @@ global lasty = 0
 
 ## Grille adaptée à l'orientation : paysage = 4×2, portrait = 2×4
 ## cell_pos(col, row, cols, rows) → [x, z] dans le plan XZ (vue ortho iso, size=16)
+## Convertit une position de grille (col, row) en coordonnées monde XZ
+## pour la caméra iso à (12,12,12)→(0,0,0) :
+##   screen_x = (wx - wz) / √2  ;  screen_y = (-wx - wz) / √6  (avec wy=0)
+## On inverse ce système pour obtenir wx, wz à partir de la cible écran.
 func cell_pos(col, row, cols, rows)
-    var size   = 16.0
+    var size  = 16.0
     var aspect = W / H
-    var halfH  = size / 2.0
-    var halfW  = halfH * aspect
-    var sx = halfW * 2 / cols
-    var sz = halfH * 2 / rows
-    return [(col - (cols - 1) / 2.0) * sx, (row - (rows - 1) / 2.0) * sz]
+    var sx = (col - (cols - 1) / 2.0) * (size * aspect / cols)
+    var sy = (row - (rows - 1) / 2.0) * (size / rows)
+    var sqrt2 = 1.41421356
+    var sqrt6 = 2.44948975
+    var wx = (sx * sqrt2 - sy * sqrt6) / 2.0
+    var wz = -(sx * sqrt2 + sy * sqrt6) / 2.0
+    return [wx, wz]
 end
 
 func setup()
