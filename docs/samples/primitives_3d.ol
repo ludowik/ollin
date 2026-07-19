@@ -135,17 +135,13 @@ func draw()
             graphics.noStroke()
         graphics.pop()
 
-        ## Cube fil de fer (idx 5)
+        ## Cône (idx 5)
         p = cell_pos(gc(5), gr(5), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
-            graphics.noFill()
-            graphics.stroke(Color(0.7, 0.4, 1.0))
-            graphics.strokeSize(2)
-            graphics.cube(0, 0, 0,  2.5, 2.5, 2.5)
-            graphics.strokeSize(1)
-            graphics.noStroke()
+            graphics.fill(Color(0.9, 0.4, 0.8))
+            graphics.cone(0, -1.2, 0,  1.0, 2.4)
         graphics.pop()
 
     graphics.end3d()
@@ -154,8 +150,8 @@ func draw()
     ## row 0 = bas de l'écran (Y élevé), row rows-1 = haut (Y faible)
     var lc = Color(1, 1, 1, 0.75)
     var fs = 13
-    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cube (stroke)"]
-    var offsets = [-14, -20, -26, -18, -42, -38]
+    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone"]
+    var offsets = [-14, -20, -26, -18, -42, -14]
     for i = 1, 6 do
         var idx = i - 1
         var col = idx % cols

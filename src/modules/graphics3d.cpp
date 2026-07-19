@@ -165,7 +165,7 @@ static Value gfx_camera(Value* args, int argc) {
 // DrawMeshInstanced custom (transfo + couleur PAR INSTANCE via 2 VBO d'instance)
 // avec le shader Blinn-Phong. → N formes de même (mesh,texture) = 1 draw call.
 
-enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_COUNT = 4 };
+enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_CONE = 4, SH_COUNT = 5 };
 
 struct Bucket3D {
     unsigned int vaoId;          // clé mesh : identifie le mesh GPU (primitive OU modèle externe)
@@ -213,7 +213,7 @@ static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
 static Mesh s_shape_mesh[SH_COUNT];
-static bool s_shape_ready[SH_COUNT] = {false, false, false, false};
+static bool s_shape_ready[SH_COUNT] = {false, false, false, false, false};
 static Mesh getShapeMesh(int shape) {
     if (!s_shape_ready[shape]) {
         switch (shape) {
@@ -225,6 +225,9 @@ static Mesh getShapeMesh(int shape) {
                 break;
             case SH_CYLINDER:
                 s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, 16);
+                break;
+            case SH_CONE:
+                s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, 16);
                 break;
             default:
                 s_shape_mesh[shape] = GenMeshPlane(1.0f, 1.0f, 1, 1);
@@ -974,6 +977,19 @@ static Value gfx_cylinder(Value* args, int argc) {
     return Value{};
 }
 
+// graphics.cone(x,y,z, r, h) : cône, (x,y,z) = centre de la base, rayon r, hauteur h (vers +Y).
+static Value gfx_cone(Value* args, int argc) {
+    Vector3 pos{(float)numArg(args, argc, 0, "graphics.cone"), (float)numArg(args, argc, 1, "graphics.cone"),
+                (float)numArg(args, argc, 2, "graphics.cone")};
+    float r = (float)numArg(args, argc, 3, "graphics.cone");
+    float h = (float)numArg(args, argc, 4, "graphics.cone");
+    if (gfxHasFill())
+        pushInstance(getShapeMesh(SH_CONE), s_cur_tex3d, pos, Vector3{r, h, r}, gfxFillColor());
+    if (gfxHasStroke())
+        DrawCylinderWires(pos, r, 0.0f, h, 16, gfxStrokeColor());
+    return Value{};
+}
+
 // graphics.plane(x,y,z, sx,sz) : plan horizontal (XZ) centré en (x,y,z), taille
 // sx×sz. Instancié + éclairé (utilise la couleur fill ; sinon stroke pour rester visible).
 static Value gfx_plane(Value* args, int argc) {
@@ -1432,6 +1448,7 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("cube")), Value::makeBuiltin(gfx_cube));
     m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
     m.mapSet(Value(std::string("cylinder")), Value::makeBuiltin(gfx_cylinder));
+    m.mapSet(Value(std::string("cone")), Value::makeBuiltin(gfx_cone));
     m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
     m.mapSet(Value(std::string("model")), Value::makeBuiltin(gfx_model));
     m.mapSet(Value(std::string("drawModel")), Value::makeBuiltin(gfx_draw_model));
