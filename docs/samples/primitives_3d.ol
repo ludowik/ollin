@@ -1,18 +1,24 @@
 ## Primitives 3D : cube, sphère, cylindre, plan, ligne, point.
 ## Glisse pour faire tourner chaque primitive sur elle-même.
 
-global cam = graphics.camera(0, 3, 24,  0, 3, 0)
+global cam = graphics.camera(0, 0, 24,  0, 0, 0)
 global orient = graphics.quat()
 global dragging = false
 global lastx = 0
 global lasty = 0
 
-## Grille 3 colonnes × 2 rangées — plan XY face à la caméra
-global SX = 5.5    ## espacement x
-global SY = 4.5    ## espacement y
-
-func cell_pos(col, row)
-    return [(col - 1) * SX, row * SY - 1.5]
+## Grille adaptée à l'orientation : paysage = 3×2, portrait = 2×3
+## cell_pos(col, row, cols, rows) → [x, y] en unités monde, centré sur (0,0)
+func cell_pos(col, row, cols, rows)
+    var fov = 45.0
+    var aspect = W / H
+    ## demi-largeur et demi-hauteur visibles à z=0 depuis la caméra en z=24
+    var depth = 24.0
+    var halfH = depth * math.tan(fov * 0.5 * math.PI / 180)
+    var halfW = halfH * aspect
+    var sx = halfW * 2 / cols
+    var sy = halfH * 2 / rows
+    return [(col - (cols - 1) / 2.0) * sx, (row - (rows - 1) / 2.0) * sy]
 end
 
 func setup()
@@ -44,11 +50,28 @@ end
 func draw()
     graphics.clear(Color(0.08, 0.08, 0.12))
 
+    ## idx → col/row selon l'orientation
+    ## Paysage 3×2 : cube sphère cylindre / plan lignes fil
+    ## Portrait 2×3 : cube sphère / cylindre plan / lignes fil
+    var cols = 3
+    var rows = 2
+    if H > W then
+        cols = 2
+        rows = 3
+    end
+
+    func gc(idx)
+        return idx % cols
+    end
+    func gr(idx)
+        return idx // cols
+    end
+
     graphics.noStroke()
     graphics.begin3d(cam)
 
-        ## Cube  (col 0, row 0)
-        var p = cell_pos(0, 0)
+        ## Cube (idx 0)
+        var p = cell_pos(gc(0), gr(0), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
@@ -56,8 +79,8 @@ func draw()
             graphics.cube(0, 0, 0,  2, 2, 2)
         graphics.pop()
 
-        ## Sphère  (col 1, row 0)
-        p = cell_pos(1, 0)
+        ## Sphère (idx 1)
+        p = cell_pos(gc(1), gr(1), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
@@ -67,8 +90,8 @@ func draw()
             graphics.noStroke()
         graphics.pop()
 
-        ## Cylindre  (col 2, row 0)
-        p = cell_pos(2, 0)
+        ## Cylindre (idx 2)
+        p = cell_pos(gc(2), gr(2), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
@@ -76,8 +99,8 @@ func draw()
             graphics.cylinder(0, -1.2, 0,  0.9, 2.4)
         graphics.pop()
 
-        ## Plan (90° autour X → dans le plan XY, face caméra)  (col 0, row 1)
-        p = cell_pos(0, 1)
+        ## Plan (idx 3)
+        p = cell_pos(gc(3), gr(3), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
@@ -86,8 +109,8 @@ func draw()
             graphics.plane(0, 0, 0,  2.5, 2.5)
         graphics.pop()
 
-        ## line3d + point3d  (col 1, row 1)
-        p = cell_pos(1, 1)
+        ## line3d + point3d (idx 4)
+        p = cell_pos(gc(4), gr(4), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
@@ -102,8 +125,8 @@ func draw()
             graphics.noStroke()
         graphics.pop()
 
-        ## Cube fil de fer  (col 2, row 1)
-        p = cell_pos(2, 1)
+        ## Cube fil de fer (idx 5)
+        p = cell_pos(gc(5), gr(5), cols, rows)
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
@@ -117,21 +140,20 @@ func draw()
 
     graphics.end3d()
 
-    ## Labels 2D centrés sous chaque colonne
+    ## Labels 2D — un par primitive, centrés horizontalement sur la colonne
+    ## row 0 = bas de l'écran (Y élevé), row rows-1 = haut (Y faible)
     var lc = Color(1, 1, 1, 0.75)
     var fs = 13
-    var col0 = W / 6
-    var col1 = W / 2
-    var col2 = W * 5 / 6
-    ## row 1 (y>0) est en haut de l'écran, row 0 (y<0) en bas
-    var rowTop = H * 0.28
-    var rowBot = H * 0.72
-    graphics.text("plane",          col0 - 18, rowTop, fs, lc)
-    graphics.text("line3d/point3d", col1 - 42, rowTop, fs, lc)
-    graphics.text("cube (stroke)",  col2 - 38, rowTop, fs, lc)
-    graphics.text("cube",           col0 - 14, rowBot, fs, lc)
-    graphics.text("sphere",         col1 - 20, rowBot, fs, lc)
-    graphics.text("cylinder",       col2 - 26, rowBot, fs, lc)
+    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cube (stroke)"]
+    var offsets = [-14, -20, -26, -18, -42, -38]
+    for i = 1, 6 do
+        var idx = i - 1
+        var col = idx % cols
+        var row = idx // cols
+        var cx = W * (col + 0.5) / cols
+        var cy = H * (rows - 0.5 - row) / rows - H * 0.05
+        graphics.text(names[i], cx + offsets[i], cy, fs, lc)
+    end
 
     graphics.text("Glisse pour tourner", 12, 12, 16, Color(1, 1, 1, 0.5))
 end
