@@ -1159,10 +1159,20 @@ dispatch_loop:
         } else if (obj.isString()) {
             regs[base + A] = string_module_.mapGet(key);
         } else if (obj.isArray()) {
-            if (!key.isInteger())
-                throw std::runtime_error("line " + std::to_string(errLine()) +
-                                         ": runtime: array index must be integer");
-            regs[base + A] = obj.arrayGet(key.asInt());
+            if (key.isString()) {
+                if (key.asString() == "len")
+                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                        return Value((int64_t)(n > 0 ? a[0].arraySize() : 0));
+                    });
+                else
+                    throw std::runtime_error("line " + std::to_string(errLine()) +
+                                             ": runtime: array has no field '" + key.asString() + "'");
+            } else {
+                if (!key.isInteger())
+                    throw std::runtime_error("line " + std::to_string(errLine()) +
+                                             ": runtime: array index must be integer");
+                regs[base + A] = obj.arrayGet(key.asInt());
+            }
         } else {
             throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot index " +
                                      std::string(obj.typeName()) +
@@ -1375,7 +1385,7 @@ dispatch_loop:
         {
             int cb = base + A;
             int argc = C;
-            bool is_instance = isInstance(regs[cb]) || regs[cb].isString();
+            bool is_instance = isInstance(regs[cb]) || regs[cb].isString() || regs[cb].isArray();
             Value fn = regs[cb + 1];
             // Membre = une CLASSE (ex. `mod.Widget()` via un import aliasé) →
             // instanciation, comme CALL_DYN. Les args sont encore en cb+2.. (pas
