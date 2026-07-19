@@ -748,6 +748,13 @@ assert(#{a: 1, b: 2} == 2)
 assert(#[1;5] == 5)
 assert(#la == len(la))
 
+## méthode .len() sur array (syntaxe objet)
+assert(la.len() == len(la))
+assert([10, 20, 30].len() == 3)
+var nested = [[1, 2], [3, 4]]
+assert(nested.len() == 2)
+assert(nested[1].len() == 2)
+
 ## ── 17. Import ───────────────────────────────────────────────────────────────
 
 ## import plat : les symboles du fichier sont injectés dans le scope courant

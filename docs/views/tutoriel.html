@@ -1221,8 +1221,9 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <span class="bi">printf</span>(<span class="str">"array : {} Ko"</span>, (<span class="bi">mem</span>() - avant) / <span class="num">1024</span>)</code></pre>
 
 <h3>len</h3>
-<p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments).</p>
+<p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments). Disponible aussi en méthode sur les arrays : <code>arr.len()</code>.</p>
 <pre><code><span class="bi">len</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])  <span class="cmt">## 3</span>
+[<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].len()  <span class="cmt">## 3  (forme méthode)</span>
 <span class="bi">len</span>(<span class="str">"bonjour"</span>)  <span class="cmt">## 7</span>
 <span class="kw">var</span> m = {<span class="str">"a"</span>: <span class="num">1</span>, <span class="str">"b"</span>: <span class="num">2</span>}
 <span class="bi">len</span>(m)          <span class="cmt">## 2</span>
