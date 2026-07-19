@@ -23,6 +23,7 @@ bool gfxHasFill();
 Color gfxFillColor();
 bool gfxHasStroke();
 Color gfxStrokeColor();
+float gfxStrokeSize();
 
 // ── Ponts 2D → 3D (définis dans graphics3d.cpp) ─────────────────────────────
 void end3dInternal();          // flush des buckets + EndMode3D (no-op hors bloc 3D)

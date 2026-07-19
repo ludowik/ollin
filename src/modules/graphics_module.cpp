@@ -316,6 +316,9 @@ bool gfxHasStroke() {
 Color gfxStrokeColor() {
     return s_stroke_color;
 }
+float gfxStrokeSize() {
+    return s_stroke_size;
+}
 
 // ── Contextes de style (pile) ───────────────────────────────────────────────
 // Capture/restaure TOUT l'état de dessin : trait, remplissage, mode de fusion,
