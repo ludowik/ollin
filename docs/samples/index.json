@@ -12,5 +12,6 @@
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
   { "name": "Modèle 3D (.obj)", "file": "model_3d.ol" },
   { "name": "Modèle GLB (texturé)", "file": "model_glb.ol" },
-  { "name": "Univers voxel (Minecraft)", "file": "voxel_world.ol" }
+  { "name": "Univers voxel (Minecraft)", "file": "voxel_world.ol" },
+  { "name": "Caméra isométrique",        "file": "iso_camera.ol" }
 ]

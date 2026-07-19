@@ -21,6 +21,7 @@ class VM {
     Value callValue(const Value& fn);                       // appelle une fonction Ollin (0 arg)
     Value callValue(const Value& fn, const Value& arg);     // appelle une fonction Ollin (1 arg)
     Value callValue(const Value& fn, const Value& a, const Value& b); // 2 args
+    Value callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d); // 4 args
     Value getGlobal(const std::string& name) const; // returns nil if not found
     void setGlobal(const std::string& name, const Value& value);
     // Après execute() : appelle setup() une fois, puis lance la boucle graphique via
