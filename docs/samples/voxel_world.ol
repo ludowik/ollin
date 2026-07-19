@@ -511,17 +511,35 @@ end
 ## Cull par SECTEUR fait ICI, comme les chunks : AVANT begin3d(rcam), donc contre le
 ## frustum FIGÉ du JOUEUR. Sinon, en caméra de contrôle (rendu depuis ctrlCam),
 ## inFrustum lirait le frustum de la caméra de contrôle → aucun secteur rejeté.
+##
+## On ne scanne pas le carré 2·reach plein (dont ~la moitié est DERRIÈRE le joueur et
+## échoue toujours inFrustum) : chaque rangée est clippée au demi-plan avant (produit
+## scalaire avec la direction de regard f). On ne retire que des secteurs derrière la
+## caméra — que inFrustum rejetait déjà — donc couverture visible inchangée.
 ## Renvoie un tableau plat [sx0, sz0, sx1, sz1, …] des secteurs visibles.
 func cull_cloud_sectors()
     var drift = elapsedTime * CLOUD_SPEED
     var reach = vd.radius * CS + CLOUD_MARGIN   ## suit la distance d'affichage du terrain
+    var fx = math.sin(yaw)                       ## direction de regard (XZ)
+    var fz = math.cos(yaw)
     var secs = []
-    var s0x = math.floor((camX - drift - reach) / CLOUD_SEC) * CLOUD_SEC
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
-    for sx = s0x, camX - drift + reach, CLOUD_SEC do
-        for sz = s0z, camZ + reach, CLOUD_SEC do
-            ## bbox du secteur EN MONDE (x décalé par le drift) testée en frustum
-            if graphics.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, sz + CLOUD_SEC / 2, CLOUD_SEC * 0.72 + 4) then
+    for sz = s0z, camZ + reach, CLOUD_SEC do
+        var wz = sz + CLOUD_SEC / 2
+        ## span x du demi-plan avant : (wx-camX)*fx + (wz-camZ)*fz >= -CLOUD_SEC
+        var rhs = 0 - CLOUD_SEC - (wz - camZ) * fz
+        var wlo = camX - reach
+        var whi = camX + reach
+        if fx > 0.001 then
+            wlo = math.max(wlo, camX + rhs / fx)
+        elseif fx < -0.001 then
+            whi = math.min(whi, camX + rhs / fx)
+        elseif rhs > 0 then
+            wlo = whi + 1                         ## rangée entièrement derrière → vide
+        end
+        var s0x = math.floor((wlo - drift) / CLOUD_SEC) * CLOUD_SEC
+        for sx = s0x, whi - drift, CLOUD_SEC do
+            if graphics.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, wz, CLOUD_SEC * 0.72 + 4) then
                 secs[#secs + 1] = sx
                 secs[#secs + 1] = sz
             end
