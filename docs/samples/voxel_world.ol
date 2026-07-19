@@ -517,13 +517,20 @@ end
 ## scalaire avec la direction de regard f). On ne retire que des secteurs derrière la
 ## caméra — que inFrustum rejetait déjà — donc couverture visible inchangée.
 ## Renvoie un tableau plat [sx0, sz0, sx1, sz1, …] des secteurs visibles.
+global cloudStats = {tested=0, kept=0}
+
 func cull_cloud_sectors()
     var drift = elapsedTime * CLOUD_SPEED
     var reach = vd.radius * CS + CLOUD_MARGIN   ## suit la distance d'affichage du terrain
     var fx = math.sin(yaw)                       ## direction de regard (XZ)
     var fz = math.cos(yaw)
     var secs = []
+    var tested = 0
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
+    ## carré plein sans demi-plan : toutes les rangées de s0z à camZ+reach
+    var full_w = math.floor(2 * reach / CLOUD_SEC) + 1
+    var full_rows = math.floor(2 * reach / CLOUD_SEC) + 1
+    var full_total = full_w * full_rows
     for sz = s0z, camZ + reach, CLOUD_SEC do
         var wz = sz + CLOUD_SEC / 2
         ## span x du demi-plan avant : (wx-camX)*fx + (wz-camZ)*fz >= -CLOUD_SEC
@@ -539,12 +546,16 @@ func cull_cloud_sectors()
         end
         var s0x = math.floor((wlo - drift) / CLOUD_SEC) * CLOUD_SEC
         for sx = s0x, whi - drift, CLOUD_SEC do
+            tested = tested + 1
             if graphics.inFrustum(sx + CLOUD_SEC / 2 + drift, CLOUD_Y, wz, CLOUD_SEC * 0.72 + 4) then
                 secs[#secs + 1] = sx
                 secs[#secs + 1] = sz
             end
         end
     end
+    cloudStats.tested = tested
+    cloudStats.full = full_total
+    cloudStats.kept = #secs // 2
     return secs
 end
 
@@ -643,4 +654,5 @@ func draw()
     var camlbl = "joueur"
     if debugCam then camlbl = "contrôle" end
     graphics.text("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12, 15, colors.WHITE)
+    graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30, 13, colors.WHITE)
 end
