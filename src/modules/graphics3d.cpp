@@ -988,24 +988,23 @@ static Value gfx_plane(Value* args, int argc) {
     return Value{};
 }
 
-// graphics.line3d(x1,y1,z1, x2,y2,z2) : segment 3D (couleur stroke, épaisseur strokeSize).
+// graphics.line3d(x1,y1,z1, x2,y2,z2) : segment 3D — rendu comme un cylindre (rayon = strokeSize * 0.02).
 static Value gfx_line3d(Value* args, int argc) {
     Vector3 a{(float)numArg(args, argc, 0, "graphics.line3d"), (float)numArg(args, argc, 1, "graphics.line3d"),
               (float)numArg(args, argc, 2, "graphics.line3d")};
     Vector3 b{(float)numArg(args, argc, 3, "graphics.line3d"), (float)numArg(args, argc, 4, "graphics.line3d"),
               (float)numArg(args, argc, 5, "graphics.line3d")};
-    rlSetLineWidth(gfxStrokeSize());
-    DrawLine3D(a, b, gfxStrokeColor());
-    rlSetLineWidth(1.0f);
+    float r = gfxStrokeSize() * 0.02f;
+    DrawCylinderEx(a, b, r, r, 6, gfxStrokeColor());
     return Value{};
 }
 
-// graphics.point3d(x,y,z) : point 3D — rendu comme une petite sphère (rayon = strokeSize * 0.04).
+// graphics.point3d(x,y,z) : point 3D — rendu comme une petite sphère (rayon = strokeSize * 0.015).
 static Value gfx_point3d(Value* args, int argc) {
     float x = (float)numArg(args, argc, 0, "graphics.point3d");
     float y = (float)numArg(args, argc, 1, "graphics.point3d");
     float z = (float)numArg(args, argc, 2, "graphics.point3d");
-    float r = gfxStrokeSize() * 0.04f;
+    float r = gfxStrokeSize() * 0.015f;
     pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, {x, y, z}, {2.0f * r, 2.0f * r, 2.0f * r}, gfxStrokeColor());
     return Value{};
 }
