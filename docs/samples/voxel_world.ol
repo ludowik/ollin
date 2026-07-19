@@ -35,7 +35,7 @@ global TURN_MAX = 1.8
 global SPEED_MAX = 8.0
 
 global C_SKY = Color(0.55, 0.80, 0.95)
-global AMB = 0.5              ## ambiant du terrain (restauré après le rendu blanc des nuages)
+global AMB = 0.5              ## ambiant du terrain
 
 ## Nuages : couche de cubes blancs semi-transparents, dérivant en +x. Dessinés en
 ## IMMÉDIAT chaque frame (ils bougent → pas de chunk/cuisson). 1 seul draw call
@@ -532,9 +532,8 @@ end
 
 func draw_clouds(secs)
     var drift = elapsedTime * CLOUD_SPEED
-    graphics.noStroke()
-    graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle crée un dégradé
-    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))   ## (haut clair, sous-face plus douce) : donne du volume
+    graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle donne du volume aux nuages
+    graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))
     graphics.texture(cloudTex)                    ## moucheté doux (casse le blanc plat)
     for i = 1, #secs, 2 do
         var sx = secs[i]
@@ -618,7 +617,7 @@ func draw()
         end
         draw_clouds(cloudSecs)      ## nuages (semi-transparents) au-dessus de tout
     graphics.end3d()
-    graphics.ambient(AMB)           ## draw_clouds a mis l'ambiant à blanc → on rétablit
+    graphics.ambient(AMB)           ## draw_clouds a baissé l'ambiant → rétablir pour le terrain
 
     pad.draw()
     vd.draw()                          ## boutons − / + (ViewDistance)
