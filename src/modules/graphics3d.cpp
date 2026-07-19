@@ -165,7 +165,7 @@ static Value gfx_camera(Value* args, int argc) {
 // DrawMeshInstanced custom (transfo + couleur PAR INSTANCE via 2 VBO d'instance)
 // avec le shader Blinn-Phong. → N formes de même (mesh,texture) = 1 draw call.
 
-enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_CONE = 4, SH_COUNT = 5 };
+enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_CONE = 4, SH_TORUS = 5, SH_COUNT = 6 };
 
 struct Bucket3D {
     unsigned int vaoId;          // clé mesh : identifie le mesh GPU (primitive OU modèle externe)
@@ -213,7 +213,7 @@ static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au
 
 // Meshes unitaires en cache (normales + UV propres via GenMesh*).
 static Mesh s_shape_mesh[SH_COUNT];
-static bool s_shape_ready[SH_COUNT] = {false, false, false, false, false};
+static bool s_shape_ready[SH_COUNT] = {false, false, false, false, false, false};
 static Mesh getShapeMesh(int shape) {
     if (!s_shape_ready[shape]) {
         switch (shape) {
@@ -228,6 +228,11 @@ static Mesh getShapeMesh(int shape) {
                 break;
             case SH_CONE:
                 s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, 16);
+                break;
+            case SH_TORUS:
+                // major=1, tube=0.3, size=2 → par_shapes_scale×1 → no shrink
+                // The ring lies in the XY plane; XY scale = major radius, Z = tube
+                s_shape_mesh[shape] = GenMeshTorus(0.3f, 2.0f, 24, 16);
                 break;
             default:
                 s_shape_mesh[shape] = GenMeshPlane(1.0f, 1.0f, 1, 1);
@@ -990,6 +995,22 @@ static Value gfx_cone(Value* args, int argc) {
     return Value{};
 }
 
+// graphics.torus(x,y,z, r, tube) : tore centré en (x,y,z), rayon major r, rayon du tube tube.
+// Le mesh unitaire a r=0.5, tube=0.25 → scale = (r/0.5, r/0.5, r/0.5) avec tube/r = 0.5 fixé.
+// Pour exposer les deux paramètres indépendants, on scale X=Z sur r, Y sur tube.
+static Value gfx_torus(Value* args, int argc) {
+    Vector3 pos{(float)numArg(args, argc, 0, "graphics.torus"), (float)numArg(args, argc, 1, "graphics.torus"),
+                (float)numArg(args, argc, 2, "graphics.torus")};
+    float r    = (float)numArg(args, argc, 3, "graphics.torus");
+    float tube = (float)numArg(args, argc, 4, "graphics.torus");
+    // mesh : major=1 (XY), tube=0.3 (Z) → scale XY par r, Z par tube/0.3
+    if (gfxHasFill())
+        pushInstance(getShapeMesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfxFillColor());
+    if (gfxHasStroke())
+        DrawCircle3D(pos, r, {1, 0, 0}, 90.0f, gfxStrokeColor());
+    return Value{};
+}
+
 // graphics.plane(x,y,z, sx,sz) : plan horizontal (XZ) centré en (x,y,z), taille
 // sx×sz. Instancié + éclairé (utilise la couleur fill ; sinon stroke pour rester visible).
 static Value gfx_plane(Value* args, int argc) {
@@ -1449,6 +1470,7 @@ void register3dGraphics(Value& m) {
     m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
     m.mapSet(Value(std::string("cylinder")), Value::makeBuiltin(gfx_cylinder));
     m.mapSet(Value(std::string("cone")), Value::makeBuiltin(gfx_cone));
+    m.mapSet(Value(std::string("torus")), Value::makeBuiltin(gfx_torus));
     m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
     m.mapSet(Value(std::string("model")), Value::makeBuiltin(gfx_model));
     m.mapSet(Value(std::string("drawModel")), Value::makeBuiltin(gfx_draw_model));

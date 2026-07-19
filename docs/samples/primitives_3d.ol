@@ -1,4 +1,4 @@
-## Primitives 3D : cube, sphère, cylindre, plan, ligne, point.
+## Primitives 3D : cube, sphère, cylindre, plan, ligne, point, cône, tore.
 ## Glisse pour faire tourner chaque primitive sur elle-même.
 
 global cam = graphics.camera(0, 0, 24,  0, 0, 0)
@@ -7,12 +7,11 @@ global dragging = false
 global lastx = 0
 global lasty = 0
 
-## Grille adaptée à l'orientation : paysage = 3×2, portrait = 2×3
+## Grille adaptée à l'orientation : paysage = 4×2, portrait = 2×4
 ## cell_pos(col, row, cols, rows) → [x, y] en unités monde, centré sur (0,0)
 func cell_pos(col, row, cols, rows)
     var fov = 45.0
     var aspect = W / H
-    ## demi-largeur et demi-hauteur visibles à z=0 depuis la caméra en z=24
     var depth = 24.0
     var halfH = depth * math.tan(fov * 0.5 * math.PI / 180)
     var halfW = halfH * aspect
@@ -50,14 +49,13 @@ end
 func draw()
     graphics.clear(Color(0.08, 0.08, 0.12))
 
-    ## idx → col/row selon l'orientation
-    ## Paysage 3×2 : cube sphère cylindre / plan lignes fil
-    ## Portrait 2×3 : cube sphère / cylindre plan / lignes fil
-    var cols = 3
+    ## Paysage 4×2 : cube sphère cylindre plan / lignes cône tore (vide)
+    ## Portrait 2×4 : cube sphère / cylindre plan / lignes cône / tore (vide)
+    var cols = 4
     var rows = 2
     if H > W then
         cols = 2
-        rows = 3
+        rows = 4
     end
 
     func gc(idx)
@@ -114,13 +112,11 @@ func draw()
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
-            ## 3 lignes diagonales, plus longues que le nuage
             graphics.stroke(Color(1, 0.5, 0.1))
             graphics.strokeSize(4)
             graphics.line3d(-1.8, -1.8, -1.8,   1.8,  1.8,  1.8)
             graphics.line3d(-1.8, -1.8,  1.8,   1.8,  1.8, -1.8)
             graphics.line3d( 1.8, -1.8, -1.8,  -1.8,  1.8,  1.8)
-            ## nuage de points en spirale (rayon max 1.0, bien en deçà des lignes)
             graphics.strokeSize(6)
             for i = 1, 40 do
                 var t = i * 2.399
@@ -144,15 +140,23 @@ func draw()
             graphics.cone(0, -1.2, 0,  1.0, 2.4)
         graphics.pop()
 
+        ## Tore (idx 6)
+        p = cell_pos(gc(6), gr(6), cols, rows)
+        graphics.push()
+            graphics.translate(p[1], p[2], 0)
+            graphics.rotateq(orient)
+            graphics.fill(Color(0.4, 0.9, 0.7))
+            graphics.torus(0, 0, 0,  1.1, 0.4)
+        graphics.pop()
+
     graphics.end3d()
 
-    ## Labels 2D — un par primitive, centrés horizontalement sur la colonne
-    ## row 0 = bas de l'écran (Y élevé), row rows-1 = haut (Y faible)
+    ## Labels 2D
     var lc = Color(1, 1, 1, 0.75)
     var fs = 13
-    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone"]
-    var offsets = [-14, -20, -26, -18, -42, -14]
-    for i = 1, 6 do
+    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus"]
+    var offsets = [-14, -20, -26, -18, -42, -14, -16]
+    for i = 1, 7 do
         var idx = i - 1
         var col = idx % cols
         var row = idx // cols
