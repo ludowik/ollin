@@ -96,4 +96,9 @@ func draw()
     g.text("text", px(460), py(310), fs(13), dim)
     g.text("size 16", px(460), py(328), fs(16), Color(0.9, 0.9, 1))
     g.text("size 22", px(460), py(352), fs(22), Color(0.7, 0.85, 1))
+
+    g.stroke(Color(1, 0.5, 0.7), fs(2))
+    g.fill(Color(1, 0.5, 0.7, 0.25))
+    g.arc(px(620), py(350), fs(90), fs(90), t, t + math.rad(250))
+    g.text("arc", px(600), py(300), fs(13), dim)
 end
