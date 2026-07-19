@@ -338,6 +338,7 @@ struct StyleState {
     bool  hasTint;
     Color tint;
     unsigned int tex3d;
+    int   segments;
 };
 static std::vector<StyleState> s_style_stack;
 
@@ -351,6 +352,7 @@ static StyleState captureStyle() {
     s.blendMode = s_blend_mode;
     image_get_tint(&s.hasTint, &s.tint.r, &s.tint.g, &s.tint.b, &s.tint.a);
     s.tex3d = gfx3dGetTexture();
+    s.segments = s_segments;
     return s;
 }
 
@@ -364,6 +366,10 @@ static void restoreStyle(const StyleState& s) {
     BeginBlendMode(s.blendMode);
     image_set_tint(s.hasTint, s.tint.r, s.tint.g, s.tint.b, s.tint.a);
     gfx3dSetTexture(s.tex3d);
+    if (s.segments != s_segments) {
+        s_segments = s.segments;
+        reset3dShapeCache();
+    }
 }
 
 static void resetStyles() {
