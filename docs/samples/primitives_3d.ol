@@ -154,7 +154,7 @@ func draw()
         graphics.push()
             graphics.translate(p[1], p[2], 0)
             graphics.rotateq(orient)
-            graphics.segments(8)
+            graphics.segments(6)
             graphics.fill(Color(0.3, 0.7, 0.9))
             graphics.sphere(0, 0, 0,  1.4)
         graphics.pop()
@@ -164,7 +164,7 @@ func draw()
     ## Labels 2D
     var lc = Color(1, 1, 1, 0.75)
     var fs = 13
-    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(8)"]
+    var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(6)"]
     var offsets = [-14, -20, -26, -18, -42, -14, -16, -34]
     for i = 1, 8 do
         var idx = i - 1
