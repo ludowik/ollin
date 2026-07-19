@@ -29,6 +29,34 @@ struct Array {
     void push(const Value& v) {
         items.push_back(v);
     }
+    Value pop() {
+        if (items.empty())
+            throw std::runtime_error("runtime: pop on empty array");
+        Value v = std::move(items.back());
+        items.pop_back();
+        return v;
+    }
+    Value removeAt(int64_t idx) {
+        int64_t i = idx - 1;
+        if (i < 0 || i >= (int64_t)items.size())
+            throw std::runtime_error("runtime: array index out of bounds (got " + std::to_string(idx) + ")");
+        Value v = std::move(items[(size_t)i]);
+        items.erase(items.begin() + i);
+        return v;
+    }
+    void insertAt(int64_t idx, const Value& v) {
+        int64_t i = idx - 1;
+        if (i < 0 || i > (int64_t)items.size())
+            throw std::runtime_error("runtime: array index out of bounds (got " + std::to_string(idx) + ")");
+        items.insert(items.begin() + i, v);
+    }
+    Value shift() {
+        if (items.empty())
+            throw std::runtime_error("runtime: dequeue on empty array");
+        Value v = std::move(items.front());
+        items.erase(items.begin());
+        return v;
+    }
 };
 
 struct ArrayPool {

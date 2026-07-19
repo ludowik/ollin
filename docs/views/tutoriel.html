@@ -1130,6 +1130,28 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 ## 2: b
 ## 3: c</span></code></pre>
 
+<h3>Méthodes</h3>
+<table>
+<tr><th>Méthode</th><th>Description</th></tr>
+<tr><td><code>arr.len()</code></td><td>Nombre d'éléments</td></tr>
+<tr><td><code>arr.push(v)</code></td><td>Ajoute <code>v</code> en fin</td></tr>
+<tr><td><code>arr.pop()</code></td><td>Retire et retourne le dernier élément</td></tr>
+<tr><td><code>arr.insert(i, v)</code></td><td>Insère <code>v</code> à l'indice <code>i</code> (1-based)</td></tr>
+<tr><td><code>arr.delete(i)</code></td><td>Retire et retourne l'élément à l'indice <code>i</code></td></tr>
+<tr><td><code>arr.enqueue(v)</code></td><td>Alias de <code>push</code> — ajoute en fin (file)</td></tr>
+<tr><td><code>arr.dequeue()</code></td><td>Retire et retourne le premier élément (file)</td></tr>
+</table>
+<pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
+a.push(<span class="num">4</span>)           <span class="cmt">## [1, 2, 3, 4]</span>
+a.pop()             <span class="cmt">## retire 4</span>
+a.insert(<span class="num">2</span>, <span class="num">99</span>)    <span class="cmt">## [1, 99, 2, 3]</span>
+a.delete(<span class="num">2</span>)        <span class="cmt">## retire 99 → [1, 2, 3]</span>
+
+<span class="kw">var</span> q = []          <span class="cmt">## file FIFO</span>
+q.enqueue(<span class="str">"a"</span>)
+q.enqueue(<span class="str">"b"</span>)
+q.dequeue()         <span class="cmt">## "a"</span></code></pre>
+
 <h3>Sémantique de copie</h3>
 <div class="callout warn">Les arrays sont <strong>partagés par référence</strong> (comptage de référence), comme les maps.</div>
 </section>

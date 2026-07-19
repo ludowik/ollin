@@ -748,12 +748,28 @@ assert(#{a: 1, b: 2} == 2)
 assert(#[1;5] == 5)
 assert(#la == len(la))
 
-## méthode .len() sur array (syntaxe objet)
+## méthodes array
 assert(la.len() == len(la))
 assert([10, 20, 30].len() == 3)
 var nested = [[1, 2], [3, 4]]
 assert(nested.len() == 2)
 assert(nested[1].len() == 2)
+
+var ma = [1, 2, 3]
+ma.push(4)
+assert(ma[4] == 4)
+assert(ma.pop() == 4)
+assert(ma.len() == 3)
+ma.insert(2, 99)
+assert(ma[2] == 99)
+assert(ma.delete(2) == 99)
+assert(ma[2] == 2)
+
+var fifo = []
+fifo.enqueue(10)
+fifo.enqueue(20)
+assert(fifo.dequeue() == 10)
+assert(fifo.dequeue() == 20)
 
 ## ── 17. Import ───────────────────────────────────────────────────────────────
 

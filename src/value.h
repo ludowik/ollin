@@ -212,6 +212,10 @@ struct Value {
     Value arrayGet(int64_t idx) const;            // 1-based
     void arraySet(int64_t idx, const Value& val); // 1-based, grows if needed
     void arrayPush(const Value& val);
+    Value arrayPop();
+    void arrayInsert(int64_t idx, const Value& val);
+    Value arrayRemove(int64_t idx);
+    Value arrayShift();
     int64_t arraySize() const;
     int64_t mapSize() const;
 
@@ -294,6 +298,18 @@ inline void Value::arraySet(int64_t idx, const Value& v) {
 }
 inline void Value::arrayPush(const Value& v) {
     aptr->push(v);
+}
+inline Value Value::arrayPop() {
+    return aptr->pop();
+}
+inline void Value::arrayInsert(int64_t idx, const Value& v) {
+    aptr->insertAt(idx, v);
+}
+inline Value Value::arrayRemove(int64_t idx) {
+    return aptr->removeAt(idx);
+}
+inline Value Value::arrayShift() {
+    return aptr->shift();
 }
 inline int64_t Value::arraySize() const {
     return (int64_t)aptr->items.size();

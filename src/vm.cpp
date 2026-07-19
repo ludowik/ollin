@@ -1160,13 +1160,37 @@ dispatch_loop:
             regs[base + A] = string_module_.mapGet(key);
         } else if (obj.isArray()) {
             if (key.isString()) {
-                if (key.asString() == "len")
+                const std::string& m = key.asString();
+                if (m == "len")
                     regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
                         return Value((int64_t)(n > 0 ? a[0].arraySize() : 0));
                     });
+                else if (m == "push" || m == "enqueue")
+                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                        if (n >= 2) a[0].arrayPush(a[1]);
+                        return a[0];
+                    });
+                else if (m == "pop")
+                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                        return n > 0 ? a[0].arrayPop() : Value{};
+                    });
+                else if (m == "dequeue")
+                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                        return n > 0 ? a[0].arrayShift() : Value{};
+                    });
+                else if (m == "insert")
+                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                        if (n >= 3 && a[1].isInteger()) a[0].arrayInsert(a[1].asInt(), a[2]);
+                        return a[0];
+                    });
+                else if (m == "delete")
+                    regs[base + A] = Value::makeBuiltin([](Value* a, int n) -> Value {
+                        if (n >= 2 && a[1].isInteger()) return a[0].arrayRemove(a[1].asInt());
+                        return Value{};
+                    });
                 else
                     throw std::runtime_error("line " + std::to_string(errLine()) +
-                                             ": runtime: array has no field '" + key.asString() + "'");
+                                             ": runtime: array has no field '" + m + "'");
             } else {
                 if (!key.isInteger())
                     throw std::runtime_error("line " + std::to_string(errLine()) +
