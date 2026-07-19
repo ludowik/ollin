@@ -8,6 +8,7 @@
   { "name": "Image (loadData)", "file": "image_demo.ol" },
   { "name": "Persistance (data)", "file": "data_demo.ol" },
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },
+  { "name": "Primitives 3D",  "file": "primitives_3d.ol" },
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
   { "name": "Modèle 3D (.obj)", "file": "model_3d.ol" },
   { "name": "Modèle GLB (texturé)", "file": "model_glb.ol" },
