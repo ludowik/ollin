@@ -161,18 +161,21 @@ func draw()
 
     graphics.end3d()
 
-    ## Labels 2D
-    var lc = Color(1, 1, 1, 0.75)
+    ## Labels 2D — fond blanc, texte noir, centrés sur la cellule
     var fs = 13
+    var pad = 4
     var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(6)"]
-    var offsets = [-14, -20, -26, -18, -42, -14, -16, -34]
+    var hw = [14, 20, 26, 18, 42, 14, 16, 34]  ## demi-largeur approx du texte
     for i = 1, 8 do
         var idx = i - 1
         var col = idx % cols
         var row = idx // cols
         var cx = W * (col + 0.5) / cols
-        var cy = H * (rows - 0.5 - row) / rows - H * 0.05
-        graphics.text(names[i], cx + offsets[i], cy, fs, lc)
+        var cy = H * (rows - 0.5 - row) / rows
+        graphics.noStroke()
+        graphics.fill(Color(1, 1, 1, 0.88))
+        graphics.rect(cx - hw[i] - pad, cy - fs/2 - pad, hw[i]*2 + pad*2, fs + pad*2)
+        graphics.text(names[i], cx - hw[i], cy - fs/2, fs, Color(0, 0, 0))
     end
 
     graphics.text("Glisse pour tourner", 12, 12, 16, Color(1, 1, 1, 0.5))
