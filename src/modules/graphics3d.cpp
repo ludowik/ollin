@@ -224,10 +224,10 @@ static Mesh getShapeMesh(int shape) {
                 s_shape_mesh[shape] = GenMeshSphere(0.5f, 24, 24);
                 break;
             case SH_CYLINDER:
-                s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, 16);
+                s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, 64);
                 break;
             case SH_CONE:
-                s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, 16);
+                s_shape_mesh[shape] = GenMeshCone(1.0f, 1.0f, 64);
                 break;
             case SH_TORUS:
                 // major=1, tube=0.3, size=2 → par_shapes_scale×1 → no shrink
