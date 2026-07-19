@@ -625,8 +625,8 @@ func draw()
             vis[#vis + 1] = c
         end
     end
-    var cloudSecs = cull_cloud_sectors()   ## cull ICI (frustum joueur), comme les chunks
     graphics.begin3d(rcam)
+        var cloudSecs = cull_cloud_sectors()   ## cull ici = frustum de rcam (joueur ou contrôle)
         for i = 1, #vis do
             graphics.drawChunk(vis[i])
         end
