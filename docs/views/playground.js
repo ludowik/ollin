@@ -1114,9 +1114,10 @@ async function renderMenuOpen() {
   }
 }
 
-function renderMenuExamples() {
+async function renderMenuExamples() {
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Ouvrir un exemple', renderMenuRoot))
+  examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => examples)
   if (!examples.length) {
     const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun exemple.'
     projectMenu.appendChild(d); return
