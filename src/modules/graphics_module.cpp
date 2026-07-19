@@ -669,6 +669,82 @@ static Value gfx_circle(Value* args, int argc) {
     return Value{};
 }
 
+// Secteur (part de tarte) : triangles depuis le centre sur l'arc [start;stop].
+static void drawArcFill(float cx, float cy, float rx, float ry, float start, float stop, Color color, int segs) {
+    for (int i = 0; i < segs; i++) {
+        float a0 = start + (stop - start) * (float)i / segs;
+        float a1 = start + (stop - start) * (float)(i + 1) / segs;
+        DrawTriangle({cx, cy}, {cx + rx * cosf(a1), cy + ry * sinf(a1)}, {cx + rx * cosf(a0), cy + ry * sinf(a0)},
+                     color);
+    }
+}
+
+// Contour de l'arc SEUL (courbe, sans les rayons) : anneau triangulé sur [start;stop],
+// épaisseur centrée sur le tracé — même construction que drawEllipseStroke.
+static void drawArcStroke(float cx, float cy, float rx, float ry, float start, float stop, float thick, Color color,
+                          int segs) {
+    float h = thick * 0.5f;
+    float rxi = rx - h;
+    float ryi = ry - h;
+    if (rxi < 0.0f) {
+        rxi = 0.0f;
+    }
+    if (ryi < 0.0f) {
+        ryi = 0.0f;
+    }
+    float rxo = rx + h;
+    float ryo = ry + h;
+    for (int i = 0; i < segs; i++) {
+        float a0 = start + (stop - start) * (float)i / segs;
+        float a1 = start + (stop - start) * (float)(i + 1) / segs;
+        float c0 = cosf(a0);
+        float s0 = sinf(a0);
+        float c1 = cosf(a1);
+        float s1 = sinf(a1);
+        Vector2 o0 = {cx + rxo * c0, cy + ryo * s0};
+        Vector2 o1 = {cx + rxo * c1, cy + ryo * s1};
+        Vector2 i0 = {cx + rxi * c0, cy + ryi * s0};
+        Vector2 i1 = {cx + rxi * c1, cy + ryi * s1};
+        // Winding aligné sur drawArcFill (front-face, sinon back-face-culled → invisible).
+        DrawTriangle(o0, i1, o1, color);
+        DrawTriangle(o0, i0, i1, color);
+    }
+}
+
+// arc(x, y, w, h, start, stop) : arc elliptique. w/h = tailles pleines (comme ellipse).
+// start/stop en radians, sens horaire (y vers le bas → angle croissant = horaire).
+// fill → secteur plein ; stroke → courbe de l'arc seule. segs proportionnel à l'angle.
+static Value gfx_arc(Value* args, int argc) {
+    static constexpr const char* FN = "graphics.arc";
+    if (argc < 6)
+        throw std::runtime_error(std::string(FN) + ": expected x, y, w, h, start, stop");
+    float cx = (float)numArg(args, 0, FN);
+    float cy = (float)numArg(args, 1, FN);
+    float rx = (float)numArg(args, 2, FN) * 0.5f;
+    float ry = (float)numArg(args, 3, FN) * 0.5f;
+    float start = (float)numArg(args, 4, FN);
+    float stop = (float)numArg(args, 5, FN);
+    while (stop < start) {
+        stop += 2.0f * PI;
+    }
+    float span = stop - start;
+    if (span > 2.0f * PI) {
+        span = 2.0f * PI;
+        stop = start + span;
+    }
+    int segs = (int)ceilf(64.0f * span / (2.0f * PI));
+    if (segs < 2) {
+        segs = 2;
+    }
+    if (s_has_fill)
+        drawArcFill(cx, cy, rx, ry, start, stop, s_fill_color, segs);
+    if (s_has_stroke) {
+        StrokeWC s = strokeParams();
+        drawArcStroke(cx, cy, rx, ry, start, stop, s.w, s.c, segs);
+    }
+    return Value{};
+}
+
 static Value gfx_point(Value* args, int argc) {
     if (argc < 2)
         throw std::runtime_error("graphics.point: expected x, y");
@@ -1080,6 +1156,7 @@ Value makeGraphicsModule() {
     m.mapSet(Value(std::string("polyline")), Value::makeBuiltin(gfx_polyline));
     m.mapSet(Value(std::string("ellipse")), Value::makeBuiltin(gfx_ellipse));
     m.mapSet(Value(std::string("circle")), Value::makeBuiltin(gfx_circle));
+    m.mapSet(Value(std::string("arc")), Value::makeBuiltin(gfx_arc));
     m.mapSet(Value(std::string("point")), Value::makeBuiltin(gfx_point));
     m.mapSet(Value(std::string("sprite")), Value::makeBuiltin(gfx_sprite));
     register3dGraphics(m);   // 3D (caméra, begin3d/end3d, primitives, éclairage, texture) — graphics3d.cpp
