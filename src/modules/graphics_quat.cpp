@@ -44,7 +44,7 @@ Value makeQuatInstance(Quaternion q) {
 
 // q.mul(autre) : composition q · autre (applique d'abord autre, puis q).
 static Value quat_mul(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Quaternion a = quatFromInstance(args[0], "Quat.mul");
     if (argc < 2)
         throw std::runtime_error("Quat.mul: expected another Quat");
@@ -54,7 +54,7 @@ static Value quat_mul(CallCtx& ctx) {
 
 // q.slerp(autre, t) : interpolation sphérique (t ∈ [0,1]).
 static Value quat_slerp(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Quaternion a = quatFromInstance(args[0], "Quat.slerp");
     if (argc < 3)
         throw std::runtime_error("Quat.slerp: expected a Quat and t");
@@ -65,21 +65,21 @@ static Value quat_slerp(CallCtx& ctx) {
 
 // q.normalize() : quaternion normalisé.
 static Value quat_normalize(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)argc;
     return makeQuatInstance(QuaternionNormalize(quatFromInstance(args[0], "Quat.normalize")));
 }
 
 // q.inverse() : rotation inverse.
 static Value quat_inverse(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)argc;
     return makeQuatInstance(QuaternionInvert(quatFromInstance(args[0], "Quat.inverse")));
 }
 
 // q.rotateVec(x, y, z) : renvoie le vecteur (x,y,z) tourné par q, sous forme [x,y,z].
 static Value quat_rotate_vec(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Quaternion q = quatFromInstance(args[0], "Quat.rotateVec");
     Vector3 v = {(float)numArg(args, argc, 1, "Quat.rotateVec"), (float)numArg(args, argc, 2, "Quat.rotateVec"),
                  (float)numArg(args, argc, 3, "Quat.rotateVec")};
@@ -110,7 +110,7 @@ static Value quatClass() {
 // ── Fabriques (module graphics) ─────────────────────────────────────────────
 // graphics.quat() : quaternion identité (aucune rotation).
 static Value gfx_quat(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     return makeQuatInstance(QuaternionIdentity());
@@ -118,7 +118,7 @@ static Value gfx_quat(CallCtx& ctx) {
 
 // graphics.quatAxis(ax, ay, az, deg) : rotation de deg° autour de l'axe (ax,ay,az).
 static Value gfx_quat_axis(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 axis = {(float)numArg(args, argc, 0, "graphics.quatAxis"),
                     (float)numArg(args, argc, 1, "graphics.quatAxis"),
                     (float)numArg(args, argc, 2, "graphics.quatAxis")};
@@ -132,7 +132,7 @@ static Value gfx_quat_axis(CallCtx& ctx) {
 
 // graphics.quatEuler(pitch, yaw, roll) : depuis des angles d'Euler (en degrés).
 static Value gfx_quat_euler(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     float pitch = (float)numArg(args, argc, 0, "graphics.quatEuler") * DEG2RAD;
     float yaw = (float)numArg(args, argc, 1, "graphics.quatEuler") * DEG2RAD;
     float roll = (float)numArg(args, argc, 2, "graphics.quatEuler") * DEG2RAD;

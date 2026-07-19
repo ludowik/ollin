@@ -78,7 +78,7 @@ static double camField(const Value& self, const char* k) {
 
 // cam.setPos(x,y,z) : fixe la position de la caméra.
 static Value cam_set_pos(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     self.mapSet(Value(std::string("px")), Value(numArg(args, argc, 1, "Camera.setPos")));
     self.mapSet(Value(std::string("py")), Value(numArg(args, argc, 2, "Camera.setPos")));
@@ -88,7 +88,7 @@ static Value cam_set_pos(CallCtx& ctx) {
 
 // cam.lookAt(x,y,z) : réoriente la caméra vers le point cible (x,y,z).
 static Value cam_look_at(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     self.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 1, "Camera.lookAt")));
     self.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 2, "Camera.lookAt")));
@@ -99,7 +99,7 @@ static Value cam_look_at(CallCtx& ctx) {
 // cam.move(dx,dy,dz) : translate la caméra ET sa cible du même delta → la
 // direction de visée est conservée (déplacement latéral/avant du point de vue).
 static Value cam_move(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     double dx = numArg(args, argc, 1, "Camera.move");
     double dy = numArg(args, argc, 2, "Camera.move");
@@ -116,7 +116,7 @@ static Value cam_move(CallCtx& ctx) {
 // cam.zoom(factor) : multiplie la taille du monde visible (ortho: fovy *= factor,
 // perspective: rapproche/éloigne la position le long de l'axe de visée).
 static Value cam_zoom(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     double factor = numArg(args, argc, 1, "Camera.zoom");
     if (factor <= 0.0) return self;
@@ -140,7 +140,7 @@ static Value cam_zoom(CallCtx& ctx) {
 // avec elapsedTime / math.cos-sin). `hauteur` optionnelle = altitude AU-DESSUS de
 // la cible (par défaut : conserve la hauteur courante).
 static Value cam_orbit(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     double angle = numArg(args, argc, 1, "Camera.orbit");
     double radius = numArg(args, argc, 2, "Camera.orbit");
@@ -175,7 +175,7 @@ static Value cameraClass() {
 // Regarde (tx,ty,tz) depuis (px,py,pz), up = +Y, fovy = champ de vision vertical
 // (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit/zoom).
 static Value gfx_camera(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::makeMap();
     cam.mapSet(Value(std::string("__class__")), cameraClass());
     cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.camera")));
@@ -192,7 +192,7 @@ static Value gfx_camera(CallCtx& ctx) {
 // Projection sans perspective — taille du monde visible = size unités en hauteur
 // (défaut 10). Mêmes méthodes que camera() ; zoom() ajuste size.
 static Value gfx_camera_ortho(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::makeMap();
     cam.mapSet(Value(std::string("__class__")), cameraClass());
     cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.cameraOrtho")));
@@ -756,7 +756,7 @@ void end3dInternal() {
 }
 
 static Value gfx_begin3d(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.begin3d: expected a camera (graphics.camera)");
     s_cam3d = cameraFromMap(args[0], "graphics.begin3d");
@@ -776,7 +776,7 @@ static Value gfx_begin3d(CallCtx& ctx) {
 }
 
 static Value gfx_end3d(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     end3dInternal();   // idempotent
@@ -785,7 +785,7 @@ static Value gfx_end3d(CallCtx& ctx) {
 
 // graphics.ambient(v | couleur) : lumière ambiante (active le mode éclairé).
 static Value gfx_ambient(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
         Color c = gfxToColor(args[0]);
         s_amb3d[0] = c.r / 255.0f;
@@ -835,7 +835,7 @@ static void applyLightFromInstance(const Value& self) {
 
 // light.setDir(x,y,z) : oriente une lumière directionnelle (direction de propagation).
 static Value light_set_dir(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     self.mapSet(Value(std::string("type")), Value((int64_t)0));
     self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.setDir")));
@@ -847,7 +847,7 @@ static Value light_set_dir(CallCtx& ctx) {
 
 // light.setPos(x,y,z) : positionne une lumière ponctuelle.
 static Value light_set_pos(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     self.mapSet(Value(std::string("type")), Value((int64_t)1));
     self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.setPos")));
@@ -859,7 +859,7 @@ static Value light_set_pos(CallCtx& ctx) {
 
 // light.setColor(couleur) : couleur de la lumière.
 static Value light_set_color(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     if (argc > 1 && (args[1].isMap() || args[1].isClass())) {
         Color c = gfxToColor(args[1]);
@@ -874,7 +874,7 @@ static Value light_set_color(CallCtx& ctx) {
 
 // light.enable(bool) : active/désactive la lumière (défaut : active).
 static Value light_enable(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     bool on = (argc > 1) ? !isFalsy(args[1]) : true;
     self.mapSet(Value(std::string("enabled")), Value((int64_t)(on ? 1 : 0)));
@@ -900,7 +900,7 @@ static Value lightClass() {
 // graphics.light("dir"|"point", x,y,z [, couleur]) : crée un objet Light et
 // l'active. "dir" : (x,y,z) = direction de propagation ; "point" : position.
 static Value gfx_light(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     std::string type = (argc > 0 && args[0].isString()) ? args[0].asString() : "dir";
     float x = (float)numArg(args, argc, 1, "graphics.light");
     float y = (float)numArg(args, argc, 2, "graphics.light");
@@ -924,7 +924,7 @@ static Value gfx_light(CallCtx& ctx) {
 // graphics.grid(slices, spacing) : repère quadrillé au sol (plan XZ), centré sur
 // l'origine. Couleur grise fixe de raylib (n'utilise ni fill ni stroke).
 static Value gfx_grid(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     int slices = argc > 0 ? gfxToInt(args[0]) : 10;
     float spacing = argc > 1 ? (float)numArg(args, argc, 1, "graphics.grid") : 1.0f;
     DrawGrid(slices, spacing);
@@ -933,7 +933,7 @@ static Value gfx_grid(CallCtx& ctx) {
 
 // graphics.texture(img) / graphics.noTexture() : texture 3D courante (handle image).
 static Value gfx_texture(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].isMap()) {
         Value idv = args[0].mapGet(Value(std::string("id")));
         s_cur_tex3d = idv.isInteger() ? image_gl_texid((int)idv.asInt()) : 0;
@@ -942,7 +942,7 @@ static Value gfx_texture(CallCtx& ctx) {
 }
 
 static Value gfx_no_texture(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     s_cur_tex3d = 0;
@@ -952,7 +952,7 @@ static Value gfx_no_texture(CallCtx& ctx) {
 // graphics.tileset(img, cols, rows) : déclare l'atlas de tuiles (terrain voxel).
 // Une seule texture en grille, échantillonnée par tuile selon la face du cube.
 static Value gfx_tileset(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].isMap()) {
         Value idv = args[0].mapGet(Value(std::string("id")));
         s_atlas_texid = idv.isInteger() ? image_gl_texid((int)idv.asInt()) : 0;
@@ -969,7 +969,7 @@ static Value gfx_tileset(CallCtx& ctx) {
 
 // graphics.tiles(top, side, bottom) : tuiles du prochain cube (état, comme fill).
 static Value gfx_tiles(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     s_cur_tile[0] = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tiles") : -1.0f;
     s_cur_tile[1] = argc > 1 ? (float)numArg(args, argc, 1, "graphics.tiles") : s_cur_tile[0];
     s_cur_tile[2] = argc > 2 ? (float)numArg(args, argc, 2, "graphics.tiles") : s_cur_tile[1];
@@ -978,7 +978,7 @@ static Value gfx_tiles(CallCtx& ctx) {
 
 // graphics.tile(t) : même tuile sur les 6 faces (raccourci). tile(-1) = aucune.
 static Value gfx_tile(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     float t = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tile") : -1.0f;
     s_cur_tile[0] = t;
     s_cur_tile[1] = t;
@@ -990,7 +990,7 @@ static Value gfx_tile(CallCtx& ctx) {
 // défile/ondule dans le temps (eau). -1 = aucune. Les 4 paramètres optionnels règlent
 // l'ondulation (défauts = look eau) ; la phase spatiale est en coordonnées monde.
 static Value gfx_tile_anim(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     s_anim_tile = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tileAnim") : -1.0f;
     if (argc > 1) {
         s_anim_params[0] = (float)numArg(args, argc, 1, "graphics.tileAnim");
@@ -1010,7 +1010,7 @@ static Value gfx_tile_anim(CallCtx& ctx) {
 // graphics.cube(x,y,z, w,h,l) : cube centré en (x,y,z). Plein si fill (instancié,
 // éclairé, texturé), arêtes si stroke (immédiat, non éclairé).
 static Value gfx_cube(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.cube"), (float)numArg(args, argc, 1, "graphics.cube"),
                 (float)numArg(args, argc, 2, "graphics.cube")};
     Vector3 size{(float)numArg(args, argc, 3, "graphics.cube"), (float)numArg(args, argc, 4, "graphics.cube"),
@@ -1025,7 +1025,7 @@ static Value gfx_cube(CallCtx& ctx) {
 // graphics.sphere(x,y,z, r) : sphère centrée en (x,y,z). Pleine si fill (instanciée,
 // éclairée, texturée), fil de fer si stroke (immédiat). Mesh unitaire = rayon 0.5.
 static Value gfx_sphere(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.sphere"), (float)numArg(args, argc, 1, "graphics.sphere"),
                 (float)numArg(args, argc, 2, "graphics.sphere")};
     float r = (float)numArg(args, argc, 3, "graphics.sphere");
@@ -1040,7 +1040,7 @@ static Value gfx_sphere(CallCtx& ctx) {
 // hauteur h (vers +Y). Plein si fill (instancié), fil de fer si stroke (immédiat).
 // Mono-rayon (contrainte de l'instancing : mesh unitaire figé, rayon 1 hauteur 1).
 static Value gfx_cylinder(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.cylinder"), (float)numArg(args, argc, 1, "graphics.cylinder"),
                 (float)numArg(args, argc, 2, "graphics.cylinder")};
     float r = (float)numArg(args, argc, 3, "graphics.cylinder");
@@ -1054,7 +1054,7 @@ static Value gfx_cylinder(CallCtx& ctx) {
 
 // graphics.cone(x,y,z, r, h) : cône, (x,y,z) = centre de la base, rayon r, hauteur h (vers +Y).
 static Value gfx_cone(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.cone"), (float)numArg(args, argc, 1, "graphics.cone"),
                 (float)numArg(args, argc, 2, "graphics.cone")};
     float r = (float)numArg(args, argc, 3, "graphics.cone");
@@ -1070,7 +1070,7 @@ static Value gfx_cone(CallCtx& ctx) {
 // Le mesh unitaire a r=0.5, tube=0.25 → scale = (r/0.5, r/0.5, r/0.5) avec tube/r = 0.5 fixé.
 // Pour exposer les deux paramètres indépendants, on scale X=Z sur r, Y sur tube.
 static Value gfx_torus(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.torus"), (float)numArg(args, argc, 1, "graphics.torus"),
                 (float)numArg(args, argc, 2, "graphics.torus")};
     float r    = (float)numArg(args, argc, 3, "graphics.torus");
@@ -1086,7 +1086,7 @@ static Value gfx_torus(CallCtx& ctx) {
 // graphics.plane(x,y,z, sx,sz) : plan horizontal (XZ) centré en (x,y,z), taille
 // sx×sz. Instancié + éclairé (utilise la couleur fill ; sinon stroke pour rester visible).
 static Value gfx_plane(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)numArg(args, argc, 0, "graphics.plane"), (float)numArg(args, argc, 1, "graphics.plane"),
                 (float)numArg(args, argc, 2, "graphics.plane")};
     float sx = (float)numArg(args, argc, 3, "graphics.plane");
@@ -1100,7 +1100,7 @@ static Value gfx_plane(CallCtx& ctx) {
 
 // graphics.line3d(x1,y1,z1, x2,y2,z2) : segment 3D — rendu comme un cylindre (rayon = strokeSize * 0.02).
 static Value gfx_line3d(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Vector3 a{(float)numArg(args, argc, 0, "graphics.line3d"), (float)numArg(args, argc, 1, "graphics.line3d"),
               (float)numArg(args, argc, 2, "graphics.line3d")};
     Vector3 b{(float)numArg(args, argc, 3, "graphics.line3d"), (float)numArg(args, argc, 4, "graphics.line3d"),
@@ -1112,7 +1112,7 @@ static Value gfx_line3d(CallCtx& ctx) {
 
 // graphics.point3d(x,y,z) : point 3D — rendu comme une petite sphère (rayon = strokeSize * 0.015).
 static Value gfx_point3d(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     float x = (float)numArg(args, argc, 0, "graphics.point3d");
     float y = (float)numArg(args, argc, 1, "graphics.point3d");
     float z = (float)numArg(args, argc, 2, "graphics.point3d");
@@ -1126,7 +1126,7 @@ static Value gfx_point3d(CallCtx& ctx) {
 // composable, compatible push/pop, appliqué aux solides instanciés ET immédiats.
 // rlMultMatrixf gauche-multiplie (comme rlRotatef) → composition identique.
 static Value gfx_rotateq(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.rotateq: expected a Quat (graphics.quat…)");
     Matrix m = QuaternionToMatrix(quatFromInstance(args[0], "graphics.rotateq"));
@@ -1185,7 +1185,7 @@ static Model* modelGet(const std::string& name) {
 // graphics.model(name) : renvoie un handle {name} vers un modèle préchargé (ou un
 // chemin chargeable). Déclenche le chargement (erreur si introuvable).
 static Value gfx_model(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isString()) {
         throw std::runtime_error("graphics.model: expected a model name (string)");
     }
@@ -1202,7 +1202,7 @@ static Value gfx_model(CallCtx& ctx) {
 // les meshes du modèle comme instances (transfo courante · translate · scale,
 // teinte = fill) → éclairage + instancing du batcher.
 static Value gfx_draw_model(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isMap()) {
         throw std::runtime_error("graphics.drawModel: expected a model handle (graphics.model)");
     }
@@ -1247,7 +1247,7 @@ static Value gfx_draw_model(CallCtx& ctx) {
 // map { w, h, d, cx, cy, cz, radius }. radius = rayon de la sphère englobante
 // (demi-diagonale). À appeler UNE fois (le parcours des sommets n'est pas gratuit).
 static Value gfx_model_size(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isMap()) {
         throw std::runtime_error("graphics.modelSize: expected a model handle (graphics.model)");
     }
@@ -1280,7 +1280,7 @@ static Value gfx_model_size(CallCtx& ctx) {
 // paysage la contrainte est verticale ; en portrait, horizontale — on prend le plus
 // petit demi-angle. À appeler chaque frame (bon marché) → suit les rotations d'écran.
 static Value gfx_fit_distance(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     double radius = numArg(args, argc, 0, "graphics.fitDistance");
     double fovy = argc > 1 ? numArg(args, argc, 1, "graphics.fitDistance") : 45.0;
     int sh = GetScreenHeight();
@@ -1299,7 +1299,7 @@ static Value gfx_fit_distance(CallCtx& ctx) {
 // visible). À appeler DANS un bloc begin3d/end3d (la vue/projection du frame y
 // sont posées). Test exact : 6 plans du frustum extraits de view·projection.
 static Value gfx_in_frustum(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     float x = (float)numArg(args, argc, 0, "graphics.inFrustum");
     float y = (float)numArg(args, argc, 1, "graphics.inFrustum");
     float z = (float)numArg(args, argc, 2, "graphics.inFrustum");
@@ -1340,7 +1340,7 @@ static Value gfx_in_frustum(CallCtx& ctx) {
 // graphics.cube(...) suivants sont CUITS (pas dessinés). Appeler dans setup (le
 // contexte GL doit être prêt : après graphics.canvas).
 static Value gfx_begin_chunk(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     s_recording = true;
@@ -1389,7 +1389,7 @@ static int placeGroup(const InstGroup& g) {
 // TRANSPARENT (eau, idw=0 si aucune eau). À redessiner chaque frame : drawChunk
 // (opaque) puis, après TOUT l'opaque, drawChunkAlpha (eau).
 static Value gfx_end_chunk(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     s_recording = false;
@@ -1417,7 +1417,7 @@ static Value gfx_end_chunk(CallCtx& ctx) {
 // graphics.drawChunk(handle) : redessine un groupe cuit en UN appel instancié
 // (éclairé). À appeler DANS un bloc begin3d. Ne ré-émet AUCUN cube depuis Ollin.
 static Value gfx_draw_chunk(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isMap()) {
         throw std::runtime_error("graphics.drawChunk: expected a chunk handle (graphics.endChunk)");
     }
@@ -1451,7 +1451,7 @@ static Value gfx_draw_chunk(CallCtx& ctx) {
 // gardés → la surface d'eau s'occlude proprement (pas d'accumulation entre couches).
 // À appeler DANS begin3d APRÈS avoir dessiné TOUT l'opaque (drawChunk) des chunks.
 static Value gfx_draw_chunk_alpha(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isMap()) {
         return Value{};
     }
@@ -1513,7 +1513,7 @@ static void freeGroupById(Value& handle, const char* key) {
 }
 
 static Value gfx_free_chunk(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isMap()) {
         return Value{};
     }

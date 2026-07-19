@@ -71,7 +71,7 @@ static void flushPendingScreenshot();   // défini plus bas (utilisé par gfx_en
 static bool s_run_active = false;
 
 static Value gfx_canvas(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     int w = argc > 0 ? gfxToInt(args[0]) : 800;
     int h = argc > 1 ? gfxToInt(args[1]) : 600;
     const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
@@ -187,14 +187,14 @@ static Value gfx_canvas(CallCtx& ctx) {
 }
 
 static Value gfx_is_open(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     return Value(WindowShouldClose() ? int64_t(0) : int64_t(1));
 }
 
 static Value gfx_begin_draw(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     BeginDrawing();
@@ -202,7 +202,7 @@ static Value gfx_begin_draw(CallCtx& ctx) {
 }
 
 static Value gfx_end_draw(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     flushPendingScreenshot();   // chemin manuel beginDraw/endDraw : capture ici
@@ -211,7 +211,7 @@ static Value gfx_end_draw(CallCtx& ctx) {
 }
 
 static Value gfx_clear(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     Color c = BLACK;
     if (argc > 0) {
         ColorRGBA k = parseColor(args, argc, "clear");
@@ -239,7 +239,7 @@ static Value gfx_clear(CallCtx& ctx) {
 // "multiply", "subtract", "add_colors", "premultiply") ou une constante du
 // module `blend`. Remis à "alpha" au début de chaque frame (resetStyles).
 static Value gfx_blend_mode(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     int mode = BLEND_ALPHA;
     if (argc > 0 && args[0].isString()) {
         const std::string& s = args[0].asString();
@@ -388,21 +388,21 @@ static void resetStyles() {
 }
 
 static Value gfx_stroke_size(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].isNumber())
         applyStrokeSize((float)args[0].asNum());
     return Value{};
 }
 
 static Value gfx_segments(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].isNumber())
         s_segments = std::max(3, (int)args[0].asNum());
     return Value{};
 }
 
 static Value gfx_stroke(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0) {
         s_has_stroke = true;                   // sans argument → (ré)active avec la couleur courante
         return Value{};
@@ -417,7 +417,7 @@ static Value gfx_stroke(CallCtx& ctx) {
 }
 
 static Value gfx_no_stroke(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     s_has_stroke = false;                       // ne plus dessiner de contour (couleur conservée)
@@ -425,7 +425,7 @@ static Value gfx_no_stroke(CallCtx& ctx) {
 }
 
 static Value gfx_fill(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0) {
         s_has_fill = true;                   // sans argument → (ré)active avec la couleur courante
         return Value{};
@@ -436,7 +436,7 @@ static Value gfx_fill(CallCtx& ctx) {
 }
 
 static Value gfx_no_fill(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     s_has_fill = false;                       // ne plus remplir (couleur conservée)
@@ -445,7 +445,7 @@ static Value gfx_no_fill(CallCtx& ctx) {
 
 // Teinte globale des images (graphics.sprite / image.draw) : objet Color ou r,g,b[,a].
 static Value gfx_tint(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
         return Value{};   // sans argument : ne change rien
     ColorRGBA k = parseColor(args, argc, "tint");   // même signature que clear/fill/stroke
@@ -455,7 +455,7 @@ static Value gfx_tint(CallCtx& ctx) {
 }
 
 static Value gfx_no_tint(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     image_set_tint(false, 255, 255, 255, 255);
@@ -463,7 +463,7 @@ static Value gfx_no_tint(CallCtx& ctx) {
 }
 
 static Value gfx_line(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.line: expected x1, y1, x2, y2");
     if (!s_has_stroke)
@@ -478,7 +478,7 @@ static Value gfx_line(CallCtx& ctx) {
 }
 
 static Value gfx_rect(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.rect: expected x, y, w, h");
     int x = gfxToInt(args[0]);
@@ -495,7 +495,7 @@ static Value gfx_rect(CallCtx& ctx) {
 }
 
 static Value gfx_fps(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     return Value((int64_t)GetFPS());
@@ -507,7 +507,7 @@ static Value gfx_fps(CallCtx& ctx) {
 // dans renderFrame (ou dans gfx_end_draw pour le chemin manuel). Sur WASM,
 // TakeScreenshot déclenche un téléchargement. (s_shot_path/s_shot_pending : voir haut.)
 static Value gfx_screenshot(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("graphics.screenshot: expected a file path");
     s_shot_path = args[0].asString();
@@ -526,7 +526,7 @@ static void flushPendingScreenshot() {
 }
 
 static Value gfx_text(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.text: expected text, x, y, size [, color]");
     const char* text = args[0].isString() ? args[0].asString().c_str() : "";
@@ -535,7 +535,7 @@ static Value gfx_text(CallCtx& ctx) {
 }
 
 static Value gfx_close(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     CloseWindow();
@@ -595,7 +595,7 @@ static std::vector<Vector2> parsePoints(const Value& v, const char* fn) {
 }
 
 static Value gfx_polygon(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.polygon";
     if (argc < 1 || !args[0].isArray())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
@@ -614,7 +614,7 @@ static Value gfx_polygon(CallCtx& ctx) {
 }
 
 static Value gfx_polyline(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.polyline";
     if (argc < 1 || !args[0].isArray())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
@@ -690,7 +690,7 @@ static void drawOval(float cx, float cy, float rx, float ry, int segs) {
 }
 
 static Value gfx_ellipse(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
     int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : s_segments;
@@ -700,7 +700,7 @@ static Value gfx_ellipse(CallCtx& ctx) {
 }
 
 static Value gfx_circle(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
         throw std::runtime_error("graphics.circle: expected x, y, radius");
     int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : s_segments;
@@ -755,7 +755,7 @@ static void drawArcStroke(float cx, float cy, float rx, float ry, float start, f
 // start/stop en radians, sens horaire (y vers le bas → angle croissant = horaire).
 // fill → secteur plein ; stroke → courbe de l'arc seule. segs proportionnel à l'angle.
 static Value gfx_arc(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.arc";
     if (argc < 6)
         throw std::runtime_error(std::string(FN) + ": expected x, y, w, h, start, stop");
@@ -787,7 +787,7 @@ static Value gfx_arc(CallCtx& ctx) {
 }
 
 static Value gfx_point(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2)
         throw std::runtime_error("graphics.point: expected x, y");
     if (!s_has_stroke)
@@ -835,7 +835,7 @@ static void drawFpsOverlay() {
 }
 
 static Value gfx_quit(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
 #ifdef __EMSCRIPTEN__
@@ -965,7 +965,7 @@ static void emscripten_frame() {
 #endif
 
 static Value gfx_run(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.run: expected callback function");
     if (s_run_active)   // déjà lancé pour ce programme → ignorer le 2ᵉ appel (voir s_run_active)
@@ -999,7 +999,7 @@ static Value gfx_run(CallCtx& ctx) {
 // push/pop        : sauvent/restaurent À LA FOIS la matrice ET le style (Processing/p5).
 // pushMatrix/pop  : matrice seule.  pushStyle/pop : style seul.
 static Value gfx_push(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     rlPushMatrix();
@@ -1008,7 +1008,7 @@ static Value gfx_push(CallCtx& ctx) {
 }
 
 static Value gfx_pop(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     if (!s_style_stack.empty()) {
@@ -1020,7 +1020,7 @@ static Value gfx_pop(CallCtx& ctx) {
 }
 
 static Value gfx_push_matrix(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     rlPushMatrix();
@@ -1028,7 +1028,7 @@ static Value gfx_push_matrix(CallCtx& ctx) {
 }
 
 static Value gfx_pop_matrix(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     rlPopMatrix();
@@ -1036,7 +1036,7 @@ static Value gfx_pop_matrix(CallCtx& ctx) {
 }
 
 static Value gfx_push_style(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     s_style_stack.push_back(captureStyle());
@@ -1044,7 +1044,7 @@ static Value gfx_push_style(CallCtx& ctx) {
 }
 
 static Value gfx_pop_style(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     if (!s_style_stack.empty()) {
@@ -1056,7 +1056,7 @@ static Value gfx_pop_style(CallCtx& ctx) {
 
 // graphics.translate(x, y [, z]) : z optionnel (défaut 0) → 2D et 3D.
 static Value gfx_translate(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2)
         throw std::runtime_error("graphics.translate: expected x, y [, z]");
     float x = (float)numArg(args, 0, "graphics.translate");
@@ -1076,7 +1076,7 @@ static void rotateAxis(Value* args, int argc, float ax, float ay, float az, cons
 // composantes → rotation 3D autour de (ax,ay,az). Un axe PARTIEL (2 ou 3 args)
 // est une ERREUR — on ne retombe pas silencieusement sur Z.
 static Value gfx_rotate(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 1) {
         rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // axe Z par défaut
     } else if (argc >= 4) {
@@ -1089,17 +1089,17 @@ static Value gfx_rotate(CallCtx& ctx) {
 }
 
 static Value gfx_rotate_x(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     rotateAxis(args, argc, 1.0f, 0.0f, 0.0f, "graphics.rotateX");
     return Value{};
 }
 static Value gfx_rotate_y(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     rotateAxis(args, argc, 0.0f, 1.0f, 0.0f, "graphics.rotateY");
     return Value{};
 }
 static Value gfx_rotate_z(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotateZ");
     return Value{};
 }
@@ -1107,7 +1107,7 @@ static Value gfx_rotate_z(CallCtx& ctx) {
 // graphics.scale(s | sx,sy | sx,sy,sz) : 1 arg = uniforme (s,s,s) ; 2 args =
 // (sx,sy,1) (2D) ; 3 args = (sx,sy,sz).
 static Value gfx_scale(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.scale: expected s | sx, sy | sx, sy, sz");
     float sx = (float)numArg(args, 0, "graphics.scale");
@@ -1127,7 +1127,7 @@ static Value gfx_scale(CallCtx& ctx) {
 }
 
 static Value gfx_reset_transform(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     rlLoadIdentity();
@@ -1137,7 +1137,7 @@ static Value gfx_reset_transform(CallCtx& ctx) {
 // ── graphics.sprite(img, x, y [, w, h]) ──────────────────────────────────────
 
 static Value gfx_sprite(CallCtx& ctx) {
-    Value* a = ctx.args; int n = ctx.argc;
+    Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
         throw std::runtime_error("graphics.sprite: expected img, x, y");
     if (!args[0].isMap())
