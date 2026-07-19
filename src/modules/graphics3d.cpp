@@ -232,7 +232,7 @@ static Mesh getShapeMesh(int shape) {
             case SH_TORUS:
                 // major=1, tube=0.3, size=2 → par_shapes_scale×1 → no shrink
                 // The ring lies in the XY plane; XY scale = major radius, Z = tube
-                s_shape_mesh[shape] = GenMeshTorus(0.3f, 2.0f, 24, 16);
+                s_shape_mesh[shape] = GenMeshTorus(0.3f, 2.0f, 48, 32);
                 break;
             default:
                 s_shape_mesh[shape] = GenMeshPlane(1.0f, 1.0f, 1, 1);
