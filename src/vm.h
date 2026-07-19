@@ -56,6 +56,7 @@ class VM {
     Chunk owned_chunk;
     const Chunk* ch = nullptr;
     Value string_module_;
+    Value map_builtins_;
     uint32_t ip = 0;
     std::vector<Value> globals;
     std::vector<bool> globals_init;

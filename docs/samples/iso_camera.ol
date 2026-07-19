@@ -39,13 +39,13 @@ end
 
 func mouse.scrolled(x, y, dx, dy)
     ISO_SIZE = math.max(3.0, math.min(40.0, ISO_SIZE * (1.0 - dy * 0.1)))
-    cam["fovy"] = ISO_SIZE
+    cam.mapSet("fovy", ISO_SIZE)
 end
 
 func mouse.doubleClicked(x, y)
     angle    = ISO_ANGLE
     ISO_SIZE = 14.0
-    cam["fovy"] = ISO_SIZE
+    cam.mapSet("fovy", ISO_SIZE)
     cam.orbit(angle, ISO_DIST, ISO_H)
 end
 

@@ -1155,7 +1155,10 @@ dispatch_loop:
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
         if (obj.isMap() || obj.isClass()) {
-            regs[base + A] = protoChainGet(obj, key);
+            Value v = protoChainGet(obj, key);
+            if (v.isNil() && key.isString())
+                v = map_builtins_.mapGet(key);
+            regs[base + A] = std::move(v);
         } else if (obj.isString()) {
             regs[base + A] = string_module_.mapGet(key);
         } else if (obj.isArray()) {
@@ -1584,6 +1587,15 @@ void VM::execute(Chunk chunk) {
                 globals_init[gi] = true;
             }
     string_module_ = makeBuiltinModule("string");
+    map_builtins_ = Value::makeMap();
+    map_builtins_.mapSet(Value(std::string("mapSet")), Value::makeBuiltin([](Value* a, int n) -> Value {
+        if (n >= 3) a[0].mapSet(a[1], a[2]);
+        return a[0];
+    }));
+    map_builtins_.mapSet(Value(std::string("mapGet")), Value::makeBuiltin([](Value* a, int n) -> Value {
+        if (n >= 2) return a[0].mapGet(a[1]);
+        return Value{};
+    }));
     {
         Value core = makeBuiltinModule("core");
         for (auto& [k, v] : core.asMap()->data) {
