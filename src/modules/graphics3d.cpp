@@ -221,7 +221,7 @@ static Mesh getShapeMesh(int shape) {
                 s_shape_mesh[shape] = GenMeshCube(1.0f, 1.0f, 1.0f);
                 break;
             case SH_SPHERE:
-                s_shape_mesh[shape] = GenMeshSphere(0.5f, 24, 24);
+                s_shape_mesh[shape] = GenMeshSphere(0.5f, 64, 64);
                 break;
             case SH_CYLINDER:
                 s_shape_mesh[shape] = GenMeshCylinder(1.0f, 1.0f, 64);
