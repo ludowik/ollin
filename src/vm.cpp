@@ -1175,11 +1175,19 @@ dispatch_loop:
                         if (ctx.argc >= 2 && ctx.args[1].isCallable()) {
                             Value fn = ctx.args[1];
                             VM* vm = ctx.vm;
+                            std::exception_ptr ex;
                             std::stable_sort(arr.aptr->items.begin(), arr.aptr->items.end(),
-                                [&fn, vm](const Value& a, const Value& b) {
-                                    Value args[2] = {a, b};
-                                    return !isFalsy(vm->callValue(fn, args, 2));
+                                [&fn, vm, &ex](const Value& a, const Value& b) {
+                                    if (ex) return false;
+                                    try {
+                                        Value args[2] = {a, b};
+                                        return !isFalsy(vm->callValue(fn, args, 2));
+                                    } catch (...) {
+                                        ex = std::current_exception();
+                                        return false;
+                                    }
                                 });
+                            if (ex) std::rethrow_exception(ex);
                         } else {
                             auto type_rank = [](const Value& v) -> int {
                                 if (v.isNil()) return 0;
@@ -1449,8 +1457,7 @@ dispatch_loop:
             else if (fn.isStaticBuiltin())
                 fn_is_static = true;
             Value& recv = regs[cb];
-            bool is_map_method = recv.isMap() && !isInstance(recv) && !recv.isModule()
-                                 && fn.isBuiltin() && !fn_is_static;
+            bool is_map_method = recv.isMap() && !isInstance(recv) && fn.isBuiltin() && !fn_is_static;
             bool is_instance = isInstance(recv) || recv.isString() || recv.isArray() || is_map_method;
             bool inject_self = is_instance && !fn_is_static;
             int total;
