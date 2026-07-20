@@ -786,7 +786,7 @@ static Value gfx_end3d(CallCtx& ctx) {
 // graphics.ambient(v | couleur) : lumière ambiante (active le mode éclairé).
 static Value gfx_ambient(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && (args[0].isMap() || args[0].isClass() || args[0].isModule())) {
+    if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
         Color c = gfxToColor(args[0]);
         s_amb3d[0] = c.r / 255.0f;
         s_amb3d[1] = c.g / 255.0f;
@@ -861,7 +861,7 @@ static Value light_set_pos(CallCtx& ctx) {
 static Value light_set_color(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    if (argc > 1 && (args[1].isMap() || args[1].isClass() || args[1].isModule())) {
+    if (argc > 1 && (args[1].isMap() || args[1].isClass())) {
         Color c = gfxToColor(args[1]);
         self.mapSet(Value(std::string("r")), Value(c.r / 255.0));
         self.mapSet(Value(std::string("g")), Value(c.g / 255.0));
@@ -905,7 +905,7 @@ static Value gfx_light(CallCtx& ctx) {
     float x = (float)numArg(args, argc, 1, "graphics.light");
     float y = (float)numArg(args, argc, 2, "graphics.light");
     float z = (float)numArg(args, argc, 3, "graphics.light");
-    Color c = (argc > 4 && (args[4].isMap() || args[4].isClass() || args[4].isModule())) ? gfxToColor(args[4]) : WHITE;
+    Color c = (argc > 4 && (args[4].isMap() || args[4].isClass())) ? gfxToColor(args[4]) : WHITE;
     Value inst = Value::makeMap();
     inst.mapSet(Value(std::string("__class__")), lightClass());
     inst.mapSet(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));

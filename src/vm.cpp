@@ -61,7 +61,7 @@ bool VM::isInstance(const Value& v) {
 
 // ── protoChainGet ─────────────────────────────────────────────────────────────
 Value VM::protoChainGet(const Value& obj, const Value& key) {
-    if (obj.isMap() || obj.isClass() || obj.isModule()) {
+    if (obj.isMap() || obj.isClass()) {
         Value v = obj.mapGet(key);
         if (!v.isNil())
             return v;
@@ -165,8 +165,6 @@ std::string valueToString(const Value& v) {
         return v.asString();
     if (v.isClass())
         return "{class}";
-    if (v.isModule())
-        return "{module}";
     if (v.isMap()) {
         VM* vm = VM::current();
         if (vm) {
@@ -261,7 +259,7 @@ static Value builtin_len(CallCtx& ctx) {
         return Value((int64_t)0);
     if (v.isArray())
         return Value((int64_t)v.arraySize());
-    if (v.isMap() || v.isClass() || v.isModule())
+    if (v.isMap() || v.isClass())
         return Value(v.mapSize());
     if (v.isString())
         return Value((int64_t)utf8Count(v.asString())); // longueur en caractères (codepoints), pas en octets
@@ -1091,7 +1089,7 @@ dispatch_loop:
     op_GET_INDEX: {
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
-        if (obj.isMap() || obj.isClass() || obj.isModule()) {
+        if (obj.isMap() || obj.isClass()) {
             if (key.isString() && key.asString() == "len" && !isInstance(obj)) {
                 Value found = protoChainGet(obj, key);
                 if (found.isNil())
@@ -1238,7 +1236,7 @@ dispatch_loop:
     op_SET_INDEX: {
         Value& obj = regs[base + A];
         const Value& key = regs[base + B];
-        if (obj.isMap() || obj.isClass() || obj.isModule()) {
+        if (obj.isMap() || obj.isClass()) {
             obj.mapSet(key, regs[base + C]);
         } else if (obj.isArray()) {
             if (!key.isInteger())
@@ -1455,8 +1453,7 @@ dispatch_loop:
             else if (fn.isStaticBuiltin())
                 fn_is_static = true;
             Value& recv = regs[cb];
-            bool is_map_method = recv.isMap() && !isInstance(recv) && fn.isBuiltin() && !fn_is_static;
-            bool is_instance = isInstance(recv) || recv.isString() || recv.isArray() || is_map_method;
+            bool is_instance = isInstance(recv) || recv.isString() || recv.isArray();
             bool inject_self = is_instance && !fn_is_static;
             int total;
             if (inject_self) {
@@ -1667,7 +1664,7 @@ void VM::execute(Chunk chunk) {
     {
         int64_t win_w = 0, win_h = 0;
         Value win = makeBuiltinModule("window");
-        if (win.isMap() || win.isModule()) {
+        if (win.isMap()) {
             Value vw = win.mapGet(Value(std::string("width")));
             Value vh = win.mapGet(Value(std::string("height")));
             if (vw.isInteger())
