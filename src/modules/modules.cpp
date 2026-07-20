@@ -47,17 +47,13 @@ const std::vector<std::string>& builtinFuncNames() {
     return names;
 }
 
-static void convertToModule(Value& v) {
-        if (!v.isMap()) return;
-    v.tag = Value::T_MODULE;
-}
-
 Value makeBuiltinModule(const std::string& name) {
-    for (auto& m : k_modules)
+    for (auto& m : k_modules) {
         if (name == m.name) {
             Value mod = m.make();
-            convertToModule(mod);
+            if (mod.isMap()) mod.tag = Value::T_MODULE;
             return mod;
         }
+    }
     throw std::runtime_error("unknown built-in module: " + name);
 }

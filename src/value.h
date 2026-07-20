@@ -75,7 +75,7 @@ struct Value {
     static constexpr uint8_t T_CLOSURE = 9;
     static constexpr uint8_t T_CLASS = 10;  // prototype de classe (Map* réutilisé)
     static constexpr uint8_t T_RANGE = 11;  // range [a;b] (Range*, ref-counted)
-    static constexpr uint8_t T_MODULE = 12; // module natif (Map* réutilisé, non poolé)
+    static constexpr uint8_t T_MODULE = 12; // module natif (T_MAP sans injection de self)
 
   private:
     explicit Value(Map* p) : tag(T_MAP), str_hash(0), mptr(p) {
@@ -151,9 +151,7 @@ struct Value {
     bool isRange() const {
         return tag == T_RANGE;
     }
-    bool isModule() const {
-        return tag == T_MODULE;
-    }
+    bool isModule() const { return tag == T_MODULE; }
     bool isCallable() const {
         return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS;
     }
@@ -347,16 +345,11 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
             string_table().erase(sptr);
         break;
     case T_MAP:
-    case T_CLASS: {
-        Map* mp = mptr;
-        if (--mp->refcount == 0)
-            map_pool().release(mp);
-        break;
-    }
+    case T_CLASS:
     case T_MODULE: {
         Map* mp = mptr;
         if (--mp->refcount == 0)
-            delete mp;
+            map_pool().release(mp);
         break;
     }
     case T_ARRAY: {
