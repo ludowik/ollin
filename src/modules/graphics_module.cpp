@@ -18,7 +18,7 @@
 // gfxToInt : fourni en inline par graphics_internal.h (partagé 2D/3D).
 // gfxToColor : déclaré dans graphics_internal.h, défini ici (lu aussi par graphics3d.cpp).
 Color gfxToColor(const Value& v) {
-    if (!v.isMap() && !v.isClass())
+    if (!v.isMap() && !v.isClass() && !v.isModule())
         throw std::runtime_error("expected a Color object");
     auto getComp = [&](const char* k, double def) -> uint8_t {
         Value f = v.mapGet(Value(std::string(k)));
@@ -411,7 +411,7 @@ static Value gfx_stroke(CallCtx& ctx) {
     applyStroke(true, rgbaColor(k.r, k.g, k.b, k.a));
     // Taille optionnelle : seulement avec un objet Color en 1er arg — stroke(Color, taille).
     // (Pour les formes numériques, utiliser graphics.strokeSize : les nombres = couleur.)
-    if ((args[0].isMap() || args[0].isClass()) && argc > 1 && args[1].isNumber())
+    if ((args[0].isMap() || args[0].isClass() || args[0].isModule()) && argc > 1 && args[1].isNumber())
         applyStrokeSize((float)args[1].asNum());
     return Value{};
 }

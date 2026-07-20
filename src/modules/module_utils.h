@@ -47,7 +47,7 @@ static inline double colorClamp01(double v) {
 //   4 nombres r,g,b,a      → (r,g,b,a)
 // Précondition : argc >= 1. Lève une erreur si la forme est invalide.
 static inline ColorRGBA parseColor(const Value* args, int argc, const char* fn) {
-    if (args[0].isMap() || args[0].isClass()) {
+    if (args[0].isMap() || args[0].isClass() || args[0].isModule()) {
         auto field = [&](const char* k, double def) -> double {
             Value f = args[0].mapGet(Value(std::string(k)));
             return f.isNumber() ? colorClamp01(f.asNum()) : def;
