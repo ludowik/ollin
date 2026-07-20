@@ -19,7 +19,8 @@
     /* Barre de menu — sous l'encoche (safe-area-inset-top). Ne fait PAS partie
        de la zone graphique. */
     #bar { flex:none; display:flex; align-items:center; gap:12px; font-size:13px;
-           padding: calc(8px + env(safe-area-inset-top)) 14px 8px;
+           height: calc(48px + env(safe-area-inset-top));
+           padding: env(safe-area-inset-top) 14px 0;
            border-bottom:1px solid var(--border); }
     #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
     #bar a:hover { text-decoration:underline; }
