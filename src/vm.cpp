@@ -1129,6 +1129,44 @@ dispatch_loop:
                         if (n >= 2 && a[1].isInteger()) return a[0].arrayRemove(a[1].asInt());
                         return Value{};
                     });
+                else if (m == "map")
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        if (ctx.argc < 2) throw std::runtime_error("array.map: expected fn");
+                        Value& arr = ctx.args[0]; Value& fn = ctx.args[1];
+                        int64_t n = arr.arraySize();
+                        Value result = Value::makeArray();
+                        for (int64_t i = 0; i < n; i++) {
+                            Value v = arr.arrayGet(i + 1), idx((int64_t)(i + 1));
+                            Value args[2] = {v, idx};
+                            result.arrayPush(ctx.vm->callValue(fn, args, 2));
+                        }
+                        return result;
+                    });
+                else if (m == "filter")
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        if (ctx.argc < 2) throw std::runtime_error("array.filter: expected fn");
+                        Value& arr = ctx.args[0]; Value& fn = ctx.args[1];
+                        int64_t n = arr.arraySize();
+                        Value result = Value::makeArray();
+                        for (int64_t i = 0; i < n; i++) {
+                            Value v = arr.arrayGet(i + 1), idx((int64_t)(i + 1));
+                            Value args[2] = {v, idx};
+                            if (!isFalsy(ctx.vm->callValue(fn, args, 2))) result.arrayPush(v);
+                        }
+                        return result;
+                    });
+                else if (m == "reduce")
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        if (ctx.argc < 3) throw std::runtime_error("array.reduce: expected (fn, init)");
+                        Value& arr = ctx.args[0]; Value& fn = ctx.args[1]; Value acc = ctx.args[2];
+                        int64_t n = arr.arraySize();
+                        for (int64_t i = 0; i < n; i++) {
+                            Value v = arr.arrayGet(i + 1), idx((int64_t)(i + 1));
+                            Value args[3] = {acc, v, idx};
+                            acc = ctx.vm->callValue(fn, args, 3);
+                        }
+                        return acc;
+                    });
                 else
                     throw std::runtime_error("line " + std::to_string(errLine()) +
                                              ": runtime: array has no field '" + m + "'");

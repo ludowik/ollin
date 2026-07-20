@@ -1094,21 +1094,21 @@ assert(sw_func(5) == "autre")
 ## FPS : graphics.fps() → entier
 ## Texte : graphics.text(text, x, y, size [, color])
 
-## ── 24. Module array (fonctions d'ordre supérieur) ───────────────────────────
+## ── 24. Méthodes d'instance array (fonctions d'ordre supérieur) ──────────────
 
-var am_doubled = array.map([1, 2, 3], func(x) return x * 2 end)
+var am_doubled = [1, 2, 3].map(func(x) return x * 2 end)
 assert(am_doubled.len() == 3)
 assert(am_doubled[1] == 2 and am_doubled[2] == 4 and am_doubled[3] == 6)
 
-var am_evens = array.filter([1, 2, 3, 4, 5], func(x) return x % 2 == 0 end)
+var am_evens = [1, 2, 3, 4, 5].filter(func(x) return x % 2 == 0 end)
 assert(am_evens.len() == 2)
 assert(am_evens[1] == 2 and am_evens[2] == 4)
 
-var am_sum = array.reduce([1, 2, 3, 4], func(acc, x) return acc + x end, 0)
+var am_sum = [1, 2, 3, 4].reduce(func(acc, x) return acc + x end, 0)
 assert(am_sum == 10)
 
-var am_product = array.reduce([1, 2, 3, 4], func(acc, x) return acc * x end, 1)
+var am_product = [1, 2, 3, 4].reduce(func(acc, x) return acc * x end, 1)
 assert(am_product == 24)
 
-var am_idx = array.map(["a", "b"], func(v, i) return i end)
+var am_idx = ["a", "b"].map(func(v, i) return i end)
 assert(am_idx[1] == 1 and am_idx[2] == 2)
