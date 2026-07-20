@@ -82,10 +82,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     }
 
     void compileInto(const Expr& e, int dest);
-    // Compile chaque expression dans un registre CONSÉCUTIF base+i (MOVE si
-    // l'expression n'atterrit pas pile sur sa cible). Factorise le lowering des
-    // listes d'arguments d'appel et des valeurs de RETURN.
     void compileConsecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);
+    // Portée lexicale stricte : sauvegarde local_regs_/reg_top_/locals_top_, alloue
+    // les locales déclarées dans body (sans descendre dans les sous-blocs), compile,
+    // puis restaure. Les registres restent réservés si le corps contient des closures.
+    void compileBlock(const std::vector<std::unique_ptr<Stmt>>& body);
 
     // StmtVisitor
     void visit(const CommentStmt&) override {

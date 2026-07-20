@@ -219,38 +219,16 @@ struct CollectLocalsVisitor : StmtQuery {
             out.push_back(s.name);
         }
     }
-    void visit(const ForIterStmt& s) override {
-        // var1/var2 ne sont PAS des locales permanentes (scopées à la boucle).
-        run(s.body);
-    }
-    void visit(const WhileStmt& s) override {
-        run(s.body);
-    }
-    void visit(const IfStmt& s) override {
-        run(s.then_body);
-        for (auto& ei : s.else_ifs)
-            run(ei.body);
-        run(s.else_body);
-    }
-    void visit(const TryCatchStmt& s) override {
-        run(s.try_body);
-        if (!s.catch_var.empty() && seen.insert(s.catch_var).second) {
-            out.push_back(s.catch_var);
-        }
-        run(s.catch_body);
-        run(s.else_body);
-    }
-    void visit(const BlockStmt& s) override {
-        run(s.stmts);
-    }
-    void visit(const DoStmt&) override {
-        // ne pas descendre : les locales d'un do...end sont scopées au bloc
-    }
-    void visit(const SwitchStmt& s) override {
-        for (auto& arm : s.cases)
-            run(arm.body);
-        run(s.else_body);
-    }
+    // Blocs utilisateur : portée lexicale stricte — ne pas descendre.
+    // Les locales de chaque bloc sont collectées séparément dans compileBlock.
+    void visit(const ForIterStmt&) override {}
+    void visit(const WhileStmt&) override {}
+    void visit(const IfStmt&) override {}
+    void visit(const TryCatchStmt&) override {}
+    void visit(const DoStmt&) override {}
+    void visit(const SwitchStmt&) override {}
+    // BlockStmt = conteneur interne (import) sans portée propre : descendre normalement.
+    void visit(const BlockStmt& s) override { run(s.stmts); }
 };
 
 static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
@@ -479,6 +457,33 @@ void Compiler::visit(const VarDeclStmt& s) {
             const_names_.insert(n);
 }
 
+static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
+
+void Compiler::compileBlock(const std::vector<std::unique_ptr<Stmt>>& body) {
+    auto saved_regs = local_regs_;
+    int saved_top = reg_top_;
+    int saved_locals = locals_top_;
+
+    std::vector<std::string> block_locals;
+    collectLocals(body, block_locals);
+    for (auto& nm : block_locals)
+        local_regs_[nm] = reg_top_++; // assignment inconditionnelle : permet l'ombrage
+    int block_locals_top = reg_top_;
+    locals_top_ = block_locals_top;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
+
+    for (auto& stmt : body) {
+        int s = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = s;
+    }
+
+    local_regs_ = std::move(saved_regs);
+    reg_top_ = bodyHasFunc(body) ? block_locals_top : saved_top;
+    locals_top_ = saved_locals;
+}
+
 void Compiler::visit(const WhileStmt& s) {
     noteLine(s.line);
     auto loop_start = (uint16_t)chunk.currentPos();
@@ -490,12 +495,7 @@ void Compiler::visit(const WhileStmt& s) {
 
     break_patches.push_back({});
     continue_patches.push_back({});
-    for (auto& stmt : s.body) {
-        int s2 = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s2;
-    }
-    // continue → réévaluation de la condition
+    compileBlock(s.body);
     for (size_t p : continue_patches.back())
         chunk.patchJump(p, loop_start);
     continue_patches.pop_back();
@@ -516,11 +516,7 @@ void Compiler::visit(const IfStmt& s) {
     reg_top_ = saved;
     size_t next_patch = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
 
-    for (auto& stmt : s.then_body) {
-        int s2 = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s2;
-    }
+    compileBlock(s.then_body);
     end_patches.push_back(chunk.emitJump(Op::JUMP));
 
     for (auto& ei : s.else_ifs) {
@@ -530,20 +526,12 @@ void Compiler::visit(const IfStmt& s) {
         int er = last_reg_;
         reg_top_ = s2;
         next_patch = chunk.emitJump(Op::JUMP_IF_FALSE, (uint8_t)er);
-        for (auto& stmt : ei.body) {
-            int s3 = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = s3;
-        }
+        compileBlock(ei.body);
         end_patches.push_back(chunk.emitJump(Op::JUMP));
     }
 
     chunk.patchJump(next_patch, (uint16_t)chunk.currentPos());
-    for (auto& stmt : s.else_body) {
-        int s2 = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s2;
-    }
+    compileBlock(s.else_body);
 
     uint16_t end_addr = (uint16_t)chunk.currentPos();
     for (size_t p : end_patches)
@@ -594,21 +582,13 @@ void Compiler::visit(const SwitchStmt& s) {
             chunk.patchJump(p, body_addr);
 
         reg_top_ = above_subj;
-        for (auto& stmt : arm.body) {
-            int st = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = st;
-        }
+        compileBlock(arm.body);
         end_patches.push_back(chunk.emitJump(Op::JUMP));
         chunk.patchJump(next_arm_patch, (uint16_t)chunk.currentPos());
     }
 
     reg_top_ = above_subj;
-    for (auto& stmt : s.else_body) {
-        int st = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = st;
-    }
+    compileBlock(s.else_body);
 
     uint16_t end_addr = (uint16_t)chunk.currentPos();
     for (size_t p : end_patches)
@@ -725,40 +705,55 @@ void Compiler::visit(const ThrowStmt& s) {
 
 void Compiler::visit(const TryCatchStmt& s) {
     noteLine(s.line);
-    int catch_r = s.catch_var.empty() ? 0 : local_regs_.at(s.catch_var);
+    int saved_top = reg_top_;
 
-    size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
-
-    for (auto& stmt : s.try_body) {
-        int s2 = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s2;
+    // catch_r doit être connu avant d'émettre TRY → pré-alloué comme temporaire.
+    int catch_r = 0;
+    if (!s.catch_var.empty()) {
+        catch_r = reg_top_++;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
     }
 
+    size_t try_patch = chunk.emitJump(Op::TRY, (uint8_t)catch_r);
+    compileBlock(s.try_body);
     chunk.emit(makeBx((uint8_t)Op::POP_TRY, 0));
     size_t else_patch = chunk.emitJump(Op::JUMP);
 
-    uint16_t catch_addr = (uint16_t)chunk.currentPos();
-    chunk.patchJump(try_patch, catch_addr);
+    chunk.patchJump(try_patch, (uint16_t)chunk.currentPos());
 
-    for (auto& stmt : s.catch_body) {
-        int s2 = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s2;
+    // Bloc catch : catch_var lié à catch_r, autres locales scopées normalement.
+    {
+        auto saved_regs = local_regs_;
+        int saved_top2 = reg_top_;
+        int saved_locals = locals_top_;
+        if (!s.catch_var.empty())
+            local_regs_[s.catch_var] = catch_r;
+        std::vector<std::string> catch_ls;
+        collectLocals(s.catch_body, catch_ls);
+        for (auto& nm : catch_ls)
+            local_regs_[nm] = reg_top_++;
+        int catch_top = reg_top_;
+        locals_top_ = catch_top;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
+        for (auto& stmt : s.catch_body) {
+            int sv = reg_top_;
+            stmt->accept(*this);
+            reg_top_ = sv;
+        }
+        local_regs_ = std::move(saved_regs);
+        reg_top_ = bodyHasFunc(s.catch_body) ? catch_top : saved_top2;
+        locals_top_ = saved_locals;
     }
+
     size_t end_patch = chunk.emitJump(Op::JUMP);
+    chunk.patchJump(else_patch, (uint16_t)chunk.currentPos());
+    compileBlock(s.else_body);
+    chunk.patchJump(end_patch, (uint16_t)chunk.currentPos());
 
-    uint16_t else_addr = (uint16_t)chunk.currentPos();
-    chunk.patchJump(else_patch, else_addr);
-
-    for (auto& stmt : s.else_body) {
-        int s2 = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s2;
-    }
-
-    uint16_t end_addr = (uint16_t)chunk.currentPos();
-    chunk.patchJump(end_patch, end_addr);
+    if (!bodyHasFunc(s.catch_body))
+        reg_top_ = saved_top;
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
@@ -1411,8 +1406,6 @@ void Compiler::visit(const RangeExpr& e) {
     last_reg_ = dest;
 }
 
-static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
-
 void Compiler::compileIteratorLoop(const Expr& src, const std::string& var1, const std::string& var2,
                                    const std::vector<std::unique_ptr<Stmt>>& body) {
     bool two_vars = !var2.empty();
@@ -1454,11 +1447,7 @@ void Compiler::compileIteratorLoop(const Expr& src, const std::string& var1, con
 
     break_patches.push_back({});
     continue_patches.push_back({});
-    for (auto& stmt : body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
+    compileBlock(body);
     for (size_t p : continue_patches.back())
         chunk.patchJump(p, loop_start);
     continue_patches.pop_back();
@@ -1470,11 +1459,9 @@ void Compiler::compileIteratorLoop(const Expr& src, const std::string& var1, con
         chunk.patchJump(p, exit);
     break_patches.pop_back();
 
-    restoreBind(var1, had1, old1); // restaure la portée (pas de fuite)
+    restoreBind(var1, had1, old1);
     if (two_vars)
         restoreBind(var2, had2, old2);
-    // recyclage : si une closure capture la variable de boucle, garder ses registres
-    // réservés (sinon réécrits après la boucle → upvalue corrompue).
     reg_top_ = bodyHasFunc(body) ? (block + (two_vars ? 3 : 2)) : block;
 }
 
@@ -1744,15 +1731,11 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
 
     break_patches.push_back({});
     continue_patches.push_back({});
-    for (auto& stmt : body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
+    compileBlock(body);
 
     uint16_t loop_addr = (uint16_t)chunk.currentPos();
     for (size_t p : continue_patches.back())
-        chunk.patchJump(p, loop_addr); // continue → FOR_LOOP
+        chunk.patchJump(p, loop_addr);
     continue_patches.pop_back();
     chunk.emit(makeABx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
 
@@ -1897,31 +1880,7 @@ void Compiler::visit(const BlockStmt& s) {
 }
 
 void Compiler::visit(const DoStmt& s) {
-    auto saved_regs = local_regs_;
-    int saved_top = reg_top_;
-    int saved_locals = locals_top_;
-
-    std::vector<std::string> block_locals;
-    collectLocals(s.body, block_locals);
-    for (auto& nm : block_locals)
-        if (!local_regs_.count(nm))
-            local_regs_[nm] = reg_top_++;
-    int do_locals_top = reg_top_; // top après les locales du bloc
-    locals_top_ = do_locals_top;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
-
-    for (auto& stmt : s.body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
-
-    local_regs_ = std::move(saved_regs);
-    // Si le corps capture des locales via closure, garder leurs registres vivants
-    // (upvalues ouvertes pointent dedans — même logique que les boucles for).
-    reg_top_ = bodyHasFunc(s.body) ? do_locals_top : saved_top;
-    locals_top_ = saved_locals;
+    compileBlock(s.body);
 }
 
 // ── compileMethodFunc : compile une méthode avec 'self' implicite en R[0] ──────
