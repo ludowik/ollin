@@ -1118,3 +1118,26 @@ assert(am_sorted[1] == 1 and am_sorted[2] == 2 and am_sorted[3] == 3)
 var am_mixed = [2.5, nil, "z", 1]
 am_mixed.sort()
 assert(am_mixed[1] == nil and am_mixed[2] == 1 and am_mixed[3] == 2.5 and am_mixed[4] == "z")
+
+## ── 25. Bloc do...end (portée lexicale) ───────────────────────────────────────
+var do_x = 0
+do
+    var do_tmp = 42
+    do_x = do_tmp + 1
+end
+assert(do_x == 43)
+
+var do_fns = []
+do
+    var do_i = 99
+    do_fns.push(func() return do_i end)
+end
+assert(do_fns[1]() == 99)
+
+do
+    var do_a = 1
+    do
+        var do_b = do_a + 1
+        assert(do_b == 2)
+    end
+end

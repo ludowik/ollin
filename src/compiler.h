@@ -106,6 +106,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     void visit(const BlockStmt&) override;
     void visit(const ClassDeclStmt&) override;
     void visit(const SwitchStmt&) override;
+    void visit(const DoStmt&) override;
 
     // ExprVisitor
     void visit(const BoolExpr&) override;

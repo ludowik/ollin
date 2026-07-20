@@ -40,6 +40,7 @@ class Parser {
     std::unique_ptr<Stmt> globalDecl();
     std::unique_ptr<Stmt> constantDecl();
     std::unique_ptr<Stmt> whileStmt();
+    std::unique_ptr<Stmt> doStmt();
     std::unique_ptr<Stmt> ifStmt();
     std::unique_ptr<Stmt> breakStmt();
     std::unique_ptr<Stmt> continueStmt();

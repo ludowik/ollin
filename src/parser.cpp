@@ -112,6 +112,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
         throw std::runtime_error("line " + std::to_string(peek().line) +
                                  ": ';' is not valid syntax — statements are terminated by newlines");
     case TokenType::WHILE:    return whileStmt();
+    case TokenType::DO:       return doStmt();
     case TokenType::IF:       return ifStmt();
     case TokenType::BREAK:    return breakStmt();
     case TokenType::CONTINUE: return continueStmt();
@@ -264,6 +265,22 @@ std::unique_ptr<Stmt> Parser::whileStmt() {
     s->cond = expr();
     skipComments();
     expect(TokenType::DO);
+    while (true) {
+        skipComments();
+        if (check(TokenType::END) || check(TokenType::EOF_T))
+            break;
+        s->body.push_back(parseOneStmt());
+    }
+    expect(TokenType::END);
+    consumeOptComment();
+    return s;
+}
+
+std::unique_ptr<Stmt> Parser::doStmt() {
+    int line = peek().line;
+    advance(); // consomme DO
+    auto s = std::make_unique<DoStmt>();
+    s->line = line;
     while (true) {
         skipComments();
         if (check(TokenType::END) || check(TokenType::EOF_T))

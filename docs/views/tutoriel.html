@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-20 18:33</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-20 18:47</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -391,6 +391,7 @@ pre:hover .code-actions,
   <a href="#while">While</a>
   <a href="#for">For</a>
   <a href="#switch">Switch</a>
+  <a href="#do">Bloc do…end</a>
   <div class="section-label">Fonctions</div>
   <a href="#functions">Fonctions</a>
   <a href="#varargs">Varargs</a>
@@ -419,7 +420,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-20 18:33</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-20 18:47</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -798,6 +799,31 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="kw">else</span>
     <span class="bi">print</span>(<span class="str">"commande inconnue"</span>)
 <span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── Do ────────────────────────────────────────────────────────────────── -->
+<section id="do">
+<h2>Bloc <code>do … end</code></h2>
+<p>Un bloc <code>do … end</code> crée une portée lexicale locale : les variables déclarées à l'intérieur ne sont pas visibles après <code>end</code>. Utile pour isoler des variables temporaires sans créer une fonction.</p>
+
+<pre><code><span class="kw">var</span> x = <span class="num">0</span>
+<span class="kw">do</span>
+    <span class="kw">var</span> tmp = <span class="num">42</span>
+    x = tmp + <span class="num">1</span>
+<span class="kw">end</span>
+<span class="cmt">## tmp n'existe plus ici</span>
+<span class="bi">assert</span>(x == <span class="num">43</span>)</code></pre>
+
+<p>Les closures créées à l'intérieur capturent les variables du bloc normalement :</p>
+
+<pre><code><span class="kw">var</span> fns = []
+<span class="kw">do</span>
+    <span class="kw">var</span> i = <span class="num">99</span>
+    fns.push(<span class="kw">func</span>() <span class="kw">return</span> i <span class="kw">end</span>)
+<span class="kw">end</span>
+<span class="bi">assert</span>(fns[<span class="num">1</span>]() == <span class="num">99</span>)</code></pre>
+
+<div class="callout">Les blocs <code>do</code> sont librement imbriquables. La variable d'une portée externe reste accessible dans un bloc interne.</div>
 </section>
 
 <!-- ── Functions ─────────────────────────────────────────────────────────── -->

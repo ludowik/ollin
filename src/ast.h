@@ -24,6 +24,7 @@ struct MultiAssignStmt;
 struct BlockStmt;
 struct ClassDeclStmt;
 struct SwitchStmt;
+struct DoStmt;
 
 struct BoolExpr;
 struct NumberExpr;
@@ -64,6 +65,7 @@ struct StmtVisitor {
     virtual void visit(const BlockStmt&) = 0;
     virtual void visit(const ClassDeclStmt&) = 0;
     virtual void visit(const SwitchStmt&) = 0;
+    virtual void visit(const DoStmt&) = 0;
     virtual ~StmtVisitor() = default;
 };
 
@@ -135,6 +137,8 @@ struct StmtQuery : StmtVisitor {
     void visit(const ClassDeclStmt&) override {
     }
     void visit(const SwitchStmt&) override {
+    }
+    void visit(const DoStmt&) override {
     }
 };
 struct Expr {
@@ -418,6 +422,13 @@ struct ForIterStmt : Stmt {
 
 struct BlockStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> stmts;
+    void accept(StmtVisitor& v) const override {
+        v.visit(*this);
+    }
+};
+
+struct DoStmt : Stmt {
+    std::vector<std::unique_ptr<Stmt>> body;
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }

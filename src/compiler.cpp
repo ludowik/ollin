@@ -243,6 +243,9 @@ struct CollectLocalsVisitor : StmtQuery {
     void visit(const BlockStmt& s) override {
         run(s.stmts);
     }
+    void visit(const DoStmt&) override {
+        // ne pas descendre : les locales d'un do...end sont scopées au bloc
+    }
     void visit(const SwitchStmt& s) override {
         for (auto& arm : s.cases)
             run(arm.body);
@@ -296,6 +299,9 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
     void visit(const BlockStmt& s) override {
         run(s.stmts);
+    }
+    void visit(const DoStmt& s) override {
+        run(s.body);
     }
     void visit(const ClassDeclStmt& s) override {
         out.insert(s.name); // classe visible par ses propres méthodes
@@ -1888,6 +1894,34 @@ void Compiler::visit(const MultiAssignStmt& s) {
 void Compiler::visit(const BlockStmt& s) {
     for (auto& stmt : s.stmts)
         stmt->accept(*this);
+}
+
+void Compiler::visit(const DoStmt& s) {
+    auto saved_regs = local_regs_;
+    int saved_top = reg_top_;
+    int saved_locals = locals_top_;
+
+    std::vector<std::string> block_locals;
+    collectLocals(s.body, block_locals);
+    for (auto& nm : block_locals)
+        if (!local_regs_.count(nm))
+            local_regs_[nm] = reg_top_++;
+    int do_locals_top = reg_top_; // top après les locales du bloc
+    locals_top_ = do_locals_top;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
+
+    for (auto& stmt : s.body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+
+    local_regs_ = std::move(saved_regs);
+    // Si le corps capture des locales via closure, garder leurs registres vivants
+    // (upvalues ouvertes pointent dedans — même logique que les boucles for).
+    reg_top_ = bodyHasFunc(s.body) ? do_locals_top : saved_top;
+    locals_top_ = saved_locals;
 }
 
 // ── compileMethodFunc : compile une méthode avec 'self' implicite en R[0] ──────

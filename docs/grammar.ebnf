@@ -18,6 +18,7 @@ stmt           = varDecl
                | globalDecl
                | constDecl
                | whileStmt
+               | doStmt
                | forStmt
                | ifStmt
                | tryStmt
@@ -54,6 +55,9 @@ constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } NL ;
                  (* toute tentative d'assignation ultérieure est une erreur de compilation *)
                  (* une constante peut être capturée en lecture seule par une closure *)
 whileStmt      = "while" expr "do" { stmt } "end" NL ;
+doStmt         = "do" { stmt } "end" NL ;
+                 (* bloc lexical libre : les variables déclarées à l'intérieur sont locales au bloc
+                    et ne sont pas visibles après "end". Les closures capturées restent valides. *)
 forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" NL
                | "for" IDENT [ "," IDENT ] "in" expr "do" { stmt } "end" NL ;
                  (* numérique : "for i=start,end[,step]" ; step optionnel, défaut 1 ; step<0 décompte *)
