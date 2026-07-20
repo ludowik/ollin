@@ -18,10 +18,11 @@ class VM {
     void execute(Chunk chunk);
     std::string invokeStr(Value v);
     static VM* current();                   // returns s_current_vm
-    Value callValue(const Value& fn);                       // appelle une fonction Ollin (0 arg)
-    Value callValue(const Value& fn, const Value& arg);     // appelle une fonction Ollin (1 arg)
-    Value callValue(const Value& fn, const Value& a, const Value& b); // 2 args
-    Value callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d); // 4 args
+    Value callValue(const Value& fn, const Value* args, int argc); // générique
+    Value callValue(const Value& fn);
+    Value callValue(const Value& fn, const Value& a);
+    Value callValue(const Value& fn, const Value& a, const Value& b);
+    Value callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d);
     Value getGlobal(const std::string& name) const; // returns nil if not found
     void setGlobal(const std::string& name, const Value& value);
     // Après execute() : appelle setup() une fois, puis lance la boucle graphique via

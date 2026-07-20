@@ -458,125 +458,51 @@ void VM::runEntryHooks() {
     }
 }
 
+Value VM::callValue(const Value& fn, const Value* args, int argc) {
+    if (fn.isBuiltin()) {
+        CallCtx ctx{this, const_cast<Value*>(args), argc};
+        return fn.asBuiltin()(ctx);
+    }
+    uint8_t fi;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
+    if (fn.isFuncVal()) {
+        fi = (uint8_t)fn.asInt();
+    } else if (fn.isClosure()) {
+        fi = fn.asClosure()->func_idx;
+        const auto& uvs = fn.asClosure()->upvals;
+        if (!uvs.empty())
+            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+    } else {
+        throw std::runtime_error("callValue: not callable");
+    }
+    int call_base = (int)regs.size();
+    if (argc > 0) {
+        growRegs((size_t)(call_base + argc));
+        for (int i = 0; i < argc; i++)
+            regs[call_base + i] = args[i];
+    }
+    uint32_t saved_ip = ip;
+    ip = pushCallFrame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
+    runGoto(call_stack.size() - 1);
+    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
+    regs.resize(call_base);
+    ip = saved_ip;
+    return result;
+}
+
 Value VM::callValue(const Value& fn) {
-    if (fn.isBuiltin()) {
-        CallCtx ctx{this, nullptr, 0};
-        return fn.asBuiltin()(ctx);
-    }
-    uint8_t fi;
-    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.isFuncVal()) {
-        fi = (uint8_t)fn.asInt();
-    } else if (fn.isClosure()) {
-        fi = fn.asClosure()->func_idx;
-        const auto& uvs = fn.asClosure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else {
-        throw std::runtime_error("callValue: not callable");
-    }
-    int call_base = (int)regs.size();
-    uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, 0, std::move(frame_upvals), saved_ip);
-    runGoto(call_stack.size() - 1);
-    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
-    regs.resize(call_base);
-    ip = saved_ip;
-    return result;
+    return callValue(fn, nullptr, 0);
 }
-
-Value VM::callValue(const Value& fn, const Value& arg) {
-    if (fn.isBuiltin()) {
-        Value a = arg;
-        CallCtx ctx{this, &a, 1};
-        return fn.asBuiltin()(ctx);
-    }
-    uint8_t fi;
-    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.isFuncVal()) {
-        fi = (uint8_t)fn.asInt();
-    } else if (fn.isClosure()) {
-        fi = fn.asClosure()->func_idx;
-        const auto& uvs = fn.asClosure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else {
-        throw std::runtime_error("callValue: not callable");
-    }
-    int call_base = (int)regs.size();
-    growRegs((size_t)(call_base + 1));
-    regs[call_base] = arg; // R[0] du nouveau frame = argument
-    uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, 1, std::move(frame_upvals), saved_ip);
-    runGoto(call_stack.size() - 1);
-    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
-    regs.resize(call_base);
-    ip = saved_ip;
-    return result;
+Value VM::callValue(const Value& fn, const Value& a) {
+    return callValue(fn, &a, 1);
 }
-
 Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
-    if (fn.isBuiltin()) {
-        Value args[2] = {a, b};
-        CallCtx ctx{this, args, 2};
-        return fn.asBuiltin()(ctx);
-    }
-    uint8_t fi;
-    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.isFuncVal()) {
-        fi = (uint8_t)fn.asInt();
-    } else if (fn.isClosure()) {
-        fi = fn.asClosure()->func_idx;
-        const auto& uvs = fn.asClosure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else {
-        throw std::runtime_error("callValue: not callable");
-    }
-    int call_base = (int)regs.size();
-    growRegs((size_t)(call_base + 2));
-    regs[call_base] = a;     // R[0] = 1er argument
-    regs[call_base + 1] = b; // R[1] = 2e argument
-    uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, 2, std::move(frame_upvals), saved_ip);
-    runGoto(call_stack.size() - 1);
-    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
-    regs.resize(call_base);
-    ip = saved_ip;
-    return result;
+    Value args[2] = {a, b};
+    return callValue(fn, args, 2);
 }
-
 Value VM::callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d) {
-    if (fn.isBuiltin()) {
-        Value args[4] = {a, b, c, d};
-        CallCtx ctx{this, args, 4};
-        return fn.asBuiltin()(ctx);
-    }
-    uint8_t fi;
-    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.isFuncVal()) {
-        fi = (uint8_t)fn.asInt();
-    } else if (fn.isClosure()) {
-        fi = fn.asClosure()->func_idx;
-        const auto& uvs = fn.asClosure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else {
-        throw std::runtime_error("callValue: not callable");
-    }
-    int call_base = (int)regs.size();
-    growRegs((size_t)(call_base + 4));
-    regs[call_base]     = a;
-    regs[call_base + 1] = b;
-    regs[call_base + 2] = c;
-    regs[call_base + 3] = d;
-    uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, 4, std::move(frame_upvals), saved_ip);
-    runGoto(call_stack.size() - 1);
-    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
-    regs.resize(call_base);
-    ip = saved_ip;
-    return result;
+    Value args[4] = {a, b, c, d};
+    return callValue(fn, args, 4);
 }
 
 // ── pushCallFrame ─────────────────────────────────────────────────────────────
