@@ -1238,9 +1238,7 @@ dispatch_loop:
     op_SET_INDEX: {
         Value& obj = regs[base + A];
         const Value& key = regs[base + B];
-        if (obj.isModule()) {
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot assign to module field");
-        } else if (obj.isMap() || obj.isClass()) {
+        if (obj.isMap() || obj.isClass() || obj.isModule()) {
             obj.mapSet(key, regs[base + C]);
         } else if (obj.isArray()) {
             if (!key.isInteger())
