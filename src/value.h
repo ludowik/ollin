@@ -73,8 +73,9 @@ struct Value {
     static constexpr uint8_t T_ARRAY = 7;
     static constexpr uint8_t T_ITERATOR = 8;
     static constexpr uint8_t T_CLOSURE = 9;
-    static constexpr uint8_t T_CLASS = 10; // prototype de classe (Map* réutilisé)
-    static constexpr uint8_t T_RANGE = 11; // range [a;b] (Range*, ref-counted)
+    static constexpr uint8_t T_CLASS = 10;  // prototype de classe (Map* réutilisé)
+    static constexpr uint8_t T_RANGE = 11;  // range [a;b] (Range*, ref-counted)
+    static constexpr uint8_t T_MODULE = 12; // module natif (Map* réutilisé, non poolé)
 
   private:
     explicit Value(Map* p) : tag(T_MAP), str_hash(0), mptr(p) {
@@ -149,6 +150,9 @@ struct Value {
     }
     bool isRange() const {
         return tag == T_RANGE;
+    }
+    bool isModule() const {
+        return tag == T_MODULE;
     }
     bool isCallable() const {
         return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS;
@@ -254,6 +258,8 @@ struct Value {
             return "class";
         case T_RANGE:
             return "range";
+        case T_MODULE:
+            return "module";
         default:
             return "unknown";
         }
@@ -347,6 +353,12 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
             map_pool().release(mp);
         break;
     }
+    case T_MODULE: {
+        Map* mp = mptr;
+        if (--mp->refcount == 0)
+            delete mp;
+        break;
+    }
     case T_ARRAY: {
         Array* ap = aptr;
         if (--ap->refcount == 0)
@@ -389,6 +401,7 @@ inline void Value::retain() const noexcept {
         break;
     case T_MAP:
     case T_CLASS:
+    case T_MODULE:
         mptr->refcount++;
         break;
     case T_ARRAY:

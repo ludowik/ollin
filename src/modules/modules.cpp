@@ -47,19 +47,19 @@ const std::vector<std::string>& builtinFuncNames() {
     return names;
 }
 
-static void markModule(Value& v) {
-    if (!v.isMap() && !v.isClass()) return;
-    v.asMap()->is_module = true;
+static void convertToModule(Value& v) {
+    if (!v.isMap()) return; // T_CLASS reste T_CLASS (classes dans un module = non converties)
+    v.tag = Value::T_MODULE;
     for (auto& kv : v.asMap()->data)
-        if (kv.second.isMap() || kv.second.isClass())
-            markModule(const_cast<Value&>(kv.second));
+        if (kv.second.isMap())
+            convertToModule(const_cast<Value&>(kv.second));
 }
 
 Value makeBuiltinModule(const std::string& name) {
     for (auto& m : k_modules)
         if (name == m.name) {
             Value mod = m.make();
-            markModule(mod);
+            convertToModule(mod);
             return mod;
         }
     throw std::runtime_error("unknown built-in module: " + name);
