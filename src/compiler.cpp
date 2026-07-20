@@ -479,8 +479,9 @@ void Compiler::compileBlock(const std::vector<std::unique_ptr<Stmt>>& body) {
         reg_top_ = s;
     }
 
+    bool has_func = bodyHasFunc(body);
     local_regs_ = std::move(saved_regs);
-    reg_top_ = bodyHasFunc(body) ? block_locals_top : saved_top;
+    reg_top_ = has_func ? block_locals_top : saved_top;
     locals_top_ = saved_locals;
 }
 
@@ -742,8 +743,9 @@ void Compiler::visit(const TryCatchStmt& s) {
             stmt->accept(*this);
             reg_top_ = sv;
         }
+        bool catch_has_func = bodyHasFunc(s.catch_body);
         local_regs_ = std::move(saved_regs);
-        reg_top_ = bodyHasFunc(s.catch_body) ? catch_top : saved_top2;
+        reg_top_ = catch_has_func ? catch_top : saved_top2;
         locals_top_ = saved_locals;
     }
 
@@ -752,7 +754,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     compileBlock(s.else_body);
     chunk.patchJump(end_patch, (uint16_t)chunk.currentPos());
 
-    if (!bodyHasFunc(s.catch_body))
+    if (!bodyHasFunc(s.try_body) && !bodyHasFunc(s.catch_body))
         reg_top_ = saved_top;
 }
 
