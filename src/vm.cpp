@@ -1089,7 +1089,17 @@ dispatch_loop:
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
         if (obj.isMap() || obj.isClass()) {
-            regs[base + A] = protoChainGet(obj, key);
+            if (key.isString() && key.asString() == "len" && !isInstance(obj)) {
+                Value found = protoChainGet(obj, key);
+                if (found.isNil())
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        return Value((int64_t)(ctx.argc > 0 ? ctx.args[0].mapSize() : 0));
+                    });
+                else
+                    regs[base + A] = found;
+            } else {
+                regs[base + A] = protoChainGet(obj, key);
+            }
         } else if (obj.isString()) {
             regs[base + A] = string_module_.mapGet(key);
         } else if (obj.isArray()) {
@@ -1388,29 +1398,25 @@ dispatch_loop:
         {
             int cb = base + A;
             int argc = C;
-            bool is_instance = isInstance(regs[cb]) || regs[cb].isString() || regs[cb].isArray();
             Value fn = regs[cb + 1];
-            // Membre = une CLASSE (ex. `mod.Widget()` via un import aliasé) →
-            // instanciation, comme CALL_DYN. Les args sont encore en cb+2.. (pas
-            // de décalage self appliqué). On les amène en cb+1.. avec l'instance
-            // en cb, puis on appelle init (si présent).
             if (fn.isClass()) {
-                // Instanciation via un membre-classe (ex. mod.Widget()) : args en
-                // cb+2.. → arg_off = 2. Partagé avec CALL_DYN.
                 bool done;
                 uint32_t addr = instantiateClass(cb, 2, argc, fn, done);
                 if (!done)
                     ip = addr;
                 goto call_method_done;
             }
-            // méthode statique : pas d'injection de self, même si appelée sur une instance
             bool fn_is_static = false;
             if (fn.isFuncVal())
                 fn_is_static = ch->funcs[(uint8_t)fn.asInt()].is_static;
             else if (fn.isClosure())
                 fn_is_static = ch->funcs[fn.asClosure()->func_idx].is_static;
-            else if (fn.isStaticBuiltin()) // builtin déclaré static → traité comme un static Ollin
+            else if (fn.isStaticBuiltin())
                 fn_is_static = true;
+            Value& recv = regs[cb];
+            bool is_map_method = recv.isMap() && !isInstance(recv) && !recv.asMap()->is_module
+                                 && fn.isBuiltin() && !fn_is_static;
+            bool is_instance = isInstance(recv) || recv.isString() || recv.isArray() || is_map_method;
             bool inject_self = is_instance && !fn_is_static;
             int total;
             if (inject_self) {
