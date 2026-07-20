@@ -1,6 +1,7 @@
 #include "vm.h"
 #include "modules/modules.h"
 #include "utf8.h"
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -1166,6 +1167,26 @@ dispatch_loop:
                             if (!isFalsy(ctx.vm->callValue(fn, args, 2))) result.arrayPush(v);
                         }
                         return result;
+                    });
+                else if (m == "sort")
+                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {
+                        if (ctx.argc < 1) return Value{};
+                        Value& arr = ctx.args[0];
+                        auto type_rank = [](const Value& v) -> int {
+                            if (v.isNil()) return 0;
+                            if (v.isInteger() || v.isFloat()) return 1;
+                            if (v.isString()) return 2;
+                            return 3;
+                        };
+                        std::stable_sort(arr.aptr->items.begin(), arr.aptr->items.end(),
+                            [&type_rank](const Value& a, const Value& b) {
+                                int ra = type_rank(a), rb = type_rank(b);
+                                if (ra != rb) return ra < rb;
+                                if (ra == 1) return a.asNum() < b.asNum();
+                                if (ra == 2) return a.asString() < b.asString();
+                                return false;
+                            });
+                        return arr;
                     });
                 else if (m == "reduce")
                     regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> Value {

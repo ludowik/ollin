@@ -1112,3 +1112,9 @@ assert(am_product == 24)
 
 var am_idx = ["a", "b"].map(func(v, i) return i end)
 assert(am_idx[1] == 1 and am_idx[2] == 2)
+
+var am_sorted = [3, 1, 2].sort()
+assert(am_sorted[1] == 1 and am_sorted[2] == 2 and am_sorted[3] == 3)
+var am_mixed = [2.5, nil, "z", 1]
+am_mixed.sort()
+assert(am_mixed[1] == nil and am_mixed[2] == 1 and am_mixed[3] == 2.5 and am_mixed[4] == "z")
