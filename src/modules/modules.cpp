@@ -48,13 +48,8 @@ const std::vector<std::string>& builtinFuncNames() {
 }
 
 static void convertToModule(Value& v) {
-        // T_CLASS et instances (map avec __class__) restent inchangées.
-    if (!v.isMap()) return;
-    if (v.asMap()->data.count(Value(std::string("__class__")))) return;
+        if (!v.isMap()) return;
     v.tag = Value::T_MODULE;
-    for (auto& kv : v.asMap()->data)
-        if (kv.second.isMap())
-            convertToModule(const_cast<Value&>(kv.second));
 }
 
 Value makeBuiltinModule(const std::string& name) {
