@@ -84,10 +84,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         }
     }
 
-    std::string locStr(int line, int fi) const {
-        const std::string& f = (fi >= 0 && fi < (int)chunk.source_files.size()) ? chunk.source_files[fi] : "?";
-        return f + ":" + std::to_string(line);
-    }
+    SourceLoc sloc() const { return {(uint16_t)current_file_idx_, (uint16_t)current_line_}; }
 
     void compileInto(const Expr& e, int dest);
     void compileConsecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);

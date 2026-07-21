@@ -1,4 +1,5 @@
 #pragma once
+#include "source_loc.h"
 #include "token.h"
 #include <cstdint>
 #include <memory>
@@ -94,6 +95,7 @@ struct ExprVisitor {
 struct Stmt {
     int line = 0;
     int file_idx = 0;
+    SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
     virtual void accept(StmtVisitor&) const = 0;
     virtual ~Stmt() = default;
 };

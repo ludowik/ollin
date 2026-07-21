@@ -28,16 +28,9 @@ class Parser {
     int current_file_idx_ = 0;
     int depth_ = 0; // profondeur de récursion (garde anti-débordement de pile)
 
-    std::string locStr(int line) const {
-        const std::string& f = (current_file_idx_ < (int)source_files_->size()) ? (*source_files_)[current_file_idx_] : "?";
-        return f + ":" + std::to_string(line);
-    }
-    std::string locStrFi(int line, int fi) const {
-        const std::string& f = (fi >= 0 && fi < (int)source_files_->size()) ? (*source_files_)[fi] : "?";
-        return f + ":" + std::to_string(line);
-    }
+    SourceLoc curLoc(int line) const { return {(uint16_t)current_file_idx_, (uint16_t)line}; }
 
-    const Token& peek() const;
+const Token& peek() const;
     const Token& advance();
     bool check(TokenType t) const;
     bool match(TokenType t);

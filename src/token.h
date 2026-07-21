@@ -1,4 +1,5 @@
 #pragma once
+#include "source_loc.h"
 #include <string>
 
 enum class TokenType {
@@ -83,4 +84,5 @@ struct Token {
     std::string lexeme;
     int line;
     int file_idx = 0;
+    SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
 };

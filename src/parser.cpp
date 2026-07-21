@@ -40,7 +40,7 @@ bool Parser::match(TokenType t) {
 
 Token Parser::expect(TokenType t) {
     if (!check(t))
-        throw std::runtime_error(locStr(tokens[pos].line) + ": unexpected token '" +
+        throw std::runtime_error(curLoc(tokens[pos].line).str(*source_files_) + ": unexpected token '" +
                                  tokens[pos].lexeme + "'");
     return advance();
 }
@@ -108,7 +108,7 @@ static bool isAssignOp(TokenType t) {
 }
 
 std::unique_ptr<Stmt> Parser::parseOneStmt() {
-    DepthGuard guard(depth_, locStr(peek().line));
+    DepthGuard guard(depth_, peek().sloc().str(*source_files_));
     switch (peek().type) {
     case TokenType::COMMENT: {
         std::string text = advance().lexeme;
@@ -118,7 +118,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     case TokenType::SEMICOLON:
         // ';' n'est valide qu'à l'intérieur d'un range [a;b] (consommé par
         // rangeExpr). Au niveau instruction, c'est une erreur — message clair.
-        throw std::runtime_error(locStr(peek().line) +
+        throw std::runtime_error(peek().sloc().str(*source_files_) +
                                  ": ';' is not valid syntax — statements are terminated by newlines");
     case TokenType::WHILE:    return whileStmt();
     case TokenType::DO:       return doStmt();
@@ -206,7 +206,7 @@ std::unique_ptr<Stmt> Parser::finishAssignFromExpr(std::unique_ptr<Expr> target,
         s->value = std::move(value);
         return s;
     }
-    throw std::runtime_error(locStr(line) + ": invalid assignment target");
+    throw std::runtime_error(curLoc(line).str(*source_files_) + ": invalid assignment target");
 }
 
 // ── instructions ─────────────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ std::unique_ptr<Stmt> Parser::constantDecl() {
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     if (!check(TokenType::EQUALS))
-        throw std::runtime_error(locStr(line) + ": const '" + s->names[0] + "' must be initialized");
+        throw std::runtime_error(curLoc(line).str(*source_files_) + ": const '" + s->names[0] + "' must be initialized");
     advance(); // consume '='
     s->values.push_back(expr());
     while (match(TokenType::COMMA))
@@ -613,7 +613,7 @@ std::unique_ptr<Stmt> Parser::exprStmt() {
 // ── expressions ──────────────────────────────────────────────────────────────
 
 std::unique_ptr<Expr> Parser::expr() {
-    DepthGuard guard(depth_, locStr(peek().line));
+    DepthGuard guard(depth_, peek().sloc().str(*source_files_));
     return logical();
 }
 
@@ -914,7 +914,7 @@ std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
         advance();
         node->incl_right = false;
     } else {
-        throw std::runtime_error(locStr(peek().line) + ": expected ']' or '[' to close range");
+        throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected ']' or '[' to close range");
     }
 
     // Ajustement open-left (incl_left=false → start += step) : émis par le
@@ -941,7 +941,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
             return std::make_unique<NumberExpr>(std::stod(lex));
         } catch (const std::out_of_range&) {
-            throw std::runtime_error(locStrFi(tok.line, tok.file_idx) + ": numeric literal out of range: " + lex);
+            throw std::runtime_error(tok.sloc().str(*source_files_) + ": numeric literal out of range: " + lex);
         }
     }
     if (check(TokenType::STRING))
@@ -964,7 +964,7 @@ std::unique_ptr<Expr> Parser::primary() {
             if (opt_super)
                 advance(); // consume '?'
             if (!check(TokenType::LPAREN))
-                throw std::runtime_error(locStr(peek().line) +
+                throw std::runtime_error(peek().sloc().str(*source_files_) +
                                          ": super: seuls les appels de méthode sont supportés");
             advance(); // LPAREN
             auto mc = std::make_unique<MethodCallExpr>();
@@ -1053,7 +1053,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 expect(TokenType::RBRACKET);
                 break;
             default:
-                throw std::runtime_error(locStr(peek().line) +
+                throw std::runtime_error(peek().sloc().str(*source_files_) +
                                          ": expected string, identifier, or [expr] key in map literal");
             }
             expect(TokenType::COLON);
@@ -1096,7 +1096,7 @@ std::unique_ptr<Expr> Parser::primary() {
         // postfix sur une expression parenthésée : (expr)(args), (expr)[i], (expr).champ
         return parsePostfix(std::move(e));
     }
-    throw std::runtime_error(locStr(peek().line) + ": unexpected token '" + peek().lexeme + "'");
+    throw std::runtime_error(peek().sloc().str(*source_files_) + ": unexpected token '" + peek().lexeme + "'");
 }
 
 std::unique_ptr<Stmt> Parser::classDecl() {
@@ -1120,7 +1120,7 @@ std::unique_ptr<Stmt> Parser::classDecl() {
             is_static = true;
         }
         if (!check(TokenType::FUNC))
-            throw std::runtime_error(locStr(peek().line) + ": expected 'func' inside class body");
+            throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected 'func' inside class body");
         int method_line = peek().line;
         // funcDeclStmt() renvoie un IndexAssignStmt pour la forme `func obj.field()`
         // — invalide dans une classe. Vérifier le type au lieu d'un static_cast
@@ -1128,7 +1128,7 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         auto raw = funcDeclStmt();
         auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
         if (!fd)
-            throw std::runtime_error(locStr(method_line) +
+            throw std::runtime_error(curLoc(method_line).str(*source_files_) +
                                      ": une méthode de classe doit être 'func nom(...)' (pas 'func obj.champ(...)')");
         raw.release();
         auto method = std::unique_ptr<FuncDeclStmt>(fd);
@@ -1210,7 +1210,7 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     if (!source_get(resolved, src_text) && !(resolved != path && source_get(path, src_text))) {
         std::ifstream f(resolved);
         if (!f)
-            throw std::runtime_error(locStrFi(path_tok.line, path_tok.file_idx) + ": import: cannot open '" + resolved + "'");
+            throw std::runtime_error(path_tok.sloc().str(*source_files_) + ": import: cannot open '" + resolved + "'");
         std::ostringstream ss;
         ss << f.rdbuf();
         src_text = ss.str();

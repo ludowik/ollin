@@ -1,5 +1,6 @@
 #pragma once
 #include "opcode.h"
+#include "source_loc.h"
 #include "value.h"
 #include <cstdint>
 #include <functional>
@@ -37,11 +38,6 @@ struct ConstKeyHash {
     size_t operator()(const ConstKey& k) const {
         return (std::hash<uint64_t>{}(k.bits) * 31u) ^ k.tag;
     }
-};
-
-struct SourceLoc {
-    uint16_t file_idx = 0;
-    uint16_t line = 0;
 };
 
 struct Chunk {
