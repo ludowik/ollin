@@ -146,6 +146,8 @@ struct StmtQuery : StmtVisitor {
 };
 struct Expr {
     int line = 0;
+    int file_idx = 0;
+    SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
     virtual void accept(ExprVisitor&) const = 0;
     virtual ~Expr() = default;
 };

@@ -70,7 +70,7 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
 }
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
-static Value evalConstant(const Expr& e, const std::vector<std::string>& files, int fallback_line = 0, int fallback_fi = 0) {
+static Value evalConstant(const Expr& e, const std::vector<std::string>& files, SourceLoc fallback = {}) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e))
         return n->is_integer ? Value(n->ival) : numValue(n->value);
     if (auto* s = dynamic_cast<const StringExpr*>(&e))
@@ -79,7 +79,7 @@ static Value evalConstant(const Expr& e, const std::vector<std::string>& files, 
         return Value((int64_t)(b->value ? 1 : 0));
     if (dynamic_cast<const NilExpr*>(&e))
         return Value{};
-    SourceLoc loc{(uint16_t)fallback_fi, (uint16_t)(e.line > 0 ? e.line : fallback_line)};
+    SourceLoc loc = (e.line > 0) ? e.sloc() : fallback;
     throw std::runtime_error(loc.str(files) + ": default values must be literal constants (not a runtime expression)");
 }
 
@@ -810,7 +810,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Build default values
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.line, s.file_idx) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -925,7 +925,7 @@ void Compiler::visit(const FuncExpr& s) {
 
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.line, current_file_idx_) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, SourceLoc{(uint16_t)current_file_idx_, (uint16_t)s.line}) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -1944,7 +1944,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     std::vector<Value> defs(n_fixed);
     int defs_offset = s.is_static ? 0 : 1;
     for (int i = 0; i < n_params; ++i)
-        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files) : Value{};
+        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, s.is_static, defaults_idx, 0, {}};
