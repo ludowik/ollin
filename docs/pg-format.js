@@ -9,7 +9,7 @@
 // En cas de blocs déséquilibrés, renvoie { ok:false } sans rien reformater.
 
 const UNIT = '    '
-const OPENERS = /\b(?:func|if|while|for|class|try)\b/g   // switch traité à part
+const OPENERS = /\b(?:func|if|while|for|class|try)\b/g   // switch et do traités à part
 const count = (s, re) => (s.match(re) || []).length
 
 // Retire chaînes et commentaire de fin de ligne → ne reste que le code « nu »
@@ -75,10 +75,14 @@ export function formatOllin(src) {
       if (/^[})]/.test(code)) show = st.length + delim - 1
       // ouvertures/fermetures nettes de BLOCS sur la ligne (mono-ligne = net 0)
       const sw = count(code, /\bswitch\b/g)
+      // `do` standalone (doStmt) : opener seulement quand c'est le premier mot de la ligne
+      // (dans `while x do` ou `for i=1,10 do`, `first` vaut `while`/`for`, pas `do`)
+      const doBlock = first === 'do' ? 1 : 0
       let net = count(code, OPENERS) - count(code, /\bend\b/g)
       while (net > 0) { st.push('block'); net-- }
       while (net < 0) { if (top() === 'case') st.pop(); if (st.length) st.pop(); net++ }
       for (let k = 0; k < sw; k++) st.push('switch')
+      for (let k = 0; k < doBlock; k++) st.push('block')
     }
 
     out.push(UNIT.repeat(Math.max(0, show)) + body)
