@@ -7,18 +7,25 @@
 
 Parser::Parser(std::vector<Token> tokens, std::string base_dir,
                std::shared_ptr<std::unordered_set<std::string>> imported,
-               std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names)
+               std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names,
+               std::shared_ptr<std::vector<std::string>> source_files, std::string /*filename*/)
     : tokens(std::move(tokens)), base_dir_(std::move(base_dir)),
       imported_paths_(imported ? std::move(imported) : std::make_shared<std::unordered_set<std::string>>()),
       module_names_(module_names ? std::move(module_names)
-                                 : std::make_shared<std::unordered_map<std::string, std::vector<std::string>>>()) {
+                                 : std::make_shared<std::unordered_map<std::string, std::vector<std::string>>>()),
+      source_files_(source_files ? std::move(source_files) : std::make_shared<std::vector<std::string>>()) {
+    // current_file_idx_ is updated from token.file_idx in advance()
+    if (!this->tokens.empty())
+        current_file_idx_ = this->tokens[0].file_idx;
 }
 
 const Token& Parser::peek() const {
     return tokens[pos];
 }
 const Token& Parser::advance() {
-    return tokens[pos++];
+    const Token& t = tokens[pos++];
+    current_file_idx_ = t.file_idx;
+    return t;
 }
 bool Parser::check(TokenType t) const {
     return tokens[pos].type == t;
@@ -33,7 +40,7 @@ bool Parser::match(TokenType t) {
 
 Token Parser::expect(TokenType t) {
     if (!check(t))
-        throw std::runtime_error("line " + std::to_string(tokens[pos].line) + ": unexpected token '" +
+        throw std::runtime_error(locStr(tokens[pos].line) + ": unexpected token '" +
                                  tokens[pos].lexeme + "'");
     return advance();
 }
@@ -68,9 +75,10 @@ void Parser::consumeOptComment() {
 namespace {
 struct DepthGuard {
     int& d;
-    DepthGuard(int& depth, int line) : d(depth) {
+    std::string prefix;
+    DepthGuard(int& depth, std::string loc) : d(depth), prefix(std::move(loc)) {
         if (++d > 256)
-            throw std::runtime_error("line " + std::to_string(line) + ": nesting too deep");
+            throw std::runtime_error(prefix + ": nesting too deep");
     }
     ~DepthGuard() {
         --d;
@@ -88,6 +96,7 @@ Program Parser::parse() {
             break;
         prog.stmts.push_back(parseOneStmt());
     }
+    prog.source_files = *source_files_;
     return prog;
 }
 
@@ -99,7 +108,7 @@ static bool isAssignOp(TokenType t) {
 }
 
 std::unique_ptr<Stmt> Parser::parseOneStmt() {
-    DepthGuard guard(depth_, peek().line);
+    DepthGuard guard(depth_, locStr(peek().line));
     switch (peek().type) {
     case TokenType::COMMENT: {
         std::string text = advance().lexeme;
@@ -109,7 +118,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     case TokenType::SEMICOLON:
         // ';' n'est valide qu'à l'intérieur d'un range [a;b] (consommé par
         // rangeExpr). Au niveau instruction, c'est une erreur — message clair.
-        throw std::runtime_error("line " + std::to_string(peek().line) +
+        throw std::runtime_error(locStr(peek().line) +
                                  ": ';' is not valid syntax — statements are terminated by newlines");
     case TokenType::WHILE:    return whileStmt();
     case TokenType::DO:       return doStmt();
@@ -145,7 +154,7 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
         }
         consumeOptComment();
         auto st = std::make_unique<ExprStmt>(std::move(e));
-        st->line = line;
+        st->line = line; st->file_idx = current_file_idx_;
         return st;
     }
     default:
@@ -163,7 +172,7 @@ std::unique_ptr<Stmt> Parser::finishAssignFromExpr(std::unique_ptr<Expr> target,
     consumeOptComment();
     if (auto* ve = dynamic_cast<VarExpr*>(target.get())) {
         auto s = std::make_unique<AssignStmt>();
-        s->line = line;
+        s->line = line; s->file_idx = current_file_idx_;
         s->name = ve->name;
         switch (opt) {
         case TokenType::PLUS_EQUAL:
@@ -190,14 +199,14 @@ std::unique_ptr<Stmt> Parser::finishAssignFromExpr(std::unique_ptr<Expr> target,
     }
     if (auto* ie = dynamic_cast<IndexExpr*>(target.get())) {
         auto s = std::make_unique<IndexAssignStmt>();
-        s->line = line;
+        s->line = line; s->file_idx = current_file_idx_;
         s->obj_expr = std::move(ie->obj); // conteneur (peut être lui-même chaîné)
         s->key = std::move(ie->key);
         s->op = opt;
         s->value = std::move(value);
         return s;
     }
-    throw std::runtime_error("line " + std::to_string(line) + ": invalid assignment target");
+    throw std::runtime_error(locStr(line) + ": invalid assignment target");
 }
 
 // ── instructions ─────────────────────────────────────────────────────────────
@@ -206,7 +215,7 @@ std::unique_ptr<Stmt> Parser::varDecl() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<VarDeclStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
@@ -225,7 +234,7 @@ std::unique_ptr<Stmt> Parser::globalDecl() {
     advance(); // consume 'global'
     auto s = std::make_unique<VarDeclStmt>();
     s->is_global = true;
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
@@ -243,12 +252,12 @@ std::unique_ptr<Stmt> Parser::constantDecl() {
     advance(); // consume 'const'
     auto s = std::make_unique<VarDeclStmt>();
     s->is_constant = true;
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     if (!check(TokenType::EQUALS))
-        throw std::runtime_error("line " + std::to_string(line) + ": const '" + s->names[0] + "' must be initialized");
+        throw std::runtime_error(locStr(line) + ": const '" + s->names[0] + "' must be initialized");
     advance(); // consume '='
     s->values.push_back(expr());
     while (match(TokenType::COMMA))
@@ -261,7 +270,7 @@ std::unique_ptr<Stmt> Parser::whileStmt() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<WhileStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->cond = expr();
     skipComments();
     expect(TokenType::DO);
@@ -280,7 +289,7 @@ std::unique_ptr<Stmt> Parser::doStmt() {
     int line = peek().line;
     advance(); // consomme DO
     auto s = std::make_unique<DoStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     while (true) {
         skipComments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
@@ -296,7 +305,7 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
     int line = peek().line;
     advance(); // IF
     auto s = std::make_unique<IfStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->cond = expr();
     skipComments();
     expect(TokenType::THEN);
@@ -345,7 +354,7 @@ std::unique_ptr<Stmt> Parser::breakStmt() {
     advance();
     consumeOptComment();
     auto s = std::make_unique<BreakStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     return s;
 }
 
@@ -354,7 +363,7 @@ std::unique_ptr<Stmt> Parser::continueStmt() {
     advance();
     consumeOptComment();
     auto s = std::make_unique<ContinueStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     return s;
 }
 
@@ -362,7 +371,7 @@ std::unique_ptr<Stmt> Parser::throwStmt() {
     int line = peek().line;
     advance(); // throw
     auto s = std::make_unique<ThrowStmt>(expr());
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     consumeOptComment();
     return s;
 }
@@ -371,7 +380,7 @@ std::unique_ptr<Stmt> Parser::tryCatchStmt() {
     int line = peek().line;
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     consumeOptComment();
     while (true) {
         skipComments();
@@ -445,7 +454,7 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
         auto fe = std::make_unique<FuncExpr>();
         parseParamsBody(fe->params, fe->defaults, fe->variadic, fe->body);
         auto ia = std::make_unique<IndexAssignStmt>();
-        ia->line = line;
+        ia->line = line; ia->file_idx = current_file_idx_;
         ia->obj = name;
         ia->key = std::make_unique<StringExpr>(field);
         ia->op = TokenType::EQUALS;
@@ -454,7 +463,7 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
     }
 
     auto s = std::make_unique<FuncDeclStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->name = name;
     parseParamsBody(s->params, s->defaults, s->variadic, s->body);
     return s;
@@ -464,7 +473,7 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
     int line = peek().line;
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     // retvals optionnels : pas de valeur si on est sur une fermeture de bloc
     // (end/else/elseif/catch), un séparateur, un commentaire ou EOF.
     if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)
@@ -492,7 +501,7 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
 std::unique_ptr<Stmt> Parser::multiAssignStmt() {
     int line = peek().line;
     auto s = std::make_unique<MultiAssignStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
 
     // Parse LValue list
     auto parseLValue = [&]() {
@@ -552,7 +561,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         skipComments();
         expect(TokenType::DO);
         auto s = std::make_unique<ForIterStmt>();
-        s->line = line;
+        s->line = line; s->file_idx = current_file_idx_;
         s->var1 = first_var;
         s->iter_expr = std::move(range);
         while (true) {
@@ -577,7 +586,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     skipComments();
     expect(TokenType::DO);
     auto s = std::make_unique<ForIterStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->var1 = first_var;
     s->var2 = var2;
     s->iter_expr = std::move(iter_e);
@@ -597,14 +606,14 @@ std::unique_ptr<Stmt> Parser::exprStmt() {
     auto e = expr();
     consumeOptComment();
     auto s = std::make_unique<ExprStmt>(std::move(e));
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     return s;
 }
 
 // ── expressions ──────────────────────────────────────────────────────────────
 
 std::unique_ptr<Expr> Parser::expr() {
-    DepthGuard guard(depth_, peek().line);
+    DepthGuard guard(depth_, locStr(peek().line));
     return logical();
 }
 
@@ -905,7 +914,7 @@ std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
         advance();
         node->incl_right = false;
     } else {
-        throw std::runtime_error("line " + std::to_string(peek().line) + ": expected ']' or '[' to close range");
+        throw std::runtime_error(locStr(peek().line) + ": expected ']' or '[' to close range");
     }
 
     // Ajustement open-left (incl_left=false → start += step) : émis par le
@@ -932,7 +941,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
             return std::make_unique<NumberExpr>(std::stod(lex));
         } catch (const std::out_of_range&) {
-            throw std::runtime_error("line " + std::to_string(tok.line) + ": numeric literal out of range: " + lex);
+            throw std::runtime_error(locStrFi(tok.line, tok.file_idx) + ": numeric literal out of range: " + lex);
         }
     }
     if (check(TokenType::STRING))
@@ -955,7 +964,7 @@ std::unique_ptr<Expr> Parser::primary() {
             if (opt_super)
                 advance(); // consume '?'
             if (!check(TokenType::LPAREN))
-                throw std::runtime_error("line " + std::to_string(peek().line) +
+                throw std::runtime_error(locStr(peek().line) +
                                          ": super: seuls les appels de méthode sont supportés");
             advance(); // LPAREN
             auto mc = std::make_unique<MethodCallExpr>();
@@ -1044,7 +1053,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 expect(TokenType::RBRACKET);
                 break;
             default:
-                throw std::runtime_error("line " + std::to_string(peek().line) +
+                throw std::runtime_error(locStr(peek().line) +
                                          ": expected string, identifier, or [expr] key in map literal");
             }
             expect(TokenType::COLON);
@@ -1087,14 +1096,14 @@ std::unique_ptr<Expr> Parser::primary() {
         // postfix sur une expression parenthésée : (expr)(args), (expr)[i], (expr).champ
         return parsePostfix(std::move(e));
     }
-    throw std::runtime_error("line " + std::to_string(peek().line) + ": unexpected token '" + peek().lexeme + "'");
+    throw std::runtime_error(locStr(peek().line) + ": unexpected token '" + peek().lexeme + "'");
 }
 
 std::unique_ptr<Stmt> Parser::classDecl() {
     int line = peek().line;
     advance(); // CLASS
     auto s = std::make_unique<ClassDeclStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->name = expect(TokenType::IDENTIFIER).lexeme;
     if (check(TokenType::EXTENDS)) {
         advance();
@@ -1111,7 +1120,7 @@ std::unique_ptr<Stmt> Parser::classDecl() {
             is_static = true;
         }
         if (!check(TokenType::FUNC))
-            throw std::runtime_error("line " + std::to_string(peek().line) + ": expected 'func' inside class body");
+            throw std::runtime_error(locStr(peek().line) + ": expected 'func' inside class body");
         int method_line = peek().line;
         // funcDeclStmt() renvoie un IndexAssignStmt pour la forme `func obj.field()`
         // — invalide dans une classe. Vérifier le type au lieu d'un static_cast
@@ -1119,7 +1128,7 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         auto raw = funcDeclStmt();
         auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
         if (!fd)
-            throw std::runtime_error("line " + std::to_string(method_line) +
+            throw std::runtime_error(locStr(method_line) +
                                      ": une méthode de classe doit être 'func nom(...)' (pas 'func obj.champ(...)')");
         raw.release();
         auto method = std::unique_ptr<FuncDeclStmt>(fd);
@@ -1201,7 +1210,7 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     if (!source_get(resolved, src_text) && !(resolved != path && source_get(path, src_text))) {
         std::ifstream f(resolved);
         if (!f)
-            throw std::runtime_error("line " + std::to_string(path_tok.line) + ": import: cannot open '" + resolved + "'");
+            throw std::runtime_error(locStrFi(path_tok.line, path_tok.file_idx) + ": import: cannot open '" + resolved + "'");
         std::ostringstream ss;
         ss << f.rdbuf();
         src_text = ss.str();
@@ -1210,19 +1219,18 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     auto sep2 = resolved.find_last_of("/\\");
     std::string sub_dir = (sep2 != std::string::npos) ? resolved.substr(0, sep2 + 1) : base_dir_;
 
-    // Parse le fichier importé en préfixant son chemin aux erreurs lex/parse :
-    // sinon « line N » serait ambigu (on ne saurait pas DANS QUEL fichier). Un
-    // import plus profond ayant déjà préfixé (message contenant « .ol: ») n'est
-    // pas re-préfixé → on garde le fichier le plus interne (la vraie source).
+    // Enregistre le fichier importé dans la table partagée des sources, puis
+    // lexe et parse avec ce file_idx pour que tokens et nœuds AST portent la bonne
+    // origine. La table est partagée par tous les parseurs de la chaîne.
+    int sub_file_idx = (int)source_files_->size();
+    source_files_->push_back(resolved);
     Program sub_prog;
     try {
-        Parser sub_parser(Lexer(src_text).tokenize(), sub_dir, imported_paths_, module_names_);
+        Parser sub_parser(Lexer(src_text, resolved, sub_file_idx).tokenize(), sub_dir,
+                          imported_paths_, module_names_, source_files_);
         sub_prog = sub_parser.parse();
     } catch (const std::exception& e) {
-        std::string msg = e.what();
-        if (msg.find(".ol:") != std::string::npos)
-            throw; // déjà attribué à un fichier importé plus profond
-        throw std::runtime_error(resolved + ": " + msg);
+        throw; // message already contains "file:line:" prefix
     }
 
     // Mémorise les noms exportés (même pour un import flat) → un import aliasé
@@ -1260,7 +1268,7 @@ std::unique_ptr<Stmt> Parser::switchStmt() {
     int line = peek().line;
     advance(); // SWITCH
     auto s = std::make_unique<SwitchStmt>();
-    s->line = line;
+    s->line = line; s->file_idx = current_file_idx_;
     s->subject = expr();
     consumeOptComment();
 

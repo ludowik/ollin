@@ -15,6 +15,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::vector<std::vector<size_t>> break_patches;
     std::vector<std::vector<size_t>> continue_patches;
     int current_line_ = 0;
+    int current_file_idx_ = 0;
 
     // ── register allocator ────────────────────────────────────────────────────
     std::unordered_map<std::string, int> local_regs_;
@@ -74,11 +75,18 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // Enregistre la ligne source courante (pour les diagnostics runtime) — remplace
     // le prologue `if (line > 0) { current_line_ = line; chunk.setLine(line); }`
     // dupliqué dans chaque visit().
-    void noteLine(int line) {
+    void noteLine(int line, int fi = -1) {
         if (line > 0) {
             current_line_ = line;
-            chunk.setLine(line);
+            if (fi >= 0)
+                current_file_idx_ = fi;
+            chunk.setLine(line, current_file_idx_);
         }
+    }
+
+    std::string locStr(int line, int fi) const {
+        const std::string& f = (fi >= 0 && fi < (int)chunk.source_files.size()) ? chunk.source_files[fi] : "?";
+        return f + ":" + std::to_string(line);
     }
 
     void compileInto(const Expr& e, int dest);

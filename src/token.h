@@ -82,4 +82,5 @@ struct Token {
     TokenType type;
     std::string lexeme;
     int line;
+    int file_idx = 0;
 };

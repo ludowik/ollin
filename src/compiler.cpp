@@ -348,6 +348,7 @@ void Compiler::compileInto(const Expr& e, int dest) {
 
 // ── top-level compile ─────────────────────────────────────────────────────────
 Chunk Compiler::compile(const Program& prog) {
+    chunk.source_files = prog.source_files;
     reg_top_ = 0;
     reg_count_ = 8;
     collectGlobals(prog.stmts, declared_globals_);
@@ -376,11 +377,11 @@ Chunk Compiler::compile(const Program& prog) {
     // Même garde que pour les fonctions : les registres sont des opérandes 8 bits.
     // Sans elle, un script top-level > 255 registres tronquait silencieusement.
     if (reg_count_ > 255)
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": top-level code uses more than 255 registers");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": top-level code uses more than 255 registers");
     chunk.top_reg_count = (uint8_t)std::max(reg_count_, 8);
     chunk.emit(makeBx((uint8_t)Op::HALT, 0));
     if (chunk.code.size() > 65535)
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": program too large (> 65535 instructions)");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": program too large (> 65535 instructions)");
     return std::move(chunk);
 }
 
@@ -394,7 +395,7 @@ static bool isCallNode(const Expr* e) {
 }
 
 void Compiler::visit(const VarDeclStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
 
     // Multi-retour : plusieurs cibles, une seule valeur qui est un APPEL (de
     // n'importe quelle forme : fonction nommée, closure, appel dynamique, méthode).
@@ -485,7 +486,7 @@ void Compiler::compileBlock(const std::vector<std::unique_ptr<Stmt>>& body) {
 }
 
 void Compiler::visit(const WhileStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     auto loop_start = (uint16_t)chunk.currentPos();
     int saved = reg_top_;
     s.cond->accept(*this);
@@ -507,7 +508,7 @@ void Compiler::visit(const WhileStmt& s) {
 }
 
 void Compiler::visit(const IfStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     std::vector<size_t> end_patches;
 
     int saved = reg_top_;
@@ -539,7 +540,7 @@ void Compiler::visit(const IfStmt& s) {
 }
 
 void Compiler::visit(const SwitchStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
 
     int saved = reg_top_;
     s.subject->accept(*this);
@@ -601,25 +602,25 @@ void Compiler::visit(const SwitchStmt& s) {
 
 void Compiler::visit(const BreakStmt& s) {
     if (break_patches.empty())
-        throw std::runtime_error("line " + std::to_string(s.line) + ": break outside loop");
+        throw std::runtime_error(locStr(s.line, s.file_idx) + ": break outside loop");
     break_patches.back().push_back(chunk.emitJump(Op::JUMP));
 }
 
 void Compiler::visit(const ContinueStmt& s) {
     if (continue_patches.empty())
-        throw std::runtime_error("line " + std::to_string(s.line) + ": continue outside loop");
+        throw std::runtime_error(locStr(s.line, s.file_idx) + ": continue outside loop");
     continue_patches.back().push_back(chunk.emitJump(Op::JUMP));
 }
 
 void Compiler::visit(const AssignStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     if (const_names_.count(s.name))
-        throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
+        throw std::runtime_error(locStr(s.line > 0 ? s.line : current_line_, s.file_idx) +
                                  ": cannot assign to const '" + s.name + "'");
     // Also block assignment when name is a constant captured from an outer scope
     for (auto& scope : outer_scopes_)
         if (scope.consts.count(s.name))
-            throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
+            throw std::runtime_error(locStr(s.line > 0 ? s.line : current_line_, s.file_idx) +
                                      ": cannot assign to const '" + s.name + "'");
     {
         auto it = local_regs_.find(s.name);
@@ -683,19 +684,19 @@ void Compiler::visit(const AssignStmt& s) {
         return;
     }
     // Global scope — assignment without var/global is not allowed
-    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) + ": undeclared variable '" +
+    throw std::runtime_error(locStr(s.line > 0 ? s.line : current_line_, s.file_idx) + ": undeclared variable '" +
                              s.name + "' (use 'var' or 'global')");
 }
 
 void Compiler::visit(const ExprStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     int saved = reg_top_;
     s.expr->accept(*this);
     reg_top_ = saved;
 }
 
 void Compiler::visit(const ThrowStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     int saved = reg_top_;
     s.value->accept(*this);
     int r = last_reg_;
@@ -704,7 +705,7 @@ void Compiler::visit(const ThrowStmt& s) {
 }
 
 void Compiler::visit(const TryCatchStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     int saved_top = reg_top_;
 
     // catch_r doit être connu avant d'émettre TRY → pré-alloué comme temporaire.
@@ -758,7 +759,7 @@ void Compiler::visit(const TryCatchStmt& s) {
 }
 
 void Compiler::visit(const FuncDeclStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     // Save outer context
     auto outer_regs = std::move(local_regs_);
     auto outer_upvals = std::move(cur_upval_idx_);
@@ -832,7 +833,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
 
     // Update reg_count in FuncProto
     if (reg_count_ > 255)
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": function uses more than 255 registers");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
 
     // Patch jump over body
@@ -935,7 +936,7 @@ void Compiler::visit(const FuncExpr& s) {
     }
     emitImplicitReturn(chunk);
     if (reg_count_ > 255)
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": function uses more than 255 registers");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
@@ -972,9 +973,9 @@ void Compiler::compileConsecutive(int base, const std::vector<std::unique_ptr<Ex
 }
 
 void Compiler::visit(const ReturnStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     if (!inFunction())
-        throw std::runtime_error("line " + std::to_string(s.line) + ": return outside function");
+        throw std::runtime_error(locStr(s.line, s.file_idx) + ": return outside function");
     if (s.spread_varargs) {
         int base = reg_top_;
         compileConsecutive(base, s.values);
@@ -1044,7 +1045,7 @@ void Compiler::visit(const VarExpr& e) {
         }
     }
     if (!declared_globals_.count(e.name))
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": undeclared variable '" + e.name + "'");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": undeclared variable '" + e.name + "'");
     last_reg_ = allocReg();
     chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_, chunk.addIdentifier(e.name)));
 }
@@ -1297,7 +1298,7 @@ void Compiler::visit(const ExprCallExpr& e) {
 
 void Compiler::visit(const VarArgExpr&) {
     if (!inFunction())
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": ... outside a variadic function");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": ... outside a variadic function");
     int base = reg_top_;
     chunk.emit(makeABC((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 0, 0));
     last_reg_ = base;
@@ -1467,7 +1468,7 @@ void Compiler::compileIteratorLoop(const Expr& src, const std::string& var1, con
 }
 
 void Compiler::visit(const ForIterStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     // chemin rapide : for i in <range littéral inclus aux deux bornes>, 1 variable
     // (couvre la forme `for i = a, b[, step]`). Évite Range + itérateur + dispatch virtuel.
     if (s.var2.empty()) {
@@ -1756,7 +1757,7 @@ void Compiler::compileNumericFor(const RangeExpr& r, const std::string& var1,
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     int saved = reg_top_;
 
     // Charge le conteneur (map/array) à indexer.
@@ -1778,7 +1779,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
                 chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
             } else {
                 if (!declared_globals_.count(s.obj))
-                    throw std::runtime_error("line " + std::to_string(s.line > 0 ? s.line : current_line_) +
+                    throw std::runtime_error(locStr(s.line > 0 ? s.line : current_line_, s.file_idx) +
                                              ": undeclared variable '" + s.obj + "'");
                 chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.addIdentifier(s.obj)));
             }
@@ -1810,7 +1811,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
 }
 
 void Compiler::visit(const MultiAssignStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     int saved = reg_top_;
 
     // Évalue tous les RHS dans des registres temporaires consécutifs
@@ -1955,7 +1956,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     emitImplicitReturn(chunk);
 
     if (reg_count_ > 255)
-        throw std::runtime_error("line " + std::to_string(current_line_) + ": function uses more than 255 registers");
+        throw std::runtime_error(locStr(current_line_, current_file_idx_) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
@@ -1974,7 +1975,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
 
 // ── visit(ClassDeclStmt) ──────────────────────────────────────────────────────
 void Compiler::visit(const ClassDeclStmt& s) {
-    noteLine(s.line);
+    noteLine(s.line, s.file_idx);
     int saved = reg_top_;
 
     // Créer la valeur classe (T_CLASS = map vide)
@@ -2016,10 +2017,10 @@ void Compiler::visit(const ClassDeclStmt& s) {
         // membre statique y produirait un décalage d'arguments silencieux.
         if (method->is_static) {
             if (method->name == "init")
-                throw std::runtime_error("line " + std::to_string(method->line) +
+                throw std::runtime_error(locStr(method->line, method->file_idx) +
                                          ": 'init' cannot be static (a constructor always has 'self')");
             if (method->name.size() >= 2 && method->name[0] == '_' && method->name[1] == '_')
-                throw std::runtime_error("line " + std::to_string(method->line) + ": metamethod '" + method->name +
+                throw std::runtime_error(locStr(method->line, method->file_idx) + ": metamethod '" + method->name +
                                          "' cannot be static (operators always have 'self')");
         }
         uint8_t func_idx = compileMethodFunc(*method);
@@ -2058,14 +2059,14 @@ void Compiler::visit(const MethodCallExpr& e) {
         // 'self' n'existe pas → diagnostic propre plutôt qu'un crash (map::at).
         auto self_it = local_regs_.find("self");
         if (self_it == local_regs_.end())
-            throw std::runtime_error("line " + std::to_string(current_line_) +
+            throw std::runtime_error(locStr(current_line_, current_file_idx_) +
                                      ": 'super' n'est utilisable que dans une méthode");
         // La classe parente est fixée LEXICALEMENT (classe où la méthode est
         // définie), et non via self.__class__.__parent__ : sinon B.m() exécuté sur
         // une instance C reverrait toujours sur B → récursion infinie dans une
         // hiérarchie à 3+ niveaux.
         if (current_class_parent_.empty())
-            throw std::runtime_error("line " + std::to_string(current_line_) +
+            throw std::runtime_error(locStr(current_line_, current_file_idx_) +
                                      ": 'super' : la classe courante n'a pas de parent");
         int self_src = self_it->second;
         reg_top_ = call_base + 1;

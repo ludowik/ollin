@@ -13,6 +13,7 @@
 #include <memory>
 #include <sstream>
 #include <unordered_set>
+#include <vector>
 
 // VM persists across ollin_run() calls so graphics frame callbacks remain valid.
 static std::unique_ptr<VM> s_vm;
@@ -28,7 +29,10 @@ static std::string ollin_run(const std::string& source) {
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
     try {
         auto imported = std::make_shared<std::unordered_set<std::string>>();
-        s_vm->execute(Compiler().compile(Parser(Lexer(source).tokenize(), "", imported).parse()));
+        auto source_files = std::make_shared<std::vector<std::string>>();
+        source_files->push_back("<playground>");
+        s_vm->execute(Compiler().compile(
+            Parser(Lexer(source, "<playground>", 0).tokenize(), "", imported, nullptr, source_files).parse()));
         s_vm->runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);

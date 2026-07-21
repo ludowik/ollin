@@ -39,9 +39,15 @@ struct ConstKeyHash {
     }
 };
 
+struct SourceLoc {
+    uint16_t file_idx = 0;
+    uint16_t line = 0;
+};
+
 struct Chunk {
     std::vector<Instr> code;
-    std::vector<int> lines; // parallel to code[] — source line per instruction
+    std::vector<SourceLoc> lines; // parallel to code[] — source file+line per instruction
+    std::vector<std::string> source_files;
     std::vector<Value> constants;
     std::unordered_map<ConstKey, uint16_t, ConstKeyHash> const_map_; // dédup des constantes
     std::vector<std::string> identifiers;
@@ -50,9 +56,12 @@ struct Chunk {
     std::vector<FuncProto> funcs;
     uint8_t top_reg_count = 8;
     int current_line_ = 0;
+    int current_file_idx_ = 0;
 
-    void setLine(int l) {
+    void setLine(int l, int fi = -1) {
         current_line_ = l;
+        if (fi >= 0)
+            current_file_idx_ = fi;
     }
 
     uint16_t addConstant(Value v);

@@ -31,7 +31,7 @@ class VM {
     void runEntryHooks();
 
   private:
-    int errLine() const;             // extracted from the lambda in execute()
+    std::string errLine() const;      // "file:line" from current ip
     void runGoto(size_t stop_depth); // unified computed-goto dispatch loop
     struct Handler {
         uint32_t catch_addr;

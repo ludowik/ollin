@@ -30,12 +30,11 @@ static VM* s_current_vm = nullptr;
 // ferait boucler l'itération indéfiniment. (La branche int de FOR_PREP n'appelle
 // pas cette fonction : les entiers sont finis par construction, elle garde son
 // propre test de pas nul.)
-static void validateNumericRange(double start, double end, double step, int line) {
+static void validateNumericRange(double start, double end, double step, const std::string& loc) {
     if (step == 0.0)
-        throw std::runtime_error("line " + std::to_string(line) + ": runtime: le pas ne peut pas être 0");
+        throw std::runtime_error(loc + ": runtime: le pas ne peut pas être 0");
     if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(step))
-        throw std::runtime_error("line " + std::to_string(line) +
-                                 ": runtime: bornes de range non finies (NaN/infini interdit)");
+        throw std::runtime_error(loc + ": runtime: bornes de range non finies (NaN/infini interdit)");
 }
 
 // ── Interned meta-key constants (initialized once, reused across all calls) ───
@@ -410,9 +409,13 @@ static bool valuesEqual(const Value& av, const Value& bv) {
 
 // ── VM::errLine / VM::current / VM::callValue ────────────────────────────────
 
-int VM::errLine() const {
+std::string VM::errLine() const {
     uint32_t idx = ip > 0 ? ip - 1 : 0;
-    return (idx < (uint32_t)ch->lines.size()) ? ch->lines[idx] : 0;
+    if (idx >= ch->lines.size())
+        return "?";
+    auto& loc = ch->lines[idx];
+    const std::string& f = (loc.file_idx < ch->source_files.size()) ? ch->source_files[loc.file_idx] : "?";
+    return f + ":" + std::to_string(loc.line);
 }
 
 VM* VM::current() {
@@ -639,7 +642,7 @@ dispatch_loop:
 
     op_LOAD_GLOBAL:
         if (!globals_init[Bx])
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": undefined: " + ch->identifiers[Bx]);
+            throw std::runtime_error(errLine() + ": undefined: " + ch->identifiers[Bx]);
         regs[base + A] = globals[Bx];
         NEXT();
 
@@ -723,7 +726,7 @@ dispatch_loop:
         }
         double dv = asDouble(regs[base + C]);
         if (dv == 0.0)
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+            throw std::runtime_error(errLine() + ": runtime: division by zero");
         regs[base + A] = Value(asDouble(regs[base + B]) / dv);
         NEXT();
     }
@@ -733,7 +736,7 @@ dispatch_loop:
         const Value& cv = regs[base + C];
         if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier % entier
             if (cv.asInt() == 0)
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
+                throw std::runtime_error(errLine() + ": runtime: modulo by zero");
             regs[base + A] = Value(bv.asInt() % cv.asInt());
             NEXT();
         }
@@ -746,7 +749,7 @@ dispatch_loop:
         }
         double dv = asDouble(cv);
         if (dv == 0.0)
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: modulo by zero");
+            throw std::runtime_error(errLine() + ": runtime: modulo by zero");
         regs[base + A] = Value(std::fmod(asDouble(bv), dv));
         NEXT();
     }
@@ -756,7 +759,7 @@ dispatch_loop:
         const Value& cv = regs[base + C];
         if (bv.isInteger() && cv.isInteger()) {
             if (cv.asInt() == 0)
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+                throw std::runtime_error(errLine() + ": runtime: division by zero");
             int64_t q = bv.asInt() / cv.asInt();
             // floor division: adjust if signs differ and there is a remainder
             if ((bv.asInt() ^ cv.asInt()) < 0 && q * cv.asInt() != bv.asInt())
@@ -765,7 +768,7 @@ dispatch_loop:
         } else {
             double dv = asDouble(cv);
             if (dv == 0.0)
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: division by zero");
+                throw std::runtime_error(errLine() + ": runtime: division by zero");
             regs[base + A] = Value(std::floor(asDouble(bv) / dv));
         }
         NEXT();
@@ -1072,8 +1075,7 @@ dispatch_loop:
         {
             Value thrown = regs[base + A];
             if (handler_stack.empty())
-                throw std::runtime_error("line " + std::to_string(errLine()) +
-                                         ": unhandled exception: " + valueToString(thrown));
+                throw std::runtime_error(errLine() + ": unhandled exception: " + valueToString(thrown));
             Handler h = handler_stack.back();
             handler_stack.pop_back();
             unwindToHandler(h, std::move(thrown));
@@ -1217,16 +1219,14 @@ dispatch_loop:
                         return acc;
                     });
                 else
-                    throw std::runtime_error("line " + std::to_string(errLine()) +
-                                             ": runtime: array has no field '" + m + "'");
+                    throw std::runtime_error(errLine() + ": runtime: array has no field '" + m + "'");
             } else {
                 if (!key.isInteger())
-                    throw std::runtime_error("line " + std::to_string(errLine()) +
-                                             ": runtime: array index must be integer");
+                    throw std::runtime_error(errLine() + ": runtime: array index must be integer");
                 regs[base + A] = obj.arrayGet(key.asInt());
             }
         } else {
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot index " +
+            throw std::runtime_error(errLine() + ": cannot index " +
                                      std::string(obj.typeName()) +
                                      (key.isString() ? " with field '" + key.asString() + "'" : ""));
         }
@@ -1240,11 +1240,10 @@ dispatch_loop:
             obj.mapSet(key, regs[base + C]);
         } else if (obj.isArray()) {
             if (!key.isInteger())
-                throw std::runtime_error("line " + std::to_string(errLine()) +
-                                         ": runtime: array index must be integer");
+                throw std::runtime_error(errLine() + ": runtime: array index must be integer");
             obj.arraySet(key.asInt(), regs[base + C]);
         } else {
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": cannot assign index on " +
+            throw std::runtime_error(errLine() + ": cannot assign index on " +
                                      std::string(obj.typeName()) +
                                      (key.isString() ? " with field '" + key.asString() + "'" : ""));
         }
@@ -1259,7 +1258,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: & requires integer operands");
+            throw std::runtime_error(errLine() + ": runtime: & requires integer operands");
         regs[base + A] = Value(bv.asInt() & cv.asInt());
         NEXT();
     }
@@ -1268,7 +1267,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: | requires integer operands");
+            throw std::runtime_error(errLine() + ": runtime: | requires integer operands");
         regs[base + A] = Value(bv.asInt() | cv.asInt());
         NEXT();
     }
@@ -1277,7 +1276,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ^ requires integer operands");
+            throw std::runtime_error(errLine() + ": runtime: ^ requires integer operands");
         regs[base + A] = Value(bv.asInt() ^ cv.asInt());
         NEXT();
     }
@@ -1285,7 +1284,7 @@ dispatch_loop:
     op_BNOT: {
         const Value& bv = regs[base + B];
         if (!bv.isInteger())
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: ~ requires integer operand");
+            throw std::runtime_error(errLine() + ": runtime: ~ requires integer operand");
         regs[base + A] = Value(~bv.asInt());
         NEXT();
     }
@@ -1294,7 +1293,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: << requires integer operands");
+            throw std::runtime_error(errLine() + ": runtime: << requires integer operands");
         regs[base + A] = Value((int64_t)((uint64_t)bv.asInt() << (cv.asInt() & 63)));
         NEXT();
     }
@@ -1303,7 +1302,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error("line " + std::to_string(errLine()) + ": runtime: >> requires integer operands");
+            throw std::runtime_error(errLine() + ": runtime: >> requires integer operands");
         regs[base + A] = Value(bv.asInt() >> (cv.asInt() & 63));
         NEXT();
     }
@@ -1481,8 +1480,7 @@ dispatch_loop:
                     if (!u.empty())
                         fuv = std::make_unique<std::vector<Upvalue*>>(u);
                 } else
-                    throw std::runtime_error("line " + std::to_string(errLine()) +
-                                             ": runtime: method call on non-function value");
+                    throw std::runtime_error(errLine() + ": runtime: method call on non-function value");
                 fp_addr = pushCallFrame(cb, fi, total, std::move(fuv), ip);
             }
         }
@@ -1496,13 +1494,13 @@ dispatch_loop:
         {
             bool has_step = (C >> 1) & 1;
             bool incl_right = C & 1;
-            int line_ = errLine();
+            std::string line_ = errLine();
             auto toDouble_ = [&](const Value& v) -> double {
                 if (v.isInteger())
                     return (double)v.asInt();
                 if (v.isFloat())
                     return v.asFloat();
-                throw std::runtime_error("line " + std::to_string(line_) + ": runtime: range bound must be a number");
+                throw std::runtime_error(line_ + ": runtime: range bound must be a number");
             };
             double start = toDouble_(regs[base + B]);
             double end = toDouble_(regs[base + B + 1]);
@@ -1524,13 +1522,11 @@ dispatch_loop:
             Value& vl = regs[base + A + 1];
             Value& vs = regs[base + A + 2];
             if (!vi.isNumber() || !vl.isNumber() || !vs.isNumber())
-                throw std::runtime_error("line " + std::to_string(errLine()) +
-                                         ": runtime: for: bornes numériques attendues");
+                throw std::runtime_error(errLine() + ": runtime: for: bornes numériques attendues");
             if (vi.isInteger() && vl.isInteger() && vs.isInteger()) {
                 int64_t i0 = vi.asInt(), lim = vl.asInt(), st = vs.asInt();
                 if (st == 0)
-                    throw std::runtime_error("line " + std::to_string(errLine()) +
-                                             ": runtime: for: le pas ne peut pas être 0");
+                    throw std::runtime_error(errLine() + ": runtime: for: le pas ne peut pas être 0");
                 empty = (st > 0) ? (i0 > lim) : (i0 < lim);
                 if (!empty) {
                     // Compteur de tours RESTANTS (après la 1re itération), calculé une seule
@@ -1604,8 +1600,21 @@ dispatch_loop:
             // n'en porte pas déjà une (les builtins lèvent sans localisation). Les
             // erreurs rattrapées par try/catch gardent leur message brut (ci-dessous).
             std::string msg = e.what();
-            if (msg.compare(0, 5, "line ") != 0)
-                throw std::runtime_error("line " + std::to_string(errLine()) + ": " + msg);
+            // Un message déjà localisé contient ":<chiffres>:" (pattern file:line:)
+            auto hasLoc = [&](const std::string& m) {
+                auto p = m.find(':');
+                while (p != std::string::npos && p + 1 < m.size()) {
+                    if (std::isdigit((unsigned char)m[p + 1])) {
+                        auto q = m.find(':', p + 1);
+                        if (q != std::string::npos)
+                            return true;
+                    }
+                    p = m.find(':', p + 1);
+                }
+                return false;
+            };
+            if (!hasLoc(msg))
+                throw std::runtime_error(errLine() + ": " + msg);
             throw;
         }
         Handler h = handler_stack.back();

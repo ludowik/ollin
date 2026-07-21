@@ -21,7 +21,8 @@ static const std::unordered_map<std::string, TokenType> s_keywords = {
     {"switch", TokenType::SWITCH},   {"case", TokenType::CASE},
 };
 
-Lexer::Lexer(std::string source) : src(std::move(source)) {
+Lexer::Lexer(std::string source, std::string filename, int file_idx)
+    : src(std::move(source)), filename_(std::move(filename)), file_idx_(file_idx) {
 }
 
 char Lexer::peek() const {
@@ -56,7 +57,7 @@ Token Lexer::number(bool leading_dot) {
             char pl = (char)std::tolower((unsigned char)p); // 'x', 'o' ou 'b'
             const char* kind = pl == 'x' ? "hexadecimal" : pl == 'o' ? "octal" : "binary";
             auto invalid = [&]() {
-                throw std::runtime_error("line " + std::to_string(line) + ": invalid " + kind + " literal");
+                throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid " + kind + " literal");
             };
             advance(); // consomme x/o/b
             digits += pl;
@@ -120,7 +121,7 @@ Token Lexer::number(bool leading_dot) {
     // (les littéraux hex/oct/bin sont déjà retournés plus haut, jamais ici.)
     if (!atEnd() && (peek() == 'e' || peek() == 'E')) {
         if (prev_underscore) // '_' juste avant l'exposant → invalide (ex. 1_e5)
-            throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
+            throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
         digits += 'e';
         advance();
         if (!atEnd() && (peek() == '+' || peek() == '-')) {
@@ -134,13 +135,13 @@ Token Lexer::number(bool leading_dot) {
             exp_digit = true;
         }
         if (!exp_digit) // 'e' sans chiffre (ex. 1e, 1e+)
-            throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
+            throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
         last_was_digit = true;
         prev_underscore = false;
     }
     // '_' final (ou non suivi d'un chiffre), ou caractère alphanumérique / '.' / '_' collé
     if (prev_underscore || (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '.' || peek() == '_')))
-        throw std::runtime_error("line " + std::to_string(line) + ": invalid number literal");
+        throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
     return {TokenType::NUMBER, digits, line};
 }
 
@@ -149,7 +150,7 @@ Token Lexer::string() {
     while (!atEnd() && peek() != '"' && peek() != '\n')
         advance();
     if (atEnd() || peek() == '\n')
-        throw std::runtime_error("line " + std::to_string(line) + ": unterminated string");
+        throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": unterminated string");
     std::string val = src.substr(start, pos - start);
     advance();
     return {TokenType::STRING, val, line};
@@ -183,14 +184,17 @@ Token Lexer::blockComment() {
             break;
     }
     if (hashes < 3)
-        throw std::runtime_error("line " + std::to_string(line) + ": unterminated block comment");
+        throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": unterminated block comment");
     return {TokenType::COMMENT, src.substr(start, pos - start - 3), line};
 }
 
 std::vector<Token> Lexer::tokenize() {
     std::vector<Token> tokens;
 
-    auto emit = [&](Token t) { tokens.push_back(std::move(t)); };
+    auto emit = [&](Token t) {
+        t.file_idx = file_idx_;
+        tokens.push_back(std::move(t));
+    };
 
     while (!atEnd()) {
         skipWhitespace();
@@ -358,9 +362,9 @@ std::vector<Token> Lexer::tokenize() {
                 emit(identifier());
                 break;
             }
-            throw std::runtime_error("line " + std::to_string(line) + ": unexpected character '" + c + "'");
+            throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": unexpected character '" + c + "'");
         }
     }
-    tokens.push_back({TokenType::EOF_T, "", line});
+    tokens.push_back({TokenType::EOF_T, "", line, file_idx_});
     return tokens;
 }

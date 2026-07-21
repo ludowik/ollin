@@ -47,12 +47,12 @@ uint8_t Chunk::addFunc(FuncProto fp) {
 
 void Chunk::emit(Instr i) {
     code.push_back(i);
-    lines.push_back(current_line_);
+    lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
 }
 
 size_t Chunk::emitJump(Op op, uint8_t a) {
     code.push_back(makeABx((uint8_t)op, a, 0xFFFF));
-    lines.push_back(current_line_);
+    lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
     return code.size() - 1;
 }
 

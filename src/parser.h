@@ -11,7 +11,9 @@ class Parser {
   public:
     explicit Parser(std::vector<Token> tokens, std::string base_dir = "",
                     std::shared_ptr<std::unordered_set<std::string>> imported = nullptr,
-                    std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names = nullptr);
+                    std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names = nullptr,
+                    std::shared_ptr<std::vector<std::string>> source_files = nullptr,
+                    std::string filename = "");
     Program parse();
 
   private:
@@ -22,7 +24,18 @@ class Parser {
     // Cache partagé path résolu → noms top-level exportés, pour bâtir la map d'un
     // import aliasé même quand le module a déjà été importé (dédup ≠ cycle).
     std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names_;
+    std::shared_ptr<std::vector<std::string>> source_files_;
+    int current_file_idx_ = 0;
     int depth_ = 0; // profondeur de récursion (garde anti-débordement de pile)
+
+    std::string locStr(int line) const {
+        const std::string& f = (current_file_idx_ < (int)source_files_->size()) ? (*source_files_)[current_file_idx_] : "?";
+        return f + ":" + std::to_string(line);
+    }
+    std::string locStrFi(int line, int fi) const {
+        const std::string& f = (fi >= 0 && fi < (int)source_files_->size()) ? (*source_files_)[fi] : "?";
+        return f + ":" + std::to_string(line);
+    }
 
     const Token& peek() const;
     const Token& advance();

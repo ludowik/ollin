@@ -93,6 +93,7 @@ struct ExprVisitor {
 // ── classes de base ───────────────────────────────────────────────────────────
 struct Stmt {
     int line = 0;
+    int file_idx = 0;
     virtual void accept(StmtVisitor&) const = 0;
     virtual ~Stmt() = default;
 };
@@ -513,4 +514,5 @@ struct SwitchStmt : Stmt {
 
 struct Program {
     std::vector<std::unique_ptr<Stmt>> stmts;
+    std::vector<std::string> source_files;
 };
