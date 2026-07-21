@@ -638,13 +638,15 @@ func draw()
     end
     var cloudSecs = cull_cloud_sectors()   ## cull avant begin3d(rcam) → frustum joueur figé
     graphics.begin3d(rcam)
+    do
         for i = 1, #vis do
             graphics.drawChunk(vis[i])
         end
-        for i = 1, #vis do          ## eau transparente après tout l'opaque
+        for i = 1, #vis do
             graphics.drawChunkAlpha(vis[i])
         end
-        draw_clouds(cloudSecs)      ## nuages (semi-transparents) au-dessus de tout
+        draw_clouds(cloudSecs)
+    end
     graphics.end3d()
     graphics.ambient(AMB)           ## draw_clouds a baissé l'ambiant → rétablir pour le terrain
 
