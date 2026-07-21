@@ -70,7 +70,7 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
 }
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
-static Value evalConstant(const Expr& e) {
+static Value evalConstant(const Expr& e, int fallback_line = 0) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e))
         return n->is_integer ? Value(n->ival) : numValue(n->value);
     if (auto* s = dynamic_cast<const StringExpr*>(&e))
@@ -79,7 +79,8 @@ static Value evalConstant(const Expr& e) {
         return Value((int64_t)(b->value ? 1 : 0));
     if (dynamic_cast<const NilExpr*>(&e))
         return Value{};
-    throw std::runtime_error("default values must be literal constants (not a runtime expression)");
+    int ln = e.line > 0 ? e.line : fallback_line;
+    throw std::runtime_error("line " + std::to_string(ln) + ": default values must be literal constants (not a runtime expression)");
 }
 
 // ── arithmetic op helpers ─────────────────────────────────────────────────────
@@ -207,7 +208,7 @@ struct CollectLocalsVisitor : StmtQuery {
                             // 'constant' → locale normale (immuable à la compilation)
             for (auto& n : s.names) {
                 if (!seen.insert(n).second) {
-                    throw std::runtime_error("local variable '" + n + "' already declared in this scope");
+                    throw std::runtime_error("line " + std::to_string(s.line) + ": local variable '" + n + "' already declared in this scope");
                 }
                 out.push_back(n);
             }
@@ -250,7 +251,7 @@ struct CollectGlobalsVisitor : StmtQuery {
         if (s.is_global) {
             for (auto& n : s.names) {
                 if (!out.insert(n).second) {
-                    throw std::runtime_error("global variable '" + n + "' already declared");
+                    throw std::runtime_error("line " + std::to_string(s.line) + ": global variable '" + n + "' already declared");
                 }
             }
         }
@@ -375,13 +376,11 @@ Chunk Compiler::compile(const Program& prog) {
     // Même garde que pour les fonctions : les registres sont des opérandes 8 bits.
     // Sans elle, un script top-level > 255 registres tronquait silencieusement.
     if (reg_count_ > 255)
-        throw std::runtime_error("top-level code uses more than 255 registers");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": top-level code uses more than 255 registers");
     chunk.top_reg_count = (uint8_t)std::max(reg_count_, 8);
     chunk.emit(makeBx((uint8_t)Op::HALT, 0));
-    // Les cibles de saut sont des adresses absolues 16 bits (Bx). Au-delà de 65535
-    // instructions, elles seraient tronquées → saut vers une mauvaise adresse.
     if (chunk.code.size() > 65535)
-        throw std::runtime_error("program too large (> 65535 instructions)");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": program too large (> 65535 instructions)");
     return std::move(chunk);
 }
 
@@ -807,7 +806,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Build default values
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], s.line) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -833,7 +832,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
 
     // Update reg_count in FuncProto
     if (reg_count_ > 255)
-        throw std::runtime_error("function uses more than 255 registers");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
 
     // Patch jump over body
@@ -922,7 +921,7 @@ void Compiler::visit(const FuncExpr& s) {
 
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], s.line) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -936,7 +935,7 @@ void Compiler::visit(const FuncExpr& s) {
     }
     emitImplicitReturn(chunk);
     if (reg_count_ > 255)
-        throw std::runtime_error("function uses more than 255 registers");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 
@@ -1956,7 +1955,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     emitImplicitReturn(chunk);
 
     if (reg_count_ > 255)
-        throw std::runtime_error("function uses more than 255 registers");
+        throw std::runtime_error("line " + std::to_string(current_line_) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
     chunk.patchJump(jump_patch, (uint16_t)chunk.currentPos());
 

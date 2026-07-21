@@ -1201,7 +1201,7 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     if (!source_get(resolved, src_text) && !(resolved != path && source_get(path, src_text))) {
         std::ifstream f(resolved);
         if (!f)
-            throw std::runtime_error("import: cannot open '" + resolved + "'");
+            throw std::runtime_error("line " + std::to_string(path_tok.line) + ": import: cannot open '" + resolved + "'");
         std::ostringstream ss;
         ss << f.rdbuf();
         src_text = ss.str();

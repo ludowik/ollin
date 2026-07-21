@@ -1348,7 +1348,7 @@ dispatch_loop:
         if (regs[base + B].isBuiltin()) {
             auto fn = regs[base + B].asBuiltin();
             { CallCtx ctx{this, &regs[base + A], C}; regs[base + A] = fn(ctx); }
-            last_results_ = 1; // builtin → 1 valeur (pour SPREAD_RESULTS)
+            last_results_ = 1;
             NEXT();
         }
         if (regs[base + B].isClass()) {
@@ -1466,8 +1466,8 @@ dispatch_loop:
                 total = argc;
             }
             if (fn.isBuiltin()) {
-                { CallCtx ctx{this, &regs[cb], total}; regs[cb] = fn.asBuiltin()(ctx); }
-                last_results_ = 1; // builtin → 1 valeur (pour SPREAD_RESULTS)
+                { auto bfn = fn.asBuiltin(); CallCtx ctx{this, &regs[cb], total}; regs[cb] = bfn(ctx); }
+                last_results_ = 1;
                 goto call_method_done;
             }
             {
