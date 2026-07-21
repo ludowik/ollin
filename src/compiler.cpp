@@ -70,7 +70,7 @@ int Compiler::captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const
 }
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
-static Value evalConstant(const Expr& e, int fallback_line = 0) {
+static Value evalConstant(const Expr& e, const std::vector<std::string>& files, int fallback_line = 0, int fallback_fi = 0) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e))
         return n->is_integer ? Value(n->ival) : numValue(n->value);
     if (auto* s = dynamic_cast<const StringExpr*>(&e))
@@ -79,8 +79,8 @@ static Value evalConstant(const Expr& e, int fallback_line = 0) {
         return Value((int64_t)(b->value ? 1 : 0));
     if (dynamic_cast<const NilExpr*>(&e))
         return Value{};
-    int ln = e.line > 0 ? e.line : fallback_line;
-    throw std::runtime_error("line " + std::to_string(ln) + ": default values must be literal constants (not a runtime expression)");
+    SourceLoc loc{(uint16_t)fallback_fi, (uint16_t)(e.line > 0 ? e.line : fallback_line)};
+    throw std::runtime_error(loc.str(files) + ": default values must be literal constants (not a runtime expression)");
 }
 
 // ── arithmetic op helpers ─────────────────────────────────────────────────────
@@ -198,17 +198,18 @@ struct CollectLocalsVisitor : StmtQuery {
     std::vector<std::string>& out;
     std::unordered_set<std::string>& seen;
     bool collect_funcs;
+    const std::vector<std::string>& files;
 
     CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
-                         bool collect_funcs)
-        : out(out), seen(seen), collect_funcs(collect_funcs) {}
+                         bool collect_funcs, const std::vector<std::string>& files)
+        : out(out), seen(seen), collect_funcs(collect_funcs), files(files) {}
 
     void visit(const VarDeclStmt& s) override {
         if (!s.is_global) { // 'global' → table des globaux, pas de registre
                             // 'constant' → locale normale (immuable à la compilation)
             for (auto& n : s.names) {
                 if (!seen.insert(n).second) {
-                    throw std::runtime_error("line " + std::to_string(s.line) + ": local variable '" + n + "' already declared in this scope");
+                    throw std::runtime_error(s.sloc().str(files) + ": local variable '" + n + "' already declared in this scope");
                 }
                 out.push_back(n);
             }
@@ -233,9 +234,9 @@ struct CollectLocalsVisitor : StmtQuery {
 };
 
 static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
-                          bool collect_funcs = true) {
+                          const std::vector<std::string>& files, bool collect_funcs = true) {
     std::unordered_set<std::string> seen(out.begin(), out.end());
-    CollectLocalsVisitor v(out, seen, collect_funcs);
+    CollectLocalsVisitor v(out, seen, collect_funcs, files);
     v.run(stmts);
 }
 
@@ -244,14 +245,16 @@ static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::
 // l'endroit de leur déclaration → on les collecte tous avant la compilation.
 struct CollectGlobalsVisitor : StmtQuery {
     std::unordered_set<std::string>& out;
+    const std::vector<std::string>& files;
 
-    explicit CollectGlobalsVisitor(std::unordered_set<std::string>& out) : out(out) {}
+    CollectGlobalsVisitor(std::unordered_set<std::string>& out, const std::vector<std::string>& files)
+        : out(out), files(files) {}
 
     void visit(const VarDeclStmt& s) override {
         if (s.is_global) {
             for (auto& n : s.names) {
                 if (!out.insert(n).second) {
-                    throw std::runtime_error("line " + std::to_string(s.line) + ": global variable '" + n + "' already declared");
+                    throw std::runtime_error(s.sloc().str(files) + ": global variable '" + n + "' already declared");
                 }
             }
         }
@@ -295,8 +298,8 @@ struct CollectGlobalsVisitor : StmtQuery {
 };
 
 static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
-                           std::unordered_set<std::string>& out) {
-    CollectGlobalsVisitor v(out);
+                           std::unordered_set<std::string>& out, const std::vector<std::string>& files) {
+    CollectGlobalsVisitor v(out, files);
     v.run(stmts);
 }
 
@@ -351,7 +354,7 @@ Chunk Compiler::compile(const Program& prog) {
     chunk.source_files = prog.source_files;
     reg_top_ = 0;
     reg_count_ = 8;
-    collectGlobals(prog.stmts, declared_globals_);
+    collectGlobals(prog.stmts, declared_globals_, chunk.source_files);
     for (auto& n : builtinModuleNames())
         declared_globals_.insert(n);
     for (auto& n : builtinFuncNames())
@@ -365,7 +368,7 @@ Chunk Compiler::compile(const Program& prog) {
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
-    collectLocals(prog.stmts, top_locals, false);
+    collectLocals(prog.stmts, top_locals, chunk.source_files, false);
     for (auto& name : top_locals)
         local_regs_[name] = reg_top_++;
     locals_top_ = reg_top_;
@@ -465,7 +468,7 @@ void Compiler::compileBlock(const std::vector<std::unique_ptr<Stmt>>& body) {
     int saved_locals = locals_top_;
 
     std::vector<std::string> block_locals;
-    collectLocals(body, block_locals);
+    collectLocals(body, block_locals, chunk.source_files);
     for (auto& nm : block_locals)
         local_regs_[nm] = reg_top_++; // assignment inconditionnelle : permet l'ombrage
     int block_locals_top = reg_top_;
@@ -731,7 +734,7 @@ void Compiler::visit(const TryCatchStmt& s) {
         if (!s.catch_var.empty())
             local_regs_[s.catch_var] = catch_r;
         std::vector<std::string> catch_ls;
-        collectLocals(s.catch_body, catch_ls);
+        collectLocals(s.catch_body, catch_ls, chunk.source_files);
         for (auto& nm : catch_ls)
             local_regs_[nm] = reg_top_++;
         int catch_top = reg_top_;
@@ -792,7 +795,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Pre-scan body for all var declarations and for-loop variables
     // Seed with param names so redeclaring a param with 'var' is caught
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
-    collectLocals(s.body, body_locals);
+    collectLocals(s.body, body_locals, chunk.source_files);
     for (auto& name : body_locals) {
         if (!local_regs_.count(name))
             local_regs_[name] = reg_top_++;
@@ -807,7 +810,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Build default values
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], s.line) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.line, s.file_idx) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -910,7 +913,7 @@ void Compiler::visit(const FuncExpr& s) {
     reg_top_ = n_fixed;
 
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
-    collectLocals(s.body, body_locals);
+    collectLocals(s.body, body_locals, chunk.source_files);
     for (auto& nm : body_locals)
         if (!local_regs_.count(nm))
             local_regs_[nm] = reg_top_++;
@@ -922,7 +925,7 @@ void Compiler::visit(const FuncExpr& s) {
 
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], s.line) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.line, current_file_idx_) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -1927,7 +1930,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     if (!s.is_static)
         body_locals.push_back("self");
     body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
-    collectLocals(s.body, body_locals);
+    collectLocals(s.body, body_locals, chunk.source_files);
     for (auto& name : body_locals)
         if (!local_regs_.count(name))
             local_regs_[name] = reg_top_++;
@@ -1941,7 +1944,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     std::vector<Value> defs(n_fixed);
     int defs_offset = s.is_static ? 0 : 1;
     for (int i = 0; i < n_params; ++i)
-        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i]) : Value{};
+        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files) : Value{};
     uint16_t defaults_idx = chunk.addFuncDefaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, s.is_static, defaults_idx, 0, {}};
