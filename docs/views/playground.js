@@ -425,12 +425,12 @@ const editorExtensions = [
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
         // F4 : aller à la première erreur de syntaxe/exécution (lien de la zone sortie).
         { key: 'F4', run: () => { if (lastErrorLoc) { gotoError(lastErrorLoc); return true } return false } },
-        // Chord (Alt+K puis C/U) : commenter / dé-commenter les lignes sélectionnées.
-        // Deux variantes : Alt relâché avant la 2e touche, OU Alt maintenu (Alt+K Alt+C).
-        { key: 'Alt-k c', run: (v) => toggleLineComment(v, true) },
-        { key: 'Alt-k u', run: (v) => toggleLineComment(v, false) },
-        { key: 'Alt-k Alt-c', run: (v) => toggleLineComment(v, true) },
-        { key: 'Alt-k Alt-u', run: (v) => toggleLineComment(v, false) },
+        // Chord (Cmd+K puis C/U sur Mac, Ctrl+K puis C/U ailleurs) : commenter / dé-commenter.
+        // Variantes : Mod relâché avant la 2e touche, OU Mod maintenu (Mod+K Mod+C).
+        { key: 'Mod-k c', run: (v) => toggleLineComment(v, true) },
+        { key: 'Mod-k u', run: (v) => toggleLineComment(v, false) },
+        { key: 'Mod-k Mod-c', run: (v) => toggleLineComment(v, true) },
+        { key: 'Mod-k Mod-u', run: (v) => toggleLineComment(v, false) },
       ]),
       keymap.of(searchKeymap),   // Ctrl+F (rechercher), Ctrl+G (suivant), etc.
       indentUnit.of('    '),
@@ -465,8 +465,8 @@ const SHORTCUTS = [
     { keys: ['Tab'],            desc: 'Indenter au curseur (ou accepter la complétion si la popup est ouverte)' },
     { keys: ['Maj', 'Tab'],     desc: 'Désindenter' },
     { keys: ['Alt', 'Espace'], desc: 'Déclencher l’autocomplétion' },
-    { keys: ['Alt+K', 'C'], sep: ' puis ', desc: 'Commenter les lignes sélectionnées' },
-    { keys: ['Alt+K', 'U'], sep: ' puis ', desc: 'Décommenter les lignes sélectionnées' },
+    { keys: ['Cmd+K', 'C'], sep: ' puis ', desc: 'Commenter les lignes sélectionnées' },
+    { keys: ['Cmd+K', 'U'], sep: ' puis ', desc: 'Décommenter les lignes sélectionnées' },
     { keys: ['Alt', 'Maj', 'F'],desc: 'Reformater le code (indentation)' },
     { keys: ['Ctrl', 'Z'],      desc: 'Annuler' },
     { keys: ['Ctrl', 'Y'],      desc: 'Rétablir (ou Ctrl+Maj+Z)' },
@@ -559,8 +559,8 @@ function runEditKeymap(e) {
   }
   return false
 }
-// Chord Alt+K → C/U : géré par code physique (e.code) pour Safari/macOS où
-// Option+K produit 'È' et non 'k', empêchant la reconnaissance par CodeMirror.
+// Chord Cmd/Ctrl+K → C/U : géré par code physique (e.code) car certains navigateurs
+// ou layouts peuvent substituer le caractère (ex. Safari/macOS).
 let chordAltKPending = false
 const onGlobalKeydown = e => {
   // F1 : bascule la popup d'aide (raccourcis). En capture → marche quel que soit
@@ -594,8 +594,8 @@ const onGlobalKeydown = e => {
     stopExec()
     return
   }
-  // Chord Alt+K → C/U via code physique (contourne la substitution de caractère Safari/macOS).
-  if (e.altKey && e.code === 'KeyK' && view.hasFocus) {
+  // Chord Cmd/Ctrl+K → C/U via code physique (contourne les substitutions de caractère).
+  if ((e.metaKey || e.ctrlKey) && e.code === 'KeyK' && view.hasFocus) {
     e.preventDefault()
     e.stopImmediatePropagation()
     chordAltKPending = true
