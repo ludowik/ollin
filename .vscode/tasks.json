@@ -4,14 +4,14 @@
         {
             "label": "cmake: configure",
             "type": "shell",
-            "command": "cmake -B build -DCMAKE_BUILD_TYPE=Release",
+            "command": "cmake -B build -DCMAKE_BUILD_TYPE=Release -DOLLIN_NATIVE_RAYLIB=ON",
             "presentation": { "reveal": "silent", "panel": "shared" },
             "problemMatcher": []
         },
         {
             "label": "cmake: build",
             "type": "shell",
-            "command": "cmake --build build",
+            "command": "cmake -B build -DCMAKE_BUILD_TYPE=Release -DOLLIN_NATIVE_RAYLIB=ON && cmake --build build",
             "group": { "kind": "build", "isDefault": true },
             "presentation": { "reveal": "silent", "panel": "shared" },
             "problemMatcher": ["$gcc"]
