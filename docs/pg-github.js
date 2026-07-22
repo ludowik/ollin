@@ -11,12 +11,11 @@
 // api.github.com renvoie CORS ouvert pour les appels REST authentifiés → tout
 // marche depuis le navigateur, sans serveur intermédiaire.
 
-const API          = 'https://api.github.com'
-const TOKEN_KEY    = 'ollin-gh-token'
-const REPO_KEY     = 'ollin-gh-repo'
-const DEFAULT_REPO = 'ollin-projects'
-const MANIFEST     = 'ollin.project.json'
-const IMAGE_EXTS   = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
+const API        = 'https://api.github.com'
+const TOKEN_KEY  = 'ollin-gh-token'
+const REPO_KEY   = 'ollin-gh-repo'
+const MANIFEST   = 'ollin.project.json'
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
 
 // ── token ─────────────────────────────────────────────────────────────────
 export function setToken(t) {
@@ -35,14 +34,15 @@ export function isConnected() {
   return !!getToken()
 }
 
-// ── dépôt cible (paramétrable) ──────────────────────────────────────────────
+// ── dépôt cible (obligatoire, format owner/repo) ────────────────────────────
 export function getRepo() {
-  return localStorage.getItem(REPO_KEY) || DEFAULT_REPO
+  return localStorage.getItem(REPO_KEY) || null
 }
 export function setRepo(v) {
   const s = (v || '').trim()
-  if (s && s !== DEFAULT_REPO) localStorage.setItem(REPO_KEY, s)
-  else localStorage.removeItem(REPO_KEY)
+  if (!s) { localStorage.removeItem(REPO_KEY); return }
+  if (!s.includes('/')) throw new Error('Format invalide — utilise owner/repo (ex. moncompte/ollin-projects)')
+  localStorage.setItem(REPO_KEY, s)
 }
 
 // ── requêtes bas niveau ───────────────────────────────────────────────────
@@ -95,32 +95,21 @@ async function login() {
   return _login || (await getUser()).login
 }
 
-// Résout le dépôt cible : { owner, repo, mine, base }.
-// mine=true si le dépôt appartient à l'utilisateur authentifié (créable).
+// Résout le dépôt cible : { owner, repo, base }.
 async function ctx() {
   const val = getRepo()
-  if (val.includes('/')) {
-    const [owner, repo] = val.split('/')
-    return { owner, repo, mine: (owner === (await login())), base: `/repos/${owner}/${repo}` }
-  }
-  const owner = await login()
-  return { owner, repo: val, mine: true, base: `/repos/${owner}/${val}` }
+  if (!val || !val.includes('/')) throw new Error('Dépôt non configuré — renseigne owner/repo dans les paramètres GitHub')
+  const [owner, repo] = val.split('/')
+  return { owner, repo, base: `/repos/${owner}/${repo}` }
 }
 
 // ── repo ──────────────────────────────────────────────────────────────────
-// Renvoie le dépôt ; le crée (public, auto-init) s'il n'existe pas ET qu'il
-// appartient à l'utilisateur. Chez un autre propriétaire : erreur explicite.
+// Vérifie que le dépôt existe (doit être créé manuellement sur GitHub).
 export async function ensureRepo() {
-  const { owner, repo, mine, base } = await ctx()
+  const { owner, repo, base } = await ctx()
   const res = await gh(base)
   if (res.ok) return res.json()
-  if (res.status === 404) {
-    if (!mine) throw new Error(`Dépôt ${owner}/${repo} introuvable — création impossible chez un autre propriétaire.`)
-    return ghJson('/user/repos', {
-      method: 'POST',
-      body: { name: repo, private: false, auto_init: true, description: 'Projets Ollin (playground)' },
-    })
-  }
+  if (res.status === 404) throw new Error(`Dépôt ${owner}/${repo} introuvable — crée-le d'abord sur GitHub.`)
   let msg = String(res.status)
   try { const e = await res.json(); if (e && e.message) msg = res.status + ' — ' + e.message } catch (_) {}
   throw new Error('GitHub ' + msg)

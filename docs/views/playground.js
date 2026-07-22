@@ -1088,11 +1088,11 @@ function renderMenuGithub() {
     const span = hdr.querySelector('span')
     GH.getUser().then(u => { ghLogin = u.login; if (span) span.textContent = 'GitHub : @' + u.login }).catch(() => {})
   }
-  projectMenu.appendChild(menuItem('🗄 Dépôt : ' + GH.getRepo(), false, () => {
-    const v = prompt('Dépôt cible (nom, ou « owner/repo » pour un dépôt partagé) :', GH.getRepo())
+  projectMenu.appendChild(menuItem('🗄 Dépôt : ' + (GH.getRepo() || '(non configuré)'), false, () => {
+    const v = prompt('Dépôt cible (format obligatoire : owner/repo) :', GH.getRepo() || '')
     if (v === null) return
-    GH.setRepo(v)
-    renderMenuGithub()
+    try { GH.setRepo(v); renderMenuGithub() }
+    catch (e) { alert(e.message) }
   }))
   if (currentProject && !isExample()) {   // pousser/récupérer agit sur un projet réel
     projectMenu.appendChild(menuItem('⬆ Pousser vers GitHub', false, () => ghPush()))
@@ -1150,19 +1150,22 @@ function renderMenuConnect() {
   projectMenu.appendChild(menuHeader('Se connecter à GitHub', renderMenuGithub))
   const wrap = document.createElement('div'); wrap.className = 'menu-form'
   const info = document.createElement('div'); info.className = 'menu-info'
-  info.innerHTML = 'Colle un <b>fine-grained token</b> (dépôt <code>ollin-projects</code>, permission Contents : lecture/écriture). '
+  info.innerHTML = 'Colle un <b>fine-grained token</b> GitHub (permission Contents : lecture/écriture) et le dépôt cible au format <b>owner/repo</b>. '
     + '<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Créer un token ↗</a>'
   const input = document.createElement('input')
   input.type = 'password'; input.className = 'menu-input'; input.placeholder = 'github_pat_… / ghp_…'
   const repo = document.createElement('input')
-  repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo()
-  repo.placeholder = 'dépôt : ollin-projects ou owner/repo'
-  repo.title = 'Dépôt cible (défaut ollin-projects). « owner/repo » pour un dépôt partagé.'
+  repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo() || ''
+  repo.placeholder = 'owner/repo (ex. moncompte/ollin-projects)'
+  repo.title = 'Dépôt cible au format owner/repo — doit exister sur GitHub.'
   const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = 'Connecter'
   const err = document.createElement('div'); err.className = 'menu-err'
   const connect = async () => {
     const t = input.value.trim(); if (!t) return
-    GH.setToken(t); GH.setRepo(repo.value); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
+    const r = repo.value.trim()
+    if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
+    try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
+    GH.setToken(t); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
     try { const u = await GH.getUser(); ghLogin = u.login; renderMenuRoot() }
     catch (e) { GH.clearToken(); err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = 'Connecter' }
   }
@@ -1179,7 +1182,7 @@ function renderMenuConnect() {
 // le projet reste en local et un message le signale — « Pousser vers GitHub » reste
 // disponible pour réessayer.
 async function autoPushNewProject(p) {
-  if (!GH.isConnected()) return
+  if (!GH.isConnected() || !GH.getRepo()) return
   setStatus('Création sur GitHub…')
   try {
     await GH.ensureRepo()
@@ -1466,7 +1469,7 @@ async function takenProjectNames(exclude = {}) {
     if (p.id === exclude.id) continue
     names.add((p.name || '').trim().toLowerCase())
   }
-  if (GH.isConnected()) {
+  if (GH.isConnected() && GH.getRepo()) {
     try {
       for (const r of await GH.listRemoteProjects()) {
         if (r.slug === exclude.slug) continue
@@ -1483,12 +1486,10 @@ async function takenProjectNames(exclude = {}) {
 // `opts` : { label, exclude:{id,slug} } (exclusion = le projet lui-même en renommage).
 async function askFreeProjectName(defName, opts = {}) {
   const label = opts.label || 'Nom du projet :'
-  if (GH.isConnected()) setStatus('Vérification des noms…')
+  if (GH.isConnected() && GH.getRepo()) setStatus('Vérification des noms…')
   const { names, remoteFailed } = await takenProjectNames(opts.exclude)
-  // Nettoie le « Vérification… » : avertissement transitoire si le distant a échoué,
-  // sinon efface (sinon le message resterait affiché après annulation/renommage).
   if (remoteFailed) setStatus('Noms distants non vérifiés (dépôt injoignable)', true, true)
-  else if (GH.isConnected()) setStatus('')
+  else if (GH.isConnected() && GH.getRepo()) setStatus('')
   let name = prompt(label, defName)
   while (name !== null) {
     const clean = name.trim()
