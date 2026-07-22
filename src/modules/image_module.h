@@ -29,6 +29,15 @@ unsigned int image_gl_texid(int id);
 void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned char r, unsigned char g, unsigned char b,
                        unsigned char a);
 
+// Streaming texture API (camera module).
+// Creates a plain Texture2D from blank RGBA data. Returns a handle map {id,width,height}.
+// *id_out receives the numeric id for image_push_pixels.
+Value image_alloc_tex(int w, int h, int* id_out);
+// Pushes raw RGBA8 pixels to a streaming texture. No-op if id is invalid.
+void  image_push_pixels(int id, const uint8_t* rgba);
+// Returns true if the texture id is still alive (not cleared by image_reset).
+bool  image_tex_valid(int id);
+
 // Teinte globale (graphics.tint / noTint) : appliquée par défaut à image.draw et
 // graphics.sprite. RGBA 0-255. `has`=false → pas de teinte (blanc).
 void image_set_tint(bool has, unsigned char r, unsigned char g, unsigned char b, unsigned char a);

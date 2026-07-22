@@ -497,6 +497,38 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
     DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
 }
 
+// ── streaming texture (camera module) ────────────────────────────────────────
+
+Value image_alloc_tex(int w, int h, int* id_out) {
+    Image blank = GenImageColor(w, h, BLANK);
+    Texture2D tex = LoadTextureFromImage(blank);
+    UnloadImage(blank);
+    TexHandle hnd;
+    hnd.tex = tex;
+    hnd.is_render = false;
+    int id = s_next_id++;
+    hnd.id = id;
+    *id_out = id;
+    auto uptr = std::make_unique<TexHandle>(std::move(hnd));
+    s_images[id] = std::move(uptr);
+    Value m = Value::makeMap();
+    m.mapSet(Value(std::string("id")),     Value((int64_t)id));
+    m.mapSet(Value(std::string("width")),  Value((int64_t)w));
+    m.mapSet(Value(std::string("height")), Value((int64_t)h));
+    return m;
+}
+
+void image_push_pixels(int id, const uint8_t* rgba) {
+    auto it = s_images.find(id);
+    if (it == s_images.end())
+        return;
+    UpdateTexture(it->second->tex, rgba);
+}
+
+bool image_tex_valid(int id) {
+    return s_images.count(id) > 0;
+}
+
 // ── makeImageModule ───────────────────────────────────────────────────────────
 
 Value makeImageModule() {
