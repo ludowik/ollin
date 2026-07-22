@@ -1631,11 +1631,16 @@ function showOutput(text) {
   }
 }
 
-// Extrait la localisation d'un message « error: [<fichier>: ]line N: … » (syntaxe
-// lex/parse OU runtime VM). Renvoie { file?, line, str, index } où `str`/`index`
-// repèrent la sous-chaîne à rendre cliquable ; null si aucune ligne.
+// Extrait la localisation d'un message d'erreur.
+// Nouveau format (SourceLoc) : « fichier.ol:42: … »
+// Ancien format (compatibilité) : « [fichier.ol: ]line N: … »
+// Renvoie { file?, line, str, index } ; null si aucune localisation trouvée.
 function errLoc(text) {
-  const m = /(?:([\w./-]+\.ol)\s*:\s*)?line\s+(\d+)/.exec(text || '')
+  // Nouveau format : fichier.ol:42 (obligatoirement un .ol pour éviter les faux positifs)
+  let m = /(([\w./-]+\.ol):(\d+))/.exec(text || '')
+  if (m) return { file: m[2], line: parseInt(m[3], 10), str: m[1], index: m.index }
+  // Ancien format : [fichier.ol: ]line N
+  m = /(?:([\w./-]+\.ol)\s*:\s*)?line\s+(\d+)/.exec(text || '')
   if (!m) return null
   return { file: m[1] || null, line: parseInt(m[2], 10), str: m[0], index: m.index }
 }
