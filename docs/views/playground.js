@@ -559,6 +559,9 @@ function runEditKeymap(e) {
   }
   return false
 }
+// Chord Alt+K → C/U : géré par code physique (e.code) pour Safari/macOS où
+// Option+K produit 'È' et non 'k', empêchant la reconnaissance par CodeMirror.
+let chordAltKPending = false
 const onGlobalKeydown = e => {
   // F1 : bascule la popup d'aide (raccourcis). En capture → marche quel que soit
   // le focus ; preventDefault pour couper l'aide native du navigateur.
@@ -590,6 +593,22 @@ const onGlobalKeydown = e => {
     e.stopImmediatePropagation()
     stopExec()
     return
+  }
+  // Chord Alt+K → C/U via code physique (contourne la substitution de caractère Safari/macOS).
+  if (e.altKey && e.code === 'KeyK' && view.hasFocus) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    chordAltKPending = true
+    return
+  }
+  if (chordAltKPending) {
+    chordAltKPending = false
+    if (view.hasFocus && (e.code === 'KeyC' || e.code === 'KeyU')) {
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      toggleLineComment(view, e.code === 'KeyC')
+      return
+    }
   }
   if (!isRuntimeArmed() || !view.hasFocus) return
   if (e.key !== 'Backspace' && e.key !== 'Tab') return   // seules touches mangées par GLFW
