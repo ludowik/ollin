@@ -178,9 +178,21 @@ void Lexer::interpString(std::vector<Token>& out) {
             while (!atEnd() && depth > 0) {
                 char ec = peek();
                 if (ec == '\n') break;
-                if (ec == '{') depth++;
-                else if (ec == '}') { depth--; if (depth == 0) break; }
-                advance();
+                if (ec == '"') {
+                    advance(); // consomme le '"' ouvrant
+                    while (!atEnd() && peek() != '"' && peek() != '\n')
+                        advance();
+                    if (!atEnd() && peek() == '"') advance(); // consomme le '"' fermant
+                } else if (ec == '{') {
+                    depth++;
+                    advance();
+                } else if (ec == '}') {
+                    depth--;
+                    if (depth == 0) break;
+                    advance();
+                } else {
+                    advance();
+                }
             }
             if (atEnd() || peek() == '\n' || depth > 0)
                 throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": accolade non fermée dans l'interpolation");
