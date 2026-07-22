@@ -985,6 +985,8 @@ async function loadProject(id) {
   flushEditorToFile()
   currentProject = p
   Store.setActiveId(id)
+  railHidden = !localStorage.getItem(railKey(id))
+  applyRail()
   const files = scripts(p)
   const last = localStorage.getItem(fileKey(id))
   currentFile = (last && p.files[last] !== undefined) ? last
@@ -1433,9 +1435,8 @@ newFileBtn.addEventListener('click', newFile)
 // ── bascule de la barre latérale (état NON mémorisé : fermée à chaque ouverture) ──
 const railToggle = document.getElementById('rail-toggle')
 const fileRailEl = document.getElementById('file-rail')
-// La barre des fichiers démarre TOUJOURS fermée à l'ouverture de l'éditeur ;
-// le bouton l'ouvre/ferme pour la session en cours (pas de persistance).
 let railHidden = true
+const railKey = id => 'ollin-rail-open:' + id
 function applyRail() {
   fileRailEl.classList.toggle('rail-hidden', railHidden)
   railToggle.classList.toggle('active', !railHidden)
@@ -1444,6 +1445,10 @@ function applyRail() {
 const onRailToggle = () => {
   railHidden = !railHidden
   applyRail()
+  if (currentProject) {
+    if (!railHidden) localStorage.setItem(railKey(currentProject.id), '1')
+    else localStorage.removeItem(railKey(currentProject.id))
+  }
 }
 railToggle.addEventListener('click', onRailToggle)
 disposers.push(() => railToggle.removeEventListener('click', onRailToggle))
