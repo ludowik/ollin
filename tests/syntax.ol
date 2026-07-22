@@ -707,7 +707,7 @@ assert(s7 == 15)
 
 ## itération index + valeur
 for i, v in arr do
-    printf("{}: {}", i, v)
+    print("{i}: {v}")
 end
 
 ## sémantique référence
@@ -720,10 +720,20 @@ assert(arr[1] == 0)
 ## print — arguments séparés par espaces, retour à la ligne
 print("hello", 42, true)    ## hello 42 1
 
-## printf — substitution positionnelle ou indexée
-printf("{} + {} = {}", 1, 2, 3)         ## 1 + 2 = 3
-printf("{0} et {0}", "oui")             ## oui et oui
-printf("a={0} b={1} a={0}", 10, 20)    ## a=10 b=20 a=10
+## printf — substitution positionnelle ou indexée (\{ = accolade littérale)
+printf("\{} + \{} = \{}", 1, 2, 3)         ## 1 + 2 = 3
+printf("\{0} et \{0}", "oui")              ## oui et oui
+printf("a=\{0} b=\{1} a=\{0}", 10, 20)    ## a=10 b=20 a=10
+
+## interpolation de chaînes
+var iname = "monde"
+var ix = 42
+assert("hello {iname}" == "hello monde")
+assert("x={ix}" == "x=42")
+assert("calc: {ix * 2 + 1}" == "calc: 85")
+assert("{ix}{ix}" == "4242")
+assert("pi~{3.14}" == "pi~3.14")
+assert(len("ac\{olade") == 8)    ## \{ = accolade littérale (1 char)
 
 ## assert — lève une exception si falsy
 assert(1 + 1 == 2)

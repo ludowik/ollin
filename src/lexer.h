@@ -21,6 +21,7 @@ class Lexer {
     void skipWhitespace();
     Token number(bool leading_dot = false);
     Token string();
+    void interpString(std::vector<Token>& out);
     Token identifier();
     Token comment();
     Token blockComment();

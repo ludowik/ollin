@@ -946,6 +946,23 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::STRING))
         return parsePostfix(std::make_unique<StringExpr>(advance().lexeme));
+    if (check(TokenType::INTERP_START)) {
+        auto node = std::make_unique<InterpExpr>();
+        node->line = peek().line;
+        node->file_idx = peek().file_idx;
+        node->literals.push_back(advance().lexeme); // INTERP_START → premier littéral
+        while (true) {
+            node->exprs.push_back(expr());
+            if (check(TokenType::INTERP_MID)) {
+                node->literals.push_back(advance().lexeme);
+            } else {
+                Token end = expect(TokenType::INTERP_END);
+                node->literals.push_back(end.lexeme);
+                break;
+            }
+        }
+        return parsePostfix(std::move(node));
+    }
     if (check(TokenType::TRUE)) {
         advance();
         return std::make_unique<BoolExpr>(true);

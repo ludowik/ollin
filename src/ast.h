@@ -44,6 +44,7 @@ struct MethodCallExpr;
 struct RangeExpr;
 struct FuncExpr;
 struct ChainedCompareExpr;
+struct InterpExpr;
 
 // ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
@@ -88,6 +89,7 @@ struct ExprVisitor {
     virtual void visit(const RangeExpr&) = 0;
     virtual void visit(const FuncExpr&) = 0;
     virtual void visit(const ChainedCompareExpr&) = 0;
+    virtual void visit(const InterpExpr&) = 0;
     virtual ~ExprVisitor() = default;
 };
 
@@ -514,6 +516,14 @@ struct SwitchStmt : Stmt {
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
+};
+
+// Chaîne interpolée "texte {expr} texte {expr} texte"
+// literals[i] précède exprs[i] ; literals.size() == exprs.size() + 1 (toujours)
+struct InterpExpr : Expr {
+    std::vector<std::string> literals;
+    std::vector<std::unique_ptr<Expr>> exprs;
+    void accept(ExprVisitor& v) const override { v.visit(*this); }
 };
 
 struct Program {

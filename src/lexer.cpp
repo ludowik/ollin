@@ -156,6 +156,62 @@ Token Lexer::string() {
     return {TokenType::STRING, val, line};
 }
 
+void Lexer::interpString(std::vector<Token>& out) {
+    auto emit_tok = [&](Token t) { t.file_idx = file_idx_; out.push_back(std::move(t)); };
+
+    int str_line = line;
+    std::string literal;
+    bool has_interp = false;
+
+    while (!atEnd() && peek() != '"' && peek() != '\n') {
+        char c = advance();
+        if (c == '\\' && !atEnd() && peek() == '{') {
+            literal += '{';
+            advance();
+        } else if (c == '{') {
+            emit_tok({has_interp ? TokenType::INTERP_MID : TokenType::INTERP_START, literal, str_line});
+            has_interp = true;
+            literal.clear();
+
+            int depth = 1;
+            int expr_start = pos;
+            while (!atEnd() && depth > 0) {
+                char ec = peek();
+                if (ec == '\n') break;
+                if (ec == '{') depth++;
+                else if (ec == '}') { depth--; if (depth == 0) break; }
+                advance();
+            }
+            if (atEnd() || peek() == '\n' || depth > 0)
+                throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": accolade non fermée dans l'interpolation");
+
+            std::string expr_src = src.substr(expr_start, pos - expr_start);
+            advance(); // consomme '}'
+
+            if (expr_src.empty())
+                throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": interpolation vide {}");
+
+            Lexer sub(expr_src, filename_, file_idx_);
+            sub.line = str_line;
+            auto sub_tokens = sub.tokenize();
+            for (auto& t : sub_tokens)
+                if (t.type != TokenType::EOF_T)
+                    emit_tok(t);
+        } else {
+            literal += c;
+        }
+    }
+
+    if (atEnd() || peek() == '\n')
+        throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": unterminated string");
+    advance(); // consomme '"'
+
+    if (!has_interp)
+        emit_tok({TokenType::STRING, literal, str_line});
+    else
+        emit_tok({TokenType::INTERP_END, literal, str_line});
+}
+
 Token Lexer::identifier() {
     int start = pos - 1;
     while (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '_'))
@@ -332,7 +388,7 @@ std::vector<Token> Lexer::tokenize() {
             emit({TokenType::QUESTION, "?", line});
             break;
         case '"':
-            emit(string());
+            interpString(tokens);
             break;
         case '+':
             if (!atEnd() && peek() == '=') {

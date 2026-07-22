@@ -76,6 +76,9 @@ enum class TokenType {
     HASH,
     QUESTION,
     COMMENT,
+    INTERP_START, // début d'une chaîne interpolée : texte avant le premier {
+    INTERP_MID,   // texte entre deux segments interpolés
+    INTERP_END,   // texte après le dernier segment interpolé
     EOF_T
 };
 

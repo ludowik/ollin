@@ -189,7 +189,12 @@ exponent       = ( "e" | "E" ) [ "+" | "-" ] digit { digit } ;
 hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;
 binDigit       = "0" | "1" ;
-STRING         = '"' { any \ '"' } '"' ;
+STRING         = '"' { strChar } '"' ;
+strChar        = any \ ( '"' | '{' | LF ) | "\{" | "{" expr "}" ;
+                 (* "{" expr "}" : interpolation — évalue expr et insère sa représentation string.
+                    "\{" : accolade littérale (non interpolée).
+                    Une chaîne sans "{" est un littéral pur (token STRING) ;
+                    une chaîne avec "{…}" produit une séquence INTERP_START/MID/END. *)
 BOOL           = "true" | "false" ;
 NIL            = "nil" ;
 IDENT          = ( letter | "_" ) { letter | digit | "_" } ;

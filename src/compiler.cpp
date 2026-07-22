@@ -1008,6 +1008,31 @@ void Compiler::visit(const StringExpr& e) {
     chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.addConstant(Value(e.value))));
 }
 
+void Compiler::visit(const InterpExpr& e) {
+    noteLine(e.line, e.file_idx);
+    // Résultat = literals[0] + str(exprs[0]) + literals[1] + ... + literals[n]
+    // ADD sur string gauche auto-convertit le côté droit via valueToString.
+    int result = allocReg();
+    chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)result,
+                       (uint16_t)chunk.addConstant(Value(e.literals[0]))));
+    for (int i = 0; i < (int)e.exprs.size(); ++i) {
+        e.exprs[i]->accept(*this);
+        int expr_reg = last_reg_;
+        int acc = allocReg();
+        chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)acc, (uint8_t)result, (uint8_t)expr_reg));
+        result = acc;
+        if (!e.literals[i + 1].empty()) {
+            int lit = allocReg();
+            chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)lit,
+                               (uint16_t)chunk.addConstant(Value(e.literals[i + 1]))));
+            int acc2 = allocReg();
+            chunk.emit(makeABC((uint8_t)Op::ADD, (uint8_t)acc2, (uint8_t)result, (uint8_t)lit));
+            result = acc2;
+        }
+    }
+    last_reg_ = result;
+}
+
 void Compiler::visit(const BoolExpr& e) {
     last_reg_ = allocReg();
     chunk.emit(makeABx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.addConstant(Value((int64_t)(e.value ? 1 : 0)))));

@@ -132,6 +132,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     void visit(const RangeExpr&) override;
     void visit(const FuncExpr&) override;
     void visit(const ChainedCompareExpr&) override;
+    void visit(const InterpExpr&) override;
 
     // StmtVisitor (map)
     void visit(const IndexAssignStmt&) override;
