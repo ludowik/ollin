@@ -751,6 +751,8 @@ const projectBtn   = document.getElementById('project-btn')
 const projectLabel = document.getElementById('project-label')
 const projectMenu  = document.getElementById('project-menu')
 const fileRail     = document.getElementById('file-list')
+const ghRailEl     = document.getElementById('gh-rail')
+const ghRailBody   = document.getElementById('gh-rail-body')
 const newFileBtn   = document.getElementById('new-file-btn')
 const resList      = document.getElementById('res-list')
 const newResBtn    = document.getElementById('new-res-btn')
@@ -797,6 +799,29 @@ function scheduleSave() {
 }
 
 // ── liste latérale de fichiers ──
+function renderGhRail() {
+  const p = currentProject
+  const show = !!(p && !isExample() && p.remote && p.remote.slug && GH.isConnected() && GH.getRepo())
+  ghRailEl.style.display = show ? '' : 'none'
+  if (!show) return
+  ghRailBody.innerHTML = ''
+  const repo = document.createElement('div')
+  repo.className = 'gh-repo'
+  repo.textContent = p.remote.repo || GH.getRepo()
+  repo.title = repo.textContent
+  ghRailBody.appendChild(repo)
+  const pushBtn = document.createElement('button')
+  pushBtn.className = 'gh-btn'
+  pushBtn.innerHTML = '⬆ <span>Push</span>'
+  pushBtn.onclick = () => { closeMenu(); ghPush() }
+  ghRailBody.appendChild(pushBtn)
+  const pullBtn = document.createElement('button')
+  pullBtn.className = 'gh-btn'
+  pullBtn.innerHTML = '⬇ <span>Pull</span>'
+  pullBtn.onclick = () => { closeMenu(); ghPull() }
+  ghRailBody.appendChild(pullBtn)
+}
+
 function renderFiles() {
   fileRail.innerHTML = ''
   if (!currentProject) return
@@ -841,7 +866,7 @@ function openFile(path) {
   currentFile = path
   setEditorText(currentProject.files[path] ?? '')
   if (!isExample()) localStorage.setItem(fileKey(currentProject.id), path)
-  renderFiles()
+  renderGhRail(); renderFiles()
   view.focus()
 }
 
@@ -883,7 +908,7 @@ async function renameFile(path) {
   await Store.saveProject(currentProject)
   localStorage.setItem(fileKey(currentProject.id), currentFile)
   setEditorText(currentProject.files[currentFile] ?? '')
-  renderFiles()
+  renderGhRail(); renderFiles()
 }
 
 async function deleteFile(path) {
@@ -894,13 +919,13 @@ async function deleteFile(path) {
   if (currentFile === path) currentFile = currentProject.entry
   await Store.saveProject(currentProject)
   setEditorText(currentProject.files[currentFile] ?? '')
-  renderFiles()
+  renderGhRail(); renderFiles()
 }
 
 async function setEntry(path) {
   currentProject.entry = path
   await Store.saveProject(currentProject)
-  renderFiles()
+  renderGhRail(); renderFiles()
 }
 
 // ── ressources (images) ──
@@ -966,7 +991,7 @@ async function loadProject(id) {
               : (p.files[p.entry] !== undefined ? p.entry : files[0])
   setEditorText(p.files[currentFile] ?? '')
   projectLabel.textContent = p.name
-  renderFiles()
+  renderGhRail(); renderFiles()
   renderResources()
   view.focus()
   // Pastille de synchro : checkRemoteFreshness la (ré)initialise dès son entrée
@@ -1225,7 +1250,8 @@ async function ghPush(force) {
     currentProject.remote.localSha = localContentSha(currentProject)   // base locale = poussée
     await Store.saveProject(currentProject)   // persister project.remote (folderSha, localSha)
     syncRemoteAhead = false
-    updateSyncBadge()   // à jour → pastille verte
+    updateSyncBadge()
+    renderGhRail()
     setStatus('Poussé sur GitHub ✓', true)
   } catch (e) {
     if (e.code === 'CONFLICT') {
@@ -1471,7 +1497,7 @@ async function loadExample(file) {
   currentFile = bundle.entry
   setEditorText(currentProject.files[bundle.entry] ?? '')
   setStructuralUI(false)         // pas de création/renommage/suppression sur un exemple
-  renderFiles()
+  renderGhRail(); renderFiles()
   renderResources()
   showExampleBanner(file)
   projectLabel.textContent = file
