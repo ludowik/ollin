@@ -2,7 +2,6 @@
 ## Nécessite l'autorisation de la caméra dans le navigateur
 ## Espace = démarrer / Echap = arrêter
 
-window.title("Caméra")
 graphics.canvas(640, 480)
 
 var opened = false
