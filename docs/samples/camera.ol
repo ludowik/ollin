@@ -2,11 +2,12 @@
 
 graphics.canvas(640, 480)
 
+global scale = 2
 global frame = nil
 global status = "En attente de l'autorisation..."
 
 func setup()
-    camera.open(320, 240)
+    camera.open(W / scale, H / scale)
 end
 
 func toGrayscale(img)
