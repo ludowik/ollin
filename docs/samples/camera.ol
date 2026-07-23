@@ -33,7 +33,6 @@ func update()
 end
 
 func draw()
-    graphics.clear(0.08)
     if frame <> nil then
         graphics.sprite(frame, 0, 0, W, H)
     end
