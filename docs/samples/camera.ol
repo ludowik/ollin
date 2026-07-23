@@ -10,14 +10,12 @@ func setup()
 end
 
 func toGrayscale(img)
-    var w = img["width"]
-    var h = img["height"]
     image.beginPixels(img)
-    for y = 0, h - 1 do
-        for x = 0, w - 1 do
+    for y = 0, img.height - 1 do
+        for x = 0, img.width - 1 do
             var c = image.getPixel(img, x, y)
-            var g = 0.299 * c["r"] + 0.587 * c["g"] + 0.114 * c["b"]
-            image.setPixel(img, x, y, g, g, g, c["a"])
+            var g = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b
+            image.setPixel(img, x, y, g, g, g, c.a)
         end
     end
     image.endPixels(img)
