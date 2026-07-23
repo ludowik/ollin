@@ -4,7 +4,6 @@ graphics.canvas(640, 480)
 
 global scale = 2
 global frame = nil
-global status = "En attente de l'autorisation..."
 
 func setup()
     camera.open(W / scale, H / scale)
@@ -24,7 +23,6 @@ end
 
 func update()
     if camera.isOpen() then
-        status = ""
         frame = camera.capture()
         if frame then
             toGrayscale(frame)
@@ -35,8 +33,5 @@ end
 func draw()
     if frame then
         graphics.sprite(frame, 0, 0, frame.width * scale, frame.height * scale)
-    end
-    if status <> "" then
-        graphics.text(status, 12, 12, 18)
     end
 end
