@@ -30,9 +30,7 @@ graphics.run(func()
     end
 
     if status <> "" then
-        graphics.fill(1, 1, 1, 0.85)
-        graphics.textSize(18)
-        graphics.text(status, 12, 12)
+        graphics.text(status, 12, 12, 18)
     end
 end,
 func()
