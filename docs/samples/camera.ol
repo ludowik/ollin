@@ -32,6 +32,6 @@ end
 
 func draw()
     if frame then
-        graphics.sprite(frame, 0, 0, frame.width * scale, frame.height * scale)
+        graphics.sprite(frame, 0, 0, W, H)
     end
 end
