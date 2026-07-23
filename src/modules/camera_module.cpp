@@ -10,6 +10,16 @@ static Value s_cam_handle;
 static int   s_cam_w = 0;
 static int   s_cam_h = 0;
 
+static void cam_reset_js() {
+    EM_ASM({
+        const cam = window.__ollinCam;
+        if (!cam) return;
+        if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
+        if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
+        cam.video = null; cam.stream = null; cam.state = 'idle';
+    });
+}
+
 static Value cam_open(CallCtx& ctx) {
     int w = ctx.argc >= 1 ? (int)numArg(ctx.args, 0, "camera.open") : 640;
     int h = ctx.argc >= 2 ? (int)numArg(ctx.args, 1, "camera.open") : 480;
@@ -19,13 +29,7 @@ static Value cam_open(CallCtx& ctx) {
         s_cam_h = h;
         s_cam_handle = image_alloc_tex(w, h, &s_cam_id);
     }
-    EM_ASM({
-        const cam = window.__ollinCam;
-        if (!cam) return;
-        if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
-        if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
-        cam.video = null; cam.stream = null; cam.state = 'idle';
-    });
+    cam_reset_js();
 
     EM_ASM({
         var w = $0;
@@ -94,15 +98,7 @@ static Value cam_capture(CallCtx&) {
 }
 
 static Value cam_close(CallCtx&) {
-    EM_ASM({
-        const cam = window.__ollinCam;
-        if (!cam) return;
-        if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
-        cam.stream = null;
-        if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
-        cam.video = null;
-        cam.state = 'idle';
-    });
+    cam_reset_js();
     return Value{};
 }
 
