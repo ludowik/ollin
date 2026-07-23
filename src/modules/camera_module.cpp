@@ -21,14 +21,15 @@ static Value cam_open(CallCtx& ctx) {
     }
 
     EM_ASM({
-        const w = $0, h = $1;
+        var w = $0;
+        var h = $1;
         if (!window.__ollinCam) window.__ollinCam = {};
         const cam = window.__ollinCam;
         if (cam.state === 'open' || cam.state === 'opening') return;
         cam.w = w; cam.h = h;
         cam.state = 'opening';
         const vid = document.createElement('video');
-        vid.setAttribute('playsinline', '');
+        vid.setAttribute('playsinline', 'playsinline');
         vid.muted = true;
         cam.video = vid;
         const cv = document.createElement('canvas');
@@ -48,7 +49,7 @@ static Value cam_open(CallCtx& ctx) {
     return Value{};
 }
 
-static Value cam_capture(CallCtx& ctx) {
+static Value cam_capture(CallCtx&) {
     if (!s_cam_id || !image_tex_valid(s_cam_id))
         return Value{};
 
@@ -73,7 +74,7 @@ static Value cam_capture(CallCtx& ctx) {
     return s_cam_handle;
 }
 
-static Value cam_close(CallCtx& ctx) {
+static Value cam_close(CallCtx&) {
     EM_ASM({
         const cam = window.__ollinCam;
         if (!cam) return;
@@ -85,7 +86,7 @@ static Value cam_close(CallCtx& ctx) {
     return Value{};
 }
 
-static Value cam_is_open(CallCtx& ctx) {
+static Value cam_is_open(CallCtx&) {
     int r = EM_ASM_INT({
         const cam = window.__ollinCam;
         return (cam && cam.state === 'open') ? 1 : 0;
