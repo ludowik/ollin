@@ -37,6 +37,8 @@ Value image_alloc_tex(int w, int h, int* id_out);
 void  image_push_pixels(int id, const uint8_t* rgba);
 // Returns true if the texture id is still alive (not cleared by image_reset).
 bool  image_tex_valid(int id);
+// Frees a streaming texture (GPU + CPU shadow) by id. No-op if invalid.
+void  image_free_tex(int id);
 
 // Teinte globale (graphics.tint / noTint) : appliquée par défaut à image.draw et
 // graphics.sprite. RGBA 0-255. `has`=false → pas de teinte (blanc).

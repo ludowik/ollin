@@ -33,6 +33,8 @@ static Value cam_open(CallCtx& ctx) {
     int h = ctx.argc >= 2 ? (int)numArg(ctx.args, 1, "camera.open") : 480;
 
     if (!s_cam_id || !image_tex_valid(s_cam_id) || s_cam_w != w || s_cam_h != h) {
+        if (s_cam_id)
+            image_free_tex(s_cam_id); // libère l'ancienne texture avant réalloc (sinon fuite GPU)
         s_cam_w = w;
         s_cam_h = h;
         s_cam_handle = image_alloc_tex(w, h, &s_cam_id);
@@ -55,10 +57,10 @@ static Value cam_open(CallCtx& ctx) {
         vid.style.left = '-9999px';
         document.body.appendChild(vid);
         cam.video = vid;
-        const cv = document.createElement('canvas');
-        cv.width = w; cv.height = h;
-        cam.canvas = cv;
-        cam.ctx2d = cv.getContext('2d');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            cam.state = 'error'; // contexte non sécurisé (HTTP hors localhost) → pas d'API caméra
+            return;
+        }
         navigator.mediaDevices.getUserMedia({ video: { width: w, height: h } })
             .then(function(stream) {
                 cam.stream = stream;
@@ -76,7 +78,12 @@ static Value cam_capture(CallCtx&) {
     if (!s_cam_id || !image_tex_valid(s_cam_id))
         return Value{};
 
-    std::vector<uint8_t> pixels((size_t)(s_cam_w * s_cam_h * 4));
+    // Buffer persistant réutilisé entre frames (chemin chaud, ~60 fps) : évite d'allouer
+    // ~1,2 Mo par capture. Redimensionné seulement si la résolution change.
+    static std::vector<uint8_t> pixels;
+    size_t need = (size_t)s_cam_w * (size_t)s_cam_h * 4;
+    if (pixels.size() != need)
+        pixels.resize(need);
     int ok = EM_ASM_INT({
         const cam = window.__ollinCam;
         if (!cam || cam.state !== 'open') return 0;

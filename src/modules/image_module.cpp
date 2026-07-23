@@ -34,6 +34,7 @@ void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char
 struct TexHandle {
     int id = 0;
     bool is_render = false;
+    bool is_streaming = false; // texture alimentée par image_push_pixels (caméra) → ombre CPU maintenue
     bool pixels_open = false;
     bool gpu_dirty = false;   // le GPU a été dessiné (beginDraw) → resync CPU au prochain accès pixel
     Texture2D tex = {};
@@ -170,10 +171,19 @@ static void pixelsOpen(TexHandle& h) {
         }
         if (!h.cpu.data)
             h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
-    } else {
-        // Texture streaming (ex. caméra) : l'ombre CPU est maintenue à jour par image_push_pixels.
+    } else if (h.is_streaming) {
+        // Caméra : l'ombre CPU est maintenue à jour par image_push_pixels.
         if (!h.cpu.data)
             h.cpu = GenImageColor(h.tex.width, h.tex.height, BLANK);
+    } else {
+        // Image chargée (image.load) : lire les vrais pixels depuis le GPU au lieu de
+        // générer du BLANK (sinon getPixel renvoie transparent et endPixels efface l'image).
+        if (!h.cpu.data) {
+            Image fresh = LoadImageFromTexture(h.tex);
+            if (!fresh.data)
+                throw std::runtime_error("image: pixel access failed (texture not readable)");
+            h.cpu = fresh;
+        }
     }
     h.pixels_open = true;
 }
@@ -509,6 +519,7 @@ Value image_alloc_tex(int w, int h, int* id_out) {
     TexHandle hnd;
     hnd.tex = tex;
     hnd.is_render = false;
+    hnd.is_streaming = true;
     hnd.cpu = GenImageColor(w, h, BLANK);
     int id = s_next_id++;
     hnd.id = id;
@@ -525,12 +536,26 @@ void image_push_pixels(int id, const uint8_t* rgba) {
         return;
     TexHandle& h = *it->second;
     if (h.cpu.data)
-        memcpy(h.cpu.data, rgba, (size_t)(h.tex.width * h.tex.height * 4));
+        memcpy(h.cpu.data, rgba, (size_t)h.tex.width * (size_t)h.tex.height * 4);
     UpdateTexture(h.tex, rgba);
 }
 
 bool image_tex_valid(int id) {
     return s_images.count(id) > 0;
+}
+
+void image_free_tex(int id) {
+    auto it = s_images.find(id);
+    if (it == s_images.end())
+        return;
+    TexHandle& h = *it->second;
+    if (h.cpu.data)
+        UnloadImage(h.cpu);
+    if (h.is_render)
+        UnloadRenderTexture(h.rtt);
+    else
+        UnloadTexture(h.tex);
+    s_images.erase(it);
 }
 
 // ── makeImageModule ───────────────────────────────────────────────────────────
