@@ -159,30 +159,33 @@ static Color toColor(const Value& v) {
 static void pixelsOpen(TexHandle& h) {
     if (h.pixels_open)
         return;
-    if (!h.is_render)
-        throw std::runtime_error("image: pixel access requires a render texture (use image.create())");
-    // Chemin normal : l'ombre CPU est persistante (allouée à la création) → AUCUN readback
-    // GPU (le glReadPixels en cours de frame casse le rendu WebGL). Readback uniquement si
-    // le GPU a été dessiné via beginDraw depuis le dernier accès pixel (cas mixte, rare).
-    if (h.gpu_dirty) {
-        Image fresh = LoadImageFromTexture(h.rtt.texture);
-        if (fresh.data) {
-            if (h.cpu.data)
-                UnloadImage(h.cpu);
-            h.cpu = fresh;
+    if (h.is_render) {
+        if (h.gpu_dirty) {
+            Image fresh = LoadImageFromTexture(h.rtt.texture);
+            if (fresh.data) {
+                if (h.cpu.data) UnloadImage(h.cpu);
+                h.cpu = fresh;
+            }
+            h.gpu_dirty = false;
         }
-        h.gpu_dirty = false;
+        if (!h.cpu.data)
+            h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
+    } else {
+        // Texture streaming (ex. caméra) : l'ombre CPU est maintenue à jour par image_push_pixels.
+        if (!h.cpu.data)
+            h.cpu = GenImageColor(h.tex.width, h.tex.height, BLANK);
     }
-    if (!h.cpu.data)
-        h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
     h.pixels_open = true;
 }
 
 static void pixelsClose(TexHandle& h) {
     if (!h.pixels_open)
         return;
-    UpdateTexture(h.rtt.texture, h.cpu.data);   // pousse l'ombre CPU vers la texture
-    h.pixels_open = false;                       // l'ombre CPU reste allouée (persistante)
+    if (h.is_render)
+        UpdateTexture(h.rtt.texture, h.cpu.data);
+    else
+        UpdateTexture(h.tex, h.cpu.data);
+    h.pixels_open = false;
 }
 
 static Texture2D loadFromMemory(const std::vector<uint8_t>& bytes, const std::string& ext) {
@@ -506,23 +509,24 @@ Value image_alloc_tex(int w, int h, int* id_out) {
     TexHandle hnd;
     hnd.tex = tex;
     hnd.is_render = false;
+    hnd.cpu = GenImageColor(w, h, BLANK);
     int id = s_next_id++;
     hnd.id = id;
     *id_out = id;
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
+    TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("id")),     Value((int64_t)id));
-    m.mapSet(Value(std::string("width")),  Value((int64_t)w));
-    m.mapSet(Value(std::string("height")), Value((int64_t)h));
-    return m;
+    return makeHandle(id, w, h, ptr);
 }
 
 void image_push_pixels(int id, const uint8_t* rgba) {
     auto it = s_images.find(id);
     if (it == s_images.end())
         return;
-    UpdateTexture(it->second->tex, rgba);
+    TexHandle& h = *it->second;
+    if (h.cpu.data)
+        memcpy(h.cpu.data, rgba, (size_t)(h.tex.width * h.tex.height * 4));
+    UpdateTexture(h.tex, rgba);
 }
 
 bool image_tex_valid(int id) {

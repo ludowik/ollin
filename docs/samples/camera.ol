@@ -1,31 +1,35 @@
-## Capture webcam en temps réel
-## Nécessite l'autorisation de la caméra dans le navigateur
-## Espace = démarrer / Echap = arrêter
+## Capture webcam en temps réel — niveau de gris
 
 graphics.canvas(640, 480)
 
-global opened = false
 global frame = nil
-global status = "Appuie sur Espace pour démarrer la caméra"
+global status = "En attente de l'autorisation..."
 
-func keyboard.keypressed(key)
-    if key == "space" and not opened then
-        camera.open(640, 480)
-        opened = true
-        status = "En attente de l'autorisation..."
+func setup()
+    camera.open(640, 480)
+end
+
+func toGrayscale(img)
+    var w = img["width"]
+    var h = img["height"]
+    image.beginPixels(img)
+    for y = 0, h - 1 do
+        for x = 0, w - 1 do
+            var c = image.getPixel(img, x, y)
+            var g = 0.299 * c["r"] + 0.587 * c["g"] + 0.114 * c["b"]
+            image.setPixel(img, x, y, g, g, g, c["a"])
+        end
     end
-    if key == "escape" and opened then
-        camera.close()
-        opened = false
-        frame = nil
-        status = "Caméra fermée — Espace pour redémarrer"
-    end
+    image.endPixels(img)
 end
 
 func update()
-    if opened and camera.isOpen() then
+    if camera.isOpen() then
         status = ""
-        frame = camera.capture(true)
+        frame = camera.capture()
+        if frame <> nil then
+            toGrayscale(frame)
+        end
     end
 end
 

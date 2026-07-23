@@ -54,11 +54,9 @@ static Value cam_open(CallCtx& ctx) {
     return Value{};
 }
 
-static Value cam_capture(CallCtx& ctx) {
+static Value cam_capture(CallCtx&) {
     if (!s_cam_id || !image_tex_valid(s_cam_id))
         return Value{};
-
-    bool grayscale = ctx.argc >= 1 && !ctx.args[0].isFalsy();
 
     std::vector<uint8_t> pixels((size_t)(s_cam_w * s_cam_h * 4));
     int ok = EM_ASM_INT({
@@ -73,15 +71,6 @@ static Value cam_capture(CallCtx& ctx) {
             return 1;
         } catch(e) { return 0; }
     }, pixels.data());
-
-    if (grayscale) {
-        uint8_t* p = pixels.data();
-        const uint8_t* end = p + (size_t)(s_cam_w * s_cam_h * 4);
-        for (; p < end; p += 4) {
-            uint8_t g = (uint8_t)(0.299f * p[0] + 0.587f * p[1] + 0.114f * p[2]);
-            p[0] = p[1] = p[2] = g;
-        }
-    }
 
     if (!ok)
         return Value{};
