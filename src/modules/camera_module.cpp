@@ -18,6 +18,15 @@ static Value cam_open(CallCtx& ctx) {
         s_cam_w = w;
         s_cam_h = h;
         s_cam_handle = image_alloc_tex(w, h, &s_cam_id);
+        // Forcer la réinitialisation JS si les dimensions changent (sinon cam.w/h restent
+        // à l'ancienne valeur et HEAPU8.set copie des pixels en mauvais stride).
+        EM_ASM({
+            const cam = window.__ollinCam;
+            if (!cam) return;
+            if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
+            if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
+            cam.video = null; cam.stream = null; cam.state = 'idle';
+        });
     }
 
     EM_ASM({
