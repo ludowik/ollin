@@ -18,21 +18,22 @@
 // VM persists across ollin_run() calls so graphics frame callbacks remain valid.
 static std::unique_ptr<VM> s_vm;
 
-static std::string ollin_run(const std::string& source) {
+static std::string ollin_run(const std::string& source, const std::string& filename) {
     // Release stale GL texture handles before GL context may be reset.
     image_reset();
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
     s_vm = std::make_unique<VM>();
 
+    const std::string fname = filename.empty() ? "<playground>" : filename;
     std::ostringstream out;
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
     try {
         auto imported = std::make_shared<std::unordered_set<std::string>>();
         auto source_files = std::make_shared<std::vector<std::string>>();
-        source_files->push_back("<playground>");
+        source_files->push_back(fname);
         s_vm->execute(Compiler().compile(
-            Parser(Lexer(source, "<playground>", 0).tokenize(), "", imported, nullptr, source_files).parse()));
+            Parser(Lexer(source, fname, 0).tokenize(), "", imported, nullptr, source_files).parse()));
         s_vm->runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
@@ -68,7 +69,7 @@ static void data_load_js(const std::string& projectBlob, const std::string& glob
 }
 
 EMSCRIPTEN_BINDINGS(ollin) {
-    emscripten::function("execute", &ollin_run);
+    emscripten::function("execute", &ollin_run);  // execute(source, filename)
     emscripten::function("preloadImage", &preload_image_js);
     emscripten::function("preloadModel", &preload_model_js);
     emscripten::function("preloadSource", &preload_source_js);

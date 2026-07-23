@@ -43,7 +43,8 @@ export async function init(ctx) {
     await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // modèles des imports aussi
     // Portée « projet » du module `data` : cohérente avec le playground (même clé).
     window.__ollinDataProject = exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_')
-    runProgram(mod, code, canvasEl, {
+    const entryFilename = project ? (project.entry || '') : (exampleFile || '')
+    runProgram(mod, code, entryFilename, canvasEl, {
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
       // Programme graphique : focus clavier au canvas (programmes interactifs).
       // preventScroll : sinon mobile défile pour amener le canvas dans le viewport.

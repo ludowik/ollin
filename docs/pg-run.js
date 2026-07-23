@@ -61,14 +61,15 @@ export function loadProjectIntoRuntime(m, project) {
 //   hooks.onError(msg)   erreur (top-level OU frame graphique), chaîne « error: … »
 //   hooks.onRunning()    le programme a ouvert un canvas (boucle graphique lancée)
 //   hooks.onOutput(text) sortie texte d'un programme non graphique
-export function runProgram(m, code, canvasEl, hooks) {
+// `filename` (optionnel) : nom du fichier source affiché dans les messages d'erreur.
+export function runProgram(m, code, filename, canvasEl, hooks) {
   // Erreur dans une frame (update/draw) : le runtime WASM (emscripten_frame) a
   // déjà arrêté la boucle et nous remonte le message ici.
   window.__ollinFrameError = (msg) => hooks.onError('error: ' + (msg || "erreur d'exécution"))
   loadDataInto(m)   // restaure les données persistées (module `data`) avant le run
   let out
   try {
-    out = m.execute(code)
+    out = m.execute(code, filename || '')
   } catch (e) {
     // Trap dur SYNCHRONE (relance in-place iOS) : rattrapé ici → surface l'overlay
     // de diagnostic AVEC la stack (nom de la fonction fautive), que le message

@@ -236,7 +236,7 @@ export async function init(ctx) {
         canvas.style.display = 'none'
         // Exécution partagée : gère try/catch, erreurs de frame graphique et
         // erreur haut-niveau survenant après ouverture du canvas.
-        Run.runProgram(ollin, text, canvas, {
+        Run.runProgram(ollin, text, '', canvas, {
           onRunning: () => {                       // programme graphique : canvas sous le bloc
             outDiv.style.display = 'none'
             canvas.style.maxWidth = '100%'

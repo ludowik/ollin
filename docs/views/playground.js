@@ -1764,7 +1764,8 @@ async function launch() {
   }
   // Portée « projet » du module `data` : id du projet, ou 'sample:<fichier>' pour un exemple.
   window.__ollinDataProject = isExample() ? ('sample:' + exampleFile) : (currentProject ? currentProject.id : '_')
-  Run.runProgram(ollin, code, canvasEl, {
+  const entryFilename = currentProject ? (currentProject.entry || '') : (exampleFile || '')
+  Run.runProgram(ollin, code, entryFilename, canvasEl, {
     onError:   (msg) => { setRunning(false); showOutput(msg) },
     onRunning: () => {
       outputPane.style.overflow = 'hidden'
