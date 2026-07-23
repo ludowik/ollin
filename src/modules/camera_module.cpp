@@ -74,12 +74,19 @@ static Value cam_capture(CallCtx&) {
         const vid = cam.video;
         if (!vid || vid.readyState < 2) return 0;
         try {
-            cam.ctx2d.drawImage(vid, 0, 0, cam.w, cam.h);
-            const img = cam.ctx2d.getImageData(0, 0, cam.w, cam.h);
+            const w = $1, h = $2;
+            if (!cam.canvas || cam.canvas.width !== w || cam.canvas.height !== h) {
+                cam.canvas = document.createElement('canvas');
+                cam.canvas.width = w;
+                cam.canvas.height = h;
+                cam.ctx2d = cam.canvas.getContext('2d');
+            }
+            cam.ctx2d.drawImage(vid, 0, 0, w, h);
+            const img = cam.ctx2d.getImageData(0, 0, w, h);
             HEAPU8.set(img.data, $0);
             return 1;
         } catch(e) { return 0; }
-    }, pixels.data());
+    }, pixels.data(), s_cam_w, s_cam_h);
 
     if (!ok)
         return Value{};
