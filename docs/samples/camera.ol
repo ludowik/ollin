@@ -25,7 +25,7 @@ end
 func update()
     if opened and camera.isOpen() then
         status = ""
-        frame = camera.capture()
+        frame = camera.capture(true)
     end
 end
 
