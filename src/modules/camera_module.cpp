@@ -20,6 +20,14 @@ static void cam_reset_js() {
     });
 }
 
+void camera_reset() {
+    cam_reset_js();
+    s_cam_id = 0;
+    s_cam_w = 0;
+    s_cam_h = 0;
+    s_cam_handle = Value{};
+}
+
 static Value cam_open(CallCtx& ctx) {
     int w = ctx.argc >= 1 ? (int)numArg(ctx.args, 0, "camera.open") : 640;
     int h = ctx.argc >= 2 ? (int)numArg(ctx.args, 1, "camera.open") : 480;
@@ -29,7 +37,6 @@ static Value cam_open(CallCtx& ctx) {
         s_cam_h = h;
         s_cam_handle = image_alloc_tex(w, h, &s_cam_id);
     }
-    cam_reset_js();
 
     EM_ASM({
         var w = $0;
@@ -76,7 +83,7 @@ static Value cam_capture(CallCtx&) {
         const vid = cam.video;
         if (!vid || vid.readyState < 2) return 0;
         try {
-            const w = $1, h = $2;
+            const w = $1; const h = $2;
             if (!cam.canvas || cam.canvas.width !== w || cam.canvas.height !== h) {
                 cam.canvas = document.createElement('canvas');
                 cam.canvas.width = w;

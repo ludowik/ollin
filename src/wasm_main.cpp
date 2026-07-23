@@ -1,5 +1,6 @@
 #include "compiler.h"
 #include "lexer.h"
+#include "modules/camera_module.h"
 #include "modules/data_module.h"
 #include "modules/graphics_internal.h"
 #include "modules/image_module.h"
@@ -21,6 +22,7 @@ static std::unique_ptr<VM> s_vm;
 static std::string ollin_run(const std::string& source, const std::string& filename) {
     // Release stale GL texture handles before GL context may be reset.
     image_reset();
+    camera_reset();
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
     s_vm = std::make_unique<VM>();
