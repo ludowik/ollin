@@ -34,7 +34,7 @@ end
 
 func draw()
     if frame <> nil then
-        graphics.sprite(frame, 0, 0, W, H)
+        graphics.sprite(frame, 0, 0, frame.width * scale, frame.height * scale)
     end
     if status <> "" then
         graphics.text(status, 12, 12, 18)
