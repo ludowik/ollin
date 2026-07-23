@@ -30,20 +30,25 @@ static Value cam_open(CallCtx& ctx) {
         cam.state = 'opening';
         const vid = document.createElement('video');
         vid.setAttribute('playsinline', 'playsinline');
+        vid.setAttribute('autoplay', 'autoplay');
         vid.muted = true;
+        vid.style.position = 'fixed';
+        vid.style.top = '-9999px';
+        vid.style.left = '-9999px';
+        document.body.appendChild(vid);
         cam.video = vid;
         const cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
         cam.canvas = cv;
         cam.ctx2d = cv.getContext('2d');
         navigator.mediaDevices.getUserMedia({ video: { width: w, height: h } })
-            .then(stream => {
+            .then(function(stream) {
                 cam.stream = stream;
                 vid.srcObject = stream;
                 return vid.play();
             })
-            .then(() => { cam.state = 'open'; })
-            .catch(() => { cam.state = 'error'; });
+            .then(function() { cam.state = 'open'; })
+            .catch(function() { cam.state = 'error'; });
     }, w, h);
 
     return Value{};
@@ -80,6 +85,7 @@ static Value cam_close(CallCtx&) {
         if (!cam) return;
         if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
         cam.stream = null;
+        if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
         cam.video = null;
         cam.state = 'idle';
     });
