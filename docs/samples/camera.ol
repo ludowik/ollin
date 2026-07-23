@@ -6,7 +6,7 @@ global frame = nil
 global status = "En attente de l'autorisation..."
 
 func setup()
-    camera.open(640, 480)
+    camera.open(320, 240)
 end
 
 func toGrayscale(img)
