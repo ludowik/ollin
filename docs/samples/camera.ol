@@ -26,14 +26,14 @@ func update()
     if camera.isOpen() then
         status = ""
         frame = camera.capture()
-        if frame <> nil then
+        if frame then
             toGrayscale(frame)
         end
     end
 end
 
 func draw()
-    if frame <> nil then
+    if frame then
         graphics.sprite(frame, 0, 0, frame.width * scale, frame.height * scale)
     end
     if status <> "" then
