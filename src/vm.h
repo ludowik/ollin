@@ -47,6 +47,8 @@ class VM {
     struct Frame {
         uint32_t return_ip = 0;
         int reg_base = 0;
+        int result_base = 0;  // où RETURN/RETURN_V écrit les résultats (= reg_base sauf CALL_VARARGS,
+                              // qui exécute dans une zone fraîche mais renvoie au registre statique appelant)
         int varargs_base = 0; // = reg_base + fp.reg_count (where varargs live in regs)
         int n_varargs = 0;    // count of extra variadic args (0 if none)
         bool is_ctor = false; // true = frame is a constructor; RETURN overrides R[0] with instance
@@ -102,7 +104,7 @@ class VM {
 
     // Pousse un frame d'appel, remplit les défauts et varargs, retourne fp.addr.
     uint32_t pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                           uint32_t return_ip, bool is_ctor = false, int return_dest = -1);
+                           uint32_t return_ip, bool is_ctor = false, int return_dest = -1, int result_base = -1);
 
     [[gnu::always_inline]] inline double asDouble(const Value& v) {
         if (v.isInteger())

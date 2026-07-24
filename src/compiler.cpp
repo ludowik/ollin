@@ -401,6 +401,13 @@ static bool isCallNode(const Expr* e) {
            dynamic_cast<const MethodCallExpr*>(e);
 }
 
+// Expression pouvant produire PLUSIEURS valeurs si elle est en dernière position d'une
+// liste (arguments d'appel, éléments de tableau, retour, destructuration) : `...` ou un
+// appel. Ailleurs (position non terminale) elle est ajustée à une seule valeur.
+static bool isMultiValueExpr(const Expr* e) {
+    return dynamic_cast<const VarArgExpr*>(e) || isCallNode(e);
+}
+
 void Compiler::visit(const VarDeclStmt& s) {
     noteLine(s.line, s.file_idx);
 
@@ -429,10 +436,17 @@ void Compiler::visit(const VarDeclStmt& s) {
     // retour (RETURN copie R[A..A+k-1] → base..base+k-1). On lit ensuite base+i.
     // (Généralise l'ancien chemin qui ne gérait que CALL_FUNC nommé → corrige le
     // crash sur closure et la perte de valeurs pour méthodes/appels dynamiques.)
-    if (s.names.size() > 1 && s.values.size() == 1 && isCallNode(s.values[0].get())) {
+    if (s.names.size() > 1 && s.values.size() == 1 && isMultiValueExpr(s.values[0].get())) {
         int base = reg_top_;
-        s.values[0]->accept(*this); // laisse k valeurs de retour en base..base+k-1
         int n = (int)s.names.size();
+        if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
+            // var a, b = ...  → n varargs (nil-paddées) à base ; last_results_ = n
+            chunk.emit(makeABC((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n, 0));
+        } else {
+            s.values[0]->accept(*this); // appel : k valeurs de retour ; last_results_ = k
+            if (last_reg_ != base) // appel lui-même spread → recompose à base
+                chunk.emit(makeABC((uint8_t)Op::MOVE_RESULTS, (uint8_t)base, (uint8_t)last_reg_, 0));
+        }
         if (base + n > reg_count_)
             reg_count_ = base + n; // ces registres sont vivants (lus ci-dessous)
         // Met à nil les cibles au-delà de ce que l'appel a renvoyé (k < n) : sinon
@@ -1025,6 +1039,29 @@ void Compiler::visit(const ReturnStmt& s) {
     noteLine(s.line, s.file_idx);
     if (!inFunction())
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": return outside function");
+    // return <explicites>, <appel> : le dernier retour, s'il est un appel, s'étend à
+    // TOUTES ses valeurs (sémantique Lua). (`return ...` reste géré par spread_varargs.)
+    if (!s.spread_varargs && !s.values.empty() && isCallNode(s.values.back().get())) {
+        int base = reg_top_;
+        int n_expl = (int)s.values.size() - 1;
+        for (int i = 0; i < n_expl; ++i) {
+            int target = base + i;
+            reg_top_ = target;
+            s.values[i]->accept(*this);
+            if (last_reg_ != target)
+                chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
+            reg_top_ = target + 1;
+            if (reg_top_ > reg_count_)
+                reg_count_ = reg_top_;
+        }
+        int want = base + n_expl;
+        reg_top_ = want;
+        s.values.back()->accept(*this); // appel terminal : k valeurs de retour ; last_results_ = k
+        if (last_reg_ != want)
+            chunk.emit(makeABC((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
+        chunk.emit(makeABC((uint8_t)Op::RETURN_SPREAD, (uint8_t)base, (uint8_t)n_expl, 0));
+        return;
+    }
     if (s.spread_varargs) {
         int base = reg_top_;
         compileConsecutive(base, s.values);
@@ -1234,7 +1271,67 @@ void Compiler::visit(const UnaryExpr& e) {
     chunk.emit(makeABC((uint8_t)unaryOpcode(e.op), (uint8_t)last_reg_, (uint8_t)rIn, 0));
 }
 
+void Compiler::emitCalleeValue(const std::string& name, int reg) {
+    auto rit = local_regs_.find(name);
+    if (rit != local_regs_.end()) {
+        if (rit->second != reg)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)reg, (uint8_t)rit->second, 0));
+        return;
+    }
+    int uv = resolveUpvalue(name);
+    if (uv >= 0) {
+        chunk.emit(makeABC((uint8_t)Op::GET_UPVAL, (uint8_t)reg, (uint8_t)uv, 0));
+        return;
+    }
+    // builtins et fonctions top-level (closures comprises) sont des globaux (STORE_GLOBAL)
+    chunk.emit(makeABx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)reg, chunk.addIdentifier(name)));
+}
+
+void Compiler::emitSpreadCall(const std::vector<std::unique_ptr<Expr>>& args,
+                              const std::function<void(int)>& emitCallee) {
+    int n_fixed = (int)args.size() - 1;
+    const Expr* last = args.back().get();
+    bool is_vararg = dynamic_cast<const VarArgExpr*>(last) != nullptr;
+
+    int func_slot = reg_top_++; // callee SOUS le bloc d'arguments (jamais écrasé par l'expansion)
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
+    int call_base = reg_top_;
+    for (int i = 0; i < n_fixed; ++i) {
+        int target = call_base + i;
+        reg_top_ = target;
+        args[i]->accept(*this);
+        if (last_reg_ != target)
+            chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
+        reg_top_ = target + 1;
+        if (reg_top_ > reg_count_)
+            reg_count_ = reg_top_;
+    }
+    emitCallee(func_slot);
+    if (is_vararg) {
+        chunk.emit(makeABC((uint8_t)Op::CALL_VARARGS, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
+    } else {
+        // dernier argument = appel : ses k valeurs de retour doivent être contiguës aux
+        // fixes (à call_base+n_fixed) ; last_results_ = k au runtime → CALL_VA (argc = n_fixed + k).
+        int want = call_base + n_fixed;
+        reg_top_ = want;
+        args.back()->accept(*this);
+        if (last_reg_ != want) // appel imbriqué lui-même spread → recompose à `want`
+            chunk.emit(makeABC((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
+        chunk.emit(makeABC((uint8_t)Op::CALL_VA, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
+    }
+    last_reg_ = call_base;
+    reg_top_ = call_base + 1;
+    if (reg_top_ > reg_count_)
+        reg_count_ = reg_top_;
+}
+
 void Compiler::visit(const CallExpr& e) {
+    // Dernier argument multi-valeurs (… ou appel) → expansion (sauf appel optionnel).
+    if (!e.optional && !e.args.empty() && isMultiValueExpr(e.args.back().get())) {
+        emitSpreadCall(e.args, [&](int reg) { emitCalleeValue(e.callee, reg); });
+        return;
+    }
     if (e.optional) {
         // appel optionnel nommé : callee résolu AVANT les args, garde, puis args
         int call_base = reg_top_;
@@ -1326,6 +1423,11 @@ void Compiler::visit(const CallExpr& e) {
 }
 
 void Compiler::visit(const ExprCallExpr& e) {
+    // Dernier argument multi-valeurs (… ou appel) → expansion (sauf appel optionnel).
+    if (!e.optional && !e.args.empty() && isMultiValueExpr(e.args.back().get())) {
+        emitSpreadCall(e.args, [&](int reg) { compileInto(*e.callee, reg); });
+        return;
+    }
     int call_base = reg_top_;
     int argc = (int)e.args.size();
 
@@ -1373,8 +1475,11 @@ void Compiler::visit(const ExprCallExpr& e) {
 void Compiler::visit(const VarArgExpr&) {
     if (!inFunction())
         throw std::runtime_error(sloc().str(chunk.source_files) + ": ... outside a variadic function");
+    // Valeur SIMPLE par défaut (1ʳᵉ vararg, ou nil si aucune) : count=1 → padding nil.
+    // Les consommateurs multi-valeurs (appel/tableau/retour/destructuration terminale)
+    // émettent eux-mêmes LOAD_VARARGS count=0 pour l'expansion complète.
     int base = reg_top_;
-    chunk.emit(makeABC((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 0, 0));
+    chunk.emit(makeABC((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 1, 0));
     last_reg_ = base;
 }
 
@@ -1417,12 +1522,27 @@ void Compiler::visit(const IndexExpr& e) {
 void Compiler::visit(const ArrayExpr& e) {
     int dest = allocReg();
     chunk.emit(makeABC((uint8_t)Op::NEW_ARRAY, (uint8_t)dest, 0, 0));
-    for (auto& elem : e.elements) {
-        int saved = reg_top_;
-        int val_r = allocReg();
-        compileInto(*elem, val_r);
-        chunk.emit(makeABC((uint8_t)Op::ARRAY_PUSH, (uint8_t)dest, (uint8_t)val_r, 0));
-        reg_top_ = saved;
+    int n = (int)e.elements.size();
+    for (int i = 0; i < n; ++i) {
+        const Expr* elem = e.elements[i].get();
+        bool last_pos = (i == n - 1);
+        // En DERNIÈRE position, un élément multi-valeurs s'étend (sémantique Lua) :
+        // `...` → toutes les varargs ; un appel → toutes ses valeurs de retour.
+        if (last_pos && dynamic_cast<const VarArgExpr*>(elem)) {
+            chunk.emit(makeABC((uint8_t)Op::ARRAY_PUSH_VARARGS, (uint8_t)dest, 0, 0));
+        } else if (last_pos && isCallNode(elem)) {
+            int saved = reg_top_;
+            int spread_base = reg_top_;
+            e.elements[i]->accept(*this); // k valeurs à spread_base.., last_results_ = k
+            chunk.emit(makeABC((uint8_t)Op::ARRAY_PUSH_SPREAD, (uint8_t)dest, (uint8_t)spread_base, 0));
+            reg_top_ = saved;
+        } else {
+            int saved = reg_top_;
+            int val_r = allocReg();
+            compileInto(*e.elements[i], val_r);
+            chunk.emit(makeABC((uint8_t)Op::ARRAY_PUSH, (uint8_t)dest, (uint8_t)val_r, 0));
+            reg_top_ = saved;
+        }
     }
     last_reg_ = dest;
 }

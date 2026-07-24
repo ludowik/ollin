@@ -93,5 +93,15 @@ enum class Op : uint8_t {
               // (vers FOR_LOOP)
     FOR_LOOP, // ABx: i+=pas ; si dans la limite (incl) → R[A]=i, ip=Bx (corps) ; sinon continue (sortie)
     SPREAD_RESULTS, // AB: destructuration multi-retour — met R[A+last_results..A+B-1] à nil
+    CALL_VA,        // ABC: A=arg_base, B=func_val_reg, C=n_fixe ; argc = C + last_results_ (dernier
+                    // argument = appel multi-valeurs, déjà matérialisé après les fixes)
+    CALL_VARARGS,   // ABC: A=arg_base(fixes), B=func_val_reg, C=n_fixe ; dernier argument = `...`.
+                    // Rassemble fixes + varargs du frame courant dans une zone FRAÎCHE (au-dessus
+                    // des varargs de l'appelant → aucun écrasement), appelle, et renvoie les
+                    // résultats à A (result_base du frame appelé).
+    ARRAY_PUSH_SPREAD,  // AB: pousse last_results_ valeurs R[B..] dans le tableau R[A] (spread appel)
+    ARRAY_PUSH_VARARGS, // A: pousse TOUTES les varargs du frame courant dans le tableau R[A] ([..., ...])
+    MOVE_RESULTS,       // AB: copie last_results_ valeurs R[B..] → R[A..] (recompose un spread imbriqué)
+    RETURN_SPREAD,      // AB: return B explicites + last_results_ (dernier = appel), contigus à R[A..]
     HALT,
 };

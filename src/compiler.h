@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.h"
 #include "chunk.h"
+#include <functional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -104,6 +105,15 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // sont différées dans pending_var_reg_ (portée lexicale). Les noms déjà liés
     // (params, self, catch var) sont laissés tels quels.
     void bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs);
+
+    // Charge la valeur appelable nommée `name` dans le registre `reg` (locale, upvalue,
+    // fonction top-level via LOAD_FUNC, ou global via LOAD_GLOBAL).
+    void emitCalleeValue(const std::string& name, int reg);
+    // Compile un appel dont le DERNIER argument est multi-valeurs (… ou appel) : callee
+    // sous le bloc d'arguments, args fixes, puis expansion — émet CALL_VARARGS (…) ou
+    // CALL_VA (appel). emitCallee(reg) place l'appelable. Résultat via last_reg_ = call_base.
+    void emitSpreadCall(const std::vector<std::unique_ptr<Expr>>& args,
+                        const std::function<void(int)>& emitCallee);
 
     // StmtVisitor
     void visit(const CommentStmt&) override {

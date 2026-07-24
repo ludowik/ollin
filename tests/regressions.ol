@@ -389,4 +389,56 @@ do
 end
 assert(lex_b == 3)          ## hors du bloc → global de nouveau
 
+## ── Compilateur : expansion de `...` et spread d'appel terminal ─────────────
+## `...` et un appel en DERNIÈRE position s'étendent à TOUTES leurs valeurs (Lua).
+## Auparavant `...` ne donnait qu'une valeur (ou du garbage si vide) hors `return`.
+func va_sum(...)
+    var s = 0
+    for v in [...] do s += v end   ## [...] = toutes les varargs
+    return s
+end
+assert(va_sum() == 0)
+assert(va_sum(1, 2, 3, 4) == 10)
+
+## forwarding : f(head, ...) transmet toutes les varargs (argc dynamique)
+func va_fwd(head, ...) return head + va_sum(...) end
+assert(va_fwd(100, 1, 2, 3) == 106)
+
+## multi-usage des varargs dans le même corps (pas de corruption après spread)
+func va_twice(...)
+    var a = va_sum(...)
+    var b = va_sum(...)
+    return a + b
+end
+assert(va_twice(1, 2, 3) == 12)
+
+## ... en valeur simple : 1ʳᵉ vararg, ou nil si aucune (plus de garbage)
+func va_first(...) return ... end
+var vf = va_first(9, 8)
+assert(vf == 9)
+
+## multi-affectation depuis ... : var a, b = ...
+func va_take2(...)
+    var a, b = ...
+    return a, b
+end
+var vt1, vt2 = va_take2(11, 22, 33)
+assert(vt1 == 11 and vt2 == 22)
+var vu1, vu2 = va_take2(5)
+assert(vu1 == 5 and vu2 == nil)
+
+## spread d'appel terminal : f(a, g()), return g(), [x, g()]
+func va_pair() return 1, 2 end
+func va_add3(a, b, c) return a + b + c end
+assert(va_add3(10, va_pair()) == 13)        ## g() étendu en dernier argument
+func va_ret() return va_pair() end
+var vr1, vr2 = va_ret()
+assert(vr1 == 1 and vr2 == 2)               ## return d'un appel terminal étendu
+var va_a = [0, va_pair()]
+assert(len(va_a) == 3 and va_a[2] == 1 and va_a[3] == 2)  ## [x, g()] étendu
+
+## un appel en position NON finale est ajusté à 1 valeur (Lua)
+func va_one(x) return x end
+assert(va_one(va_pair()) == 1)
+
 print("regressions ok")

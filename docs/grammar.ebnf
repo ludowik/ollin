@@ -89,6 +89,15 @@ funcDecl       = "func" IDENT [ "." IDENT ] "(" [ params ] ")" NL { stmt } "end"
                   de map/module (ex. func keyboard.keypressed(key) ... end) *)
 params         = param { "," param } [ "," "..." ] | "..." ;
 param          = IDENT [ "=" literal ] ;
+                 (* "..." dans les paramètres = fonction variadique. Dans le CORPS, `...`
+                    désigne les arguments variadiques. Expansion multi-valeurs (modèle Lua) :
+                    en DERNIÈRE position d'une liste — arguments d'appel `f(a, ...)`, éléments
+                    de tableau `[x, ...]`, `return a, ...`, destructuration `var a, b = ...` —
+                    `...` s'étend à TOUTES les varargs. Un APPEL en dernière position s'étend de
+                    même à toutes ses valeurs de retour (`f(g())`, `return g()`, `[x, g()]`).
+                    Ailleurs (position non finale, ou `var x = ...`), l'expression est ajustée à
+                    UNE valeur : `...` → 1ʳᵉ vararg ou nil ; un appel → sa 1ʳᵉ valeur.
+                    Limite connue : `objet.methode(...)` n'étend pas encore (ajusté à 1 valeur). *)
 returnStmt     = "return" [ retvals ] NL ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;

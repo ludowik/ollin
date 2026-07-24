@@ -576,7 +576,7 @@ Value VM::callValue(const Value& fn, const Value& a, const Value& b, const Value
 //   4. construit et empile le Frame
 //   5. retourne fp.addr (le caller fait ip = pushCallFrame(...))
 uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                           uint32_t return_ip, bool is_ctor, int return_dest) {
+                           uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
     growRegs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
     if (argc < fp.n_fixed) {
@@ -595,6 +595,7 @@ uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<s
     Frame fr;
     fr.return_ip = return_ip;
     fr.reg_base = new_base;
+    fr.result_base = (result_base >= 0) ? result_base : new_base;
     fr.varargs_base = va_base;
     fr.n_varargs = n_varargs;
     fr.is_ctor = is_ctor;
@@ -676,6 +677,12 @@ void VM::runGoto(size_t stop_depth) {
         &&op_FOR_PREP,
         &&op_FOR_LOOP,
         &&op_SPREAD_RESULTS,
+        &&op_CALL_VA,
+        &&op_CALL_VARARGS,
+        &&op_ARRAY_PUSH_SPREAD,
+        &&op_ARRAY_PUSH_VARARGS,
+        &&op_MOVE_RESULTS,
+        &&op_RETURN_SPREAD,
         &&op_HALT,
     };
 
@@ -1048,16 +1055,17 @@ dispatch_loop:
             if (is_ctor_)
                 ctor_val = regs[base + 0]; // save self before potential overwrite
             int ret_dest = call_stack.back().return_dest;
+            int wb = call_stack.back().result_base;
             int n = B;
-            if (n > 0 && A != 0)
+            if (n > 0 && (wb != base || A != 0))
                 for (int i = 0; i < n; ++i)
-                    regs[base + i] = std::move(regs[base + A + i]);
+                    regs[wb + i] = std::move(regs[base + A + i]);
             uint32_t rip = call_stack.back().return_ip;
             call_stack.pop_back();
             if (is_ctor_)
-                regs[base + 0] = std::move(ctor_val);
+                regs[wb + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[base + 0]) ? 1 : 0)) : regs[base + 0];
+                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[wb + 0]) ? 1 : 0)) : regs[wb + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : n; // pour SPREAD_RESULTS (multi-retour)
         }
@@ -1071,15 +1079,15 @@ dispatch_loop:
         {
             const Frame& fr = call_stack.back();
             int n_va = fr.n_varargs;
-            if (n_va > 0) {
-                int count = B;
-                int n = (count == 0) ? n_va : std::min(count, n_va);
-                size_t needed = (size_t)(base + A + n);
-                if (regs.size() < needed)
-                    regs.resize(needed);
-                for (int i = 0; i < n; ++i)
-                    regs[base + A + i] = regs[fr.varargs_base + i];
-            }
+            int count = B;                       // 0 = tous ; sinon nombre fixe (padding nil)
+            int n = (count == 0) ? n_va : count;
+            size_t needed = (size_t)(base + A + n);
+            if ((int)regs.size() < (int)needed)
+                regs.resize(needed);
+            int va_src = fr.varargs_base;
+            for (int i = 0; i < n; ++i)
+                regs[base + A + i] = (i < n_va) ? regs[va_src + i] : Value{};
+            last_results_ = n; // compte publié (spread [..., ...] / CALL_VA)
         }
         NEXT();
     }
@@ -1103,7 +1111,7 @@ dispatch_loop:
             for (int i = 0; i < n_va; ++i)
                 rvs[n_expl + i] = std::move(regs[va_src + i]);
             uint32_t rip = call_stack.back().return_ip;
-            int rbase = call_stack.back().reg_base;
+            int rbase = call_stack.back().result_base;
             call_stack.pop_back();
             if ((int)regs.size() < rbase + total)
                 regs.resize(rbase + total);
@@ -1422,6 +1430,141 @@ dispatch_loop:
             ip = pushCallFrame(base + A, fi, C, std::move(fuv), ip);
         }
     call_dyn_done:
+        base = call_stack.back().reg_base;
+        NEXT();
+    }
+
+    op_CALL_VA: {
+        // Comme CALL_DYN mais argc dynamique : C args fixes + last_results_ valeurs
+        // du dernier argument étendu (... ou appel multi-valeurs), déjà matérialisées
+        // à la suite des fixes. Le callee (B) est SOUS le bloc d'arguments (jamais
+        // écrasé par le nombre variable de valeurs).
+        int argc_va = C + last_results_;
+        if (regs[base + B].isBuiltin()) {
+            invokeBuiltinRegs(regs[base + B].asBuiltin(), base + A, argc_va);
+            NEXT();
+        }
+        if (regs[base + B].isClass()) {
+            bool done;
+            uint32_t addr = instantiateClass(base + A, 0, argc_va, regs[base + B], done);
+            if (!done)
+                ip = addr;
+            goto call_va_done;
+        }
+        {
+            std::unique_ptr<std::vector<Upvalue*>> fuv;
+            uint8_t fi = resolveFuncVal(regs[base + B], fuv);
+            ip = pushCallFrame(base + A, fi, argc_va, std::move(fuv), ip);
+        }
+    call_va_done:
+        base = call_stack.back().reg_base;
+        NEXT();
+    }
+
+    op_CALL_VARARGS: {
+        // A=fixed_base, B=func_reg, C=n_fixe ; dernier argument = `...` (varargs du frame
+        // courant). Rassemble fixes + varargs dans une zone FRAÎCHE au-dessus des varargs
+        // de l'appelant (jamais écrasés → un `...` ultérieur reste correct), appelle, et
+        // renvoie les résultats au registre statique fixed_base (result_base du frame appelé).
+        {
+            Frame& cur = call_stack.back();
+            int n_va = cur.n_varargs;
+            int va_src = cur.varargs_base;
+            int n_fixed = C;
+            int total = n_fixed + n_va;
+            int fixed_base = base + A;
+            Value fn = regs[base + B];
+            int fresh = (int)regs.size();
+            if (fresh < va_src + n_va)
+                fresh = va_src + n_va;
+            growRegs((size_t)(fresh + (total > 0 ? total : 1)));
+            for (int i = 0; i < n_fixed; ++i)
+                regs[fresh + i] = regs[fixed_base + i];
+            for (int i = 0; i < n_va; ++i)
+                regs[fresh + n_fixed + i] = regs[va_src + i];
+            if (fn.isBuiltin()) {
+                int k = invokeBuiltin(fn.asBuiltin(), &regs[fresh], total, (int)regs.size() - fresh);
+                for (int i = 0; i < k; ++i)
+                    regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base → recopie descendante sûre
+            } else if (fn.isClass()) {
+                for (int i = 0; i < total; ++i) // repli rare : instancie au registre statique
+                    regs[fixed_base + i] = regs[fresh + i];
+                bool done;
+                uint32_t addr = instantiateClass(fixed_base, 0, total, fn, done);
+                if (!done)
+                    ip = addr;
+            } else {
+                std::unique_ptr<std::vector<Upvalue*>> fuv;
+                uint8_t fi = resolveFuncVal(fn, fuv);
+                ip = pushCallFrame(fresh, fi, total, std::move(fuv), ip, false, -1, fixed_base);
+            }
+        }
+        base = call_stack.back().reg_base;
+        NEXT();
+    }
+
+    op_ARRAY_PUSH_SPREAD: {
+        {
+            int n = last_results_;
+            for (int i = 0; i < n; ++i)
+                regs[base + A].arrayPush(regs[base + B + i]);
+        }
+        NEXT();
+    }
+
+    op_ARRAY_PUSH_VARARGS: {
+        {
+            Frame& cur = call_stack.back();
+            int n_va = cur.n_varargs;
+            int va_src = cur.varargs_base;
+            for (int i = 0; i < n_va; ++i)
+                regs[base + A].arrayPush(regs[va_src + i]);
+        }
+        NEXT();
+    }
+
+    op_MOVE_RESULTS: {
+        {
+            int n = last_results_;
+            if (A != B) // A < B (recopie descendante) → boucle avant sûre
+                for (int i = 0; i < n; ++i)
+                    regs[base + A + i] = std::move(regs[base + B + i]);
+        }
+        NEXT();
+    }
+
+    op_RETURN_SPREAD: {
+        // return <explicites>, <appel> : B explicites + last_results_ valeurs de l'appel,
+        // toutes contiguës à base+A. Comme RETURN_V mais source contiguë (pas de varargs).
+        {
+            closeUpvals();
+            bool is_ctor_ = call_stack.back().is_ctor;
+            bool neg_ = call_stack.back().negate_result;
+            Value ctor_val;
+            if (is_ctor_)
+                ctor_val = regs[base + 0];
+            int ret_dest = call_stack.back().return_dest;
+            int total = B + last_results_;
+            int src = base + A;
+            std::vector<Value> rvs(total);
+            for (int i = 0; i < total; ++i)
+                rvs[i] = std::move(regs[src + i]);
+            uint32_t rip = call_stack.back().return_ip;
+            int rbase = call_stack.back().result_base;
+            call_stack.pop_back();
+            if ((int)regs.size() < rbase + total)
+                regs.resize(rbase + total);
+            for (int i = 0; i < total; ++i)
+                regs[rbase + i] = std::move(rvs[i]);
+            if (is_ctor_)
+                regs[rbase + 0] = std::move(ctor_val);
+            if (ret_dest >= 0)
+                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
+            ip = rip;
+            last_results_ = is_ctor_ ? 1 : total;
+        }
+        if (call_stack.size() <= stop_depth)
+            return;
         base = call_stack.back().reg_base;
         NEXT();
     }
