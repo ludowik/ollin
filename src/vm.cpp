@@ -90,6 +90,17 @@ void VM::growRegs(size_t needed) {
     regs.resize(needed);
 }
 
+int VM::invokeBuiltin(Value::BuiltinFn fn, Value* results, int argc, int cap) {
+    CallCtx ctx{this, results, argc, cap};
+    last_results_ = fn(ctx);
+    return last_results_;
+}
+
+int VM::invokeBuiltinRegs(Value::BuiltinFn fn, int result_base, int argc) {
+    // cap = reg_count du frame courant - (result_base - reg_base) = varargs_base - result_base.
+    return invokeBuiltin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base);
+}
+
 // ── invokeStr : mini-loop to call __str without recursion ─────────────────────
 std::string VM::invokeStr(Value obj) { // by value: regs.resize() ne invalide pas obj
     Value cls = obj.mapGet(MK().class_);
@@ -114,9 +125,8 @@ std::string VM::invokeStr(Value obj) { // by value: regs.resize() ne invalide pa
         break;
     }
     case Value::T_BUILTIN: {
-        Value self = obj;
-        CallCtx ctx{this, &self, 1, 1}; // 1 slot dispo (self) ; le builtin y écrit son résultat
-        int n = str_fn.asBuiltin()(ctx);
+        Value self = obj; // 1 slot dispo (self) ; le builtin y écrit son résultat, relu ensuite
+        int n = invokeBuiltin(str_fn.asBuiltin(), &self, 1, 1);
         return (n >= 1 && self.isString()) ? self.asString() : "{object}";
     }
     default: {
@@ -342,7 +352,7 @@ uint32_t VM::instantiateClass(int base_reg, int arg_off, int argc, Value cls, bo
         bargs[0] = inst;
         for (int i = 0; i < argc; ++i)
             bargs[1 + i] = regs[base_reg + arg_off + i];
-        { CallCtx ctx{this, bargs.data(), argc + 1, argc + 1}; init_fn.asBuiltin()(ctx); }
+        invokeBuiltin(init_fn.asBuiltin(), bargs.data(), argc + 1, argc + 1); // retour ignoré (l'instance prime)
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
@@ -454,10 +464,8 @@ void VM::runEntryHooks() {
         Value gfx = getGlobal("graphics");
         if (gfx.isMap()) {
             Value run_fn = gfx.mapGet(Value(std::string("run")));
-            if (run_fn.isBuiltin()) {
-                CallCtx ctx{this, &draw, 1, 1};
-                run_fn.asBuiltin()(ctx);
-            }
+            if (run_fn.isBuiltin())
+                invokeBuiltin(run_fn.asBuiltin(), &draw, 1, 1);
         }
     }
 }
@@ -469,8 +477,7 @@ Value VM::callValue(const Value& fn, const Value* args, int argc) {
         std::vector<Value> buf(std::max(argc, 1));
         for (int i = 0; i < argc; ++i)
             buf[i] = args[i];
-        CallCtx ctx{this, buf.data(), argc, (int)buf.size()};
-        int n = fn.asBuiltin()(ctx);
+        int n = invokeBuiltin(fn.asBuiltin(), buf.data(), argc, (int)buf.size());
         return n >= 1 ? buf[0] : Value{};
     }
     uint8_t fi;
@@ -1351,11 +1358,7 @@ dispatch_loop:
     op_CALL_DYN: {
         // A=arg_base, B=func_val_reg, C=argc
         if (regs[base + B].isBuiltin()) {
-            auto fn = regs[base + B].asBuiltin();
-            {
-                CallCtx ctx{this, &regs[base + A], C, call_stack.back().varargs_base - base - A};
-                last_results_ = fn(ctx); // le builtin écrit ses valeurs dans regs[base+A..] et renvoie leur nombre
-            }
+            invokeBuiltinRegs(regs[base + B].asBuiltin(), base + A, C);
             NEXT();
         }
         if (regs[base + B].isClass()) {
@@ -1473,11 +1476,7 @@ dispatch_loop:
                 total = argc;
             }
             if (fn.isBuiltin()) {
-                {
-                    auto bfn = fn.asBuiltin();
-                    CallCtx ctx{this, &regs[cb], total, call_stack.back().varargs_base - cb};
-                    last_results_ = bfn(ctx);
-                }
+                invokeBuiltinRegs(fn.asBuiltin(), cb, total);
                 goto call_method_done;
             }
             {

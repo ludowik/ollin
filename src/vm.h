@@ -86,6 +86,17 @@ class VM {
     void unwindToHandler(const Handler& h, Value thrown);
     void growRegs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
 
+    // Invoque un builtin : construit le CallCtx, appelle, met à jour last_results_,
+    // renvoie le nombre de valeurs produites. Point d'entrée UNIQUE des 6 sites
+    // d'appel builtin → le calcul de result_cap n'est écrit qu'ici (impossible à
+    // oublier/se tromper à un futur site). `results` = slots résultat (= args), `cap`
+    // = nombre de slots sûrs.
+    int invokeBuiltin(Value::BuiltinFn fn, Value* results, int argc, int cap);
+    // Variante registres : les résultats vont dans regs[result_base..] et `cap` est
+    // dérivé du frame courant (varargs_base - result_base) — le calcul piégeux,
+    // centralisé ici. Utilisée par CALL_DYN et CALL_METHOD.
+    int invokeBuiltinRegs(Value::BuiltinFn fn, int result_base, int argc);
+
     // Pousse un frame d'appel, remplit les défauts et varargs, retourne fp.addr.
     uint32_t pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                            uint32_t return_ip, bool is_ctor = false, int return_dest = -1);
