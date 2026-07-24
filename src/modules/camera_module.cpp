@@ -46,6 +46,12 @@ static Value cam_open(CallCtx& ctx) {
         if (!window.__ollinCam) window.__ollinCam = {};
         const cam = window.__ollinCam;
         if (cam.state === 'open' || cam.state === 'opening') return;
+        // Garde avant toute création DOM : sinon chaque retry en contexte non sécurisé
+        // (état 'error') ajouterait un <video> orphelin de plus.
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            cam.state = 'error'; // contexte non sécurisé (HTTP hors localhost) → pas d'API caméra
+            return;
+        }
         cam.w = w; cam.h = h;
         cam.state = 'opening';
         const vid = document.createElement('video');
@@ -57,10 +63,6 @@ static Value cam_open(CallCtx& ctx) {
         vid.style.left = '-9999px';
         document.body.appendChild(vid);
         cam.video = vid;
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            cam.state = 'error'; // contexte non sécurisé (HTTP hors localhost) → pas d'API caméra
-            return;
-        }
         navigator.mediaDevices.getUserMedia({ video: { width: w, height: h } })
             .then(function(stream) {
                 cam.stream = stream;
