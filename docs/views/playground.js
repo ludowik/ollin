@@ -1498,7 +1498,7 @@ async function loadExample(file) {
     return
   }
   // Projet TRANSITOIRE : entrée + imports + assets, visibles et navigables, mais non
-  // persistés (marqueur `example`). Un refresh recharge la version du dépôt.
+  // persistés (id sentinelle TRANSIENT_ID). Un refresh recharge la version du dépôt.
   currentProject = {
     id: Store.TRANSIENT_ID, name: file, entry: bundle.entry,
     files: bundle.files, resources: bundle.resources,
