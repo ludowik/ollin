@@ -239,7 +239,7 @@ const MODULE_MEMBERS = {
     fn('image.draw','draw(img, x, y [, w, h [, tint]])'),
     fn('image.unload','unload(img)'),
     fn('image.setPixel','setPixel(img, x, y, color)'),
-    fn('image.getPixel','getPixel(img, x, y) → color'),
+    fn('image.getPixel','getPixel(img, x, y) → r, g, b, a'),
     fn('image.beginPixels','beginPixels(img)'),
     fn('image.endPixels','endPixels(img)'),
   ],

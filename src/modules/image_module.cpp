@@ -432,10 +432,12 @@ static int img_end_pixels(CallCtx& ctx) {
 
 // ── image.getPixel(img, x, y) ───────────────────────────────────────────────
 
+// Renvoie 4 valeurs (r, g, b, a) dans [0,1] : `var r, g, b, a = image.getPixel(img, x, y)`.
+// Multi-retour direct dans les registres (aucune allocation de map par pixel) → chemin
+// chaud du traitement pixel par pixel.
 static int img_get_pixel(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.getPixel";
-    static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
     TexHandle& h = handlePtr(args[0], FN);
@@ -451,12 +453,11 @@ static int img_get_pixel(CallCtx& ctx) {
     } else {
         c = GetImageColor(h.cpu, x, y);
     }
-    Value m = Value::makeMap();
-    m.mapSet(K_R, Value(c.r / 255.0));
-    m.mapSet(K_G, Value(c.g / 255.0));
-    m.mapSet(K_B, Value(c.b / 255.0));
-    m.mapSet(K_A, Value(c.a / 255.0));
-    return ctx.ret(m);
+    ctx.setResult(0, Value(c.r / 255.0));
+    ctx.setResult(1, Value(c.g / 255.0));
+    ctx.setResult(2, Value(c.b / 255.0));
+    ctx.setResult(3, Value(c.a / 255.0));
+    return 4;
 }
 
 // ── image.setPixel(img, x, y, color | r, g, b, a) ───────────────────────────
