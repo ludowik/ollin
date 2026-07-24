@@ -199,10 +199,12 @@ struct CollectLocalsVisitor : StmtQuery {
     std::unordered_set<std::string>& seen;
     bool collect_funcs;
     const std::vector<std::string>& files;
+    std::unordered_set<std::string>* funcs; // noms de fonctions locales (liées d'emblée), si demandé
 
     CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
-                         bool collect_funcs, const std::vector<std::string>& files)
-        : out(out), seen(seen), collect_funcs(collect_funcs), files(files) {}
+                         bool collect_funcs, const std::vector<std::string>& files,
+                         std::unordered_set<std::string>* funcs)
+        : out(out), seen(seen), collect_funcs(collect_funcs), files(files), funcs(funcs) {}
 
     void visit(const VarDeclStmt& s) override {
         if (!s.is_global) { // 'global' → table des globaux, pas de registre
@@ -219,6 +221,8 @@ struct CollectLocalsVisitor : StmtQuery {
         // Ne pas descendre dans le corps : les locales d'une fonction sont dans sa propre portée.
         if (collect_funcs && seen.insert(s.name).second) {
             out.push_back(s.name);
+            if (funcs)
+                funcs->insert(s.name);
         }
     }
     // Blocs utilisateur : portée lexicale stricte — ne pas descendre.
@@ -234,9 +238,10 @@ struct CollectLocalsVisitor : StmtQuery {
 };
 
 static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
-                          const std::vector<std::string>& files, bool collect_funcs = true) {
+                          const std::vector<std::string>& files, bool collect_funcs = true,
+                          std::unordered_set<std::string>* funcs = nullptr) {
     std::unordered_set<std::string> seen(out.begin(), out.end());
-    CollectLocalsVisitor v(out, seen, collect_funcs, files);
+    CollectLocalsVisitor v(out, seen, collect_funcs, files, funcs);
     v.run(stmts);
 }
 
@@ -369,8 +374,7 @@ Chunk Compiler::compile(const Program& prog) {
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
     collectLocals(prog.stmts, top_locals, chunk.source_files, false);
-    for (auto& name : top_locals)
-        local_regs_[name] = reg_top_++;
+    bindScanLocals(top_locals, {}); // collect_funcs=false → aucune fonction ici, tout est différé
     locals_top_ = reg_top_;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
@@ -400,6 +404,25 @@ static bool isCallNode(const Expr* e) {
 void Compiler::visit(const VarDeclStmt& s) {
     noteLine(s.line, s.file_idx);
 
+    // Active une locale différée : la déplace de pending_var_reg_ vers local_regs_
+    // (portée lexicale : elle devient visible À PARTIR d'ici). Renvoie son registre.
+    // À n'appeler qu'APRÈS avoir compilé les initialisateurs, pour que `var a = a`
+    // lise le `a` extérieur, pas la locale en cours de déclaration.
+    auto activateLocal = [&](const std::string& name) -> int {
+        auto it = pending_var_reg_.find(name);
+        if (it == pending_var_reg_.end())
+            return local_regs_.at(name); // déjà active (sécurité)
+        int reg = it->second;
+        pending_var_reg_.erase(it);
+        local_regs_[name] = reg;
+        return reg;
+    };
+    // Registre réservé d'une locale encore différée (sans l'activer).
+    auto reservedReg = [&](const std::string& name) -> int {
+        auto it = pending_var_reg_.find(name);
+        return it != pending_var_reg_.end() ? it->second : local_regs_.at(name);
+    };
+
     // Multi-retour : plusieurs cibles, une seule valeur qui est un APPEL (de
     // n'importe quelle forme : fonction nommée, closure, appel dynamique, méthode).
     // On compile l'appel à une base connue ; la VM y laisse toutes les valeurs de
@@ -419,7 +442,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             if (s.is_global) {
                 chunk.emit(makeABx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.addIdentifier(s.names[i])));
             } else {
-                int dest = local_regs_.at(s.names[i]);
+                int dest = activateLocal(s.names[i]); // l'appel est déjà compilé → activation sûre
                 if (base + i != dest)
                     chunk.emit(makeABC((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(base + i), 0));
             }
@@ -445,15 +468,20 @@ void Compiler::visit(const VarDeclStmt& s) {
         return;
     }
 
-    // Normal: compile each value into its pre-allocated local register
+    // Compile chaque initialisateur dans son registre réservé, la locale n'étant PAS
+    // encore active (portée lexicale : `var a = a` lit le `a` extérieur). Les
+    // initialisateurs de TOUTES les cibles voient donc la portée d'avant la déclaration.
     for (int i = 0; i < (int)s.names.size(); ++i) {
-        int dest = local_regs_.at(s.names[i]);
+        int dest = reservedReg(s.names[i]);
         if (i < (int)s.values.size()) {
             compileInto(*s.values[i], dest);
         } else {
             chunk.emit(makeABC((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
         }
     }
+    // Initialisateurs compilés → les locales deviennent visibles à partir d'ici.
+    for (auto& n : s.names)
+        activateLocal(n);
     // Register constants so any later assignment is caught at compile time
     if (s.is_constant)
         for (auto& n : s.names)
@@ -462,15 +490,27 @@ void Compiler::visit(const VarDeclStmt& s) {
 
 static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
 
+void Compiler::bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs) {
+    for (auto& name : names) {
+        if (local_regs_.count(name))
+            continue; // déjà lié (param, self, variable de catch)
+        if (funcs.count(name))
+            local_regs_[name] = reg_top_++;      // fonction locale : visible d'emblée (récursion / réf. en avant)
+        else
+            pending_var_reg_[name] = reg_top_++; // var/const : différée jusqu'à sa déclaration
+    }
+}
+
 void Compiler::compileBlock(const std::vector<std::unique_ptr<Stmt>>& body) {
     auto saved_regs = local_regs_;
+    auto saved_pending = pending_var_reg_;
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
     std::vector<std::string> block_locals;
-    collectLocals(body, block_locals, chunk.source_files);
-    for (auto& nm : block_locals)
-        local_regs_[nm] = reg_top_++; // assignment inconditionnelle : permet l'ombrage
+    std::unordered_set<std::string> block_funcs;
+    collectLocals(body, block_locals, chunk.source_files, true, &block_funcs);
+    bindScanLocals(block_locals, block_funcs);
     int block_locals_top = reg_top_;
     locals_top_ = block_locals_top;
     if (reg_top_ > reg_count_)
@@ -484,6 +524,7 @@ void Compiler::compileBlock(const std::vector<std::unique_ptr<Stmt>>& body) {
 
     bool has_func = bodyHasFunc(body);
     local_regs_ = std::move(saved_regs);
+    pending_var_reg_ = std::move(saved_pending);
     reg_top_ = has_func ? block_locals_top : saved_top;
     locals_top_ = saved_locals;
 }
@@ -729,14 +770,15 @@ void Compiler::visit(const TryCatchStmt& s) {
     // Bloc catch : catch_var lié à catch_r, autres locales scopées normalement.
     {
         auto saved_regs = local_regs_;
+        auto saved_pending = pending_var_reg_;
         int saved_top2 = reg_top_;
         int saved_locals = locals_top_;
         if (!s.catch_var.empty())
             local_regs_[s.catch_var] = catch_r;
         std::vector<std::string> catch_ls;
-        collectLocals(s.catch_body, catch_ls, chunk.source_files);
-        for (auto& nm : catch_ls)
-            local_regs_[nm] = reg_top_++;
+        std::unordered_set<std::string> catch_funcs;
+        collectLocals(s.catch_body, catch_ls, chunk.source_files, true, &catch_funcs);
+        bindScanLocals(catch_ls, catch_funcs);
         int catch_top = reg_top_;
         locals_top_ = catch_top;
         if (reg_top_ > reg_count_)
@@ -748,6 +790,7 @@ void Compiler::visit(const TryCatchStmt& s) {
         }
         bool catch_has_func = bodyHasFunc(s.catch_body);
         local_regs_ = std::move(saved_regs);
+        pending_var_reg_ = std::move(saved_pending);
         reg_top_ = catch_has_func ? catch_top : saved_top2;
         locals_top_ = saved_locals;
     }
@@ -765,6 +808,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     noteLine(s.line, s.file_idx);
     // Save outer context
     auto outer_regs = std::move(local_regs_);
+    auto outer_pending = std::move(pending_var_reg_);
     auto outer_upvals = std::move(cur_upval_idx_);
     int outer_top = reg_top_;
     int outer_count = reg_count_;
@@ -782,6 +826,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     current_func_name = s.name;
     cur_upval_idx_.clear();
     local_regs_.clear();
+    pending_var_reg_.clear();
     reg_top_ = 0;
     reg_count_ = 0;
     locals_top_ = 0;
@@ -795,11 +840,9 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Pre-scan body for all var declarations and for-loop variables
     // Seed with param names so redeclaring a param with 'var' is caught
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
-    collectLocals(s.body, body_locals, chunk.source_files);
-    for (auto& name : body_locals) {
-        if (!local_regs_.count(name))
-            local_regs_[name] = reg_top_++;
-    }
+    std::unordered_set<std::string> body_funcs;
+    collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
+    bindScanLocals(body_locals, body_funcs);
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 
@@ -845,6 +888,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Pop scope and restore outer context
     outer_scopes_.pop_back();
     local_regs_ = std::move(outer_regs);
+    pending_var_reg_ = std::move(outer_pending);
     cur_upval_idx_ = std::move(outer_upvals);
     const_names_ = std::move(outer_consts);
     reg_top_ = outer_top;
@@ -889,6 +933,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
 
 void Compiler::visit(const FuncExpr& s) {
     auto outer_regs = std::move(local_regs_);
+    auto outer_pending = std::move(pending_var_reg_);
     auto outer_upvals = std::move(cur_upval_idx_);
     int outer_top = reg_top_;
     int outer_count = reg_count_;
@@ -903,6 +948,7 @@ void Compiler::visit(const FuncExpr& s) {
     current_func_name = "<lambda>";
     cur_upval_idx_.clear();
     local_regs_.clear();
+    pending_var_reg_.clear();
     reg_top_ = 0;
     reg_count_ = 0;
     locals_top_ = 0;
@@ -913,10 +959,9 @@ void Compiler::visit(const FuncExpr& s) {
     reg_top_ = n_fixed;
 
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
-    collectLocals(s.body, body_locals, chunk.source_files);
-    for (auto& nm : body_locals)
-        if (!local_regs_.count(nm))
-            local_regs_[nm] = reg_top_++;
+    std::unordered_set<std::string> body_funcs;
+    collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
+    bindScanLocals(body_locals, body_funcs);
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 
@@ -945,6 +990,7 @@ void Compiler::visit(const FuncExpr& s) {
 
     outer_scopes_.pop_back();
     local_regs_ = std::move(outer_regs);
+    pending_var_reg_ = std::move(outer_pending);
     cur_upval_idx_ = std::move(outer_upvals);
     const_names_ = std::move(outer_consts);
     reg_top_ = outer_top;
@@ -1916,6 +1962,7 @@ void Compiler::visit(const DoStmt& s) {
 // ── compileMethodFunc : compile une méthode avec 'self' implicite en R[0] ──────
 uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     auto outer_regs = std::move(local_regs_);
+    auto outer_pending = std::move(pending_var_reg_);
     auto outer_upvals = std::move(cur_upval_idx_);
     auto outer_consts = const_names_; // copy — stays in OuterScope too
     int outer_top = reg_top_;
@@ -1930,6 +1977,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     current_func_name = s.name;
     cur_upval_idx_.clear();
     local_regs_.clear();
+    pending_var_reg_.clear();
     reg_top_ = 0;
     reg_count_ = 0;
     locals_top_ = 0;
@@ -1955,10 +2003,9 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     if (!s.is_static)
         body_locals.push_back("self");
     body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
-    collectLocals(s.body, body_locals, chunk.source_files);
-    for (auto& name : body_locals)
-        if (!local_regs_.count(name))
-            local_regs_[name] = reg_top_++;
+    std::unordered_set<std::string> body_funcs;
+    collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
+    bindScanLocals(body_locals, body_funcs);
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 
@@ -1990,6 +2037,7 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
 
     outer_scopes_.pop_back();
     local_regs_ = std::move(outer_regs);
+    pending_var_reg_ = std::move(outer_pending);
     cur_upval_idx_ = std::move(outer_upvals);
     const_names_ = std::move(outer_consts);
     reg_top_ = outer_top;

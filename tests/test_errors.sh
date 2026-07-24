@@ -39,6 +39,18 @@ check_error "param redeclaration via var" \
 end' \
     "local variable 'a' already declared in this scope"
 
+check_error "var utilisée avant sa déclaration (top-level)" \
+    'print(z)
+var z = 1' \
+    "undeclared variable 'z'"
+
+check_error "var utilisée avant sa déclaration (dans fonction)" \
+    'func f()
+    print(w)
+    var w = 1
+end' \
+    "undeclared variable 'w'"
+
 check_error "global redeclaration" \
     'global g = 1
 global g = 2' \

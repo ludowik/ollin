@@ -362,4 +362,31 @@ for i = 1, 20000 do
 end
 assert(mem() >= mem_before)     ## l'allocation d'un grand array n'a pas fait baisser la mémoire
 
+## ── Compilateur : portée lexicale des `var` (visible à partir de sa déclaration) ──
+## Bug : une `var` déclarée plus loin masquait une référence antérieure → lecture du
+## registre non initialisé (nil au top-level, valeur résiduelle en fonction). Désormais
+## avant sa ligne le nom résout au global ; la locale ne masque qu'à partir du `var`.
+global lex_g = 2
+assert(lex_g == 2)          ## référence AVANT le `var lex_g` ci-dessous → le global
+var lex_g = 1               ## à partir d'ici : locale
+assert(lex_g == 1)
+
+## `var x = x` : l'initialisateur lit le x EXTÉRIEUR, pas la locale en cours
+global lex_h = 7
+func lex_init()
+    var lex_h = lex_h + 1   ## RHS = global (7) → locale = 8
+    return lex_h
+end
+assert(lex_init() == 8)
+assert(lex_h == 7)          ## global inchangé
+
+## bloc `do` : même règle, cloisonné
+global lex_b = 3
+do
+    assert(lex_b == 3)      ## avant le var du bloc → global
+    var lex_b = 9
+    assert(lex_b == 9)
+end
+assert(lex_b == 3)          ## hors du bloc → global de nouveau
+
 print("regressions ok")

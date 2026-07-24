@@ -19,6 +19,12 @@ class Compiler : public StmtVisitor, public ExprVisitor {
 
     // ── register allocator ────────────────────────────────────────────────────
     std::unordered_map<std::string, int> local_regs_;
+    // Locales `var`/`const` dont le registre est réservé mais qui ne sont PAS encore
+    // déclarées (portée lexicale : visibles seulement à partir de leur ligne). Une
+    // référence avant la déclaration ne les trouve donc pas dans local_regs_ → tombe
+    // sur global/upvalue/erreur. Activées (déplacées vers local_regs_) au VarDeclStmt.
+    // Sauvée/restaurée partout où local_regs_ l'est (portées imbriquées).
+    std::unordered_map<std::string, int> pending_var_reg_;
     int reg_top_ = 0;    // next free register
     int reg_count_ = 0;  // max reg ever used → FuncProto.reg_count
     int locals_top_ = 0; // reg_top_ after pre-scanning locals (temps start here)
@@ -92,6 +98,12 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // les locales déclarées dans body (sans descendre dans les sous-blocs), compile,
     // puis restaure. Les registres restent réservés si le corps contient des closures.
     void compileBlock(const std::vector<std::unique_ptr<Stmt>>& body);
+
+    // Réserve un registre pour chaque locale pré-scannée. Les fonctions (funcs) sont
+    // liées d'emblée dans local_regs_ (récursion / références en avant) ; les var/const
+    // sont différées dans pending_var_reg_ (portée lexicale). Les noms déjà liés
+    // (params, self, catch var) sont laissés tels quels.
+    void bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs);
 
     // StmtVisitor
     void visit(const CommentStmt&) override {
