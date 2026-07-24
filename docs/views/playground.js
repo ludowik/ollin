@@ -765,7 +765,10 @@ let examples       = []      // [{name, file}] pour « Nouveau depuis un exemple
 // Mode exemple : le projet courant est TRANSITOIRE (chargé depuis le dépôt, jamais
 // persisté). On voit/navigue tous ses fichiers, mais aucune écriture en base ni
 // mutation de structure (créer/renommer/supprimer) — « Créer un projet » pour éditer.
-const isExample = () => !!(currentProject && currentProject.example)
+// Un exemple = le projet TRANSITOIRE (id sentinelle), jamais un enregistrement en
+// base. Ne pas se fier à un flag persistable : il pouvait fuiter en base et masquer
+// à tort renommage/suppression (auto-réparé par Store.init).
+const isExample = () => !!(currentProject && currentProject.id === Store.TRANSIENT_ID)
 
 const fileKey = id => 'ollin-pg-file:' + id           // dernier fichier ouvert / projet
 const scripts = p => Object.keys(p.files).filter(f => f !== Store.MANIFEST).sort()
@@ -1497,8 +1500,8 @@ async function loadExample(file) {
   // Projet TRANSITOIRE : entrée + imports + assets, visibles et navigables, mais non
   // persistés (marqueur `example`). Un refresh recharge la version du dépôt.
   currentProject = {
-    id: '__exemple__', name: file, entry: bundle.entry,
-    files: bundle.files, resources: bundle.resources, example: true,
+    id: Store.TRANSIENT_ID, name: file, entry: bundle.entry,
+    files: bundle.files, resources: bundle.resources,
   }
   currentFile = bundle.entry
   setEditorText(currentProject.files[bundle.entry] ?? '')

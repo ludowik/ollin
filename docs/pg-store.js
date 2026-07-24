@@ -28,6 +28,11 @@ export const MANIFEST = 'ollin.project.json'
 const DEFAULT_ENTRY   = 'main.ol'
 const DEFAULT_CODE    = 'print("hello world!")\n'
 
+// Id sentinelle du projet transitoire (exemple ouvert en lecture directe) : jamais
+// persisté. Sert de seul critère « est-ce un exemple ? » côté UI (un flag persistable
+// pouvait fuiter en base et bloquer renommage/suppression).
+export const TRANSIENT_ID = '__exemple__'
+
 // ── slug ────────────────────────────────────────────────────────────────────
 // "Mon jeu !" → "mon-jeu". ASCII, minuscules, séparateurs = tirets.
 export function slugify(name) {
@@ -84,6 +89,46 @@ function writeManifest(project) {
 export async function init() {
   await openDB()
   await migrateIfNeeded()
+  await healExampleFlags()
+}
+
+// Auto-réparation : un enregistrement a pu être persisté par erreur avec le marqueur
+// `example` du projet transitoire (ancien bug) → l'UI le traitait comme jetable (ni
+// renommage ni suppression). On retire le marqueur ; si l'id est la sentinelle du
+// transitoire, on lui réattribue un slug réel dérivé du nom. Les ids de réattribution
+// sont calculés AVANT la transaction d'écriture — uniqueId ouvre sa propre transaction,
+// l'attendre pendant le rw le fermerait (piège IndexedDB).
+async function healExampleFlags() {
+  const ro = await tx('readonly')
+  const all = await reqAsync(ro.getAll())
+  const bad = all.filter(p => p.example || p.id === TRANSIENT_ID)
+  if (!bad.length) return
+  for (const p of bad) {
+    delete p.example
+    if (p.id === TRANSIENT_ID) {
+      p._oldId = p.id
+      p.id = await uniqueId(p.name || 'Sans titre')
+    }
+    writeManifest(p)
+  }
+  const rw = await tx('readwrite')
+  const done = new Promise((resolve, reject) => {
+    rw.transaction.oncomplete = () => resolve()
+    rw.transaction.onerror    = () => reject(rw.transaction.error)
+    rw.transaction.onabort    = () => reject(rw.transaction.error)
+  })
+  for (const p of bad) {
+    const oldId = p._oldId
+    delete p._oldId
+    if (oldId) {
+      rw.add(p)
+      rw.delete(oldId)
+      if (getActiveId() === oldId) setActiveId(p.id)
+    } else {
+      rw.put(p)
+    }
+  }
+  await done
 }
 
 // Résumés triés du plus récent au plus ancien (sans le contenu lourd).
