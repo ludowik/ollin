@@ -245,19 +245,19 @@ void dataSetNativePaths(const std::string& projectFile, const std::string& globa
 // pointeurs de fonction ; la portée est figée par une fonction dédiée par portée).
 static void fillScope(Value& m, int scope) {
     if (scope == S_PROJECT) {
-        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return dataGet(S_PROJECT, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return dataSet(S_PROJECT, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return dataHas(S_PROJECT, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return dataDelete(S_PROJECT, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return dataKeys(S_PROJECT, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return dataClear(S_PROJECT, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataGet(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataSet(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataHas(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataClear(S_PROJECT, ctx.args, ctx.argc)); }));
     } else {
-        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return dataGet(S_GLOBAL, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return dataSet(S_GLOBAL, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return dataHas(S_GLOBAL, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return dataDelete(S_GLOBAL, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return dataKeys(S_GLOBAL, ctx.args, ctx.argc); }));
-        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return dataClear(S_GLOBAL, ctx.args, ctx.argc); }));
+        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataGet(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataSet(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataHas(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataClear(S_GLOBAL, ctx.args, ctx.argc)); }));
     }
 }
 

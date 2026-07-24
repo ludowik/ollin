@@ -582,3 +582,29 @@ méta-méthode est nié avant d'être écrit dans `return_dest`.
 `VM::last_results_` : nombre de valeurs produites par le dernier appel/retour,
 consommé par `SPREAD_RESULTS` pour mettre à `nil` les cibles d'une
 destructuration multi-retour au-delà de ce que l'appel a réellement renvoyé.
+
+## Builtins : convention de retour (modèle Lua)
+
+Signature : `using BuiltinFn = int (*)(CallCtx&)`. Comme une `lua_CFunction`, un
+builtin **écrit ses valeurs de retour dans les slots résultat** puis **renvoie
+leur nombre** (repris dans `last_results_`). Les slots résultat sont
+`ctx.args[0..]`, c'est-à-dire les registres à partir du call_base — là où
+`RETURN_V` place déjà les retours d'une fonction du langage. Un builtin écrase
+donc ses propres arguments (déjà lus), exactement comme `RETURN_V`.
+
+- `ctx.ret(v)` : écrit `v` dans le slot 0 et renvoie 1 (cas courant : une valeur).
+- `ctx.setResult(i, v)` : écrit la i-ème valeur (suivi de `return n;`).
+- `ctx.result_cap` : nombre de slots **sûrs** (= `reg_count` du frame − A). Toute
+  écriture est bornée à cette capacité → aucun débordement hors du frame.
+
+**Invariant registre (sûreté mémoire)** : chaque frame pose
+`varargs_base = reg_base + reg_count` et `regs` est dimensionné à
+`≥ reg_base + reg_count` ; d'où `result_cap = frame.varargs_base − reg_base − A`.
+Le compilateur force `reg_count ≥ call_base + n` pour une destructuration à `n`
+cibles (compiler.cpp), donc `result_cap ≥ n` : un builtin peut toujours remplir
+les cibles, et les valeurs excédentaires tombent dans les temporaires du frame
+(ignorées, jamais au-delà de `varargs_base`). **Le frame top-level doit initialiser
+`varargs_base = top_reg_count`** (sinon `result_cap ≤ 0` et `ctx.ret` n'écrit rien).
+
+Les 6 sites d'appel builtin (vm.cpp : `CALL_DYN`, `CALL_METHOD`, `invokeStr`,
+init ctor, hook `run`, `callValue`) fixent `result_cap` puis `last_results_ = fn(ctx)`.

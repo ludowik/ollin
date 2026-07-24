@@ -36,7 +36,7 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
     return out;
 }
 
-static Value core_print(CallCtx& ctx) {
+static int core_print(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     // Copie AVANT toute conversion : valueToString peut invoquer __str, qui exécute
@@ -49,25 +49,25 @@ static Value core_print(CallCtx& ctx) {
         std::cout << valueToString(vargs[i]);
     }
     std::cout << '\n';
-    return Value{};
+    return ctx.ret(Value{});
 }
 
-static Value core_printf(CallCtx& ctx) {
+static int core_printf(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("printf: first arg must be string");
     std::vector<Value> vargs(args, args + argc);
     std::cout << applyFormat(args[0].asString(), vargs, 1) << '\n';
-    return Value{};
+    return ctx.ret(Value{});
 }
 
-static Value core_typeof(CallCtx& ctx) {
+static int core_typeof(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1)
-        return Value(std::string("nil"));
-    return Value(std::string(args[0].typeName()));
+        return ctx.ret(Value(std::string("nil")));
+    return ctx.ret(Value(std::string(args[0].typeName())));
 }
 
 Value makeCoreModule() {

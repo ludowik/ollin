@@ -104,11 +104,11 @@ static const double NOISE_AMP_2D = 0.55;
 static const double NOISE_AMP_3D = 0.62;
 
 #define MATH1(name, expr)                                                                                              \
-    static Value math_##name(CallCtx& ctx) {                                                                           \
+    static int math_##name(CallCtx& ctx) {                                                                             \
         Value* args = ctx.args;                                                                                        \
         int argc = ctx.argc;                                                                                           \
         double x = numArg(args, argc, 0, "math." #name);                                                               \
-        return numValue(expr);                                                                                         \
+        return ctx.ret(numValue(expr));                                                                                \
     }
 
 MATH1(abs, std::fabs(x))
@@ -134,7 +134,7 @@ MATH1(frac, x - std::floor(x))
 MATH1(isNan, std::isnan(x) ? 1.0 : 0.0)
 MATH1(isInf, std::isinf(x) ? 1.0 : 0.0)
 
-static Value math_map(CallCtx& ctx) {
+static int math_map(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.map");
@@ -143,52 +143,52 @@ static Value math_map(CallCtx& ctx) {
     double out_lo = numArg(args, argc, 3, "math.map");
     double out_hi = numArg(args, argc, 4, "math.map");
     if (in_hi == in_lo)
-        return numValue(out_lo); // plage d'entrée dégénérée → borne basse (évite inf/nan)
-    return numValue(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo));
+        return ctx.ret(numValue(out_lo)); // plage d'entrée dégénérée → borne basse (évite inf/nan)
+    return ctx.ret(numValue(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)));
 }
 
-static Value math_atan2(CallCtx& ctx) {
+static int math_atan2(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     double y = numArg(args, argc, 0, "math.atan2");
     double x = numArg(args, argc, 1, "math.atan2");
-    return numValue(std::atan2(y, x));
+    return ctx.ret(numValue(std::atan2(y, x)));
 }
 
-static Value math_pow(CallCtx& ctx) {
+static int math_pow(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.pow");
     double n = numArg(args, argc, 1, "math.pow");
-    return numValue(std::pow(x, n));
+    return ctx.ret(numValue(std::pow(x, n)));
 }
 
-static Value math_clamp(CallCtx& ctx) {
+static int math_clamp(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.clamp");
     double lo = numArg(args, argc, 1, "math.clamp");
     double hi = numArg(args, argc, 2, "math.clamp");
-    return numValue(x < lo ? lo : x > hi ? hi : x);
+    return ctx.ret(numValue(x < lo ? lo : x > hi ? hi : x));
 }
 
-static Value math_seed(CallCtx& ctx) {
+static int math_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     int64_t s = (int64_t)numArg(args, argc, 0, "math.seed");
     srand((unsigned)s);
-    return Value();
+    return ctx.ret(Value());
 }
 
-static Value math_logn(CallCtx& ctx) {
+static int math_logn(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     double x = numArg(args, argc, 0, "math.logn");
     double n = numArg(args, argc, 1, "math.logn");
-    return numValue(std::log(x) / std::log(n));
+    return ctx.ret(numValue(std::log(x) / std::log(n)));
 }
 
-static Value math_min(CallCtx& ctx) {
+static int math_min(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc == 0)
@@ -206,7 +206,7 @@ static Value math_min(CallCtx& ctx) {
             if (v < result)
                 result = v;
         }
-        return Value(result);
+        return ctx.ret(Value(result));
     }
     double result = numArg(args, argc, 0, "math.min");
     for (int i = 1; i < argc; i++) {
@@ -214,10 +214,10 @@ static Value math_min(CallCtx& ctx) {
         if (v < result)
             result = v;
     }
-    return Value(result);
+    return ctx.ret(Value(result));
 }
 
-static Value math_max(CallCtx& ctx) {
+static int math_max(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc == 0)
@@ -235,7 +235,7 @@ static Value math_max(CallCtx& ctx) {
             if (v > result)
                 result = v;
         }
-        return Value(result);
+        return ctx.ret(Value(result));
     }
     double result = numArg(args, argc, 0, "math.max");
     for (int i = 1; i < argc; i++) {
@@ -243,20 +243,20 @@ static Value math_max(CallCtx& ctx) {
         if (v > result)
             result = v;
     }
-    return Value(result);
+    return ctx.ret(Value(result));
 }
 
-static Value math_rand(CallCtx& ctx) {
+static int math_rand(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     double r = (double)rand() / ((double)RAND_MAX + 1.0);
     if (argc == 0)
-        return Value(r);
+        return ctx.ret(Value(r));
     if (argc == 1)
-        return Value(r * numArg(args, argc, 0, "math.rand"));
+        return ctx.ret(Value(r * numArg(args, argc, 0, "math.rand")));
     double lo = numArg(args, argc, 0, "math.rand");
     double hi = numArg(args, argc, 1, "math.rand");
-    return Value(lo + r * (hi - lo));
+    return ctx.ret(Value(lo + r * (hi - lo)));
 }
 
 // Argument entier : (int64_t)numArg est UB (trap WASM) si le double est NaN/inf
@@ -268,7 +268,7 @@ static int64_t intArg(const Value* args, int argc, int i, const char* fn) {
     return (int64_t)d;
 }
 
-static Value math_randInt(CallCtx& ctx) {
+static int math_randInt(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc == 0)
@@ -277,17 +277,17 @@ static Value math_randInt(CallCtx& ctx) {
         int64_t hi = intArg(args, argc, 0, "math.randInt");
         if (hi <= 0)
             throw std::runtime_error("math.randInt: argument must be > 0");
-        return Value((int64_t)(rand() % hi + 1));
+        return ctx.ret(Value((int64_t)(rand() % hi + 1)));
     }
     int64_t lo = intArg(args, argc, 0, "math.randInt");
     int64_t hi = intArg(args, argc, 1, "math.randInt");
     if (lo > hi)
         throw std::runtime_error("math.randInt: lo must be <= hi");
-    return Value(lo + (int64_t)(rand() % (hi - lo + 1)));
+    return ctx.ret(Value(lo + (int64_t)(rand() % (hi - lo + 1))));
 }
 
 // Bruit de Perlin fractal (fBm), 1/2/3 dimensions → FLOAT dans [0, 1].
-static Value math_noise(CallCtx& ctx) {
+static int math_noise(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1 || argc > 3)
@@ -310,16 +310,16 @@ static Value math_noise(CallCtx& ctx) {
         n = 0.0;
     if (n > 1.0)
         n = 1.0;
-    return Value(n);
+    return ctx.ret(Value(n));
 }
 
 // Rebat la table de permutation → bruit reproductible / variable.
-static Value math_noiseSeed(CallCtx& ctx) {
+static int math_noiseSeed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     int64_t s = (int64_t)numArg(args, argc, 0, "math.noiseSeed");
     noiseReseed((uint64_t)s);
-    return Value();
+    return ctx.ret(Value());
 }
 
 Value makeMathModule() {

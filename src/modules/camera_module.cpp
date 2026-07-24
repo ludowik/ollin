@@ -28,7 +28,7 @@ void camera_reset() {
     s_cam_handle = Value{};
 }
 
-static Value cam_open(CallCtx& ctx) {
+static int cam_open(CallCtx& ctx) {
     int w = ctx.argc >= 1 ? (int)numArg(ctx.args, 0, "camera.open") : 640;
     int h = ctx.argc >= 2 ? (int)numArg(ctx.args, 1, "camera.open") : 480;
 
@@ -73,12 +73,12 @@ static Value cam_open(CallCtx& ctx) {
             .catch(function() { cam.state = 'error'; });
     }, w, h);
 
-    return Value{};
+    return ctx.ret(Value{});
 }
 
-static Value cam_capture(CallCtx&) {
+static int cam_capture(CallCtx& ctx) {
     if (!s_cam_id || !image_tex_valid(s_cam_id))
-        return Value{};
+        return ctx.ret(Value{});
 
     // Buffer persistant réutilisé entre frames (chemin chaud, ~60 fps) : évite d'allouer
     // ~1,2 Mo par capture. Redimensionné seulement si la résolution change.
@@ -107,23 +107,23 @@ static Value cam_capture(CallCtx&) {
     }, pixels.data(), s_cam_w, s_cam_h);
 
     if (!ok)
-        return Value{};
+        return ctx.ret(Value{});
 
     image_push_pixels(s_cam_id, pixels.data());
-    return s_cam_handle;
+    return ctx.ret(s_cam_handle);
 }
 
-static Value cam_close(CallCtx&) {
+static int cam_close(CallCtx& ctx) {
     cam_reset_js();
-    return Value{};
+    return ctx.ret(Value{});
 }
 
-static Value cam_is_open(CallCtx&) {
+static int cam_is_open(CallCtx& ctx) {
     int r = EM_ASM_INT({
         const cam = window.__ollinCam;
         return (cam && cam.state === 'open') ? 1 : 0;
     });
-    return Value(int64_t(r));
+    return ctx.ret(Value(int64_t(r)));
 }
 
 Value makeCameraModule() {

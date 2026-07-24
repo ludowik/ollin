@@ -36,10 +36,21 @@ struct Iterator;
 struct Closure;
 struct Value;
 class VM;
+// Contexte d'appel d'un builtin. Modèle Lua : le builtin écrit ses valeurs de
+// retour dans les slots résultat (args[0..], qui sont les registres à partir du
+// call_base) et retourne leur nombre. `result_cap` = nombre de slots sûrs
+// (= reg_count du frame - A) ; toute écriture est bornée à cette capacité, ce
+// qui interdit tout débordement hors du frame (cf. invariant registre).
 struct CallCtx {
     VM*    vm;
     Value* args;
     int    argc;
+    int    result_cap = 0;
+
+    // Retour simple d'une valeur (migration mécanique de `return v;`).
+    int ret(const Value& v);
+    // Écrit la i-ème valeur de retour (bornée par result_cap). Suivi de `return n;`.
+    void setResult(int i, const Value& v);
 };
 
 struct Value {
@@ -161,7 +172,7 @@ struct Value {
         return mptr;
     }
 
-    using BuiltinFn = Value (*)(CallCtx&);
+    using BuiltinFn = int (*)(CallCtx&);
     BuiltinFn asBuiltin() const {
         return (BuiltinFn)(intptr_t)ival;
     }
@@ -259,6 +270,18 @@ struct Value {
         }
     }
 };
+
+inline int CallCtx::ret(const Value& v) {
+    if (result_cap <= 0)
+        return 0;
+    args[0] = v;
+    return 1;
+}
+
+inline void CallCtx::setResult(int i, const Value& v) {
+    if (i >= 0 && i < result_cap)
+        args[i] = v;
+}
 
 // ── Array (1-based, ref-counted) — définition complète ───────────────────────
 #include "collections/array.h"

@@ -252,7 +252,7 @@ static std::vector<uint8_t> fetchBytesSync(const std::string& url) {
 
 // ── image.load(path) ──────────────────────────────────────────────────────────
 
-static Value img_load(CallCtx& ctx) {
+static int img_load(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].isString())
         throw std::runtime_error("image.load: expected path string");
@@ -282,12 +282,12 @@ static Value img_load(CallCtx& ctx) {
     auto uptr = std::make_unique<TexHandle>(std::move(h));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return makeHandle(id, w, hh, ptr);
+    return ctx.ret(makeHandle(id, w, hh, ptr));
 }
 
 // ── image.loadData(format, base64) ──────────────────────────────────────────
 
-static Value img_load_data(CallCtx& ctx) {
+static int img_load_data(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2 || !args[0].isString() || !args[1].isString())
         throw std::runtime_error("image.loadData: expected format string and base64 string");
@@ -307,12 +307,12 @@ static Value img_load_data(CallCtx& ctx) {
     auto uptr = std::make_unique<TexHandle>(std::move(h));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return makeHandle(id, w, hh, ptr);
+    return ctx.ret(makeHandle(id, w, hh, ptr));
 }
 
 // ── image.create(w, h) ───────────────────────────────────────────────────────
 
-static Value img_create(CallCtx& ctx) {
+static int img_create(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.create";
     int w = (int)numArg(args, argc, 0, FN);
@@ -330,12 +330,12 @@ static Value img_create(CallCtx& ctx) {
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return makeHandle(id, w, h, ptr);
+    return ctx.ret(makeHandle(id, w, h, ptr));
 }
 
 // ── image.beginDraw(img) ────────────────────────────────────────────────────
 
-static Value img_begin(CallCtx& ctx) {
+static int img_begin(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.beginDraw";
     if (argc < 1)
@@ -346,22 +346,22 @@ static Value img_begin(CallCtx& ctx) {
     pixelsClose(h);
     h.gpu_dirty = true;   // le dessin GPU va diverger de l'ombre CPU → resync au prochain accès pixel
     BeginTextureMode(h.rtt);
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image.endDraw() ─────────────────────────────────────────────────────────
 
-static Value img_end(CallCtx& ctx) {
+static int img_end(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
     EndTextureMode();
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image.draw(img, x, y [, w, h [, tint]]) ──────────────────────────────────
 
-static Value img_draw(CallCtx& ctx) {
+static int img_draw(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.draw";
     if (argc < 3)
@@ -382,21 +382,21 @@ static Value img_draw(CallCtx& ctx) {
     Rectangle src = {0, 0, (float)tex.width, sh};
     Rectangle dst = {x, y, dw, dh};
     DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image.unload(img) ────────────────────────────────────────────────────────
 
-static Value img_unload(CallCtx& ctx) {
+static int img_unload(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
-        return Value{};
+        return ctx.ret(Value{});
     if (!args[0].isMap() || !args[0].mptr->userdata)
-        return Value{};
+        return ctx.ret(Value{});
     TexHandle& h = *(TexHandle*)args[0].mptr->userdata;
     auto it = s_images.find(h.id);
     if (it == s_images.end())
-        return Value{};
+        return ctx.ret(Value{});
     args[0].mptr->userdata = nullptr;
     if (h.cpu.data)
         UnloadImage(h.cpu);   // ombre CPU persistante
@@ -405,34 +405,34 @@ static Value img_unload(CallCtx& ctx) {
     else
         UnloadTexture(h.tex);
     s_images.erase(it);
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image.beginPixels(img) ──────────────────────────────────────────────────
 
-static Value img_begin_pixels(CallCtx& ctx) {
+static int img_begin_pixels(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.beginPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
     pixelsOpen(handlePtr(args[0], FN));
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image.endPixels(img) ────────────────────────────────────────────────────
 
-static Value img_end_pixels(CallCtx& ctx) {
+static int img_end_pixels(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.endPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
     pixelsClose(handlePtr(args[0], FN));
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image.getPixel(img, x, y) ───────────────────────────────────────────────
 
-static Value img_get_pixel(CallCtx& ctx) {
+static int img_get_pixel(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.getPixel";
     static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
@@ -456,12 +456,12 @@ static Value img_get_pixel(CallCtx& ctx) {
     m.mapSet(K_G, Value(c.g / 255.0));
     m.mapSet(K_B, Value(c.b / 255.0));
     m.mapSet(K_A, Value(c.a / 255.0));
-    return m;
+    return ctx.ret(m);
 }
 
 // ── image.setPixel(img, x, y, color | r, g, b, a) ───────────────────────────
 
-static Value img_set_pixel(CallCtx& ctx) {
+static int img_set_pixel(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.setPixel";
     if (argc < 4)
@@ -471,7 +471,7 @@ static Value img_set_pixel(CallCtx& ctx) {
     int y = (int)numArg(args, 2, FN);
     pixelsOpen(h);
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height)
-        return Value{}; // hors image → ignore (borne x,y ; sinon écriture OOB dans le chemin rapide)
+        return ctx.ret(Value{}); // hors image → ignore (borne x,y ; sinon écriture OOB dans le chemin rapide)
     Color c = (argc >= 7) ? Color{
         (uint8_t)(numArg(args, 3, FN) * 255.0 + 0.5),
         (uint8_t)(numArg(args, 4, FN) * 255.0 + 0.5),
@@ -484,7 +484,7 @@ static Value img_set_pixel(CallCtx& ctx) {
     } else {
         ImageDrawPixel(&h.cpu, x, y, c);
     }
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── image_draw_sprite ─────────────────────────────────────────────────────────

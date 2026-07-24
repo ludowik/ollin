@@ -44,7 +44,7 @@ static void appendLower(uint32_t cp, std::string& out) {
         utf8Encode(cp, out);
 }
 
-static Value str_upper(CallCtx& ctx) {
+static int str_upper(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.upper");
@@ -54,10 +54,10 @@ static Value str_upper(CallCtx& ctx) {
         appendUpper(utf8Decode(s, i, &nb), out);
         i += nb;
     }
-    return Value(std::move(out));
+    return ctx.ret(Value(std::move(out)));
 }
 
-static Value str_lower(CallCtx& ctx) {
+static int str_lower(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.lower");
@@ -67,7 +67,7 @@ static Value str_lower(CallCtx& ctx) {
         appendLower(utf8Decode(s, i, &nb), out);
         i += nb;
     }
-    return Value(std::move(out));
+    return ctx.ret(Value(std::move(out)));
 }
 
 // Rogne les codepoints présents dans `chars` (par codepoint, pas par octet) aux
@@ -103,49 +103,49 @@ static std::string trimCp(const std::string& s, const std::string& chars, bool l
     return (b >= e) ? std::string("") : s.substr(b, e - b);
 }
 
-static Value str_trim(CallCtx& ctx) {
+static int str_trim(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.trim");
     std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.trim")) : " ";
-    return Value(trimCp(s, chars, true, true));
+    return ctx.ret(Value(trimCp(s, chars, true, true)));
 }
 
-static Value str_ltrim(CallCtx& ctx) {
+static int str_ltrim(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.ltrim");
     std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.ltrim")) : " ";
-    return Value(trimCp(s, chars, true, false));
+    return ctx.ret(Value(trimCp(s, chars, true, false)));
 }
 
-static Value str_rtrim(CallCtx& ctx) {
+static int str_rtrim(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.rtrim");
     std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.rtrim")) : " ";
-    return Value(trimCp(s, chars, false, true));
+    return ctx.ret(Value(trimCp(s, chars, false, true)));
 }
 
 // string.char(s, i) : i-ème CARACTÈRE (codepoint UTF-8), 1-based ; renvoyé sous
 // forme de string ; "" si hors limites. (Index par codepoint, pas par octet.)
-static Value str_char(CallCtx& ctx) {
+static int str_char(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.char");
     int i = toIntSafe(numArg(args, argc, 1, "string.char"));
     size_t cnt = utf8Count(s);
     if (i < 1 || (size_t)i > cnt)
-        return Value(std::string(""));
+        return ctx.ret(Value(std::string("")));
     size_t b0 = utf8ByteOffset(s, (size_t)i - 1);
     size_t b1 = utf8ByteOffset(s, (size_t)i);
-    return Value(s.substr(b0, b1 - b0));
+    return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
 // string.substr(s, start[, length]) : sous-chaîne à partir du caractère start
 // (1-based), de length CARACTÈRES (jusqu'à la fin si omis) ; bornes ajustées, ""
 // si hors plage. (Comptage par codepoint UTF-8, pas par octet.)
-static Value str_substr(CallCtx& ctx) {
+static int str_substr(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.substr");
@@ -155,24 +155,24 @@ static Value str_substr(CallCtx& ctx) {
     if (start < 1)
         start = 1;
     if (len <= 0 || (size_t)start > cnt)
-        return Value(std::string(""));
+        return ctx.ret(Value(std::string("")));
     size_t startCp = (size_t)start - 1;
     size_t endCp = startCp + (size_t)len; // borné à cnt ci-dessous
     if (endCp > cnt)
         endCp = cnt;
     size_t b0 = utf8ByteOffset(s, startCp);
     size_t b1 = utf8ByteOffset(s, endCp);
-    return Value(s.substr(b0, b1 - b0));
+    return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
 // string.len(s) : nombre de CARACTÈRES (codepoints UTF-8) de la chaîne. Contrairement
 // au builtin global len (polymorphe : array/map/string/range), celui-ci n'accepte
 // QU'une string — un autre type lève une erreur (via strArg).
-static Value str_len(CallCtx& ctx) {
+static int str_len(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = strArg(args, argc, 0, "string.len");
-    return Value((int64_t)utf8Count(s));
+    return ctx.ret(Value((int64_t)utf8Count(s)));
 }
 
 Value makeStringModule() {

@@ -90,12 +90,12 @@ static int keyCode(std::string name) {
 
 // keyboard.isDown(key) : la touche est-elle enfoncée à cet instant ? true/false.
 // shift/ctrl/alt testent les deux côtés du clavier.
-static Value kbd_is_down(CallCtx& ctx) {
+static int kbd_is_down(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (s_blocked)
-        return Value((int64_t)0);   // éditeur focalisé → le jeu ne lit pas le clavier
+        return ctx.ret(Value((int64_t)0));   // éditeur focalisé → le jeu ne lit pas le clavier
     if (argc < 1 || !args[0].isString())
-        return Value((int64_t)0);
+        return ctx.ret(Value((int64_t)0));
     std::string name = args[0].asString();
     for (char& c : name)
         c = (char)std::tolower((unsigned char)c);
@@ -111,7 +111,7 @@ static Value kbd_is_down(CallCtx& ctx) {
         if (code >= 0)
             down = IsKeyDown(code);
     }
-    return Value((int64_t)(down ? 1 : 0));
+    return ctx.ret(Value((int64_t)(down ? 1 : 0)));
 }
 
 // Touches actuellement enfoncées (pour émettre keyrelease). Indexé par keycode

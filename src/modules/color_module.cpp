@@ -39,7 +39,7 @@ static Value colorField(const Value& self, const char* name) {
 // args[0] = self ; args[1..] = forme couleur flexible (voir parseColor) :
 //   Color(gris) · Color(gris, a) · Color(r, g, b) · Color(r, g, b, a) · Color(autreColor)
 
-static Value color_init(CallCtx& ctx) {
+static int color_init(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 2)
@@ -50,23 +50,23 @@ static Value color_init(CallCtx& ctx) {
     self.mapSet(Value(std::string("g")), Value(c.g));
     self.mapSet(Value(std::string("b")), Value(c.b));
     self.mapSet(Value(std::string("a")), Value(c.a));
-    return Value{};
+    return ctx.ret(Value{});
 }
 
 // ── __str ─────────────────────────────────────────────────────────────────────
 
-static Value color_str(CallCtx& ctx) {
+static int color_str(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1)
-        return Value(std::string("Color(0,0,0,1)"));
+        return ctx.ret(Value(std::string("Color(0,0,0,1)")));
     const Value& self = args[0];
     auto r = colorField(self, "r").asNum();
     auto g = colorField(self, "g").asNum();
     auto b = colorField(self, "b").asNum();
     auto a = colorField(self, "a").asNum();
-    return Value(std::string("Color(") + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
-                 std::to_string(a) + ")");
+    return ctx.ret(Value(std::string("Color(") + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
+                 std::to_string(a) + ")"));
 }
 
 // ── random ────────────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ static Value color_str(CallCtx& ctx) {
 // d'aucun receveur/argument : la classe vient du global `Color` (repli sur une
 // classe fraîche si le global n'est pas encore matérialisé).
 
-static Value color_random(CallCtx& ctx) {
+static int color_random(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     (void)args;
@@ -88,13 +88,13 @@ static Value color_random(CallCtx& ctx) {
     inst.mapSet(Value(std::string("g")), Value(rnd()));
     inst.mapSet(Value(std::string("b")), Value(rnd()));
     inst.mapSet(Value(std::string("a")), Value(1.0));
-    return inst;
+    return ctx.ret(inst);
 }
 
 // ── pastel ────────────────────────────────────────────────────────────────────
 // args[0] = self  → retourne une nouvelle instance Color pastel (mélange 50% blanc)
 
-static Value color_pastel(CallCtx& ctx) {
+static int color_pastel(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     (void)argc;
@@ -110,13 +110,13 @@ static Value color_pastel(CallCtx& ctx) {
     inst.mapSet(Value(std::string("g")), Value(g * 0.5 + 0.5));
     inst.mapSet(Value(std::string("b")), Value(b * 0.5 + 0.5));
     inst.mapSet(Value(std::string("a")), Value(a));
-    return inst;
+    return ctx.ret(inst);
 }
 
 // ── grayscale ─────────────────────────────────────────────────────────────────
 // args[0] = self  → retourne une nouvelle instance Color en niveaux de gris (luminance Rec. 601)
 
-static Value color_grayscale(CallCtx& ctx) {
+static int color_grayscale(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     (void)argc;
@@ -133,14 +133,14 @@ static Value color_grayscale(CallCtx& ctx) {
     inst.mapSet(Value(std::string("g")), Value(lum));
     inst.mapSet(Value(std::string("b")), Value(lum));
     inst.mapSet(Value(std::string("a")), Value(a));
-    return inst;
+    return ctx.ret(inst);
 }
 
 // ── gray (statique, AVEC paramètre) ──────────────────────────────────────────
 // Color.gray(v) → nouvelle Color grise de luminance v (clampée à [0,1]), a = 1.
 // Méthode statique avec un paramètre : grâce au flag static builtin, `v` est en
 // args[0] que l'appel soit Color.gray(x) OU c.gray(x) (aucun self injecté).
-static Value color_gray(CallCtx& ctx) {
+static int color_gray(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 1)
@@ -153,7 +153,7 @@ static Value color_gray(CallCtx& ctx) {
     inst.mapSet(Value(std::string("g")), Value(v));
     inst.mapSet(Value(std::string("b")), Value(v));
     inst.mapSet(Value(std::string("a")), Value(1.0));
-    return inst;
+    return ctx.ret(inst);
 }
 
 // ── makeColorClass ────────────────────────────────────────────────────────────

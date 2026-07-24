@@ -2,7 +2,7 @@
 #include "../vm.h"
 #include <stdexcept>
 
-static Value arr_map(CallCtx& ctx) {
+static int arr_map(CallCtx& ctx) {
     if (ctx.argc < 2 || !ctx.args[0].isArray())
         throw std::runtime_error("array.map: expected (array, fn)");
     Value& arr = ctx.args[0];
@@ -15,10 +15,10 @@ static Value arr_map(CallCtx& ctx) {
         Value args[2] = {val, idx};
         result.arrayPush(ctx.vm->callValue(fn, args, 2));
     }
-    return result;
+    return ctx.ret(result);
 }
 
-static Value arr_filter(CallCtx& ctx) {
+static int arr_filter(CallCtx& ctx) {
     if (ctx.argc < 2 || !ctx.args[0].isArray())
         throw std::runtime_error("array.filter: expected (array, fn)");
     Value& arr = ctx.args[0];
@@ -32,10 +32,10 @@ static Value arr_filter(CallCtx& ctx) {
         if (!isFalsy(ctx.vm->callValue(fn, args, 2)))
             result.arrayPush(val);
     }
-    return result;
+    return ctx.ret(result);
 }
 
-static Value arr_reduce(CallCtx& ctx) {
+static int arr_reduce(CallCtx& ctx) {
     if (ctx.argc < 3 || !ctx.args[0].isArray())
         throw std::runtime_error("array.reduce: expected (array, fn, init)");
     Value& arr = ctx.args[0];
@@ -48,7 +48,7 @@ static Value arr_reduce(CallCtx& ctx) {
         Value args[3] = {acc, val, idx};
         acc = ctx.vm->callValue(fn, args, 3);
     }
-    return acc;
+    return ctx.ret(acc);
 }
 
 Value makeArrayModule() {
