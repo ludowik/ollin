@@ -9,23 +9,14 @@ func setup()
     camera.open(W / scale, H / scale)
 end
 
-func toGrayscale(img)
-    image.beginPixels(img)
-    for y = 0, img.height - 1 do
-        for x = 0, img.width - 1 do
-            var r, g, b, a = image.getPixel(img, x, y)
-            var lum = 0.299 * r + 0.587 * g + 0.114 * b
-            image.setPixel(img, x, y, lum, lum, lum, a)
-        end
-    end
-    image.endPixels(img)
-end
-
 func update()
     if camera.isOpen() then
         frame = camera.capture()
         if frame then
-            toGrayscale(frame)
+            image.mapPixel(frame, func(x, y, r, g, b, a)
+                var lum = 0.299 * r + 0.587 * g + 0.114 * b
+                return lum, lum, lum, a
+            end)
         end
     end
 end

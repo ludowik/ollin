@@ -23,6 +23,9 @@ class VM {
     Value callValue(const Value& fn, const Value& a);
     Value callValue(const Value& fn, const Value& a, const Value& b);
     Value callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d);
+    // Comme callValue mais récupère jusqu'à out_cap valeurs de retour (multi-retour
+    // natif→Ollin) ; renvoie le nombre effectivement écrit dans out.
+    int callValueMulti(const Value& fn, const Value* args, int argc, Value* out, int out_cap);
     Value getGlobal(const std::string& name) const; // returns nil if not found
     void setGlobal(const std::string& name, const Value& value);
     // Après execute() : appelle setup() une fois, puis lance la boucle graphique via

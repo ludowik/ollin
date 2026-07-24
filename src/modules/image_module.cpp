@@ -1,4 +1,5 @@
 #include "image_module.h"
+#include "../vm.h"
 #include "modules/module_utils.h"
 #include <cstdint>
 #include <memory>
@@ -488,6 +489,61 @@ static int img_set_pixel(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
+// ── image.mapPixel(img, f) ──────────────────────────────────────────────────
+
+// Applique f(x, y, r, g, b, a) → r, g, b, a à chaque pixel (x,y entiers 0-based ;
+// canaux [0,1]). beginPixels/endPixels sont gérés en interne. Les valeurs de retour
+// manquantes ou non numériques laissent le canal d'origine inchangé.
+static int img_map_pixel(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    static constexpr const char* FN = "image.mapPixel";
+    if (argc < 2)
+        throw std::runtime_error(std::string(FN) + ": expected img, fn");
+    TexHandle& h = handlePtr(args[0], FN);
+    Value fn = args[1];
+    if (!fn.isBuiltin() && !fn.isFuncVal() && !fn.isClosure())
+        throw std::runtime_error(std::string(FN) + ": second argument must be a function");
+    pixelsOpen(h);
+    VM* vm = ctx.vm;
+    const int w = h.cpu.width;
+    const int hgt = h.cpu.height;
+    try {
+        for (int y = 0; y < hgt; ++y) {
+            for (int x = 0; x < w; ++x) {
+                // lecture depuis l'ombre CPU courante (le callback a pu la muter au tour précédent)
+                Color c;
+                if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 && x < h.cpu.width && y < h.cpu.height) {
+                    const uint8_t* px = (const uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
+                    c = {px[0], px[1], px[2], px[3]};
+                } else {
+                    c = GetImageColor(h.cpu, x, y);
+                }
+                Value in[6] = {Value((int64_t)x),   Value((int64_t)y),   Value(c.r / 255.0),
+                               Value(c.g / 255.0), Value(c.b / 255.0), Value(c.a / 255.0)};
+                Value out[4];
+                int n = vm->callValueMulti(fn, in, 6, out, 4);
+                uint8_t ch[4] = {c.r, c.g, c.b, c.a};
+                for (int i = 0; i < n; ++i)
+                    if (out[i].isNumber())
+                        ch[i] = (uint8_t)(out[i].asNum() * 255.0 + 0.5);
+                Color nc = {ch[0], ch[1], ch[2], ch[3]};
+                // écriture recalculée : le callback a pu réallouer/redimensionner h.cpu
+                if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 && x < h.cpu.width && y < h.cpu.height) {
+                    uint8_t* px = (uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
+                    px[0] = nc.r; px[1] = nc.g; px[2] = nc.b; px[3] = nc.a;
+                } else {
+                    ImageDrawPixel(&h.cpu, x, y, nc);
+                }
+            }
+        }
+    } catch (...) {
+        pixelsClose(h);
+        throw;
+    }
+    pixelsClose(h);
+    return ctx.ret(Value{});
+}
+
 // ── image_draw_sprite ─────────────────────────────────────────────────────────
 
 void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned char cr, unsigned char cg,
@@ -574,5 +630,6 @@ Value makeImageModule() {
     m.mapSet(Value(std::string("endPixels")), Value::makeBuiltin(img_end_pixels));
     m.mapSet(Value(std::string("getPixel")), Value::makeBuiltin(img_get_pixel));
     m.mapSet(Value(std::string("setPixel")), Value::makeBuiltin(img_set_pixel));
+    m.mapSet(Value(std::string("mapPixel")), Value::makeBuiltin(img_map_pixel));
     return m;
 }

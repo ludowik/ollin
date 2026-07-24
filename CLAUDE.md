@@ -608,3 +608,13 @@ les cibles, et les valeurs excédentaires tombent dans les temporaires du frame
 
 Les 6 sites d'appel builtin (vm.cpp : `CALL_DYN`, `CALL_METHOD`, `invokeStr`,
 init ctor, hook `run`, `callValue`) fixent `result_cap` puis `last_results_ = fn(ctx)`.
+
+**Sens inverse (natif→Ollin), multi-retour** : `VM::callValue` (utilisé par les
+builtins d'ordre supérieur — `array.map/filter/reduce`, `mouse`/`keyboard`, …)
+rappelle une fonction Ollin mais ne renvoie qu'**une** valeur (`regs[call_base]`).
+Pour récupérer plusieurs retours (ex. `image.mapPixel` dont le callback renvoie
+`r,g,b,a`), utiliser `VM::callValueMulti(fn, args, argc, out, out_cap) → n` : après
+`runGoto`, les valeurs de retour sont déjà en `regs[call_base..]` et `last_results_`
+en donne le compte ; la méthode en recopie `min(last_results_, out_cap)` dans `out`
+avant de rétrécir `regs`. Aucun mécanisme moteur nouveau — seulement la lecture des
+valeurs déjà produites.

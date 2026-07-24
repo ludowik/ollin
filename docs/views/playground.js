@@ -242,6 +242,7 @@ const MODULE_MEMBERS = {
     fn('image.getPixel','getPixel(img, x, y) → r, g, b, a'),
     fn('image.beginPixels','beginPixels(img)'),
     fn('image.endPixels','endPixels(img)'),
+    fn('image.mapPixel','mapPixel(img, f(x,y,r,g,b,a) → r,g,b,a)'),
   ],
   colors: [
     cst('colors.BLACK',''),   cst('colors.WHITE',''),  cst('colors.RED',''),

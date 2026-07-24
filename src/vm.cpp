@@ -507,6 +507,52 @@ Value VM::callValue(const Value& fn, const Value* args, int argc) {
     return result;
 }
 
+int VM::callValueMulti(const Value& fn, const Value* args, int argc, Value* out, int out_cap) {
+    if (out_cap <= 0)
+        return 0;
+    if (fn.isBuiltin()) {
+        std::vector<Value> buf(std::max(argc, out_cap));
+        for (int i = 0; i < argc; ++i)
+            buf[i] = args[i];
+        int n = invokeBuiltin(fn.asBuiltin(), buf.data(), argc, (int)buf.size());
+        int m = n < out_cap ? n : out_cap;
+        for (int i = 0; i < m; ++i)
+            out[i] = buf[i];
+        return m;
+    }
+    uint8_t fi;
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
+    if (fn.isFuncVal()) {
+        fi = (uint8_t)fn.asInt();
+    } else if (fn.isClosure()) {
+        fi = fn.asClosure()->func_idx;
+        const auto& uvs = fn.asClosure()->upvals;
+        if (!uvs.empty())
+            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
+    } else {
+        throw std::runtime_error("callValue: not callable");
+    }
+    int call_base = (int)regs.size();
+    if (argc > 0) {
+        growRegs((size_t)(call_base + argc));
+        for (int i = 0; i < argc; i++)
+            regs[call_base + i] = args[i];
+    }
+    uint32_t saved_ip = ip;
+    ip = pushCallFrame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
+    runGoto(call_stack.size() - 1);
+    // Les valeurs de retour de f sont en regs[call_base..], last_results_ en donne le compte.
+    int avail = (int)regs.size() - call_base;
+    int n = last_results_ < avail ? last_results_ : avail;
+    if (n > out_cap)
+        n = out_cap;
+    for (int i = 0; i < n; ++i)
+        out[i] = regs[call_base + i];
+    regs.resize(call_base);
+    ip = saved_ip;
+    return n;
+}
+
 Value VM::callValue(const Value& fn) {
     return callValue(fn, nullptr, 0);
 }
