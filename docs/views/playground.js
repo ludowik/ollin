@@ -19,8 +19,12 @@ export async function init(ctx) {
 const { getOllin, hardReload } = ctx
 const disposers = []   // écouteurs globaux à retirer au démontage
 
-const Store = await import('../pg-store.js?v=' + ctx.v)
-const GH    = await import('../pg-github.js?v=' + ctx.v)
+// Stockage via la couche d'abstraction (pg-provider) : `Store` = magasin de
+// travail (défaut local), `GH` = fournisseur distant (défaut GitHub). Brancher
+// un autre backend se fait dans pg-provider.js, sans toucher aux sites d'appel.
+const Prov  = await import('../pg-provider.js?v=' + ctx.v)
+const Store = await Prov.getProvider(ctx.v)
+const GH    = await Prov.getRemote(ctx.v)
 const Run   = await import('../pg-run.js?v=' + ctx.v)   // exécution partagée avec run.html
 const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // formateur « à la demande »
 const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)

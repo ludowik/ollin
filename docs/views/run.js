@@ -11,7 +11,7 @@ export async function init(ctx) {
 
   // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
   // session réutilise la même URL → pas de croissance du registre de modules).
-  const Store = await import('../pg-store.js?v=' + ctx.v)
+  const Store = await (await import('../pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
   const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
 
