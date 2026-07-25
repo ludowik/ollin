@@ -441,4 +441,25 @@ assert(len(va_a) == 3 and va_a[2] == 1 and va_a[3] == 2)  ## [x, g()] étendu
 func va_one(x) return x end
 assert(va_one(va_pair()) == 1)
 
+## ── Compilateur : masquage lexical par bloc ─────────────────────────────────
+## Un `var` dans un bloc imbriqué masque la locale externe (registre distinct) ;
+## l'externe est intacte après le bloc. Régressé un temps par bindScanLocals qui
+## réutilisait le registre externe quand le nom était déjà lié (portée héritée).
+var shadow_x = 1
+do
+    var shadow_x = 99
+    assert(shadow_x == 99)
+end
+assert(shadow_x == 1)
+## l'initialisateur lit la portée d'avant la déclaration (var z = z externe)
+func shadow_outer()
+    var z = 3
+    do
+        var z = z + 100   ## RHS = z externe (3)
+        assert(z == 103)
+    end
+    return z              ## externe intacte
+end
+assert(shadow_outer() == 3)
+
 print("regressions ok")

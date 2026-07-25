@@ -504,10 +504,11 @@ void Compiler::visit(const VarDeclStmt& s) {
 
 static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
 
-void Compiler::bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs) {
+void Compiler::bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
+                              const std::unordered_set<std::string>& skip) {
     for (auto& name : names) {
-        if (local_regs_.count(name))
-            continue; // déjà lié (param, self, variable de catch)
+        if (skip.count(name))
+            continue; // prologue de la portée courante (param, self, catch var) — déjà lié
         if (funcs.count(name))
             local_regs_[name] = reg_top_++;      // fonction locale : visible d'emblée (récursion / réf. en avant)
         else
@@ -792,7 +793,10 @@ void Compiler::visit(const TryCatchStmt& s) {
         std::vector<std::string> catch_ls;
         std::unordered_set<std::string> catch_funcs;
         collectLocals(s.catch_body, catch_ls, chunk.source_files, true, &catch_funcs);
-        bindScanLocals(catch_ls, catch_funcs);
+        std::unordered_set<std::string> catch_skip;
+        if (!s.catch_var.empty())
+            catch_skip.insert(s.catch_var);
+        bindScanLocals(catch_ls, catch_funcs, catch_skip);
         int catch_top = reg_top_;
         locals_top_ = catch_top;
         if (reg_top_ > reg_count_)
@@ -856,7 +860,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
     std::unordered_set<std::string> body_funcs;
     collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
-    bindScanLocals(body_locals, body_funcs);
+    bindScanLocals(body_locals, body_funcs, {s.params.begin(), s.params.end()});
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 
@@ -975,7 +979,7 @@ void Compiler::visit(const FuncExpr& s) {
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
     std::unordered_set<std::string> body_funcs;
     collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
-    bindScanLocals(body_locals, body_funcs);
+    bindScanLocals(body_locals, body_funcs, {s.params.begin(), s.params.end()});
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 
@@ -2125,7 +2129,10 @@ uint8_t Compiler::compileMethodFunc(const FuncDeclStmt& s) {
     body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
     std::unordered_set<std::string> body_funcs;
     collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
-    bindScanLocals(body_locals, body_funcs);
+    std::unordered_set<std::string> method_skip(s.params.begin(), s.params.end());
+    if (!s.is_static)
+        method_skip.insert("self");
+    bindScanLocals(body_locals, body_funcs, method_skip);
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 

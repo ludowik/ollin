@@ -102,9 +102,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
 
     // Réserve un registre pour chaque locale pré-scannée. Les fonctions (funcs) sont
     // liées d'emblée dans local_regs_ (récursion / références en avant) ; les var/const
-    // sont différées dans pending_var_reg_ (portée lexicale). Les noms déjà liés
-    // (params, self, catch var) sont laissés tels quels.
-    void bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs);
+    // sont différées dans pending_var_reg_ (portée lexicale). `skip` = noms du prologue
+    // de la portée COURANTE (params, self, catch var) : laissés tels quels. Un nom hérité
+    // d'une portée englobante n'est PAS dans skip → il obtient un registre neuf (masquage).
+    void bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
+                        const std::unordered_set<std::string>& skip = {});
 
     // Charge la valeur appelable nommée `name` dans le registre `reg` (locale, upvalue,
     // fonction top-level via LOAD_FUNC, ou global via LOAD_GLOBAL).
