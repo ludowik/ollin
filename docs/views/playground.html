@@ -370,8 +370,7 @@ canvas#canvas {
 #project-btn:hover:not(:disabled) { border-color: var(--accent); }
 #project-btn:disabled { opacity: 0.5; cursor: default; }
 /* pastille d'état de synchro GitHub (persistante, visible mobile+PC) :
-   jaune = distant plus récent (Pull) · bleu = local plus récent (Push) · vert = à jour */
-#project-btn.sync-remote::after,
+   bleu = local à pousser (dirty) · vert = synchronisé */
 #project-btn.sync-local::after,
 #project-btn.sync-syncing::after,
 #project-btn.sync-ok::after {
@@ -379,7 +378,6 @@ canvas#canvas {
   width: 9px; height: 9px; border-radius: 50%;
   border: 2px solid var(--surface);
 }
-#project-btn.sync-remote::after  { background: var(--yellow); }
 #project-btn.sync-local::after   { background: var(--blue); }
 #project-btn.sync-syncing::after { background: var(--blue); animation: sync-pulse 1s ease-in-out infinite; }
 #project-btn.sync-ok::after      { background: var(--green); }
@@ -450,14 +448,6 @@ canvas#canvas {
 #gh-rail { border-bottom: 1px solid var(--border); }
 #gh-rail-body { padding: 6px 8px; display: flex; flex-direction: column; gap: 4px; }
 .gh-repo { font-size: 11px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gh-btn {
-  display: flex; align-items: center; gap: 6px; width: 100%;
-  background: var(--surface2); border: 1px solid var(--border); border-radius: 5px;
-  color: var(--text); font-size: 12px; padding: 5px 8px; cursor: pointer; text-align: left;
-}
-.gh-btn:hover { border-color: var(--accent); color: var(--accent); }
-.gh-auto { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--dim); cursor: pointer; margin-top: 2px; }
-.gh-auto input { margin: 0; cursor: pointer; }
 .rail-empty { padding: 6px 8px; font-size: 12px; color: var(--dim); font-style: italic; }
 .file-item {
   display: flex; align-items: center; justify-content: space-between; gap: 4px;

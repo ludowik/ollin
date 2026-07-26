@@ -256,47 +256,14 @@ export async function pushProject(project, message, opts = {}) {
   const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
   const baseTree = baseCommit.tree.sha
 
-  // État distant courant (sert au garde-fou de conflit ET aux suppressions).
+  // État distant courant (sert aux suppressions ; le renommage retire l'ancien dossier).
   const oldSlug = project.remote && project.remote.slug
   const trackedSlug = oldSlug || slug
   const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })   // réutilise le contexte déjà résolu
 
-  // Garde-fou : le dossier distant correspond-il à notre dernière synchro ?
-  // Base = SHA du dernier commit du dossier, fourni PAR GitHub (pas une
-  // empreinte recalculée en relisant l'arbre — instable à cause de la cohérence
-  // ÉVENTUELLE de l'API juste après un push → faux conflits en mono-poste).
-  if (!opts.force) {
-    let current
-    try {
-      // Lire le dossier depuis l'arbre du commit de base (`baseTree`, par SHA =
-      // content-addressed, donc lecture read-after-write cohérente) plutôt que via un
-      // 2e appel `git/trees/{branch}` (résolution de ref → cohérence ÉVENTUELLE :
-      // renvoyait un SHA périmé juste après NOTRE propre push et déclenchait un faux
-      // conflit à la sauvegarde suivante, aggravé par l'auto-sync qui pousse souvent).
-      // `baseSha` est forcément à jour — sinon le PATCH de ref (fin de push, sans force)
-      // échouerait en non-fast-forward — donc son arbre reflète l'état réel du dépôt.
-      const rootTree = await ghJson(`${base}/git/trees/${baseTree}`)
-      current = (rootTree.tree || []).find(e => e.path === trackedSlug && e.type === 'tree')?.sha || null
-    } catch (_) {
-      // Lecture de l'état distant impossible : NE PAS écraser en silence.
-      const err = new Error('Impossible de vérifier l’état du dépôt distant — réessaie.')
-      err.code = 'VERIFY_FAILED'
-      throw err
-    }
-    const known  = (project.remote && project.remote.folderSha) || null
-    const linked = !!(project.remote && project.remote.slug)   // déjà synchronisé ≥ 1 fois
-    // Politique push (anti-écrasement) : avec une base connue, alerter dès qu'elle
-    // diffère du distant (autre poste). Sans base connue, deux cas : projet DÉJÀ
-    // lié par une version antérieure sans `folderSha` → on fait confiance (pas de
-    // faux conflit) ; projet jamais lié dont le slug est déjà pris → on alerte
-    // (on écraserait le travail d'autrui). Après ce push, remote.folderSha est posé.
-    const conflict = known !== null ? folderMoved(current, known) : (current !== null && !linked)
-    if (conflict) {
-      const err = new Error('Le projet a été modifié sur GitHub depuis ta dernière synchro.')
-      err.code = 'CONFLICT'
-      throw err
-    }
-  }
+  // Pas de garde-fou de conflit ici : le modèle de synchro (drapeau `dirty`, usage
+  // mono-personne) fait du LOCAL l'autorité au push. La réconciliation avec un
+  // distant divergent se fait à l'OUVERTURE (syncOnOpen, côté playground), pas ici.
 
   const tree = []
   for (const rel in (project.files || {})) {

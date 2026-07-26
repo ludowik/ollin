@@ -172,6 +172,7 @@ export async function createProject(name) {
     createdAt: now,
     updatedAt: now,
     remote: null,
+    dirty: true,   // à pousser sur le distant (drapeau de synchro)
   }
   writeManifest(project)
   const store = await tx('readwrite')
@@ -249,6 +250,7 @@ async function migrateIfNeeded() {
     createdAt: now,
     updatedAt: now,
     remote: null,
+    dirty: true,   // à pousser sur le distant (drapeau de synchro)
   }
   writeManifest(project)
   const rw = await tx('readwrite')
