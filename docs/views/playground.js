@@ -28,6 +28,17 @@ const GH    = await Prov.getRemote(ctx.v)
 const Run   = await import('../pg-run.js?v=' + ctx.v)   // exécution partagée avec run.html
 const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // formateur « à la demande »
 const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
+const { createRemoteSync } = await import('../pg-sync.js?v=' + ctx.v)
+
+// Coordinateur de sauvegarde distante : chaque sauvegarde locale d'un projet lié
+// planifie un push GitHub différé (anti-rafale, single-flight, tolérant hors-ligne).
+// La mécanique réelle est fournie plus bas (sharedRemotePush / canAutoPush).
+const sync = createRemoteSync({
+  doPush:  p => sharedRemotePush(p),
+  canPush: p => canAutoPush(p),
+  onError: (err, p) => onRemoteSyncError(err, p),
+})
+disposers.push(() => sync.cancel())
 
 // Barre d'outils collee au haut du VISIBLE quand le clavier mobile s'ouvre
 // (sinon elle derive/disparait sur iOS). Actif tant que la vue est montee.
@@ -802,8 +813,17 @@ function flushEditorToFile() {
 function scheduleSave() {
   if (!currentProject || isExample()) return   // un exemple ne se persiste jamais
   flushEditorToFile()
-  updateSyncBadge()   // une frappe non poussée → pastille bleue (local plus récent)
-  Store.saveProject(currentProject).catch(e => console.error('saveProject', e))
+  persist(currentProject)
+}
+
+// Sauvegarde unifiée d'une modif du projet courant : persiste en local
+// (instantané) PUIS planifie un push distant différé si le projet y est éligible.
+// Source unique remplaçant les Store.saveProject dispersés (frappe + mutations de
+// structure) → toute modification suit le même chemin de synchronisation.
+function persist(project) {
+  updateSyncBadge()      // frappe non poussée → pastille bleue (local en avance)
+  sync.schedule(project) // push distant différé (no-op si non lié / opt-out / conflit)
+  return Store.saveProject(project).catch(e => console.error('saveProject', e))
 }
 
 // ── liste latérale de fichiers ──
@@ -828,6 +848,27 @@ function renderGhRail() {
   pullBtn.innerHTML = '⬇ <span>Pull</span>'
   pullBtn.onclick = () => { closeMenu(); ghPull() }
   ghRailBody.appendChild(pullBtn)
+
+  // Opt-out par projet : couper l'auto-push (le projet reste éditable, Push/Pull
+  // manuels restent disponibles). Persisté dans le projet (project.autoRemote).
+  const auto = document.createElement('label')
+  auto.className = 'gh-auto'
+  const chk = document.createElement('input')
+  chk.type = 'checkbox'
+  chk.checked = autoRemoteOn(p)
+  chk.onchange = () => {
+    p.autoRemote = chk.checked
+    Store.saveProject(p).catch(() => {})
+    if (chk.checked) sync.schedule(p)   // réactivation → pousse l'état courant
+    else sync.cancel()
+    updateSyncBadge()
+  }
+  auto.appendChild(chk)
+  const txt = document.createElement('span')
+  txt.textContent = 'Sauvegarde auto'
+  auto.appendChild(txt)
+  auto.title = 'Pousser automatiquement vers GitHub à chaque sauvegarde'
+  ghRailBody.appendChild(auto)
 }
 
 function renderFiles() {
@@ -898,7 +939,7 @@ async function newFile() {
   if (currentProject.files[name] !== undefined) { alert('Ce fichier existe déjà.'); return }
   flushEditorToFile()
   currentProject.files[name] = ''
-  await Store.saveProject(currentProject)
+  await persist(currentProject)
   openFile(name)
 }
 
@@ -913,7 +954,7 @@ async function renameFile(path) {
   delete currentProject.files[path]
   if (currentProject.entry === path) currentProject.entry = name
   if (currentFile === path) currentFile = name
-  await Store.saveProject(currentProject)
+  await persist(currentProject)
   localStorage.setItem(fileKey(currentProject.id), currentFile)
   setEditorText(currentProject.files[currentFile] ?? '')
   renderGhRail(); renderFiles()
@@ -925,14 +966,14 @@ async function deleteFile(path) {
   delete currentProject.files[path]
   if (currentProject.entry === path) currentProject.entry = scripts(currentProject)[0]
   if (currentFile === path) currentFile = currentProject.entry
-  await Store.saveProject(currentProject)
+  await persist(currentProject)
   setEditorText(currentProject.files[currentFile] ?? '')
   renderGhRail(); renderFiles()
 }
 
 async function setEntry(path) {
   currentProject.entry = path
-  await Store.saveProject(currentProject)
+  await persist(currentProject)
   renderGhRail(); renderFiles()
 }
 
@@ -967,7 +1008,7 @@ async function renameResource(name) {
   if (currentProject.resources[n] !== undefined) { alert('Ce nom est déjà pris.'); return }
   currentProject.resources[n] = currentProject.resources[name]
   delete currentProject.resources[name]
-  await Store.saveProject(currentProject)
+  await persist(currentProject)
   if (ollin && ollin.preloadImage) {
     const r = currentProject.resources[n]
     ollin.preloadImage(n, r.b64, r.ext)
@@ -978,7 +1019,7 @@ async function renameResource(name) {
 async function deleteResource(name) {
   if (!confirm(`Supprimer la ressource « ${name} » ?`)) return
   delete currentProject.resources[name]
-  await Store.saveProject(currentProject)
+  await persist(currentProject)
   renderResources()
 }
 
@@ -1255,13 +1296,22 @@ async function ghPush(force) {
   flushEditorToFile(); await Store.saveProject(currentProject)
   setStatus('Envoi vers GitHub…')
   try {
-    await GH.ensureRepo()
-    await GH.pushProject(currentProject, null, { force })
-    currentProject.remote.localSha = localContentSha(currentProject)   // base locale = poussée
-    await Store.saveProject(currentProject)   // persister project.remote (folderSha, localSha)
-    syncRemoteAhead = false
-    updateSyncBadge()
-    renderGhRail()
+    if (force) {
+      // Écrasement explicite (après confirmation d'un conflit) : push direct hors
+      // coordinateur, avec l'option force.
+      setSyncDot('syncing')
+      await GH.ensureRepo()
+      await GH.pushProject(currentProject, null, { force: true })
+      currentProject.remote.localSha = localContentSha(currentProject)
+      await Store.saveProject(currentProject)
+      syncRemoteAhead = false
+      updateSyncBadge()
+      renderGhRail()
+    } else {
+      // Flush immédiat via le coordinateur → single-flight partagé avec l'auto-sync
+      // (aucun push concurrent) ; sharedRemotePush met à jour localSha + pastille.
+      await sync.flush(currentProject)
+    }
     setStatus('Poussé sur GitHub ✓', true)
   } catch (e) {
     if (e.code === 'CONFLICT') {
@@ -1345,9 +1395,55 @@ function localContentSha(project) {
 }
 
 function setSyncDot(state) {
-  projectBtn.classList.toggle('sync-remote', state === 'remote')
-  projectBtn.classList.toggle('sync-local',  state === 'local')
-  projectBtn.classList.toggle('sync-ok',     state === 'ok')
+  projectBtn.classList.toggle('sync-remote',  state === 'remote')
+  projectBtn.classList.toggle('sync-local',   state === 'local')
+  projectBtn.classList.toggle('sync-syncing', state === 'syncing')
+  projectBtn.classList.toggle('sync-ok',      state === 'ok')
+}
+
+// ── Sauvegarde distante automatique : éligibilité + mécanique ────────────────
+// Opt-out PAR PROJET : `project.autoRemote` (absent/true = actif, false = coupé).
+// Un projet est auto-poussé s'il est LIÉ (remote.slug — posé au 1er push/pull ou
+// à la création si un dépôt est configuré), GitHub connecté, l'opt-in actif, et
+// qu'aucune version distante plus récente n'est en attente (sinon Pull requis).
+function autoRemoteOn(p) {
+  return !!p && p.autoRemote !== false
+}
+function canAutoPush(p) {
+  return !!(p && !isExample() && p.remote && p.remote.slug
+            && GH.isConnected() && GH.getRepo()
+            && autoRemoteOn(p) && !syncRemoteAhead)
+}
+
+// Push réel partagé par l'auto-sync ET le bouton Push manuel (via sync.flush) :
+// pastille « syncing » pendant l'envoi, met à jour localSha + pastille au succès.
+// Propage l'erreur (le coordinateur re-planifie en auto ; le manuel gère le conflit).
+async function sharedRemotePush(project) {
+  if (project === currentProject) setSyncDot('syncing')
+  await GH.ensureRepo()
+  await GH.pushProject(project, null, {})
+  project.remote.localSha = localContentSha(project)   // base locale = ce qui vient d'être poussé
+  await Store.saveProject(project)
+  syncRemoteAhead = false
+  if (project === currentProject) {
+    updateSyncBadge()
+    renderGhRail()
+  }
+}
+
+// onError du coordinateur (chemin AUTO uniquement) : un conflit distant bascule
+// la pastille en jaune (Pull requis, jamais d'écrasement auto) ; les autres
+// erreurs (hors-ligne, token) restent discrètes — l'état reste « sale » et sera
+// repoussé plus tard par le coordinateur.
+function onRemoteSyncError(err, project) {
+  if (project !== currentProject) return
+  if (err && err.code === 'CONFLICT') {
+    syncRemoteAhead = true
+    updateSyncBadge()
+    setStatus('⬇ Version plus récente sur GitHub — « Récupérer (Pull) » avant de pousser', true)
+  } else {
+    updateSyncBadge()   // repli sur l'état local (bleu) sans message intrusif
+  }
 }
 
 // Rafraîchit la pastille depuis l'état courant (sans réseau) : distant en avance →
@@ -1955,7 +2051,7 @@ imgFileInput.addEventListener('change', () => {
     reader.onload = async e => {
       const b64 = (e.target.result.split(',')[1]) ?? ''   // "data:...;base64,xxxx"
       currentProject.resources[name] = { b64, ext }
-      await Store.saveProject(currentProject)
+      await persist(currentProject)
       if (ollin) {
         // Modèles 3D → preloadModel ; images → preloadImage.
         if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && ollin.preloadModel) {
