@@ -154,6 +154,26 @@ static int cam_orbit(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
+// cam.getViewDir() : direction de visée NORMALISÉE (cible - position) → map {x,y,z}.
+// Cible confondue avec la position (vecteur nul) → renvoie {x:0, y:0, z:0}.
+static int cam_get_view_dir(CallCtx& ctx) {
+    Value self = ctx.args[0];
+    double dx = camField(self, "tx") - camField(self, "px");
+    double dy = camField(self, "ty") - camField(self, "py");
+    double dz = camField(self, "tz") - camField(self, "pz");
+    double len = std::sqrt(dx * dx + dy * dy + dz * dz);
+    if (len > 0.0) {
+        dx /= len;
+        dy /= len;
+        dz /= len;
+    }
+    Value dir = Value::makeMap();
+    dir.mapSet(Value(std::string("x")), Value(dx));
+    dir.mapSet(Value(std::string("y")), Value(dy));
+    dir.mapSet(Value(std::string("z")), Value(dz));
+    return ctx.ret(dir);
+}
+
 static Value makeCameraClass() {
     Value cls = Value::makeClass();
     cls.mapSet(Value(std::string("__name__")), Value(std::string("Camera")));
@@ -162,6 +182,7 @@ static Value makeCameraClass() {
     cls.mapSet(Value(std::string("move")), Value::makeBuiltin(cam_move));
     cls.mapSet(Value(std::string("orbit")), Value::makeBuiltin(cam_orbit));
     cls.mapSet(Value(std::string("zoom")), Value::makeBuiltin(cam_zoom));
+    cls.mapSet(Value(std::string("getViewDir")), Value::makeBuiltin(cam_get_view_dir));
     return cls;
 }
 
@@ -173,7 +194,7 @@ static Value cameraClass() {
 
 // graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : INSTANCE de classe Camera.
 // Regarde (tx,ty,tz) depuis (px,py,pz), up = +Y, fovy = champ de vision vertical
-// (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit/zoom).
+// (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit/zoom) ; getViewDir renvoie la direction de visée {x,y,z}.
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::makeMap();
