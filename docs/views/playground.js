@@ -1298,15 +1298,8 @@ async function ghPush(force) {
   try {
     if (force) {
       // Écrasement explicite (après confirmation d'un conflit) : push direct hors
-      // coordinateur, avec l'option force.
-      setSyncDot('syncing')
-      await GH.ensureRepo()
-      await GH.pushProject(currentProject, null, { force: true })
-      currentProject.remote.localSha = localContentSha(currentProject)
-      await Store.saveProject(currentProject)
-      syncRemoteAhead = false
-      updateSyncBadge()
-      renderGhRail()
+      // coordinateur, avec l'option force (même mécanique que sharedRemotePush).
+      await sharedRemotePush(currentProject, true)
     } else {
       // Flush immédiat via le coordinateur → single-flight partagé avec l'auto-sync
       // (aucun push concurrent) ; sharedRemotePush met à jour localSha + pastille.
@@ -1418,10 +1411,10 @@ function canAutoPush(p) {
 // Push réel partagé par l'auto-sync ET le bouton Push manuel (via sync.flush) :
 // pastille « syncing » pendant l'envoi, met à jour localSha + pastille au succès.
 // Propage l'erreur (le coordinateur re-planifie en auto ; le manuel gère le conflit).
-async function sharedRemotePush(project) {
+async function sharedRemotePush(project, force) {
   if (project === currentProject) setSyncDot('syncing')
   await GH.ensureRepo()
-  await GH.pushProject(project, null, {})
+  await GH.pushProject(project, null, { force })
   project.remote.localSha = localContentSha(project)   // base locale = ce qui vient d'être poussé
   await Store.saveProject(project)
   syncRemoteAhead = false
