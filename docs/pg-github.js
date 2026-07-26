@@ -268,7 +268,15 @@ export async function pushProject(project, message, opts = {}) {
   if (!opts.force) {
     let current
     try {
-      current = await folderTreeSha(base, branch, trackedSlug)
+      // Lire le dossier depuis l'arbre du commit de base (`baseTree`, par SHA =
+      // content-addressed, donc lecture read-after-write cohérente) plutôt que via un
+      // 2e appel `git/trees/{branch}` (résolution de ref → cohérence ÉVENTUELLE :
+      // renvoyait un SHA périmé juste après NOTRE propre push et déclenchait un faux
+      // conflit à la sauvegarde suivante, aggravé par l'auto-sync qui pousse souvent).
+      // `baseSha` est forcément à jour — sinon le PATCH de ref (fin de push, sans force)
+      // échouerait en non-fast-forward — donc son arbre reflète l'état réel du dépôt.
+      const rootTree = await ghJson(`${base}/git/trees/${baseTree}`)
+      current = (rootTree.tree || []).find(e => e.path === trackedSlug && e.type === 'tree')?.sha || null
     } catch (_) {
       // Lecture de l'état distant impossible : NE PAS écraser en silence.
       const err = new Error('Impossible de vérifier l’état du dépôt distant — réessaie.')
