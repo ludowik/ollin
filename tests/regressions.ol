@@ -462,4 +462,33 @@ func shadow_outer()
 end
 assert(shadow_outer() == 3)
 
+## ── Formatage {expr:spec} (interpolation) et {N:spec} (printf), moteur partagé ──
+## Le ':' de spec est celui de PREMIER niveau : un map-littéral imbriqué le préserve.
+var fmt_v = 3.14159
+assert("{fmt_v:.2f}" == "3.14")
+assert("{fmt_v:8.3f}" == "   3.142")           ## largeur + précision
+assert("{(255):x}" == "ff")                     ## hexa (expression parenthésée)
+assert("{(255):#06x}" == "0x00ff")             ## flag # + zéro-pad + largeur
+assert("{(-7):+d}" == "-7")                     ## signe forcé
+assert("{(42):d}" == "42")
+assert("{(3.9):d}" == "3")                       ## coercition float→int (troncature)
+assert("{"hi":5s}" == "   hi")                 ## largeur 5, aligné à droite (défaut C)
+assert("{"hi":-5s}" == "hi   ")                ## '-' = aligné à gauche (syntaxe printf C, pas '>')
+## le ':' d'un map imbriqué N'EST PAS un séparateur de spec
+var fmt_m = {"a": 1}
+assert("{fmt_m["a"]}" == "1")
+assert("{ {"k": 7}.k }" == "7")
+## {N} / {} sont des placeholders positionnels → LITTÉRAUX hors printf
+assert("{0}-{1}" == "{0}-{1}")
+assert("{}" == "{}")                             ## plus d'erreur « interpolation vide »
+## spec invalide → erreur runtime claire
+var fmt_err = false
+try
+    var bad = "{fmt_v:.2z}"
+    print(bad)
+catch e
+    fmt_err = true
+end
+assert(fmt_err)
+
 print("regressions ok")

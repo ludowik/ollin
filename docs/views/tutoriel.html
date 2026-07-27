@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-26 16:33</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-27 19:28</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -420,7 +420,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-26 16:33</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-27 19:28</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -653,6 +653,18 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <pre><code><span class="kw">var</span> greeting = <span class="str">"Hello, "</span> + <span class="str">"world"</span> + <span class="str">"!"</span>
 <span class="bi">assert</span>(greeting == <span class="str">"Hello, world!"</span>)</code></pre>
 <div class="callout warn">Les chaînes sont immuables. Seul <code>+</code> est surchargé pour les strings — les autres opérateurs (<code>-</code>, <code>*</code>…) restent réservés aux nombres.</div>
+
+<h3>Interpolation</h3>
+<p>Toute expression entre accolades <code>{…}</code> est évaluée et insérée. <code>\{</code> insère une accolade littérale.</p>
+<pre><code><span class="kw">var</span> nom = <span class="str">"Ada"</span>
+<span class="kw">var</span> n = <span class="num">42</span>
+<span class="bi">assert</span>(<span class="str">"Bonjour {nom}, n={n}"</span> == <span class="str">"Bonjour Ada, n=42"</span>)
+<span class="bi">assert</span>(<span class="str">"calcul : {n * 2 + 1}"</span> == <span class="str">"calcul : 85"</span>)</code></pre>
+<p>Un <strong>format</strong> optionnel suit un <code>:</code> — une spécification de conversion C (sans le <code>%</code>) : <code>.3f</code> (précision), <code>04x</code> (largeur + zéros), <code>-8s</code> (aligné à gauche)… :</p>
+<pre><code><span class="bi">assert</span>(<span class="str">"pi = {3.14159:.2f}"</span> == <span class="str">"pi = 3.14"</span>)
+<span class="bi">assert</span>(<span class="str">"hex = {(255):04x}"</span> == <span class="str">"hex = 00ff"</span>)
+<span class="bi">assert</span>(<span class="str">"pad = [{n:5d}]"</span> == <span class="str">"pad = [   42]"</span>)</code></pre>
+<div class="callout">Un <code>{}</code> vide ou un entier (<code>{0}</code>, <code>{1:.2f}</code>) est un <strong>emplacement positionnel</strong> laissé littéral — il est rempli par les arguments de <code>printf</code> (voir Builtins), pas par l'interpolation. Le formatage partage le même moteur des deux côtés.</div>
 </section>
 
 <!-- ── Multi-lignes ───────────────────────────────────────────────────────── -->
@@ -1228,10 +1240,11 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="bi">print</span>()                 <span class="cmt">## ligne vide</span></code></pre>
 
 <h3>printf</h3>
-<p>Formatage avec <code>{}</code> pour substitution positionnelle ou <code>{n}</code> pour indexation explicite.</p>
+<p>Substitution <strong>positionnelle</strong> : <code>{}</code> (index auto) ou <code>{n}</code> (index explicite), avec un format optionnel <code>{n:spec}</code> (même spec que l'interpolation).</p>
 <pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)      <span class="cmt">## 1 + 2 = 3</span>
 <span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>)          <span class="cmt">## oui et oui</span>
-<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## index explicite</span></code></pre>
+<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## index explicite</span>
+<span class="bi">printf</span>(<span class="str">"pi = {0:.3f}"</span>, <span class="num">3.14159</span>)     <span class="cmt">## pi = 3.142</span></code></pre>
 
 <h3>assert</h3>
 <p>Lève une exception si la condition est fausse. Message optionnel.</p>

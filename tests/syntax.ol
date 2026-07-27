@@ -720,12 +720,15 @@ assert(arr[1] == 0)
 ## print — arguments séparés par espaces, retour à la ligne
 print("hello", 42, true)    ## hello 42 1
 
-## printf — substitution positionnelle ou indexée (\{ = accolade littérale)
-printf("\{} + \{} = \{}", 1, 2, 3)         ## 1 + 2 = 3
-printf("\{0} et \{0}", "oui")              ## oui et oui
-printf("a=\{0} b=\{1} a=\{0}", 10, 20)    ## a=10 b=20 a=10
+## printf — substitution POSITIONNELLE : {} auto, {N} indexé (pas d'échappement).
+## {N:spec} applique un format C (spec = conversion sans le '%').
+printf("{} + {} = {}", 1, 2, 3)            ## 1 + 2 = 3
+printf("{0} et {0}", "oui")                ## oui et oui
+printf("a={0} b={1} a={0}", 10, 20)        ## a=10 b=20 a=10
+printf("pi = {0:.3f}", 3.14159)            ## pi = 3.142
+printf("hex = {0:04x}", 255)               ## hex = 00ff
 
-## interpolation de chaînes
+## interpolation de chaînes : {expr} évalue l'expression ; {expr:spec} la formate.
 var iname = "monde"
 var ix = 42
 assert("hello {iname}" == "hello monde")
@@ -733,7 +736,11 @@ assert("x={ix}" == "x=42")
 assert("calc: {ix * 2 + 1}" == "calc: 85")
 assert("{ix}{ix}" == "4242")
 assert("pi~{3.14}" == "pi~3.14")
+assert("pi={3.14159:.2f}" == "pi=3.14")            ## format : 2 décimales
+assert("hex={(255):04x}" == "hex=00ff")            ## expression + format (parenthèses)
+assert("pad=[{ix:5d}]" == "pad=[   42]")           ## largeur
 assert(len("ac\{olade") == 8)    ## \{ = accolade littérale (1 char)
+assert("{0} litteral" == "{0} litteral")           ## {N} = placeholder positionnel, littéral en interpolation
 
 ## assert — lève une exception si falsy
 assert(1 + 1 == 2)

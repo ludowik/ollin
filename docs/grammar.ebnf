@@ -204,11 +204,22 @@ hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;
 binDigit       = "0" | "1" ;
 STRING         = '"' { strChar } '"' ;
-strChar        = any \ ( '"' | '{' | LF ) | "\{" | "{" expr "}" ;
-                 (* "{" expr "}" : interpolation — évalue expr et insère sa représentation string.
-                    "\{" : accolade littérale (non interpolée).
-                    Une chaîne sans "{" est un littéral pur (token STRING) ;
-                    une chaîne avec "{…}" produit une séquence INTERP_START/MID/END. *)
+strChar        = any \ ( '"' | '{' | LF ) | "\{" | "{" expr [ ":" fmtSpec ] "}" | placeholder ;
+placeholder    = "{" [ digit { digit } ] [ ":" fmtSpec ] "}" ;
+fmtSpec        = { "-" | "+" | " " | "#" | "0" | digit | "." } convChar ;
+convChar       = "d" | "i" | "o" | "u" | "x" | "X" | "c"
+               | "e" | "E" | "f" | "F" | "g" | "G" | "a" | "A" | "s" ;
+                 (* "{" expr [":"fmtSpec] "}" : INTERPOLATION — évalue expr et insère sa
+                    représentation ; fmtSpec (spec de conversion C sans le '%') applique un
+                    format (ex. {x:.3f}, {n:04x}). Le ':' séparateur est celui de PREMIER
+                    niveau (les ':' d'un map-littéral {a:1} imbriqué sont préservés).
+                    placeholder = "{" vide ou entier [":"fmtSpec] "}" ({}, {0}, {1:.3f}) :
+                    laissé LITTÉRAL dans la chaîne, destiné à la substitution POSITIONNELLE
+                    de printf (rempli par les arguments). "\{" : accolade littérale.
+                    Une chaîne sans interpolation est un token STRING (elle peut contenir des
+                    placeholders positionnels) ; une chaîne avec "{expr}" produit une séquence
+                    INTERP_START/MID/END. Le formatage {expr:spec} / {N:spec} partage le même
+                    moteur (fonction interne __fmt / printf). *)
 BOOL           = "true" | "false" ;
 NIL            = "nil" ;
 IDENT          = ( letter | "_" ) { letter | digit | "_" } ;

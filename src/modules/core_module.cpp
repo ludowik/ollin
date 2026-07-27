@@ -1,9 +1,61 @@
 #include "vm.h"
 #include <iostream>
 #include <vector>
+#include <cstdio>
+#include <cstring>
+#include <stdexcept>
 
 Value makeColorClass();
 
+// Cœur de formatage partagé par l'interpolation ({expr:spec}) ET printf ({N:spec}).
+// `spec` = spécification de conversion C SANS le '%' (ex. ".3f", "04x", ">8s"). On
+// lit le caractère de conversion final pour coercer la valeur au bon type C — un
+// mismatch de type avec snprintf serait un comportement indéfini. Les flags/largeur/
+// précision (le « corps ») passent verbatim mais sont validés (allowlist stricte) →
+// aucune injection de conversion ni de '%'. Spec vide → représentation par défaut.
+std::string formatOne(const Value& v, const std::string& spec) {
+    if (spec.empty())
+        return valueToString(v);
+    char conv = spec.back();
+    std::string body = spec.substr(0, spec.size() - 1);   // flags + largeur + précision
+    for (char c : body)
+        if (!std::strchr("-+ #0123456789.", c))
+            throw std::runtime_error("format: caractère invalide dans la spec '" + spec + "'");
+    auto render = [](const std::string& cfmt, auto arg) {
+        int need = std::snprintf(nullptr, 0, cfmt.c_str(), arg);
+        if (need < 0)
+            throw std::runtime_error("format: spec invalide");
+        std::string out((size_t)need, '\0');
+        std::snprintf(out.data(), (size_t)need + 1, cfmt.c_str(), arg);
+        return out;
+    };
+    switch (conv) {
+        case 'c': {
+            if (!v.isNumber())
+                throw std::runtime_error("format: '%" + spec + "' attend un nombre");
+            return render("%" + body + "c", (int)v.asNum());
+        }
+        case 'd': case 'i': case 'o': case 'u': case 'x': case 'X': {
+            if (!v.isNumber())
+                throw std::runtime_error("format: '%" + spec + "' attend un nombre");
+            return render("%" + body + "ll" + conv, (long long)v.asNum());   // 'll' = int64
+        }
+        case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': {
+            if (!v.isNumber())
+                throw std::runtime_error("format: '%" + spec + "' attend un nombre");
+            return render("%" + spec, (double)v.asNum());
+        }
+        case 's': {
+            std::string s = valueToString(v);
+            return render("%" + spec, s.c_str());
+        }
+        default:
+            throw std::runtime_error("format: conversion inconnue '" + spec + "'");
+    }
+}
+
+// printf : substitution positionnelle. Chaque emplacement {N} / {} peut porter un
+// format {N:spec} / {:spec}, appliqué via formatOne (même moteur que l'interpolation).
 static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
     std::string out;
     int auto_idx = 0;
@@ -11,22 +63,28 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
         if (fmt[i] == '{') {
             size_t j = fmt.find('}', i + 1);
             if (j != std::string::npos) {
-                std::string spec = fmt.substr(i + 1, j - i - 1);
+                std::string content = fmt.substr(i + 1, j - i - 1);
+                std::string idxPart = content, spec;
+                size_t colon = content.find(':');
+                if (colon != std::string::npos) {
+                    idxPart = content.substr(0, colon);
+                    spec = content.substr(colon + 1);
+                }
                 int idx;
-                if (spec.empty()) {
+                if (idxPart.empty()) {
                     idx = auto_idx++;
                 } else {
                     try {
-                        idx = std::stoi(spec);
+                        idx = std::stoi(idxPart);
                     } catch (...) {
-                        throw std::runtime_error("printf: invalid index '{" + spec + "}'");
+                        throw std::runtime_error("printf: index invalide '{" + content + "}'");
                     }
                     if (idx < 0)
-                        throw std::runtime_error("printf: index must be >= 0 (got " + spec + ")");
+                        throw std::runtime_error("printf: index must be >= 0 (got " + idxPart + ")");
                 }
                 long long ai = (long long)idx + offset;
                 if (ai >= 0 && ai < (long long)args.size())
-                    out += valueToString(args[(int)ai]);
+                    out += formatOne(args[(int)ai], spec);
                 i = j;
                 continue;
             }
@@ -34,6 +92,17 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
         out += fmt[i];
     }
     return out;
+}
+
+// __fmt(valeur, spec) : builtin INTERNE (préfixe __ → hors API publique), cible du
+// désucrage de l'interpolation {expr:spec}. Non destiné à un appel direct.
+static int core_fmt(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc < 2 || !args[1].isString())
+        throw std::runtime_error("__fmt: (valeur, spec) attendu");
+    std::vector<Value> vargs(args, args + argc);   // copie : formatOne peut réallouer regs (__str)
+    return ctx.ret(Value(formatOne(vargs[0], vargs[1].asString())));
 }
 
 static int core_print(CallCtx& ctx) {
@@ -74,6 +143,7 @@ Value makeCoreModule() {
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("print")), Value::makeBuiltin(core_print));
     m.mapSet(Value(std::string("printf")), Value::makeBuiltin(core_printf));
+    m.mapSet(Value(std::string("__fmt")), Value::makeBuiltin(core_fmt));   // interne : désucrage {expr:spec}
     m.mapSet(Value(std::string("typeof")), Value::makeBuiltin(core_typeof));
     m.mapSet(Value(std::string("Color")), makeColorClass());
     return m;

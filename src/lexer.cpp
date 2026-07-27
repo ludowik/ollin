@@ -156,6 +156,43 @@ Token Lexer::string() {
     return {TokenType::STRING, val, line};
 }
 
+// Emplacement POSITIONNEL vs expression à interpoler : positionnel si le préfixe
+// (jusqu'au 1er ':') est vide ou uniquement des chiffres → {}, {0}, {1:.3f}, {:.3f}.
+// Ces {…} sont laissés LITTÉRAUX dans la chaîne (remplis par printf). Toute autre
+// forme ({x}, {a+b}, {x:.3f}) est une expression interpolée.
+static bool isPositionalPlaceholder(const std::string& s) {
+    size_t i = 0;
+    while (i < s.size() && std::isspace((unsigned char)s[i])) i++;
+    while (i < s.size() && std::isdigit((unsigned char)s[i])) i++;
+    while (i < s.size() && std::isspace((unsigned char)s[i])) i++;
+    return i == s.size() || s[i] == ':';
+}
+
+// Sépare une interpolation « expr:spec » sur le ':' de PREMIER NIVEAU (hors
+// parenthèses/crochets/accolades et chaînes imbriquées) → préserve les map-littéraux
+// {a:1}. Sans ':' de 1er niveau : spec vide, expr = tout le contenu.
+static void splitInterpSpec(const std::string& s, std::string& expr, std::string& spec) {
+    int depth = 0;
+    bool in_str = false;
+    for (size_t i = 0; i < s.size(); ++i) {
+        char c = s[i];
+        if (in_str) {
+            if (c == '"') in_str = false;
+            continue;
+        }
+        if (c == '"') in_str = true;
+        else if (c == '(' || c == '[' || c == '{') depth++;
+        else if (c == ')' || c == ']' || c == '}') depth--;
+        else if (c == ':' && depth == 0) {
+            expr = s.substr(0, i);
+            spec = s.substr(i + 1);
+            return;
+        }
+    }
+    expr = s;
+    spec.clear();
+}
+
 void Lexer::interpString(std::vector<Token>& out) {
     auto emit_tok = [&](Token t) { t.file_idx = file_idx_; out.push_back(std::move(t)); };
 
@@ -169,20 +206,18 @@ void Lexer::interpString(std::vector<Token>& out) {
             literal += '{';
             advance();
         } else if (c == '{') {
-            emit_tok({has_interp ? TokenType::INTERP_MID : TokenType::INTERP_START, literal, str_line});
-            has_interp = true;
-            literal.clear();
-
+            // Capturer le contenu {…} (accolades/strings imbriquées) SANS émettre,
+            // pour décider : emplacement positionnel (littéral) vs expression interpolée.
             int depth = 1;
-            int expr_start = pos;
+            int inner_start = pos;
             while (!atEnd() && depth > 0) {
                 char ec = peek();
                 if (ec == '\n') break;
                 if (ec == '"') {
-                    advance(); // consomme le '"' ouvrant
+                    advance();
                     while (!atEnd() && peek() != '"' && peek() != '\n')
                         advance();
-                    if (!atEnd() && peek() == '"') advance(); // consomme le '"' fermant
+                    if (!atEnd() && peek() == '"') advance();
                 } else if (ec == '{') {
                     depth++;
                     advance();
@@ -197,18 +232,44 @@ void Lexer::interpString(std::vector<Token>& out) {
             if (atEnd() || peek() == '\n' || depth > 0)
                 throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": accolade non fermée dans l'interpolation");
 
-            std::string expr_src = src.substr(expr_start, pos - expr_start);
+            std::string inner = src.substr(inner_start, pos - inner_start);
             advance(); // consomme '}'
 
-            if (expr_src.empty())
-                throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": interpolation vide {}");
+            // Positionnel ({}, {0}, {1:.3f}) → laissé littéral (rempli par printf).
+            if (isPositionalPlaceholder(inner)) {
+                literal += '{';
+                literal += inner;
+                literal += '}';
+                continue;
+            }
 
-            Lexer sub(expr_src, filename_, file_idx_);
-            sub.line = str_line;
-            auto sub_tokens = sub.tokenize();
-            for (auto& t : sub_tokens)
-                if (t.type != TokenType::EOF_T)
-                    emit_tok(t);
+            // Expression interpolée, avec spec de format optionnel ({expr:spec}).
+            std::string expr_src, spec;
+            splitInterpSpec(inner, expr_src, spec);
+
+            emit_tok({has_interp ? TokenType::INTERP_MID : TokenType::INTERP_START, literal, str_line});
+            has_interp = true;
+            literal.clear();
+
+            auto emit_sub = [&](const std::string& code) {
+                Lexer sub(code, filename_, file_idx_);
+                sub.line = str_line;
+                for (auto& t : sub.tokenize())
+                    if (t.type != TokenType::EOF_T)
+                        emit_tok(t);
+            };
+
+            if (spec.empty()) {
+                emit_sub(expr_src);
+            } else {
+                // Désucrage : {expr:spec} → __fmt(expr, "spec") (moteur de format partagé).
+                emit_tok({TokenType::IDENTIFIER, "__fmt", str_line});
+                emit_tok({TokenType::LPAREN, "(", str_line});
+                emit_sub(expr_src);
+                emit_tok({TokenType::COMMA, ",", str_line});
+                emit_tok({TokenType::STRING, spec, str_line});
+                emit_tok({TokenType::RPAREN, ")", str_line});
+            }
         } else {
             literal += c;
         }
