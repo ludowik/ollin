@@ -246,8 +246,17 @@ canvas#canvas {
   background: var(--border);
   flex-shrink: 0;
   transition: background 0.15s;
+  position: relative;
+  z-index: 5;   /* la zone de préhension élargie passe au-dessus des panneaux voisins (canvas inclus) */
 }
 #divider:hover, #divider.dragging { background: var(--accent); }
+/* Zone de préhension élargie (invisible) : le trait reste fin (5px) mais la cible
+   tactile déborde de ±10px → saisissable au doigt (iPad…), sans changer le layout
+   (pseudo-élément en position absolue). En colonne (mobile), l'élargissement passe
+   sur l'axe vertical. */
+#divider::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -10px; right: -10px;
+}
 
 /* ── barre d'aide à la saisie (symboles, tactile) ──────────────────────────── */
 #kbar {
@@ -477,6 +486,7 @@ canvas#canvas {
   #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
   #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
   #divider { width: 100%; height: 6px; cursor: row-resize; }
+  #divider::before { top: -10px; bottom: -10px; left: 0; right: 0; }
 
   /* Police réduite — maximum-scale=1.0 dans le viewport empêche le zoom iOS */
   #editor-wrap .cm-editor  { font-size: 12px; }
