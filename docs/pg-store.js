@@ -137,7 +137,8 @@ export async function listProjects() {
   const all = await reqAsync(store.getAll())
   return all
     .map(p => ({ id: p.id, name: p.name, entry: p.entry, updatedAt: p.updatedAt,
-                 fileCount: Object.keys(p.files || {}).length }))
+                 fileCount: Object.keys(p.files || {}).length,
+                 remote: p.remote || null }))   // lien distant (slug) → menu « Ouvrir » unifié
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 

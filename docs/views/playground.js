@@ -1081,6 +1081,12 @@ function menuSep() {
   d.className = 'menu-sep'
   return d
 }
+function menuGroupLabel(text) {
+  const d = document.createElement('div')
+  d.className = 'menu-group'
+  d.textContent = text
+  return d
+}
 
 function renderMenuRoot() {
   projectMenu.innerHTML = ''
@@ -1093,7 +1099,6 @@ function renderMenuRoot() {
     await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
-  projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, () => (GH.isConnected() ? renderMenuRemote() : renderMenuConnect())))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
   // rien à renommer/dupliquer/supprimer en base).
@@ -1163,17 +1168,79 @@ function renderMenuGithub() {
   projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
+// Menu « Ouvrir un projet » UNIFIÉ : locaux (🖥 non liés), synchronisés (🔄 liés)
+// et distants seuls (☁ présents sur GitHub, absents en local). Les deux premières
+// sections se calculent sans réseau (le lien = remote.slug local) → affichées tout
+// de suite ; la section distante est fusionnée en arrière-plan.
 async function renderMenuOpen() {
-  const list = await Store.listProjects()
+  const local = await Store.listProjects()
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Ouvrir un projet', renderMenuRoot))
-  for (const p of list) {
-    const check = (currentProject && p.id === currentProject.id) ? '✓ ' : ''
-    projectMenu.appendChild(menuItem(check + p.name, false, async () => {
-      closeMenu()
-      if (!currentProject || p.id !== currentProject.id) await openProject(p.id)
-    }))
+  const body = document.createElement('div')
+  projectMenu.appendChild(body)
+
+  const localSlugs = new Set(local.map(p => (p.remote && p.remote.slug) || p.id))
+  const isLinked = p => !!(p.remote && p.remote.slug)
+  const nameOf = p => ((currentProject && p.id === currentProject.id) ? '✓ ' : '') + p.name
+  const openLocal = id => async () => {
+    closeMenu()
+    if (!currentProject || id !== currentProject.id) await openProject(id)
   }
+
+  // Reconstruit le corps : sections non vides uniquement + pied distant (état réseau).
+  const render = (remoteOnly, footer) => {
+    if (!projectMenu.contains(body)) return   // menu changé entre-temps
+    body.innerHTML = ''
+    const group = (label, items, mk) => {
+      if (!items.length) return
+      body.appendChild(menuGroupLabel(label))
+      for (const it of items) body.appendChild(mk(it))
+    }
+    group('🖥 Locaux', local.filter(p => !isLinked(p)), p => menuItem(nameOf(p), false, openLocal(p.id)))
+    group('🔄 Synchronisés', local.filter(isLinked), p => menuItem(nameOf(p), false, openLocal(p.id)))
+    group('☁ Distants', remoteOnly, r => menuItem(r.name, false, () => openRemoteProject(r.slug)))
+    if (footer)
+      body.appendChild(footer)
+    if (!body.childNodes.length) {
+      const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun projet.'
+      body.appendChild(d)
+    }
+  }
+
+  // Pied distant selon l'état de connexion / réseau.
+  const info = txt => { const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = txt; return d }
+  if (!GH.isConnected()) {
+    render([], menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
+    return
+  }
+  if (!GH.getRepo()) {
+    render([], info('Dépôt GitHub non configuré (menu 🐙 GitHub).'))
+    return
+  }
+  render([], info('Chargement des projets distants…'))
+  try {
+    const remote = await GH.listRemoteProjects()
+    render(remote.filter(r => !localSlugs.has(r.slug)), null)
+  } catch (e) {
+    render([], info('Distant indisponible : ' + e.message))
+  }
+}
+
+// Ouvre un projet DISTANT SEUL : pull → sauvegarde locale → chargement.
+async function openRemoteProject(slug) {
+  closeMenu()
+  const existing = await Store.getProject(slug)
+  if (existing && !confirm(`Un projet « ${slug} » existe déjà en local. L'écraser avec la version GitHub ?`)) return
+  flushEditorToFile()
+  if (currentProject && currentProject.id !== slug) await Store.saveProject(currentProject)
+  setStatus('Récupération…')
+  try {
+    const p = await GH.pullProject(slug)
+    p.dirty = false   // fraîchement récupéré = synchro
+    await Store.saveProject(p)
+    await loadProject(p.id)
+    setStatus('Projet ouvert ✓', true)
+  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
 }
 
 async function renderMenuExamples() {
@@ -1349,38 +1416,6 @@ async function adoptRemote(project, slug) {
     await loadProject(p.id)   // recharge l'éditeur + relit remote.folderSha
     setStatus('Projet à jour ✓', true)
   } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
-}
-
-async function renderMenuRemote() {
-  projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuRoot))
-  const loading = document.createElement('div'); loading.className = 'menu-empty'; loading.textContent = 'Chargement…'
-  projectMenu.appendChild(loading)
-  let list
-  try { list = await GH.listRemoteProjects() }
-  catch (e) { loading.textContent = 'Erreur : ' + e.message; return }
-  loading.remove()
-  if (!list.length) {
-    const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun projet distant.'
-    projectMenu.appendChild(d); return
-  }
-  for (const r of list) {
-    projectMenu.appendChild(menuItem('📦 ' + r.name, false, async () => {
-      closeMenu()
-      const existing = await Store.getProject(r.slug)
-      if (existing && !confirm(`Un projet « ${r.slug} » existe déjà en local. L'écraser avec la version GitHub ?`)) return
-      flushEditorToFile()
-      if (currentProject && currentProject.id !== r.slug) await Store.saveProject(currentProject)
-      setStatus('Récupération…')
-      try {
-        const p = await GH.pullProject(r.slug)
-        p.dirty = false   // fraîchement récupéré = synchro
-        await Store.saveProject(p)
-        await loadProject(p.id)
-        setStatus('Projet ouvert ✓', true)
-      } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
-    }))
-  }
 }
 
 projectBtn.addEventListener('click', e => {
