@@ -1799,11 +1799,12 @@ function stopExec() {
 
 runBtn.addEventListener('click', run)
 
-// ── Mode Auto (relance différée) — navigateur desktop uniquement (souris) ──────
-// Révélé seulement sur pointeur fin : caché sur tactile/mobile pour l'instant.
+// ── Mode Auto (relance différée) — disponible sur toutes les cibles ────────────
+// Aucune restriction de pointeur : un poste tactile avec clavier (ex. iPad) édite
+// autant qu'un desktop. Le bouton est visible dès que l'élément existe.
 const autoexecWrap = document.getElementById('autoexec-wrap')
 const autoexecChk  = document.getElementById('autoexec-chk')
-if (autoexecWrap && window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+if (autoexecWrap) {
   autoexecWrap.style.display = ''
   const onAutoexec = () => {
     autoexecWrap.classList.toggle('on', autoexecChk.checked)
