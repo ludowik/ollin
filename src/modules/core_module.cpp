@@ -58,7 +58,7 @@ std::string formatOne(const Value& v, const std::string& spec) {
 // format {N:spec} / {:spec}, appliqué via formatOne (même moteur que l'interpolation).
 static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
     std::string out;
-    int auto_idx = 0;
+    int auto_idx = 1;   // indexation 1-based (cohérent avec les arrays Ollin) : {1} = 1er argument
     for (size_t i = 0; i < fmt.size(); ++i) {
         if (fmt[i] == '{') {
             size_t j = fmt.find('}', i + 1);
@@ -79,10 +79,10 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
                     } catch (...) {
                         throw std::runtime_error("printf: index invalide '{" + content + "}'");
                     }
-                    if (idx < 0)
-                        throw std::runtime_error("printf: index must be >= 0 (got " + idxPart + ")");
+                    if (idx < 1)
+                        throw std::runtime_error("printf: index 1-based, doit être >= 1 (reçu " + idxPart + ")");
                 }
-                long long ai = (long long)idx + offset;
+                long long ai = (long long)idx - 1 + offset;   // {1} → 1er arg réel (args[offset])
                 if (ai >= 0 && ai < (long long)args.size())
                     out += formatOne(args[(int)ai], spec);
                 i = j;

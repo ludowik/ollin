@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-27 19:28</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-07-29 08:56</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -420,7 +420,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-27 19:28</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-07-29 08:56</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -664,7 +664,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <pre><code><span class="bi">assert</span>(<span class="str">"pi = {3.14159:.2f}"</span> == <span class="str">"pi = 3.14"</span>)
 <span class="bi">assert</span>(<span class="str">"hex = {(255):04x}"</span> == <span class="str">"hex = 00ff"</span>)
 <span class="bi">assert</span>(<span class="str">"pad = [{n:5d}]"</span> == <span class="str">"pad = [   42]"</span>)</code></pre>
-<div class="callout">Un <code>{}</code> vide ou un entier (<code>{0}</code>, <code>{1:.2f}</code>) est un <strong>emplacement positionnel</strong> laissé littéral — il est rempli par les arguments de <code>printf</code> (voir Builtins), pas par l'interpolation. Le formatage partage le même moteur des deux côtés.</div>
+<div class="callout">Un <code>{}</code> vide ou un entier (<code>{1}</code>, <code>{2:.2f}</code> — indexation <strong>1-based</strong>) est un <strong>emplacement positionnel</strong> laissé littéral — il est rempli par les arguments de <code>printf</code> (voir Builtins), pas par l'interpolation. Le formatage partage le même moteur des deux côtés.</div>
 </section>
 
 <!-- ── Multi-lignes ───────────────────────────────────────────────────────── -->
@@ -1240,11 +1240,11 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="bi">print</span>()                 <span class="cmt">## ligne vide</span></code></pre>
 
 <h3>printf</h3>
-<p>Substitution <strong>positionnelle</strong> : <code>{}</code> (index auto) ou <code>{n}</code> (index explicite), avec un format optionnel <code>{n:spec}</code> (même spec que l'interpolation).</p>
+<p>Substitution <strong>positionnelle</strong> (indexation <strong>1-based</strong>, comme les arrays) : <code>{}</code> (index auto, à partir de 1) ou <code>{n}</code> (index explicite, <code>{1}</code> = 1<sup>er</sup> argument), avec un format optionnel <code>{n:spec}</code> (même spec que l'interpolation).</p>
 <pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)      <span class="cmt">## 1 + 2 = 3</span>
-<span class="bi">printf</span>(<span class="str">"{0} et {0}"</span>, <span class="str">"oui"</span>)          <span class="cmt">## oui et oui</span>
-<span class="bi">printf</span>(<span class="str">"x={0} y={1} x={0}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## index explicite</span>
-<span class="bi">printf</span>(<span class="str">"pi = {0:.3f}"</span>, <span class="num">3.14159</span>)     <span class="cmt">## pi = 3.142</span></code></pre>
+<span class="bi">printf</span>(<span class="str">"{1} et {1}"</span>, <span class="str">"oui"</span>)          <span class="cmt">## oui et oui  (1er argument = {1})</span>
+<span class="bi">printf</span>(<span class="str">"x={1} y={2} x={1}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## index explicite (1-based)</span>
+<span class="bi">printf</span>(<span class="str">"pi = {1:.3f}"</span>, <span class="num">3.14159</span>)     <span class="cmt">## pi = 3.142</span></code></pre>
 
 <h3>assert</h3>
 <p>Lève une exception si la condition est fausse. Message optionnel.</p>

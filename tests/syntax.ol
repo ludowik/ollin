@@ -722,11 +722,11 @@ print("hello", 42, true)    ## hello 42 1
 
 ## printf — substitution POSITIONNELLE : {} auto, {N} indexé (pas d'échappement).
 ## {N:spec} applique un format C (spec = conversion sans le '%').
-printf("{} + {} = {}", 1, 2, 3)            ## 1 + 2 = 3
-printf("{0} et {0}", "oui")                ## oui et oui
-printf("a={0} b={1} a={0}", 10, 20)        ## a=10 b=20 a=10
-printf("pi = {0:.3f}", 3.14159)            ## pi = 3.142
-printf("hex = {0:04x}", 255)               ## hex = 00ff
+printf("{} + {} = {}", 1, 2, 3)            ## 1 + 2 = 3  (auto : 1-based)
+printf("{1} et {1}", "oui")                ## oui et oui  (index 1 = 1er argument)
+printf("a={1} b={2} a={1}", 10, 20)        ## a=10 b=20 a=10
+printf("pi = {1:.3f}", 3.14159)            ## pi = 3.142
+printf("hex = {1:04x}", 255)               ## hex = 00ff
 
 ## interpolation de chaînes : {expr} évalue l'expression ; {expr:spec} la formate.
 var iname = "monde"
@@ -740,7 +740,7 @@ assert("pi={3.14159:.2f}" == "pi=3.14")            ## format : 2 décimales
 assert("hex={(255):04x}" == "hex=00ff")            ## expression + format (parenthèses)
 assert("pad=[{ix:5d}]" == "pad=[   42]")           ## largeur
 assert(len("ac\{olade") == 8)    ## \{ = accolade littérale (1 char)
-assert("{0} litteral" == "{0} litteral")           ## {N} = placeholder positionnel, littéral en interpolation
+assert("{1} litteral" == "{1} litteral")           ## {N} = placeholder positionnel (1-based), littéral en interpolation
 
 ## assert — lève une exception si falsy
 assert(1 + 1 == 2)
