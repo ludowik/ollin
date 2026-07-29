@@ -201,6 +201,7 @@ export async function renameProject(id, name) {
   if (!project) return null
   const newId = await uniqueId(name, id)
   project.name = name
+  project.dirty = true   // renommage = changement à pousser (le nom, et le dossier distant si le slug change)
   if (newId === id) {
     return saveProject(project)          // slug inchangé : simple mise à jour
   }
