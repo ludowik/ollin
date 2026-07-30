@@ -351,6 +351,7 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 - `gfx_canvas()` (graphics_module.cpp) **repositionne** `W`/`H`/`CW`/`CH` sur les dimensions logiques réelles à chaque `graphics.canvas(w, h)` (via `setGlobal`) → les globales suivent la taille effective du canvas, même si elle diffère du défaut `window`.
 - `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `graphics_module.cpp` avant chaque frame.
 - `s_elapsed_time` (statique dans `graphics_module.cpp`) est remis à 0 à chaque `gfx_run()`.
+- **Canvas implicite** : `VM::runEntryHooks()` — si un `draw()` existe et que `graphics` est un module (pas le stub), mais que `graphics.canvas()` n'a **pas** été appelé au top-level (drapeau `VM::gfxCanvasCreated()`, posé par `gfx_canvas` via `markGfxCanvas()`), le moteur appelle `graphics.canvas(W, H)` **avant `setup()`** → une session graphique démarre sur la seule présence de `draw()`. L'ordre (avant `setup()`) préserve la config d'éclairage posée dans `setup()`. Le drapeau vit sur le VM (neuf à chaque run playground) → détection fiable même avec le contexte WebGL réutilisé.
 
 **Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
 

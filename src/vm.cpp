@@ -452,21 +452,35 @@ Value VM::getGlobal(const std::string& name) const {
 }
 
 void VM::runEntryHooks() {
+    // `graphics` peut être nil (stub natif, ou script sans référence à graphics) ou
+    // réassigné à un non-map → garde isMap() obligatoire avant mapGet.
+    Value gfx = getGlobal("graphics");
+    Value draw = getGlobal("draw");
+    bool graphical = draw.isCallable() && gfx.isMap();
+
+    // Canvas IMPLICITE : la seule présence d'un draw() suffit à démarrer une session
+    // graphique. Si le script n'a pas appelé graphics.canvas() au top-level, on le crée
+    // aux dimensions W×H (globales moteur, pré-initialisées aux dimensions window).
+    // Fait AVANT setup() → l'ordre de réinitialisation (éclairage…) reste correct et
+    // un setup() qui configure l'éclairage n'est pas écrasé.
+    if (graphical && !gfx_canvas_created_) {
+        Value canvas_fn = gfx.mapGet(Value(std::string("canvas")));
+        if (canvas_fn.isBuiltin()) {
+            Value wh[2] = { getGlobal("W"), getGlobal("H") };
+            invokeBuiltin(canvas_fn.asBuiltin(), wh, 2, 2);
+        }
+    }
+
     // setup() : appelée une fois après le chargement, avant la boucle update/draw.
     Value setup = getGlobal("setup");
     if (setup.isCallable())
         callValue(setup);
+
     // draw() présent → lance la boucle graphique via graphics.run(draw).
-    Value draw = getGlobal("draw");
-    if (draw.isCallable()) {
-        // `graphics` peut être nil (stub natif, ou script sans référence à graphics)
-        // ou réassigné à un non-map → garde isMap() obligatoire avant mapGet.
-        Value gfx = getGlobal("graphics");
-        if (gfx.isMap()) {
-            Value run_fn = gfx.mapGet(Value(std::string("run")));
-            if (run_fn.isBuiltin())
-                invokeBuiltin(run_fn.asBuiltin(), &draw, 1, 1);
-        }
+    if (graphical) {
+        Value run_fn = gfx.mapGet(Value(std::string("run")));
+        if (run_fn.isBuiltin())
+            invokeBuiltin(run_fn.asBuiltin(), &draw, 1, 1);
     }
 }
 

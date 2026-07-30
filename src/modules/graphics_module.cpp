@@ -183,6 +183,8 @@ static int gfx_canvas(CallCtx& ctx) {
         win.mapSet(Value(std::string("width")), Value((int64_t)w));
         win.mapSet(Value(std::string("height")), Value((int64_t)h));
     }
+    if (VM* vm = VM::current())
+        vm->markGfxCanvas();   // canvas explicite → pas de canvas implicite (runEntryHooks)
     return ctx.ret(Value{});
 }
 
