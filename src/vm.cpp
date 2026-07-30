@@ -458,11 +458,16 @@ void VM::runEntryHooks() {
     Value draw = getGlobal("draw");
     bool graphical = draw.isCallable() && gfx.isMap();
 
+    // setup() : appelée une fois après le chargement, avant la boucle update/draw.
+    Value setup = getGlobal("setup");
+    if (setup.isCallable())
+        callValue(setup);
+
     // Canvas IMPLICITE : la seule présence d'un draw() suffit à démarrer une session
-    // graphique. Si le script n'a pas appelé graphics.canvas() au top-level, on le crée
-    // aux dimensions W×H (globales moteur, pré-initialisées aux dimensions window).
-    // Fait AVANT setup() → l'ordre de réinitialisation (éclairage…) reste correct et
-    // un setup() qui configure l'éclairage n'est pas écrasé.
+    // graphique. Si NI le top-level NI setup() n'ont appelé graphics.canvas(), on le
+    // crée aux dimensions W×H (globales moteur, pré-initialisées aux dimensions window).
+    // Fait APRÈS setup() — car setup() est un endroit courant pour appeler canvas()
+    // (cf. tutoriel) : le créer avant provoquerait un double InitWindow (crash WASM).
     if (graphical && !gfx_canvas_created_) {
         Value canvas_fn = gfx.mapGet(Value(std::string("canvas")));
         if (canvas_fn.isBuiltin()) {
@@ -470,11 +475,6 @@ void VM::runEntryHooks() {
             invokeBuiltin(canvas_fn.asBuiltin(), wh, 2, 2);
         }
     }
-
-    // setup() : appelée une fois après le chargement, avant la boucle update/draw.
-    Value setup = getGlobal("setup");
-    if (setup.isCallable())
-        callValue(setup);
 
     // draw() présent → lance la boucle graphique via graphics.run(draw).
     if (graphical) {
