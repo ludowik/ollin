@@ -471,8 +471,28 @@ void VM::runEntryHooks() {
     if (graphical && !gfx_canvas_created_) {
         Value canvas_fn = gfx.mapGet(Value(std::string("canvas")));
         if (canvas_fn.isBuiltin()) {
-            Value wh[2] = { getGlobal("W"), getGlobal("H") };
-            invokeBuiltin(canvas_fn.asBuiltin(), wh, 2, 2);
+            // Dimensions de la zone de rendu. On NE lit PAS getGlobal("W") : si le
+            // script ne référence pas W/H, ces identifiants n'existent pas dans le
+            // chunk → getGlobal renvoie nil → 0. On relit le module `window`
+            // directement (source des globales W/H, et en WASM = taille mesurée en JS
+            // fournie via __ollinRenderW → fiable, pas de course de layout).
+            int w = 0, h = 0;
+            Value winm = makeBuiltinModule("window");
+            if (winm.isMap()) {
+                Value vw = winm.mapGet(Value(std::string("width")));
+                Value vh = winm.mapGet(Value(std::string("height")));
+                if (vw.isNumber()) w = (int)vw.asNum();
+                if (vh.isNumber()) h = (int)vh.asNum();
+            }
+            // Si la taille reste inexploitable, canvas() sans argument → défauts de
+            // gfx_canvas (800×600) plutôt qu'un canvas 0×0 sans contexte GL (crash).
+            if (w > 0 && h > 0) {
+                Value wh[2] = { Value((int64_t)w), Value((int64_t)h) };
+                invokeBuiltin(canvas_fn.asBuiltin(), wh, 2, 2);
+            } else {
+                Value none[1] = {};
+                invokeBuiltin(canvas_fn.asBuiltin(), none, 0, 1);
+            }
         }
     }
 

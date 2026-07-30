@@ -7,16 +7,30 @@ Value makeWindowModule() {
     // Zone de dessin disponible : le conteneur #output-pane du playground s'il
     // existe, sinon le viewport (page autonome run.html, page externe…).
     // Sans repli, getElementById renvoie null → null.clientWidth plante.
-    auto document = emscripten::val::global("document");
-    auto pane = document.call<emscripten::val>("getElementById", std::string("output-pane"));
-    int w, h;
-    if (pane.isNull() || pane.isUndefined()) {
-        auto win = emscripten::val::global("window");
+    auto win = emscripten::val::global("window");
+    int w = 0, h = 0;
+    // 1) Taille FOURNIE par l'hôte (playground : zone de rendu mesurée en JS après
+    // affichage — fiable, pas de course de layout comme la lecture DOM à l'init).
+    auto ow = win["__ollinRenderW"];
+    auto oh = win["__ollinRenderH"];
+    if (ow.isNumber() && oh.isNumber()) {
+        w = ow.as<int>();
+        h = oh.as<int>();
+    }
+    // 2) Sinon lecture directe de #output-pane (run.html, page externe…).
+    if (w <= 0 || h <= 0) {
+        auto document = emscripten::val::global("document");
+        auto pane = document.call<emscripten::val>("getElementById", std::string("output-pane"));
+        if (!pane.isNull() && !pane.isUndefined()) {
+            w = pane["clientWidth"].as<int>();
+            h = pane["clientHeight"].as<int>();
+        }
+    }
+    // 3) Dernier repli : viewport → W/H toujours une taille RÉELLE, jamais 0
+    // (sinon canvas à vide, sans contexte GL → crash).
+    if (w <= 0 || h <= 0) {
         w = win["innerWidth"].as<int>();
         h = win["innerHeight"].as<int>();
-    } else {
-        w = pane["clientWidth"].as<int>();
-        h = pane["clientHeight"].as<int>();
     }
     Value m = Value::makeMap();
     m.mapSet(Value(std::string("width")), Value((int64_t)w));

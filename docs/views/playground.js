@@ -1749,9 +1749,15 @@ async function launch() {
   setRunning(false)
   outputEl.className = ''
   lastErrorLoc = null   // nouvelle exécution : F4 ne doit plus viser l'erreur précédente
-  // Afficher la zone AVANT execute : window.width lit le clientWidth de
-  // #output-pane (0 si display:none → graphics dimensionné à vide).
+  // Afficher la zone AVANT execute puis MESURER en JS et transmettre au moteur : la
+  // lecture DOM côté C++ à l'init est sujette à une course de layout (flex tout juste
+  // passé de display:none → parfois clientWidth=0 au moment de la lecture, W/H=0 →
+  // canvas à vide). Le JS, lui, a un layout fiable après reflow (getBoundingClientRect).
+  // Le module `window` lit __ollinRenderW/H en priorité (voir window_module.cpp).
   setOutputVisible(true)
+  const _rr = outputPane.getBoundingClientRect()
+  window.__ollinRenderW = Math.round(_rr.width)
+  window.__ollinRenderH = Math.round(_rr.height)
   flushEditorToFile()
   // Préchargement + exécution + gestion d'erreurs : logique PARTAGÉE avec le mode
   // autonome (run.html) via pg-run.js — plus de duplication ni de divergence.
