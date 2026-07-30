@@ -596,6 +596,25 @@ static std::vector<Vector2> parsePoints(const Value& v, const char* fn) {
     return pts;
 }
 
+// Tracé d'une polyligne épaisse avec JOINTURES/EMBOUTS ARRONDIS. À forte épaisseur,
+// des DrawLineEx indépendants laissent des encoches aux sommets (coins non jointés,
+// aspect « roue dentée »). Un disque de rayon épaisseur/2 posé sur chaque sommet
+// comble le creux extérieur et donne une jointure ronde (embouts ronds aux extrémités
+// d'une polyligne ouverte). Négligeable en dessous de ~2px → sauté (perf, sans effet).
+static void drawThickPath(const std::vector<Vector2>& pts, bool closed, float w, Color c) {
+    int n = (int)pts.size();
+    if (n < 2)
+        return;
+    int segs = closed ? n : n - 1;
+    for (int i = 0; i < segs; i++)
+        DrawLineEx(pts[i], pts[(i + 1) % n], w, c);
+    if (w > 2.0f) {
+        float r = w * 0.5f;
+        for (int i = 0; i < n; i++)
+            DrawCircleV(pts[i], r, c);
+    }
+}
+
 static int gfx_polygon(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.polygon";
@@ -608,9 +627,7 @@ static int gfx_polygon(CallCtx& ctx) {
         polyFill(pts, s_fill_color);
     if (s_has_stroke) {
         StrokeWC s = strokeParams();
-        int n = (int)pts.size();
-        for (int i = 0; i < n; i++)
-            DrawLineEx(pts[i], pts[(i + 1) % n], s.w, s.c);
+        drawThickPath(pts, true, s.w, s.c);
     }
     return ctx.ret(Value{});
 }
@@ -624,9 +641,7 @@ static int gfx_polyline(CallCtx& ctx) {
         return ctx.ret(Value{});
     auto pts = parsePoints(args[0], FN);
     StrokeWC s = strokeParams();
-    int n = (int)pts.size();
-    for (int i = 0; i < n - 1; i++)
-        DrawLineEx(pts[i], pts[i + 1], s.w, s.c);
+    drawThickPath(pts, false, s.w, s.c);
     return ctx.ret(Value{});
 }
 
