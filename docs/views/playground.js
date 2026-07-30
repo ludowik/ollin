@@ -474,6 +474,7 @@ const editorExtensions = [
 const SHORTCUTS = [
   { cat: 'Exécution', items: [
     { keys: ['Alt', '↵'],   desc: 'Exécuter / relancer le script' },
+    { keys: ['Alt', 'Maj', '↵'], desc: 'Exécuter + activer le mode Auto (relance à chaque modif)' },
     { keys: ['Échap'],      desc: 'Arrêter l’exécution en cours' },
     { keys: ['F4'],         desc: 'Aller à la première erreur' },
   ]},
@@ -592,6 +593,20 @@ const onGlobalKeydown = e => {
     e.preventDefault()
     e.stopImmediatePropagation()
     closeHelp()
+    return
+  }
+  // Alt+Maj+Entrée : lance ET active le mode Auto (relance automatique à chaque
+  // modif). Testé AVANT Alt+Entrée (qui matcherait aussi, altKey étant vrai).
+  if (e.key === 'Enter' && e.altKey && e.shiftKey) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    const chk = document.getElementById('autoexec-chk')
+    const wrap = document.getElementById('autoexec-wrap')
+    if (chk) {
+      chk.checked = true
+      if (wrap) wrap.classList.add('on')
+    }
+    relaunch()
     return
   }
   // Alt+Entrée : lance ou RELANCE l'exécution — géré en capture pour marcher
