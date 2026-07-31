@@ -109,8 +109,8 @@ void image_preload(const std::string& name, const std::vector<uint8_t>& bytes, c
 }
 
 void image_preload_b64(const std::string& name, const std::string& b64, const std::string& ext) {
-    std::string dotExt = (!ext.empty() && ext[0] == '.') ? ext : ("." + ext);
-    image_preload(name, b64decode(b64), dotExt);
+    std::string dot_ext = (!ext.empty() && ext[0] == '.') ? ext : ("." + ext);
+    image_preload(name, b64decode(b64), dot_ext);
 }
 
 void image_reset() {
@@ -131,7 +131,7 @@ void image_reset() {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static Value makeHandle(int id, int w, int h, TexHandle* ptr) {
+static Value make_handle(int id, int w, int h, TexHandle* ptr) {
     static const Value K_ID(std::string("id")), K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
     Value m = Value::make_map();
     m.mptr->userdata = ptr;
@@ -141,13 +141,13 @@ static Value makeHandle(int id, int w, int h, TexHandle* ptr) {
     return m;
 }
 
-static TexHandle& handlePtr(const Value& v, const char* fn) {
+static TexHandle& handle_ptr(const Value& v, const char* fn) {
     if (!v.is_map() || !v.mptr->userdata)
         throw std::runtime_error(std::string(fn) + ": expected image handle");
     return *(TexHandle*)v.mptr->userdata;
 }
 
-static Color toColor(const Value& v) {
+static Color to_color(const Value& v) {
     static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
     if (!v.is_map())
         throw std::runtime_error("image: expected Color object");
@@ -158,7 +158,7 @@ static Color toColor(const Value& v) {
     return {gc(K_R, 1), gc(K_G, 1), gc(K_B, 1), gc(K_A, 1)};
 }
 
-static void pixelsOpen(TexHandle& h) {
+static void pixels_open(TexHandle& h) {
     if (h.pixels_open)
         return;
     if (h.is_render) {
@@ -189,7 +189,7 @@ static void pixelsOpen(TexHandle& h) {
     h.pixels_open = true;
 }
 
-static void pixelsClose(TexHandle& h) {
+static void pixels_close(TexHandle& h) {
     if (!h.pixels_open)
         return;
     if (h.is_render)
@@ -199,7 +199,7 @@ static void pixelsClose(TexHandle& h) {
     h.pixels_open = false;
 }
 
-static Texture2D loadFromMemory(const std::vector<uint8_t>& bytes, const std::string& ext) {
+static Texture2D load_from_memory(const std::vector<uint8_t>& bytes, const std::string& ext) {
     Image img = LoadImageFromMemory(ext.c_str(), bytes.data(), (int)bytes.size());
     if (!img.data)
         throw std::runtime_error("image: failed to decode image (ext: " + ext + ")");
@@ -209,7 +209,7 @@ static Texture2D loadFromMemory(const std::vector<uint8_t>& bytes, const std::st
 }
 
 // Extension (avec le point) déduite du chemin ; ".png" par défaut.
-static std::string extOf(const std::string& path) {
+static std::string ext_of(const std::string& path) {
     auto dot = path.find_last_of('.');
     return dot == std::string::npos ? std::string(".png") : path.substr(dot);
 }
@@ -218,7 +218,7 @@ static std::string extOf(const std::string& path) {
 // Récupère une ressource servie (même origine) de façon SYNCHRONE, pour garder
 // image.load() synchrone. XHR synchrone sur le thread principal n'autorise pas
 // responseType 'arraybuffer' → on lit responseText en binaire (x-user-defined).
-static std::vector<uint8_t> fetchBytesSync(const std::string& url) {
+static std::vector<uint8_t> fetch_bytes_sync(const std::string& url) {
     int len = 0;
     char* data = (char*)EM_ASM_INT(
         {
@@ -226,15 +226,15 @@ static std::vector<uint8_t> fetchBytesSync(const std::string& url) {
                 var u = UTF8ToString($0);
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', u, false);
-                xhr.overrideMimeType('text/plain; charset=x-user-defined');
+                xhr.override_mime_type('text/plain; charset=x-user-defined');
                 xhr.send(null);
                 if (xhr.status !== 200 && xhr.status !== 0)
                     return 0;
-                var s = xhr.responseText;
+                var s = xhr.response_text;
                 var n = s.length;
                 var ptr = _malloc(n);
                 for (var i = 0; i < n; i++)
-                    HEAPU8[ptr + i] = s.charCodeAt(i) & 0xff;
+                    HEAPU8[ptr + i] = s.char_code_at(i) & 0xff;
                 HEAP32[$1 >> 2] = n;
                 return ptr;
             } catch (e) {
@@ -262,14 +262,14 @@ static int img_load(CallCtx& ctx) {
     TexHandle h;
     auto it = s_preloaded.find(path);
     if (it != s_preloaded.end()) {
-        h.tex = loadFromMemory(it->second.first, it->second.second);
+        h.tex = load_from_memory(it->second.first, it->second.second);
     } else {
 #ifdef __EMSCRIPTEN__
         // Pas d'upload : tenter de récupérer la ressource servie (même origine),
         // relative à la page (ex. image.load("logo.png") → <base>/logo.png).
-        std::vector<uint8_t> bytes = fetchBytesSync(path);
+        std::vector<uint8_t> bytes = fetch_bytes_sync(path);
         if (!bytes.empty())
-            h.tex = loadFromMemory(bytes, extOf(path));
+            h.tex = load_from_memory(bytes, ext_of(path));
 #else
         h.tex = LoadTexture(path.c_str());
 #endif
@@ -283,7 +283,7 @@ static int img_load(CallCtx& ctx) {
     auto uptr = std::make_unique<TexHandle>(std::move(h));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return ctx.ret(makeHandle(id, w, hh, ptr));
+    return ctx.ret(make_handle(id, w, hh, ptr));
 }
 
 // ── image.loadData(format, base64) ──────────────────────────────────────────
@@ -300,7 +300,7 @@ static int img_load_data(CallCtx& ctx) {
         throw std::runtime_error("image.loadData: empty or invalid base64 data");
 
     TexHandle h;
-    h.tex = loadFromMemory(bytes, ext);
+    h.tex = load_from_memory(bytes, ext);
     h.is_render = false;
     int id = s_next_id++;
     h.id = id;
@@ -308,7 +308,7 @@ static int img_load_data(CallCtx& ctx) {
     auto uptr = std::make_unique<TexHandle>(std::move(h));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return ctx.ret(makeHandle(id, w, hh, ptr));
+    return ctx.ret(make_handle(id, w, hh, ptr));
 }
 
 // ── image.create(w, h) ───────────────────────────────────────────────────────
@@ -331,7 +331,7 @@ static int img_create(CallCtx& ctx) {
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return ctx.ret(makeHandle(id, w, h, ptr));
+    return ctx.ret(make_handle(id, w, h, ptr));
 }
 
 // ── image.beginDraw(img) ────────────────────────────────────────────────────
@@ -341,10 +341,10 @@ static int img_begin(CallCtx& ctx) {
     static constexpr const char* FN = "image.beginDraw";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
-    TexHandle& h = handlePtr(args[0], FN);
+    TexHandle& h = handle_ptr(args[0], FN);
     if (!h.is_render)
         throw std::runtime_error(std::string(FN) + ": not a render texture — use image.create()");
-    pixelsClose(h);
+    pixels_close(h);
     h.gpu_dirty = true;   // le dessin GPU va diverger de l'ombre CPU → resync au prochain accès pixel
     BeginTextureMode(h.rtt);
     return ctx.ret(Value{});
@@ -367,8 +367,8 @@ static int img_draw(CallCtx& ctx) {
     static constexpr const char* FN = "image.draw";
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
-    TexHandle& h = handlePtr(args[0], FN);
-    pixelsClose(h);
+    TexHandle& h = handle_ptr(args[0], FN);
+    pixels_close(h);
 
     Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
     float x = (float)num_arg(args, 1, FN);
@@ -376,7 +376,7 @@ static int img_draw(CallCtx& ctx) {
     float dw = argc > 3 ? (float)num_arg(args, 3, FN) : (float)tex.width;
     float dh = argc > 4 ? (float)num_arg(args, 4, FN) : (float)tex.height;
     // teinte : argument explicite prioritaire, sinon teinte globale (graphics.tint)
-    Color tint = (argc > 5 && args[5].is_map()) ? toColor(args[5]) : (s_has_tint ? s_tint : WHITE);
+    Color tint = (argc > 5 && args[5].is_map()) ? to_color(args[5]) : (s_has_tint ? s_tint : WHITE);
 
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
     float sh = h.is_render ? -(float)tex.height : (float)tex.height;
@@ -416,7 +416,7 @@ static int img_begin_pixels(CallCtx& ctx) {
     static constexpr const char* FN = "image.beginPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
-    pixelsOpen(handlePtr(args[0], FN));
+    pixels_open(handle_ptr(args[0], FN));
     return ctx.ret(Value{});
 }
 
@@ -427,7 +427,7 @@ static int img_end_pixels(CallCtx& ctx) {
     static constexpr const char* FN = "image.endPixels";
     if (argc < 1)
         throw std::runtime_error(std::string(FN) + ": expected image handle");
-    pixelsClose(handlePtr(args[0], FN));
+    pixels_close(handle_ptr(args[0], FN));
     return ctx.ret(Value{});
 }
 
@@ -441,10 +441,10 @@ static int img_get_pixel(CallCtx& ctx) {
     static constexpr const char* FN = "image.getPixel";
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
-    TexHandle& h = handlePtr(args[0], FN);
+    TexHandle& h = handle_ptr(args[0], FN);
     int x = (int)num_arg(args, 1, FN);
     int y = (int)num_arg(args, 2, FN);
-    pixelsOpen(h);
+    pixels_open(h);
     Color c;
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height) {
         c = BLANK; // hors image → transparent (borne x,y ; sinon accès OOB dans le chemin rapide)
@@ -468,10 +468,10 @@ static int img_set_pixel(CallCtx& ctx) {
     static constexpr const char* FN = "image.setPixel";
     if (argc < 4)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y, color");
-    TexHandle& h = handlePtr(args[0], FN);
+    TexHandle& h = handle_ptr(args[0], FN);
     int x = (int)num_arg(args, 1, FN);
     int y = (int)num_arg(args, 2, FN);
-    pixelsOpen(h);
+    pixels_open(h);
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height)
         return ctx.ret(Value{}); // hors image → ignore (borne x,y ; sinon écriture OOB dans le chemin rapide)
     Color c = (argc >= 7) ? Color{
@@ -479,7 +479,7 @@ static int img_set_pixel(CallCtx& ctx) {
         (uint8_t)(num_arg(args, 4, FN) * 255.0 + 0.5),
         (uint8_t)(num_arg(args, 5, FN) * 255.0 + 0.5),
         (uint8_t)(num_arg(args, 6, FN) * 255.0 + 0.5),
-    } : toColor(args[3]);
+    } : to_color(args[3]);
     if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
         uint8_t* px = (uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
         px[0] = c.r; px[1] = c.g; px[2] = c.b; px[3] = c.a;
@@ -499,11 +499,11 @@ static int img_map_pixel(CallCtx& ctx) {
     static constexpr const char* FN = "image.mapPixel";
     if (argc < 2)
         throw std::runtime_error(std::string(FN) + ": expected img, fn");
-    TexHandle& h = handlePtr(args[0], FN);
+    TexHandle& h = handle_ptr(args[0], FN);
     Value fn = args[1];
     if (!fn.is_builtin() && !fn.is_func_val() && !fn.is_closure())
         throw std::runtime_error(std::string(FN) + ": second argument must be a function");
-    pixelsOpen(h);
+    pixels_open(h);
     VM* vm = ctx.vm;
     const int w = h.cpu.width;
     const int hgt = h.cpu.height;
@@ -537,10 +537,10 @@ static int img_map_pixel(CallCtx& ctx) {
             }
         }
     } catch (...) {
-        pixelsClose(h);
+        pixels_close(h);
         throw;
     }
-    pixelsClose(h);
+    pixels_close(h);
     return ctx.ret(Value{});
 }
 
@@ -584,7 +584,7 @@ Value image_alloc_tex(int w, int h, int* id_out) {
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
     TexHandle* ptr = uptr.get();
     s_images[id] = std::move(uptr);
-    return makeHandle(id, w, h, ptr);
+    return make_handle(id, w, h, ptr);
 }
 
 void image_push_pixels(int id, const uint8_t* rgba) {
