@@ -9,7 +9,7 @@
 #include <stdexcept>
 #include <string>
 
-static double quatField(const Value& v, const char* k) {
+static double quat_field(const Value& v, const char* k) {
     Value f = v.map_get(Value(std::string(k)));
     return f.is_number() ? f.as_num() : 0.0;
 }
@@ -22,15 +22,15 @@ Quaternion quat_from_instance(const Value& v, const char* fn) {
     Value name = cls.is_class() ? cls.map_get(Value(std::string("__name__"))) : Value{};
     if (!(name.is_string() && name.as_string() == "Quat"))
         throw std::runtime_error(std::string(fn) + ": expected a Quat (graphics.quat / quatAxis / quatEuler)");
-    return Quaternion{(float)quatField(v, "x"), (float)quatField(v, "y"), (float)quatField(v, "z"),
-                      (float)quatField(v, "w")};
+    return Quaternion{(float)quat_field(v, "x"), (float)quat_field(v, "y"), (float)quat_field(v, "z"),
+                      (float)quat_field(v, "w")};
 }
 
-static Value quatClass();   // défini plus bas
+static Value quat_class();   // défini plus bas
 
 Value make_quat_instance(Quaternion q) {
     Value inst = Value::make_map();
-    inst.map_set(Value(std::string("__class__")), quatClass());
+    inst.map_set(Value(std::string("__class__")), quat_class());
     inst.map_set(Value(std::string("x")), Value((double)q.x));
     inst.map_set(Value(std::string("y")), Value((double)q.y));
     inst.map_set(Value(std::string("z")), Value((double)q.z));
@@ -91,7 +91,7 @@ static int quat_rotate_vec(CallCtx& ctx) {
     return ctx.ret(arr);
 }
 
-static Value makeQuatClass() {
+static Value make_quat_class() {
     Value cls = Value::make_class();
     cls.map_set(Value(std::string("__name__")), Value(std::string("Quat")));
     cls.map_set(Value(std::string("mul")), Value::make_builtin(quat_mul));
@@ -102,8 +102,8 @@ static Value makeQuatClass() {
     return cls;
 }
 
-static Value quatClass() {
-    static Value cls = makeQuatClass();
+static Value quat_class() {
+    static Value cls = make_quat_class();
     return cls;
 }
 
