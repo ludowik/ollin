@@ -49,7 +49,7 @@ static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
 
 // Reconstruit une Camera3D raylib depuis le handle map (graphics.camera). up par
 // défaut = +Y ; projection perspective ; near/far = valeurs par défaut de raylib.
-static Camera3D cameraFromMap(const Value& v, const char* fn) {
+static Camera3D camera_from_map(const Value& v, const char* fn) {
     if (!v.is_map())
         throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
     auto get = [&](const char* k, double def) -> float {
@@ -71,7 +71,7 @@ static Camera3D cameraFromMap(const Value& v, const char* fn) {
 // px,py,pz (position), tx,ty,tz (cible), fovy. Comme toute instance reste un
 // T_MAP, cameraFromMap la relit sans changement. Les méthodes MUTENT self en
 // place (caméra mutable entre frames) et renvoient self → appels chaînables.
-static double camField(const Value& self, const char* k) {
+static double cam_field(const Value& self, const char* k) {
     Value v = self.map_get(Value(std::string(k)));
     return v.is_number() ? v.as_num() : 0.0;
 }
@@ -104,12 +104,12 @@ static int cam_move(CallCtx& ctx) {
     double dx = num_arg(args, argc, 1, "Camera.move");
     double dy = num_arg(args, argc, 2, "Camera.move");
     double dz = num_arg(args, argc, 3, "Camera.move");
-    self.map_set(Value(std::string("px")), Value(camField(self, "px") + dx));
-    self.map_set(Value(std::string("py")), Value(camField(self, "py") + dy));
-    self.map_set(Value(std::string("pz")), Value(camField(self, "pz") + dz));
-    self.map_set(Value(std::string("tx")), Value(camField(self, "tx") + dx));
-    self.map_set(Value(std::string("ty")), Value(camField(self, "ty") + dy));
-    self.map_set(Value(std::string("tz")), Value(camField(self, "tz") + dz));
+    self.map_set(Value(std::string("px")), Value(cam_field(self, "px") + dx));
+    self.map_set(Value(std::string("py")), Value(cam_field(self, "py") + dy));
+    self.map_set(Value(std::string("pz")), Value(cam_field(self, "pz") + dz));
+    self.map_set(Value(std::string("tx")), Value(cam_field(self, "tx") + dx));
+    self.map_set(Value(std::string("ty")), Value(cam_field(self, "ty") + dy));
+    self.map_set(Value(std::string("tz")), Value(cam_field(self, "tz") + dz));
     return ctx.ret(self);
 }
 
@@ -122,11 +122,11 @@ static int cam_zoom(CallCtx& ctx) {
     if (factor <= 0.0) return ctx.ret(self);
     bool ortho = self.map_get(Value(std::string("ortho"))).is_number() && self.map_get(Value(std::string("ortho"))).as_num() != 0.0;
     if (ortho) {
-        double fovy = camField(self, "fovy");
+        double fovy = cam_field(self, "fovy");
         self.map_set(Value(std::string("fovy")), Value(std::max(0.01, fovy * factor)));
     } else {
-        double tx = camField(self, "tx"), ty = camField(self, "ty"), tz = camField(self, "tz");
-        double px = camField(self, "px"), py = camField(self, "py"), pz = camField(self, "pz");
+        double tx = cam_field(self, "tx"), ty = cam_field(self, "ty"), tz = cam_field(self, "tz");
+        double px = cam_field(self, "px"), py = cam_field(self, "py"), pz = cam_field(self, "pz");
         double dx = px - tx, dy = py - ty, dz = pz - tz;
         self.map_set(Value(std::string("px")), Value(tx + dx * factor));
         self.map_set(Value(std::string("py")), Value(ty + dy * factor));
@@ -144,10 +144,10 @@ static int cam_orbit(CallCtx& ctx) {
     Value self = args[0];
     double angle = num_arg(args, argc, 1, "Camera.orbit");
     double radius = num_arg(args, argc, 2, "Camera.orbit");
-    double tx = camField(self, "tx");
-    double ty = camField(self, "ty");
-    double tz = camField(self, "tz");
-    double py = (argc > 3) ? ty + num_arg(args, argc, 3, "Camera.orbit") : camField(self, "py");
+    double tx = cam_field(self, "tx");
+    double ty = cam_field(self, "ty");
+    double tz = cam_field(self, "tz");
+    double py = (argc > 3) ? ty + num_arg(args, argc, 3, "Camera.orbit") : cam_field(self, "py");
     self.map_set(Value(std::string("px")), Value(tx + std::cos(angle) * radius));
     self.map_set(Value(std::string("py")), Value(py));
     self.map_set(Value(std::string("pz")), Value(tz + std::sin(angle) * radius));
@@ -158,9 +158,9 @@ static int cam_orbit(CallCtx& ctx) {
 // Cible confondue avec la position (vecteur nul) → renvoie {x:0, y:0, z:0}.
 static int cam_get_view_dir(CallCtx& ctx) {
     Value self = ctx.args[0];
-    double dx = camField(self, "tx") - camField(self, "px");
-    double dy = camField(self, "ty") - camField(self, "py");
-    double dz = camField(self, "tz") - camField(self, "pz");
+    double dx = cam_field(self, "tx") - cam_field(self, "px");
+    double dy = cam_field(self, "ty") - cam_field(self, "py");
+    double dz = cam_field(self, "tz") - cam_field(self, "pz");
     double len = std::sqrt(dx * dx + dy * dy + dz * dz);
     if (len > 0.0) {
         dx /= len;
@@ -174,7 +174,7 @@ static int cam_get_view_dir(CallCtx& ctx) {
     return ctx.ret(dir);
 }
 
-static Value makeCameraClass() {
+static Value make_camera_class() {
     Value cls = Value::make_class();
     cls.map_set(Value(std::string("__name__")), Value(std::string("Camera")));
     cls.map_set(Value(std::string("setPos")), Value::make_builtin(cam_set_pos));
@@ -187,8 +187,8 @@ static Value makeCameraClass() {
 }
 
 // Classe Camera partagée (construite une fois, réutilisée par chaque instance).
-static Value cameraClass() {
-    static Value cls = makeCameraClass();
+static Value camera_class() {
+    static Value cls = make_camera_class();
     return cls;
 }
 
@@ -198,7 +198,7 @@ static Value cameraClass() {
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
-    cam.map_set(Value(std::string("__class__")), cameraClass());
+    cam.map_set(Value(std::string("__class__")), camera_class());
     cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.camera")));
     cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.camera")));
     cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.camera")));
@@ -215,7 +215,7 @@ static int gfx_camera(CallCtx& ctx) {
 static int gfx_camera_ortho(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
-    cam.map_set(Value(std::string("__class__")), cameraClass());
+    cam.map_set(Value(std::string("__class__")), camera_class());
     cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.cameraOrtho")));
     cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.cameraOrtho")));
     cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.cameraOrtho")));
@@ -269,9 +269,9 @@ static Mesh s_rec_mesh{};             // mesh enregistré, groupe OPAQUE (cube)
 static Mesh s_rec_mesh_w{};           // mesh enregistré, groupe TRANSPARENT (ex. plane pour l'eau)
 struct InstGroup {
     Mesh mesh;
-    unsigned int vboX;   // VBO transfos (persistant)
-    unsigned int vboC;   // VBO couleurs (persistant)
-    unsigned int vboT;   // VBO tuiles (persistant, 3 floats/instance)
+    unsigned int vbo_x;   // VBO transfos (persistant)
+    unsigned int vbo_c;   // VBO couleurs (persistant)
+    unsigned int vbo_t;   // VBO tuiles (persistant, 3 floats/instance)
     int count;
 };
 static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
@@ -289,7 +289,7 @@ void reset3d_shape_cache() {
     s_shape_cache.clear();
 }
 
-static Mesh getShapeMesh(int shape) {
+static Mesh get_shape_mesh(int shape) {
     int seg = gfx_segments();
     auto key = std::make_pair(shape, seg);
     auto it = s_shape_cache.find(key);
@@ -325,7 +325,7 @@ static Mesh getShapeMesh(int shape) {
 // Texture blanche 1×1 : « pas de texture » → échantillon blanc → texture×tint = tint.
 static Texture2D s_white_tex{};
 static bool s_white_ready = false;
-static unsigned int whiteTexId() {
+static unsigned int white_tex_id() {
     if (!s_white_ready) {
         Image img = GenImageColor(1, 1, WHITE);
         s_white_tex = LoadTextureFromImage(img);
@@ -361,7 +361,7 @@ static int s_inst_cap_xform = 0, s_inst_cap_color = 0, s_inst_cap_tile = 0;
 
 // Crée (1re fois / agrandissement) ou met à jour un VBO d'instance ; laisse le
 // VBO lié en sortie (pour le rlSetVertexAttribute qui suit).
-static void uploadInstanceVBO(unsigned int& vbo, int& cap, const void* data, int bytes) {
+static void upload_instance_vbo(unsigned int& vbo, int& cap, const void* data, int bytes) {
     if (vbo == 0 || bytes > cap) {
         if (vbo != 0)
             rlUnloadVertexBuffer(vbo);
@@ -373,7 +373,7 @@ static void uploadInstanceVBO(unsigned int& vbo, int& cap, const void* data, int
     }
 }
 
-static void loadLitShader() {
+static void load_lit_shader() {
     if (s_lit_ready) {
         return;
     }
@@ -484,7 +484,7 @@ static void loadLitShader() {
 // Bucket courant pour (mesh, texture courante) — créé à la demande. Keyé par
 // mesh.vaoId → primitives unitaires ET meshes de modèles externes partagent le
 // même chemin instancié + éclairé (N formes de même (mesh,texture) = 1 draw call).
-static Bucket3D& bucketFor(const Mesh& mesh, unsigned int texId) {
+static Bucket3D& bucket_for(const Mesh& mesh, unsigned int texId) {
     for (auto& b : s_buckets) {
         if (b.vaoId == mesh.vaoId && b.texId == texId) {
             return b;
@@ -495,7 +495,7 @@ static Bucket3D& bucketFor(const Mesh& mesh, unsigned int texId) {
 }
 
 // Empile une instance (transfo translate·scale + couleur) dans son bucket (mesh, texId).
-static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vector3 size, Color col) {
+static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vector3 size, Color col) {
     if (s_recording) {
         // Mode enregistrement (beginChunk) : on cuit la transfo LOCALE (monde) et la
         // couleur ; texId ignoré (groupe cuit = texture blanche + couleur par instance).
@@ -525,7 +525,7 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
         s_rec_t.push_back(s_cur_tile[2]);
         return;
     }
-    Bucket3D& b = bucketFor(mesh, texId);
+    Bucket3D& b = bucket_for(mesh, texId);
     // Placement local (scale puis translate) PUIS la transfo courante capturée ICI
     // → chaque instance fige sa propre transfo. begin3d ayant ouvert le mode
     // transform, rlGetMatrixTransform() reflète translate/rotate/scale qu'ils soient
@@ -545,8 +545,8 @@ static void pushInstance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vect
 // Active le shader lit et pose les uniforms du frame (MVP = view·proj figée au
 // begin3d, position caméra, éclairage). Renvoie false si le shader est indisponible.
 // Partagé par flushBucket (instances collectées) ET drawChunk (groupe cuit).
-static bool litBeginDraw() {
-    loadLitShader();
+static bool lit_begin_draw() {
+    load_lit_shader();
     if (s_lit.id == 0) {
         return false;
     }
@@ -593,22 +593,22 @@ static bool litBeginDraw() {
 // Attache les attributs d'instance (transfo mat4 = 4 vec4, couleur vec4, tuiles
 // vec3 ; divisor 1) depuis des VBO DÉJÀ REMPLIS. VAO supposé déjà actif. Partagé
 // par litBindInstances (groupe cuit) et flushBucket (VBO partagés).
-static void bindInstanceVBOs(unsigned int vboX, unsigned int vboC, unsigned int vboT) {
-    int locT = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
-    rlEnableVertexBuffer(vboX);
+static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t) {
+    int loc_t = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
+    rlEnableVertexBuffer(vbo_x);
     for (unsigned int i = 0; i < 4; i++) {
-        rlEnableVertexAttribute(locT + i);
-        rlSetVertexAttribute(locT + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
-        rlSetVertexAttributeDivisor(locT + i, 1);
+        rlEnableVertexAttribute(loc_t + i);
+        rlSetVertexAttribute(loc_t + i, 4, RL_FLOAT, 0, sizeof(Matrix), i * sizeof(Vector4));
+        rlSetVertexAttributeDivisor(loc_t + i, 1);
     }
-    rlEnableVertexBuffer(vboC);
+    rlEnableVertexBuffer(vbo_c);
     if (s_loc_instcolor >= 0) {
         rlEnableVertexAttribute(s_loc_instcolor);
         rlSetVertexAttribute(s_loc_instcolor, 4, RL_FLOAT, 0, 0, 0);
         rlSetVertexAttributeDivisor(s_loc_instcolor, 1);
     }
-    if (s_loc_insttile >= 0 && vboT != 0) {
-        rlEnableVertexBuffer(vboT);
+    if (s_loc_insttile >= 0 && vbo_t != 0) {
+        rlEnableVertexBuffer(vbo_t);
         rlEnableVertexAttribute(s_loc_insttile);
         rlSetVertexAttribute(s_loc_insttile, 3, RL_FLOAT, 0, 0, 0);
         rlSetVertexAttributeDivisor(s_loc_insttile, 1);
@@ -616,17 +616,17 @@ static void bindInstanceVBOs(unsigned int vboX, unsigned int vboC, unsigned int 
 }
 
 // divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
-static void litBindInstances(unsigned int vaoId, unsigned int vboX, unsigned int vboC, unsigned int vboT) {
+static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t) {
     rlEnableVertexArray(vaoId);
-    bindInstanceVBOs(vboX, vboC, vboT);
+    bind_instance_vbos(vbo_x, vbo_c, vbo_t);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
 }
 
 // Dessin instancié (shader + attributs déjà en place). Lie la texture puis draw.
-static void litDrawInstanced(const Mesh& mesh, unsigned int texId, int n) {
+static void lit_draw_instanced(const Mesh& mesh, unsigned int texId, int n) {
     rlActiveTextureSlot(0);
-    rlEnableTexture(texId ? texId : whiteTexId());
+    rlEnableTexture(texId ? texId : white_tex_id());
     int slot = 0;
     rlSetUniform(s_lit.locs[SHADER_LOC_MAP_DIFFUSE], &slot, RL_SHADER_UNIFORM_INT, 1);
     rlEnableVertexArray(mesh.vaoId);
@@ -641,12 +641,12 @@ static void litDrawInstanced(const Mesh& mesh, unsigned int texId, int n) {
 }
 
 // Résout un bucket (instances collectées CETTE frame) en UN appel instancié.
-static void flushBucket(const Bucket3D& b) {
+static void flush_bucket(const Bucket3D& b) {
     int n = (int)b.xforms.size();
     if (n == 0) {
         return;
     }
-    if (!litBeginDraw()) {
+    if (!lit_begin_draw()) {
         return;
     }
     Mesh mesh = b.mesh;
@@ -658,13 +658,13 @@ static void flushBucket(const Bucket3D& b) {
         xf[i] = MatrixToFloatV(b.xforms[i]);
     }
     rlEnableVertexArray(mesh.vaoId);
-    uploadInstanceVBO(s_inst_vbo_xform, s_inst_cap_xform, xf.data(), n * (int)sizeof(float16));
-    uploadInstanceVBO(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
-    uploadInstanceVBO(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
-    bindInstanceVBOs(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile);
+    upload_instance_vbo(s_inst_vbo_xform, s_inst_cap_xform, xf.data(), n * (int)sizeof(float16));
+    upload_instance_vbo(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
+    upload_instance_vbo(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
+    bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
-    litDrawInstanced(mesh, b.texId, n);
+    lit_draw_instanced(mesh, b.texId, n);
     rlDisableShader();
 }
 
@@ -701,14 +701,14 @@ void reset3d_graphics_state() {
     // Groupes d'instances cuits : VBO liés au contexte → libérer et vider (le script
     // les recuit dans setup au prochain run).
     for (auto& g : s_groups) {
-        if (g.vboX) {
-            rlUnloadVertexBuffer(g.vboX);
+        if (g.vbo_x) {
+            rlUnloadVertexBuffer(g.vbo_x);
         }
-        if (g.vboC) {
-            rlUnloadVertexBuffer(g.vboC);
+        if (g.vbo_c) {
+            rlUnloadVertexBuffer(g.vbo_c);
         }
-        if (g.vboT) {
-            rlUnloadVertexBuffer(g.vboT);
+        if (g.vbo_t) {
+            rlUnloadVertexBuffer(g.vbo_t);
         }
     }
     s_groups.clear();
@@ -756,12 +756,12 @@ void reset3d_graphics_state() {
     s_anim_params[3] = 0.045f;
 }
 
-static void flush3dBuckets() {
+static void flush3d_buckets() {
     // Vider le batch immédiat en attente (fil de fer/grille dessinés pendant la
     // collecte) avant nos draw calls instanciés → ordre cohérent.
     rlDrawRenderBatchActive();
     for (const auto& b : s_buckets) {
-        flushBucket(b);
+        flush_bucket(b);
     }
     s_buckets.clear();
 }
@@ -770,7 +770,7 @@ void end3d_internal() {
     if (!s_in_3d) {
         return;
     }
-    flush3dBuckets();   // encore en Mode3D → matrices view/proj disponibles
+    flush3d_buckets();   // encore en Mode3D → matrices view/proj disponibles
     rlPopMatrix();      // referme le mode transform ouvert par begin3d (rlPushMatrix)
     EndMode3D();
     s_in_3d = false;
@@ -780,7 +780,7 @@ static int gfx_begin3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.begin3d: expected a camera (graphics.camera)");
-    s_cam3d = cameraFromMap(args[0], "graphics.begin3d");
+    s_cam3d = camera_from_map(args[0], "graphics.begin3d");
     s_buckets.clear();
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
@@ -828,16 +828,16 @@ static int gfx_ambient(CallCtx& ctx) {
 // Phase 1 : une seule lumière active (directionnelle ou ponctuelle). Un objet
 // Light porte sa config (type, direction/position, couleur, activée) et, à chaque
 // mutation, la répercute sur l'état d'éclairage global (dernier écrit = actif).
-static double instField(const Value& self, const char* k, double def) {
+static double inst_field(const Value& self, const char* k, double def) {
     Value v = self.map_get(Value(std::string(k)));
     return v.is_number() ? v.as_num() : def;
 }
 
-static void applyLightFromInstance(const Value& self) {
-    int type = (int)instField(self, "type", 0);
-    float x = (float)instField(self, "dx", 0.0);
-    float y = (float)instField(self, "dy", -1.0);
-    float z = (float)instField(self, "dz", 0.0);
+static void apply_light_from_instance(const Value& self) {
+    int type = (int)inst_field(self, "type", 0);
+    float x = (float)inst_field(self, "dx", 0.0);
+    float y = (float)inst_field(self, "dy", -1.0);
+    float z = (float)inst_field(self, "dz", 0.0);
     s_light_type = type;
     if (type == 1) {
         s_light_pos = Vector3{x, y, z};
@@ -846,11 +846,11 @@ static void applyLightFromInstance(const Value& self) {
         s_light_pos = Vector3{0.0f, 0.0f, 0.0f};
         s_light_tgt = Vector3{x, y, z};
     }
-    s_light_col[0] = (float)instField(self, "r", 1.0);
-    s_light_col[1] = (float)instField(self, "g", 1.0);
-    s_light_col[2] = (float)instField(self, "b", 1.0);
-    s_light_col[3] = (float)instField(self, "a", 1.0);
-    s_light_on = instField(self, "enabled", 1.0) != 0.0;
+    s_light_col[0] = (float)inst_field(self, "r", 1.0);
+    s_light_col[1] = (float)inst_field(self, "g", 1.0);
+    s_light_col[2] = (float)inst_field(self, "b", 1.0);
+    s_light_col[3] = (float)inst_field(self, "a", 1.0);
+    s_light_on = inst_field(self, "enabled", 1.0) != 0.0;
     s_lighting_used = true;
 }
 
@@ -862,7 +862,7 @@ static int light_set_dir(CallCtx& ctx) {
     self.map_set(Value(std::string("dx")), Value(num_arg(args, argc, 1, "Light.setDir")));
     self.map_set(Value(std::string("dy")), Value(num_arg(args, argc, 2, "Light.setDir")));
     self.map_set(Value(std::string("dz")), Value(num_arg(args, argc, 3, "Light.setDir")));
-    applyLightFromInstance(self);
+    apply_light_from_instance(self);
     return ctx.ret(self);
 }
 
@@ -874,7 +874,7 @@ static int light_set_pos(CallCtx& ctx) {
     self.map_set(Value(std::string("dx")), Value(num_arg(args, argc, 1, "Light.setPos")));
     self.map_set(Value(std::string("dy")), Value(num_arg(args, argc, 2, "Light.setPos")));
     self.map_set(Value(std::string("dz")), Value(num_arg(args, argc, 3, "Light.setPos")));
-    applyLightFromInstance(self);
+    apply_light_from_instance(self);
     return ctx.ret(self);
 }
 
@@ -889,7 +889,7 @@ static int light_set_color(CallCtx& ctx) {
         self.map_set(Value(std::string("b")), Value(c.b / 255.0));
         self.map_set(Value(std::string("a")), Value(c.a / 255.0));
     }
-    applyLightFromInstance(self);
+    apply_light_from_instance(self);
     return ctx.ret(self);
 }
 
@@ -899,11 +899,11 @@ static int light_enable(CallCtx& ctx) {
     Value self = args[0];
     bool on = (argc > 1) ? !is_falsy(args[1]) : true;
     self.map_set(Value(std::string("enabled")), Value((int64_t)(on ? 1 : 0)));
-    applyLightFromInstance(self);
+    apply_light_from_instance(self);
     return ctx.ret(self);
 }
 
-static Value makeLightClass() {
+static Value make_light_class() {
     Value cls = Value::make_class();
     cls.map_set(Value(std::string("__name__")), Value(std::string("Light")));
     cls.map_set(Value(std::string("setDir")), Value::make_builtin(light_set_dir));
@@ -913,8 +913,8 @@ static Value makeLightClass() {
     return cls;
 }
 
-static Value lightClass() {
-    static Value cls = makeLightClass();
+static Value light_class() {
+    static Value cls = make_light_class();
     return cls;
 }
 
@@ -928,7 +928,7 @@ static int gfx_light(CallCtx& ctx) {
     float z = (float)num_arg(args, argc, 3, "graphics.light");
     Color c = (argc > 4 && (args[4].is_map() || args[4].is_class())) ? gfx_to_color(args[4]) : WHITE;
     Value inst = Value::make_map();
-    inst.map_set(Value(std::string("__class__")), lightClass());
+    inst.map_set(Value(std::string("__class__")), light_class());
     inst.map_set(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
     inst.map_set(Value(std::string("dx")), Value((double)x));
     inst.map_set(Value(std::string("dy")), Value((double)y));
@@ -938,7 +938,7 @@ static int gfx_light(CallCtx& ctx) {
     inst.map_set(Value(std::string("b")), Value(c.b / 255.0));
     inst.map_set(Value(std::string("a")), Value(c.a / 255.0));
     inst.map_set(Value(std::string("enabled")), Value((int64_t)1));
-    applyLightFromInstance(inst);
+    apply_light_from_instance(inst);
     return ctx.ret(inst);
 }
 
@@ -1037,7 +1037,7 @@ static int gfx_cube(CallCtx& ctx) {
     Vector3 size{(float)num_arg(args, argc, 3, "graphics.cube"), (float)num_arg(args, argc, 4, "graphics.cube"),
                  (float)num_arg(args, argc, 5, "graphics.cube")};
     if (gfx_has_fill())
-        pushInstance(getShapeMesh(SH_CUBE), s_cur_tex3d, pos, size, gfx_fill_color());
+        push_instance(get_shape_mesh(SH_CUBE), s_cur_tex3d, pos, size, gfx_fill_color());
     if (gfx_has_stroke())
         DrawCubeWiresV(pos, size, gfx_stroke_color());
     return ctx.ret(Value{});
@@ -1051,7 +1051,7 @@ static int gfx_sphere(CallCtx& ctx) {
                 (float)num_arg(args, argc, 2, "graphics.sphere")};
     float r = (float)num_arg(args, argc, 3, "graphics.sphere");
     if (gfx_has_fill())
-        pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfx_fill_color());
+        push_instance(get_shape_mesh(SH_SPHERE), s_cur_tex3d, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfx_fill_color());
     if (gfx_has_stroke())
         DrawSphereWires(pos, r, 16, 16, gfx_stroke_color());
     return ctx.ret(Value{});
@@ -1067,7 +1067,7 @@ static int gfx_cylinder(CallCtx& ctx) {
     float r = (float)num_arg(args, argc, 3, "graphics.cylinder");
     float h = (float)num_arg(args, argc, 4, "graphics.cylinder");
     if (gfx_has_fill())
-        pushInstance(getShapeMesh(SH_CYLINDER), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
+        push_instance(get_shape_mesh(SH_CYLINDER), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
     if (gfx_has_stroke())
         DrawCylinderWires(pos, r, r, h, 16, gfx_stroke_color());
     return ctx.ret(Value{});
@@ -1081,7 +1081,7 @@ static int gfx_cone(CallCtx& ctx) {
     float r = (float)num_arg(args, argc, 3, "graphics.cone");
     float h = (float)num_arg(args, argc, 4, "graphics.cone");
     if (gfx_has_fill())
-        pushInstance(getShapeMesh(SH_CONE), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
+        push_instance(get_shape_mesh(SH_CONE), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
     if (gfx_has_stroke())
         DrawCylinderWires(pos, r, 0.0f, h, 16, gfx_stroke_color());
     return ctx.ret(Value{});
@@ -1098,7 +1098,7 @@ static int gfx_torus(CallCtx& ctx) {
     float tube = (float)num_arg(args, argc, 4, "graphics.torus");
     // mesh : major=1 (XY), tube=0.3 (Z) → scale XY par r, Z par tube/0.3
     if (gfx_has_fill())
-        pushInstance(getShapeMesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfx_fill_color());
+        push_instance(get_shape_mesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfx_fill_color());
     if (gfx_has_stroke())
         DrawCircle3D(pos, r, {1, 0, 0}, 90.0f, gfx_stroke_color());
     return ctx.ret(Value{});
@@ -1114,7 +1114,7 @@ static int gfx_plane(CallCtx& ctx) {
     float sz = (float)num_arg(args, argc, 4, "graphics.plane");
     if (gfx_has_fill() || gfx_has_stroke()) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
         Color c = gfx_has_fill() ? gfx_fill_color() : gfx_stroke_color();
-        pushInstance(getShapeMesh(SH_PLANE), s_cur_tex3d, pos, Vector3{sx, 1.0f, sz}, c);
+        push_instance(get_shape_mesh(SH_PLANE), s_cur_tex3d, pos, Vector3{sx, 1.0f, sz}, c);
     }
     return ctx.ret(Value{});
 }
@@ -1138,7 +1138,7 @@ static int gfx_point3d(CallCtx& ctx) {
     float y = (float)num_arg(args, argc, 1, "graphics.point3d");
     float z = (float)num_arg(args, argc, 2, "graphics.point3d");
     float r = gfx_stroke_size() * 0.015f;
-    pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, {x, y, z}, {2.0f * r, 2.0f * r, 2.0f * r}, gfx_stroke_color());
+    push_instance(get_shape_mesh(SH_SPHERE), s_cur_tex3d, {x, y, z}, {2.0f * r, 2.0f * r, 2.0f * r}, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
@@ -1172,7 +1172,7 @@ void model_preload_bytes(const std::string& name, std::vector<unsigned char> byt
 // Récupère (et charge en GPU à la demande) le modèle `name`. Cherche : cache →
 // octets préchargés (écriture FS + LoadModel) → chemin de fichier direct (natif /
 // asset écrit dans MEMFS). Renvoie nullptr si introuvable/illisible.
-static Model* modelGet(const std::string& name) {
+static Model* model_get(const std::string& name) {
     auto c = s_model_cache.find(name);
     if (c != s_model_cache.end()) {
         return &c->second;
@@ -1211,7 +1211,7 @@ static int gfx_model(CallCtx& ctx) {
         throw std::runtime_error("graphics.model: expected a model name (string)");
     }
     const std::string& name = args[0].as_string();
-    if (!modelGet(name)) {
+    if (!model_get(name)) {
         throw std::runtime_error("graphics.model: modèle introuvable ou illisible : " + name);
     }
     Value h = Value::make_map();
@@ -1227,13 +1227,13 @@ static int gfx_draw_model(CallCtx& ctx) {
     if (argc < 1 || !args[0].is_map()) {
         throw std::runtime_error("graphics.drawModel: expected a model handle (graphics.model)");
     }
-    Value nameV = args[0].map_get(Value(std::string("name")));
-    if (!nameV.is_string()) {
+    Value name_v = args[0].map_get(Value(std::string("name")));
+    if (!name_v.is_string()) {
         throw std::runtime_error("graphics.drawModel: handle de modèle invalide");
     }
-    Model* mdl = modelGet(nameV.as_string());
+    Model* mdl = model_get(name_v.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.drawModel: modèle introuvable : " + nameV.as_string());
+        throw std::runtime_error("graphics.drawModel: modèle introuvable : " + name_v.as_string());
     }
     float x = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.drawModel") : 0.0f;
     float y = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.drawModel") : 0.0f;
@@ -1259,7 +1259,7 @@ static int gfx_draw_model(CallCtx& ctx) {
         // tint = couleur de base du matériau × fill (composantes).
         Color tint{(unsigned char)(base.r * fill.r / 255), (unsigned char)(base.g * fill.g / 255),
                    (unsigned char)(base.b * fill.b / 255), (unsigned char)(base.a * fill.a / 255)};
-        pushInstance(mdl->meshes[i], texId, pos, size, tint);
+        push_instance(mdl->meshes[i], texId, pos, size, tint);
     }
     return ctx.ret(Value{});
 }
@@ -1272,13 +1272,13 @@ static int gfx_model_size(CallCtx& ctx) {
     if (argc < 1 || !args[0].is_map()) {
         throw std::runtime_error("graphics.modelSize: expected a model handle (graphics.model)");
     }
-    Value nameV = args[0].map_get(Value(std::string("name")));
-    if (!nameV.is_string()) {
+    Value name_v = args[0].map_get(Value(std::string("name")));
+    if (!name_v.is_string()) {
         throw std::runtime_error("graphics.modelSize: handle de modèle invalide");
     }
-    Model* mdl = modelGet(nameV.as_string());
+    Model* mdl = model_get(name_v.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.modelSize: modèle introuvable : " + nameV.as_string());
+        throw std::runtime_error("graphics.modelSize: modèle introuvable : " + name_v.as_string());
     }
     BoundingBox bb = GetModelBoundingBox(*mdl);
     float w = bb.max.x - bb.min.x;
@@ -1307,9 +1307,9 @@ static int gfx_fit_distance(CallCtx& ctx) {
     int sh = GetScreenHeight();
     int sw = GetScreenWidth();
     double aspect = (sh > 0) ? (double)sw / (double)sh : 1.0;
-    double halfV = fovy * DEG2RAD * 0.5;
-    double halfH = std::atan(std::tan(halfV) * aspect);
-    double half = halfV < halfH ? halfV : halfH;
+    double half_v = fovy * DEG2RAD * 0.5;
+    double half_h = std::atan(std::tan(half_v) * aspect);
+    double half = half_v < half_h ? half_v : half_h;
     double s = std::sin(half);
     return ctx.ret(Value((s > 1e-4) ? radius / s : radius * 10.0));
 }
@@ -1375,7 +1375,7 @@ static int gfx_begin_chunk(CallCtx& ctx) {
 }
 
 // Construit un InstGroup (VBO persistants) depuis des vecteurs d'instances cuits.
-static InstGroup buildGroup(const Mesh& mesh, const std::vector<Matrix>& xs, const std::vector<float>& cs,
+static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, const std::vector<float>& cs,
                             const std::vector<float>& ts) {
     InstGroup g{};
     g.mesh = mesh;
@@ -1385,16 +1385,16 @@ static InstGroup buildGroup(const Mesh& mesh, const std::vector<Matrix>& xs, con
         for (int i = 0; i < g.count; i++) {
             xf[i] = MatrixToFloatV(xs[i]);
         }
-        g.vboX = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
-        g.vboC = rlLoadVertexBuffer(cs.data(), g.count * 4 * (int)sizeof(float), false);
-        g.vboT = rlLoadVertexBuffer(ts.data(), g.count * 3 * (int)sizeof(float), false);
+        g.vbo_x = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
+        g.vbo_c = rlLoadVertexBuffer(cs.data(), g.count * 4 * (int)sizeof(float), false);
+        g.vbo_t = rlLoadVertexBuffer(ts.data(), g.count * 3 * (int)sizeof(float), false);
     }
     return g;
 }
 
 // Range un groupe cuit dans s_groups en réutilisant un slot libéré si dispo (borne
 // la croissance en streaming infini) ; sinon agrandit. Renvoie l'id 1-based.
-static int placeGroup(const InstGroup& g) {
+static int place_group(const InstGroup& g) {
     if (!s_free_groups.empty()) {
         int idx = s_free_groups.back();
         s_free_groups.pop_back();
@@ -1414,12 +1414,12 @@ static int gfx_end_chunk(CallCtx& ctx) {
     (void)args;
     (void)argc;
     s_recording = false;
-    InstGroup g = buildGroup(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t);
-    InstGroup w = buildGroup(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw);
-    int idO = placeGroup(g);
-    int idW = 0;                       // pas de slot si pas d'eau (évite un groupe vide)
+    InstGroup g = build_group(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t);
+    InstGroup w = build_group(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw);
+    int id_o = place_group(g);
+    int id_w = 0;                       // pas de slot si pas d'eau (évite un groupe vide)
     if (w.count > 0) {
-        idW = placeGroup(w);
+        id_w = place_group(w);
     }
     s_rec_x.clear();
     s_rec_c.clear();
@@ -1428,8 +1428,8 @@ static int gfx_end_chunk(CallCtx& ctx) {
     s_rec_cw.clear();
     s_rec_tw.clear();
     Value h = Value::make_map();
-    h.map_set(Value(std::string("id")), Value((int64_t)idO));
-    h.map_set(Value(std::string("idw")), Value((int64_t)idW));
+    h.map_set(Value(std::string("id")), Value((int64_t)id_o));
+    h.map_set(Value(std::string("idw")), Value((int64_t)id_w));
     h.map_set(Value(std::string("count")), Value((int64_t)g.count));
     h.map_set(Value(std::string("wcount")), Value((int64_t)w.count));
     return ctx.ret(h);
@@ -1451,18 +1451,18 @@ static int gfx_draw_chunk(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     InstGroup& g = s_groups[id - 1];
-    if (g.count <= 0 || g.vboX == 0) {
+    if (g.count <= 0 || g.vbo_x == 0) {
         return ctx.ret(Value{});
     }
-    if (!litBeginDraw()) {
+    if (!lit_begin_draw()) {
         return ctx.ret(Value{});
     }
-    litBindInstances(g.mesh.vaoId, g.vboX, g.vboC, g.vboT);
+    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
     // Atlas lié si déclaré (tuiles≥0 échantillonnent l'atlas) ; sinon blanc (couleur
     // pleine). CONTRAT : avec un tileset actif, donner une tuile à CHAQUE cube du
     // chunk — un cube à tuile -1 échantillonnerait l'atlas @ fragTexCoord (tuile 0)
     // au lieu d'une couleur pleine.
-    litDrawInstanced(g.mesh, s_atlas_texid, g.count);
+    lit_draw_instanced(g.mesh, s_atlas_texid, g.count);
     rlDisableShader();
     return ctx.ret(Value{});
 }
@@ -1485,15 +1485,15 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     InstGroup& g = s_groups[id - 1];
-    if (g.count <= 0 || g.vboX == 0) {
+    if (g.count <= 0 || g.vbo_x == 0) {
         return ctx.ret(Value{});
     }
-    if (!litBeginDraw()) {
+    if (!lit_begin_draw()) {
         return ctx.ret(Value{});
     }
     BeginBlendMode(BLEND_ALPHA);
-    litBindInstances(g.mesh.vaoId, g.vboX, g.vboC, g.vboT);
-    litDrawInstanced(g.mesh, s_atlas_texid, g.count);
+    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    lit_draw_instanced(g.mesh, s_atlas_texid, g.count);
     rlDisableShader();
     EndBlendMode();
     return ctx.ret(Value{});
@@ -1502,7 +1502,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
 // graphics.freeChunk(handle) : libère les VBO d'un groupe cuit (chunk lointain
 // déchargé) → mémoire GPU récupérée. Le handle devient un no-op au dessin. Permet
 // un monde INFINI : on cuit les chunks autour du joueur, on libère les autres.
-static void freeGroupById(Value& handle, const char* key) {
+static void free_group_by_id(Value& handle, const char* key) {
     Value idv = handle.map_get(Value(std::string(key)));
     if (!idv.is_integer()) {
         return;
@@ -1512,18 +1512,18 @@ static void freeGroupById(Value& handle, const char* key) {
         return;
     }
     InstGroup& g = s_groups[id - 1];
-    bool live = g.vboX != 0 || g.vboC != 0 || g.vboT != 0 || g.count != 0;
-    if (g.vboX) {
-        rlUnloadVertexBuffer(g.vboX);
-        g.vboX = 0;
+    bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.count != 0;
+    if (g.vbo_x) {
+        rlUnloadVertexBuffer(g.vbo_x);
+        g.vbo_x = 0;
     }
-    if (g.vboC) {
-        rlUnloadVertexBuffer(g.vboC);
-        g.vboC = 0;
+    if (g.vbo_c) {
+        rlUnloadVertexBuffer(g.vbo_c);
+        g.vbo_c = 0;
     }
-    if (g.vboT) {
-        rlUnloadVertexBuffer(g.vboT);
-        g.vboT = 0;
+    if (g.vbo_t) {
+        rlUnloadVertexBuffer(g.vbo_t);
+        g.vbo_t = 0;
     }
     g.count = 0;
     // slot rendu au pool UNIQUEMENT s'il était vivant → double-free idempotent
@@ -1538,8 +1538,8 @@ static int gfx_free_chunk(CallCtx& ctx) {
     if (argc < 1 || !args[0].is_map()) {
         return ctx.ret(Value{});
     }
-    freeGroupById(args[0], "id");    // groupe opaque
-    freeGroupById(args[0], "idw");   // groupe transparent (eau)
+    free_group_by_id(args[0], "id");    // groupe opaque
+    free_group_by_id(args[0], "idw");   // groupe transparent (eau)
     return ctx.ret(Value{});
 }
 
