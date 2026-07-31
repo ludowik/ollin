@@ -20,11 +20,11 @@
 Color gfx_to_color(const Value& v) {
     if (!v.is_map() && !v.is_class())
         throw std::runtime_error("expected a Color object");
-    auto getComp = [&](const char* k, double def) -> uint8_t {
+    auto get_comp = [&](const char* k, double def) -> uint8_t {
         Value f = v.map_get(Value(std::string(k)));
         return f.is_number() ? (uint8_t)(f.as_num() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
     };
-    return {getComp("r", 0), getComp("g", 0), getComp("b", 0), getComp("a", 1)};
+    return {get_comp("r", 0), get_comp("g", 0), get_comp("b", 0), get_comp("a", 1)};
 }
 
 // Composante [0,1] → octet [0,255] (bornée).
@@ -36,7 +36,7 @@ static uint8_t comp01(double v) {
     return (uint8_t)(v * 255.0 + 0.5);
 }
 
-static Color rgbaColor(double r, double g, double b, double a) {
+static Color rgba_color(double r, double g, double b, double a) {
     return {comp01(r), comp01(g), comp01(b), comp01(a)};
 }
 
@@ -61,7 +61,7 @@ static int s_blend_mode = BLEND_ALPHA;
 // d'une requête d'un programme précédent dans l'instance WASM partagée).
 static std::string s_shot_path;
 static bool s_shot_pending = false;
-static void flushPendingScreenshot();   // défini plus bas (utilisé par gfx_end_draw)
+static void flush_pending_screenshot();   // défini plus bas (utilisé par gfx_end_draw)
 // reset3dLightingState / reset3dGraphicsState / end3dInternal : déclarés dans graphics_internal.h (définis dans graphics3d.cpp)
 // Un SEUL graphics.run par programme. Le moteur (runEntryHooks) appelle
 // graphics.run(draw) automatiquement si draw() existe ; si le script l'appelle
@@ -97,7 +97,7 @@ static int gfx_canvas(CallCtx& ctx) {
         }
         reset3d_graphics_state();               // libérer shader/meshes/textures/VBO 3D dans CE contexte
     }
-    double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
+    double dpr = EM_ASM_DOUBLE({ return window.device_pixel_ratio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
     s_physH = (int)(h * dpr + 0.5);
     // InitWindow with logical dimensions — sets projection [0,w]×[0,h]
@@ -207,7 +207,7 @@ static int gfx_end_draw(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    flushPendingScreenshot();   // chemin manuel beginDraw/endDraw : capture ici
+    flush_pending_screenshot();   // chemin manuel beginDraw/endDraw : capture ici
     EndDrawing();
     return ctx.ret(Value{});
 }
@@ -217,7 +217,7 @@ static int gfx_clear(CallCtx& ctx) {
     Color c = BLACK;
     if (argc > 0) {
         ColorRGBA k = parse_color(args, argc, "clear");
-        c = rgbaColor(k.r, k.g, k.b, k.a);
+        c = rgba_color(k.r, k.g, k.b, k.a);
     }
     if (c.a < 255) {
         // Couleur semi-transparente → FONDU (comme p5.js background(r,g,b,a<255))
@@ -276,7 +276,7 @@ static bool s_has_fill = false;
 static Color s_fill_color = WHITE;
 static int s_segments = 64;
 
-static void applyStrokeSize(float sz) {
+static void apply_stroke_size(float sz) {
     s_stroke_size = sz;
 }
 
@@ -284,7 +284,7 @@ static void applyStrokeSize(float sz) {
 // pointillés (couverture partielle non lissée). On approxime l'anti-aliasing en
 // gardant un trait CONTINU de 1px et en modulant l'alpha par la couverture
 // (l'épaisseur) → trait fin, continu, de plus en plus pâle quand la taille baisse.
-static void subpixelStroke(float& w, Color& c) {
+static void subpixel_stroke(float& w, Color& c) {
     if (w < 1.0f) {
         float cov = w < 0.0f ? 0.0f : w;
         c.a = (unsigned char)(c.a * cov + 0.5f);
@@ -297,17 +297,17 @@ struct StrokeWC {
     float w;
     Color c;
 };
-static StrokeWC strokeParams() {
+static StrokeWC stroke_params() {
     float w = s_stroke_size;
     Color c = s_stroke_color;
-    subpixelStroke(w, c);
+    subpixel_stroke(w, c);
     return {w, c};
 }
-static void applyStroke(bool en, Color c = WHITE) {
+static void apply_stroke(bool en, Color c = WHITE) {
     s_has_stroke = en;
     s_stroke_color = c;
 }
-static void applyFill(bool en, Color c = WHITE) {
+static void apply_fill(bool en, Color c = WHITE) {
     s_has_fill = en;
     s_fill_color = c;
 }
@@ -338,49 +338,49 @@ int gfx_segments() {
 // push/pop (matrice + style) et pushStyle/popStyle (style seul).
 struct StyleState {
     float stroke_size;
-    bool  hasStroke;
-    Color strokeColor;
-    bool  hasFill;
-    Color fillColor;
+    bool  has_stroke;
+    Color stroke_color;
+    bool  has_fill;
+    Color fill_color;
     int   blendMode;
-    bool  hasTint;
+    bool  has_tint;
     Color tint;
     unsigned int tex3d;
     int   segments;
 };
 static std::vector<StyleState> s_style_stack;
 
-static StyleState captureStyle() {
+static StyleState capture_style() {
     StyleState s;
     s.stroke_size = s_stroke_size;
-    s.hasStroke = s_has_stroke;
-    s.strokeColor = s_stroke_color;
-    s.hasFill = s_has_fill;
-    s.fillColor = s_fill_color;
+    s.has_stroke = s_has_stroke;
+    s.stroke_color = s_stroke_color;
+    s.has_fill = s_has_fill;
+    s.fill_color = s_fill_color;
     s.blendMode = s_blend_mode;
-    image_get_tint(&s.hasTint, &s.tint.r, &s.tint.g, &s.tint.b, &s.tint.a);
+    image_get_tint(&s.has_tint, &s.tint.r, &s.tint.g, &s.tint.b, &s.tint.a);
     s.tex3d = gfx3d_get_texture();
     s.segments = s_segments;
     return s;
 }
 
-static void restoreStyle(const StyleState& s) {
+static void restore_style(const StyleState& s) {
     s_stroke_size = s.stroke_size;
-    s_has_stroke = s.hasStroke;
-    s_stroke_color = s.strokeColor;
-    s_has_fill = s.hasFill;
-    s_fill_color = s.fillColor;
+    s_has_stroke = s.has_stroke;
+    s_stroke_color = s.stroke_color;
+    s_has_fill = s.has_fill;
+    s_fill_color = s.fill_color;
     s_blend_mode = s.blendMode;
     BeginBlendMode(s.blendMode);
-    image_set_tint(s.hasTint, s.tint.r, s.tint.g, s.tint.b, s.tint.a);
+    image_set_tint(s.has_tint, s.tint.r, s.tint.g, s.tint.b, s.tint.a);
     gfx3d_set_texture(s.tex3d);
     s_segments = s.segments;
 }
 
 static void reset_styles() {
-    applyStrokeSize(2.0f);
-    applyStroke(true, WHITE);
-    applyFill(false);
+    apply_stroke_size(2.0f);
+    apply_stroke(true, WHITE);
+    apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
     s_blend_mode = BLEND_ALPHA;                   // mode de fusion remis par défaut chaque frame
     reset3d_frame_state();                          // texture 3D remise à « aucune » (blanche) chaque frame
@@ -392,7 +392,7 @@ static void reset_styles() {
 static int gfx_stroke_size(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].is_number())
-        applyStrokeSize((float)args[0].as_num());
+        apply_stroke_size((float)args[0].as_num());
     return ctx.ret(Value{});
 }
 
@@ -410,11 +410,11 @@ static int gfx_stroke(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     ColorRGBA k = parse_color(args, argc, "stroke");
-    applyStroke(true, rgbaColor(k.r, k.g, k.b, k.a));
+    apply_stroke(true, rgba_color(k.r, k.g, k.b, k.a));
     // Taille optionnelle : seulement avec un objet Color en 1er arg — stroke(Color, taille).
     // (Pour les formes numériques, utiliser graphics.strokeSize : les nombres = couleur.)
     if ((args[0].is_map() || args[0].is_class()) && argc > 1 && args[1].is_number())
-        applyStrokeSize((float)args[1].as_num());
+        apply_stroke_size((float)args[1].as_num());
     return ctx.ret(Value{});
 }
 
@@ -433,7 +433,7 @@ static int gfx_fill(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     ColorRGBA k = parse_color(args, argc, "fill");
-    applyFill(true, rgbaColor(k.r, k.g, k.b, k.a));
+    apply_fill(true, rgba_color(k.r, k.g, k.b, k.a));
     return ctx.ret(Value{});
 }
 
@@ -451,7 +451,7 @@ static int gfx_tint(CallCtx& ctx) {
     if (argc == 0)
         return ctx.ret(Value{});   // sans argument : ne change rien
     ColorRGBA k = parse_color(args, argc, "tint");   // même signature que clear/fill/stroke
-    Color c = rgbaColor(k.r, k.g, k.b, k.a);
+    Color c = rgba_color(k.r, k.g, k.b, k.a);
     image_set_tint(true, c.r, c.g, c.b, c.a);
     return ctx.ret(Value{});
 }
@@ -474,7 +474,7 @@ static int gfx_line(CallCtx& ctx) {
     float y1 = (float)num_arg(args, 1, "graphics.line");
     float x2 = (float)num_arg(args, 2, "graphics.line");
     float y2 = (float)num_arg(args, 3, "graphics.line");
-    StrokeWC s = strokeParams();   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
+    StrokeWC s = stroke_params();   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
     DrawLineEx({x1, y1}, {x2, y2}, s.w, s.c);
     return ctx.ret(Value{});
 }
@@ -490,7 +490,7 @@ static int gfx_rect(CallCtx& ctx) {
     if (s_has_fill)
         DrawRectangle(x, y, w, h, s_fill_color);
     if (s_has_stroke) {
-        StrokeWC s = strokeParams();
+        StrokeWC s = stroke_params();
         DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, s.w, s.c);
     }
     return ctx.ret(Value{});
@@ -519,7 +519,7 @@ static int gfx_screenshot(CallCtx& ctx) {
 
 // Exécute une capture en attente : appelé en fin de frame par renderFrame, quand
 // le framebuffer par défaut contient l'image composée (écran réellement affiché).
-static void flushPendingScreenshot() {
+static void flush_pending_screenshot() {
     if (!s_shot_pending)
         return;
     s_shot_pending = false;
@@ -545,7 +545,7 @@ static int gfx_close(CallCtx& ctx) {
 }
 
 // ── Polygon ───────────────────────────────────────────────────────────────────
-static void polyFill(std::vector<Vector2> pts, Color color) {
+static void poly_fill(std::vector<Vector2> pts, Color color) {
     int n = (int)pts.size();
     if (n < 3)
         return;
@@ -571,7 +571,7 @@ static void polyFill(std::vector<Vector2> pts, Color color) {
         DrawTriangle(hub, pts[(i + 1) % n], pts[i], color);
 }
 
-static std::vector<Vector2> parsePoints(const Value& v, const char* fn) {
+static std::vector<Vector2> parse_points(const Value& v, const char* fn) {
     std::vector<Vector2> pts;
     if (!v.is_array())
         return pts;
@@ -601,7 +601,7 @@ static std::vector<Vector2> parsePoints(const Value& v, const char* fn) {
 // aspect « roue dentée »). Un disque de rayon épaisseur/2 posé sur chaque sommet
 // comble le creux extérieur et donne une jointure ronde (embouts ronds aux extrémités
 // d'une polyligne ouverte). Négligeable en dessous de ~2px → sauté (perf, sans effet).
-static void drawThickPath(const std::vector<Vector2>& pts, bool closed, float w, Color c) {
+static void draw_thick_path(const std::vector<Vector2>& pts, bool closed, float w, Color c) {
     int n = (int)pts.size();
     if (n < 2)
         return;
@@ -620,14 +620,14 @@ static int gfx_polygon(CallCtx& ctx) {
     static constexpr const char* FN = "graphics.polygon";
     if (argc < 1 || !args[0].is_array())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
-    auto pts = parsePoints(args[0], FN);
+    auto pts = parse_points(args[0], FN);
     if ((int)pts.size() < 3)
         return ctx.ret(Value{});
     if (s_has_fill)
-        polyFill(pts, s_fill_color);
+        poly_fill(pts, s_fill_color);
     if (s_has_stroke) {
-        StrokeWC s = strokeParams();
-        drawThickPath(pts, true, s.w, s.c);
+        StrokeWC s = stroke_params();
+        draw_thick_path(pts, true, s.w, s.c);
     }
     return ctx.ret(Value{});
 }
@@ -639,9 +639,9 @@ static int gfx_polyline(CallCtx& ctx) {
         throw std::runtime_error(std::string(FN) + ": expected array of points");
     if (!s_has_stroke)
         return ctx.ret(Value{});
-    auto pts = parsePoints(args[0], FN);
-    StrokeWC s = strokeParams();
-    drawThickPath(pts, false, s.w, s.c);
+    auto pts = parse_points(args[0], FN);
+    StrokeWC s = stroke_params();
+    draw_thick_path(pts, false, s.w, s.c);
     return ctx.ret(Value{});
 }
 
@@ -650,7 +650,7 @@ static int gfx_polyline(CallCtx& ctx) {
 // le tracé (sémantique p5.js). Auparavant on dessinait `segs` segments épais
 // (DrawLineEx) : à forte épaisseur, leurs coins non jointés dépassaient et
 // donnaient un aspect « roue dentée » (pointes). L'anneau, lui, reste lisse.
-static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
+static void draw_ellipse_stroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
     float h = thick * 0.5f;
     float rxi = rx - h;
     float ryi = ry - h;
@@ -679,7 +679,7 @@ static void drawEllipseStroke(float cx, float cy, float rx, float ry, float thic
     }
 }
 
-static void drawEllipseFill(float cx, float cy, float rx, float ry, Color color, int segs) {
+static void draw_ellipse_fill(float cx, float cy, float rx, float ry, Color color, int segs) {
     for (int i = 0; i < segs; i++) {
         float a0 = (float)i / segs * 2.0f * PI;
         float a1 = (float)(i + 1) / segs * 2.0f * PI;
@@ -688,11 +688,11 @@ static void drawEllipseFill(float cx, float cy, float rx, float ry, Color color,
     }
 }
 
-static void drawOval(float cx, float cy, float rx, float ry, int segs) {
+static void draw_oval(float cx, float cy, float rx, float ry, int segs) {
     if (s_has_fill)
-        drawEllipseFill(cx, cy, rx, ry, s_fill_color, segs);
+        draw_ellipse_fill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke) {
-        StrokeWC s = strokeParams();
+        StrokeWC s = stroke_params();
         if (rx == ry) {
             // Cercle : anneau natif raylib (contour lisse, épaisseur centrée sur r).
             float inner = rx - s.w * 0.5f;
@@ -701,7 +701,7 @@ static void drawOval(float cx, float cy, float rx, float ry, int segs) {
             }
             DrawRing({cx, cy}, inner, rx + s.w * 0.5f, 0.0f, 360.0f, segs, s.c);
         } else {
-            drawEllipseStroke(cx, cy, rx, ry, s.w, s.c, segs);
+            draw_ellipse_stroke(cx, cy, rx, ry, s.w, s.c, segs);
         }
     }
 }
@@ -711,7 +711,7 @@ static int gfx_ellipse(CallCtx& ctx) {
     if (argc < 4)
         throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
     int segs = (argc > 4 && args[4].is_number()) ? std::max(3, (int)args[4].as_num()) : s_segments;
-    drawOval((float)num_arg(args, 0, "graphics.ellipse"), (float)num_arg(args, 1, "graphics.ellipse"),
+    draw_oval((float)num_arg(args, 0, "graphics.ellipse"), (float)num_arg(args, 1, "graphics.ellipse"),
              (float)num_arg(args, 2, "graphics.ellipse") * 0.5f, (float)num_arg(args, 3, "graphics.ellipse") * 0.5f, segs);
     return ctx.ret(Value{});
 }
@@ -722,12 +722,12 @@ static int gfx_circle(CallCtx& ctx) {
         throw std::runtime_error("graphics.circle: expected x, y, radius");
     int segs = (argc > 3 && args[3].is_number()) ? std::max(3, (int)args[3].as_num()) : s_segments;
     float r = (float)num_arg(args, 2, "graphics.circle");
-    drawOval((float)num_arg(args, 0, "graphics.circle"), (float)num_arg(args, 1, "graphics.circle"), r, r, segs);
+    draw_oval((float)num_arg(args, 0, "graphics.circle"), (float)num_arg(args, 1, "graphics.circle"), r, r, segs);
     return ctx.ret(Value{});
 }
 
 // Secteur (part de tarte) : triangles depuis le centre sur l'arc [start;stop].
-static void drawArcFill(float cx, float cy, float rx, float ry, float start, float stop, Color color, int segs) {
+static void draw_arc_fill(float cx, float cy, float rx, float ry, float start, float stop, Color color, int segs) {
     for (int i = 0; i < segs; i++) {
         float a0 = start + (stop - start) * (float)i / segs;
         float a1 = start + (stop - start) * (float)(i + 1) / segs;
@@ -738,7 +738,7 @@ static void drawArcFill(float cx, float cy, float rx, float ry, float start, flo
 
 // Contour de l'arc SEUL (courbe, sans les rayons) : anneau triangulé sur [start;stop],
 // épaisseur centrée sur le tracé — même construction que drawEllipseStroke.
-static void drawArcStroke(float cx, float cy, float rx, float ry, float start, float stop, float thick, Color color,
+static void draw_arc_stroke(float cx, float cy, float rx, float ry, float start, float stop, float thick, Color color,
                           int segs) {
     float h = thick * 0.5f;
     float rxi = rx - h;
@@ -795,10 +795,10 @@ static int gfx_arc(CallCtx& ctx) {
         segs = 2;
     }
     if (s_has_fill)
-        drawArcFill(cx, cy, rx, ry, start, stop, s_fill_color, segs);
+        draw_arc_fill(cx, cy, rx, ry, start, stop, s_fill_color, segs);
     if (s_has_stroke) {
-        StrokeWC s = strokeParams();
-        drawArcStroke(cx, cy, rx, ry, start, stop, s.w, s.c, segs);
+        StrokeWC s = stroke_params();
+        draw_arc_stroke(cx, cy, rx, ry, start, stop, s.w, s.c, segs);
     }
     return ctx.ret(Value{});
 }
@@ -832,7 +832,7 @@ static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
 
 // Overlay FPS dessiné par le moteur après chaque frame (toujours en haut à
 // droite de la zone graphique). Couleur vive + ombre → lisible sur tout fond.
-static void drawFpsOverlay() {
+static void draw_fps_overlay() {
     // FPS calculé depuis NOTRE delta (fiable), lissé pour éviter le scintillement.
     if (s_frame_dt > 0.0) {
         double inst = 1.0 / s_frame_dt;
@@ -868,7 +868,7 @@ static double s_elapsed_time = 0.0;
 
 // Met à jour deltaTime/elapsedTime dans la VM et appelle update(dt) si définie.
 static Value s_update_callback;
-static void callUpdateIfAny() {
+static void call_update_if_any() {
     double dt = s_frame_dt;   // notre mesure fiable, pas GetFrameTime() (cf. plus haut)
     s_elapsed_time += dt;
     VM* vm = VM::current();
@@ -885,16 +885,16 @@ static void callUpdateIfAny() {
 // l'état des blocs ouverts pour un nettoyage sûr si draw() lève (boucle web).
 // Prélude commun d'une frame : styles par défaut, entrées, logique (update),
 // puis rendu utilisateur (draw). Partagé par les deux chemins de renderFrame.
-static void runUserCallbacks(const Value& drawFn) {
+static void run_user_callbacks(const Value& draw_fn) {
     reset_styles();
     keyboard_poll();
     mouse_poll();
-    callUpdateIfAny();
-    VM::current()->call_value(const_cast<Value&>(drawFn));
+    call_update_if_any();
+    VM::current()->call_value(const_cast<Value&>(draw_fn));
     end3d_internal();   // no-op hors 3D ; sinon flush + refermer si draw() a oublié end3d
 }
 
-static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
+static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
     *tex = false;
     *drawing = false;
     // Delta de frame : écart mur depuis l'entrée de la frame précédente (inclut
@@ -915,7 +915,7 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
-        runUserCallbacks(drawFn);
+        run_user_callbacks(draw_fn);
         *tex = false;
         EndTextureMode();
 
@@ -938,9 +938,9 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
-        flushPendingScreenshot();      // capture l'écran composé (avant l'overlay FPS)
+        flush_pending_screenshot();      // capture l'écran composé (avant l'overlay FPS)
         BeginBlendMode(BLEND_ALPHA);   // overlay FPS en fusion normale
-        drawFpsOverlay();
+        draw_fps_overlay();
         *drawing = false;
         EndDrawing();
     } else {
@@ -949,9 +949,9 @@ static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
-        runUserCallbacks(drawFn);
-        flushPendingScreenshot();      // capture l'écran (avant l'overlay FPS)
-        drawFpsOverlay();
+        run_user_callbacks(draw_fn);
+        flush_pending_screenshot();      // capture l'écran (avant l'overlay FPS)
+        draw_fps_overlay();
         *drawing = false;
         EndDrawing();
     }
@@ -966,7 +966,7 @@ static void emscripten_frame() {
     // et on remonte le message au playground pour l'afficher à la place du canvas.
     bool tex = false, drawing = false;
     try {
-        renderFrame(s_run_callback, &tex, &drawing);
+        render_frame(s_run_callback, &tex, &drawing);
     } catch (const std::exception& e) {
         if (tex)                   // refermer les blocs restés ouverts (pas de 2× End…)
             EndTextureMode();
@@ -1001,7 +1001,7 @@ static int gfx_run(CallCtx& ctx) {
     s_quit = false;
     while (!WindowShouldClose() && !s_quit) {
         bool tex = false, drawing = false;
-        renderFrame(fn, &tex, &drawing);
+        render_frame(fn, &tex, &drawing);
     }
     if (s_target_ready) {
         UnloadRenderTexture(s_target);
@@ -1020,7 +1020,7 @@ static int gfx_push(CallCtx& ctx) {
     (void)args;
     (void)argc;
     rlPushMatrix();
-    s_style_stack.push_back(captureStyle());
+    s_style_stack.push_back(capture_style());
     return ctx.ret(Value{});
 }
 
@@ -1029,7 +1029,7 @@ static int gfx_pop(CallCtx& ctx) {
     (void)args;
     (void)argc;
     if (!s_style_stack.empty()) {
-        restoreStyle(s_style_stack.back());
+        restore_style(s_style_stack.back());
         s_style_stack.pop_back();
     }
     rlPopMatrix();
@@ -1056,7 +1056,7 @@ static int gfx_push_style(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    s_style_stack.push_back(captureStyle());
+    s_style_stack.push_back(capture_style());
     return ctx.ret(Value{});
 }
 
@@ -1065,7 +1065,7 @@ static int gfx_pop_style(CallCtx& ctx) {
     (void)args;
     (void)argc;
     if (!s_style_stack.empty()) {
-        restoreStyle(s_style_stack.back());
+        restore_style(s_style_stack.back());
         s_style_stack.pop_back();
     }
     return ctx.ret(Value{});
@@ -1085,7 +1085,7 @@ static int gfx_translate(CallCtx& ctx) {
 
 // Rotation de deg° (argument 0) autour de l'axe (ax,ay,az) — facteur commun de
 // rotate (axe Z par défaut) et de rotateX/rotateY/rotateZ.
-static void rotateAxis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
+static void rotate_axis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
     rlRotatef((float)num_arg(args, argc, 0, fn), ax, ay, az);
 }
 
@@ -1095,7 +1095,7 @@ static void rotateAxis(Value* args, int argc, float ax, float ay, float az, cons
 static int gfx_rotate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 1) {
-        rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // axe Z par défaut
+        rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // axe Z par défaut
     } else if (argc >= 4) {
         rlRotatef((float)num_arg(args, argc, 0, "graphics.rotate"), (float)num_arg(args, argc, 1, "graphics.rotate"),
                   (float)num_arg(args, argc, 2, "graphics.rotate"), (float)num_arg(args, argc, 3, "graphics.rotate"));
@@ -1107,17 +1107,17 @@ static int gfx_rotate(CallCtx& ctx) {
 
 static int gfx_rotate_x(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    rotateAxis(args, argc, 1.0f, 0.0f, 0.0f, "graphics.rotateX");
+    rotate_axis(args, argc, 1.0f, 0.0f, 0.0f, "graphics.rotateX");
     return ctx.ret(Value{});
 }
 static int gfx_rotate_y(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    rotateAxis(args, argc, 0.0f, 1.0f, 0.0f, "graphics.rotateY");
+    rotate_axis(args, argc, 0.0f, 1.0f, 0.0f, "graphics.rotateY");
     return ctx.ret(Value{});
 }
 static int gfx_rotate_z(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotateZ");
+    rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotateZ");
     return ctx.ret(Value{});
 }
 
