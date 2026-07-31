@@ -23,15 +23,15 @@ static std::string s_file[2];                            // natif : fichier side
 // ── encodage typé d'une Value scalaire ↔ chaîne stockée ────────────────────────
 // 'i'<entier>, 'f'<double>, 's'<brut>. (le booléen Ollin est un entier).
 static std::string encodeValue(const Value& v) {
-    if (v.isInteger())
-        return std::string("i") + std::to_string(v.asInt());
-    if (v.isFloat()) {
+    if (v.is_integer())
+        return std::string("i") + std::to_string(v.as_int());
+    if (v.is_float()) {
         char buf[32];
-        snprintf(buf, sizeof(buf), "f%.17g", v.asFloat());
+        snprintf(buf, sizeof(buf), "f%.17g", v.as_float());
         return buf;
     }
-    if (v.isString())
-        return std::string("s") + v.asString();
+    if (v.is_string())
+        return std::string("s") + v.as_string();
     throw std::runtime_error("data: value must be a number, string or boolean");
 }
 static Value decodeValue(const std::string& enc) {
@@ -170,18 +170,18 @@ static void persist(int scope) {
 
 // ── implémentations partagées (paramétrées par la portée) ───────────────────────
 static Value dataGet(int scope, Value* args, int argc) {
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.get: expected a string key");
-    auto it = s_store[scope].find(args[0].asString());
+    auto it = s_store[scope].find(args[0].as_string());
     if (it == s_store[scope].end())
         return argc > 1 ? args[1] : Value();
     return decodeValue(it->second);
 }
 static Value dataSet(int scope, Value* args, int argc) {
-    if (argc < 2 || !args[0].isString())
+    if (argc < 2 || !args[0].is_string())
         throw std::runtime_error("data.set: expected a string key and a value");
-    const std::string& k = args[0].asString();
-    if (args[1].isNil())
+    const std::string& k = args[0].as_string();
+    if (args[1].is_nil())
         s_store[scope].erase(k);
     else
         s_store[scope][k] = encodeValue(args[1]);
@@ -189,22 +189,22 @@ static Value dataSet(int scope, Value* args, int argc) {
     return Value();
 }
 static Value dataHas(int scope, Value* args, int argc) {
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.has: expected a string key");
-    return Value((int64_t)(s_store[scope].count(args[0].asString()) ? 1 : 0));
+    return Value((int64_t)(s_store[scope].count(args[0].as_string()) ? 1 : 0));
 }
 static Value dataDelete(int scope, Value* args, int argc) {
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.delete: expected a string key");
-    s_store[scope].erase(args[0].asString());
+    s_store[scope].erase(args[0].as_string());
     persist(scope);
     return Value();
 }
 static Value dataKeys(int scope, Value* args, int argc) {
     (void)args; (void)argc;
-    Value arr = Value::makeArray();
+    Value arr = Value::make_array();
     for (auto& kv : s_store[scope])
-        arr.arrayPush(Value(kv.first));
+        arr.array_push(Value(kv.first));
     return arr;
 }
 static Value dataClear(int scope, Value* args, int argc) {
@@ -215,9 +215,9 @@ static Value dataClear(int scope, Value* args, int argc) {
 }
 
 // ── hôte ────────────────────────────────────────────────────────────────────────
-void dataLoad(const std::string& projectBlob, const std::string& globalBlob) {
-    deserialize(S_PROJECT, projectBlob);
-    deserialize(S_GLOBAL, globalBlob);
+void data_load(const std::string& project_blob, const std::string& global_blob) {
+    deserialize(S_PROJECT, project_blob);
+    deserialize(S_GLOBAL, global_blob);
 }
 
 #ifndef __EMSCRIPTEN__
@@ -233,11 +233,11 @@ static std::string readFile(const std::string& path) {
     fclose(f);
     return s;
 }
-void dataSetNativePaths(const std::string& projectFile, const std::string& globalFile) {
-    s_file[S_PROJECT] = projectFile;
-    s_file[S_GLOBAL] = globalFile;
-    deserialize(S_PROJECT, readFile(projectFile));
-    deserialize(S_GLOBAL, readFile(globalFile));
+void data_set_native_paths(const std::string& project_file, const std::string& global_file) {
+    s_file[S_PROJECT] = project_file;
+    s_file[S_GLOBAL] = global_file;
+    deserialize(S_PROJECT, readFile(project_file));
+    deserialize(S_GLOBAL, readFile(global_file));
 }
 #endif
 
@@ -245,27 +245,27 @@ void dataSetNativePaths(const std::string& projectFile, const std::string& globa
 // pointeurs de fonction ; la portée est figée par une fonction dédiée par portée).
 static void fillScope(Value& m, int scope) {
     if (scope == S_PROJECT) {
-        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataGet(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataSet(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataHas(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataClear(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataGet(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("set")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataSet(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("has")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataHas(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("delete")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("keys")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("clear")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataClear(S_PROJECT, ctx.args, ctx.argc)); }));
     } else {
-        m.mapSet(Value(std::string("get")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataGet(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("set")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataSet(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("has")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataHas(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("delete")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("keys")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.mapSet(Value(std::string("clear")), Value::makeBuiltin([](CallCtx& ctx) { return ctx.ret(dataClear(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataGet(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("set")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataSet(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("has")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataHas(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("delete")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("keys")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("clear")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataClear(S_GLOBAL, ctx.args, ctx.argc)); }));
     }
 }
 
-Value makeDataModule() {
-    Value m = Value::makeMap();
+Value make_data_module() {
+    Value m = Value::make_map();
     fillScope(m, S_PROJECT);
-    Value g = Value::makeMap();
+    Value g = Value::make_map();
     fillScope(g, S_GLOBAL);
-    m.mapSet(Value(std::string("shared")), g);   // « global » est un mot-clé Ollin → « shared »
+    m.map_set(Value(std::string("shared")), g);   // « global » est un mot-clé Ollin → « shared »
     return m;
 }

@@ -107,8 +107,8 @@ static const double NOISE_AMP_3D = 0.62;
     static int math_##name(CallCtx& ctx) {                                                                             \
         Value* args = ctx.args;                                                                                        \
         int argc = ctx.argc;                                                                                           \
-        double x = numArg(args, argc, 0, "math." #name);                                                               \
-        return ctx.ret(numValue(expr));                                                                                \
+        double x = num_arg(args, argc, 0, "math." #name);                                                               \
+        return ctx.ret(num_value(expr));                                                                                \
     }
 
 MATH1(abs, std::fabs(x))
@@ -137,45 +137,45 @@ MATH1(isInf, std::isinf(x) ? 1.0 : 0.0)
 static int math_map(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double x = numArg(args, argc, 0, "math.map");
-    double in_lo = numArg(args, argc, 1, "math.map");
-    double in_hi = numArg(args, argc, 2, "math.map");
-    double out_lo = numArg(args, argc, 3, "math.map");
-    double out_hi = numArg(args, argc, 4, "math.map");
+    double x = num_arg(args, argc, 0, "math.map");
+    double in_lo = num_arg(args, argc, 1, "math.map");
+    double in_hi = num_arg(args, argc, 2, "math.map");
+    double out_lo = num_arg(args, argc, 3, "math.map");
+    double out_hi = num_arg(args, argc, 4, "math.map");
     if (in_hi == in_lo)
-        return ctx.ret(numValue(out_lo)); // plage d'entrée dégénérée → borne basse (évite inf/nan)
-    return ctx.ret(numValue(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)));
+        return ctx.ret(num_value(out_lo)); // plage d'entrée dégénérée → borne basse (évite inf/nan)
+    return ctx.ret(num_value(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)));
 }
 
 static int math_atan2(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double y = numArg(args, argc, 0, "math.atan2");
-    double x = numArg(args, argc, 1, "math.atan2");
-    return ctx.ret(numValue(std::atan2(y, x)));
+    double y = num_arg(args, argc, 0, "math.atan2");
+    double x = num_arg(args, argc, 1, "math.atan2");
+    return ctx.ret(num_value(std::atan2(y, x)));
 }
 
 static int math_pow(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double x = numArg(args, argc, 0, "math.pow");
-    double n = numArg(args, argc, 1, "math.pow");
-    return ctx.ret(numValue(std::pow(x, n)));
+    double x = num_arg(args, argc, 0, "math.pow");
+    double n = num_arg(args, argc, 1, "math.pow");
+    return ctx.ret(num_value(std::pow(x, n)));
 }
 
 static int math_clamp(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double x = numArg(args, argc, 0, "math.clamp");
-    double lo = numArg(args, argc, 1, "math.clamp");
-    double hi = numArg(args, argc, 2, "math.clamp");
-    return ctx.ret(numValue(x < lo ? lo : x > hi ? hi : x));
+    double x = num_arg(args, argc, 0, "math.clamp");
+    double lo = num_arg(args, argc, 1, "math.clamp");
+    double hi = num_arg(args, argc, 2, "math.clamp");
+    return ctx.ret(num_value(x < lo ? lo : x > hi ? hi : x));
 }
 
 static int math_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    int64_t s = (int64_t)numArg(args, argc, 0, "math.seed");
+    int64_t s = (int64_t)num_arg(args, argc, 0, "math.seed");
     srand((unsigned)s);
     return ctx.ret(Value());
 }
@@ -183,9 +183,9 @@ static int math_seed(CallCtx& ctx) {
 static int math_logn(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    double x = numArg(args, argc, 0, "math.logn");
-    double n = numArg(args, argc, 1, "math.logn");
-    return ctx.ret(numValue(std::log(x) / std::log(n)));
+    double x = num_arg(args, argc, 0, "math.logn");
+    double n = num_arg(args, argc, 1, "math.logn");
+    return ctx.ret(num_value(std::log(x) / std::log(n)));
 }
 
 static int math_min(CallCtx& ctx) {
@@ -195,22 +195,22 @@ static int math_min(CallCtx& ctx) {
         throw std::runtime_error("math.min: at least one argument required");
     bool all_int = true;
     for (int i = 0; i < argc; i++)
-        if (!args[i].isInteger()) {
+        if (!args[i].is_integer()) {
             all_int = false;
             break;
         }
     if (all_int) {
-        int64_t result = args[0].asInt();
+        int64_t result = args[0].as_int();
         for (int i = 1; i < argc; i++) {
-            int64_t v = args[i].asInt();
+            int64_t v = args[i].as_int();
             if (v < result)
                 result = v;
         }
         return ctx.ret(Value(result));
     }
-    double result = numArg(args, argc, 0, "math.min");
+    double result = num_arg(args, argc, 0, "math.min");
     for (int i = 1; i < argc; i++) {
-        double v = numArg(args, argc, i, "math.min");
+        double v = num_arg(args, argc, i, "math.min");
         if (v < result)
             result = v;
     }
@@ -224,22 +224,22 @@ static int math_max(CallCtx& ctx) {
         throw std::runtime_error("math.max: at least one argument required");
     bool all_int = true;
     for (int i = 0; i < argc; i++)
-        if (!args[i].isInteger()) {
+        if (!args[i].is_integer()) {
             all_int = false;
             break;
         }
     if (all_int) {
-        int64_t result = args[0].asInt();
+        int64_t result = args[0].as_int();
         for (int i = 1; i < argc; i++) {
-            int64_t v = args[i].asInt();
+            int64_t v = args[i].as_int();
             if (v > result)
                 result = v;
         }
         return ctx.ret(Value(result));
     }
-    double result = numArg(args, argc, 0, "math.max");
+    double result = num_arg(args, argc, 0, "math.max");
     for (int i = 1; i < argc; i++) {
-        double v = numArg(args, argc, i, "math.max");
+        double v = num_arg(args, argc, i, "math.max");
         if (v > result)
             result = v;
     }
@@ -253,17 +253,17 @@ static int math_rand(CallCtx& ctx) {
     if (argc == 0)
         return ctx.ret(Value(r));
     if (argc == 1)
-        return ctx.ret(Value(r * numArg(args, argc, 0, "math.rand")));
-    double lo = numArg(args, argc, 0, "math.rand");
-    double hi = numArg(args, argc, 1, "math.rand");
+        return ctx.ret(Value(r * num_arg(args, argc, 0, "math.rand")));
+    double lo = num_arg(args, argc, 0, "math.rand");
+    double hi = num_arg(args, argc, 1, "math.rand");
     return ctx.ret(Value(lo + r * (hi - lo)));
 }
 
 // Argument entier : (int64_t)numArg est UB (trap WASM) si le double est NaN/inf
 // ou hors plage int64. doubleFitsInt64 (value.h) garde le cast → erreur claire.
 static int64_t intArg(const Value* args, int argc, int i, const char* fn) {
-    double d = numArg(args, argc, i, fn);
-    if (!doubleFitsInt64(d))
+    double d = num_arg(args, argc, i, fn);
+    if (!double_fits_int64(d))
         throw std::runtime_error(std::string(fn) + ": argument entier hors plage");
     return (int64_t)d;
 }
@@ -292,9 +292,9 @@ static int math_noise(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc < 1 || argc > 3)
         throw std::runtime_error("math.noise: expects 1, 2 or 3 arguments");
-    double x = numArg(args, argc, 0, "math.noise");
-    double y = argc >= 2 ? numArg(args, argc, 1, "math.noise") : 0.0;
-    double z = argc >= 3 ? numArg(args, argc, 2, "math.noise") : 0.0;
+    double x = num_arg(args, argc, 0, "math.noise");
+    double y = argc >= 2 ? num_arg(args, argc, 1, "math.noise") : 0.0;
+    double z = argc >= 3 ? num_arg(args, argc, 2, "math.noise") : 0.0;
     double total = 0.0, amp = 0.5, freq = 1.0, maxAmp = 0.0;
     for (int o = 0; o < NOISE_OCTAVES; o++) {
         total += perlin3(x * freq, y * freq, z * freq) * amp;
@@ -317,58 +317,58 @@ static int math_noise(CallCtx& ctx) {
 static int math_noiseSeed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    int64_t s = (int64_t)numArg(args, argc, 0, "math.noiseSeed");
+    int64_t s = (int64_t)num_arg(args, argc, 0, "math.noiseSeed");
     noiseReseed((uint64_t)s);
     return ctx.ret(Value());
 }
 
-Value makeMathModule() {
+Value make_math_module() {
     srand((unsigned)time(nullptr));
     noiseInitDefault();
-    Value m = Value::makeMap();
+    Value m = Value::make_map();
     // constantes
-    m.mapSet(Value(std::string("PI")), Value(M_PI));
-    m.mapSet(Value(std::string("TAU")), Value(2.0 * M_PI));
-    m.mapSet(Value(std::string("E")), Value(2.718281828459045235360));
-    m.mapSet(Value(std::string("INF")), Value(std::numeric_limits<double>::infinity()));
+    m.map_set(Value(std::string("PI")), Value(M_PI));
+    m.map_set(Value(std::string("TAU")), Value(2.0 * M_PI));
+    m.map_set(Value(std::string("E")), Value(2.718281828459045235360));
+    m.map_set(Value(std::string("INF")), Value(std::numeric_limits<double>::infinity()));
     // arithmétique
-    m.mapSet(Value(std::string("abs")), Value::makeBuiltin(math_abs));
-    m.mapSet(Value(std::string("sign")), Value::makeBuiltin(math_sign));
-    m.mapSet(Value(std::string("floor")), Value::makeBuiltin(math_floor));
-    m.mapSet(Value(std::string("ceil")), Value::makeBuiltin(math_ceil));
-    m.mapSet(Value(std::string("round")), Value::makeBuiltin(math_round));
-    m.mapSet(Value(std::string("trunc")), Value::makeBuiltin(math_trunc));
-    m.mapSet(Value(std::string("sqrt")), Value::makeBuiltin(math_sqrt));
-    m.mapSet(Value(std::string("pow")), Value::makeBuiltin(math_pow));
-    m.mapSet(Value(std::string("clamp")), Value::makeBuiltin(math_clamp));
-    m.mapSet(Value(std::string("min")), Value::makeBuiltin(math_min));
-    m.mapSet(Value(std::string("max")), Value::makeBuiltin(math_max));
+    m.map_set(Value(std::string("abs")), Value::make_builtin(math_abs));
+    m.map_set(Value(std::string("sign")), Value::make_builtin(math_sign));
+    m.map_set(Value(std::string("floor")), Value::make_builtin(math_floor));
+    m.map_set(Value(std::string("ceil")), Value::make_builtin(math_ceil));
+    m.map_set(Value(std::string("round")), Value::make_builtin(math_round));
+    m.map_set(Value(std::string("trunc")), Value::make_builtin(math_trunc));
+    m.map_set(Value(std::string("sqrt")), Value::make_builtin(math_sqrt));
+    m.map_set(Value(std::string("pow")), Value::make_builtin(math_pow));
+    m.map_set(Value(std::string("clamp")), Value::make_builtin(math_clamp));
+    m.map_set(Value(std::string("min")), Value::make_builtin(math_min));
+    m.map_set(Value(std::string("max")), Value::make_builtin(math_max));
     // logarithmes / exponentielle
-    m.mapSet(Value(std::string("exp")), Value::makeBuiltin(math_exp));
-    m.mapSet(Value(std::string("log")), Value::makeBuiltin(math_log));
-    m.mapSet(Value(std::string("log2")), Value::makeBuiltin(math_log2));
-    m.mapSet(Value(std::string("log10")), Value::makeBuiltin(math_log10));
-    m.mapSet(Value(std::string("logn")), Value::makeBuiltin(math_logn));
+    m.map_set(Value(std::string("exp")), Value::make_builtin(math_exp));
+    m.map_set(Value(std::string("log")), Value::make_builtin(math_log));
+    m.map_set(Value(std::string("log2")), Value::make_builtin(math_log2));
+    m.map_set(Value(std::string("log10")), Value::make_builtin(math_log10));
+    m.map_set(Value(std::string("logn")), Value::make_builtin(math_logn));
     // trigonométrie
-    m.mapSet(Value(std::string("sin")), Value::makeBuiltin(math_sin));
-    m.mapSet(Value(std::string("cos")), Value::makeBuiltin(math_cos));
-    m.mapSet(Value(std::string("tan")), Value::makeBuiltin(math_tan));
-    m.mapSet(Value(std::string("asin")), Value::makeBuiltin(math_asin));
-    m.mapSet(Value(std::string("acos")), Value::makeBuiltin(math_acos));
-    m.mapSet(Value(std::string("atan")), Value::makeBuiltin(math_atan));
-    m.mapSet(Value(std::string("atan2")), Value::makeBuiltin(math_atan2));
-    m.mapSet(Value(std::string("deg")), Value::makeBuiltin(math_deg));
-    m.mapSet(Value(std::string("rad")), Value::makeBuiltin(math_rad));
-    m.mapSet(Value(std::string("frac")), Value::makeBuiltin(math_frac));
-    m.mapSet(Value(std::string("isNan")), Value::makeBuiltin(math_isNan));
-    m.mapSet(Value(std::string("isInf")), Value::makeBuiltin(math_isInf));
-    m.mapSet(Value(std::string("map")), Value::makeBuiltin(math_map));
+    m.map_set(Value(std::string("sin")), Value::make_builtin(math_sin));
+    m.map_set(Value(std::string("cos")), Value::make_builtin(math_cos));
+    m.map_set(Value(std::string("tan")), Value::make_builtin(math_tan));
+    m.map_set(Value(std::string("asin")), Value::make_builtin(math_asin));
+    m.map_set(Value(std::string("acos")), Value::make_builtin(math_acos));
+    m.map_set(Value(std::string("atan")), Value::make_builtin(math_atan));
+    m.map_set(Value(std::string("atan2")), Value::make_builtin(math_atan2));
+    m.map_set(Value(std::string("deg")), Value::make_builtin(math_deg));
+    m.map_set(Value(std::string("rad")), Value::make_builtin(math_rad));
+    m.map_set(Value(std::string("frac")), Value::make_builtin(math_frac));
+    m.map_set(Value(std::string("isNan")), Value::make_builtin(math_isNan));
+    m.map_set(Value(std::string("isInf")), Value::make_builtin(math_isInf));
+    m.map_set(Value(std::string("map")), Value::make_builtin(math_map));
     // aléatoire
-    m.mapSet(Value(std::string("rand")), Value::makeBuiltin(math_rand));
-    m.mapSet(Value(std::string("randInt")), Value::makeBuiltin(math_randInt));
-    m.mapSet(Value(std::string("seed")), Value::makeBuiltin(math_seed));
+    m.map_set(Value(std::string("rand")), Value::make_builtin(math_rand));
+    m.map_set(Value(std::string("randInt")), Value::make_builtin(math_randInt));
+    m.map_set(Value(std::string("seed")), Value::make_builtin(math_seed));
     // bruit de Perlin
-    m.mapSet(Value(std::string("noise")), Value::makeBuiltin(math_noise));
-    m.mapSet(Value(std::string("noiseSeed")), Value::makeBuiltin(math_noiseSeed));
+    m.map_set(Value(std::string("noise")), Value::make_builtin(math_noise));
+    m.map_set(Value(std::string("noiseSeed")), Value::make_builtin(math_noiseSeed));
     return m;
 }

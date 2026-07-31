@@ -94,9 +94,9 @@ static int kbd_is_down(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (s_blocked)
         return ctx.ret(Value((int64_t)0));   // éditeur focalisé → le jeu ne lit pas le clavier
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         return ctx.ret(Value((int64_t)0));
-    std::string name = args[0].asString();
+    std::string name = args[0].as_string();
     for (char& c : name)
         c = (char)std::tolower((unsigned char)c);
     bool down = false;
@@ -121,22 +121,22 @@ static bool s_down[512];
 // Remet l'état « enfoncé » à zéro. Appelé au début de chaque gfx_run : sur
 // l'instance WASM partagée, s_down est statique et survivrait sinon d'un run au
 // suivant (touche tenue à travers un reset → keyrelease sans keypressed).
-void keyboardReset() {
+void keyboard_reset() {
     for (int i = 0; i < 512; i++)
         s_down[i] = false;
 }
 
-void keyboardPoll() {
+void keyboard_poll() {
     s_blocked = queryBlocked();   // rafraîchi 1×/frame ; lu par isDown sans re-interroger le DOM
     VM* vm = VM::current();
-    Value kbd = vm->getGlobal("keyboard");
+    Value kbd = vm->get_global("keyboard");
     Value pressed, released;
-    if (kbd.isMap()) {
-        pressed = kbd.mapGet(Value(std::string("keypressed")));
-        released = kbd.mapGet(Value(std::string("keyrelease")));
+    if (kbd.is_map()) {
+        pressed = kbd.map_get(Value(std::string("keypressed")));
+        released = kbd.map_get(Value(std::string("keyrelease")));
     }
-    bool wantPress = pressed.isCallable();
-    bool wantRelease = released.isCallable();
+    bool wantPress = pressed.is_callable();
+    bool wantRelease = released.is_callable();
 
     if (s_blocked) {
         // Éditeur focalisé : le jeu ne reçoit plus le clavier. On RELÂCHE proprement les
@@ -149,7 +149,7 @@ void keyboardPoll() {
             if (wantRelease) {
                 std::string name = keyName(k);
                 if (!name.empty())
-                    vm->callValue(released, Value(name));
+                    vm->call_value(released, Value(name));
             }
         }
         while (GetKeyPressed() != 0) {
@@ -167,7 +167,7 @@ void keyboardPoll() {
         if (key >= 0 && key < 512)
             s_down[key] = true;
         if (wantPress)
-            vm->callValue(pressed, Value(name));
+            vm->call_value(pressed, Value(name));
     }
 
     // Relâchements : parcourt les touches suivies comme enfoncées.
@@ -179,7 +179,7 @@ void keyboardPoll() {
             if (wantRelease) {
                 std::string name = keyName(k);
                 if (!name.empty())
-                    vm->callValue(released, Value(name));
+                    vm->call_value(released, Value(name));
             }
         }
     }
@@ -187,8 +187,8 @@ void keyboardPoll() {
 
 // Le module `keyboard` expose isDown() ; l'utilisateur y affecte en plus
 // keypressed / keyrelease, lues par keyboardPoll().
-Value makeKeyboardModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("isDown")), Value::makeBuiltin(kbd_is_down));
+Value make_keyboard_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("isDown")), Value::make_builtin(kbd_is_down));
     return m;
 }

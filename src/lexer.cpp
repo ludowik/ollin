@@ -26,17 +26,17 @@ Lexer::Lexer(std::string source, std::string filename, int file_idx)
 }
 
 char Lexer::peek() const {
-    return atEnd() ? '\0' : src[pos];
+    return at_end() ? '\0' : src[pos];
 }
 char Lexer::advance() {
     return src[pos++];
 }
-bool Lexer::atEnd() const {
+bool Lexer::at_end() const {
     return pos >= static_cast<int>(src.size());
 }
 
-void Lexer::skipWhitespace() {
-    while (!atEnd() && (peek() == ' ' || peek() == '\t' || peek() == '\r'))
+void Lexer::skip_whitespace() {
+    while (!at_end() && (peek() == ' ' || peek() == '\t' || peek() == '\r'))
         advance();
 }
 
@@ -51,7 +51,7 @@ Token Lexer::number(bool leading_dot) {
 
     // littéraux hexadécimaux (0x..), octaux (0o..) et binaires (0b..) — entiers
     // '_' autorisé uniquement entre deux chiffres (cf. grammar.ebnf)
-    if (!leading_dot && src[start] == '0' && !atEnd()) {
+    if (!leading_dot && src[start] == '0' && !at_end()) {
         char p = peek();
         if (p == 'x' || p == 'X' || p == 'o' || p == 'O' || p == 'b' || p == 'B') {
             char pl = (char)std::tolower((unsigned char)p); // 'x', 'o' ou 'b'
@@ -69,7 +69,7 @@ Token Lexer::number(bool leading_dot) {
                 return c == '0' || c == '1'; // binaire
             };
             bool any = false, last_was_digit = false;
-            while (!atEnd()) {
+            while (!at_end()) {
                 char c = peek();
                 if (c == '_') {
                     if (!last_was_digit)
@@ -88,7 +88,7 @@ Token Lexer::number(bool leading_dot) {
             // pas de chiffre, underscore final, ou caractère alphanumérique/'.' collé
             if (!any || !last_was_digit)
                 invalid();
-            if (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '.'))
+            if (!at_end() && (std::isalnum((unsigned char)peek()) || peek() == '.'))
                 invalid();
             return {TokenType::NUMBER, digits, line};
         }
@@ -97,7 +97,7 @@ Token Lexer::number(bool leading_dot) {
     // décimal : '_' uniquement entre deux chiffres, un seul '.', pas d'alnum/'.' collé
     bool last_was_digit = !leading_dot; // src[start] est un chiffre si !leading_dot
     bool prev_underscore = false;
-    while (!atEnd()) {
+    while (!at_end()) {
         char c = peek();
         if (std::isdigit((unsigned char)c)) {
             advance();
@@ -119,17 +119,17 @@ Token Lexer::number(bool leading_dot) {
     }
     // exposant scientifique optionnel : [eE] [+-]? chiffres → le nombre est flottant.
     // (les littéraux hex/oct/bin sont déjà retournés plus haut, jamais ici.)
-    if (!atEnd() && (peek() == 'e' || peek() == 'E')) {
+    if (!at_end() && (peek() == 'e' || peek() == 'E')) {
         if (prev_underscore) // '_' juste avant l'exposant → invalide (ex. 1_e5)
             throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
         digits += 'e';
         advance();
-        if (!atEnd() && (peek() == '+' || peek() == '-')) {
+        if (!at_end() && (peek() == '+' || peek() == '-')) {
             digits += peek();
             advance();
         }
         bool exp_digit = false;
-        while (!atEnd() && std::isdigit((unsigned char)peek())) {
+        while (!at_end() && std::isdigit((unsigned char)peek())) {
             digits += peek();
             advance();
             exp_digit = true;
@@ -140,16 +140,16 @@ Token Lexer::number(bool leading_dot) {
         prev_underscore = false;
     }
     // '_' final (ou non suivi d'un chiffre), ou caractère alphanumérique / '.' / '_' collé
-    if (prev_underscore || (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '.' || peek() == '_')))
+    if (prev_underscore || (!at_end() && (std::isalnum((unsigned char)peek()) || peek() == '.' || peek() == '_')))
         throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
     return {TokenType::NUMBER, digits, line};
 }
 
 Token Lexer::string() {
     int start = pos;
-    while (!atEnd() && peek() != '"' && peek() != '\n')
+    while (!at_end() && peek() != '"' && peek() != '\n')
         advance();
-    if (atEnd() || peek() == '\n')
+    if (at_end() || peek() == '\n')
         throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": unterminated string");
     std::string val = src.substr(start, pos - start);
     advance();
@@ -193,16 +193,16 @@ static void splitInterpSpec(const std::string& s, std::string& expr, std::string
     spec.clear();
 }
 
-void Lexer::interpString(std::vector<Token>& out) {
+void Lexer::interp_string(std::vector<Token>& out) {
     auto emit_tok = [&](Token t) { t.file_idx = file_idx_; out.push_back(std::move(t)); };
 
     int str_line = line;
     std::string literal;
     bool has_interp = false;
 
-    while (!atEnd() && peek() != '"' && peek() != '\n') {
+    while (!at_end() && peek() != '"' && peek() != '\n') {
         char c = advance();
-        if (c == '\\' && !atEnd() && peek() == '{') {
+        if (c == '\\' && !at_end() && peek() == '{') {
             literal += '{';
             advance();
         } else if (c == '{') {
@@ -210,14 +210,14 @@ void Lexer::interpString(std::vector<Token>& out) {
             // pour décider : emplacement positionnel (littéral) vs expression interpolée.
             int depth = 1;
             int inner_start = pos;
-            while (!atEnd() && depth > 0) {
+            while (!at_end() && depth > 0) {
                 char ec = peek();
                 if (ec == '\n') break;
                 if (ec == '"') {
                     advance();
-                    while (!atEnd() && peek() != '"' && peek() != '\n')
+                    while (!at_end() && peek() != '"' && peek() != '\n')
                         advance();
-                    if (!atEnd() && peek() == '"') advance();
+                    if (!at_end() && peek() == '"') advance();
                 } else if (ec == '{') {
                     depth++;
                     advance();
@@ -229,7 +229,7 @@ void Lexer::interpString(std::vector<Token>& out) {
                     advance();
                 }
             }
-            if (atEnd() || peek() == '\n' || depth > 0)
+            if (at_end() || peek() == '\n' || depth > 0)
                 throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": accolade non fermée dans l'interpolation");
 
             std::string inner = src.substr(inner_start, pos - inner_start);
@@ -275,7 +275,7 @@ void Lexer::interpString(std::vector<Token>& out) {
         }
     }
 
-    if (atEnd() || peek() == '\n')
+    if (at_end() || peek() == '\n')
         throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": unterminated string");
     advance(); // consomme '"'
 
@@ -287,7 +287,7 @@ void Lexer::interpString(std::vector<Token>& out) {
 
 Token Lexer::identifier() {
     int start = pos - 1;
-    while (!atEnd() && (std::isalnum((unsigned char)peek()) || peek() == '_'))
+    while (!at_end() && (std::isalnum((unsigned char)peek()) || peek() == '_'))
         advance();
     std::string lex = src.substr(start, pos - start);
     auto it = s_keywords.find(lex);
@@ -296,15 +296,15 @@ Token Lexer::identifier() {
 
 Token Lexer::comment() {
     int start = pos;
-    while (!atEnd() && peek() != '\n')
+    while (!at_end() && peek() != '\n')
         advance();
     return {TokenType::COMMENT, src.substr(start, pos - start), line};
 }
 
-Token Lexer::blockComment() {
+Token Lexer::block_comment() {
     int start = pos;
     int hashes = 0;
-    while (!atEnd()) {
+    while (!at_end()) {
         char c = advance();
         if (c == '\n')
             line++;
@@ -325,9 +325,9 @@ std::vector<Token> Lexer::tokenize() {
         tokens.push_back(std::move(t));
     };
 
-    while (!atEnd()) {
-        skipWhitespace();
-        if (atEnd())
+    while (!at_end()) {
+        skip_whitespace();
+        if (at_end())
             break;
 
         char c = advance();
@@ -336,7 +336,7 @@ std::vector<Token> Lexer::tokenize() {
             line++;
             break;
         case '=':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::EQUAL_EQUAL, "==", line});
             } else
@@ -352,15 +352,15 @@ std::vector<Token> Lexer::tokenize() {
             emit({TokenType::RPAREN, ")", line});
             break;
         case '.':
-            if (!atEnd() && peek() == '.') {
+            if (!at_end() && peek() == '.') {
                 advance();
-                if (!atEnd() && peek() == '.') {
+                if (!at_end() && peek() == '.') {
                     advance();
                     emit({TokenType::DOT_DOT_DOT, "...", line});
                 } else
                     throw std::runtime_error("line " + std::to_string(line) +
                                              ": '..' is not valid syntax (use [a;b] for ranges)");
-            } else if (!atEnd() && std::isdigit((unsigned char)peek())) {
+            } else if (!at_end() && std::isdigit((unsigned char)peek())) {
                 emit(number(true)); // .5 → nombre à virgule
             } else {
                 emit({TokenType::DOT, ".", line});
@@ -374,57 +374,57 @@ std::vector<Token> Lexer::tokenize() {
             emit({TokenType::SEMICOLON, ";", line});
             break;
         case '-':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::MINUS_EQUAL, "-=", line});
             } else
                 emit({TokenType::MINUS, "-", line});
             break;
         case '*':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::STAR_EQUAL, "*=", line});
-            } else if (!atEnd() && peek() == '*')
+            } else if (!at_end() && peek() == '*')
                 throw std::runtime_error("line " + std::to_string(line) +
                                          ": '**' n'existe plus — utilisez '^' pour la puissance");
             else
                 emit({TokenType::STAR, "*", line});
             break;
         case '/':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::SLASH_EQUAL, "/=", line});
-            } else if (!atEnd() && peek() == '/') {
+            } else if (!at_end() && peek() == '/') {
                 advance();
                 emit({TokenType::SLASH_SLASH, "//", line});
             } else
                 emit({TokenType::SLASH, "/", line});
             break;
         case '%':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::PERCENT_EQUAL, "%=", line});
             } else
                 emit({TokenType::PERCENT, "%", line});
             break;
         case '>':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::GREATER_EQUAL, ">=", line});
-            } else if (!atEnd() && peek() == '>') {
+            } else if (!at_end() && peek() == '>') {
                 advance();
                 emit({TokenType::RSHIFT, ">>", line});
             } else
                 emit({TokenType::GREATER, ">", line});
             break;
         case '<':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::LESS_EQUAL, "<=", line});
-            } else if (!atEnd() && peek() == '>') {
+            } else if (!at_end() && peek() == '>') {
                 advance();
                 emit({TokenType::NOT_EQUAL, "<>", line});
-            } else if (!atEnd() && peek() == '<') {
+            } else if (!at_end() && peek() == '<') {
                 advance();
                 emit({TokenType::LSHIFT, "<<", line});
             } else
@@ -461,21 +461,21 @@ std::vector<Token> Lexer::tokenize() {
             emit({TokenType::QUESTION, "?", line});
             break;
         case '"':
-            interpString(tokens);
+            interp_string(tokens);
             break;
         case '+':
-            if (!atEnd() && peek() == '=') {
+            if (!at_end() && peek() == '=') {
                 advance();
                 emit({TokenType::PLUS_EQUAL, "+=", line});
             } else
                 emit({TokenType::PLUS, "+", line});
             break;
         case '#':
-            if (!atEnd() && peek() == '#') {
+            if (!at_end() && peek() == '#') {
                 advance();
-                if (!atEnd() && peek() == '#') {
+                if (!at_end() && peek() == '#') {
                     advance();
-                    emit(blockComment());
+                    emit(block_comment());
                 } else
                     emit(comment());
             } else {

@@ -54,31 +54,31 @@ static MetaKeys& MK() {
     return mk;
 }
 
-bool VM::isInstance(const Value& v) {
-    return (v.isMap() || v.isClass()) && !v.mapGet(MK().class_).isNil();
+bool VM::is_instance(const Value& v) {
+    return (v.is_map() || v.is_class()) && !v.map_get(MK().class_).is_nil();
 }
 
 // ── protoChainGet ─────────────────────────────────────────────────────────────
-Value VM::protoChainGet(const Value& obj, const Value& key) {
-    if (obj.isMap() || obj.isClass()) {
-        Value v = obj.mapGet(key);
-        if (!v.isNil())
+Value VM::proto_chain_get(const Value& obj, const Value& key) {
+    if (obj.is_map() || obj.is_class()) {
+        Value v = obj.map_get(key);
+        if (!v.is_nil())
             return v;
-        if (obj.isMap()) {
-            Value cls = obj.mapGet(MK().class_);
-            if (!cls.isNil())
-                return protoChainGet(cls, key);
+        if (obj.is_map()) {
+            Value cls = obj.map_get(MK().class_);
+            if (!cls.is_nil())
+                return proto_chain_get(cls, key);
         } else {
-            Value par = obj.mapGet(MK().parent_);
-            if (!par.isNil())
-                return protoChainGet(par, key);
+            Value par = obj.map_get(MK().parent_);
+            if (!par.is_nil())
+                return proto_chain_get(par, key);
         }
     }
     return Value{};
 }
 
 // ── growRegs : croît par doublement, max 4096, size reste exacte ─────────────
-void VM::growRegs(size_t needed) {
+void VM::grow_regs(size_t needed) {
     if (regs.size() >= needed)
         return;
     if (needed > 4096)
@@ -90,69 +90,69 @@ void VM::growRegs(size_t needed) {
     regs.resize(needed);
 }
 
-int VM::invokeBuiltin(Value::BuiltinFn fn, Value* results, int argc, int cap) {
+int VM::invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap) {
     CallCtx ctx{this, results, argc, cap};
     last_results_ = fn(ctx);
     return last_results_;
 }
 
-int VM::invokeBuiltinRegs(Value::BuiltinFn fn, int result_base, int argc) {
+int VM::invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc) {
     // cap = reg_count du frame courant - (result_base - reg_base) = varargs_base - result_base.
-    return invokeBuiltin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base);
+    return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base);
 }
 
 // ── invokeStr : mini-loop to call __str without recursion ─────────────────────
-std::string VM::invokeStr(Value obj) { // by value: regs.resize() ne invalide pas obj
-    Value cls = obj.mapGet(MK().class_);
-    if (cls.isNil())
+std::string VM::invoke_str(Value obj) { // by value: regs.resize() ne invalide pas obj
+    Value cls = obj.map_get(MK().class_);
+    if (cls.is_nil())
         return "{map}";
-    Value str_fn = protoChainGet(cls, MK().str_);
-    if (str_fn.isNil() || !str_fn.isCallable()) {
-        Value nm = cls.mapGet(MK().name_);
-        return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
+    Value str_fn = proto_chain_get(cls, MK().str_);
+    if (str_fn.is_nil() || !str_fn.is_callable()) {
+        Value nm = cls.map_get(MK().name_);
+        return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     switch (str_fn.tag) {
     case Value::T_FUNCTION:
-        fi = (uint8_t)str_fn.asInt();
+        fi = (uint8_t)str_fn.as_int();
         break;
     case Value::T_CLOSURE: {
-        fi = str_fn.asClosure()->func_idx;
-        const auto& uvs = str_fn.asClosure()->upvals;
+        fi = str_fn.as_closure()->func_idx;
+        const auto& uvs = str_fn.as_closure()->upvals;
         if (!uvs.empty())
             frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
         break;
     }
     case Value::T_BUILTIN: {
         Value self = obj; // 1 slot dispo (self) ; le builtin y écrit son résultat, relu ensuite
-        int n = invokeBuiltin(str_fn.asBuiltin(), &self, 1, 1);
-        return (n >= 1 && self.isString()) ? self.asString() : "{object}";
+        int n = invoke_builtin(str_fn.as_builtin(), &self, 1, 1);
+        return (n >= 1 && self.is_string()) ? self.as_string() : "{object}";
     }
     default: {
-        Value nm = cls.mapGet(MK().name_);
-        return nm.isString() ? "{" + nm.asString() + "}" : "{object}";
+        Value nm = cls.map_get(MK().name_);
+        return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
     }
     }
     int call_base = (int)regs.size();
-    growRegs((size_t)(call_base + std::max((int)ch->funcs[fi].reg_count, 1)));
+    grow_regs((size_t)(call_base + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[call_base] = obj; // self en R[0] avant pushCallFrame
     uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, 1, std::move(frame_upvals), 0);
-    runGoto(call_stack.size() - 1);
+    ip = push_call_frame(call_base, fi, 1, std::move(frame_upvals), 0);
+    run_goto(call_stack.size() - 1);
     std::string result;
     if ((int)regs.size() > call_base) {
         const Value& rv = regs[call_base];
-        if (rv.isString()) {
-            result = rv.asString();
+        if (rv.is_string()) {
+            result = rv.as_string();
         } else {
             std::ostringstream os;
-            if (rv.isNil())
+            if (rv.is_nil())
                 os << "nil";
-            else if (rv.isInteger())
-                os << rv.asInt();
-            else if (rv.isFloat()) {
-                double d = rv.asFloat();
+            else if (rv.is_integer())
+                os << rv.as_int();
+            else if (rv.is_float()) {
+                double d = rv.as_float();
                 if (d == (long long)d && d >= -1e15 && d <= 1e15)
                     os << (long long)d;
                 else
@@ -167,34 +167,34 @@ std::string VM::invokeStr(Value obj) { // by value: regs.resize() ne invalide pa
 }
 
 // ── valueToString ─────────────────────────────────────────────────────────────
-std::string valueToString(const Value& v) {
-    if (v.isNil())
+std::string value_to_string(const Value& v) {
+    if (v.is_nil())
         return "nil";
-    if (v.isString())
-        return v.asString();
-    if (v.isClass())
+    if (v.is_string())
+        return v.as_string();
+    if (v.is_class())
         return "{class}";
-    if (v.isMap()) {
+    if (v.is_map()) {
         VM* vm = VM::current();
         if (vm) {
-            Value cls = v.mapGet(MK().class_);
-            if (!cls.isNil())
-                return vm->invokeStr(v);
+            Value cls = v.map_get(MK().class_);
+            if (!cls.is_nil())
+                return vm->invoke_str(v);
         }
         return "{map}";
     }
-    if (v.isArray())
+    if (v.is_array())
         return "{array}";
-    if (v.isIterator())
+    if (v.is_iterator())
         return "{iterator}";
-    if (v.isRange())
+    if (v.is_range())
         return "{range}";
-    if (v.isFuncVal() || v.isClosure() || v.isBuiltin())
+    if (v.is_func_val() || v.is_closure() || v.is_builtin())
         return "{function}";
-    if (v.isInteger())
-        return std::to_string(v.asInt());
+    if (v.is_integer())
+        return std::to_string(v.as_int());
     std::ostringstream os;
-    double d = v.asFloat();
+    double d = v.as_float();
     if (d == (long long)d && d >= -1e15 && d <= 1e15)
         os << (long long)d;
     else
@@ -206,8 +206,8 @@ std::string valueToString(const Value& v) {
 
 static int builtin_assert(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc == 0 || isFalsy(args[0])) {
-        std::string msg = (argc >= 2 && args[1].isString()) ? args[1].asString() : "assertion failed";
+    if (argc == 0 || is_falsy(args[0])) {
+        std::string msg = (argc >= 2 && args[1].is_string()) ? args[1].as_string() : "assertion failed";
         throw std::runtime_error(msg);
     }
     return ctx.ret(Value{});
@@ -221,7 +221,7 @@ static int builtin_time(CallCtx& ctx) {
 
 // Mémoire tas en cours d'usage (octets) — par plateforme : octets « in use » de
 // l'allocateur (WASM/macOS/glibc) ou working set (Windows) ; 0 si indisponible.
-uint64_t ollinHeapBytes() {
+uint64_t ollin_heap_bytes() {
     uint64_t bytes = 0;
 #if defined(__EMSCRIPTEN__)
     struct mallinfo mi = mallinfo();            // uordblks (arène) + hblkhd (blocs mmap)
@@ -245,7 +245,7 @@ uint64_t ollinHeapBytes() {
 // runtime + libs). Renvoie un entier.
 static int builtin_mem(CallCtx& ctx) {
     (void)ctx;
-    return ctx.ret(Value((int64_t)ollinHeapBytes()));
+    return ctx.ret(Value((int64_t)ollin_heap_bytes()));
 }
 
 static int64_t range_len(const Range* r) {
@@ -264,15 +264,15 @@ static int builtin_len(CallCtx& ctx) {
     if (argc == 0)
         throw std::runtime_error("len() requires 1 argument");
     const Value& v = args[0];
-    if (v.isNil())
+    if (v.is_nil())
         return ctx.ret(Value((int64_t)0));
-    if (v.isArray())
-        return ctx.ret(Value((int64_t)v.arraySize()));
-    if (v.isMap() || v.isClass())
-        return ctx.ret(Value(v.mapSize()));
-    if (v.isString())
-        return ctx.ret(Value((int64_t)utf8Count(v.asString()))); // longueur en caractères (codepoints), pas en octets
-    if (v.isRange())
+    if (v.is_array())
+        return ctx.ret(Value((int64_t)v.array_size()));
+    if (v.is_map() || v.is_class())
+        return ctx.ret(Value(v.map_size()));
+    if (v.is_string())
+        return ctx.ret(Value((int64_t)utf8_count(v.as_string()))); // longueur en caractères (codepoints), pas en octets
+    if (v.is_range())
         return ctx.ret(Value(range_len(v.rptr)));
     return ctx.ret(Value((int64_t)1));
 }
@@ -294,38 +294,38 @@ static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upval
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
 // The caller sets ip = addr, then dispatches (NEXT() or continue in switch).
 
-uint32_t VM::tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs, bool negate) {
-    Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
-    if (!fn.isCallable())
+uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate) {
+    Value fn = proto_chain_get(lhs.map_get(MK().class_), name);
+    if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolveFuncVal(fn, fuv); // fn est callable (garde ci-dessus)
     int nb = (int)regs.size();
-    growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
+    grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb] = std::move(lhs);
     regs[nb + 1] = std::move(rhs);
-    uint32_t addr = pushCallFrame(nb, fi, 2, std::move(fuv), ip, false, dest);
+    uint32_t addr = push_call_frame(nb, fi, 2, std::move(fuv), ip, false, dest);
     if (negate)
         call_stack.back().negate_result = true;
     return addr;
 }
 
-uint32_t VM::tryMetaUnary(const Value& name, int dest, Value lhs) {
-    Value fn = protoChainGet(lhs.mapGet(MK().class_), name);
-    if (!fn.isCallable())
+uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
+    Value fn = proto_chain_get(lhs.map_get(MK().class_), name);
+    if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolveFuncVal(fn, fuv); // fn est callable (garde ci-dessus)
     int nb = (int)regs.size();
-    growRegs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
+    grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[nb] = std::move(lhs);
-    return pushCallFrame(nb, fi, 1, std::move(fuv), ip, false, dest);
+    return push_call_frame(nb, fi, 1, std::move(fuv), ip, false, dest);
 }
 
 // ── unwindToHandler : déroulé commun throw / erreur runtime C++ ───────────────
-void VM::unwindToHandler(const Handler& h, Value thrown) {
+void VM::unwind_to_handler(const Handler& h, Value thrown) {
     while (call_stack.size() > h.call_depth) {
-        closeUpvals();
+        close_upvals();
         call_stack.pop_back();
     }
     if (regs.size() > h.regs_size)
@@ -336,23 +336,23 @@ void VM::unwindToHandler(const Handler& h, Value thrown) {
 }
 
 // ── instantiateClass : partagé par CALL_DYN et CALL_METHOD ────────────────────
-uint32_t VM::instantiateClass(int base_reg, int arg_off, int argc, Value cls, bool& done) {
+uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done) {
     done = false;
-    Value inst = Value::makeMap();
-    inst.mapSet(MK().class_, cls);
-    Value init_fn = protoChainGet(cls, MK().init_);
-    if (!init_fn.isCallable()) { // pas de constructeur → l'instance EST le résultat
+    Value inst = Value::make_map();
+    inst.map_set(MK().class_, cls);
+    Value init_fn = proto_chain_get(cls, MK().init_);
+    if (!init_fn.is_callable()) { // pas de constructeur → l'instance EST le résultat
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
         return 0;
     }
-    if (init_fn.isBuiltin()) {
+    if (init_fn.is_builtin()) {
         std::vector<Value> bargs(argc + 1);
         bargs[0] = inst;
         for (int i = 0; i < argc; ++i)
             bargs[1 + i] = regs[base_reg + arg_off + i];
-        invokeBuiltin(init_fn.asBuiltin(), bargs.data(), argc + 1, argc + 1); // retour ignoré (l'instance prime)
+        invoke_builtin(init_fn.as_builtin(), bargs.data(), argc + 1, argc + 1); // retour ignoré (l'instance prime)
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
@@ -361,7 +361,7 @@ uint32_t VM::instantiateClass(int base_reg, int arg_off, int argc, Value cls, bo
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolveFuncVal(init_fn, fuv);
     int total = argc + 1;
-    growRegs((size_t)(base_reg + std::max((int)ch->funcs[fi].reg_count, total)));
+    grow_regs((size_t)(base_reg + std::max((int)ch->funcs[fi].reg_count, total)));
     // Décale les args pour insérer self en base_reg : base_reg+arg_off+i → base_reg+1+i.
     // Sens de parcours selon dest vs src pour éviter d'écraser des args non déplacés.
     if (arg_off >= 1)
@@ -371,11 +371,11 @@ uint32_t VM::instantiateClass(int base_reg, int arg_off, int argc, Value cls, bo
         for (int i = argc - 1; i >= 0; --i)
             regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
     regs[base_reg + 0] = std::move(inst);
-    return pushCallFrame(base_reg, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
+    return push_call_frame(base_reg, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
 }
 
 // ── closeUpvals : close and free all open upvalues of the top frame ──────────
-void VM::closeUpvals() {
+void VM::close_upvals() {
     auto& ouv = call_stack.back().open_upvals;
     if (!ouv)
         return;
@@ -391,35 +391,35 @@ void VM::closeUpvals() {
 
 // ── Helper: resolve function value → func_idx + upvals ───────────────────────
 static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals) {
-    if (fv.isFuncVal())
-        return (uint8_t)fv.asInt();
-    if (fv.isClosure()) {
-        const auto& uvs = fv.asClosure()->upvals;
+    if (fv.is_func_val())
+        return (uint8_t)fv.as_int();
+    if (fv.is_closure()) {
+        const auto& uvs = fv.as_closure()->upvals;
         if (!uvs.empty())
             out_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-        return fv.asClosure()->func_idx;
+        return fv.as_closure()->func_idx;
     }
     throw std::runtime_error("runtime: call on non-function value");
 }
 
 // ── EQ comparison (shared by op_EQ and op_NEQ) ────────────────────────────────
 static bool valuesEqual(const Value& av, const Value& bv) {
-    if (av.isNil() && bv.isNil())
+    if (av.is_nil() && bv.is_nil())
         return true;
-    if (av.isNil() || bv.isNil())
+    if (av.is_nil() || bv.is_nil())
         return false;
-    if (av.isInteger() && bv.isInteger())
-        return av.asInt() == bv.asInt();
-    if (av.isNumber() && bv.isNumber())
-        return av.asNum() == bv.asNum();
-    if (av.isString() && bv.isString())
+    if (av.is_integer() && bv.is_integer())
+        return av.as_int() == bv.as_int();
+    if (av.is_number() && bv.is_number())
+        return av.as_num() == bv.as_num();
+    if (av.is_string() && bv.is_string())
         return av.sptr == bv.sptr;
-    return (av.isMap() && bv.isMap() && av.mptr == bv.mptr) || (av.isClass() && bv.isClass() && av.mptr == bv.mptr);
+    return (av.is_map() && bv.is_map() && av.mptr == bv.mptr) || (av.is_class() && bv.is_class() && av.mptr == bv.mptr);
 }
 
 // ── VM::errLine / VM::current / VM::callValue ────────────────────────────────
 
-std::string VM::errLine() const {
+std::string VM::err_line() const {
     uint32_t idx = ip > 0 ? ip - 1 : 0;
     if (idx >= ch->lines.size())
         return "?";
@@ -432,7 +432,7 @@ VM* VM::current() {
     return s_current_vm;
 }
 
-void VM::setGlobal(const std::string& name, const Value& value) {
+void VM::set_global(const std::string& name, const Value& value) {
     for (int i = 0; i < (int)owned_chunk.identifiers.size(); ++i) {
         if (owned_chunk.identifiers[i] == name) {
             globals[i] = value;
@@ -442,7 +442,7 @@ void VM::setGlobal(const std::string& name, const Value& value) {
     }
 }
 
-Value VM::getGlobal(const std::string& name) const {
+Value VM::get_global(const std::string& name) const {
     if (!ch)
         return Value{};
     for (int i = 0; i < (int)ch->identifiers.size(); ++i)
@@ -451,17 +451,17 @@ Value VM::getGlobal(const std::string& name) const {
     return Value{};
 }
 
-void VM::runEntryHooks() {
+void VM::run_entry_hooks() {
     // `graphics` peut être nil (stub natif, ou script sans référence à graphics) ou
     // réassigné à un non-map → garde isMap() obligatoire avant mapGet.
-    Value gfx = getGlobal("graphics");
-    Value draw = getGlobal("draw");
-    bool graphical = draw.isCallable() && gfx.isMap();
+    Value gfx = get_global("graphics");
+    Value draw = get_global("draw");
+    bool graphical = draw.is_callable() && gfx.is_map();
 
     // setup() : appelée une fois après le chargement, avant la boucle update/draw.
-    Value setup = getGlobal("setup");
-    if (setup.isCallable())
-        callValue(setup);
+    Value setup = get_global("setup");
+    if (setup.is_callable())
+        call_value(setup);
 
     // Canvas IMPLICITE : la seule présence d'un draw() suffit à démarrer une session
     // graphique. Si NI le top-level NI setup() n'ont appelé graphics.canvas(), on le
@@ -469,58 +469,58 @@ void VM::runEntryHooks() {
     // Fait APRÈS setup() — car setup() est un endroit courant pour appeler canvas()
     // (cf. tutoriel) : le créer avant provoquerait un double InitWindow (crash WASM).
     if (graphical && !gfx_canvas_created_) {
-        Value canvas_fn = gfx.mapGet(Value(std::string("canvas")));
-        if (canvas_fn.isBuiltin()) {
+        Value canvas_fn = gfx.map_get(Value(std::string("canvas")));
+        if (canvas_fn.is_builtin()) {
             // Dimensions de la zone de rendu. On NE lit PAS getGlobal("W") : si le
             // script ne référence pas W/H, ces identifiants n'existent pas dans le
             // chunk → getGlobal renvoie nil → 0. On relit le module `window`
             // directement (source des globales W/H, et en WASM = taille mesurée en JS
             // fournie via __ollinRenderW → fiable, pas de course de layout).
             int w = 0, h = 0;
-            Value winm = makeBuiltinModule("window");
-            if (winm.isMap()) {
-                Value vw = winm.mapGet(Value(std::string("width")));
-                Value vh = winm.mapGet(Value(std::string("height")));
-                if (vw.isNumber()) w = (int)vw.asNum();
-                if (vh.isNumber()) h = (int)vh.asNum();
+            Value winm = make_builtin_module("window");
+            if (winm.is_map()) {
+                Value vw = winm.map_get(Value(std::string("width")));
+                Value vh = winm.map_get(Value(std::string("height")));
+                if (vw.is_number()) w = (int)vw.as_num();
+                if (vh.is_number()) h = (int)vh.as_num();
             }
             // Si la taille reste inexploitable, canvas() sans argument → défauts de
             // gfx_canvas (800×600) plutôt qu'un canvas 0×0 sans contexte GL (crash).
             if (w > 0 && h > 0) {
                 Value wh[2] = { Value((int64_t)w), Value((int64_t)h) };
-                invokeBuiltin(canvas_fn.asBuiltin(), wh, 2, 2);
+                invoke_builtin(canvas_fn.as_builtin(), wh, 2, 2);
             } else {
                 Value none[1] = {};
-                invokeBuiltin(canvas_fn.asBuiltin(), none, 0, 1);
+                invoke_builtin(canvas_fn.as_builtin(), none, 0, 1);
             }
         }
     }
 
     // draw() présent → lance la boucle graphique via graphics.run(draw).
     if (graphical) {
-        Value run_fn = gfx.mapGet(Value(std::string("run")));
-        if (run_fn.isBuiltin())
-            invokeBuiltin(run_fn.asBuiltin(), &draw, 1, 1);
+        Value run_fn = gfx.map_get(Value(std::string("run")));
+        if (run_fn.is_builtin())
+            invoke_builtin(run_fn.as_builtin(), &draw, 1, 1);
     }
 }
 
-Value VM::callValue(const Value& fn, const Value* args, int argc) {
-    if (fn.isBuiltin()) {
+Value VM::call_value(const Value& fn, const Value* args, int argc) {
+    if (fn.is_builtin()) {
         // Buffer local writable : le builtin y écrit son résultat (args de l'appelant
         // peuvent être en lecture seule). Au moins 1 slot pour recevoir la valeur.
         std::vector<Value> buf(std::max(argc, 1));
         for (int i = 0; i < argc; ++i)
             buf[i] = args[i];
-        int n = invokeBuiltin(fn.asBuiltin(), buf.data(), argc, (int)buf.size());
+        int n = invoke_builtin(fn.as_builtin(), buf.data(), argc, (int)buf.size());
         return n >= 1 ? buf[0] : Value{};
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.isFuncVal()) {
-        fi = (uint8_t)fn.asInt();
-    } else if (fn.isClosure()) {
-        fi = fn.asClosure()->func_idx;
-        const auto& uvs = fn.asClosure()->upvals;
+    if (fn.is_func_val()) {
+        fi = (uint8_t)fn.as_int();
+    } else if (fn.is_closure()) {
+        fi = fn.as_closure()->func_idx;
+        const auto& uvs = fn.as_closure()->upvals;
         if (!uvs.empty())
             frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
     } else {
@@ -528,27 +528,27 @@ Value VM::callValue(const Value& fn, const Value* args, int argc) {
     }
     int call_base = (int)regs.size();
     if (argc > 0) {
-        growRegs((size_t)(call_base + argc));
+        grow_regs((size_t)(call_base + argc));
         for (int i = 0; i < argc; i++)
             regs[call_base + i] = args[i];
     }
     uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
-    runGoto(call_stack.size() - 1);
+    ip = push_call_frame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
+    run_goto(call_stack.size() - 1);
     Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
     regs.resize(call_base);
     ip = saved_ip;
     return result;
 }
 
-int VM::callValueMulti(const Value& fn, const Value* args, int argc, Value* out, int out_cap) {
+int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* out, int out_cap) {
     if (out_cap <= 0)
         return 0;
-    if (fn.isBuiltin()) {
+    if (fn.is_builtin()) {
         std::vector<Value> buf(std::max(argc, out_cap));
         for (int i = 0; i < argc; ++i)
             buf[i] = args[i];
-        int n = invokeBuiltin(fn.asBuiltin(), buf.data(), argc, (int)buf.size());
+        int n = invoke_builtin(fn.as_builtin(), buf.data(), argc, (int)buf.size());
         int m = n < out_cap ? n : out_cap;
         for (int i = 0; i < m; ++i)
             out[i] = buf[i];
@@ -556,11 +556,11 @@ int VM::callValueMulti(const Value& fn, const Value* args, int argc, Value* out,
     }
     uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.isFuncVal()) {
-        fi = (uint8_t)fn.asInt();
-    } else if (fn.isClosure()) {
-        fi = fn.asClosure()->func_idx;
-        const auto& uvs = fn.asClosure()->upvals;
+    if (fn.is_func_val()) {
+        fi = (uint8_t)fn.as_int();
+    } else if (fn.is_closure()) {
+        fi = fn.as_closure()->func_idx;
+        const auto& uvs = fn.as_closure()->upvals;
         if (!uvs.empty())
             frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
     } else {
@@ -568,13 +568,13 @@ int VM::callValueMulti(const Value& fn, const Value* args, int argc, Value* out,
     }
     int call_base = (int)regs.size();
     if (argc > 0) {
-        growRegs((size_t)(call_base + argc));
+        grow_regs((size_t)(call_base + argc));
         for (int i = 0; i < argc; i++)
             regs[call_base + i] = args[i];
     }
     uint32_t saved_ip = ip;
-    ip = pushCallFrame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
-    runGoto(call_stack.size() - 1);
+    ip = push_call_frame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
+    run_goto(call_stack.size() - 1);
     // Les valeurs de retour de f sont en regs[call_base..], last_results_ en donne le compte.
     int avail = (int)regs.size() - call_base;
     int n = last_results_ < avail ? last_results_ : avail;
@@ -587,19 +587,19 @@ int VM::callValueMulti(const Value& fn, const Value* args, int argc, Value* out,
     return n;
 }
 
-Value VM::callValue(const Value& fn) {
-    return callValue(fn, nullptr, 0);
+Value VM::call_value(const Value& fn) {
+    return call_value(fn, nullptr, 0);
 }
-Value VM::callValue(const Value& fn, const Value& a) {
-    return callValue(fn, &a, 1);
+Value VM::call_value(const Value& fn, const Value& a) {
+    return call_value(fn, &a, 1);
 }
-Value VM::callValue(const Value& fn, const Value& a, const Value& b) {
+Value VM::call_value(const Value& fn, const Value& a, const Value& b) {
     Value args[2] = {a, b};
-    return callValue(fn, args, 2);
+    return call_value(fn, args, 2);
 }
-Value VM::callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d) {
+Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d) {
     Value args[4] = {a, b, c, d};
-    return callValue(fn, args, 4);
+    return call_value(fn, args, 4);
 }
 
 // ── pushCallFrame ─────────────────────────────────────────────────────────────
@@ -609,10 +609,10 @@ Value VM::callValue(const Value& fn, const Value& a, const Value& b, const Value
 //   3. déplace les varargs au-delà de reg_count
 //   4. construit et empile le Frame
 //   5. retourne fp.addr (le caller fait ip = pushCallFrame(...))
-uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                            uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
-    growRegs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
+    grow_regs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
     if (argc < fp.n_fixed) {
         auto& defs = ch->func_defaults[fp.defaults_idx];
         for (int i = argc; i < fp.n_fixed; ++i)
@@ -622,7 +622,7 @@ uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<s
     int va_base = new_base + fp.reg_count;
     if (fp.variadic && argc > fp.n_fixed) {
         n_varargs = argc - fp.n_fixed;
-        growRegs((size_t)(va_base + n_varargs));
+        grow_regs((size_t)(va_base + n_varargs));
         for (int i = n_varargs - 1; i >= 0; --i)
             regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
     }
@@ -640,18 +640,18 @@ uint32_t VM::pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<s
 }
 
 // ── runGoto: dispatch loop, stops when call_stack.size() <= stop_depth ────────
-void VM::runGoto(size_t stop_depth) {
+void VM::run_goto(size_t stop_depth) {
 // ── Computed-goto dispatch (GCC / Clang) ─────────────────────────────────────
 // Table in the exact order of enum Op (chunk.h).
 // Each handler ends with NEXT() → direct jump to the next handler.
 #define NEXT()                                                                                                         \
     do {                                                                                                               \
         Instr _ni = ch->code[ip++];                                                                                    \
-        A = iA(_ni);                                                                                                   \
-        B = iB(_ni);                                                                                                   \
-        C = iC(_ni);                                                                                                   \
-        Bx = iBx(_ni);                                                                                                 \
-        goto* dt[iOP(_ni)];                                                                                            \
+        A = i_a(_ni);                                                                                                   \
+        B = i_b(_ni);                                                                                                   \
+        C = i_c(_ni);                                                                                                   \
+        Bx = i_bx(_ni);                                                                                                 \
+        goto* dt[i_op(_ni)];                                                                                            \
     } while (0)
 
     static const void* const dt[] = {
@@ -742,7 +742,7 @@ dispatch_loop:
 
     op_LOAD_GLOBAL:
         if (!globals_init[Bx])
-            throw std::runtime_error(errLine() + ": undefined: " + ch->identifiers[Bx]);
+            throw std::runtime_error(err_line() + ": undefined: " + ch->identifiers[Bx]);
         regs[base + A] = globals[Bx];
         NEXT();
 
@@ -754,122 +754,122 @@ dispatch_loop:
     op_ADD: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier + entier
-            regs[base + A] = Value(bv.asInt() + cv.asInt());
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier + entier
+            regs[base + A] = Value(bv.as_int() + cv.as_int());
             NEXT();
         }
-        if (bv.isString() || cv.isString()) {
+        if (bv.is_string() || cv.is_string()) {
             {
                 // Copier les opérandes AVANT valueToString : si l'un est une instance
                 // avec __str, invokeStr réalloue regs → les références bv/cv pendraient.
                 // Bloc interne : Value (destructeur non trivial) hors portée avant NEXT().
                 Value b2 = bv;
                 Value c2 = cv;
-                regs[base + A] = Value(valueToString(b2) + valueToString(c2));
+                regs[base + A] = Value(value_to_string(b2) + value_to_string(c2));
             }
             NEXT();
         }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().add_, base + A, bv, cv)) {
+        if (is_instance(bv)) {
+            if (uint32_t addr = try_meta_binary(MK().add_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        regs[base + A] = Value(asDouble(bv) + asDouble(cv));
+        regs[base + A] = Value(as_double(bv) + as_double(cv));
         NEXT();
     }
 
     op_SUB: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier - entier
-            regs[base + A] = Value(bv.asInt() - cv.asInt());
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier - entier
+            regs[base + A] = Value(bv.as_int() - cv.as_int());
             NEXT();
         }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().sub_, base + A, bv, cv)) {
+        if (is_instance(bv)) {
+            if (uint32_t addr = try_meta_binary(MK().sub_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        regs[base + A] = Value(asDouble(bv) - asDouble(cv));
+        regs[base + A] = Value(as_double(bv) - as_double(cv));
         NEXT();
     }
 
     op_MUL: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier * entier
-            regs[base + A] = Value(bv.asInt() * cv.asInt());
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier * entier
+            regs[base + A] = Value(bv.as_int() * cv.as_int());
             NEXT();
         }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().mul_, base + A, bv, cv)) {
+        if (is_instance(bv)) {
+            if (uint32_t addr = try_meta_binary(MK().mul_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        regs[base + A] = Value(asDouble(bv) * asDouble(cv));
+        regs[base + A] = Value(as_double(bv) * as_double(cv));
         NEXT();
     }
 
     op_DIV: {
-        if (isInstance(regs[base + B])) {
-            if (uint32_t addr = tryMetaBinary(MK().div_, base + A, regs[base + B], regs[base + C])) {
+        if (is_instance(regs[base + B])) {
+            if (uint32_t addr = try_meta_binary(MK().div_, base + A, regs[base + B], regs[base + C])) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        double dv = asDouble(regs[base + C]);
+        double dv = as_double(regs[base + C]);
         if (dv == 0.0)
-            throw std::runtime_error(errLine() + ": runtime: division by zero");
-        regs[base + A] = Value(asDouble(regs[base + B]) / dv);
+            throw std::runtime_error(err_line() + ": runtime: division by zero");
+        regs[base + A] = Value(as_double(regs[base + B]) / dv);
         NEXT();
     }
 
     op_MOD: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier % entier
-            if (cv.asInt() == 0)
-                throw std::runtime_error(errLine() + ": runtime: modulo by zero");
-            regs[base + A] = Value(bv.asInt() % cv.asInt());
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier % entier
+            if (cv.as_int() == 0)
+                throw std::runtime_error(err_line() + ": runtime: modulo by zero");
+            regs[base + A] = Value(bv.as_int() % cv.as_int());
             NEXT();
         }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().mod_, base + A, bv, cv)) {
+        if (is_instance(bv)) {
+            if (uint32_t addr = try_meta_binary(MK().mod_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        double dv = asDouble(cv);
+        double dv = as_double(cv);
         if (dv == 0.0)
-            throw std::runtime_error(errLine() + ": runtime: modulo by zero");
-        regs[base + A] = Value(std::fmod(asDouble(bv), dv));
+            throw std::runtime_error(err_line() + ": runtime: modulo by zero");
+        regs[base + A] = Value(std::fmod(as_double(bv), dv));
         NEXT();
     }
 
     op_IDIV: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) {
-            if (cv.asInt() == 0)
-                throw std::runtime_error(errLine() + ": runtime: division by zero");
-            int64_t q = bv.asInt() / cv.asInt();
+        if (bv.is_integer() && cv.is_integer()) {
+            if (cv.as_int() == 0)
+                throw std::runtime_error(err_line() + ": runtime: division by zero");
+            int64_t q = bv.as_int() / cv.as_int();
             // floor division: adjust if signs differ and there is a remainder
-            if ((bv.asInt() ^ cv.asInt()) < 0 && q * cv.asInt() != bv.asInt())
+            if ((bv.as_int() ^ cv.as_int()) < 0 && q * cv.as_int() != bv.as_int())
                 q--;
             regs[base + A] = Value(q);
         } else {
-            double dv = asDouble(cv);
+            double dv = as_double(cv);
             if (dv == 0.0)
-                throw std::runtime_error(errLine() + ": runtime: division by zero");
-            regs[base + A] = Value(std::floor(asDouble(bv) / dv));
+                throw std::runtime_error(err_line() + ": runtime: division by zero");
+            regs[base + A] = Value(std::floor(as_double(bv) / dv));
         }
         NEXT();
     }
@@ -878,8 +878,8 @@ dispatch_loop:
         {
             const Value& bv = regs[base + B]; // lu avant l'écriture de R[A] → réf sûre
             const Value& cv = regs[base + C];
-            if (bv.isInteger() && cv.isInteger() && cv.asInt() >= 0) {
-                int64_t b = bv.asInt(), e = cv.asInt(), r = 1;
+            if (bv.is_integer() && cv.is_integer() && cv.as_int() >= 0) {
+                int64_t b = bv.as_int(), e = cv.as_int(), r = 1;
                 while (e > 0) {
                     if (e & 1)
                         r *= b;
@@ -888,45 +888,45 @@ dispatch_loop:
                 }
                 regs[base + A] = Value(r);
             } else {
-                regs[base + A] = Value(std::pow(asDouble(bv), asDouble(cv)));
+                regs[base + A] = Value(std::pow(as_double(bv), as_double(cv)));
             }
         }
         NEXT();
     }
     op_NEGATE: {
-        if (isInstance(regs[base + B])) {
-            if (uint32_t addr = tryMetaUnary(MK().neg_, base + A, regs[base + B])) {
+        if (is_instance(regs[base + B])) {
+            if (uint32_t addr = try_meta_unary(MK().neg_, base + A, regs[base + B])) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
         const Value& bv = regs[base + B];
-        regs[base + A] = bv.isInteger() ? Value(-bv.asInt()) : Value(-asDouble(bv));
+        regs[base + A] = bv.is_integer() ? Value(-bv.as_int()) : Value(-as_double(bv));
         NEXT();
     }
 
     op_NOT:
-        regs[base + A] = Value((int64_t)(isFalsy(regs[base + B]) ? 1 : 0));
+        regs[base + A] = Value((int64_t)(is_falsy(regs[base + B]) ? 1 : 0));
         NEXT();
 
     op_AND:
-        regs[base + A] = Value((int64_t)(!isFalsy(regs[base + B]) && !isFalsy(regs[base + C]) ? 1 : 0));
+        regs[base + A] = Value((int64_t)(!is_falsy(regs[base + B]) && !is_falsy(regs[base + C]) ? 1 : 0));
         NEXT();
 
     op_OR:
-        regs[base + A] = Value((int64_t)(!isFalsy(regs[base + B]) || !isFalsy(regs[base + C]) ? 1 : 0));
+        regs[base + A] = Value((int64_t)(!is_falsy(regs[base + B]) || !is_falsy(regs[base + C]) ? 1 : 0));
         NEXT();
 
     op_EQ: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier == entier
-            regs[base + A] = Value((int64_t)(bv.asInt() == cv.asInt() ? 1 : 0));
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier == entier
+            regs[base + A] = Value((int64_t)(bv.as_int() == cv.as_int() ? 1 : 0));
             NEXT();
         }
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().eq_, base + A, bv, cv)) {
+        if (is_instance(bv)) {
+            if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
@@ -940,8 +940,8 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         // a <> b via __eq puis négation (sinon == et <> seraient vrais en même temps).
-        if (isInstance(bv)) {
-            if (uint32_t addr = tryMetaBinary(MK().eq_, base + A, bv, cv, /*negate=*/true)) {
+        if (is_instance(bv)) {
+            if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
@@ -955,56 +955,56 @@ dispatch_loop:
         // GT(a,b) == LT(b,a): check __lt on rhs
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier > entier
-            regs[base + A] = Value((int64_t)(bv.asInt() > cv.asInt()));
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier > entier
+            regs[base + A] = Value((int64_t)(bv.as_int() > cv.as_int()));
             NEXT();
         }
-        if (isInstance(cv)) { // instance à droite : a > b == b < a → b.__lt(a)
-            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv)) {
+        if (is_instance(cv)) { // instance à droite : a > b == b < a → b.__lt(a)
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (isInstance(bv)) { // instance à gauche : a > b == not(a <= b) → not a.__le(b)
-            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv, /*negate=*/true)) {
+        } else if (is_instance(bv)) { // instance à gauche : a > b == not(a <= b) → not a.__le(b)
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        if (bv.isString() && cv.isString()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.asString() > cv.asString()));
+        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.as_string() > cv.as_string()));
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(asDouble(bv) > asDouble(cv)));
+        regs[base + A] = Value((int64_t)(as_double(bv) > as_double(cv)));
         NEXT();
     }
 
     op_LT: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier < entier
-            regs[base + A] = Value((int64_t)(bv.asInt() < cv.asInt()));
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier < entier
+            regs[base + A] = Value((int64_t)(bv.as_int() < cv.as_int()));
             NEXT();
         }
-        if (isInstance(bv)) { // instance à gauche : a < b → a.__lt(b)
-            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv)) {
+        if (is_instance(bv)) { // instance à gauche : a < b → a.__lt(b)
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (isInstance(cv)) { // instance à droite : a < b == not(b <= a) → not b.__le(a)
-            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv, /*negate=*/true)) {
+        } else if (is_instance(cv)) { // instance à droite : a < b == not(b <= a) → not b.__le(a)
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        if (bv.isString() && cv.isString()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.asString() < cv.asString()));
+        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.as_string() < cv.as_string()));
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(asDouble(bv) < asDouble(cv)));
+        regs[base + A] = Value((int64_t)(as_double(bv) < as_double(cv)));
         NEXT();
     }
 
@@ -1012,56 +1012,56 @@ dispatch_loop:
         // GE(a,b) == LE(b,a): check __le on rhs
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier >= entier
-            regs[base + A] = Value((int64_t)(bv.asInt() >= cv.asInt()));
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier >= entier
+            regs[base + A] = Value((int64_t)(bv.as_int() >= cv.as_int()));
             NEXT();
         }
-        if (isInstance(cv)) { // instance à droite : a >= b == b <= a → b.__le(a)
-            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, cv, bv)) {
+        if (is_instance(cv)) { // instance à droite : a >= b == b <= a → b.__le(a)
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (isInstance(bv)) { // instance à gauche : a >= b == not(a < b) → not a.__lt(b)
-            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, bv, cv, /*negate=*/true)) {
+        } else if (is_instance(bv)) { // instance à gauche : a >= b == not(a < b) → not a.__lt(b)
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        if (bv.isString() && cv.isString()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.asString() >= cv.asString()));
+        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.as_string() >= cv.as_string()));
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(asDouble(bv) >= asDouble(cv)));
+        regs[base + A] = Value((int64_t)(as_double(bv) >= as_double(cv)));
         NEXT();
     }
 
     op_LE: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.isInteger() && cv.isInteger()) { // chemin chaud : entier <= entier
-            regs[base + A] = Value((int64_t)(bv.asInt() <= cv.asInt()));
+        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier <= entier
+            regs[base + A] = Value((int64_t)(bv.as_int() <= cv.as_int()));
             NEXT();
         }
-        if (isInstance(bv)) { // instance à gauche : a <= b → a.__le(b)
-            if (uint32_t addr = tryMetaBinary(MK().le_, base + A, bv, cv)) {
+        if (is_instance(bv)) { // instance à gauche : a <= b → a.__le(b)
+            if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (isInstance(cv)) { // instance à droite : a <= b == not(b < a) → not b.__lt(a)
-            if (uint32_t addr = tryMetaBinary(MK().lt_, base + A, cv, bv, /*negate=*/true)) {
+        } else if (is_instance(cv)) { // instance à droite : a <= b == not(b < a) → not b.__lt(a)
+            if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
         }
-        if (bv.isString() && cv.isString()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.asString() <= cv.asString()));
+        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+            regs[base + A] = Value((int64_t)(bv.as_string() <= cv.as_string()));
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(asDouble(bv) <= asDouble(cv)));
+        regs[base + A] = Value((int64_t)(as_double(bv) <= as_double(cv)));
         NEXT();
     }
 
@@ -1070,19 +1070,19 @@ dispatch_loop:
         NEXT();
 
     op_JUMP_IF_FALSE:
-        if (isFalsy(regs[base + A]))
+        if (is_falsy(regs[base + A]))
             ip = Bx;
         NEXT();
 
     op_CALL_FUNC: {
-        ip = pushCallFrame(base + A, (uint8_t)B, C, nullptr, ip);
+        ip = push_call_frame(base + A, (uint8_t)B, C, nullptr, ip);
         base = call_stack.back().reg_base;
         NEXT();
     }
 
     op_RETURN: {
         {
-            closeUpvals();
+            close_upvals();
             bool is_ctor_ = call_stack.back().is_ctor;
             bool neg_ = call_stack.back().negate_result;
             Value ctor_val;
@@ -1099,7 +1099,7 @@ dispatch_loop:
             if (is_ctor_)
                 regs[wb + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[wb + 0]) ? 1 : 0)) : regs[wb + 0];
+                regs[ret_dest] = neg_ ? Value((int64_t)(is_falsy(regs[wb + 0]) ? 1 : 0)) : regs[wb + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : n; // pour SPREAD_RESULTS (multi-retour)
         }
@@ -1128,7 +1128,7 @@ dispatch_loop:
 
     op_RETURN_V: {
         {
-            closeUpvals();
+            close_upvals();
             bool is_ctor_ = call_stack.back().is_ctor;
             bool neg_ = call_stack.back().negate_result;
             Value ctor_val;
@@ -1154,7 +1154,7 @@ dispatch_loop:
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
+                regs[ret_dest] = neg_ ? Value((int64_t)(is_falsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : total; // pour SPREAD_RESULTS (multi-retour)
         }
@@ -1176,104 +1176,104 @@ dispatch_loop:
         {
             Value thrown = regs[base + A];
             if (handler_stack.empty())
-                throw std::runtime_error(errLine() + ": unhandled exception: " + valueToString(thrown));
+                throw std::runtime_error(err_line() + ": unhandled exception: " + value_to_string(thrown));
             Handler h = handler_stack.back();
             handler_stack.pop_back();
-            unwindToHandler(h, std::move(thrown));
+            unwind_to_handler(h, std::move(thrown));
         }
         base = call_stack.back().reg_base;
         NEXT();
     }
 
     op_NEW_MAP:
-        regs[base + A] = Value::makeMap();
+        regs[base + A] = Value::make_map();
         NEXT();
 
     op_GET_INDEX: {
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
-        if (obj.isMap() || obj.isClass()) {
-            if (key.isString() && key.asString() == "len" && !isInstance(obj)) {
-                Value found = protoChainGet(obj, key);
-                if (found.isNil())
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
-                        return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].mapSize() : 0)));
+        if (obj.is_map() || obj.is_class()) {
+            if (key.is_string() && key.as_string() == "len" && !is_instance(obj)) {
+                Value found = proto_chain_get(obj, key);
+                if (found.is_nil())
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
+                        return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
                     });
                 else
                     regs[base + A] = found;
             } else {
-                regs[base + A] = protoChainGet(obj, key);
+                regs[base + A] = proto_chain_get(obj, key);
             }
-        } else if (obj.isString()) {
-            regs[base + A] = string_module_.mapGet(key);
-        } else if (obj.isArray()) {
-            if (key.isString()) {
-                const std::string& m = key.asString();
+        } else if (obj.is_string()) {
+            regs[base + A] = string_module_.map_get(key);
+        } else if (obj.is_array()) {
+            if (key.is_string()) {
+                const std::string& m = key.as_string();
                 if (m == "len")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         Value* a = ctx.args; int n = ctx.argc;
-                        return ctx.ret(Value((int64_t)(n > 0 ? a[0].arraySize() : 0)));
+                        return ctx.ret(Value((int64_t)(n > 0 ? a[0].array_size() : 0)));
                     });
                 else if (m == "push" || m == "enqueue")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         Value* a = ctx.args; int n = ctx.argc;
-                        if (n >= 2) a[0].arrayPush(a[1]);
+                        if (n >= 2) a[0].array_push(a[1]);
                         return ctx.ret(a[0]);
                     });
                 else if (m == "pop")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         Value* a = ctx.args; int n = ctx.argc;
-                        return ctx.ret(n > 0 ? a[0].arrayPop() : Value{});
+                        return ctx.ret(n > 0 ? a[0].array_pop() : Value{});
                     });
                 else if (m == "dequeue")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         Value* a = ctx.args; int n = ctx.argc;
-                        return ctx.ret(n > 0 ? a[0].arrayShift() : Value{});
+                        return ctx.ret(n > 0 ? a[0].array_shift() : Value{});
                     });
                 else if (m == "insert")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         Value* a = ctx.args; int n = ctx.argc;
-                        if (n == 2) a[0].arrayPush(a[1]);                         // insert(v) = push
-                        else if (n >= 3 && a[1].isInteger()) a[0].arrayInsert(a[1].asInt(), a[2]); // insert(i, v)
+                        if (n == 2) a[0].array_push(a[1]);                         // insert(v) = push
+                        else if (n >= 3 && a[1].is_integer()) a[0].array_insert(a[1].as_int(), a[2]); // insert(i, v)
                         return ctx.ret(a[0]);
                     });
                 else if (m == "delete")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         Value* a = ctx.args; int n = ctx.argc;
-                        if (n >= 2 && a[1].isInteger()) return ctx.ret(a[0].arrayRemove(a[1].asInt()));
+                        if (n >= 2 && a[1].is_integer()) return ctx.ret(a[0].array_remove(a[1].as_int()));
                         return ctx.ret(Value{});
                     });
                 else if (m == "map")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         if (ctx.argc < 2) throw std::runtime_error("array.map: expected fn");
                         Value& arr = ctx.args[0]; Value& fn = ctx.args[1];
-                        int64_t n = arr.arraySize();
-                        Value result = Value::makeArray();
+                        int64_t n = arr.array_size();
+                        Value result = Value::make_array();
                         for (int64_t i = 0; i < n; i++) {
-                            Value v = arr.arrayGet(i + 1), idx((int64_t)(i + 1));
+                            Value v = arr.array_get(i + 1), idx((int64_t)(i + 1));
                             Value args[2] = {v, idx};
-                            result.arrayPush(ctx.vm->callValue(fn, args, 2));
+                            result.array_push(ctx.vm->call_value(fn, args, 2));
                         }
                         return ctx.ret(result);
                     });
                 else if (m == "filter")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         if (ctx.argc < 2) throw std::runtime_error("array.filter: expected fn");
                         Value& arr = ctx.args[0]; Value& fn = ctx.args[1];
-                        int64_t n = arr.arraySize();
-                        Value result = Value::makeArray();
+                        int64_t n = arr.array_size();
+                        Value result = Value::make_array();
                         for (int64_t i = 0; i < n; i++) {
-                            Value v = arr.arrayGet(i + 1), idx((int64_t)(i + 1));
+                            Value v = arr.array_get(i + 1), idx((int64_t)(i + 1));
                             Value args[2] = {v, idx};
-                            if (!isFalsy(ctx.vm->callValue(fn, args, 2))) result.arrayPush(v);
+                            if (!is_falsy(ctx.vm->call_value(fn, args, 2))) result.array_push(v);
                         }
                         return ctx.ret(result);
                     });
                 else if (m == "sort")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         if (ctx.argc < 1) return ctx.ret(Value{});
                         Value& arr = ctx.args[0];
-                        if (ctx.argc >= 2 && ctx.args[1].isCallable()) {
+                        if (ctx.argc >= 2 && ctx.args[1].is_callable()) {
                             Value fn = ctx.args[1];
                             VM* vm = ctx.vm;
                             std::exception_ptr ex;
@@ -1282,7 +1282,7 @@ dispatch_loop:
                                     if (ex) return false;
                                     try {
                                         Value args[2] = {a, b};
-                                        return !isFalsy(vm->callValue(fn, args, 2));
+                                        return !is_falsy(vm->call_value(fn, args, 2));
                                     } catch (...) {
                                         ex = std::current_exception();
                                         return false;
@@ -1291,45 +1291,45 @@ dispatch_loop:
                             if (ex) std::rethrow_exception(ex);
                         } else {
                             auto type_rank = [](const Value& v) -> int {
-                                if (v.isNil()) return 0;
-                                if (v.isInteger() || v.isFloat()) return 1;
-                                if (v.isString()) return 2;
+                                if (v.is_nil()) return 0;
+                                if (v.is_integer() || v.is_float()) return 1;
+                                if (v.is_string()) return 2;
                                 return 3;
                             };
                             std::stable_sort(arr.aptr->items.begin(), arr.aptr->items.end(),
                                 [&type_rank](const Value& a, const Value& b) {
                                     int ra = type_rank(a), rb = type_rank(b);
                                     if (ra != rb) return ra < rb;
-                                    if (ra == 1) return a.asNum() < b.asNum();
-                                    if (ra == 2) return a.asString() < b.asString();
+                                    if (ra == 1) return a.as_num() < b.as_num();
+                                    if (ra == 2) return a.as_string() < b.as_string();
                                     return false;
                                 });
                         }
                         return ctx.ret(arr);
                     });
                 else if (m == "reduce")
-                    regs[base + A] = Value::makeBuiltin([](CallCtx& ctx) -> int {
+                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
                         if (ctx.argc < 3) throw std::runtime_error("array.reduce: expected (fn, init)");
                         Value& arr = ctx.args[0]; Value& fn = ctx.args[1]; Value acc = ctx.args[2];
-                        int64_t n = arr.arraySize();
+                        int64_t n = arr.array_size();
                         for (int64_t i = 0; i < n; i++) {
-                            Value v = arr.arrayGet(i + 1), idx((int64_t)(i + 1));
+                            Value v = arr.array_get(i + 1), idx((int64_t)(i + 1));
                             Value args[3] = {acc, v, idx};
-                            acc = ctx.vm->callValue(fn, args, 3);
+                            acc = ctx.vm->call_value(fn, args, 3);
                         }
                         return ctx.ret(acc);
                     });
                 else
-                    throw std::runtime_error(errLine() + ": runtime: array has no field '" + m + "'");
+                    throw std::runtime_error(err_line() + ": runtime: array has no field '" + m + "'");
             } else {
-                if (!key.isInteger())
-                    throw std::runtime_error(errLine() + ": runtime: array index must be integer");
-                regs[base + A] = obj.arrayGet(key.asInt());
+                if (!key.is_integer())
+                    throw std::runtime_error(err_line() + ": runtime: array index must be integer");
+                regs[base + A] = obj.array_get(key.as_int());
             }
         } else {
-            throw std::runtime_error(errLine() + ": cannot index " +
-                                     std::string(obj.typeName()) +
-                                     (key.isString() ? " with field '" + key.asString() + "'" : ""));
+            throw std::runtime_error(err_line() + ": cannot index " +
+                                     std::string(obj.type_name()) +
+                                     (key.is_string() ? " with field '" + key.as_string() + "'" : ""));
         }
         NEXT();
     }
@@ -1337,83 +1337,83 @@ dispatch_loop:
     op_SET_INDEX: {
         Value& obj = regs[base + A];
         const Value& key = regs[base + B];
-        if (obj.isMap() || obj.isClass()) {
-            obj.mapSet(key, regs[base + C]);
-        } else if (obj.isArray()) {
-            if (!key.isInteger())
-                throw std::runtime_error(errLine() + ": runtime: array index must be integer");
-            obj.arraySet(key.asInt(), regs[base + C]);
+        if (obj.is_map() || obj.is_class()) {
+            obj.map_set(key, regs[base + C]);
+        } else if (obj.is_array()) {
+            if (!key.is_integer())
+                throw std::runtime_error(err_line() + ": runtime: array index must be integer");
+            obj.array_set(key.as_int(), regs[base + C]);
         } else {
-            throw std::runtime_error(errLine() + ": cannot assign index on " +
-                                     std::string(obj.typeName()) +
-                                     (key.isString() ? " with field '" + key.asString() + "'" : ""));
+            throw std::runtime_error(err_line() + ": cannot assign index on " +
+                                     std::string(obj.type_name()) +
+                                     (key.is_string() ? " with field '" + key.as_string() + "'" : ""));
         }
         NEXT();
     }
 
     op_MAKE_ITER:
-        regs[base + A] = Value::makeIterFrom(regs[base + B]);
+        regs[base + A] = Value::make_iter_from(regs[base + B]);
         NEXT();
 
     op_BAND: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error(errLine() + ": runtime: & requires integer operands");
-        regs[base + A] = Value(bv.asInt() & cv.asInt());
+        if (!bv.is_integer() || !cv.is_integer())
+            throw std::runtime_error(err_line() + ": runtime: & requires integer operands");
+        regs[base + A] = Value(bv.as_int() & cv.as_int());
         NEXT();
     }
 
     op_BOR: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error(errLine() + ": runtime: | requires integer operands");
-        regs[base + A] = Value(bv.asInt() | cv.asInt());
+        if (!bv.is_integer() || !cv.is_integer())
+            throw std::runtime_error(err_line() + ": runtime: | requires integer operands");
+        regs[base + A] = Value(bv.as_int() | cv.as_int());
         NEXT();
     }
 
     op_BXOR: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error(errLine() + ": runtime: ^ requires integer operands");
-        regs[base + A] = Value(bv.asInt() ^ cv.asInt());
+        if (!bv.is_integer() || !cv.is_integer())
+            throw std::runtime_error(err_line() + ": runtime: ^ requires integer operands");
+        regs[base + A] = Value(bv.as_int() ^ cv.as_int());
         NEXT();
     }
 
     op_BNOT: {
         const Value& bv = regs[base + B];
-        if (!bv.isInteger())
-            throw std::runtime_error(errLine() + ": runtime: ~ requires integer operand");
-        regs[base + A] = Value(~bv.asInt());
+        if (!bv.is_integer())
+            throw std::runtime_error(err_line() + ": runtime: ~ requires integer operand");
+        regs[base + A] = Value(~bv.as_int());
         NEXT();
     }
 
     op_BLSHIFT: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error(errLine() + ": runtime: << requires integer operands");
-        regs[base + A] = Value((int64_t)((uint64_t)bv.asInt() << (cv.asInt() & 63)));
+        if (!bv.is_integer() || !cv.is_integer())
+            throw std::runtime_error(err_line() + ": runtime: << requires integer operands");
+        regs[base + A] = Value((int64_t)((uint64_t)bv.as_int() << (cv.as_int() & 63)));
         NEXT();
     }
 
     op_BRSHIFT: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (!bv.isInteger() || !cv.isInteger())
-            throw std::runtime_error(errLine() + ": runtime: >> requires integer operands");
-        regs[base + A] = Value(bv.asInt() >> (cv.asInt() & 63));
+        if (!bv.is_integer() || !cv.is_integer())
+            throw std::runtime_error(err_line() + ": runtime: >> requires integer operands");
+        regs[base + A] = Value(bv.as_int() >> (cv.as_int() & 63));
         NEXT();
     }
 
     op_NEW_ARRAY:
-        regs[base + A] = Value::makeArray();
+        regs[base + A] = Value::make_array();
         NEXT();
 
     op_ARRAY_PUSH:
-        regs[base + A].arrayPush(regs[base + B]);
+        regs[base + A].array_push(regs[base + B]);
         NEXT();
 
     op_FOR_ITER_NEXT:
@@ -1440,19 +1440,19 @@ dispatch_loop:
     }
 
     op_LOAD_FUNC:
-        regs[base + A] = Value::makeFunc((uint8_t)Bx);
+        regs[base + A] = Value::make_func((uint8_t)Bx);
         NEXT();
 
     op_CALL_DYN: {
         // A=arg_base, B=func_val_reg, C=argc
-        if (regs[base + B].isBuiltin()) {
-            invokeBuiltinRegs(regs[base + B].asBuiltin(), base + A, C);
+        if (regs[base + B].is_builtin()) {
+            invoke_builtin_regs(regs[base + B].as_builtin(), base + A, C);
             NEXT();
         }
-        if (regs[base + B].isClass()) {
+        if (regs[base + B].is_class()) {
             // Instanciation (args en ctor_base+0.. → arg_off = 0).
             bool done;
-            uint32_t addr = instantiateClass(base + A, 0, C, regs[base + B], done);
+            uint32_t addr = instantiate_class(base + A, 0, C, regs[base + B], done);
             if (!done)
                 ip = addr;
             goto call_dyn_done;
@@ -1461,7 +1461,7 @@ dispatch_loop:
             // Regular function/closure call
             std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolveFuncVal(regs[base + B], fuv);
-            ip = pushCallFrame(base + A, fi, C, std::move(fuv), ip);
+            ip = push_call_frame(base + A, fi, C, std::move(fuv), ip);
         }
     call_dyn_done:
         base = call_stack.back().reg_base;
@@ -1474,13 +1474,13 @@ dispatch_loop:
         // à la suite des fixes. Le callee (B) est SOUS le bloc d'arguments (jamais
         // écrasé par le nombre variable de valeurs).
         int argc_va = C + last_results_;
-        if (regs[base + B].isBuiltin()) {
-            invokeBuiltinRegs(regs[base + B].asBuiltin(), base + A, argc_va);
+        if (regs[base + B].is_builtin()) {
+            invoke_builtin_regs(regs[base + B].as_builtin(), base + A, argc_va);
             NEXT();
         }
-        if (regs[base + B].isClass()) {
+        if (regs[base + B].is_class()) {
             bool done;
-            uint32_t addr = instantiateClass(base + A, 0, argc_va, regs[base + B], done);
+            uint32_t addr = instantiate_class(base + A, 0, argc_va, regs[base + B], done);
             if (!done)
                 ip = addr;
             goto call_va_done;
@@ -1488,7 +1488,7 @@ dispatch_loop:
         {
             std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolveFuncVal(regs[base + B], fuv);
-            ip = pushCallFrame(base + A, fi, argc_va, std::move(fuv), ip);
+            ip = push_call_frame(base + A, fi, argc_va, std::move(fuv), ip);
         }
     call_va_done:
         base = call_stack.back().reg_base;
@@ -1511,26 +1511,26 @@ dispatch_loop:
             int fresh = (int)regs.size();
             if (fresh < va_src + n_va)
                 fresh = va_src + n_va;
-            growRegs((size_t)(fresh + (total > 0 ? total : 1)));
+            grow_regs((size_t)(fresh + (total > 0 ? total : 1)));
             for (int i = 0; i < n_fixed; ++i)
                 regs[fresh + i] = regs[fixed_base + i];
             for (int i = 0; i < n_va; ++i)
                 regs[fresh + n_fixed + i] = regs[va_src + i];
-            if (fn.isBuiltin()) {
-                int k = invokeBuiltin(fn.asBuiltin(), &regs[fresh], total, (int)regs.size() - fresh);
+            if (fn.is_builtin()) {
+                int k = invoke_builtin(fn.as_builtin(), &regs[fresh], total, (int)regs.size() - fresh);
                 for (int i = 0; i < k; ++i)
                     regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base → recopie descendante sûre
-            } else if (fn.isClass()) {
+            } else if (fn.is_class()) {
                 for (int i = 0; i < total; ++i) // repli rare : instancie au registre statique
                     regs[fixed_base + i] = regs[fresh + i];
                 bool done;
-                uint32_t addr = instantiateClass(fixed_base, 0, total, fn, done);
+                uint32_t addr = instantiate_class(fixed_base, 0, total, fn, done);
                 if (!done)
                     ip = addr;
             } else {
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
                 uint8_t fi = resolveFuncVal(fn, fuv);
-                ip = pushCallFrame(fresh, fi, total, std::move(fuv), ip, false, -1, fixed_base);
+                ip = push_call_frame(fresh, fi, total, std::move(fuv), ip, false, -1, fixed_base);
             }
         }
         base = call_stack.back().reg_base;
@@ -1541,7 +1541,7 @@ dispatch_loop:
         {
             int n = last_results_;
             for (int i = 0; i < n; ++i)
-                regs[base + A].arrayPush(regs[base + B + i]);
+                regs[base + A].array_push(regs[base + B + i]);
         }
         NEXT();
     }
@@ -1552,7 +1552,7 @@ dispatch_loop:
             int n_va = cur.n_varargs;
             int va_src = cur.varargs_base;
             for (int i = 0; i < n_va; ++i)
-                regs[base + A].arrayPush(regs[va_src + i]);
+                regs[base + A].array_push(regs[va_src + i]);
         }
         NEXT();
     }
@@ -1571,7 +1571,7 @@ dispatch_loop:
         // return <explicites>, <appel> : B explicites + last_results_ valeurs de l'appel,
         // toutes contiguës à base+A. Comme RETURN_V mais source contiguë (pas de varargs).
         {
-            closeUpvals();
+            close_upvals();
             bool is_ctor_ = call_stack.back().is_ctor;
             bool neg_ = call_stack.back().negate_result;
             Value ctor_val;
@@ -1593,7 +1593,7 @@ dispatch_loop:
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(isFalsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
+                regs[ret_dest] = neg_ ? Value((int64_t)(is_falsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : total;
         }
@@ -1641,7 +1641,7 @@ dispatch_loop:
             }
             cl->upvals.push_back(uv);
         }
-        regs[base + A] = Value::makeClosure(cl.release());
+        regs[base + A] = Value::make_closure(cl.release());
         }
         NEXT();
     }
@@ -1662,7 +1662,7 @@ dispatch_loop:
     }
 
     op_NEW_CLASS:
-        regs[base + A] = Value::makeClass();
+        regs[base + A] = Value::make_class();
         NEXT();
 
     op_CALL_METHOD: {
@@ -1671,23 +1671,23 @@ dispatch_loop:
             int cb = base + A;
             int argc = C;
             Value fn = regs[cb + 1];
-            if (fn.isClass()) {
+            if (fn.is_class()) {
                 bool done;
-                uint32_t addr = instantiateClass(cb, 2, argc, fn, done);
+                uint32_t addr = instantiate_class(cb, 2, argc, fn, done);
                 if (!done)
                     ip = addr;
                 goto call_method_done;
             }
             bool fn_is_static = false;
-            if (fn.isFuncVal())
-                fn_is_static = ch->funcs[(uint8_t)fn.asInt()].is_static;
-            else if (fn.isClosure())
-                fn_is_static = ch->funcs[fn.asClosure()->func_idx].is_static;
-            else if (fn.isStaticBuiltin())
+            if (fn.is_func_val())
+                fn_is_static = ch->funcs[(uint8_t)fn.as_int()].is_static;
+            else if (fn.is_closure())
+                fn_is_static = ch->funcs[fn.as_closure()->func_idx].is_static;
+            else if (fn.is_static_builtin())
                 fn_is_static = true;
             Value& recv = regs[cb];
-            bool is_instance = isInstance(recv) || recv.isString() || recv.isArray();
-            bool inject_self = is_instance && !fn_is_static;
+            bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array();
+            bool inject_self = recv_is_instance && !fn_is_static;
             int total;
             if (inject_self) {
                 for (int i = 0; i < argc; ++i)
@@ -1698,23 +1698,23 @@ dispatch_loop:
                     regs[cb + i] = std::move(regs[cb + 2 + i]);
                 total = argc;
             }
-            if (fn.isBuiltin()) {
-                invokeBuiltinRegs(fn.asBuiltin(), cb, total);
+            if (fn.is_builtin()) {
+                invoke_builtin_regs(fn.as_builtin(), cb, total);
                 goto call_method_done;
             }
             {
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
                 uint8_t fi;
-                if (fn.isFuncVal())
-                    fi = (uint8_t)fn.asInt();
-                else if (fn.isClosure()) {
-                    fi = fn.asClosure()->func_idx;
-                    const auto& u = fn.asClosure()->upvals;
+                if (fn.is_func_val())
+                    fi = (uint8_t)fn.as_int();
+                else if (fn.is_closure()) {
+                    fi = fn.as_closure()->func_idx;
+                    const auto& u = fn.as_closure()->upvals;
                     if (!u.empty())
                         fuv = std::make_unique<std::vector<Upvalue*>>(u);
                 } else
-                    throw std::runtime_error(errLine() + ": runtime: method call on non-function value");
-                fp_addr = pushCallFrame(cb, fi, total, std::move(fuv), ip);
+                    throw std::runtime_error(err_line() + ": runtime: method call on non-function value");
+                fp_addr = push_call_frame(cb, fi, total, std::move(fuv), ip);
             }
         }
         ip = fp_addr;
@@ -1727,12 +1727,12 @@ dispatch_loop:
         {
             bool has_step = (C >> 1) & 1;
             bool incl_right = C & 1;
-            std::string line_ = errLine();
+            std::string line_ = err_line();
             auto toDouble_ = [&](const Value& v) -> double {
-                if (v.isInteger())
-                    return (double)v.asInt();
-                if (v.isFloat())
-                    return v.asFloat();
+                if (v.is_integer())
+                    return (double)v.as_int();
+                if (v.is_float())
+                    return v.as_float();
                 throw std::runtime_error(line_ + ": runtime: range bound must be a number");
             };
             double start = toDouble_(regs[base + B]);
@@ -1740,7 +1740,7 @@ dispatch_loop:
             double step = has_step ? toDouble_(regs[base + B + 2]) : 1.0;
             validateNumericRange(start, end, step, line_);
             Range* r = new Range{1, start, end, step, incl_right};
-            regs[base + A] = Value::makeRange(r);
+            regs[base + A] = Value::make_range(r);
         }
         NEXT();
     }
@@ -1754,12 +1754,12 @@ dispatch_loop:
             Value& vi = regs[base + A];
             Value& vl = regs[base + A + 1];
             Value& vs = regs[base + A + 2];
-            if (!vi.isNumber() || !vl.isNumber() || !vs.isNumber())
-                throw std::runtime_error(errLine() + ": runtime: for: bornes numériques attendues");
-            if (vi.isInteger() && vl.isInteger() && vs.isInteger()) {
-                int64_t i0 = vi.asInt(), lim = vl.asInt(), st = vs.asInt();
+            if (!vi.is_number() || !vl.is_number() || !vs.is_number())
+                throw std::runtime_error(err_line() + ": runtime: for: bornes numériques attendues");
+            if (vi.is_integer() && vl.is_integer() && vs.is_integer()) {
+                int64_t i0 = vi.as_int(), lim = vl.as_int(), st = vs.as_int();
                 if (st == 0)
-                    throw std::runtime_error(errLine() + ": runtime: for: le pas ne peut pas être 0");
+                    throw std::runtime_error(err_line() + ": runtime: for: le pas ne peut pas être 0");
                 empty = (st > 0) ? (i0 > lim) : (i0 < lim);
                 if (!empty) {
                     // Compteur de tours RESTANTS (après la 1re itération), calculé une seule
@@ -1771,8 +1771,8 @@ dispatch_loop:
                     regs[base + A + 1] = Value((int64_t)(urange / ustep));
                 }
             } else {
-                double di = vi.asNum(), dl = vl.asNum(), ds = vs.asNum();
-                validateNumericRange(di, dl, ds, errLine());
+                double di = vi.as_num(), dl = vl.as_num(), ds = vs.as_num();
+                validateNumericRange(di, dl, ds, err_line());
                 regs[base + A] = Value(di); // normalise tout en double
                 regs[base + A + 1] = Value(dl);
                 regs[base + A + 2] = Value(ds);
@@ -1790,21 +1790,21 @@ dispatch_loop:
             Value& vi = regs[base + A];
             Value& vl = regs[base + A + 1];
             Value& vs = regs[base + A + 2];
-            if (vi.isInteger()) { // type figé par FOR_PREP
+            if (vi.is_integer()) { // type figé par FOR_PREP
                 // R[A+1] = compteur de tours restants (posé par FOR_PREP). Tant qu'il est
                 // non nul : décrémenter, avancer i. Pas de garde anti-débordement : le
                 // compteur garantit que i + st reste dans la plage initiale.
-                uint64_t cnt = (uint64_t)vl.asInt();
+                uint64_t cnt = (uint64_t)vl.as_int();
                 if (cnt != 0) {
                     vl = Value((int64_t)(cnt - 1));
-                    vi = Value(vi.asInt() + vs.asInt());
+                    vi = Value(vi.as_int() + vs.as_int());
                     cont = true;
                 } else {
                     cont = false;
                 }
             } else {
-                double ni = vi.asNum() + vs.asNum();
-                cont = (vs.asNum() > 0) ? (ni <= vl.asNum()) : (ni >= vl.asNum());
+                double ni = vi.as_num() + vs.as_num();
+                cont = (vs.as_num() > 0) ? (ni <= vl.as_num()) : (ni >= vl.as_num());
                 if (cont)
                     regs[base + A] = Value(ni);
             }
@@ -1823,7 +1823,7 @@ dispatch_loop:
         NEXT();
 
     op_HALT:
-        closeUpvals();
+        close_upvals();
         call_stack.pop_back();
         return;
 
@@ -1847,12 +1847,12 @@ dispatch_loop:
                 return false;
             };
             if (!hasLoc(msg))
-                throw std::runtime_error(errLine() + ": " + msg);
+                throw std::runtime_error(err_line() + ": " + msg);
             throw;
         }
         Handler h = handler_stack.back();
         handler_stack.pop_back();
-        unwindToHandler(h, Value(std::string(e.what())));
+        unwind_to_handler(h, Value(std::string(e.what())));
         // base (local) restauré ici — comme op_THROW ; unwindToHandler a posé ip.
         base = call_stack.back().reg_base;
         goto dispatch_loop;
@@ -1872,22 +1872,22 @@ void VM::execute(Chunk chunk) {
     for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
         for (auto& b : k_builtins)
             if (owned_chunk.identifiers[gi] == b.name) {
-                globals[gi] = Value::makeBuiltin(b.fn);
+                globals[gi] = Value::make_builtin(b.fn);
                 globals_init[gi] = true;
             }
     for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
-        for (auto& name : builtinModuleNames())
+        for (auto& name : builtin_module_names())
             if (owned_chunk.identifiers[gi] == name) {
-                globals[gi] = makeBuiltinModule(name);
+                globals[gi] = make_builtin_module(name);
                 globals_init[gi] = true;
             }
-    string_module_ = makeBuiltinModule("string");
+    string_module_ = make_builtin_module("string");
     {
-        Value core = makeBuiltinModule("core");
+        Value core = make_builtin_module("core");
         for (auto& [k, v] : core.mptr->data) {
-            if (!k.isString())
+            if (!k.is_string())
                 continue;
-            const std::string& fname = k.asString();
+            const std::string& fname = k.as_string();
             for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
                 if (owned_chunk.identifiers[gi] == fname) {
                     globals[gi] = v;
@@ -1905,14 +1905,14 @@ void VM::execute(Chunk chunk) {
     // que graphics.canvas(W, H) fonctionne directement.
     {
         int64_t win_w = 0, win_h = 0;
-        Value win = makeBuiltinModule("window");
-        if (win.isMap()) {
-            Value vw = win.mapGet(Value(std::string("width")));
-            Value vh = win.mapGet(Value(std::string("height")));
-            if (vw.isInteger())
-                win_w = vw.asInt();
-            if (vh.isInteger())
-                win_h = vh.asInt();
+        Value win = make_builtin_module("window");
+        if (win.is_map()) {
+            Value vw = win.map_get(Value(std::string("width")));
+            Value vh = win.map_get(Value(std::string("height")));
+            if (vw.is_integer())
+                win_w = vw.as_int();
+            if (vh.is_integer())
+                win_h = vh.as_int();
         }
         for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi) {
             if (owned_chunk.identifiers[gi] == "W") {
@@ -1930,11 +1930,11 @@ void VM::execute(Chunk chunk) {
             }
         }
     }
-    growRegs(owned_chunk.top_reg_count);
+    grow_regs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     Frame top;
     top.varargs_base = owned_chunk.top_reg_count; // reg_count du frame top-level → result_cap correct pour les builtins
     call_stack.push_back(std::move(top));
 
-    runGoto(0);
+    run_goto(0);
 }

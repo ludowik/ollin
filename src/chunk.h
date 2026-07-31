@@ -54,21 +54,21 @@ struct Chunk {
     int current_line_ = 0;
     int current_file_idx_ = 0;
 
-    void setLine(int l, int fi = -1) {
+    void set_line(int l, int fi = -1) {
         current_line_ = l;
         if (fi >= 0)
             current_file_idx_ = fi;
     }
 
-    uint16_t addConstant(Value v);
-    uint16_t addIdentifier(const std::string& name);
-    uint16_t addFuncDefaults(std::vector<Value> defs);
-    uint8_t addFunc(FuncProto fp);
+    uint16_t add_constant(Value v);
+    uint16_t add_identifier(const std::string& name);
+    uint16_t add_func_defaults(std::vector<Value> defs);
+    uint8_t add_func(FuncProto fp);
 
     void emit(Instr i);
-    size_t emitJump(Op op, uint8_t a = 0);
-    void patchJump(size_t pos, uint16_t target);
-    size_t currentPos() const {
+    size_t emit_jump(Op op, uint8_t a = 0);
+    void patch_jump(size_t pos, uint16_t target);
+    size_t current_pos() const {
         return code.size();
     }
 };

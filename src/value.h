@@ -12,7 +12,7 @@
 // qui n'est PAS un int64 valide → borne haute STRICTE. INT64_MIN = -2^63 est exact,
 // et -lo == 2^63. Source de vérité unique : numValue, ValueHash (clés float) et
 // RangeIterator s'appuient tous dessus (évite le littéral 2^63 dupliqué).
-inline bool doubleFitsInt64(double d) {
+inline bool double_fits_int64(double d) {
     constexpr double lo = static_cast<double>(std::numeric_limits<int64_t>::min()); // -2^63 (exact)
     return d >= lo && d < -lo;                                                      // -lo == 2^63, exclu
 }
@@ -50,7 +50,7 @@ struct CallCtx {
     // Retour simple d'une valeur (migration mécanique de `return v;`).
     int ret(const Value& v);
     // Écrit la i-ème valeur de retour (bornée par result_cap). Suivi de `return n;`.
-    void setResult(int i, const Value& v);
+    void set_result(int i, const Value& v);
 };
 
 struct Value {
@@ -122,71 +122,71 @@ struct Value {
     Value& operator=(Value&& o) noexcept;
     ~Value();
 
-    bool isNil() const {
+    bool is_nil() const {
         return tag == T_NIL;
     }
-    bool isFloat() const {
+    bool is_float() const {
         return tag == T_FLOAT;
     }
-    bool isInteger() const {
+    bool is_integer() const {
         return tag == T_INTEGER;
     }
-    bool isNumber() const {
+    bool is_number() const {
         return tag == T_INTEGER || tag == T_FLOAT;
     }
-    bool isString() const {
+    bool is_string() const {
         return tag == T_STRING;
     }
-    bool isMap() const {
+    bool is_map() const {
         return tag == T_MAP;
     }
-    bool isArray() const {
+    bool is_array() const {
         return tag == T_ARRAY;
     }
-    bool isIterator() const {
+    bool is_iterator() const {
         return tag == T_ITERATOR;
     }
-    bool isFuncVal() const {
+    bool is_func_val() const {
         return tag == T_FUNCTION;
     }
-    bool isClosure() const {
+    bool is_closure() const {
         return tag == T_CLOSURE;
     }
-    bool isBuiltin() const {
+    bool is_builtin() const {
         return tag == T_BUILTIN;
     }
-    bool isClass() const {
+    bool is_class() const {
         return tag == T_CLASS;
     }
-    bool isRange() const {
+    bool is_range() const {
         return tag == T_RANGE;
     }
-    bool isCallable() const {
+    bool is_callable() const {
         return tag == T_FUNCTION || tag == T_CLOSURE || tag == T_BUILTIN || tag == T_CLASS;
     }
 
-    Closure* asClosure() const {
+    Closure* as_closure() const {
         return cptr;
     }
-    Map* asMap() const {
+    Map* as_map() const {
         return mptr;
     }
 
     using BuiltinFn = int (*)(CallCtx&);
-    BuiltinFn asBuiltin() const {
+    BuiltinFn as_builtin() const {
         return (BuiltinFn)(intptr_t)ival;
     }
 
-    static Value makeFunc(uint8_t idx) {
+    static Value make_func(uint8_t idx) {
         Value v;
         v.tag = T_FUNCTION;
         v.ival = idx;
         return v;
     }
-    static Value makeClosure(Closure* p) {
+    static Value make_closure(Closure* p) {
         return Value(p);
     }
-    static Value makeBuiltin(BuiltinFn fn) {
+    static Value make_builtin(BuiltinFn fn) {
         Value v;
         v.tag = T_BUILTIN;
         v.ival = (int64_t)(intptr_t)fn;
@@ -196,50 +196,50 @@ struct Value {
     // self, comme un `static func` Ollin → mêmes règles pour les classes Ollin et
     // builtin (arguments explicites en R[0..], sans receveur devant). Le marqueur est
     // porté par str_hash (inutilisé pour T_BUILTIN, mais préservé à la copie — pas _pad).
-    static Value makeStaticBuiltin(BuiltinFn fn) {
-        Value v = makeBuiltin(fn);
+    static Value make_static_builtin(BuiltinFn fn) {
+        Value v = make_builtin(fn);
         v.str_hash = 1;
         return v;
     }
-    bool isStaticBuiltin() const {
+    bool is_static_builtin() const {
         return tag == T_BUILTIN && str_hash != 0;
     }
-    static Value makeClass();
-    static Value makeRange(Range* r) {
+    static Value make_class();
+    static Value make_range(Range* r) {
         return Value(r);
     }
 
-    int64_t asInt() const {
+    int64_t as_int() const {
         return ival;
     }
-    double asFloat() const {
+    double as_float() const {
         return dval;
     }
-    double asNum() const {
-        return isInteger() ? (double)ival : dval;
+    double as_num() const {
+        return is_integer() ? (double)ival : dval;
     }
-    const std::string& asString() const {
+    const std::string& as_string() const {
         return sptr->str;
     }
 
-    static Value makeMap();
-    Value mapGet(const Value& key) const;
-    void mapSet(const Value& key, const Value& val);
+    static Value make_map();
+    Value map_get(const Value& key) const;
+    void map_set(const Value& key, const Value& val);
 
-    static Value makeArray();
-    Value arrayGet(int64_t idx) const;            // 1-based
-    void arraySet(int64_t idx, const Value& val); // 1-based, grows if needed
-    void arrayPush(const Value& val);
-    Value arrayPop();
-    void arrayInsert(int64_t idx, const Value& val);
-    Value arrayRemove(int64_t idx);
-    Value arrayShift();
-    int64_t arraySize() const;
-    int64_t mapSize() const;
+    static Value make_array();
+    Value array_get(int64_t idx) const;            // 1-based
+    void array_set(int64_t idx, const Value& val); // 1-based, grows if needed
+    void array_push(const Value& val);
+    Value array_pop();
+    void array_insert(int64_t idx, const Value& val);
+    Value array_remove(int64_t idx);
+    Value array_shift();
+    int64_t array_size() const;
+    int64_t map_size() const;
 
-    static Value makeIterFrom(const Value& src);
+    static Value make_iter_from(const Value& src);
 
-    const char* typeName() const {
+    const char* type_name() const {
         switch (tag) {
         case T_NIL:
             return "nil";
@@ -278,7 +278,7 @@ inline int CallCtx::ret(const Value& v) {
     return 1;
 }
 
-inline void CallCtx::setResult(int i, const Value& v) {
+inline void CallCtx::set_result(int i, const Value& v) {
     if (i >= 0 && i < result_cap)
         args[i] = v;
 }
@@ -300,51 +300,51 @@ inline void CallCtx::setResult(int i, const Value& v) {
 
 // ── inline Value implementations (nécessitent Map, Array, Iterator complets) ─
 
-inline Value Value::makeMap() {
+inline Value Value::make_map() {
     return Value(map_pool().acquire());
 }
-inline Value Value::makeArray() {
+inline Value Value::make_array() {
     return Value(array_pool().acquire());
 }
-inline Value Value::makeClass() {
+inline Value Value::make_class() {
     Value v;
     v.tag = T_CLASS;
     v.mptr = map_pool().acquire();
     return v;
 }
 
-inline Value Value::mapGet(const Value& k) const {
+inline Value Value::map_get(const Value& k) const {
     return mptr->get(k);
 }
-inline void Value::mapSet(const Value& k, const Value& v) {
+inline void Value::map_set(const Value& k, const Value& v) {
     mptr->set(k, v);
 }
 
-inline Value Value::arrayGet(int64_t idx) const {
+inline Value Value::array_get(int64_t idx) const {
     return aptr->get(idx);
 }
-inline void Value::arraySet(int64_t idx, const Value& v) {
+inline void Value::array_set(int64_t idx, const Value& v) {
     aptr->set(idx, v);
 }
-inline void Value::arrayPush(const Value& v) {
+inline void Value::array_push(const Value& v) {
     aptr->push(v);
 }
-inline Value Value::arrayPop() {
+inline Value Value::array_pop() {
     return aptr->pop();
 }
-inline void Value::arrayInsert(int64_t idx, const Value& v) {
-    aptr->insertAt(idx, v);
+inline void Value::array_insert(int64_t idx, const Value& v) {
+    aptr->insert_at(idx, v);
 }
-inline Value Value::arrayRemove(int64_t idx) {
-    return aptr->removeAt(idx);
+inline Value Value::array_remove(int64_t idx) {
+    return aptr->remove_at(idx);
 }
-inline Value Value::arrayShift() {
+inline Value Value::array_shift() {
     return aptr->shift();
 }
-inline int64_t Value::arraySize() const {
+inline int64_t Value::array_size() const {
     return (int64_t)aptr->items.size();
 }
-inline int64_t Value::mapSize() const {
+inline int64_t Value::map_size() const {
     return (int64_t)mptr->data.size();
 }
 
@@ -431,12 +431,12 @@ inline void Value::retain() const noexcept {
     }
 }
 
-inline Value Value::makeIterFrom(const Value& src) {
-    if (src.isMap() || src.isClass())
+inline Value Value::make_iter_from(const Value& src) {
+    if (src.is_map() || src.is_class())
         return Value(new MapIterator(src.mptr));
-    if (src.isArray())
+    if (src.is_array())
         return Value(array_iter_pool().acquire(src.aptr));
-    if (src.isRange())
+    if (src.is_range())
         return Value(new RangeIterator(src.rptr));
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
@@ -471,27 +471,27 @@ inline Value::~Value() {
     release();
 }
 
-inline bool isFalsy(const Value& v) {
+inline bool is_falsy(const Value& v) {
     // principe : « le vide est faux »
-    if (v.isNil())
+    if (v.is_nil())
         return true;
-    if (v.isInteger())
-        return v.asInt() == 0;
-    if (v.isFloat())
-        return v.asFloat() == 0.0;
-    if (v.isString())
-        return v.asString().empty();
-    if (v.isArray())
-        return v.arraySize() == 0;
-    if (v.isMap())
-        return v.mapSize() == 0; // instance : ≥1 clé (__class__) → truthy
+    if (v.is_integer())
+        return v.as_int() == 0;
+    if (v.is_float())
+        return v.as_float() == 0.0;
+    if (v.is_string())
+        return v.as_string().empty();
+    if (v.is_array())
+        return v.array_size() == 0;
+    if (v.is_map())
+        return v.map_size() == 0; // instance : ≥1 clé (__class__) → truthy
     return false;                // T_CLASS, range, closure, function → truthy
 }
 
-inline Value numValue(double d) {
+inline Value num_value(double d) {
     // Repli en entier si d est un entier exact représentable en int64. doubleFitsInt64
     // garde le cast (UB sur NaN/inf/hors plage) ; le round-trip vérifie l'exactitude.
-    if (doubleFitsInt64(d)) {
+    if (double_fits_int64(d)) {
         int64_t i = static_cast<int64_t>(d);
         if (static_cast<double>(i) == d)
             return Value(i);

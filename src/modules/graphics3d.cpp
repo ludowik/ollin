@@ -50,13 +50,13 @@ static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
 // Reconstruit une Camera3D raylib depuis le handle map (graphics.camera). up par
 // défaut = +Y ; projection perspective ; near/far = valeurs par défaut de raylib.
 static Camera3D cameraFromMap(const Value& v, const char* fn) {
-    if (!v.isMap())
+    if (!v.is_map())
         throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
     auto get = [&](const char* k, double def) -> float {
-        Value f = v.mapGet(Value(std::string(k)));
-        return f.isNumber() ? (float)f.asNum() : (float)def;
+        Value f = v.map_get(Value(std::string(k)));
+        return f.is_number() ? (float)f.as_num() : (float)def;
     };
-    bool ortho = v.mapGet(Value(std::string("ortho"))).isNumber() && v.mapGet(Value(std::string("ortho"))).asNum() != 0.0;
+    bool ortho = v.map_get(Value(std::string("ortho"))).is_number() && v.map_get(Value(std::string("ortho"))).as_num() != 0.0;
     Camera3D cam{};
     cam.position = Vector3{get("px", 0), get("py", 0), get("pz", 0)};
     cam.target = Vector3{get("tx", 0), get("ty", 0), get("tz", 0)};
@@ -72,17 +72,17 @@ static Camera3D cameraFromMap(const Value& v, const char* fn) {
 // T_MAP, cameraFromMap la relit sans changement. Les méthodes MUTENT self en
 // place (caméra mutable entre frames) et renvoient self → appels chaînables.
 static double camField(const Value& self, const char* k) {
-    Value v = self.mapGet(Value(std::string(k)));
-    return v.isNumber() ? v.asNum() : 0.0;
+    Value v = self.map_get(Value(std::string(k)));
+    return v.is_number() ? v.as_num() : 0.0;
 }
 
 // cam.setPos(x,y,z) : fixe la position de la caméra.
 static int cam_set_pos(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    self.mapSet(Value(std::string("px")), Value(numArg(args, argc, 1, "Camera.setPos")));
-    self.mapSet(Value(std::string("py")), Value(numArg(args, argc, 2, "Camera.setPos")));
-    self.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 3, "Camera.setPos")));
+    self.map_set(Value(std::string("px")), Value(num_arg(args, argc, 1, "Camera.setPos")));
+    self.map_set(Value(std::string("py")), Value(num_arg(args, argc, 2, "Camera.setPos")));
+    self.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 3, "Camera.setPos")));
     return ctx.ret(self);
 }
 
@@ -90,9 +90,9 @@ static int cam_set_pos(CallCtx& ctx) {
 static int cam_look_at(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    self.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 1, "Camera.lookAt")));
-    self.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 2, "Camera.lookAt")));
-    self.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 3, "Camera.lookAt")));
+    self.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 1, "Camera.lookAt")));
+    self.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 2, "Camera.lookAt")));
+    self.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 3, "Camera.lookAt")));
     return ctx.ret(self);
 }
 
@@ -101,15 +101,15 @@ static int cam_look_at(CallCtx& ctx) {
 static int cam_move(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    double dx = numArg(args, argc, 1, "Camera.move");
-    double dy = numArg(args, argc, 2, "Camera.move");
-    double dz = numArg(args, argc, 3, "Camera.move");
-    self.mapSet(Value(std::string("px")), Value(camField(self, "px") + dx));
-    self.mapSet(Value(std::string("py")), Value(camField(self, "py") + dy));
-    self.mapSet(Value(std::string("pz")), Value(camField(self, "pz") + dz));
-    self.mapSet(Value(std::string("tx")), Value(camField(self, "tx") + dx));
-    self.mapSet(Value(std::string("ty")), Value(camField(self, "ty") + dy));
-    self.mapSet(Value(std::string("tz")), Value(camField(self, "tz") + dz));
+    double dx = num_arg(args, argc, 1, "Camera.move");
+    double dy = num_arg(args, argc, 2, "Camera.move");
+    double dz = num_arg(args, argc, 3, "Camera.move");
+    self.map_set(Value(std::string("px")), Value(camField(self, "px") + dx));
+    self.map_set(Value(std::string("py")), Value(camField(self, "py") + dy));
+    self.map_set(Value(std::string("pz")), Value(camField(self, "pz") + dz));
+    self.map_set(Value(std::string("tx")), Value(camField(self, "tx") + dx));
+    self.map_set(Value(std::string("ty")), Value(camField(self, "ty") + dy));
+    self.map_set(Value(std::string("tz")), Value(camField(self, "tz") + dz));
     return ctx.ret(self);
 }
 
@@ -118,19 +118,19 @@ static int cam_move(CallCtx& ctx) {
 static int cam_zoom(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    double factor = numArg(args, argc, 1, "Camera.zoom");
+    double factor = num_arg(args, argc, 1, "Camera.zoom");
     if (factor <= 0.0) return ctx.ret(self);
-    bool ortho = self.mapGet(Value(std::string("ortho"))).isNumber() && self.mapGet(Value(std::string("ortho"))).asNum() != 0.0;
+    bool ortho = self.map_get(Value(std::string("ortho"))).is_number() && self.map_get(Value(std::string("ortho"))).as_num() != 0.0;
     if (ortho) {
         double fovy = camField(self, "fovy");
-        self.mapSet(Value(std::string("fovy")), Value(std::max(0.01, fovy * factor)));
+        self.map_set(Value(std::string("fovy")), Value(std::max(0.01, fovy * factor)));
     } else {
         double tx = camField(self, "tx"), ty = camField(self, "ty"), tz = camField(self, "tz");
         double px = camField(self, "px"), py = camField(self, "py"), pz = camField(self, "pz");
         double dx = px - tx, dy = py - ty, dz = pz - tz;
-        self.mapSet(Value(std::string("px")), Value(tx + dx * factor));
-        self.mapSet(Value(std::string("py")), Value(ty + dy * factor));
-        self.mapSet(Value(std::string("pz")), Value(tz + dz * factor));
+        self.map_set(Value(std::string("px")), Value(tx + dx * factor));
+        self.map_set(Value(std::string("py")), Value(ty + dy * factor));
+        self.map_set(Value(std::string("pz")), Value(tz + dz * factor));
     }
     return ctx.ret(self);
 }
@@ -142,15 +142,15 @@ static int cam_zoom(CallCtx& ctx) {
 static int cam_orbit(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    double angle = numArg(args, argc, 1, "Camera.orbit");
-    double radius = numArg(args, argc, 2, "Camera.orbit");
+    double angle = num_arg(args, argc, 1, "Camera.orbit");
+    double radius = num_arg(args, argc, 2, "Camera.orbit");
     double tx = camField(self, "tx");
     double ty = camField(self, "ty");
     double tz = camField(self, "tz");
-    double py = (argc > 3) ? ty + numArg(args, argc, 3, "Camera.orbit") : camField(self, "py");
-    self.mapSet(Value(std::string("px")), Value(tx + std::cos(angle) * radius));
-    self.mapSet(Value(std::string("py")), Value(py));
-    self.mapSet(Value(std::string("pz")), Value(tz + std::sin(angle) * radius));
+    double py = (argc > 3) ? ty + num_arg(args, argc, 3, "Camera.orbit") : camField(self, "py");
+    self.map_set(Value(std::string("px")), Value(tx + std::cos(angle) * radius));
+    self.map_set(Value(std::string("py")), Value(py));
+    self.map_set(Value(std::string("pz")), Value(tz + std::sin(angle) * radius));
     return ctx.ret(self);
 }
 
@@ -167,22 +167,22 @@ static int cam_get_view_dir(CallCtx& ctx) {
         dy /= len;
         dz /= len;
     }
-    Value dir = Value::makeMap();
-    dir.mapSet(Value(std::string("x")), Value(dx));
-    dir.mapSet(Value(std::string("y")), Value(dy));
-    dir.mapSet(Value(std::string("z")), Value(dz));
+    Value dir = Value::make_map();
+    dir.map_set(Value(std::string("x")), Value(dx));
+    dir.map_set(Value(std::string("y")), Value(dy));
+    dir.map_set(Value(std::string("z")), Value(dz));
     return ctx.ret(dir);
 }
 
 static Value makeCameraClass() {
-    Value cls = Value::makeClass();
-    cls.mapSet(Value(std::string("__name__")), Value(std::string("Camera")));
-    cls.mapSet(Value(std::string("setPos")), Value::makeBuiltin(cam_set_pos));
-    cls.mapSet(Value(std::string("lookAt")), Value::makeBuiltin(cam_look_at));
-    cls.mapSet(Value(std::string("move")), Value::makeBuiltin(cam_move));
-    cls.mapSet(Value(std::string("orbit")), Value::makeBuiltin(cam_orbit));
-    cls.mapSet(Value(std::string("zoom")), Value::makeBuiltin(cam_zoom));
-    cls.mapSet(Value(std::string("getViewDir")), Value::makeBuiltin(cam_get_view_dir));
+    Value cls = Value::make_class();
+    cls.map_set(Value(std::string("__name__")), Value(std::string("Camera")));
+    cls.map_set(Value(std::string("setPos")), Value::make_builtin(cam_set_pos));
+    cls.map_set(Value(std::string("lookAt")), Value::make_builtin(cam_look_at));
+    cls.map_set(Value(std::string("move")), Value::make_builtin(cam_move));
+    cls.map_set(Value(std::string("orbit")), Value::make_builtin(cam_orbit));
+    cls.map_set(Value(std::string("zoom")), Value::make_builtin(cam_zoom));
+    cls.map_set(Value(std::string("getViewDir")), Value::make_builtin(cam_get_view_dir));
     return cls;
 }
 
@@ -197,15 +197,15 @@ static Value cameraClass() {
 // (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit/zoom) ; getViewDir renvoie la direction de visée {x,y,z}.
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Value cam = Value::makeMap();
-    cam.mapSet(Value(std::string("__class__")), cameraClass());
-    cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.camera")));
-    cam.mapSet(Value(std::string("py")), Value(numArg(args, argc, 1, "graphics.camera")));
-    cam.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 2, "graphics.camera")));
-    cam.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 3, "graphics.camera")));
-    cam.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 4, "graphics.camera")));
-    cam.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 5, "graphics.camera")));
-    cam.mapSet(Value(std::string("fovy")), Value(argc > 6 ? numArg(args, argc, 6, "graphics.camera") : 45.0));
+    Value cam = Value::make_map();
+    cam.map_set(Value(std::string("__class__")), cameraClass());
+    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.camera")));
+    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.camera")));
+    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.camera")));
+    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "graphics.camera")));
+    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "graphics.camera")));
+    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "graphics.camera")));
+    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "graphics.camera") : 45.0));
     return ctx.ret(cam);
 }
 
@@ -214,16 +214,16 @@ static int gfx_camera(CallCtx& ctx) {
 // (défaut 10). Mêmes méthodes que camera() ; zoom() ajuste size.
 static int gfx_camera_ortho(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Value cam = Value::makeMap();
-    cam.mapSet(Value(std::string("__class__")), cameraClass());
-    cam.mapSet(Value(std::string("px")), Value(numArg(args, argc, 0, "graphics.cameraOrtho")));
-    cam.mapSet(Value(std::string("py")), Value(numArg(args, argc, 1, "graphics.cameraOrtho")));
-    cam.mapSet(Value(std::string("pz")), Value(numArg(args, argc, 2, "graphics.cameraOrtho")));
-    cam.mapSet(Value(std::string("tx")), Value(numArg(args, argc, 3, "graphics.cameraOrtho")));
-    cam.mapSet(Value(std::string("ty")), Value(numArg(args, argc, 4, "graphics.cameraOrtho")));
-    cam.mapSet(Value(std::string("tz")), Value(numArg(args, argc, 5, "graphics.cameraOrtho")));
-    cam.mapSet(Value(std::string("fovy")), Value(argc > 6 ? numArg(args, argc, 6, "graphics.cameraOrtho") : 10.0));
-    cam.mapSet(Value(std::string("ortho")), Value((int64_t)1));
+    Value cam = Value::make_map();
+    cam.map_set(Value(std::string("__class__")), cameraClass());
+    cam.map_set(Value(std::string("px")), Value(num_arg(args, argc, 0, "graphics.cameraOrtho")));
+    cam.map_set(Value(std::string("py")), Value(num_arg(args, argc, 1, "graphics.cameraOrtho")));
+    cam.map_set(Value(std::string("pz")), Value(num_arg(args, argc, 2, "graphics.cameraOrtho")));
+    cam.map_set(Value(std::string("tx")), Value(num_arg(args, argc, 3, "graphics.cameraOrtho")));
+    cam.map_set(Value(std::string("ty")), Value(num_arg(args, argc, 4, "graphics.cameraOrtho")));
+    cam.map_set(Value(std::string("tz")), Value(num_arg(args, argc, 5, "graphics.cameraOrtho")));
+    cam.map_set(Value(std::string("fovy")), Value(argc > 6 ? num_arg(args, argc, 6, "graphics.cameraOrtho") : 10.0));
+    cam.map_set(Value(std::string("ortho")), Value((int64_t)1));
     return ctx.ret(cam);
 }
 
@@ -283,14 +283,14 @@ static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au
 // (ex. push→segments(8)→sphère + pop n'invalide pas la sphère 64 segments du même frame).
 static std::map<std::pair<int,int>, Mesh> s_shape_cache;
 
-void reset3dShapeCache() {
+void reset3d_shape_cache() {
     for (auto& kv : s_shape_cache)
         UnloadMesh(kv.second);
     s_shape_cache.clear();
 }
 
 static Mesh getShapeMesh(int shape) {
-    int seg = gfxSegments();
+    int seg = gfx_segments();
     auto key = std::make_pair(shape, seg);
     auto it = s_shape_cache.find(key);
     if (it != s_shape_cache.end())
@@ -668,7 +668,7 @@ static void flushBucket(const Bucket3D& b) {
     rlDisableShader();
 }
 
-void reset3dLightingState() {
+void reset3d_lighting_state() {
     s_lighting_used = false;
     s_light_on = false;
     s_cur_tex3d = 0;
@@ -685,13 +685,13 @@ void reset3dLightingState() {
 // suivant (playground) → 3D corrompue/plantage. Équivalent 3D de image_reset().
 // NB : ne fait des appels GL que si un contexte est courant (garde IsWindowReady
 // côté appelant) ; sur le 1er run les flags *_ready sont false → no-op.
-void reset3dGraphicsState() {
+void reset3d_graphics_state() {
     if (s_lit_ready) {
         UnloadShader(s_lit);
         s_lit = Shader{};
         s_lit_ready = false;
     }
-    reset3dShapeCache();
+    reset3d_shape_cache();
     // Modèles chargés en GPU : invalides avec le contexte détruit → décharger et
     // vider le cache (rechargés paresseusement depuis les octets au prochain usage).
     for (auto& kv : s_model_cache) {
@@ -766,7 +766,7 @@ static void flush3dBuckets() {
     s_buckets.clear();
 }
 
-void end3dInternal() {
+void end3d_internal() {
     if (!s_in_3d) {
         return;
     }
@@ -800,21 +800,21 @@ static int gfx_end3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    end3dInternal();   // idempotent
+    end3d_internal();   // idempotent
     return ctx.ret(Value{});
 }
 
 // graphics.ambient(v | couleur) : lumière ambiante (active le mode éclairé).
 static int gfx_ambient(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && (args[0].isMap() || args[0].isClass())) {
-        Color c = gfxToColor(args[0]);
+    if (argc > 0 && (args[0].is_map() || args[0].is_class())) {
+        Color c = gfx_to_color(args[0]);
         s_amb3d[0] = c.r / 255.0f;
         s_amb3d[1] = c.g / 255.0f;
         s_amb3d[2] = c.b / 255.0f;
         s_amb3d[3] = 1.0f;
     } else {
-        float v = argc > 0 ? (float)numArg(args, argc, 0, "graphics.ambient") : 0.15f;
+        float v = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.ambient") : 0.15f;
         s_amb3d[0] = v;
         s_amb3d[1] = v;
         s_amb3d[2] = v;
@@ -829,8 +829,8 @@ static int gfx_ambient(CallCtx& ctx) {
 // Light porte sa config (type, direction/position, couleur, activée) et, à chaque
 // mutation, la répercute sur l'état d'éclairage global (dernier écrit = actif).
 static double instField(const Value& self, const char* k, double def) {
-    Value v = self.mapGet(Value(std::string(k)));
-    return v.isNumber() ? v.asNum() : def;
+    Value v = self.map_get(Value(std::string(k)));
+    return v.is_number() ? v.as_num() : def;
 }
 
 static void applyLightFromInstance(const Value& self) {
@@ -858,10 +858,10 @@ static void applyLightFromInstance(const Value& self) {
 static int light_set_dir(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    self.mapSet(Value(std::string("type")), Value((int64_t)0));
-    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.setDir")));
-    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.setDir")));
-    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.setDir")));
+    self.map_set(Value(std::string("type")), Value((int64_t)0));
+    self.map_set(Value(std::string("dx")), Value(num_arg(args, argc, 1, "Light.setDir")));
+    self.map_set(Value(std::string("dy")), Value(num_arg(args, argc, 2, "Light.setDir")));
+    self.map_set(Value(std::string("dz")), Value(num_arg(args, argc, 3, "Light.setDir")));
     applyLightFromInstance(self);
     return ctx.ret(self);
 }
@@ -870,10 +870,10 @@ static int light_set_dir(CallCtx& ctx) {
 static int light_set_pos(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    self.mapSet(Value(std::string("type")), Value((int64_t)1));
-    self.mapSet(Value(std::string("dx")), Value(numArg(args, argc, 1, "Light.setPos")));
-    self.mapSet(Value(std::string("dy")), Value(numArg(args, argc, 2, "Light.setPos")));
-    self.mapSet(Value(std::string("dz")), Value(numArg(args, argc, 3, "Light.setPos")));
+    self.map_set(Value(std::string("type")), Value((int64_t)1));
+    self.map_set(Value(std::string("dx")), Value(num_arg(args, argc, 1, "Light.setPos")));
+    self.map_set(Value(std::string("dy")), Value(num_arg(args, argc, 2, "Light.setPos")));
+    self.map_set(Value(std::string("dz")), Value(num_arg(args, argc, 3, "Light.setPos")));
     applyLightFromInstance(self);
     return ctx.ret(self);
 }
@@ -882,12 +882,12 @@ static int light_set_pos(CallCtx& ctx) {
 static int light_set_color(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    if (argc > 1 && (args[1].isMap() || args[1].isClass())) {
-        Color c = gfxToColor(args[1]);
-        self.mapSet(Value(std::string("r")), Value(c.r / 255.0));
-        self.mapSet(Value(std::string("g")), Value(c.g / 255.0));
-        self.mapSet(Value(std::string("b")), Value(c.b / 255.0));
-        self.mapSet(Value(std::string("a")), Value(c.a / 255.0));
+    if (argc > 1 && (args[1].is_map() || args[1].is_class())) {
+        Color c = gfx_to_color(args[1]);
+        self.map_set(Value(std::string("r")), Value(c.r / 255.0));
+        self.map_set(Value(std::string("g")), Value(c.g / 255.0));
+        self.map_set(Value(std::string("b")), Value(c.b / 255.0));
+        self.map_set(Value(std::string("a")), Value(c.a / 255.0));
     }
     applyLightFromInstance(self);
     return ctx.ret(self);
@@ -897,19 +897,19 @@ static int light_set_color(CallCtx& ctx) {
 static int light_enable(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    bool on = (argc > 1) ? !isFalsy(args[1]) : true;
-    self.mapSet(Value(std::string("enabled")), Value((int64_t)(on ? 1 : 0)));
+    bool on = (argc > 1) ? !is_falsy(args[1]) : true;
+    self.map_set(Value(std::string("enabled")), Value((int64_t)(on ? 1 : 0)));
     applyLightFromInstance(self);
     return ctx.ret(self);
 }
 
 static Value makeLightClass() {
-    Value cls = Value::makeClass();
-    cls.mapSet(Value(std::string("__name__")), Value(std::string("Light")));
-    cls.mapSet(Value(std::string("setDir")), Value::makeBuiltin(light_set_dir));
-    cls.mapSet(Value(std::string("setPos")), Value::makeBuiltin(light_set_pos));
-    cls.mapSet(Value(std::string("setColor")), Value::makeBuiltin(light_set_color));
-    cls.mapSet(Value(std::string("enable")), Value::makeBuiltin(light_enable));
+    Value cls = Value::make_class();
+    cls.map_set(Value(std::string("__name__")), Value(std::string("Light")));
+    cls.map_set(Value(std::string("setDir")), Value::make_builtin(light_set_dir));
+    cls.map_set(Value(std::string("setPos")), Value::make_builtin(light_set_pos));
+    cls.map_set(Value(std::string("setColor")), Value::make_builtin(light_set_color));
+    cls.map_set(Value(std::string("enable")), Value::make_builtin(light_enable));
     return cls;
 }
 
@@ -922,22 +922,22 @@ static Value lightClass() {
 // l'active. "dir" : (x,y,z) = direction de propagation ; "point" : position.
 static int gfx_light(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    std::string type = (argc > 0 && args[0].isString()) ? args[0].asString() : "dir";
-    float x = (float)numArg(args, argc, 1, "graphics.light");
-    float y = (float)numArg(args, argc, 2, "graphics.light");
-    float z = (float)numArg(args, argc, 3, "graphics.light");
-    Color c = (argc > 4 && (args[4].isMap() || args[4].isClass())) ? gfxToColor(args[4]) : WHITE;
-    Value inst = Value::makeMap();
-    inst.mapSet(Value(std::string("__class__")), lightClass());
-    inst.mapSet(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
-    inst.mapSet(Value(std::string("dx")), Value((double)x));
-    inst.mapSet(Value(std::string("dy")), Value((double)y));
-    inst.mapSet(Value(std::string("dz")), Value((double)z));
-    inst.mapSet(Value(std::string("r")), Value(c.r / 255.0));
-    inst.mapSet(Value(std::string("g")), Value(c.g / 255.0));
-    inst.mapSet(Value(std::string("b")), Value(c.b / 255.0));
-    inst.mapSet(Value(std::string("a")), Value(c.a / 255.0));
-    inst.mapSet(Value(std::string("enabled")), Value((int64_t)1));
+    std::string type = (argc > 0 && args[0].is_string()) ? args[0].as_string() : "dir";
+    float x = (float)num_arg(args, argc, 1, "graphics.light");
+    float y = (float)num_arg(args, argc, 2, "graphics.light");
+    float z = (float)num_arg(args, argc, 3, "graphics.light");
+    Color c = (argc > 4 && (args[4].is_map() || args[4].is_class())) ? gfx_to_color(args[4]) : WHITE;
+    Value inst = Value::make_map();
+    inst.map_set(Value(std::string("__class__")), lightClass());
+    inst.map_set(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
+    inst.map_set(Value(std::string("dx")), Value((double)x));
+    inst.map_set(Value(std::string("dy")), Value((double)y));
+    inst.map_set(Value(std::string("dz")), Value((double)z));
+    inst.map_set(Value(std::string("r")), Value(c.r / 255.0));
+    inst.map_set(Value(std::string("g")), Value(c.g / 255.0));
+    inst.map_set(Value(std::string("b")), Value(c.b / 255.0));
+    inst.map_set(Value(std::string("a")), Value(c.a / 255.0));
+    inst.map_set(Value(std::string("enabled")), Value((int64_t)1));
     applyLightFromInstance(inst);
     return ctx.ret(inst);
 }
@@ -946,8 +946,8 @@ static int gfx_light(CallCtx& ctx) {
 // l'origine. Couleur grise fixe de raylib (n'utilise ni fill ni stroke).
 static int gfx_grid(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    int slices = argc > 0 ? gfxToInt(args[0]) : 10;
-    float spacing = argc > 1 ? (float)numArg(args, argc, 1, "graphics.grid") : 1.0f;
+    int slices = argc > 0 ? gfx_to_int(args[0]) : 10;
+    float spacing = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.grid") : 1.0f;
     DrawGrid(slices, spacing);
     return ctx.ret(Value{});
 }
@@ -955,9 +955,9 @@ static int gfx_grid(CallCtx& ctx) {
 // graphics.texture(img) / graphics.noTexture() : texture 3D courante (handle image).
 static int gfx_texture(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && args[0].isMap()) {
-        Value idv = args[0].mapGet(Value(std::string("id")));
-        s_cur_tex3d = idv.isInteger() ? image_gl_texid((int)idv.asInt()) : 0;
+    if (argc > 0 && args[0].is_map()) {
+        Value idv = args[0].map_get(Value(std::string("id")));
+        s_cur_tex3d = idv.is_integer() ? image_gl_texid((int)idv.as_int()) : 0;
     }
     return ctx.ret(Value{});
 }
@@ -974,12 +974,12 @@ static int gfx_no_texture(CallCtx& ctx) {
 // Une seule texture en grille, échantillonnée par tuile selon la face du cube.
 static int gfx_tileset(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && args[0].isMap()) {
-        Value idv = args[0].mapGet(Value(std::string("id")));
-        s_atlas_texid = idv.isInteger() ? image_gl_texid((int)idv.asInt()) : 0;
+    if (argc > 0 && args[0].is_map()) {
+        Value idv = args[0].map_get(Value(std::string("id")));
+        s_atlas_texid = idv.is_integer() ? image_gl_texid((int)idv.as_int()) : 0;
     }
-    s_atlas_grid[0] = argc > 1 ? (float)numArg(args, argc, 1, "graphics.tileset") : 1.0f;
-    s_atlas_grid[1] = argc > 2 ? (float)numArg(args, argc, 2, "graphics.tileset") : 1.0f;
+    s_atlas_grid[0] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tileset") : 1.0f;
+    s_atlas_grid[1] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tileset") : 1.0f;
     if (s_atlas_texid != 0) {
         // pixels nets (look voxel) : filtrage NEAREST, pas de mipmap.
         rlTextureParameters(s_atlas_texid, RL_TEXTURE_MAG_FILTER, RL_TEXTURE_FILTER_NEAREST);
@@ -991,16 +991,16 @@ static int gfx_tileset(CallCtx& ctx) {
 // graphics.tiles(top, side, bottom) : tuiles du prochain cube (état, comme fill).
 static int gfx_tiles(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    s_cur_tile[0] = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tiles") : -1.0f;
-    s_cur_tile[1] = argc > 1 ? (float)numArg(args, argc, 1, "graphics.tiles") : s_cur_tile[0];
-    s_cur_tile[2] = argc > 2 ? (float)numArg(args, argc, 2, "graphics.tiles") : s_cur_tile[1];
+    s_cur_tile[0] = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tiles") : -1.0f;
+    s_cur_tile[1] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tiles") : s_cur_tile[0];
+    s_cur_tile[2] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tiles") : s_cur_tile[1];
     return ctx.ret(Value{});
 }
 
 // graphics.tile(t) : même tuile sur les 6 faces (raccourci). tile(-1) = aucune.
 static int gfx_tile(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float t = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tile") : -1.0f;
+    float t = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tile") : -1.0f;
     s_cur_tile[0] = t;
     s_cur_tile[1] = t;
     s_cur_tile[2] = t;
@@ -1012,18 +1012,18 @@ static int gfx_tile(CallCtx& ctx) {
 // l'ondulation (défauts = look eau) ; la phase spatiale est en coordonnées monde.
 static int gfx_tile_anim(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    s_anim_tile = argc > 0 ? (float)numArg(args, argc, 0, "graphics.tileAnim") : -1.0f;
+    s_anim_tile = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tileAnim") : -1.0f;
     if (argc > 1) {
-        s_anim_params[0] = (float)numArg(args, argc, 1, "graphics.tileAnim");
+        s_anim_params[0] = (float)num_arg(args, argc, 1, "graphics.tileAnim");
     }
     if (argc > 2) {
-        s_anim_params[1] = (float)numArg(args, argc, 2, "graphics.tileAnim");
+        s_anim_params[1] = (float)num_arg(args, argc, 2, "graphics.tileAnim");
     }
     if (argc > 3) {
-        s_anim_params[2] = (float)numArg(args, argc, 3, "graphics.tileAnim");
+        s_anim_params[2] = (float)num_arg(args, argc, 3, "graphics.tileAnim");
     }
     if (argc > 4) {
-        s_anim_params[3] = (float)numArg(args, argc, 4, "graphics.tileAnim");
+        s_anim_params[3] = (float)num_arg(args, argc, 4, "graphics.tileAnim");
     }
     return ctx.ret(Value{});
 }
@@ -1032,14 +1032,14 @@ static int gfx_tile_anim(CallCtx& ctx) {
 // éclairé, texturé), arêtes si stroke (immédiat, non éclairé).
 static int gfx_cube(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)numArg(args, argc, 0, "graphics.cube"), (float)numArg(args, argc, 1, "graphics.cube"),
-                (float)numArg(args, argc, 2, "graphics.cube")};
-    Vector3 size{(float)numArg(args, argc, 3, "graphics.cube"), (float)numArg(args, argc, 4, "graphics.cube"),
-                 (float)numArg(args, argc, 5, "graphics.cube")};
-    if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_CUBE), s_cur_tex3d, pos, size, gfxFillColor());
-    if (gfxHasStroke())
-        DrawCubeWiresV(pos, size, gfxStrokeColor());
+    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cube"), (float)num_arg(args, argc, 1, "graphics.cube"),
+                (float)num_arg(args, argc, 2, "graphics.cube")};
+    Vector3 size{(float)num_arg(args, argc, 3, "graphics.cube"), (float)num_arg(args, argc, 4, "graphics.cube"),
+                 (float)num_arg(args, argc, 5, "graphics.cube")};
+    if (gfx_has_fill())
+        pushInstance(getShapeMesh(SH_CUBE), s_cur_tex3d, pos, size, gfx_fill_color());
+    if (gfx_has_stroke())
+        DrawCubeWiresV(pos, size, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
@@ -1047,13 +1047,13 @@ static int gfx_cube(CallCtx& ctx) {
 // éclairée, texturée), fil de fer si stroke (immédiat). Mesh unitaire = rayon 0.5.
 static int gfx_sphere(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)numArg(args, argc, 0, "graphics.sphere"), (float)numArg(args, argc, 1, "graphics.sphere"),
-                (float)numArg(args, argc, 2, "graphics.sphere")};
-    float r = (float)numArg(args, argc, 3, "graphics.sphere");
-    if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfxFillColor());
-    if (gfxHasStroke())
-        DrawSphereWires(pos, r, 16, 16, gfxStrokeColor());
+    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.sphere"), (float)num_arg(args, argc, 1, "graphics.sphere"),
+                (float)num_arg(args, argc, 2, "graphics.sphere")};
+    float r = (float)num_arg(args, argc, 3, "graphics.sphere");
+    if (gfx_has_fill())
+        pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, pos, Vector3{2.0f * r, 2.0f * r, 2.0f * r}, gfx_fill_color());
+    if (gfx_has_stroke())
+        DrawSphereWires(pos, r, 16, 16, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
@@ -1062,28 +1062,28 @@ static int gfx_sphere(CallCtx& ctx) {
 // Mono-rayon (contrainte de l'instancing : mesh unitaire figé, rayon 1 hauteur 1).
 static int gfx_cylinder(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)numArg(args, argc, 0, "graphics.cylinder"), (float)numArg(args, argc, 1, "graphics.cylinder"),
-                (float)numArg(args, argc, 2, "graphics.cylinder")};
-    float r = (float)numArg(args, argc, 3, "graphics.cylinder");
-    float h = (float)numArg(args, argc, 4, "graphics.cylinder");
-    if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_CYLINDER), s_cur_tex3d, pos, Vector3{r, h, r}, gfxFillColor());
-    if (gfxHasStroke())
-        DrawCylinderWires(pos, r, r, h, 16, gfxStrokeColor());
+    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cylinder"), (float)num_arg(args, argc, 1, "graphics.cylinder"),
+                (float)num_arg(args, argc, 2, "graphics.cylinder")};
+    float r = (float)num_arg(args, argc, 3, "graphics.cylinder");
+    float h = (float)num_arg(args, argc, 4, "graphics.cylinder");
+    if (gfx_has_fill())
+        pushInstance(getShapeMesh(SH_CYLINDER), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
+    if (gfx_has_stroke())
+        DrawCylinderWires(pos, r, r, h, 16, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
 // graphics.cone(x,y,z, r, h) : cône, (x,y,z) = centre de la base, rayon r, hauteur h (vers +Y).
 static int gfx_cone(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)numArg(args, argc, 0, "graphics.cone"), (float)numArg(args, argc, 1, "graphics.cone"),
-                (float)numArg(args, argc, 2, "graphics.cone")};
-    float r = (float)numArg(args, argc, 3, "graphics.cone");
-    float h = (float)numArg(args, argc, 4, "graphics.cone");
-    if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_CONE), s_cur_tex3d, pos, Vector3{r, h, r}, gfxFillColor());
-    if (gfxHasStroke())
-        DrawCylinderWires(pos, r, 0.0f, h, 16, gfxStrokeColor());
+    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cone"), (float)num_arg(args, argc, 1, "graphics.cone"),
+                (float)num_arg(args, argc, 2, "graphics.cone")};
+    float r = (float)num_arg(args, argc, 3, "graphics.cone");
+    float h = (float)num_arg(args, argc, 4, "graphics.cone");
+    if (gfx_has_fill())
+        pushInstance(getShapeMesh(SH_CONE), s_cur_tex3d, pos, Vector3{r, h, r}, gfx_fill_color());
+    if (gfx_has_stroke())
+        DrawCylinderWires(pos, r, 0.0f, h, 16, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
@@ -1092,15 +1092,15 @@ static int gfx_cone(CallCtx& ctx) {
 // Pour exposer les deux paramètres indépendants, on scale X=Z sur r, Y sur tube.
 static int gfx_torus(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)numArg(args, argc, 0, "graphics.torus"), (float)numArg(args, argc, 1, "graphics.torus"),
-                (float)numArg(args, argc, 2, "graphics.torus")};
-    float r    = (float)numArg(args, argc, 3, "graphics.torus");
-    float tube = (float)numArg(args, argc, 4, "graphics.torus");
+    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.torus"), (float)num_arg(args, argc, 1, "graphics.torus"),
+                (float)num_arg(args, argc, 2, "graphics.torus")};
+    float r    = (float)num_arg(args, argc, 3, "graphics.torus");
+    float tube = (float)num_arg(args, argc, 4, "graphics.torus");
     // mesh : major=1 (XY), tube=0.3 (Z) → scale XY par r, Z par tube/0.3
-    if (gfxHasFill())
-        pushInstance(getShapeMesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfxFillColor());
-    if (gfxHasStroke())
-        DrawCircle3D(pos, r, {1, 0, 0}, 90.0f, gfxStrokeColor());
+    if (gfx_has_fill())
+        pushInstance(getShapeMesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfx_fill_color());
+    if (gfx_has_stroke())
+        DrawCircle3D(pos, r, {1, 0, 0}, 90.0f, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
@@ -1108,12 +1108,12 @@ static int gfx_torus(CallCtx& ctx) {
 // sx×sz. Instancié + éclairé (utilise la couleur fill ; sinon stroke pour rester visible).
 static int gfx_plane(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 pos{(float)numArg(args, argc, 0, "graphics.plane"), (float)numArg(args, argc, 1, "graphics.plane"),
-                (float)numArg(args, argc, 2, "graphics.plane")};
-    float sx = (float)numArg(args, argc, 3, "graphics.plane");
-    float sz = (float)numArg(args, argc, 4, "graphics.plane");
-    if (gfxHasFill() || gfxHasStroke()) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
-        Color c = gfxHasFill() ? gfxFillColor() : gfxStrokeColor();
+    Vector3 pos{(float)num_arg(args, argc, 0, "graphics.plane"), (float)num_arg(args, argc, 1, "graphics.plane"),
+                (float)num_arg(args, argc, 2, "graphics.plane")};
+    float sx = (float)num_arg(args, argc, 3, "graphics.plane");
+    float sz = (float)num_arg(args, argc, 4, "graphics.plane");
+    if (gfx_has_fill() || gfx_has_stroke()) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
+        Color c = gfx_has_fill() ? gfx_fill_color() : gfx_stroke_color();
         pushInstance(getShapeMesh(SH_PLANE), s_cur_tex3d, pos, Vector3{sx, 1.0f, sz}, c);
     }
     return ctx.ret(Value{});
@@ -1122,23 +1122,23 @@ static int gfx_plane(CallCtx& ctx) {
 // graphics.line3d(x1,y1,z1, x2,y2,z2) : segment 3D — rendu comme un cylindre (rayon = strokeSize * 0.02).
 static int gfx_line3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Vector3 a{(float)numArg(args, argc, 0, "graphics.line3d"), (float)numArg(args, argc, 1, "graphics.line3d"),
-              (float)numArg(args, argc, 2, "graphics.line3d")};
-    Vector3 b{(float)numArg(args, argc, 3, "graphics.line3d"), (float)numArg(args, argc, 4, "graphics.line3d"),
-              (float)numArg(args, argc, 5, "graphics.line3d")};
-    float r = gfxStrokeSize() * 0.02f;
-    DrawCylinderEx(a, b, r, r, 6, gfxStrokeColor());
+    Vector3 a{(float)num_arg(args, argc, 0, "graphics.line3d"), (float)num_arg(args, argc, 1, "graphics.line3d"),
+              (float)num_arg(args, argc, 2, "graphics.line3d")};
+    Vector3 b{(float)num_arg(args, argc, 3, "graphics.line3d"), (float)num_arg(args, argc, 4, "graphics.line3d"),
+              (float)num_arg(args, argc, 5, "graphics.line3d")};
+    float r = gfx_stroke_size() * 0.02f;
+    DrawCylinderEx(a, b, r, r, 6, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
 // graphics.point3d(x,y,z) : point 3D — rendu comme une petite sphère (rayon = strokeSize * 0.015).
 static int gfx_point3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float x = (float)numArg(args, argc, 0, "graphics.point3d");
-    float y = (float)numArg(args, argc, 1, "graphics.point3d");
-    float z = (float)numArg(args, argc, 2, "graphics.point3d");
-    float r = gfxStrokeSize() * 0.015f;
-    pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, {x, y, z}, {2.0f * r, 2.0f * r, 2.0f * r}, gfxStrokeColor());
+    float x = (float)num_arg(args, argc, 0, "graphics.point3d");
+    float y = (float)num_arg(args, argc, 1, "graphics.point3d");
+    float z = (float)num_arg(args, argc, 2, "graphics.point3d");
+    float r = gfx_stroke_size() * 0.015f;
+    pushInstance(getShapeMesh(SH_SPHERE), s_cur_tex3d, {x, y, z}, {2.0f * r, 2.0f * r, 2.0f * r}, gfx_stroke_color());
     return ctx.ret(Value{});
 }
 
@@ -1150,7 +1150,7 @@ static int gfx_rotateq(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.rotateq: expected a Quat (graphics.quat…)");
-    Matrix m = QuaternionToMatrix(quatFromInstance(args[0], "graphics.rotateq"));
+    Matrix m = QuaternionToMatrix(quat_from_instance(args[0], "graphics.rotateq"));
     rlMultMatrixf(MatrixToFloatV(m).v);
     return ctx.ret(Value{});
 }
@@ -1207,15 +1207,15 @@ static Model* modelGet(const std::string& name) {
 // chemin chargeable). Déclenche le chargement (erreur si introuvable).
 static int gfx_model(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isString()) {
+    if (argc < 1 || !args[0].is_string()) {
         throw std::runtime_error("graphics.model: expected a model name (string)");
     }
-    const std::string& name = args[0].asString();
+    const std::string& name = args[0].as_string();
     if (!modelGet(name)) {
         throw std::runtime_error("graphics.model: modèle introuvable ou illisible : " + name);
     }
-    Value h = Value::makeMap();
-    h.mapSet(Value(std::string("name")), Value(name));
+    Value h = Value::make_map();
+    h.map_set(Value(std::string("name")), Value(name));
     return ctx.ret(h);
 }
 
@@ -1224,26 +1224,26 @@ static int gfx_model(CallCtx& ctx) {
 // teinte = fill) → éclairage + instancing du batcher.
 static int gfx_draw_model(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isMap()) {
+    if (argc < 1 || !args[0].is_map()) {
         throw std::runtime_error("graphics.drawModel: expected a model handle (graphics.model)");
     }
-    Value nameV = args[0].mapGet(Value(std::string("name")));
-    if (!nameV.isString()) {
+    Value nameV = args[0].map_get(Value(std::string("name")));
+    if (!nameV.is_string()) {
         throw std::runtime_error("graphics.drawModel: handle de modèle invalide");
     }
-    Model* mdl = modelGet(nameV.asString());
+    Model* mdl = modelGet(nameV.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.drawModel: modèle introuvable : " + nameV.asString());
+        throw std::runtime_error("graphics.drawModel: modèle introuvable : " + nameV.as_string());
     }
-    float x = argc > 1 ? (float)numArg(args, argc, 1, "graphics.drawModel") : 0.0f;
-    float y = argc > 2 ? (float)numArg(args, argc, 2, "graphics.drawModel") : 0.0f;
-    float z = argc > 3 ? (float)numArg(args, argc, 3, "graphics.drawModel") : 0.0f;
-    float s = argc > 4 ? (float)numArg(args, argc, 4, "graphics.drawModel") : 1.0f;
+    float x = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.drawModel") : 0.0f;
+    float y = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.drawModel") : 0.0f;
+    float z = argc > 3 ? (float)num_arg(args, argc, 3, "graphics.drawModel") : 0.0f;
+    float s = argc > 4 ? (float)num_arg(args, argc, 4, "graphics.drawModel") : 1.0f;
     Vector3 pos{x, y, z};
     Vector3 size{s, s, s};
     // fill = teinte GLOBALE (multiplicateur). fill blanc → le modèle garde ses
     // propres couleurs/textures ; fill coloré → il teinte le modèle.
-    Color fill = gfxHasFill() ? gfxFillColor() : WHITE;
+    Color fill = gfx_has_fill() ? gfx_fill_color() : WHITE;
     for (int i = 0; i < mdl->meshCount; i++) {
         // Matériau du mesh (GLB/GLTF) : texture diffuse + couleur de base.
         unsigned int texId = s_cur_tex3d;   // défaut : texture 3D courante (ou blanche)
@@ -1269,29 +1269,29 @@ static int gfx_draw_model(CallCtx& ctx) {
 // (demi-diagonale). À appeler UNE fois (le parcours des sommets n'est pas gratuit).
 static int gfx_model_size(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isMap()) {
+    if (argc < 1 || !args[0].is_map()) {
         throw std::runtime_error("graphics.modelSize: expected a model handle (graphics.model)");
     }
-    Value nameV = args[0].mapGet(Value(std::string("name")));
-    if (!nameV.isString()) {
+    Value nameV = args[0].map_get(Value(std::string("name")));
+    if (!nameV.is_string()) {
         throw std::runtime_error("graphics.modelSize: handle de modèle invalide");
     }
-    Model* mdl = modelGet(nameV.asString());
+    Model* mdl = modelGet(nameV.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.modelSize: modèle introuvable : " + nameV.asString());
+        throw std::runtime_error("graphics.modelSize: modèle introuvable : " + nameV.as_string());
     }
     BoundingBox bb = GetModelBoundingBox(*mdl);
     float w = bb.max.x - bb.min.x;
     float h = bb.max.y - bb.min.y;
     float d = bb.max.z - bb.min.z;
-    Value r = Value::makeMap();
-    r.mapSet(Value(std::string("w")), Value((double)w));
-    r.mapSet(Value(std::string("h")), Value((double)h));
-    r.mapSet(Value(std::string("d")), Value((double)d));
-    r.mapSet(Value(std::string("cx")), Value((double)((bb.min.x + bb.max.x) * 0.5f)));
-    r.mapSet(Value(std::string("cy")), Value((double)((bb.min.y + bb.max.y) * 0.5f)));
-    r.mapSet(Value(std::string("cz")), Value((double)((bb.min.z + bb.max.z) * 0.5f)));
-    r.mapSet(Value(std::string("radius")), Value((double)(0.5f * std::sqrt(w * w + h * h + d * d))));
+    Value r = Value::make_map();
+    r.map_set(Value(std::string("w")), Value((double)w));
+    r.map_set(Value(std::string("h")), Value((double)h));
+    r.map_set(Value(std::string("d")), Value((double)d));
+    r.map_set(Value(std::string("cx")), Value((double)((bb.min.x + bb.max.x) * 0.5f)));
+    r.map_set(Value(std::string("cy")), Value((double)((bb.min.y + bb.max.y) * 0.5f)));
+    r.map_set(Value(std::string("cz")), Value((double)((bb.min.z + bb.max.z) * 0.5f)));
+    r.map_set(Value(std::string("radius")), Value((double)(0.5f * std::sqrt(w * w + h * h + d * d))));
     return ctx.ret(r);
 }
 
@@ -1302,8 +1302,8 @@ static int gfx_model_size(CallCtx& ctx) {
 // petit demi-angle. À appeler chaque frame (bon marché) → suit les rotations d'écran.
 static int gfx_fit_distance(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    double radius = numArg(args, argc, 0, "graphics.fitDistance");
-    double fovy = argc > 1 ? numArg(args, argc, 1, "graphics.fitDistance") : 45.0;
+    double radius = num_arg(args, argc, 0, "graphics.fitDistance");
+    double fovy = argc > 1 ? num_arg(args, argc, 1, "graphics.fitDistance") : 45.0;
     int sh = GetScreenHeight();
     int sw = GetScreenWidth();
     double aspect = (sh > 0) ? (double)sw / (double)sh : 1.0;
@@ -1321,10 +1321,10 @@ static int gfx_fit_distance(CallCtx& ctx) {
 // sont posées). Test exact : 6 plans du frustum extraits de view·projection.
 static int gfx_in_frustum(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    float x = (float)numArg(args, argc, 0, "graphics.inFrustum");
-    float y = (float)numArg(args, argc, 1, "graphics.inFrustum");
-    float z = (float)numArg(args, argc, 2, "graphics.inFrustum");
-    float r = argc > 3 ? (float)numArg(args, argc, 3, "graphics.inFrustum") : 0.0f;
+    float x = (float)num_arg(args, argc, 0, "graphics.inFrustum");
+    float y = (float)num_arg(args, argc, 1, "graphics.inFrustum");
+    float z = (float)num_arg(args, argc, 2, "graphics.inFrustum");
+    float r = argc > 3 ? (float)num_arg(args, argc, 3, "graphics.inFrustum") : 0.0f;
     // Utilise la projection FIGÉE au begin3d (s_proj3d), pas rlGetMatrixProjection()
     // en direct : le culling par chunk est fait AVANT begin3d, où la projection
     // courante est l'ortho 2D restaurée par le end3d précédent → frustum faux
@@ -1427,11 +1427,11 @@ static int gfx_end_chunk(CallCtx& ctx) {
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
-    Value h = Value::makeMap();
-    h.mapSet(Value(std::string("id")), Value((int64_t)idO));
-    h.mapSet(Value(std::string("idw")), Value((int64_t)idW));
-    h.mapSet(Value(std::string("count")), Value((int64_t)g.count));
-    h.mapSet(Value(std::string("wcount")), Value((int64_t)w.count));
+    Value h = Value::make_map();
+    h.map_set(Value(std::string("id")), Value((int64_t)idO));
+    h.map_set(Value(std::string("idw")), Value((int64_t)idW));
+    h.map_set(Value(std::string("count")), Value((int64_t)g.count));
+    h.map_set(Value(std::string("wcount")), Value((int64_t)w.count));
     return ctx.ret(h);
 }
 
@@ -1439,14 +1439,14 @@ static int gfx_end_chunk(CallCtx& ctx) {
 // (éclairé). À appeler DANS un bloc begin3d. Ne ré-émet AUCUN cube depuis Ollin.
 static int gfx_draw_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isMap()) {
+    if (argc < 1 || !args[0].is_map()) {
         throw std::runtime_error("graphics.drawChunk: expected a chunk handle (graphics.endChunk)");
     }
-    Value idv = args[0].mapGet(Value(std::string("id")));
-    if (!idv.isInteger()) {
+    Value idv = args[0].map_get(Value(std::string("id")));
+    if (!idv.is_integer()) {
         throw std::runtime_error("graphics.drawChunk: handle de chunk invalide");
     }
-    int id = (int)idv.asInt();
+    int id = (int)idv.as_int();
     if (id < 1 || id > (int)s_groups.size()) {
         return ctx.ret(Value{});
     }
@@ -1473,14 +1473,14 @@ static int gfx_draw_chunk(CallCtx& ctx) {
 // À appeler DANS begin3d APRÈS avoir dessiné TOUT l'opaque (drawChunk) des chunks.
 static int gfx_draw_chunk_alpha(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isMap()) {
+    if (argc < 1 || !args[0].is_map()) {
         return ctx.ret(Value{});
     }
-    Value idv = args[0].mapGet(Value(std::string("idw")));
-    if (!idv.isInteger()) {
+    Value idv = args[0].map_get(Value(std::string("idw")));
+    if (!idv.is_integer()) {
         return ctx.ret(Value{});
     }
-    int id = (int)idv.asInt();
+    int id = (int)idv.as_int();
     if (id < 1 || id > (int)s_groups.size()) {
         return ctx.ret(Value{});
     }
@@ -1503,11 +1503,11 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
 // déchargé) → mémoire GPU récupérée. Le handle devient un no-op au dessin. Permet
 // un monde INFINI : on cuit les chunks autour du joueur, on libère les autres.
 static void freeGroupById(Value& handle, const char* key) {
-    Value idv = handle.mapGet(Value(std::string(key)));
-    if (!idv.isInteger()) {
+    Value idv = handle.map_get(Value(std::string(key)));
+    if (!idv.is_integer()) {
         return;
     }
-    int id = (int)idv.asInt();
+    int id = (int)idv.as_int();
     if (id < 1 || id > (int)s_groups.size()) {
         return;
     }
@@ -1535,7 +1535,7 @@ static void freeGroupById(Value& handle, const char* key) {
 
 static int gfx_free_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isMap()) {
+    if (argc < 1 || !args[0].is_map()) {
         return ctx.ret(Value{});
     }
     freeGroupById(args[0], "id");    // groupe opaque
@@ -1544,7 +1544,7 @@ static int gfx_free_chunk(CallCtx& ctx) {
 }
 
 // Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
-void reset3dFrameState() {
+void reset3d_frame_state() {
     s_cur_tex3d = 0;
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;
@@ -1552,46 +1552,46 @@ void reset3dFrameState() {
 }
 
 // Texture 3D courante — exposée pour la sauvegarde/restauration de style (push/pushStyle).
-unsigned int gfx3dGetTexture() {
+unsigned int gfx3d_get_texture() {
     return s_cur_tex3d;
 }
-void gfx3dSetTexture(unsigned int id) {
+void gfx3d_set_texture(unsigned int id) {
     s_cur_tex3d = id;
 }
 
 // Enregistre les builtins 3D dans le module graphics (appelé par makeGraphicsModule).
-void register3dGraphics(Value& m) {
-    m.mapSet(Value(std::string("camera")), Value::makeBuiltin(gfx_camera));
-    m.mapSet(Value(std::string("cameraOrtho")), Value::makeBuiltin(gfx_camera_ortho));
-    m.mapSet(Value(std::string("begin3d")), Value::makeBuiltin(gfx_begin3d));
-    m.mapSet(Value(std::string("end3d")), Value::makeBuiltin(gfx_end3d));
-    m.mapSet(Value(std::string("ambient")), Value::makeBuiltin(gfx_ambient));
-    m.mapSet(Value(std::string("light")), Value::makeBuiltin(gfx_light));
-    m.mapSet(Value(std::string("texture")), Value::makeBuiltin(gfx_texture));
-    m.mapSet(Value(std::string("noTexture")), Value::makeBuiltin(gfx_no_texture));
-    m.mapSet(Value(std::string("tileset")), Value::makeBuiltin(gfx_tileset));
-    m.mapSet(Value(std::string("tiles")), Value::makeBuiltin(gfx_tiles));
-    m.mapSet(Value(std::string("tile")), Value::makeBuiltin(gfx_tile));
-    m.mapSet(Value(std::string("tileAnim")), Value::makeBuiltin(gfx_tile_anim));
-    m.mapSet(Value(std::string("grid")), Value::makeBuiltin(gfx_grid));
-    m.mapSet(Value(std::string("cube")), Value::makeBuiltin(gfx_cube));
-    m.mapSet(Value(std::string("sphere")), Value::makeBuiltin(gfx_sphere));
-    m.mapSet(Value(std::string("cylinder")), Value::makeBuiltin(gfx_cylinder));
-    m.mapSet(Value(std::string("cone")), Value::makeBuiltin(gfx_cone));
-    m.mapSet(Value(std::string("torus")), Value::makeBuiltin(gfx_torus));
-    m.mapSet(Value(std::string("plane")), Value::makeBuiltin(gfx_plane));
-    m.mapSet(Value(std::string("model")), Value::makeBuiltin(gfx_model));
-    m.mapSet(Value(std::string("drawModel")), Value::makeBuiltin(gfx_draw_model));
-    m.mapSet(Value(std::string("modelSize")), Value::makeBuiltin(gfx_model_size));
-    m.mapSet(Value(std::string("fitDistance")), Value::makeBuiltin(gfx_fit_distance));
-    m.mapSet(Value(std::string("inFrustum")), Value::makeBuiltin(gfx_in_frustum));
-    m.mapSet(Value(std::string("beginChunk")), Value::makeBuiltin(gfx_begin_chunk));
-    m.mapSet(Value(std::string("endChunk")), Value::makeBuiltin(gfx_end_chunk));
-    m.mapSet(Value(std::string("drawChunk")), Value::makeBuiltin(gfx_draw_chunk));
-    m.mapSet(Value(std::string("drawChunkAlpha")), Value::makeBuiltin(gfx_draw_chunk_alpha));
-    m.mapSet(Value(std::string("freeChunk")), Value::makeBuiltin(gfx_free_chunk));
-    m.mapSet(Value(std::string("line3d")), Value::makeBuiltin(gfx_line3d));
-    m.mapSet(Value(std::string("point3d")), Value::makeBuiltin(gfx_point3d));
-    m.mapSet(Value(std::string("rotateq")), Value::makeBuiltin(gfx_rotateq));
-    registerQuat(m);   // quat / quatAxis / quatEuler (classe Quat, graphics_quat.cpp)
+void register3d_graphics(Value& m) {
+    m.map_set(Value(std::string("camera")), Value::make_builtin(gfx_camera));
+    m.map_set(Value(std::string("cameraOrtho")), Value::make_builtin(gfx_camera_ortho));
+    m.map_set(Value(std::string("begin3d")), Value::make_builtin(gfx_begin3d));
+    m.map_set(Value(std::string("end3d")), Value::make_builtin(gfx_end3d));
+    m.map_set(Value(std::string("ambient")), Value::make_builtin(gfx_ambient));
+    m.map_set(Value(std::string("light")), Value::make_builtin(gfx_light));
+    m.map_set(Value(std::string("texture")), Value::make_builtin(gfx_texture));
+    m.map_set(Value(std::string("noTexture")), Value::make_builtin(gfx_no_texture));
+    m.map_set(Value(std::string("tileset")), Value::make_builtin(gfx_tileset));
+    m.map_set(Value(std::string("tiles")), Value::make_builtin(gfx_tiles));
+    m.map_set(Value(std::string("tile")), Value::make_builtin(gfx_tile));
+    m.map_set(Value(std::string("tileAnim")), Value::make_builtin(gfx_tile_anim));
+    m.map_set(Value(std::string("grid")), Value::make_builtin(gfx_grid));
+    m.map_set(Value(std::string("cube")), Value::make_builtin(gfx_cube));
+    m.map_set(Value(std::string("sphere")), Value::make_builtin(gfx_sphere));
+    m.map_set(Value(std::string("cylinder")), Value::make_builtin(gfx_cylinder));
+    m.map_set(Value(std::string("cone")), Value::make_builtin(gfx_cone));
+    m.map_set(Value(std::string("torus")), Value::make_builtin(gfx_torus));
+    m.map_set(Value(std::string("plane")), Value::make_builtin(gfx_plane));
+    m.map_set(Value(std::string("model")), Value::make_builtin(gfx_model));
+    m.map_set(Value(std::string("drawModel")), Value::make_builtin(gfx_draw_model));
+    m.map_set(Value(std::string("modelSize")), Value::make_builtin(gfx_model_size));
+    m.map_set(Value(std::string("fitDistance")), Value::make_builtin(gfx_fit_distance));
+    m.map_set(Value(std::string("inFrustum")), Value::make_builtin(gfx_in_frustum));
+    m.map_set(Value(std::string("beginChunk")), Value::make_builtin(gfx_begin_chunk));
+    m.map_set(Value(std::string("endChunk")), Value::make_builtin(gfx_end_chunk));
+    m.map_set(Value(std::string("drawChunk")), Value::make_builtin(gfx_draw_chunk));
+    m.map_set(Value(std::string("drawChunkAlpha")), Value::make_builtin(gfx_draw_chunk_alpha));
+    m.map_set(Value(std::string("freeChunk")), Value::make_builtin(gfx_free_chunk));
+    m.map_set(Value(std::string("line3d")), Value::make_builtin(gfx_line3d));
+    m.map_set(Value(std::string("point3d")), Value::make_builtin(gfx_point3d));
+    m.map_set(Value(std::string("rotateq")), Value::make_builtin(gfx_rotateq));
+    register_quat(m);   // quat / quatAxis / quatEuler (classe Quat, graphics_quat.cpp)
 }

@@ -3,7 +3,7 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten/val.h>
 
-Value makeWindowModule() {
+Value make_window_module() {
     // Zone de dessin disponible : le conteneur #output-pane du playground s'il
     // existe, sinon le viewport (page autonome run.html, page externe…).
     // Sans repli, getElementById renvoie null → null.clientWidth plante.
@@ -32,24 +32,24 @@ Value makeWindowModule() {
         w = win["innerWidth"].as<int>();
         h = win["innerHeight"].as<int>();
     }
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("width")), Value((int64_t)w));
-    m.mapSet(Value(std::string("height")), Value((int64_t)h));
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("width")), Value((int64_t)w));
+    m.map_set(Value(std::string("height")), Value((int64_t)h));
     return m;
 }
 
 #elif defined(OLLIN_HAS_RAYLIB)
 
-Value makeWindowModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("width")), Value((int64_t)800));
-    m.mapSet(Value(std::string("height")), Value((int64_t)600));
+Value make_window_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("width")), Value((int64_t)800));
+    m.map_set(Value(std::string("height")), Value((int64_t)600));
     return m;
 }
 
 #else
 
-Value makeWindowModule() {
+Value make_window_module() {
     return Value();
 }
 

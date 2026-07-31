@@ -5,8 +5,8 @@
 #include <raymath.h>
 
 // Construit une instance Quat (classe native) depuis un Quaternion raymath.
-Value makeQuatInstance(Quaternion q);
+Value make_quat_instance(Quaternion q);
 // Relit une instance Quat → Quaternion raymath (lève si ce n'est pas un Quat).
-Quaternion quatFromInstance(const Value& v, const char* fn);
+Quaternion quat_from_instance(const Value& v, const char* fn);
 // Enregistre les fabriques quat / quat_axis / quat_euler dans le module graphics.
-void registerQuat(Value& m);
+void register_quat(Value& m);

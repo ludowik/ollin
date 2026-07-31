@@ -1,14 +1,14 @@
 #include "value.h"
 
-Value makeGraphicsModule() {
+Value make_graphics_module() {
     return Value();
 }
-Value makeKeyboardModule() {
+Value make_keyboard_module() {
     return Value();
 }
-Value makeMouseModule() {
+Value make_mouse_module() {
     return Value();
 }
-Value makeBlendModule() {
+Value make_blend_module() {
     return Value();
 }

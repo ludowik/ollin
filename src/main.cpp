@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
     {
         const char* home = std::getenv("HOME");
         std::string global = (home ? std::string(home) + "/" : "") + ".ollin-data-global.json";
-        dataSetNativePaths(scriptPath + ".data.json", global);
+        data_set_native_paths(scriptPath + ".data.json", global);
     }
 
     try {
@@ -66,7 +66,7 @@ int main(int argc, char* argv[]) {
 
         VM vm;
         vm.execute(Compiler().compile(program));
-        vm.runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée natif/WASM)
+        vm.run_entry_hooks(); // setup() puis draw()→graphics.run (logique partagée natif/WASM)
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n'; // filename:line déjà dans le message
         return 1;

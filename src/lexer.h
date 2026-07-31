@@ -17,12 +17,12 @@ class Lexer {
 
     char peek() const;
     char advance();
-    bool atEnd() const;
-    void skipWhitespace();
+    bool at_end() const;
+    void skip_whitespace();
     Token number(bool leading_dot = false);
     Token string();
-    void interpString(std::vector<Token>& out);
+    void interp_string(std::vector<Token>& out);
     Token identifier();
     Token comment();
-    Token blockComment();
+    Token block_comment();
 };

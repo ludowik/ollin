@@ -28,51 +28,51 @@ class Parser {
     int current_file_idx_ = 0;
     int depth_ = 0; // profondeur de récursion (garde anti-débordement de pile)
 
-    SourceLoc curLoc(int line) const { return {(uint16_t)current_file_idx_, (uint16_t)line}; }
+    SourceLoc cur_loc(int line) const { return {(uint16_t)current_file_idx_, (uint16_t)line}; }
 
 const Token& peek() const;
     const Token& advance();
     bool check(TokenType t) const;
     bool match(TokenType t);
     Token expect(TokenType t);
-    void skipComments();
+    void skip_comments();
 
-    TokenType peekNextType() const;
-    TokenType peekAt(int offset) const;
-    void consumeOptComment(); // absorbe un COMMENT optionnel
+    TokenType peek_next_type() const;
+    TokenType peek_at(int offset) const;
+    void consume_opt_comment(); // absorbe un COMMENT optionnel
 
-    std::unique_ptr<Stmt> parseOneStmt();
-    std::unique_ptr<Stmt> varDecl();
-    std::unique_ptr<Stmt> globalDecl();
-    std::unique_ptr<Stmt> constantDecl();
-    std::unique_ptr<Stmt> whileStmt();
-    std::unique_ptr<Stmt> doStmt();
-    std::unique_ptr<Stmt> ifStmt();
-    std::unique_ptr<Stmt> breakStmt();
-    std::unique_ptr<Stmt> continueStmt();
-    std::unique_ptr<Stmt> tryCatchStmt();
-    std::unique_ptr<Stmt> throwStmt();
-    std::unique_ptr<Stmt> funcDeclStmt();
-    std::unique_ptr<Stmt> returnStmt();
-    std::unique_ptr<Stmt> multiAssignStmt();
-    std::unique_ptr<Stmt> exprStmt();
+    std::unique_ptr<Stmt> parse_one_stmt();
+    std::unique_ptr<Stmt> var_decl();
+    std::unique_ptr<Stmt> global_decl();
+    std::unique_ptr<Stmt> constant_decl();
+    std::unique_ptr<Stmt> while_stmt();
+    std::unique_ptr<Stmt> do_stmt();
+    std::unique_ptr<Stmt> if_stmt();
+    std::unique_ptr<Stmt> break_stmt();
+    std::unique_ptr<Stmt> continue_stmt();
+    std::unique_ptr<Stmt> try_catch_stmt();
+    std::unique_ptr<Stmt> throw_stmt();
+    std::unique_ptr<Stmt> func_decl_stmt();
+    std::unique_ptr<Stmt> return_stmt();
+    std::unique_ptr<Stmt> multi_assign_stmt();
+    std::unique_ptr<Stmt> expr_stmt();
     // Construit l'instruction d'affectation à partir d'une cible déjà parsée
     // (VarExpr → AssignStmt ; IndexExpr → IndexAssignStmt chaîné). Rejette toute
     // autre forme (« invalid assignment target »).
-    std::unique_ptr<Stmt> finishAssignFromExpr(std::unique_ptr<Expr> target, int line);
-    std::unique_ptr<Stmt> forStmt();
-    std::unique_ptr<Stmt> importStmt();
-    std::unique_ptr<Stmt> classDecl();
-    std::unique_ptr<Stmt> switchStmt();
+    std::unique_ptr<Stmt> finish_assign_from_expr(std::unique_ptr<Expr> target, int line);
+    std::unique_ptr<Stmt> for_stmt();
+    std::unique_ptr<Stmt> import_stmt();
+    std::unique_ptr<Stmt> class_decl();
+    std::unique_ptr<Stmt> switch_stmt();
 
-    std::unique_ptr<Expr> parsePostfix(std::unique_ptr<Expr> base);
+    std::unique_ptr<Expr> parse_postfix(std::unique_ptr<Expr> base);
 
     std::unique_ptr<Expr> expr();
     std::unique_ptr<Expr> logical();
-    std::unique_ptr<Expr> logicalAnd();
-    std::unique_ptr<Expr> bitwiseOr();
-    std::unique_ptr<Expr> bitwiseXor();
-    std::unique_ptr<Expr> bitwiseAnd();
+    std::unique_ptr<Expr> logical_and();
+    std::unique_ptr<Expr> bitwise_or();
+    std::unique_ptr<Expr> bitwise_xor();
+    std::unique_ptr<Expr> bitwise_and();
     std::unique_ptr<Expr> comparison();
     std::unique_ptr<Expr> shift();
     std::unique_ptr<Expr> additive();
@@ -82,6 +82,6 @@ const Token& peek() const;
     std::unique_ptr<Expr> primary();
 
     // Range parsing helpers
-    bool looksLikeRange() const;                     // scan from current pos for SEMICOLON before COMMA/RBRACKET
-    std::unique_ptr<Expr> rangeExpr(bool incl_left); // parse rest after [ or ]
+    bool looks_like_range() const;                     // scan from current pos for SEMICOLON before COMMA/RBRACKET
+    std::unique_ptr<Expr> range_expr(bool incl_left); // parse rest after [ or ]
 };

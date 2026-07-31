@@ -3,6 +3,6 @@
 #include <string>
 #include <vector>
 
-const std::vector<std::string>& builtinModuleNames();
-const std::vector<std::string>& builtinFuncNames();
-Value makeBuiltinModule(const std::string& name);
+const std::vector<std::string>& builtin_module_names();
+const std::vector<std::string>& builtin_func_names();
+Value make_builtin_module(const std::string& name);

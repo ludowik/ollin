@@ -133,27 +133,27 @@ void image_reset() {
 
 static Value makeHandle(int id, int w, int h, TexHandle* ptr) {
     static const Value K_ID(std::string("id")), K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
-    Value m = Value::makeMap();
+    Value m = Value::make_map();
     m.mptr->userdata = ptr;
-    m.mapSet(K_ID, Value((int64_t)id));   // requis par graphics.sprite
-    m.mapSet(K_WIDTH, Value((int64_t)w));
-    m.mapSet(K_HEIGHT, Value((int64_t)h));
+    m.map_set(K_ID, Value((int64_t)id));   // requis par graphics.sprite
+    m.map_set(K_WIDTH, Value((int64_t)w));
+    m.map_set(K_HEIGHT, Value((int64_t)h));
     return m;
 }
 
 static TexHandle& handlePtr(const Value& v, const char* fn) {
-    if (!v.isMap() || !v.mptr->userdata)
+    if (!v.is_map() || !v.mptr->userdata)
         throw std::runtime_error(std::string(fn) + ": expected image handle");
     return *(TexHandle*)v.mptr->userdata;
 }
 
 static Color toColor(const Value& v) {
     static const Value K_R(std::string("r")), K_G(std::string("g")), K_B(std::string("b")), K_A(std::string("a"));
-    if (!v.isMap())
+    if (!v.is_map())
         throw std::runtime_error("image: expected Color object");
     auto gc = [&](const Value& k, double def) -> uint8_t {
-        Value f = v.mapGet(k);
-        return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0);
+        Value f = v.map_get(k);
+        return f.is_number() ? (uint8_t)(f.as_num() * 255.0 + 0.5) : (uint8_t)(def * 255.0);
     };
     return {gc(K_R, 1), gc(K_G, 1), gc(K_B, 1), gc(K_A, 1)};
 }
@@ -255,9 +255,9 @@ static std::vector<uint8_t> fetchBytesSync(const std::string& url) {
 
 static int img_load(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("image.load: expected path string");
-    const std::string& path = args[0].asString();
+    const std::string& path = args[0].as_string();
 
     TexHandle h;
     auto it = s_preloaded.find(path);
@@ -290,12 +290,12 @@ static int img_load(CallCtx& ctx) {
 
 static int img_load_data(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 2 || !args[0].isString() || !args[1].isString())
+    if (argc < 2 || !args[0].is_string() || !args[1].is_string())
         throw std::runtime_error("image.loadData: expected format string and base64 string");
-    std::string ext = args[0].asString();
+    std::string ext = args[0].as_string();
     if (ext[0] != '.')
         ext = "." + ext;
-    auto bytes = b64decode(args[1].asString());
+    auto bytes = b64decode(args[1].as_string());
     if (bytes.empty())
         throw std::runtime_error("image.loadData: empty or invalid base64 data");
 
@@ -316,8 +316,8 @@ static int img_load_data(CallCtx& ctx) {
 static int img_create(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.create";
-    int w = (int)numArg(args, argc, 0, FN);
-    int h = (int)numArg(args, argc, 1, FN);
+    int w = (int)num_arg(args, argc, 0, FN);
+    int h = (int)num_arg(args, argc, 1, FN);
     TexHandle hnd;
     hnd.rtt = LoadRenderTexture(w, h);
     hnd.is_render = true;
@@ -371,12 +371,12 @@ static int img_draw(CallCtx& ctx) {
     pixelsClose(h);
 
     Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
-    float x = (float)numArg(args, 1, FN);
-    float y = (float)numArg(args, 2, FN);
-    float dw = argc > 3 ? (float)numArg(args, 3, FN) : (float)tex.width;
-    float dh = argc > 4 ? (float)numArg(args, 4, FN) : (float)tex.height;
+    float x = (float)num_arg(args, 1, FN);
+    float y = (float)num_arg(args, 2, FN);
+    float dw = argc > 3 ? (float)num_arg(args, 3, FN) : (float)tex.width;
+    float dh = argc > 4 ? (float)num_arg(args, 4, FN) : (float)tex.height;
     // teinte : argument explicite prioritaire, sinon teinte globale (graphics.tint)
-    Color tint = (argc > 5 && args[5].isMap()) ? toColor(args[5]) : (s_has_tint ? s_tint : WHITE);
+    Color tint = (argc > 5 && args[5].is_map()) ? toColor(args[5]) : (s_has_tint ? s_tint : WHITE);
 
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
     float sh = h.is_render ? -(float)tex.height : (float)tex.height;
@@ -392,7 +392,7 @@ static int img_unload(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         return ctx.ret(Value{});
-    if (!args[0].isMap() || !args[0].mptr->userdata)
+    if (!args[0].is_map() || !args[0].mptr->userdata)
         return ctx.ret(Value{});
     TexHandle& h = *(TexHandle*)args[0].mptr->userdata;
     auto it = s_images.find(h.id);
@@ -442,8 +442,8 @@ static int img_get_pixel(CallCtx& ctx) {
     if (argc < 3)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y");
     TexHandle& h = handlePtr(args[0], FN);
-    int x = (int)numArg(args, 1, FN);
-    int y = (int)numArg(args, 2, FN);
+    int x = (int)num_arg(args, 1, FN);
+    int y = (int)num_arg(args, 2, FN);
     pixelsOpen(h);
     Color c;
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height) {
@@ -454,10 +454,10 @@ static int img_get_pixel(CallCtx& ctx) {
     } else {
         c = GetImageColor(h.cpu, x, y);
     }
-    ctx.setResult(0, Value(c.r / 255.0));
-    ctx.setResult(1, Value(c.g / 255.0));
-    ctx.setResult(2, Value(c.b / 255.0));
-    ctx.setResult(3, Value(c.a / 255.0));
+    ctx.set_result(0, Value(c.r / 255.0));
+    ctx.set_result(1, Value(c.g / 255.0));
+    ctx.set_result(2, Value(c.b / 255.0));
+    ctx.set_result(3, Value(c.a / 255.0));
     return 4;
 }
 
@@ -469,16 +469,16 @@ static int img_set_pixel(CallCtx& ctx) {
     if (argc < 4)
         throw std::runtime_error(std::string(FN) + ": expected img, x, y, color");
     TexHandle& h = handlePtr(args[0], FN);
-    int x = (int)numArg(args, 1, FN);
-    int y = (int)numArg(args, 2, FN);
+    int x = (int)num_arg(args, 1, FN);
+    int y = (int)num_arg(args, 2, FN);
     pixelsOpen(h);
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height)
         return ctx.ret(Value{}); // hors image → ignore (borne x,y ; sinon écriture OOB dans le chemin rapide)
     Color c = (argc >= 7) ? Color{
-        (uint8_t)(numArg(args, 3, FN) * 255.0 + 0.5),
-        (uint8_t)(numArg(args, 4, FN) * 255.0 + 0.5),
-        (uint8_t)(numArg(args, 5, FN) * 255.0 + 0.5),
-        (uint8_t)(numArg(args, 6, FN) * 255.0 + 0.5),
+        (uint8_t)(num_arg(args, 3, FN) * 255.0 + 0.5),
+        (uint8_t)(num_arg(args, 4, FN) * 255.0 + 0.5),
+        (uint8_t)(num_arg(args, 5, FN) * 255.0 + 0.5),
+        (uint8_t)(num_arg(args, 6, FN) * 255.0 + 0.5),
     } : toColor(args[3]);
     if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
         uint8_t* px = (uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
@@ -501,7 +501,7 @@ static int img_map_pixel(CallCtx& ctx) {
         throw std::runtime_error(std::string(FN) + ": expected img, fn");
     TexHandle& h = handlePtr(args[0], FN);
     Value fn = args[1];
-    if (!fn.isBuiltin() && !fn.isFuncVal() && !fn.isClosure())
+    if (!fn.is_builtin() && !fn.is_func_val() && !fn.is_closure())
         throw std::runtime_error(std::string(FN) + ": second argument must be a function");
     pixelsOpen(h);
     VM* vm = ctx.vm;
@@ -521,11 +521,11 @@ static int img_map_pixel(CallCtx& ctx) {
                 Value in[6] = {Value((int64_t)x),   Value((int64_t)y),   Value(c.r / 255.0),
                                Value(c.g / 255.0), Value(c.b / 255.0), Value(c.a / 255.0)};
                 Value out[4];
-                int n = vm->callValueMulti(fn, in, 6, out, 4);
+                int n = vm->call_value_multi(fn, in, 6, out, 4);
                 uint8_t ch[4] = {c.r, c.g, c.b, c.a};
                 for (int i = 0; i < n; ++i)
-                    if (out[i].isNumber())
-                        ch[i] = (uint8_t)(out[i].asNum() * 255.0 + 0.5);
+                    if (out[i].is_number())
+                        ch[i] = (uint8_t)(out[i].as_num() * 255.0 + 0.5);
                 Color nc = {ch[0], ch[1], ch[2], ch[3]};
                 // écriture recalculée : le callback a pu réallouer/redimensionner h.cpu
                 if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 && x < h.cpu.width && y < h.cpu.height) {
@@ -617,19 +617,19 @@ void image_free_tex(int id) {
 
 // ── makeImageModule ───────────────────────────────────────────────────────────
 
-Value makeImageModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("load")), Value::makeBuiltin(img_load));
-    m.mapSet(Value(std::string("loadData")), Value::makeBuiltin(img_load_data));
-    m.mapSet(Value(std::string("create")), Value::makeBuiltin(img_create));
-    m.mapSet(Value(std::string("beginDraw")), Value::makeBuiltin(img_begin));
-    m.mapSet(Value(std::string("endDraw")), Value::makeBuiltin(img_end));
-    m.mapSet(Value(std::string("draw")), Value::makeBuiltin(img_draw));
-    m.mapSet(Value(std::string("unload")), Value::makeBuiltin(img_unload));
-    m.mapSet(Value(std::string("beginPixels")), Value::makeBuiltin(img_begin_pixels));
-    m.mapSet(Value(std::string("endPixels")), Value::makeBuiltin(img_end_pixels));
-    m.mapSet(Value(std::string("getPixel")), Value::makeBuiltin(img_get_pixel));
-    m.mapSet(Value(std::string("setPixel")), Value::makeBuiltin(img_set_pixel));
-    m.mapSet(Value(std::string("mapPixel")), Value::makeBuiltin(img_map_pixel));
+Value make_image_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("load")), Value::make_builtin(img_load));
+    m.map_set(Value(std::string("loadData")), Value::make_builtin(img_load_data));
+    m.map_set(Value(std::string("create")), Value::make_builtin(img_create));
+    m.map_set(Value(std::string("beginDraw")), Value::make_builtin(img_begin));
+    m.map_set(Value(std::string("endDraw")), Value::make_builtin(img_end));
+    m.map_set(Value(std::string("draw")), Value::make_builtin(img_draw));
+    m.map_set(Value(std::string("unload")), Value::make_builtin(img_unload));
+    m.map_set(Value(std::string("beginPixels")), Value::make_builtin(img_begin_pixels));
+    m.map_set(Value(std::string("endPixels")), Value::make_builtin(img_end_pixels));
+    m.map_set(Value(std::string("getPixel")), Value::make_builtin(img_get_pixel));
+    m.map_set(Value(std::string("setPixel")), Value::make_builtin(img_set_pixel));
+    m.map_set(Value(std::string("mapPixel")), Value::make_builtin(img_map_pixel));
     return m;
 }

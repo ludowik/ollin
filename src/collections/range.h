@@ -30,7 +30,7 @@ struct RangeIterator : Iterator {
             return false;
         // Repli en entier si current est un entier exact tenant dans int64
         // (doubleFitsInt64 garde le cast — cf. value.h).
-        out = (doubleFitsInt64(current) && current == std::floor(current)) ? Value((int64_t)current)
+        out = (double_fits_int64(current) && current == std::floor(current)) ? Value((int64_t)current)
                                                                            : Value(current);
         current += step;
         return true;

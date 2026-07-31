@@ -7,42 +7,42 @@
 #include <unordered_map>
 #include <vector>
 
-std::string valueToString(const Value& v);
+std::string value_to_string(const Value& v);
 
 // Mémoire tas en cours d'usage (octets), multi-plateforme. Base de la builtin mem()
 // et de l'overlay mémoire du moteur graphique.
-uint64_t ollinHeapBytes();
+uint64_t ollin_heap_bytes();
 
 class VM {
   public:
     void execute(Chunk chunk);
-    std::string invokeStr(Value v);
+    std::string invoke_str(Value v);
     static VM* current();                   // returns s_current_vm
-    Value callValue(const Value& fn, const Value* args, int argc); // générique
-    Value callValue(const Value& fn);
-    Value callValue(const Value& fn, const Value& a);
-    Value callValue(const Value& fn, const Value& a, const Value& b);
-    Value callValue(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d);
+    Value call_value(const Value& fn, const Value* args, int argc); // générique
+    Value call_value(const Value& fn);
+    Value call_value(const Value& fn, const Value& a);
+    Value call_value(const Value& fn, const Value& a, const Value& b);
+    Value call_value(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d);
     // Comme callValue mais récupère jusqu'à out_cap valeurs de retour (multi-retour
     // natif→Ollin) ; renvoie le nombre effectivement écrit dans out.
-    int callValueMulti(const Value& fn, const Value* args, int argc, Value* out, int out_cap);
-    Value getGlobal(const std::string& name) const; // returns nil if not found
-    void setGlobal(const std::string& name, const Value& value);
+    int call_value_multi(const Value& fn, const Value* args, int argc, Value* out, int out_cap);
+    Value get_global(const std::string& name) const; // returns nil if not found
+    void set_global(const std::string& name, const Value& value);
     // Après execute() : appelle setup() une fois, puis lance la boucle graphique via
     // graphics.run(draw) si un draw() est défini. Partagé par les points d'entrée
     // natif et WASM (une seule version gardée : graphics peut être nil/non-map).
-    void runEntryHooks();
+    void run_entry_hooks();
 
     // Marqueur « graphics.canvas() a été appelé pour ce programme » (VM neuf par run).
     // Permet à runEntryHooks de créer un canvas IMPLICITE (à W×H) si un draw() existe
     // mais qu'aucun canvas n'a été créé explicitement. Posé par gfx_canvas.
-    void markGfxCanvas() { gfx_canvas_created_ = true; }
-    bool gfxCanvasCreated() const { return gfx_canvas_created_; }
+    void mark_gfx_canvas() { gfx_canvas_created_ = true; }
+    bool gfx_canvas_created() const { return gfx_canvas_created_; }
 
   private:
     bool gfx_canvas_created_ = false;
-    std::string errLine() const;      // "file:line" from current ip
-    void runGoto(size_t stop_depth); // unified computed-goto dispatch loop
+    std::string err_line() const;      // "file:line" from current ip
+    void run_goto(size_t stop_depth); // unified computed-goto dispatch loop
     struct Handler {
         uint32_t catch_addr;
         uint8_t catch_reg;
@@ -81,44 +81,44 @@ class VM {
     // réellement renvoyé (sinon elles liraient des registres périmés).
     int last_results_ = 1;
 
-    static Value protoChainGet(const Value& obj, const Value& key);
+    static Value proto_chain_get(const Value& obj, const Value& key);
 
-    static bool isInstance(const Value& v);
+    static bool is_instance(const Value& v);
 
-    uint32_t tryMetaBinary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
+    uint32_t try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
     // Instancie `cls` : instance en regs[base_reg], args en regs[base_reg+arg_off+i].
     // done=true si aucun frame poussé (init absent/builtin, résultat déjà écrit) ;
     // sinon retourne l'adresse du corps de init (frame constructeur poussé).
-    uint32_t instantiateClass(int base_reg, int arg_off, int argc, Value cls, bool& done);
-    uint32_t tryMetaUnary(const Value& name, int dest, Value lhs);
-    void closeUpvals();           // closes & frees all open upvalues of the top frame
+    uint32_t instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done);
+    uint32_t try_meta_unary(const Value& name, int dest, Value lhs);
+    void close_upvals();           // closes & frees all open upvalues of the top frame
     // Déroule la pile jusqu'au handler `h`, remet regs à sa taille, écrit la valeur
     // capturée dans le registre de catch et positionne `ip` sur le corps du catch.
     // Partagé par op_THROW (throw utilisateur) et le catch(runtime_error) C++.
-    void unwindToHandler(const Handler& h, Value thrown);
-    void growRegs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
+    void unwind_to_handler(const Handler& h, Value thrown);
+    void grow_regs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
 
     // Invoque un builtin : construit le CallCtx, appelle, met à jour last_results_,
     // renvoie le nombre de valeurs produites. Point d'entrée UNIQUE des 6 sites
     // d'appel builtin → le calcul de result_cap n'est écrit qu'ici (impossible à
     // oublier/se tromper à un futur site). `results` = slots résultat (= args), `cap`
     // = nombre de slots sûrs.
-    int invokeBuiltin(Value::BuiltinFn fn, Value* results, int argc, int cap);
+    int invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap);
     // Variante registres : les résultats vont dans regs[result_base..] et `cap` est
     // dérivé du frame courant (varargs_base - result_base) — le calcul piégeux,
     // centralisé ici. Utilisée par CALL_DYN et CALL_METHOD.
-    int invokeBuiltinRegs(Value::BuiltinFn fn, int result_base, int argc);
+    int invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc);
 
     // Pousse un frame d'appel, remplit les défauts et varargs, retourne fp.addr.
-    uint32_t pushCallFrame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+    uint32_t push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                            uint32_t return_ip, bool is_ctor = false, int return_dest = -1, int result_base = -1);
 
-    [[gnu::always_inline]] inline double asDouble(const Value& v) {
-        if (v.isInteger())
-            return (double)v.asInt();
-        if (v.isFloat())
-            return v.asFloat();
-        if (v.isNil())
+    [[gnu::always_inline]] inline double as_double(const Value& v) {
+        if (v.is_integer())
+            return (double)v.as_int();
+        if (v.is_float())
+            return v.as_float();
+        if (v.is_nil())
             throw std::runtime_error("runtime: expected number, got nil");
         throw std::runtime_error("runtime: expected number, got string");
     }

@@ -36,7 +36,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
         source_files->push_back(fname);
         s_vm->execute(Compiler().compile(
             Parser(Lexer(source, fname, 0).tokenize(), "", imported, nullptr, source_files).parse()));
-        s_vm->runEntryHooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
+        s_vm->run_entry_hooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
         return std::string("error: ") + e.what();
@@ -66,8 +66,8 @@ static void preload_source_js(const std::string& path, const std::string& conten
 
 // Charge les données persistées (module `data`) avant un run. La SPA lit
 // localStorage (portée projet + globale) et passe les deux blobs JSON.
-static void data_load_js(const std::string& projectBlob, const std::string& globalBlob) {
-    dataLoad(projectBlob, globalBlob);
+static void data_load_js(const std::string& project_blob, const std::string& global_blob) {
+    data_load(project_blob, global_blob);
 }
 
 EMSCRIPTEN_BINDINGS(ollin) {

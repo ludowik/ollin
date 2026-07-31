@@ -17,12 +17,12 @@
 
 // gfxToInt : fourni en inline par graphics_internal.h (partagé 2D/3D).
 // gfxToColor : déclaré dans graphics_internal.h, défini ici (lu aussi par graphics3d.cpp).
-Color gfxToColor(const Value& v) {
-    if (!v.isMap() && !v.isClass())
+Color gfx_to_color(const Value& v) {
+    if (!v.is_map() && !v.is_class())
         throw std::runtime_error("expected a Color object");
     auto getComp = [&](const char* k, double def) -> uint8_t {
-        Value f = v.mapGet(Value(std::string(k)));
-        return f.isNumber() ? (uint8_t)(f.asNum() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
+        Value f = v.map_get(Value(std::string(k)));
+        return f.is_number() ? (uint8_t)(f.as_num() * 255.0 + 0.5) : (uint8_t)(def * 255.0 + 0.5);
     };
     return {getComp("r", 0), getComp("g", 0), getComp("b", 0), getComp("a", 1)};
 }
@@ -72,14 +72,14 @@ static bool s_run_active = false;
 
 static int gfx_canvas(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    int w = argc > 0 ? gfxToInt(args[0]) : 800;
-    int h = argc > 1 ? gfxToInt(args[1]) : 600;
-    const char* title = (argc > 2 && args[2].isString()) ? args[2].asString().c_str() : "Ollin";
+    int w = argc > 0 ? gfx_to_int(args[0]) : 800;
+    int h = argc > 1 ? gfx_to_int(args[1]) : 600;
+    const char* title = (argc > 2 && args[2].is_string()) ? args[2].as_string().c_str() : "Ollin";
     s_shot_pending = false;   // nouveau programme → oublier une capture en attente
     s_blend_mode = BLEND_ALPHA;
     // Éclairage 3D remis à neuf ICI (avant que setup()/top-level ne pose ambient/
     // light) — et non dans gfx_run, qui s'exécute APRÈS et effacerait la config.
-    reset3dLightingState();
+    reset3d_lighting_state();
     s_run_active = false;   // nouveau programme → autorise (un seul) graphics.run
 #ifdef __EMSCRIPTEN__
     // RÉUTILISER le contexte WebGL entre deux runs (playground) au lieu de
@@ -95,14 +95,14 @@ static int gfx_canvas(CallCtx& ctx) {
             UnloadRenderTexture(s_target);
             s_target_ready = false;
         }
-        reset3dGraphicsState();               // libérer shader/meshes/textures/VBO 3D dans CE contexte
+        reset3d_graphics_state();               // libérer shader/meshes/textures/VBO 3D dans CE contexte
     }
     double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
     s_physH = (int)(h * dpr + 0.5);
     // InitWindow with logical dimensions — sets projection [0,w]×[0,h]
     EM_ASM({
-        var o = document.getElementById('output');
+        var o = document.get_element_by_id('output');
         if (o)
             o.style.display = 'none';
     });
@@ -118,7 +118,7 @@ static int gfx_canvas(CallCtx& ctx) {
     // rlViewport in emscripten_frame will render to the full physical bitmap
     EM_ASM(
         {
-            var c = document.getElementById('canvas');
+            var c = document.get_element_by_id('canvas');
             if (c) {
                 c.width = $0;
                 c.height = $1;
@@ -134,7 +134,7 @@ static int gfx_canvas(CallCtx& ctx) {
             UnloadRenderTexture(s_target);
             s_target_ready = false;
         }
-        reset3dGraphicsState();   // libérer les ressources GL 3D avant une éventuelle réinitialisation
+        reset3d_graphics_state();   // libérer les ressources GL 3D avant une éventuelle réinitialisation
     }
     s_physW = w;
     s_physH = h;
@@ -148,10 +148,10 @@ static int gfx_canvas(CallCtx& ctx) {
     // dimensions logiques, CW/CH au centre (float). Ainsi graphics.canvas(w, h)
     // recalcule W/H/CW/CH même quand w/h diffèrent des valeurs initiales window.
     if (VM* vm = VM::current()) {
-        vm->setGlobal("W", Value((int64_t)w));
-        vm->setGlobal("H", Value((int64_t)h));
-        vm->setGlobal("CW", Value((double)w / 2.0));
-        vm->setGlobal("CH", Value((double)h / 2.0));
+        vm->set_global("W", Value((int64_t)w));
+        vm->set_global("H", Value((int64_t)h));
+        vm->set_global("CW", Value((double)w / 2.0));
+        vm->set_global("CH", Value((double)h / 2.0));
     }
     // Cible de rendu persistante. On vise un sur-échantillonnage RELATIF au
     // logique (~SSAA×) pour l'anti-aliasing, MAIS sans jamais descendre sous la
@@ -178,13 +178,13 @@ static int gfx_canvas(CallCtx& ctx) {
         ClearBackground(BLACK);
         EndTextureMode();
     }
-    Value win = VM::current()->getGlobal("window");
-    if (win.isMap()) {
-        win.mapSet(Value(std::string("width")), Value((int64_t)w));
-        win.mapSet(Value(std::string("height")), Value((int64_t)h));
+    Value win = VM::current()->get_global("window");
+    if (win.is_map()) {
+        win.map_set(Value(std::string("width")), Value((int64_t)w));
+        win.map_set(Value(std::string("height")), Value((int64_t)h));
     }
     if (VM* vm = VM::current())
-        vm->markGfxCanvas();   // canvas explicite → pas de canvas implicite (runEntryHooks)
+        vm->mark_gfx_canvas();   // canvas explicite → pas de canvas implicite (runEntryHooks)
     return ctx.ret(Value{});
 }
 
@@ -216,7 +216,7 @@ static int gfx_clear(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Color c = BLACK;
     if (argc > 0) {
-        ColorRGBA k = parseColor(args, argc, "clear");
+        ColorRGBA k = parse_color(args, argc, "clear");
         c = rgbaColor(k.r, k.g, k.b, k.a);
     }
     if (c.a < 255) {
@@ -243,8 +243,8 @@ static int gfx_clear(CallCtx& ctx) {
 static int gfx_blend_mode(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     int mode = BLEND_ALPHA;
-    if (argc > 0 && args[0].isString()) {
-        const std::string& s = args[0].asString();
+    if (argc > 0 && args[0].is_string()) {
+        const std::string& s = args[0].as_string();
         if (s == "alpha") {
             mode = BLEND_ALPHA;
         } else if (s == "add" || s == "additive") {
@@ -260,8 +260,8 @@ static int gfx_blend_mode(CallCtx& ctx) {
         } else {
             throw std::runtime_error("graphics.blendMode: mode inconnu '" + s + "'");
         }
-    } else if (argc > 0 && args[0].isNumber()) {
-        mode = (int)args[0].asNum();   // constante du module `blend`
+    } else if (argc > 0 && args[0].is_number()) {
+        mode = (int)args[0].as_num();   // constante du module `blend`
     }
     s_blend_mode = mode;
     BeginBlendMode(mode);
@@ -313,22 +313,22 @@ static void applyFill(bool en, Color c = WHITE) {
 }
 
 // Accesseurs d'état de style (déclarés dans graphics_internal.h) — lus par graphics3d.cpp.
-bool gfxHasFill() {
+bool gfx_has_fill() {
     return s_has_fill;
 }
-Color gfxFillColor() {
+Color gfx_fill_color() {
     return s_fill_color;
 }
-bool gfxHasStroke() {
+bool gfx_has_stroke() {
     return s_has_stroke;
 }
-Color gfxStrokeColor() {
+Color gfx_stroke_color() {
     return s_stroke_color;
 }
-float gfxStrokeSize() {
+float gfx_stroke_size() {
     return s_stroke_size;
 }
-int gfxSegments() {
+int gfx_segments() {
     return s_segments;
 }
 
@@ -337,7 +337,7 @@ int gfxSegments() {
 // teinte d'image (image_module) et texture 3D courante (graphics3d). Utilisé par
 // push/pop (matrice + style) et pushStyle/popStyle (style seul).
 struct StyleState {
-    float strokeSize;
+    float stroke_size;
     bool  hasStroke;
     Color strokeColor;
     bool  hasFill;
@@ -352,20 +352,20 @@ static std::vector<StyleState> s_style_stack;
 
 static StyleState captureStyle() {
     StyleState s;
-    s.strokeSize = s_stroke_size;
+    s.stroke_size = s_stroke_size;
     s.hasStroke = s_has_stroke;
     s.strokeColor = s_stroke_color;
     s.hasFill = s_has_fill;
     s.fillColor = s_fill_color;
     s.blendMode = s_blend_mode;
     image_get_tint(&s.hasTint, &s.tint.r, &s.tint.g, &s.tint.b, &s.tint.a);
-    s.tex3d = gfx3dGetTexture();
+    s.tex3d = gfx3d_get_texture();
     s.segments = s_segments;
     return s;
 }
 
 static void restoreStyle(const StyleState& s) {
-    s_stroke_size = s.strokeSize;
+    s_stroke_size = s.stroke_size;
     s_has_stroke = s.hasStroke;
     s_stroke_color = s.strokeColor;
     s_has_fill = s.hasFill;
@@ -373,17 +373,17 @@ static void restoreStyle(const StyleState& s) {
     s_blend_mode = s.blendMode;
     BeginBlendMode(s.blendMode);
     image_set_tint(s.hasTint, s.tint.r, s.tint.g, s.tint.b, s.tint.a);
-    gfx3dSetTexture(s.tex3d);
+    gfx3d_set_texture(s.tex3d);
     s_segments = s.segments;
 }
 
-static void resetStyles() {
+static void reset_styles() {
     applyStrokeSize(2.0f);
     applyStroke(true, WHITE);
     applyFill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
     s_blend_mode = BLEND_ALPHA;                   // mode de fusion remis par défaut chaque frame
-    reset3dFrameState();                          // texture 3D remise à « aucune » (blanche) chaque frame
+    reset3d_frame_state();                          // texture 3D remise à « aucune » (blanche) chaque frame
     s_style_stack.clear();                        // pile de style repartie à neuf chaque frame (push/pop équilibrés dans draw)
     BeginBlendMode(BLEND_ALPHA);
     rlLoadIdentity();
@@ -391,15 +391,15 @@ static void resetStyles() {
 
 static int gfx_stroke_size(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && args[0].isNumber())
-        applyStrokeSize((float)args[0].asNum());
+    if (argc > 0 && args[0].is_number())
+        applyStrokeSize((float)args[0].as_num());
     return ctx.ret(Value{});
 }
 
 static int gfx_segments(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && args[0].isNumber())
-        s_segments = std::max(3, (int)args[0].asNum());
+    if (argc > 0 && args[0].is_number())
+        s_segments = std::max(3, (int)args[0].as_num());
     return ctx.ret(Value{});
 }
 
@@ -409,12 +409,12 @@ static int gfx_stroke(CallCtx& ctx) {
         s_has_stroke = true;                   // sans argument → (ré)active avec la couleur courante
         return ctx.ret(Value{});
     }
-    ColorRGBA k = parseColor(args, argc, "stroke");
+    ColorRGBA k = parse_color(args, argc, "stroke");
     applyStroke(true, rgbaColor(k.r, k.g, k.b, k.a));
     // Taille optionnelle : seulement avec un objet Color en 1er arg — stroke(Color, taille).
     // (Pour les formes numériques, utiliser graphics.strokeSize : les nombres = couleur.)
-    if ((args[0].isMap() || args[0].isClass()) && argc > 1 && args[1].isNumber())
-        applyStrokeSize((float)args[1].asNum());
+    if ((args[0].is_map() || args[0].is_class()) && argc > 1 && args[1].is_number())
+        applyStrokeSize((float)args[1].as_num());
     return ctx.ret(Value{});
 }
 
@@ -432,7 +432,7 @@ static int gfx_fill(CallCtx& ctx) {
         s_has_fill = true;                   // sans argument → (ré)active avec la couleur courante
         return ctx.ret(Value{});
     }
-    ColorRGBA k = parseColor(args, argc, "fill");
+    ColorRGBA k = parse_color(args, argc, "fill");
     applyFill(true, rgbaColor(k.r, k.g, k.b, k.a));
     return ctx.ret(Value{});
 }
@@ -450,7 +450,7 @@ static int gfx_tint(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
         return ctx.ret(Value{});   // sans argument : ne change rien
-    ColorRGBA k = parseColor(args, argc, "tint");   // même signature que clear/fill/stroke
+    ColorRGBA k = parse_color(args, argc, "tint");   // même signature que clear/fill/stroke
     Color c = rgbaColor(k.r, k.g, k.b, k.a);
     image_set_tint(true, c.r, c.g, c.b, c.a);
     return ctx.ret(Value{});
@@ -470,10 +470,10 @@ static int gfx_line(CallCtx& ctx) {
         throw std::runtime_error("graphics.line: expected x1, y1, x2, y2");
     if (!s_has_stroke)
         return ctx.ret(Value{});
-    float x1 = (float)numArg(args, 0, "graphics.line");
-    float y1 = (float)numArg(args, 1, "graphics.line");
-    float x2 = (float)numArg(args, 2, "graphics.line");
-    float y2 = (float)numArg(args, 3, "graphics.line");
+    float x1 = (float)num_arg(args, 0, "graphics.line");
+    float y1 = (float)num_arg(args, 1, "graphics.line");
+    float x2 = (float)num_arg(args, 2, "graphics.line");
+    float y2 = (float)num_arg(args, 3, "graphics.line");
     StrokeWC s = strokeParams();   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
     DrawLineEx({x1, y1}, {x2, y2}, s.w, s.c);
     return ctx.ret(Value{});
@@ -483,10 +483,10 @@ static int gfx_rect(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.rect: expected x, y, w, h");
-    int x = gfxToInt(args[0]);
-    int y = gfxToInt(args[1]);
-    int w = gfxToInt(args[2]);
-    int h = gfxToInt(args[3]);
+    int x = gfx_to_int(args[0]);
+    int y = gfx_to_int(args[1]);
+    int w = gfx_to_int(args[2]);
+    int h = gfx_to_int(args[3]);
     if (s_has_fill)
         DrawRectangle(x, y, w, h, s_fill_color);
     if (s_has_stroke) {
@@ -510,9 +510,9 @@ static int gfx_fps(CallCtx& ctx) {
 // TakeScreenshot déclenche un téléchargement. (s_shot_path/s_shot_pending : voir haut.)
 static int gfx_screenshot(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("graphics.screenshot: expected a file path");
-    s_shot_path = args[0].asString();
+    s_shot_path = args[0].as_string();
     s_shot_pending = true;
     return ctx.ret(Value{});
 }
@@ -531,8 +531,8 @@ static int gfx_text(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.text: expected text, x, y, size [, color]");
-    const char* text = args[0].isString() ? args[0].asString().c_str() : "";
-    DrawText(text, gfxToInt(args[1]), gfxToInt(args[2]), gfxToInt(args[3]), argc > 4 ? gfxToColor(args[4]) : s_stroke_color);
+    const char* text = args[0].is_string() ? args[0].as_string().c_str() : "";
+    DrawText(text, gfx_to_int(args[1]), gfx_to_int(args[2]), gfx_to_int(args[3]), argc > 4 ? gfx_to_color(args[4]) : s_stroke_color);
     return ctx.ret(Value{});
 }
 
@@ -573,19 +573,19 @@ static void polyFill(std::vector<Vector2> pts, Color color) {
 
 static std::vector<Vector2> parsePoints(const Value& v, const char* fn) {
     std::vector<Vector2> pts;
-    if (!v.isArray())
+    if (!v.is_array())
         return pts;
     const auto& items = v.aptr->items;
     if (items.empty())
         return pts;
     auto req = [&](const Value& c) -> float {
-        if (!c.isNumber())
+        if (!c.is_number())
             throw std::runtime_error(std::string(fn) + ": les coordonnées de point doivent être des nombres");
-        return (float)c.asNum();
+        return (float)c.as_num();
     };
-    if (items[0].isArray()) {
+    if (items[0].is_array()) {
         for (const auto& p : items) {
-            if (!p.isArray() || p.aptr->items.size() < 2)
+            if (!p.is_array() || p.aptr->items.size() < 2)
                 continue;
             pts.push_back({req(p.aptr->items[0]), req(p.aptr->items[1])});
         }
@@ -618,7 +618,7 @@ static void drawThickPath(const std::vector<Vector2>& pts, bool closed, float w,
 static int gfx_polygon(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.polygon";
-    if (argc < 1 || !args[0].isArray())
+    if (argc < 1 || !args[0].is_array())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
     auto pts = parsePoints(args[0], FN);
     if ((int)pts.size() < 3)
@@ -635,7 +635,7 @@ static int gfx_polygon(CallCtx& ctx) {
 static int gfx_polyline(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.polyline";
-    if (argc < 1 || !args[0].isArray())
+    if (argc < 1 || !args[0].is_array())
         throw std::runtime_error(std::string(FN) + ": expected array of points");
     if (!s_has_stroke)
         return ctx.ret(Value{});
@@ -710,9 +710,9 @@ static int gfx_ellipse(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.ellipse: expected x, y, width, height");
-    int segs = (argc > 4 && args[4].isNumber()) ? std::max(3, (int)args[4].asNum()) : s_segments;
-    drawOval((float)numArg(args, 0, "graphics.ellipse"), (float)numArg(args, 1, "graphics.ellipse"),
-             (float)numArg(args, 2, "graphics.ellipse") * 0.5f, (float)numArg(args, 3, "graphics.ellipse") * 0.5f, segs);
+    int segs = (argc > 4 && args[4].is_number()) ? std::max(3, (int)args[4].as_num()) : s_segments;
+    drawOval((float)num_arg(args, 0, "graphics.ellipse"), (float)num_arg(args, 1, "graphics.ellipse"),
+             (float)num_arg(args, 2, "graphics.ellipse") * 0.5f, (float)num_arg(args, 3, "graphics.ellipse") * 0.5f, segs);
     return ctx.ret(Value{});
 }
 
@@ -720,9 +720,9 @@ static int gfx_circle(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
         throw std::runtime_error("graphics.circle: expected x, y, radius");
-    int segs = (argc > 3 && args[3].isNumber()) ? std::max(3, (int)args[3].asNum()) : s_segments;
-    float r = (float)numArg(args, 2, "graphics.circle");
-    drawOval((float)numArg(args, 0, "graphics.circle"), (float)numArg(args, 1, "graphics.circle"), r, r, segs);
+    int segs = (argc > 3 && args[3].is_number()) ? std::max(3, (int)args[3].as_num()) : s_segments;
+    float r = (float)num_arg(args, 2, "graphics.circle");
+    drawOval((float)num_arg(args, 0, "graphics.circle"), (float)num_arg(args, 1, "graphics.circle"), r, r, segs);
     return ctx.ret(Value{});
 }
 
@@ -776,12 +776,12 @@ static int gfx_arc(CallCtx& ctx) {
     static constexpr const char* FN = "graphics.arc";
     if (argc < 6)
         throw std::runtime_error(std::string(FN) + ": expected x, y, w, h, start, stop");
-    float cx = (float)numArg(args, 0, FN);
-    float cy = (float)numArg(args, 1, FN);
-    float rx = (float)numArg(args, 2, FN) * 0.5f;
-    float ry = (float)numArg(args, 3, FN) * 0.5f;
-    float start = (float)numArg(args, 4, FN);
-    float stop = (float)numArg(args, 5, FN);
+    float cx = (float)num_arg(args, 0, FN);
+    float cy = (float)num_arg(args, 1, FN);
+    float rx = (float)num_arg(args, 2, FN) * 0.5f;
+    float ry = (float)num_arg(args, 3, FN) * 0.5f;
+    float start = (float)num_arg(args, 4, FN);
+    float stop = (float)num_arg(args, 5, FN);
     while (stop < start) {
         stop += 2.0f * PI;
     }
@@ -809,8 +809,8 @@ static int gfx_point(CallCtx& ctx) {
         throw std::runtime_error("graphics.point: expected x, y");
     if (!s_has_stroke)
         return ctx.ret(Value{});
-    float x = (float)numArg(args, 0, "graphics.point");
-    float y = (float)numArg(args, 1, "graphics.point");
+    float x = (float)num_arg(args, 0, "graphics.point");
+    float y = (float)num_arg(args, 1, "graphics.point");
     DrawCircleV({x, y}, s_stroke_size, s_stroke_color);
     return ctx.ret(Value{});
 }
@@ -840,7 +840,7 @@ static void drawFpsOverlay() {
     }
     int fps = (int)(s_fps_ema + 0.5);
     // Mémoire utilisée à côté du FPS (Ko sous 1 Mo, sinon Mo).
-    double kb = ollinHeapBytes() / 1024.0;
+    double kb = ollin_heap_bytes() / 1024.0;
     const char* buf = (kb >= 1024.0) ? TextFormat("%.1f Mo  %d fps", kb / 1024.0, fps)
                                      : TextFormat("%.0f Ko  %d fps", kb, fps);
     const int size = 16, margin = 8;
@@ -872,10 +872,10 @@ static void callUpdateIfAny() {
     double dt = s_frame_dt;   // notre mesure fiable, pas GetFrameTime() (cf. plus haut)
     s_elapsed_time += dt;
     VM* vm = VM::current();
-    vm->setGlobal("deltaTime", Value(dt));
-    vm->setGlobal("elapsedTime", Value(s_elapsed_time));
-    if (s_update_callback.isCallable())
-        vm->callValue(s_update_callback, Value(dt));
+    vm->set_global("deltaTime", Value(dt));
+    vm->set_global("elapsedTime", Value(s_elapsed_time));
+    if (s_update_callback.is_callable())
+        vm->call_value(s_update_callback, Value(dt));
 }
 
 // Rend UNE frame. Le contexte n'est PAS effacé d'office : draw() dessine dans la
@@ -886,12 +886,12 @@ static void callUpdateIfAny() {
 // Prélude commun d'une frame : styles par défaut, entrées, logique (update),
 // puis rendu utilisateur (draw). Partagé par les deux chemins de renderFrame.
 static void runUserCallbacks(const Value& drawFn) {
-    resetStyles();
-    keyboardPoll();
-    mousePoll();
+    reset_styles();
+    keyboard_poll();
+    mouse_poll();
     callUpdateIfAny();
-    VM::current()->callValue(const_cast<Value&>(drawFn));
-    end3dInternal();   // no-op hors 3D ; sinon flush + refermer si draw() a oublié end3d
+    VM::current()->call_value(const_cast<Value&>(drawFn));
+    end3d_internal();   // no-op hors 3D ; sinon flush + refermer si draw() a oublié end3d
 }
 
 static void renderFrame(const Value& drawFn, bool* tex, bool* drawing) {
@@ -992,8 +992,8 @@ static int gfx_run(CallCtx& ctx) {
     s_elapsed_time = 0.0;
     s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
     s_fps_ema = 0.0;
-    keyboardReset();            // état clavier neuf (s_down statique persiste entre runs WASM)
-    s_update_callback = VM::current()->getGlobal("update");
+    keyboard_reset();            // état clavier neuf (s_down statique persiste entre runs WASM)
+    s_update_callback = VM::current()->get_global("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
     emscripten_set_main_loop(emscripten_frame, 0, 0);
@@ -1076,9 +1076,9 @@ static int gfx_translate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2)
         throw std::runtime_error("graphics.translate: expected x, y [, z]");
-    float x = (float)numArg(args, 0, "graphics.translate");
-    float y = (float)numArg(args, 1, "graphics.translate");
-    float z = argc > 2 ? (float)numArg(args, 2, "graphics.translate") : 0.0f;
+    float x = (float)num_arg(args, 0, "graphics.translate");
+    float y = (float)num_arg(args, 1, "graphics.translate");
+    float z = argc > 2 ? (float)num_arg(args, 2, "graphics.translate") : 0.0f;
     rlTranslatef(x, y, z);
     return ctx.ret(Value{});
 }
@@ -1086,7 +1086,7 @@ static int gfx_translate(CallCtx& ctx) {
 // Rotation de deg° (argument 0) autour de l'axe (ax,ay,az) — facteur commun de
 // rotate (axe Z par défaut) et de rotateX/rotateY/rotateZ.
 static void rotateAxis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
-    rlRotatef((float)numArg(args, argc, 0, fn), ax, ay, az);
+    rlRotatef((float)num_arg(args, argc, 0, fn), ax, ay, az);
 }
 
 // graphics.rotate(deg [, ax, ay, az]) : sans axe → autour de Z ; avec les 3
@@ -1097,8 +1097,8 @@ static int gfx_rotate(CallCtx& ctx) {
     if (argc == 1) {
         rotateAxis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // axe Z par défaut
     } else if (argc >= 4) {
-        rlRotatef((float)numArg(args, argc, 0, "graphics.rotate"), (float)numArg(args, argc, 1, "graphics.rotate"),
-                  (float)numArg(args, argc, 2, "graphics.rotate"), (float)numArg(args, argc, 3, "graphics.rotate"));
+        rlRotatef((float)num_arg(args, argc, 0, "graphics.rotate"), (float)num_arg(args, argc, 1, "graphics.rotate"),
+                  (float)num_arg(args, argc, 2, "graphics.rotate"), (float)num_arg(args, argc, 3, "graphics.rotate"));
     } else {
         throw std::runtime_error("graphics.rotate: expected deg [, ax, ay, az] (axe complet ou aucun)");
     }
@@ -1127,13 +1127,13 @@ static int gfx_scale(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.scale: expected s | sx, sy | sx, sy, sz");
-    float sx = (float)numArg(args, 0, "graphics.scale");
+    float sx = (float)num_arg(args, 0, "graphics.scale");
     float sy, sz;
     if (argc >= 3) {
-        sy = (float)numArg(args, 1, "graphics.scale");
-        sz = (float)numArg(args, 2, "graphics.scale");
+        sy = (float)num_arg(args, 1, "graphics.scale");
+        sz = (float)num_arg(args, 2, "graphics.scale");
     } else if (argc == 2) {
-        sy = (float)numArg(args, 1, "graphics.scale");
+        sy = (float)num_arg(args, 1, "graphics.scale");
         sz = 1.0f;
     } else {
         sy = sx;   // uniforme sur les 3 axes
@@ -1157,17 +1157,17 @@ static int gfx_sprite(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
         throw std::runtime_error("graphics.sprite: expected img, x, y");
-    if (!args[0].isMap())
+    if (!args[0].is_map())
         throw std::runtime_error("graphics.sprite: expected image handle");
-    Value idv = args[0].mapGet(Value(std::string("id")));
-    if (!idv.isInteger())
+    Value idv = args[0].map_get(Value(std::string("id")));
+    if (!idv.is_integer())
         throw std::runtime_error("graphics.sprite: invalid image handle");
-    int id = (int)idv.asInt();
+    int id = (int)idv.as_int();
 
-    float x = (float)numArg(args, 1, "graphics.sprite");
-    float y = (float)numArg(args, 2, "graphics.sprite");
-    float dw = argc > 3 ? (float)numArg(args, 3, "graphics.sprite") : 0.0f;
-    float dh = argc > 4 ? (float)numArg(args, 4, "graphics.sprite") : 0.0f;
+    float x = (float)num_arg(args, 1, "graphics.sprite");
+    float y = (float)num_arg(args, 2, "graphics.sprite");
+    float dw = argc > 3 ? (float)num_arg(args, 3, "graphics.sprite") : 0.0f;
+    float dh = argc > 4 ? (float)num_arg(args, 4, "graphics.sprite") : 0.0f;
 
     bool has = false;
     unsigned char r = 255, g = 255, b = 255, a = 255;
@@ -1180,62 +1180,62 @@ static int gfx_sprite(CallCtx& ctx) {
 // Module `blend` : modes de fusion exposés via les enums raylib DIRECTEMENT
 // (source de vérité — pas de littéraux à maintenir/vérifier). Défini ici plutôt
 // que dans modules.cpp car ce dernier compile aussi sans raylib.
-Value makeBlendModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("ALPHA")), Value((int64_t)BLEND_ALPHA));
-    m.mapSet(Value(std::string("ADD")), Value((int64_t)BLEND_ADDITIVE));
-    m.mapSet(Value(std::string("MULTIPLY")), Value((int64_t)BLEND_MULTIPLIED));
-    m.mapSet(Value(std::string("ADD_COLORS")), Value((int64_t)BLEND_ADD_COLORS));
-    m.mapSet(Value(std::string("SUBTRACT")), Value((int64_t)BLEND_SUBTRACT_COLORS));
-    m.mapSet(Value(std::string("PREMULTIPLY")), Value((int64_t)BLEND_ALPHA_PREMULTIPLY));
+Value make_blend_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("ALPHA")), Value((int64_t)BLEND_ALPHA));
+    m.map_set(Value(std::string("ADD")), Value((int64_t)BLEND_ADDITIVE));
+    m.map_set(Value(std::string("MULTIPLY")), Value((int64_t)BLEND_MULTIPLIED));
+    m.map_set(Value(std::string("ADD_COLORS")), Value((int64_t)BLEND_ADD_COLORS));
+    m.map_set(Value(std::string("SUBTRACT")), Value((int64_t)BLEND_SUBTRACT_COLORS));
+    m.map_set(Value(std::string("PREMULTIPLY")), Value((int64_t)BLEND_ALPHA_PREMULTIPLY));
     return m;
 }
 
-Value makeGraphicsModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("canvas")), Value::makeBuiltin(gfx_canvas));
-    m.mapSet(Value(std::string("isOpen")), Value::makeBuiltin(gfx_is_open));
-    m.mapSet(Value(std::string("beginDraw")), Value::makeBuiltin(gfx_begin_draw));
-    m.mapSet(Value(std::string("endDraw")), Value::makeBuiltin(gfx_end_draw));
-    m.mapSet(Value(std::string("clear")), Value::makeBuiltin(gfx_clear));
-    m.mapSet(Value(std::string("blendMode")), Value::makeBuiltin(gfx_blend_mode));
-    m.mapSet(Value(std::string("strokeSize")), Value::makeBuiltin(gfx_stroke_size));
-    m.mapSet(Value(std::string("segments")), Value::makeBuiltin(gfx_segments));
-    m.mapSet(Value(std::string("stroke")), Value::makeBuiltin(gfx_stroke));
-    m.mapSet(Value(std::string("noStroke")), Value::makeBuiltin(gfx_no_stroke));
-    m.mapSet(Value(std::string("fill")), Value::makeBuiltin(gfx_fill));
-    m.mapSet(Value(std::string("noFill")), Value::makeBuiltin(gfx_no_fill));
-    m.mapSet(Value(std::string("tint")), Value::makeBuiltin(gfx_tint));
-    m.mapSet(Value(std::string("noTint")), Value::makeBuiltin(gfx_no_tint));
-    m.mapSet(Value(std::string("line")), Value::makeBuiltin(gfx_line));
-    m.mapSet(Value(std::string("rect")), Value::makeBuiltin(gfx_rect));
-    m.mapSet(Value(std::string("fps")), Value::makeBuiltin(gfx_fps));
-    m.mapSet(Value(std::string("screenshot")), Value::makeBuiltin(gfx_screenshot));
-    m.mapSet(Value(std::string("text")), Value::makeBuiltin(gfx_text));
-    m.mapSet(Value(std::string("close")), Value::makeBuiltin(gfx_close));
-    m.mapSet(Value(std::string("quit")), Value::makeBuiltin(gfx_quit));
-    m.mapSet(Value(std::string("run")), Value::makeBuiltin(gfx_run));
-    m.mapSet(Value(std::string("push")), Value::makeBuiltin(gfx_push));
-    m.mapSet(Value(std::string("pop")), Value::makeBuiltin(gfx_pop));
-    m.mapSet(Value(std::string("pushMatrix")), Value::makeBuiltin(gfx_push_matrix));
-    m.mapSet(Value(std::string("popMatrix")), Value::makeBuiltin(gfx_pop_matrix));
-    m.mapSet(Value(std::string("pushStyle")), Value::makeBuiltin(gfx_push_style));
-    m.mapSet(Value(std::string("popStyle")), Value::makeBuiltin(gfx_pop_style));
-    m.mapSet(Value(std::string("translate")), Value::makeBuiltin(gfx_translate));
-    m.mapSet(Value(std::string("rotate")), Value::makeBuiltin(gfx_rotate));
-    m.mapSet(Value(std::string("rotateX")), Value::makeBuiltin(gfx_rotate_x));
-    m.mapSet(Value(std::string("rotateY")), Value::makeBuiltin(gfx_rotate_y));
-    m.mapSet(Value(std::string("rotateZ")), Value::makeBuiltin(gfx_rotate_z));
-    m.mapSet(Value(std::string("scale")), Value::makeBuiltin(gfx_scale));
-    m.mapSet(Value(std::string("resetTransform")), Value::makeBuiltin(gfx_reset_transform));
-    m.mapSet(Value(std::string("polygon")), Value::makeBuiltin(gfx_polygon));
-    m.mapSet(Value(std::string("polyline")), Value::makeBuiltin(gfx_polyline));
-    m.mapSet(Value(std::string("ellipse")), Value::makeBuiltin(gfx_ellipse));
-    m.mapSet(Value(std::string("circle")), Value::makeBuiltin(gfx_circle));
-    m.mapSet(Value(std::string("arc")), Value::makeBuiltin(gfx_arc));
-    m.mapSet(Value(std::string("point")), Value::makeBuiltin(gfx_point));
-    m.mapSet(Value(std::string("sprite")), Value::makeBuiltin(gfx_sprite));
-    register3dGraphics(m);   // 3D (caméra, begin3d/end3d, primitives, éclairage, texture) — graphics3d.cpp
+Value make_graphics_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("canvas")), Value::make_builtin(gfx_canvas));
+    m.map_set(Value(std::string("isOpen")), Value::make_builtin(gfx_is_open));
+    m.map_set(Value(std::string("beginDraw")), Value::make_builtin(gfx_begin_draw));
+    m.map_set(Value(std::string("endDraw")), Value::make_builtin(gfx_end_draw));
+    m.map_set(Value(std::string("clear")), Value::make_builtin(gfx_clear));
+    m.map_set(Value(std::string("blendMode")), Value::make_builtin(gfx_blend_mode));
+    m.map_set(Value(std::string("strokeSize")), Value::make_builtin(gfx_stroke_size));
+    m.map_set(Value(std::string("segments")), Value::make_builtin(gfx_segments));
+    m.map_set(Value(std::string("stroke")), Value::make_builtin(gfx_stroke));
+    m.map_set(Value(std::string("noStroke")), Value::make_builtin(gfx_no_stroke));
+    m.map_set(Value(std::string("fill")), Value::make_builtin(gfx_fill));
+    m.map_set(Value(std::string("noFill")), Value::make_builtin(gfx_no_fill));
+    m.map_set(Value(std::string("tint")), Value::make_builtin(gfx_tint));
+    m.map_set(Value(std::string("noTint")), Value::make_builtin(gfx_no_tint));
+    m.map_set(Value(std::string("line")), Value::make_builtin(gfx_line));
+    m.map_set(Value(std::string("rect")), Value::make_builtin(gfx_rect));
+    m.map_set(Value(std::string("fps")), Value::make_builtin(gfx_fps));
+    m.map_set(Value(std::string("screenshot")), Value::make_builtin(gfx_screenshot));
+    m.map_set(Value(std::string("text")), Value::make_builtin(gfx_text));
+    m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
+    m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
+    m.map_set(Value(std::string("run")), Value::make_builtin(gfx_run));
+    m.map_set(Value(std::string("push")), Value::make_builtin(gfx_push));
+    m.map_set(Value(std::string("pop")), Value::make_builtin(gfx_pop));
+    m.map_set(Value(std::string("pushMatrix")), Value::make_builtin(gfx_push_matrix));
+    m.map_set(Value(std::string("popMatrix")), Value::make_builtin(gfx_pop_matrix));
+    m.map_set(Value(std::string("pushStyle")), Value::make_builtin(gfx_push_style));
+    m.map_set(Value(std::string("popStyle")), Value::make_builtin(gfx_pop_style));
+    m.map_set(Value(std::string("translate")), Value::make_builtin(gfx_translate));
+    m.map_set(Value(std::string("rotate")), Value::make_builtin(gfx_rotate));
+    m.map_set(Value(std::string("rotateX")), Value::make_builtin(gfx_rotate_x));
+    m.map_set(Value(std::string("rotateY")), Value::make_builtin(gfx_rotate_y));
+    m.map_set(Value(std::string("rotateZ")), Value::make_builtin(gfx_rotate_z));
+    m.map_set(Value(std::string("scale")), Value::make_builtin(gfx_scale));
+    m.map_set(Value(std::string("resetTransform")), Value::make_builtin(gfx_reset_transform));
+    m.map_set(Value(std::string("polygon")), Value::make_builtin(gfx_polygon));
+    m.map_set(Value(std::string("polyline")), Value::make_builtin(gfx_polyline));
+    m.map_set(Value(std::string("ellipse")), Value::make_builtin(gfx_ellipse));
+    m.map_set(Value(std::string("circle")), Value::make_builtin(gfx_circle));
+    m.map_set(Value(std::string("arc")), Value::make_builtin(gfx_arc));
+    m.map_set(Value(std::string("point")), Value::make_builtin(gfx_point));
+    m.map_set(Value(std::string("sprite")), Value::make_builtin(gfx_sprite));
+    register3d_graphics(m);   // 3D (caméra, begin3d/end3d, primitives, éclairage, texture) — graphics3d.cpp
     // Les constantes couleur ne sont PAS ici : utiliser le module `colors`.
     return m;
 }

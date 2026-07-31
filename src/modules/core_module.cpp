@@ -5,7 +5,7 @@
 #include <cstring>
 #include <stdexcept>
 
-Value makeColorClass();
+Value make_color_class();
 
 // Cœur de formatage partagé par l'interpolation ({expr:spec}) ET printf ({N:spec}).
 // `spec` = spécification de conversion C SANS le '%' (ex. ".3f", "04x", ">8s"). On
@@ -15,7 +15,7 @@ Value makeColorClass();
 // aucune injection de conversion ni de '%'. Spec vide → représentation par défaut.
 std::string formatOne(const Value& v, const std::string& spec) {
     if (spec.empty())
-        return valueToString(v);
+        return value_to_string(v);
     char conv = spec.back();
     std::string body = spec.substr(0, spec.size() - 1);   // flags + largeur + précision
     for (char c : body)
@@ -31,22 +31,22 @@ std::string formatOne(const Value& v, const std::string& spec) {
     };
     switch (conv) {
         case 'c': {
-            if (!v.isNumber())
+            if (!v.is_number())
                 throw std::runtime_error("format: '%" + spec + "' attend un nombre");
-            return render("%" + body + "c", (int)v.asNum());
+            return render("%" + body + "c", (int)v.as_num());
         }
         case 'd': case 'i': case 'o': case 'u': case 'x': case 'X': {
-            if (!v.isNumber())
+            if (!v.is_number())
                 throw std::runtime_error("format: '%" + spec + "' attend un nombre");
-            return render("%" + body + "ll" + conv, (long long)v.asNum());   // 'll' = int64
+            return render("%" + body + "ll" + conv, (long long)v.as_num());   // 'll' = int64
         }
         case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': {
-            if (!v.isNumber())
+            if (!v.is_number())
                 throw std::runtime_error("format: '%" + spec + "' attend un nombre");
-            return render("%" + spec, (double)v.asNum());
+            return render("%" + spec, (double)v.as_num());
         }
         case 's': {
-            std::string s = valueToString(v);
+            std::string s = value_to_string(v);
             return render("%" + spec, s.c_str());
         }
         default:
@@ -99,10 +99,10 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
 static int core_fmt(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    if (argc < 2 || !args[1].isString())
+    if (argc < 2 || !args[1].is_string())
         throw std::runtime_error("__fmt: (valeur, spec) attendu");
     std::vector<Value> vargs(args, args + argc);   // copie : formatOne peut réallouer regs (__str)
-    return ctx.ret(Value(formatOne(vargs[0], vargs[1].asString())));
+    return ctx.ret(Value(formatOne(vargs[0], vargs[1].as_string())));
 }
 
 static int core_print(CallCtx& ctx) {
@@ -115,7 +115,7 @@ static int core_print(CallCtx& ctx) {
     for (int i = 0; i < argc; ++i) {
         if (i)
             std::cout << ' ';
-        std::cout << valueToString(vargs[i]);
+        std::cout << value_to_string(vargs[i]);
     }
     std::cout << '\n';
     return ctx.ret(Value{});
@@ -124,10 +124,10 @@ static int core_print(CallCtx& ctx) {
 static int core_printf(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    if (argc < 1 || !args[0].isString())
+    if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("printf: first arg must be string");
     std::vector<Value> vargs(args, args + argc);
-    std::cout << applyFormat(args[0].asString(), vargs, 1) << '\n';
+    std::cout << applyFormat(args[0].as_string(), vargs, 1) << '\n';
     return ctx.ret(Value{});
 }
 
@@ -136,15 +136,15 @@ static int core_typeof(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc < 1)
         return ctx.ret(Value(std::string("nil")));
-    return ctx.ret(Value(std::string(args[0].typeName())));
+    return ctx.ret(Value(std::string(args[0].type_name())));
 }
 
-Value makeCoreModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("print")), Value::makeBuiltin(core_print));
-    m.mapSet(Value(std::string("printf")), Value::makeBuiltin(core_printf));
-    m.mapSet(Value(std::string("__fmt")), Value::makeBuiltin(core_fmt));   // interne : désucrage {expr:spec}
-    m.mapSet(Value(std::string("typeof")), Value::makeBuiltin(core_typeof));
-    m.mapSet(Value(std::string("Color")), makeColorClass());
+Value make_core_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("print")), Value::make_builtin(core_print));
+    m.map_set(Value(std::string("printf")), Value::make_builtin(core_printf));
+    m.map_set(Value(std::string("__fmt")), Value::make_builtin(core_fmt));   // interne : désucrage {expr:spec}
+    m.map_set(Value(std::string("typeof")), Value::make_builtin(core_typeof));
+    m.map_set(Value(std::string("Color")), make_color_class());
     return m;
 }

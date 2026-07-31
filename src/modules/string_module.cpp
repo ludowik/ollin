@@ -26,32 +26,32 @@ static void appendUpper(uint32_t cp, std::string& out) {
     else if (cp == 0xDF) // ß → SS
         out += "SS";
     else if (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7) // à..þ (sauf ÷) → À..Þ
-        utf8Encode(cp - 0x20, out);
+        utf8_encode(cp - 0x20, out);
     else if (cp == 0xFF) // ÿ → Ÿ (U+0178)
-        utf8Encode(0x178, out);
+        utf8_encode(0x178, out);
     else
-        utf8Encode(cp, out);
+        utf8_encode(cp, out);
 }
 
 static void appendLower(uint32_t cp, std::string& out) {
     if (cp < 0x80)
         out += (char)((cp >= 'A' && cp <= 'Z') ? cp + 32 : cp);
     else if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7) // À..Þ (sauf ×) → à..þ
-        utf8Encode(cp + 0x20, out);
+        utf8_encode(cp + 0x20, out);
     else if (cp == 0x178) // Ÿ → ÿ
-        utf8Encode(0xFF, out);
+        utf8_encode(0xFF, out);
     else
-        utf8Encode(cp, out);
+        utf8_encode(cp, out);
 }
 
 static int str_upper(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.upper");
+    const std::string& s = str_arg(args, argc, 0, "string.upper");
     std::string out;
     for (size_t i = 0; i < s.size();) {
         size_t nb;
-        appendUpper(utf8Decode(s, i, &nb), out);
+        appendUpper(utf8_decode(s, i, &nb), out);
         i += nb;
     }
     return ctx.ret(Value(std::move(out)));
@@ -60,11 +60,11 @@ static int str_upper(CallCtx& ctx) {
 static int str_lower(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.lower");
+    const std::string& s = str_arg(args, argc, 0, "string.lower");
     std::string out;
     for (size_t i = 0; i < s.size();) {
         size_t nb;
-        appendLower(utf8Decode(s, i, &nb), out);
+        appendLower(utf8_decode(s, i, &nb), out);
         i += nb;
     }
     return ctx.ret(Value(std::move(out)));
@@ -76,14 +76,14 @@ static std::string trimCp(const std::string& s, const std::string& chars, bool l
     std::unordered_set<uint32_t> set;
     for (size_t i = 0; i < chars.size();) {
         size_t nb;
-        set.insert(utf8Decode(chars, i, &nb));
+        set.insert(utf8_decode(chars, i, &nb));
         i += nb;
     }
     size_t b = 0, e = s.size();
     if (left) {
         while (b < s.size()) {
             size_t nb;
-            uint32_t cp = utf8Decode(s, b, &nb);
+            uint32_t cp = utf8_decode(s, b, &nb);
             if (!set.count(cp))
                 break;
             b += nb;
@@ -93,7 +93,7 @@ static std::string trimCp(const std::string& s, const std::string& chars, bool l
         size_t j = b, keep = b;
         while (j < s.size()) {
             size_t nb;
-            uint32_t cp = utf8Decode(s, j, &nb);
+            uint32_t cp = utf8_decode(s, j, &nb);
             j += nb;
             if (!set.count(cp))
                 keep = j; // fin (exclusive) après le dernier codepoint conservé
@@ -106,24 +106,24 @@ static std::string trimCp(const std::string& s, const std::string& chars, bool l
 static int str_trim(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.trim");
-    std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.trim")) : " ";
+    const std::string& s = str_arg(args, argc, 0, "string.trim");
+    std::string chars = (argc >= 2) ? std::string(str_arg(args, argc, 1, "string.trim")) : " ";
     return ctx.ret(Value(trimCp(s, chars, true, true)));
 }
 
 static int str_ltrim(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.ltrim");
-    std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.ltrim")) : " ";
+    const std::string& s = str_arg(args, argc, 0, "string.ltrim");
+    std::string chars = (argc >= 2) ? std::string(str_arg(args, argc, 1, "string.ltrim")) : " ";
     return ctx.ret(Value(trimCp(s, chars, true, false)));
 }
 
 static int str_rtrim(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.rtrim");
-    std::string chars = (argc >= 2) ? std::string(strArg(args, argc, 1, "string.rtrim")) : " ";
+    const std::string& s = str_arg(args, argc, 0, "string.rtrim");
+    std::string chars = (argc >= 2) ? std::string(str_arg(args, argc, 1, "string.rtrim")) : " ";
     return ctx.ret(Value(trimCp(s, chars, false, true)));
 }
 
@@ -132,13 +132,13 @@ static int str_rtrim(CallCtx& ctx) {
 static int str_char(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.char");
-    int i = toIntSafe(numArg(args, argc, 1, "string.char"));
-    size_t cnt = utf8Count(s);
+    const std::string& s = str_arg(args, argc, 0, "string.char");
+    int i = toIntSafe(num_arg(args, argc, 1, "string.char"));
+    size_t cnt = utf8_count(s);
     if (i < 1 || (size_t)i > cnt)
         return ctx.ret(Value(std::string("")));
-    size_t b0 = utf8ByteOffset(s, (size_t)i - 1);
-    size_t b1 = utf8ByteOffset(s, (size_t)i);
+    size_t b0 = utf8_byte_offset(s, (size_t)i - 1);
+    size_t b1 = utf8_byte_offset(s, (size_t)i);
     return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
@@ -148,10 +148,10 @@ static int str_char(CallCtx& ctx) {
 static int str_substr(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.substr");
-    size_t cnt = utf8Count(s);
-    int start = toIntSafe(numArg(args, argc, 1, "string.substr"));
-    int len = (argc >= 3) ? toIntSafe(numArg(args, argc, 2, "string.substr")) : (int)cnt;
+    const std::string& s = str_arg(args, argc, 0, "string.substr");
+    size_t cnt = utf8_count(s);
+    int start = toIntSafe(num_arg(args, argc, 1, "string.substr"));
+    int len = (argc >= 3) ? toIntSafe(num_arg(args, argc, 2, "string.substr")) : (int)cnt;
     if (start < 1)
         start = 1;
     if (len <= 0 || (size_t)start > cnt)
@@ -160,8 +160,8 @@ static int str_substr(CallCtx& ctx) {
     size_t endCp = startCp + (size_t)len; // borné à cnt ci-dessous
     if (endCp > cnt)
         endCp = cnt;
-    size_t b0 = utf8ByteOffset(s, startCp);
-    size_t b1 = utf8ByteOffset(s, endCp);
+    size_t b0 = utf8_byte_offset(s, startCp);
+    size_t b1 = utf8_byte_offset(s, endCp);
     return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
@@ -171,19 +171,19 @@ static int str_substr(CallCtx& ctx) {
 static int str_len(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    const std::string& s = strArg(args, argc, 0, "string.len");
-    return ctx.ret(Value((int64_t)utf8Count(s)));
+    const std::string& s = str_arg(args, argc, 0, "string.len");
+    return ctx.ret(Value((int64_t)utf8_count(s)));
 }
 
-Value makeStringModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("len")), Value::makeBuiltin(str_len));
-    m.mapSet(Value(std::string("upper")), Value::makeBuiltin(str_upper));
-    m.mapSet(Value(std::string("lower")), Value::makeBuiltin(str_lower));
-    m.mapSet(Value(std::string("trim")), Value::makeBuiltin(str_trim));
-    m.mapSet(Value(std::string("ltrim")), Value::makeBuiltin(str_ltrim));
-    m.mapSet(Value(std::string("rtrim")), Value::makeBuiltin(str_rtrim));
-    m.mapSet(Value(std::string("char")), Value::makeBuiltin(str_char));
-    m.mapSet(Value(std::string("substr")), Value::makeBuiltin(str_substr));
+Value make_string_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("len")), Value::make_builtin(str_len));
+    m.map_set(Value(std::string("upper")), Value::make_builtin(str_upper));
+    m.map_set(Value(std::string("lower")), Value::make_builtin(str_lower));
+    m.map_set(Value(std::string("trim")), Value::make_builtin(str_trim));
+    m.map_set(Value(std::string("ltrim")), Value::make_builtin(str_ltrim));
+    m.map_set(Value(std::string("rtrim")), Value::make_builtin(str_rtrim));
+    m.map_set(Value(std::string("char")), Value::make_builtin(str_char));
+    m.map_set(Value(std::string("substr")), Value::make_builtin(str_substr));
     return m;
 }

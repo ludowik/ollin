@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-Value makeImageModule();
+Value make_image_module();
 
 // WASM interop: preload raw bytes under a name so image.load(name) works
 void image_preload(const std::string& name, const std::vector<uint8_t>& bytes,

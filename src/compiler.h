@@ -49,7 +49,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::string current_class_parent_;
     int current_func_idx_ = -1;                        // index in chunk.funcs (-1 = main chunk)
 
-    bool inFunction() const {
+    bool in_function() const {
         return !current_func_name.empty();
     }
 
@@ -63,16 +63,16 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::vector<OuterScope> outer_scopes_;
     std::unordered_map<std::string, int> cur_upval_idx_;
 
-    int resolveUpvalue(const std::string& name);
-    int resolveUpvalFrom(int scope_idx, const std::string& name);
-    int captureUpvalChain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
-    uint8_t compileMethodFunc(const FuncDeclStmt& s);
-    void compileIteratorLoop(const Expr& src, const std::string& var1, const std::string& var2,
+    int resolve_upvalue(const std::string& name);
+    int resolve_upval_from(int scope_idx, const std::string& name);
+    int capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
+    uint8_t compile_method_func(const FuncDeclStmt& s);
+    void compile_iterator_loop(const Expr& src, const std::string& var1, const std::string& var2,
                              const std::vector<std::unique_ptr<Stmt>>& body);
     // chemin rapide for numérique (range littéral inclus aux 2 bornes, 1 variable)
-    void compileNumericFor(const RangeExpr& r, const std::string& var1, const std::vector<std::unique_ptr<Stmt>>& body);
+    void compile_numeric_for(const RangeExpr& r, const std::string& var1, const std::vector<std::unique_ptr<Stmt>>& body);
 
-    int allocReg() {
+    int alloc_reg() {
         int r = reg_top_++;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
@@ -82,40 +82,40 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // Enregistre la ligne source courante (pour les diagnostics runtime) — remplace
     // le prologue `if (line > 0) { current_line_ = line; chunk.setLine(line); }`
     // dupliqué dans chaque visit().
-    void noteLine(int line, int fi = -1) {
+    void note_line(int line, int fi = -1) {
         if (line > 0) {
             current_line_ = line;
             if (fi >= 0)
                 current_file_idx_ = fi;
-            chunk.setLine(line, current_file_idx_);
+            chunk.set_line(line, current_file_idx_);
         }
     }
 
     SourceLoc sloc() const { return {(uint16_t)current_file_idx_, (uint16_t)current_line_}; }
 
-    void compileInto(const Expr& e, int dest);
-    void compileConsecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);
+    void compile_into(const Expr& e, int dest);
+    void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);
     // Portée lexicale stricte : sauvegarde local_regs_/reg_top_/locals_top_, alloue
     // les locales déclarées dans body (sans descendre dans les sous-blocs), compile,
     // puis restaure. Les registres restent réservés si le corps contient des closures.
-    void compileBlock(const std::vector<std::unique_ptr<Stmt>>& body);
+    void compile_block(const std::vector<std::unique_ptr<Stmt>>& body);
 
     // Réserve un registre pour chaque locale pré-scannée. Les fonctions (funcs) sont
     // liées d'emblée dans local_regs_ (récursion / références en avant) ; les var/const
     // sont différées dans pending_var_reg_ (portée lexicale). `skip` = noms du prologue
     // de la portée COURANTE (params, self, catch var) : laissés tels quels. Un nom hérité
     // d'une portée englobante n'est PAS dans skip → il obtient un registre neuf (masquage).
-    void bindScanLocals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
+    void bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
                         const std::unordered_set<std::string>& skip = {});
 
     // Charge la valeur appelable nommée `name` dans le registre `reg` (locale, upvalue,
     // fonction top-level via LOAD_FUNC, ou global via LOAD_GLOBAL).
-    void emitCalleeValue(const std::string& name, int reg);
+    void emit_callee_value(const std::string& name, int reg);
     // Compile un appel dont le DERNIER argument est multi-valeurs (… ou appel) : callee
     // sous le bloc d'arguments, args fixes, puis expansion — émet CALL_VARARGS (…) ou
     // CALL_VA (appel). emitCallee(reg) place l'appelable. Résultat via last_reg_ = call_base.
-    void emitSpreadCall(const std::vector<std::unique_ptr<Expr>>& args,
-                        const std::function<void(int)>& emitCallee);
+    void emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
+                        const std::function<void(int)>& emit_callee);
 
     // StmtVisitor
     void visit(const CommentStmt&) override {

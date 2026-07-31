@@ -1,4 +1,4 @@
 #pragma once
 #include "../value.h"
 
-Value makeArrayModule();
+Value make_array_module();

@@ -40,32 +40,32 @@ bool Parser::match(TokenType t) {
 
 Token Parser::expect(TokenType t) {
     if (!check(t))
-        throw std::runtime_error(curLoc(tokens[pos].line).str(*source_files_) + ": unexpected token '" +
+        throw std::runtime_error(cur_loc(tokens[pos].line).str(*source_files_) + ": unexpected token '" +
                                  tokens[pos].lexeme + "'");
     return advance();
 }
 
-TokenType Parser::peekNextType() const {
+TokenType Parser::peek_next_type() const {
     if (pos + 1 < static_cast<int>(tokens.size()))
         return tokens[pos + 1].type;
     return TokenType::EOF_T;
 }
 
-TokenType Parser::peekAt(int offset) const {
+TokenType Parser::peek_at(int offset) const {
     int idx = pos + offset;
     if (idx < static_cast<int>(tokens.size()))
         return tokens[idx].type;
     return TokenType::EOF_T;
 }
 
-void Parser::skipComments() {
+void Parser::skip_comments() {
     while (check(TokenType::COMMENT))
         advance();
 }
 
 // Absorbe un COMMENT optionnel en fin d'instruction. (Les instructions sont
 // séparées par des retours à la ligne, non tokenisés ; il n'y a pas d'ASI.)
-void Parser::consumeOptComment() {
+void Parser::consume_opt_comment() {
     match(TokenType::COMMENT);
 }
 
@@ -91,10 +91,10 @@ struct DepthGuard {
 Program Parser::parse() {
     Program prog;
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::EOF_T))
             break;
-        prog.stmts.push_back(parseOneStmt());
+        prog.stmts.push_back(parse_one_stmt());
     }
     prog.source_files = *source_files_;
     return prog;
@@ -107,12 +107,12 @@ static bool isAssignOp(TokenType t) {
            t == TokenType::STAR_EQUAL || t == TokenType::SLASH_EQUAL || t == TokenType::PERCENT_EQUAL;
 }
 
-std::unique_ptr<Stmt> Parser::parseOneStmt() {
+std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     DepthGuard guard(depth_, peek().sloc().str(*source_files_));
     switch (peek().type) {
     case TokenType::COMMENT: {
         std::string text = advance().lexeme;
-        consumeOptComment();
+        consume_opt_comment();
         return std::make_unique<CommentStmt>(std::move(text));
     }
     case TokenType::SEMICOLON:
@@ -120,22 +120,22 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
         // rangeExpr). Au niveau instruction, c'est une erreur — message clair.
         throw std::runtime_error(peek().sloc().str(*source_files_) +
                                  ": ';' is not valid syntax — statements are terminated by newlines");
-    case TokenType::WHILE:    return whileStmt();
-    case TokenType::DO:       return doStmt();
-    case TokenType::IF:       return ifStmt();
-    case TokenType::BREAK:    return breakStmt();
-    case TokenType::CONTINUE: return continueStmt();
-    case TokenType::TRY:      return tryCatchStmt();
-    case TokenType::THROW:    return throwStmt();
-    case TokenType::FOR:      return forStmt();
-    case TokenType::IMPORT:   return importStmt();
-    case TokenType::CLASS:    return classDecl();
-    case TokenType::SWITCH:   return switchStmt();
-    case TokenType::FUNC:     return funcDeclStmt();
-    case TokenType::RETURN:   return returnStmt();
-    case TokenType::VAR:      return varDecl();
-    case TokenType::GLOBAL:   return globalDecl();
-    case TokenType::CONSTANT: return constantDecl();
+    case TokenType::WHILE:    return while_stmt();
+    case TokenType::DO:       return do_stmt();
+    case TokenType::IF:       return if_stmt();
+    case TokenType::BREAK:    return break_stmt();
+    case TokenType::CONTINUE: return continue_stmt();
+    case TokenType::TRY:      return try_catch_stmt();
+    case TokenType::THROW:    return throw_stmt();
+    case TokenType::FOR:      return for_stmt();
+    case TokenType::IMPORT:   return import_stmt();
+    case TokenType::CLASS:    return class_decl();
+    case TokenType::SWITCH:   return switch_stmt();
+    case TokenType::FUNC:     return func_decl_stmt();
+    case TokenType::RETURN:   return return_stmt();
+    case TokenType::VAR:      return var_decl();
+    case TokenType::GLOBAL:   return global_decl();
+    case TokenType::CONSTANT: return constant_decl();
     case TokenType::IDENTIFIER: {
         // Une instruction débutant par un identifiant est soit une affectation
         // (simple, indexée, ou chaînée), soit une multi-affectation, soit une
@@ -147,12 +147,12 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
         int saved = pos;
         auto e = expr();
         if (isAssignOp(peek().type))
-            return finishAssignFromExpr(std::move(e), line);
+            return finish_assign_from_expr(std::move(e), line);
         if (check(TokenType::COMMA)) {
             pos = saved; // multi-affectation : re-parse via multiAssignStmt (LValue)
-            return multiAssignStmt();
+            return multi_assign_stmt();
         }
-        consumeOptComment();
+        consume_opt_comment();
         auto st = std::make_unique<ExprStmt>(std::move(e));
         st->line = line; st->file_idx = current_file_idx_;
         return st;
@@ -160,16 +160,16 @@ std::unique_ptr<Stmt> Parser::parseOneStmt() {
     default:
         break;
     }
-    return exprStmt();
+    return expr_stmt();
 }
 
 // Transforme une cible déjà parsée + l'opérateur d'affectation courant en
 // instruction. VarExpr → AssignStmt ; IndexExpr (a.b, a[i], et chaînes) →
 // IndexAssignStmt avec le conteneur en obj_expr.
-std::unique_ptr<Stmt> Parser::finishAssignFromExpr(std::unique_ptr<Expr> target, int line) {
+std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> target, int line) {
     TokenType opt = advance().type; // opérateur d'affectation
     auto value = expr();
-    consumeOptComment();
+    consume_opt_comment();
     if (auto* ve = dynamic_cast<VarExpr*>(target.get())) {
         auto s = std::make_unique<AssignStmt>();
         s->line = line; s->file_idx = current_file_idx_;
@@ -206,12 +206,12 @@ std::unique_ptr<Stmt> Parser::finishAssignFromExpr(std::unique_ptr<Expr> target,
         s->value = std::move(value);
         return s;
     }
-    throw std::runtime_error(curLoc(line).str(*source_files_) + ": invalid assignment target");
+    throw std::runtime_error(cur_loc(line).str(*source_files_) + ": invalid assignment target");
 }
 
 // ── instructions ─────────────────────────────────────────────────────────────
 
-std::unique_ptr<Stmt> Parser::varDecl() {
+std::unique_ptr<Stmt> Parser::var_decl() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<VarDeclStmt>();
@@ -225,11 +225,11 @@ std::unique_ptr<Stmt> Parser::varDecl() {
             s->values.push_back(expr());
     }
     // sans '=' → valeurs absentes → nil dans le compilateur
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::globalDecl() {
+std::unique_ptr<Stmt> Parser::global_decl() {
     int line = peek().line;
     advance(); // consume 'global'
     auto s = std::make_unique<VarDeclStmt>();
@@ -243,11 +243,11 @@ std::unique_ptr<Stmt> Parser::globalDecl() {
         while (match(TokenType::COMMA))
             s->values.push_back(expr());
     }
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::constantDecl() {
+std::unique_ptr<Stmt> Parser::constant_decl() {
     int line = peek().line;
     advance(); // consume 'const'
     auto s = std::make_unique<VarDeclStmt>();
@@ -257,63 +257,63 @@ std::unique_ptr<Stmt> Parser::constantDecl() {
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     if (!check(TokenType::EQUALS))
-        throw std::runtime_error(curLoc(line).str(*source_files_) + ": const '" + s->names[0] + "' must be initialized");
+        throw std::runtime_error(cur_loc(line).str(*source_files_) + ": const '" + s->names[0] + "' must be initialized");
     advance(); // consume '='
     s->values.push_back(expr());
     while (match(TokenType::COMMA))
         s->values.push_back(expr());
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::whileStmt() {
+std::unique_ptr<Stmt> Parser::while_stmt() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<WhileStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     s->cond = expr();
-    skipComments();
+    skip_comments();
     expect(TokenType::DO);
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
-        s->body.push_back(parseOneStmt());
+        s->body.push_back(parse_one_stmt());
     }
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::doStmt() {
+std::unique_ptr<Stmt> Parser::do_stmt() {
     int line = peek().line;
     advance(); // consomme DO
     auto s = std::make_unique<DoStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
-        s->body.push_back(parseOneStmt());
+        s->body.push_back(parse_one_stmt());
     }
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::ifStmt() {
+std::unique_ptr<Stmt> Parser::if_stmt() {
     int line = peek().line;
     advance(); // IF
     auto s = std::make_unique<IfStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     s->cond = expr();
-    skipComments();
+    skip_comments();
     expect(TokenType::THEN);
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) || check(TokenType::EOF_T))
             break;
-        s->then_body.push_back(parseOneStmt());
+        s->then_body.push_back(parse_one_stmt());
     }
     while (check(TokenType::ELSE) || check(TokenType::ELSEIF)) {
         bool is_elif = check(TokenType::ELSEIF);
@@ -323,95 +323,95 @@ std::unique_ptr<Stmt> Parser::ifStmt() {
         if (is_elif) {
             ElseIfClause ei;
             ei.cond = expr();
-            skipComments();
+            skip_comments();
             expect(TokenType::THEN);
             while (true) {
-                skipComments();
+                skip_comments();
                 if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) ||
                     check(TokenType::EOF_T))
                     break;
-                ei.body.push_back(parseOneStmt());
+                ei.body.push_back(parse_one_stmt());
             }
             s->else_ifs.push_back(std::move(ei));
         } else {
-            consumeOptComment();
+            consume_opt_comment();
             while (true) {
-                skipComments();
+                skip_comments();
                 if (check(TokenType::END) || check(TokenType::EOF_T))
                     break;
-                s->else_body.push_back(parseOneStmt());
+                s->else_body.push_back(parse_one_stmt());
             }
             break;
         }
     }
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::breakStmt() {
+std::unique_ptr<Stmt> Parser::break_stmt() {
     int line = peek().line;
     advance();
-    consumeOptComment();
+    consume_opt_comment();
     auto s = std::make_unique<BreakStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::continueStmt() {
+std::unique_ptr<Stmt> Parser::continue_stmt() {
     int line = peek().line;
     advance();
-    consumeOptComment();
+    consume_opt_comment();
     auto s = std::make_unique<ContinueStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::throwStmt() {
+std::unique_ptr<Stmt> Parser::throw_stmt() {
     int line = peek().line;
     advance(); // throw
     auto s = std::make_unique<ThrowStmt>(expr());
     s->line = line; s->file_idx = current_file_idx_;
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::tryCatchStmt() {
+std::unique_ptr<Stmt> Parser::try_catch_stmt() {
     int line = peek().line;
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
     s->line = line; s->file_idx = current_file_idx_;
-    consumeOptComment();
+    consume_opt_comment();
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::CATCH) || check(TokenType::EOF_T))
             break;
-        s->try_body.push_back(parseOneStmt());
+        s->try_body.push_back(parse_one_stmt());
     }
     expect(TokenType::CATCH);
     s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
-    consumeOptComment();
+    consume_opt_comment();
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T))
             break;
-        s->catch_body.push_back(parseOneStmt());
+        s->catch_body.push_back(parse_one_stmt());
     }
     if (match(TokenType::ELSE)) {
-        consumeOptComment();
+        consume_opt_comment();
         while (true) {
-            skipComments();
+            skip_comments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
-            s->else_body.push_back(parseOneStmt());
+            s->else_body.push_back(parse_one_stmt());
         }
     }
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::funcDeclStmt() {
+std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     int line = peek().line;
     advance(); // FUNC
     std::string name = expect(TokenType::IDENTIFIER).lexeme;
@@ -435,15 +435,15 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
                 expect(TokenType::COMMA);
         }
         expect(TokenType::RPAREN);
-        consumeOptComment();
+        consume_opt_comment();
         while (true) {
-            skipComments();
+            skip_comments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
-            body.push_back(parseOneStmt());
+            body.push_back(parse_one_stmt());
         }
         expect(TokenType::END);
-        consumeOptComment();
+        consume_opt_comment();
     };
 
     // Définition sur un champ de map : func obj.field(params) ... end
@@ -469,7 +469,7 @@ std::unique_ptr<Stmt> Parser::funcDeclStmt() {
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::returnStmt() {
+std::unique_ptr<Stmt> Parser::return_stmt() {
     int line = peek().line;
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
@@ -494,11 +494,11 @@ std::unique_ptr<Stmt> Parser::returnStmt() {
             }
         }
     }
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::multiAssignStmt() {
+std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
     int line = peek().line;
     auto s = std::make_unique<MultiAssignStmt>();
     s->line = line; s->file_idx = current_file_idx_;
@@ -538,11 +538,11 @@ std::unique_ptr<Stmt> Parser::multiAssignStmt() {
     while (match(TokenType::COMMA))
         s->values.push_back(expr());
 
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::forStmt() {
+std::unique_ptr<Stmt> Parser::for_stmt() {
     int line = peek().line;
     advance(); // FOR
     std::string first_var = expect(TokenType::IDENTIFIER).lexeme;
@@ -558,20 +558,20 @@ std::unique_ptr<Stmt> Parser::forStmt() {
         range->end = expr();
         if (match(TokenType::COMMA))
             range->step = expr();
-        skipComments();
+        skip_comments();
         expect(TokenType::DO);
         auto s = std::make_unique<ForIterStmt>();
         s->line = line; s->file_idx = current_file_idx_;
         s->var1 = first_var;
         s->iter_expr = std::move(range);
         while (true) {
-            skipComments();
+            skip_comments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
-            s->body.push_back(parseOneStmt());
+            s->body.push_back(parse_one_stmt());
         }
         expect(TokenType::END);
-        consumeOptComment();
+        consume_opt_comment();
         return s;
     }
 
@@ -583,7 +583,7 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     }
     expect(TokenType::IN);
     auto iter_e = expr();
-    skipComments();
+    skip_comments();
     expect(TokenType::DO);
     auto s = std::make_unique<ForIterStmt>();
     s->line = line; s->file_idx = current_file_idx_;
@@ -591,20 +591,20 @@ std::unique_ptr<Stmt> Parser::forStmt() {
     s->var2 = var2;
     s->iter_expr = std::move(iter_e);
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
-        s->body.push_back(parseOneStmt());
+        s->body.push_back(parse_one_stmt());
     }
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::exprStmt() {
+std::unique_ptr<Stmt> Parser::expr_stmt() {
     int line = peek().line;
     auto e = expr();
-    consumeOptComment();
+    consume_opt_comment();
     auto s = std::make_unique<ExprStmt>(std::move(e));
     s->line = line; s->file_idx = current_file_idx_;
     return s;
@@ -618,65 +618,65 @@ std::unique_ptr<Expr> Parser::expr() {
 }
 
 std::unique_ptr<Expr> Parser::logical() {
-    auto left = logicalAnd();
+    auto left = logical_and();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::OR))
             break;
         advance();
-        skipComments();
-        left = std::make_unique<BinaryExpr>('|', std::move(left), logicalAnd());
+        skip_comments();
+        left = std::make_unique<BinaryExpr>('|', std::move(left), logical_and());
     }
     return left;
 }
 
-std::unique_ptr<Expr> Parser::logicalAnd() {
-    auto left = bitwiseOr();
+std::unique_ptr<Expr> Parser::logical_and() {
+    auto left = bitwise_or();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::AND))
             break;
         advance();
-        skipComments();
-        left = std::make_unique<BinaryExpr>('&', std::move(left), bitwiseOr());
+        skip_comments();
+        left = std::make_unique<BinaryExpr>('&', std::move(left), bitwise_or());
     }
     return left;
 }
 
-std::unique_ptr<Expr> Parser::bitwiseOr() {
-    auto left = bitwiseXor();
+std::unique_ptr<Expr> Parser::bitwise_or() {
+    auto left = bitwise_xor();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::PIPE))
             break;
         advance();
-        skipComments();
-        left = std::make_unique<BinaryExpr>('o', std::move(left), bitwiseXor());
+        skip_comments();
+        left = std::make_unique<BinaryExpr>('o', std::move(left), bitwise_xor());
     }
     return left;
 }
 
-std::unique_ptr<Expr> Parser::bitwiseXor() {
-    auto left = bitwiseAnd();
+std::unique_ptr<Expr> Parser::bitwise_xor() {
+    auto left = bitwise_and();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::TILDE))
             break; // '~' binaire = XOR (modèle Lua)
         advance();
-        skipComments();
-        left = std::make_unique<BinaryExpr>('x', std::move(left), bitwiseAnd());
+        skip_comments();
+        left = std::make_unique<BinaryExpr>('x', std::move(left), bitwise_and());
     }
     return left;
 }
 
-std::unique_ptr<Expr> Parser::bitwiseAnd() {
+std::unique_ptr<Expr> Parser::bitwise_and() {
     auto left = comparison();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::AMP))
             break;
         advance();
-        skipComments();
+        skip_comments();
         left = std::make_unique<BinaryExpr>('b', std::move(left), comparison());
     }
     return left;
@@ -702,7 +702,7 @@ static char cmpChar(TokenType t) {
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto first = shift();
-    skipComments();
+    skip_comments();
     if (!isCmpToken(peek().type))
         return first;
 
@@ -711,9 +711,9 @@ std::unique_ptr<Expr> Parser::comparison() {
     chain->operands.push_back(std::move(first));
     while (isCmpToken(peek().type)) {
         chain->ops.push_back(cmpChar(advance().type));
-        skipComments();
+        skip_comments();
         chain->operands.push_back(shift());
-        skipComments();
+        skip_comments();
     }
     // single comparison: return a plain BinaryExpr for simplicity
     if (chain->ops.size() == 1)
@@ -725,12 +725,12 @@ std::unique_ptr<Expr> Parser::comparison() {
 std::unique_ptr<Expr> Parser::shift() {
     auto left = additive();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::LSHIFT) && !check(TokenType::RSHIFT))
             break;
         char op = check(TokenType::LSHIFT) ? 'l' : 'r';
         advance();
-        skipComments();
+        skip_comments();
         left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
     }
     return left;
@@ -739,11 +739,11 @@ std::unique_ptr<Expr> Parser::shift() {
 std::unique_ptr<Expr> Parser::additive() {
     auto left = multiplicative();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::PLUS) && !check(TokenType::MINUS))
             break;
         char op = advance().lexeme[0];
-        skipComments();
+        skip_comments();
         left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
     }
     return left;
@@ -752,12 +752,12 @@ std::unique_ptr<Expr> Parser::additive() {
 std::unique_ptr<Expr> Parser::multiplicative() {
     auto left = unary();
     while (true) {
-        skipComments();
+        skip_comments();
         if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) &&
             !check(TokenType::PERCENT))
             break;
         char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
-        skipComments();
+        skip_comments();
         left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
     }
     return left;
@@ -791,18 +791,18 @@ std::unique_ptr<Expr> Parser::unary() {
 
 std::unique_ptr<Expr> Parser::power() {
     auto left = primary();
-    skipComments();
+    skip_comments();
     if (!check(TokenType::CARET))
         return left; // '^' = puissance (modèle Lua)
     advance();
-    skipComments();
+    skip_comments();
     // opérande droit = unary → autorise 2 ^ -1 et associativité à droite (2^2^3)
     return std::make_unique<BinaryExpr>('p', std::move(left), unary());
 }
 
-std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
+std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
     while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) ||
-           (check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN)) {
+           (check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN)) {
         if (check(TokenType::LBRACKET)) {
             advance();
             auto key = expr();
@@ -814,7 +814,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
         } else if (check(TokenType::DOT)) {
             advance();
             std::string field = expect(TokenType::IDENTIFIER).lexeme;
-            bool opt_m = check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN;
+            bool opt_m = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
             if (check(TokenType::LPAREN) || opt_m) {
                 if (opt_m)
                     advance(); // consume '?'
@@ -863,7 +863,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(std::unique_ptr<Expr> base) {
 
 // Scan forward from current position looking for SEMICOLON at depth 0 before
 // COMMA or RBRACKET at depth 0. Returns true if this looks like a range.
-bool Parser::looksLikeRange() const {
+bool Parser::looks_like_range() const {
     int depth = 0;
     for (int i = pos; i < (int)tokens.size(); ++i) {
         TokenType t = tokens[i].type;
@@ -888,7 +888,7 @@ bool Parser::looksLikeRange() const {
 // Parse range after the opening bracket character has been consumed.
 // incl_left=true  means we saw '[' (inclusive left)
 // incl_left=false means we saw ']' (exclusive left = open left)
-std::unique_ptr<Expr> Parser::rangeExpr(bool incl_left) {
+std::unique_ptr<Expr> Parser::range_expr(bool incl_left) {
     auto node = std::make_unique<RangeExpr>();
     node->incl_left = incl_left;
 
@@ -945,7 +945,7 @@ std::unique_ptr<Expr> Parser::primary() {
         }
     }
     if (check(TokenType::STRING))
-        return parsePostfix(std::make_unique<StringExpr>(advance().lexeme));
+        return parse_postfix(std::make_unique<StringExpr>(advance().lexeme));
     if (check(TokenType::INTERP_START)) {
         auto node = std::make_unique<InterpExpr>();
         node->line = peek().line;
@@ -961,7 +961,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 break;
             }
         }
-        return parsePostfix(std::move(node));
+        return parse_postfix(std::move(node));
     }
     if (check(TokenType::TRUE)) {
         advance();
@@ -977,7 +977,7 @@ std::unique_ptr<Expr> Parser::primary() {
         if (name == "super") {
             expect(TokenType::DOT);
             std::string method_name = expect(TokenType::IDENTIFIER).lexeme;
-            bool opt_super = check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN;
+            bool opt_super = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
             if (opt_super)
                 advance(); // consume '?'
             if (!check(TokenType::LPAREN))
@@ -995,10 +995,10 @@ std::unique_ptr<Expr> Parser::primary() {
                     mc->args.push_back(expr());
             }
             expect(TokenType::RPAREN);
-            return parsePostfix(std::move(mc));
+            return parse_postfix(std::move(mc));
         }
         // appel optionnel : F?()  → n'appelle que si F est callable, sinon nil
-        bool opt_call = check(TokenType::QUESTION) && peekNextType() == TokenType::LPAREN;
+        bool opt_call = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
         if (opt_call)
             advance(); // consume '?'
         if (match(TokenType::LPAREN)) {
@@ -1011,10 +1011,10 @@ std::unique_ptr<Expr> Parser::primary() {
                     call->args.push_back(expr());
             }
             expect(TokenType::RPAREN);
-            return parsePostfix(std::move(call));
+            return parse_postfix(std::move(call));
         }
         // Plain variable — may be followed by postfix chaining
-        return parsePostfix(std::make_unique<VarExpr>(name));
+        return parse_postfix(std::make_unique<VarExpr>(name));
     }
     if (check(TokenType::NIL)) {
         advance();
@@ -1043,19 +1043,19 @@ std::unique_ptr<Expr> Parser::primary() {
                 expect(TokenType::COMMA);
         }
         expect(TokenType::RPAREN);
-        consumeOptComment();
+        consume_opt_comment();
         while (true) {
-            skipComments();
+            skip_comments();
             if (check(TokenType::END) || check(TokenType::EOF_T))
                 break;
-            fe->body.push_back(parseOneStmt());
+            fe->body.push_back(parse_one_stmt());
         }
         expect(TokenType::END);
-        return parsePostfix(std::move(fe));
+        return parse_postfix(std::move(fe));
     }
     if (check(TokenType::LBRACE)) {
         advance(); // consume {
-        skipComments();
+        skip_comments();
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
             std::unique_ptr<Expr> key;
@@ -1078,45 +1078,45 @@ std::unique_ptr<Expr> Parser::primary() {
             map->entries.push_back({std::move(key), std::move(val)});
             if (check(TokenType::COMMA))
                 advance();
-            skipComments();
+            skip_comments();
         }
         expect(TokenType::RBRACE);
-        return parsePostfix(std::move(map));
+        return parse_postfix(std::move(map));
     }
     if (check(TokenType::LBRACKET)) {
         advance(); // consume [
         // Check if this is a range [a;b] or array [a,b,c]
-        if (looksLikeRange()) {
-            return rangeExpr(true); // incl_left=true
+        if (looks_like_range()) {
+            return range_expr(true); // incl_left=true
         }
-        skipComments();
+        skip_comments();
         auto arr = std::make_unique<ArrayExpr>();
         while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
             arr->elements.push_back(expr());
             if (check(TokenType::COMMA))
                 advance();
-            skipComments();
+            skip_comments();
         }
         expect(TokenType::RBRACKET);
-        return parsePostfix(std::move(arr));
+        return parse_postfix(std::move(arr));
     }
     if (check(TokenType::RBRACKET)) {
         // Open-left range: ]a;b]  or  ]a;b[
         advance();               // consume ]
-        return rangeExpr(false); // incl_left=false
+        return range_expr(false); // incl_left=false
     }
     if (match(TokenType::LPAREN)) {
-        skipComments();
+        skip_comments();
         auto e = expr();
-        skipComments();
+        skip_comments();
         expect(TokenType::RPAREN);
         // postfix sur une expression parenthésée : (expr)(args), (expr)[i], (expr).champ
-        return parsePostfix(std::move(e));
+        return parse_postfix(std::move(e));
     }
     throw std::runtime_error(peek().sloc().str(*source_files_) + ": unexpected token '" + peek().lexeme + "'");
 }
 
-std::unique_ptr<Stmt> Parser::classDecl() {
+std::unique_ptr<Stmt> Parser::class_decl() {
     int line = peek().line;
     advance(); // CLASS
     auto s = std::make_unique<ClassDeclStmt>();
@@ -1126,9 +1126,9 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         advance();
         s->parent = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consumeOptComment();
+    consume_opt_comment();
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
         bool is_static = false;
@@ -1142,10 +1142,10 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         // funcDeclStmt() renvoie un IndexAssignStmt pour la forme `func obj.field()`
         // — invalide dans une classe. Vérifier le type au lieu d'un static_cast
         // aveugle (qui provoquait un segfault).
-        auto raw = funcDeclStmt();
+        auto raw = func_decl_stmt();
         auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
         if (!fd)
-            throw std::runtime_error(curLoc(method_line).str(*source_files_) +
+            throw std::runtime_error(cur_loc(method_line).str(*source_files_) +
                                      ": une méthode de classe doit être 'func nom(...)' (pas 'func obj.champ(...)')");
         raw.release();
         auto method = std::unique_ptr<FuncDeclStmt>(fd);
@@ -1153,7 +1153,7 @@ std::unique_ptr<Stmt> Parser::classDecl() {
         s->methods.push_back(std::move(method));
     }
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }
 
@@ -1171,7 +1171,7 @@ static std::vector<std::string> collectTopLevelNames(const std::vector<std::uniq
     return names;
 }
 
-std::unique_ptr<Stmt> Parser::importStmt() {
+std::unique_ptr<Stmt> Parser::import_stmt() {
     advance(); // consomme 'import'
     Token path_tok = expect(TokenType::STRING);
     std::string path = path_tok.lexeme;
@@ -1183,7 +1183,7 @@ std::unique_ptr<Stmt> Parser::importStmt() {
         advance();
         alias = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consumeOptComment();
+    consume_opt_comment();
 
     // Résoudre le chemin par rapport au répertoire du script courant
     std::string resolved =
@@ -1281,31 +1281,31 @@ std::unique_ptr<Stmt> Parser::importStmt() {
     return block;
 }
 
-std::unique_ptr<Stmt> Parser::switchStmt() {
+std::unique_ptr<Stmt> Parser::switch_stmt() {
     int line = peek().line;
     advance(); // SWITCH
     auto s = std::make_unique<SwitchStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     s->subject = expr();
-    consumeOptComment();
+    consume_opt_comment();
 
     auto isArmStart = [&]() {
         return check(TokenType::CASE) || check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T);
     };
 
     while (true) {
-        skipComments();
+        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
 
         if (check(TokenType::ELSE)) {
             advance(); // ELSE
-            consumeOptComment();
+            consume_opt_comment();
             while (!check(TokenType::END) && !check(TokenType::EOF_T)) {
-                skipComments();
+                skip_comments();
                 if (check(TokenType::END) || check(TokenType::EOF_T))
                     break;
-                s->else_body.push_back(parseOneStmt());
+                s->else_body.push_back(parse_one_stmt());
             }
             break;
         }
@@ -1317,17 +1317,17 @@ std::unique_ptr<Stmt> Parser::switchStmt() {
             advance(); // COMMA
             arm.values.push_back(expr());
         }
-        consumeOptComment();
+        consume_opt_comment();
         while (!isArmStart()) {
-            skipComments();
+            skip_comments();
             if (isArmStart())
                 break;
-            arm.body.push_back(parseOneStmt());
+            arm.body.push_back(parse_one_stmt());
         }
         s->cases.push_back(std::move(arm));
     }
 
     expect(TokenType::END);
-    consumeOptComment();
+    consume_opt_comment();
     return s;
 }

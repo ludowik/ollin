@@ -2,7 +2,7 @@
 #include <cstring>
 #include <stdexcept>
 
-uint16_t Chunk::addConstant(Value v) {
+uint16_t Chunk::add_constant(Value v) {
     // Déduplication stricte par type : (tag, 8 octets bruts de l'union). Une même
     // valeur littérale ne réserve qu'une entrée du pool (comme addIdentifier).
     uint64_t bits;
@@ -19,7 +19,7 @@ uint16_t Chunk::addConstant(Value v) {
     return idx;
 }
 
-uint16_t Chunk::addIdentifier(const std::string& name) {
+uint16_t Chunk::add_identifier(const std::string& name) {
     auto it = identifier_map_.find(name);
     if (it != identifier_map_.end())
         return it->second;
@@ -31,14 +31,14 @@ uint16_t Chunk::addIdentifier(const std::string& name) {
     return idx;
 }
 
-uint16_t Chunk::addFuncDefaults(std::vector<Value> defs) {
+uint16_t Chunk::add_func_defaults(std::vector<Value> defs) {
     if (func_defaults.size() >= 0xFFFF)
         throw std::runtime_error("compile: too many functions with defaults (max 65535)");
     func_defaults.push_back(std::move(defs));
     return static_cast<uint16_t>(func_defaults.size() - 1);
 }
 
-uint8_t Chunk::addFunc(FuncProto fp) {
+uint8_t Chunk::add_func(FuncProto fp) {
     if (funcs.size() >= 0xFF)
         throw std::runtime_error("compile: too many functions (max 255)");
     funcs.push_back(std::move(fp));
@@ -50,13 +50,13 @@ void Chunk::emit(Instr i) {
     lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
 }
 
-size_t Chunk::emitJump(Op op, uint8_t a) {
-    code.push_back(makeABx((uint8_t)op, a, 0xFFFF));
+size_t Chunk::emit_jump(Op op, uint8_t a) {
+    code.push_back(make_abx((uint8_t)op, a, 0xFFFF));
     lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
     return code.size() - 1;
 }
 
-void Chunk::patchJump(size_t pos, uint16_t target) {
+void Chunk::patch_jump(size_t pos, uint16_t target) {
     // patch the lower 16 bits (Bx) of the instruction at pos
     Instr old = code[pos];
     code[pos] = (old & 0xFFFF0000u) | target;

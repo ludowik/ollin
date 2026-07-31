@@ -29,8 +29,8 @@ void camera_reset() {
 }
 
 static int cam_open(CallCtx& ctx) {
-    int w = ctx.argc >= 1 ? (int)numArg(ctx.args, 0, "camera.open") : 640;
-    int h = ctx.argc >= 2 ? (int)numArg(ctx.args, 1, "camera.open") : 480;
+    int w = ctx.argc >= 1 ? (int)num_arg(ctx.args, 0, "camera.open") : 640;
+    int h = ctx.argc >= 2 ? (int)num_arg(ctx.args, 1, "camera.open") : 480;
 
     if (!s_cam_id || !image_tex_valid(s_cam_id) || s_cam_w != w || s_cam_h != h) {
         if (s_cam_id)
@@ -126,11 +126,11 @@ static int cam_is_open(CallCtx& ctx) {
     return ctx.ret(Value(int64_t(r)));
 }
 
-Value makeCameraModule() {
-    Value m = Value::makeMap();
-    m.mapSet(Value(std::string("open")),    Value::makeBuiltin(cam_open));
-    m.mapSet(Value(std::string("capture")), Value::makeBuiltin(cam_capture));
-    m.mapSet(Value(std::string("close")),   Value::makeBuiltin(cam_close));
-    m.mapSet(Value(std::string("isOpen")),  Value::makeBuiltin(cam_is_open));
+Value make_camera_module() {
+    Value m = Value::make_map();
+    m.map_set(Value(std::string("open")),    Value::make_builtin(cam_open));
+    m.map_set(Value(std::string("capture")), Value::make_builtin(cam_capture));
+    m.map_set(Value(std::string("close")),   Value::make_builtin(cam_close));
+    m.map_set(Value(std::string("isOpen")),  Value::make_builtin(cam_is_open));
     return m;
 }

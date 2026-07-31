@@ -5,13 +5,13 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
     case Value::T_NIL:
         return 0;
     case Value::T_INTEGER:
-        return std::hash<int64_t>{}(v.asInt());
+        return std::hash<int64_t>{}(v.as_int());
     case Value::T_FLOAT: {
-        double d = v.asFloat();
+        double d = v.as_float();
         // Un float à valeur entière doit hacher comme l'INTEGER égal (cohérence avec
         // ValueEqual). doubleFitsInt64 garde le cast : sans lui, une clé float hors
         // plage int64 (m[1e300]) ferait un cast UB — trap sur WASM.
-        if (doubleFitsInt64(d)) {
+        if (double_fits_int64(d)) {
             int64_t i = static_cast<int64_t>(d);
             if (static_cast<double>(i) == d)
                 return std::hash<int64_t>{}(i);
@@ -47,9 +47,9 @@ bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
         case Value::T_NIL:
             return true;
         case Value::T_INTEGER:
-            return a.asInt() == b.asInt();
+            return a.as_int() == b.as_int();
         case Value::T_FLOAT:
-            return a.asFloat() == b.asFloat();
+            return a.as_float() == b.as_float();
         case Value::T_STRING:
             return a.sptr == b.sptr;
         case Value::T_MAP:
@@ -73,8 +73,8 @@ bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
         }
     }
     // Cross-type numérique : INTEGER(1) == FLOAT(1.0)
-    if (a.isNumber() && b.isNumber())
-        return a.asNum() == b.asNum();
+    if (a.is_number() && b.is_number())
+        return a.as_num() == b.as_num();
     return false;
 }
 

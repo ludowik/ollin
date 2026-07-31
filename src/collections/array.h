@@ -36,7 +36,7 @@ struct Array {
         items.pop_back();
         return v;
     }
-    Value removeAt(int64_t idx) {
+    Value remove_at(int64_t idx) {
         int64_t i = idx - 1;
         if (i < 0 || i >= (int64_t)items.size())
             throw std::runtime_error("runtime: array index out of bounds (got " + std::to_string(idx) + ")");
@@ -44,7 +44,7 @@ struct Array {
         items.erase(items.begin() + i);
         return v;
     }
-    void insertAt(int64_t idx, const Value& v) {
+    void insert_at(int64_t idx, const Value& v) {
         int64_t i = idx - 1;
         if (i < 0 || i > (int64_t)items.size())
             throw std::runtime_error("runtime: array index out of bounds (got " + std::to_string(idx) + ")");

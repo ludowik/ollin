@@ -23,16 +23,16 @@ static int   s_last_click_y    = -9999;
 static const float DBLCLICK_DELAY = 0.30f;
 static const int   DBLCLICK_DIST  = 8;
 
-void mousePoll() {
+void mouse_poll() {
     VM* vm = VM::current();
-    Value m = vm->getGlobal("mouse");
-    if (!m.isMap())
+    Value m = vm->get_global("mouse");
+    if (!m.is_map())
         return;
-    Value pressed       = m.mapGet(Value(std::string("pressed")));
-    Value released      = m.mapGet(Value(std::string("released")));
-    Value moved         = m.mapGet(Value(std::string("moved")));
-    Value scrolled      = m.mapGet(Value(std::string("scrolled")));
-    Value doubleClicked = m.mapGet(Value(std::string("doubleClicked")));
+    Value pressed       = m.map_get(Value(std::string("pressed")));
+    Value released      = m.map_get(Value(std::string("released")));
+    Value moved         = m.map_get(Value(std::string("moved")));
+    Value scrolled      = m.map_get(Value(std::string("scrolled")));
+    Value doubleClicked = m.map_get(Value(std::string("doubleClicked")));
 
     int mx = GetMouseX();
     int my = GetMouseY();
@@ -41,40 +41,40 @@ void mousePoll() {
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         float now = GetTime();
-        bool dbl = doubleClicked.isCallable()
+        bool dbl = doubleClicked.is_callable()
             && (now - s_last_click_time) < DBLCLICK_DELAY
             && std::abs(mx - s_last_click_x) < DBLCLICK_DIST
             && std::abs(my - s_last_click_y) < DBLCLICK_DIST;
         if (dbl) {
-            vm->callValue(doubleClicked, x, y);
+            vm->call_value(doubleClicked, x, y);
             s_last_click_time = -1.0f;   // reset pour ne pas déclencher en triple-clic
         } else {
-            if (pressed.isCallable())
-                vm->callValue(pressed, x, y);
+            if (pressed.is_callable())
+                vm->call_value(pressed, x, y);
             s_last_click_time = now;
             s_last_click_x    = mx;
             s_last_click_y    = my;
         }
     }
-    if (released.isCallable() && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-        vm->callValue(released, x, y);
-    if (moved.isCallable()) {
+    if (released.is_callable() && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+        vm->call_value(released, x, y);
+    if (moved.is_callable()) {
         Vector2 d = GetMouseDelta();
         if (d.x != 0.0f || d.y != 0.0f)
-            vm->callValue(moved, x, y);
+            vm->call_value(moved, x, y);
     }
-    if (scrolled.isCallable()) {
+    if (scrolled.is_callable()) {
         Vector2 w = GetMouseWheelMoveV();
         if (w.x != 0.0f || w.y != 0.0f) {
             Value dx = Value((double)w.x);
             Value dy = Value((double)w.y);
-            vm->callValue(scrolled, x, y, dx, dy);
+            vm->call_value(scrolled, x, y, dx, dy);
         }
     }
 }
 
 // Le module `mouse` est une map vide : l'utilisateur y affecte pressed /
 // released / moved, lues par mousePoll().
-Value makeMouseModule() {
-    return Value::makeMap();
+Value make_mouse_module() {
+    return Value::make_map();
 }

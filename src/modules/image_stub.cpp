@@ -1,6 +1,6 @@
 #include "image_module.h"
 
-Value makeImageModule() {
+Value make_image_module() {
     return Value();
 }
 void image_preload(const std::string&, const std::vector<uint8_t>&, const std::string&) {

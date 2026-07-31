@@ -8,29 +8,29 @@
 
 using Instr = uint32_t;
 
-inline uint8_t iOP(Instr i) noexcept {
+inline uint8_t i_op(Instr i) noexcept {
     return (i >> 24) & 0xFF;
 }
-inline uint8_t iA(Instr i) noexcept {
+inline uint8_t i_a(Instr i) noexcept {
     return (i >> 16) & 0xFF;
 }
-inline uint8_t iB(Instr i) noexcept {
+inline uint8_t i_b(Instr i) noexcept {
     return (i >> 8) & 0xFF;
 }
-inline uint8_t iC(Instr i) noexcept {
+inline uint8_t i_c(Instr i) noexcept {
     return i & 0xFF;
 }
-inline uint16_t iBx(Instr i) noexcept {
+inline uint16_t i_bx(Instr i) noexcept {
     return i & 0xFFFF;
 }
 
-inline Instr makeABC(uint8_t op, uint8_t a, uint8_t b, uint8_t c) noexcept {
+inline Instr make_abc(uint8_t op, uint8_t a, uint8_t b, uint8_t c) noexcept {
     return ((uint32_t)op << 24) | ((uint32_t)a << 16) | ((uint32_t)b << 8) | c;
 }
-inline Instr makeABx(uint8_t op, uint8_t a, uint16_t bx) noexcept {
+inline Instr make_abx(uint8_t op, uint8_t a, uint16_t bx) noexcept {
     return ((uint32_t)op << 24) | ((uint32_t)a << 16) | bx;
 }
-inline Instr makeBx(uint8_t op, uint16_t bx) noexcept {
+inline Instr make_bx(uint8_t op, uint16_t bx) noexcept {
     return ((uint32_t)op << 24) | bx;
 }
 
