@@ -292,6 +292,9 @@ canvas#canvas {
   cursor: pointer;
 }
 .kbar-key:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Bouton Exécuter : poussé à l'extrême droite (margin auto), accent — la barre
+   d'outils étant masquée en saisie, il permet de lancer sans fermer le clavier. */
+.kbar-run { margin-left: auto; background: var(--accent); color: #fff; border-color: transparent; padding: 5px 14px; }
 
 /* ── Popup d'aide (raccourcis) ──────────────────────────────────────────────── */
 #help-overlay {
@@ -595,6 +598,7 @@ canvas#canvas {
   <button class="kbar-key" data-ins="=" data-back="0">=</button>
   <button class="kbar-key" data-move="-1" aria-label="Curseur à gauche">←</button>
   <button class="kbar-key" data-move="1" aria-label="Curseur à droite">→</button>
+  <button class="kbar-key kbar-run" data-run="1" aria-label="Exécuter">▶</button>
 </div>
 
 <!-- Popup d'aide : raccourcis clavier. Ouverte par le bouton « Aide » ou F1.

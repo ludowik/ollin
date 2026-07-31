@@ -719,6 +719,10 @@ disposers.push(() => {
     const key = e.target.closest('.kbar-key')
     if (!key) return
     e.preventDefault()   // garde le focus de l'éditeur → le clavier reste ouvert
+    if (key.hasAttribute('data-run')) {   // ▶ Exécuter (barre d'outils masquée en saisie)
+      relaunch()
+      return
+    }
     const move = key.getAttribute('data-move')
     if (move) {
       const forward = move === '1'
