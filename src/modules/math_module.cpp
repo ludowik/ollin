@@ -28,7 +28,7 @@ static const unsigned char PERLIN_REF[256] = {
 
 static int s_perm[512];
 
-static void noiseInitDefault() {
+static void noise_init_default() {
     for (int i = 0; i < 256; i++) {
         s_perm[i] = PERLIN_REF[i];
         s_perm[256 + i] = PERLIN_REF[i];
@@ -37,7 +37,7 @@ static void noiseInitDefault() {
 
 // Rebat la table via un PRNG déterministe local (xorshift64), indépendant de
 // rand()/math.seed → le bruit et l'aléatoire ne s'influencent pas.
-static void noiseReseed(uint64_t seed) {
+static void noise_reseed(uint64_t seed) {
     int p[256];
     for (int i = 0; i < 256; i++)
         p[i] = i;
@@ -57,15 +57,15 @@ static void noiseReseed(uint64_t seed) {
     }
 }
 
-static inline double noiseFade(double t) {
+static inline double noise_fade(double t) {
     return t * t * t * (t * (t * 6 - 15) + 10);
 }
 
-static inline double noiseLerp(double t, double a, double b) {
+static inline double noise_lerp(double t, double a, double b) {
     return a + t * (b - a);
 }
 
-static inline double noiseGrad(int hash, double x, double y, double z) {
+static inline double noise_grad(int hash, double x, double y, double z) {
     int h = hash & 15;
     double u = h < 8 ? x : y;
     double v = h < 4 ? y : (h == 12 || h == 14 ? x : z);
@@ -79,18 +79,18 @@ static double perlin3(double x, double y, double z) {
     x -= std::floor(x);
     y -= std::floor(y);
     z -= std::floor(z);
-    double u = noiseFade(x);
-    double v = noiseFade(y);
-    double w = noiseFade(z);
+    double u = noise_fade(x);
+    double v = noise_fade(y);
+    double w = noise_fade(z);
     int A = s_perm[X] + Y, AA = s_perm[A] + Z, AB = s_perm[A + 1] + Z;
     int B = s_perm[X + 1] + Y, BA = s_perm[B] + Z, BB = s_perm[B + 1] + Z;
-    return noiseLerp(
+    return noise_lerp(
         w,
-        noiseLerp(v, noiseLerp(u, noiseGrad(s_perm[AA], x, y, z), noiseGrad(s_perm[BA], x - 1, y, z)),
-                  noiseLerp(u, noiseGrad(s_perm[AB], x, y - 1, z), noiseGrad(s_perm[BB], x - 1, y - 1, z))),
-        noiseLerp(v, noiseLerp(u, noiseGrad(s_perm[AA + 1], x, y, z - 1), noiseGrad(s_perm[BA + 1], x - 1, y, z - 1)),
-                  noiseLerp(u, noiseGrad(s_perm[AB + 1], x, y - 1, z - 1),
-                            noiseGrad(s_perm[BB + 1], x - 1, y - 1, z - 1))));
+        noise_lerp(v, noise_lerp(u, noise_grad(s_perm[AA], x, y, z), noise_grad(s_perm[BA], x - 1, y, z)),
+                  noise_lerp(u, noise_grad(s_perm[AB], x, y - 1, z), noise_grad(s_perm[BB], x - 1, y - 1, z))),
+        noise_lerp(v, noise_lerp(u, noise_grad(s_perm[AA + 1], x, y, z - 1), noise_grad(s_perm[BA + 1], x - 1, y, z - 1)),
+                  noise_lerp(u, noise_grad(s_perm[AB + 1], x, y - 1, z - 1),
+                            noise_grad(s_perm[BB + 1], x - 1, y - 1, z - 1))));
 }
 
 static const int NOISE_OCTAVES = 4;
@@ -131,8 +131,8 @@ MATH1(atan, std::atan(x))
 MATH1(deg, x * (180.0 / M_PI))
 MATH1(rad, x*(M_PI / 180.0))
 MATH1(frac, x - std::floor(x))
-MATH1(isNan, std::isnan(x) ? 1.0 : 0.0)
-MATH1(isInf, std::isinf(x) ? 1.0 : 0.0)
+MATH1(is_nan, std::isnan(x) ? 1.0 : 0.0)
+MATH1(is_inf, std::isinf(x) ? 1.0 : 0.0)
 
 static int math_map(CallCtx& ctx) {
     Value* args = ctx.args;
@@ -261,26 +261,26 @@ static int math_rand(CallCtx& ctx) {
 
 // Argument entier : (int64_t)numArg est UB (trap WASM) si le double est NaN/inf
 // ou hors plage int64. doubleFitsInt64 (value.h) garde le cast → erreur claire.
-static int64_t intArg(const Value* args, int argc, int i, const char* fn) {
+static int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
     double d = num_arg(args, argc, i, fn);
     if (!double_fits_int64(d))
         throw std::runtime_error(std::string(fn) + ": argument entier hors plage");
     return (int64_t)d;
 }
 
-static int math_randInt(CallCtx& ctx) {
+static int math_rand_int(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc == 0)
         throw std::runtime_error("math.randInt: at least one argument required");
     if (argc == 1) {
-        int64_t hi = intArg(args, argc, 0, "math.randInt");
+        int64_t hi = int_arg(args, argc, 0, "math.randInt");
         if (hi <= 0)
             throw std::runtime_error("math.randInt: argument must be > 0");
         return ctx.ret(Value((int64_t)(rand() % hi + 1)));
     }
-    int64_t lo = intArg(args, argc, 0, "math.randInt");
-    int64_t hi = intArg(args, argc, 1, "math.randInt");
+    int64_t lo = int_arg(args, argc, 0, "math.randInt");
+    int64_t hi = int_arg(args, argc, 1, "math.randInt");
     if (lo > hi)
         throw std::runtime_error("math.randInt: lo must be <= hi");
     return ctx.ret(Value(lo + (int64_t)(rand() % (hi - lo + 1))));
@@ -295,17 +295,17 @@ static int math_noise(CallCtx& ctx) {
     double x = num_arg(args, argc, 0, "math.noise");
     double y = argc >= 2 ? num_arg(args, argc, 1, "math.noise") : 0.0;
     double z = argc >= 3 ? num_arg(args, argc, 2, "math.noise") : 0.0;
-    double total = 0.0, amp = 0.5, freq = 1.0, maxAmp = 0.0;
+    double total = 0.0, amp = 0.5, freq = 1.0, max_amp = 0.0;
     for (int o = 0; o < NOISE_OCTAVES; o++) {
         total += perlin3(x * freq, y * freq, z * freq) * amp;
-        maxAmp += amp;
+        max_amp += amp;
         freq *= 2.0;
         amp *= NOISE_FALLOFF;
     }
     // Le bruit de Perlin amélioré ne couvre PAS ±1 : on normalise par l'amplitude
     // pratique selon la dimension (voir NOISE_AMP_*), puis on clampe → couvre [0,1].
     double amp01 = argc >= 3 ? NOISE_AMP_3D : (argc == 2 ? NOISE_AMP_2D : NOISE_AMP_1D);
-    double n = (total / maxAmp / amp01 + 1.0) * 0.5;
+    double n = (total / max_amp / amp01 + 1.0) * 0.5;
     if (n < 0.0)
         n = 0.0;
     if (n > 1.0)
@@ -314,17 +314,17 @@ static int math_noise(CallCtx& ctx) {
 }
 
 // Rebat la table de permutation → bruit reproductible / variable.
-static int math_noiseSeed(CallCtx& ctx) {
+static int math_noise_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     int64_t s = (int64_t)num_arg(args, argc, 0, "math.noiseSeed");
-    noiseReseed((uint64_t)s);
+    noise_reseed((uint64_t)s);
     return ctx.ret(Value());
 }
 
 Value make_math_module() {
     srand((unsigned)time(nullptr));
-    noiseInitDefault();
+    noise_init_default();
     Value m = Value::make_map();
     // constantes
     m.map_set(Value(std::string("PI")), Value(M_PI));
@@ -360,15 +360,15 @@ Value make_math_module() {
     m.map_set(Value(std::string("deg")), Value::make_builtin(math_deg));
     m.map_set(Value(std::string("rad")), Value::make_builtin(math_rad));
     m.map_set(Value(std::string("frac")), Value::make_builtin(math_frac));
-    m.map_set(Value(std::string("isNan")), Value::make_builtin(math_isNan));
-    m.map_set(Value(std::string("isInf")), Value::make_builtin(math_isInf));
+    m.map_set(Value(std::string("isNan")), Value::make_builtin(math_is_nan));
+    m.map_set(Value(std::string("isInf")), Value::make_builtin(math_is_inf));
     m.map_set(Value(std::string("map")), Value::make_builtin(math_map));
     // aléatoire
     m.map_set(Value(std::string("rand")), Value::make_builtin(math_rand));
-    m.map_set(Value(std::string("randInt")), Value::make_builtin(math_randInt));
+    m.map_set(Value(std::string("randInt")), Value::make_builtin(math_rand_int));
     m.map_set(Value(std::string("seed")), Value::make_builtin(math_seed));
     // bruit de Perlin
     m.map_set(Value(std::string("noise")), Value::make_builtin(math_noise));
-    m.map_set(Value(std::string("noiseSeed")), Value::make_builtin(math_noiseSeed));
+    m.map_set(Value(std::string("noiseSeed")), Value::make_builtin(math_noise_seed));
     return m;
 }
