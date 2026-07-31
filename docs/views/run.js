@@ -16,7 +16,11 @@ export async function init(ctx) {
   const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
 
   // Barre du plein ecran collee au haut du visible quand le clavier s'ouvre.
-  const unpinViewport = pinToVisualViewport()
+  // TÉLÉPHONE uniquement (pas tablette/iPad, interface « bureau ») : pointeur
+  // grossier ET petit écran (petit côté < 600px sépare téléphones ≤ ~430 et iPad ≥ 744).
+  const isPhone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+               && Math.min(window.screen.width, window.screen.height) < 600
+  const unpinViewport = isPhone ? pinToVisualViewport() : () => {}
 
   const statusEl = document.getElementById('status')
   const outEl    = document.getElementById('out')
