@@ -22,7 +22,7 @@ static std::string s_file[2];                            // natif : fichier side
 
 // ── encodage typé d'une Value scalaire ↔ chaîne stockée ────────────────────────
 // 'i'<entier>, 'f'<double>, 's'<brut>. (le booléen Ollin est un entier).
-static std::string encodeValue(const Value& v) {
+static std::string encode_value(const Value& v) {
     if (v.is_integer())
         return std::string("i") + std::to_string(v.as_int());
     if (v.is_float()) {
@@ -34,7 +34,7 @@ static std::string encodeValue(const Value& v) {
         return std::string("s") + v.as_string();
     throw std::runtime_error("data: value must be a number, string or boolean");
 }
-static Value decodeValue(const std::string& enc) {
+static Value decode_value(const std::string& enc) {
     if (enc.empty())
         return Value();
     std::string rest = enc.substr(1);
@@ -46,7 +46,7 @@ static Value decodeValue(const std::string& enc) {
 }
 
 // ── (dé)sérialisation d'une portée en objet JSON plat {clé:valeur} ──────────────
-static void jsonEscape(const std::string& s, std::string& out) {
+static void json_escape(const std::string& s, std::string& out) {
     out += '"';
     for (char c : s) {
         switch (c) {
@@ -74,14 +74,14 @@ static std::string serialize(int scope) {
         if (!first)
             out += ",";
         first = false;
-        jsonEscape(kv.first, out);
+        json_escape(kv.first, out);
         out += ":";
-        jsonEscape(kv.second, out);
+        json_escape(kv.second, out);
     }
     out += "}";
     return out;
 }
-static bool parseJsonString(const std::string& s, size_t& i, std::string& out) {
+static bool parse_json_string(const std::string& s, size_t& i, std::string& out) {
     if (i >= s.size() || s[i] != '"')
         return false;
     i++;
@@ -116,31 +116,31 @@ static bool parseJsonString(const std::string& s, size_t& i, std::string& out) {
 static void deserialize(int scope, const std::string& blob) {
     s_store[scope].clear();
     size_t i = 0;
-    auto skipWs = [&]() {
+    auto skip_ws = [&]() {
         while (i < blob.size() && (blob[i] == ' ' || blob[i] == '\n' || blob[i] == '\r' || blob[i] == '\t'))
             i++;
     };
-    skipWs();
+    skip_ws();
     if (i >= blob.size() || blob[i] != '{')
         return;
     i++;
-    skipWs();
+    skip_ws();
     if (i < blob.size() && blob[i] == '}')
         return;
     while (i < blob.size()) {
-        skipWs();
+        skip_ws();
         std::string k, v;
-        if (!parseJsonString(blob, i, k))
+        if (!parse_json_string(blob, i, k))
             return;
-        skipWs();
+        skip_ws();
         if (i >= blob.size() || blob[i] != ':')
             return;
         i++;
-        skipWs();
-        if (!parseJsonString(blob, i, v))
+        skip_ws();
+        if (!parse_json_string(blob, i, v))
             return;
         s_store[scope][k] = v;
-        skipWs();
+        skip_ws();
         if (i < blob.size() && blob[i] == ',') {
             i++;
             continue;
@@ -169,45 +169,45 @@ static void persist(int scope) {
 }
 
 // ── implémentations partagées (paramétrées par la portée) ───────────────────────
-static Value dataGet(int scope, Value* args, int argc) {
+static Value data_get(int scope, Value* args, int argc) {
     if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.get: expected a string key");
     auto it = s_store[scope].find(args[0].as_string());
     if (it == s_store[scope].end())
         return argc > 1 ? args[1] : Value();
-    return decodeValue(it->second);
+    return decode_value(it->second);
 }
-static Value dataSet(int scope, Value* args, int argc) {
+static Value data_set(int scope, Value* args, int argc) {
     if (argc < 2 || !args[0].is_string())
         throw std::runtime_error("data.set: expected a string key and a value");
     const std::string& k = args[0].as_string();
     if (args[1].is_nil())
         s_store[scope].erase(k);
     else
-        s_store[scope][k] = encodeValue(args[1]);
+        s_store[scope][k] = encode_value(args[1]);
     persist(scope);
     return Value();
 }
-static Value dataHas(int scope, Value* args, int argc) {
+static Value data_has(int scope, Value* args, int argc) {
     if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.has: expected a string key");
     return Value((int64_t)(s_store[scope].count(args[0].as_string()) ? 1 : 0));
 }
-static Value dataDelete(int scope, Value* args, int argc) {
+static Value data_delete(int scope, Value* args, int argc) {
     if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.delete: expected a string key");
     s_store[scope].erase(args[0].as_string());
     persist(scope);
     return Value();
 }
-static Value dataKeys(int scope, Value* args, int argc) {
+static Value data_keys(int scope, Value* args, int argc) {
     (void)args; (void)argc;
     Value arr = Value::make_array();
     for (auto& kv : s_store[scope])
         arr.array_push(Value(kv.first));
     return arr;
 }
-static Value dataClear(int scope, Value* args, int argc) {
+static Value data_clear(int scope, Value* args, int argc) {
     (void)args; (void)argc;
     s_store[scope].clear();
     persist(scope);
@@ -221,7 +221,7 @@ void data_load(const std::string& project_blob, const std::string& global_blob) 
 }
 
 #ifndef __EMSCRIPTEN__
-static std::string readFile(const std::string& path) {
+static std::string read_file(const std::string& path) {
     FILE* f = fopen(path.c_str(), "rb");
     if (!f)
         return "";
@@ -236,36 +236,36 @@ static std::string readFile(const std::string& path) {
 void data_set_native_paths(const std::string& project_file, const std::string& global_file) {
     s_file[S_PROJECT] = project_file;
     s_file[S_GLOBAL] = global_file;
-    deserialize(S_PROJECT, readFile(project_file));
-    deserialize(S_GLOBAL, readFile(global_file));
+    deserialize(S_PROJECT, read_file(project_file));
+    deserialize(S_GLOBAL, read_file(global_file));
 }
 #endif
 
 // Remplit une map avec les 6 opérations d'une portée (lambdas non capturantes →
 // pointeurs de fonction ; la portée est figée par une fonction dédiée par portée).
-static void fillScope(Value& m, int scope) {
+static void fill_scope(Value& m, int scope) {
     if (scope == S_PROJECT) {
-        m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataGet(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("set")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataSet(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("has")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataHas(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("delete")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("keys")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_PROJECT, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("clear")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataClear(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_get(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("set")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_set(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("has")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_has(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("delete")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_delete(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("keys")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_keys(S_PROJECT, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("clear")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_clear(S_PROJECT, ctx.args, ctx.argc)); }));
     } else {
-        m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataGet(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("set")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataSet(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("has")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataHas(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("delete")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataDelete(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("keys")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataKeys(S_GLOBAL, ctx.args, ctx.argc)); }));
-        m.map_set(Value(std::string("clear")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(dataClear(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_get(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("set")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_set(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("has")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_has(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("delete")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_delete(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("keys")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_keys(S_GLOBAL, ctx.args, ctx.argc)); }));
+        m.map_set(Value(std::string("clear")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_clear(S_GLOBAL, ctx.args, ctx.argc)); }));
     }
 }
 
 Value make_data_module() {
     Value m = Value::make_map();
-    fillScope(m, S_PROJECT);
+    fill_scope(m, S_PROJECT);
     Value g = Value::make_map();
-    fillScope(g, S_GLOBAL);
+    fill_scope(g, S_GLOBAL);
     m.map_set(Value(std::string("shared")), g);   // « global » est un mot-clé Ollin → « shared »
     return m;
 }
