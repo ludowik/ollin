@@ -13,7 +13,7 @@ Value make_color_class();
 // mismatch de type avec snprintf serait un comportement indéfini. Les flags/largeur/
 // précision (le « corps ») passent verbatim mais sont validés (allowlist stricte) →
 // aucune injection de conversion ni de '%'. Spec vide → représentation par défaut.
-std::string formatOne(const Value& v, const std::string& spec) {
+std::string format_one(const Value& v, const std::string& spec) {
     if (spec.empty())
         return value_to_string(v);
     char conv = spec.back();
@@ -56,7 +56,7 @@ std::string formatOne(const Value& v, const std::string& spec) {
 
 // printf : substitution positionnelle. Chaque emplacement {N} / {} peut porter un
 // format {N:spec} / {:spec}, appliqué via formatOne (même moteur que l'interpolation).
-static std::string applyFormat(const std::string& fmt, const std::vector<Value>& args, int offset) {
+static std::string apply_format(const std::string& fmt, const std::vector<Value>& args, int offset) {
     std::string out;
     int auto_idx = 1;   // indexation 1-based (cohérent avec les arrays Ollin) : {1} = 1er argument
     for (size_t i = 0; i < fmt.size(); ++i) {
@@ -64,27 +64,27 @@ static std::string applyFormat(const std::string& fmt, const std::vector<Value>&
             size_t j = fmt.find('}', i + 1);
             if (j != std::string::npos) {
                 std::string content = fmt.substr(i + 1, j - i - 1);
-                std::string idxPart = content, spec;
+                std::string idx_part = content, spec;
                 size_t colon = content.find(':');
                 if (colon != std::string::npos) {
-                    idxPart = content.substr(0, colon);
+                    idx_part = content.substr(0, colon);
                     spec = content.substr(colon + 1);
                 }
                 int idx;
-                if (idxPart.empty()) {
+                if (idx_part.empty()) {
                     idx = auto_idx++;
                 } else {
                     try {
-                        idx = std::stoi(idxPart);
+                        idx = std::stoi(idx_part);
                     } catch (...) {
                         throw std::runtime_error("printf: index invalide '{" + content + "}'");
                     }
                     if (idx < 1)
-                        throw std::runtime_error("printf: index 1-based, doit être >= 1 (reçu " + idxPart + ")");
+                        throw std::runtime_error("printf: index 1-based, doit être >= 1 (reçu " + idx_part + ")");
                 }
                 long long ai = (long long)idx - 1 + offset;   // {1} → 1er arg réel (args[offset])
                 if (ai >= 0 && ai < (long long)args.size())
-                    out += formatOne(args[(int)ai], spec);
+                    out += format_one(args[(int)ai], spec);
                 i = j;
                 continue;
             }
@@ -102,7 +102,7 @@ static int core_fmt(CallCtx& ctx) {
     if (argc < 2 || !args[1].is_string())
         throw std::runtime_error("__fmt: (valeur, spec) attendu");
     std::vector<Value> vargs(args, args + argc);   // copie : formatOne peut réallouer regs (__str)
-    return ctx.ret(Value(formatOne(vargs[0], vargs[1].as_string())));
+    return ctx.ret(Value(format_one(vargs[0], vargs[1].as_string())));
 }
 
 static int core_print(CallCtx& ctx) {
@@ -127,7 +127,7 @@ static int core_printf(CallCtx& ctx) {
     if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("printf: first arg must be string");
     std::vector<Value> vargs(args, args + argc);
-    std::cout << applyFormat(args[0].as_string(), vargs, 1) << '\n';
+    std::cout << apply_format(args[0].as_string(), vargs, 1) << '\n';
     return ctx.ret(Value{});
 }
 
