@@ -17,7 +17,7 @@
 // (EM_ASM) à chaque isDown serait coûteux (chemin chaud).
 static bool s_blocked = false;
 
-static bool queryBlocked() {
+static bool query_blocked() {
 #ifdef __EMSCRIPTEN__
     return EM_ASM_INT({ return window.__ollinKbdBlocked ? 1 : 0; }) != 0;
 #else
@@ -40,7 +40,7 @@ static bool queryBlocked() {
 // pendant un graphics.run(...) (ou via la fonction draw auto-appelée).
 
 // Nom lisible d'une touche raylib ; "" si non gérée (ignorée).
-static std::string keyName(int key) {
+static std::string key_name(int key) {
     if (key >= KEY_A && key <= KEY_Z)
         return std::string(1, (char)('a' + (key - KEY_A)));
     if (key >= KEY_ZERO && key <= KEY_NINE)
@@ -64,7 +64,7 @@ static std::string keyName(int key) {
 }
 
 // Nom de touche → keycode raylib (inverse de keyName) ; -1 si inconnu.
-static int keyCode(std::string name) {
+static int key_code(std::string name) {
     for (char& c : name)
         c = (char)std::tolower((unsigned char)c);
     if (name.size() == 1) {
@@ -107,7 +107,7 @@ static int kbd_is_down(CallCtx& ctx) {
     else if (name == "alt")
         down = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
     else {
-        int code = keyCode(name);
+        int code = key_code(name);
         if (code >= 0)
             down = IsKeyDown(code);
     }
@@ -127,7 +127,7 @@ void keyboard_reset() {
 }
 
 void keyboard_poll() {
-    s_blocked = queryBlocked();   // rafraîchi 1×/frame ; lu par isDown sans re-interroger le DOM
+    s_blocked = query_blocked();   // rafraîchi 1×/frame ; lu par isDown sans re-interroger le DOM
     VM* vm = VM::current();
     Value kbd = vm->get_global("keyboard");
     Value pressed, released;
@@ -135,8 +135,8 @@ void keyboard_poll() {
         pressed = kbd.map_get(Value(std::string("keypressed")));
         released = kbd.map_get(Value(std::string("keyrelease")));
     }
-    bool wantPress = pressed.is_callable();
-    bool wantRelease = released.is_callable();
+    bool want_press = pressed.is_callable();
+    bool want_release = released.is_callable();
 
     if (s_blocked) {
         // Éditeur focalisé : le jeu ne reçoit plus le clavier. On RELÂCHE proprement les
@@ -146,8 +146,8 @@ void keyboard_poll() {
             if (!s_down[k])
                 continue;
             s_down[k] = false;
-            if (wantRelease) {
-                std::string name = keyName(k);
+            if (want_release) {
+                std::string name = key_name(k);
                 if (!name.empty())
                     vm->call_value(released, Value(name));
             }
@@ -161,12 +161,12 @@ void keyboard_poll() {
     // suit l'état « enfoncé » même sans callback keypressed, pour keyrelease.
     int key;
     while ((key = GetKeyPressed()) != 0) {
-        std::string name = keyName(key);
+        std::string name = key_name(key);
         if (name.empty())
             continue;
         if (key >= 0 && key < 512)
             s_down[key] = true;
-        if (wantPress)
+        if (want_press)
             vm->call_value(pressed, Value(name));
     }
 
@@ -176,8 +176,8 @@ void keyboard_poll() {
             continue;
         if (IsKeyReleased(k)) {
             s_down[k] = false;
-            if (wantRelease) {
-                std::string name = keyName(k);
+            if (want_release) {
+                std::string name = key_name(k);
                 if (!name.empty())
                     vm->call_value(released, Value(name));
             }
