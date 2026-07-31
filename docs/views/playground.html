@@ -40,6 +40,10 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
    normalement (ce ne sont pas leurs descendants). */
 #toolbar, .rail-head, #divider { touch-action: none; }
 
+/* Saisie mobile (clavier ouvert) : la barre d'outils remonte/disparaît pour agrandir
+   l'éditeur. Réactivée dès la fermeture du clavier (classe posée par playground.js). */
+body.kbd-editing #toolbar { display: none; }
+
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
 #toolbar {
   display: flex;
@@ -111,7 +115,7 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 }
 .tool-btn:hover { border-color: var(--accent); color: var(--accent); }
 
-/* Bascule « Auto » (relance automatique) — desktop uniquement, révélée par JS. */
+/* Bascule « Auto » (relance automatique) — révélée par JS (toutes cibles). */
 #autoexec-wrap { user-select: none; }
 #autoexec-wrap input { margin: 0; width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
 #autoexec-wrap.on { border-color: var(--accent); color: var(--accent); }
@@ -246,8 +250,17 @@ canvas#canvas {
   background: var(--border);
   flex-shrink: 0;
   transition: background 0.15s;
+  position: relative;
 }
 #divider:hover, #divider.dragging { background: var(--accent); }
+/* Zone de préhension élargie (invisible) : le trait reste fin (5px) mais la cible
+   tactile déborde de 20px du CÔTÉ ÉDITEUR uniquement → saisissable au doigt (iPad…)
+   sans grignoter la surface d'entrée du canvas (côté sortie laissé à ras). Le divider
+   (sibling postérieur à l'éditeur) peint au-dessus de lui sans z-index. En colonne
+   (mobile), l'éditeur est au-dessus → le débord passe sur le haut. */
+#divider::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -20px; right: 0;
+}
 
 /* ── barre d'aide à la saisie (symboles, tactile) ──────────────────────────── */
 #kbar {
@@ -279,6 +292,9 @@ canvas#canvas {
   cursor: pointer;
 }
 .kbar-key:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* Bouton Exécuter : poussé à l'extrême droite (margin auto), accent — la barre
+   d'outils étant masquée en saisie, il permet de lancer sans fermer le clavier. */
+.kbar-run { margin-left: auto; background: var(--accent); color: #fff; border-color: transparent; padding: 5px 14px; }
 
 /* ── Popup d'aide (raccourcis) ──────────────────────────────────────────────── */
 #help-overlay {
@@ -408,6 +424,7 @@ canvas#canvas {
 .menu-arrow { color: var(--dim); font-size: 16px; }
 .menu-sep { height: 1px; background: var(--border); margin: 5px 4px; }
 .menu-empty { padding: 10px; font-size: 12px; color: var(--dim); font-style: italic; }
+.menu-group { padding: 8px 10px 3px; font-size: 10.5px; font-weight: 600; color: var(--dim); letter-spacing: 0.3px; }
 .menu-form { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
 .menu-info { font-size: 11.5px; color: var(--dim); line-height: 1.5; }
 .menu-info a { color: var(--accent); text-decoration: none; }
@@ -476,6 +493,7 @@ canvas#canvas {
   #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
   #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
   #divider { width: 100%; height: 6px; cursor: row-resize; }
+  #divider::before { top: -20px; bottom: 0; left: 0; right: 0; }
 
   /* Police réduite — maximum-scale=1.0 dans le viewport empêche le zoom iOS */
   #editor-wrap .cm-editor  { font-size: 12px; }
@@ -580,6 +598,7 @@ canvas#canvas {
   <button class="kbar-key" data-ins="=" data-back="0">=</button>
   <button class="kbar-key" data-move="-1" aria-label="Curseur à gauche">←</button>
   <button class="kbar-key" data-move="1" aria-label="Curseur à droite">→</button>
+  <button class="kbar-key kbar-run" data-run="1" aria-label="Exécuter">▶</button>
 </div>
 
 <!-- Popup d'aide : raccourcis clavier. Ouverte par le bouton « Aide » ou F1.

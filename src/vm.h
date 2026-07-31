@@ -33,7 +33,14 @@ class VM {
     // natif et WASM (une seule version gardée : graphics peut être nil/non-map).
     void runEntryHooks();
 
+    // Marqueur « graphics.canvas() a été appelé pour ce programme » (VM neuf par run).
+    // Permet à runEntryHooks de créer un canvas IMPLICITE (à W×H) si un draw() existe
+    // mais qu'aucun canvas n'a été créé explicitement. Posé par gfx_canvas.
+    void markGfxCanvas() { gfx_canvas_created_ = true; }
+    bool gfxCanvasCreated() const { return gfx_canvas_created_; }
+
   private:
+    bool gfx_canvas_created_ = false;
     std::string errLine() const;      // "file:line" from current ip
     void runGoto(size_t stop_depth); // unified computed-goto dispatch loop
     struct Handler {

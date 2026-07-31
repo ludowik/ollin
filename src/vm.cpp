@@ -452,21 +452,55 @@ Value VM::getGlobal(const std::string& name) const {
 }
 
 void VM::runEntryHooks() {
+    // `graphics` peut être nil (stub natif, ou script sans référence à graphics) ou
+    // réassigné à un non-map → garde isMap() obligatoire avant mapGet.
+    Value gfx = getGlobal("graphics");
+    Value draw = getGlobal("draw");
+    bool graphical = draw.isCallable() && gfx.isMap();
+
     // setup() : appelée une fois après le chargement, avant la boucle update/draw.
     Value setup = getGlobal("setup");
     if (setup.isCallable())
         callValue(setup);
-    // draw() présent → lance la boucle graphique via graphics.run(draw).
-    Value draw = getGlobal("draw");
-    if (draw.isCallable()) {
-        // `graphics` peut être nil (stub natif, ou script sans référence à graphics)
-        // ou réassigné à un non-map → garde isMap() obligatoire avant mapGet.
-        Value gfx = getGlobal("graphics");
-        if (gfx.isMap()) {
-            Value run_fn = gfx.mapGet(Value(std::string("run")));
-            if (run_fn.isBuiltin())
-                invokeBuiltin(run_fn.asBuiltin(), &draw, 1, 1);
+
+    // Canvas IMPLICITE : la seule présence d'un draw() suffit à démarrer une session
+    // graphique. Si NI le top-level NI setup() n'ont appelé graphics.canvas(), on le
+    // crée aux dimensions W×H (globales moteur, pré-initialisées aux dimensions window).
+    // Fait APRÈS setup() — car setup() est un endroit courant pour appeler canvas()
+    // (cf. tutoriel) : le créer avant provoquerait un double InitWindow (crash WASM).
+    if (graphical && !gfx_canvas_created_) {
+        Value canvas_fn = gfx.mapGet(Value(std::string("canvas")));
+        if (canvas_fn.isBuiltin()) {
+            // Dimensions de la zone de rendu. On NE lit PAS getGlobal("W") : si le
+            // script ne référence pas W/H, ces identifiants n'existent pas dans le
+            // chunk → getGlobal renvoie nil → 0. On relit le module `window`
+            // directement (source des globales W/H, et en WASM = taille mesurée en JS
+            // fournie via __ollinRenderW → fiable, pas de course de layout).
+            int w = 0, h = 0;
+            Value winm = makeBuiltinModule("window");
+            if (winm.isMap()) {
+                Value vw = winm.mapGet(Value(std::string("width")));
+                Value vh = winm.mapGet(Value(std::string("height")));
+                if (vw.isNumber()) w = (int)vw.asNum();
+                if (vh.isNumber()) h = (int)vh.asNum();
+            }
+            // Si la taille reste inexploitable, canvas() sans argument → défauts de
+            // gfx_canvas (800×600) plutôt qu'un canvas 0×0 sans contexte GL (crash).
+            if (w > 0 && h > 0) {
+                Value wh[2] = { Value((int64_t)w), Value((int64_t)h) };
+                invokeBuiltin(canvas_fn.asBuiltin(), wh, 2, 2);
+            } else {
+                Value none[1] = {};
+                invokeBuiltin(canvas_fn.asBuiltin(), none, 0, 1);
+            }
         }
+    }
+
+    // draw() présent → lance la boucle graphique via graphics.run(draw).
+    if (graphical) {
+        Value run_fn = gfx.mapGet(Value(std::string("run")));
+        if (run_fn.isBuiltin())
+            invokeBuiltin(run_fn.asBuiltin(), &draw, 1, 1);
     }
 }
 

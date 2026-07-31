@@ -137,7 +137,8 @@ export async function listProjects() {
   const all = await reqAsync(store.getAll())
   return all
     .map(p => ({ id: p.id, name: p.name, entry: p.entry, updatedAt: p.updatedAt,
-                 fileCount: Object.keys(p.files || {}).length }))
+                 fileCount: Object.keys(p.files || {}).length,
+                 remote: p.remote || null }))   // lien distant (slug) → menu « Ouvrir » unifié
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -200,6 +201,7 @@ export async function renameProject(id, name) {
   if (!project) return null
   const newId = await uniqueId(name, id)
   project.name = name
+  project.dirty = true   // renommage = changement à pousser (le nom, et le dossier distant si le slug change)
   if (newId === id) {
     return saveProject(project)          // slug inchangé : simple mise à jour
   }

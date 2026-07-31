@@ -479,7 +479,7 @@ var fmt_m = {"a": 1}
 assert("{fmt_m["a"]}" == "1")
 assert("{ {"k": 7}.k }" == "7")
 ## {N} / {} sont des placeholders positionnels → LITTÉRAUX hors printf
-assert("{0}-{1}" == "{0}-{1}")
+assert("{1}-{2}" == "{1}-{2}")
 assert("{}" == "{}")                             ## plus d'erreur « interpolation vide »
 ## spec invalide → erreur runtime claire
 var fmt_err = false

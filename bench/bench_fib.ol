@@ -8,4 +8,4 @@ end
 var t0 = time()
 var result = fib(35)
 var t1 = time()
-printf("ollin  fib(35) = {0}  time: {1}s", result, t1 - t0)
+printf("ollin  fib(35) = {1}  time: {2}s", result, t1 - t0)

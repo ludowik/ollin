@@ -213,7 +213,7 @@ convChar       = "d" | "i" | "o" | "u" | "x" | "X" | "c"
                     représentation ; fmtSpec (spec de conversion C sans le '%') applique un
                     format (ex. {x:.3f}, {n:04x}). Le ':' séparateur est celui de PREMIER
                     niveau (les ':' d'un map-littéral {a:1} imbriqué sont préservés).
-                    placeholder = "{" vide ou entier [":"fmtSpec] "}" ({}, {0}, {1:.3f}) :
+                    placeholder = "{" vide ou entier ≥ 1 [":"fmtSpec] "}" ({}, {1}, {2:.3f}) — index 1-based :
                     laissé LITTÉRAL dans la chaîne, destiné à la substitution POSITIONNELLE
                     de printf (rempli par les arguments). "\{" : accolade littérale.
                     Une chaîne sans interpolation est un token STRING (elle peut contenir des

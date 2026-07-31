@@ -39,6 +39,9 @@ const sync = createRemoteSync({
   onError: (err, p) => onRemoteSyncError(err, p),
 })
 disposers.push(() => sync.cancel())
+// Indice de taille de rendu propre à cette vue : nettoyé au démontage pour ne pas
+// fuiter vers la vue #/run (qui pose la sienne, mais on évite tout résidu).
+disposers.push(() => { window.__ollinRenderW = undefined; window.__ollinRenderH = undefined })
 
 // Barre d'outils collee au haut du VISIBLE quand le clavier mobile s'ouvre
 // (sinon elle derive/disparait sur iOS). Actif tant que la vue est montee.
@@ -474,6 +477,7 @@ const editorExtensions = [
 const SHORTCUTS = [
   { cat: 'Exécution', items: [
     { keys: ['Alt', '↵'],   desc: 'Exécuter / relancer le script' },
+    { keys: ['Alt', 'Maj', '↵'], desc: 'Exécuter + activer le mode Auto (relance à chaque modif)' },
     { keys: ['Échap'],      desc: 'Arrêter l’exécution en cours' },
     { keys: ['F4'],         desc: 'Aller à la première erreur' },
   ]},
@@ -594,6 +598,20 @@ const onGlobalKeydown = e => {
     closeHelp()
     return
   }
+  // Alt+Maj+Entrée : lance ET active le mode Auto (relance automatique à chaque
+  // modif). Testé AVANT Alt+Entrée (qui matcherait aussi, altKey étant vrai).
+  if (e.key === 'Enter' && e.altKey && e.shiftKey) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    const chk = document.getElementById('autoexec-chk')
+    const wrap = document.getElementById('autoexec-wrap')
+    if (chk) {
+      chk.checked = true
+      if (wrap) wrap.classList.add('on')
+    }
+    relaunch()
+    return
+  }
   // Alt+Entrée : lance ou RELANCE l'exécution — géré en capture pour marcher
   // même quand le focus est sur le CANVAS (programme graphique en cours), pas
   // seulement dans l'éditeur.
@@ -701,6 +719,10 @@ disposers.push(() => {
     const key = e.target.closest('.kbar-key')
     if (!key) return
     e.preventDefault()   // garde le focus de l'éditeur → le clavier reste ouvert
+    if (key.hasAttribute('data-run')) {   // ▶ Exécuter (barre d'outils masquée en saisie)
+      relaunch()
+      return
+    }
     const move = key.getAttribute('data-move')
     if (move) {
       const forward = move === '1'
@@ -739,6 +761,9 @@ disposers.push(() => {
       const editing = document.activeElement === view.contentDOM
       const running = runBtnEl && runBtnEl.classList.contains('running')
       kbar.classList.toggle('show', editing && keyboardOpen() && !running)
+      // En saisie (clavier ouvert), masquer la barre d'outils → l'éditeur récupère
+      // sa hauteur (précieux sur petit écran). Restaurée à la fermeture du clavier.
+      document.body.classList.toggle('kbd-editing', editing && keyboardOpen())
     }
     view.contentDOM.addEventListener('focus', update)
     view.contentDOM.addEventListener('blur', update)
@@ -751,6 +776,7 @@ disposers.push(() => {
       if (vv) {
         vv.removeEventListener('resize', update)
       }
+      document.body.classList.remove('kbd-editing')   // pas de barre masquée résiduelle
     })
   }
 })()
@@ -1081,6 +1107,12 @@ function menuSep() {
   d.className = 'menu-sep'
   return d
 }
+function menuGroupLabel(text) {
+  const d = document.createElement('div')
+  d.className = 'menu-group'
+  d.textContent = text
+  return d
+}
 
 function renderMenuRoot() {
   projectMenu.innerHTML = ''
@@ -1093,7 +1125,6 @@ function renderMenuRoot() {
     await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
-  projectMenu.appendChild(menuItem('📥 Ouvrir depuis GitHub', true, () => (GH.isConnected() ? renderMenuRemote() : renderMenuConnect())))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
   // rien à renommer/dupliquer/supprimer en base).
@@ -1163,17 +1194,79 @@ function renderMenuGithub() {
   projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
+// Menu « Ouvrir un projet » UNIFIÉ : locaux (🖥 non liés), synchronisés (🔄 liés)
+// et distants seuls (☁ présents sur GitHub, absents en local). Les deux premières
+// sections se calculent sans réseau (le lien = remote.slug local) → affichées tout
+// de suite ; la section distante est fusionnée en arrière-plan.
 async function renderMenuOpen() {
-  const list = await Store.listProjects()
+  const local = await Store.listProjects()
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Ouvrir un projet', renderMenuRoot))
-  for (const p of list) {
-    const check = (currentProject && p.id === currentProject.id) ? '✓ ' : ''
-    projectMenu.appendChild(menuItem(check + p.name, false, async () => {
-      closeMenu()
-      if (!currentProject || p.id !== currentProject.id) await openProject(p.id)
-    }))
+  const body = document.createElement('div')
+  projectMenu.appendChild(body)
+
+  const localSlugs = new Set(local.map(p => (p.remote && p.remote.slug) || p.id))
+  const isLinked = p => !!(p.remote && p.remote.slug)
+  const nameOf = p => ((currentProject && p.id === currentProject.id) ? '✓ ' : '') + p.name
+  const openLocal = id => async () => {
+    closeMenu()
+    if (!currentProject || id !== currentProject.id) await openProject(id)
   }
+
+  // Reconstruit le corps : sections non vides uniquement + pied distant (état réseau).
+  const render = (remoteOnly, footer) => {
+    if (!projectMenu.contains(body)) return   // menu changé entre-temps
+    body.innerHTML = ''
+    const group = (label, items, mk) => {
+      if (!items.length) return
+      body.appendChild(menuGroupLabel(label))
+      for (const it of items) body.appendChild(mk(it))
+    }
+    group('🖥 Locaux', local.filter(p => !isLinked(p)), p => menuItem(nameOf(p), false, openLocal(p.id)))
+    group('🔄 Synchronisés', local.filter(isLinked), p => menuItem(nameOf(p), false, openLocal(p.id)))
+    group('☁ Distants', remoteOnly, r => menuItem(r.name, false, () => openRemoteProject(r.slug)))
+    if (footer)
+      body.appendChild(footer)
+    if (!body.childNodes.length) {
+      const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun projet.'
+      body.appendChild(d)
+    }
+  }
+
+  // Pied distant selon l'état de connexion / réseau.
+  const info = txt => { const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = txt; return d }
+  if (!GH.isConnected()) {
+    render([], menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
+    return
+  }
+  if (!GH.getRepo()) {
+    render([], info('Dépôt GitHub non configuré (menu 🐙 GitHub).'))
+    return
+  }
+  render([], info('Chargement des projets distants…'))
+  try {
+    const remote = await GH.listRemoteProjects()
+    render(remote.filter(r => !localSlugs.has(r.slug)), null)
+  } catch (e) {
+    render([], info('Distant indisponible : ' + e.message))
+  }
+}
+
+// Ouvre un projet DISTANT SEUL : pull → sauvegarde locale → chargement.
+async function openRemoteProject(slug) {
+  closeMenu()
+  const existing = await Store.getProject(slug)
+  if (existing && !confirm(`Un projet « ${slug} » existe déjà en local. L'écraser avec la version GitHub ?`)) return
+  flushEditorToFile()
+  if (currentProject && currentProject.id !== slug) await Store.saveProject(currentProject)
+  setStatus('Récupération…')
+  try {
+    const p = await GH.pullProject(slug)
+    p.dirty = false   // fraîchement récupéré = synchro
+    await Store.saveProject(p)
+    await loadProject(p.id)
+    setStatus('Projet ouvert ✓', true)
+  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
 }
 
 async function renderMenuExamples() {
@@ -1349,38 +1442,6 @@ async function adoptRemote(project, slug) {
     await loadProject(p.id)   // recharge l'éditeur + relit remote.folderSha
     setStatus('Projet à jour ✓', true)
   } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
-}
-
-async function renderMenuRemote() {
-  projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Ouvrir depuis GitHub', renderMenuRoot))
-  const loading = document.createElement('div'); loading.className = 'menu-empty'; loading.textContent = 'Chargement…'
-  projectMenu.appendChild(loading)
-  let list
-  try { list = await GH.listRemoteProjects() }
-  catch (e) { loading.textContent = 'Erreur : ' + e.message; return }
-  loading.remove()
-  if (!list.length) {
-    const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun projet distant.'
-    projectMenu.appendChild(d); return
-  }
-  for (const r of list) {
-    projectMenu.appendChild(menuItem('📦 ' + r.name, false, async () => {
-      closeMenu()
-      const existing = await Store.getProject(r.slug)
-      if (existing && !confirm(`Un projet « ${r.slug} » existe déjà en local. L'écraser avec la version GitHub ?`)) return
-      flushEditorToFile()
-      if (currentProject && currentProject.id !== r.slug) await Store.saveProject(currentProject)
-      setStatus('Récupération…')
-      try {
-        const p = await GH.pullProject(r.slug)
-        p.dirty = false   // fraîchement récupéré = synchro
-        await Store.saveProject(p)
-        await loadProject(p.id)
-        setStatus('Projet ouvert ✓', true)
-      } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
-    }))
-  }
 }
 
 projectBtn.addEventListener('click', e => {
@@ -1714,9 +1775,15 @@ async function launch() {
   setRunning(false)
   outputEl.className = ''
   lastErrorLoc = null   // nouvelle exécution : F4 ne doit plus viser l'erreur précédente
-  // Afficher la zone AVANT execute : window.width lit le clientWidth de
-  // #output-pane (0 si display:none → graphics dimensionné à vide).
+  // Afficher la zone AVANT execute puis MESURER en JS et transmettre au moteur : la
+  // lecture DOM côté C++ à l'init est sujette à une course de layout (flex tout juste
+  // passé de display:none → parfois clientWidth=0 au moment de la lecture, W/H=0 →
+  // canvas à vide). Le JS, lui, a un layout fiable après reflow (getBoundingClientRect).
+  // Le module `window` lit __ollinRenderW/H en priorité (voir window_module.cpp).
   setOutputVisible(true)
+  const _rr = outputPane.getBoundingClientRect()
+  window.__ollinRenderW = Math.round(_rr.width)
+  window.__ollinRenderH = Math.round(_rr.height)
   flushEditorToFile()
   // Préchargement + exécution + gestion d'erreurs : logique PARTAGÉE avec le mode
   // autonome (run.html) via pg-run.js — plus de duplication ni de divergence.
@@ -1764,11 +1831,12 @@ function stopExec() {
 
 runBtn.addEventListener('click', run)
 
-// ── Mode Auto (relance différée) — navigateur desktop uniquement (souris) ──────
-// Révélé seulement sur pointeur fin : caché sur tactile/mobile pour l'instant.
+// ── Mode Auto (relance différée) — disponible sur toutes les cibles ────────────
+// Aucune restriction de pointeur : un poste tactile avec clavier (ex. iPad) édite
+// autant qu'un desktop. Le bouton est visible dès que l'élément existe.
 const autoexecWrap = document.getElementById('autoexec-wrap')
 const autoexecChk  = document.getElementById('autoexec-chk')
-if (autoexecWrap && window.matchMedia && window.matchMedia('(pointer: fine)').matches) {
+if (autoexecWrap) {
   autoexecWrap.style.display = ''
   const onAutoexec = () => {
     autoexecWrap.classList.toggle('on', autoexecChk.checked)
