@@ -250,11 +250,13 @@ void visit(const WhileStmt& s) override {
 |---|---|---|
 | **API Ollin** (fonctions/méthodes de modules exposées aux scripts) | **camelCase** | `beginDraw`, `strokeSize`, `setPos`, `noiseSeed`, `getPixel` |
 | **API Ollin** (constructeurs / classes) | **PascalCase** | `Color`, `Quat`, `Camera`, `Light` |
-| **Interne C++** (fonctions) | snake_case, préfixe module | `gfx_begin3d`, `cam_set_pos`, `math_rand` |
-| **Interne C++** (statiques de fichier) | préfixe `s_` | `s_target`, `s_run_active` |
+| **Interne C++** (fonctions, méthodes, helpers, statiques, variables) | **snake_case**, préfixe module quand pertinent | `gfx_begin3d`, `cam_set_pos`, `math_rand`, `make_builtin`, `map_set`, `alloc_reg` |
+| **Interne C++** (statiques de fichier) | préfixe `s_` + snake | `s_target`, `s_run_active` |
+| **Interne C++** (types / classes) | **PascalCase** | `Value`, `Chunk`, `Frame` |
 
-- **Règle stricte, côté API Ollin : jamais de `snake_case`.** Le nom exposé (1ᵉʳ argument de `mapSet(..., makeBuiltin(...))`) peut différer du nom C++ interne (ex. exposé `setPos` ↔ interne `cam_set_pos`). Les méta-méthodes (`__str`, `__add`, `init`, clés `__class__`/`__name__`) sont exemptées.
-- **Garde-fou** : `tests/check_naming.sh` (inclus dans `tests/run.sh`) échoue si un builtin exposé contient un `_`. Ajouté après l'unification snake→camel de l'API (graphics/math/image).
+- **Règle stricte, côté API Ollin : jamais de `snake_case`.** Le nom exposé (1ᵉʳ argument de `map_set(..., make_builtin(...))`) peut différer du nom C++ interne (ex. exposé `setPos` ↔ interne `cam_set_pos`). Les méta-méthodes (`__str`, `__add`, `init`, clés `__class__`/`__name__`) sont exemptées.
+- **Règle stricte, côté C++ interne : `snake_case` partout.** Une seule convention pour tout le code du moteur (choix de cohérence interne, indépendant de l'API langage). Le C++ « parle la même langue » que la STL qu'il appelle. **Exceptions** (axes orthogonaux, pas des choix de casse) : types/classes en `PascalCase`, statiques préfixés `s_`, méta-noms `__…` du langage, et **identifiants externes conservés tels quels** — API raylib/rlgl (`rl*`/`gl*`), méthodes `emscripten::val` (`isNumber`, `isNull`…), champs de structs raylib (`vaoId`, `texId`, `meshMaterial`…). Les noms d'API exposés, les identifiants GLSL des shaders et l'API DOM/JS des blocs `EM_ASM` vivent dans des **littéraux de chaîne** → hors casse C++.
+- **Garde-fou** : `tests/check_naming.sh` (inclus dans `tests/run.sh`) vérifie les **deux sens** — (1) aucun builtin exposé ne contient de `_` ; (2) aucun identifiant camelCase dans le **code** C++ (chaînes/commentaires ignorés), hors liste blanche externe (`rl*`/`gl*`, méthodes `emscripten::val`, champs raylib). Un nouvel identifiant camelCase interne fait échouer le test.
 - **Code utilisateur** (`.ol`) : aucune contrainte imposée par le langage (le nommage des variables/fonctions de l'utilisateur est libre).
 
 ## Commentaires (règle générale — moteur C++ ET code Ollin)
