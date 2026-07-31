@@ -19,14 +19,9 @@ export function pinToVisualViewport() {
         return () => {};
     }
     const body = document.body;
-    // Épinglage via `top` (le body est position:fixed), PAS via `transform`. Un
-    // `transform` sur un ANCÊTRE d'un canvas WebGL fait perdre le contexte GL sur
-    // iOS Safari → à l'ouverture du clavier pendant un programme graphique, la frame
-    // plantait et la boucle s'arrêtait. `top` décale à l'identique sans compositer
-    // le canvas.
     const sync = () => {
         body.style.height = vv.height + 'px';
-        body.style.top = vv.offsetTop + 'px';
+        body.style.transform = 'translateY(' + vv.offsetTop + 'px)';
     };
     vv.addEventListener('resize', sync);
     vv.addEventListener('scroll', sync);
@@ -35,6 +30,6 @@ export function pinToVisualViewport() {
         vv.removeEventListener('resize', sync);
         vv.removeEventListener('scroll', sync);
         body.style.height = '';
-        body.style.top = '';
+        body.style.transform = '';
     };
 }

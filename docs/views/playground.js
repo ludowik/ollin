@@ -658,7 +658,17 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
 // l'éditeur piloterait aussi un programme graphique en cours (ex. le sample voxel).
 // On signale au moteur (keyboard_module) d'ignorer le clavier tant que l'ÉDITEUR a
 // le focus ; dès qu'il le perd (canvas/bouton), le jeu reçoit de nouveau les touches.
-const onEditorFocus = () => { window.__ollinKbdBlocked = true }
+// Reprise de l'édition sur MOBILE : réactiver le clavier (focus éditeur) pendant un
+// programme en cours l'ARRÊTE → retour propre au mode édition, l'éditeur reprenant
+// la place du canvas (sinon on taperait « derrière » un programme qui tourne).
+// Tactile uniquement : sur desktop, cliquer l'éditeur pendant un run ne doit pas
+// interrompre (on peut vouloir lire le code en regardant le canvas).
+let isRunning = false   // déclaré tôt : onEditorFocus le lit dès le view.focus() d'init
+const isCoarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+const onEditorFocus = () => {
+  window.__ollinKbdBlocked = true
+  if (isCoarsePointer && isRunning) clearAndStop()
+}
 const onEditorBlur  = () => { window.__ollinKbdBlocked = false }
 view.contentDOM.addEventListener('focus', onEditorFocus)
 view.contentDOM.addEventListener('blur', onEditorBlur)
@@ -1648,8 +1658,7 @@ function setOutputVisible(visible) {
 
 const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
-let   isRunning = false
-let   isPaused  = false
+let   isPaused  = false   // isRunning est déclaré plus haut (lu par onEditorFocus à l'init)
 
 const ICON_RUN   = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
 const ICON_STOP  = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>'
