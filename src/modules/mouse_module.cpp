@@ -32,7 +32,7 @@ void mouse_poll() {
     Value released      = m.map_get(Value(std::string("released")));
     Value moved         = m.map_get(Value(std::string("moved")));
     Value scrolled      = m.map_get(Value(std::string("scrolled")));
-    Value doubleClicked = m.map_get(Value(std::string("doubleClicked")));
+    Value double_clicked = m.map_get(Value(std::string("doubleClicked")));
 
     int mx = GetMouseX();
     int my = GetMouseY();
@@ -41,12 +41,12 @@ void mouse_poll() {
 
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
         float now = GetTime();
-        bool dbl = doubleClicked.is_callable()
+        bool dbl = double_clicked.is_callable()
             && (now - s_last_click_time) < DBLCLICK_DELAY
             && std::abs(mx - s_last_click_x) < DBLCLICK_DIST
             && std::abs(my - s_last_click_y) < DBLCLICK_DIST;
         if (dbl) {
-            vm->call_value(doubleClicked, x, y);
+            vm->call_value(double_clicked, x, y);
             s_last_click_time = -1.0f;   // reset pour ne pas déclencher en triple-clic
         } else {
             if (pressed.is_callable())
