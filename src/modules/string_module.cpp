@@ -7,7 +7,7 @@
 // (int)d est un COMPORTEMENT INDÉFINI (et trappe sur WASM) si d est NaN/inf ou
 // hors plage int. On borne le double AVANT le cast ; les contrôles de bornes des
 // appelants transforment ensuite un index hors limites en "".
-static int toIntSafe(double d) {
+static int to_int_safe(double d) {
     if (std::isnan(d))
         return 0;
     if (d < (double)INT_MIN)
@@ -20,7 +20,7 @@ static int toIntSafe(double d) {
 // Casse par codepoint : ASCII + Latin-1 Supplement (lettres latines accentuées).
 // Au-delà (Latin étendu, grec, cyrillique…) : inchangé — la casse Unicode complète
 // nécessiterait des tables de données disproportionnées pour ce langage.
-static void appendUpper(uint32_t cp, std::string& out) {
+static void append_upper(uint32_t cp, std::string& out) {
     if (cp < 0x80)
         out += (char)((cp >= 'a' && cp <= 'z') ? cp - 32 : cp);
     else if (cp == 0xDF) // ß → SS
@@ -33,7 +33,7 @@ static void appendUpper(uint32_t cp, std::string& out) {
         utf8_encode(cp, out);
 }
 
-static void appendLower(uint32_t cp, std::string& out) {
+static void append_lower(uint32_t cp, std::string& out) {
     if (cp < 0x80)
         out += (char)((cp >= 'A' && cp <= 'Z') ? cp + 32 : cp);
     else if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7) // À..Þ (sauf ×) → à..þ
@@ -51,7 +51,7 @@ static int str_upper(CallCtx& ctx) {
     std::string out;
     for (size_t i = 0; i < s.size();) {
         size_t nb;
-        appendUpper(utf8_decode(s, i, &nb), out);
+        append_upper(utf8_decode(s, i, &nb), out);
         i += nb;
     }
     return ctx.ret(Value(std::move(out)));
@@ -64,7 +64,7 @@ static int str_lower(CallCtx& ctx) {
     std::string out;
     for (size_t i = 0; i < s.size();) {
         size_t nb;
-        appendLower(utf8_decode(s, i, &nb), out);
+        append_lower(utf8_decode(s, i, &nb), out);
         i += nb;
     }
     return ctx.ret(Value(std::move(out)));
@@ -72,7 +72,7 @@ static int str_lower(CallCtx& ctx) {
 
 // Rogne les codepoints présents dans `chars` (par codepoint, pas par octet) aux
 // extrémités choisies (left/right).
-static std::string trimCp(const std::string& s, const std::string& chars, bool left, bool right) {
+static std::string trim_cp(const std::string& s, const std::string& chars, bool left, bool right) {
     std::unordered_set<uint32_t> set;
     for (size_t i = 0; i < chars.size();) {
         size_t nb;
@@ -108,7 +108,7 @@ static int str_trim(CallCtx& ctx) {
     int argc = ctx.argc;
     const std::string& s = str_arg(args, argc, 0, "string.trim");
     std::string chars = (argc >= 2) ? std::string(str_arg(args, argc, 1, "string.trim")) : " ";
-    return ctx.ret(Value(trimCp(s, chars, true, true)));
+    return ctx.ret(Value(trim_cp(s, chars, true, true)));
 }
 
 static int str_ltrim(CallCtx& ctx) {
@@ -116,7 +116,7 @@ static int str_ltrim(CallCtx& ctx) {
     int argc = ctx.argc;
     const std::string& s = str_arg(args, argc, 0, "string.ltrim");
     std::string chars = (argc >= 2) ? std::string(str_arg(args, argc, 1, "string.ltrim")) : " ";
-    return ctx.ret(Value(trimCp(s, chars, true, false)));
+    return ctx.ret(Value(trim_cp(s, chars, true, false)));
 }
 
 static int str_rtrim(CallCtx& ctx) {
@@ -124,7 +124,7 @@ static int str_rtrim(CallCtx& ctx) {
     int argc = ctx.argc;
     const std::string& s = str_arg(args, argc, 0, "string.rtrim");
     std::string chars = (argc >= 2) ? std::string(str_arg(args, argc, 1, "string.rtrim")) : " ";
-    return ctx.ret(Value(trimCp(s, chars, false, true)));
+    return ctx.ret(Value(trim_cp(s, chars, false, true)));
 }
 
 // string.char(s, i) : i-ème CARACTÈRE (codepoint UTF-8), 1-based ; renvoyé sous
@@ -133,7 +133,7 @@ static int str_char(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     const std::string& s = str_arg(args, argc, 0, "string.char");
-    int i = toIntSafe(num_arg(args, argc, 1, "string.char"));
+    int i = to_int_safe(num_arg(args, argc, 1, "string.char"));
     size_t cnt = utf8_count(s);
     if (i < 1 || (size_t)i > cnt)
         return ctx.ret(Value(std::string("")));
@@ -150,18 +150,18 @@ static int str_substr(CallCtx& ctx) {
     int argc = ctx.argc;
     const std::string& s = str_arg(args, argc, 0, "string.substr");
     size_t cnt = utf8_count(s);
-    int start = toIntSafe(num_arg(args, argc, 1, "string.substr"));
-    int len = (argc >= 3) ? toIntSafe(num_arg(args, argc, 2, "string.substr")) : (int)cnt;
+    int start = to_int_safe(num_arg(args, argc, 1, "string.substr"));
+    int len = (argc >= 3) ? to_int_safe(num_arg(args, argc, 2, "string.substr")) : (int)cnt;
     if (start < 1)
         start = 1;
     if (len <= 0 || (size_t)start > cnt)
         return ctx.ret(Value(std::string("")));
-    size_t startCp = (size_t)start - 1;
-    size_t endCp = startCp + (size_t)len; // borné à cnt ci-dessous
-    if (endCp > cnt)
-        endCp = cnt;
-    size_t b0 = utf8_byte_offset(s, startCp);
-    size_t b1 = utf8_byte_offset(s, endCp);
+    size_t start_cp = (size_t)start - 1;
+    size_t end_cp = start_cp + (size_t)len; // borné à cnt ci-dessous
+    if (end_cp > cnt)
+        end_cp = cnt;
+    size_t b0 = utf8_byte_offset(s, start_cp);
+    size_t b1 = utf8_byte_offset(s, end_cp);
     return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
