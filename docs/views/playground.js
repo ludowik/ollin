@@ -43,9 +43,16 @@ disposers.push(() => sync.cancel())
 // fuiter vers la vue #/run (qui pose la sienne, mais on évite tout résidu).
 disposers.push(() => { window.__ollinRenderW = undefined; window.__ollinRenderH = undefined })
 
+// TÉLÉPHONE uniquement (pas tablette/iPad, dont l'interface reste « bureau ») :
+// pointeur grossier ET petit écran. Le petit côté sépare proprement téléphones
+// (≤ ~430) et iPad (≥ 744) indépendamment de l'orientation. Toutes les
+// adaptations liées au clavier logiciel sont gardées par ce drapeau.
+const isPhone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+             && Math.min(window.screen.width, window.screen.height) < 600
+
 // Barre d'outils collee au haut du VISIBLE quand le clavier mobile s'ouvre
 // (sinon elle derive/disparait sur iOS). Actif tant que la vue est montee.
-disposers.push(pinToVisualViewport())
+if (isPhone) disposers.push(pinToVisualViewport())
 
 // Mode EXEMPLE : route #/playground/sample/<fichier> → on ouvre l'exemple
 // directement depuis le dépôt (samples/…), SANS copie ni persistance. Édition
@@ -661,13 +668,12 @@ disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true
 // Reprise de l'édition sur MOBILE : réactiver le clavier (focus éditeur) pendant un
 // programme en cours l'ARRÊTE → retour propre au mode édition, l'éditeur reprenant
 // la place du canvas (sinon on taperait « derrière » un programme qui tourne).
-// Tactile uniquement : sur desktop, cliquer l'éditeur pendant un run ne doit pas
-// interrompre (on peut vouloir lire le code en regardant le canvas).
+// Téléphone uniquement : sur desktop ET tablette/iPad, cliquer l'éditeur pendant
+// un run ne doit pas interrompre (on peut vouloir lire le code en regardant le canvas).
 let isRunning = false   // déclaré tôt : onEditorFocus le lit dès le view.focus() d'init
-const isCoarsePointer = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
 const onEditorFocus = () => {
   window.__ollinKbdBlocked = true
-  if (isCoarsePointer && isRunning) clearAndStop()
+  if (isPhone && isRunning) clearAndStop()
 }
 const onEditorBlur  = () => { window.__ollinKbdBlocked = false }
 view.contentDOM.addEventListener('focus', onEditorFocus)
@@ -761,8 +767,7 @@ disposers.push(() => {
   // un view.focus() programmatique qui N'OUVRE PAS le clavier (iOS) → la barre ne
   // doit pas apparaître. On détecte le clavier via visualViewport (la zone visible
   // rétrécit franchement quand il s'ouvre).
-  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches
-  if (coarse) {
+  if (isPhone) {
     const runBtnEl = document.getElementById('run-btn')
     const vv = window.visualViewport
     // Clavier ouvert ≈ la zone visible perd > 120px par rapport au layout viewport.
@@ -1805,7 +1810,7 @@ async function launch() {
   // Lancement clavier OUVERT (tactile) : le fermer d'abord et attendre le retour du
   // viewport. Sinon la zone de rendu serait mesurée RÉDUITE (clavier) → canvas trop
   // petit, taille erronée une fois le clavier refermé.
-  if (isCoarsePointer && document.activeElement === view.contentDOM) {
+  if (isPhone && document.activeElement === view.contentDOM) {
     view.contentDOM.blur()
     await waitViewportRestored()
   }
