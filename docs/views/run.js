@@ -43,6 +43,12 @@ export async function init(ctx) {
     await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // modèles des imports aussi
     // Portée « projet » du module `data` : cohérente avec le playground (même clé).
     window.__ollinDataProject = exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_')
+    // Dimensions de rendu FRAÎCHES transmises au moteur (le module `window` lit
+    // __ollinRenderW/H en priorité). Sans ça, la valeur posée par le playground
+    // PERSISTE sur window → W/H figés à l'ancienne taille en plein écran.
+    const rr = pane.getBoundingClientRect()
+    window.__ollinRenderW = Math.round(rr.width)
+    window.__ollinRenderH = Math.round(rr.height)
     runProgram(mod, code, canvasEl, {
       filename:  project ? (project.entry || '') : (exampleFile || ''),
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
@@ -103,6 +109,8 @@ export async function init(ctx) {
   const stop = () => {
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
+    window.__ollinRenderW = undefined   // indice de taille propre à cette vue → ne pas fuiter
+    window.__ollinRenderH = undefined
     unpinViewport()
   }
 

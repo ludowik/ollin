@@ -39,6 +39,9 @@ const sync = createRemoteSync({
   onError: (err, p) => onRemoteSyncError(err, p),
 })
 disposers.push(() => sync.cancel())
+// Indice de taille de rendu propre à cette vue : nettoyé au démontage pour ne pas
+// fuiter vers la vue #/run (qui pose la sienne, mais on évite tout résidu).
+disposers.push(() => { window.__ollinRenderW = undefined; window.__ollinRenderH = undefined })
 
 // Barre d'outils collee au haut du VISIBLE quand le clavier mobile s'ouvre
 // (sinon elle derive/disparait sur iOS). Actif tant que la vue est montee.
