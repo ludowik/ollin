@@ -9,7 +9,7 @@ Value make_color_class(); // défini plus bas — utilisé par color_random (rep
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-static double colorComponent(const Value& v, const char* name) {
+static double color_component(const Value& v, const char* name) {
     if (!v.is_number())
         throw std::runtime_error(std::string("Color.") + name + " must be a number");
     double d = v.as_num();
@@ -23,12 +23,12 @@ static double colorComponent(const Value& v, const char* name) {
 // Classe Color pour les fabriques statiques (random/gray) : la classe globale
 // (réutilisée, pas de nouvelle alloc, __class__ == Color), avec repli sur une classe
 // fraîche si le global n'est pas encore matérialisé.
-static Value colorClass() {
+static Value color_class() {
     Value c = VM::current()->get_global("Color");
     return c.is_class() ? c : make_color_class();
 }
 
-static Value colorField(const Value& self, const char* name) {
+static Value color_field(const Value& self, const char* name) {
     Value v = self.map_get(Value(std::string(name)));
     if (v.is_nil())
         throw std::runtime_error(std::string("Color: missing field '") + name + "'");
@@ -61,10 +61,10 @@ static int color_str(CallCtx& ctx) {
     if (argc < 1)
         return ctx.ret(Value(std::string("Color(0,0,0,1)")));
     const Value& self = args[0];
-    auto r = colorField(self, "r").as_num();
-    auto g = colorField(self, "g").as_num();
-    auto b = colorField(self, "b").as_num();
-    auto a = colorField(self, "a").as_num();
+    auto r = color_field(self, "r").as_num();
+    auto g = color_field(self, "g").as_num();
+    auto b = color_field(self, "b").as_num();
+    auto a = color_field(self, "a").as_num();
     return ctx.ret(Value(std::string("Color(") + std::to_string(r) + "," + std::to_string(g) + "," + std::to_string(b) + "," +
                  std::to_string(a) + ")"));
 }
@@ -80,7 +80,7 @@ static int color_random(CallCtx& ctx) {
     int argc = ctx.argc;
     (void)args;
     (void)argc;
-    Value cls = colorClass();
+    Value cls = color_class();
     auto rnd = []() { return (double)rand() / ((double)RAND_MAX + 1.0); };
     Value inst = Value::make_map();
     inst.map_set(Value(std::string("__class__")), cls);
@@ -99,10 +99,10 @@ static int color_pastel(CallCtx& ctx) {
     int argc = ctx.argc;
     (void)argc;
     const Value& self = args[0];
-    double r = colorField(self, "r").as_num();
-    double g = colorField(self, "g").as_num();
-    double b = colorField(self, "b").as_num();
-    double a = colorField(self, "a").as_num();
+    double r = color_field(self, "r").as_num();
+    double g = color_field(self, "g").as_num();
+    double b = color_field(self, "b").as_num();
+    double a = color_field(self, "a").as_num();
     Value cls = self.map_get(Value(std::string("__class__")));
     Value inst = Value::make_map();
     inst.map_set(Value(std::string("__class__")), cls);
@@ -121,10 +121,10 @@ static int color_grayscale(CallCtx& ctx) {
     int argc = ctx.argc;
     (void)argc;
     const Value& self = args[0];
-    double r = colorField(self, "r").as_num();
-    double g = colorField(self, "g").as_num();
-    double b = colorField(self, "b").as_num();
-    double a = colorField(self, "a").as_num();
+    double r = color_field(self, "r").as_num();
+    double g = color_field(self, "g").as_num();
+    double b = color_field(self, "b").as_num();
+    double a = color_field(self, "a").as_num();
     double lum = 0.299 * r + 0.587 * g + 0.114 * b;
     Value cls = self.map_get(Value(std::string("__class__")));
     Value inst = Value::make_map();
@@ -145,8 +145,8 @@ static int color_gray(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("Color.gray: expected a value");
-    double v = colorComponent(args[0], "gray");
-    Value cls = colorClass();
+    double v = color_component(args[0], "gray");
+    Value cls = color_class();
     Value inst = Value::make_map();
     inst.map_set(Value(std::string("__class__")), cls);
     inst.map_set(Value(std::string("r")), Value(v));
@@ -176,7 +176,7 @@ Value make_color_class() {
 
 // Chaque constante est une vraie instance Color (clé __class__ posée) → les méthodes
 // (pastel/grayscale/random) et __str fonctionnent dessus, comme sur Color(...).
-static Value makeColorInstance(const Value& cls, double r, double g, double b, double a = 1.0) {
+static Value make_color_instance(const Value& cls, double r, double g, double b, double a = 1.0) {
     Value inst = Value::make_map();
     inst.map_set(Value(std::string("__class__")), cls);
     inst.map_set(Value(std::string("r")), Value(r));
@@ -189,20 +189,20 @@ static Value makeColorInstance(const Value& cls, double r, double g, double b, d
 Value make_colors_module() {
     Value m = Value::make_map();
     Value cls = make_color_class(); // classe Color partagée par toutes les constantes de la palette
-    m.map_set(Value(std::string("BLACK")), makeColorInstance(cls, 0.0, 0.0, 0.0));
-    m.map_set(Value(std::string("WHITE")), makeColorInstance(cls, 1.0, 1.0, 1.0));
-    m.map_set(Value(std::string("RED")), makeColorInstance(cls, 230 / 255.0, 41 / 255.0, 55 / 255.0));
-    m.map_set(Value(std::string("GREEN")), makeColorInstance(cls, 0 / 255.0, 228 / 255.0, 48 / 255.0));
-    m.map_set(Value(std::string("BLUE")), makeColorInstance(cls, 0 / 255.0, 121 / 255.0, 241 / 255.0));
-    m.map_set(Value(std::string("YELLOW")), makeColorInstance(cls, 253 / 255.0, 249 / 255.0, 0 / 255.0));
-    m.map_set(Value(std::string("GRAY")), makeColorInstance(cls, 130 / 255.0, 130 / 255.0, 130 / 255.0));
-    m.map_set(Value(std::string("ORANGE")), makeColorInstance(cls, 255 / 255.0, 161 / 255.0, 0 / 255.0));
-    m.map_set(Value(std::string("PINK")), makeColorInstance(cls, 255 / 255.0, 109 / 255.0, 194 / 255.0));
-    m.map_set(Value(std::string("PURPLE")), makeColorInstance(cls, 200 / 255.0, 122 / 255.0, 255 / 255.0));
-    m.map_set(Value(std::string("BROWN")), makeColorInstance(cls, 127 / 255.0, 106 / 255.0, 79 / 255.0));
-    m.map_set(Value(std::string("DARKGRAY")), makeColorInstance(cls, 80 / 255.0, 80 / 255.0, 80 / 255.0));
-    m.map_set(Value(std::string("SKYBLUE")), makeColorInstance(cls, 102 / 255.0, 191 / 255.0, 255 / 255.0));
-    m.map_set(Value(std::string("LIME")), makeColorInstance(cls, 0 / 255.0, 158 / 255.0, 47 / 255.0));
-    m.map_set(Value(std::string("MAGENTA")), makeColorInstance(cls, 255 / 255.0, 0 / 255.0, 255 / 255.0));
+    m.map_set(Value(std::string("BLACK")), make_color_instance(cls, 0.0, 0.0, 0.0));
+    m.map_set(Value(std::string("WHITE")), make_color_instance(cls, 1.0, 1.0, 1.0));
+    m.map_set(Value(std::string("RED")), make_color_instance(cls, 230 / 255.0, 41 / 255.0, 55 / 255.0));
+    m.map_set(Value(std::string("GREEN")), make_color_instance(cls, 0 / 255.0, 228 / 255.0, 48 / 255.0));
+    m.map_set(Value(std::string("BLUE")), make_color_instance(cls, 0 / 255.0, 121 / 255.0, 241 / 255.0));
+    m.map_set(Value(std::string("YELLOW")), make_color_instance(cls, 253 / 255.0, 249 / 255.0, 0 / 255.0));
+    m.map_set(Value(std::string("GRAY")), make_color_instance(cls, 130 / 255.0, 130 / 255.0, 130 / 255.0));
+    m.map_set(Value(std::string("ORANGE")), make_color_instance(cls, 255 / 255.0, 161 / 255.0, 0 / 255.0));
+    m.map_set(Value(std::string("PINK")), make_color_instance(cls, 255 / 255.0, 109 / 255.0, 194 / 255.0));
+    m.map_set(Value(std::string("PURPLE")), make_color_instance(cls, 200 / 255.0, 122 / 255.0, 255 / 255.0));
+    m.map_set(Value(std::string("BROWN")), make_color_instance(cls, 127 / 255.0, 106 / 255.0, 79 / 255.0));
+    m.map_set(Value(std::string("DARKGRAY")), make_color_instance(cls, 80 / 255.0, 80 / 255.0, 80 / 255.0));
+    m.map_set(Value(std::string("SKYBLUE")), make_color_instance(cls, 102 / 255.0, 191 / 255.0, 255 / 255.0));
+    m.map_set(Value(std::string("LIME")), make_color_instance(cls, 0 / 255.0, 158 / 255.0, 47 / 255.0));
+    m.map_set(Value(std::string("MAGENTA")), make_color_instance(cls, 255 / 255.0, 0 / 255.0, 255 / 255.0));
     return m;
 }
