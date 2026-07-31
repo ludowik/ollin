@@ -30,7 +30,7 @@ static VM* s_current_vm = nullptr;
 // ferait boucler l'itération indéfiniment. (La branche int de FOR_PREP n'appelle
 // pas cette fonction : les entiers sont finis par construction, elle garde son
 // propre test de pas nul.)
-static void validateNumericRange(double start, double end, double step, const std::string& loc) {
+static void validate_numeric_range(double start, double end, double step, const std::string& loc) {
     if (step == 0.0)
         throw std::runtime_error(loc + ": runtime: le pas ne peut pas être 0");
     if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(step))
@@ -288,7 +288,7 @@ static const struct {
 };
 
 // resolveFuncVal : func value → func_idx (+ upvals) ; défini plus bas.
-static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals);
+static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals);
 
 // ── Meta-method dispatch helpers ──────────────────────────────────────────────
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
@@ -299,7 +299,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolveFuncVal(fn, fuv); // fn est callable (garde ci-dessus)
+    uint8_t fi = resolve_func_val(fn, fuv); // fn est callable (garde ci-dessus)
     int nb = (int)regs.size();
     grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb] = std::move(lhs);
@@ -315,7 +315,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolveFuncVal(fn, fuv); // fn est callable (garde ci-dessus)
+    uint8_t fi = resolve_func_val(fn, fuv); // fn est callable (garde ci-dessus)
     int nb = (int)regs.size();
     grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[nb] = std::move(lhs);
@@ -359,7 +359,7 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         return 0;
     }
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolveFuncVal(init_fn, fuv);
+    uint8_t fi = resolve_func_val(init_fn, fuv);
     int total = argc + 1;
     grow_regs((size_t)(base_reg + std::max((int)ch->funcs[fi].reg_count, total)));
     // Décale les args pour insérer self en base_reg : base_reg+arg_off+i → base_reg+1+i.
@@ -390,7 +390,7 @@ void VM::close_upvals() {
 }
 
 // ── Helper: resolve function value → func_idx + upvals ───────────────────────
-static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals) {
+static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals) {
     if (fv.is_func_val())
         return (uint8_t)fv.as_int();
     if (fv.is_closure()) {
@@ -403,7 +403,7 @@ static uint8_t resolveFuncVal(const Value& fv, std::unique_ptr<std::vector<Upval
 }
 
 // ── EQ comparison (shared by op_EQ and op_NEQ) ────────────────────────────────
-static bool valuesEqual(const Value& av, const Value& bv) {
+static bool values_equal(const Value& av, const Value& bv) {
     if (av.is_nil() && bv.is_nil())
         return true;
     if (av.is_nil() || bv.is_nil())
@@ -932,7 +932,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        regs[base + A] = Value((int64_t)(valuesEqual(bv, cv) ? 1 : 0));
+        regs[base + A] = Value((int64_t)(values_equal(bv, cv) ? 1 : 0));
         NEXT();
     }
 
@@ -947,7 +947,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        regs[base + A] = Value((int64_t)(valuesEqual(bv, cv) ? 0 : 1));
+        regs[base + A] = Value((int64_t)(values_equal(bv, cv) ? 0 : 1));
         NEXT();
     }
 
@@ -1460,7 +1460,7 @@ dispatch_loop:
         {
             // Regular function/closure call
             std::unique_ptr<std::vector<Upvalue*>> fuv;
-            uint8_t fi = resolveFuncVal(regs[base + B], fuv);
+            uint8_t fi = resolve_func_val(regs[base + B], fuv);
             ip = push_call_frame(base + A, fi, C, std::move(fuv), ip);
         }
     call_dyn_done:
@@ -1487,7 +1487,7 @@ dispatch_loop:
         }
         {
             std::unique_ptr<std::vector<Upvalue*>> fuv;
-            uint8_t fi = resolveFuncVal(regs[base + B], fuv);
+            uint8_t fi = resolve_func_val(regs[base + B], fuv);
             ip = push_call_frame(base + A, fi, argc_va, std::move(fuv), ip);
         }
     call_va_done:
@@ -1529,7 +1529,7 @@ dispatch_loop:
                     ip = addr;
             } else {
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
-                uint8_t fi = resolveFuncVal(fn, fuv);
+                uint8_t fi = resolve_func_val(fn, fuv);
                 ip = push_call_frame(fresh, fi, total, std::move(fuv), ip, false, -1, fixed_base);
             }
         }
@@ -1738,7 +1738,7 @@ dispatch_loop:
             double start = toDouble_(regs[base + B]);
             double end = toDouble_(regs[base + B + 1]);
             double step = has_step ? toDouble_(regs[base + B + 2]) : 1.0;
-            validateNumericRange(start, end, step, line_);
+            validate_numeric_range(start, end, step, line_);
             Range* r = new Range{1, start, end, step, incl_right};
             regs[base + A] = Value::make_range(r);
         }
@@ -1772,7 +1772,7 @@ dispatch_loop:
                 }
             } else {
                 double di = vi.as_num(), dl = vl.as_num(), ds = vs.as_num();
-                validateNumericRange(di, dl, ds, err_line());
+                validate_numeric_range(di, dl, ds, err_line());
                 regs[base + A] = Value(di); // normalise tout en double
                 regs[base + A + 1] = Value(dl);
                 regs[base + A + 2] = Value(ds);
@@ -1834,7 +1834,7 @@ dispatch_loop:
             // erreurs rattrapées par try/catch gardent leur message brut (ci-dessous).
             std::string msg = e.what();
             // Un message déjà localisé contient ":<chiffres>:" (pattern file:line:)
-            auto hasLoc = [&](const std::string& m) {
+            auto has_loc = [&](const std::string& m) {
                 auto p = m.find(':');
                 while (p != std::string::npos && p + 1 < m.size()) {
                     if (std::isdigit((unsigned char)m[p + 1])) {
@@ -1846,7 +1846,7 @@ dispatch_loop:
                 }
                 return false;
             };
-            if (!hasLoc(msg))
+            if (!has_loc(msg))
                 throw std::runtime_error(err_line() + ": " + msg);
             throw;
         }

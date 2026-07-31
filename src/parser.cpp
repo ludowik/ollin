@@ -102,7 +102,7 @@ Program Parser::parse() {
 
 // ── dispatch ─────────────────────────────────────────────────────────────────
 
-static bool isAssignOp(TokenType t) {
+static bool is_assign_op(TokenType t) {
     return t == TokenType::EQUALS || t == TokenType::PLUS_EQUAL || t == TokenType::MINUS_EQUAL ||
            t == TokenType::STAR_EQUAL || t == TokenType::SLASH_EQUAL || t == TokenType::PERCENT_EQUAL;
 }
@@ -146,7 +146,7 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         int line = peek().line;
         int saved = pos;
         auto e = expr();
-        if (isAssignOp(peek().type))
+        if (is_assign_op(peek().type))
             return finish_assign_from_expr(std::move(e), line);
         if (check(TokenType::COMMA)) {
             pos = saved; // multi-affectation : re-parse via multiAssignStmt (LValue)
@@ -417,7 +417,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     std::string name = expect(TokenType::IDENTIFIER).lexeme;
 
     // Parse "(" params ")" NL body "end" dans les champs fournis.
-    auto parseParamsBody = [&](std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,
+    auto parse_params_body = [&](std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,
                                bool& variadic, std::vector<std::unique_ptr<Stmt>>& body) {
         expect(TokenType::LPAREN);
         while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
@@ -452,7 +452,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
         advance(); // DOT
         std::string field = expect(TokenType::IDENTIFIER).lexeme;
         auto fe = std::make_unique<FuncExpr>();
-        parseParamsBody(fe->params, fe->defaults, fe->variadic, fe->body);
+        parse_params_body(fe->params, fe->defaults, fe->variadic, fe->body);
         auto ia = std::make_unique<IndexAssignStmt>();
         ia->line = line; ia->file_idx = current_file_idx_;
         ia->obj = name;
@@ -465,7 +465,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     auto s = std::make_unique<FuncDeclStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     s->name = name;
-    parseParamsBody(s->params, s->defaults, s->variadic, s->body);
+    parse_params_body(s->params, s->defaults, s->variadic, s->body);
     return s;
 }
 
@@ -504,7 +504,7 @@ std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
     s->line = line; s->file_idx = current_file_idx_;
 
     // Parse LValue list
-    auto parseLValue = [&]() {
+    auto parse_l_value = [&]() {
         LValue lv;
         lv.name = expect(TokenType::IDENTIFIER).lexeme;
         if (match(TokenType::DOT)) {
@@ -528,9 +528,9 @@ std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
         return lv;
     };
 
-    s->targets.push_back(parseLValue());
+    s->targets.push_back(parse_l_value());
     while (match(TokenType::COMMA))
-        s->targets.push_back(parseLValue());
+        s->targets.push_back(parse_l_value());
 
     expect(TokenType::EQUALS);
 
@@ -682,11 +682,11 @@ std::unique_ptr<Expr> Parser::bitwise_and() {
     return left;
 }
 
-static bool isCmpToken(TokenType t) {
+static bool is_cmp_token(TokenType t) {
     return t == TokenType::GREATER || t == TokenType::LESS || t == TokenType::GREATER_EQUAL ||
            t == TokenType::LESS_EQUAL || t == TokenType::EQUAL_EQUAL || t == TokenType::NOT_EQUAL;
 }
-static char cmpChar(TokenType t) {
+static char cmp_char(TokenType t) {
     if (t == TokenType::EQUAL_EQUAL)
         return '=';
     if (t == TokenType::GREATER_EQUAL)
@@ -703,14 +703,14 @@ static char cmpChar(TokenType t) {
 std::unique_ptr<Expr> Parser::comparison() {
     auto first = shift();
     skip_comments();
-    if (!isCmpToken(peek().type))
+    if (!is_cmp_token(peek().type))
         return first;
 
     // collect all operands and operators
     auto chain = std::make_unique<ChainedCompareExpr>();
     chain->operands.push_back(std::move(first));
-    while (isCmpToken(peek().type)) {
-        chain->ops.push_back(cmpChar(advance().type));
+    while (is_cmp_token(peek().type)) {
+        chain->ops.push_back(cmp_char(advance().type));
         skip_comments();
         chain->operands.push_back(shift());
         skip_comments();
@@ -1157,7 +1157,7 @@ std::unique_ptr<Stmt> Parser::class_decl() {
     return s;
 }
 
-static std::vector<std::string> collectTopLevelNames(const std::vector<std::unique_ptr<Stmt>>& stmts) {
+static std::vector<std::string> collect_top_level_names(const std::vector<std::unique_ptr<Stmt>>& stmts) {
     std::vector<std::string> names;
     for (auto& s : stmts) {
         if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
@@ -1194,7 +1194,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     // Construit `var al = {}` puis `al[n] = n` pour chaque nom exporté (référence
     // les globales déjà injectées). Partagé par le cas « déjà importé » et le
     // cas frais.
-    auto emitAliasMap = [&](const std::string& al, const std::vector<std::string>& names) {
+    auto emit_alias_map = [&](const std::string& al, const std::vector<std::string>& names) {
         auto vd = std::make_unique<VarDeclStmt>();
         vd->names.push_back(al);
         vd->values.push_back(std::make_unique<MapExpr>());
@@ -1215,7 +1215,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     if (imported_paths_->count(resolved)) {
         if (!alias.empty()) {
             auto it = module_names_->find(resolved);
-            emitAliasMap(alias, it != module_names_->end() ? it->second : std::vector<std::string>{});
+            emit_alias_map(alias, it != module_names_->end() ? it->second : std::vector<std::string>{});
         }
         return block;
     }
@@ -1252,7 +1252,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
 
     // Mémorise les noms exportés (même pour un import flat) → un import aliasé
     // ultérieur du même module pourra reconstruire sa map.
-    auto top_names = collectTopLevelNames(sub_prog.stmts);
+    auto top_names = collect_top_level_names(sub_prog.stmts);
     (*module_names_)[resolved] = top_names;
 
     if (alias.empty()) {
@@ -1289,7 +1289,7 @@ std::unique_ptr<Stmt> Parser::switch_stmt() {
     s->subject = expr();
     consume_opt_comment();
 
-    auto isArmStart = [&]() {
+    auto is_arm_start = [&]() {
         return check(TokenType::CASE) || check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T);
     };
 
@@ -1318,9 +1318,9 @@ std::unique_ptr<Stmt> Parser::switch_stmt() {
             arm.values.push_back(expr());
         }
         consume_opt_comment();
-        while (!isArmStart()) {
+        while (!is_arm_start()) {
             skip_comments();
-            if (isArmStart())
+            if (is_arm_start())
                 break;
             arm.body.push_back(parse_one_stmt());
         }

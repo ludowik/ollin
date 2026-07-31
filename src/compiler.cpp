@@ -70,7 +70,7 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
 }
 
 // ── constant evaluator (for default parameter values) ─────────────────────────
-static Value evalConstant(const Expr& e, const std::vector<std::string>& files, SourceLoc fallback = {}) {
+static Value eval_constant(const Expr& e, const std::vector<std::string>& files, SourceLoc fallback = {}) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e))
         return n->is_integer ? Value(n->ival) : num_value(n->value);
     if (auto* s = dynamic_cast<const StringExpr*>(&e))
@@ -84,7 +84,7 @@ static Value evalConstant(const Expr& e, const std::vector<std::string>& files, 
 }
 
 // ── arithmetic op helpers ─────────────────────────────────────────────────────
-static Op charToOp(char op) {
+static Op char_to_op(char op) {
     switch (op) {
     case '+':
         return Op::ADD;
@@ -100,7 +100,7 @@ static Op charToOp(char op) {
         throw std::runtime_error(std::string("unknown assign op: ") + op);
     }
 }
-static Op tokenToOp(TokenType op) {
+static Op token_to_op(TokenType op) {
     switch (op) {
     case TokenType::PLUS_EQUAL:
         return Op::ADD;
@@ -121,7 +121,7 @@ static Op tokenToOp(TokenType op) {
 // '&' et '|' (and/or) sont exclus : ils compilent en court-circuit (JUMP_IF_FALSE),
 // jamais via cet opcode. Partagé par visit(BinaryExpr) et compileInto → évite de
 // dupliquer le switch (et supprime les anciens cas '&'/'|' morts).
-static Op binaryArithOpcode(char op) {
+static Op binary_arith_opcode(char op) {
     switch (op) {
     case '+':
         return Op::ADD;
@@ -164,7 +164,7 @@ static Op binaryArithOpcode(char op) {
     }
 }
 
-static Op unaryOpcode(char op) {
+static Op unary_opcode(char op) {
     switch (op) {
     case '-':
         return Op::NEGATE;
@@ -181,7 +181,7 @@ static Op unaryOpcode(char op) {
 // par un RETURN/RETURN_V : la dernière instruction retourne inconditionnellement,
 // donc un RETURN de plus serait inatteignable (code mort). Ne concerne PAS le
 // `return` explicite sans valeur, qui doit toujours être émis.
-static void emitImplicitReturn(Chunk& chunk) {
+static void emit_implicit_return(Chunk& chunk) {
     if (!chunk.code.empty()) {
         Op last = (Op)i_op(chunk.code.back());
         if (last == Op::RETURN || last == Op::RETURN_V)
@@ -237,7 +237,7 @@ struct CollectLocalsVisitor : StmtQuery {
     void visit(const BlockStmt& s) override { run(s.stmts); }
 };
 
-static void collectLocals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
+static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
                           const std::vector<std::string>& files, bool collect_funcs = true,
                           std::unordered_set<std::string>* funcs = nullptr) {
     std::unordered_set<std::string> seen(out.begin(), out.end());
@@ -302,7 +302,7 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
 };
 
-static void collectGlobals(const std::vector<std::unique_ptr<Stmt>>& stmts,
+static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts,
                            std::unordered_set<std::string>& out, const std::vector<std::string>& files) {
     CollectGlobalsVisitor v(out, files);
     v.run(stmts);
@@ -327,22 +327,22 @@ void Compiler::compile_into(const Expr& e, int dest) {
         // temporaires d'opérandes (alloués à reg_top_+) ne recouvrent jamais dest.
         int saved = reg_top_;
         bin->left->accept(*this);
-        int rL = last_reg_;
-        if (reg_top_ <= rL) // protège rL d'un appel 0-arg (cf. visit(BinaryExpr))
-            reg_top_ = rL + 1;
+        int r_l = last_reg_;
+        if (reg_top_ <= r_l) // protège rL d'un appel 0-arg (cf. visit(BinaryExpr))
+            reg_top_ = r_l + 1;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
         bin->right->accept(*this);
-        int rR = last_reg_;
-        chunk.emit(make_abc((uint8_t)binaryArithOpcode(bin->op), (uint8_t)dest, (uint8_t)rL, (uint8_t)rR));
+        int r_r = last_reg_;
+        chunk.emit(make_abc((uint8_t)binary_arith_opcode(bin->op), (uint8_t)dest, (uint8_t)r_l, (uint8_t)r_r));
         reg_top_ = saved;
         last_reg_ = dest;
     } else if (auto* un = dynamic_cast<const UnaryExpr*>(&e)) {
         // Unaire : op directement dans dest (même sûreté que ci-dessus, un seul opérande).
         int saved = reg_top_;
         un->operand->accept(*this);
-        int rIn = last_reg_;
-        chunk.emit(make_abc((uint8_t)unaryOpcode(un->op), (uint8_t)dest, (uint8_t)rIn, 0));
+        int r_in = last_reg_;
+        chunk.emit(make_abc((uint8_t)unary_opcode(un->op), (uint8_t)dest, (uint8_t)r_in, 0));
         reg_top_ = saved;
         last_reg_ = dest;
     } else {
@@ -359,7 +359,7 @@ Chunk Compiler::compile(const Program& prog) {
     chunk.source_files = prog.source_files;
     reg_top_ = 0;
     reg_count_ = 8;
-    collectGlobals(prog.stmts, declared_globals_, chunk.source_files);
+    collect_globals(prog.stmts, declared_globals_, chunk.source_files);
     for (auto& n : builtin_module_names())
         declared_globals_.insert(n);
     for (auto& n : builtin_func_names())
@@ -373,7 +373,7 @@ Chunk Compiler::compile(const Program& prog) {
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
-    collectLocals(prog.stmts, top_locals, chunk.source_files, false);
+    collect_locals(prog.stmts, top_locals, chunk.source_files, false);
     bind_scan_locals(top_locals, {}); // collect_funcs=false → aucune fonction ici, tout est différé
     locals_top_ = reg_top_;
     if (reg_top_ > reg_count_)
@@ -396,7 +396,7 @@ Chunk Compiler::compile(const Program& prog) {
 
 // Vrai si l'expression est un appel (toute forme) — utilisé pour la
 // destructuration multi-retour, qui doit lire plusieurs valeurs à la base.
-static bool isCallNode(const Expr* e) {
+static bool is_call_node(const Expr* e) {
     return dynamic_cast<const CallExpr*>(e) || dynamic_cast<const ExprCallExpr*>(e) ||
            dynamic_cast<const MethodCallExpr*>(e);
 }
@@ -404,8 +404,8 @@ static bool isCallNode(const Expr* e) {
 // Expression pouvant produire PLUSIEURS valeurs si elle est en dernière position d'une
 // liste (arguments d'appel, éléments de tableau, retour, destructuration) : `...` ou un
 // appel. Ailleurs (position non terminale) elle est ajustée à une seule valeur.
-static bool isMultiValueExpr(const Expr* e) {
-    return dynamic_cast<const VarArgExpr*>(e) || isCallNode(e);
+static bool is_multi_value_expr(const Expr* e) {
+    return dynamic_cast<const VarArgExpr*>(e) || is_call_node(e);
 }
 
 void Compiler::visit(const VarDeclStmt& s) {
@@ -415,7 +415,7 @@ void Compiler::visit(const VarDeclStmt& s) {
     // (portée lexicale : elle devient visible À PARTIR d'ici). Renvoie son registre.
     // À n'appeler qu'APRÈS avoir compilé les initialisateurs, pour que `var a = a`
     // lise le `a` extérieur, pas la locale en cours de déclaration.
-    auto activateLocal = [&](const std::string& name) -> int {
+    auto activate_local = [&](const std::string& name) -> int {
         auto it = pending_var_reg_.find(name);
         if (it == pending_var_reg_.end())
             return local_regs_.at(name); // déjà active (sécurité)
@@ -425,7 +425,7 @@ void Compiler::visit(const VarDeclStmt& s) {
         return reg;
     };
     // Registre réservé d'une locale encore différée (sans l'activer).
-    auto reservedReg = [&](const std::string& name) -> int {
+    auto reserved_reg = [&](const std::string& name) -> int {
         auto it = pending_var_reg_.find(name);
         return it != pending_var_reg_.end() ? it->second : local_regs_.at(name);
     };
@@ -436,7 +436,7 @@ void Compiler::visit(const VarDeclStmt& s) {
     // retour (RETURN copie R[A..A+k-1] → base..base+k-1). On lit ensuite base+i.
     // (Généralise l'ancien chemin qui ne gérait que CALL_FUNC nommé → corrige le
     // crash sur closure et la perte de valeurs pour méthodes/appels dynamiques.)
-    if (s.names.size() > 1 && s.values.size() == 1 && isMultiValueExpr(s.values[0].get())) {
+    if (s.names.size() > 1 && s.values.size() == 1 && is_multi_value_expr(s.values[0].get())) {
         int base = reg_top_;
         int n = (int)s.names.size();
         if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
@@ -456,7 +456,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             if (s.is_global) {
                 chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.add_identifier(s.names[i])));
             } else {
-                int dest = activateLocal(s.names[i]); // l'appel est déjà compilé → activation sûre
+                int dest = activate_local(s.names[i]); // l'appel est déjà compilé → activation sûre
                 if (base + i != dest)
                     chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(base + i), 0));
             }
@@ -486,7 +486,7 @@ void Compiler::visit(const VarDeclStmt& s) {
     // encore active (portée lexicale : `var a = a` lit le `a` extérieur). Les
     // initialisateurs de TOUTES les cibles voient donc la portée d'avant la déclaration.
     for (int i = 0; i < (int)s.names.size(); ++i) {
-        int dest = reservedReg(s.names[i]);
+        int dest = reserved_reg(s.names[i]);
         if (i < (int)s.values.size()) {
             compile_into(*s.values[i], dest);
         } else {
@@ -495,14 +495,14 @@ void Compiler::visit(const VarDeclStmt& s) {
     }
     // Initialisateurs compilés → les locales deviennent visibles à partir d'ici.
     for (auto& n : s.names)
-        activateLocal(n);
+        activate_local(n);
     // Register constants so any later assignment is caught at compile time
     if (s.is_constant)
         for (auto& n : s.names)
             const_names_.insert(n);
 }
 
-static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
+static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
 
 void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
                               const std::unordered_set<std::string>& skip) {
@@ -524,7 +524,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body) {
 
     std::vector<std::string> block_locals;
     std::unordered_set<std::string> block_funcs;
-    collectLocals(body, block_locals, chunk.source_files, true, &block_funcs);
+    collect_locals(body, block_locals, chunk.source_files, true, &block_funcs);
     bind_scan_locals(block_locals, block_funcs);
     int block_locals_top = reg_top_;
     locals_top_ = block_locals_top;
@@ -537,7 +537,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body) {
         reg_top_ = s;
     }
 
-    bool has_func = bodyHasFunc(body);
+    bool has_func = body_has_func(body);
     local_regs_ = std::move(saved_regs);
     pending_var_reg_ = std::move(saved_pending);
     reg_top_ = has_func ? block_locals_top : saved_top;
@@ -693,7 +693,7 @@ void Compiler::visit(const AssignStmt& s) {
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 // Emit op directly into dest — safe: rhs is already in a register
-                chunk.emit(make_abc((uint8_t)charToOp(s.op), (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs));
+                chunk.emit(make_abc((uint8_t)char_to_op(s.op), (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs));
                 reg_top_ = saved;
             }
             return;
@@ -715,7 +715,7 @@ void Compiler::visit(const AssignStmt& s) {
                 int res = alloc_reg();
                 if (reg_top_ > reg_count_)
                     reg_count_ = reg_top_;
-                chunk.emit(make_abc((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
+                chunk.emit(make_abc((uint8_t)char_to_op(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
                 chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)res, (uint8_t)uv, 0));
             }
             reg_top_ = saved;
@@ -736,7 +736,7 @@ void Compiler::visit(const AssignStmt& s) {
             int res = alloc_reg();
             if (reg_top_ > reg_count_)
                 reg_count_ = reg_top_;
-            chunk.emit(make_abc((uint8_t)charToOp(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
+            chunk.emit(make_abc((uint8_t)char_to_op(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
             chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res, chunk.add_identifier(s.name)));
         }
         reg_top_ = saved;
@@ -792,7 +792,7 @@ void Compiler::visit(const TryCatchStmt& s) {
             local_regs_[s.catch_var] = catch_r;
         std::vector<std::string> catch_ls;
         std::unordered_set<std::string> catch_funcs;
-        collectLocals(s.catch_body, catch_ls, chunk.source_files, true, &catch_funcs);
+        collect_locals(s.catch_body, catch_ls, chunk.source_files, true, &catch_funcs);
         std::unordered_set<std::string> catch_skip;
         if (!s.catch_var.empty())
             catch_skip.insert(s.catch_var);
@@ -806,7 +806,7 @@ void Compiler::visit(const TryCatchStmt& s) {
             stmt->accept(*this);
             reg_top_ = sv;
         }
-        bool catch_has_func = bodyHasFunc(s.catch_body);
+        bool catch_has_func = body_has_func(s.catch_body);
         local_regs_ = std::move(saved_regs);
         pending_var_reg_ = std::move(saved_pending);
         reg_top_ = catch_has_func ? catch_top : saved_top2;
@@ -818,7 +818,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     compile_block(s.else_body);
     chunk.patch_jump(end_patch, (uint16_t)chunk.current_pos());
 
-    if (!bodyHasFunc(s.try_body) && !bodyHasFunc(s.catch_body))
+    if (!body_has_func(s.try_body) && !body_has_func(s.catch_body))
         reg_top_ = saved_top;
 }
 
@@ -859,7 +859,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Seed with param names so redeclaring a param with 'var' is caught
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
     std::unordered_set<std::string> body_funcs;
-    collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
+    collect_locals(s.body, body_locals, chunk.source_files, true, &body_funcs);
     bind_scan_locals(body_locals, body_funcs, {s.params.begin(), s.params.end()});
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
@@ -871,7 +871,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Build default values
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? eval_constant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
     uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -893,7 +893,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    emitImplicitReturn(chunk); // implicit void return (omis si le corps finit déjà par RETURN)
+    emit_implicit_return(chunk); // implicit void return (omis si le corps finit déjà par RETURN)
 
     // Update reg_count in FuncProto
     if (reg_count_ > 255)
@@ -978,7 +978,7 @@ void Compiler::visit(const FuncExpr& s) {
 
     std::vector<std::string> body_locals(s.params.begin(), s.params.end());
     std::unordered_set<std::string> body_funcs;
-    collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
+    collect_locals(s.body, body_locals, chunk.source_files, true, &body_funcs);
     bind_scan_locals(body_locals, body_funcs, {s.params.begin(), s.params.end()});
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
@@ -988,7 +988,7 @@ void Compiler::visit(const FuncExpr& s) {
 
     std::vector<Value> defs(n_fixed);
     for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, SourceLoc{(uint16_t)current_file_idx_, (uint16_t)s.line}) : Value{};
+        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? eval_constant(*s.defaults[i], chunk.source_files, SourceLoc{(uint16_t)current_file_idx_, (uint16_t)s.line}) : Value{};
     uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
@@ -1000,7 +1000,7 @@ void Compiler::visit(const FuncExpr& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    emitImplicitReturn(chunk);
+    emit_implicit_return(chunk);
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
@@ -1045,7 +1045,7 @@ void Compiler::visit(const ReturnStmt& s) {
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": return outside function");
     // return <explicites>, <appel> : le dernier retour, s'il est un appel, s'étend à
     // TOUTES ses valeurs (sémantique Lua). (`return ...` reste géré par spread_varargs.)
-    if (!s.spread_varargs && !s.values.empty() && isCallNode(s.values.back().get())) {
+    if (!s.spread_varargs && !s.values.empty() && is_call_node(s.values.back().get())) {
         int base = reg_top_;
         int n_expl = (int)s.values.size() - 1;
         for (int i = 0; i < n_expl; ++i) {
@@ -1172,13 +1172,13 @@ void Compiler::visit(const BinaryExpr& e) {
     // par les comparaisons chaînées, où les deux côtés sont déjà calculés.)
     if (e.op == '&' || e.op == '|') {
         e.left->accept(*this);
-        int rL = last_reg_;
-        if (reg_top_ <= rL)
-            reg_top_ = rL + 1;
+        int r_l = last_reg_;
+        if (reg_top_ <= r_l)
+            reg_top_ = r_l + 1;
         int dst = reg_top_++;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
-        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)rL, 0));
+        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)r_l, 0));
         if (e.op == '&') {
             // a falsy → garder a (dans dst) et sauter l'évaluation de b
             size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
@@ -1187,9 +1187,9 @@ void Compiler::visit(const BinaryExpr& e) {
             chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
         } else {
             // a truthy → garder a ; a falsy → évaluer b
-            size_t evalRight = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
+            size_t eval_right = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
             size_t done = chunk.emit_jump(Op::JUMP);
-            chunk.patch_jump(evalRight, (uint16_t)chunk.current_pos());
+            chunk.patch_jump(eval_right, (uint16_t)chunk.current_pos());
             e.right->accept(*this);
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
             chunk.patch_jump(done, (uint16_t)chunk.current_pos());
@@ -1199,20 +1199,20 @@ void Compiler::visit(const BinaryExpr& e) {
         return;
     }
     e.left->accept(*this);
-    int rL = last_reg_;
+    int r_l = last_reg_;
     // protéger le registre du résultat gauche : un appel 0-arg (ou toute expr
     // qui laisse reg_top_ <= rL) verrait sinon l'opérande droit le réécraser.
-    if (reg_top_ <= rL)
-        reg_top_ = rL + 1;
+    if (reg_top_ <= r_l)
+        reg_top_ = r_l + 1;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
     e.right->accept(*this);
-    int rR = last_reg_;
+    int r_r = last_reg_;
     last_reg_ = reg_top_++;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
 
-    chunk.emit(make_abc((uint8_t)binaryArithOpcode(e.op), (uint8_t)last_reg_, (uint8_t)rL, (uint8_t)rR));
+    chunk.emit(make_abc((uint8_t)binary_arith_opcode(e.op), (uint8_t)last_reg_, (uint8_t)r_l, (uint8_t)r_r));
 }
 
 // a < b < c  →  chaque opérande dans un registre dédié, comparaisons pairées, AND final
@@ -1238,7 +1238,7 @@ void Compiler::visit(const ChainedCompareExpr& e) {
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
 
-    static auto cmpOp = [](char op) -> uint8_t {
+    static auto cmp_op = [](char op) -> uint8_t {
         switch (op) {
         case '=':
             return (uint8_t)Op::EQ;
@@ -1258,7 +1258,7 @@ void Compiler::visit(const ChainedCompareExpr& e) {
     };
 
     for (int i = 0; i < n - 1; i++)
-        chunk.emit(make_abc(cmpOp(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i], (uint8_t)regs[i + 1]));
+        chunk.emit(make_abc(cmp_op(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i], (uint8_t)regs[i + 1]));
 
     // AND itératif des résultats partiels dans cmp_base
     for (int i = 1; i < n - 1; i++)
@@ -1270,9 +1270,9 @@ void Compiler::visit(const ChainedCompareExpr& e) {
 
 void Compiler::visit(const UnaryExpr& e) {
     e.operand->accept(*this);
-    int rIn = last_reg_;
+    int r_in = last_reg_;
     last_reg_ = alloc_reg();
-    chunk.emit(make_abc((uint8_t)unaryOpcode(e.op), (uint8_t)last_reg_, (uint8_t)rIn, 0));
+    chunk.emit(make_abc((uint8_t)unary_opcode(e.op), (uint8_t)last_reg_, (uint8_t)r_in, 0));
 }
 
 void Compiler::emit_callee_value(const std::string& name, int reg) {
@@ -1332,7 +1332,7 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
 
 void Compiler::visit(const CallExpr& e) {
     // Dernier argument multi-valeurs (… ou appel) → expansion (sauf appel optionnel).
-    if (!e.optional && !e.args.empty() && isMultiValueExpr(e.args.back().get())) {
+    if (!e.optional && !e.args.empty() && is_multi_value_expr(e.args.back().get())) {
         emit_spread_call(e.args, [&](int reg) { emit_callee_value(e.callee, reg); });
         return;
     }
@@ -1428,7 +1428,7 @@ void Compiler::visit(const CallExpr& e) {
 
 void Compiler::visit(const ExprCallExpr& e) {
     // Dernier argument multi-valeurs (… ou appel) → expansion (sauf appel optionnel).
-    if (!e.optional && !e.args.empty() && isMultiValueExpr(e.args.back().get())) {
+    if (!e.optional && !e.args.empty() && is_multi_value_expr(e.args.back().get())) {
         emit_spread_call(e.args, [&](int reg) { compile_into(*e.callee, reg); });
         return;
     }
@@ -1534,7 +1534,7 @@ void Compiler::visit(const ArrayExpr& e) {
         // `...` → toutes les varargs ; un appel → toutes ses valeurs de retour.
         if (last_pos && dynamic_cast<const VarArgExpr*>(elem)) {
             chunk.emit(make_abc((uint8_t)Op::ARRAY_PUSH_VARARGS, (uint8_t)dest, 0, 0));
-        } else if (last_pos && isCallNode(elem)) {
+        } else if (last_pos && is_call_node(elem)) {
             int saved = reg_top_;
             int spread_base = reg_top_;
             e.elements[i]->accept(*this); // k valeurs à spread_base.., last_results_ = k
@@ -1623,13 +1623,13 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // FOR_ITER_NEXT écrit (block+1 = clé/primaire, block+2 = val). Pas de copie : la
     // valeur est réécrite à chaque tour (modifier la variable dans le corps est donc
     // sans effet). Liaisons sauvegardées puis restaurées → aucune fuite après la boucle.
-    auto saveBind = [&](const std::string& n, int reg, bool& had, int& old) {
+    auto save_bind = [&](const std::string& n, int reg, bool& had, int& old) {
         auto it = local_regs_.find(n);
         had = (it != local_regs_.end());
         old = had ? it->second : -1;
         local_regs_[n] = reg;
     };
-    auto restoreBind = [&](const std::string& n, bool had, int old) {
+    auto restore_bind = [&](const std::string& n, bool had, int old) {
         if (had)
             local_regs_[n] = old;
         else
@@ -1637,9 +1637,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     };
     bool had1, had2 = false;
     int old1, old2 = -1;
-    saveBind(var1, block + 1, had1, old1);
+    save_bind(var1, block + 1, had1, old1);
     if (two_vars)
-        saveBind(var2, block + 2, had2, old2);
+        save_bind(var2, block + 2, had2, old2);
 
     auto loop_start = (uint16_t)chunk.current_pos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
@@ -1659,10 +1659,10 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
         chunk.patch_jump(p, exit);
     break_patches.pop_back();
 
-    restoreBind(var1, had1, old1);
+    restore_bind(var1, had1, old1);
     if (two_vars)
-        restoreBind(var2, had2, old2);
-    reg_top_ = bodyHasFunc(body) ? (block + (two_vars ? 3 : 2)) : block;
+        restore_bind(var2, had2, old2);
+    reg_top_ = body_has_func(body) ? (block + (two_vars ? 3 : 2)) : block;
 }
 
 void Compiler::visit(const ForIterStmt& s) {
@@ -1682,56 +1682,56 @@ void Compiler::visit(const ForIterStmt& s) {
 
 // ── analyse de sûreté pour aliaser la variable de boucle au registre de contrôle ──
 // Vrai si l'expression contient une lambda (capture potentielle de la var de boucle).
-static bool exprHasLambda(const Expr* e) {
+static bool expr_has_lambda(const Expr* e) {
     if (!e)
         return false;
     if (dynamic_cast<const FuncExpr*>(e))
         return true;
     if (auto* b = dynamic_cast<const BinaryExpr*>(e))
-        return exprHasLambda(b->left.get()) || exprHasLambda(b->right.get());
+        return expr_has_lambda(b->left.get()) || expr_has_lambda(b->right.get());
     if (auto* u = dynamic_cast<const UnaryExpr*>(e))
-        return exprHasLambda(u->operand.get());
+        return expr_has_lambda(u->operand.get());
     if (auto* c = dynamic_cast<const CallExpr*>(e)) {
         for (auto& a : c->args)
-            if (exprHasLambda(a.get()))
+            if (expr_has_lambda(a.get()))
                 return true;
         return false;
     }
     if (auto* c = dynamic_cast<const ExprCallExpr*>(e)) {
-        if (exprHasLambda(c->callee.get()))
+        if (expr_has_lambda(c->callee.get()))
             return true;
         for (auto& a : c->args)
-            if (exprHasLambda(a.get()))
+            if (expr_has_lambda(a.get()))
                 return true;
         return false;
     }
     if (auto* m = dynamic_cast<const MethodCallExpr*>(e)) {
-        if (exprHasLambda(m->receiver.get()))
+        if (expr_has_lambda(m->receiver.get()))
             return true;
         for (auto& a : m->args)
-            if (exprHasLambda(a.get()))
+            if (expr_has_lambda(a.get()))
                 return true;
         return false;
     }
     if (auto* i = dynamic_cast<const IndexExpr*>(e))
-        return exprHasLambda(i->obj.get()) || exprHasLambda(i->key.get());
+        return expr_has_lambda(i->obj.get()) || expr_has_lambda(i->key.get());
     if (auto* mp = dynamic_cast<const MapExpr*>(e)) {
         for (auto& en : mp->entries)
-            if (exprHasLambda(en.key.get()) || exprHasLambda(en.value.get()))
+            if (expr_has_lambda(en.key.get()) || expr_has_lambda(en.value.get()))
                 return true;
         return false;
     }
     if (auto* ar = dynamic_cast<const ArrayExpr*>(e)) {
         for (auto& x : ar->elements)
-            if (exprHasLambda(x.get()))
+            if (expr_has_lambda(x.get()))
                 return true;
         return false;
     }
     if (auto* rg = dynamic_cast<const RangeExpr*>(e))
-        return exprHasLambda(rg->start.get()) || exprHasLambda(rg->end.get()) || exprHasLambda(rg->step.get());
+        return expr_has_lambda(rg->start.get()) || expr_has_lambda(rg->end.get()) || expr_has_lambda(rg->step.get());
     if (auto* cc = dynamic_cast<const ChainedCompareExpr*>(e)) {
         for (auto& o : cc->operands)
-            if (exprHasLambda(o.get()))
+            if (expr_has_lambda(o.get()))
                 return true;
         return false;
     }
@@ -1744,46 +1744,46 @@ static bool exprHasLambda(const Expr* e) {
 // Vrai si le corps est sûr pour aliaser la var de boucle 'v' au registre de contrôle :
 // aucune réassignation de v, aucune lambda, aucune structure de contrôle imbriquée
 // (conservatif — couvre les corps « feuilles » comme s += i).
-static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& v) {
+static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& v) {
     for (auto& sp : body) {
         const Stmt* s = sp.get();
         if (auto* a = dynamic_cast<const AssignStmt*>(s)) {
             if (a->name == v)
                 return false;
-            if (exprHasLambda(a->value.get()))
+            if (expr_has_lambda(a->value.get()))
                 return false;
         } else if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) {
             for (auto& t : m->targets) {
                 if (t.kind == LValue::VAR && t.name == v)
                     return false;
-                if (t.key && exprHasLambda(t.key.get()))
+                if (t.key && expr_has_lambda(t.key.get()))
                     return false;
             }
             for (auto& val : m->values)
-                if (exprHasLambda(val.get()))
+                if (expr_has_lambda(val.get()))
                     return false;
         } else if (auto* d = dynamic_cast<const VarDeclStmt*>(s)) {
             for (auto& n : d->names)
                 if (n == v)
                     return false; // shadow
             for (auto& val : d->values)
-                if (exprHasLambda(val.get()))
+                if (expr_has_lambda(val.get()))
                     return false;
         } else if (auto* e = dynamic_cast<const ExprStmt*>(s)) {
-            if (exprHasLambda(e->expr.get()))
+            if (expr_has_lambda(e->expr.get()))
                 return false;
         } else if (auto* r = dynamic_cast<const ReturnStmt*>(s)) {
             for (auto& x : r->values)
-                if (exprHasLambda(x.get()))
+                if (expr_has_lambda(x.get()))
                     return false;
         } else if (auto* th = dynamic_cast<const ThrowStmt*>(s)) {
-            if (exprHasLambda(th->value.get()))
+            if (expr_has_lambda(th->value.get()))
                 return false;
         } else if (auto* ia = dynamic_cast<const IndexAssignStmt*>(s)) {
             // obj==v n'écrit pas v (écrit dans son conteneur) ; vérifier key/value
             // et le conteneur chaîné éventuel (obj_expr).
-            if (exprHasLambda(ia->key.get()) || exprHasLambda(ia->value.get()) ||
-                (ia->obj_expr && exprHasLambda(ia->obj_expr.get())))
+            if (expr_has_lambda(ia->key.get()) || expr_has_lambda(ia->value.get()) ||
+                (ia->obj_expr && expr_has_lambda(ia->obj_expr.get())))
                 return false;
         } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
                    dynamic_cast<const CommentStmt*>(s)) {
@@ -1799,7 +1799,7 @@ static bool loopBodyAliasSafe(const std::vector<std::unique_ptr<Stmt>>& body, co
 // Sert à décider si on peut recycler les registres de boucle à la sortie : une
 // closure peut capturer (upvalue ouverte) le registre de la variable de boucle ;
 // dans ce cas on le garde réservé pour qu'il ne soit pas réécrit après la boucle.
-static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body);
+static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body);
 struct HasFuncQuery : StmtQuery {
     bool result = false;
     void visit(const FuncDeclStmt&) override {
@@ -1812,77 +1812,77 @@ struct HasFuncQuery : StmtQuery {
         result = true; // conservatif
     }
     void visit(const AssignStmt& s) override {
-        result = exprHasLambda(s.value.get());
+        result = expr_has_lambda(s.value.get());
     }
     void visit(const ExprStmt& s) override {
-        result = exprHasLambda(s.expr.get());
+        result = expr_has_lambda(s.expr.get());
     }
     void visit(const ThrowStmt& s) override {
-        result = exprHasLambda(s.value.get());
+        result = expr_has_lambda(s.value.get());
     }
     void visit(const IndexAssignStmt& s) override {
-        result = exprHasLambda(s.key.get()) || exprHasLambda(s.value.get()) ||
-                 (s.obj_expr && exprHasLambda(s.obj_expr.get()));
+        result = expr_has_lambda(s.key.get()) || expr_has_lambda(s.value.get()) ||
+                 (s.obj_expr && expr_has_lambda(s.obj_expr.get()));
     }
     void visit(const MultiAssignStmt& s) override {
         for (auto& v : s.values)
-            if (exprHasLambda(v.get())) {
+            if (expr_has_lambda(v.get())) {
                 result = true;
                 return;
             }
         for (auto& t : s.targets)
-            if (t.key && exprHasLambda(t.key.get())) {
+            if (t.key && expr_has_lambda(t.key.get())) {
                 result = true;
                 return;
             }
     }
     void visit(const VarDeclStmt& s) override {
         for (auto& v : s.values)
-            if (exprHasLambda(v.get())) {
+            if (expr_has_lambda(v.get())) {
                 result = true;
                 return;
             }
     }
     void visit(const ReturnStmt& s) override {
         for (auto& v : s.values)
-            if (exprHasLambda(v.get())) {
+            if (expr_has_lambda(v.get())) {
                 result = true;
                 return;
             }
     }
     void visit(const WhileStmt& s) override {
-        result = exprHasLambda(s.cond.get()) || bodyHasFunc(s.body);
+        result = expr_has_lambda(s.cond.get()) || body_has_func(s.body);
     }
     void visit(const ForIterStmt& s) override {
-        result = exprHasLambda(s.iter_expr.get()) || bodyHasFunc(s.body);
+        result = expr_has_lambda(s.iter_expr.get()) || body_has_func(s.body);
     }
     void visit(const TryCatchStmt& s) override {
-        result = bodyHasFunc(s.try_body) || bodyHasFunc(s.catch_body) || bodyHasFunc(s.else_body);
+        result = body_has_func(s.try_body) || body_has_func(s.catch_body) || body_has_func(s.else_body);
     }
     void visit(const BlockStmt& s) override {
-        result = bodyHasFunc(s.stmts);
+        result = body_has_func(s.stmts);
     }
     void visit(const IfStmt& s) override {
-        if (exprHasLambda(s.cond.get()) || bodyHasFunc(s.then_body) || bodyHasFunc(s.else_body)) {
+        if (expr_has_lambda(s.cond.get()) || body_has_func(s.then_body) || body_has_func(s.else_body)) {
             result = true;
             return;
         }
         for (auto& ei : s.else_ifs)
-            if (exprHasLambda(ei.cond.get()) || bodyHasFunc(ei.body)) {
+            if (expr_has_lambda(ei.cond.get()) || body_has_func(ei.body)) {
                 result = true;
                 return;
             }
     }
     // BreakStmt, ContinueStmt, CommentStmt → no-op hérité de StmtQuery (result reste false)
 };
-static bool stmtHasFunc(const Stmt* s) {
+static bool stmt_has_func(const Stmt* s) {
     HasFuncQuery q;
     s->accept(q);
     return q.result;
 }
-static bool bodyHasFunc(const std::vector<std::unique_ptr<Stmt>>& body) {
+static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body) {
     for (auto& s : body)
-        if (stmtHasFunc(s.get()))
+        if (stmt_has_func(s.get()))
             return true;
     return false;
 }
@@ -1907,7 +1907,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     // (pas de copie). Sinon → registre séparé + copie par tour (le corps peut
     // modifier i sans toucher le compteur, comportement sans effet). Liaison
     // restaurée à la sortie → aucune fuite après la boucle.
-    bool can_alias = loopBodyAliasSafe(body, var1);
+    bool can_alias = loop_body_alias_safe(body, var1);
     int var_reg = ctl;
     if (!can_alias) {
         var_reg = reg_top_++;
@@ -1951,7 +1951,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         local_regs_.erase(var1); // restaure la portée
     // recyclage des registres : si une closure du corps capture i, on garde son
     // registre réservé (sinon il serait réécrit après la boucle → upvalue corrompue).
-    reg_top_ = bodyHasFunc(body) ? (var_reg + 1) : ctl;
+    reg_top_ = body_has_func(body) ? (var_reg + 1) : ctl;
 }
 
 void Compiler::visit(const IndexAssignStmt& s) {
@@ -2002,7 +2002,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         int result_r = alloc_reg();
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
-        chunk.emit(make_abc((uint8_t)tokenToOp(s.op), (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
+        chunk.emit(make_abc((uint8_t)token_to_op(s.op), (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
         chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
     }
     reg_top_ = saved;
@@ -2128,7 +2128,7 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
         body_locals.push_back("self");
     body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
     std::unordered_set<std::string> body_funcs;
-    collectLocals(s.body, body_locals, chunk.source_files, true, &body_funcs);
+    collect_locals(s.body, body_locals, chunk.source_files, true, &body_funcs);
     std::unordered_set<std::string> method_skip(s.params.begin(), s.params.end());
     if (!s.is_static)
         method_skip.insert("self");
@@ -2143,7 +2143,7 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     std::vector<Value> defs(n_fixed);
     int defs_offset = s.is_static ? 0 : 1;
     for (int i = 0; i < n_params; ++i)
-        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? evalConstant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
+        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? eval_constant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
     uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, s.is_static, defaults_idx, 0, {}};
@@ -2155,7 +2155,7 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
         stmt->accept(*this);
         reg_top_ = sv;
     }
-    emitImplicitReturn(chunk);
+    emit_implicit_return(chunk);
 
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");

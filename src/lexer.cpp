@@ -160,7 +160,7 @@ Token Lexer::string() {
 // (jusqu'au 1er ':') est vide ou uniquement des chiffres → {}, {0}, {1:.3f}, {:.3f}.
 // Ces {…} sont laissés LITTÉRAUX dans la chaîne (remplis par printf). Toute autre
 // forme ({x}, {a+b}, {x:.3f}) est une expression interpolée.
-static bool isPositionalPlaceholder(const std::string& s) {
+static bool is_positional_placeholder(const std::string& s) {
     size_t i = 0;
     while (i < s.size() && std::isspace((unsigned char)s[i])) i++;
     while (i < s.size() && std::isdigit((unsigned char)s[i])) i++;
@@ -171,7 +171,7 @@ static bool isPositionalPlaceholder(const std::string& s) {
 // Sépare une interpolation « expr:spec » sur le ':' de PREMIER NIVEAU (hors
 // parenthèses/crochets/accolades et chaînes imbriquées) → préserve les map-littéraux
 // {a:1}. Sans ':' de 1er niveau : spec vide, expr = tout le contenu.
-static void splitInterpSpec(const std::string& s, std::string& expr, std::string& spec) {
+static void split_interp_spec(const std::string& s, std::string& expr, std::string& spec) {
     int depth = 0;
     bool in_str = false;
     for (size_t i = 0; i < s.size(); ++i) {
@@ -236,7 +236,7 @@ void Lexer::interp_string(std::vector<Token>& out) {
             advance(); // consomme '}'
 
             // Positionnel ({}, {0}, {1:.3f}) → laissé littéral (rempli par printf).
-            if (isPositionalPlaceholder(inner)) {
+            if (is_positional_placeholder(inner)) {
                 literal += '{';
                 literal += inner;
                 literal += '}';
@@ -245,7 +245,7 @@ void Lexer::interp_string(std::vector<Token>& out) {
 
             // Expression interpolée, avec spec de format optionnel ({expr:spec}).
             std::string expr_src, spec;
-            splitInterpSpec(inner, expr_src, spec);
+            split_interp_spec(inner, expr_src, spec);
 
             emit_tok({has_interp ? TokenType::INTERP_MID : TokenType::INTERP_START, literal, str_line});
             has_interp = true;
