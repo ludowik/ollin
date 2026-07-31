@@ -1776,10 +1776,39 @@ function gotoError(loc) {
 // ── Run ───────────────────────────────────────────────────────────────────
 let ollin = null
 
+// Attend que le viewport visuel revienne à sa hauteur pleine (clavier refermé),
+// avec un repli par timeout si aucun événement resize n'arrive. Sert à mesurer la
+// zone de rendu APRÈS fermeture du clavier (sinon dimensions réduites).
+function waitViewportRestored(timeout = 500) {
+  const vv = window.visualViewport
+  if (!vv || window.innerHeight - vv.height < 100)
+    return Promise.resolve()   // pas (plus) de clavier visible
+  return new Promise(resolve => {
+    let done = false
+    const finish = () => {
+      if (done) return
+      done = true
+      vv.removeEventListener('resize', onResize)
+      clearTimeout(timer)
+      resolve()
+    }
+    const onResize = () => { if (window.innerHeight - vv.height < 100) finish() }
+    vv.addEventListener('resize', onResize)
+    const timer = setTimeout(finish, timeout)
+  })
+}
+
 // Démarre l'exécution (à froid). Ne toggle pas : voir run()/relaunch()/stopExec().
 async function launch() {
   if (!ollin) return
   clearTimeout(autoexecTimer)   // tout lancement (bouton, Alt+Entrée, auto) vaut relance → annule celle en attente
+  // Lancement clavier OUVERT (tactile) : le fermer d'abord et attendre le retour du
+  // viewport. Sinon la zone de rendu serait mesurée RÉDUITE (clavier) → canvas trop
+  // petit, taille erronée une fois le clavier refermé.
+  if (isCoarsePointer && document.activeElement === view.contentDOM) {
+    view.contentDOM.blur()
+    await waitViewportRestored()
+  }
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
