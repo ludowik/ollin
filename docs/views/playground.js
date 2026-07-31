@@ -754,6 +754,9 @@ disposers.push(() => {
       const editing = document.activeElement === view.contentDOM
       const running = runBtnEl && runBtnEl.classList.contains('running')
       kbar.classList.toggle('show', editing && keyboardOpen() && !running)
+      // En saisie (clavier ouvert), masquer la barre d'outils → l'éditeur récupère
+      // sa hauteur (précieux sur petit écran). Restaurée à la fermeture du clavier.
+      document.body.classList.toggle('kbd-editing', editing && keyboardOpen())
     }
     view.contentDOM.addEventListener('focus', update)
     view.contentDOM.addEventListener('blur', update)
@@ -766,6 +769,7 @@ disposers.push(() => {
       if (vv) {
         vv.removeEventListener('resize', update)
       }
+      document.body.classList.remove('kbd-editing')   // pas de barre masquée résiduelle
     })
   }
 })()

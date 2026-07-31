@@ -40,6 +40,10 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
    normalement (ce ne sont pas leurs descendants). */
 #toolbar, .rail-head, #divider { touch-action: none; }
 
+/* Saisie mobile (clavier ouvert) : la barre d'outils remonte/disparaît pour agrandir
+   l'éditeur. Réactivée dès la fermeture du clavier (classe posée par playground.js). */
+body.kbd-editing #toolbar { display: none; }
+
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
 #toolbar {
   display: flex;
