@@ -151,7 +151,8 @@ class ViewDistance
             end
             graphics.rect(x, self.BTN_Y, self.BTN, self.BTN)
             graphics.stroke(colors.WHITE)
-            graphics.text(b[2], x + self.BTN / 2 + b[3], ty, 30)
+            graphics.fontSize(30)
+            graphics.text(b[2], x + self.BTN / 2 + b[3], ty)
         end
     end
 end

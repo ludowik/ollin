@@ -24,5 +24,6 @@ func draw()
     graphics.clear(colors.BLACK)
     image.draw(canvas, 0, 0, W, H)
     graphics.stroke(Color(1, 1, 1))
-    graphics.text("Perlin par pixel", 12, 12, 18)
+    graphics.fontSize(18)
+    graphics.text("Perlin par pixel", 12, 12)
 end

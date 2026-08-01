@@ -270,6 +270,7 @@ static int gfx_blend_mode(CallCtx& ctx) {
 
 // ── Style state ───────────────────────────────────────────────────────────────
 static float s_stroke_size = 2.0f;
+static float s_font_size = 20.0f;   // taille de police (état), comme s_stroke_size
 static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
@@ -278,6 +279,10 @@ static int s_segments = 64;
 
 static void apply_stroke_size(float sz) {
     s_stroke_size = sz;
+}
+
+static void apply_font_size(float sz) {
+    s_font_size = sz;
 }
 
 // Trait sous-pixel : la RenderTexture n'a pas de MSAA → une épaisseur < 1 rend des
@@ -338,6 +343,7 @@ int gfx_segments() {
 // push/pop (matrice + style) et pushStyle/popStyle (style seul).
 struct StyleState {
     float stroke_size;
+    float font_size;
     bool  has_stroke;
     Color stroke_color;
     bool  has_fill;
@@ -353,6 +359,7 @@ static std::vector<StyleState> s_style_stack;
 static StyleState capture_style() {
     StyleState s;
     s.stroke_size = s_stroke_size;
+    s.font_size = s_font_size;
     s.has_stroke = s_has_stroke;
     s.stroke_color = s_stroke_color;
     s.has_fill = s_has_fill;
@@ -366,6 +373,7 @@ static StyleState capture_style() {
 
 static void restore_style(const StyleState& s) {
     s_stroke_size = s.stroke_size;
+    s_font_size = s.font_size;
     s_has_stroke = s.has_stroke;
     s_stroke_color = s.stroke_color;
     s_has_fill = s.has_fill;
@@ -379,6 +387,7 @@ static void restore_style(const StyleState& s) {
 
 static void reset_styles() {
     apply_stroke_size(2.0f);
+    apply_font_size(20.0f);
     apply_stroke(true, WHITE);
     apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
@@ -393,6 +402,14 @@ static int gfx_stroke_size(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].is_number())
         apply_stroke_size((float)args[0].as_num());
+    return ctx.ret(Value{});
+}
+
+static int gfx_font_size(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc > 0 && args[0].is_number())
+        apply_font_size((float)args[0].as_num());
     return ctx.ret(Value{});
 }
 
@@ -529,13 +546,13 @@ static void flush_pending_screenshot() {
 
 static int gfx_text(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc < 4)
-        throw std::runtime_error("graphics.text: expected text, x, y, size");
+    if (argc < 3)
+        throw std::runtime_error("graphics.text: expected text, x, y");
     const char* text = args[0].is_string() ? args[0].as_string().c_str() : "";
-    // Couleur prise dans l'état de TRAIT : écrire, c'est tracer au stylo, pas
-    // remplir une forme. Pas de couleur en argument — comme toutes les autres
-    // primitives, qui lisent uniquement l'état courant.
-    DrawText(text, gfx_to_int(args[1]), gfx_to_int(args[2]), gfx_to_int(args[3]), s_stroke_color);
+    // Style pris dans l'ÉTAT courant, comme toutes les autres primitives : couleur
+    // de trait (écrire, c'est tracer au stylo) et taille de police via fontSize().
+    // Seule la géométrie passe en argument.
+    DrawText(text, gfx_to_int(args[1]), gfx_to_int(args[2]), (int)s_font_size, s_stroke_color);
     return ctx.ret(Value{});
 }
 
@@ -1215,6 +1232,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("fps")), Value::make_builtin(gfx_fps));
     m.map_set(Value(std::string("screenshot")), Value::make_builtin(gfx_screenshot));
     m.map_set(Value(std::string("text")), Value::make_builtin(gfx_text));
+    m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
     m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
     m.map_set(Value(std::string("run")), Value::make_builtin(gfx_run));

@@ -440,7 +440,8 @@ func draw_cam_button()
         graphics.rect(12, 36, CAMBTN, CAMBTN)
     end
     graphics.stroke(colors.WHITE)
-    graphics.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15, 28)
+    graphics.fontSize(28)
+    graphics.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15)
 end
 
 func mouse.pressed(x, y)
@@ -657,7 +658,9 @@ func draw()
     var camlbl = "joueur"
     if debugCam then camlbl = "contrôle" end
     graphics.stroke(colors.WHITE)
-    graphics.text("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12, 15)
+    graphics.fontSize(15)
+    graphics.text("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12)
     graphics.stroke(colors.WHITE)
-    graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30, 13)
+    graphics.fontSize(13)
+    graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30)
 end

@@ -58,5 +58,6 @@ func draw()
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.text("Glisse pour tourner — .obj cadrage auto", 12, 12, 18)
+    graphics.fontSize(18)
+    graphics.text("Glisse pour tourner — .obj cadrage auto", 12, 12)
 end
