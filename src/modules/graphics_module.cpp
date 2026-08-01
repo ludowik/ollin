@@ -561,6 +561,11 @@ static int gfx_text(CallCtx& ctx) {
     // avance par paliers (1 de 10 à 19, 2 de 20 à 29…) ; on garde la même intention
     // en continu, soit le facteur d'échelle lui-même.
     Font font = GetFontDefault();
+    // Garde que DrawText appliquait et que l'appel direct à DrawTextEx perdait :
+    // sans canvas, la police par défaut n'est pas chargée (glyphs nul, baseSize à 0)
+    // → division par zéro puis déréférencement nul. Ne rien dessiner, comme avant.
+    if (font.texture.id == 0 || font.baseSize == 0)
+        return ctx.ret(Value{});
     float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)gfx_to_int(args[1]), (float)gfx_to_int(args[2])};
     DrawTextEx(font, text, pos, s_font_size, spacing, s_stroke_color);
