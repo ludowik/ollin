@@ -58,6 +58,5 @@ func draw()
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.fontSize(18)
     graphics.text("Glisse pour tourner — GLB cadrage auto", 12, 12)
 end

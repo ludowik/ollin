@@ -270,7 +270,7 @@ static int gfx_blend_mode(CallCtx& ctx) {
 
 // ── Style state ───────────────────────────────────────────────────────────────
 static float s_stroke_size = 2.0f;
-static float s_font_size = 20.0f;   // taille de police (état), comme s_stroke_size
+static float s_font_size = 18.0f;   // taille de police (état), comme s_stroke_size
 static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
@@ -387,7 +387,7 @@ static void restore_style(const StyleState& s) {
 
 static void reset_styles() {
     apply_stroke_size(2.0f);
-    apply_font_size(20.0f);
+    apply_font_size(18.0f);   // taille la plus courante → pas besoin de l'écrire
     apply_stroke(true, WHITE);
     apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)

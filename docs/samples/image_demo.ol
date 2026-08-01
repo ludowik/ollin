@@ -31,6 +31,5 @@ func draw()
     image.draw(img, W / 2 - big / 2, H / 2 - big / 2, big, big)
 
     graphics.stroke(Color(0.75, 0.8, 0.9))
-    graphics.fontSize(18)
     graphics.text("image.loadData : PNG embarque (base64)", 12, 12)
 end
