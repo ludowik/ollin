@@ -43,7 +43,7 @@ Ces deux étapes sont **non négociables**, quelle que soit la taille du script.
 - Implémentation : **C++17**
 - Build : **CMake** (cross-platform)
 - Compilateurs supportés : **GCC et Clang** (computed-goto requis — MSVC non supporté)
-- Cibles : Windows (Clang natif), Linux, macOS, iOS, Android, wasm
+- Cibles : Windows, Linux, macOS, iOS, Android, wasm
 - Runtime : **bytecode custom + VM register-based** (instructions 32-bit format ABC/ABx/Bx)
 
 ## Architecture (pipeline strict, modules indépendants)
