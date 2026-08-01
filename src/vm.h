@@ -66,6 +66,18 @@ class VM {
         std::unique_ptr<std::vector<Upvalue*>> open_upvals;
     };
 
+    // Inline cache monomorphe pour GET_INDEX sur une map non-instance (modules,
+    // maps data). Indexé par position d'instruction. Hit = même map (mptr) + même
+    // version (invalidée à chaque mutation, cf. Map::version/g_map_epoch) + même clé
+    // internée → renvoie la valeur résolue sans proto_chain_get.
+    struct GetIndexCache {
+        const Map* map = nullptr;
+        uint64_t version = 0;
+        const InternedStr* key = nullptr;
+        Value val;
+    };
+    std::vector<GetIndexCache> gicache_;
+
     Chunk owned_chunk;
     const Chunk* ch = nullptr;
     Value string_module_;

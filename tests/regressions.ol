@@ -501,4 +501,19 @@ assert({}.len() == 0)
 var mlen_def = {len: 42}          ## une entrée "len" définie gagne sur le builtin
 assert(mlen_def.len == 42)
 
+## inline cache GET_INDEX : invalidation à la mutation de la map (version)
+var ic = {x: 1, y: 2}
+var ic_a = ic.x            ## remplit le cache (ic, "x") = 1
+ic["x"] = 99               ## mutation → version bump → cache invalidé
+assert(ic_a == 1)
+assert(ic.x == 99)         ## doit relire, pas servir 1
+ic["x"] = "str"            ## changement de type via le même site
+assert(ic.x == "str")
+var ic_s = 0               ## site en boucle avec mutation à chaque tour
+for i = 1, 5 do
+    ic["x"] = i
+    ic_s += ic.x
+end
+assert(ic_s == 15)
+
 print("regressions ok")

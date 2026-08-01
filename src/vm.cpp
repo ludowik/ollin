@@ -731,6 +731,10 @@ void VM::run_goto(size_t stop_depth) {
     uint8_t A, B, C;
     uint16_t Bx;
     int base = call_stack.back().reg_base;
+    // Inline cache GET_INDEX dimensionné sur le code courant (un slot par instruction).
+    // Réentrance (run_goto imbriqué via call_value) : même ch → taille identique → no-op.
+    if (gicache_.size() != ch->code.size())
+        gicache_.assign(ch->code.size(), GetIndexCache{});
 dispatch_loop:
     try {
         NEXT();
@@ -1200,16 +1204,41 @@ dispatch_loop:
     op_GET_INDEX: {
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
+        // Capturer AVANT toute écriture de regs[base+A] : le dest peut aliaser le
+        // registre de la clé (A==C) ou de l'objet (A==B) → lire obj/key après
+        // `regs[A] = found` lirait la valeur écrasée (bug d'aliasing).
+        const Map* obj_map = obj.is_map() ? obj.mptr : nullptr;
+        const InternedStr* key_sptr = key.is_string() ? key.sptr : nullptr;
+        // Inline cache : map non-instance (module/data) + clé string. Hit si la même
+        // map (mptr), non mutée depuis (version), pour la même clé internée (sptr).
+        if (obj_map && key_sptr) {
+            GetIndexCache& c = gicache_[ip - 1];
+            if (c.map == obj_map && c.version == obj_map->version && c.key == key_sptr) {
+                regs[base + A] = c.val;
+                NEXT();
+            }
+        }
         if (obj.is_map() || obj.is_class()) {
+            bool obj_inst = is_instance(obj);   // capturé avant l'écriture (obj peut aliaser)
             // Lookup d'abord (chemin chaud) ; le `len` intégré n'est qu'un repli sur
             // miss → le strcmp "len" sort du chemin chaud (payé seulement si la clé
             // est absente ET string ET hors instance). Sémantique inchangée : une
             // entrée "len" définie par la map gagne toujours.
             Value found = proto_chain_get(obj, key);
-            if (found.is_nil() && key.is_string() && !is_instance(obj) && key.as_string() == "len") {
+            if (found.is_nil() && key_sptr && !obj_inst && key.as_string() == "len") {
                 regs[base + A] = Value::make_builtin(builtin_map_len);
             } else {
                 regs[base + A] = found;
+                // Remplir le cache : map non-instance, hit direct non-nil. Pour une
+                // map non-instance, proto_chain_get == accès direct (pas de chaîne de
+                // parents) → (mptr, version) suffit à garantir la validité.
+                if (!found.is_nil() && obj_map && key_sptr && !obj_inst) {
+                    GetIndexCache& c = gicache_[ip - 1];
+                    c.map = obj_map;
+                    c.version = obj_map->version;
+                    c.key = key_sptr;
+                    c.val = found;
+                }
             }
         } else if (obj.is_string()) {
             regs[base + A] = string_module_.map_get(key);

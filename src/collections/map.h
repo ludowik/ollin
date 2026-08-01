@@ -10,10 +10,16 @@ struct ValueEqual {
     bool operator()(const Value& a, const Value& b) const noexcept;
 };
 
+// Époque globale monotone : chaque mutation de map reçoit une version unique.
+// Sert à l'inline cache de GET_INDEX (vm.cpp) : une paire (Map*, version) identifie
+// un état de map de façon unique, insensible à la réutilisation d'adresse (pool).
+extern uint64_t g_map_epoch;
+
 struct Map {
     robin_hood::unordered_map<Value, Value, ValueHash, ValueEqual> data;
     int refcount = 1;
     void* userdata = nullptr;
+    uint64_t version = 0;   // = ++g_map_epoch à chaque mutation ; 0 = jamais mutée
 
     Value get(const Value& k) const;
     void set(const Value& k, const Value& v);
@@ -48,6 +54,7 @@ struct MapPool {
             return;
         }
         m->data.clear();  // peut ré-entrer le pool (releases imbriqués) → n peut changer
+        m->version = ++g_map_epoch;  // recyclage : invalide tout inline cache pointant sur ce Map*
         if (n < CAP) {
             buf[n++] = m; // n RELU après clear
         } else {
