@@ -42,8 +42,9 @@ Ces deux étapes sont **non négociables**, quelle que soit la taille du script.
 ## Stack
 - Implémentation : **C++17**
 - Build : **CMake** (cross-platform)
-- Compilateurs supportés : **GCC et Clang** (computed-goto requis — MSVC non supporté)
+- Compilateurs supportés : **GCC et Clang**, indifféremment (seule contrainte : le *computed-goto*, extension GNU absente de MSVC — voir « Règle computed-goto »)
 - Cibles : Windows, Linux, macOS, iOS, Android, wasm
+- La cible **wasm** compile avec **Clang** : `emcc` n'est pas un compilateur mais une enveloppe autour de LLVM/Clang (`$EMSDK/upstream/bin/clang`). Le computed-goto y fonctionne donc, et le playground exécute la **même** VM que le binaire natif — aucun repli vers un `switch`.
 - Runtime : **bytecode custom + VM register-based** (instructions 32-bit format ABC/ABx/Bx)
 
 ## Architecture (pipeline strict, modules indépendants)
@@ -144,6 +145,7 @@ exceptionnelle » ne dispense jamais de livrer sur `main`.
 ## Règle computed-goto (vm.cpp)
 
 La VM utilise le **computed-goto dispatch** (`goto *dt[op]`) pour la performance (+15-25% vs switch).  
+L'extension GNU employée s'appelle « labels comme valeurs » : `&&etiquette` donne l'adresse d'une étiquette (interdit en C++ standard) et `goto *ptr` saute vers une adresse calculée. Chaque opcode a ainsi **son propre** saut indirect, que le prédicteur de branchement apprend à anticiper, au lieu du saut unique d'un `switch`. Corollaire : tous les gestionnaires vivant dans une seule fonction, la disposition du code machine influe sur les mesures (cf. « Commande perf »). Disponible avec GCC comme avec Clang, donc **aussi en wasm** (emcc = Clang).  
 gcc/clang sont **stricts** : toute variable avec destructeur non-trivial (`Value`, `std::vector`, `std::unique_ptr`…) doit être dans un bloc `{}` qui se ferme **avant** `NEXT()`.  
 Le fallback switch MSVC a été supprimé — seuls GCC et Clang sont supportés.
 
