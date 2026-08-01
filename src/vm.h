@@ -95,6 +95,11 @@ class VM {
 
     static Value proto_chain_get(const Value& obj, const Value& key);
 
+    // Suite de la chaîne de prototypes (__class__ d'une map, __parent__ d'une classe),
+    // la data PROPRE de obj ayant déjà été consultée par l'appelant → évite un second
+    // lookup de la même clé dans obj (cf. op_GET_INDEX).
+    static Value proto_chain_rest(const Value& obj, const Value& key);
+
     static bool is_instance(const Value& v);
 
     uint32_t try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);

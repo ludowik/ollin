@@ -85,6 +85,19 @@ Value VM::proto_chain_get(const Value& obj, const Value& key) {
     return Value{};
 }
 
+Value VM::proto_chain_rest(const Value& obj, const Value& key) {
+    if (obj.is_map()) {
+        Value cls = obj.map_get(MK().class_);
+        if (!cls.is_nil())
+            return proto_chain_get(cls, key);
+    } else if (obj.is_class()) {
+        Value par = obj.map_get(MK().parent_);
+        if (!par.is_nil())
+            return proto_chain_get(par, key);
+    }
+    return Value{};
+}
+
 // ── growRegs : croît par doublement, max 4096, size reste exacte ─────────────
 void VM::grow_regs(size_t needed) {
     if (regs.size() >= needed)
@@ -1207,10 +1220,11 @@ dispatch_loop:
         // Capturer AVANT toute écriture de regs[base+A] : le dest peut aliaser le
         // registre de la clé (A==C) ou de l'objet (A==B) → lire obj/key après
         // `regs[A] = found` lirait la valeur écrasée (bug d'aliasing).
-        const Map* obj_map = obj.is_map() ? obj.mptr : nullptr;
+        const Map* obj_map = (obj.is_map() || obj.is_class()) ? obj.mptr : nullptr;
         const InternedStr* key_sptr = key.is_string() ? key.sptr : nullptr;
-        // Inline cache : map non-instance (module/data) + clé string. Hit si la même
-        // map (mptr), non mutée depuis (version), pour la même clé internée (sptr).
+        // Inline cache (clé string) : hit si même map/classe (mptr), non mutée depuis
+        // (version) et même clé internée (sptr). Ne cache que les hits sur la data
+        // PROPRE de l'objet (cf. remplissage plus bas).
         if (obj_map && key_sptr) {
             GetIndexCache& c = gicache_[ip - 1];
             if (c.map == obj_map && c.version == obj_map->version && c.key == key_sptr) {
@@ -1219,26 +1233,32 @@ dispatch_loop:
             }
         }
         if (obj.is_map() || obj.is_class()) {
-            bool obj_inst = is_instance(obj);   // capturé avant l'écriture (obj peut aliaser)
-            // Lookup d'abord (chemin chaud) ; le `len` intégré n'est qu'un repli sur
-            // miss → le strcmp "len" sort du chemin chaud (payé seulement si la clé
-            // est absente ET string ET hors instance). Sémantique inchangée : une
-            // entrée "len" définie par la map gagne toujours.
-            Value found = proto_chain_get(obj, key);
-            if (found.is_nil() && key_sptr && !obj_inst && key.as_string() == "len") {
-                regs[base + A] = Value::make_builtin(builtin_map_len);
-            } else {
-                regs[base + A] = found;
-                // Remplir le cache : map non-instance, hit direct non-nil. Pour une
-                // map non-instance, proto_chain_get == accès direct (pas de chaîne de
-                // parents) → (mptr, version) suffit à garantir la validité.
-                if (!found.is_nil() && obj_map && key_sptr && !obj_inst) {
+            // Data PROPRE d'abord (T_MAP et T_CLASS partagent le layout Map).
+            const Map* own = obj.mptr;
+            Value found = own->get(key);
+            if (!found.is_nil()) {
+                // Trouvée directement → sa validité ne dépend QUE de (mptr, version) :
+                // cacheable même sur une instance (muter l'instance bump sa version,
+                // et sa data propre masque toujours la classe). Pas de test
+                // is_instance ici — il coûterait un lookup "__class__" par accès.
+                if (key_sptr) {
                     GetIndexCache& c = gicache_[ip - 1];
-                    c.map = obj_map;
-                    c.version = obj_map->version;
+                    c.map = own;
+                    c.version = own->version;
                     c.key = key_sptr;
                     c.val = found;
                 }
+                regs[base + A] = std::move(found);
+            } else {
+                // Absente de la data propre : chaîne de prototypes (__class__ /
+                // __parent__). NON cachée — une mutation de la CLASSE ne bump pas la
+                // version de l'instance. Le `len` intégré n'est qu'un repli tout-froid
+                // (rien trouvé nulle part) → le strcmp reste hors du chemin chaud.
+                Value chained = proto_chain_rest(obj, key);
+                if (chained.is_nil() && key_sptr && key.as_string() == "len" && !is_instance(obj))
+                    regs[base + A] = Value::make_builtin(builtin_map_len);
+                else
+                    regs[base + A] = std::move(chained);
             }
         } else if (obj.is_string()) {
             regs[base + A] = string_module_.map_get(key);

@@ -516,4 +516,35 @@ for i = 1, 5 do
 end
 assert(ic_s == 15)
 
+## inline cache GET_INDEX : le cache ne porte que sur la data PROPRE de l'objet.
+## Une résolution via la chaîne (__class__/__parent__) n'est PAS cachée → une
+## mutation de la classe reste visible depuis une instance déjà créée.
+class ICA
+    func init(v)
+        self.v = v
+    end
+    func kind()
+        return "ICA"
+    end
+end
+class ICB extends ICA
+    func kind()
+        return "ICB"
+    end
+end
+var ica = ICA(1)
+assert(ica.v == 1)         ## champ propre → cacheable
+ica.v = 2
+assert(ica.v == 2)         ## mutation de l'instance → version bump → pas de périmé
+ICA["tag"] = "c1"
+assert(ica.tag == "c1")    ## via la chaîne (non cachée)
+ICA["tag"] = "c2"
+assert(ica.tag == "c2")    ## re-mutation de la classe bien vue
+ica["tag"] = "own"
+assert(ica.tag == "own")   ## la data propre masque la classe
+var icb = ICB(5)
+assert(icb.kind() == "ICB")
+assert(icb.get_v_ok == nil)
+assert(ICB.tag == "c2")    ## héritée via __parent__
+
 print("regressions ok")
