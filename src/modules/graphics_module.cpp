@@ -552,7 +552,18 @@ static int gfx_text(CallCtx& ctx) {
     // Style pris dans l'ÉTAT courant, comme toutes les autres primitives : couleur
     // de trait (écrire, c'est tracer au stylo) et taille de police via fontSize().
     // Seule la géométrie passe en argument.
-    DrawText(text, gfx_to_int(args[1]), gfx_to_int(args[2]), (int)s_font_size, s_stroke_color);
+    //
+    // DrawTextEx et non DrawText : ce dernier prend un int, donc tronquerait la
+    // taille (biais systématique vers le bas sur une taille mise à l'échelle), et
+    // relève toute valeur < 10 à 10. Ici la taille flottante est transmise telle
+    // quelle, sans plancher.
+    // L'espacement de DrawText vaut fontSize/baseSize en division ENTIÈRE, donc il
+    // avance par paliers (1 de 10 à 19, 2 de 20 à 29…) ; on garde la même intention
+    // en continu, soit le facteur d'échelle lui-même.
+    Font font = GetFontDefault();
+    float spacing = s_font_size / (float)font.baseSize;
+    Vector2 pos = {(float)gfx_to_int(args[1]), (float)gfx_to_int(args[2])};
+    DrawTextEx(font, text, pos, s_font_size, spacing, s_stroke_color);
     return ctx.ret(Value{});
 }
 

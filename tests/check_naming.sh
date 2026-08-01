@@ -102,7 +102,7 @@ def strip(text):
 ALLOW = {
     'isNull', 'isNumber', 'isUndefined', 'isString', 'isArray', 'isTrue', 'isFalse',
     'blendMode', 'materialCount', 'meshCount', 'meshMaterial', 'texId',
-    'triangleCount', 'vaoId', 'vboId', 'vertexCount', 'boneCount',
+    'triangleCount', 'vaoId', 'vboId', 'vertexCount', 'boneCount', 'baseSize',
 }
 def is_ext(t):
     if t in ALLOW: return True
