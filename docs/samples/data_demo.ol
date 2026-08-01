@@ -19,8 +19,12 @@ end
 
 func draw()
     graphics.clear(Color(0.10, 0.12, 0.18))
-    graphics.text("Lancement n° " + runs, 24, 40, 30, colors.WHITE)
-    graphics.text("Score (clique) : " + score, 24, 92, 26, colors.SKYBLUE)
-    graphics.text("Relance ou recharge : tout est conservé.", 24, 150, 16, colors.GRAY)
-    graphics.text("data.shared.* pour une portée partagée entre projets.", 24, 176, 16, colors.GRAY)
+    graphics.stroke(colors.WHITE)
+    graphics.text("Lancement n° " + runs, 24, 40, 30)
+    graphics.stroke(colors.SKYBLUE)
+    graphics.text("Score (clique) : " + score, 24, 92, 26)
+    graphics.stroke(colors.GRAY)
+    graphics.text("Relance ou recharge : tout est conservé.", 24, 150, 16)
+    graphics.stroke(colors.GRAY)
+    graphics.text("data.shared.* pour une portée partagée entre projets.", 24, 176, 16)
 end

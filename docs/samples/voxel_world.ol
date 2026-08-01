@@ -439,7 +439,8 @@ func draw_cam_button()
         graphics.fill(Color(0.30, 0.70, 1.00, 0.55))
         graphics.rect(12, 36, CAMBTN, CAMBTN)
     end
-    graphics.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15, 28, colors.WHITE)
+    graphics.stroke(colors.WHITE)
+    graphics.text("C", 12 + CAMBTN / 2 - 8, 36 + CAMBTN / 2 - 15, 28)
 end
 
 func mouse.pressed(x, y)
@@ -655,6 +656,8 @@ func draw()
     draw_cam_button()                  ## bouton « C » (bascule caméra de contrôle)
     var camlbl = "joueur"
     if debugCam then camlbl = "contrôle" end
-    graphics.text("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12, 15, colors.WHITE)
-    graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30, 13, colors.WHITE)
+    graphics.stroke(colors.WHITE)
+    graphics.text("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12, 15)
+    graphics.stroke(colors.WHITE)
+    graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30, 13)
 end

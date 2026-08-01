@@ -530,9 +530,12 @@ static void flush_pending_screenshot() {
 static int gfx_text(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
-        throw std::runtime_error("graphics.text: expected text, x, y, size [, color]");
+        throw std::runtime_error("graphics.text: expected text, x, y, size");
     const char* text = args[0].is_string() ? args[0].as_string().c_str() : "";
-    DrawText(text, gfx_to_int(args[1]), gfx_to_int(args[2]), gfx_to_int(args[3]), argc > 4 ? gfx_to_color(args[4]) : s_stroke_color);
+    // Couleur prise dans l'état de TRAIT : écrire, c'est tracer au stylo, pas
+    // remplir une forme. Pas de couleur en argument — comme toutes les autres
+    // primitives, qui lisent uniquement l'état courant.
+    DrawText(text, gfx_to_int(args[1]), gfx_to_int(args[2]), gfx_to_int(args[3]), s_stroke_color);
     return ctx.ret(Value{});
 }
 

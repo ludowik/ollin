@@ -103,5 +103,6 @@ func draw()
 
     ## HUD
     var hint = "Glisser : orbiter   Molette : zoom   Double-clic : reset"
-    graphics.text(hint, 12, H - 28, 14, Color(1, 1, 1, 0.55))
+    graphics.stroke(Color(1, 1, 1, 0.55))
+    graphics.text(hint, 12, H - 28, 14)
 end

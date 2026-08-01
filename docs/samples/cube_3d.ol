@@ -63,5 +63,6 @@ func draw()
         graphics.pop()
     graphics.end3d()
 
-    graphics.text("Glisse pour tourner la scène", 12, 12, 20, colors.WHITE)
+    graphics.stroke(colors.WHITE)
+    graphics.text("Glisse pour tourner la scène", 12, 12, 20)
 end

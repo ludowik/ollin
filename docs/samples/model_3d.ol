@@ -57,5 +57,6 @@ func draw()
         graphics.drawModel(graphics.model("knot.obj"), 0, 0, 0, 1)
     graphics.end3d()
 
-    graphics.text("Glisse pour tourner — .obj cadrage auto", 12, 12, 18, colors.WHITE)
+    graphics.stroke(colors.WHITE)
+    graphics.text("Glisse pour tourner — .obj cadrage auto", 12, 12, 18)
 end

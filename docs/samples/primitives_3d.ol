@@ -180,8 +180,10 @@ func draw()
         graphics.noStroke()
         graphics.fill(Color(1, 1, 1, 0.88))
         graphics.rect(cx - hw[i] - pad, cy - fs/2 - pad, hw[i]*2 + pad*2, fs + pad*2)
-        graphics.text(names[i], cx - hw[i], cy - fs/2, fs, Color(0, 0, 0))
+        graphics.stroke(Color(0, 0, 0))
+        graphics.text(names[i], cx - hw[i], cy - fs/2, fs)
     end
 
-    graphics.text("Glisse pour tourner", 12, 12, 16, Color(1, 1, 1, 0.5))
+    graphics.stroke(Color(1, 1, 1, 0.5))
+    graphics.text("Glisse pour tourner", 12, 12, 16)
 end
