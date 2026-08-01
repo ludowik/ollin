@@ -179,6 +179,12 @@ Les trois langages mesurent le **temps PROCESSEUR**, pas le temps écoulé : `cp
 | 3 | Création/accès map 100K | `bench/bench_objects.*` |
 | 4 | Accès array 1M | `bench/bench_array.*` |
 | 5 | Appels de fonctions 1M | `bench/bench_calls.*` |
+| 6 | Chaînes : concaténation + interpolation 200K | `bench/bench_strings.*` |
+| 7 | Classes : instanciation, méthode, héritage 200K | `bench/bench_classes.*` |
+| 8 | Itération `for … in` tableau + map 2.4M | `bench/bench_iter.*` |
+| 9 | Mandelbrot 200×200 (arithmétique flottante) | `bench/bench_float.*` |
+
+Chaque benchmark affiche une **somme de contrôle** identique dans les trois langages (longueur totale, accumulateur, nombre d'itérations) : elle vérifie que les trois versions font bien le même travail. Toute divergence signale une traduction fautive, pas un écart de performance.
 
 **Aucun environnement n'est normatif — tous sont des cibles** (cf. « Stack ») :
 - `bench_all.sh` localise seul les interpréteurs : Lua via `lua5.4`/`lua54`/`lua` dans le PATH (ou `C:\Tools\lua\lua55.exe` sous Windows), Python via `python3`/`python`. Une colonne affiche `N/A` si l'interpréteur manque.

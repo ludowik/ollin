@@ -8,6 +8,10 @@
 # peut afficher un coefficient faussé.
 
 set -euo pipefail
+# Alignement du tableau : ${#label} doit compter des CARACTÈRES et non des octets,
+# sinon un label accentué (« chaînes ») ressort trop court. Sans locale UTF-8
+# disponible, on retombe simplement sur ce léger décalage.
+export LC_ALL=${LC_ALL:-C.UTF-8}
 RUNS=${RUNS:-3}
 OLLIN=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.exe")
 LUA=$(command -v lua5.4 2>/dev/null || command -v lua54 2>/dev/null || { [ -x "/c/Tools/lua/lua55.exe" ] && echo "/c/Tools/lua/lua55.exe"; } || command -v lua 2>/dev/null || echo "")
@@ -33,8 +37,9 @@ best_of() {
     echo "${best:-N/A}"
 }
 
-benchmarks=(fib loop objects array calls)
-labels=("fib(35) récursif" "boucle 10M" "map 100K" "array 1M" "appels 1M")
+benchmarks=(fib loop objects array calls strings classes iter float)
+labels=("fib(35) récursif" "boucle 10M" "map 100K" "array 1M" "appels 1M"
+        "chaînes 200K" "classes 200K" "iter 2.4M" "mandelbrot 200x200")
 
 echo ""
 echo "  (meilleur de $RUNS runs par benchmark)"
@@ -73,15 +78,16 @@ ratio() {
     fi
 }
 
-for i in 0 1 2 3 4; do
+for i in "${!benchmarks[@]}"; do
     label="${labels[$i]}"
     ot="${ollin_times[$i]}"
     lt="${lua_times[$i]}"
     pt="${py_times[$i]}"
     or=$(ratio "$ot" "$lt")
     pr=$(ratio "$pt" "$lt")
-    printf "│ %-20s │ %12s │ %12s │ %12s │\n" \
-        "$label" \
+    pad=$((20 - ${#label}))
+    printf "│ %s%*s │ %12s │ %12s │ %12s │\n" \
+        "$label" "$pad" "" \
         "${lt:+${lt}s}" \
         "$or" \
         "$pr"
