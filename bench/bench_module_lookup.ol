@@ -6,38 +6,38 @@ var N = 5_000_000
 
 ## ---- builtin bon marché : le lookup pèse proportionnellement plus ----
 var s = 0.0
-var t0 = time()
+var t0 = cpuTime()
 for i = 1, N do
     s += math.abs(i)
 end
-var t1 = time()
+var t1 = cpuTime()
 var abs_direct = t1 - t0
 
 var fa = math.abs
 s = 0.0
-var t2 = time()
+var t2 = cpuTime()
 for i = 1, N do
     s += fa(i)
 end
-var t3 = time()
+var t3 = cpuTime()
 var abs_hoisted = t3 - t2
 
 ## ---- builtin coûteux (noise) : le lookup pèse peu, réalisme ----
 s = 0.0
-var t4 = time()
+var t4 = cpuTime()
 for i = 1, N do
     s += math.noise(i * 0.01)
 end
-var t5 = time()
+var t5 = cpuTime()
 var noise_direct = t5 - t4
 
 var fn = math.noise
 s = 0.0
-var t6 = time()
+var t6 = cpuTime()
 for i = 1, N do
     s += fn(i * 0.01)
 end
-var t7 = time()
+var t7 = cpuTime()
 var noise_hoisted = t7 - t6
 
 printf("N = {} appels", N)

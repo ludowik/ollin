@@ -2,7 +2,7 @@
 
 var N = 100_000
 
-var t0 = time()
+var t0 = cpuTime()
 
 var i = 0
 while i < N do
@@ -13,5 +13,5 @@ while i < N do
     i += 1
 end
 
-var t1 = time()
+var t1 = cpuTime()
 printf("ollin  objects N={}  time: {}s", N, t1 - t0)

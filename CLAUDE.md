@@ -168,6 +168,8 @@ Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le 
 
 Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharger)** et on garde le **meilleur temps** : un run unique est trop sensible au bruit (contention CPU/cache) et peut afficher un coefficient faussé.
 
+Les trois langages mesurent le **temps PROCESSEUR**, pas le temps écoulé : `cpuTime()` en Ollin, `os.clock()` en Lua, `time.process_time()` en Python. Ne pas utiliser `time()` dans un benchmark Ollin : il lit une horloge murale que le système peut ajuster en cours de route (NTP), d'où des valeurs aberrantes isolées.
+
 | # | Benchmark | Script |
 |---|-----------|--------|
 | 1 | fib(35) récursif | `bench/bench_fib.*` |

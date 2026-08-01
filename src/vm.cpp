@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <ctime>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -242,6 +243,14 @@ static int builtin_time(CallCtx& ctx) {
     return ctx.ret(Value(std::chrono::duration<double>(now.time_since_epoch()).count()));
 }
 
+// Temps PROCESSEUR consommé depuis le démarrage, en secondes. À préférer à time()
+// pour mesurer une durée : time() lit une horloge murale que le système peut
+// ajuster en cours de route (NTP), ce qui produit des valeurs aberrantes.
+static int builtin_cpu_time(CallCtx& ctx) {
+    (void)ctx;
+    return ctx.ret(Value((double)std::clock() / (double)CLOCKS_PER_SEC));
+}
+
 // Mémoire tas en cours d'usage (octets) — par plateforme : octets « in use » de
 // l'allocateur (WASM/macOS/glibc) ou working set (Windows) ; 0 si indisponible.
 uint64_t ollin_heap_bytes() {
@@ -306,6 +315,7 @@ static const struct {
 } k_builtins[] = {
     {"assert", builtin_assert},
     {"time", builtin_time},
+    {"cpuTime", builtin_cpu_time},
     {"mem", builtin_mem},
     {"len", builtin_len},
 };
