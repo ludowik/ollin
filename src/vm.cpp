@@ -40,11 +40,12 @@ static void validate_numeric_range(double start, double end, double step, const 
 
 // ── Interned meta-key constants (initialized once, reused across all calls) ───
 struct MetaKeys {
-    Value class_, parent_, str_, name_, init_;
+    Value class_, parent_, str_, name_, init_, len_;
     Value add_, sub_, mul_, div_, mod_, neg_, eq_, lt_, le_;
     MetaKeys()
         : class_(std::string("__class__")), parent_(std::string("__parent__")), str_(std::string("__str")),
-          name_(std::string("__name__")), init_(std::string("init")), add_(std::string("__add")),
+          name_(std::string("__name__")), init_(std::string("init")), len_(std::string("len")),
+          add_(std::string("__add")),
           sub_(std::string("__sub")), mul_(std::string("__mul")), div_(std::string("__div")),
           mod_(std::string("__mod")), neg_(std::string("__neg")), eq_(std::string("__eq")), lt_(std::string("__lt")),
           le_(std::string("__le")) {
@@ -1267,7 +1268,9 @@ dispatch_loop:
                 // version de l'instance. Le `len` intégré n'est qu'un repli tout-froid
                 // (rien trouvé nulle part) → le strcmp reste hors du chemin chaud.
                 Value chained = proto_chain_rest(obj, key);
-                if (chained.is_nil() && key_sptr && key.as_string() == "len" && !is_instance(obj))
+                // Clé `len` comparée par POINTEUR interné (comme __class__/__parent__),
+                // plus par contenu : plus aucun strcmp dans GET_INDEX.
+                if (chained.is_nil() && key_sptr == MK().len_.sptr && !is_instance(obj))
                     regs[base + A] = Value::make_builtin(builtin_map_len);
                 else
                     regs[base + A] = std::move(chained);
