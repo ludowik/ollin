@@ -22,6 +22,11 @@ struct Map {
     uint64_t version = 0;   // = ++g_map_epoch à chaque mutation ; 0 = jamais mutée
 
     Value get(const Value& k) const;
+    // Emplacement de la valeur (nullptr si absente) — permet à l'inline cache de
+    // GET_INDEX de mémoriser une référence NON possédante : la map elle-même garde
+    // la valeur vivante tant que sa version est inchangée. Ne déréférencer qu'après
+    // avoir validé (Map*, version).
+    const Value* find_ptr(const Value& k) const;
     void set(const Value& k, const Value& v);
 };
 

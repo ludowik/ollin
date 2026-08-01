@@ -572,4 +572,18 @@ assert(ins[3] == 9)
 ins.insert(1, 7)
 assert(ins[1] == 7)
 
+## inline cache : la valeur cachée est une référence NON possédante vers
+## l'emplacement dans la map. Le registre destination peut aliaser celui de
+## l'objet (`m = m.inner`) : l'écriture détruirait la map d'où provient la valeur
+## → la copie doit être faite AVANT d'écrire le registre.
+var ali = {inner: {v: 42}}
+ali = ali.inner
+assert(ali.v == 42)
+var deep = {x: {x: {x: 9}}}
+var pd = deep
+for i = 1, 2 do
+    pd = pd.x
+end
+assert(pd.x == 9)
+
 print("regressions ok")

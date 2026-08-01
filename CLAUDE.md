@@ -448,7 +448,9 @@ Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 
 **Injection de `self` (`CALL_METHOD`)** : instances, chaînes, tableaux → `self` injecté. Maps → **non** (un module ne se reçoit pas), sauf `builtin_map_len`.
 
-**Inline cache monomorphe** (`VM::gicache_`, un slot par instruction, dimensionné sur `ch->code.size()`) : mémorise `{Map*, version, clé internée → valeur}`. Hit = même map + version inchangée + même clé ⇒ valeur rendue sans lookup.
+**Inline cache monomorphe** (`VM::gicache_`, un slot par instruction, dimensionné sur `ch->code.size()`) : mémorise `{Map*, version, clé internée → emplacement}`. Hit = même map + version inchangée + même clé ⇒ valeur rendue sans lookup.
+- La valeur cachée est un **pointeur NON possédant** (`const Value*` via `Map::find_ptr`) : un hit implique une version inchangée, donc la map contient toujours l'entrée et garde la valeur vivante. Posséder une copie retenait l'objet longtemps après sa libération par le script (mesuré : ×2 sur l'empreinte avec un gros tableau).
+- **Copier avant d'écrire** : `Value tmp = *c.val;` puis `regs[base+A] = std::move(tmp)`. Le registre destination peut aliaser l'objet (`m = m.inner`) et détenir sa dernière référence : `regs[A] = *c.val` libérerait la map avant de lire l'union source (`operator=` retient puis relâche, mais lit après). Bloc fermé **avant** `NEXT()` (règle computed-goto).
 - **Ne cache que les hits sur la data PROPRE** de l'objet : la validité ne dépend alors que de `(mptr, version)`, y compris pour une instance. Les résolutions **via la chaîne** ne sont pas cachées (muter la classe ne bump pas la version de l'instance). Ne **jamais** conditionner le remplissage par `is_instance()` : ce test fait un lookup `__class__`, donc un coût par accès (régression mesurée).
 - `Map::version` = `++g_map_epoch` (époque globale monotone) à chaque `Map::set` **et** au recyclage dans `MapPool::release` → insensible à la réutilisation d'adresse.
 - `module_member()` (vm.h) applique le même cache aux maps de module **immuables** (`string_module_`, `array_module_`) → hit systématique après le premier passage.

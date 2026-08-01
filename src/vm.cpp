@@ -1229,15 +1229,22 @@ dispatch_loop:
         if (obj_map && key_sptr) {
             GetIndexCache& c = gicache_[ip - 1];
             if (c.map == obj_map && c.version == obj_map->version && c.key == key_sptr) {
-                regs[base + A] = c.val;
+                {
+                    // Copie AVANT d'écrire le registre : si dest aliase l'objet (A==B)
+                    // et détenait la dernière référence à la map, l'écriture la
+                    // détruirait — or c.val pointe DANS cette map. Le temporaire
+                    // retient d'abord. Bloc fermé avant NEXT() (règle computed-goto).
+                    Value hit = *c.val;
+                    regs[base + A] = std::move(hit);
+                }
                 NEXT();
             }
         }
         if (obj.is_map() || obj.is_class()) {
             // Data PROPRE d'abord (T_MAP et T_CLASS partagent le layout Map).
             const Map* own = obj.mptr;
-            Value found = own->get(key);
-            if (!found.is_nil()) {
+            const Value* slot = own->find_ptr(key);
+            if (slot) {
                 // Trouvée directement → sa validité ne dépend QUE de (mptr, version) :
                 // cacheable même sur une instance (muter l'instance bump sa version,
                 // et sa data propre masque toujours la classe). Pas de test
@@ -1247,9 +1254,10 @@ dispatch_loop:
                     c.map = own;
                     c.version = own->version;
                     c.key = key_sptr;
-                    c.val = found;
+                    c.val = slot;
                 }
-                regs[base + A] = std::move(found);
+                Value hit = *slot;   // lire avant d'écrire le registre (cf. hit du cache)
+                regs[base + A] = std::move(hit);
             } else {
                 // Absente de la data propre : chaîne de prototypes (__class__ /
                 // __parent__). NON cachée — une mutation de la CLASSE ne bump pas la
@@ -1264,17 +1272,19 @@ dispatch_loop:
         } else if (obj.is_string()) {
             // Pseudo-méthodes des chaînes : servies par le module `string`, qui ne
             // change jamais → toujours un hit de cache après le premier passage.
-            regs[base + A] = module_member(string_module_, key, key_sptr);
+            // (Le module vit aussi longtemps que la VM : pas de risque d'aliasing.)
+            const Value* meth = module_member(string_module_, key, key_sptr);
+            regs[base + A] = meth ? *meth : Value{};
         } else if (obj.is_array()) {
             if (key_sptr) {
                 // Pseudo-méthodes : un seul lookup dans la map construite au démarrage
                 // (cf. array_module.cpp), comme pour les chaînes — et cachée par site,
                 // la map étant immuable. Absente = erreur, pas nil (un tableau n'a pas
                 // de champs libres).
-                Value meth = module_member(array_module_, key, key_sptr);
-                if (meth.is_nil())
+                const Value* meth = module_member(array_module_, key, key_sptr);
+                if (!meth)
                     throw std::runtime_error(err_line() + ": runtime: array has no field '" + key.as_string() + "'");
-                regs[base + A] = std::move(meth);
+                regs[base + A] = *meth;
             } else {
                 if (!key.is_integer())
                     throw std::runtime_error(err_line() + ": runtime: array index must be integer");

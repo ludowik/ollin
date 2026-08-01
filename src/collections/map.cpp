@@ -85,6 +85,13 @@ Value Map::get(const Value& k) const {
     return it->second;
 }
 
+const Value* Map::find_ptr(const Value& k) const {
+    auto it = data.find(k);
+    if (it == data.end())
+        return nullptr;
+    return &it->second;
+}
+
 uint64_t g_map_epoch = 0;
 
 void Map::set(const Value& k, const Value& v) {
