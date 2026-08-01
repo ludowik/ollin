@@ -58,6 +58,14 @@ bool VM::is_instance(const Value& v) {
     return (v.is_map() || v.is_class()) && !v.map_get(MK().class_).is_nil();
 }
 
+// Pseudo-méthode `len` intégrée des maps : synthétisée par GET_INDEX quand la map
+// ne définit pas elle-même "len". Fonction NOMMÉE (pas un lambda) pour que
+// CALL_METHOD la reconnaisse par pointeur et lui injecte la map en self — les
+// maps n'injectent pas self par défaut (sinon math.noise(x) recevrait le module).
+static int builtin_map_len(CallCtx& ctx) {
+    return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
+}
+
 // ── protoChainGet ─────────────────────────────────────────────────────────────
 Value VM::proto_chain_get(const Value& obj, const Value& key) {
     if (obj.is_map() || obj.is_class()) {
@@ -1199,9 +1207,7 @@ dispatch_loop:
             // entrée "len" définie par la map gagne toujours.
             Value found = proto_chain_get(obj, key);
             if (found.is_nil() && key.is_string() && !is_instance(obj) && key.as_string() == "len") {
-                regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                    return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
-                });
+                regs[base + A] = Value::make_builtin(builtin_map_len);
             } else {
                 regs[base + A] = found;
             }
@@ -1687,7 +1693,11 @@ dispatch_loop:
             else if (fn.is_static_builtin())
                 fn_is_static = true;
             Value& recv = regs[cb];
-            bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array();
+            // Les maps n'injectent pas self (un module comme `math` ne doit pas se
+            // recevoir : math.noise(x) → noise(x)). Exception : la pseudo-méthode
+            // `len` intégrée des maps, reconnue par pointeur, a besoin de la map.
+            bool map_len_call = recv.is_map() && fn.is_builtin() && fn.as_builtin() == builtin_map_len;
+            bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_len_call;
             bool inject_self = recv_is_instance && !fn_is_static;
             int total;
             if (inject_self) {

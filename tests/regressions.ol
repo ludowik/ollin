@@ -491,4 +491,14 @@ catch e
 end
 assert(fmt_err)
 
+## map.len() : la pseudo-méthode `len` intégrée reçoit bien la map en self
+## (les maps n'injectent pas self sinon — module vs pseudo-méthode)
+var mlen = {a: 1, b: 2, c: 3}
+assert(mlen.len() == 3)
+mlen["d"] = 4
+assert(mlen.len() == 4)
+assert({}.len() == 0)
+var mlen_def = {len: 42}          ## une entrée "len" définie gagne sur le builtin
+assert(mlen_def.len == 42)
+
 print("regressions ok")
