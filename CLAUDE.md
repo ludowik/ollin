@@ -178,10 +178,10 @@ Les trois langages mesurent le **temps PROCESSEUR**, pas le temps écoulé : `cp
 | 4 | Accès array 1M | `bench/bench_array.*` |
 | 5 | Appels de fonctions 1M | `bench/bench_calls.*` |
 
-**Environnement de référence (Windows) :**
-- Lua : `C:\Tools\lua\lua55.exe` (Lua 5.5) — pas de Lua 5.4 disponible, pacman/MSYS2 inutilisable (timeouts réseau)
-- Python : `python` ou `python3` dans le PATH
-- Build : `cmake --build build` via **PowerShell** avec **Clang natif (LLVM)** — Clang définit `__GNUC__`, le computed-goto est actif
+**Aucun environnement n'est normatif — tous sont des cibles** (cf. « Stack ») :
+- `bench_all.sh` localise seul les interpréteurs : Lua via `lua5.4`/`lua54`/`lua` dans le PATH (ou `C:\Tools\lua\lua55.exe` sous Windows), Python via `python3`/`python`. Une colonne affiche `N/A` si l'interpréteur manque.
+- **Ne jamais comparer des chiffres obtenus sur deux machines, ni sur deux sessions différentes** : ni les temps absolus ni les coefficients ne sont transposables (matériel, compilateur, version des interpréteurs). Un tableau de benchmarks ne vaut que pour la machine et le moment où il a été produit.
+- Pour attribuer un écart à un changement de code, mesurer les binaires comparés sur la **même machine, dans la même série** (cf. tourniquet ci-dessous).
 
 **Règles strictes pour les comparaisons :**
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
