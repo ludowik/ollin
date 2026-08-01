@@ -1,4 +1,5 @@
 #include "vm.h"
+#include "modules/array_module.h"
 #include "modules/modules.h"
 #include "utf8.h"
 #include <algorithm>
@@ -1261,122 +1262,19 @@ dispatch_loop:
                     regs[base + A] = std::move(chained);
             }
         } else if (obj.is_string()) {
-            regs[base + A] = string_module_.map_get(key);
+            // Pseudo-méthodes des chaînes : servies par le module `string`, qui ne
+            // change jamais → toujours un hit de cache après le premier passage.
+            regs[base + A] = module_member(string_module_, key, key_sptr);
         } else if (obj.is_array()) {
-            if (key.is_string()) {
-                const std::string& m = key.as_string();
-                if (m == "len")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        Value* a = ctx.args; int n = ctx.argc;
-                        return ctx.ret(Value((int64_t)(n > 0 ? a[0].array_size() : 0)));
-                    });
-                else if (m == "push" || m == "enqueue")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        Value* a = ctx.args; int n = ctx.argc;
-                        if (n >= 2) a[0].array_push(a[1]);
-                        return ctx.ret(a[0]);
-                    });
-                else if (m == "pop")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        Value* a = ctx.args; int n = ctx.argc;
-                        return ctx.ret(n > 0 ? a[0].array_pop() : Value{});
-                    });
-                else if (m == "dequeue")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        Value* a = ctx.args; int n = ctx.argc;
-                        return ctx.ret(n > 0 ? a[0].array_shift() : Value{});
-                    });
-                else if (m == "insert")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        Value* a = ctx.args; int n = ctx.argc;
-                        if (n == 2) a[0].array_push(a[1]);                         // insert(v) = push
-                        else if (n >= 3 && a[1].is_integer()) a[0].array_insert(a[1].as_int(), a[2]); // insert(i, v)
-                        return ctx.ret(a[0]);
-                    });
-                else if (m == "delete")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        Value* a = ctx.args; int n = ctx.argc;
-                        if (n >= 2 && a[1].is_integer()) return ctx.ret(a[0].array_remove(a[1].as_int()));
-                        return ctx.ret(Value{});
-                    });
-                else if (m == "map")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        if (ctx.argc < 2) throw std::runtime_error("array.map: expected fn");
-                        Value& arr = ctx.args[0]; Value& fn = ctx.args[1];
-                        int64_t n = arr.array_size();
-                        Value result = Value::make_array();
-                        for (int64_t i = 0; i < n; i++) {
-                            Value v = arr.array_get(i + 1), idx((int64_t)(i + 1));
-                            Value args[2] = {v, idx};
-                            result.array_push(ctx.vm->call_value(fn, args, 2));
-                        }
-                        return ctx.ret(result);
-                    });
-                else if (m == "filter")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        if (ctx.argc < 2) throw std::runtime_error("array.filter: expected fn");
-                        Value& arr = ctx.args[0]; Value& fn = ctx.args[1];
-                        int64_t n = arr.array_size();
-                        Value result = Value::make_array();
-                        for (int64_t i = 0; i < n; i++) {
-                            Value v = arr.array_get(i + 1), idx((int64_t)(i + 1));
-                            Value args[2] = {v, idx};
-                            if (!is_falsy(ctx.vm->call_value(fn, args, 2))) result.array_push(v);
-                        }
-                        return ctx.ret(result);
-                    });
-                else if (m == "sort")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        if (ctx.argc < 1) return ctx.ret(Value{});
-                        Value& arr = ctx.args[0];
-                        if (ctx.argc >= 2 && ctx.args[1].is_callable()) {
-                            Value fn = ctx.args[1];
-                            VM* vm = ctx.vm;
-                            std::exception_ptr ex;
-                            std::stable_sort(arr.aptr->items.begin(), arr.aptr->items.end(),
-                                [&fn, vm, &ex](const Value& a, const Value& b) {
-                                    if (ex) return false;
-                                    try {
-                                        Value args[2] = {a, b};
-                                        return !is_falsy(vm->call_value(fn, args, 2));
-                                    } catch (...) {
-                                        ex = std::current_exception();
-                                        return false;
-                                    }
-                                });
-                            if (ex) std::rethrow_exception(ex);
-                        } else {
-                            auto type_rank = [](const Value& v) -> int {
-                                if (v.is_nil()) return 0;
-                                if (v.is_integer() || v.is_float()) return 1;
-                                if (v.is_string()) return 2;
-                                return 3;
-                            };
-                            std::stable_sort(arr.aptr->items.begin(), arr.aptr->items.end(),
-                                [&type_rank](const Value& a, const Value& b) {
-                                    int ra = type_rank(a), rb = type_rank(b);
-                                    if (ra != rb) return ra < rb;
-                                    if (ra == 1) return a.as_num() < b.as_num();
-                                    if (ra == 2) return a.as_string() < b.as_string();
-                                    return false;
-                                });
-                        }
-                        return ctx.ret(arr);
-                    });
-                else if (m == "reduce")
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        if (ctx.argc < 3) throw std::runtime_error("array.reduce: expected (fn, init)");
-                        Value& arr = ctx.args[0]; Value& fn = ctx.args[1]; Value acc = ctx.args[2];
-                        int64_t n = arr.array_size();
-                        for (int64_t i = 0; i < n; i++) {
-                            Value v = arr.array_get(i + 1), idx((int64_t)(i + 1));
-                            Value args[3] = {acc, v, idx};
-                            acc = ctx.vm->call_value(fn, args, 3);
-                        }
-                        return ctx.ret(acc);
-                    });
-                else
-                    throw std::runtime_error(err_line() + ": runtime: array has no field '" + m + "'");
+            if (key_sptr) {
+                // Pseudo-méthodes : un seul lookup dans la map construite au démarrage
+                // (cf. array_module.cpp), comme pour les chaînes — et cachée par site,
+                // la map étant immuable. Absente = erreur, pas nil (un tableau n'a pas
+                // de champs libres).
+                Value meth = module_member(array_module_, key, key_sptr);
+                if (meth.is_nil())
+                    throw std::runtime_error(err_line() + ": runtime: array has no field '" + key.as_string() + "'");
+                regs[base + A] = std::move(meth);
             } else {
                 if (!key.is_integer())
                     throw std::runtime_error(err_line() + ": runtime: array index must be integer");
@@ -1942,6 +1840,7 @@ void VM::execute(Chunk chunk) {
                 globals_init[gi] = true;
             }
     string_module_ = make_builtin_module("string");
+    array_module_ = make_array_module();
     {
         Value core = make_builtin_module("core");
         for (auto& [k, v] : core.mptr->data) {

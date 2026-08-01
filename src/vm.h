@@ -78,9 +78,33 @@ class VM {
     };
     std::vector<GetIndexCache> gicache_;
 
+    // Membre d'une map de module IMMUABLE (string_module_, array_module_), avec le
+    // même inline cache par site : ces maps ne changent jamais → hit systématique
+    // après le premier passage. `key_sptr` = clé internée, nullptr si non-string
+    // (indexation d'une chaîne par entier p. ex.) → lookup direct, non caché.
+    Value module_member(const Value& mod, const Value& key, const InternedStr* key_sptr) {
+        const Map* m = mod.mptr;
+        if (!key_sptr)
+            return m->get(key);
+        GetIndexCache& c = gicache_[ip - 1];
+        if (c.map == m && c.version == m->version && c.key == key_sptr)
+            return c.val;
+        Value v = m->get(key);
+        if (!v.is_nil()) {
+            c.map = m;
+            c.version = m->version;
+            c.key = key_sptr;
+            c.val = v;
+        }
+        return v;
+    }
+
     Chunk owned_chunk;
     const Chunk* ch = nullptr;
     Value string_module_;
+    // Pseudo-méthodes des tableaux, construites une fois (cf. array_module.cpp).
+    // Interne au moteur : PAS un module global exposé aux scripts.
+    Value array_module_;
     uint32_t ip = 0;
     std::vector<Value> globals;
     std::vector<bool> globals_init;

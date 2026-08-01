@@ -547,4 +547,29 @@ assert(icb.kind() == "ICB")
 assert(icb.get_v_ok == nil)
 assert(ICB.tag == "c2")    ## héritée via __parent__
 
+## pseudo-méthodes de tableau servies par array_module (plus de chaîne de strcmp
+## dans GET_INDEX) : un champ inconnu doit rester une ERREUR, pas nil.
+var arr_err = false
+try
+    var bad_field = [1, 2].zzz
+    print(bad_field)
+catch e
+    arr_err = true
+end
+assert(arr_err)
+## tri : comparateur explicite, et ordre par rang de type sans comparateur
+var srt = [1, 2, 3].sort(func(x, y) return x > y end)
+assert(srt[1] == 3)
+assert(srt[3] == 1)
+var srt_mix = [3, "a", nil, 1].sort()
+assert(srt_mix[1] == nil)      ## nil < nombres < chaînes
+assert(srt_mix[2] == 1)
+assert(srt_mix[4] == "a")
+## insert(v) == push, insert(i, v) positionnel (1-based)
+var ins = [1, 2]
+ins.insert(9)
+assert(ins[3] == 9)
+ins.insert(1, 7)
+assert(ins[1] == 7)
+
 print("regressions ok")

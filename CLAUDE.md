@@ -74,6 +74,7 @@ ollin/
 │   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
 │   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
 │   │                  image (+ image_stub), + modules.h/.cpp, module_utils.h
+│   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
 ├── tests/             suite de tests (`bash tests/run.sh` = tout) : syntax.ol, regressions.ol, test_errors.sh + fixtures (utils_test*.ol, config.ol)
@@ -436,6 +437,22 @@ Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti
 Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 
 **Invariant pools (`MapPool`/`ArrayPool`/`ArrayIteratorPool`) — RÉ-ENTRANCE** : `release()` doit vider (`data.clear()`/`items.clear()`) **AVANT** de tester la capacité `n < CAP`, puis relire `n`. Le clear libère les entrées, et une entrée map/array **ré-entre** le pool (`release` → `buf[n++]`) → `n` peut grandir pendant le clear. Tester `n < CAP` *avant* le clear puis faire `buf[n++]` avec le `n` à jour écrit `buf[CAP]` (= `&n`) et corrompt la free-list (bug du crash au re-run corrigé). Ne jamais remettre le test de capacité avant le clear.
+
+## Accès membre : `GET_INDEX`, pseudo-méthodes et inline cache
+
+**Résolution.** `GET_INDEX` traite quatre familles de receveurs :
+- **map / classe** : data PROPRE d'abord, puis la chaîne (`__class__` d'une map, `__parent__` d'une classe) via `proto_chain_rest()` — séparé de `proto_chain_get()` pour ne consulter la data propre qu'**une** fois.
+- **chaîne** : membre du module `string` (`string_module_`).
+- **tableau** : membre de `array_module_` (`len`, `push`/`enqueue`, `pop`, `dequeue`, `insert`, `delete`, `map`, `filter`, `reduce`, `sort`). Un champ absent est une **erreur** (`array has no field '…'`), pas `nil`. Ces maps sont construites **une fois** au démarrage — plus de chaîne de `strcmp` reconstruisant une closure par accès.
+- **pseudo-méthode `len` des maps** : seule survivance en dur, uniquement en **repli tout-froid** (rien trouvé dans la data propre ni la chaîne) → le `strcmp` reste hors du chemin chaud. Une entrée `len` définie par la map gagne toujours. C'est une fonction **nommée** (`builtin_map_len`) pour que `CALL_METHOD` la reconnaisse par pointeur et lui injecte la map en `self` (les maps n'injectent pas `self` : sinon `math.noise(x)` recevrait le module).
+
+**Injection de `self` (`CALL_METHOD`)** : instances, chaînes, tableaux → `self` injecté. Maps → **non** (un module ne se reçoit pas), sauf `builtin_map_len`.
+
+**Inline cache monomorphe** (`VM::gicache_`, un slot par instruction, dimensionné sur `ch->code.size()`) : mémorise `{Map*, version, clé internée → valeur}`. Hit = même map + version inchangée + même clé ⇒ valeur rendue sans lookup.
+- **Ne cache que les hits sur la data PROPRE** de l'objet : la validité ne dépend alors que de `(mptr, version)`, y compris pour une instance. Les résolutions **via la chaîne** ne sont pas cachées (muter la classe ne bump pas la version de l'instance). Ne **jamais** conditionner le remplissage par `is_instance()` : ce test fait un lookup `__class__`, donc un coût par accès (régression mesurée).
+- `Map::version` = `++g_map_epoch` (époque globale monotone) à chaque `Map::set` **et** au recyclage dans `MapPool::release` → insensible à la réutilisation d'adresse.
+- `module_member()` (vm.h) applique le même cache aux maps de module **immuables** (`string_module_`, `array_module_`) → hit systématique après le premier passage.
+- **Piège d'aliasing** : le registre destination peut aliaser celui de l'objet (`A==B`) ou de la clé (`A==C`). Capturer `obj.mptr` / `key.sptr` **avant** toute écriture de `regs[base+A]` — les lire après donne la valeur écrasée (le cache ne se remplissait jamais).
 
 ## Type entier natif (implémentation)
 
