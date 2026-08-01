@@ -183,6 +183,16 @@ Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharge
 
 **Règles strictes pour les comparaisons :**
 - Ne pas inventer de raison pour expliquer les écarts de performance — s'en tenir aux faits mesurés.
+- **Sensibilité à la disposition du code (mesurée, ±7 % sur `fib`)** : tous les gestionnaires
+  d'opcodes vivent dans une seule fonction (`run_goto`, computed-goto), donc modifier
+  **n'importe quel** gestionnaire déplace l'adresse de tous les autres et change le
+  comportement du cache d'instructions. Fait vérifié : ajouter 32 `nop` dans `op_TRY`, que
+  `bench_fib.ol` n'exécute jamais, rend `fib` **7 % plus rapide**. Corollaire : un écart de
+  quelques pour cent sur un benchmark dont le chemin d'exécution ne touche pas le code
+  modifié n'est **pas** un coût réel — ne pas chercher à l'« optimiser », et surtout ne pas
+  figer une disposition favorable (le prochain changement la défera). Pour attribuer un
+  écart à un commit, mesurer en **tourniquet** (tous les binaires une fois par tour, puis
+  minimum par binaire) : une mesure au meilleur de trois est trop bruitée.
 
 ## Tests graphiques — DEUX chaînes qui MARCHENT (ne pas conclure « cassé »)
 
