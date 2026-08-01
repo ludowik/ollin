@@ -115,7 +115,14 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 > **La syntaxe et la sémantique du langage sont décrites dans [`docs/grammar.ebnf`](docs/grammar.ebnf).**
 > CLAUDE.md ne documente **pas** la syntaxe — il décrit l'architecture et l'implémentation (opcodes, registres, structures internes). Pour toute question sur la forme du langage, lire la grammaire.
 
-| Fichier | Propriétaire | Rôle |
+Le tableau ci-dessous répartit la **charge d'entretien** : qui tient la plume sur
+quel fichier au quotidien. Ce n'est **pas** une frontière de propriété — tout le
+dépôt appartient à l'utilisateur. Corollaire : quand une modification rend une
+ligne obsolète dans un fichier « à l'utilisateur » (une signature documentée dans
+un commentaire, par exemple), c'est à Claude de la corriger, sans s'en abstenir au
+prétexte de cette colonne.
+
+| Fichier | Maintenu par | Rôle |
 |---|---|---|
 | `tests/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
 | `tests/regressions.ol` | Claude | non-régression des bugs corrigés en revue (coins peu couverts par `syntax.ol` : multi-retour closure/méthode, `super` 3 niveaux, clobber de registre sur appel 0-arg, lvalues chaînées, range ouvert…) |
