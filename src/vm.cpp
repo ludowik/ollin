@@ -1193,16 +1193,17 @@ dispatch_loop:
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
         if (obj.is_map() || obj.is_class()) {
-            if (key.is_string() && key.as_string() == "len" && !is_instance(obj)) {
-                Value found = proto_chain_get(obj, key);
-                if (found.is_nil())
-                    regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
-                        return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
-                    });
-                else
-                    regs[base + A] = found;
+            // Lookup d'abord (chemin chaud) ; le `len` intégré n'est qu'un repli sur
+            // miss → le strcmp "len" sort du chemin chaud (payé seulement si la clé
+            // est absente ET string ET hors instance). Sémantique inchangée : une
+            // entrée "len" définie par la map gagne toujours.
+            Value found = proto_chain_get(obj, key);
+            if (found.is_nil() && key.is_string() && !is_instance(obj) && key.as_string() == "len") {
+                regs[base + A] = Value::make_builtin([](CallCtx& ctx) -> int {
+                    return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
+                });
             } else {
-                regs[base + A] = proto_chain_get(obj, key);
+                regs[base + A] = found;
             }
         } else if (obj.is_string()) {
             regs[base + A] = string_module_.map_get(key);
