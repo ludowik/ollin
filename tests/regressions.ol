@@ -586,4 +586,22 @@ for i = 1, 2 do
 end
 assert(pd.x == 9)
 
+## `nil` vaut ABSENT dans une map : une clé propre valant nil ne masque PAS ce que
+## la chaîne de prototypes (ou le repli `len`) fournirait. Régression possible en
+## passant d'un lookup par valeur à un lookup par présence de clé.
+class NilSh
+    func init()
+        self.a = 1
+    end
+    func m()
+        return "classe"
+    end
+end
+var nsh = NilSh()
+nsh["m"] = nil
+assert(nsh.m() == "classe")     ## la méthode de classe reste atteignable
+var nlen = {}
+nlen["len"] = nil
+assert(nlen.len() == 1)         ## repli `len` intégré ; la map a 1 clé
+
 print("regressions ok")

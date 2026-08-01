@@ -1243,8 +1243,11 @@ dispatch_loop:
         if (obj.is_map() || obj.is_class()) {
             // Data PROPRE d'abord (T_MAP et T_CLASS partagent le layout Map).
             const Map* own = obj.mptr;
+            // `nil` vaut ABSENT dans tout le moteur (cf. proto_chain_get) : une clé
+            // propre valant nil doit continuer à laisser la main à la chaîne de
+            // prototypes et au repli `len`, pas à masquer la méthode de classe.
             const Value* slot = own->find_ptr(key);
-            if (slot) {
+            if (slot && !slot->is_nil()) {
                 // Trouvée directement → sa validité ne dépend QUE de (mptr, version) :
                 // cacheable même sur une instance (muter l'instance bump sa version,
                 // et sa data propre masque toujours la classe). Pas de test
