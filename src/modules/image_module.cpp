@@ -226,15 +226,15 @@ static std::vector<uint8_t> fetch_bytes_sync(const std::string& url) {
                 var u = UTF8ToString($0);
                 var xhr = new XMLHttpRequest();
                 xhr.open('GET', u, false);
-                xhr.override_mime_type('text/plain; charset=x-user-defined');
+                xhr.overrideMimeType('text/plain; charset=x-user-defined');
                 xhr.send(null);
                 if (xhr.status !== 200 && xhr.status !== 0)
                     return 0;
-                var s = xhr.response_text;
+                var s = xhr.responseText;
                 var n = s.length;
                 var ptr = _malloc(n);
                 for (var i = 0; i < n; i++)
-                    HEAPU8[ptr + i] = s.char_code_at(i) & 0xff;
+                    HEAPU8[ptr + i] = s.charCodeAt(i) & 0xff;
                 HEAP32[$1 >> 2] = n;
                 return ptr;
             } catch (e) {

@@ -14,8 +14,8 @@ static void cam_reset_js() {
     EM_ASM({
         const cam = window.__ollinCam;
         if (!cam) return;
-        if (cam.stream) cam.stream.get_tracks().for_each(function(t) { t.stop(); });
-        if (cam.video && cam.video.parent_node) cam.video.parent_node.remove_child(cam.video);
+        if (cam.stream) cam.stream.getTracks().forEach(function(t) { t.stop(); });
+        if (cam.video && cam.video.parentNode) cam.video.parentNode.removeChild(cam.video);
         cam.video = null; cam.stream = null; cam.state = 'idle';
     });
 }
@@ -48,25 +48,25 @@ static int cam_open(CallCtx& ctx) {
         if (cam.state === 'open' || cam.state === 'opening') return;
         // Garde avant toute création DOM : sinon chaque retry en contexte non sécurisé
         // (état 'error') ajouterait un <video> orphelin de plus.
-        if (!navigator.media_devices || !navigator.media_devices.get_user_media) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             cam.state = 'error'; // contexte non sécurisé (HTTP hors localhost) → pas d'API caméra
             return;
         }
         cam.w = w; cam.h = h;
         cam.state = 'opening';
-        const vid = document.create_element('video');
-        vid.set_attribute('playsinline', 'playsinline');
-        vid.set_attribute('autoplay', 'autoplay');
+        const vid = document.createElement('video');
+        vid.setAttribute('playsinline', 'playsinline');
+        vid.setAttribute('autoplay', 'autoplay');
         vid.muted = true;
         vid.style.position = 'fixed';
         vid.style.top = '-9999px';
         vid.style.left = '-9999px';
-        document.body.append_child(vid);
+        document.body.appendChild(vid);
         cam.video = vid;
-        navigator.media_devices.get_user_media({ video: { width: w, height: h } })
+        navigator.mediaDevices.getUserMedia({ video: { width: w, height: h } })
             .then(function(stream) {
                 cam.stream = stream;
-                vid.src_object = stream;
+                vid.srcObject = stream;
                 return vid.play();
             })
             .then(function() { cam.state = 'open'; })
@@ -90,17 +90,17 @@ static int cam_capture(CallCtx& ctx) {
         const cam = window.__ollinCam;
         if (!cam || cam.state !== 'open') return 0;
         const vid = cam.video;
-        if (!vid || vid.ready_state < 2) return 0;
+        if (!vid || vid.readyState < 2) return 0;
         try {
             const w = $1; const h = $2;
             if (!cam.canvas || cam.canvas.width !== w || cam.canvas.height !== h) {
-                cam.canvas = document.create_element('canvas');
+                cam.canvas = document.createElement('canvas');
                 cam.canvas.width = w;
                 cam.canvas.height = h;
-                cam.ctx2d = cam.canvas.get_context('2d');
+                cam.ctx2d = cam.canvas.getContext('2d');
             }
-            cam.ctx2d.draw_image(vid, 0, 0, w, h);
-            const img = cam.ctx2d.get_image_data(0, 0, w, h);
+            cam.ctx2d.drawImage(vid, 0, 0, w, h);
+            const img = cam.ctx2d.getImageData(0, 0, w, h);
             HEAPU8.set(img.data, $0);
             return 1;
         } catch(e) { return 0; }

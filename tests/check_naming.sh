@@ -43,6 +43,33 @@ def strip(text):
     out = []; i = 0; n = len(text)
     while i < n:
         c = text[i]
+        # Bloc EM_ASM(...) : c'est du JavaScript stringifié par la macro (pas du C++)
+        # → neutraliser toute la portée (parenthèses équilibrées, en ignorant
+        # commentaires et chaînes internes). Sinon ses identifiants JS (getElementById,
+        # srcObject…) seraient pris pour du camelCase C++.
+        ma = re.match(r'\b(?:MAIN_THREAD_)?EM_ASM\w*\s*\(', text[i:])
+        if ma:
+            k = i + ma.end() - 1  # position du '('
+            depth = 0; j = k
+            while j < n:
+                cj = text[j]
+                if cj == '/' and j + 1 < n and text[j + 1] == '/':
+                    e = text.find('\n', j); j = n if e < 0 else e; continue
+                if cj == '/' and j + 1 < n and text[j + 1] == '*':
+                    e = text.find('*/', j + 2); j = n if e < 0 else e + 2; continue
+                if cj in '"\'':
+                    j += 1
+                    while j < n:
+                        if text[j] == '\\': j += 2; continue
+                        if text[j] == cj: j += 1; break
+                        j += 1
+                    continue
+                if cj == '(': depth += 1
+                elif cj == ')':
+                    depth -= 1
+                    if depth == 0: j += 1; break
+                j += 1
+            out.append(' ' * (j - i)); i = j; continue
         if c == '/' and i + 1 < n and text[i + 1] == '/':
             j = text.find('\n', i); j = n if j < 0 else j
             out.append(' ' * (j - i)); i = j; continue

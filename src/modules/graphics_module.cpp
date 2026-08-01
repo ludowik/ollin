@@ -97,12 +97,12 @@ static int gfx_canvas(CallCtx& ctx) {
         }
         reset3d_graphics_state();               // libérer shader/meshes/textures/VBO 3D dans CE contexte
     }
-    double dpr = EM_ASM_DOUBLE({ return window.device_pixel_ratio || 1.0; });
+    double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
     s_physH = (int)(h * dpr + 0.5);
     // InitWindow with logical dimensions — sets projection [0,w]×[0,h]
     EM_ASM({
-        var o = document.get_element_by_id('output');
+        var o = document.getElementById('output');
         if (o)
             o.style.display = 'none';
     });
@@ -118,7 +118,7 @@ static int gfx_canvas(CallCtx& ctx) {
     // rlViewport in emscripten_frame will render to the full physical bitmap
     EM_ASM(
         {
-            var c = document.get_element_by_id('canvas');
+            var c = document.getElementById('canvas');
             if (c) {
                 c.width = $0;
                 c.height = $1;
