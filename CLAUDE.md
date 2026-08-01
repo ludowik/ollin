@@ -9,6 +9,15 @@ français**. Les rapports, revues de code, synthèses et résultats sont rendus 
 structure de données comme livrable à l'utilisateur, même si un outil/skill
 produit du JSON en interne (le convertir en rapport lisible avant de le présenter).
 
+**Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
+français correct. Le style télégraphique est proscrit : pas de fragments sans
+verbe (« Vérifié : … », « Corrigé et poussé. »), pas de listes de mots-clés en
+guise d'explication. Rester **simple, précis et concis** — des phrases courtes et
+claires plutôt que de longs développements. Éviter les anglicismes fabriqués
+(« differ » un fichier, une sortie « diffée ») : dire « comparer les sorties ».
+Ne pas inventer de jargon interne pour désigner les artefacts du projet (un
+fichier de test est un « script de test », pas une « torture »).
+
 Avant d'agir, délimiter le périmètre exact de la demande. Si plusieurs
 interprétations raisonnables divergent — surtout si l'une déborde de la cible —
 poser une question de clarification **brève** avant de coder ; ne pas deviner
