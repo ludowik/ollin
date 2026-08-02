@@ -12,12 +12,18 @@ func px(v) return v * sx end
 func py(v) return v * sy end
 func fs(v) return v * ss end
 
+## Le canvas est en pixels PHYSIQUES : sur un mobile à 3 pixels par pixel CSS,
+## une police mise à l'échelle du dessin devient illisible. dpr donne le rapport,
+## et ft() garantit au moins la taille nominale telle qu'on la voit à l'écran.
+var dpr = W / window.width
+func ft(v) return math.max(v * ss, v * dpr) end
+
 var dim = Color(0.6, 0.65, 0.75)
 
 ## Étiquette d'un bloc : coordonnées en unités du dessin, style commun à toutes.
 func label(txt, x, y)
     g.stroke(dim)
-    g.fontSize(fs(13))
+    g.fontSize(ft(13))
     g.text(txt, px(x), py(y))
 end
 
@@ -147,25 +153,26 @@ func demoTransforms()
         g.pop()
     end
     g.pop()
-    label("push/pop/translate", 476, 246)
-    label("rotate/scale", 490, 262)
+    label("push/pop", 476, 246)
+    label("translate", 476, 262)
+    label("rotate/scale", 476, 278)
 end
 
 func demoText()
     label("text", 460, 310)
     g.stroke(Color(0.9, 0.9, 1))
-    g.fontSize(fs(16))
+    g.fontSize(ft(16))
     g.text("size 16", px(460), py(328))
     g.stroke(Color(0.7, 0.85, 1))
-    g.fontSize(fs(22))
+    g.fontSize(ft(22))
     g.text("size 22", px(460), py(352))
 end
 
 func demoArc()
     g.stroke(Color(1, 0.5, 0.7), fs(2))
     g.fill(Color(1, 0.5, 0.7, 0.25))
-    g.arc(px(620), py(350), fs(90), fs(90), t, t + math.rad(250))
-    label("arc", 600, 300)
+    g.arc(px(645), py(355), fs(70), fs(70), t, t + math.rad(250))
+    label("arc", 630, 305)
 end
 
 func draw()
