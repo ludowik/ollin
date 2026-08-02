@@ -1098,18 +1098,27 @@ assert(sw_func(5) == "autre")
 
 ## ── 23. Module graphics (Raylib) ─────────────────────────────────────────────
 ##
-## Module natif (non disponible en WASM/headless). Voir examples/graphics_demo.ol.
+## Disponible en natif comme en WASM (le playground l'utilise). Le build natif par
+## DÉFAUT emploie le stub : `graphics` y vaut nil. Exemples : docs/samples/.
 ##
 ##   graphics.canvas(800, 600, "Titre")   ## ouvre une fenêtre
-##   graphics.run(func()
+##   func draw()                          ## appelée à chaque frame
 ##       graphics.clear(colors.BLACK)
-##       graphics.line(x1, y1, x2, y2, 1, color)
-##   end)
+##       graphics.stroke(colors.RED)      ## style : état courant
+##       graphics.line(x1, y1, x2, y2)    ## géométrie : arguments
+##   end
+##
+## RÈGLE du module : la géométrie passe par les ARGUMENTS, le style vient de
+## l'ÉTAT courant (fill, stroke, strokeSize, fontSize). Aucune primitive de dessin
+## ne prend de couleur ni de taille en argument.
 ##
 ## Couleurs prédéfinies : module `colors` (colors.BLACK, colors.WHITE, colors.RED…)
-## Couleurs personnalisées : (r << 24) | (g << 16) | (b << 8) | 255
+## Couleurs personnalisées : Color(r, g, b[, a]) avec des composantes de 0 à 1
+##   (un entier empaqueté ne marche PAS : les valeurs sont bornées à 1 → blanc)
 ## FPS : graphics.fps() → entier
-## Texte : graphics.text(text, x, y) — couleur stroke, taille fontSize(n)
+## Texte : graphics.text(text, x, y) — couleur de stroke (on écrit au stylo)
+##   graphics.fontSize(n) → taille de police ; accepte une valeur fractionnaire,
+##   sans minimum, remise à 18 à chaque frame
 
 ## ── 24. Méthodes d'instance array (fonctions d'ordre supérieur) ──────────────
 
