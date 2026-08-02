@@ -535,6 +535,12 @@ static int gfx_rect(CallCtx& ctx) {
                 if (iround > 1.0f)
                     iround = 1.0f;
                 DrawRectangleRoundedLinesEx({(float)x + t, (float)y + t, iw, ih}, iround, s_segments, t, s.c);
+            } else {
+                // Trait plus épais que la moitié du petit côté : la bande couvre toute
+                // la forme. Le chemin à angles droits la remplit alors (mesuré : un
+                // carré 20x20 au trait 12 allume ses 400 pixels) → même dégradation ici,
+                // plutôt que de ne rien dessiner.
+                DrawRectangleRounded(rec, roundness, s_segments, s.c);
             }
         }
         return ctx.ret(Value{});
