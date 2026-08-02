@@ -18,12 +18,12 @@
 ##   func mouse.pressed(x, y)
 ##       var ev = vd.hit(x, y)
 ##       if ev == 1 then streaming = true
-##       elseif ev == -1 then stream_unload(lastcx, lastcz, 0)
+##       elseif ev == -1 then streamUnload(lastcx, lastcz, 0)
 ##       elseif ev == 0 then pad.press(x, y) end   ## ev == 2 : rien à faire
 ##   end
 ##   ## dans draw() : boucler sur vd.radius, puis
 ##   ##   var ev = vd.update(deltaTime, streaming)
-##   ##   if ev == 1 then streaming = true elseif ev == -1 then stream_unload(pcx, pcz, 0) end
+##   ##   if ev == 1 then streaming = true elseif ev == -1 then streamUnload(pcx, pcz, 0) end
 ##   ##   ... vd.draw()  (boutons)  ...  vd.mode() → "auto"/"manuel"
 
 class ViewDistance
@@ -69,9 +69,9 @@ class ViewDistance
         self.n = self.n + 1
         if dt > self.SLOW_DT then self.slow = self.slow + 1 end
         if self.t < self.WIN then return 0 end
-        var mem_full = mem() > self.MEM_MAX   ## lu une fois par fenêtre, pas à chaque frame
+        var memFull = mem() > self.MEM_MAX   ## lu une fois par fenêtre, pas à chaque frame
         var ev = 0
-        if (mem_full or self.slow > self.n * self.DROP) and self.radius > self.lo then
+        if (memFull or self.slow > self.n * self.DROP) and self.radius > self.lo then
             self.cap = self.radius - 1
             self.radius = math.clamp((self.good + self.radius) // 2, self.lo, self.radius - 1)
             self.step = 1
@@ -79,7 +79,7 @@ class ViewDistance
             ev = -1
         elseif self.slow < self.n * self.GROW then
             self.good = self.radius
-            if self.radius < self.hi and self.radius < self.cap and not mem_full then
+            if self.radius < self.hi and self.radius < self.cap and not memFull then
                 self.radius = math.min(self.radius + self.step, math.min(self.hi, self.cap))
                 self.step = self.step * 2
                 self.stable = 0.0
@@ -87,7 +87,7 @@ class ViewDistance
             else
                 self.step = 1
                 self.stable = self.stable + self.t
-                if self.radius == self.cap and self.stable >= self.RELAX and not mem_full then
+                if self.radius == self.cap and self.stable >= self.RELAX and not memFull then
                     self.cap = self.cap + 1
                     self.stable = 0.0
                 end

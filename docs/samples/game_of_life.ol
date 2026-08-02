@@ -13,14 +13,14 @@ global cells = []
 global back  = []
 global paused = false
 global acc = 0.0         ## accumulateur pour cadencer les générations
-global last_tap = -1.0   ## dernier appui (détection du double tap)
+global lastTap = -1.0   ## dernier appui (détection du double tap)
 global drawing = false   ## true entre appui et relâché → glisser = dessin
 
 func idx(x, y)
     return y * COLS + x + 1
 end
 
-func empty_grid()
+func emptyGrid()
     var g = []
     for i = 1, COLS * ROWS do
         g[i] = 0
@@ -93,8 +93,8 @@ end
 
 ## Un canon + 5 à 10 motifs de base placés aléatoirement (type, position, orientation).
 func reset()
-    cells = empty_grid()
-    back = empty_grid()
+    cells = emptyGrid()
+    back = emptyGrid()
     gun(cells, 2, 2)
     var count = math.randInt(5, 10)
     for i = 1, count do
@@ -160,13 +160,13 @@ end
 
 const DOUBLE_TAP = 0.3
 func mouse.pressed(x, y)
-    if last_tap >= 0.0 and elapsedTime - last_tap < DOUBLE_TAP then
+    if lastTap >= 0.0 and elapsedTime - lastTap < DOUBLE_TAP then
         paused = false                          ## double tap → relance
         drawing = false
-        last_tap = -1.0                          ## un 3e appui ne compte pas comme double
+        lastTap = -1.0                          ## un 3e appui ne compte pas comme double
         return
     end
-    last_tap = elapsedTime
+    lastTap = elapsedTime
     paused = true
     drawing = true
     set(cells, x // CELL, y // CELL)

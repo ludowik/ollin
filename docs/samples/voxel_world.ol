@@ -24,7 +24,7 @@ global camX = 8.5
 global camY = 10
 global camZ = 8.5
 global yaw = 0.0
-global save_acc = 0.0        ## accumulateur pour throttler la sauvegarde de position
+global saveAcc = 0.0        ## accumulateur pour throttler la sauvegarde de position
 global PITCH = -0.12
 global lastcx = 999999
 global lastcz = 999999
@@ -71,7 +71,7 @@ global T_SANDD = 9
 
 ## Couleur de base + bruit INDÉPENDANT par canal → variation de teinte, pas seulement
 ## de luminosité (les tuiles paraissent moins plates).
-func put_tile(idx, br, bg, bb, jit)
+func putTile(idx, br, bg, bb, jit)
     var cx = (idx % ACOLS) * TILE
     var cy = math.floor(idx / ACOLS) * TILE
     for py = 0, TILE - 1 do
@@ -87,19 +87,19 @@ func put_tile(idx, br, bg, bb, jit)
     end
 end
 
-func build_atlas()
+func buildAtlas()
     atlas = image.create(ACOLS * TILE, AROWS * TILE)
     image.beginPixels(atlas)
-    put_tile(T_GRASS, 0.42, 0.68, 0.30, 0.16)
-    put_tile(T_DIRT,  0.46, 0.33, 0.20, 0.15)
-    put_tile(T_SAND,  0.86, 0.79, 0.53, 0.11)
-    put_tile(T_ROCK,  0.47, 0.46, 0.45, 0.18)
-    put_tile(T_SNOW,  0.95, 0.97, 1.00, 0.07)
-    put_tile(T_WATER, 0.20, 0.45, 0.80, 0.14)
-    put_tile(T_TRUNK, 0.40, 0.26, 0.13, 0.16)
-    put_tile(T_LEAF,  0.18, 0.42, 0.16, 0.22)
-    put_tile(T_STONE, 0.36, 0.36, 0.40, 0.16)
-    put_tile(T_SANDD, 0.72, 0.63, 0.40, 0.12)
+    putTile(T_GRASS, 0.42, 0.68, 0.30, 0.16)
+    putTile(T_DIRT,  0.46, 0.33, 0.20, 0.15)
+    putTile(T_SAND,  0.86, 0.79, 0.53, 0.11)
+    putTile(T_ROCK,  0.47, 0.46, 0.45, 0.18)
+    putTile(T_SNOW,  0.95, 0.97, 1.00, 0.07)
+    putTile(T_WATER, 0.20, 0.45, 0.80, 0.14)
+    putTile(T_TRUNK, 0.40, 0.26, 0.13, 0.16)
+    putTile(T_LEAF,  0.18, 0.42, 0.16, 0.22)
+    putTile(T_STONE, 0.36, 0.36, 0.40, 0.16)
+    putTile(T_SANDD, 0.72, 0.63, 0.40, 0.12)
     image.endPixels(atlas)
     graphics.tileset(atlas, ACOLS, AROWS)
     graphics.tileAnim(T_WATER)
@@ -107,7 +107,7 @@ end
 
 ## Texture de nuage : blanc légèrement moucheté (bruit de luminosité), alpha plein.
 ## Casse le blanc plat des cubes sans créer de trou.
-func build_cloud_tex()
+func buildCloudTex()
     cloudTex = image.create(CLOUD_TEX, CLOUD_TEX)
     image.beginPixels(cloudTex)
     for py = 0, CLOUD_TEX - 1 do
@@ -121,7 +121,7 @@ end
 
 ## Biome de surface : 0 = désert, 1 = plaine, 2 = forêt. Le relief (roche/neige) vient
 ## de l'altitude, pas du biome.
-func biome_at(x, z)
+func biomeAt(x, z)
     var b = math.noise(x * 0.026 + 50, z * 0.026 + 50)
     if b < 0.38 then return 0 end
     if b < 0.62 then return 1 end
@@ -137,7 +137,7 @@ end
 
 ## Amplitude 44 (et non 60) : depuis la normalisation de math.noise sur [0,1], le bruit
 ## s'étale ~1,35× plus → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
-func raw_height(x, z)
+func rawHeight(x, z)
     return math.floor((elevation(x, z) - 0.42) * 44 + SEA)
 end
 
@@ -145,12 +145,12 @@ end
 ## rabaissé au plus haut voisin, un puits isolé (plus bas que ses 4 voisins) est
 ## remonté au plus bas voisin → ni cube ni trou solitaire. Fonction pure de (x, z)
 ## → même hauteur pour le culling, la collision et le spawn (pas de jointure incohérente).
-func height_at(x, z)
-    var h = raw_height(x, z)
-    var e = raw_height(x + 1, z)
-    var w = raw_height(x - 1, z)
-    var n = raw_height(x, z + 1)
-    var s = raw_height(x, z - 1)
+func heightAt(x, z)
+    var h = rawHeight(x, z)
+    var e = rawHeight(x + 1, z)
+    var w = rawHeight(x - 1, z)
+    var n = rawHeight(x, z + 1)
+    var s = rawHeight(x, z - 1)
     var hi = math.max(math.max(e, w), math.max(n, s))
     var lo = math.min(math.min(e, w), math.min(n, s))
     if h > hi then return hi end   ## cube solitaire → éliminé
@@ -159,12 +159,12 @@ func height_at(x, z)
 end
 
 func ground(x, z)
-    return math.max(height_at(math.floor(x), math.floor(z)), SEA)
+    return math.max(heightAt(math.floor(x), math.floor(z)), SEA)
 end
 
 ## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
 ## le biome ne distingue que le désert.
-func set_block_tiles(b, h, y)
+func setBlockTiles(b, h, y)
     if y >= h then
         if h < SEA + 1 then
             graphics.tile(T_SAND)
@@ -196,7 +196,7 @@ end
 
 ## Hash 2D bien mélangé (≠ x*a + z*b linéaire, qui alignait les arbres en diagonales).
 ## `salt` donne des flux indépendants (position / hauteur / forme) pour la même colonne.
-func tree_hash(x, z, salt)
+func treeHash(x, z, salt)
     var h = (x * 374761393) ~ (z * 668265263) ~ (salt * 2246822519)
     h = (h ~ (h >> 15)) * 2654435761
     h = h ~ (h >> 13)
@@ -216,9 +216,9 @@ end
 
 ## Arbre à la colonne (x,z), sol en h. Hauteur de tronc et forme du houppier variées,
 ## dérivées du hash (déterministe par colonne) → chaque arbre diffère.
-func put_tree(x, z, h)
-    var th = 3 + tree_hash(x, z, 1) % 4      ## tronc : 3..6 cubes
-    var shape = tree_hash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
+func putTree(x, z, h)
+    var th = 3 + treeHash(x, z, 1) % 4      ## tronc : 3..6 cubes
+    var shape = treeHash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
     graphics.tile(T_TRUNK)
     for k = 1, th do
         graphics.cube(x, h + k, z,  1, 1, 1)
@@ -237,7 +237,7 @@ func put_tree(x, z, h)
     end
 end
 
-func bake_chunk(cx, cz)
+func bakeChunk(cx, cz)
     graphics.beginChunk()
     graphics.fill(colors.WHITE)   ## teinte neutre : l'atlas fournit la couleur
     var x0 = cx * CS
@@ -249,14 +249,14 @@ func bake_chunk(cx, cz)
     var hg = []
     for lz = -1, CS do
         for lx = -1, CS do
-            hg[(lz + 1) * W2 + (lx + 1) + 1] = height_at(x0 + lx, z0 + lz)
+            hg[(lz + 1) * W2 + (lx + 1) + 1] = heightAt(x0 + lx, z0 + lz)
         end
     end
     for lz = 0, CS - 1 do
         for lx = 0, CS - 1 do
             var x = x0 + lx
             var z = z0 + lz
-            var b = biome_at(x, z)
+            var b = biomeAt(x, z)
             var h = hg[(lz + 1) * W2 + (lx + 1) + 1]
             var top = math.max(h, 0)
             ## hauteurs des 4 voisins, clampées comme les colonnes cuites (>= 0)
@@ -267,7 +267,7 @@ func bake_chunk(cx, cz)
             var mn = math.min(math.min(he, hw), math.min(hs, hn))
             for y = 0, top do
                 if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
-                    set_block_tiles(b, h, y)
+                    setBlockTiles(b, h, y)
                     ## Cube IMMERGÉ : assombri selon sa profondeur (moins de lumière au fond).
                     ## C'est le FOND qui s'assombrit avec la profondeur, pas l'eau (uniforme).
                     if y < SEA then
@@ -287,11 +287,11 @@ func bake_chunk(cx, cz)
                 graphics.plane(x, SEA + 0.45, z,  1, 1)
                 graphics.fill(colors.WHITE)
             end
-            var hp = tree_hash(x, z, 0) % 100    ## placement dispersé (hash mélangé)
+            var hp = treeHash(x, z, 0) % 100    ## placement dispersé (hash mélangé)
             var grassy = h > SEA and h < SEA + 8 and b <> 0
             var tree = grassy and ((b == 2 and hp < 6) or hp == 0)
             if tree then
-                put_tree(x, z, h)
+                putTree(x, z, h)
             end
         end
     end
@@ -305,7 +305,7 @@ end
 
 ## Cuit les chunks manquants du rayon, `budget` par frame, en priorisant ce qui est
 ## devant la caméra puis le plus proche (buffer trié borné). Renvoie le nombre cuit.
-func stream_load(pcx, pcz, budget)
+func streamLoad(pcx, pcz, budget)
     if budget < 1 then
         return 0
     end
@@ -357,14 +357,14 @@ func stream_load(pcx, pcz, budget)
         end
     end
     for i = 1, cnt do
-        loaded[ckey(bcx[i], bcz[i])] = bake_chunk(bcx[i], bcz[i])
+        loaded[ckey(bcx[i], bcz[i])] = bakeChunk(bcx[i], bcz[i])
     end
     return cnt
 end
 
 ## Libère les chunks hors rayon. margin = hystérésis : 1 en déplacement (anneau tampon,
 ## pas de churn en reculant d'un pas), 0 en réduction (libère aussitôt).
-func stream_unload(pcx, pcz, margin)
+func streamUnload(pcx, pcz, margin)
     var keep = {}
     for k, c in loaded do
         if math.abs(c.cx - pcx) <= vd.radius + margin and math.abs(c.cz - pcz) <= vd.radius + margin then
@@ -381,14 +381,14 @@ func setup()
     graphics.ambient(AMB)
     graphics.light("dir", -0.5, -1, -0.35)
     math.noiseSeed(7)
-    build_atlas()
-    build_cloud_tex()
+    buildAtlas()
+    buildCloudTex()
     ## spawn : terre ferme, basse et proche de l'origine (pénalité forte sur l'altitude
     ## → jamais sous l'eau).
     var best = 1000000000.0
     for z = 0, 60 do
         for x = 0, 60 do
-            var h = height_at(x, z)
+            var h = heightAt(x, z)
             if h > SEA then
                 var cx = x - 30
                 var cz = z - 30
@@ -422,16 +422,16 @@ func setup()
     end
     lastcx = math.floor(camX / CS)
     lastcz = math.floor(camZ / CS)
-    loaded[ckey(lastcx, lastcz)] = bake_chunk(lastcx, lastcz)   ## sol présent dès le spawn
+    loaded[ckey(lastcx, lastcz)] = bakeChunk(lastcx, lastcz)   ## sol présent dès le spawn
     streaming = true
 end
 
 ## Bouton caméra (bascule debug) : carré en haut-gauche, sous le HUD.
-func cam_btn_hit(x, y)
+func camBtnHit(x, y)
     return x >= 12 and x <= 12 + CAMBTN and y >= 36 and y <= 36 + CAMBTN
 end
 
-func draw_cam_button()
+func drawCamButton()
     graphics.noStroke()
     graphics.fill(Color(0, 0, 0, 0.38))
     graphics.rect(12, 36, CAMBTN, CAMBTN)
@@ -445,7 +445,7 @@ func draw_cam_button()
 end
 
 func mouse.pressed(x, y)
-    if cam_btn_hit(x, y) then          ## bouton caméra → bascule (accessible tactile)
+    if camBtnHit(x, y) then          ## bouton caméra → bascule (accessible tactile)
         debugCam = not debugCam
         return
     end
@@ -453,7 +453,7 @@ func mouse.pressed(x, y)
     if ev == 1 then
         streaming = true               ## rayon agrandi → charger le nouvel anneau
     elseif ev == -1 then
-        stream_unload(lastcx, lastcz, 0)   ## rayon réduit → libérer aussitôt
+        streamUnload(lastcx, lastcz, 0)   ## rayon réduit → libérer aussitôt
     elseif ev == 0 then
         pad.press(x, y)                ## hors boutons → joystick (ev == 2 : borne atteinte, rien)
     end
@@ -473,7 +473,7 @@ end
 
 ## Avance le joueur (virage + vitesse), joystick tactile ET flèches clavier combinés,
 ## avec glissement sur les pentes franchissables et blocage sur les murs.
-func move_player()
+func movePlayer()
     var turn = pad.steer()
     if keyboard.isDown("left") then turn = turn - 1 end
     if keyboard.isDown("right") then turn = turn + 1 end
@@ -496,12 +496,12 @@ end
 
 ## Mémorise la position (module data) au plus une fois par seconde (throttle) : éviter
 ## une écriture localStorage/fichier à chaque frame.
-func save_player()
-    save_acc = save_acc + deltaTime
-    if save_acc < 1.0 then
+func savePlayer()
+    saveAcc = saveAcc + deltaTime
+    if saveAcc < 1.0 then
         return
     end
-    save_acc = 0.0
+    saveAcc = 0.0
     data.set("camX", camX)
     data.set("camZ", camZ)
     data.set("yaw", yaw)
@@ -521,7 +521,7 @@ end
 ## Renvoie un tableau plat [sx0, sz0, sx1, sz1, …] des secteurs visibles.
 global cloudStats = {"tested": 0, "kept": 0, "full": 0}
 
-func cull_cloud_sectors()
+func cullCloudSectors()
     var drift = elapsedTime * CLOUD_SPEED
     var reach = vd.radius * CS + CLOUD_MARGIN   ## suit la distance d'affichage du terrain
     var fx = math.sin(yaw)                       ## direction de regard (XZ)
@@ -530,9 +530,9 @@ func cull_cloud_sectors()
     var tested = 0
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
     ## carré plein sans demi-plan : toutes les rangées de s0z à camZ+reach
-    var full_w = math.floor(2 * reach / CLOUD_SEC) + 1
-    var full_rows = math.floor(2 * reach / CLOUD_SEC) + 1
-    var full_total = full_w * full_rows
+    var fullW = math.floor(2 * reach / CLOUD_SEC) + 1
+    var fullRows = math.floor(2 * reach / CLOUD_SEC) + 1
+    var fullTotal = fullW * fullRows
     for sz = s0z, camZ + reach, CLOUD_SEC do
         var wz = sz + CLOUD_SEC / 2
         ## span x du demi-plan avant : (wx-camX)*fx + (wz-camZ)*fz >= -CLOUD_SEC
@@ -556,12 +556,12 @@ func cull_cloud_sectors()
         end
     end
     cloudStats.tested = tested
-    cloudStats.full = full_total
+    cloudStats.full = fullTotal
     cloudStats.kept = #secs // 2
     return secs
 end
 
-func draw_clouds(secs)
+func drawClouds(secs)
     var drift = elapsedTime * CLOUD_SPEED
     graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle donne du volume aux nuages
     graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))
@@ -583,27 +583,27 @@ end
 
 func draw()
     graphics.clear(C_SKY)
-    move_player()
-    save_player()
+    movePlayer()
+    savePlayer()
 
     var pcx = math.floor(camX / CS)
     var pcz = math.floor(camZ / CS)
     if pcx <> lastcx or pcz <> lastcz then
         lastcx = pcx
         lastcz = pcz
-        stream_unload(pcx, pcz, 1)
+        streamUnload(pcx, pcz, 1)
         streaming = true
     end
     var budget = 6
     if vd.manual then budget = 10 end
-    if streaming and stream_load(pcx, pcz, budget) == 0 then
+    if streaming and streamLoad(pcx, pcz, budget) == 0 then
         streaming = false
     end
     var ev = vd.update(deltaTime, streaming)
     if ev == 1 then
         streaming = true
     elseif ev == -1 then
-        stream_unload(pcx, pcz, 0)
+        streamUnload(pcx, pcz, 0)
     end
 
     camY = ground(camX, camZ) + EYE
@@ -638,7 +638,7 @@ func draw()
             vis[#vis + 1] = c
         end
     end
-    var cloudSecs = cull_cloud_sectors()   ## cull avant begin3d(rcam) → frustum joueur figé
+    var cloudSecs = cullCloudSectors()   ## cull avant begin3d(rcam) → frustum joueur figé
     graphics.begin3d(rcam)
     do
         for i = 1, #vis do
@@ -647,14 +647,14 @@ func draw()
         for i = 1, #vis do
             graphics.drawChunkAlpha(vis[i])
         end
-        draw_clouds(cloudSecs)
+        drawClouds(cloudSecs)
     end
     graphics.end3d()
-    graphics.ambient(AMB)           ## draw_clouds a baissé l'ambiant → rétablir pour le terrain
+    graphics.ambient(AMB)           ## drawClouds a baissé l'ambiant → rétablir pour le terrain
 
     pad.draw()
     vd.draw()                          ## boutons − / + (ViewDistance)
-    draw_cam_button()                  ## bouton « C » (bascule caméra de contrôle)
+    drawCamButton()                  ## bouton « C » (bascule caméra de contrôle)
     var camlbl = "joueur"
     if debugCam then camlbl = "contrôle" end
     graphics.stroke(colors.WHITE)

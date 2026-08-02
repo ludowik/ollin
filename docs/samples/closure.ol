@@ -1,4 +1,4 @@
-func make_counter()
+func makeCounter()
     var n = 0
     func inc()
         n += 1
@@ -7,5 +7,5 @@ func make_counter()
     return inc
 end
 
-var c = make_counter()
+var c = makeCounter()
 print(c(), c(), c())

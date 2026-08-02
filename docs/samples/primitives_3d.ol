@@ -8,12 +8,12 @@ global lastx = 0
 global lasty = 0
 
 ## Grille adaptée à l'orientation : paysage = 4×2, portrait = 2×4
-## cell_pos(col, row, cols, rows) → [x, z] dans le plan XZ (vue ortho iso, size=16)
+## cellPos(col, row, cols, rows) → [x, z] dans le plan XZ (vue ortho iso, size=16)
 ## Convertit une position de grille (col, row) en coordonnées monde XZ
 ## pour la caméra iso à (12,12,12)→(0,0,0) :
 ##   screen_x = (wx - wz) / √2  ;  screen_y = (-wx - wz) / √6  (avec wy=0)
 ## On inverse ce système pour obtenir wx, wz à partir de la cible écran.
-func cell_pos(col, row, cols, rows)
+func cellPos(col, row, cols, rows)
     var size  = 16.0
     var aspect = W / H
     var sx = (col - (cols - 1) / 2.0) * (size * aspect / cols)
@@ -74,7 +74,7 @@ func draw()
     graphics.begin3d(cam)
 
         ## Cube (idx 0)
-        var p = cell_pos(gc(0), gr(0), cols, rows)
+        var p = cellPos(gc(0), gr(0), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -83,7 +83,7 @@ func draw()
         graphics.pop()
 
         ## Sphère (idx 1)
-        p = cell_pos(gc(1), gr(1), cols, rows)
+        p = cellPos(gc(1), gr(1), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -94,7 +94,7 @@ func draw()
         graphics.pop()
 
         ## Cylindre (idx 2)
-        p = cell_pos(gc(2), gr(2), cols, rows)
+        p = cellPos(gc(2), gr(2), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -103,7 +103,7 @@ func draw()
         graphics.pop()
 
         ## Plan (idx 3)
-        p = cell_pos(gc(3), gr(3), cols, rows)
+        p = cellPos(gc(3), gr(3), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -113,7 +113,7 @@ func draw()
         graphics.pop()
 
         ## line3d + point3d (idx 4)
-        p = cell_pos(gc(4), gr(4), cols, rows)
+        p = cellPos(gc(4), gr(4), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -137,7 +137,7 @@ func draw()
         graphics.pop()
 
         ## Cône (idx 5)
-        p = cell_pos(gc(5), gr(5), cols, rows)
+        p = cellPos(gc(5), gr(5), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -146,7 +146,7 @@ func draw()
         graphics.pop()
 
         ## Tore (idx 6)
-        p = cell_pos(gc(6), gr(6), cols, rows)
+        p = cellPos(gc(6), gr(6), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
@@ -155,7 +155,7 @@ func draw()
         graphics.pop()
 
         ## segments(8) — même sphère, basse définition (idx 7)
-        p = cell_pos(gc(7), gr(7), cols, rows)
+        p = cellPos(gc(7), gr(7), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
             graphics.rotateq(orient)
