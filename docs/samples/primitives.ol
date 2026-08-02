@@ -1,11 +1,11 @@
 ## Panorama des primitives 2D : une fonction par primitive, appelées depuis draw().
-## px/py/fs mettent tout à l'échelle de la fenêtre (dessin conçu pour 700x420).
+## px/py/fs mettent tout à l'échelle de la fenêtre (dessin conçu pour 700x520).
 graphics.canvas(W, H, "Primitives")
 var g = graphics
 var t = 0
 
 var sx = W / 700
-var sy = H / 420
+var sy = H / 520
 var ss = math.min(sx, sy)
 
 func px(v) return v * sx end
@@ -19,6 +19,20 @@ var dpr = W / window.width
 func ft(v) return math.max(v * ss, v * dpr) end
 
 var dim = Color(0.6, 0.65, 0.75)
+
+## Damier 8x8 construit pixel par pixel, pour la démonstration de spriteMode.
+var tile = image.create(8, 8)
+image.beginPixels(tile)
+for y = 0, 7 do
+    for x = 0, 7 do
+        if (x + y) % 2 == 0 then
+            image.setPixel(tile, x, y, 1, 0.6, 0.25, 1)
+        else
+            image.setPixel(tile, x, y, 0.25, 0.3, 0.5, 1)
+        end
+    end
+end
+image.endPixels(tile)
 
 ## Étiquette d'un bloc : coordonnées en unités du dessin, style commun à toutes.
 func label(txt, x, y)
@@ -96,6 +110,42 @@ func demoRectMode()
     g.point(px(265), py(345))
     g.point(px(365), py(345))
     label("rectMode corner / center", 250, 400)
+end
+
+## circle/ellipse sont centrés par défaut, à l'inverse de rect : le mode coin
+## place ici le cercle en bas à droite du point d'ancrage.
+func demoEllipseMode()
+    var r = fs(18)
+    g.pushStyle()
+    do
+        g.stroke(Color(1, 0.85, 0.5), fs(2))
+        g.noFill()
+        g.circle(px(70), py(430), r)
+        g.ellipseMode("corner")
+        g.circle(px(170), py(430), r)
+    end
+    g.popStyle()
+    g.stroke(Color(1, 1, 1), fs(3))
+    g.point(px(70), py(430))
+    g.point(px(170), py(430))
+    label("ellipseMode center / corner", 30, 480)
+end
+
+## Le mode centre des images vaut aussi pour image.draw.
+func demoSpriteMode()
+    var s = fs(40)
+    g.pushStyle()
+    do
+        g.sprite(tile, px(330), py(430), s, s)
+        g.spriteMode("center")
+        g.sprite(tile, px(450), py(430), s, s)
+    end
+    g.popStyle()
+    ## Point plus gros ici : celui du mode centre tombe sur le damier.
+    g.stroke(Color(1, 1, 1), fs(5))
+    g.point(px(330), py(430))
+    g.point(px(450), py(430))
+    label("spriteMode corner / center", 320, 503)
 end
 
 func demoCircle()
@@ -186,6 +236,8 @@ func draw()
     demoPolyline()
     demoRoundRect()
     demoRectMode()
+    demoEllipseMode()
+    demoSpriteMode()
     demoCircle()
     demoEllipse()
     demoPolygon()
