@@ -73,6 +73,25 @@ func demoRoundRect()
     label("rect arrondi", 120, 378)
 end
 
+## Même point d'ancrage (le point blanc), deux modes : à gauche x,y = coin supérieur
+## gauche, à droite x,y = centre. pushStyle isole le changement de mode.
+func demoRectMode()
+    var s = fs(34)
+    g.pushStyle()
+    do
+        g.stroke(Color(0.6, 1, 0.8), fs(2))
+        g.noFill()
+        g.rect(px(265), py(345), s, s)
+        g.rectMode("center")
+        g.rect(px(365), py(345), s, s)
+    end
+    g.popStyle()
+    g.stroke(Color(1, 1, 1), fs(3))
+    g.point(px(265), py(345))
+    g.point(px(365), py(345))
+    label("rectMode corner / center", 250, 400)
+end
+
 func demoCircle()
     g.stroke(Color(0.7, 0.5, 1), fs(2))
     g.fill(Color(0.7, 0.5, 1, 0.2))
@@ -159,6 +178,7 @@ func draw()
     demoStrokeFill()
     demoPolyline()
     demoRoundRect()
+    demoRectMode()
     demoCircle()
     demoEllipse()
     demoPolygon()
