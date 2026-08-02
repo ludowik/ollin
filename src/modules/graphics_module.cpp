@@ -276,6 +276,11 @@ static float s_font_size = 18.0f;   // taille de police (état), comme s_stroke_
 static const int RECT_CORNER = 0;
 static const int RECT_CENTER = 1;
 static int s_rect_mode = RECT_CORNER;
+// Ancrage de circle/ellipse. Ces primitives sont centrées depuis toujours : le
+// défaut reste donc "center", à l'inverse de rect.
+static const int ELLIPSE_CORNER = 0;
+static const int ELLIPSE_CENTER = 1;
+static int s_ellipse_mode = ELLIPSE_CENTER;
 static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
@@ -350,6 +355,7 @@ struct StyleState {
     float stroke_size;
     float font_size;
     int rect_mode;
+    int ellipse_mode;
     int sprite_mode;
     bool  has_stroke;
     Color stroke_color;
@@ -368,6 +374,7 @@ static StyleState capture_style() {
     s.stroke_size = s_stroke_size;
     s.font_size = s_font_size;
     s.rect_mode = s_rect_mode;
+    s.ellipse_mode = s_ellipse_mode;
     s.sprite_mode = image_get_sprite_mode();
     s.has_stroke = s_has_stroke;
     s.stroke_color = s_stroke_color;
@@ -384,6 +391,7 @@ static void restore_style(const StyleState& s) {
     s_stroke_size = s.stroke_size;
     s_font_size = s.font_size;
     s_rect_mode = s.rect_mode;
+    s_ellipse_mode = s.ellipse_mode;
     image_set_sprite_mode(s.sprite_mode);
     s_has_stroke = s.has_stroke;
     s_stroke_color = s.stroke_color;
@@ -400,6 +408,7 @@ static void reset_styles() {
     apply_stroke_size(2.0f);
     apply_font_size(18.0f);   // taille la plus courante → pas besoin de l'écrire
     s_rect_mode = RECT_CORNER;
+    s_ellipse_mode = ELLIPSE_CENTER;
     image_set_sprite_mode(SPRITE_CORNER);
     apply_stroke(true, WHITE);
     apply_fill(false);
@@ -426,11 +435,12 @@ static int gfx_font_size(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Argument d'un mode d'ancrage : "corner" (0, aussi le défaut sans argument) ou
-// "center" (1). Les constantes RECT_* et SPRITE_* partagent ces valeurs.
-static int anchor_mode_arg(CallCtx& ctx, const char* fn) {
+// Argument d'un mode d'ancrage : "corner" (0) ou "center" (1) — valeurs partagées
+// par les constantes RECT_*, ELLIPSE_* et SPRITE_*. Sans argument, on revient au
+// défaut de la primitive, qui n'est pas le même pour rect et pour ellipse.
+static int anchor_mode_arg(CallCtx& ctx, const char* fn, int dflt) {
     if (ctx.argc == 0)
-        return 0;
+        return dflt;
     if (!ctx.args[0].is_string())
         throw std::runtime_error(std::string(fn) + ": attendu \"corner\" ou \"center\"");
     const std::string& s = ctx.args[0].as_string();
@@ -442,12 +452,18 @@ static int anchor_mode_arg(CallCtx& ctx, const char* fn) {
 }
 
 static int gfx_rect_mode(CallCtx& ctx) {
-    s_rect_mode = anchor_mode_arg(ctx, "graphics.rectMode") == 0 ? RECT_CORNER : RECT_CENTER;
+    s_rect_mode = anchor_mode_arg(ctx, "graphics.rectMode", RECT_CORNER) == 0 ? RECT_CORNER : RECT_CENTER;
+    return ctx.ret(Value{});
+}
+
+static int gfx_ellipse_mode(CallCtx& ctx) {
+    s_ellipse_mode = anchor_mode_arg(ctx, "graphics.ellipseMode", ELLIPSE_CENTER) == 0 ? ELLIPSE_CORNER : ELLIPSE_CENTER;
     return ctx.ret(Value{});
 }
 
 static int gfx_sprite_mode(CallCtx& ctx) {
-    image_set_sprite_mode(anchor_mode_arg(ctx, "graphics.spriteMode") == 0 ? SPRITE_CORNER : SPRITE_CENTER);
+    image_set_sprite_mode(anchor_mode_arg(ctx, "graphics.spriteMode", SPRITE_CORNER) == 0 ? SPRITE_CORNER
+                                                                                        : SPRITE_CENTER);
     return ctx.ret(Value{});
 }
 
@@ -813,7 +829,13 @@ static void draw_ellipse_fill(float cx, float cy, float rx, float ry, Color colo
     }
 }
 
+// cx,cy = centre, sauf en mode coin où l'appelant a passé le coin supérieur
+// gauche de la boîte englobante. Seul point de passage de circle et ellipse.
 static void draw_oval(float cx, float cy, float rx, float ry, int segs) {
+    if (s_ellipse_mode == ELLIPSE_CORNER) {
+        cx += rx;
+        cy += ry;
+    }
     if (s_has_fill)
         draw_ellipse_fill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke) {
@@ -1339,6 +1361,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("text")), Value::make_builtin(gfx_text));
     m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
     m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
+    m.map_set(Value(std::string("ellipseMode")), Value::make_builtin(gfx_ellipse_mode));
     m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));
     m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
