@@ -1121,8 +1121,9 @@ assert(sw_func(5) == "autre")
 ##   sans minimum, remise à 18 à chaque frame
 ## Ancrage des rectangles : graphics.rectMode("corner" | "center") — "corner" (défaut,
 ##   x,y = coin supérieur gauche) est remis à chaque frame ; en "center", x,y = centre
-## Ancrage de circle/ellipse : graphics.ellipseMode("center" | "corner") — le défaut
-##   est "center" (ces primitives sont centrées) ; n'affecte pas arc
+## Ancrage de circle/ellipse/arc : graphics.ellipseMode("center" | "corner") — le
+##   défaut est "center" (ces primitives sont centrées) ; en "corner", la boîte de
+##   référence d'arc est celle de l'ellipse entière, pas du secteur tracé
 ## Ancrage des images : graphics.spriteMode("corner" | "center") — vaut pour
 ##   graphics.sprite ET image.draw ; le décalage porte sur la taille affichée
 

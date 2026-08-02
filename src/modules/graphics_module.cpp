@@ -281,6 +281,15 @@ static int s_rect_mode = RECT_CORNER;
 static const int ELLIPSE_CORNER = 0;
 static const int ELLIPSE_CENTER = 1;
 static int s_ellipse_mode = ELLIPSE_CENTER;
+
+// En mode coin, l'appelant a passé le coin supérieur gauche de la boîte
+// englobante : le ramener au centre, seule forme comprise par les tracés.
+static void anchor_oval(float* cx, float* cy, float rx, float ry) {
+    if (s_ellipse_mode == ELLIPSE_CORNER) {
+        *cx += rx;
+        *cy += ry;
+    }
+}
 static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
@@ -829,13 +838,8 @@ static void draw_ellipse_fill(float cx, float cy, float rx, float ry, Color colo
     }
 }
 
-// cx,cy = centre, sauf en mode coin où l'appelant a passé le coin supérieur
-// gauche de la boîte englobante. Seul point de passage de circle et ellipse.
 static void draw_oval(float cx, float cy, float rx, float ry, int segs) {
-    if (s_ellipse_mode == ELLIPSE_CORNER) {
-        cx += rx;
-        cy += ry;
-    }
+    anchor_oval(&cx, &cy, rx, ry);
     if (s_has_fill)
         draw_ellipse_fill(cx, cy, rx, ry, s_fill_color, segs);
     if (s_has_stroke) {
@@ -929,6 +933,7 @@ static int gfx_arc(CallCtx& ctx) {
     float ry = (float)num_arg(args, 3, FN) * 0.5f;
     float start = (float)num_arg(args, 4, FN);
     float stop = (float)num_arg(args, 5, FN);
+    anchor_oval(&cx, &cy, rx, ry);
     while (stop < start) {
         stop += 2.0f * PI;
     }
