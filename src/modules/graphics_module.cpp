@@ -499,16 +499,51 @@ static int gfx_line(CallCtx& ctx) {
 static int gfx_rect(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
-        throw std::runtime_error("graphics.rect: expected x, y, w, h");
+        throw std::runtime_error("graphics.rect: expected x, y, w, h[, r]");
     int x = gfx_to_int(args[0]);
     int y = gfx_to_int(args[1]);
     int w = gfx_to_int(args[2]);
     int h = gfx_to_int(args[3]);
+    Rectangle rec = {(float)x, (float)y, (float)w, (float)h};
+    // Rayon de coin optionnel, en PIXELS — c'est de la géométrie, donc un argument.
+    // raylib attend une FRACTION de 0 à 1 dont il tire radius = min(w,h)*roundness/2 :
+    // on convertit, et on borne à la moitié du petit côté (au-delà, c'est une gélule).
+    double r = (argc > 4 && args[4].is_number()) ? args[4].as_num() : 0.0;
+    int side = (w < h) ? w : h;
+    if (r > 0.0 && side > 0) {
+        float roundness = (float)(2.0 * r / side);
+        if (roundness > 1.0f)
+            roundness = 1.0f;
+        if (s_has_fill)
+            DrawRectangleRounded(rec, roundness, s_segments, s_fill_color);
+        if (s_has_stroke) {
+            StrokeWC s = stroke_params();
+            // Conventions OPPOSÉES dans raylib : DrawRectangleLinesEx trace la bande à
+            // l'INTÉRIEUR du rectangle, DrawRectangleRoundedLinesEx à l'EXTÉRIEUR — son
+            // cas roundness<=0 le montre, il élargit de lineThick avant de déléguer.
+            // On rétrécit donc de l'épaisseur pour que le contour reste DANS la géométrie
+            // déclarée, comme sur le chemin à angles droits. Le rayon suit : la bande
+            // intérieure porte r - épaisseur, si bien qu'un rayon entièrement mangé par
+            // le trait redonne exactement le rectangle carré.
+            float t = s.w;
+            float iw = (float)w - 2.0f * t;
+            float ih = (float)h - 2.0f * t;
+            if (iw > 0.0f && ih > 0.0f) {
+                float iside = (iw < ih) ? iw : ih;
+                float ir = (float)r - t;
+                float iround = (ir > 0.0f) ? 2.0f * ir / iside : 0.0f;
+                if (iround > 1.0f)
+                    iround = 1.0f;
+                DrawRectangleRoundedLinesEx({(float)x + t, (float)y + t, iw, ih}, iround, s_segments, t, s.c);
+            }
+        }
+        return ctx.ret(Value{});
+    }
     if (s_has_fill)
         DrawRectangle(x, y, w, h, s_fill_color);
     if (s_has_stroke) {
         StrokeWC s = stroke_params();
-        DrawRectangleLinesEx({(float)x, (float)y, (float)w, (float)h}, s.w, s.c);
+        DrawRectangleLinesEx(rec, s.w, s.c);
     }
     return ctx.ret(Value{});
 }
