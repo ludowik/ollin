@@ -350,6 +350,7 @@ struct StyleState {
     float stroke_size;
     float font_size;
     int rect_mode;
+    int sprite_mode;
     bool  has_stroke;
     Color stroke_color;
     bool  has_fill;
@@ -367,6 +368,7 @@ static StyleState capture_style() {
     s.stroke_size = s_stroke_size;
     s.font_size = s_font_size;
     s.rect_mode = s_rect_mode;
+    s.sprite_mode = image_get_sprite_mode();
     s.has_stroke = s_has_stroke;
     s.stroke_color = s_stroke_color;
     s.has_fill = s_has_fill;
@@ -382,6 +384,7 @@ static void restore_style(const StyleState& s) {
     s_stroke_size = s.stroke_size;
     s_font_size = s.font_size;
     s_rect_mode = s.rect_mode;
+    image_set_sprite_mode(s.sprite_mode);
     s_has_stroke = s.has_stroke;
     s_stroke_color = s.stroke_color;
     s_has_fill = s.has_fill;
@@ -397,6 +400,7 @@ static void reset_styles() {
     apply_stroke_size(2.0f);
     apply_font_size(18.0f);   // taille la plus courante → pas besoin de l'écrire
     s_rect_mode = RECT_CORNER;
+    image_set_sprite_mode(SPRITE_CORNER);
     apply_stroke(true, WHITE);
     apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
@@ -422,22 +426,28 @@ static int gfx_font_size(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-static int gfx_rect_mode(CallCtx& ctx) {
-    Value* args = ctx.args;
-    int argc = ctx.argc;
-    if (argc == 0) {
-        s_rect_mode = RECT_CORNER;
-        return ctx.ret(Value{});
-    }
-    if (!args[0].is_string())
-        throw std::runtime_error("graphics.rectMode: attendu \"corner\" ou \"center\"");
-    const std::string& s = args[0].as_string();
+// Argument d'un mode d'ancrage : "corner" (0, aussi le défaut sans argument) ou
+// "center" (1). Les constantes RECT_* et SPRITE_* partagent ces valeurs.
+static int anchor_mode_arg(CallCtx& ctx, const char* fn) {
+    if (ctx.argc == 0)
+        return 0;
+    if (!ctx.args[0].is_string())
+        throw std::runtime_error(std::string(fn) + ": attendu \"corner\" ou \"center\"");
+    const std::string& s = ctx.args[0].as_string();
     if (s == "corner")
-        s_rect_mode = RECT_CORNER;
-    else if (s == "center")
-        s_rect_mode = RECT_CENTER;
-    else
-        throw std::runtime_error("graphics.rectMode: mode inconnu '" + s + "'");
+        return 0;
+    if (s == "center")
+        return 1;
+    throw std::runtime_error(std::string(fn) + ": mode inconnu '" + s + "'");
+}
+
+static int gfx_rect_mode(CallCtx& ctx) {
+    s_rect_mode = anchor_mode_arg(ctx, "graphics.rectMode") == 0 ? RECT_CORNER : RECT_CENTER;
+    return ctx.ret(Value{});
+}
+
+static int gfx_sprite_mode(CallCtx& ctx) {
+    image_set_sprite_mode(anchor_mode_arg(ctx, "graphics.spriteMode") == 0 ? SPRITE_CORNER : SPRITE_CENTER);
     return ctx.ret(Value{});
 }
 
@@ -1329,6 +1339,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("text")), Value::make_builtin(gfx_text));
     m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
     m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
+    m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));
     m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
     m.map_set(Value(std::string("run")), Value::make_builtin(gfx_run));

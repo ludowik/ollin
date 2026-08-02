@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-02 13:27</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-02 14:31</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -420,7 +420,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-02 13:27</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-02 14:31</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1624,6 +1624,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés <strong>2D</strong> (défaut : 2 ; remise à 2 chaque frame). <strong>Sans effet en 3D</strong> : le fil de fer 3D reste à 1&nbsp;px (limite WebGL).</td></tr>
     <tr><td><code>graphics.rectMode(mode)</code></td><td>Point d'ancrage de <code>graphics.rect</code> : <code>"corner"</code> (défaut — <code>x, y</code> = coin supérieur gauche) ou <code>"center"</code> (<code>x, y</code> = centre du rectangle). N'affecte que <code>rect</code> ; remis à <code>"corner"</code> à chaque frame et sauvegardé/restauré par <code>push</code>/<code>pop</code>.</td></tr>
+    <tr><td><code>graphics.spriteMode(mode)</code></td><td>Même chose pour les images : <code>"corner"</code> (défaut) ou <code>"center"</code>. S'applique à <code>graphics.sprite</code> <strong>et</strong> à <code>image.draw</code>, comme <code>graphics.tint</code>. Le décalage porte sur la taille <strong>affichée</strong> : centrer une image rendue en 200×200 la décale de 100, quelle que soit la taille de la source.</td></tr>
     <tr><td><code>graphics.segments(n)</code></td><td>Nombre de segments des primitives courbes — cercle, ellipse, arc <strong>2D</strong> et sphère, cylindre, cône, tore <strong>3D</strong> (défaut : 64). Intégré au système de style : sauvegardé/restauré par <code>push</code>/<code>pop</code>.</td></tr>
     <tr><td><code>graphics.stroke([gris | r,g,b | color …])</code></td><td>Active le contour. Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code> (+ taille optionnelle en 2e arg) ; sans argument, réactive avec la couleur courante</td></tr>
     <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
@@ -1642,7 +1643,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>Ellipse de centre (x,y), largeur w et hauteur h — fill/stroke selon styles</td></tr>
     <tr><td><code>graphics.polygon(pts)</code></td><td>Polygone fermé — <code>pts</code> : tableau plat <code>[x1,y1,x2,y2,…]</code> ou tableau de paires <code>[[x1,y1],…]</code></td></tr>
     <tr><td><code>graphics.polyline(pts)</code></td><td>Polyligne ouverte (stroke uniquement) — mêmes formats que <code>polygon</code></td></tr>
-    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Affiche une texture (handle <code>image</code>) à (x,y) — teintée par <code>graphics.tint</code> courant (blanc si aucun) ; respecte la matrice de transformation</td></tr>
+    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Affiche une texture (handle <code>image</code>) à (x,y) — teintée par <code>graphics.tint</code> courant (blanc si aucun) ; respecte la matrice de transformation. <code>x, y</code> désignent le coin supérieur gauche ou le centre selon <code>spriteMode</code></td></tr>
     <tr><td><code>graphics.quit()</code></td><td>Arrête la boucle <code>run()</code> sans fermer la fenêtre (safe sur WASM)</td></tr>
     <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
   </tbody>
@@ -2052,7 +2053,7 @@ image.endDraw()
     <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
     <tr><td><code>image.beginDraw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
     <tr><td><code>image.endDraw()</code></td><td>Termine le rendu hors-écran et restaure la cible par défaut</td></tr>
-    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture ; <code>tint</code> explicite (objet Color) prioritaire, sinon la teinte globale <code>graphics.tint</code></td></tr>
+    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture ; <code>tint</code> explicite (objet Color) prioritaire, sinon la teinte globale <code>graphics.tint</code>. L'ancrage suit <code>graphics.spriteMode</code>, comme <code>graphics.sprite</code></td></tr>
     <tr><td><code>image.unload(handle)</code></td><td>Libère les ressources GPU de la texture</td></tr>
     <tr><td><code>image.beginPixels(handle)</code></td><td>Ouvre l'accès pixel-par-pixel à la texture (à recalculer chaque frame)</td></tr>
     <tr><td><code>image.setPixel(handle, x, y, color)</code></td><td>Écrit un pixel — objet <code>Color</code> ou composantes <code>r, g, b [, a]</code> dans [0,1]. Entre <code>beginPixels</code>/<code>endPixels</code>.</td></tr>

@@ -1109,7 +1109,7 @@ assert(sw_func(5) == "autre")
 ##   end
 ##
 ## RÈGLE du module : la géométrie passe par les ARGUMENTS, le style vient de
-## l'ÉTAT courant (fill, stroke, strokeSize, fontSize, rectMode). Aucune primitive de dessin
+## l'ÉTAT courant (fill, stroke, strokeSize, fontSize, rectMode, spriteMode). Aucune primitive de dessin
 ## ne prend de couleur ni de taille en argument.
 ##
 ## Couleurs prédéfinies : module `colors` (colors.BLACK, colors.WHITE, colors.RED…)
@@ -1121,6 +1121,8 @@ assert(sw_func(5) == "autre")
 ##   sans minimum, remise à 18 à chaque frame
 ## Ancrage des rectangles : graphics.rectMode("corner" | "center") — "corner" (défaut,
 ##   x,y = coin supérieur gauche) est remis à chaque frame ; en "center", x,y = centre
+## Ancrage des images : graphics.spriteMode("corner" | "center") — vaut pour
+##   graphics.sprite ET image.draw ; le décalage porte sur la taille affichée
 
 ## ── 24. Méthodes d'instance array (fonctions d'ordre supérieur) ──────────────
 

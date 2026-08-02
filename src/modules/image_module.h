@@ -44,3 +44,10 @@ void  image_free_tex(int id);
 // graphics.sprite. RGBA 0-255. `has`=false → pas de teinte (blanc).
 void image_set_tint(bool has, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char* b, unsigned char* a);
+
+// Ancrage global des images (graphics.spriteMode) : x,y = coin supérieur gauche
+// ou centre. Comme la teinte, l'état vit ici car il s'applique aux DEUX surfaces
+// qui dessinent une image : graphics.sprite et image.draw.
+enum { SPRITE_CORNER = 0, SPRITE_CENTER = 1 };
+void image_set_sprite_mode(int mode);
+int image_get_sprite_mode();

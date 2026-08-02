@@ -30,6 +30,28 @@ void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char
     *a = s_tint.a;
 }
 
+// ── ancrage global des images (graphics.spriteMode) ─────────────────────────────
+static int s_sprite_mode = SPRITE_CORNER;
+
+void image_set_sprite_mode(int mode) {
+    s_sprite_mode = mode;
+}
+
+int image_get_sprite_mode() {
+    return s_sprite_mode;
+}
+
+// Rectangle de destination selon l'ancrage courant. Le décalage porte sur la
+// taille de DESTINATION (dw/dh déjà résolus) : centrer une image affichée en
+// 200x200 décale de 100, quelle que soit la taille de la source.
+static Rectangle sprite_dest(float x, float y, float dw, float dh) {
+    if (s_sprite_mode == SPRITE_CENTER) {
+        x -= dw * 0.5f;
+        y -= dh * 0.5f;
+    }
+    return {x, y, dw, dh};
+}
+
 // ── storage ───────────────────────────────────────────────────────────────────
 
 struct TexHandle {
@@ -381,7 +403,7 @@ static int img_draw(CallCtx& ctx) {
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
     float sh = h.is_render ? -(float)tex.height : (float)tex.height;
     Rectangle src = {0, 0, (float)tex.width, sh};
-    Rectangle dst = {x, y, dw, dh};
+    Rectangle dst = sprite_dest(x, y, dw, dh);
     DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
     return ctx.ret(Value{});
 }
@@ -562,7 +584,7 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
     float sh = h.is_render ? -(float)tex.height : (float)tex.height;
     Rectangle src = {0, 0, (float)tex.width, sh};
-    Rectangle dst = {x, y, dw, dh};
+    Rectangle dst = sprite_dest(x, y, dw, dh);
     Color tint = {cr, cg, cb, ca};
     DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
 }
