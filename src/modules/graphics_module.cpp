@@ -271,6 +271,11 @@ static int gfx_blend_mode(CallCtx& ctx) {
 // ── Style state ───────────────────────────────────────────────────────────────
 static float s_stroke_size = 2.0f;
 static float s_font_size = 18.0f;   // taille de police (état), comme s_stroke_size
+// Ancrage de rect : x,y = coin supérieur gauche (défaut) ou centre. C'est un ÉTAT,
+// comme blendMode : cela ne change pas la géométrie mais son interprétation.
+static const int RECT_CORNER = 0;
+static const int RECT_CENTER = 1;
+static int s_rect_mode = RECT_CORNER;
 static bool s_has_stroke = true;
 static Color s_stroke_color = WHITE;
 static bool s_has_fill = false;
@@ -344,6 +349,7 @@ int gfx_segments() {
 struct StyleState {
     float stroke_size;
     float font_size;
+    int rect_mode;
     bool  has_stroke;
     Color stroke_color;
     bool  has_fill;
@@ -360,6 +366,7 @@ static StyleState capture_style() {
     StyleState s;
     s.stroke_size = s_stroke_size;
     s.font_size = s_font_size;
+    s.rect_mode = s_rect_mode;
     s.has_stroke = s_has_stroke;
     s.stroke_color = s_stroke_color;
     s.has_fill = s_has_fill;
@@ -374,6 +381,7 @@ static StyleState capture_style() {
 static void restore_style(const StyleState& s) {
     s_stroke_size = s.stroke_size;
     s_font_size = s.font_size;
+    s_rect_mode = s.rect_mode;
     s_has_stroke = s.has_stroke;
     s_stroke_color = s.stroke_color;
     s_has_fill = s.has_fill;
@@ -388,6 +396,7 @@ static void restore_style(const StyleState& s) {
 static void reset_styles() {
     apply_stroke_size(2.0f);
     apply_font_size(18.0f);   // taille la plus courante → pas besoin de l'écrire
+    s_rect_mode = RECT_CORNER;
     apply_stroke(true, WHITE);
     apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
@@ -410,6 +419,25 @@ static int gfx_font_size(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc > 0 && args[0].is_number())
         apply_font_size((float)args[0].as_num());
+    return ctx.ret(Value{});
+}
+
+static int gfx_rect_mode(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc == 0) {
+        s_rect_mode = RECT_CORNER;
+        return ctx.ret(Value{});
+    }
+    if (!args[0].is_string())
+        throw std::runtime_error("graphics.rectMode: attendu \"corner\" ou \"center\"");
+    const std::string& s = args[0].as_string();
+    if (s == "corner")
+        s_rect_mode = RECT_CORNER;
+    else if (s == "center")
+        s_rect_mode = RECT_CENTER;
+    else
+        throw std::runtime_error("graphics.rectMode: mode inconnu '" + s + "'");
     return ctx.ret(Value{});
 }
 
@@ -500,10 +528,20 @@ static int gfx_rect(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 4)
         throw std::runtime_error("graphics.rect: expected x, y, w, h[, r]");
-    int x = gfx_to_int(args[0]);
-    int y = gfx_to_int(args[1]);
-    int w = gfx_to_int(args[2]);
-    int h = gfx_to_int(args[3]);
+    double wn = gfx_to_num(args[2]);
+    double hn = gfx_to_num(args[3]);
+    double xn = gfx_to_num(args[0]);
+    double yn = gfx_to_num(args[1]);
+    // Mode centre : x,y désignent le CENTRE. Le décalage est appliqué avant la
+    // conversion en entier, sinon une taille impaire biaiserait la position.
+    if (s_rect_mode == RECT_CENTER) {
+        xn -= wn * 0.5;
+        yn -= hn * 0.5;
+    }
+    int x = (int)xn;
+    int y = (int)yn;
+    int w = (int)wn;
+    int h = (int)hn;
     Rectangle rec = {(float)x, (float)y, (float)w, (float)h};
     // Rayon de coin optionnel, en PIXELS — c'est de la géométrie, donc un argument.
     // raylib attend une FRACTION de 0 à 1 dont il tire radius = min(w,h)*roundness/2 :
@@ -1290,6 +1328,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("screenshot")), Value::make_builtin(gfx_screenshot));
     m.map_set(Value(std::string("text")), Value::make_builtin(gfx_text));
     m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
+    m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
     m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
     m.map_set(Value(std::string("run")), Value::make_builtin(gfx_run));

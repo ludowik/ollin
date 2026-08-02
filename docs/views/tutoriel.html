@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-02 12:19</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-02 13:27</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -420,7 +420,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-02 12:19</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-02 13:27</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1609,7 +1609,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <p>Tu peux aussi piloter la boucle explicitement avec <code>graphics.run(callback)</code> si tu préfères nommer ta fonction de rendu autrement (<code>update</code> reste appelée avant).</p>
 
 <h3>API</h3>
-<p><strong>Règle du module :</strong> la <em>géométrie</em> passe par les arguments, le <em>style</em> vient de l'état courant — <code>fill</code>, <code>stroke</code>, <code>strokeSize</code>, <code>fontSize</code>. Aucune primitive de dessin ne prend de couleur ni de taille en argument, et cet état est remis à ses valeurs par défaut au début de chaque frame.</p>
+<p><strong>Règle du module :</strong> la <em>géométrie</em> passe par les arguments, le <em>style</em> vient de l'état courant — <code>fill</code>, <code>stroke</code>, <code>strokeSize</code>, <code>fontSize</code>, <code>rectMode</code>. Aucune primitive de dessin ne prend de couleur ni de taille en argument, et cet état est remis à ses valeurs par défaut au début de chaque frame.</p>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
@@ -1623,6 +1623,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.blendMode(mode)</code></td><td>Mode de fusion des dessins suivants : chaîne (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) ou constante du module <code>blend</code>. Remis à <code>"alpha"</code> à chaque frame.</td></tr>
     <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés <strong>2D</strong> (défaut : 2 ; remise à 2 chaque frame). <strong>Sans effet en 3D</strong> : le fil de fer 3D reste à 1&nbsp;px (limite WebGL).</td></tr>
+    <tr><td><code>graphics.rectMode(mode)</code></td><td>Point d'ancrage de <code>graphics.rect</code> : <code>"corner"</code> (défaut — <code>x, y</code> = coin supérieur gauche) ou <code>"center"</code> (<code>x, y</code> = centre du rectangle). N'affecte que <code>rect</code> ; remis à <code>"corner"</code> à chaque frame et sauvegardé/restauré par <code>push</code>/<code>pop</code>.</td></tr>
     <tr><td><code>graphics.segments(n)</code></td><td>Nombre de segments des primitives courbes — cercle, ellipse, arc <strong>2D</strong> et sphère, cylindre, cône, tore <strong>3D</strong> (défaut : 64). Intégré au système de style : sauvegardé/restauré par <code>push</code>/<code>pop</code>.</td></tr>
     <tr><td><code>graphics.stroke([gris | r,g,b | color …])</code></td><td>Active le contour. Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code> (+ taille optionnelle en 2e arg) ; sans argument, réactive avec la couleur courante</td></tr>
     <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
@@ -1631,7 +1632,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.tint([gris | r,g,b | color …])</code></td><td>Teinte des images (<code>graphics.sprite</code> et <code>image.draw</code>). Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code></td></tr>
     <tr><td><code>graphics.noTint()</code></td><td>Désactive la teinte des images (images dessinées telles quelles)</td></tr>
     <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
-    <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif. <code>r</code> = rayon des coins en <strong>pixels</strong>, borné à la moitié du petit côté (au-delà, on obtient une gélule) ; le contour reste à l'intérieur de la géométrie déclarée, comme pour les angles droits. Finesse des coins : <code>segments</code></td></tr>
+    <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif. <code>x, y</code> désignent le coin supérieur gauche ou le centre selon <code>rectMode</code>. <code>r</code> = rayon des coins en <strong>pixels</strong>, borné à la moitié du petit côté (au-delà, on obtient une gélule) ; le contour reste à l'intérieur de la géométrie déclarée, comme pour les angles droits. Finesse des coins : <code>segments</code></td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
     <tr><td><code>graphics.screenshot(fichier)</code></td><td>Capture le rendu courant dans un PNG (à appeler dans <code>draw</code>) ; sur WASM, déclenche un téléchargement</td></tr>
     <tr><td><code>graphics.text(text, x, y)</code></td><td>Affiche une chaîne — couleur de <code>stroke</code> (on écrit au stylo), taille de <code>fontSize</code>. <code>noStroke()</code> ne masque PAS le texte : seule la couleur est empruntée au trait. Sans canvas, ne dessine rien</td></tr>

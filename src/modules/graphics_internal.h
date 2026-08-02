@@ -15,6 +15,15 @@ inline int gfx_to_int(const Value& v) {
         return (int)v.as_float();
     return 0;
 }
+// Même permissivité que gfx_to_int (0 si ce n'est pas un nombre), mais sans
+// troncature : pour calculer avant d'arrondir, p. ex. un décalage d'une demi-taille.
+inline double gfx_to_num(const Value& v) {
+    if (v.is_integer())
+        return (double)v.as_int();
+    if (v.is_float())
+        return v.as_float();
+    return 0.0;
+}
 // Value (objet Color / classe) → Color raylib ; lève si ce n'en est pas un.
 Color gfx_to_color(const Value& v);
 
