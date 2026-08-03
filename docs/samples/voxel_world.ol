@@ -1,6 +1,8 @@
 ## Univers voxel infini — chunks générés à la volée par bruit de Perlin, cuits
 ## autour du joueur (beginChunk/endChunk) et libérés au loin (freeChunk). Distance
 ## de vue auto-adaptative (classe ViewDistance, view_distance.ol). Joystick tactile.
+## Déplacement à inertie : vitesse, virage et hauteur d'œil rejoignent leur consigne
+## au lieu de l'adopter d'un coup (voir approach).
 
 import "joystick.ol"
 import "view_distance.ol"
@@ -33,6 +35,21 @@ global streaming = false
 global pad = Joystick()
 global TURN_MAX = 1.8
 global SPEED_MAX = 8.0
+## Inertie : la vitesse et le virage ne suivent pas la consigne du joystick d'un
+## coup, ils la rejoignent. L'œil perçoit alors un démarrage et un freinage au lieu
+## d'un mouvement uniforme qui s'allume et s'éteint.
+global vel = 0.0            ## vitesse d'avance courante
+global turnVel = 0.0        ## vitesse de rotation courante
+global ACCEL = 5.0          ## nervosité de l'avance (plus grand = plus sec)
+global TURN_ACCEL = 7.0
+global EYE_RISE = 6.0       ## lissage de la hauteur d'œil (terrain en marches de 1)
+
+## Rapproche `cur` de `target` d'une fraction du chemin restant. La fraction dépend
+## de deltaTime via une exponentielle : le résultat ne change donc pas avec le
+## nombre d'images par seconde, contrairement à un simple `cur + (target-cur) * 0.1`.
+func approach(cur, target, rate)
+    return cur + (target - cur) * (1 - math.exp(-rate * deltaTime))
+end
 
 global C_SKY = Color(0.55, 0.80, 0.95)
 global AMB = 0.5              ## ambiant du terrain
@@ -420,6 +437,7 @@ func setup()
         camZ = data.get("camZ", camZ)
         yaw = data.get("yaw", yaw)
     end
+    camY = ground(camX, camZ) + EYE   ## sans ça, l'œil descendrait depuis le ciel au 1er frame
     lastcx = math.floor(camX / CS)
     lastcz = math.floor(camZ / CS)
     loaded[ckey(lastcx, lastcz)] = bakeChunk(lastcx, lastcz)   ## sol présent dès le spawn
@@ -477,21 +495,37 @@ func movePlayer()
     var turn = pad.steer()
     if keyboard.isDown("left") then turn = turn - 1 end
     if keyboard.isDown("right") then turn = turn + 1 end
-    yaw = yaw - math.clamp(turn, -1, 1) * TURN_MAX * deltaTime
+    turnVel = approach(turnVel, math.clamp(turn, -1, 1) * TURN_MAX, TURN_ACCEL)
+    yaw = yaw - turnVel * deltaTime
 
     var thr = pad.throttle()      ## joystick : [-1;1] (avant / arrière)
     if keyboard.isDown("up") then thr = thr + 1 end
     if keyboard.isDown("down") then thr = thr - 1 end   ## flèche bas = marche arrière
-    thr = math.clamp(thr, -1, 1)
-    if thr == 0 then
+    vel = approach(vel, math.clamp(thr, -1, 1) * SPEED_MAX, ACCEL)
+    ## Sous le millimètre par seconde, on est à l'arrêt : couper évite de faire
+    ## tourner le test de collision pour un déplacement invisible.
+    if math.abs(vel) < 0.001 then
+        vel = 0.0
         return
     end
-    var sp = thr * SPEED_MAX * deltaTime
+    var sp = vel * deltaTime
     var nx = camX + math.sin(yaw) * sp
     var nz = camZ + math.cos(yaw) * sp
     var g0 = ground(camX, camZ)
-    if ground(nx, camZ) - g0 <= STEP then camX = nx end
-    if ground(camX, nz) - g0 <= STEP then camZ = nz end
+    var moved = false
+    if ground(nx, camZ) - g0 <= STEP then
+        camX = nx
+        moved = true
+    end
+    if ground(camX, nz) - g0 <= STEP then
+        camZ = nz
+        moved = true
+    end
+    ## Face à un mur, on retombe à zéro : sinon la vitesse continuerait de monter
+    ## dans le vide et le joueur bondirait en se dégageant.
+    if not moved then
+        vel = 0.0
+    end
 end
 
 ## Mémorise la position (module data) au plus une fois par seconde (throttle) : éviter
@@ -606,7 +640,9 @@ func draw()
         streamUnload(pcx, pcz, 0)
     end
 
-    camY = ground(camX, camZ) + EYE
+    ## Le terrain monte par marches d'un bloc : poser l'œil dessus le ferait sauter
+    ## d'un cran d'un seul coup. On le laisse rejoindre la marche progressivement.
+    camY = approach(camY, ground(camX, camZ) + EYE, EYE_RISE)
     cam.setPos(camX, camY, camZ)
     cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),
                camY + math.sin(PITCH),
