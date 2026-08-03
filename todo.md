@@ -11,7 +11,7 @@ Joystick
 - en faire un objet du langage ?
 
 Module graphics:
-- Plan roundRect => rect mais avec des angles ronds. Nouvelle fonction ou paramètre optionnelle pour les angles ? 
+- 
 
 Modules :
 - UI : button, check box pour commencer, l'UI doit utiliser les fonctionnalités 
