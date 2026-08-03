@@ -4,9 +4,6 @@ Syntaxe
 Optimisations :
 - cache méthode optimale ?
 
-Tutoriel / Samples : voxel_world
-- lors des déplacements donner l'impression de fluidité mais pas de linéarite dans l'oeil de l'utilisateur...
-	
 Joystick
 - en faire un objet du langage ?
 
