@@ -441,18 +441,23 @@ Même principe pour la DESCENTE : chaque nœud composite déclare ses sous-corps
 Un parcours combine les deux mécanismes : `accept`/`visit` pour agir SELON la sorte
 d'instruction, `for_each_body` pour DESCENDRE.
 
-`CollectGlobalsVisitor` en est l'exemple (`compiler.cpp`) : sa méthode `walk` remplace
-les 8 `visit` qui ne faisaient que réénumérer les nœuds composites ; ses `visit`
-restants ne font plus que collecter. Une nouvelle instruction à corps est donc
-parcourue sans toucher ce visiteur.
+Deux visiteurs l'utilisent :
+- `CollectGlobalsVisitor` : sa méthode `walk` remplace les 8 `visit` qui ne faisaient
+  que réénumérer les nœuds composites ; ses `visit` restants ne font plus que collecter.
+- `HasFuncQuery` : `stmt_has_func` demande d'abord au nœud s'il PORTE une fonction
+  (déclaration, ou lambda dans une de ses propres expressions), puis descend via
+  `for_each_body`. Sa descente était tenue à la main et `do … end` y manquait : le
+  compilateur croyait qu'aucune closure ne capturait la variable de boucle, recyclait
+  les registres, et la closure lisait un registre réutilisé (valeur d'un autre type).
+  **Conservatisme inchangé** : `SwitchStmt`, `ClassDeclStmt` et `EnumDeclStmt`
+  répondent toujours « oui » sans regarder, ce qui court-circuite la descente — la
+  conversion n'autorise donc AUCUNE optimisation nouvelle. Les rendre précis serait un
+  autre changement, à mesurer.
 
-**Non convertis, volontairement** :
+**Non converti, volontairement** :
 - `CollectLocalsVisitor` repose sur le fait de NE PAS descendre (portée lexicale : les
   locales d'un bloc sont collectées à part, avec leurs propres registres). Le convertir
   toucherait l'allocation de registres pour un gain nul.
-- `HasFuncQuery` répond « oui » par prudence sur les nœuds composites sans regarder.
-  Le faire descendre vraiment autoriserait PLUS d'optimisations d'aliasage de boucle :
-  c'est un changement de comportement à mesurer, pas un nettoyage.
 - `CollectLocalsVisitor`/`CollectGlobalsVisitor` gardent leur propre critère de noms
   (`is_global` ou non, classes comprises ou non) : ces questions dépendent du contexte
   de compilation et n'ont pas leur place dans `ast.h`.
@@ -460,7 +465,9 @@ parcourue sans toucher ce visiteur.
 **Filet de sécurité** : `tests/regressions.ol` déclare un `global` au fond de CHAQUE
 sorte de construction et le lit depuis une fonction déclarée AVANT — une descente
 manquante fait échouer la compilation sur « undeclared variable ». Les 13 listes ont
-été cassées une par une pour vérifier que le test les détecte toutes.
+été cassées une par une pour vérifier que le test les détecte toutes. Un second jeu de
+cas pousse une closure sur la variable de boucle depuis un `do`/`if`/`switch`/`try`
+imbriqué : une descente manquante y produirait une valeur corrompue.
 
 ## Déclaration de variables (implémentation de l'enforcement)
 

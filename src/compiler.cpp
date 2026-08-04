@@ -1787,19 +1787,25 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
 // closure peut capturer (upvalue ouverte) le registre de la variable de boucle ;
 // dans ce cas on le garde réservé pour qu'il ne soit pas réécrit après la boucle.
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body);
+// Ce nœud PORTE-t-il une fonction directement (déclaration, ou lambda dans une de ses
+// propres expressions) ? La DESCENTE dans les sous-corps est faite par stmt_has_func
+// via Stmt::for_each_body — aucune liste de sortes composites à tenir ici, c'est ce qui
+// avait laissé `do ... end` de côté (closure lisant un registre recyclé).
 struct HasFuncQuery : StmtQuery {
     bool result = false;
     void visit(const FuncDeclStmt&) override {
         result = true;
     }
+    // Conservatisme historique : on ne regarde pas dans ces trois-là, on répond « oui ».
+    // Le court-circuit de stmt_has_func évite alors la descente — comportement inchangé.
     void visit(const SwitchStmt&) override {
-        result = true; // conservatif
+        result = true;
     }
     void visit(const ClassDeclStmt&) override {
-        result = true; // conservatif
+        result = true;
     }
     void visit(const EnumDeclStmt&) override {
-        result = true; // conservatif
+        result = true;
     }
     void visit(const AssignStmt& s) override {
         result = expr_has_lambda(s.value.get());
@@ -1840,38 +1846,38 @@ struct HasFuncQuery : StmtQuery {
                 return;
             }
     }
+    // Nœuds à corps : seules leurs EXPRESSIONS propres sont examinées ici.
     void visit(const WhileStmt& s) override {
-        result = expr_has_lambda(s.cond.get()) || body_has_func(s.body);
+        result = expr_has_lambda(s.cond.get());
     }
     void visit(const ForIterStmt& s) override {
-        result = expr_has_lambda(s.iter_expr.get()) || body_has_func(s.body);
-    }
-    void visit(const TryCatchStmt& s) override {
-        result = body_has_func(s.try_body) || body_has_func(s.catch_body) || body_has_func(s.else_body);
-    }
-    void visit(const BlockStmt& s) override {
-        result = body_has_func(s.stmts);
-    }
-    void visit(const DoStmt& s) override {
-        result = body_has_func(s.body);
+        result = expr_has_lambda(s.iter_expr.get());
     }
     void visit(const IfStmt& s) override {
-        if (expr_has_lambda(s.cond.get()) || body_has_func(s.then_body) || body_has_func(s.else_body)) {
+        if (expr_has_lambda(s.cond.get())) {
             result = true;
             return;
         }
         for (auto& ei : s.else_ifs)
-            if (expr_has_lambda(ei.cond.get()) || body_has_func(ei.body)) {
+            if (expr_has_lambda(ei.cond.get())) {
                 result = true;
                 return;
             }
     }
-    // BreakStmt, ContinueStmt, CommentStmt → no-op hérité de StmtQuery (result reste false)
+    // TryCatchStmt, BlockStmt, DoStmt : aucune expression propre → rien à examiner,
+    // la descente suffit. BreakStmt/ContinueStmt/CommentStmt : rien non plus.
 };
 static bool stmt_has_func(const Stmt* s) {
     HasFuncQuery q;
     s->accept(q);
-    return q.result;
+    if (q.result)
+        return true;
+    bool found = false;
+    s->for_each_body([&found](const std::vector<std::unique_ptr<Stmt>>& sub) {
+        if (!found)
+            found = body_has_func(sub);
+    });
+    return found;
 }
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body) {
     for (auto& s : body)
