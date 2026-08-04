@@ -432,9 +432,35 @@ qu'on édite forcément pour en ajouter une.
 
 **Limite assumée** : le défaut vide n'oblige à rien (une méthode virtuelle pure le
 ferait, au prix d'une ligne obligatoire sur les 20 nœuds d'`ast.h`). C'est la proximité
-qui protège, pas le compilateur. Les autres consommateurs de l'AST (`CollectLocalsVisitor`,
-`CollectGlobalsVisitor`, `HasFuncQuery`) gardent leur forme : leurs questions dépendent
-du contexte de compilation (portées, registres) et n'ont pas leur place dans `ast.h`.
+qui protège, pas le compilateur.
+
+## Topologie de l'arbre (`Stmt::for_each_body`)
+
+Même principe pour la DESCENTE : chaque nœud composite déclare ses sous-corps
+(`for_each_body`, ast.h) — 9 nœuds, 13 listes d'instructions (un `if` en a trois).
+Un parcours combine les deux mécanismes : `accept`/`visit` pour agir SELON la sorte
+d'instruction, `for_each_body` pour DESCENDRE.
+
+`CollectGlobalsVisitor` en est l'exemple (`compiler.cpp`) : sa méthode `walk` remplace
+les 8 `visit` qui ne faisaient que réénumérer les nœuds composites ; ses `visit`
+restants ne font plus que collecter. Une nouvelle instruction à corps est donc
+parcourue sans toucher ce visiteur.
+
+**Non convertis, volontairement** :
+- `CollectLocalsVisitor` repose sur le fait de NE PAS descendre (portée lexicale : les
+  locales d'un bloc sont collectées à part, avec leurs propres registres). Le convertir
+  toucherait l'allocation de registres pour un gain nul.
+- `HasFuncQuery` répond « oui » par prudence sur les nœuds composites sans regarder.
+  Le faire descendre vraiment autoriserait PLUS d'optimisations d'aliasage de boucle :
+  c'est un changement de comportement à mesurer, pas un nettoyage.
+- `CollectLocalsVisitor`/`CollectGlobalsVisitor` gardent leur propre critère de noms
+  (`is_global` ou non, classes comprises ou non) : ces questions dépendent du contexte
+  de compilation et n'ont pas leur place dans `ast.h`.
+
+**Filet de sécurité** : `tests/regressions.ol` déclare un `global` au fond de CHAQUE
+sorte de construction et le lit depuis une fonction déclarée AVANT — une descente
+manquante fait échouer la compilation sur « undeclared variable ». Les 13 listes ont
+été cassées une par une pour vérifier que le test les détecte toutes.
 
 ## Déclaration de variables (implémentation de l'enforcement)
 

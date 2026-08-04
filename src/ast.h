@@ -2,6 +2,7 @@
 #include "source_loc.h"
 #include "token.h"
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -96,6 +97,10 @@ struct ExprVisitor {
 };
 
 // ── classes de base ───────────────────────────────────────────────────────────
+struct Stmt;
+// Rappel reçu par Stmt::for_each_body, une fois par sous-corps.
+using BodyFn = std::function<void(const std::vector<std::unique_ptr<Stmt>>&)>;
+
 struct Stmt {
     int line = 0;
     int file_idx = 0;
@@ -107,6 +112,14 @@ struct Stmt {
     // ses noms restent invisibles à l'import — le cas s'est produit avec `enum`.
     virtual void exported_names(std::vector<std::string>& out) const {
         (void)out;
+    }
+    // Sous-corps de cette instruction (aucun par défaut) : un parcours d'arbre s'appuie
+    // là-dessus au lieu de réénumérer les sortes composites. À redéfinir sur toute
+    // nouvelle instruction à corps, sinon un parcours ne descend pas dedans.
+    // NB : `accept`/`visit` sert à agir SELON la sorte d'instruction, `for_each_body`
+    // à DESCENDRE. Les deux se combinent (cf. CollectGlobalsVisitor).
+    virtual void for_each_body(const BodyFn& f) const {
+        (void)f;
     }
     virtual ~Stmt() = default;
 };
@@ -313,6 +326,12 @@ struct IfStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> then_body;
     std::vector<ElseIfClause> else_ifs;
     std::vector<std::unique_ptr<Stmt>> else_body;
+    void for_each_body(const BodyFn& f) const override {
+        f(then_body);
+        for (auto& ei : else_ifs)
+            f(ei.body);
+        f(else_body);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -321,6 +340,9 @@ struct IfStmt : Stmt {
 struct WhileStmt : Stmt {
     std::unique_ptr<Expr> cond;
     std::vector<std::unique_ptr<Stmt>> body;
+    void for_each_body(const BodyFn& f) const override {
+        f(body);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -340,6 +362,11 @@ struct TryCatchStmt : Stmt {
     std::string catch_var;
     std::vector<std::unique_ptr<Stmt>> catch_body;
     std::vector<std::unique_ptr<Stmt>> else_body;
+    void for_each_body(const BodyFn& f) const override {
+        f(try_body);
+        f(catch_body);
+        f(else_body);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -354,6 +381,9 @@ struct FuncDeclStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> body;
     void exported_names(std::vector<std::string>& out) const override {
         out.push_back(name);
+    }
+    void for_each_body(const BodyFn& f) const override {
+        f(body);
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -440,6 +470,9 @@ struct ForIterStmt : Stmt {
     std::string var2; // vide = forme 1 var
     std::unique_ptr<Expr> iter_expr;
     std::vector<std::unique_ptr<Stmt>> body;
+    void for_each_body(const BodyFn& f) const override {
+        f(body);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -447,6 +480,9 @@ struct ForIterStmt : Stmt {
 
 struct BlockStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> stmts;
+    void for_each_body(const BodyFn& f) const override {
+        f(stmts);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -454,6 +490,9 @@ struct BlockStmt : Stmt {
 
 struct DoStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> body;
+    void for_each_body(const BodyFn& f) const override {
+        f(body);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -517,6 +556,10 @@ struct ClassDeclStmt : Stmt {
     void exported_names(std::vector<std::string>& out) const override {
         out.push_back(name);
     }
+    void for_each_body(const BodyFn& f) const override {
+        for (auto& m : methods)
+            f(m->body);   // les méthodes sont des FuncDeclStmt : on expose leur corps
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -555,6 +598,11 @@ struct SwitchStmt : Stmt {
     std::unique_ptr<Expr> subject;
     std::vector<CaseClause> cases;
     std::vector<std::unique_ptr<Stmt>> else_body;
+    void for_each_body(const BodyFn& f) const override {
+        for (auto& arm : cases)
+            f(arm.body);
+        f(else_body);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }

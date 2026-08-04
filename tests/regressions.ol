@@ -679,4 +679,70 @@ assert(expMod.ExpEnum.A == 1 and expMod.ExpEnum.B == 2)
 assert(expMod.dansUneMap == nil)   ## `enum a.b` n'exporte pas de nom propre
 
 
+## Pré-scan des globaux : un `global` déclaré au FOND de chaque sorte de construction
+## doit être vu avant la compilation. Ces fonctions le lisent alors qu'elles sont
+## déclarées AVANT la déclaration du global : si le parcours ne descend pas dans une
+## construction, la compilation échoue sur « undeclared variable ».
+## (Verrouille Stmt::for_each_body : une instruction à corps oubliée casse ici.)
+func psLire() return psWhile + psIf + psElseIf + psElse + psFor + psFunc + psDo end
+func psLire2() return psSwitch + psSwitchElse + psTry + psCatch + psTryElse + psMethode end
+
+while true do
+    global psWhile = 1
+    break
+end
+if true then
+    global psIf = 2
+elseif false then
+    global psElseIf = 3
+else
+    global psElse = 4
+end
+if false then
+    psElseIf = 3
+end
+psElseIf = 3
+psElse = 4
+for i = 1, 1 do
+    global psFor = 5
+end
+func psPorteuse()
+    global psFunc = 6
+end
+psPorteuse()
+do
+    global psDo = 7
+end
+switch 1
+    case 1 do
+        global psSwitch = 8
+    end
+    else
+        global psSwitchElse = 9
+end
+psSwitchElse = 9
+try
+    global psTry = 10
+    throw "x"
+catch e
+    global psCatch = 11
+end
+try
+    var psRien = 0
+catch e
+else
+    global psTryElse = 12   ## bloc `else` du try : exécuté si aucune exception
+end
+class PsClasse
+    func m()
+        global psMethode = 13
+        return psMethode
+    end
+end
+PsClasse().m()
+
+assert(psLire() == 1 + 2 + 3 + 4 + 5 + 6 + 7)
+assert(psLire2() == 8 + 9 + 10 + 11 + 12 + 13)
+
+
 print("regressions ok")

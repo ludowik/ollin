@@ -257,6 +257,18 @@ struct CollectGlobalsVisitor : StmtQuery {
                           const std::vector<std::string>& files)
         : out(out), enums(enums), files(files) {}
 
+    // Descente : la topologie de l'arbre est déclarée par les nœuds (Stmt::for_each_body,
+    // ast.h), pas réénumérée ici — une nouvelle instruction à corps est donc parcourue
+    // sans toucher ce visiteur. Les `visit` ci-dessous ne font plus que COLLECTER.
+    void walk(const std::vector<std::unique_ptr<Stmt>>& stmts) {
+        for (auto& s : stmts) {
+            s->accept(*this);
+            s->for_each_body([this](const std::vector<std::unique_ptr<Stmt>>& sub) {
+                walk(sub);
+            });
+        }
+    }
+
     void visit(const VarDeclStmt& s) override {
         if (s.is_global) {
             for (auto& n : s.names) {
@@ -266,32 +278,6 @@ struct CollectGlobalsVisitor : StmtQuery {
             }
         }
     }
-    void visit(const FuncDeclStmt& s) override {
-        run(s.body);
-    }
-    void visit(const ForIterStmt& s) override {
-        run(s.body);
-    }
-    void visit(const WhileStmt& s) override {
-        run(s.body);
-    }
-    void visit(const IfStmt& s) override {
-        run(s.then_body);
-        for (auto& ei : s.else_ifs)
-            run(ei.body);
-        run(s.else_body);
-    }
-    void visit(const TryCatchStmt& s) override {
-        run(s.try_body);
-        run(s.catch_body);
-        run(s.else_body);
-    }
-    void visit(const BlockStmt& s) override {
-        run(s.stmts);
-    }
-    void visit(const DoStmt& s) override {
-        run(s.body);
-    }
     void visit(const EnumDeclStmt& s) override {
         if (!s.obj_expr) {
             out.insert(s.name); // enum sous nom simple = globale, comme une classe
@@ -300,20 +286,13 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
     void visit(const ClassDeclStmt& s) override {
         out.insert(s.name); // classe visible par ses propres méthodes
-        for (auto& m : s.methods)
-            run(m->body);
-    }
-    void visit(const SwitchStmt& s) override {
-        for (auto& arm : s.cases)
-            run(arm.body);
-        run(s.else_body);
     }
 };
 
 static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::unordered_set<std::string>& out,
                            std::unordered_set<std::string>& enums, const std::vector<std::string>& files) {
     CollectGlobalsVisitor v(out, enums, files);
-    v.run(stmts);
+    v.walk(stmts);
 }
 
 // ── compile expression into a specific destination register ──────────────────
