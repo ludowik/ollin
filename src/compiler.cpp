@@ -1852,6 +1852,9 @@ struct HasFuncQuery : StmtQuery {
     void visit(const BlockStmt& s) override {
         result = body_has_func(s.stmts);
     }
+    void visit(const DoStmt& s) override {
+        result = body_has_func(s.body);
+    }
     void visit(const IfStmt& s) override {
         if (expr_has_lambda(s.cond.get()) || body_has_func(s.then_body) || body_has_func(s.else_body)) {
             result = true;

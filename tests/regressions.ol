@@ -745,4 +745,45 @@ assert(psLire() == 1 + 2 + 3 + 4 + 5 + 6 + 7)
 assert(psLire2() == 8 + 9 + 10 + 11 + 12 + 13)
 
 
+## Closure capturant la variable de boucle depuis un bloc IMBRIQUÉ. body_has_func
+## décide si les registres de boucle restent réservés ; il n'avait pas de cas pour
+## `do ... end` (no-op hérité) et répondait « aucune fonction ici » → registres
+## recyclés, et la closure lisait un registre réutilisé : dfDo[1]() renvoyait
+## {function} au lieu de 3. Une closure voit la valeur FINALE de la variable.
+var dfDo = []
+for i = 1, 3 do
+    do
+        dfDo[#dfDo + 1] = func() return i end
+    end
+end
+assert(dfDo[1]() == 3 and dfDo[2]() == 3 and dfDo[3]() == 3)
+
+var dfIf = []
+for i = 1, 3 do
+    if true then
+        dfIf[#dfIf + 1] = func() return i end
+    end
+end
+assert(dfIf[1]() == 3 and dfIf[3]() == 3)
+
+var dfSw = []
+for i = 1, 3 do
+    switch 1
+        case 1 do
+            dfSw[#dfSw + 1] = func() return i end
+        end
+    end
+end
+assert(dfSw[1]() == 3 and dfSw[3]() == 3)
+
+var dfTry = []
+for i = 1, 3 do
+    try
+        dfTry[#dfTry + 1] = func() return i end
+    catch e
+    end
+end
+assert(dfTry[1]() == 3 and dfTry[3]() == 3)
+
+
 print("regressions ok")
