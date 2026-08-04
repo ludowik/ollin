@@ -666,4 +666,17 @@ rg_libre.x = 1
 assert(rg_libre.x == 1)
 
 
+## Export d'un module : toutes les sortes de déclarations doivent se retrouver dans
+## la map créée par `import ... as`. Un enum y manquait (collect_top_level_names ne
+## connaissait pas EnumDeclStmt), donc m.MonEnum valait nil.
+import "exports_test" as expMod
+assert(expMod.expVar == 1)
+assert(expMod.expGlobal == 2)
+assert(expMod.expFunc() == 3)
+assert(ExpClass().v == 4)          ## la classe est exportée (instanciable via le nom)
+assert(expMod.ExpClass <> nil)
+assert(expMod.ExpEnum.A == 1 and expMod.ExpEnum.B == 2)
+assert(expMod.dansUneMap == nil)   ## `enum a.b` n'exporte pas de nom propre
+
+
 print("regressions ok")

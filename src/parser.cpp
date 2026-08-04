@@ -1246,20 +1246,13 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
     return s;
 }
 
+// Noms exportés par un module (rangés dans la map de `import "m" as m`). Chaque
+// sorte d'instruction répond pour elle-même (Stmt::exported_names, ast.h) : rien à
+// tenir à jour ici quand le langage gagne une instruction déclarative.
 static std::vector<std::string> collect_top_level_names(const std::vector<std::unique_ptr<Stmt>>& stmts) {
     std::vector<std::string> names;
-    for (auto& s : stmts) {
-        if (auto* v = dynamic_cast<const VarDeclStmt*>(s.get()))
-            for (auto& n : v->names)
-                names.push_back(n);
-        else if (auto* f = dynamic_cast<const FuncDeclStmt*>(s.get()))
-            names.push_back(f->name);
-        else if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get()))
-            names.push_back(c->name); // les classes sont aussi des noms exportés
-        else if (auto* e = dynamic_cast<const EnumDeclStmt*>(s.get()))
-            if (!e->obj_expr)
-                names.push_back(e->name); // idem pour un enum sous nom simple
-    }
+    for (auto& s : stmts)
+        s->exported_names(names);
     return names;
 }
 

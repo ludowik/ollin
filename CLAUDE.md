@@ -122,6 +122,7 @@ ligne obsolète dans un fichier « à l'utilisateur » (une signature documenté
 un commentaire, par exemple), c'est à Claude de la corriger, sans s'en abstenir au
 prétexte de cette colonne.
 
+
 | Fichier | Maintenu par | Rôle |
 |---|---|---|
 | `tests/syntax.ol` | utilisateur | source de vérité syntaxe + suite de tests complète |
@@ -413,6 +414,27 @@ La 3D s'appuie sur raylib (`Camera3D`, `BeginMode3D`/`EndMode3D`, `GenMesh*`) ma
 - **Garde-fou** : `s_in_3d` ; `runUserCallbacks` appelle `end3dInternal()` si `draw()` oublie `end3d` (flush + rééquilibre la pile). `end3d` idempotent.
 - **Quaternions** (`graphics_quat.cpp`, math raymath pure, fichier séparé) : classe native `Quat` ; fabriques `graphics.quat()`/`quat_axis(ax,ay,az,deg)`/`quat_euler(pitch,yaw,roll)` (**degrés**) ; méthodes `mul`/`slerp`/`normalize`/`inverse`/`rotate_vec` (renvoient de NOUVELLES instances, valeurs immuables). `graphics.rotateq(q)` (dans graphics3d.cpp) applique `QuaternionToMatrix(q)` via `rlMultMatrixf` (gauche-multiplie comme `rlRotatef` → compose comme `rotate`). `quatFromInstance()`/`makeQuatInstance()` = pont graphics3d↔graphics_quat.
 - **Perf/limites** : 1 draw call par `(shape, texture)` — le nombre de **couleurs** n'ajoute pas de draw call (couleur par instance). `cylinder` est **mono-rayon** (`x,y,z,r,h`) : contrainte du mesh unitaire figé. Models externes = extension additive (bucket déjà keyé `(mesh, texture)`).
+
+
+## Noms exportés par un module (`Stmt::exported_names`)
+
+`import "m" as m` construit `m = {}` puis une entrée par nom déclaré au premier
+niveau du module (parser.cpp, `import_stmt`). La liste vient de `collect_top_level_names`,
+qui **ne connaît aucune sorte d'instruction** : chaque nœud répond pour lui-même via
+`Stmt::exported_names` (ast.h), vide par défaut, redéfini par `VarDeclStmt`,
+`FuncDeclStmt`, `ClassDeclStmt` et `EnumDeclStmt` (rien pour `enum a.b`).
+
+**Pourquoi la réponse vit dans le nœud** : la fonction du parser était une cascade de
+`dynamic_cast`, donc une nouvelle sorte d'instruction y était ignorée SANS erreur ni
+avertissement — `enum` a été livré ainsi, et un module n'exportait pas ses énumérations.
+La question est désormais posée à côté de la déclaration du nœud, dans le seul fichier
+qu'on édite forcément pour en ajouter une.
+
+**Limite assumée** : le défaut vide n'oblige à rien (une méthode virtuelle pure le
+ferait, au prix d'une ligne obligatoire sur les 20 nœuds d'`ast.h`). C'est la proximité
+qui protège, pas le compilateur. Les autres consommateurs de l'AST (`CollectLocalsVisitor`,
+`CollectGlobalsVisitor`, `HasFuncQuery`) gardent leur forme : leurs questions dépendent
+du contexte de compilation (portées, registres) et n'ont pas leur place dans `ast.h`.
 
 ## Déclaration de variables (implémentation de l'enforcement)
 

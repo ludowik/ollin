@@ -101,6 +101,13 @@ struct Stmt {
     int file_idx = 0;
     SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
     virtual void accept(StmtVisitor&) const = 0;
+    // Noms que cette instruction déclare au niveau d'un module, donc rangés dans la
+    // map créée par `import "m" as m` (aucun par défaut). La réponse vit ICI, à côté
+    // du nœud : une nouvelle sorte d'instruction déclarative doit y répondre, sinon
+    // ses noms restent invisibles à l'import — le cas s'est produit avec `enum`.
+    virtual void exported_names(std::vector<std::string>& out) const {
+        (void)out;
+    }
     virtual ~Stmt() = default;
 };
 // Base pour les visiteurs lecture seule : méthodes non overridées = no-op.
@@ -252,6 +259,10 @@ struct CommentStmt : Stmt {
 struct VarDeclStmt : Stmt {
     std::vector<std::string> names;
     std::vector<std::unique_ptr<Expr>> values;
+    void exported_names(std::vector<std::string>& out) const override {
+        for (auto& n : names)
+            out.push_back(n);
+    }
     bool is_global = false;   // true = déclaré avec 'global' → variables globales
     bool is_constant = false; // true = déclaré avec 'constant' → locale immuable
     void accept(StmtVisitor& v) const override {
@@ -341,6 +352,9 @@ struct FuncDeclStmt : Stmt {
     bool variadic = false;
     bool is_static = false; // méthode de classe (pas de self implicite)
     std::vector<std::unique_ptr<Stmt>> body;
+    void exported_names(std::vector<std::string>& out) const override {
+        out.push_back(name);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -500,6 +514,9 @@ struct ClassDeclStmt : Stmt {
     std::string name;
     std::string parent; // vide si pas d'extends
     std::vector<std::unique_ptr<FuncDeclStmt>> methods;
+    void exported_names(std::vector<std::string>& out) const override {
+        out.push_back(name);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -517,6 +534,10 @@ struct EnumDeclStmt : Stmt {
     std::string name;                   // nom simple (globale) ; sinon nom du champ
     std::unique_ptr<Expr> obj_expr;     // non nul pour `enum obj.champ` : la map cible
     std::vector<EnumItem> items;
+    void exported_names(std::vector<std::string>& out) const override {
+        if (!obj_expr)   // `enum a.b` écrit un champ d'une map : aucun nom propre
+            out.push_back(name);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
