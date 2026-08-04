@@ -148,6 +148,20 @@ var k = "A"
 E[k] = 5' \
     "cannot modify enum 'E'"
 
+check_error "enum write in multi-assignment" \
+    'enum E A, B end
+var x = 0
+E.A, x = 1, 2' \
+    "cannot modify enum 'E' element 'A'"
+
+check_error "enum write before its declaration" \
+    'func f()
+    E.A = 1
+end
+enum E A, B end
+f()' \
+    "cannot modify enum 'E' element 'A'"
+
 check_error "enum write through alias (runtime guard)" \
     'enum E A, B end
 var m = E

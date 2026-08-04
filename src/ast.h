@@ -506,12 +506,11 @@ struct ClassDeclStmt : Stmt {
 };
 
 // enum Name A[=expr], B, C end  —  ou  enum obj.champ A, B end (obj_expr non nul).
-// Les valeurs implicites sont déjà résolues par le parser : un item sans expr
-// porte `auto_value`, calculé de proche en proche (cf. parser::enum_decl).
+// Un élément sans valeur explicite reçoit du parser un littéral synthétique portant
+// la valeur du compteur : `value` est donc toujours renseigné (cf. parser::enum_decl).
 struct EnumItem {
     std::string name;
-    std::unique_ptr<Expr> value;   // nul = valeur implicite (auto_value)
-    int64_t auto_value = 0;
+    std::unique_ptr<Expr> value;
 };
 
 struct EnumDeclStmt : Stmt {

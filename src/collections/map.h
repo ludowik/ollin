@@ -44,9 +44,8 @@ struct MapPool {
         if (n) {
             Map* m = buf[--n];
             m->refcount = 1;
-            m->kind = Map::PLAIN;
             m->userdata = nullptr;
-            return m;
+            return m;   // kind/version déjà remis à neuf par release()
         }
         return new Map();
     }

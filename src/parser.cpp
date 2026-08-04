@@ -1184,30 +1184,30 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
     s->line = line;
     s->file_idx = current_file_idx_;
 
-    // Cible : nom simple (globale) ou chemin `a.b.c` (champ d'une map). On construit
-    // l'expression du conteneur segment par segment ; `name` garde le dernier.
-    std::string seg = expect(TokenType::IDENTIFIER).lexeme;
+    // Cible : nom simple (globale) ou chemin `a.b.c` (champ d'une map). Les segments
+    // sont lus d'abord, le dernier devient `name` et les précédents sont repliés en
+    // conteneur. On n'appelle pas parse_postfix : il accepterait aussi `a[0]` et
+    // `a.f()`, que la grammaire n'admet pas comme cible d'enum.
+    std::vector<std::string> path;
+    path.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (check(TokenType::DOT)) {
         advance();
+        path.push_back(expect(TokenType::IDENTIFIER).lexeme);
+    }
+    s->name = path.back();
+    path.pop_back();
+    for (auto& seg : path) {
         if (!s->obj_expr) {
-            auto v = std::make_unique<VarExpr>(seg);
-            v->line = line;
-            v->file_idx = current_file_idx_;
-            s->obj_expr = std::move(v);
+            s->obj_expr = std::make_unique<VarExpr>(seg);
         } else {
             auto ix = std::make_unique<IndexExpr>();
-            ix->line = line;
-            ix->file_idx = current_file_idx_;
             ix->obj = std::move(s->obj_expr);
-            auto k = std::make_unique<StringExpr>(seg);
-            k->line = line;
-            k->file_idx = current_file_idx_;
-            ix->key = std::move(k);
+            ix->key = std::make_unique<StringExpr>(seg);
             s->obj_expr = std::move(ix);
         }
-        seg = expect(TokenType::IDENTIFIER).lexeme;
+        s->obj_expr->line = line;
+        s->obj_expr->file_idx = current_file_idx_;
     }
-    s->name = seg;
 
     int64_t counter = 1;   // le premier élément sans valeur vaut 1
     std::unordered_set<std::string> seen;
@@ -1228,7 +1228,9 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
             if (enum_int_literal(it.value.get(), &lit))
                 counter = lit + 1;
         } else {
-            it.auto_value = counter++;
+            it.value = std::make_unique<NumberExpr>((int64_t)counter++);
+            it.value->line = item_line;
+            it.value->file_idx = current_file_idx_;
         }
         s->items.push_back(std::move(it));
         skip_comments();
@@ -1254,6 +1256,9 @@ static std::vector<std::string> collect_top_level_names(const std::vector<std::u
             names.push_back(f->name);
         else if (auto* c = dynamic_cast<const ClassDeclStmt*>(s.get()))
             names.push_back(c->name); // les classes sont aussi des noms exportés
+        else if (auto* e = dynamic_cast<const EnumDeclStmt*>(s.get()))
+            if (!e->obj_expr)
+                names.push_back(e->name); // idem pour un enum sous nom simple
     }
     return names;
 }

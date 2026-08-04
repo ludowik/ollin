@@ -250,10 +250,12 @@ static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std:
 // l'endroit de leur déclaration → on les collecte tous avant la compilation.
 struct CollectGlobalsVisitor : StmtQuery {
     std::unordered_set<std::string>& out;
+    std::unordered_set<std::string>& enums;
     const std::vector<std::string>& files;
 
-    CollectGlobalsVisitor(std::unordered_set<std::string>& out, const std::vector<std::string>& files)
-        : out(out), files(files) {}
+    CollectGlobalsVisitor(std::unordered_set<std::string>& out, std::unordered_set<std::string>& enums,
+                          const std::vector<std::string>& files)
+        : out(out), enums(enums), files(files) {}
 
     void visit(const VarDeclStmt& s) override {
         if (s.is_global) {
@@ -291,8 +293,10 @@ struct CollectGlobalsVisitor : StmtQuery {
         run(s.body);
     }
     void visit(const EnumDeclStmt& s) override {
-        if (!s.obj_expr)
+        if (!s.obj_expr) {
             out.insert(s.name); // enum sous nom simple = globale, comme une classe
+            enums.insert(s.name);
+        }
     }
     void visit(const ClassDeclStmt& s) override {
         out.insert(s.name); // classe visible par ses propres méthodes
@@ -306,9 +310,9 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
 };
 
-static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts,
-                           std::unordered_set<std::string>& out, const std::vector<std::string>& files) {
-    CollectGlobalsVisitor v(out, files);
+static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::unordered_set<std::string>& out,
+                           std::unordered_set<std::string>& enums, const std::vector<std::string>& files) {
+    CollectGlobalsVisitor v(out, enums, files);
     v.run(stmts);
 }
 
@@ -363,7 +367,7 @@ Chunk Compiler::compile(const Program& prog) {
     chunk.source_files = prog.source_files;
     reg_top_ = 0;
     reg_count_ = 8;
-    collect_globals(prog.stmts, declared_globals_, chunk.source_files);
+    collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files);
     for (auto& n : builtin_module_names())
         declared_globals_.insert(n);
     for (auto& n : builtin_func_names())
@@ -1961,29 +1965,35 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     reg_top_ = body_has_func(body) ? (var_reg + 1) : ctl;
 }
 
+// Écriture visible sur un enum : refusée dès la compilation pour nommer
+// l'énumération et l'élément. La VM garde les chemins indirects (alias, clé
+// calculée) avec un message générique. Une locale de même nom masque l'enum.
+void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
+                                 int file_idx) {
+    if (enum_names_.empty())
+        return;   // aucun enum dans le programme : rien à vérifier
+    const std::string* name = &obj_name;
+    if (obj_expr) {
+        auto* ve = dynamic_cast<const VarExpr*>(obj_expr);
+        if (!ve)
+            return;   // cible chaînée (a.b[k]) : l'objet écrit n'est pas l'enum lui-même
+        name = &ve->name;
+    }
+    if (!enum_names_.count(*name) || local_regs_.count(*name))
+        return;
+    throw std::runtime_error(SourceLoc{(uint16_t)file_idx, (uint16_t)(line > 0 ? line : current_line_)}.str(
+                                 chunk.source_files) +
+                             ": cannot modify enum '" + *name + "'" +
+                             (field.empty() ? "" : " element '" + field + "'"));
+}
+
 void Compiler::visit(const IndexAssignStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
 
-    // Écriture visible sur un enum : refusée dès la compilation, pour nommer
-    // l'énumération et l'élément. La VM garde les chemins indirects (alias, clé
-    // calculée) avec un message générique.
     {
-        const std::string* enum_target = nullptr;
-        if (!s.obj_expr && enum_names_.count(s.obj) && !local_regs_.count(s.obj))
-            enum_target = &s.obj;
-        else if (auto* ve = dynamic_cast<const VarExpr*>(s.obj_expr.get()))
-            if (enum_names_.count(ve->name) && !local_regs_.count(ve->name))
-                enum_target = &ve->name;
-        if (enum_target) {
-            std::string field;
-            if (auto* se = dynamic_cast<const StringExpr*>(s.key.get()))
-                field = " element '" + se->value + "'";
-            throw std::runtime_error(
-                SourceLoc{(uint16_t)s.file_idx, (uint16_t)(s.line > 0 ? s.line : current_line_)}.str(
-                    chunk.source_files) +
-                ": cannot modify enum '" + *enum_target + "'" + field);
-        }
+        auto* key_lit = dynamic_cast<const StringExpr*>(s.key.get());
+        reject_enum_write(s.obj, s.obj_expr.get(), key_lit ? key_lit->value : std::string(), s.line, s.file_idx);
     }
 
     // Charge le conteneur (map/array) à indexer.
@@ -2052,6 +2062,10 @@ void Compiler::visit(const MultiAssignStmt& s) {
     for (int i = 0; i < (int)s.targets.size(); ++i) {
         int val_r = (i < n) ? base + i : alloc_reg(); // nil si pas de valeur
         const LValue& lv = s.targets[i];
+        // FIELD_INDEX (a.b[k]) écrit dans a.b, pas dans a → hors de portée du refus.
+        if (lv.kind == LValue::FIELD || lv.kind == LValue::INDEX)
+            reject_enum_write(lv.name, nullptr, lv.kind == LValue::FIELD ? lv.field : std::string(), s.line,
+                              s.file_idx);
 
         if (lv.kind == LValue::VAR) {
             auto it = local_regs_.find(lv.name);
@@ -2293,10 +2307,7 @@ void Compiler::visit(const EnumDeclStmt& s) {
         int key_r = alloc_reg();
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(it.name))));
         int val_r = alloc_reg();
-        if (it.value)
-            compile_into(*it.value, val_r);
-        else
-            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.add_constant(Value(it.auto_value))));
+        compile_into(*it.value, val_r);
         chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
         reg_top_ = item_saved;
     }
@@ -2305,8 +2316,8 @@ void Compiler::visit(const EnumDeclStmt& s) {
 
     if (!s.obj_expr) {
         // Le nom est déjà dans declared_globals_ via le pré-scan collectGlobals.
+        // Nom déjà dans declared_globals_ ET enum_names_ via le pré-scan collect_globals.
         chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
-        enum_names_.insert(s.name);
     } else {
         int obj_r = alloc_reg();
         compile_into(*s.obj_expr, obj_r);
