@@ -2294,7 +2294,6 @@ void Compiler::visit(const EnumDeclStmt& s) {
     chunk.emit(make_abc((uint8_t)Op::SEAL_ENUM, (uint8_t)dest, 0, 0));
 
     if (!s.obj_expr) {
-        // Le nom est déjà dans declared_globals_ via le pré-scan collectGlobals.
         // Nom déjà dans declared_globals_ ET enum_names_ via le pré-scan collect_globals.
         chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
     } else {

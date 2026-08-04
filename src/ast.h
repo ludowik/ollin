@@ -272,12 +272,12 @@ struct CommentStmt : Stmt {
 struct VarDeclStmt : Stmt {
     std::vector<std::string> names;
     std::vector<std::unique_ptr<Expr>> values;
+    bool is_global = false;   // true = déclaré avec 'global' → variables globales
+    bool is_constant = false; // true = déclaré avec 'constant' → locale immuable
     void exported_names(std::vector<std::string>& out) const override {
         for (auto& n : names)
             out.push_back(n);
     }
-    bool is_global = false;   // true = déclaré avec 'global' → variables globales
-    bool is_constant = false; // true = déclaré avec 'constant' → locale immuable
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }

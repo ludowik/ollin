@@ -139,12 +139,13 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     void visit(const BlockStmt&) override;
     void visit(const ClassDeclStmt&) override;
     void visit(const EnumDeclStmt&) override;
+    void visit(const SwitchStmt&) override;
+    void visit(const DoStmt&) override;
+
     // Refus d'écriture sur un enum, détecté à la compilation pour nommer
     // l'énumération et l'élément. `field` vide = clé non littérale.
     void reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
                            int file_idx);
-    void visit(const SwitchStmt&) override;
-    void visit(const DoStmt&) override;
 
     // ExprVisitor
     void visit(const BoolExpr&) override;
