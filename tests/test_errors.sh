@@ -132,6 +132,35 @@ check_error "var for itérateur non visible après" \
 print(k)' \
     "undeclared variable 'k'"
 
+# ── enum ─────────────────────────────────────────────────────────────────────
+check_error "enum element declared twice" \
+    'enum E A, B, A end' \
+    "element 'A' declared twice"
+
+check_error "enum write refused at compile time" \
+    'enum E A, B end
+E.A = 5' \
+    "cannot modify enum 'E' element 'A'"
+
+check_error "enum write through computed key" \
+    'enum E A, B end
+var k = "A"
+E[k] = 5' \
+    "cannot modify enum 'E'"
+
+check_error "enum write through alias (runtime guard)" \
+    'enum E A, B end
+var m = E
+m.A = 5' \
+    "cannot modify an enum"
+
+check_error "enum delete refused" \
+    'enum E A, B end
+var m = E
+m.A = nil' \
+    "cannot modify an enum"
+
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

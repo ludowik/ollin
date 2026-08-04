@@ -369,6 +369,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | NEW_CLASS     | A      | A=dest                     | R[A] = nouvelle classe vide (T_CLASS)            |
 | CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
 | SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
+| SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | HALT          | —      |                            | arrêt                                            |
 
 ## Globales moteur (engine-injected globals)
@@ -471,6 +472,31 @@ Sémantique de copie : référence comptée (partage de la même map, pas clone)
 `isFalsy(map)` → `mapSize() == 0` (« le vide est faux » ; une instance a ≥1 clé `__class__` → truthy). Idem `isFalsy(array)` → `arraySize() == 0`.  
 Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.  
 Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
+
+## Type enum (implémentation)
+
+> Syntaxe, numérotation et sémantique : voir `grammar.ebnf` (`enumDecl`).
+
+Un enum **est une map** (`T_MAP`), distinguée par `Map::kind == Map::ENUM`. Pas de tag
+dédié : en LECTURE (`GET_INDEX`, `MAKE_ITER`, `isFalsy`, `len`, affichage) un enum se
+comporte exactement comme une map et **aucun de ces chemins ne connaît les enums**.
+
+- `kind` (uint8_t) loge dans le trou d'alignement après `refcount` → `sizeof(Map)`
+  inchangé (80 o, mesuré).
+- La garde est dans **`op_SET_INDEX` seul** : toutes les écritures d'un script y passent
+  (`E.A = v`, `E[k] = v`, alias, suppression par nil). Le chemin de lecture et son inline
+  cache ne paient rien. Coût mesuré sur 5 M d'écritures indexées : +1,4 %, sous la
+  sensibilité à la disposition du code (±7 %).
+- `Map::set` natif n'est PAS gardé : c'est lui qui construit les modules, et le
+  remplissage de l'enum lui-même passe par `SET_INDEX` **avant** le scellement.
+- `SEAL_ENUM` est émis en DERNIER par `visit(EnumDeclStmt)` — après le remplissage, dont
+  les valeurs peuvent être des appels de fonction.
+- `MapPool::acquire`/`release` remettent `kind = PLAIN` : sans ça une map recyclée
+  ressortirait gelée (même piège que `version`, cf. invariant ci-dessous).
+- Le compilateur tient `enum_names_` (enums sous nom simple) et refuse dès la compilation
+  une écriture dont la cible est visiblement l'enum → message nommant l'élément. La VM
+  rattrape les chemins indirects avec un message générique.
+- Le gel est **superficiel** : un objet/tableau contenu dans l'enum reste modifiable.
 
 **Invariant pools (`MapPool`/`ArrayPool`/`ArrayIteratorPool`) — RÉ-ENTRANCE** : `release()` doit vider (`data.clear()`/`items.clear()`) **AVANT** de tester la capacité `n < CAP`, puis relire `n`. Le clear libère les entrées, et une entrée map/array **ré-entre** le pool (`release` → `buf[n++]`) → `n` peut grandir pendant le clear. Tester `n < CAP` *avant* le clear puis faire `buf[n++]` avec le `n` à jour écrit `buf[CAP]` (= `&n`) et corrompt la free-list (bug du crash au re-run corrigé). Ne jamais remettre le test de capacité avant le clear.
 

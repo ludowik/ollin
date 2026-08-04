@@ -290,6 +290,10 @@ struct CollectGlobalsVisitor : StmtQuery {
     void visit(const DoStmt& s) override {
         run(s.body);
     }
+    void visit(const EnumDeclStmt& s) override {
+        if (!s.obj_expr)
+            out.insert(s.name); // enum sous nom simple = globale, comme une classe
+    }
     void visit(const ClassDeclStmt& s) override {
         out.insert(s.name); // classe visible par ses propres méthodes
         for (auto& m : s.methods)
@@ -1811,6 +1815,9 @@ struct HasFuncQuery : StmtQuery {
     void visit(const ClassDeclStmt&) override {
         result = true; // conservatif
     }
+    void visit(const EnumDeclStmt&) override {
+        result = true; // conservatif
+    }
     void visit(const AssignStmt& s) override {
         result = expr_has_lambda(s.value.get());
     }
@@ -1957,6 +1964,27 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 void Compiler::visit(const IndexAssignStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
+
+    // Écriture visible sur un enum : refusée dès la compilation, pour nommer
+    // l'énumération et l'élément. La VM garde les chemins indirects (alias, clé
+    // calculée) avec un message générique.
+    {
+        const std::string* enum_target = nullptr;
+        if (!s.obj_expr && enum_names_.count(s.obj) && !local_regs_.count(s.obj))
+            enum_target = &s.obj;
+        else if (auto* ve = dynamic_cast<const VarExpr*>(s.obj_expr.get()))
+            if (enum_names_.count(ve->name) && !local_regs_.count(ve->name))
+                enum_target = &ve->name;
+        if (enum_target) {
+            std::string field;
+            if (auto* se = dynamic_cast<const StringExpr*>(s.key.get()))
+                field = " element '" + se->value + "'";
+            throw std::runtime_error(
+                SourceLoc{(uint16_t)s.file_idx, (uint16_t)(s.line > 0 ? s.line : current_line_)}.str(
+                    chunk.source_files) +
+                ": cannot modify enum '" + *enum_target + "'" + field);
+        }
+    }
 
     // Charge le conteneur (map/array) à indexer.
     int obj_r;
@@ -2246,6 +2274,46 @@ void Compiler::visit(const ClassDeclStmt& s) {
     // Stocker la classe comme global (le nom est déjà dans declared_globals_
     // via le pré-scan collectGlobals — source unique de vérité)
     chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
+
+    reg_top_ = saved;
+}
+
+// ── visit(EnumDeclStmt) ───────────────────────────────────────────────────────
+// NEW_MAP, une paire (clé, valeur) par élément, SEAL_ENUM, puis rangement : global
+// pour `enum Name`, SET_INDEX sur la map cible pour `enum a.b`. Le scellement vient
+// après le remplissage, qui passe lui-même par SET_INDEX.
+void Compiler::visit(const EnumDeclStmt& s) {
+    note_line(s.line, s.file_idx);
+    int saved = reg_top_;
+    int dest = alloc_reg();
+    chunk.emit(make_abc((uint8_t)Op::NEW_MAP, (uint8_t)dest, 0, 0));
+
+    for (auto& it : s.items) {
+        int item_saved = reg_top_;
+        int key_r = alloc_reg();
+        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(it.name))));
+        int val_r = alloc_reg();
+        if (it.value)
+            compile_into(*it.value, val_r);
+        else
+            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.add_constant(Value(it.auto_value))));
+        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
+        reg_top_ = item_saved;
+    }
+
+    chunk.emit(make_abc((uint8_t)Op::SEAL_ENUM, (uint8_t)dest, 0, 0));
+
+    if (!s.obj_expr) {
+        // Le nom est déjà dans declared_globals_ via le pré-scan collectGlobals.
+        chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
+        enum_names_.insert(s.name);
+    } else {
+        int obj_r = alloc_reg();
+        compile_into(*s.obj_expr, obj_r);
+        int key_r = alloc_reg();
+        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(s.name))));
+        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)dest));
+    }
 
     reg_top_ = saved;
 }

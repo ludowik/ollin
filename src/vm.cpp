@@ -750,6 +750,7 @@ void VM::run_goto(size_t stop_depth) {
         &&op_ARRAY_PUSH_VARARGS,
         &&op_MOVE_RESULTS,
         &&op_RETURN_SPREAD,
+        &&op_SEAL_ENUM,
         &&op_HALT,
     };
 
@@ -1318,6 +1319,9 @@ dispatch_loop:
         Value& obj = regs[base + A];
         const Value& key = regs[base + B];
         if (obj.is_map() || obj.is_class()) {
+            if (obj.mptr->kind == Map::ENUM)
+                throw std::runtime_error(err_line() + ": cannot modify an enum" +
+                                         (key.is_string() ? " (field '" + key.as_string() + "')" : ""));
             obj.map_set(key, regs[base + C]);
         } else if (obj.is_array()) {
             if (!key.is_integer())
@@ -1805,6 +1809,15 @@ dispatch_loop:
         for (int i = last_results_; i < B; ++i)
             regs[base + A + i] = Value{};
         NEXT();
+
+    // Scellement d'un enum : émis APRÈS le remplissage, qui passe lui-même par
+    // SET_INDEX (et peut évaluer des appels pour les valeurs).
+    op_SEAL_ENUM: {
+        Value& target = regs[base + A];
+        if (target.is_map())
+            target.mptr->kind = Map::ENUM;
+        NEXT();
+    }
 
     op_HALT:
         close_upvals();

@@ -18,6 +18,11 @@ extern uint64_t g_map_epoch;
 struct Map {
     robin_hood::unordered_map<Value, Value, ValueHash, ValueEqual> data;
     int refcount = 1;
+    // Rôle de la map, testé UNIQUEMENT à l'écriture (SET_INDEX) : un enum est une map
+    // ordinaire en lecture (itérable, len, print…) mais refuse toute mutation. Loge
+    // dans le trou d'alignement avant userdata → sizeof(Map) inchangé.
+    enum : uint8_t { PLAIN = 0, ENUM = 1 };
+    uint8_t kind = PLAIN;
     void* userdata = nullptr;
     uint64_t version = 0;   // = ++g_map_epoch à chaque mutation ; 0 = jamais mutée
 
@@ -39,6 +44,7 @@ struct MapPool {
         if (n) {
             Map* m = buf[--n];
             m->refcount = 1;
+            m->kind = Map::PLAIN;
             m->userdata = nullptr;
             return m;
         }
@@ -60,6 +66,7 @@ struct MapPool {
         }
         m->data.clear();  // peut ré-entrer le pool (releases imbriqués) → n peut changer
         m->version = ++g_map_epoch;  // recyclage : invalide tout inline cache pointant sur ce Map*
+        m->kind = Map::PLAIN;             // sinon une map recyclée ressortirait gelée (enum)
         if (n < CAP) {
             buf[n++] = m; // n RELU après clear
         } else {

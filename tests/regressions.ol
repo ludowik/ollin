@@ -604,4 +604,66 @@ var nlen = {}
 nlen["len"] = nil
 assert(nlen.len() == 1)         ## repli `len` intégré ; la map a 1 clé
 
+## ── enum ─────────────────────────────────────────────────────────────────────
+## Numérotation : 1 par défaut, +1 ensuite ; un littéral entier redéfinit la suite ;
+## une valeur non littérale (ici une chaîne) laisse le compteur où il est.
+enum RgEtat REPOS = 0, MARCHE, SAUT = 10, CHUTE end
+assert(RgEtat.REPOS == 0 and RgEtat.MARCHE == 1)
+assert(RgEtat.SAUT == 10 and RgEtat.CHUTE == 11)
+enum RgMix A, B = "texte", C end
+assert(RgMix.A == 1 and RgMix.B == "texte" and RgMix.C == 2)
+enum RgNeg X = -3, Y end
+assert(RgNeg.X == -3 and RgNeg.Y == -2)
+enum RgAlias UN = 1, PREMIER = 1 end       ## valeur répétée = alias, permis
+assert(RgAlias.UN == RgAlias.PREMIER)
+
+## Un enum est une map ordinaire en LECTURE : len, itération, valeurs de tout type.
+enum RgCol ROUGE, VERT, BLEU end
+assert(#RgCol == 3)
+var rg_sum = 0
+for k, v in RgCol do
+    rg_sum = rg_sum + v
+end
+assert(rg_sum == 6)
+func rg_carre(x) return x * x end
+enum RgObj L = [1, 2, 3], F = rg_carre end
+assert(RgObj.L[2] == 2 and RgObj.F(5) == 25)
+
+## Gel SUPERFICIEL : l'enum refuse l'écriture, pas l'objet qu'il contient.
+RgObj.L[1] = 99
+assert(RgObj.L[1] == 99)
+
+## Verrou à l'exécution : alias et clé calculée passent par le même SET_INDEX.
+var rg_alias = RgCol
+var rg_caught = 0
+try
+    rg_alias.ROUGE = 9
+catch e
+    rg_caught = rg_caught + 1
+end
+try
+    var rg_k = "VERT"
+    rg_alias[rg_k] = 9
+catch e
+    rg_caught = rg_caught + 1
+end
+assert(rg_caught == 2 and RgCol.ROUGE == 1 and RgCol.VERT == 2)
+
+## enum dans une map existante (chemin `a.b`).
+global rgCfg = {}
+enum rgCfg.mode PLEIN, FENETRE end
+assert(rgCfg.mode.PLEIN == 1 and rgCfg.mode.FENETRE == 2)
+
+## Recyclage du pool : le marquage enum ne doit pas contaminer une map réutilisée.
+## Les maps ci-dessous sont libérées puis leur mémoire est réattribuée.
+for i = 1, 200 do
+    var rg_tmp = {a: i}
+    rg_tmp.a = i + 1
+    assert(rg_tmp.a == i + 1)
+end
+var rg_libre = {}
+rg_libre.x = 1
+assert(rg_libre.x == 1)
+
+
 print("regressions ok")

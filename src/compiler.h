@@ -41,6 +41,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::unordered_map<std::string, FuncInfo> func_table;
     std::unordered_set<std::string> declared_globals_; // globals déclarés (source + builtins + modules)
     std::unordered_set<std::string> const_names_;      // locals declared with 'const'
+    // Enums déclarés sous un nom simple → refus des écritures visibles dès la
+    // compilation (message nommant l'élément). La VM garde tous les autres chemins.
+    std::unordered_set<std::string> enum_names_;
     std::string current_func_name;                     // "" = global scope
     // Nom de la classe parente de la classe dont on compile actuellement une
     // méthode ("" hors classe / classe sans parent). 'super' se résout par CETTE
@@ -135,6 +138,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     void visit(const ForIterStmt&) override;
     void visit(const BlockStmt&) override;
     void visit(const ClassDeclStmt&) override;
+    void visit(const EnumDeclStmt&) override;
     void visit(const SwitchStmt&) override;
     void visit(const DoStmt&) override;
 

@@ -36,6 +36,7 @@ enum class TokenType {
     STATIC,
     SWITCH,
     CASE,
+    ENUM,
     SEMICOLON,
     DOT_DOT_DOT,
     EQUALS,

@@ -13,7 +13,7 @@ export const KEYWORDS = new Set([
   'var', 'global', 'const', 'while', 'do', 'for', 'in', 'if', 'then', 'elseif', 'end',
   'break', 'true', 'false', 'nil', 'try', 'catch', 'throw', 'else', 'func', 'return',
   'import', 'as', 'or', 'and', 'not', 'class', 'extends', 'static', 'super', 'self',
-  'switch', 'case', 'default',
+  'switch', 'case', 'default', 'enum',
 ])
 export const BUILTINS = new Set([
   'print', 'printf', 'time', 'assert', 'len', 'typeof', 'Color',

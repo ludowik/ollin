@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-02 17:24</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-04 13:54</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -400,6 +400,7 @@ pre:hover .code-actions,
   <div class="section-label">Maps</div>
   <a href="#maps">Maps</a>
   <a href="#map-iter">Itération</a>
+  <a href="#enum">Enum</a>
   <div class="section-label">Arrays</div>
   <a href="#arrays">Arrays</a>
   <div class="section-label">Gestion d'erreurs</div>
@@ -420,7 +421,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-02 17:24</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-04 13:54</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1130,6 +1131,48 @@ b.x = <span class="num">99</span>
 
 <span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
 <span class="bi">assert</span>(sum_values(scores) == <span class="num">255</span>)</code></pre>
+</section>
+
+<!-- ── Enum ───────────────────────────────────────────────────────────────── -->
+<section id="enum">
+<h2>Enum</h2>
+<p><code>enum</code> déclare des constantes nommées. Le résultat est une <strong>map gelée</strong> : elle se lit, s'itère et se mesure comme n'importe quelle map, mais toute écriture est refusée.</p>
+
+<pre><code><span class="kw">enum</span> Couleur ROUGE, VERT, BLEU <span class="kw">end</span>
+<span class="bi">print</span>(Couleur.ROUGE, Couleur.VERT, Couleur.BLEU)   <span class="cmt">## 1 2 3</span></code></pre>
+
+<h3>Numérotation</h3>
+<p>Un élément sans valeur prend le compteur, qui part de <strong>1</strong> et avance de un. Un <strong>littéral entier</strong> fixe la valeur et fait repartir le compteur juste après. Toute <strong>autre expression</strong> est acceptée comme valeur mais laisse le compteur où il est — le compilateur ne peut pas évaluer un appel de fonction.</p>
+
+<pre><code><span class="kw">enum</span> Etat REPOS = <span class="num">0</span>, MARCHE, SAUT = <span class="num">10</span>, CHUTE <span class="kw">end</span>
+<span class="cmt">## 0, 1, 10, 11</span>
+
+<span class="kw">enum</span> Mixte A, B = <span class="str">"texte"</span>, C <span class="kw">end</span>
+<span class="cmt">## 1, "texte", 2 — la chaîne ne déplace pas le compteur</span></code></pre>
+
+<div class="callout">Corollaire : <code>A = 1 + 1</code> est une expression, pas un littéral, donc elle ne déplace pas le compteur même si elle vaut deux.</div>
+
+<h3>Valeurs de tout type</h3>
+<p>Une valeur peut être un nombre, une chaîne, un objet, un tableau ou une fonction. Deux éléments de même valeur sont un alias, ce qui est permis ; deux éléments de même <strong>nom</strong> sont une erreur de compilation.</p>
+
+<pre><code><span class="kw">enum</span> Palette ROUGE = <span class="bi">Color</span>(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>), VERT = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">1</span>, <span class="num">0</span>) <span class="kw">end</span></code></pre>
+
+<h3>Immuabilité</h3>
+<p>Écrire dans un enum échoue. Quand la cible est visiblement l'énumération, l'erreur arrive dès la <strong>compilation</strong> et nomme l'élément ; les chemins indirects — alias, clé calculée — sont arrêtés à l'<strong>exécution</strong>.</p>
+
+<pre><code>Couleur.ROUGE = <span class="num">5</span>        <span class="cmt">## erreur de compilation : cannot modify enum 'Couleur' element 'ROUGE'</span>
+
+<span class="kw">var</span> m = Couleur
+m.ROUGE = <span class="num">5</span>              <span class="cmt">## erreur d'exécution : cannot modify an enum</span></code></pre>
+
+<div class="callout warn">Le gel est <strong>superficiel</strong> : il protège l'énumération, pas ce qu'elle contient. Si un élément est un tableau ou un objet, ce tableau ou cet objet reste modifiable — <code>E.L[1] = 9</code> passe. Geler en profondeur rendrait immuable un objet qui peut être référencé ailleurs.</div>
+
+<h3>Cible</h3>
+<p>Un nom simple déclare une <strong>globale</strong>, comme une classe : les références en avant fonctionnent. Un chemin écrit dans une map existante.</p>
+
+<pre><code><span class="kw">global</span> cfg = {}
+<span class="kw">enum</span> cfg.mode PLEIN, FENETRE <span class="kw">end</span>
+<span class="bi">print</span>(cfg.mode.PLEIN)      <span class="cmt">## 1</span></code></pre>
 </section>
 
 <!-- ── Arrays ─────────────────────────────────────────────────────────────── -->

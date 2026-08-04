@@ -103,5 +103,6 @@ enum class Op : uint8_t {
     ARRAY_PUSH_VARARGS, // A: pousse TOUTES les varargs du frame courant dans le tableau R[A] ([..., ...])
     MOVE_RESULTS,       // AB: copie last_results_ valeurs R[B..] → R[A..] (recompose un spread imbriqué)
     RETURN_SPREAD,      // AB: return B explicites + last_results_ (dernier = appel), contigus à R[A..]
+    SEAL_ENUM,          // A: la map de R[A] devient un enum — toute écriture indexée est refusée
     HALT,
 };

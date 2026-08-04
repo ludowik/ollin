@@ -130,6 +130,7 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     case TokenType::FOR:      return for_stmt();
     case TokenType::IMPORT:   return import_stmt();
     case TokenType::CLASS:    return class_decl();
+    case TokenType::ENUM:     return enum_decl();
     case TokenType::SWITCH:   return switch_stmt();
     case TokenType::FUNC:     return func_decl_stmt();
     case TokenType::RETURN:   return return_stmt();
@@ -1152,6 +1153,92 @@ std::unique_ptr<Stmt> Parser::class_decl() {
         method->is_static = is_static;
         s->methods.push_back(std::move(method));
     }
+    expect(TokenType::END);
+    consume_opt_comment();
+    return s;
+}
+
+// Valeur d'un littéral entier, éventuellement précédé de '-' : seule forme qui
+// déplace le compteur d'un enum (une expression quelconque ne peut pas être
+// évaluée à la compilation). Renvoie false si ce n'en est pas un.
+static bool enum_int_literal(const Expr* e, int64_t* out) {
+    if (auto* u = dynamic_cast<const UnaryExpr*>(e)) {
+        int64_t inner = 0;
+        if (u->op == '-' && enum_int_literal(u->operand.get(), &inner)) {
+            *out = -inner;
+            return true;
+        }
+        return false;
+    }
+    auto* n = dynamic_cast<const NumberExpr*>(e);
+    if (!n || !n->is_integer)
+        return false;
+    *out = n->ival;
+    return true;
+}
+
+std::unique_ptr<Stmt> Parser::enum_decl() {
+    int line = peek().line;
+    advance(); // ENUM
+    auto s = std::make_unique<EnumDeclStmt>();
+    s->line = line;
+    s->file_idx = current_file_idx_;
+
+    // Cible : nom simple (globale) ou chemin `a.b.c` (champ d'une map). On construit
+    // l'expression du conteneur segment par segment ; `name` garde le dernier.
+    std::string seg = expect(TokenType::IDENTIFIER).lexeme;
+    while (check(TokenType::DOT)) {
+        advance();
+        if (!s->obj_expr) {
+            auto v = std::make_unique<VarExpr>(seg);
+            v->line = line;
+            v->file_idx = current_file_idx_;
+            s->obj_expr = std::move(v);
+        } else {
+            auto ix = std::make_unique<IndexExpr>();
+            ix->line = line;
+            ix->file_idx = current_file_idx_;
+            ix->obj = std::move(s->obj_expr);
+            auto k = std::make_unique<StringExpr>(seg);
+            k->line = line;
+            k->file_idx = current_file_idx_;
+            ix->key = std::move(k);
+            s->obj_expr = std::move(ix);
+        }
+        seg = expect(TokenType::IDENTIFIER).lexeme;
+    }
+    s->name = seg;
+
+    int64_t counter = 1;   // le premier élément sans valeur vaut 1
+    std::unordered_set<std::string> seen;
+    while (true) {
+        skip_comments();
+        if (check(TokenType::END) || check(TokenType::EOF_T))
+            break;
+        EnumItem it;
+        int item_line = peek().line;
+        it.name = expect(TokenType::IDENTIFIER).lexeme;
+        if (!seen.insert(it.name).second)
+            throw std::runtime_error(cur_loc(item_line).str(*source_files_) + ": enum '" + s->name +
+                                     "' : element '" + it.name + "' declared twice");
+        if (check(TokenType::EQUALS)) {
+            advance();
+            it.value = expr();
+            int64_t lit = 0;
+            if (enum_int_literal(it.value.get(), &lit))
+                counter = lit + 1;
+        } else {
+            it.auto_value = counter++;
+        }
+        s->items.push_back(std::move(it));
+        skip_comments();
+        if (check(TokenType::COMMA)) {
+            advance();
+            continue;
+        }
+        break;
+    }
+    skip_comments();
     expect(TokenType::END);
     consume_opt_comment();
     return s;

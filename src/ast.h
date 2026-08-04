@@ -24,6 +24,7 @@ struct IndexAssignStmt;
 struct MultiAssignStmt;
 struct BlockStmt;
 struct ClassDeclStmt;
+struct EnumDeclStmt;
 struct SwitchStmt;
 struct DoStmt;
 
@@ -66,6 +67,7 @@ struct StmtVisitor {
     virtual void visit(const ForIterStmt&) = 0;
     virtual void visit(const BlockStmt&) = 0;
     virtual void visit(const ClassDeclStmt&) = 0;
+    virtual void visit(const EnumDeclStmt&) = 0;
     virtual void visit(const SwitchStmt&) = 0;
     virtual void visit(const DoStmt&) = 0;
     virtual ~StmtVisitor() = default;
@@ -140,6 +142,8 @@ struct StmtQuery : StmtVisitor {
     void visit(const BlockStmt&) override {
     }
     void visit(const ClassDeclStmt&) override {
+    }
+    void visit(const EnumDeclStmt&) override {
     }
     void visit(const SwitchStmt&) override {
     }
@@ -496,6 +500,24 @@ struct ClassDeclStmt : Stmt {
     std::string name;
     std::string parent; // vide si pas d'extends
     std::vector<std::unique_ptr<FuncDeclStmt>> methods;
+    void accept(StmtVisitor& v) const override {
+        v.visit(*this);
+    }
+};
+
+// enum Name A[=expr], B, C end  —  ou  enum obj.champ A, B end (obj_expr non nul).
+// Les valeurs implicites sont déjà résolues par le parser : un item sans expr
+// porte `auto_value`, calculé de proche en proche (cf. parser::enum_decl).
+struct EnumItem {
+    std::string name;
+    std::unique_ptr<Expr> value;   // nul = valeur implicite (auto_value)
+    int64_t auto_value = 0;
+};
+
+struct EnumDeclStmt : Stmt {
+    std::string name;                   // nom simple (globale) ; sinon nom du champ
+    std::unique_ptr<Expr> obj_expr;     // non nul pour `enum obj.champ` : la map cible
+    std::vector<EnumItem> items;
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }

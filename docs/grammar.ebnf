@@ -26,12 +26,34 @@ stmt           = varDecl
                | throwStmt
                | funcDecl
                | classDecl
+               | enumDecl
                | returnStmt
                | importStmt
                | assignStmt
                | exprStmt ;
 
 importStmt     = "import" STRING [ "as" IDENT ] NL ;
+
+enumDecl       = "enum" enumTarget [ enumItem { "," enumItem } ] "end" NL ;
+enumTarget     = IDENT { "." IDENT } ;
+enumItem       = IDENT [ "=" expr ] ;
+                 (* crée une MAP dont les clés sont les éléments ; les sauts de ligne
+                    entre éléments sont libres (les NL ne sont pas des tokens) *)
+                 (* cible : IDENT seul = variable GLOBALE (comme une classe, référence
+                    en avant possible) ; chemin a.b = écrit le champ b de la map a *)
+                 (* NUMÉROTATION — un élément sans valeur prend le compteur, qui part de 1
+                    et avance de 1 ; un LITTÉRAL entier (signé permis) fixe la valeur et
+                    fait repartir le compteur à valeur+1 ; toute AUTRE expression est
+                    acceptée comme valeur mais laisse le compteur inchangé (elle n'est
+                    pas évaluable à la compilation). Ex. : A, B = "x", C  →  1, "x", 2 *)
+                 (* une valeur peut être de tout type (nombre, chaîne, objet, tableau,
+                    fonction) ; deux éléments de même valeur = alias, permis ; deux
+                    éléments de même NOM = erreur de compilation *)
+                 (* la map est GELÉE : toute écriture indexée est refusée (erreur de
+                    compilation si la cible est visiblement l'enum, erreur d'exécution
+                    sinon — alias, clé calculée). Le gel est SUPERFICIEL : un objet ou
+                    un tableau CONTENU dans l'enum reste modifiable *)
+                 (* en lecture, un enum est une map ordinaire : accès, len, itération *)
 
 classDecl      = "class" IDENT [ "extends" IDENT ] NL { method } "end" NL ;
 method         = [ "static" ] "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;

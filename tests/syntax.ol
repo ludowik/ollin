@@ -1174,3 +1174,39 @@ do
         assert(do_b == 2)
     end
 end
+
+## ── 26. enum (constantes nommées, map gelée) ─────────────────────────────────
+## Sans valeur : le premier vaut 1, chacun suit à +1.
+enum Couleur ROUGE, VERT, BLEU end
+assert(Couleur.ROUGE == 1 and Couleur.VERT == 2 and Couleur.BLEU == 3)
+
+## Un littéral entier fixe la valeur ; le compteur repart à valeur+1.
+enum Etat REPOS = 0, MARCHE, SAUT = 10, CHUTE end
+assert(Etat.REPOS == 0 and Etat.MARCHE == 1 and Etat.SAUT == 10 and Etat.CHUTE == 11)
+
+## Toute expression est acceptée comme valeur, mais ne déplace pas le compteur.
+enum Mixte A, B = "texte", C end
+assert(Mixte.A == 1 and Mixte.B == "texte" and Mixte.C == 2)
+
+## En lecture, un enum est une map : len et itération.
+assert(#Couleur == 3)
+var enum_somme = 0
+for k, v in Couleur do
+    enum_somme = enum_somme + v
+end
+assert(enum_somme == 6)
+
+## Toute écriture est refusée — ici par un alias, donc à l'exécution.
+var enum_alias = Couleur
+var enum_bloque = false
+try
+    enum_alias.ROUGE = 9
+catch e
+    enum_bloque = true
+end
+assert(enum_bloque and Couleur.ROUGE == 1)
+
+## Déclaration dans une map existante : enum a.b
+global enumCfg = {}
+enum enumCfg.mode PLEIN, FENETRE end
+assert(enumCfg.mode.PLEIN == 1 and enumCfg.mode.FENETRE == 2)
