@@ -9,8 +9,10 @@ Value make_ui_module();
 // ui_poll()  AVANT mouse_poll — renvoie true si un widget a pris le clic, auquel cas
 //            le clic ne doit PAS être transmis aux callbacks mouse.* du script.
 // ui_draw()  APRÈS draw() — dessine la pile de widgets par-dessus la scène.
-// ui_reset() à chaque graphics.run — sinon les widgets d'une exécution précédente
-//            survivent (les statiques persistent entre deux runs en WASM).
+// ui_reset() au démarrage d'un PROGRAMME (ollin_run, wasm_main.cpp) — PAS dans
+//            gfx_run : les widgets sont déclarés au niveau du fichier, donc AVANT
+//            graphics.run, et un reset là les effacerait tous. Nécessaire car les
+//            statiques survivent au VM entre deux exécutions du playground.
 bool ui_poll();
 void ui_draw();
 void ui_reset();

@@ -163,15 +163,21 @@ void ui_draw() {
     Vector2 mouse = {(float)GetMouseX(), (float)GetMouseY()};
     Font f = GetFontDefault();
     bool has_font = f.texture.id != 0 && f.baseSize != 0;
-    for (auto& w : s_widgets) {
-        bool hover = CheckCollisionPointRec(mouse, w.box);
-        DrawRectangleRec(w.box, hover ? C_BG_HOVER : C_BG);
-        DrawRectangleLinesEx(w.box, 1.0f, C_BORDER);
-        float tx = w.box.x + m.pad;
-        if (w.kind == Widget::CHECKBOX) {
-            Rectangle box = {w.box.x + m.pad, w.box.y + (m.row - m.box) * 0.5f, m.box, m.box};
+    for (size_t i = 0; i < s_widgets.size(); ++i) {
+        // Copies locales : lire l'état d'une case appelle une closure du script, qui
+        // pourrait déclarer un widget et réallouer s_widgets sous nos pieds.
+        Rectangle rect = s_widgets[i].box;
+        Widget::Kind kind = s_widgets[i].kind;
+        std::string label = s_widgets[i].label;
+        bool checked = kind == Widget::CHECKBOX && checkbox_state(s_widgets[i]);
+        bool hover = CheckCollisionPointRec(mouse, rect);
+        DrawRectangleRec(rect, hover ? C_BG_HOVER : C_BG);
+        DrawRectangleLinesEx(rect, 1.0f, C_BORDER);
+        float tx = rect.x + m.pad;
+        if (kind == Widget::CHECKBOX) {
+            Rectangle box = {rect.x + m.pad, rect.y + (m.row - m.box) * 0.5f, m.box, m.box};
             DrawRectangleLinesEx(box, 1.0f, C_BORDER);
-            if (checkbox_state(w)) {
+            if (checked) {
                 float inset = m.box * 0.22f;
                 Rectangle fill = {box.x + inset, box.y + inset, m.box - 2 * inset, m.box - 2 * inset};
                 DrawRectangleRec(fill, C_CHECK);
@@ -179,8 +185,8 @@ void ui_draw() {
             tx = box.x + m.box + m.pad * 0.6f;
         }
         if (has_font) {
-            Vector2 pos = {tx, w.box.y + (m.row - m.font) * 0.5f};
-            DrawTextEx(f, w.label.c_str(), pos, m.font, m.font / (float)f.baseSize, C_TEXT);
+            Vector2 pos = {tx, rect.y + (m.row - m.font) * 0.5f};
+            DrawTextEx(f, label.c_str(), pos, m.font, m.font / (float)f.baseSize, C_TEXT);
         }
     }
 }
@@ -193,18 +199,27 @@ bool ui_poll() {
     Vector2 p = {(float)GetMouseX(), (float)GetMouseY()};
     // Les rectangles viennent de la dernière frame dessinée : ce qu'on voit est ce
     // qu'on clique. Avant la première frame, aucun widget n'a de boîte → aucun clic.
-    for (auto& w : s_widgets) {
-        if (!CheckCollisionPointRec(p, w.box))
+    for (size_t i = 0; i < s_widgets.size(); ++i) {
+        if (!CheckCollisionPointRec(p, s_widgets[i].box))
             continue;
+        // COPIER avant d'appeler quoi que ce soit : le callback (ou le setter de la
+        // référence) peut déclarer un widget ou appeler ui.clear, donc réallouer
+        // s_widgets. Passer `w.action` par référence à call_value laisserait alors une
+        // référence pendante PENDANT l'appel.
+        Widget::Kind kind = s_widgets[i].kind;
+        Value action = s_widgets[i].action;
+        Value target = s_widgets[i].target;
+        Value on_change = s_widgets[i].on_change;
         VM* vm = VM::current();
-        if (w.kind == Widget::BUTTON) {
-            if (w.action.is_callable())
-                vm->call_value(w.action);
+        if (kind == Widget::BUTTON) {
+            if (action.is_callable())
+                vm->call_value(action);
         } else {
-            bool now = !checkbox_state(w);
-            ref_set(w.target, Value(now ? int64_t(1) : int64_t(0)));
-            if (w.on_change.is_callable())
-                vm->call_value(w.on_change, Value(now ? int64_t(1) : int64_t(0)));
+            bool now = is_falsy(ref_get(target));   // nouvel état = l'inverse du courant
+            Value state = Value(now ? int64_t(1) : int64_t(0));
+            ref_set(target, state);
+            if (on_change.is_callable())
+                vm->call_value(on_change, state);
         }
         return true;   // clic consommé : ne pas le transmettre à mouse.pressed
     }

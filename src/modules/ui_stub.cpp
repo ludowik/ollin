@@ -1,12 +1,11 @@
 #include "ui_module.h"
 
-// Build sans raylib : les widgets n'ont pas de zone où se dessiner. Les déclarer ne
-// lève pas — un script utilitaire peut ainsi tourner en natif headless —, elles ne
-// font simplement rien.
+// Build sans raylib : aucune zone où dessiner, donc déclarer un widget ne produit
+// rien de visible. Les arguments sont tout de même VÉRIFIÉS (mêmes messages, cf.
+// ui_module.h) : une faute d'appel se voit ainsi en natif headless, là où tournent
+// les tests.
 Value make_ui_module() {
     Value m = Value::make_map();
-    // Les arguments sont VALIDÉS quand même (mêmes messages, cf. ui_module.h) : une
-    // faute d'appel se voit en natif headless, là où tournent les tests.
     m.map_set(Value(std::string("button")), Value::make_builtin([](CallCtx& ctx) -> int {
         ui_check_button_args(ctx.args, ctx.argc);
         return ctx.ret(Value{});
