@@ -24,6 +24,10 @@ poser une question de clarification **brève** avant de coder ; ne pas deviner
 large. Ne modifier que ce qui est demandé (pas de refactor/nettoyage collatéral
 non sollicité). Agir sans confirmation seulement si l'intention est univoque.
 
+**`todo.md` n'est PAS à Claude (règle permanente)** : ne jamais le lire pour se donner
+du travail, ne jamais l'éditer, ne jamais proposer ce qu'il contient. Traiter uniquement
+ce que l'utilisateur demande.
+
 **Plan ⇒ pas d'implémentation sans GO explicite (règle permanente).** Une demande
 de *plan* (ou « plan pour… ») n'autorise JAMAIS à coder. Ne commencer l'implémentation
 qu'après un **GO explicite** de l'utilisateur (« GO », « implémente », « vas-y »).
@@ -450,9 +454,14 @@ Deux visiteurs l'utilisent :
   compilateur croyait qu'aucune closure ne capturait la variable de boucle, recyclait
   les registres, et la closure lisait un registre réutilisé (valeur d'un autre type).
   **Conservatisme inchangé** : `SwitchStmt`, `ClassDeclStmt` et `EnumDeclStmt`
-  répondent toujours « oui » sans regarder, ce qui court-circuite la descente — la
-  conversion n'autorise donc AUCUNE optimisation nouvelle. Les rendre précis serait un
-  autre changement, à mesurer.
+  répondent « oui » sans regarder, ce qui court-circuite la descente — la conversion
+  n'autorise donc AUCUNE optimisation nouvelle. Pour `ClassDeclStmt` c'est même la
+  réponse EXACTE : une méthode est une fonction et capture par upvalue (vérifié).
+  **Affiner `Switch`/`Enum` a été essayé puis abandonné, mesure à l'appui** : le gain est
+  nul, car l'aliasage de la variable de boucle est refusé par `loop_body_alias_safe` dès
+  qu'une structure est imbriquée, et `body_has_func` ne pilote que `reg_top_` (registres
+  réservés), pas la vitesse. Boucle 10M contenant un switch : +0,9 %, sous le bruit de
+  disposition du code (±7 %).
 
 **Non converti, volontairement** :
 - `CollectLocalsVisitor` repose sur le fait de NE PAS descendre (portée lexicale : les

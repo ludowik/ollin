@@ -1796,12 +1796,19 @@ struct HasFuncQuery : StmtQuery {
     void visit(const FuncDeclStmt&) override {
         result = true;
     }
-    // Conservatisme historique : on ne regarde pas dans ces trois-là, on répond « oui ».
-    // Le court-circuit de stmt_has_func évite alors la descente — comportement inchangé.
-    void visit(const SwitchStmt&) override {
+    // Une classe PORTE ses méthodes, qui sont des fonctions pouvant capturer une variable
+    // du bloc englobant par upvalue (vérifié : une méthode déclarée dans une boucle lit
+    // bien la variable de boucle) → « oui » est ici la réponse EXACTE, pas un repli.
+    void visit(const ClassDeclStmt&) override {
         result = true;
     }
-    void visit(const ClassDeclStmt&) override {
+    // Switch et enum répondent « oui » sans examiner leurs expressions. C'est un repli,
+    // et il est CONSERVÉ : affiner ne débloque aucune optimisation, car l'aliasage de la
+    // variable de boucle est refusé par loop_body_alias_safe dès qu'une structure est
+    // imbriquée. body_has_func ne pilote que reg_top_, donc le nombre de registres
+    // réservés — mesuré sur une boucle 10M contenant un switch : aucun gain (+0,9 %,
+    // sous le bruit de disposition du code). Ne pas ré-affiner sans nouvelle mesure.
+    void visit(const SwitchStmt&) override {
         result = true;
     }
     void visit(const EnumDeclStmt&) override {

@@ -34,11 +34,12 @@ stmt           = varDecl
 
 importStmt     = "import" STRING [ "as" IDENT ] NL ;
 
-enumDecl       = "enum" enumTarget [ enumItem { "," enumItem } ] "end" NL ;
+enumDecl       = "enum" enumTarget [ enumItem { "," enumItem } [ "," ] ] "end" NL ;
 enumTarget     = IDENT { "." IDENT } ;
 enumItem       = IDENT [ "=" expr ] ;
                  (* crée une MAP dont les clés sont les éléments ; les sauts de ligne
-                    entre éléments sont libres (les NL ne sont pas des tokens) *)
+                    entre éléments sont libres (les NL ne sont pas des tokens), et la
+                    virgule finale est tolérée — pratique en liste verticale *)
                  (* cible : IDENT seul = variable GLOBALE (comme une classe, référence
                     en avant possible) ; chemin a.b = écrit le champ b de la map a *)
                  (* NUMÉROTATION — un élément sans valeur prend le compteur, qui part de 1
