@@ -764,9 +764,6 @@ std::unique_ptr<Expr> Parser::multiplicative() {
     return left;
 }
 
-// Précédence (modèle Lua) : '^' (puissance) lie plus fort que le moins unaire.
-//   multiplicative → unary → power → primary
-//   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (droite)
 // `ref x` / `ref a.b.c` — passage par RÉFÉRENCE, désucré ici même (aucun type ni
 // opcode nouveau) en un objet portant la lecture et l'écriture de la cible :
 //
@@ -875,6 +872,9 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     return m;
 }
 
+// Précédence (modèle Lua) : '^' (puissance) lie plus fort que le moins unaire.
+//   multiplicative → unary → power → primary
+//   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (droite)
 std::unique_ptr<Expr> Parser::unary() {
     if (check(TokenType::MINUS)) {
         advance();
