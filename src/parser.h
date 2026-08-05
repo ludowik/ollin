@@ -64,6 +64,7 @@ const Token& peek() const;
     std::unique_ptr<Stmt> import_stmt();
     std::unique_ptr<Stmt> class_decl();
     std::unique_ptr<Stmt> enum_decl();
+    std::unique_ptr<Expr> ref_expr();
     std::unique_ptr<Stmt> switch_stmt();
 
     std::unique_ptr<Expr> parse_postfix(std::unique_ptr<Expr> base);

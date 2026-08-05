@@ -626,8 +626,8 @@ assert(scene.camera.fov       == 60)
 
 ## sémantique référence
 var orig = {x: 1}
-var ref  = orig
-ref.x = 99
+var alias = orig          ## `ref` est un mot-clé (passage par référence) → autre nom
+alias.x = 99
 assert(orig.x == 99)
 
 ## clés de tout type (via crochets)
@@ -1210,3 +1210,32 @@ assert(enum_bloque and Couleur.ROUGE == 1)
 global enumCfg = {}
 enum enumCfg.mode PLEIN, FENETRE end
 assert(enumCfg.mode.PLEIN == 1 and enumCfg.mode.FENETRE == 2)
+
+## ── 27. ref (passage par référence) ──────────────────────────────────────────
+## `ref x` donne à une fonction le moyen de LIRE et d'ÉCRIRE la variable x.
+## La cible reste une variable ordinaire : on la lit et on l'écrit normalement.
+global refCible = 1
+var refLocale = "a"
+global refObj = {champ: 10}
+
+func refEcrire(r, v)
+    r.set(v)          ## écriture à travers la référence
+end
+func refLire(r)
+    return r.get()
+end
+
+assert(refLire(ref refCible) == 1)
+refEcrire(ref refCible, 5)
+assert(refCible == 5)         ## la variable elle-même a changé
+
+refEcrire(ref refLocale, "b")    ## une LOCALE est référençable (upvalue)
+assert(refLocale == "b")
+
+refEcrire(ref refObj.champ, 20)  ## un champ d'objet aussi
+assert(refObj.champ == 20)
+
+## Une référence est une valeur : stockable et transmissible.
+var refStock = ref refCible
+refStock.set(7)
+assert(refCible == 7)

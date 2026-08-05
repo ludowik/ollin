@@ -767,6 +767,114 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 // Précédence (modèle Lua) : '^' (puissance) lie plus fort que le moins unaire.
 //   multiplicative → unary → power → primary
 //   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (droite)
+// `ref x` / `ref a.b.c` — passage par RÉFÉRENCE, désucré ici même (aucun type ni
+// opcode nouveau) en un objet portant la lecture et l'écriture de la cible :
+//
+//   {__ref: true, get: func() return x end, set: func(v) x = v end}
+//
+// Les closures capturent la cible par upvalue si elle est locale, ou lisent/écrivent
+// le global sinon — c'est le mécanisme des upvalues qui fait tout le travail.
+// `__ref` ne sert qu'à la validation côté module natif (une map avec get/set n'est
+// pas forcément une référence : le module `data` en a aussi).
+static const char* REF_PARAM = "__ref_v";   // nom du paramètre du setter : ne doit
+                                            // JAMAIS collisionner avec la cible (`ref v`)
+
+std::unique_ptr<Expr> Parser::ref_expr() {
+    int line = peek().line;
+    advance(); // REF
+    // Cible : IDENT { "." IDENT }. L'indexation par crochets est refusée — le chemin
+    // serait réévalué à chaque accès, donc `ref t[i]` suivrait les changements de i.
+    if (!check(TokenType::IDENTIFIER))
+        throw std::runtime_error(cur_loc(line).str(*source_files_) + ": ref attend un nom de variable, pas '" +
+                                 peek().lexeme + "'");
+    std::vector<std::string> path;
+    path.push_back(advance().lexeme);
+    while (check(TokenType::DOT)) {
+        advance();
+        path.push_back(expect(TokenType::IDENTIFIER).lexeme);
+    }
+    if (check(TokenType::LBRACKET))
+        throw std::runtime_error(cur_loc(line).str(*source_files_) +
+                                 ": ref n'accepte qu'un nom ou un chemin de champs (pas d'indexation [])");
+
+    auto set_loc = [&](Expr* e) {
+        e->line = line;
+        e->file_idx = current_file_idx_;
+    };
+    // Construit l'accès aux `n` premiers segments (VarExpr, ou IndexExpr chaîné).
+    // Appelé plusieurs fois : chaque arbre généré a besoin du sien.
+    auto make_access = [&](size_t n) {
+        std::unique_ptr<Expr> e = std::make_unique<VarExpr>(path[0]);
+        set_loc(e.get());
+        for (size_t i = 1; i < n; ++i) {
+            auto ix = std::make_unique<IndexExpr>();
+            ix->obj = std::move(e);
+            auto k = std::make_unique<StringExpr>(path[i]);
+            set_loc(k.get());
+            ix->key = std::move(k);
+            set_loc(ix.get());
+            e = std::move(ix);
+        }
+        return e;
+    };
+
+    auto getter = std::make_unique<FuncExpr>();
+    set_loc(getter.get());
+    {
+        auto ret = std::make_unique<ReturnStmt>();
+        ret->line = line;
+        ret->file_idx = current_file_idx_;
+        ret->values.push_back(make_access(path.size()));
+        getter->body.push_back(std::move(ret));
+    }
+
+    auto setter = std::make_unique<FuncExpr>();
+    set_loc(setter.get());
+    setter->params.push_back(REF_PARAM);
+    setter->defaults.push_back(nullptr);
+    {
+        auto val = std::make_unique<VarExpr>(std::string(REF_PARAM));
+        set_loc(val.get());
+        std::unique_ptr<Stmt> assign;
+        if (path.size() == 1) {
+            auto a = std::make_unique<AssignStmt>();
+            a->name = path[0];
+            a->value = std::move(val);
+            assign = std::move(a);
+        } else {
+            // a.b.c = v  →  conteneur = accès à `a.b`, clé = "c"
+            auto ia = std::make_unique<IndexAssignStmt>();
+            ia->obj_expr = make_access(path.size() - 1);
+            auto k = std::make_unique<StringExpr>(path.back());
+            set_loc(k.get());
+            ia->key = std::move(k);
+            ia->op = TokenType::EQUALS;
+            ia->value = std::move(val);
+            assign = std::move(ia);
+        }
+        assign->line = line;
+        assign->file_idx = current_file_idx_;
+        setter->body.push_back(std::move(assign));
+    }
+
+    auto m = std::make_unique<MapExpr>();
+    set_loc(m.get());
+    auto add = [&](const char* key, std::unique_ptr<Expr> value) {
+        MapEntry e;
+        auto k = std::make_unique<StringExpr>(std::string(key));
+        set_loc(k.get());
+        e.key = std::move(k);
+        e.value = std::move(value);
+        m->entries.push_back(std::move(e));
+    };
+    auto marker = std::make_unique<BoolExpr>(true);
+    set_loc(marker.get());
+    add("__ref", std::move(marker));
+    add("get", std::move(getter));
+    add("set", std::move(setter));
+    return m;
+}
+
 std::unique_ptr<Expr> Parser::unary() {
     if (check(TokenType::MINUS)) {
         advance();
@@ -787,6 +895,8 @@ std::unique_ptr<Expr> Parser::unary() {
         e->args.push_back(unary());
         return e;
     }
+    if (check(TokenType::REF))
+        return ref_expr();
     return power();
 }
 

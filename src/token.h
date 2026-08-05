@@ -37,6 +37,7 @@ enum class TokenType {
     SWITCH,
     CASE,
     ENUM,
+    REF,
     SEMICOLON,
     DOT_DOT_DOT,
     EQUALS,

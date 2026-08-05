@@ -541,6 +541,27 @@ Sémantique de copie : référence comptée (partage de la même map, pas clone)
 Itération via `MapIterator` (snapshot au moment du `for`) — ordre non garanti.  
 Opcodes : `NEW_MAP`, `GET_INDEX`, `SET_INDEX`.
 
+## Passage par référence (`ref`, implémentation)
+
+> Syntaxe et sémantique : voir `grammar.ebnf` (`refExpr`).
+
+`ref x` est **désucré par le parser** (`parser.cpp`, `ref_expr`) en l'arbre de
+`{__ref: true, get: func() return x end, set: func(v) x = v end}`. Conséquence :
+**aucun type, aucun opcode, aucune ligne dans `ast.h`, le compilateur ou la VM** — ce
+sont les upvalues qui font tout le travail, y compris la capture d'une locale.
+
+- Le paramètre du setter s'appelle `__ref_v` : avec `v`, `ref v` générait
+  `func(v) v = v end`, une écriture sans effet (cas figé dans `regressions.ol`).
+- Le getter et le setter ont chacun leur propre arbre d'accès (`make_access(n)`) : un
+  `unique_ptr` ne se duplique pas.
+- `__ref` sert à la VALIDATION côté natif : une map avec `get`/`set` n'est pas forcément
+  une référence (le module `data` en a). Helpers `is_ref`/`ref_get`/`ref_set` dans
+  `module_utils.h`.
+- Cible = nom ou chemin de champs. L'indexation est refusée : le chemin étant réévalué à
+  chaque accès, `ref t[i]` suivrait les changements de `i`.
+- `ref` est un **mot-clé réservé** : il ne peut plus servir de nom de variable (une
+  occurrence de `syntax.ol` a dû être renommée).
+
 ## Type enum (implémentation)
 
 > Syntaxe, numérotation et sémantique : voir `grammar.ebnf` (`enumDecl`).

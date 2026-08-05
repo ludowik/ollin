@@ -786,4 +786,47 @@ end
 assert(dfTry[1]() == 3 and dfTry[3]() == 3)
 
 
+## ── ref (passage par référence) ───────────────────────────────────────────────
+## `ref x` est désucré par le parser en {__ref, get, set} : deux closures qui lisent
+## et écrivent la cible. Les upvalues font le travail, y compris pour une locale.
+global rfGlobal = 5
+var rfLocale = 1
+global rfObj = {champ: "a", sous: {x: 1}}
+
+func rfLire(r) return r.get() end
+func rfEcrire(r, v) r.set(v) end
+
+assert((ref rfGlobal).__ref)              ## marque de validation pour les modules natifs
+assert(rfLire(ref rfGlobal) == 5)
+rfEcrire(ref rfGlobal, 42)
+assert(rfGlobal == 42)
+rfEcrire(ref rfLocale, 7)                 ## écriture d'une LOCALE depuis une autre fonction
+assert(rfLocale == 7)
+rfEcrire(ref rfObj.champ, "b")
+assert(rfObj.champ == "b")
+rfEcrire(ref rfObj.sous.x, 99)            ## chemin de deux niveaux
+assert(rfObj.sous.x == 99)
+
+## Le paramètre du setter généré ne doit JAMAIS masquer la cible : `ref v` a produit
+## `func(v) v = v end` dans une version naïve, donc une écriture sans effet.
+var v = 1
+rfEcrire(ref v, 9)
+assert(v == 9)
+
+## La référence est une valeur ordinaire : stockable, transmissible.
+var rfStock = ref rfGlobal
+rfStock.set(3)
+assert(rfGlobal == 3)
+
+## Référence prise sur une locale de BLOC : lisible après la sortie du bloc (l'upvalue
+## est fermée sur une copie), l'écriture ne remonte plus nulle part — comportement figé
+## ici pour qu'un changement du mécanisme d'upvalue se voie.
+var rfEchappe = nil
+do
+    var rfInterne = "dedans"
+    rfEchappe = ref rfInterne
+end
+assert(rfEchappe.get() == "dedans")
+
+
 print("regressions ok")

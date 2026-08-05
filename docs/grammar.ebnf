@@ -157,7 +157,25 @@ additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
              (* overflow int64 → wrapping silencieux *)
 multiplicative = unary { ( "*" | "/" | "//" | "%" ) unary } ;
              (* "//" : division entière plancher (floor) — INT//INT → INT, FLOAT//FLOAT → FLOAT *)
-unary          = ( "-" | "not" | "~" | "#" ) unary | power ;
+refExpr        = "ref" IDENT { "." IDENT } ;
+                 (* PASSAGE PAR RÉFÉRENCE. Donne à une fonction (Ollin ou native) le
+                    moyen de LIRE et d'ÉCRIRE la variable désignée. Usage principal :
+                    lier une variable à un widget — ui.checkbox("Grille", ref grille) *)
+                 (* La cible est un nom ou un chemin de champs. L'indexation `ref t[i]`
+                    est refusée : le chemin étant réévalué à chaque accès, la référence
+                    suivrait les changements de i. *)
+                 (* Le nom doit être DÉCLARÉ : `ref inconnue` est une erreur de
+                    compilation, contrairement à un nom passé sous forme de chaîne. *)
+                 (* Vaut un objet {__ref: true, get: func, set: func} : le script lit
+                    r.get() et écrit r.set(v) ; `__ref` sert à la validation côté natif.
+                    La cible, elle, se lit et s'écrit NORMALEMENT — une référence ne
+                    change rien à l'usage de la variable elle-même. *)
+                 (* Cible LOCALE : la référence reste valide après la sortie du bloc
+                    (upvalue fermée sur une copie) mais l'écriture ne remonte plus. *)
+                 (* Coût : deux fermetures + une map par évaluation → à éviter dans une
+                    boucle serrée. *)
+
+unary          = ( "-" | "not" | "~" | "#" ) unary | refExpr | power ;
              (* "~" unaire = NOT bit-à-bit ; "#" : sucre syntaxique — "#expr" ≡ "len(expr)" *)
 power          = primary ( "^" unary ) ? ;
              (* "^" : exponentiation, associatif à droite — INT^INT(≥0) → INT ; sinon FLOAT *)

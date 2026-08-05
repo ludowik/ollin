@@ -1,6 +1,28 @@
 #pragma once
 #include "value.h"
+#include "vm.h"
 #include <stdexcept>
+
+// ── Références (`ref x` côté script) ────────────────────────────────────────────
+// Le parser désucre `ref x` en {__ref: true, get: func, set: func} (parser.cpp,
+// ref_expr). Un module natif lit et écrit la variable référencée par ces deux
+// closures. La marque `__ref` distingue une VRAIE référence d'une map qui aurait
+// simplement des membres get/set — le module `data` en a.
+static inline bool is_ref(const Value& v) {
+    if (!v.is_map())
+        return false;
+    return !v.map_get(Value(std::string("__ref"))).is_nil() &&
+           v.map_get(Value(std::string("get"))).is_callable() &&
+           v.map_get(Value(std::string("set"))).is_callable();
+}
+
+static inline Value ref_get(const Value& r) {
+    return VM::current()->call_value(r.map_get(Value(std::string("get"))));
+}
+
+static inline void ref_set(const Value& r, const Value& value) {
+    VM::current()->call_value(r.map_get(Value(std::string("set"))), value);
+}
 
 // Précondition : l'appelant DOIT avoir garanti i < argc (aucun contrôle de borne
 // ici — forme rapide utilisée après une garde argc). Pour un contrôle de borne

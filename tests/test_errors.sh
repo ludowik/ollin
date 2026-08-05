@@ -175,6 +175,21 @@ m.A = nil' \
     "cannot modify an enum"
 
 
+# ── ref ──────────────────────────────────────────────────────────────────────
+check_error "ref on undeclared variable" \
+    'var r = ref inconnue' \
+    "undeclared variable 'inconnue'"
+
+check_error "ref on a literal" \
+    'var r = ref 42' \
+    "ref attend un nom de variable"
+
+check_error "ref with index" \
+    'var t = [1, 2]
+var r = ref t[1]' \
+    "chemin de champs"
+
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

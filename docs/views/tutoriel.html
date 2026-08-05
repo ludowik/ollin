@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-05 08:27</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-05 10:08</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -401,6 +401,7 @@ pre:hover .code-actions,
   <a href="#maps">Maps</a>
   <a href="#map-iter">Itération</a>
   <a href="#enum">Enum</a>
+  <a href="#ref">Références</a>
   <div class="section-label">Arrays</div>
   <a href="#arrays">Arrays</a>
   <div class="section-label">Gestion d'erreurs</div>
@@ -421,7 +422,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-05 08:27</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-05 10:08</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -1173,6 +1174,46 @@ m.ROUGE = <span class="num">5</span>              <span class="cmt">## erreur d'
 <pre><code><span class="kw">global</span> cfg = {}
 <span class="kw">enum</span> cfg.mode PLEIN, FENETRE <span class="kw">end</span>
 <span class="bi">print</span>(cfg.mode.PLEIN)      <span class="cmt">## 1</span></code></pre>
+</section>
+
+<!-- ── ref ────────────────────────────────────────────────────────────────── -->
+<section id="ref">
+<h2>Références</h2>
+<p><code>ref x</code> donne à une fonction le moyen de <strong>lire et d'écrire</strong> la variable <code>x</code>, au lieu d'en recevoir une copie. C'est ce qui permet à un module de tenir une variable à jour — le cas typique étant une case à cocher liée à un réglage.</p>
+
+<pre><code><span class="kw">global</span> grille = <span class="kw">true</span>
+ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grille)
+
+<span class="kw">func</span> <span class="fn">draw</span>()
+    <span class="kw">if</span> grille <span class="kw">then</span>          <span class="cmt">## lecture NORMALE : ref ne change rien à l'usage de la variable</span>
+        dessineGrille()
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+
+<div class="callout tip">Le point important : la variable reste une variable. <code>ref</code> sert uniquement à <em>transmettre</em> le droit de l'écrire ; le code qui l'utilise ne change pas.</div>
+
+<h3>Manipuler une référence reçue</h3>
+<p>Une fonction qui reçoit une référence la lit avec <code>get()</code> et l'écrit avec <code>set(v)</code>.</p>
+
+<pre><code><span class="kw">func</span> <span class="fn">basculer</span>(r)
+    r.set(<span class="kw">not</span> r.get())
+<span class="kw">end</span>
+
+<span class="kw">global</span> actif = <span class="kw">false</span>
+basculer(<span class="kw">ref</span> actif)
+<span class="bi">assert</span>(actif)</code></pre>
+
+<h3>Cibles acceptées</h3>
+<p>Un nom — global ou local — ou un chemin de champs. Le nom doit être <strong>déclaré</strong> : <code>ref inconnue</code> est une erreur de <em>compilation</em>, ce qui est tout l'intérêt par rapport au passage d'un nom sous forme de chaîne.</p>
+
+<pre><code><span class="kw">ref</span> compteur           <span class="cmt">## un global ou une locale</span>
+<span class="kw">ref</span> cfg.tuiles         <span class="cmt">## un champ</span>
+<span class="kw">ref</span> cfg.rendu.ombres   <span class="cmt">## un chemin de champs</span>
+<span class="kw">ref</span> t[<span class="num">1</span>]              <span class="cmt">## REFUSÉ : le chemin serait réévalué à chaque accès</span></code></pre>
+
+<h3>Deux limites à connaître</h3>
+<p>Une référence prise sur une variable <strong>locale à un bloc</strong> reste lisible après la sortie du bloc, mais l'écriture n'atteint plus rien : la variable n'existe plus, la référence s'est fermée sur une copie.</p>
+<p>Chaque <code>ref x</code> évalué crée deux fermetures et un objet. C'est négligeable à la déclaration d'un widget, à éviter dans une boucle serrée.</p>
 </section>
 
 <!-- ── Arrays ─────────────────────────────────────────────────────────────── -->
