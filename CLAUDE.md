@@ -463,13 +463,17 @@ Deux visiteurs l'utilisent :
   réservés), pas la vitesse. Boucle 10M contenant un switch : +0,9 %, sous le bruit de
   disposition du code (±7 %).
 
-**Non converti, volontairement** :
-- `CollectLocalsVisitor` repose sur le fait de NE PAS descendre (portée lexicale : les
-  locales d'un bloc sont collectées à part, avec leurs propres registres). Le convertir
-  toucherait l'allocation de registres pour un gain nul.
-- `CollectLocalsVisitor`/`CollectGlobalsVisitor` gardent leur propre critère de noms
-  (`is_global` ou non, classes comprises ou non) : ces questions dépendent du contexte
-  de compilation et n'ont pas leur place dans `ast.h`.
+**Non converti, volontairement** : `CollectLocalsVisitor`. Il repose sur le fait de NE
+PAS descendre (portée lexicale : les locales d'un bloc sont collectées à part, avec leurs
+propres registres). Le convertir toucherait l'allocation de registres pour un gain nul.
+C'est le SEUL consommateur de l'AST qui garde une liste de sortes d'instructions écrite
+à la main, et un oubli y est sans effet : ne pas descendre est justement son but.
+
+**Question distincte, qui n'a PAS migré dans `ast.h`** : le CRITÈRE de noms de
+`CollectLocalsVisitor` / `CollectGlobalsVisitor` (`is_global` ou non, classes comprises
+ou non). Il dépend du contexte de compilation, donc seule la question « quels noms au
+niveau module » vit sur le nœud (`exported_names`) — ne pas confondre les deux en
+voulant « généraliser ».
 
 **Filet de sécurité** : `tests/regressions.ol` déclare un `global` au fond de CHAQUE
 sorte de construction et le lit depuis une fonction déclarée AVANT — une descente
