@@ -190,6 +190,22 @@ var r = ref t[1]' \
     "chemin de champs"
 
 
+# ── module ui ────────────────────────────────────────────────────────────────
+check_error "ui.checkbox without a reference" \
+    'global g = true
+ui.checkbox("Grille", g)' \
+    "must be a reference"
+
+check_error "ui.button without a function" \
+    'ui.button("Rejouer", 42)' \
+    "must be a function"
+
+check_error "ui.button label not a string" \
+    'func f() end
+ui.button(42, f)' \
+    "label must be a string"
+
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

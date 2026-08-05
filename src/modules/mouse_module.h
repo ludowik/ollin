@@ -5,4 +5,5 @@
 // Appelé une fois par frame depuis la boucle de rendu (graphics_module.cpp) :
 // détecte les actions pointeur et appelle, si elles existent, mouse.pressed(x,y) /
 // mouse.released(x,y) / mouse.moved(x,y).
-void mouse_poll();
+// click_taken : un widget de l'UI a déjà pris ce clic → ne pas appeler pressed/released.
+void mouse_poll(bool click_taken = false);

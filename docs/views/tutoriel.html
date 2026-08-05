@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-05 18:29</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-05 18:57</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -414,6 +414,7 @@ pre:hover .code-actions,
   <a href="#graphics">Graphics + Colors</a>
   <a href="#keyboard">Clavier</a>
   <a href="#mouse">Souris</a>
+  <a href="#ui">Module ui</a>
   <a href="#data">Module data</a>
   <a href="#image">Module image</a>
   <a href="#window">Module window</a>
@@ -422,7 +423,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-05 18:29</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-05 18:57</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2074,6 +2075,49 @@ print(v3)          ## Vec2(4,6)</code></pre>
     graphics.fill(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>)
     graphics.circle(px, py, <span class="num">10</span>)
 <span class="kw">end</span></code></pre>
+</section>
+
+<!-- ── ui ─────────────────────────────────────────────────────────────────── -->
+<section id="ui">
+<h2>Module ui</h2>
+<p>Boutons et cases à cocher dessinés par le <strong>moteur</strong>, en pile dans le coin haut droit de la zone de tracé. Aucune dépendance au navigateur : le même code tourne en natif, sous un affichage virtuel et dans le playground.</p>
+
+<p>Un widget se déclare <strong>une fois</strong> — au niveau du fichier ou dans <code>setup()</code>. Le moteur le dessine et le teste à chaque frame : il n'y a rien à appeler dans <code>draw()</code>.</p>
+
+<pre><code><span class="kw">global</span> grille = <span class="kw">true</span>
+
+<span class="kw">func</span> <span class="fn">remettreAZero</span>()
+    t = <span class="num">0</span>
+<span class="kw">end</span>
+
+ui.button(<span class="str">"Remettre à zéro"</span>, remettreAZero)
+ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grille)
+
+<span class="kw">func</span> <span class="fn">draw</span>()
+    <span class="kw">if</span> grille <span class="kw">then</span>       <span class="cmt">## lecture NORMALE de la variable liée</span>
+        dessineGrille()
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+
+<h3>API</h3>
+<table>
+  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>ui.button(libellé, fonction)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
+    <tr><td><code>ui.checkbox(libellé, ref variable [, surChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>surChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
+    <tr><td><code>ui.clear()</code></td><td>Retire tous les widgets — pour reconstruire une interface qui change en cours de route.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip">Un clic sur un widget n'est <strong>pas</strong> transmis à <code>mouse.pressed</code> : cliquer un bouton de l'interface ne déclenche donc pas aussi l'action de la scène. Un clic ailleurs parvient normalement au script.</div>
+
+<h3>Ce qu'il faut savoir</h3>
+<ul>
+  <li>La taille de l'interface est <strong>proportionnelle</strong> à la hauteur de la zone de tracé, donc lisible aussi bien sur un écran de bureau que sur un téléphone, dont la toile compte plusieurs pixels par pixel d'affichage.</li>
+  <li>La pile se place sous l'indicateur de mémoire et d'images par seconde, qui occupe le même coin.</li>
+  <li>La variable d'une case doit être <strong>accessible</strong> : un global ou un champ d'objet. Une variable locale à une fonction n'a pas de sens ici, puisqu'elle disparaît avant le premier clic.</li>
+  <li>Sans zone graphique — exécution en ligne de commande sans fenêtre —, déclarer un widget ne fait rien, mais les arguments sont tout de même vérifiés.</li>
+</ul>
 </section>
 
 <section id="data">

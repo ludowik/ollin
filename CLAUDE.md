@@ -87,7 +87,7 @@ ollin/
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
 │   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
-│   │                  image (+ image_stub), + modules.h/.cpp, module_utils.h
+│   │                  image (+ image_stub), ui (+ ui_stub), + modules.h/.cpp, module_utils.h
 │   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
@@ -376,6 +376,36 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | HALT          | —      |                            | arrêt                                            |
+
+## Module `ui` (implémentation)
+
+> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module ui »).
+
+Widgets dessinés par le moteur, en pile dans le coin haut droit. Trois points
+d'accroche dans la boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`) :
+
+- **`ui_poll()` AVANT `mouse_poll(...)`** : il renvoie true s'il a consommé le clic, et
+  `mouse_poll(click_taken)` neutralise alors `pressed`/`released`/`doubleClicked`. C'est
+  LA raison d'être d'un module natif plutôt qu'une classe Ollin : une classe ne peut pas
+  s'interposer, elle devrait voler les callbacks du script (cf. l'avertissement en tête
+  de `joystick.ol`, qui réclame trois relais).
+- **`ui_draw()` APRÈS `draw()`** et après `end3d_internal()` : dans la même render
+  texture, donc capturé par `graphics.screenshot` et posé par-dessus la 3D.
+- **`ui_reset()` dans `ollin_run` (wasm_main.cpp), PAS dans `gfx_run`** : les widgets
+  sont déclarés au niveau du fichier, donc AVANT `graphics.run` — réinitialiser dans
+  `gfx_run` les effaçait tous (constaté). Le reset appartient au démarrage d'un
+  PROGRAMME, comme `image_reset`/`camera_reset`.
+
+Autres points :
+- La géométrie de chaque widget est celle **de la dernière frame dessinée**, mémorisée
+  dans `Widget::box` : la zone cliquable est exactement ce qui est affiché.
+- Mise en page **proportionnelle** à `gfx_logical_height()` (comme `joystick.ol`) : le
+  canvas est en pixels physiques, donc des tailles fixes seraient illisibles sur mobile.
+- La pile démarre sous `gfx_overlay_height()` : l'overlay FPS occupe le même coin et se
+  compose APRÈS la render texture, donc par-dessus.
+- La validation des arguments vit dans `ui_module.h` (`ui_check_*_args`), appelée par le
+  module ET par `ui_stub.cpp` : une faute d'appel se voit en natif headless, où tournent
+  les tests.
 
 ## Globales moteur (engine-injected globals)
 

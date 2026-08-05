@@ -17,6 +17,7 @@ Value make_keyboard_module();
 Value make_mouse_module();
 Value make_data_module();
 Value make_camera_module();
+Value make_ui_module();
 
 static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "core",     make_core_module     },
@@ -31,6 +32,7 @@ static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "mouse",    make_mouse_module    },
     { "data",     make_data_module     },
     { "camera",   make_camera_module   },
+    { "ui",       make_ui_module       },
 };
 
 const std::vector<std::string>& builtin_module_names() {

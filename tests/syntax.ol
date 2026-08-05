@@ -1239,3 +1239,24 @@ assert(refObj.champ == 20)
 var refStock = ref refCible
 refStock.set(7)
 assert(refCible == 7)
+
+## ── 28. Module ui (widgets dessinés par le moteur) ────────────────────────────
+## Boutons et cases à cocher en pile dans le coin haut droit de la zone de tracé.
+## Un widget se déclare UNE fois ; le moteur le dessine et le teste chaque frame.
+##
+##   ui.button(libellé, fonction)                       → appelée à chaque clic
+##   ui.checkbox(libellé, ref variable [, surChange])   → écrit true/false dedans
+##   ui.clear()                                         → retire tous les widgets
+##
+## La case est liée par RÉFÉRENCE : l'état initial est lu dans la variable, chaque
+## clic y écrit, et le programme lit la variable normalement. surChange(nouvelEtat)
+## est appelée après le changement si elle est fournie.
+##
+## Un clic sur un widget n'est PAS transmis à mouse.pressed ; un clic ailleurs l'est.
+## Sans zone graphique, déclarer un widget ne fait rien — mais les arguments sont
+## vérifiés (label chaîne, fonction appelable, référence obligatoire).
+global uiFlag = true
+func uiAction() end
+ui.button("Action", uiAction)
+ui.checkbox("Option", ref uiFlag)
+ui.clear()

@@ -1,6 +1,7 @@
 #include "compiler.h"
 #include "lexer.h"
 #include "modules/camera_module.h"
+#include "modules/ui_module.h"
 #include "modules/data_module.h"
 #include "modules/graphics_internal.h"
 #include "modules/image_module.h"
@@ -23,6 +24,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     // Release stale GL texture handles before GL context may be reset.
     image_reset();
     camera_reset();
+    ui_reset();   // widgets du programme précédent (les statiques survivent au VM)
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
     s_vm = std::make_unique<VM>();

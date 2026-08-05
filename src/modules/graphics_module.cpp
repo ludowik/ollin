@@ -1,4 +1,5 @@
 #include "graphics_internal.h"
+#include "ui_module.h"
 #include "image_module.h"
 #include "module_utils.h"
 #include "value.h"
@@ -337,6 +338,14 @@ static void apply_fill(bool en, Color c = WHITE) {
 }
 
 // Accesseurs d'état de style (déclarés dans graphics_internal.h) — lus par graphics3d.cpp.
+int gfx_logical_width() {
+    return s_logicalW;
+}
+
+int gfx_logical_height() {
+    return s_logicalH;
+}
+
 bool gfx_has_fill() {
     return s_has_fill;
 }
@@ -984,6 +993,15 @@ static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
 
 // Overlay FPS dessiné par le moteur après chaque frame (toujours en haut à
 // droite de la zone graphique). Couleur vive + ombre → lisible sur tout fond.
+// Taille et marge de l'overlay FPS. `ui_module` réserve cette bande pour ne pas
+// dessiner dessous (l'overlay est composé APRÈS la render texture, donc par-dessus).
+static const int OVERLAY_SIZE = 16;
+static const int OVERLAY_MARGIN = 8;
+
+int gfx_overlay_height() {
+    return OVERLAY_MARGIN + OVERLAY_SIZE;
+}
+
 static void draw_fps_overlay() {
     // FPS calculé depuis NOTRE delta (fiable), lissé pour éviter le scintillement.
     if (s_frame_dt > 0.0) {
@@ -995,7 +1013,7 @@ static void draw_fps_overlay() {
     double kb = ollin_heap_bytes() / 1024.0;
     const char* buf = (kb >= 1024.0) ? TextFormat("%.1f Mo  %d fps", kb / 1024.0, fps)
                                      : TextFormat("%.0f Ko  %d fps", kb, fps);
-    const int size = 16, margin = 8;
+    const int size = OVERLAY_SIZE, margin = OVERLAY_MARGIN;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
     int y = margin;
@@ -1040,10 +1058,14 @@ static void call_update_if_any() {
 static void run_user_callbacks(const Value& draw_fn) {
     reset_styles();
     keyboard_poll();
-    mouse_poll();
+    // Les widgets voient le clic AVANT le script : s'ils le consomment, mouse.pressed
+    // n'est pas appelé — cliquer un bouton ne déclenche donc pas aussi l'action de la
+    // scène. C'est la raison d'être d'un module natif plutôt qu'une classe Ollin.
+    mouse_poll(ui_poll());
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
     end3d_internal();   // no-op hors 3D ; sinon flush + refermer si draw() a oublié end3d
+    ui_draw();          // par-dessus la scène, dans la même render texture
 }
 
 static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {

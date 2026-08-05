@@ -27,6 +27,15 @@ inline double gfx_to_num(const Value& v) {
 // Value (objet Color / classe) → Color raylib ; lève si ce n'en est pas un.
 Color gfx_to_color(const Value& v);
 
+// ── Zone de tracé en unités LOGIQUES (défini par graphics.canvas) ───────────────
+// La projection d'une frame est en unités logiques : un module qui dessine dedans
+// (ui_module) doit s'y référer, pas à GetScreenWidth() qui est en pixels physiques.
+int gfx_logical_width();
+int gfx_logical_height();
+// Bande occupée en haut par l'overlay FPS (composé PAR-DESSUS la render texture) :
+// un module qui dessine en haut de la zone doit la laisser libre.
+int gfx_overlay_height();
+
 // ── État de style courant (défini dans graphics_module.cpp, lu par graphics3d.cpp) ──
 bool gfx_has_fill();
 Color gfx_fill_color();
