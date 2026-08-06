@@ -277,10 +277,14 @@ std::string slider_text(double value, bool integral) {
     return std::string(buf);
 }
 
-// Écrit la valeur si elle a changé, puis notifie. Rien n'est écrit à l'identique :
-// sinon un simple survol maintenu appellerait le rappel à chaque frame.
-void slider_set(const Value& target, const Value& on_change, double value, bool integral, double current) {
-    if (value == current)
+// Écrit la valeur si elle a changé, puis notifie. La comparaison porte sur le contenu
+// BRUT de la variable, jamais sur la valeur ramenée aux bornes : sinon une variable
+// hors plage (20 pour un slider 1..10) resterait telle quelle, le glissement sur la
+// butée n'écrivant jamais. Rien n'est écrit à l'identique, sans quoi un maintien
+// immobile appellerait le rappel à chaque frame.
+void slider_set(const Value& target, const Value& on_change, double value, bool integral) {
+    Value current = ref_get(target);
+    if (current.is_number() && current.as_num() == value)
         return;
     Value v = integral ? Value((int64_t)llround(value)) : Value(value);
     ref_set(target, v);
@@ -357,15 +361,19 @@ static int add_checkbox(CallCtx& ctx, const Value* args, int argc, int parent) {
 static int add_slider(CallCtx& ctx, const Value* args, int argc, int parent) {
     ui_check_slider_args(args, argc);
     ui_slider_init(args, argc);
+    // TOUT ce qui appelle le script — ici la lecture de la référence — est fait AVANT
+    // d'allouer le nœud : un getter peut déclarer un widget, donc réallouer s_nodes, et
+    // la référence `n` obtenue avant l'appel désignerait alors de la mémoire libérée.
+    // Slider ENTIER seulement si les bornes ET la valeur de départ le sont : sinon un
+    // slider 0..1 réglant un facteur flottant arrondirait à 0 ou 1.
+    bool integral = args[2].is_integer() && args[3].is_integer() && ref_get(args[1]).is_integer();
     int slot = alloc_node(Node::SLIDER, args[0].as_string(), parent);
     Node& n = s_nodes[slot];
     n.target = args[1];
     n.vmin = args[2].as_num();
     n.vmax = args[3].as_num();
     n.vdefault = ui_slider_default(args, argc).as_num();
-    // Slider ENTIER seulement si les bornes ET la valeur de départ le sont : sinon un
-    // slider 0..1 réglant un facteur flottant arrondirait à 0 ou 1.
-    n.integral = args[2].is_integer() && args[3].is_integer() && ref_get(args[1]).is_integer();
+    n.integral = integral;
     for (int i = 4; i < argc; ++i) {
         if (args[i].is_callable())
             n.on_change = args[i];
@@ -647,8 +655,7 @@ bool poll_drag() {
     Value target = s_nodes[slot].target;
     Value on_change = s_nodes[slot].on_change;
     bool integral = s_nodes[slot].integral;
-    double current = slider_value(target, s_nodes[slot].vmin, s_nodes[slot].vmax, s_nodes[slot].vdefault);
-    slider_set(target, on_change, integral ? (double)llround(wanted) : wanted, integral, current);
+    slider_set(target, on_change, integral ? (double)llround(wanted) : wanted, integral);
     return true;
 }
 
