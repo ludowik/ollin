@@ -1246,6 +1246,8 @@ assert(refCible == 7)
 ##
 ##   ui.button(libellé, fonction)                       → appelée à chaque clic
 ##   ui.checkbox(libellé, ref variable [, surChange])   → écrit true/false dedans
+##   ui.slider(libellé, ref v, min, max [, défaut] [, surChange])
+##                                                      → valeur numérique réglable
 ##   ui.clear()                                         → retire tous les widgets
 ##
 ## Les widgets peuvent être rangés dans des MENUS. Un seul menu est affiché à la
@@ -1271,10 +1273,19 @@ func uiAction() end
 ui.button("Action", uiAction)
 ui.checkbox("Option", ref uiFlag)
 
+## Un slider initialise la variable liée si elle vaut nil (défaut, sinon min).
+global uiVal = nil
+ui.slider("Taille", ref uiVal, 0, 1, 0.25)
+assert(uiVal == 0.25)
+global uiVal2 = 7
+ui.slider("Autre", ref uiVal2, 1, 10)
+assert(uiVal2 == 7)
+
 var uiMenu = ui.menu("Réglages")
 uiMenu.checkbox("Option", ref uiFlag)
 var uiSous = uiMenu.menu("Affichage")
 uiSous.button("Action", uiAction)
+uiSous.slider("Zoom", ref uiVal, 0, 2)
 ui.show(uiMenu)
 uiSous.open()
 ui.back()

@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-06 12:51</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-06 13:03</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -423,7 +423,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-06 12:51</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-06 13:03</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2080,7 +2080,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <!-- ── ui ─────────────────────────────────────────────────────────────────── -->
 <section id="ui">
 <h2>Module ui</h2>
-<p>Boutons et cases à cocher dessinés par le <strong>moteur</strong>, en pile dans le coin haut droit de la zone de tracé. Aucune dépendance au navigateur : le même code tourne en natif, sous un affichage virtuel et dans le playground.</p>
+<p>Boutons, cases à cocher et sliders dessinés par le <strong>moteur</strong>, en pile dans le coin haut droit de la zone de tracé. Aucune dépendance au navigateur : le même code tourne en natif, sous un affichage virtuel et dans le playground.</p>
 
 <p>Un widget se déclare <strong>une fois</strong> — au niveau du fichier ou dans <code>setup()</code>. Le moteur le dessine et le teste à chaque frame : il n'y a rien à appeler dans <code>draw()</code>.</p>
 
@@ -2105,6 +2105,7 @@ ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grill
   <tbody>
     <tr><td><code>ui.button(libellé, fonction)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
     <tr><td><code>ui.checkbox(libellé, ref variable [, surChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>surChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
+    <tr><td><code>ui.slider(libellé, ref variable, min, max [, défaut] [, surChange])</code></td><td>Ajoute une valeur numérique réglable à la souris, liée à une variable passée par <a href="#ref">référence</a>. Si la variable vaut <code>nil</code>, elle est initialisée au <strong>défaut</strong> (ou à <code>min</code> en son absence). Les deux derniers arguments sont reconnus par leur type : un nombre est le défaut, une fonction le rappel appelé à chaque changement avec la nouvelle valeur.</td></tr>
     <tr><td><code>ui.clear()</code></td><td>Retire tous les widgets — pour reconstruire une interface qui change en cours de route.</td></tr>
   </tbody>
 </table>
@@ -2128,7 +2129,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>ui.menu(libellé)</code></td><td>Crée un menu à la racine et renvoie son handle. <code>menu.menu(libellé)</code> crée un sous-menu.</td></tr>
-    <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code></td><td>Mêmes déclarations que <code>ui.button</code>/<code>ui.checkbox</code>, rangées dans ce menu.</td></tr>
+    <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>Mêmes déclarations que leurs équivalents <code>ui.*</code>, rangées dans ce menu.</td></tr>
     <tr><td><code>ui.show(menu)</code></td><td>Remplace le menu global affiché. La navigation repart de zéro : <code>ui.back()</code> ne remonte pas au menu précédent. <code>ui.show(nil)</code> revient au menu racine.</td></tr>
     <tr><td><code>ui.back()</code></td><td>Remonte d'un niveau. Sans effet quand le menu global est affiché.</td></tr>
     <tr><td><code>menu.open()</code></td><td>Descend dans ce menu, comme un clic sur sa ligne — <code>ui.back()</code> y revient.</td></tr>
@@ -2147,6 +2148,8 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   <li>La taille de l'interface est <strong>proportionnelle</strong> à la hauteur de la zone de tracé, donc lisible aussi bien sur un écran de bureau que sur un téléphone, dont la toile compte plusieurs pixels par pixel d'affichage.</li>
   <li>La pile se place sous l'indicateur de mémoire et d'images par seconde, qui occupe le même coin.</li>
   <li>Retirer un menu où l'on se trouve fait remonter l'affichage au premier menu parent encore présent. Utiliser un handle retiré lève une erreur explicite.</li>
+  <li>Un slider donne une valeur <strong>entière</strong> si ses bornes et sa valeur de départ le sont, sinon flottante : <code>ui.slider("Taille", <span class="kw">ref</span> n, 1, 10)</code> avec <code>n = 3</code> règle un entier, tandis que <code>ui.slider("Facteur", <span class="kw">ref</span> f, 0, 1, 0.5)</code> règle un flottant.</li>
+  <li>La variable liée est la <strong>seule source de vérité</strong> : la glissière lit sa valeur à chaque frame, donc le programme peut l'écrire lui-même et l'affichage suit. Une valeur hors plage est ramenée aux bornes à l'affichage, sans écrire dans la variable.</li>
   <li>La variable d'une case doit être <strong>accessible</strong> : un global ou un champ d'objet. Une variable locale à une fonction n'a pas de sens ici, puisqu'elle disparaît avant le premier clic.</li>
   <li>Sans zone graphique — exécution en ligne de commande sans fenêtre —, déclarer un widget ne fait rien, mais les arguments sont tout de même vérifiés.</li>
 </ul>

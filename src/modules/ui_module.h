@@ -42,6 +42,43 @@ inline void ui_check_checkbox_args(const Value* args, int argc) {
         throw std::runtime_error("ui.checkbox: third argument must be a function");
 }
 
+// ui.slider(libellé, ref v, min, max [, défaut] [, surChange]) — les deux derniers
+// arguments sont reconnus par leur TYPE : un nombre est la valeur par défaut, une
+// fonction le rappel de changement. Aucun ordre imposé, donc aucune ambiguïté.
+inline void ui_check_slider_args(const Value* args, int argc) {
+    if (argc < 4)
+        throw std::runtime_error("ui.slider: expected label, ref variable, min, max");
+    if (!args[0].is_string())
+        throw std::runtime_error("ui.slider: label must be a string");
+    if (!is_ref(args[1]))
+        throw std::runtime_error("ui.slider: second argument must be a reference — write `ref maVariable`");
+    if (!args[2].is_number() || !args[3].is_number())
+        throw std::runtime_error("ui.slider: min and max must be numbers");
+    if (args[2].as_num() >= args[3].as_num())
+        throw std::runtime_error("ui.slider: min must be smaller than max");
+    for (int i = 4; i < argc; ++i) {
+        if (!args[i].is_nil() && !args[i].is_number() && !args[i].is_callable())
+            throw std::runtime_error("ui.slider: extra argument must be a number (default) or a function");
+    }
+}
+
+// Valeur par défaut d'un slider : le premier argument numérique après max, sinon min.
+inline Value ui_slider_default(const Value* args, int argc) {
+    for (int i = 4; i < argc; ++i) {
+        if (args[i].is_number())
+            return args[i];
+    }
+    return args[2];
+}
+
+// Une variable liée qui vaut nil est INITIALISÉE à la déclaration : le script peut la
+// lire dès la première frame. Partagé avec le stub, qui n'a pas de rendu mais doit
+// donner la même valeur au script.
+inline void ui_slider_init(const Value* args, int argc) {
+    if (ref_get(args[1]).is_nil())
+        ref_set(args[1], ui_slider_default(args, argc));
+}
+
 inline void ui_check_menu_args(const Value* args, int argc) {
     if (argc < 1)
         throw std::runtime_error("ui.menu: expected label");

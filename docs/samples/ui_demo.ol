@@ -12,6 +12,7 @@ global anim = true
 global epais = false
 global tours = 0
 global t = 0
+global vitesse = nil
 
 func remettreAZero()
     t = 0
@@ -33,6 +34,9 @@ end
 var principal = ui.menu("Principal")
 principal.button("Remettre à zéro", remettreAZero)
 principal.checkbox("Animation", ref anim)
+## Un slider règle une valeur numérique. `vitesse` valant nil, elle est initialisée
+## au défaut (1.0) à la déclaration.
+principal.slider("Vitesse", ref vitesse, 0.25, 3, 1.0)
 
 var apparence = principal.menu("Apparence")
 apparence.checkbox("Grille", ref grille)
@@ -63,7 +67,7 @@ func draw()
         dessineGrille()
     end
     if anim then
-        t += deltaTime
+        t += deltaTime * vitesse
     end
 
     ## Un cercle qui tourne : montre l'effet immédiat des trois cases.

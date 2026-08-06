@@ -411,6 +411,23 @@ entrée, un clic sur un sous-menu empile, la ligne « < » et `ui.back()` dépil
   laisserait la pile pointer sur un nœud libéré → on la tronque au premier ancêtre
   encore vivant.
 
+**Slider** (`ui.slider(libellé, ref v, min, max [, défaut] [, surChange])`) : les deux
+derniers arguments sont reconnus par leur TYPE (nombre = défaut, fonction = rappel), donc
+aucun ordre imposé. La variable liée est la **seule source de vérité** — le nœud ne
+mémorise pas la valeur courante, il la relit chaque frame, si bien qu'une écriture du
+script déplace la glissière. Une variable `nil` est initialisée à la déclaration
+(`ui_slider_init`, partagé avec le stub). Le slider est **entier** seulement si les bornes
+ET la valeur de départ le sont : sinon un slider `0..1` arrondirait à 0 ou 1. Le
+glissement dure plusieurs frames → `s_drag` retient le nœud par identité `{slot, gen}`,
+et `ui_poll` renvoie true tant qu'on glisse (sinon le relâchement atteindrait la scène).
+
+**Style** : toute l'apparence (couleurs, épaisseurs, proportions) vit dans le seul bloc
+`struct Style` / `const STYLE` de `ui_module.cpp`, et les tailles sont des fractions de
+`gfx_logical_height()`. Le rendu ne lit **aucune** valeur d'apparence en dur : changer le
+style est donc une édition locale qui s'applique à tous les widgets. `metrics()` dérive
+les dimensions de `STYLE` à chaque frame ; `row_height()` donne sa hauteur propre au
+slider (libellé + glissière).
+
 Autres points :
 - La géométrie de chaque ligne est celle **de la dernière frame dessinée**, mémorisée
   dans `Node::box` : la zone cliquable est exactement ce qui est affiché.

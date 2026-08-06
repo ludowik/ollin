@@ -3,6 +3,8 @@
 #include "module_utils.h"
 #include "vm.h"
 #include <raylib.h>
+#include <cmath>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -30,12 +32,16 @@
 namespace {
 
 struct Node {
-    enum Kind { BUTTON, CHECKBOX, MENU };
+    enum Kind { BUTTON, CHECKBOX, SLIDER, MENU };
     Kind kind = BUTTON;
     std::string label;
     Value action;      // bouton : fonction appelée au clic
     Value target;      // case : référence (`ref x`) vers la variable liée
-    Value on_change;   // case : fonction optionnelle appelée après changement
+    Value on_change;   // case/slider : fonction optionnelle appelée après changement
+    double vmin = 0.0;     // slider : bornes de la plage
+    double vmax = 1.0;
+    double vdefault = 0.0; // slider : valeur si la variable liée vaut nil
+    bool integral = false; // slider : bornes entières → valeur entière
     std::vector<int> children;   // menu : slots de son contenu, dans l'ordre déclaré
     int parent = -1;
     uint32_t gen = 1;   // incrémentée à la libération → un handle périmé est détecté
@@ -52,6 +58,10 @@ std::vector<int> s_free;
 int s_root = -1;
 std::vector<int> s_nav;
 Rectangle s_back_box = {0, 0, 0, 0};   // ligne de retour de la frame dessinée
+// Slider en cours de glissement : le suivi dure plusieurs frames, donc on retient le
+// nœud par identité (un slot seul pourrait avoir été recyclé entre deux frames).
+int s_drag = -1;
+uint32_t s_drag_gen = 0;
 
 bool node_alive(int slot, uint32_t gen) {
     return slot >= 0 && slot < (int)s_nodes.size() && s_nodes[slot].alive && s_nodes[slot].gen == gen;
@@ -149,19 +159,56 @@ Value make_handle(int slot) {
     return h;
 }
 
-// ── Mise en page ────────────────────────────────────────────────────────────────
-// PROPORTIONNELLE à la hauteur de la zone de tracé, comme le joystick : le canvas
-// est en pixels PHYSIQUES (sur mobile, plusieurs par pixel CSS), donc des tailles
-// fixes donneraient une interface illisible là et énorme ailleurs.
-const float FONT_FRAC = 0.026f;   // taille de police, fraction de la hauteur
-const float FONT_MIN = 10.0f;     // en dessous, illisible quelle que soit la zone
+// ── Style ───────────────────────────────────────────────────────────────────────
+// TOUTE l'apparence est ici, et NULLE PART ailleurs : couleurs, épaisseurs, et
+// proportions. Les tailles sont des FRACTIONS de la hauteur de la zone de tracé
+// (comme le joystick) : le canvas est en pixels physiques — sur mobile, plusieurs par
+// pixel d'affichage —, donc des tailles fixes donneraient une interface illisible là
+// et énorme ailleurs. Changer le style se fait en éditant ce seul bloc : le rendu ne
+// lit aucune valeur d'apparence en dur.
+struct Style {
+    Color bg;
+    Color bg_hover;
+    Color border;
+    Color text;
+    Color check;      // remplissage d'une case cochée
+    Color chevron;    // marque d'un sous-menu
+    Color track;      // fond de la glissière d'un slider
+    Color knob;       // partie remplie de la glissière
+    float border_thick;
+    float font_frac;  // police, fraction de la hauteur de la zone
+    float font_min;   // en dessous, illisible quelle que soit la zone
+    float pad_frac;   // marge interne, fraction de la police
+    float row_frac;   // hauteur d'une ligne
+    float slider_row_frac;   // hauteur d'une ligne de slider (libellé + glissière)
+    float gap_frac;   // espace entre deux lignes
+    float margin_frac;// marge au bord de la zone
+    float box_frac;   // côté du carré d'une case
+    float check_inset;// retrait du remplissage dans le carré, fraction du carré
+    float track_frac; // épaisseur de la glissière
+};
 
-const Color C_BG = {40, 44, 54, 220};
-const Color C_BG_HOVER = {58, 64, 78, 235};
-const Color C_BORDER = {120, 130, 150, 255};
-const Color C_TEXT = {228, 232, 240, 255};
-const Color C_CHECK = {120, 220, 150, 255};
-const Color C_CHEVRON = {150, 160, 180, 255};
+const Style STYLE = {
+    {40, 44, 54, 220},     // bg
+    {58, 64, 78, 235},     // bg_hover
+    {120, 130, 150, 255},  // border
+    {228, 232, 240, 255},  // text
+    {120, 220, 150, 255},  // check
+    {150, 160, 180, 255},  // chevron
+    {28, 31, 38, 255},     // track
+    {96, 168, 232, 255},   // knob
+    1.0f,                  // border_thick
+    0.026f,                // font_frac
+    10.0f,                 // font_min
+    0.62f,                 // pad_frac
+    1.9f,                  // row_frac
+    3.0f,                  // slider_row_frac
+    0.38f,                 // gap_frac
+    0.75f,                 // margin_frac
+    1.0f,                  // box_frac
+    0.22f,                 // check_inset
+    0.34f,                 // track_frac
+};
 
 const char* CHEVRON = ">";
 const char* BACK_MARK = "<";
@@ -170,22 +217,26 @@ struct Metrics {
     float font;
     float pad;
     float row;
+    float slider_row;
     float gap;
     float margin;
     float box;
+    float track;
 };
 
 Metrics metrics() {
     float h = (float)gfx_logical_height();
     Metrics m;
-    m.font = h * FONT_FRAC;
-    if (m.font < FONT_MIN)
-        m.font = FONT_MIN;
-    m.pad = m.font * 0.62f;
-    m.row = m.font * 1.9f;
-    m.gap = m.font * 0.38f;
-    m.margin = m.font * 0.75f;
-    m.box = m.font;
+    m.font = h * STYLE.font_frac;
+    if (m.font < STYLE.font_min)
+        m.font = STYLE.font_min;
+    m.pad = m.font * STYLE.pad_frac;
+    m.row = m.font * STYLE.row_frac;
+    m.slider_row = m.font * STYLE.slider_row_frac;
+    m.gap = m.font * STYLE.gap_frac;
+    m.margin = m.font * STYLE.margin_frac;
+    m.box = m.font * STYLE.box_frac;
+    m.track = m.font * STYLE.track_frac;
     return m;
 }
 
@@ -204,6 +255,49 @@ std::string back_label() {
     return parent.empty() ? std::string(BACK_MARK) : std::string(BACK_MARK) + " " + parent;
 }
 
+// ── Slider : la variable liée est la SEULE source de vérité ─────────────────────
+// Le nœud ne mémorise pas la valeur courante : elle est lue dans la variable à chaque
+// frame, donc le script peut l'écrire lui-même et la glissière suit.
+double slider_value(const Value& target, double vmin, double vmax, double vdefault) {
+    Value v = ref_get(target);
+    double d = v.is_number() ? v.as_num() : vdefault;
+    if (d < vmin)
+        return vmin;
+    if (d > vmax)
+        return vmax;
+    return d;
+}
+
+std::string slider_text(double value, bool integral) {
+    char buf[32];
+    if (integral)
+        snprintf(buf, sizeof(buf), "%lld", (long long)llround(value));
+    else
+        snprintf(buf, sizeof(buf), "%.2f", value);
+    return std::string(buf);
+}
+
+// Écrit la valeur si elle a changé, puis notifie. Rien n'est écrit à l'identique :
+// sinon un simple survol maintenu appellerait le rappel à chaque frame.
+void slider_set(const Value& target, const Value& on_change, double value, bool integral, double current) {
+    if (value == current)
+        return;
+    Value v = integral ? Value((int64_t)llround(value)) : Value(value);
+    ref_set(target, v);
+    if (on_change.is_callable())
+        VM::current()->call_value(const_cast<Value&>(on_change), v);
+}
+
+float row_height(Node::Kind kind, const Metrics& m) {
+    return kind == Node::SLIDER ? m.slider_row : m.row;
+}
+
+// Zone utile de la glissière : c'est elle qui traduit un abscisse en valeur, au rendu
+// comme au clic — une seule vérité, donc la poignée est là où l'on croit cliquer.
+Rectangle slider_track(const Rectangle& rect, const Metrics& m) {
+    return {rect.x + m.pad, rect.y + rect.height - m.pad - m.track, rect.width - 2 * m.pad, m.track};
+}
+
 // Largeur commune à toutes les lignes : celle de la plus large, pour une pile alignée.
 float stack_width(const Metrics& m, const std::vector<int>& rows) {
     float widest = text_width(back_label(), m.font);
@@ -214,6 +308,12 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
             need += m.box + m.pad;
         if (n.kind == Node::MENU)
             need += m.pad + text_width(CHEVRON, m.font);
+        if (n.kind == Node::SLIDER) {
+            // Place pour la valeur affichée à droite : la plus large des deux bornes.
+            float vw = text_width(slider_text(n.vmin, n.integral), m.font);
+            float vmaxw = text_width(slider_text(n.vmax, n.integral), m.font);
+            need += m.pad + (vmaxw > vw ? vmaxw : vw);
+        }
         if (need > widest)
             widest = need;
     }
@@ -254,6 +354,25 @@ static int add_checkbox(CallCtx& ctx, const Value* args, int argc, int parent) {
     return ctx.ret(make_handle(slot));
 }
 
+static int add_slider(CallCtx& ctx, const Value* args, int argc, int parent) {
+    ui_check_slider_args(args, argc);
+    ui_slider_init(args, argc);
+    int slot = alloc_node(Node::SLIDER, args[0].as_string(), parent);
+    Node& n = s_nodes[slot];
+    n.target = args[1];
+    n.vmin = args[2].as_num();
+    n.vmax = args[3].as_num();
+    n.vdefault = ui_slider_default(args, argc).as_num();
+    // Slider ENTIER seulement si les bornes ET la valeur de départ le sont : sinon un
+    // slider 0..1 réglant un facteur flottant arrondirait à 0 ou 1.
+    n.integral = args[2].is_integer() && args[3].is_integer() && ref_get(args[1]).is_integer();
+    for (int i = 4; i < argc; ++i) {
+        if (args[i].is_callable())
+            n.on_change = args[i];
+    }
+    return ctx.ret(make_handle(slot));
+}
+
 static int add_menu(CallCtx& ctx, const Value* args, int argc, int parent) {
     ui_check_menu_args(args, argc);
     int slot = alloc_node(Node::MENU, args[0].as_string(), parent);
@@ -266,6 +385,10 @@ static int ui_button(CallCtx& ctx) {
 
 static int ui_checkbox(CallCtx& ctx) {
     return add_checkbox(ctx, ctx.args, ctx.argc, ui_root());
+}
+
+static int ui_slider(CallCtx& ctx) {
+    return add_slider(ctx, ctx.args, ctx.argc, ui_root());
 }
 
 static int ui_menu(CallCtx& ctx) {
@@ -282,6 +405,11 @@ static int menu_button(CallCtx& ctx) {
 static int menu_checkbox(CallCtx& ctx) {
     int parent = menu_slot(ctx.args[0], "menu.checkbox");
     return add_checkbox(ctx, ctx.args + 1, ctx.argc - 1, parent);
+}
+
+static int menu_slider(CallCtx& ctx) {
+    int parent = menu_slot(ctx.args[0], "menu.slider");
+    return add_slider(ctx, ctx.args + 1, ctx.argc - 1, parent);
 }
 
 static int menu_menu(CallCtx& ctx) {
@@ -367,6 +495,7 @@ Value make_element_class() {
     cls.map_set(Value(std::string("__name__")), Value(std::string("UiElement")));
     cls.map_set(Value(std::string("button")), Value::make_builtin(menu_button));
     cls.map_set(Value(std::string("checkbox")), Value::make_builtin(menu_checkbox));
+    cls.map_set(Value(std::string("slider")), Value::make_builtin(menu_slider));
     cls.map_set(Value(std::string("menu")), Value::make_builtin(menu_menu));
     cls.map_set(Value(std::string("open")), Value::make_builtin(menu_open));
     cls.map_set(Value(std::string("clear")), Value::make_builtin(menu_clear));
@@ -389,6 +518,7 @@ void ui_reset() {
     s_nav.clear();
     s_root = -1;
     s_back_box = {0, 0, 0, 0};
+    s_drag = -1;
 }
 
 namespace {
@@ -406,21 +536,22 @@ void layout(const Metrics& m, const std::vector<int>& rows) {
         y += m.row + m.gap;
     }
     for (int slot : rows) {
-        s_nodes[slot].box = {x, y, w, m.row};
-        y += m.row + m.gap;
+        float h = row_height(s_nodes[slot].kind, m);
+        s_nodes[slot].box = {x, y, w, h};
+        y += h + m.gap;
     }
 }
 
 void draw_row(const Rectangle& rect, bool hover) {
-    DrawRectangleRec(rect, hover ? C_BG_HOVER : C_BG);
-    DrawRectangleLinesEx(rect, 1.0f, C_BORDER);
+    DrawRectangleRec(rect, hover ? STYLE.bg_hover : STYLE.bg);
+    DrawRectangleLinesEx(rect, STYLE.border_thick, STYLE.border);
 }
 
 void draw_text_at(const std::string& text, float x, const Rectangle& rect, const Metrics& m, Color color) {
     Font f = GetFontDefault();
     if (f.texture.id == 0 || f.baseSize == 0)
         return;
-    Vector2 pos = {x, rect.y + (m.row - m.font) * 0.5f};
+    Vector2 pos = {x, rect.y + (rect.height - m.font) * 0.5f};
     DrawTextEx(f, text.c_str(), pos, m.font, m.font / (float)f.baseSize, color);
 }
 
@@ -437,7 +568,7 @@ void ui_draw() {
     Vector2 mouse = {(float)GetMouseX(), (float)GetMouseY()};
     if (s_nav.size() > 1) {
         draw_row(s_back_box, CheckCollisionPointRec(mouse, s_back_box));
-        draw_text_at(back_label(), s_back_box.x + m.pad, s_back_box, m, C_TEXT);
+        draw_text_at(back_label(), s_back_box.x + m.pad, s_back_box, m, STYLE.text);
     }
     for (int slot : rows) {
         // Copies locales : lire l'état d'une case appelle une closure du script, qui
@@ -448,28 +579,86 @@ void ui_draw() {
         Value target = s_nodes[slot].target;
         bool checked = kind == Node::CHECKBOX && checkbox_state(target);
         draw_row(rect, CheckCollisionPointRec(mouse, rect));
+        // Un slider réserve le bas de sa ligne à la glissière : le texte se centre dans
+        // la partie qui reste.
+        Rectangle text_rect = rect;
+        if (kind == Node::SLIDER)
+            text_rect.height = rect.height - m.track - m.pad;
         float tx = rect.x + m.pad;
         if (kind == Node::CHECKBOX) {
             Rectangle box = {rect.x + m.pad, rect.y + (m.row - m.box) * 0.5f, m.box, m.box};
-            DrawRectangleLinesEx(box, 1.0f, C_BORDER);
+            DrawRectangleLinesEx(box, STYLE.border_thick, STYLE.border);
             if (checked) {
-                float inset = m.box * 0.22f;
+                float inset = m.box * STYLE.check_inset;
                 Rectangle fill = {box.x + inset, box.y + inset, m.box - 2 * inset, m.box - 2 * inset};
-                DrawRectangleRec(fill, C_CHECK);
+                DrawRectangleRec(fill, STYLE.check);
             }
-            tx = box.x + m.box + m.pad * 0.6f;
+            tx = box.x + m.box + m.pad;
         }
-        draw_text_at(label, tx, rect, m, C_TEXT);
+        if (kind == Node::SLIDER) {
+            double vmin = s_nodes[slot].vmin;
+            double vmax = s_nodes[slot].vmax;
+            double value = slider_value(target, vmin, vmax, s_nodes[slot].vdefault);
+            bool integral = s_nodes[slot].integral;
+            Rectangle track = slider_track(rect, m);
+            DrawRectangleRec(track, STYLE.track);
+            float t = (float)((value - vmin) / (vmax - vmin));
+            Rectangle filled = {track.x, track.y, track.width * t, track.height};
+            DrawRectangleRec(filled, STYLE.knob);
+            DrawRectangleLinesEx(track, STYLE.border_thick, STYLE.border);
+            std::string vtext = slider_text(value, integral);
+            float vw = text_width(vtext, m.font);
+            draw_text_at(vtext, rect.x + rect.width - m.pad - vw, text_rect, m, STYLE.text);
+        }
+        draw_text_at(label, tx, text_rect, m, STYLE.text);
         if (kind == Node::MENU) {
             float cw = text_width(CHEVRON, m.font);
-            draw_text_at(CHEVRON, rect.x + rect.width - m.pad - cw, rect, m, C_CHEVRON);
+            draw_text_at(CHEVRON, rect.x + rect.width - m.pad - cw, rect, m, STYLE.chevron);
         }
     }
 }
 
+namespace {
+
+// Valeur désignée par l'abscisse du curseur sur la glissière d'un slider.
+double slider_value_at(int slot, float mouse_x, const Metrics& m) {
+    const Node& n = s_nodes[slot];
+    Rectangle track = slider_track(n.box, m);
+    float t = track.width > 0.0f ? (mouse_x - track.x) / track.width : 0.0f;
+    if (t < 0.0f)
+        t = 0.0f;
+    if (t > 1.0f)
+        t = 1.0f;
+    return n.vmin + t * (n.vmax - n.vmin);
+}
+
+// Glissement en cours : la valeur suit le curseur tant que le bouton est maintenu, et
+// le clic reste consommé — sinon relâcher au-dessus de la scène la ferait réagir.
+bool poll_drag() {
+    if (s_drag < 0)
+        return false;
+    if (!node_alive(s_drag, s_drag_gen) || !IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        s_drag = -1;
+        return false;
+    }
+    int slot = s_drag;
+    Metrics m = metrics();
+    double wanted = slider_value_at(slot, (float)GetMouseX(), m);
+    Value target = s_nodes[slot].target;
+    Value on_change = s_nodes[slot].on_change;
+    bool integral = s_nodes[slot].integral;
+    double current = slider_value(target, s_nodes[slot].vmin, s_nodes[slot].vmax, s_nodes[slot].vdefault);
+    slider_set(target, on_change, integral ? (double)llround(wanted) : wanted, integral, current);
+    return true;
+}
+
+} // namespace
+
 bool ui_poll() {
     if (s_nodes.empty())
         return false;
+    if (poll_drag())
+        return true;
     if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
         return false;
     Vector2 p = {(float)GetMouseX(), (float)GetMouseY()};
@@ -496,6 +685,12 @@ bool ui_poll() {
                 VM::current()->call_value(action);
         } else if (kind == Node::CHECKBOX) {
             toggle_checkbox(target, on_change);
+        } else if (kind == Node::SLIDER) {
+            // Le clic positionne tout de suite la valeur, puis le glissement prend le
+            // relais jusqu'au relâchement.
+            s_drag = slot;
+            s_drag_gen = s_nodes[slot].gen;
+            poll_drag();
         } else {
             s_nav.push_back(slot);
         }
@@ -508,6 +703,7 @@ Value make_ui_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("button")), Value::make_builtin(ui_button));
     m.map_set(Value(std::string("checkbox")), Value::make_builtin(ui_checkbox));
+    m.map_set(Value(std::string("slider")), Value::make_builtin(ui_slider));
     m.map_set(Value(std::string("menu")), Value::make_builtin(ui_menu));
     m.map_set(Value(std::string("show")), Value::make_builtin(ui_show));
     m.map_set(Value(std::string("back")), Value::make_builtin(ui_back));

@@ -209,6 +209,21 @@ check_error "ui.menu label not a string" \
     'var m = ui.menu(42)' \
     "label must be a string"
 
+check_error "ui.slider without a reference" \
+    'global v = 1
+ui.slider("Taille", v, 1, 10)' \
+    "must be a reference"
+
+check_error "ui.slider with min >= max" \
+    'global v = 1
+ui.slider("Taille", ref v, 10, 1)' \
+    "min must be smaller than max"
+
+check_error "ui.slider bounds not numbers" \
+    'global v = 1
+ui.slider("Taille", ref v, "a", 10)' \
+    "must be numbers"
+
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
