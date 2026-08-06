@@ -91,6 +91,9 @@ void free_subtree(int slot) {
     n.on_change = Value{};
     n.children.clear();
     n.label.clear();
+    // Le slot est recyclable : sans cet effacement, le prochain nœud qui l'occupe
+    // hériterait du rectangle du disparu et serait cliquable avant d'être dessiné.
+    n.box = {0, 0, 0, 0};
     s_free.push_back(slot);
 }
 
@@ -217,14 +220,15 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
     return widest + 2.0f * m.pad;
 }
 
-bool checkbox_state(const Node& n) {
-    return !is_falsy(ref_get(n.target));
+// La cible est prise par COPIE, jamais depuis s_nodes : lire une référence appelle
+// un getter du script, qui peut déclarer un widget et réallouer la table.
+bool checkbox_state(const Value& target) {
+    return !is_falsy(ref_get(target));
 }
 
-// Bascule d'une case : renvoie le nouvel état, écrit la variable liée, notifie.
-// Copies locales exigées par l'appelant : les callbacks peuvent réallouer s_nodes.
+// Bascule d'une case : écrit la variable liée puis notifie. Même exigence de copie.
 void toggle_checkbox(const Value& target, const Value& on_change) {
-    Value state = Value(is_falsy(ref_get(target)) ? int64_t(1) : int64_t(0));
+    Value state = Value(checkbox_state(target) ? int64_t(0) : int64_t(1));
     ref_set(target, state);
     if (on_change.is_callable())
         VM::current()->call_value(const_cast<Value&>(on_change), state);
@@ -441,7 +445,8 @@ void ui_draw() {
         Rectangle rect = s_nodes[slot].box;
         Node::Kind kind = s_nodes[slot].kind;
         std::string label = s_nodes[slot].label;
-        bool checked = kind == Node::CHECKBOX && checkbox_state(s_nodes[slot]);
+        Value target = s_nodes[slot].target;
+        bool checked = kind == Node::CHECKBOX && checkbox_state(target);
         draw_row(rect, CheckCollisionPointRec(mouse, rect));
         float tx = rect.x + m.pad;
         if (kind == Node::CHECKBOX) {
