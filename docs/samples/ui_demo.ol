@@ -3,8 +3,9 @@
 ##
 ## Un widget se déclare UNE fois. Le moteur le dessine et le teste à chaque frame.
 ## Les widgets se rangent dans des menus et sous-menus ; ui.show change le menu affiché.
-## Une case à cocher reçoit une RÉFÉRENCE (`ref maVariable`) : elle écrit dedans, et
-## le programme lit la variable normalement — voir `if grille then` dans draw().
+## Une case à cocher et un slider reçoivent une RÉFÉRENCE (`ref maVariable`) : ils
+## écrivent dedans, et le programme lit la variable normalement — voir `if grille then`
+## et `t += deltaTime * vitesse` dans draw().
 graphics.canvas(W, H, "ui")
 
 global grille = true
@@ -13,10 +14,18 @@ global epais = false
 global tours = 0
 global t = 0
 global vitesse = nil
+global branches = 3
+global teinte = 0.55
 
 func remettreAZero()
     t = 0
     tours = 0
+end
+
+func surTeinte(valeur)
+    ## Un slider accepte aussi un rappel, appelé avec la NOUVELLE valeur à chaque
+    ## changement — utile pour recalculer quelque chose de coûteux une seule fois.
+    print("teinte = " + valeur)
 end
 
 func surEpais(actif)
@@ -34,13 +43,17 @@ end
 var principal = ui.menu("Principal")
 principal.button("Remettre à zéro", remettreAZero)
 principal.checkbox("Animation", ref anim)
-## Un slider règle une valeur numérique. `vitesse` valant nil, elle est initialisée
-## au défaut (1.0) à la déclaration.
+## Un slider règle une valeur numérique à la souris. `vitesse` valant nil, elle est
+## initialisée au défaut (1.0) dès la déclaration.
 principal.slider("Vitesse", ref vitesse, 0.25, 3, 1.0)
+## Bornes ET valeur de départ entières → slider ENTIER (pas de décimale affichée).
+principal.slider("Branches", ref branches, 1, 8)
 
 var apparence = principal.menu("Apparence")
 apparence.checkbox("Grille", ref grille)
 apparence.checkbox("Trait épais", ref epais, surEpais)
+## Bornes entières mais départ flottant → slider flottant, avec rappel de changement.
+apparence.slider("Teinte", ref teinte, 0, 1, surTeinte)
 
 ## ui.show remplace le menu GLOBAL affiché : de quoi passer d'un écran à l'autre
 ## (réglages, pause, fin de partie) sans reconstruire l'interface.
@@ -70,14 +83,17 @@ func draw()
         t += deltaTime * vitesse
     end
 
-    ## Un cercle qui tourne : montre l'effet immédiat des trois cases.
+    ## Autant de bras que `branches` : chaque widget agit tout de suite sur le dessin.
     var r = math.min(W, H) * 0.28
-    var cx = CW + math.cos(t) * r
-    var cy = CH + math.sin(t) * r
-    graphics.stroke(Color(0.5, 0.85, 1), epais and 8 or 2)
+    graphics.stroke(Color(teinte, 0.85, 1 - teinte * 0.6), epais and 8 or 2)
     graphics.noFill()
-    graphics.circle(cx, cy, math.min(W, H) * 0.06)
-    graphics.line(CW, CH, cx, cy)
+    for i = 1, branches do
+        var angle = t + math.TAU * i / branches
+        var cx = CW + math.cos(angle) * r
+        var cy = CH + math.sin(angle) * r
+        graphics.circle(cx, cy, math.min(W, H) * 0.06)
+        graphics.line(CW, CH, cx, cy)
+    end
 
     if t > math.TAU then
         t -= math.TAU
