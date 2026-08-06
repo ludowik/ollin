@@ -396,16 +396,32 @@ d'accroche dans la boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`)
   `gfx_run` les effaçait tous (constaté). Le reset appartient au démarrage d'un
   PROGRAMME, comme `image_reset`/`camera_reset`.
 
+**Arbre de menus et navigation** : widgets et menus sont des `Node` d'une même table
+(`s_nodes`), un menu portant la liste ordonnée des slots de son contenu. Un seul menu
+est affiché : `s_nav` est la pile de navigation — `s_nav[0]` est le menu global (la
+racine implicite par défaut), les suivants la descente. `ui.show` la remet à une seule
+entrée, un clic sur un sous-menu empile, la ligne « < » et `ui.back()` dépilent.
+
+- **Identités stables, pas de pointeurs** : un handle côté script est une instance de
+  classe native portant `{slot, gen}`. Déclarer un widget depuis un callback fait
+  `push_back` sur `s_nodes` → tout pointeur ou référence serait invalidé. `gen` est
+  incrémentée à la libération, donc un handle périmé est détecté au lieu de désigner le
+  nœud qui a recyclé le slot.
+- **`prune_nav()` après toute suppression** : retirer un menu où l'on se trouve
+  laisserait la pile pointer sur un nœud libéré → on la tronque au premier ancêtre
+  encore vivant.
+
 Autres points :
-- La géométrie de chaque widget est celle **de la dernière frame dessinée**, mémorisée
-  dans `Widget::box` : la zone cliquable est exactement ce qui est affiché.
+- La géométrie de chaque ligne est celle **de la dernière frame dessinée**, mémorisée
+  dans `Node::box` : la zone cliquable est exactement ce qui est affiché.
 - Mise en page **proportionnelle** à `gfx_logical_height()` (comme `joystick.ol`) : le
   canvas est en pixels physiques, donc des tailles fixes seraient illisibles sur mobile.
 - La pile démarre sous `gfx_overlay_height()` : l'overlay FPS occupe le même coin et se
   compose APRÈS la render texture, donc par-dessus.
 - La validation des arguments vit dans `ui_module.h` (`ui_check_*_args`), appelée par le
   module ET par `ui_stub.cpp` : une faute d'appel se voit en natif headless, où tournent
-  les tests.
+  les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un
+  script chaînant `ui.menu("x").button(...)` tourne aussi sans graphisme.
 
 ## Globales moteur (engine-injected globals)
 

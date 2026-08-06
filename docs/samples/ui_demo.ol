@@ -2,6 +2,7 @@
 ## Aucune dépendance au navigateur : le même code tourne en natif et dans le playground.
 ##
 ## Un widget se déclare UNE fois. Le moteur le dessine et le teste à chaque frame.
+## Les widgets se rangent dans des menus et sous-menus ; ui.show change le menu affiché.
 ## Une case à cocher reçoit une RÉFÉRENCE (`ref maVariable`) : elle écrit dedans, et
 ## le programme lit la variable normalement — voir `if grille then` dans draw().
 graphics.canvas(W, H, "ui")
@@ -27,10 +28,23 @@ func surEpais(actif)
     end
 end
 
-ui.button("Remettre à zéro", remettreAZero)
-ui.checkbox("Grille", ref grille)
-ui.checkbox("Animation", ref anim)
-ui.checkbox("Trait épais", ref epais, surEpais)
+## Les widgets se rangent dans des MENUS : un seul est affiché à la fois. Un
+## sous-menu est une ligne cliquable (chevron) ; la ligne « < » remonte d'un niveau.
+var principal = ui.menu("Principal")
+principal.button("Remettre à zéro", remettreAZero)
+principal.checkbox("Animation", ref anim)
+
+var apparence = principal.menu("Apparence")
+apparence.checkbox("Grille", ref grille)
+apparence.checkbox("Trait épais", ref epais, surEpais)
+
+## ui.show remplace le menu GLOBAL affiché : de quoi passer d'un écran à l'autre
+## (réglages, pause, fin de partie) sans reconstruire l'interface.
+var pause = ui.menu("Pause")
+pause.button("Reprendre", func() ui.show(principal) end)
+principal.button("Pause", func() ui.show(pause) end)
+
+ui.show(principal)
 
 func dessineGrille()
     graphics.stroke(Color(1, 1, 1, 0.10), 1)

@@ -1248,6 +1248,17 @@ assert(refCible == 7)
 ##   ui.checkbox(libellé, ref variable [, surChange])   → écrit true/false dedans
 ##   ui.clear()                                         → retire tous les widgets
 ##
+## Les widgets peuvent être rangés dans des MENUS. Un seul menu est affiché à la
+## fois ; un sous-menu s'affiche comme une ligne cliquable, et une ligne « < »
+## remonte d'un niveau.
+##
+##   var m = ui.menu(libellé)     → menu (à la racine, ou m.menu(...) = sous-menu)
+##   m.button / m.checkbox        → même déclaration, rangée dans ce menu
+##   ui.show(m)                   → remplace le menu global affiché (nil = racine)
+##   ui.back()                    → remonte d'un niveau ; ui.current() = menu affiché
+##   m.open()                     → descend dans m (comme un clic sur sa ligne)
+##   h.remove() / m.clear()       → retire un élément / vide un menu
+##
 ## La case est liée par RÉFÉRENCE : l'état initial est lu dans la variable, chaque
 ## clic y écrit, et le programme lit la variable normalement. surChange(nouvelEtat)
 ## est appelée après le changement si elle est fournie.
@@ -1259,4 +1270,15 @@ global uiFlag = true
 func uiAction() end
 ui.button("Action", uiAction)
 ui.checkbox("Option", ref uiFlag)
+
+var uiMenu = ui.menu("Réglages")
+uiMenu.checkbox("Option", ref uiFlag)
+var uiSous = uiMenu.menu("Affichage")
+uiSous.button("Action", uiAction)
+ui.show(uiMenu)
+uiSous.open()
+ui.back()
+uiSous.remove()
+uiMenu.clear()
+ui.show(nil)
 ui.clear()

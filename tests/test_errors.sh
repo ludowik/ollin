@@ -205,6 +205,10 @@ check_error "ui.button label not a string" \
 ui.button(42, f)' \
     "label must be a string"
 
+check_error "ui.menu label not a string" \
+    'var m = ui.menu(42)' \
+    "label must be a string"
+
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
