@@ -42,7 +42,7 @@ static Color rgba_color(double r, double g, double b, double a) {
 }
 
 static int s_physW = 0, s_physH = 0;
-static int s_logicalW = 0; // largeur logique de la zone (pour l'overlay FPS en haut à droite)
+static int s_logicalW = 0; // largeur logique de la zone (pour l'overlay mémoire/FPS)
 static int s_logicalH = 0; // hauteur logique de la zone
 // Contexte de dessin PERSISTANT : draw() rend dans cette RenderTexture, qui n'est
 // PAS effacée entre les frames (c'est à draw() d'appeler graphics.clear() s'il
@@ -993,14 +993,9 @@ static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
 
 // Overlay FPS dessiné par le moteur après chaque frame (toujours en haut à
 // droite de la zone graphique). Couleur vive + ombre → lisible sur tout fond.
-// Taille et marge de l'overlay FPS. `ui_module` réserve cette bande pour ne pas
-// dessiner dessous (l'overlay est composé APRÈS la render texture, donc par-dessus).
+// Overlay mémoire/FPS : coin BAS droit, pour laisser le haut à l'interface `ui`.
 static const int OVERLAY_SIZE = 16;
 static const int OVERLAY_MARGIN = 8;
-
-int gfx_overlay_height() {
-    return OVERLAY_MARGIN + OVERLAY_SIZE;
-}
 
 static void draw_fps_overlay() {
     // FPS calculé depuis NOTRE delta (fiable), lissé pour éviter le scintillement.
@@ -1016,7 +1011,7 @@ static void draw_fps_overlay() {
     const int size = OVERLAY_SIZE, margin = OVERLAY_MARGIN;
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
-    int y = margin;
+    int y = s_logicalH - size - margin;
     DrawText(buf, x + 1, y + 1, size, BLACK);     // ombre (contraste)
     DrawText(buf, x, y, size, {0, 228, 48, 255}); // vert vif (lime)
 }

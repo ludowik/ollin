@@ -34,7 +34,6 @@ int gfx_logical_width();
 int gfx_logical_height();
 // Bande occupée en haut par l'overlay FPS (composé PAR-DESSUS la render texture) :
 // un module qui dessine en haut de la zone doit la laisser libre.
-int gfx_overlay_height();
 
 // ── État de style courant (défini dans graphics_module.cpp, lu par graphics3d.cpp) ──
 bool gfx_has_fill();

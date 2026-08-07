@@ -213,11 +213,11 @@ const Style STYLE = {
     0.020f,                // font_frac
     9.0f,                  // font_min
     0.72f,                 // pad_frac
-    1.65f,                 // row_frac
+    1.8f,                  // row_frac
     2.45f,                 // slider_row_frac
     0.22f,                 // gap_frac
     0.9f,                  // margin_frac
-    0.82f,                 // box_frac
+    1.45f,                 // box_frac
     0.26f,                 // check_inset
     0.26f,                 // track_frac
     0.105f,                // bar_thick_frac
@@ -245,6 +245,19 @@ Metrics metrics() {
     m.font = h * STYLE.font_frac;
     if (m.font < STYLE.font_min)
         m.font = STYLE.font_min;
+    // La police par défaut de raylib est une IMAGE de 10 px : l'agrandir d'un facteur
+    // fractionnaire fait interpoler les pixels, d'où un texte flou. On cale donc la
+    // taille sur un multiple ENTIER de sa hauteur native — netteté plutôt que taille
+    // exacte. Une police vectorielle rendrait ce calage inutile.
+    float base = (float)GetFontDefault().baseSize;
+    if (base > 0.0f) {
+        // Vers le BAS : entre deux multiples on préfère le plus discret, la lisibilité
+        // étant déjà garantie par la netteté et par font_min.
+        float k = std::floor(m.font / base);
+        if (k < 1.0f)
+            k = 1.0f;
+        m.font = k * base;
+    }
     m.pad = m.font * STYLE.pad_frac;
     m.row = m.font * STYLE.row_frac;
     m.slider_row = m.font * STYLE.slider_row_frac;
@@ -579,8 +592,7 @@ namespace {
 // par le rendu ; le test de clic réutilise ces rectangles (une seule vérité).
 void layout(const Metrics& m, const std::vector<int>& rows) {
     float right = (float)gfx_logical_width() - m.margin;
-    // Sous l'overlay FPS, qui occupe le même coin et se compose par-dessus la frame.
-    float y = (float)gfx_overlay_height() + m.margin;
+    float y = m.margin;
     s_back_box = {0, 0, 0, 0};
     if (!s_open) {
         s_head_box = {right - m.row, y, m.row, m.row};

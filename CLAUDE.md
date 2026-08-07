@@ -442,8 +442,12 @@ Autres points :
   dans `Node::box` : la zone cliquable est exactement ce qui est affiché.
 - Mise en page **proportionnelle** à `gfx_logical_height()` (comme `joystick.ol`) : le
   canvas est en pixels physiques, donc des tailles fixes seraient illisibles sur mobile.
-- La pile démarre sous `gfx_overlay_height()` : l'overlay FPS occupe le même coin et se
-  compose APRÈS la render texture, donc par-dessus.
+- La pile démarre à la marge haute : l'overlay mémoire/FPS a été déplacé dans le coin
+  **bas** droit (`draw_fps_overlay`), donc plus rien à réserver — `gfx_overlay_height()`
+  a disparu avec son unique appelant.
+- `metrics()` cale la police sur un multiple ENTIER de `GetFontDefault().baseSize` (10 px,
+  la police intégrée est une image) — un facteur fractionnaire interpole les pixels et
+  rend le texte flou. Calage vers le bas : entre deux multiples, le plus discret.
 - La validation des arguments vit dans `ui_module.h` (`ui_check_*_args`), appelée par le
   module ET par `ui_stub.cpp` : une faute d'appel se voit en natif headless, où tournent
   les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un
