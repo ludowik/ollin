@@ -16,6 +16,7 @@ global t = 0
 global vitesse = nil
 global branches = 3
 global teinte = 0.55
+global couleurBras
 
 func remettreAZero()
     t = 0
@@ -23,9 +24,9 @@ func remettreAZero()
 end
 
 func surTeinte(valeur)
-    ## Un slider accepte aussi un rappel, appelé avec la NOUVELLE valeur à chaque
-    ## changement — utile pour recalculer quelque chose de coûteux une seule fois.
-    print("teinte = " + valeur)
+    ## Le rappel reçoit la NOUVELLE valeur : la couleur est donc calculée quand elle
+    ## change, et non à chaque frame comme le ferait une lecture dans draw().
+    couleurBras = Color(valeur, 0.85, 1 - valeur * 0.6)
 end
 
 func surEpais(actif)
@@ -38,27 +39,22 @@ func surEpais(actif)
     end
 end
 
-## Les widgets se rangent dans des MENUS : un seul est affiché à la fois. Un
-## sous-menu est une ligne cliquable (chevron) ; la ligne « < » remonte d'un niveau.
 var principal = ui.menu("Principal")
 principal.button("Remettre à zéro", remettreAZero)
 principal.checkbox("Animation", ref anim)
-## Un slider règle une valeur numérique à la souris. `vitesse` valant nil, elle est
-## initialisée au défaut (1.0) dès la déclaration.
+## `vitesse` valant nil, le slider l'initialise à son défaut (1.0) dès la déclaration.
 principal.slider("Vitesse", ref vitesse, 0.25, 3, 1.0)
-## Bornes ET valeur de départ entières → slider ENTIER (pas de décimale affichée).
+## Bornes ET départ entiers → slider entier, sans décimale affichée.
 principal.slider("Branches", ref branches, 1, 8)
 
 var apparence = principal.menu("Apparence")
 apparence.checkbox("Grille", ref grille)
 apparence.checkbox("Trait épais", ref epais, surEpais)
-## Bornes entières mais départ flottant → slider flottant, avec rappel de changement.
 apparence.slider("Teinte", ref teinte, 0, 1, surTeinte)
+surTeinte(teinte)   ## le rappel ne part qu'au premier changement : couleur initiale ici
 
-## L'interface est FERMÉE au démarrage (une poignée dans le coin) ; ui.show la déplie,
-## et un clic sur la poignée ou sur la ligne de tête la referme.
-## ui.show remplace le menu GLOBAL affiché : de quoi passer d'un écran à l'autre
-## (réglages, pause, fin de partie) sans reconstruire l'interface.
+## ui.show remplace le menu affiché : de quoi passer d'un écran à l'autre (réglages,
+## pause, fin de partie) sans reconstruire l'interface.
 var pause = ui.menu("Pause")
 pause.button("Reprendre", func() ui.show(principal) end)
 principal.button("Pause", func() ui.show(pause) end)
@@ -86,14 +82,17 @@ func draw()
     end
 
     ## Autant de bras que `branches` : chaque widget agit tout de suite sur le dessin.
-    var r = math.min(W, H) * 0.28
-    graphics.stroke(Color(teinte, 0.85, 1 - teinte * 0.6), epais and 8 or 2)
+    var cote = math.min(W, H)
+    var r = cote * 0.28
+    var rayon = cote * 0.06
+    var ecart = math.TAU / branches
+    graphics.stroke(couleurBras, epais and 8 or 2)
     graphics.noFill()
     for i = 1, branches do
-        var angle = t + math.TAU * i / branches
+        var angle = t + ecart * i
         var cx = CW + math.cos(angle) * r
         var cy = CH + math.sin(angle) * r
-        graphics.circle(cx, cy, math.min(W, H) * 0.06)
+        graphics.circle(cx, cy, rayon)
         graphics.line(CW, CH, cx, cy)
     end
 

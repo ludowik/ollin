@@ -2089,6 +2089,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <p>L'interface est <strong>fermée au démarrage</strong> : elle se réduit à une poignée à trois barres dans le coin, pour ne pas masquer la scène. Un clic dessus déplie le menu affiché, dont la ligne de tête reprend la poignée et le titre du menu ; un clic sur cette tête referme.</p>
 
 <pre><code><span class="kw">global</span> grille = <span class="kw">true</span>
+<span class="kw">global</span> vitesse = <span class="kw">nil</span>   <span class="cmt">## le slider l'initialise à son défaut</span>
 
 <span class="kw">func</span> <span class="fn">remettreAZero</span>()
     t = <span class="num">0</span>
@@ -2096,6 +2097,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 ui.button(<span class="str">"Remettre à zéro"</span>, remettreAZero)
 ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grille)
+ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> vitesse, <span class="num">0.25</span>, <span class="num">3</span>, <span class="num">1.0</span>)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
     <span class="kw">if</span> grille <span class="kw">then</span>       <span class="cmt">## lecture NORMALE de la variable liée</span>
@@ -2134,9 +2136,9 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   <tbody>
     <tr><td><code>ui.menu(libellé)</code></td><td>Crée un menu à la racine et renvoie son handle. <code>menu.menu(libellé)</code> crée un sous-menu.</td></tr>
     <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>Mêmes déclarations que leurs équivalents <code>ui.*</code>, rangées dans ce menu.</td></tr>
-    <tr><td><code>ui.show(menu)</code></td><td>Remplace le menu global affiché. La navigation repart de zéro : <code>ui.back()</code> ne remonte pas au menu précédent. <code>ui.show(nil)</code> revient au menu racine.</td></tr>
+    <tr><td><code>ui.show(menu)</code></td><td>Remplace le menu global affiché, et déplie l'interface. La navigation repart de zéro : <code>ui.back()</code> ne remonte pas au menu précédent. <code>ui.show(nil)</code> revient au menu racine.</td></tr>
     <tr><td><code>ui.back()</code></td><td>Remonte d'un niveau. Sans effet quand le menu global est affiché.</td></tr>
-    <tr><td><code>ui.open([menu])</code> / <code>ui.close()</code> / <code>ui.toggle()</code></td><td>Déplie ou replie l'interface. <code>ui.open(menu)</code> affiche ce menu et le déplie du même geste ; <code>ui.show(menu)</code> déplie également, puisque montrer un menu c'est le rendre visible.</td></tr>
+    <tr><td><code>ui.open([menu])</code> / <code>ui.close()</code> / <code>ui.toggle()</code></td><td>Déplie ou replie l'interface. <code>ui.open(menu)</code> affiche ce menu et le déplie du même geste.</td></tr>
     <tr><td><code>menu.open()</code></td><td>Descend dans ce menu, comme un clic sur sa ligne — <code>ui.back()</code> y revient.</td></tr>
     <tr><td><code>ui.current()</code></td><td>Handle du menu actuellement affiché.</td></tr>
     <tr><td><code>élément.remove()</code></td><td>Retire un widget ou un menu (avec tout son contenu) de son parent.</td></tr>
@@ -2151,10 +2153,10 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 <h3>Ce qu'il faut savoir</h3>
 <ul>
   <li>La taille de l'interface est <strong>proportionnelle</strong> à la hauteur de la zone de tracé, donc lisible aussi bien sur un écran de bureau que sur un téléphone, dont la toile compte plusieurs pixels par pixel d'affichage.</li>
-  <li>La pile occupe le coin haut droit ; l'indicateur de mémoire et d'images par seconde est, lui, en bas à droite.</li>
-  <li>Le texte est rendu avec une police proportionnelle embarquée dans le moteur, accents compris — la même sur toutes les plateformes, sans fichier à installer.</li>
+  <li>L'indicateur de mémoire et d'images par seconde occupe le coin bas droit, à l'opposé de la pile.</li>
+  <li>Les libellés utilisent la police par défaut du moteur (voir <code>graphics.font</code>), et non celle que le script a choisie : l'interface garde son apparence quoi que fasse le programme.</li>
   <li>Retirer un menu où l'on se trouve fait remonter l'affichage au premier menu parent encore présent. Utiliser un handle retiré lève une erreur explicite.</li>
-  <li>Un slider donne une valeur <strong>entière</strong> si ses bornes et sa valeur de départ le sont, sinon flottante : <code>ui.slider("Taille", <span class="kw">ref</span> n, 1, 10)</code> avec <code>n = 3</code> règle un entier, tandis que <code>ui.slider("Facteur", <span class="kw">ref</span> f, 0, 1, 0.5)</code> règle un flottant.</li>
+  <li>Un slider donne une valeur <strong>entière</strong> si ses bornes et sa valeur de départ le sont, sinon flottante : <code>ui.slider("Facteur", <span class="kw">ref</span> f, 0, 1, 0.5)</code> règle donc un flottant malgré ses bornes entières.</li>
   <li>La variable liée est la <strong>seule source de vérité</strong> : la glissière lit sa valeur à chaque frame, donc le programme peut l'écrire lui-même et l'affichage suit. Une valeur hors plage est ramenée aux bornes à l'affichage, sans écrire dans la variable.</li>
   <li>La variable d'une case doit être <strong>accessible</strong> : un global ou un champ d'objet. Une variable locale à une fonction n'a pas de sens ici, puisqu'elle disparaît avant le premier clic.</li>
   <li>Sans zone graphique — exécution en ligne de commande sans fenêtre —, déclarer un widget ne fait rien, mais les arguments sont tout de même vérifiés.</li>
