@@ -11,8 +11,7 @@
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },
   { "name": "Primitives 3D",  "file": "primitives_3d.ol" },
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
-  { "name": "Modèle 3D (.obj)", "file": "model_3d.ol" },
-  { "name": "Modèle GLB (texturé)", "file": "model_glb.ol" },
+  { "name": "Modèles 3D (.obj / .glb)", "file": "model_3d.ol" },
   { "name": "Univers voxel (Minecraft)", "file": "voxel_world.ol" },
   { "name": "Caméra isométrique",        "file": "iso_camera.ol" },
   { "name": "Webcam (camera)",           "file": "camera.ol" }

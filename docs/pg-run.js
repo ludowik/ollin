@@ -179,24 +179,23 @@ const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
 // Résolution identique au parseur : base_dir + chemin (concat naïve), sauf chemin absolu.
 const resolveImport = (parentDir, imp) => (imp[0] === '/' ? imp : parentDir + imp)
 
-// Références de modèles 3D dans du code Ollin → liste de noms de fichiers (.obj/.glb/.gltf).
-function findModels(code) {
-  const re = /model\s*\(\s*["']([^"']+\.(?:obj|glb|gltf))["']\s*\)/gi
+// Ressources référencées par du code Ollin → noms de fichiers portant une des
+// extensions données. On collecte TOUTE chaîne littérale qui ressemble à un fichier,
+// sans exiger qu'elle soit l'argument direct de model()/image.load() : un nom peut
+// vivre dans une table de données ou une variable (cf. docs/samples/model_3d.ol).
+// Le préchargement est best-effort — une chaîne qui n'est pas une ressource donne un
+// 404 ignoré, alors qu'une ressource manquée fait échouer le programme.
+function findAssets(code, exts) {
+  const re = new RegExp(`["']([^"'\\s]+\\.(?:${exts}))["']`, 'gi')
   const out = []
   let mm
   while ((mm = re.exec(code))) out.push(mm[1])
   return out
 }
 
-// Références d'images EXTERNES (image.load("x.png")) → liste de noms de fichiers.
+const findModels = (code) => findAssets(code, 'obj|glb|gltf')
 // image.loadData (base64 embarqué) n'a pas d'asset à collecter → non concerné.
-function findImages(code) {
-  const re = /image\.load\s*\(\s*["']([^"']+\.(?:png|jpg|jpeg|gif|webp|bmp))["']\s*\)/gi
-  const out = []
-  let mm
-  while ((mm = re.exec(code))) out.push(mm[1])
-  return out
-}
+const findImages = (code) => findAssets(code, 'png|jpg|jpeg|gif|webp|bmp')
 
 // Construit un PROJET complet à partir d'un exemple du dépôt : le fichier d'entrée,
 // tous ses imports .ol transitifs (→ files), et les modèles 3D référencés (→ resources
