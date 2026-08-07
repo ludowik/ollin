@@ -55,6 +55,8 @@ apparence.checkbox("Trait épais", ref epais, surEpais)
 ## Bornes entières mais départ flottant → slider flottant, avec rappel de changement.
 apparence.slider("Teinte", ref teinte, 0, 1, surTeinte)
 
+## L'interface est FERMÉE au démarrage (une poignée dans le coin) ; ui.show la déplie,
+## et un clic sur la poignée ou sur la ligne de tête la referme.
 ## ui.show remplace le menu GLOBAL affiché : de quoi passer d'un écran à l'autre
 ## (réglages, pause, fin de partie) sans reconstruire l'interface.
 var pause = ui.menu("Pause")

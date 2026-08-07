@@ -396,6 +396,14 @@ d'accroche dans la boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`)
   `gfx_run` les effaçait tous (constaté). Le reset appartient au démarrage d'un
   PROGRAMME, comme `image_reset`/`camera_reset`.
 
+**Ouverture** : `s_open` est **faux au démarrage** — l'interface se réduit à une poignée
+(trois barres tracées à la main : la police par défaut n'a pas de glyphe de menu). Ouverte,
+la ligne de tête porte la poignée et le titre du menu affiché ; le même rectangle
+(`s_head_box`) sert dans les deux états, d'où un seul test de clic qui bascule `s_open`.
+`ui.show` déplie (montrer = rendre visible) ; `ui.open([menu])`/`close`/`toggle` pilotent
+explicitement. Quand rien n'est déclaré, `ui_draw` remet `s_head_box` **et** `s_back_box`
+à zéro : sinon une zone cliquable subsisterait sans rien d'affiché.
+
 **Arbre de menus et navigation** : widgets et menus sont des `Node` d'une même table
 (`s_nodes`), un menu portant la liste ordonnée des slots de son contenu. Un seul menu
 est affiché : `s_nav` est la pile de navigation — `s_nav[0]` est le menu global (la

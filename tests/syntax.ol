@@ -1258,6 +1258,9 @@ assert(refCible == 7)
 ##   m.button / m.checkbox        → même déclaration, rangée dans ce menu
 ##   ui.show(m)                   → remplace le menu global affiché (nil = racine)
 ##   ui.back()                    → remonte d'un niveau ; ui.current() = menu affiché
+##   ui.open([m]) / ui.close() / ui.toggle()
+##                                → déplie / replie l'interface (FERMÉE au démarrage :
+##                                  réduite à une poignée dans le coin)
 ##   m.open()                     → descend dans m (comme un clic sur sa ligne)
 ##   h.remove() / m.clear()       → retire un élément / vide un menu
 ##
@@ -1292,4 +1295,7 @@ ui.back()
 uiSous.remove()
 uiMenu.clear()
 ui.show(nil)
+ui.open()
+ui.toggle()
+ui.close()
 ui.clear()

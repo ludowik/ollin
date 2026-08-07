@@ -88,6 +88,9 @@ Value make_ui_module() {
         return ctx.ret(make_inert());
     }));
     m.map_set(Value(std::string("show")), Value::make_builtin(nothing));
+    m.map_set(Value(std::string("open")), Value::make_builtin(nothing));
+    m.map_set(Value(std::string("close")), Value::make_builtin(nothing));
+    m.map_set(Value(std::string("toggle")), Value::make_builtin(nothing));
     m.map_set(Value(std::string("back")), Value::make_builtin(nothing));
     m.map_set(Value(std::string("current")), Value::make_builtin([](CallCtx& ctx) -> int {
         return ctx.ret(make_inert());

@@ -22,6 +22,11 @@
 // setup()) ; le moteur le garde, le dessine et le teste à chaque frame. Rien à
 // appeler dans draw().
 //
+// OUVERTURE : au démarrage l'interface est FERMÉE — une simple poignée à trois barres
+// dans le coin. Un clic dessus déplie le menu affiché, dont la ligne de tête porte la
+// poignée et le titre ; un clic sur cette tête referme. Côté script : ui.open([menu]),
+// ui.close(), ui.toggle() ; ui.show(menu) déplie aussi (montrer = rendre visible).
+//
 // NAVIGATION : un seul menu est affiché à la fois. `s_nav` est la pile courante —
 // `s_nav[0]` est le menu global (la racine implicite par défaut), les suivants la
 // descente dans les sous-menus. Cliquer un sous-menu empile, la ligne « < » dépile.
@@ -58,6 +63,10 @@ std::vector<int> s_free;
 int s_root = -1;
 std::vector<int> s_nav;
 Rectangle s_back_box = {0, 0, 0, 0};   // ligne de retour de la frame dessinée
+// L'interface est FERMÉE au démarrage : elle se réduit à une poignée dans le coin, pour
+// ne pas masquer la scène d'un programme qui ne s'en sert qu'occasionnellement.
+bool s_open = false;
+Rectangle s_head_box = {0, 0, 0, 0};   // poignée fermée, ou ligne de tête ouverte
 // Slider en cours de glissement : le suivi dure plusieurs frames, donc on retient le
 // nœud par identité (un slot seul pourrait avoir été recyclé entre deux frames).
 int s_drag = -1;
@@ -186,6 +195,8 @@ struct Style {
     float box_frac;   // côté du carré d'une case
     float check_inset;// retrait du remplissage dans le carré, fraction du carré
     float track_frac; // épaisseur de la glissière
+    float bar_thick_frac;  // épaisseur d'une barre de la poignée, fraction du carré
+    float bar_gap_frac;    // écart entre deux barres
 };
 
 const Style STYLE = {
@@ -208,6 +219,8 @@ const Style STYLE = {
     1.0f,                  // box_frac
     0.22f,                 // check_inset
     0.34f,                 // track_frac
+    0.11f,                 // bar_thick_frac
+    0.22f,                 // bar_gap_frac
 };
 
 const char* CHEVRON = ">";
@@ -305,6 +318,10 @@ Rectangle slider_track(const Rectangle& rect, const Metrics& m) {
 // Largeur commune à toutes les lignes : celle de la plus large, pour une pile alignée.
 float stack_width(const Metrics& m, const std::vector<int>& rows) {
     float widest = text_width(back_label(), m.font);
+    // Ligne de tête : poignée + titre du menu affiché.
+    float head = m.row + text_width(s_nodes[current_menu()].label, m.font);
+    if (head > widest)
+        widest = head;
     for (int slot : rows) {
         const Node& n = s_nodes[slot];
         float need = text_width(n.label, m.font);
@@ -445,6 +462,29 @@ static int ui_show(CallCtx& ctx) {
         slot = menu_slot(ctx.args[0], "ui.show");
     s_nav.clear();
     s_nav.push_back(slot);
+    s_open = true;   // « montrer » implique déplier
+    return ctx.ret(Value{});
+}
+
+// ui.open([menu]) : déplie l'interface, sur le menu donné le cas échéant.
+static int ui_open(CallCtx& ctx) {
+    if (ctx.argc > 0 && !ctx.args[0].is_nil()) {
+        int slot = menu_slot(ctx.args[0], "ui.open");
+        s_nav.clear();
+        s_nav.push_back(slot);
+    }
+    s_open = true;
+    return ctx.ret(Value{});
+}
+
+// ui.close() : replie l'interface sur sa poignée, sans changer le menu affiché.
+static int ui_close(CallCtx& ctx) {
+    s_open = false;
+    return ctx.ret(Value{});
+}
+
+static int ui_toggle(CallCtx& ctx) {
+    s_open = !s_open;
     return ctx.ret(Value{});
 }
 
@@ -526,6 +566,8 @@ void ui_reset() {
     s_nav.clear();
     s_root = -1;
     s_back_box = {0, 0, 0, 0};
+    s_head_box = {0, 0, 0, 0};
+    s_open = false;
     s_drag = -1;
 }
 
@@ -534,11 +576,18 @@ namespace {
 // Calcule la géométrie des lignes affichées et la mémorise dans chaque nœud. Appelé
 // par le rendu ; le test de clic réutilise ces rectangles (une seule vérité).
 void layout(const Metrics& m, const std::vector<int>& rows) {
-    float w = stack_width(m, rows);
-    float x = (float)gfx_logical_width() - m.margin - w;
+    float right = (float)gfx_logical_width() - m.margin;
     // Sous l'overlay FPS, qui occupe le même coin et se compose par-dessus la frame.
     float y = (float)gfx_overlay_height() + m.margin;
     s_back_box = {0, 0, 0, 0};
+    if (!s_open) {
+        s_head_box = {right - m.row, y, m.row, m.row};
+        return;
+    }
+    float w = stack_width(m, rows);
+    float x = right - w;
+    s_head_box = {x, y, w, m.row};
+    y += m.row + m.gap;
     if (s_nav.size() > 1) {
         s_back_box = {x, y, w, m.row};
         y += m.row + m.gap;
@@ -555,6 +604,20 @@ void draw_row(const Rectangle& rect, bool hover) {
     DrawRectangleLinesEx(rect, STYLE.border_thick, STYLE.border);
 }
 
+// Trois barres dessinées à la main : la police par défaut n'a pas de glyphe de menu,
+// et un tracé suit le style sans dépendre du jeu de caractères.
+void draw_handle(const Rectangle& rect, const Metrics& m) {
+    float side = m.row;
+    float thick = side * STYLE.bar_thick_frac;
+    float gap = side * STYLE.bar_gap_frac;
+    float bw = side * 0.44f;
+    float cx = rect.x + (side - bw) * 0.5f;
+    float cy = rect.y + (rect.height - (3 * thick + 2 * gap)) * 0.5f;
+    for (int i = 0; i < 3; ++i) {
+        DrawRectangleRec({cx, cy + i * (thick + gap), bw, thick}, STYLE.text);
+    }
+}
+
 void draw_text_at(const std::string& text, float x, const Rectangle& rect, const Metrics& m, Color color) {
     Font f = GetFontDefault();
     if (f.texture.id == 0 || f.baseSize == 0)
@@ -569,11 +632,26 @@ void ui_draw() {
     if (s_nodes.empty())
         return;
     std::vector<int> rows = s_nodes[current_menu()].children;
-    if (rows.empty() && s_nav.size() < 2)
+    if (rows.empty() && s_nav.size() < 2) {
+        // Interface vide : même pas de poignée, et surtout aucune zone cliquable
+        // résiduelle (le test de clic lit ces rectangles).
+        s_head_box = {0, 0, 0, 0};
+        s_back_box = {0, 0, 0, 0};
         return;
+    }
     Metrics m = metrics();
     layout(m, rows);
     Vector2 mouse = {(float)GetMouseX(), (float)GetMouseY()};
+    draw_row(s_head_box, CheckCollisionPointRec(mouse, s_head_box));
+    draw_handle(s_head_box, m);
+    if (s_open && !s_nodes[current_menu()].label.empty()) {
+        // Le titre du menu affiché n'a de sens qu'ouvert : fermée, la pile se réduit
+        // à la poignée.
+        std::string title = s_nodes[current_menu()].label;
+        draw_text_at(title, s_head_box.x + m.row + m.pad * 0.5f, s_head_box, m, STYLE.text);
+    }
+    if (!s_open)
+        return;
     if (s_nav.size() > 1) {
         draw_row(s_back_box, CheckCollisionPointRec(mouse, s_back_box));
         draw_text_at(back_label(), s_back_box.x + m.pad, s_back_box, m, STYLE.text);
@@ -671,6 +749,12 @@ bool ui_poll() {
     Vector2 p = {(float)GetMouseX(), (float)GetMouseY()};
     // Les rectangles viennent de la dernière frame dessinée : ce qu'on voit est ce
     // qu'on clique. Avant la première frame, aucune ligne n'a de boîte → aucun clic.
+    if (CheckCollisionPointRec(p, s_head_box)) {
+        s_open = !s_open;
+        return true;
+    }
+    if (!s_open)
+        return false;
     if (s_nav.size() > 1 && CheckCollisionPointRec(p, s_back_box)) {
         s_nav.pop_back();
         return true;
@@ -713,6 +797,9 @@ Value make_ui_module() {
     m.map_set(Value(std::string("slider")), Value::make_builtin(ui_slider));
     m.map_set(Value(std::string("menu")), Value::make_builtin(ui_menu));
     m.map_set(Value(std::string("show")), Value::make_builtin(ui_show));
+    m.map_set(Value(std::string("open")), Value::make_builtin(ui_open));
+    m.map_set(Value(std::string("close")), Value::make_builtin(ui_close));
+    m.map_set(Value(std::string("toggle")), Value::make_builtin(ui_toggle));
     m.map_set(Value(std::string("back")), Value::make_builtin(ui_back));
     m.map_set(Value(std::string("current")), Value::make_builtin(ui_current));
     m.map_set(Value(std::string("clear")), Value::make_builtin(ui_clear));

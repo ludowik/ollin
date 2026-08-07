@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-06 14:45</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-07 07:49</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -423,7 +423,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-06 14:45</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-07 07:49</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2084,6 +2084,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <p>Un widget se déclare <strong>une fois</strong> — au niveau du fichier ou dans <code>setup()</code>. Le moteur le dessine et le teste à chaque frame : il n'y a rien à appeler dans <code>draw()</code>.</p>
 
+<p>L'interface est <strong>fermée au démarrage</strong> : elle se réduit à une poignée à trois barres dans le coin, pour ne pas masquer la scène. Un clic dessus déplie le menu affiché, dont la ligne de tête reprend la poignée et le titre du menu ; un clic sur cette tête referme.</p>
+
 <pre><code><span class="kw">global</span> grille = <span class="kw">true</span>
 
 <span class="kw">func</span> <span class="fn">remettreAZero</span>()
@@ -2132,6 +2134,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
     <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>Mêmes déclarations que leurs équivalents <code>ui.*</code>, rangées dans ce menu.</td></tr>
     <tr><td><code>ui.show(menu)</code></td><td>Remplace le menu global affiché. La navigation repart de zéro : <code>ui.back()</code> ne remonte pas au menu précédent. <code>ui.show(nil)</code> revient au menu racine.</td></tr>
     <tr><td><code>ui.back()</code></td><td>Remonte d'un niveau. Sans effet quand le menu global est affiché.</td></tr>
+    <tr><td><code>ui.open([menu])</code> / <code>ui.close()</code> / <code>ui.toggle()</code></td><td>Déplie ou replie l'interface. <code>ui.open(menu)</code> affiche ce menu et le déplie du même geste ; <code>ui.show(menu)</code> déplie également, puisque montrer un menu c'est le rendre visible.</td></tr>
     <tr><td><code>menu.open()</code></td><td>Descend dans ce menu, comme un clic sur sa ligne — <code>ui.back()</code> y revient.</td></tr>
     <tr><td><code>ui.current()</code></td><td>Handle du menu actuellement affiché.</td></tr>
     <tr><td><code>élément.remove()</code></td><td>Retire un widget ou un menu (avec tout son contenu) de son parent.</td></tr>
