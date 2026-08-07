@@ -1,5 +1,6 @@
 #include "graphics_internal.h"
 #include "ui_module.h"
+#include "engine_font.h"
 #include "image_module.h"
 #include "module_utils.h"
 #include "value.h"
@@ -272,6 +273,9 @@ static int gfx_blend_mode(CallCtx& ctx) {
 // ── Style state ───────────────────────────────────────────────────────────────
 static float s_stroke_size = 2.0f;
 static float s_font_size = 18.0f;   // taille de police (état), comme s_stroke_size
+// Police courante, index dans le registre du moteur (engine_font.h) : un ÉTAT de style
+// comme la taille, donc sauvegardé par push/pushStyle et remis au défaut chaque frame.
+static int s_font_idx = engine_font_default();
 // Ancrage de rect : x,y = coin supérieur gauche (défaut) ou centre. C'est un ÉTAT,
 // comme blendMode : cela ne change pas la géométrie mais son interprétation.
 static const int RECT_CORNER = 0;
@@ -303,6 +307,11 @@ static void apply_stroke_size(float sz) {
 
 static void apply_font_size(float sz) {
     s_font_size = sz;
+}
+
+// Police du tracé de texte, telle que le script l'a choisie.
+static Font current_font() {
+    return engine_font(s_font_idx);
 }
 
 // Trait sous-pixel : la RenderTexture n'a pas de MSAA → une épaisseur < 1 rend des
@@ -372,6 +381,7 @@ int gfx_segments() {
 struct StyleState {
     float stroke_size;
     float font_size;
+    int font_idx;
     int rect_mode;
     int ellipse_mode;
     int sprite_mode;
@@ -391,6 +401,7 @@ static StyleState capture_style() {
     StyleState s;
     s.stroke_size = s_stroke_size;
     s.font_size = s_font_size;
+    s.font_idx = s_font_idx;
     s.rect_mode = s_rect_mode;
     s.ellipse_mode = s_ellipse_mode;
     s.sprite_mode = image_get_sprite_mode();
@@ -408,6 +419,7 @@ static StyleState capture_style() {
 static void restore_style(const StyleState& s) {
     s_stroke_size = s.stroke_size;
     s_font_size = s.font_size;
+    s_font_idx = s.font_idx;
     s_rect_mode = s.rect_mode;
     s_ellipse_mode = s.ellipse_mode;
     image_set_sprite_mode(s.sprite_mode);
@@ -425,6 +437,7 @@ static void restore_style(const StyleState& s) {
 static void reset_styles() {
     apply_stroke_size(2.0f);
     apply_font_size(18.0f);   // taille la plus courante → pas besoin de l'écrire
+    s_font_idx = engine_font_default();
     s_rect_mode = RECT_CORNER;
     s_ellipse_mode = ELLIPSE_CENTER;
     image_set_sprite_mode(SPRITE_CORNER);
@@ -445,12 +458,61 @@ static int gfx_stroke_size(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
+// graphics.fontSize([hauteur]) : fixe la hauteur de la police, et renvoie TOUJOURS la
+// hauteur courante — sans argument, c'est donc un simple accesseur.
 static int gfx_font_size(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc > 0 && args[0].is_number())
         apply_font_size((float)args[0].as_num());
-    return ctx.ret(Value{});
+    return ctx.ret(Value((double)s_font_size));
+}
+
+// graphics.font([nom]) : choisit la police courante parmi celles du moteur, et renvoie
+// TOUJOURS son nom. Un nom inconnu est une erreur nommant les polices disponibles :
+// mieux vaut le signaler que dessiner silencieusement avec une autre police.
+static int gfx_font(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc > 0 && !args[0].is_nil()) {
+        if (!args[0].is_string())
+            throw std::runtime_error("graphics.font: expected a font name");
+        std::string name = args[0].as_string();
+        int idx = engine_font_index(name.c_str());
+        if (idx < 0) {
+            std::string known;
+            for (int i = 0; i < engine_font_count(); ++i) {
+                if (i > 0)
+                    known += ", ";
+                known += engine_font_name(i);
+            }
+            throw std::runtime_error("graphics.font: unknown font '" + name + "' (available: " + known + ")");
+        }
+        s_font_idx = idx;
+    }
+    return ctx.ret(Value(std::string(engine_font_name(s_font_idx))));
+}
+
+// graphics.textSize(texte) : largeur et hauteur du texte AVEC la police et la taille
+// courantes — deux valeurs, pour centrer ou aligner sans réimplémenter la mesure.
+static int gfx_text_size(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc < 1 || !args[0].is_string())
+        throw std::runtime_error("graphics.textSize: expected a text");
+    std::string text = args[0].as_string();
+    Font font = current_font();
+    if (font.texture.id == 0 || font.baseSize == 0) {
+        // Sans zone graphique aucune police n'est chargée : renvoyer 0 plutôt que de
+        // diviser par la hauteur native (comme graphics.text, qui ne dessine rien).
+        ctx.set_result(0, Value(0.0));
+        ctx.set_result(1, Value(0.0));
+        return 2;
+    }
+    Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, s_font_size / (float)font.baseSize);
+    ctx.set_result(0, Value((double)size.x));
+    ctx.set_result(1, Value((double)size.y));
+    return 2;
 }
 
 // Argument d'un mode d'ancrage : "corner" (0) ou "center" (1) — valeurs partagées
@@ -683,7 +745,7 @@ static int gfx_text(CallCtx& ctx) {
     // L'espacement de DrawText vaut fontSize/baseSize en division ENTIÈRE, donc il
     // avance par paliers (1 de 10 à 19, 2 de 20 à 29…) ; on garde la même intention
     // en continu, soit le facteur d'échelle lui-même.
-    Font font = GetFontDefault();
+    Font font = current_font();
     // Garde que DrawText appliquait et que l'appel direct à DrawTextEx perdait :
     // sans canvas, la police par défaut n'est pas chargée (glyphs nul, baseSize à 0)
     // → division par zéro puis déréférencement nul. Ne rien dessiner, comme avant.
@@ -1382,6 +1444,8 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("screenshot")), Value::make_builtin(gfx_screenshot));
     m.map_set(Value(std::string("text")), Value::make_builtin(gfx_text));
     m.map_set(Value(std::string("fontSize")), Value::make_builtin(gfx_font_size));
+    m.map_set(Value(std::string("font")), Value::make_builtin(gfx_font));
+    m.map_set(Value(std::string("textSize")), Value::make_builtin(gfx_text_size));
     m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
     m.map_set(Value(std::string("ellipseMode")), Value::make_builtin(gfx_ellipse_mode));
     m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));

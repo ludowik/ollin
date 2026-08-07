@@ -445,23 +445,38 @@ Autres points :
 - La pile démarre à la marge haute : l'overlay mémoire/FPS a été déplacé dans le coin
   **bas** droit (`draw_fps_overlay`), donc plus rien à réserver — `gfx_overlay_height()`
   a disparu avec son unique appelant.
-- **Police embarquée** : `src/modules/ui_font.h` est un atlas **généré** (Liberation Sans
-  32 px, ASCII + accents français, SIL OFL 1.1) par `ExportFontAsCode` de raylib, via
-  l'outil `tools/gen_ui_font.cpp` — lancé à la main, pas par le build. Aucun fichier à
-  trouver à l'exécution et aucune option de build : le même code vaut pour toutes les
-  cibles, WASM compris (+41 Ko sur le `.wasm`, données DEFLATE de 20 Ko). `ui_font()`
-  charge l'atlas au PREMIER TRACÉ (`LoadFont_UiFont` crée une texture, donc exige un
-  contexte graphique, absent à la déclaration des widgets) et se replie sur
-  `GetFontDefault()` en cas d'échec. `ui_reset()` oublie la police **sans la décharger** :
-  sa texture appartient au contexte du programme précédent, déjà détruit. Le filtre est
-  BILINEAR — l'atlas est le plus souvent réduit. La taille de police est donc redevenue
-  continue (plus de calage sur la hauteur d'une police bitmap).
-- `tests/check_naming.sh` **exclut** `ui_font.h` : les identifiants d'un fichier généré
-  sont ceux de l'outil, et une correction serait effacée à la génération suivante.
+- Les libellés s'écrivent avec la police PAR DÉFAUT du moteur (`engine_font_default()`),
+  jamais celle que le script a choisie : l'interface garde son apparence quoi que fasse
+  le programme. Voir « Polices du moteur ».
 - La validation des arguments vit dans `ui_module.h` (`ui_check_*_args`), appelée par le
   module ET par `ui_stub.cpp` : une faute d'appel se voit en natif headless, où tournent
   les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un
   script chaînant `ui.menu("x").button(...)` tourne aussi sans graphisme.
+
+## Polices du moteur (`engine_font.h`)
+
+Registre de polices **embarquées**, désignées par un nom : `"sans"` (Liberation Sans,
+défaut), `"mono"` (Liberation Mono) et `"pixel"` (la police intégrée de raylib, sans
+atlas). Aucun fichier à trouver à l'exécution, aucune option de build → même rendu sur
+toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
+
+- Les atlas `src/modules/font_sans.h` / `font_mono.h` sont **générés** par
+  `ExportFontAsCode` (raylib) via `tools/gen_ui_font.cpp` — lancé à la main, PAS par le
+  build : `xvfb-run -a gen_ui_font <police.ttf> <taille> <nom>` (mode d'emploi complet en
+  tête de l'outil). 32 px, ASCII + accents français, SIL OFL 1.1.
+- `engine_font(idx)` charge l'atlas au PREMIER usage : le construire crée une texture,
+  donc exige un contexte graphique, absent quand les widgets sont déclarés. Repli sur
+  `GetFontDefault()` en cas d'échec. Filtre BILINEAR, l'atlas étant le plus souvent réduit.
+- `engine_font_reset()` (appelé dans `ollin_run`, comme `ui_reset`) oublie les polices
+  **sans les décharger** : leurs textures appartiennent au contexte du programme
+  précédent, déjà détruit.
+- Côté langage, la police est un **état de style** comme `fontSize` : `s_font_idx` est
+  sauvegardé par `capture_style`/`restore_style` et remis au défaut par `reset_styles`.
+  `graphics.font([nom])` le pilote et renvoie le nom courant ; `graphics.textSize(texte)`
+  mesure avec la police ET la taille courantes (deux valeurs, via `ctx.set_result`).
+- `tests/check_naming.sh` **exclut** `font_sans.h`/`font_mono.h` : les identifiants d'un
+  fichier généré sont ceux de l'outil, et une correction serait effacée à la génération
+  suivante.
 
 ## Globales moteur (engine-injected globals)
 

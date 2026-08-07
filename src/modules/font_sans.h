@@ -9,20 +9,19 @@
 //                                                                                    //
 // ---------------------------------------------------------------------------------- //
 //                                                                                    //
-// Atlas de police du module `ui` — RÉGÉNÉRER avec tools/gen_ui_font.cpp (mode d'emploi //
-// en tête de ce fichier), jamais à la main.                                          //
+// Atlas de police embarqué — RÉGÉNÉRER avec tools/gen_ui_font.cpp, jamais à la main.  //
 //                                                                                    //
-// Font name:    Liberation Sans Regular, 32 px, ASCII + accents français             //
-// Font creator: Google (Arimo/Tinos/Cousine) et Red Hat, Inc.                        //
+// Font name:    Liberation Sans Regular, 32 px, ASCII + accents français
+// Font creator: Google (Arimo/Tinos/Cousine) et Red Hat, Inc.
 // Font LICENSE: SIL Open Font License 1.1                                            //
 //                                                                                    //
 ////////////////////////////////////////////////////////////////////////////////////////
 
-#define COMPRESSED_DATA_SIZE_FONT_UIFONT 20541
+#define COMPRESSED_DATA_SIZE_FONT_FONTSANS 20541
 
 // Font image pixels data compressed (DEFLATE)
 // NOTE: Original pixel data simplified to GRAYSCALE
-static unsigned char fontData_UiFont[COMPRESSED_DATA_SIZE_FONT_UIFONT] = { 0xec,
+static unsigned char fontData_FontSans[COMPRESSED_DATA_SIZE_FONT_FONTSANS] = { 0xec,
     0x5d, 0x09, 0xbc, 0x4d, 0xd5, 0x17, 0x7e, 0x03, 0xcf, 0xf4, 0xcc, 0x53, 0x19, 0x33, 0x45, 0xc9, 0x94, 0x79, 0x28, 0x2a,
     0x92, 0x29, 0x0d, 0x4a, 0x45, 0x25, 0x29, 0xe4, 0x5f, 0xa4, 0x12, 0x22, 0x32, 0x24, 0x94, 0x29, 0x19, 0x32, 0x95, 0xf4,
     0x84, 0x8c, 0x3d, 0x8a, 0x22, 0x8a, 0xa2, 0x32, 0x84, 0x8c, 0x21, 0x32, 0xa5, 0x01, 0x99, 0x1e, 0xef, 0x79, 0xdf, 0xff,
@@ -1052,7 +1051,7 @@ static unsigned char fontData_UiFont[COMPRESSED_DATA_SIZE_FONT_UIFONT] = { 0xec,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x74, 0x7e, 0x00, 0xfd, 0x03, 0x77, 0xfd, 0x07 };
 
 // Font characters rectangles data
-static Rectangle fontRecs_UiFont[135] = {
+static Rectangle fontRecs_FontSans[135] = {
     { 4, 4, 7 , 32 },
     { 19, 4, 4 , 20 },
     { 31, 4, 8 , 7 },
@@ -1192,7 +1191,7 @@ static Rectangle fontRecs_UiFont[135] = {
 
 // Font glyphs info data
 // NOTE: No glyphs.image data provided
-static GlyphInfo fontGlyphs_UiFont[135] = {
+static GlyphInfo fontGlyphs_FontSans[135] = {
     { 32, 0, 0, 7, { 0 }},
     { 33, 2, 5, 7, { 0 }},
     { 34, 1, 5, 10, { 0 }},
@@ -1330,8 +1329,8 @@ static GlyphInfo fontGlyphs_UiFont[135] = {
     { 8212, 0, 16, 28, { 0 }},
 };
 
-// Font loading function: UiFont
-static Font LoadFont_UiFont(void)
+// Font loading function: FontSans
+static Font LoadFont_FontSans(void)
 {
     Font font = { 0 };
 
@@ -1341,8 +1340,8 @@ static Font LoadFont_UiFont(void)
 
     // Custom font loading
     // NOTE: Compressed font image data (DEFLATE), it requires DecompressData() function
-    int fontDataSize_UiFont = 0;
-    unsigned char *data = DecompressData(fontData_UiFont, COMPRESSED_DATA_SIZE_FONT_UIFONT, &fontDataSize_UiFont);
+    int fontDataSize_FontSans = 0;
+    unsigned char *data = DecompressData(fontData_FontSans, COMPRESSED_DATA_SIZE_FONT_FONTSANS, &fontDataSize_FontSans);
     Image imFont = { data, 512, 512, 1, 2 };
 
     // Load texture from image
@@ -1351,8 +1350,8 @@ static Font LoadFont_UiFont(void)
 
     // Assign glyph recs and info data directly
     // WARNING: This font data must not be unloaded
-    font.recs = fontRecs_UiFont;
-    font.glyphs = fontGlyphs_UiFont;
+    font.recs = fontRecs_FontSans;
+    font.glyphs = fontGlyphs_FontSans;
 
     return font;
 }

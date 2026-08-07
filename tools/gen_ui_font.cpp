@@ -1,4 +1,4 @@
-// Génère `src/modules/ui_font.h` : l'atlas de police embarqué du module `ui`.
+// Génère un atlas de police embarqué : `src/modules/font_<nom>.h`.
 //
 // Outil de développement, exécuté À LA MAIN quand on change de police ou de jeu de
 // caractères — il n'est PAS compilé par le build du moteur. Il s'appuie sur
@@ -9,7 +9,7 @@
 //   c++ -std=c++17 tools/gen_ui_font.cpp -o /tmp/gen_ui_font \
 //       -Ibuild-gfx/_deps/raylib-build/raylib/include \
 //       build-gfx/_deps/raylib-build/raylib/libraylib.a -lm -lpthread -ldl -lGL -lX11
-//   xvfb-run -a /tmp/gen_ui_font <police.ttf> <taille>
+//   xvfb-run -a /tmp/gen_ui_font <police.ttf> <taille> <nom>
 //
 // LoadFontEx crée une texture, donc un contexte graphique est nécessaire : d'où la
 // fenêtre minimale et l'affichage virtuel.
@@ -21,6 +21,7 @@
 int main(int argc, char** argv) {
     const char* path = (argc > 1) ? argv[1] : "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf";
     int size = (argc > 2) ? atoi(argv[2]) : 32;
+    const char* name = (argc > 3) ? argv[3] : "sans";
 
     // ASCII imprimable + les lettres accentuées du français (les libellés sont écrits
     // par l'utilisateur du langage, pas par le moteur).
@@ -42,7 +43,7 @@ int main(int argc, char** argv) {
         CloseWindow();
         return 1;
     }
-    ExportFontAsCode(font, "src/modules/ui_font.h");
+    ExportFontAsCode(font, TextFormat("src/modules/font_%s.h", name));
     printf("police %s à %d px : %d glyphes, atlas %dx%d\n", path, size, font.glyphCount,
            font.texture.width, font.texture.height);
     UnloadFont(font);

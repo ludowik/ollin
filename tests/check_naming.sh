@@ -114,7 +114,7 @@ files = glob.glob(os.path.join(root, 'src', '**', '*.cpp'), recursive=True) \
       + glob.glob(os.path.join(root, 'src', '**', '*.h'), recursive=True)
 # Fichiers GÉNÉRÉS par un outil externe : leurs identifiants sont ceux de l'outil, pas
 # des choix du projet, et une correction serait effacée à la prochaine génération.
-GENERATED = {'ui_font.h'}
+GENERATED = {'font_sans.h', 'font_mono.h'}
 files = [f for f in files if os.path.basename(f) not in GENERATED]
 seen = {}
 for f in files:

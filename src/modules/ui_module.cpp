@@ -3,7 +3,7 @@
 #include "module_utils.h"
 #include "vm.h"
 #include <raylib.h>
-#include "ui_font.h"   // atlas embarqué (généré par tools/gen_ui_font.cpp)
+#include "engine_font.h"
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -256,23 +256,11 @@ Metrics metrics() {
     return m;
 }
 
-// Police du module : atlas embarqué, chargé au premier usage — LoadFont_UiFont crée une
-// texture, donc il faut un contexte graphique, qui n'existe pas encore à la déclaration
-// des widgets. Repli sur la police intégrée de raylib si le chargement échoue.
-Font s_font = {0};
-bool s_font_ready = false;
-
+// Les widgets s'écrivent toujours avec la police par défaut du moteur, indépendamment
+// de celle que le script a choisie pour ses propres tracés : l'interface garde son
+// apparence quoi que fasse le programme.
 Font ui_font() {
-    if (!s_font_ready && IsWindowReady()) {
-        s_font = LoadFont_UiFont();
-        if (s_font.texture.id != 0) {
-            // L'atlas est rendu à 32 px et le plus souvent réduit : l'interpolation
-            // donne des contours lisses là où un filtre par point les créerait dentelés.
-            SetTextureFilter(s_font.texture, TEXTURE_FILTER_BILINEAR);
-            s_font_ready = true;
-        }
-    }
-    return s_font_ready ? s_font : GetFontDefault();
+    return engine_font(engine_font_default());
 }
 
 float text_width(const std::string& text, float font_size) {
@@ -583,10 +571,6 @@ Value element_class() {
 // ── Boucle de rendu ────────────────────────────────────────────────────────────
 
 void ui_reset() {
-    // La texture de l'atlas appartient au contexte graphique du programme précédent,
-    // détruit avec sa fenêtre : on oublie la police sans la décharger (l'objet GL n'est
-    // plus valide) et le premier tracé la rechargera.
-    s_font_ready = false;
     s_nodes.clear();
     s_free.clear();
     s_nav.clear();
