@@ -1,11 +1,11 @@
 ## Primitives 3D : cube, sphère, cylindre, plan, ligne, point, cône, tore.
 ## Glisse pour faire tourner chaque primitive sur elle-même.
 
+## La rotation à la souris vit dans trackball.ol (bibliothèque partagée par les
+## exemples 3D) : l'hôte lui relaie les trois callbacks souris.
+import "trackball.ol"
+global ball = Trackball()
 global cam = graphics.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
-global orient = graphics.quat()
-global dragging = false
-global lastx = 0
-global lasty = 0
 
 ## Grille adaptée à l'orientation : paysage = 4×2, portrait = 2×4
 ## cellPos(col, row, cols, rows) → [x, z] dans le plan XZ (vue ortho iso, size=16)
@@ -31,24 +31,17 @@ func setup()
     graphics.light("dir", -1, -2, -0.5)
 end
 
+## Souris ET tactile : sur le web, le doigt pilote le pointeur → mêmes callbacks.
 func mouse.pressed(x, y)
-    dragging = true
-    lastx = x
-    lasty = y
-end
-
-func mouse.released(x, y)
-    dragging = false
+    ball.press(x, y)
 end
 
 func mouse.moved(x, y)
-    if not dragging then return end
-    var dx = x - lastx
-    var dy = y - lasty
-    lastx = x
-    lasty = y
-    var spin = graphics.quatAxis(0, 1, 0, dx * 0.5).mul(graphics.quatAxis(1, 0, 0, dy * 0.5))
-    orient = spin.mul(orient)
+    ball.move(x, y)
+end
+
+func mouse.released(x, y)
+    ball.release()
 end
 
 func draw()
@@ -77,7 +70,7 @@ func draw()
         var p = cellPos(gc(0), gr(0), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.fill(Color(0.9, 0.3, 0.3))
             graphics.cube(0, 0, 0,  2, 2, 2)
         graphics.pop()
@@ -86,7 +79,7 @@ func draw()
         p = cellPos(gc(1), gr(1), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.fill(Color(0.3, 0.7, 0.9))
             graphics.stroke(Color(1, 1, 1, 0.35))
             graphics.sphere(0, 0, 0,  1.4)
@@ -97,7 +90,7 @@ func draw()
         p = cellPos(gc(2), gr(2), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.fill(Color(0.4, 0.85, 0.4))
             graphics.cylinder(0, -1.2, 0,  0.9, 2.4)
         graphics.pop()
@@ -106,7 +99,7 @@ func draw()
         p = cellPos(gc(3), gr(3), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.rotateX(90)
             graphics.fill(Color(0.9, 0.7, 0.2, 0.75))
             graphics.plane(0, 0, 0,  2.5, 2.5)
@@ -116,7 +109,7 @@ func draw()
         p = cellPos(gc(4), gr(4), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.stroke(Color(1, 0.5, 0.1))
             graphics.strokeSize(4)
             graphics.line3d(-1.8, -1.8, -1.8,   1.8,  1.8,  1.8)
@@ -140,7 +133,7 @@ func draw()
         p = cellPos(gc(5), gr(5), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.fill(Color(0.9, 0.4, 0.8))
             graphics.cone(0, -1.2, 0,  1.0, 2.4)
         graphics.pop()
@@ -149,7 +142,7 @@ func draw()
         p = cellPos(gc(6), gr(6), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.fill(Color(0.4, 0.9, 0.7))
             graphics.torus(0, 0, 0,  1.1, 0.4)
         graphics.pop()
@@ -158,7 +151,7 @@ func draw()
         p = cellPos(gc(7), gr(7), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
-            graphics.rotateq(orient)
+            graphics.rotateq(ball.orient())
             graphics.segments(6)
             graphics.fill(Color(0.3, 0.7, 0.9))
             graphics.sphere(0, 0, 0,  1.4)

@@ -388,7 +388,7 @@ d'accroche dans la boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`)
   `mouse_poll(click_taken)` neutralise alors `pressed`/`released`/`doubleClicked`. C'est
   LA raison d'être d'un module natif plutôt qu'une classe Ollin : une classe ne peut pas
   s'interposer, elle devrait voler les callbacks du script (cf. l'avertissement en tête
-  de `joystick.ol`, qui réclame trois relais).
+  de `joystick.ol` et de `trackball.ol`, qui réclament trois relais chacun).
 - **`ui_draw()` APRÈS `draw()`** et après `end3d_internal()` : dans la même render
   texture, donc capturé par `graphics.screenshot` et posé par-dessus la 3D.
 - **`ui_reset()` dans `ollin_run` (wasm_main.cpp), PAS dans `gfx_run`** : les widgets
