@@ -1053,9 +1053,9 @@ static double s_frame_dt = 0.0;          // durée de la dernière frame (second
 static double s_last_frame_time = -1.0;  // horodatage de la frame précédente
 static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
 
-// Overlay FPS dessiné par le moteur après chaque frame (toujours en haut à
-// droite de la zone graphique). Couleur vive + ombre → lisible sur tout fond.
-// Overlay mémoire/FPS : coin BAS droit, pour laisser le haut à l'interface `ui`.
+// Overlay mémoire/FPS dessiné par le moteur après chaque frame, dans le coin BAS
+// droit — le haut est laissé à l'interface `ui`. Couleur vive + ombre portée : lisible
+// quel que soit le fond de la scène.
 static const int OVERLAY_SIZE = 16;
 static const int OVERLAY_MARGIN = 8;
 
