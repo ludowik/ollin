@@ -178,12 +178,12 @@ Value make_handle(int slot) {
 struct Style {
     Color bg;
     Color bg_hover;
-    Color border;
+    Color border;     // contour discret des cases et de la glissière
     Color text;
-    Color check;      // remplissage d'une case cochée
-    Color chevron;    // marque d'un sous-menu
+    Color text_dim;   // valeur d'un slider, chevron d'un sous-menu
+    Color accent;     // case cochée, partie remplie d'une glissière
     Color track;      // fond de la glissière d'un slider
-    Color knob;       // partie remplie de la glissière
+    float round;      // arrondi des lignes, 0 = angles droits
     float border_thick;
     float font_frac;  // police, fraction de la hauteur de la zone
     float font_min;   // en dessous, illisible quelle que soit la zone
@@ -197,30 +197,32 @@ struct Style {
     float track_frac; // épaisseur de la glissière
     float bar_thick_frac;  // épaisseur d'une barre de la poignée, fraction du carré
     float bar_gap_frac;    // écart entre deux barres
+    float bar_width_frac;  // largeur des barres, fraction du carré
 };
 
 const Style STYLE = {
-    {40, 44, 54, 220},     // bg
-    {58, 64, 78, 235},     // bg_hover
-    {120, 130, 150, 255},  // border
-    {228, 232, 240, 255},  // text
-    {120, 220, 150, 255},  // check
-    {150, 160, 180, 255},  // chevron
-    {28, 31, 38, 255},     // track
-    {96, 168, 232, 255},   // knob
+    {46, 51, 63, 238},     // bg
+    {64, 71, 86, 248},     // bg_hover
+    {96, 104, 122, 255},   // border
+    {232, 235, 242, 255},  // text
+    {148, 156, 174, 255},  // text_dim
+    {94, 162, 255, 255},   // accent
+    {14, 15, 19, 255},     // track
+    0.34f,                 // round
     1.0f,                  // border_thick
-    0.026f,                // font_frac
-    10.0f,                 // font_min
-    0.62f,                 // pad_frac
-    1.9f,                  // row_frac
-    3.0f,                  // slider_row_frac
-    0.38f,                 // gap_frac
-    0.75f,                 // margin_frac
-    1.0f,                  // box_frac
-    0.22f,                 // check_inset
-    0.34f,                 // track_frac
-    0.11f,                 // bar_thick_frac
-    0.22f,                 // bar_gap_frac
+    0.020f,                // font_frac
+    9.0f,                  // font_min
+    0.72f,                 // pad_frac
+    1.65f,                 // row_frac
+    2.45f,                 // slider_row_frac
+    0.22f,                 // gap_frac
+    0.9f,                  // margin_frac
+    0.82f,                 // box_frac
+    0.26f,                 // check_inset
+    0.26f,                 // track_frac
+    0.105f,                // bar_thick_frac
+    0.17f,                 // bar_gap_frac
+    0.5f,                  // bar_width_frac
 };
 
 const char* CHEVRON = ">";
@@ -600,8 +602,7 @@ void layout(const Metrics& m, const std::vector<int>& rows) {
 }
 
 void draw_row(const Rectangle& rect, bool hover) {
-    DrawRectangleRec(rect, hover ? STYLE.bg_hover : STYLE.bg);
-    DrawRectangleLinesEx(rect, STYLE.border_thick, STYLE.border);
+    DrawRectangleRounded(rect, STYLE.round, 8, hover ? STYLE.bg_hover : STYLE.bg);
 }
 
 // Trois barres dessinées à la main : la police par défaut n'a pas de glyphe de menu,
@@ -610,7 +611,7 @@ void draw_handle(const Rectangle& rect, const Metrics& m) {
     float side = m.row;
     float thick = side * STYLE.bar_thick_frac;
     float gap = side * STYLE.bar_gap_frac;
-    float bw = side * 0.44f;
+    float bw = side * STYLE.bar_width_frac;
     float cx = rect.x + (side - bw) * 0.5f;
     float cy = rect.y + (rect.height - (3 * thick + 2 * gap)) * 0.5f;
     for (int i = 0; i < 3; ++i) {
@@ -648,7 +649,7 @@ void ui_draw() {
         // Le titre du menu affiché n'a de sens qu'ouvert : fermée, la pile se réduit
         // à la poignée.
         std::string title = s_nodes[current_menu()].label;
-        draw_text_at(title, s_head_box.x + m.row + m.pad * 0.5f, s_head_box, m, STYLE.text);
+        draw_text_at(title, s_head_box.x + m.row, s_head_box, m, STYLE.text);
     }
     if (!s_open)
         return;
@@ -673,11 +674,11 @@ void ui_draw() {
         float tx = rect.x + m.pad;
         if (kind == Node::CHECKBOX) {
             Rectangle box = {rect.x + m.pad, rect.y + (m.row - m.box) * 0.5f, m.box, m.box};
-            DrawRectangleLinesEx(box, STYLE.border_thick, STYLE.border);
+            DrawRectangleRoundedLinesEx(box, STYLE.round, 6, STYLE.border_thick, STYLE.border);
             if (checked) {
                 float inset = m.box * STYLE.check_inset;
                 Rectangle fill = {box.x + inset, box.y + inset, m.box - 2 * inset, m.box - 2 * inset};
-                DrawRectangleRec(fill, STYLE.check);
+                DrawRectangleRounded(fill, STYLE.round, 6, STYLE.accent);
             }
             tx = box.x + m.box + m.pad;
         }
@@ -687,19 +688,24 @@ void ui_draw() {
             double value = slider_value(target, vmin, vmax, s_nodes[slot].vdefault);
             bool integral = s_nodes[slot].integral;
             Rectangle track = slider_track(rect, m);
-            DrawRectangleRec(track, STYLE.track);
+            DrawRectangleRounded(track, 1.0f, 6, STYLE.track);
             float t = (float)((value - vmin) / (vmax - vmin));
-            Rectangle filled = {track.x, track.y, track.width * t, track.height};
-            DrawRectangleRec(filled, STYLE.knob);
-            DrawRectangleLinesEx(track, STYLE.border_thick, STYLE.border);
+            // Un remplissage plus court que son arrondi dégénérerait : on n'en dessine
+            // que la partie utile, et jamais moins que l'épaisseur du rail.
+            if (t > 0.0f) {
+                float fw = track.width * t;
+                if (fw < track.height)
+                    fw = track.height;
+                DrawRectangleRounded({track.x, track.y, fw, track.height}, 1.0f, 6, STYLE.accent);
+            }
             std::string vtext = slider_text(value, integral);
             float vw = text_width(vtext, m.font);
-            draw_text_at(vtext, rect.x + rect.width - m.pad - vw, text_rect, m, STYLE.text);
+            draw_text_at(vtext, rect.x + rect.width - m.pad - vw, text_rect, m, STYLE.text_dim);
         }
         draw_text_at(label, tx, text_rect, m, STYLE.text);
         if (kind == Node::MENU) {
             float cw = text_width(CHEVRON, m.font);
-            draw_text_at(CHEVRON, rect.x + rect.width - m.pad - cw, rect, m, STYLE.chevron);
+            draw_text_at(CHEVRON, rect.x + rect.width - m.pad - cw, rect, m, STYLE.text_dim);
         }
     }
 }

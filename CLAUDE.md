@@ -429,9 +429,10 @@ ET la valeur de départ le sont : sinon un slider `0..1` arrondirait à 0 ou 1. 
 glissement dure plusieurs frames → `s_drag` retient le nœud par identité `{slot, gen}`,
 et `ui_poll` renvoie true tant qu'on glisse (sinon le relâchement atteindrait la scène).
 
-**Style** : toute l'apparence (couleurs, épaisseurs, proportions) vit dans le seul bloc
-`struct Style` / `const STYLE` de `ui_module.cpp`, et les tailles sont des fractions de
-`gfx_logical_height()`. Le rendu ne lit **aucune** valeur d'apparence en dur : changer le
+**Style** : toute l'apparence (couleurs, arrondi, épaisseurs, proportions) vit dans le
+seul bloc `struct Style` / `const STYLE` de `ui_module.cpp`, et les tailles sont des
+fractions de `gfx_logical_height()`. Les lignes sont des rectangles **arrondis sans
+contour** — la séparation vient de l'espacement, pas d'un liseré. Le rendu ne lit **aucune** valeur d'apparence en dur : changer le
 style est donc une édition locale qui s'applique à tous les widgets. `metrics()` dérive
 les dimensions de `STYLE` à chaque frame ; `row_height()` donne sa hauteur propre au
 slider (libellé + glissière).
