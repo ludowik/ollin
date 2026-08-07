@@ -786,6 +786,35 @@ end
 assert(dfTry[1]() == 3 and dfTry[3]() == 3)
 
 
+## Closure capturant une LOCALE DU CORPS de boucle, appelée APRÈS la boucle.
+## compile_block réserve les registres des locales du corps quand celui-ci contient une
+## fonction ; les deux boucles écrasaient ensuite reg_top_ avec la seule réservation des
+## variables de boucle, plus basse → le registre de la locale redevenait un temporaire,
+## et l'appel suivant écrasait la valeur sous une upvalue encore ouverte (on lisait
+## {function} au lieu de la valeur). Comme pour la variable de boucle, les closures
+## partagent le registre et voient donc la valeur FINALE.
+var clNum = []
+for i = 1, 3 do
+    var copie = i * 10
+    clNum[#clNum + 1] = func() return copie end
+end
+assert(clNum[1]() == 30 and clNum[2]() == 30 and clNum[3]() == 30)
+
+var clIter = []
+for v in ["a", "b", "c"] do
+    var copie = v
+    clIter[#clIter + 1] = func() return copie end
+end
+assert(clIter[1]() == "c" and clIter[2]() == "c" and clIter[3]() == "c")
+
+var clPaire = []
+for k, v in {x: 1} do
+    var copie = k + "=" + v
+    clPaire[#clPaire + 1] = func() return copie end
+end
+assert(clPaire[1]() == "x=1")
+
+
 ## ── ref (passage par référence) ───────────────────────────────────────────────
 ## `ref x` est désucré par le parser en {__ref, get, set} : deux closures qui lisent
 ## et écrivent la cible. Les upvalues font le travail, y compris pour une locale.

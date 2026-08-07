@@ -503,6 +503,18 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std
     }
 }
 
+// Registres à conserver après une boucle. Une closure du corps peut capturer la
+// variable de boucle ET les locales du corps : leurs upvalues restent OUVERTES (elles
+// pointent dans les registres) jusqu'au retour du frame, donc rendre ces registres aux
+// temporaires écraserait les valeurs capturées. `compile_block` a déjà réservé les
+// locales du corps (reg_top_ courant) ; on garde le plus haut des deux.
+static int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
+                              int reg_top_after_body) {
+    if (!body_has_func(body))
+        return recycled_top;
+    return loop_vars_top > reg_top_after_body ? loop_vars_top : reg_top_after_body;
+}
+
 void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body) {
     auto saved_regs = local_regs_;
     auto saved_pending = pending_var_reg_;
@@ -1649,7 +1661,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     restore_bind(var1, had1, old1);
     if (two_vars)
         restore_bind(var2, had2, old2);
-    reg_top_ = body_has_func(body) ? (block + (two_vars ? 3 : 2)) : block;
+    reg_top_ = keep_captured_regs(body, block + (two_vars ? 3 : 2), block, reg_top_);
 }
 
 void Compiler::visit(const ForIterStmt& s) {
@@ -1957,7 +1969,10 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         local_regs_.erase(var1); // restaure la portée
     // recyclage des registres : si une closure du corps capture i, on garde son
     // registre réservé (sinon il serait réécrit après la boucle → upvalue corrompue).
-    reg_top_ = body_has_func(body) ? (var_reg + 1) : ctl;
+    // NE PAS redescendre sous ce que compile_block a réservé pour les LOCALES du corps,
+    // qu'une closure peut aussi capturer : les rendre disponibles comme temporaires
+    // écrasait leur valeur sous une upvalue encore ouverte.
+    reg_top_ = keep_captured_regs(body, var_reg + 1, ctl, reg_top_);
 }
 
 // Écriture visible sur un enum : refusée dès la compilation pour nommer
