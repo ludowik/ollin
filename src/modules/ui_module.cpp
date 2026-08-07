@@ -3,6 +3,7 @@
 #include "module_utils.h"
 #include "vm.h"
 #include <raylib.h>
+#include "ui_font.h"   // atlas embarqué (généré par tools/gen_ui_font.cpp)
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -245,19 +246,6 @@ Metrics metrics() {
     m.font = h * STYLE.font_frac;
     if (m.font < STYLE.font_min)
         m.font = STYLE.font_min;
-    // La police par défaut de raylib est une IMAGE de 10 px : l'agrandir d'un facteur
-    // fractionnaire fait interpoler les pixels, d'où un texte flou. On cale donc la
-    // taille sur un multiple ENTIER de sa hauteur native — netteté plutôt que taille
-    // exacte. Une police vectorielle rendrait ce calage inutile.
-    float base = (float)GetFontDefault().baseSize;
-    if (base > 0.0f) {
-        // Vers le BAS : entre deux multiples on préfère le plus discret, la lisibilité
-        // étant déjà garantie par la netteté et par font_min.
-        float k = std::floor(m.font / base);
-        if (k < 1.0f)
-            k = 1.0f;
-        m.font = k * base;
-    }
     m.pad = m.font * STYLE.pad_frac;
     m.row = m.font * STYLE.row_frac;
     m.slider_row = m.font * STYLE.slider_row_frac;
@@ -268,8 +256,27 @@ Metrics metrics() {
     return m;
 }
 
+// Police du module : atlas embarqué, chargé au premier usage — LoadFont_UiFont crée une
+// texture, donc il faut un contexte graphique, qui n'existe pas encore à la déclaration
+// des widgets. Repli sur la police intégrée de raylib si le chargement échoue.
+Font s_font = {0};
+bool s_font_ready = false;
+
+Font ui_font() {
+    if (!s_font_ready && IsWindowReady()) {
+        s_font = LoadFont_UiFont();
+        if (s_font.texture.id != 0) {
+            // L'atlas est rendu à 32 px et le plus souvent réduit : l'interpolation
+            // donne des contours lisses là où un filtre par point les créerait dentelés.
+            SetTextureFilter(s_font.texture, TEXTURE_FILTER_BILINEAR);
+            s_font_ready = true;
+        }
+    }
+    return s_font_ready ? s_font : GetFontDefault();
+}
+
 float text_width(const std::string& text, float font_size) {
-    Font font = GetFontDefault();
+    Font font = ui_font();
     if (font.texture.id == 0 || font.baseSize == 0)
         return (float)text.size() * font_size * 0.5f;   // sans canvas : estimation
     return MeasureTextEx(font, text.c_str(), font_size, font_size / (float)font.baseSize).x;
@@ -576,6 +583,10 @@ Value element_class() {
 // ── Boucle de rendu ────────────────────────────────────────────────────────────
 
 void ui_reset() {
+    // La texture de l'atlas appartient au contexte graphique du programme précédent,
+    // détruit avec sa fenêtre : on oublie la police sans la décharger (l'objet GL n'est
+    // plus valide) et le premier tracé la rechargera.
+    s_font_ready = false;
     s_nodes.clear();
     s_free.clear();
     s_nav.clear();
@@ -632,7 +643,7 @@ void draw_handle(const Rectangle& rect, const Metrics& m) {
 }
 
 void draw_text_at(const std::string& text, float x, const Rectangle& rect, const Metrics& m, Color color) {
-    Font f = GetFontDefault();
+    Font f = ui_font();
     if (f.texture.id == 0 || f.baseSize == 0)
         return;
     Vector2 pos = {x, rect.y + (rect.height - m.font) * 0.5f};

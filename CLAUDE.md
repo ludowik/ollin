@@ -445,9 +445,19 @@ Autres points :
 - La pile démarre à la marge haute : l'overlay mémoire/FPS a été déplacé dans le coin
   **bas** droit (`draw_fps_overlay`), donc plus rien à réserver — `gfx_overlay_height()`
   a disparu avec son unique appelant.
-- `metrics()` cale la police sur un multiple ENTIER de `GetFontDefault().baseSize` (10 px,
-  la police intégrée est une image) — un facteur fractionnaire interpole les pixels et
-  rend le texte flou. Calage vers le bas : entre deux multiples, le plus discret.
+- **Police embarquée** : `src/modules/ui_font.h` est un atlas **généré** (Liberation Sans
+  32 px, ASCII + accents français, SIL OFL 1.1) par `ExportFontAsCode` de raylib, via
+  l'outil `tools/gen_ui_font.cpp` — lancé à la main, pas par le build. Aucun fichier à
+  trouver à l'exécution et aucune option de build : le même code vaut pour toutes les
+  cibles, WASM compris (+41 Ko sur le `.wasm`, données DEFLATE de 20 Ko). `ui_font()`
+  charge l'atlas au PREMIER TRACÉ (`LoadFont_UiFont` crée une texture, donc exige un
+  contexte graphique, absent à la déclaration des widgets) et se replie sur
+  `GetFontDefault()` en cas d'échec. `ui_reset()` oublie la police **sans la décharger** :
+  sa texture appartient au contexte du programme précédent, déjà détruit. Le filtre est
+  BILINEAR — l'atlas est le plus souvent réduit. La taille de police est donc redevenue
+  continue (plus de calage sur la hauteur d'une police bitmap).
+- `tests/check_naming.sh` **exclut** `ui_font.h` : les identifiants d'un fichier généré
+  sont ceux de l'outil, et une correction serait effacée à la génération suivante.
 - La validation des arguments vit dans `ui_module.h` (`ui_check_*_args`), appelée par le
   module ET par `ui_stub.cpp` : une faute d'appel se voit en natif headless, où tournent
   les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un

@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-07 08:28</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-07 08:53</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -423,7 +423,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-07 08:28</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-07 08:53</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2150,7 +2150,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 <ul>
   <li>La taille de l'interface est <strong>proportionnelle</strong> à la hauteur de la zone de tracé, donc lisible aussi bien sur un écran de bureau que sur un téléphone, dont la toile compte plusieurs pixels par pixel d'affichage.</li>
   <li>La pile occupe le coin haut droit ; l'indicateur de mémoire et d'images par seconde est, lui, en bas à droite.</li>
-  <li>Le texte est rendu avec la police intégrée du moteur, une image de 10 pixels de haut : sa taille est calée sur un multiple entier de cette hauteur, ce qui donne des caractères nets plutôt qu'interpolés.</li>
+  <li>Le texte est rendu avec une police proportionnelle embarquée dans le moteur, accents compris — la même sur toutes les plateformes, sans fichier à installer.</li>
   <li>Retirer un menu où l'on se trouve fait remonter l'affichage au premier menu parent encore présent. Utiliser un handle retiré lève une erreur explicite.</li>
   <li>Un slider donne une valeur <strong>entière</strong> si ses bornes et sa valeur de départ le sont, sinon flottante : <code>ui.slider("Taille", <span class="kw">ref</span> n, 1, 10)</code> avec <code>n = 3</code> règle un entier, tandis que <code>ui.slider("Facteur", <span class="kw">ref</span> f, 0, 1, 0.5)</code> règle un flottant.</li>
   <li>La variable liée est la <strong>seule source de vérité</strong> : la glissière lit sa valeur à chaque frame, donc le programme peut l'écrire lui-même et l'affichage suit. Une valeur hors plage est ramenée aux bornes à l'affichage, sans écrire dans la variable.</li>
