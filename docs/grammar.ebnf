@@ -96,6 +96,9 @@ forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" 
                     après (y référer = erreur) ; une variable externe de même nom est
                     masquée puis restaurée. Les modifier dans le corps n'affecte pas
                     l'itération. *)
+                 (* chaque ITÉRATION a ses propres variables : une closure créée dans le
+                    corps capture la variable de boucle et les locales du corps telles
+                    qu'elles étaient à SON tour, pas leur valeur finale *)
 ifStmt         = "if" expr "then" { stmt }
                  { "elseif" expr "then" { stmt } }
                  [ "else" { stmt } ]

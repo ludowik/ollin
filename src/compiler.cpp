@@ -1647,12 +1647,23 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     break_patches.push_back({});
     continue_patches.push_back({});
     compile_block(body);
+    // Fin d'itération : les variables de boucle et les locales du corps sont hors de
+    // portée, donc leurs upvalues sont fermées → le tour suivant en crée de neuves
+    // (une variable par itération). `continue` saute ICI, donc y passe aussi.
+    bool close_scope = body_has_func(body);
+    uint16_t iter_end = (uint16_t)chunk.current_pos();
+    if (close_scope)
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
     for (size_t p : continue_patches.back())
-        chunk.patch_jump(p, loop_start);
+        chunk.patch_jump(p, iter_end);
     continue_patches.pop_back();
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit = (uint16_t)chunk.current_pos();
+    // Sortie (fin normale, itérateur épuisé ou `break`) : même fermeture, pour que la
+    // dernière itération se comporte comme les autres.
+    if (close_scope)
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
     chunk.patch_jump(exit_patch, exit);
     for (size_t p : break_patches.back())
         chunk.patch_jump(p, exit);
@@ -1951,13 +1962,21 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     continue_patches.push_back({});
     compile_block(body);
 
+    // Fin d'itération : fermeture des upvalues de la portée du corps (cf. boucle à
+    // itérateur). Fermer ne modifie pas les registres, donc FOR_LOOP retrouve son
+    // compteur intact.
+    bool close_scope = body_has_func(body);
     uint16_t loop_addr = (uint16_t)chunk.current_pos();
+    if (close_scope)
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
     for (size_t p : continue_patches.back())
         chunk.patch_jump(p, loop_addr);
     continue_patches.pop_back();
     chunk.emit(make_abx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
 
     uint16_t exit_addr = (uint16_t)chunk.current_pos();
+    if (close_scope)
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
     chunk.patch_jump(prep, exit_addr); // FOR_PREP saute ici si la boucle est vide
     for (size_t p : break_patches.back())
         chunk.patch_jump(p, exit_addr);

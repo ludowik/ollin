@@ -104,5 +104,6 @@ enum class Op : uint8_t {
     MOVE_RESULTS,       // AB: copie last_results_ valeurs R[B..] → R[A..] (recompose un spread imbriqué)
     RETURN_SPREAD,      // AB: return B explicites + last_results_ (dernier = appel), contigus à R[A..]
     SEAL_ENUM,          // A: la map de R[A] devient un enum — toute écriture indexée est refusée
+    CLOSE_UPVALS,       // A: ferme les upvalues ouvertes dont le registre est >= A (fin de portée)
     HALT,
 };

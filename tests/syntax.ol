@@ -287,14 +287,14 @@ var ish = 99
 for ish = 1, 3 do end
 assert(ish == 99)
 
-## closures créées dans une boucle : capturent la liaison (valeur finale),
-## cohérent et sans corruption après la boucle
+## closures créées dans une boucle : chaque itération a SA variable (les upvalues sont
+## fermées en fin de tour), donc chaque closure garde la valeur de son propre tour
 var cl = []
 var ci = 0
 for v in [10, 20, 30] do ci += 1  cl[ci] = func() return v end end
 var pad_after = 1
-assert(cl[1]() == 30 and cl[2]() == 30 and cl[3]() == 30)
-## capture par valeur via IIFE → valeur de chaque itération
+assert(cl[1]() == 10 and cl[2]() == 20 and cl[3]() == 30)
+## capture par valeur via IIFE : même résultat, l'astuce n'est plus nécessaire
 var cv = []
 var cj = 0
 for v in [10, 20, 30] do cj += 1  cv[cj] = (func(x) return func() return x end end)(v) end

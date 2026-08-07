@@ -136,7 +136,8 @@ class VM {
     // sinon retourne l'adresse du corps de init (frame constructeur poussé).
     uint32_t instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done);
     uint32_t try_meta_unary(const Value& name, int dest, Value lhs);
-    void close_upvals();           // closes & frees all open upvalues of the top frame
+    void close_upvals();                     // tout le frame (retour, throw) — chemin CHAUD
+    void close_upvals_above(int threshold);   // portée qui se termine (fin d'itération)
     // Déroule la pile jusqu'au handler `h`, remet regs à sa taille, écrit la valeur
     // capturée dans le registre de catch et positionne `ip` sur le corps du catch.
     // Partagé par op_THROW (throw utilisateur) et le catch(runtime_error) C++.

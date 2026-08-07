@@ -746,17 +746,17 @@ assert(psLire2() == 8 + 9 + 10 + 11 + 12 + 13)
 
 
 ## Closure capturant la variable de boucle depuis un bloc IMBRIQUÉ. body_has_func
-## décide si les registres de boucle restent réservés ; il n'avait pas de cas pour
-## `do ... end` (no-op hérité) et répondait « aucune fonction ici » → registres
-## recyclés, et la closure lisait un registre réutilisé : dfDo[1]() renvoyait
-## {function} au lieu de 3. Une closure voit la valeur FINALE de la variable.
+## décide si la boucle ferme ses upvalues et garde ses registres réservés ; il n'avait
+## pas de cas pour `do ... end` (no-op hérité) et répondait « aucune fonction ici » →
+## registres recyclés, et la closure lisait un registre réutilisé : dfDo[1]() renvoyait
+## {function} au lieu d'un nombre. Chaque itération a sa propre variable.
 var dfDo = []
 for i = 1, 3 do
     do
         dfDo[#dfDo + 1] = func() return i end
     end
 end
-assert(dfDo[1]() == 3 and dfDo[2]() == 3 and dfDo[3]() == 3)
+assert(dfDo[1]() == 1 and dfDo[2]() == 2 and dfDo[3]() == 3)
 
 var dfIf = []
 for i = 1, 3 do
@@ -764,7 +764,7 @@ for i = 1, 3 do
         dfIf[#dfIf + 1] = func() return i end
     end
 end
-assert(dfIf[1]() == 3 and dfIf[3]() == 3)
+assert(dfIf[1]() == 1 and dfIf[3]() == 3)
 
 var dfSw = []
 for i = 1, 3 do
@@ -774,7 +774,7 @@ for i = 1, 3 do
         end
     end
 end
-assert(dfSw[1]() == 3 and dfSw[3]() == 3)
+assert(dfSw[1]() == 1 and dfSw[3]() == 3)
 
 var dfTry = []
 for i = 1, 3 do
@@ -783,7 +783,7 @@ for i = 1, 3 do
     catch e
     end
 end
-assert(dfTry[1]() == 3 and dfTry[3]() == 3)
+assert(dfTry[1]() == 1 and dfTry[3]() == 3)
 
 
 ## Closure capturant une LOCALE DU CORPS de boucle, appelée APRÈS la boucle.
@@ -791,21 +791,20 @@ assert(dfTry[1]() == 3 and dfTry[3]() == 3)
 ## fonction ; les deux boucles écrasaient ensuite reg_top_ avec la seule réservation des
 ## variables de boucle, plus basse → le registre de la locale redevenait un temporaire,
 ## et l'appel suivant écrasait la valeur sous une upvalue encore ouverte (on lisait
-## {function} au lieu de la valeur). Comme pour la variable de boucle, les closures
-## partagent le registre et voient donc la valeur FINALE.
+## {function} au lieu de la valeur).
 var clNum = []
 for i = 1, 3 do
     var copie = i * 10
     clNum[#clNum + 1] = func() return copie end
 end
-assert(clNum[1]() == 30 and clNum[2]() == 30 and clNum[3]() == 30)
+assert(clNum[1]() == 10 and clNum[2]() == 20 and clNum[3]() == 30)
 
 var clIter = []
 for v in ["a", "b", "c"] do
     var copie = v
     clIter[#clIter + 1] = func() return copie end
 end
-assert(clIter[1]() == "c" and clIter[2]() == "c" and clIter[3]() == "c")
+assert(clIter[1]() == "a" and clIter[2]() == "b" and clIter[3]() == "c")
 
 var clPaire = []
 for k, v in {x: 1} do
@@ -813,6 +812,52 @@ for k, v in {x: 1} do
     clPaire[#clPaire + 1] = func() return copie end
 end
 assert(clPaire[1]() == "x=1")
+
+
+## Fermeture des upvalues en fin d'itération (CLOSE_UPVALS) : les chemins de sortie et
+## de rebouclage doivent TOUS y passer, et deux closures d'un même tour doivent
+## continuer à PARTAGER leur variable (une seule upvalue par registre et par tour).
+var upBreak = []
+for i = 1, 5 do
+    upBreak[#upBreak + 1] = func() return i end
+    if i == 3 then break end
+end
+assert(#upBreak == 3 and upBreak[1]() == 1 and upBreak[3]() == 3)
+
+var upCont = []
+for i = 1, 4 do
+    if i % 2 == 0 then continue end
+    upCont[#upCont + 1] = func() return i end
+end
+assert(#upCont == 2 and upCont[1]() == 1 and upCont[2]() == 3)
+
+var upPart = []
+for i = 1, 2 do
+    var n = i * 10
+    upPart[#upPart + 1] = [func() return n end, func() n = n + 1 end]
+end
+var upP1 = upPart[1]
+upP1[2]()                       ## écrit dans la variable du PREMIER tour
+var upP2 = upPart[2]
+assert(upP1[1]() == 11 and upP2[1]() == 20)
+
+var upNest = []
+for i = 1, 2 do
+    for j = 1, 2 do
+        upNest[#upNest + 1] = func() return i * 10 + j end
+    end
+end
+assert(upNest[1]() == 11 and upNest[2]() == 12 and upNest[3]() == 21 and upNest[4]() == 22)
+
+func upReturn()
+    for i = 1, 3 do
+        var f = func() return i end
+        if i == 2 then
+            return f
+        end
+    end
+end
+assert(upReturn()() == 2)
 
 
 ## ── ref (passage par référence) ───────────────────────────────────────────────

@@ -407,7 +407,10 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
     return push_call_frame(base_reg, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
 }
 
-// ── closeUpvals : close and free all open upvalues of the top frame ──────────
+// ── close_upvals : ferme et libère TOUTES les upvalues ouvertes du frame ──────
+// Chemin CHAUD : appelé à chaque retour de fonction. Volontairement distinct de
+// close_upvals_above — l'y fondre grossissait ce code et coûtait 5 % sur bench_fib
+// (30 M de retours), pour un partage de trois lignes.
 void VM::close_upvals() {
     auto& ouv = call_stack.back().open_upvals;
     if (!ouv)
@@ -420,6 +423,30 @@ void VM::close_upvals() {
         if (--uv->refcount == 0)
             delete uv;
     }
+}
+
+// Fin d'une portée INTERNE au frame (itération de boucle) : seules les upvalues dont le
+// registre est >= threshold sont fermées, et RETIRÉES de la liste — MAKE_CLOSURE n'en
+// réutilise donc plus pour ce registre, si bien que le tour suivant obtient une variable
+// neuve. Les autres restent la propriété du frame.
+void VM::close_upvals_above(int threshold) {
+    auto& ouv = call_stack.back().open_upvals;
+    if (!ouv)
+        return;
+    size_t kept = 0;
+    for (auto* uv : *ouv) {
+        if (uv->reg_idx < threshold) {
+            (*ouv)[kept++] = uv;
+            continue;
+        }
+        if (!uv->closed) {
+            uv->val = regs[uv->frame_base + uv->reg_idx];
+            uv->closed = true;
+        }
+        if (--uv->refcount == 0)
+            delete uv;
+    }
+    ouv->resize(kept);
 }
 
 // ── Helper: resolve function value → func_idx + upvals ───────────────────────
@@ -751,6 +778,7 @@ void VM::run_goto(size_t stop_depth) {
         &&op_MOVE_RESULTS,
         &&op_RETURN_SPREAD,
         &&op_SEAL_ENUM,
+        &&op_CLOSE_UPVALS,
         &&op_HALT,
     };
 
@@ -1816,6 +1844,14 @@ dispatch_loop:
         Value& target = regs[base + A];
         if (target.is_map())
             target.mptr->kind = Map::ENUM;
+        NEXT();
+    }
+
+    // Fin d'une portée qui se RÉPÈTE (itération de boucle) : les variables capturées
+    // par une closure sont figées dans leur upvalue, qui quitte la liste du frame. Le
+    // tour suivant en crée donc une neuve → une variable par itération.
+    op_CLOSE_UPVALS: {
+        close_upvals_above(A);
         NEXT();
     }
 
