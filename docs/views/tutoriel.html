@@ -2171,6 +2171,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   <li>Retirer un menu où l'on se trouve fait remonter l'affichage au premier menu parent encore présent. Utiliser un handle retiré lève une erreur explicite.</li>
   <li>Un slider donne une valeur <strong>entière</strong> si ses bornes et sa valeur de départ le sont, sinon flottante : <code>ui.slider("Facteur", <span class="kw">ref</span> f, 0, 1, 0.5)</code> règle donc un flottant malgré ses bornes entières.</li>
   <li>La variable liée est la <strong>seule source de vérité</strong> : la glissière lit sa valeur à chaque frame, donc le programme peut l'écrire lui-même et l'affichage suit. Une valeur hors plage est ramenée aux bornes à l'affichage, sans écrire dans la variable.</li>
+  <li><code>ref</code> accepte un <strong>chemin de champs</strong> : <code>ui.checkbox("Grille", <span class="kw">ref</span> config.grille)</code> permet de regrouper tous les réglages dans un seul objet plutôt que d'éparpiller des variables globales (voir l'exemple « Interface (ui) »).</li>
   <li>La variable d'une case doit être <strong>accessible</strong> : un global ou un champ d'objet. Une variable locale à une fonction n'a pas de sens ici, puisqu'elle disparaît avant le premier clic.</li>
   <li>Sans zone graphique — exécution en ligne de commande sans fenêtre —, déclarer un widget ne fait rien, mais les arguments sont tout de même vérifiés.</li>
 </ul>
