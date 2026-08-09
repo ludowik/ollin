@@ -112,6 +112,13 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
 - Modules partagés : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur).
 
+**Formateur (`pg-format.js`)** : réindentation ligne par ligne, sans AST. Deux règles à
+retenir avant d'y toucher — une ligne qui ouvre à la fois un bloc et un délimiteur
+(`f(x, func()`) ne vaut qu'**un** niveau (le bloc « absorbe » les délimiteurs de sa ligne
+d'ouverture), et les crochets ne sont comptés que sur les lignes **sans `;`**, un range
+(`[a;b[`) pouvant fermer avec `[`. Tout mot-clé ouvrant un bloc doit figurer dans
+`OPENERS` : `enum` y manquait depuis son ajout au langage.
+
 **Règle** : `init(ctx)` doit retourner un `cleanup()` qui retire tout écouteur **global** (window/document) et met la boucle raylib en pause — sinon fuite/boucle fantôme au changement de vue.
 
 ## Syntaxe
