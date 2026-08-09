@@ -21,8 +21,13 @@ class Trackball
         self.dragging = false
         self.lastx = 0
         self.lasty = 0
-        ## Degrés de rotation par pixel glissé.
-        self.sensibilite = sensibilite or 0.5
+        ## Degrés de rotation par pixel glissé. Le défaut ne s'applique qu'en l'ABSENCE
+        ## d'argument : `or` prendrait aussi le dessus sur 0, qui fige volontairement la
+        ## rotation (zéro est faux en Ollin).
+        self.sensibilite = 0.5
+        if sensibilite <> nil then
+            self.sensibilite = sensibilite
+        end
     end
 
     func orient()
