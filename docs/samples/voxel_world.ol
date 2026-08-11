@@ -11,6 +11,7 @@ global CS = 16
 global vd = ViewDistance(4, 1, 24)   ## rayon de chunks : auto-adaptatif + boutons − / +
 
 global SEA = 9
+global WATER = SEA + 0.45    ## niveau de la surface d'eau — SEUL seuil de « sous l'eau »
 global loaded = {}          ## "cx,cz" → handle endChunk
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 ## Caméra de CONTRÔLE (debug) : vue de haut regardant vers le bas, orientée comme la
@@ -152,10 +153,15 @@ func elevation(x, z)
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-## Amplitude 44 (et non 60) : depuis la normalisation de math.noise sur [0,1], le bruit
-## s'étale ~1,35× plus → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
+## Hauteur CONTINUE du terrain, seule formule de relief du programme. Amplitude 44 (et
+## non 60) : depuis la normalisation de math.noise sur [0,1], le bruit s'étale ~1,35× plus
+## → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
+func cornerHeight(x, z)
+    return (elevation(x, z) - 0.42) * 44 + SEA
+end
+
 func rawHeight(x, z)
-    return math.floor((elevation(x, z) - 0.42) * 44 + SEA)
+    return math.floor(cornerHeight(x, z))
 end
 
 ## Élimine les extrema d'1 colonne : un pic isolé (plus haut que ses 4 voisins) est
@@ -173,11 +179,6 @@ func heightAt(x, z)
     if h > hi then return hi end   ## cube solitaire → éliminé
     if h < lo then return lo end   ## trou solitaire → rempli
     return h
-end
-
-## Hauteur CONTINUE (non arrondie) en (x, z) — celle dont heightAt est l'arrondi.
-func cornerHeight(x, z)
-    return (elevation(x, z) - 0.42) * 44 + SEA
 end
 
 ## Sommet (entier) de la colonne, comme la cuisson le calcule.
@@ -201,15 +202,9 @@ func cornerTop(x, z)
     return math.clamp(cornerHeight(x, z), hi - 0.5, hi + 0.5)
 end
 
-## Décalage à donner à graphics.corners : la hauteur du coin, ramenée au dessus PLAT du
-## cube de sommet (top + 0.5) et exprimée dans sa hauteur (le cube fait 1 de côté).
-func cornerOffset(x, z, top)
-    return cornerTop(x, z) - (top + 0.5)
-end
-
 ## Hauteur du SOL sous (x, z) : interpolation bilinéaire des 4 coins de la colonne, donc
 ## la pente réellement affichée — l'œil et la collision suivent la surface au lieu des
-## marches d'un bloc. Au-dessus de l'eau, on reste au niveau de la mer.
+## marches d'un bloc. Au-dessus de l'eau, on reste à la surface (WATER).
 func ground(x, z)
     var ix = math.floor(x)
     var iz = math.floor(z)
@@ -221,7 +216,7 @@ func ground(x, z)
     var d = cornerTop(ix + 0.5, iz + 0.5)
     var lo = a + (b - a) * u
     var hi = c + (d - c) * u
-    return math.max(lo + (hi - lo) * v, SEA + 0.5)
+    return math.max(lo + (hi - lo) * v, WATER)
 end
 
 ## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
@@ -327,14 +322,21 @@ func bakeChunk(cx, cz)
             var hs = math.max(hg[(lz + 2) * W2 + (lx + 1) + 1], 0)
             var hn = math.max(hg[lz * W2 + (lx + 1) + 1], 0)
             var mn = math.min(math.min(he, hw), math.min(hs, hn))
+            ## Les 4 coins du dessus, calculés UNE fois : ils servent au cube de sommet et
+            ## décident de la pose de l'eau (même source → contact eau/sol cohérent).
+            var k1 = cornerTop(x - 0.5, z - 0.5)
+            var k2 = cornerTop(x + 0.5, z - 0.5)
+            var k3 = cornerTop(x - 0.5, z + 0.5)
+            var k4 = cornerTop(x + 0.5, z + 0.5)
+            var kmin = math.min(math.min(k1, k2), math.min(k3, k4))
+            var flat = top + 0.5
             for y = 0, top do
                 if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
                     ## Seul le cube du sommet reçoit des coins de hauteurs différentes :
                     ## son dessus épouse le relief NON arrondi au lieu d'être plat. Les
                     ## cubes du dessous, invisibles, restent des cubes.
                     if y == top then
-                        graphics.corners(cornerOffset(x - 0.5, z - 0.5, top), cornerOffset(x + 0.5, z - 0.5, top),
-                                         cornerOffset(x - 0.5, z + 0.5, top), cornerOffset(x + 0.5, z + 0.5, top))
+                        graphics.corners(k1 - flat, k2 - flat, k3 - flat, k4 - flat)
                     else
                         graphics.corners()
                     end
@@ -351,12 +353,15 @@ func bakeChunk(cx, cz)
                 end
             end
             graphics.corners()   ## eau et arbres : dessus plats
-            if h < SEA then
+            ## Nappe posée dès qu'un COIN du sol plonge sous la surface, et non selon la
+            ## hauteur ENTIÈRE de la colonne : le bord de l'eau suit alors le rivage lissé
+            ## au lieu de s'arrêter en marches, et un creux immergé n'est jamais à sec.
+            if kmin < WATER then
                 ## eau = UN plan semi-transparent UNIFORME au niveau de la mer (surface
                 ## continue) ; l'atténuation avec la profondeur est portée par les cubes du fond.
                 graphics.tile(T_WATER)
                 graphics.fill(Color(1, 1, 1, 0.72))
-                graphics.plane(x, SEA + 0.45, z,  1, 1)
+                graphics.plane(x, WATER, z,  1, 1)
                 graphics.fill(colors.WHITE)
             end
             var hp = treeHash(x, z, 0) % 100    ## placement dispersé (hash mélangé)
