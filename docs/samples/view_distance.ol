@@ -2,7 +2,8 @@
 ##
 ## Encapsule le rayon courant, ses bornes, le mode manuel et l'auto-adaptation : en
 ## vsync verrouillé, deltaTime ne révèle la marge que quand des frames débordent, donc
-## on mesure la PART de frames lentes sur une fenêtre. Les frames irréelles (> STALL_DT,
+## on mesure la PART de frames lentes sur une fenêtre, par rapport à la cadence
+## d'affichage MESURÉE (un mobile bridé à 30 Hz garde sa puissance de calcul). Les frames irréelles (> STALL_DT,
 ## arrière-plan/reprise) sont ignorées. Possède aussi trois boutons (haut-droite) :
 ## − / + basculent en réglage manuel, A rebascule en auto-adaptation.
 ##
@@ -14,7 +15,8 @@
 ##
 ## Câblage côté hôte :
 ##   import "view_distance.ol"
-##   global vd = ViewDistance(4, 1, 24)       ## 4e arg = FPS cible (défaut 60 ; ex. 30)
+##   global vd = ViewDistance(4, 1, 24)       ## 4e arg = cadence d'AMORCE (défaut 60) ;
+##                                            ## la cadence réelle est ensuite mesurée
 ##   func mouse.pressed(x, y)
 ##       var ev = vd.hit(x, y)
 ##       if ev == 1 then streaming = true
@@ -32,10 +34,24 @@ class ViewDistance
         self.lo = lo
         self.hi = hi          ## filet de sécurité ; la vraie limite vient du FPS/mémoire
         self.manual = false
-        var budget = 1.0 / fps            ## durée cible d'une frame (60→16,7ms, 30→33,3ms)
-        self.SLOW_DT = budget * 1.25      ## au-delà = frame « en retard » (+25% de marge)
-        self.STALL_DT = math.max(0.30, budget * 4)
+        ## Cadence d'affichage MESURÉE, pas supposée : un mobile peut brider à 30 Hz sans
+        ## que la puissance de calcul soit divisée pour autant. Avec un seuil calé sur 60,
+        ## chaque frame paraîtrait en retard et le rayon s'effondrerait jusqu'à `lo`.
+        ## `fps` ne sert donc que d'amorce, remplacée dès la première fenêtre par la
+        ## période observée (cf. update).
+        self.period = 1.0 / fps
+        self.PERIOD_MIN = 1.0 / 121       ## bornes plausibles d'un écran (121 Hz … 29 Hz)
+        self.PERIOD_MAX = 1.0 / 29
+        self.SLOW_MARGIN = 1.25           ## au-delà de période × marge = frame « en retard »
+        self.SLOW_DT = self.period * self.SLOW_MARGIN
+        self.STALL_DT = 0.30              ## frame irréelle (onglet en arrière-plan, reprise)
+        self.fastest = 0.0                ## plus courte frame de la fenêtre courante
+        self.measured = false             ## la cadence a-t-elle déjà été mesurée ?
         self.WIN = 0.5
+        ## Une fenêtre doit aussi compter assez de frames : à 30 Hz, 0,5 s n'en donne que
+        ## 15 et la part de frames lentes devient trop bruitée pour décider (une seule
+        ## frame de retard y pèse 7 %). La fenêtre s'allonge donc quand la cadence baisse.
+        self.MIN_N = 30
         self.GROW = 0.03      ## ne grandit que si TRÈS peu de frames lentes → garde de la marge
         self.DROP = 0.25      ## large zone morte [GROW;DROP] = ne chasse pas la limite, n'oscille pas
         self.RELAX = 20.0     ## re-teste le plafond appris rarement (évite le va-et-vient)
@@ -68,7 +84,16 @@ class ViewDistance
         self.t = self.t + dt
         self.n = self.n + 1
         if dt > self.SLOW_DT then self.slow = self.slow + 1 end
-        if self.t < self.WIN then return 0 end
+        if self.fastest == 0.0 or dt < self.fastest then self.fastest = dt end
+        if self.t < self.WIN or self.n < self.MIN_N then return 0 end
+        ## Calibrer AVANT de juger : la fenêtre d'amorce serait sinon comparée à une
+        ## cadence supposée, et une seule fenêtre mal jugée suffit à rétrécir le rayon.
+        if self.measurePeriod() then
+            self.t = 0.0
+            self.n = 0
+            self.slow = 0
+            return 0
+        end
         var memFull = mem() > self.MEM_MAX   ## lu une fois par fenêtre, pas à chaque frame
         var ev = 0
         if (memFull or self.slow > self.n * self.DROP) and self.radius > self.lo then
@@ -100,6 +125,34 @@ class ViewDistance
         self.n = 0
         self.slow = 0
         return ev
+    end
+
+    ## Période de rafraîchissement = plus COURTE frame de la fenêtre : aucune frame ne peut
+    ## battre le vsync, donc la plus rapide le donne. En vsync les frames ratées coûtent un
+    ## multiple de la période (33 ms, 50 ms…), jamais 5 % de plus, d'où la fiabilité du
+    ## minimum. Elle descend d'un coup (cadence plus élevée constatée) mais ne remonte que
+    ## de 5 % par fenêtre, pour ne pas prendre un régime dégradé passager pour la cadence de
+    ## l'écran. Bornée aux cadences plausibles → au pire on vise 30 fps.
+    ## Renvoie true la PREMIÈRE fois (fenêtre d'amorce, à ne pas juger).
+    func measurePeriod()
+        if self.fastest <= 0 then
+            return false
+        end
+        var first = not self.measured
+        var p = self.fastest
+        if self.measured and self.fastest > self.period then
+            p = math.min(self.fastest, self.period * 1.05)   ## remontée prudente
+        end
+        self.period = math.clamp(p, self.PERIOD_MIN, self.PERIOD_MAX)
+        self.SLOW_DT = self.period * self.SLOW_MARGIN
+        self.fastest = 0.0
+        self.measured = true
+        return first
+    end
+
+    ## Cadence d'affichage détectée (Hz), pour l'affichage de mise au point.
+    func hz()
+        return math.floor(1.0 / self.period + 0.5)
     end
 
     ## Boutons alignés de droite à gauche : 0 = +, 1 = −, 2 = A.

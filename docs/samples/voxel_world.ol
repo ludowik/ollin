@@ -755,7 +755,8 @@ func draw()
     if debugCam then camlbl = "contrôle" end
     graphics.stroke(colors.WHITE)
     graphics.fontSize(15)
-    graphics.text("vue " + vd.radius + " " + vd.mode() + "  chunks " + #vis + "  cam " + camlbl, 12, 12)
+    graphics.text("vue " + vd.radius + " " + vd.mode() + " " + vd.hz() + "Hz  chunks " + #vis +
+                  "  cam " + camlbl, 12, 12)
     graphics.stroke(colors.WHITE)
     graphics.fontSize(13)
     graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30)
