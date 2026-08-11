@@ -175,37 +175,53 @@ func heightAt(x, z)
     return h
 end
 
-## Hauteur CONTINUE (non arrondie) au point (x, z) du réseau — celle dont heightAt est
-## l'arrondi. Elle ne dépend que du point, donc deux colonnes voisines obtiennent la même
-## valeur pour le coin qu'elles partagent : la surface est étanche par construction.
+## Hauteur CONTINUE (non arrondie) en (x, z) — celle dont heightAt est l'arrondi.
 func cornerHeight(x, z)
     return (elevation(x, z) - 0.42) * 44 + SEA
 end
 
-## Décalage vertical d'un coin par rapport au dessus PLAT du cube de sommet (top + 0.5).
-## Borné à ±0,45 : le dessus reste DANS la tranche du cube de sommet. Le bruit continu
-## peut s'écarter franchement de la hauteur entière (heightAt rabote les pics isolés) et,
-## sans borne, un coin retournerait le cube, percerait le tronc d'un arbre ou creuserait
-## un trou entre deux colonnes.
-func cornerOffset(x, z, top)
-    return math.clamp(cornerHeight(x, z) - (top + 0.5), -0.45, 0.45)
+## Sommet (entier) de la colonne, comme la cuisson le calcule.
+func colTop(x, z)
+    return math.max(heightAt(x, z), 0)
 end
 
-## Hauteur du SOL sous (x, z) : interpolation bilinéaire des 4 coins du cube de sommet,
-## donc la vraie pente lissée — l'œil et la collision suivent la surface affichée au lieu
-## des marches d'un bloc.
+## Hauteur ABSOLUE du coin situé en (x, z) — les coins des cubes sont aux DEMI-entiers,
+## un cube étant centré sur (x, z) entiers. Fonction pure du coin : les quatre colonnes
+## qui s'y rejoignent obtiennent forcément la MÊME valeur, donc une seule surface, sans
+## pli ni fissure. Bornée à la TRANCHE du plus haut des quatre cubes de sommet : plus bas,
+## le coin passerait sous la base de ce cube et en découvrirait la face inférieure (taches
+## sombres) ; plus haut, le bruit continu — que heightAt rabote de ses pics isolés —
+## étirerait le cube en pointe.
+func cornerTop(x, z)
+    var a = colTop(x - 0.5, z - 0.5)
+    var b = colTop(x + 0.5, z - 0.5)
+    var c = colTop(x - 0.5, z + 0.5)
+    var d = colTop(x + 0.5, z + 0.5)
+    var hi = math.max(math.max(a, b), math.max(c, d))
+    return math.clamp(cornerHeight(x, z), hi - 0.5, hi + 0.5)
+end
+
+## Décalage à donner à graphics.corners : la hauteur du coin, ramenée au dessus PLAT du
+## cube de sommet (top + 0.5) et exprimée dans sa hauteur (le cube fait 1 de côté).
+func cornerOffset(x, z, top)
+    return cornerTop(x, z) - (top + 0.5)
+end
+
+## Hauteur du SOL sous (x, z) : interpolation bilinéaire des 4 coins de la colonne, donc
+## la pente réellement affichée — l'œil et la collision suivent la surface au lieu des
+## marches d'un bloc. Au-dessus de l'eau, on reste au niveau de la mer.
 func ground(x, z)
     var ix = math.floor(x)
     var iz = math.floor(z)
-    var top = math.max(heightAt(ix, iz), SEA)
     var u = x - ix
     var v = z - iz
-    var a = cornerOffset(ix, iz, top)
-    var b = cornerOffset(ix + 1, iz, top)
-    var c = cornerOffset(ix, iz + 1, top)
-    var d = cornerOffset(ix + 1, iz + 1, top)
-    var dy = (a + (b - a) * u) + ((c + (d - c) * u) - (a + (b - a) * u)) * v
-    return top + 0.5 + dy
+    var a = cornerTop(ix - 0.5, iz - 0.5)
+    var b = cornerTop(ix + 0.5, iz - 0.5)
+    var c = cornerTop(ix - 0.5, iz + 0.5)
+    var d = cornerTop(ix + 0.5, iz + 0.5)
+    var lo = a + (b - a) * u
+    var hi = c + (d - c) * u
+    return math.max(lo + (hi - lo) * v, SEA + 0.5)
 end
 
 ## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
@@ -317,8 +333,8 @@ func bakeChunk(cx, cz)
                     ## son dessus épouse le relief NON arrondi au lieu d'être plat. Les
                     ## cubes du dessous, invisibles, restent des cubes.
                     if y == top then
-                        graphics.corners(cornerOffset(x, z, top), cornerOffset(x + 1, z, top),
-                                         cornerOffset(x, z + 1, top), cornerOffset(x + 1, z + 1, top))
+                        graphics.corners(cornerOffset(x - 0.5, z - 0.5, top), cornerOffset(x + 0.5, z - 0.5, top),
+                                         cornerOffset(x - 0.5, z + 0.5, top), cornerOffset(x + 0.5, z + 0.5, top))
                     else
                         graphics.corners()
                     end
