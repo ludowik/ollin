@@ -76,10 +76,11 @@ end
 
 func demoPolyline()
     g.stroke(Color(0.5, 0.9, 1), fs(2))
+    ## Beaucoup de points rapprochés : la ligne brisée passe pour une courbe lisse.
     var wave = []
-    for i = 0, 9 do
-        wave[#wave+1] = px(30 + i * 18)
-        wave[#wave+1] = py(305) + math.sin(t * 2 + i * 0.9) * py(22)
+    for i = 0, 48 do
+        wave[#wave+1] = px(30 + i * 3.375)
+        wave[#wave+1] = py(305) + math.sin(t * 2 + i * 0.18) * py(22)
     end
     g.polyline(wave)
     label("polyline", 30, 340)
@@ -103,13 +104,13 @@ func demoRectMode()
         g.noFill()
         g.rect(px(265), py(345), s, s)
         g.rectMode("center")
-        g.rect(px(365), py(345), s, s)
+        g.rect(px(333), py(345), s, s)
     end
     g.popStyle()
     g.stroke(Color(1, 1, 1), fs(3))
     g.point(px(265), py(345))
-    g.point(px(365), py(345))
-    label("rectMode corner / center", 250, 400)
+    g.point(px(333), py(345))
+    label("rectMode corner / center", 250, 388)
 end
 
 ## circle/ellipse sont centrés par défaut, à l'inverse de rect : le mode coin
@@ -122,13 +123,13 @@ func demoEllipseMode()
         g.noFill()
         g.circle(px(70), py(430), r)
         g.ellipseMode("corner")
-        g.circle(px(170), py(430), r)
+        g.circle(px(138), py(430), r)
     end
     g.popStyle()
     g.stroke(Color(1, 1, 1), fs(3))
     g.point(px(70), py(430))
-    g.point(px(170), py(430))
-    label("ellipseMode center / corner", 30, 480)
+    g.point(px(138), py(430))
+    label("ellipseMode center / corner", 30, 468)
 end
 
 ## Le mode centre des images vaut aussi pour image.draw.
@@ -138,14 +139,14 @@ func demoSpriteMode()
     do
         g.sprite(tile, px(330), py(430), s, s)
         g.spriteMode("center")
-        g.sprite(tile, px(450), py(430), s, s)
+        g.sprite(tile, px(408), py(430), s, s)
     end
     g.popStyle()
     ## Point plus gros ici : celui du mode centre tombe sur le damier.
     g.stroke(Color(1, 1, 1), fs(5))
     g.point(px(330), py(430))
-    g.point(px(450), py(430))
-    label("spriteMode corner / center", 320, 503)
+    g.point(px(408), py(430))
+    label("spriteMode corner / center", 320, 480)
 end
 
 func demoCircle()
@@ -177,8 +178,9 @@ end
 
 func demoStrokeSize()
     for i = 1, 4 do
+        var y = py(66 + i * 16)
         g.stroke(Color(0.9, 0.6, 0.3), fs(i * 2))
-        g.line(px(470), py(65 + i * 28), px(640), py(65 + i * 28))
+        g.line(px(470), y, px(640), y)
     end
     label("strokeSize", 470, 48)
 end
@@ -208,14 +210,26 @@ func demoTransforms()
     label("rotate/scale", 476, 278)
 end
 
+## La police est un STYLE, comme fill ou fontSize : elle reste en place jusqu'au
+## prochain graphics.font, d'où le pushStyle qui rend la police précédente aux
+## démonstrations suivantes.
 func demoText()
-    label("text", 460, 310)
-    g.stroke(Color(0.9, 0.9, 1))
-    g.fontSize(ft(16))
-    g.text("size 16", px(460), py(328))
-    g.stroke(Color(0.7, 0.85, 1))
-    g.fontSize(ft(22))
-    g.text("size 22", px(460), py(352))
+    label("text / font", 460, 300)
+    g.pushStyle()
+    do
+        g.fontSize(ft(15))
+        g.stroke(Color(0.9, 0.9, 1))
+        g.font("sans")
+        g.text("Ollin — sans", px(460), py(314))
+        g.stroke(Color(0.7, 0.85, 1))
+        g.font("mono")
+        g.text("Ollin — mono", px(460), py(334))
+        g.stroke(Color(0.9, 0.9, 1))
+        g.font("sans")
+        g.fontSize(ft(22))
+        g.text("taille 22", px(460), py(358))
+    end
+    g.popStyle()
 end
 
 func demoArc()
