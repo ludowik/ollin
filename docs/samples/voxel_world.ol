@@ -271,13 +271,18 @@ func canopy(x, y, z, r, round)
     end
 end
 
-## Arbre à la colonne (x,z), sol en h. Hauteur de tronc et forme du houppier variées,
-## dérivées du hash (déterministe par colonne) → chaque arbre diffère.
-func putTree(x, z, h)
+## Arbre à la colonne (x,z), sol en h ; `kmin` = plus bas coin du dessus déformé. Hauteur
+## de tronc et forme du houppier variées, dérivées du hash (déterministe par colonne) →
+## chaque arbre diffère.
+func putTree(x, z, h, kmin)
     var th = 3 + treeHash(x, z, 1) % 4      ## tronc : 3..6 cubes
     var shape = treeHash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
     graphics.tile(T_TRUNK)
-    for k = 1, th do
+    ## Le dessus du cube de sommet descend sous h + 0.5 dès que le terrain penche : un
+    ## tronc parti de h + 1 flotterait au-dessus du creux. On démarre donc au cube dont la
+    ## BASE (h + k - 0.5) passe sous le plus bas coin.
+    var k0 = math.min(1, math.floor(kmin - h + 0.5))
+    for k = k0, th do
         graphics.cube(x, h + k, z,  1, 1, 1)
     end
     graphics.tile(T_LEAF)
@@ -368,7 +373,7 @@ func bakeChunk(cx, cz)
             var grassy = h > SEA and h < SEA + 8 and b <> 0
             var tree = grassy and ((b == 2 and hp < 6) or hp == 0)
             if tree then
-                putTree(x, z, h)
+                putTree(x, z, h, kmin)
             end
         end
     end
