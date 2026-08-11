@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-07 18:48</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-11 11:48</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -423,7 +423,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-07 18:48</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-11 11:48</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2002,8 +2002,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.tile(t)</code></td><td>Même tuile <code>t</code> sur les 6 faces du prochain cube (état, comme <code>fill</code>) ; <code>-1</code> = aucune (couleur pleine)</td></tr>
     <tr><td><code>graphics.tiles(dessus, côté, dessous)</code></td><td>Tuiles distinctes par face (indices dans l'atlas)</td></tr>
     <tr><td><code>graphics.tileAnim(t)</code></td><td>Désigne une tuile dont l'UV <strong>défile</strong> dans le temps (eau qui ondule)</td></tr>
+    <tr><td><code>graphics.corners(a, b, c, d)</code></td><td>Hauteurs des 4 coins du <strong>dessus</strong> du prochain cube (état), en fraction de sa hauteur : <code>(-x,-z)</code>, <code>(+x,-z)</code>, <code>(-x,+z)</code>, <code>(+x,+z)</code>. Sans argument = dessus plat</td></tr>
   </tbody>
 </table>
+<p>Un cube à coins déformés reste un cube instancié : le déplacement se fait dans le vertex shader, donc <strong>sans coût de draw call</strong>. Deux cubes voisins qui donnent la même valeur au coin qu'ils partagent forment une surface continue — c'est ce que fait l'exemple <em>Univers voxel</em>, dont le cube de sommet épouse la hauteur de terrain <strong>non arrondie</strong> au lieu de laisser une marche.</p>
 <div class="callout tip">Avec un atlas actif, donne une tuile à <strong>chaque</strong> cube du chunk (<code>tile</code>/<code>tiles</code>) : un cube sans tuile échantillonnerait la tuile 0 au lieu d'une couleur pleine.</div>
 
 <pre><code><span class="cmt">## chunk voxel : cuisson UNIQUE dans setup(), redessin en 1 appel par frame</span>

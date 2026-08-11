@@ -42,7 +42,7 @@ global vel = 0.0            ## vitesse d'avance courante
 global turnVel = 0.0        ## vitesse de rotation courante
 global ACCEL = 5.0          ## nervosité de l'avance (plus grand = plus sec)
 global TURN_ACCEL = 7.0
-global EYE_RISE = 6.0       ## lissage de la hauteur d'œil (terrain en marches de 1)
+global EYE_RISE = 6.0       ## lissage de la hauteur d'œil (reste des marches aux fortes pentes)
 
 ## Rapproche `cur` de `target` d'une fraction du chemin restant. La fraction dépend
 ## de deltaTime via une exponentielle : le résultat ne change donc pas avec le
@@ -175,8 +175,37 @@ func heightAt(x, z)
     return h
 end
 
+## Hauteur CONTINUE (non arrondie) au point (x, z) du réseau — celle dont heightAt est
+## l'arrondi. Elle ne dépend que du point, donc deux colonnes voisines obtiennent la même
+## valeur pour le coin qu'elles partagent : la surface est étanche par construction.
+func cornerHeight(x, z)
+    return (elevation(x, z) - 0.42) * 44 + SEA
+end
+
+## Décalage vertical d'un coin par rapport au dessus PLAT du cube de sommet (top + 0.5).
+## Borné à ±0,45 : le dessus reste DANS la tranche du cube de sommet. Le bruit continu
+## peut s'écarter franchement de la hauteur entière (heightAt rabote les pics isolés) et,
+## sans borne, un coin retournerait le cube, percerait le tronc d'un arbre ou creuserait
+## un trou entre deux colonnes.
+func cornerOffset(x, z, top)
+    return math.clamp(cornerHeight(x, z) - (top + 0.5), -0.45, 0.45)
+end
+
+## Hauteur du SOL sous (x, z) : interpolation bilinéaire des 4 coins du cube de sommet,
+## donc la vraie pente lissée — l'œil et la collision suivent la surface affichée au lieu
+## des marches d'un bloc.
 func ground(x, z)
-    return math.max(heightAt(math.floor(x), math.floor(z)), SEA)
+    var ix = math.floor(x)
+    var iz = math.floor(z)
+    var top = math.max(heightAt(ix, iz), SEA)
+    var u = x - ix
+    var v = z - iz
+    var a = cornerOffset(ix, iz, top)
+    var b = cornerOffset(ix + 1, iz, top)
+    var c = cornerOffset(ix, iz + 1, top)
+    var d = cornerOffset(ix + 1, iz + 1, top)
+    var dy = (a + (b - a) * u) + ((c + (d - c) * u) - (a + (b - a) * u)) * v
+    return top + 0.5 + dy
 end
 
 ## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
@@ -284,6 +313,15 @@ func bakeChunk(cx, cz)
             var mn = math.min(math.min(he, hw), math.min(hs, hn))
             for y = 0, top do
                 if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
+                    ## Seul le cube du sommet reçoit des coins de hauteurs différentes :
+                    ## son dessus épouse le relief NON arrondi au lieu d'être plat. Les
+                    ## cubes du dessous, invisibles, restent des cubes.
+                    if y == top then
+                        graphics.corners(cornerOffset(x, z, top), cornerOffset(x + 1, z, top),
+                                         cornerOffset(x, z + 1, top), cornerOffset(x + 1, z + 1, top))
+                    else
+                        graphics.corners()
+                    end
                     setBlockTiles(b, h, y)
                     ## Cube IMMERGÉ : assombri selon sa profondeur (moins de lumière au fond).
                     ## C'est le FOND qui s'assombrit avec la profondeur, pas l'eau (uniforme).
@@ -296,6 +334,7 @@ func bakeChunk(cx, cz)
                     graphics.cube(x, y, z,  1, 1, 1)
                 end
             end
+            graphics.corners()   ## eau et arbres : dessus plats
             if h < SEA then
                 ## eau = UN plan semi-transparent UNIFORME au niveau de la mer (surface
                 ## continue) ; l'atténuation avec la profondeur est portée par les cubes du fond.
@@ -640,8 +679,8 @@ func draw()
         streamUnload(pcx, pcz, 0)
     end
 
-    ## Le terrain monte par marches d'un bloc : poser l'œil dessus le ferait sauter
-    ## d'un cran d'un seul coup. On le laisse rejoindre la marche progressivement.
+    ## Le sol lissé (ground interpole les coins) supprime l'essentiel des marches ; il en
+    ## reste aux fortes pentes, d'où le rattrapage progressif de la hauteur d'œil.
     camY = approach(camY, ground(camX, camZ) + EYE, EYE_RISE)
     cam.setPos(camX, camY, camZ)
     cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),

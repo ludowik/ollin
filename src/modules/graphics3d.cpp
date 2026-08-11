@@ -33,6 +33,9 @@ static unsigned int s_cur_tex3d = 0;
 static unsigned int s_atlas_texid = 0;
 static float s_atlas_grid[2] = {1.0f, 1.0f};
 static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
+// Hauteurs des 4 coins du dessus du prochain cube (état, comme s_cur_tile), en unités
+// locales : (-x,-z), (+x,-z), (-x,+z), (+x,+z). Tout à 0 = cube ordinaire.
+static float s_cur_corner[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 static float s_anim_tile = -1.0f;   // tuile animée (UV qui défile, ex. eau) ; -1 = aucune
 // paramètres de l'ondulation de la tuile animée : {défilement, vitesse d'onde, fréquence
 // spatiale, amplitude}. Défauts = look eau ; réglables via graphics.tileAnim(t, ...).
@@ -242,6 +245,7 @@ struct Bucket3D {
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
     std::vector<float> tiles;    // 3 floats (top/side/bottom, -1 = aucune) par instance
+    std::vector<float> corners;  // 4 floats (hauteurs de coin du dessus) par instance
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
@@ -262,9 +266,11 @@ static bool s_recording = false;
 static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées (OPAQUE)
 static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés (OPAQUE)
 static std::vector<float> s_rec_t;    // tuiles (3 floats/instance) enregistrées (OPAQUE)
+static std::vector<float> s_rec_k;    // hauteurs de coin (4 floats/instance) enregistrées (OPAQUE)
 static std::vector<Matrix> s_rec_xw;  // idem, instances TRANSPARENTES (alpha < 1, ex. eau)
 static std::vector<float> s_rec_cw;
 static std::vector<float> s_rec_tw;
+static std::vector<float> s_rec_kw;
 static Mesh s_rec_mesh{};             // mesh enregistré, groupe OPAQUE (cube)
 static Mesh s_rec_mesh_w{};           // mesh enregistré, groupe TRANSPARENT (ex. plane pour l'eau)
 struct InstGroup {
@@ -272,6 +278,7 @@ struct InstGroup {
     unsigned int vbo_x;   // VBO transfos (persistant)
     unsigned int vbo_c;   // VBO couleurs (persistant)
     unsigned int vbo_t;   // VBO tuiles (persistant, 3 floats/instance)
+    unsigned int vbo_k;   // VBO hauteurs de coin (persistant, 4 floats/instance)
     int count;
 };
 static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
@@ -349,6 +356,7 @@ static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 static Shader s_lit{};
 static bool s_lit_ready = false;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
+static int s_loc_instcorner = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
 static int s_loc_animparams = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
@@ -356,8 +364,8 @@ static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -
 // VBO d'instance PERSISTANTS (transfo + couleur) : réutilisés d'une frame à
 // l'autre (mis à jour par glBufferSubData), au lieu d'être créés/détruits à
 // chaque bucket/frame. Capacités en octets ; agrandissement seulement.
-static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0, s_inst_vbo_tile = 0;
-static int s_inst_cap_xform = 0, s_inst_cap_color = 0, s_inst_cap_tile = 0;
+static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0, s_inst_vbo_tile = 0, s_inst_vbo_corner = 0;
+static int s_inst_cap_xform = 0, s_inst_cap_color = 0, s_inst_cap_tile = 0, s_inst_cap_corner = 0;
 
 // Crée (1re fois / agrandissement) ou met à jour un VBO d'instance ; laisse le
 // VBO lié en sortie (pour le rlSetVertexAttribute qui suit).
@@ -389,6 +397,7 @@ static void load_lit_shader() {
         "in mat4 instanceTransform;\n"
         "in vec4 instanceColor;\n"
         "in vec3 instanceTile;\n"
+        "in vec4 instanceCorner;\n"
         "uniform mat4 mvp;\n"
         "out vec3 fragPosition;\n"
         "out vec2 fragTexCoord;\n"
@@ -397,13 +406,31 @@ static void load_lit_shader() {
         "flat out vec3 fragTile;\n"
         "void main() {\n"
         "    mat4 m = instanceTransform;\n"
-        "    vec4 wp = m * vec4(vertexPosition, 1.0);\n"
+        "    vec3 vp = vertexPosition;\n"
+        "    vec3 vn = vertexNormal;\n"
+        // Hauteurs de coin (instanceCorner, en unités LOCALES) : les sommets du HAUT
+        // montent de l'interpolation bilinéaire des 4 coins — exacte aux coins, les
+        // sommets du mesh unitaire étant à ±0.5. Les sommets hauts des faces latérales
+        // suivent la même valeur → pas de fissure avec la face du dessus. La normale du
+        // dessus est refaite depuis les pentes, sinon le relief resterait plat à l'œil.
+        "    if (vp.y > 0.0) {\n"
+        "        float u = vp.x + 0.5;\n"
+        "        float v = vp.z + 0.5;\n"
+        "        vp.y += mix(mix(instanceCorner.x, instanceCorner.y, u),\n"
+        "                    mix(instanceCorner.z, instanceCorner.w, u), v);\n"
+        "        if (vn.y > 0.5) {\n"
+        "            float dhx = (instanceCorner.y + instanceCorner.w - instanceCorner.x - instanceCorner.z) * 0.5;\n"
+        "            float dhz = (instanceCorner.z + instanceCorner.w - instanceCorner.x - instanceCorner.y) * 0.5;\n"
+        "            vn = normalize(vec3(-dhx, 1.0, -dhz));\n"
+        "        }\n"
+        "    }\n"
+        "    vec4 wp = m * vec4(vp, 1.0);\n"
         "    fragPosition = wp.xyz;\n"
         "    fragTexCoord = vertexTexCoord;\n"
         "    fragColor = instanceColor;\n"
         "    fragTile = instanceTile;\n"
         "    mat3 nm = transpose(inverse(mat3(m)));\n"   // matrice de normale : correcte sous rotation / scale non uniforme
-        "    fragNormal = normalize(nm * vertexNormal);\n"
+        "    fragNormal = normalize(nm * vn);\n"
         "    gl_Position = mvp * wp;\n"
         "}\n";
     std::string fs = std::string(HDR) +
@@ -467,6 +494,7 @@ static void load_lit_shader() {
     }
     s_loc_instcolor = GetShaderLocationAttrib(s_lit, "instanceColor");
     s_loc_insttile = GetShaderLocationAttrib(s_lit, "instanceTile");
+    s_loc_instcorner = GetShaderLocationAttrib(s_lit, "instanceCorner");
     s_loc_atlasgrid = GetShaderLocation(s_lit, "atlasGrid");
     s_loc_utime = GetShaderLocation(s_lit, "uTime");
     s_loc_animtile = GetShaderLocation(s_lit, "animTile");
@@ -490,7 +518,7 @@ static Bucket3D& bucket_for(const Mesh& mesh, unsigned int texId) {
             return b;
         }
     }
-    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, {}, {}, {}});
+    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, {}, {}, {}, {}});
     return s_buckets.back();
 }
 
@@ -512,6 +540,9 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
             s_rec_tw.push_back(s_cur_tile[0]);
             s_rec_tw.push_back(s_cur_tile[1]);
             s_rec_tw.push_back(s_cur_tile[2]);
+            for (int k = 0; k < 4; k++) {
+                s_rec_kw.push_back(s_cur_corner[k]);
+            }
             return;
         }
         s_rec_mesh = mesh;
@@ -523,6 +554,9 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
         s_rec_t.push_back(s_cur_tile[0]);
         s_rec_t.push_back(s_cur_tile[1]);
         s_rec_t.push_back(s_cur_tile[2]);
+        for (int k = 0; k < 4; k++) {
+            s_rec_k.push_back(s_cur_corner[k]);
+        }
         return;
     }
     Bucket3D& b = bucket_for(mesh, texId);
@@ -540,6 +574,9 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
     b.tiles.push_back(s_cur_tile[0]);
     b.tiles.push_back(s_cur_tile[1]);
     b.tiles.push_back(s_cur_tile[2]);
+    for (int k = 0; k < 4; k++) {
+        b.corners.push_back(s_cur_corner[k]);
+    }
 }
 
 // Active le shader lit et pose les uniforms du frame (MVP = view·proj figée au
@@ -593,7 +630,7 @@ static bool lit_begin_draw() {
 // Attache les attributs d'instance (transfo mat4 = 4 vec4, couleur vec4, tuiles
 // vec3 ; divisor 1) depuis des VBO DÉJÀ REMPLIS. VAO supposé déjà actif. Partagé
 // par litBindInstances (groupe cuit) et flushBucket (VBO partagés).
-static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t) {
+static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t, unsigned int vbo_k) {
     int loc_t = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
     rlEnableVertexBuffer(vbo_x);
     for (unsigned int i = 0; i < 4; i++) {
@@ -613,12 +650,19 @@ static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned 
         rlSetVertexAttribute(s_loc_insttile, 3, RL_FLOAT, 0, 0, 0);
         rlSetVertexAttributeDivisor(s_loc_insttile, 1);
     }
+    if (s_loc_instcorner >= 0 && vbo_k != 0) {
+        rlEnableVertexBuffer(vbo_k);
+        rlEnableVertexAttribute(s_loc_instcorner);
+        rlSetVertexAttribute(s_loc_instcorner, 4, RL_FLOAT, 0, 0, 0);
+        rlSetVertexAttributeDivisor(s_loc_instcorner, 1);
+    }
 }
 
 // divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
-static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t) {
+static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t,
+                              unsigned int vbo_k) {
     rlEnableVertexArray(vaoId);
-    bind_instance_vbos(vbo_x, vbo_c, vbo_t);
+    bind_instance_vbos(vbo_x, vbo_c, vbo_t, vbo_k);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
 }
@@ -661,7 +705,8 @@ static void flush_bucket(const Bucket3D& b) {
     upload_instance_vbo(s_inst_vbo_xform, s_inst_cap_xform, xf.data(), n * (int)sizeof(float16));
     upload_instance_vbo(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
     upload_instance_vbo(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
-    bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile);
+    upload_instance_vbo(s_inst_vbo_corner, s_inst_cap_corner, b.corners.data(), n * 4 * (int)sizeof(float));
+    bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile, s_inst_vbo_corner);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
     lit_draw_instanced(mesh, b.texId, n);
@@ -710,6 +755,9 @@ void reset3d_graphics_state() {
         if (g.vbo_t) {
             rlUnloadVertexBuffer(g.vbo_t);
         }
+        if (g.vbo_k) {
+            rlUnloadVertexBuffer(g.vbo_k);
+        }
     }
     s_groups.clear();
     s_free_groups.clear();
@@ -717,9 +765,11 @@ void reset3d_graphics_state() {
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
+    s_rec_k.clear();
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
+    s_rec_kw.clear();
     if (s_white_ready) {
         UnloadTexture(s_white_tex);
         s_white_tex = Texture2D{};
@@ -740,6 +790,11 @@ void reset3d_graphics_state() {
         s_inst_vbo_tile = 0;
         s_inst_cap_tile = 0;
     }
+    if (s_inst_vbo_corner != 0) {
+        rlUnloadVertexBuffer(s_inst_vbo_corner);
+        s_inst_vbo_corner = 0;
+        s_inst_cap_corner = 0;
+    }
     s_buckets.clear();
     s_in_3d = false;
     s_cur_tex3d = 0;
@@ -749,6 +804,9 @@ void reset3d_graphics_state() {
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;
     s_cur_tile[2] = -1.0f;
+    for (int k = 0; k < 4; k++) {
+        s_cur_corner[k] = 0.0f;
+    }
     s_anim_tile = -1.0f;
     s_anim_params[0] = 0.09f;
     s_anim_params[1] = 1.6f;
@@ -994,6 +1052,18 @@ static int gfx_tiles(CallCtx& ctx) {
     s_cur_tile[0] = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tiles") : -1.0f;
     s_cur_tile[1] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tiles") : s_cur_tile[0];
     s_cur_tile[2] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tiles") : s_cur_tile[1];
+    return ctx.ret(Value{});
+}
+
+// graphics.corners(a, b, c, d) : hauteurs des 4 coins du DESSUS du prochain cube, en
+// unités de sa hauteur : (-x,-z), (+x,-z), (-x,+z), (+x,+z). État, comme graphics.tile.
+// Sans argument (ou tout à 0) → dessus plat, cube ordinaire. Deux cubes voisins qui
+// donnent la même valeur au coin qu'ils partagent forment une surface continue.
+static int gfx_corners(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    for (int k = 0; k < 4; k++) {
+        s_cur_corner[k] = argc > k ? (float)num_arg(args, argc, k, "graphics.corners") : 0.0f;
+    }
     return ctx.ret(Value{});
 }
 
@@ -1368,15 +1438,17 @@ static int gfx_begin_chunk(CallCtx& ctx) {
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
+    s_rec_k.clear();
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
+    s_rec_kw.clear();
     return ctx.ret(Value{});
 }
 
 // Construit un InstGroup (VBO persistants) depuis des vecteurs d'instances cuits.
 static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, const std::vector<float>& cs,
-                            const std::vector<float>& ts) {
+                            const std::vector<float>& ts, const std::vector<float>& ks) {
     InstGroup g{};
     g.mesh = mesh;
     g.count = (int)xs.size();
@@ -1388,6 +1460,7 @@ static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, co
         g.vbo_x = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
         g.vbo_c = rlLoadVertexBuffer(cs.data(), g.count * 4 * (int)sizeof(float), false);
         g.vbo_t = rlLoadVertexBuffer(ts.data(), g.count * 3 * (int)sizeof(float), false);
+        g.vbo_k = rlLoadVertexBuffer(ks.data(), g.count * 4 * (int)sizeof(float), false);
     }
     return g;
 }
@@ -1414,8 +1487,8 @@ static int gfx_end_chunk(CallCtx& ctx) {
     (void)args;
     (void)argc;
     s_recording = false;
-    InstGroup g = build_group(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t);
-    InstGroup w = build_group(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw);
+    InstGroup g = build_group(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t, s_rec_k);
+    InstGroup w = build_group(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw, s_rec_kw);
     int id_o = place_group(g);
     int id_w = 0;                       // pas de slot si pas d'eau (évite un groupe vide)
     if (w.count > 0) {
@@ -1424,9 +1497,11 @@ static int gfx_end_chunk(CallCtx& ctx) {
     s_rec_x.clear();
     s_rec_c.clear();
     s_rec_t.clear();
+    s_rec_k.clear();
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
+    s_rec_kw.clear();
     Value h = Value::make_map();
     h.map_set(Value(std::string("id")), Value((int64_t)id_o));
     h.map_set(Value(std::string("idw")), Value((int64_t)id_w));
@@ -1457,7 +1532,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     if (!lit_begin_draw()) {
         return ctx.ret(Value{});
     }
-    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
     // Atlas lié si déclaré (tuiles≥0 échantillonnent l'atlas) ; sinon blanc (couleur
     // pleine). CONTRAT : avec un tileset actif, donner une tuile à CHAQUE cube du
     // chunk — un cube à tuile -1 échantillonnerait l'atlas @ fragTexCoord (tuile 0)
@@ -1492,7 +1567,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     BeginBlendMode(BLEND_ALPHA);
-    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
     lit_draw_instanced(g.mesh, s_atlas_texid, g.count);
     rlDisableShader();
     EndBlendMode();
@@ -1512,7 +1587,7 @@ static void free_group_by_id(Value& handle, const char* key) {
         return;
     }
     InstGroup& g = s_groups[id - 1];
-    bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.count != 0;
+    bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.vbo_k != 0 || g.count != 0;
     if (g.vbo_x) {
         rlUnloadVertexBuffer(g.vbo_x);
         g.vbo_x = 0;
@@ -1524,6 +1599,10 @@ static void free_group_by_id(Value& handle, const char* key) {
     if (g.vbo_t) {
         rlUnloadVertexBuffer(g.vbo_t);
         g.vbo_t = 0;
+    }
+    if (g.vbo_k) {
+        rlUnloadVertexBuffer(g.vbo_k);
+        g.vbo_k = 0;
     }
     g.count = 0;
     // slot rendu au pool UNIQUEMENT s'il était vivant → double-free idempotent
@@ -1549,6 +1628,9 @@ void reset3d_frame_state() {
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;
     s_cur_tile[2] = -1.0f;
+    for (int k = 0; k < 4; k++) {
+        s_cur_corner[k] = 0.0f;
+    }
 }
 
 // Texture 3D courante — exposée pour la sauvegarde/restauration de style (push/pushStyle).
@@ -1573,6 +1655,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("tiles")), Value::make_builtin(gfx_tiles));
     m.map_set(Value(std::string("tile")), Value::make_builtin(gfx_tile));
     m.map_set(Value(std::string("tileAnim")), Value::make_builtin(gfx_tile_anim));
+    m.map_set(Value(std::string("corners")), Value::make_builtin(gfx_corners));
     m.map_set(Value(std::string("grid")), Value::make_builtin(gfx_grid));
     m.map_set(Value(std::string("cube")), Value::make_builtin(gfx_cube));
     m.map_set(Value(std::string("sphere")), Value::make_builtin(gfx_sphere));
