@@ -13,8 +13,11 @@ void image_preload(const std::string& name, const std::vector<uint8_t>& bytes,
 // Convenience: decode base64 then preload. ext without dot, e.g. "png".
 void image_preload_b64(const std::string& name, const std::string& b64, const std::string& ext);
 
-// Décodeur base64 partagé (réutilisé pour précharger d'autres ressources, ex. modèles 3D).
+// Codec base64 partagé — le décodeur sert à précharger toutes les ressources (images,
+// modèles 3D), l'encodeur à rendre une capture d'écran à l'hôte JS (une chaîne binaire
+// serait recodée en UTF-8 par embind, donc corrompue).
 std::vector<uint8_t> image_b64_decode(const std::string& b64);
+std::string image_b64_encode(const uint8_t* data, size_t len);
 
 // Called at the start of each ollin_run() to release stale GL handles
 void image_reset();

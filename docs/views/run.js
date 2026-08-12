@@ -93,6 +93,69 @@ export async function init(ctx) {
       setPauseUI()
     })
   }
+  // ── Capture d'écran → ressource PNG du projet ────────────────────────────────
+  // La capture est produite par le MOTEUR en fin de frame (seul instant où le
+  // framebuffer contient l'écran composé : sans preserveDrawingBuffer, canvas.toDataURL
+  // rendrait une image vide). D'où l'aller-retour : requestCapture pose la demande, puis
+  // on attend qu'une frame livre le PNG.
+  const shotBtn = document.getElementById('shot-btn')
+
+  function stamp() {
+    const d = new Date()
+    const p = (n) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+  }
+
+  // Attend le PNG, au plus `tries` frames : une capture manquée ne doit pas laisser le
+  // bouton bloqué (programme sans draw(), erreur d'exécution…).
+  function waitCapture(tries = 40) {
+    return new Promise((resolve) => {
+      const poll = () => {
+        let b64 = ''
+        try { b64 = mod.takeCapture() } catch (_) {}
+        if (b64) return resolve(b64)
+        if (--tries <= 0) return resolve('')
+        requestAnimationFrame(poll)
+      }
+      requestAnimationFrame(poll)
+    })
+  }
+
+  async function capture() {
+    if (!mod || !mod.requestCapture) return
+    if (!project) {
+      // Un exemple lu depuis le dépôt n'a pas de ressources où ranger l'image.
+      statusEl.textContent = 'capture : crée un projet depuis cet exemple'
+      return
+    }
+    // En pause, aucune frame ne passe : on reprend le temps de la capture.
+    const wasPaused = paused
+    if (wasPaused) {
+      try { mod.resumeMainLoop() } catch (_) {}
+    }
+    statusEl.textContent = 'capture…'
+    mod.requestCapture()
+    const b64 = await waitCapture()
+    if (wasPaused) {
+      try { mod.pauseMainLoop() } catch (_) {}
+    }
+    if (!b64) {
+      statusEl.textContent = 'capture indisponible (aucune image rendue)'
+      return
+    }
+    const name = 'capture-' + stamp() + '.png'
+    project.resources = project.resources || {}
+    project.resources[name] = { b64, ext: 'png' }
+    await Store.saveProject(project)
+    // Immédiatement utilisable par le programme (image.load(name)), comme une image
+    // ajoutée depuis l'éditeur.
+    try { if (mod.preloadImage) mod.preloadImage(name, b64, 'png') } catch (_) {}
+    statusEl.textContent = name
+  }
+
+  if (shotBtn) {
+    shotBtn.addEventListener('click', () => { capture() })
+  }
   if (reloadBtn) {
     reloadBtn.addEventListener('click', () => {
       location.reload()   // module WASM neuf (chemin sûr, conserve le hash #/run/…)

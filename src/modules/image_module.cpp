@@ -124,6 +124,25 @@ static std::vector<uint8_t> b64decode(const std::string& s) {
     return out;
 }
 
+std::string image_b64_encode(const uint8_t* data, size_t len) {
+    static const char* T = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string out;
+    out.reserve((len + 2) / 3 * 4);
+    for (size_t i = 0; i < len; i += 3) {
+        uint32_t n = (uint32_t)data[i] << 16;
+        size_t rest = len - i;
+        if (rest > 1)
+            n |= (uint32_t)data[i + 1] << 8;
+        if (rest > 2)
+            n |= (uint32_t)data[i + 2];
+        out.push_back(T[(n >> 18) & 63]);
+        out.push_back(T[(n >> 12) & 63]);
+        out.push_back(rest > 1 ? T[(n >> 6) & 63] : '=');
+        out.push_back(rest > 2 ? T[n & 63] : '=');
+    }
+    return out;
+}
+
 // ── WASM interop ──────────────────────────────────────────────────────────────
 
 void image_preload(const std::string& name, const std::vector<uint8_t>& bytes, const std::string& ext) {

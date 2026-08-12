@@ -27,6 +27,13 @@ inline double gfx_to_num(const Value& v) {
 // Value (objet Color / classe) → Color raylib ; lève si ce n'en est pas un.
 Color gfx_to_color(const Value& v);
 
+// ── Capture d'écran demandée par l'HÔTE (mode plein écran du playground) ────────
+// Différée en fin de frame comme graphics.screenshot : c'est le seul instant où le
+// framebuffer par défaut contient l'écran composé. gfx_take_capture rend le PNG encodé
+// en base64 et le retire (chaîne vide = pas encore prête).
+void gfx_request_capture();
+std::string gfx_take_capture();
+
 // ── Zone de tracé en unités LOGIQUES (défini par graphics.canvas) ───────────────
 // La projection d'une frame est en unités logiques : un module qui dessine dedans
 // (ui_module) doit s'y référer, pas à GetScreenWidth() qui est en pixels physiques.

@@ -76,6 +76,17 @@ static void data_load_js(const std::string& project_blob, const std::string& glo
     data_load(project_blob, global_blob);
 }
 
+// Capture d'écran demandée par l'HÔTE (bouton du mode plein écran). Deux temps, car la
+// capture n'est possible qu'en fin de frame : requestCapture pose la demande, takeCapture
+// rend le PNG en base64 dès qu'une frame l'a produite (chaîne vide sinon).
+static void request_capture_js() {
+    gfx_request_capture();
+}
+
+static std::string take_capture_js() {
+    return gfx_take_capture();
+}
+
 EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("execute", &ollin_run);  // execute(source, filename)
     emscripten::function("preloadImage", &preload_image_js);
@@ -83,4 +94,6 @@ EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("preloadSource", &preload_source_js);
     emscripten::function("resetSources", &source_reset);
     emscripten::function("dataLoad", &data_load_js);
+    emscripten::function("requestCapture", &request_capture_js);
+    emscripten::function("takeCapture", &take_capture_js);
 }

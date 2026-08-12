@@ -720,13 +720,52 @@ static int gfx_screenshot(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
+// Capture demandée par l'HÔTE (bouton du mode plein écran, cf. wasm_main) et non par
+// le script : le PNG est produit en MÉMOIRE, encodé en base64, puis retiré par
+// gfx_take_capture. Comme graphics.screenshot, elle est DIFFÉRÉE en fin de frame — c'est
+// le seul moment où le framebuffer par défaut contient l'écran composé (sans
+// preserveDrawingBuffer, le navigateur l'efface après composition).
+static bool s_capture_pending = false;
+static std::string s_capture_b64;
+
+void gfx_request_capture() {
+    s_capture_pending = true;
+    s_capture_b64.clear();
+}
+
+std::string gfx_take_capture() {
+    std::string out = s_capture_b64;   // retirée : une capture n'est livrée qu'une fois
+    s_capture_b64.clear();
+    return out;
+}
+
+static void flush_pending_capture() {
+    if (!s_capture_pending)
+        return;
+    s_capture_pending = false;
+    Image img = LoadImageFromScreen();   // batch déjà vidé par l'appelant (cf. ci-dessous)
+    int size = 0;
+    unsigned char* png = ExportImageToMemory(img, ".png", &size);
+    if (png != nullptr && size > 0)
+        s_capture_b64 = image_b64_encode(png, (size_t)size);
+    if (png != nullptr)
+        MemFree(png);
+    UnloadImage(img);
+}
+
 // Exécute une capture en attente : appelé en fin de frame par renderFrame, quand
 // le framebuffer par défaut contient l'image composée (écran réellement affiché).
 static void flush_pending_screenshot() {
+    if (!s_shot_pending && !s_capture_pending)
+        return;
+    // Le batch rlgl doit être EXÉCUTÉ avant toute lecture de pixels : la composition de la
+    // render texture n'est encore qu'un quad en attente, et lire l'écran ici rendait une
+    // image entièrement noire (constaté au navigateur).
+    rlDrawRenderBatchActive();
+    flush_pending_capture();
     if (!s_shot_pending)
         return;
     s_shot_pending = false;
-    rlDrawRenderBatchActive();
     TakeScreenshot(s_shot_path.c_str());
 }
 

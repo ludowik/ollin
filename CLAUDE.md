@@ -95,6 +95,7 @@ ollin/
 ├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
+│                      web-check.js (test navigateur sans playwright : chromium piloté par CDP),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py)
@@ -109,6 +110,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 - `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). `ctx.anchor` = sous-chemin après la vue (ancre tutoriel, ou paramètre de vue). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
 - **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
 - `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutoriel`, `playground`, `run`.
+- **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
 - Modules partagés : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur).
 
@@ -243,6 +245,11 @@ graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigate
   le proxy → ni clone ni FetchContent ; pas de vendoring). Compile aussi = valide le C++
   raylib desktop.
 - `bash tools/run-headless.sh <script.ol>` → exécute sous `xvfb-run` (GL llvmpipe).
+- **Lire des pixels exige de vider le batch rlgl d'abord** (`rlDrawRenderBatchActive()`) :
+  la composition de la render texture n'est qu'un quad EN ATTENTE, et lire l'écran avant son
+  exécution rend une image entièrement **noire** (constaté au navigateur sur la capture du
+  mode plein écran). `flush_pending_screenshot` vide donc le batch une fois, pour le fichier
+  comme pour la capture mémoire.
 - Capture : `graphics.screenshot("f.png")` — **chemin RELATIF** (raylib préfixe le CWD ;
   un chemin absolu échoue). La capture est **différée en fin de frame** → elle contient
   l'écran composé (pas la RenderTexture). Le script doit **terminer** (`graphics.quit()`
@@ -250,9 +257,16 @@ graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigate
 - Inspecter les pixels (pas de PIL/imagemagick) : via chromium (voir B) sur `file://…png`
   → `drawImage` + `getImageData` (centroïde, bbox, couleur d'un pixel).
 
-### B. Web / WASM via Playwright (chromium)
-- chromium : `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` ; `playwright` est dans
-  `node_modules` (lancer node depuis la racine du repo). `chromium.launch({ executablePath })`.
+### B. Web / WASM via chromium
+- chromium : `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. **`playwright` n'est pas
+  toujours installé** (`node_modules` absent d'un clone frais, et npm hors d'atteinte) :
+  `tools/web-check.js` fait le travail SANS dépendance — il sert `docs/` en process, lance
+  chromium et le pilote par le protocole DevTools via le **WebSocket natif de node ≥ 22**.
+  Usage : `node tools/web-check.js '#/run' sonde.js [attente_ms]`, où `sonde.js` contient une
+  expression JS (typiquement une fonction async immédiate) évaluée dans la page ; sa valeur
+  est imprimée en JSON. C'est ainsi qu'on clique un bouton et qu'on relit IndexedDB ou les
+  pixels du canvas. Avec playwright présent, `chromium.launch({ executablePath })` reste
+  possible.
 - Charger une page/capture : `file://` marche direct (aucun réseau). Pour le playground,
   servir `docs/` en local puis charger `http://127.0.0.1:PORT/index.html#/playground`,
   injecter du code via `window.__ollinView.dispatch(...)`, cliquer `#run-btn`, puis lire
