@@ -38,7 +38,10 @@
 namespace {
 
 struct Node {
-    enum Kind { BUTTON, CHECKBOX, SLIDER, MENU };
+    // LIST = la ligne « libellé : sélection » ; LIST_ITEM = une ligne de la liste ouverte,
+    // engendrée à l'ouverture comme enfant du nœud LIST (donc affichée et cliquée par le
+    // mécanisme de menu déjà en place, sans notion de ligne « virtuelle »).
+    enum Kind { BUTTON, CHECKBOX, SLIDER, MENU, LIST, LIST_ITEM };
     Kind kind = BUTTON;
     std::string label;
     Value action;      // bouton : fonction appelée au clic
@@ -48,6 +51,8 @@ struct Node {
     double vmax = 1.0;
     double vdefault = 0.0; // slider : valeur si la variable liée vaut nil
     bool integral = false; // slider : bornes entières → valeur entière
+    Value source;      // liste : tableau, map ou enum d'où viennent les éléments
+    Value item;        // élément de liste : la valeur (ou la clé) renvoyée par la sélection
     std::vector<int> children;   // menu : slots de son contenu, dans l'ordre déclaré
     int parent = -1;
     uint32_t gen = 1;   // incrémentée à la libération → un handle périmé est détecté
@@ -133,6 +138,8 @@ void prune_nav() {
     if (s_nav.empty())
         s_nav.push_back(ui_root());
 }
+
+void open_list(int slot);
 
 int current_menu() {
     if (s_nav.empty())
@@ -315,6 +322,19 @@ void slider_set(const Value& target, const Value& on_change, double value, bool 
         VM::current()->call_value(const_cast<Value&>(on_change), v);
 }
 
+// Libellé de l'élément retenu par une liste. La cible est passée par COPIE (lire une
+// référence exécute un getter du script, qui peut réallouer s_nodes).
+std::string list_text(const Value& target) {
+    Value cur = ref_get(target);
+    return cur.is_nil() ? std::string("—") : value_to_string(cur);
+}
+
+// Égalité des valeurs du langage (celle des clés de map) : un entier et un flottant de
+// même valeur sont identiques, les chaînes se comparent par pointeur interné.
+bool same_item(const Value& a, const Value& b) {
+    return ValueEqual{}(a, b);
+}
+
 float row_height(Node::Kind kind, const Metrics& m) {
     return kind == Node::SLIDER ? m.slider_row : m.row;
 }
@@ -345,6 +365,10 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
             float vmaxw = text_width(slider_text(n.vmax, n.integral), m.font);
             need += m.pad + (vmaxw > vw ? vmaxw : vw);
         }
+        if (n.kind == Node::LIST)
+            need += m.pad + text_width(list_text(n.target), m.font);
+        if (n.kind == Node::LIST_ITEM)
+            need += m.box + m.pad;   // marque de l'élément retenu, comme une case
         if (need > widest)
             widest = need;
     }
@@ -408,6 +432,21 @@ static int add_slider(CallCtx& ctx, const Value* args, int argc, int parent) {
     return ctx.ret(make_handle(slot));
 }
 
+// La liste est MONO-sélection : la ligne montre l'élément retenu, et un clic ouvre la
+// liste (mécanisme des sous-menus) pour en choisir un autre. Les éléments ne sont PAS
+// engendrés ici : ils le sont à l'ouverture, donc la liste suit les changements de sa
+// source sans rien recalculer par frame.
+static int add_list(CallCtx& ctx, const Value* args, int argc, int parent) {
+    ui_check_list_args(args, argc);
+    ui_list_init(args, argc);   // appelle le script (getter/setter) → AVANT d'allouer le nœud
+    int slot = alloc_node(Node::LIST, args[0].as_string(), parent);
+    s_nodes[slot].source = args[1];
+    s_nodes[slot].target = args[2];
+    if (argc > 3)
+        s_nodes[slot].on_change = args[3];
+    return ctx.ret(make_handle(slot));
+}
+
 static int add_menu(CallCtx& ctx, const Value* args, int argc, int parent) {
     ui_check_menu_args(args, argc);
     int slot = alloc_node(Node::MENU, args[0].as_string(), parent);
@@ -424,6 +463,10 @@ static int ui_checkbox(CallCtx& ctx) {
 
 static int ui_slider(CallCtx& ctx) {
     return add_slider(ctx, ctx.args, ctx.argc, ui_root());
+}
+
+static int ui_list(CallCtx& ctx) {
+    return add_list(ctx, ctx.args, ctx.argc, ui_root());
 }
 
 static int ui_menu(CallCtx& ctx) {
@@ -447,6 +490,11 @@ static int menu_slider(CallCtx& ctx) {
     return add_slider(ctx, ctx.args + 1, ctx.argc - 1, parent);
 }
 
+static int menu_list(CallCtx& ctx) {
+    int parent = menu_slot(ctx.args[0], "menu.list");
+    return add_list(ctx, ctx.args + 1, ctx.argc - 1, parent);
+}
+
 static int menu_menu(CallCtx& ctx) {
     int parent = menu_slot(ctx.args[0], "menu.menu");
     return add_menu(ctx, ctx.args + 1, ctx.argc - 1, parent);
@@ -454,11 +502,18 @@ static int menu_menu(CallCtx& ctx) {
 
 // ── Navigation ──────────────────────────────────────────────────────────────────
 
-// menu.open() : descend dans ce menu depuis le menu affiché (ce que fait aussi un
-// clic sur sa ligne). Empile, donc ui.back() y revient.
+// element.open() : déplie ce menu — ou cette liste — depuis le menu affiché, ce que fait
+// aussi un clic sur sa ligne. Empile, donc ui.back() revient en arrière.
 static int menu_open(CallCtx& ctx) {
-    int slot = menu_slot(ctx.args[0], "menu.open");
-    s_nav.push_back(slot);
+    int slot = handle_slot(ctx.args[0], "menu.open");
+    Node::Kind kind = s_nodes[slot].kind;
+    if (kind == Node::LIST) {
+        open_list(slot);
+    } else if (kind == Node::MENU) {
+        s_nav.push_back(slot);
+    } else {
+        throw std::runtime_error("menu.open: this ui element is neither a menu nor a list");
+    }
     return ctx.ret(ctx.args[0]);
 }
 
@@ -554,6 +609,7 @@ Value make_element_class() {
     cls.map_set(Value(std::string("button")), Value::make_builtin(menu_button));
     cls.map_set(Value(std::string("checkbox")), Value::make_builtin(menu_checkbox));
     cls.map_set(Value(std::string("slider")), Value::make_builtin(menu_slider));
+    cls.map_set(Value(std::string("list")), Value::make_builtin(menu_list));
     cls.map_set(Value(std::string("menu")), Value::make_builtin(menu_menu));
     cls.map_set(Value(std::string("open")), Value::make_builtin(menu_open));
     cls.map_set(Value(std::string("clear")), Value::make_builtin(menu_clear));
@@ -679,6 +735,24 @@ void ui_draw() {
         if (kind == Node::SLIDER)
             text_rect.height = rect.height - m.track - m.pad;
         float tx = rect.x + m.pad;
+        if (kind == Node::LIST_ITEM) {
+            // Marque ronde de l'élément retenu (bouton radio) : la mono-sélection se lit
+            // d'un coup d'œil, et la forme la distingue de la case à cocher carrée.
+            Value item = s_nodes[slot].item;
+            Value target = s_nodes[s_nodes[slot].parent].target;
+            bool picked = same_item(item, ref_get(target));
+            float r = m.box * 0.5f;
+            Vector2 c = {rect.x + m.pad + r, rect.y + m.row * 0.5f};
+            DrawCircleLinesV(c, r, STYLE.border);
+            if (picked)
+                DrawCircleV(c, r * (1.0f - STYLE.check_inset * 2.0f), STYLE.accent);
+            tx = rect.x + m.pad + m.box + m.pad;
+        }
+        if (kind == Node::LIST) {
+            std::string vtext = list_text(target);
+            float vw = text_width(vtext, m.font);
+            draw_text_at(vtext, rect.x + rect.width - m.pad - vw, rect, m, STYLE.text_dim);
+        }
         if (kind == Node::CHECKBOX) {
             Rectangle box = {rect.x + m.pad, rect.y + (m.row - m.box) * 0.5f, m.box, m.box};
             DrawRectangleRoundedLinesEx(box, STYLE.round, 6, STYLE.border_thick, STYLE.border);
@@ -729,6 +803,34 @@ double slider_value_at(int slot, float mouse_x, const Metrics& m) {
     if (t > 1.0f)
         t = 1.0f;
     return n.vmin + t * (n.vmax - n.vmin);
+}
+
+// Ouvre une liste : ses éléments sont (RE)construits ici, à partir de la source telle
+// qu'elle est maintenant — une source modifiée par le programme se voit donc à l'ouverture
+// suivante, sans rien coûter par frame.
+//
+// Les libellés sont calculés AVANT toute allocation : value_to_string peut appeler la
+// méta-méthode `__str` d'une instance, donc du code Ollin, qui pourrait déclarer un widget
+// et réallouer s_nodes.
+void open_list(int slot) {
+    Value source = s_nodes[slot].source;
+    uint32_t gen = s_nodes[slot].gen;
+    auto items = ui_list_items(source);
+    // La construction des libellés a pu exécuter du code Ollin (méta-méthode `__str`), donc
+    // ui.clear ou element.remove : la liste n'existe peut-être plus.
+    if (!node_alive(slot, gen))
+        return;
+    // Anciens éléments retirés : la source a pu changer, et un doublon s'accumulerait à
+    // chaque ouverture.
+    std::vector<int> old_items = s_nodes[slot].children;
+    for (int child : old_items)
+        free_subtree(child);
+    s_nodes[slot].children.clear();
+    for (const auto& it : items) {
+        int item_slot = alloc_node(Node::LIST_ITEM, it.first, slot);
+        s_nodes[item_slot].item = it.second;
+    }
+    s_nav.push_back(slot);
 }
 
 // Glissement en cours : la valeur suit le curseur tant que le bouton est maintenu, et
@@ -795,6 +897,18 @@ bool ui_poll() {
             s_drag = slot;
             s_drag_gen = s_nodes[slot].gen;
             poll_drag();
+        } else if (kind == Node::LIST) {
+            open_list(slot);
+        } else if (kind == Node::LIST_ITEM) {
+            Value item = s_nodes[slot].item;
+            int list_slot = s_nodes[slot].parent;
+            Value list_target = s_nodes[list_slot].target;
+            Value list_change = s_nodes[list_slot].on_change;
+            if (!s_nav.empty())
+                s_nav.pop_back();      // choisir referme la liste, comme un menu déroulant
+            ref_set(list_target, item);
+            if (list_change.is_callable())
+                VM::current()->call_value(list_change, item);
         } else {
             s_nav.push_back(slot);
         }
@@ -808,6 +922,7 @@ Value make_ui_module() {
     m.map_set(Value(std::string("button")), Value::make_builtin(ui_button));
     m.map_set(Value(std::string("checkbox")), Value::make_builtin(ui_checkbox));
     m.map_set(Value(std::string("slider")), Value::make_builtin(ui_slider));
+    m.map_set(Value(std::string("list")), Value::make_builtin(ui_list));
     m.map_set(Value(std::string("menu")), Value::make_builtin(ui_menu));
     m.map_set(Value(std::string("show")), Value::make_builtin(ui_show));
     m.map_set(Value(std::string("open")), Value::make_builtin(ui_open));

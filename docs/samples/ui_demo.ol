@@ -3,7 +3,7 @@
 ##
 ## Un widget se déclare UNE fois. Le moteur le dessine et le teste à chaque frame.
 ## Les widgets se rangent dans des menus et sous-menus ; ui.show change le menu affiché.
-## Une case à cocher et un slider reçoivent une RÉFÉRENCE : `ref` accepte un chemin de
+## Une case à cocher, un slider et une liste reçoivent une RÉFÉRENCE : `ref` accepte un chemin de
 ## champs, donc les réglages tiennent dans UN objet `config` plutôt que dans autant de
 ## variables globales. Le programme les lit normalement — voir `config.grille` et
 ## `config.vitesse` dans draw().
@@ -16,8 +16,17 @@ global config = {
     epais: false,
     vitesse: nil,    ## le slider l'initialise à son défaut
     branches: 3,
-    teinte: 0.55
+    teinte: 0.55,
+    forme: nil,      ## la liste l'initialise à son premier élément
+    sens: nil
 }
+
+## Sources d'une liste : un TABLEAU donne ses valeurs, un ENUM (ou une map) ses clés.
+global formes = ["cercle", "carré", "triangle"]
+enum Sens
+    horaire,
+    antihoraire
+end
 
 ## État de l'animation (pas des réglages) et couleur dérivée de la teinte.
 global tours = 0
@@ -27,6 +36,11 @@ global couleurBras
 func remettreAZero()
     t = 0
     tours = 0
+end
+
+func surSens(valeur)
+    ## Le rappel reçoit l'élément choisi — ici la clé de l'enum, une chaîne.
+    print("sens : " + valeur)
 end
 
 func surTeinte(valeur)
@@ -58,6 +72,11 @@ func setup()
     ## Bornes ET départ entiers → slider entier, sans décimale affichée.
     principal.slider("Branches", ref config.branches, 1, 8)
 
+    ## Une liste est en mono-sélection : la ligne montre l'élément retenu, un clic déplie
+    ## les choix. Le tableau renvoie la VALEUR choisie, l'enum sa CLÉ.
+    principal.list("Forme", formes, ref config.forme)
+    principal.list("Sens", Sens, ref config.sens, surSens)
+
     var apparence = principal.menu("Apparence")
     apparence.checkbox("Grille", ref config.grille)
     apparence.checkbox("Trait épais", ref config.epais, surEpais)
@@ -72,6 +91,18 @@ func setup()
     ui.show(principal)
 
     surTeinte(config.teinte)   ## le rappel ne part qu'au premier changement : couleur initiale ici
+end
+
+## La forme du bout de bras vient de la liste : le programme lit config.forme comme une
+## variable ordinaire.
+func dessineForme(x, y, rayon)
+    if config.forme == "carré" then
+        graphics.rect(x - rayon, y - rayon, rayon * 2, rayon * 2)
+    elseif config.forme == "triangle" then
+        graphics.polygon([x, y - rayon, x + rayon, y + rayon, x - rayon, y + rayon])
+    else
+        graphics.circle(x, y, rayon)
+    end
 end
 
 func dessineGrille()
@@ -101,11 +132,12 @@ func draw()
     var ecart = math.TAU / config.branches
     graphics.stroke(couleurBras, config.epais and 8 or 2)
     graphics.noFill()
+    var sens = config.sens == "horaire" and 1 or -1
     for i = 1, config.branches do
-        var angle = t + ecart * i
+        var angle = sens * t + ecart * i
         var cx = CW + math.cos(angle) * r
         var cy = CH + math.sin(angle) * r
-        graphics.circle(cx, cy, rayon)
+        dessineForme(cx, cy, rayon)
         graphics.line(CW, CH, cx, cy)
     end
 

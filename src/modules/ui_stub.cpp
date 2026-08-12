@@ -33,6 +33,12 @@ int stub_slider(CallCtx& ctx) {
     return ctx.ret(make_inert());
 }
 
+int stub_list(CallCtx& ctx) {
+    ui_check_list_args(ctx.args + 1, ctx.argc - 1);
+    ui_list_init(ctx.args + 1, ctx.argc - 1);
+    return ctx.ret(make_inert());
+}
+
 int stub_menu(CallCtx& ctx) {
     ui_check_menu_args(ctx.args + 1, ctx.argc - 1);
     return ctx.ret(make_inert());
@@ -48,6 +54,7 @@ Value make_inert_class() {
     cls.map_set(Value(std::string("button")), Value::make_builtin(stub_button));
     cls.map_set(Value(std::string("checkbox")), Value::make_builtin(stub_checkbox));
     cls.map_set(Value(std::string("slider")), Value::make_builtin(stub_slider));
+    cls.map_set(Value(std::string("list")), Value::make_builtin(stub_list));
     cls.map_set(Value(std::string("menu")), Value::make_builtin(stub_menu));
     cls.map_set(Value(std::string("open")), Value::make_builtin(stub_self));
     cls.map_set(Value(std::string("clear")), Value::make_builtin(stub_self));
@@ -81,6 +88,11 @@ Value make_ui_module() {
     m.map_set(Value(std::string("slider")), Value::make_builtin([](CallCtx& ctx) -> int {
         ui_check_slider_args(ctx.args, ctx.argc);
         ui_slider_init(ctx.args, ctx.argc);
+        return ctx.ret(make_inert());
+    }));
+    m.map_set(Value(std::string("list")), Value::make_builtin([](CallCtx& ctx) -> int {
+        ui_check_list_args(ctx.args, ctx.argc);
+        ui_list_init(ctx.args, ctx.argc);
         return ctx.ret(make_inert());
     }));
     m.map_set(Value(std::string("menu")), Value::make_builtin([](CallCtx& ctx) -> int {

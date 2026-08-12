@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-12 12:41</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-12 13:03</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -424,7 +424,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-12 12:41</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-12 13:03</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2128,9 +2128,36 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> vitess
     <tr><td><code>ui.button(libellé, fonction)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
     <tr><td><code>ui.checkbox(libellé, ref variable [, surChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>surChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
     <tr><td><code>ui.slider(libellé, ref variable, min, max [, défaut] [, surChange])</code></td><td>Ajoute une valeur numérique réglable à la souris, liée à une variable passée par <a href="#ref">référence</a>. Si la variable vaut <code>nil</code>, elle est initialisée au <strong>défaut</strong> (ou à <code>min</code> en son absence). Les deux derniers arguments sont reconnus par leur type : un nombre est le défaut, une fonction le rappel appelé à chaque changement avec la nouvelle valeur.</td></tr>
+    <tr><td><code>ui.list(libellé, source, <span class="kw">ref</span> variable [, surChange])</code></td><td>Liste en <strong>mono-sélection</strong> : la ligne montre l'élément retenu, un clic déplie les choix. <code>source</code> = tableau, map ou enum</td></tr>
     <tr><td><code>ui.clear()</code></td><td>Retire tous les widgets — pour reconstruire une interface qui change en cours de route.</td></tr>
   </tbody>
 </table>
+
+<h3>Listes</h3>
+<p>Une liste choisit <strong>un</strong> élément parmi plusieurs. Sa source est un <strong>tableau</strong>, une <strong>map</strong> ou un <strong>enum</strong>, et la règle d'affichage est celle de <code><span class="kw">for</span> … <span class="kw">in</span></code> : un tableau donne ses <strong>valeurs</strong>, une map ou un enum ses <strong>clés</strong>. La variable liée reçoit exactement ce qui est affiché — la valeur pour un tableau, la clé pour une map ou un enum.</p>
+
+<pre><code><span class="kw">global</span> formes = [<span class="str">"cercle"</span>, <span class="str">"carré"</span>, <span class="str">"triangle"</span>]
+<span class="kw">enum</span> Sens
+    horaire,
+    antihoraire
+<span class="kw">end</span>
+<span class="kw">global</span> forme = <span class="kw">nil</span>      <span class="cmt">## la liste l'initialise au 1er élément</span>
+<span class="kw">global</span> sens = <span class="kw">nil</span>
+
+<span class="kw">func</span> setup()
+    <span class="kw">var</span> menu = ui.menu(<span class="str">"Réglages"</span>)
+    menu.list(<span class="str">"Forme"</span>, formes, <span class="kw">ref</span> forme)        <span class="cmt">## forme reçoit "cercle", "carré"…</span>
+    menu.list(<span class="str">"Sens"</span>, Sens, <span class="kw">ref</span> sens, surSens)   <span class="cmt">## sens reçoit "horaire" ou "antihoraire"</span>
+    ui.show(menu)
+<span class="kw">end</span></code></pre>
+
+<ul>
+  <li>La ligne affiche le libellé et l'élément retenu ; un clic <strong>déplie</strong> la liste, où l'élément courant porte une marque ronde. Choisir referme la liste et revient au menu. <code>element.open()</code> la déplie depuis le programme, comme pour un sous-menu.</li>
+  <li>La sélection est <strong>toujours</strong> définie : une variable à <code>nil</code> est initialisée au premier élément. Une valeur déjà posée est conservée.</li>
+  <li>Les éléments sont relus <strong>à chaque ouverture</strong> : modifier la source entre deux ouvertures se voit, sans rien coûter par frame.</li>
+  <li>L'<strong>ordre</strong> est figé, car une map n'en a pas : un enum est trié par valeur — donc dans l'ordre de déclaration —, une map ordinaire par libellé. Un tableau garde l'ordre de ses index.</li>
+  <li><code>surChange</code> reçoit l'élément choisi.</li>
+</ul>
 
 <h3>Menus</h3>
 <p>Les widgets peuvent être rangés dans des <strong>menus</strong>. Un seul menu est affiché à la fois : un sous-menu apparaît comme une ligne cliquable marquée d'un chevron, cliquer dessus descend d'un niveau, et une ligne <code>&lt;</code> remonte. Un menu se déclare comme un widget, et porte les mêmes méthodes de déclaration.</p>

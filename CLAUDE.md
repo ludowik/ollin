@@ -427,6 +427,24 @@ entrée, un clic sur un sous-menu empile, la ligne « < » et `ui.back()` dépil
   laisserait la pile pointer sur un nœud libéré → on la tronque au premier ancêtre
   encore vivant.
 
+**Liste** (`ui.list(libellé, source, ref v [, surChange])`) : mono-sélection sur un tableau,
+une map ou un enum. La ligne `LIST` montre l'élément retenu ; un clic ouvre la liste, dont
+les lignes sont de vrais nœuds `LIST_ITEM` **engendrés à l'ouverture** comme enfants du nœud
+`LIST`. Aucune notion de « ligne virtuelle » n'a donc été introduite : `layout`, `ui_draw` et
+`ui_poll` traitent ces items comme n'importe quel contenu de menu, et `s_nav` empile le nœud
+`LIST` exactement comme un sous-menu. Choisir un item écrit la référence puis **dépile**.
+- Règle d'affichage/retour = celle de `for … in` : un tableau donne ses **valeurs**, une map
+  ou un enum ses **clés** (`ui_list_items`, dans `ui_module.h` car partagé avec le stub).
+- **Ordre figé** : une map n'en a pas. Un enum est trié par **valeur** (donc l'ordre de
+  déclaration), une map ordinaire par libellé — sans quoi la liste se réordonnerait d'une
+  ouverture à l'autre.
+- Les items sont **reconstruits** à chaque ouverture (la source a pu changer), les anciens
+  libérés — sinon ils s'accumuleraient. Les libellés (`value_to_string`, qui peut appeler la
+  méta-méthode `__str`) sont calculés **avant** toute allocation, et `open_list` revérifie
+  `node_alive` ensuite : ce code Ollin peut avoir appelé `ui.clear`.
+- `element.open()` accepte un menu **ou** une liste (`handle_slot` puis test du genre) : la
+  liste est ainsi pilotable par programme, donc testable sans clic.
+
 **Slider** (`ui.slider(libellé, ref v, min, max [, défaut] [, surChange])`) : les deux
 derniers arguments sont reconnus par leur TYPE (nombre = défaut, fonction = rappel), donc
 aucun ordre imposé. La variable liée est la **seule source de vérité** — le nœud ne

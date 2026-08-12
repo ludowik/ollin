@@ -250,6 +250,21 @@ check_error "tween.value without a reference" \
 tween.value(v, 10, 1)' \
     "doit être une référence"
 
+check_error "ui.list without a reference" \
+    'global v = nil
+ui.list("Couleur", ["a", "b"], v)' \
+    "must be a reference"
+
+check_error "ui.list with a bad source" \
+    'global v = nil
+ui.list("Couleur", 3, ref v)' \
+    "must be an array, a map or an enum"
+
+check_error "ui.list with an empty source" \
+    'global v = nil
+ui.list("Couleur", [], ref v)' \
+    "list is empty"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

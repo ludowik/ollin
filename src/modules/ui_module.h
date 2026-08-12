@@ -1,7 +1,12 @@
 #pragma once
 #include "chunk.h"
 #include "modules/module_utils.h"
+#include "vm.h"
+#include <algorithm>
 #include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 Value make_ui_module();
 
@@ -77,6 +82,68 @@ inline Value ui_slider_default(const Value* args, int argc) {
 inline void ui_slider_init(const Value* args, int argc) {
     if (ref_get(args[1]).is_nil())
         ref_set(args[1], ui_slider_default(args, argc));
+}
+
+// Éléments d'une liste : le LIBELLÉ affiché et la VALEUR renvoyée. Un tableau donne ses
+// valeurs, une map (ou un enum) ses clés — la même règle que `for … in`, dont la variable
+// unique reçoit la valeur d'un tableau et la clé d'une map.
+//
+// L'ORDRE est figé ici, car une map n'en a pas : un enum est trié par valeur, ce qui
+// restitue l'ordre de déclaration, une map ordinaire par libellé, faute de mieux. Sans
+// cela la liste se réordonnerait d'une ouverture à l'autre.
+inline std::vector<std::pair<std::string, Value>> ui_list_items(const Value& source) {
+    std::vector<std::pair<std::string, Value>> out;
+    if (source.is_array()) {
+        int64_t n = source.array_size();
+        for (int64_t i = 1; i <= n; i++) {
+            Value v = source.array_get(i);
+            out.push_back({value_to_string(v), v});
+        }
+        return out;
+    }
+    bool is_enum = source.as_map()->kind == Map::ENUM;
+    bool by_value = is_enum;
+    for (const auto& kv : source.as_map()->data) {
+        if (!kv.second.is_number())
+            by_value = false;
+        out.push_back({value_to_string(kv.first), kv.first});
+    }
+    if (by_value) {
+        std::sort(out.begin(), out.end(), [&](const auto& a, const auto& b) {
+            return source.map_get(a.second).as_num() < source.map_get(b.second).as_num();
+        });
+    } else {
+        std::sort(out.begin(), out.end(), [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+    }
+    return out;
+}
+
+inline void ui_check_list_args(const Value* args, int argc) {
+    if (argc < 3)
+        throw std::runtime_error("ui.list: expected label, tableau|map|enum, ref variable");
+    if (!args[0].is_string())
+        throw std::runtime_error("ui.list: label must be a string");
+    if (!args[1].is_array() && !args[1].is_map())
+        throw std::runtime_error("ui.list: second argument must be an array, a map or an enum");
+    if (args[1].is_array() ? args[1].array_size() == 0 : args[1].map_size() == 0)
+        throw std::runtime_error("ui.list: the list is empty");
+    if (!is_ref(args[2]))
+        throw std::runtime_error("ui.list: third argument must be a reference — write `ref maVariable`");
+    if (argc > 3 && !args[3].is_nil() && !args[3].is_callable())
+        throw std::runtime_error("ui.list: fourth argument must be a function");
+}
+
+// Une liste est en MONO-sélection : il y a toujours un élément retenu. Une variable liée
+// à nil est donc initialisée au premier élément, comme un slider prend son défaut.
+inline void ui_list_init(const Value* args, int argc) {
+    (void)argc;
+    if (!ref_get(args[2]).is_nil())
+        return;
+    auto items = ui_list_items(args[1]);
+    if (!items.empty())
+        ref_set(args[2], items[0].second);
 }
 
 inline void ui_check_menu_args(const Value* args, int argc) {

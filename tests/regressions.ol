@@ -1011,6 +1011,32 @@ tween.update(0.5)
 ## plus du slot qui lui a été attribué.
 assert(twR.x == 100 and twR.y == 25)
 
+## ── ui.list ─────────────────────────────────────────────────────────────────────
+## Sans zone graphique, la déclaration valide ses arguments et initialise la sélection :
+## c'est cette part-là qui se teste ici (le rendu et le clic demandent un affichage).
+## Un tableau renvoie une VALEUR, une map ou un enum une CLÉ — comme `for … in`.
+enum LiDiff
+    facile,
+    normal,
+    difficile
+end
+var liCouleurs = ["rouge", "vert", "bleu"]
+var liReglages = {volume: 0.8, brillance: 0.5, alpha: 1}
+var liC = nil
+var liD = nil
+var liR = nil
+ui.list("Couleur", liCouleurs, ref liC)
+ui.list("Difficulté", LiDiff, ref liD)
+ui.list("Réglage", liReglages, ref liR)
+assert(liC == "rouge")           ## 1er élément du tableau, sa VALEUR
+assert(liD == "facile")          ## enum trié par valeur → ordre de déclaration
+assert(liR == "alpha")           ## map triée par libellé → premier dans l'ordre alphabétique
+
+## Une sélection déjà posée est respectée (l'initialisation ne vaut que pour nil).
+var liGarde = "bleu"
+ui.list("Couleur", liCouleurs, ref liGarde)
+assert(liGarde == "bleu")
+
 ## Handle d'un tween terminé : interrogeable sans erreur (garder le handle est normal).
 assert(twT.isDone() and twT.progress() == 1)
 twT.cancel()
