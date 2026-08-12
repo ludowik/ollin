@@ -1,7 +1,8 @@
 ## Éclipse de Lune — vue depuis la Terre. La Lune traverse le cône d'ombre projeté par
-## la Terre : elle s'assombrit d'abord dans la PÉNOMBRE (à peine perceptible), puis mord
-## l'OMBRE, où elle prend une teinte cuivrée. Ce rouge est celui de la lumière solaire
-## réfractée par l'atmosphère terrestre — le bleu y est diffusé, le rouge passe.
+## la Terre : elle s'assombrit d'abord dans la PÉNOMBRE, faiblement en entrant puis très
+## nettement en approchant du bord de l'ombre — la Terre y masque presque tout le Soleil.
+## Elle mord ensuite l'OMBRE, où elle prend une teinte cuivrée. Ce rouge est celui de la
+## lumière solaire réfractée par l'atmosphère terrestre — le bleu y est diffusé, le rouge passe.
 ##
 ## Deux échelles suffisent à tout décrire, en rayons lunaires : l'ombre en fait ~2,7 et la
 ## pénombre ~4,6 à la distance de la Lune. Le reste n'est que géométrie de deux disques.
@@ -216,10 +217,10 @@ func draw()
     graphics.blendMode(blend.MULTIPLY)
 
     ## Pénombre : la Terre n'y masque qu'une PART du disque solaire, et cette part suit le
-    ## profil calculé par `lumierePenombre`. L'affaiblissement est donc très inégal — à peine
-    ## perceptible au bord externe, franc au bord de l'ombre où il ne reste presque plus de
-    ## Soleil. Un facteur constant par étape (l'ancien réglage) ne retirait que ~13 % au bord
-    ## interne : la Lune y entrait sans rien perdre, alors que c'est là que tout se joue.
+    ## profil calculé par `lumierePenombre`. L'affaiblissement est donc très inégal : faible
+    ## au bord externe, franc au bord de l'ombre où il ne reste presque plus de Soleil.
+    ## Un facteur constant par étape (l'ancien réglage) ne retirait que ~13 % au bord interne,
+    ## ce qui ne simulait rien : la Lune traversait la pénombre sans presque rien perdre.
     ##
     ## Le facteur d'une étape est le RAPPORT des deux lumières successives : leur produit
     ## reconstitue exactement le profil visé, sans que le nombre d'étapes n'en change le
