@@ -101,7 +101,13 @@ end
 ## Intersection de DEUX disques, dessinée par lignes horizontales : pour chaque ligne, on
 ## garde le segment commun au disque lunaire et au disque d'ombre. C'est ainsi que l'ombre
 ## reste exactement dans la Lune, sans masque ni découpe.
-func voilerIntersection(mx, my, rl, ox, oy, ro, couleur)
+##
+## `trou` évide un disque central concentrique à l'ombre (0 = disque plein). C'est ce qui
+## permet aux étapes de PÉNOMBRE de ne voiler qu'un anneau : sans lui, leurs disques pleins
+## assombriraient aussi l'intérieur de l'ombre, qui recevrait deux fois son dû — la Lune
+## éclipsée devenait alors presque noire, alors que l'ombre n'a rien à voir avec la pénombre
+## (on n'y reçoit plus que la lumière réfractée par l'atmosphère).
+func voilerIntersection(mx, my, rl, ox, oy, ro, couleur, trou)
     var pas = 1   ## en fusion multiplicative, le bord est net : 2 px feraient un escalier
     var y0 = math.max(my - rl, oy - ro)
     var y1 = math.min(my + rl, oy + ro)
@@ -114,8 +120,22 @@ func voilerIntersection(mx, my, rl, ox, oy, ro, couleur)
             dm = math.sqrt(dm)
             var a = math.max(mx - dl, ox - dm)
             var b = math.min(mx + dl, ox + dm)
-            if b > a then
-                graphics.line(a, y, b, y)
+            var dt = trou * trou - (y - oy) * (y - oy)
+            if dt > 0 then
+                ## Le trou coupe la ligne en deux morceaux, l'un ou l'autre pouvant être vide.
+                dt = math.sqrt(dt)
+                var g = math.min(b, ox - dt)
+                if g > a then
+                    graphics.line(a, y, g, y)
+                end
+                var d = math.max(a, ox + dt)
+                if b > d then
+                    graphics.line(d, y, b, y)
+                end
+            else
+                if b > a then
+                    graphics.line(a, y, b, y)
+                end
             end
         end
     end
@@ -151,10 +171,13 @@ end
 ## `(acos t − t√(1−t²))/π`. Elle vaut 0 au bord externe (Soleil entier) et 1 au bord de
 ## l'ombre (Soleil entièrement caché) — le profil est donc tout sauf linéaire.
 ##
-## Le plancher PENOMBRE_MIN évite le noir juste avant l'ombre : au-delà, c'est la lumière
-## réfractée par l'atmosphère terrestre qui prend le relais, et ce sont les étapes rouges
-## qui la dessinent.
-const PENOMBRE_MIN = 0.30
+## Le plancher PENOMBRE_MIN est ce qu'il reste au bord de l'ombre. L'optique géométrique y
+## donnerait zéro, mais l'atmosphère terrestre réfracte de la lumière jusque dans l'ombre :
+## le bord n'est donc pas noir. Sa valeur est CONTRAINTE par la continuité — la fusion
+## multiplicative ne sait qu'assombrir, et l'ombre cuivrée dessinée juste à l'intérieur doit
+## rester plus sombre que lui. Un plancher trop bas (0,30 essayé) rendait l'ombre inatteignable :
+## la Lune éclipsée n'était qu'une tache noire.
+const PENOMBRE_MIN = 0.62
 
 func lumierePenombre(rho)
     var a = (R_PENOMBRE - R_OMBRE) / 2
@@ -238,14 +261,14 @@ func draw()
         if f >= 0.9999 then
             continue
         end
-        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(f, f, math.min(f * 1.004, 1)))
+        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(f, f, math.min(f * 1.004, 1)), R_OMBRE * rl)
     end
 
     ## Liseré turquoise, juste à l'intérieur du bord de l'ombre : l'ozone de la haute
     ## atmosphère y absorbe le rouge et laisse cette frange bleutée que les photographes
     ## connaissent bien. Dessiné AVANT les étapes rouges, dont la première a exactement ce rayon :
     ## le liseré n'est donc visible que là où elles s'arrêtent, sur une bande étroite.
-    voilerIntersection(mx, my, rl, ox, oy, R_OMBRE * rl, Color(0.86, 0.97, 1.0))
+    voilerIntersection(mx, my, rl, ox, oy, R_OMBRE * rl, Color(0.86, 0.97, 1.0), 0)
 
     ## Ombre : plus aucune lumière directe, seulement celle que l'atmosphère terrestre
     ## réfracte — rouge, car le bleu y est diffusé. Le cône d'ombre a un bord FRANC :
@@ -253,18 +276,19 @@ func draw()
     ## adoucit la transition. Étaler ce dégradé sur tout le rayon donnait une ombre molle,
     ## bien plus claire que la réalité.
     ##
-    ## Les facteurs visent une teinte MESURÉE : cuivre sombre au centre (~108, 41, 25 sur
-    ## un gris lunaire moyen) et brun-rouge un peu plus clair au bord, comme sur les
-    ## photographies. Des facteurs plus mordants donnaient un rouge quasi noir (29, 2, 1) :
-    ## la teinte était juste, la luminosité non — une Lune éclipsée reste bien visible.
+    ## Les facteurs visent une teinte MESURÉE : cuivre franc au centre (~130, 45, 28 sur un
+    ## gris lunaire moyen) et brun-orangé plus clair au bord, comme sur les photographies.
+    ## Le rouge n'est que peu entamé, le bleu beaucoup — c'est ce contraste entre canaux qui
+    ## fait la couleur, pas un assombrissement d'ensemble. Des facteurs plus mordants
+    ## donnaient un rouge quasi noir : la teinte était juste, la luminosité non.
     for k = 0, 9 do
         var r = R_OMBRE * (1 - 0.10 * k / 10)
-        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.9755, 0.9169, 0.8866))
+        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.9750, 0.9003, 0.8670), 0)
     end
     ## Plancher de l'ombre : l'intérieur, uniformément cuivré, à peine plus sombre au centre.
     for k = 0, 3 do
         var r = R_OMBRE * (0.90 - 0.55 * k / 4)
-        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.9663, 0.8870, 0.8546))
+        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.9900, 0.8955, 0.8740), 0)
     end
     graphics.blendMode(blend.ALPHA)
 
