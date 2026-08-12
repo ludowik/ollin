@@ -144,6 +144,24 @@ func magnitude()
     return math.max((R_OMBRE + 1 - distanceCentres()) / 2, 0)
 end
 
+## Lumière restant dans la pénombre, à la distance `rho` du centre de l'ombre (en rayons
+## lunaires). Vue d'un point de la pénombre, la Terre coupe le disque solaire comme une
+## CORDE : la part masquée est celle du segment circulaire ainsi retranché, d'où la formule
+## `(acos t − t√(1−t²))/π`. Elle vaut 0 au bord externe (Soleil entier) et 1 au bord de
+## l'ombre (Soleil entièrement caché) — le profil est donc tout sauf linéaire.
+##
+## Le plancher PENOMBRE_MIN évite le noir juste avant l'ombre : au-delà, c'est la lumière
+## réfractée par l'atmosphère terrestre qui prend le relais, et ce sont les étapes rouges
+## qui la dessinent.
+const PENOMBRE_MIN = 0.30
+
+func lumierePenombre(rho)
+    var a = (R_PENOMBRE - R_OMBRE) / 2
+    var t = math.clamp((rho - R_OMBRE - a) / a, -1, 1)
+    var masquee = (math.acos(t) - t * math.sqrt(math.max(1 - t * t, 0))) / math.PI
+    return math.max(1 - masquee, PENOMBRE_MIN)
+end
+
 func dessineEtoiles()
     for i = 1, #etoiles, 3 do
         var e = etoiles[i + 2]
@@ -197,19 +215,35 @@ func draw()
     ## bandes concentriques bien visibles (constaté avec six).
     graphics.blendMode(blend.MULTIPLY)
 
-    ## Pénombre : la Terre n'y masque qu'une PART du disque solaire, d'où un affaiblissement
-    ## progressif et neutre. À l'œil nu, une éclipse par la seule pénombre passe presque
-    ## inaperçue — le produit des 16 étapes ne retire que ~15 % de la lumière.
-    for k = 0, 15 do
-        ## /15 et non /16 : le dernier disque doit atteindre le bord de l'OMBRE, sinon la
+    ## Pénombre : la Terre n'y masque qu'une PART du disque solaire, et cette part suit le
+    ## profil calculé par `lumierePenombre`. L'affaiblissement est donc très inégal — à peine
+    ## perceptible au bord externe, franc au bord de l'ombre où il ne reste presque plus de
+    ## Soleil. Un facteur constant par étape (l'ancien réglage) ne retirait que ~13 % au bord
+    ## interne : la Lune y entrait sans rien perdre, alors que c'est là que tout se joue.
+    ##
+    ## Le facteur d'une étape est le RAPPORT des deux lumières successives : leur produit
+    ## reconstitue exactement le profil visé, sans que le nombre d'étapes n'en change le
+    ## résultat — il ne règle que la douceur du dégradé.
+    var precedent = 1.0
+    for k = 1, 24 do
+        ## k va jusqu'à 24 inclus : le dernier disque atteint le bord de l'OMBRE, sinon la
         ## bande qui lui est accolée n'aurait jamais l'assombrissement complet.
-        var r = R_PENOMBRE - (R_PENOMBRE - R_OMBRE) * k / 15
-        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.991, 0.991, 0.995))
+        var r = R_PENOMBRE - (R_PENOMBRE - R_OMBRE) * k / 24
+        var courant = lumierePenombre(r)
+        var f = courant / precedent
+        precedent = courant
+        ## Une fois le plancher atteint, les étapes restantes ont un facteur de 1 : les
+        ## dessiner ne coûterait que du temps.
+        if f >= 0.9999 then
+            continue
+        end
+        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(f, f, math.min(f * 1.004, 1)))
     end
 
     ## Liseré turquoise, juste à l'intérieur du bord de l'ombre : l'ozone de la haute
     ## atmosphère y absorbe le rouge et laisse cette frange bleutée que les photographes
-    ## connaissent bien. Dessiné AVANT les étapes rouges, qui commencent un peu en retrait.
+    ## connaissent bien. Dessiné AVANT les étapes rouges, dont la première a exactement ce rayon :
+    ## le liseré n'est donc visible que là où elles s'arrêtent, sur une bande étroite.
     voilerIntersection(mx, my, rl, ox, oy, R_OMBRE * rl, Color(0.86, 0.97, 1.0))
 
     ## Ombre : plus aucune lumière directe, seulement celle que l'atmosphère terrestre
