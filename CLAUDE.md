@@ -491,8 +491,11 @@ de stub, et le module tourne à l'identique en natif headless (où les tests le 
 - **Réentrance** — mêmes règles que `ui`, pour la même raison (un rappel peut déclarer un
   tween, donc faire `push_back` sur `s_tweens`) : identités `{slot, gen}` au lieu de
   pointeurs, itération par index, **aucune** référence conservée à travers un appel Ollin
-  (les canaux sont copiés avant les écritures, qui exécutent le setter d'une `ref`), et
-  rappels de fin **collectés puis appelés après la passe**.
+  (les canaux **et la courbe** sont copiés avant les écritures, qui exécutent le setter
+  d'une `ref` ou une courbe du script), et rappels de fin **collectés puis appelés après la
+  passe**. Un tween né PENDANT une passe (`born_pass == s_pass`) n'y est pas avancé : il
+  consommerait un pas de temps antérieur à sa naissance, et le résultat dépendait sinon du
+  slot obtenu — au-dessus de l'index courant il était avancé, sur un slot recyclé non.
 - `free_tween` vide les canaux et relâche `curve_fn`/`on_done` : sinon le module garderait
   l'objet animé vivant longtemps après la fin de l'animation.
 - À la fin, la cible **exacte** est écrite : une courbe à dépassement (`back`, `elastic`) ne

@@ -195,13 +195,19 @@ struct Tw {
     bool started = false;
     bool paused = false;
     bool alive = false;
-    bool done = false;
+    uint64_t born_pass = 0;   // passe d'avancement où le tween est né (cf. advance)
     uint32_t gen = 1;   // incrémentée à la libération → un handle périmé est détecté
 };
 
 std::vector<Tw> s_tweens;
 std::vector<int> s_free;
 bool s_engine_driven = false;
+// Numéro de la passe d'avancement en cours. Un tween déclaré PENDANT une passe (par une
+// courbe ou un rappel) ne doit pas y être avancé : il consommerait un pas de temps
+// antérieur à sa naissance. Sans ce compteur, le résultat dépendrait du slot obtenu —
+// au-dessus de l'index courant il était avancé, sur un slot recyclé plus bas il ne
+// l'était pas.
+uint64_t s_pass = 0;
 
 void advance(double dt);
 
@@ -223,6 +229,7 @@ int alloc_tween() {
     t = Tw{};
     t.gen = gen;
     t.alive = true;
+    t.born_pass = s_pass;
     return slot;
 }
 
@@ -270,15 +277,16 @@ bool is_object(const Value& v) {
 
 // Champs numériques communs à deux instances de MÊME classe (Color → r,g,b,a ; un Vec2
 // utilisateur → x,y). L'interpolation est donc structurelle : aucun type n'est câblé ici.
-void add_struct_chans(std::vector<Chan>& out, const Value& holder, const Value& cur, const Value& tgt,
-                      const std::string& field, const char* fn) {
+// Écrit DANS l'instance courante (`cur`), qui joue elle-même le rôle de holder : le tween
+// modifie l'objet, il ne le remplace pas.
+void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt, const std::string& field,
+                      const char* fn) {
     Value cls_a = cur.map_get(Value(std::string("__class__")));
     Value cls_b = tgt.map_get(Value(std::string("__class__")));
     if (cls_a.is_nil() || !cls_b.is_class() || cls_a.as_map() != cls_b.as_map()) {
         throw std::runtime_error(std::string(fn) + ": '" + field +
                                  "' : les deux valeurs doivent être des instances de la même classe");
     }
-    (void)holder;
     int added = 0;
     for (const auto& kv : tgt.as_map()->data) {
         if (!kv.second.is_number() || !kv.first.is_string())
@@ -302,7 +310,10 @@ void add_struct_chans(std::vector<Chan>& out, const Value& holder, const Value& 
 
 void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, const Value& cur, const Value& tgt,
               const char* fn) {
-    const std::string& field = key.is_string() ? key.as_string() : std::string("(ref)");
+    // Copie, PAS une référence : les deux branches du ternaire ont des types différents,
+    // donc le résultat est un temporaire — une `const std::string&` serait pendante dès la
+    // fin de l'instruction, et les messages d'erreur ci-dessous liraient n'importe quoi.
+    std::string field = key.is_string() ? key.as_string() : std::string("(ref)");
     if (cur.is_number() && tgt.is_number()) {
         Chan c;
         c.holder = holder;
@@ -314,7 +325,7 @@ void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, con
         return;
     }
     if (is_object(cur) && is_object(tgt)) {
-        add_struct_chans(out, holder, cur, tgt, field, fn);
+        add_struct_chans(out, cur, tgt, field, fn);
         return;
     }
     throw std::runtime_error(std::string(fn) + ": '" + field + "' n'est pas interpolable (" + cur.type_name() +
@@ -324,9 +335,9 @@ void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, con
 // Annule les canaux qui visent déjà (holder, key) : sans cela deux tweens se battraient
 // pour le même champ et le résultat dépendrait de l'ordre d'itération. Un tween qui perd
 // tous ses canaux est libéré, mais son rappel de fin n'est PAS appelé (il n'a pas fini).
-void drop_conflicts(const std::vector<Chan>& chans, int except_slot) {
+void drop_conflicts(const std::vector<Chan>& chans) {
     for (int i = 0; i < (int)s_tweens.size(); i++) {
-        if (i == except_slot || !s_tweens[i].alive)
+        if (!s_tweens[i].alive)
             continue;
         auto& mine = s_tweens[i].chans;
         for (int c = (int)mine.size() - 1; c >= 0; c--) {
@@ -406,7 +417,7 @@ int tween_to(CallCtx& ctx) {
         }
         add_chan(chans, args[0], kv.first, cur, kv.second, "tween.to");
     }
-    drop_conflicts(chans, -1);
+    drop_conflicts(chans);
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
     t.chans = std::move(chans);
@@ -441,7 +452,7 @@ int tween_value(CallCtx& ctx) {
         c.integral = cur.is_integer() && args[1].is_integer();
         chans.push_back(c);
     } else if (is_object(cur) && is_object(args[1])) {
-        add_struct_chans(chans, Value{}, cur, args[1], "(ref)", "tween.value");
+        add_struct_chans(chans, cur, args[1], "(ref)", "tween.value");
     } else {
         throw std::runtime_error(std::string("tween.value: valeur non interpolable (") + cur.type_name() + " → " +
                                  args[1].type_name() + ")");
@@ -449,7 +460,7 @@ int tween_value(CallCtx& ctx) {
     // Deux `ref x` distincts sont deux maps différentes : on ne peut pas reconnaître
     // qu'ils désignent la même variable, donc pas d'écrasement automatique ici (les
     // canaux structurés, qui écrivent dans une instance, sont eux bien dédoublonnés).
-    drop_conflicts(chans, -1);
+    drop_conflicts(chans);
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
     t.chans = std::move(chans);
@@ -566,12 +577,15 @@ Value tween_class() {
 
 // ── Avancement ──────────────────────────────────────────────────────────────────
 
-double eased(const Tw& t, double p) {
-    if (t.curve_fn.is_callable()) {
-        Value r = VM::current()->call_value(t.curve_fn, Value(p));
+// Prend la courbe PAR VALEUR (copie de la Value) et non une référence sur le tween : une
+// courbe fournie par le script peut déclarer un tween, donc réallouer s_tweens, et toute
+// référence sur un élément serait alors pendante.
+double eased(Value curve_fn, int curve, double p) {
+    if (curve_fn.is_callable()) {
+        Value r = VM::current()->call_value(curve_fn, Value(p));
         return r.is_number() ? r.as_num() : p;
     }
-    return k_curves[t.curve].fn(p);
+    return k_curves[curve].fn(p);
 }
 
 void write_chan(const Chan& c, double v) {
@@ -587,11 +601,12 @@ void write_chan(const Chan& c, double v) {
 void advance(double dt) {
     if (dt <= 0.0 || s_tweens.empty())
         return;
+    s_pass++;
     // Rappels de fin COLLECTÉS puis appelés après la passe : un rappel peut créer ou
     // annuler des tweens, donc faire push_back sur s_tweens pendant qu'on l'itère.
     std::vector<Value> finished;
     for (int i = 0; i < (int)s_tweens.size(); i++) {
-        if (!s_tweens[i].alive || s_tweens[i].paused)
+        if (!s_tweens[i].alive || s_tweens[i].paused || s_tweens[i].born_pass == s_pass)
             continue;
         double step = dt;
         {
@@ -628,7 +643,9 @@ void advance(double dt) {
         // courbe personnalisée), donc plus aucune référence à s_tweens ne doit survivre.
         {
             std::vector<Chan> chans = s_tweens[i].chans;
-            double f = ends ? 1.0 : eased(s_tweens[i], p);
+            Value curve_fn = s_tweens[i].curve_fn;
+            int curve = s_tweens[i].curve;
+            double f = ends ? 1.0 : eased(curve_fn, curve, p);
             for (const auto& c : chans) {
                 // À la fin, on pose la valeur cible EXACTE : une courbe à dépassement
                 // (back, elastic) ne rend pas 1 en 1, et un arrondi laisserait 0,999.
@@ -657,6 +674,7 @@ void tween_reset() {
     s_tweens.clear();
     s_free.clear();
     s_engine_driven = false;
+    s_pass = 0;
 }
 
 Value make_tween_module() {

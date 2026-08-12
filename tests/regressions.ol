@@ -992,6 +992,25 @@ tween.to(twObj, {n: 1}, 0.5, "linear")
 tween.update(0.5)
 assert(tween.count() == 0)
 
+## Une COURBE fournie par le script peut déclarer d'autres tweens : la table se réalloue
+## en pleine passe d'avancement, donc rien ne doit conserver de référence sur un élément.
+tween.cancelAll()
+var twR = {x: 0, y: 0}
+var twN = 0
+tween.to(twR, {x: 100}, 1.0, func(p)
+    twN += 1
+    if twN == 1 then
+        tween.to(twR, {y: 50}, 1.0, "linear")
+    end
+    return p
+end)
+tween.update(0.5)
+tween.update(0.5)
+## y = 25 : le tween né dans la 1re passe n'y est PAS avancé (il consommerait un pas de
+## temps antérieur à sa naissance), il ne reçoit donc que la seconde — la valeur ne dépend
+## plus du slot qui lui a été attribué.
+assert(twR.x == 100 and twR.y == 25)
+
 ## Handle d'un tween terminé : interrogeable sans erreur (garder le handle est normal).
 assert(twT.isDone() and twT.progress() == 1)
 twT.cancel()
