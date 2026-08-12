@@ -217,14 +217,19 @@ func draw()
     ## l'assombrissement est presque complet dès l'entrée, et seule une bande étroite
     ## adoucit la transition. Étaler ce dégradé sur tout le rayon donnait une ombre molle,
     ## bien plus claire que la réalité.
+    ##
+    ## Les facteurs visent une teinte MESURÉE : cuivre sombre au centre (~108, 41, 25 sur
+    ## un gris lunaire moyen) et brun-rouge un peu plus clair au bord, comme sur les
+    ## photographies. Des facteurs plus mordants donnaient un rouge quasi noir (29, 2, 1) :
+    ## la teinte était juste, la luminosité non — une Lune éclipsée reste bien visible.
     for k = 0, 9 do
         var r = R_OMBRE * (1 - 0.10 * k / 10)
-        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.90, 0.76, 0.74))
+        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.9755, 0.9169, 0.8866))
     end
     ## Plancher de l'ombre : l'intérieur, uniformément cuivré, à peine plus sombre au centre.
     for k = 0, 3 do
         var r = R_OMBRE * (0.90 - 0.55 * k / 4)
-        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.90, 0.72, 0.68))
+        voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.9663, 0.8870, 0.8546))
     end
     graphics.blendMode(blend.ALPHA)
 
