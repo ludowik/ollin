@@ -95,7 +95,6 @@ ollin/
 ├── tools/             outillage : update_build_date.py (date de build, appelé en post-build CMake),
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
-│                      web-check.js (test navigateur sans playwright : chromium piloté par CDP),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py)
@@ -257,16 +256,18 @@ graphique NE tourne PAS avec `./build/ollin`). Pour le rendu réel sans navigate
 - Inspecter les pixels (pas de PIL/imagemagick) : via chromium (voir B) sur `file://…png`
   → `drawImage` + `getImageData` (centroïde, bbox, couleur d'un pixel).
 
-### B. Web / WASM via chromium
-- chromium : `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. **`playwright` n'est pas
-  toujours installé** (`node_modules` absent d'un clone frais, et npm hors d'atteinte) :
-  `tools/web-check.js` fait le travail SANS dépendance — il sert `docs/` en process, lance
-  chromium et le pilote par le protocole DevTools via le **WebSocket natif de node ≥ 22**.
-  Usage : `node tools/web-check.js '#/run' sonde.js [attente_ms]`, où `sonde.js` contient une
-  expression JS (typiquement une fonction async immédiate) évaluée dans la page ; sa valeur
-  est imprimée en JSON. C'est ainsi qu'on clique un bouton et qu'on relit IndexedDB ou les
-  pixels du canvas. Avec playwright présent, `chromium.launch({ executablePath })` reste
-  possible.
+### B. Web / WASM via Playwright (chromium)
+- `playwright` est installé par le hook de session, **en GLOBAL** (`npm install -g`), et
+  chromium est dans `/opt/pw-browsers/`. Il n'y a PAS de `node_modules` à la racine du dépôt :
+  node ne résout pas les modules globaux depuis un dossier quelconque, donc
+  `require('playwright')` échoue avec « Cannot find module ». **Lancer avec
+  `NODE_PATH=$(npm root -g) node script.js`** — et ne jamais conclure que playwright est
+  absent sur ce seul message (vérifier `npm ls -g --depth=0`).
+- Le message « Failed to install browsers » du démarrage de session vient du
+  `playwright install --with-deps` (apt bloqué par le proxy sur les PPA) : le paquet npm et le
+  navigateur, eux, sont bien là.
+- `chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--no-sandbox'] })`
+  suffit (pas de GPU dans le conteneur, WebGL2 en logiciel).
 - Charger une page/capture : `file://` marche direct (aucun réseau). Pour le playground,
   servir `docs/` en local puis charger `http://127.0.0.1:PORT/index.html#/playground`,
   injecter du code via `window.__ollinView.dispatch(...)`, cliquer `#run-btn`, puis lire
