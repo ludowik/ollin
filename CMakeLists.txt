@@ -35,6 +35,7 @@ set(OLLIN_SOURCES
     src/modules/string_module.cpp
     src/modules/array_module.cpp
     src/modules/data_module.cpp
+    src/modules/tween_module.cpp
 )
 
 if(EMSCRIPTEN)

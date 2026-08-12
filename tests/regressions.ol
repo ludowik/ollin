@@ -903,4 +903,97 @@ end
 assert(rfEchappe.get() == "dedans")
 
 
+## ── Module tween ────────────────────────────────────────────────────────────────
+## Avancement par pas EXACTS (0,25 × 4) : un pas de 0,1 accumulé dix fois ne fait pas
+## tout à fait 1 seconde en binaire, et le tween ne serait pas terminé.
+tween.cancelAll()
+var twObj = {x: 0, n: 0, teinte: Color(0, 0, 0)}
+var twT = tween.to(twObj, {x: 8}, 1.0, "linear")
+tween.update(0.25)
+tween.update(0.25)
+assert(twObj.x == 4 and twT.progress() == 0.5)
+tween.update(0.25)
+tween.update(0.25)
+assert(twObj.x == 8 and twT.isDone() and tween.count() == 0)
+
+## Un pas plus long que la durée restante s'arrête à la cible, sans dépassement.
+tween.to(twObj, {x: 5}, 0.5, "linear")
+tween.update(10.0)
+assert(twObj.x == 5)
+
+## Départ ET cible entiers → la valeur reste entière tout du long (pas de dérive float).
+tween.to(twObj, {n: 10}, 1.0, "linear")
+tween.update(0.5)
+assert(twObj.n == 5 and typeof(twObj.n) == "int")
+
+## Courbe à dépassement : la valeur finale doit être la cible EXACTE, pas 0,99.
+var twFini = false
+tween.to(twObj, {x: 20}, 0.5, "easeOutBack", func() twFini = true end)
+tween.update(0.5)
+assert(twObj.x == 20 and twFini)
+
+## Interpolation structurelle : une instance de classe s'anime champ par champ.
+tween.to(twObj, {teinte: Color(1, 0.5, 0)}, 1.0, "linear")
+tween.update(1.0)
+assert(twObj.teinte.r == 1 and twObj.teinte.g == 0.5 and twObj.teinte.b == 0)
+
+## Variable simple par référence, et courbe donnée sous forme de FONCTION.
+var twVal = 0
+tween.value(ref twVal, 100, 1.0, func(p) return p * p end)
+tween.update(0.5)
+assert(twVal == 25)
+tween.update(0.5)
+assert(twVal == 100)
+
+## Deux tweens sur le MÊME champ : le second annule le premier (sinon ils se battraient
+## et le résultat dépendrait de l'ordre d'itération).
+twObj.x = 0
+tween.to(twObj, {x: 50}, 1.0, "linear")
+tween.to(twObj, {x: -50}, 1.0, "linear")
+assert(tween.count() == 1)
+tween.update(1.0)
+assert(twObj.x == -50)
+
+## Délai : rien ne bouge avant l'échéance, et la valeur de départ est celle du DÉMARRAGE.
+twObj.x = 0
+tween.to(twObj, {x: 10}, 1.0, "linear").delay(0.5)
+tween.update(0.4)
+assert(twObj.x == 0)
+twObj.x = 100          ## écrit pendant le délai → c'est de là que part l'animation
+tween.update(0.6)      ## 0,1 s de délai restant, puis 0,5 s d'animation
+assert(twObj.x == 55)
+
+## Pause / reprise.
+twObj.x = 0
+var twP = tween.to(twObj, {x: 10}, 1.0, "linear")
+tween.update(0.5)
+twP.pause()
+tween.update(0.5)
+assert(twObj.x == 5)
+twP.resume()
+tween.update(0.5)
+assert(twObj.x == 10)
+
+## Un rappel de fin qui DÉCLARE un tween : il fait push_back sur la table pendant la
+## passe d'avancement, donc toute référence conservée à travers l'appel serait pendante.
+var twChain = 0
+tween.to(twObj, {x: 0}, 0.5, "linear", func()
+    twChain = 1
+    tween.to(twObj, {x: 7}, 0.5, "linear", func() twChain = 2 end)
+end)
+tween.update(0.5)
+assert(twChain == 1)
+tween.update(0.5)
+assert(twChain == 2 and twObj.x == 7)
+
+## Un rappel de fin qui ANNULE tout : la passe ne doit pas continuer sur des slots morts.
+tween.to(twObj, {x: 1}, 0.5, "linear", func() tween.cancelAll() end)
+tween.to(twObj, {n: 1}, 0.5, "linear")
+tween.update(0.5)
+assert(tween.count() == 0)
+
+## Handle d'un tween terminé : interrogeable sans erreur (garder le handle est normal).
+assert(twT.isDone() and twT.progress() == 1)
+twT.cancel()
+
 print("regressions ok")

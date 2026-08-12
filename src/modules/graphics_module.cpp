@@ -1,5 +1,6 @@
 #include "graphics_internal.h"
 #include "ui_module.h"
+#include "tween_module.h"
 #include "engine_font.h"
 #include "image_module.h"
 #include "module_utils.h"
@@ -1119,6 +1120,9 @@ static void run_user_callbacks(const Value& draw_fn) {
     // n'est pas appelé — cliquer un bouton ne déclenche donc pas aussi l'action de la
     // scène. C'est la raison d'être d'un module natif plutôt qu'une classe Ollin.
     mouse_poll(ui_poll());
+    // Tweens avancés AVANT la logique et le dessin : update() comme draw() voient donc
+    // les valeurs de la frame courante. Même dt que la globale deltaTime.
+    tween_update_all(s_frame_dt);
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
     end3d_internal();   // no-op hors 3D ; sinon flush + refermer si draw() a oublié end3d

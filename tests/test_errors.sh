@@ -225,6 +225,31 @@ ui.slider("Taille", ref v, "a", 10)' \
     "must be numbers"
 
 
+check_error "tween.to with zero duration" \
+    'global o = {x: 0}
+tween.to(o, {x: 1}, 0)' \
+    "durée doit être > 0"
+
+check_error "tween.to with unknown curve" \
+    'global o = {x: 0}
+tween.to(o, {x: 1}, 1, "rebond")' \
+    "courbe inconnue"
+
+check_error "tween.to on a missing field" \
+    'global o = {x: 0}
+tween.to(o, {y: 1}, 1)' \
+    "absent de"
+
+check_error "tween.to on a non-interpolable value" \
+    'global o = {x: "a"}
+tween.to(o, {x: 1}, 1)' \
+    "pas interpolable"
+
+check_error "tween.value without a reference" \
+    'global v = 1
+tween.value(v, 10, 1)' \
+    "doit être une référence"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

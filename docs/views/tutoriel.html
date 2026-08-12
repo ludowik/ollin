@@ -367,7 +367,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-11 11:48</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-12 12:37</span></p>
   </div>
   <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
@@ -415,6 +415,7 @@ pre:hover .code-actions,
   <a href="#keyboard">Clavier</a>
   <a href="#mouse">Souris</a>
   <a href="#ui">Module ui</a>
+  <a href="#tween">Module tween</a>
   <a href="#data">Module data</a>
   <a href="#image">Module image</a>
   <a href="#window">Module window</a>
@@ -423,7 +424,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-11 11:48</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-12 12:37</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2176,6 +2177,59 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   <li><code>ref</code> accepte un <strong>chemin de champs</strong> : <code>ui.checkbox("Grille", <span class="kw">ref</span> config.grille)</code> permet de regrouper tous les réglages dans un seul objet plutôt que d'éparpiller des variables globales (voir l'exemple « Interface (ui) »).</li>
   <li>La variable d'une case doit être <strong>accessible</strong> : un global ou un champ d'objet. Une variable locale à une fonction n'a pas de sens ici, puisqu'elle disparaît avant le premier clic.</li>
   <li>Sans zone graphique — exécution en ligne de commande sans fenêtre —, déclarer un widget ne fait rien, mais les arguments sont tout de même vérifiés.</li>
+</ul>
+</section>
+
+<section id="tween">
+<h2>Module <code>tween</code></h2>
+<p>Fait évoluer un champ d'objet — ou une variable passée par <code>ref</code> — de sa valeur <strong>courante</strong> vers une valeur cible, sur une durée, selon une courbe. Le moteur avance les animations à chaque frame : on déclare, et il n'y a <strong>rien à appeler dans <code>draw()</code></strong>. Le dessin ne fait que lire les champs animés.</p>
+
+<table>
+  <thead><tr><th>Nom</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>tween.to(objet, {champ: cible, …}, durée [, courbe] [, surFin])</code></td><td>Anime un ou plusieurs champs de l'objet. Renvoie un <code>Tween</code></td></tr>
+    <tr><td><code>tween.value(<span class="kw">ref</span> v, cible, durée [, courbe] [, surFin])</code></td><td>Anime une variable simple</td></tr>
+    <tr><td><code>tween.curves()</code></td><td>Tableau des noms de courbes disponibles</td></tr>
+    <tr><td><code>tween.count()</code></td><td>Nombre d'animations en cours</td></tr>
+    <tr><td><code>tween.cancelAll()</code></td><td>Annule tout (changement d'écran, fin de partie)</td></tr>
+    <tr><td><code>tween.update(dt)</code></td><td>Avance à la main — <strong>seulement</strong> sans zone graphique (ligne de commande, tests) ; sans effet dès que le moteur pilote</td></tr>
+  </tbody>
+</table>
+
+<p>Le handle renvoyé porte <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code> et <code>delay(secondes)</code>. Les méthodes renvoient le tween, donc elles se chaînent.</p>
+
+<pre><code><span class="cmt">## Le dessin lit des champs ; le temps ne l'intéresse pas.</span>
+<span class="kw">global</span> balle = {x: <span class="num">0</span>, r: <span class="num">20</span>, teinte: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
+
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(W, H)
+    <span class="cmt">## Plusieurs champs d'un coup, dont une COULEUR (interpolée composante par composante).</span>
+    <span class="bi">tween</span>.to(balle, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, teinte: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
+    <span class="cmt">## Puis un retour, 0,3 s après la fin du premier.</span>
+    <span class="bi">tween</span>.to(balle, {r: <span class="num">20</span>}, <span class="num">0.8</span>, <span class="str">"easeInQuad"</span>).delay(<span class="num">1.5</span>)
+<span class="kw">end</span>
+
+<span class="kw">func</span> draw()
+    <span class="bi">graphics</span>.clear(colors.BLACK)
+    <span class="bi">graphics</span>.fill(balle.teinte)
+    <span class="bi">graphics</span>.circle(balle.x, CH, balle.r)
+<span class="kw">end</span></code></pre>
+
+<h3>Courbes</h3>
+<p><code>linear</code>, puis les familles <code>easeIn</code> / <code>easeOut</code> / <code>easeInOut</code> déclinées en <code>Quad</code>, <code>Cubic</code>, <code>Sine</code>, <code>Expo</code> et <code>Back</code>, plus <code>easeOutElastic</code> et <code>easeOutBounce</code>. Défaut : <code>easeInOutQuad</code>. Une <strong>fonction</strong> peut aussi tenir ce rôle — elle reçoit la progression sur <code>[0;1]</code> et rend la progression corrigée :</p>
+
+<pre><code><span class="bi">tween</span>.to(obj, {x: <span class="num">100</span>}, <span class="num">1</span>, <span class="kw">func</span>(p) <span class="kw">return</span> p * p * p <span class="kw">end</span>)</code></pre>
+
+<div class="callout tip">Les deux derniers arguments sont reconnus par leur <strong>type</strong> : une chaîne ou une fonction donne la courbe, la fonction suivante est le rappel de fin. Aucun ordre à retenir.</div>
+
+<h3>Ce qu'il faut savoir</h3>
+<ul>
+  <li>La valeur de départ est lue <strong>au démarrage</strong> de l'animation, pas à la déclaration : avec un <code>delay</code>, le tween part de la valeur qu'aura le champ à l'échéance.</li>
+  <li>Déclarer un tween sur un champ <strong>déjà animé annule le précédent</strong> : deux animations ne se battent jamais pour la même valeur. Deux <code>ref</code> distincts sur la même variable ne sont pas reconnus comme telle, en revanche — le langage ne permet pas de les comparer.</li>
+  <li>Si la valeur de départ <strong>et</strong> la cible sont entières, la valeur reste entière tout du long.</li>
+  <li>Une valeur cible peut être une <strong>instance de classe</strong> : les champs numériques communs sont interpolés un à un, ce qui couvre <code>Color</code> comme un <code>Vec2</code> écrit par vos soins. Le tween écrit <strong>dans</strong> l'instance, il ne la remplace pas.</li>
+  <li>La valeur finale posée est la cible <strong>exacte</strong> : une courbe à dépassement ne rend pas tout à fait 1 en fin de course, et un arrondi laisserait 0,999.</li>
+  <li>Le rappel de fin peut déclarer d'autres tweens — de quoi enchaîner des étapes — ou tout annuler.</li>
 </ul>
 </section>
 

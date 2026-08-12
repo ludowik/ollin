@@ -87,7 +87,7 @@ ollin/
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
 │   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
-│   │                  image (+ image_stub), ui (+ ui_stub), + modules.h/.cpp, module_utils.h
+│   │                  image (+ image_stub), ui (+ ui_stub), tween, + modules.h/.cpp, module_utils.h
 │   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
 │   ├── main.cpp       point d'entrée natif — pipeline Lexer | Parser | Compiler | VM
 │   └── wasm_main.cpp  point d'entrée WASM (playground)
@@ -460,6 +460,47 @@ Autres points :
   module ET par `ui_stub.cpp` : une faute d'appel se voit en natif headless, où tournent
   les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un
   script chaînant `ui.menu("x").button(...)` tourne aussi sans graphisme.
+
+## Module `tween` (implémentation)
+
+> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module tween »).
+
+Anime un champ d'objet (ou une variable passée par `ref`) de sa valeur courante vers une
+cible, sur une durée, selon une courbe. **Aucune dépendance raylib** → un seul fichier, pas
+de stub, et le module tourne à l'identique en natif headless (où les tests le pilotent).
+
+- **Deux points d'accroche** : `tween_update_all(s_frame_dt)` dans `run_user_callbacks`
+  (graphics_module.cpp) **avant** `call_update_if_any()` — `update()` comme `draw()` voient
+  donc les valeurs de la frame courante ; `tween_reset()` dans `ollin_run` (wasm_main.cpp)
+  à côté de `ui_reset`, sans quoi un tween du programme précédent retiendrait ses objets.
+- **Pourquoi natif** : un tween doit avancer à chaque frame ; en bibliothèque Ollin, l'oubli
+  d'un `update` dans `draw()` serait le premier bug. `tween_update_all` pose
+  `s_engine_driven`, ce qui rend `tween.update` **no-op** côté script — un appel resté dans
+  `draw()` doublerait sinon la vitesse.
+- **Canal** = UN champ numérique animé (`{holder, ref, key, from, to, integral}`). Une cible
+  structurée (instance de classe : `Color`, un `Vec2` utilisateur) est éclatée en un canal
+  par composante commune aux deux instances, si bien que l'avancement ne connaît **que des
+  nombres** — aucun type n'est câblé dans le module. Le tween écrit **dans** l'instance
+  cible, il ne la remplace pas (pas d'allocation par frame).
+- **Valeur de départ lue au DÉMARRAGE** (drapeau `started`), pas à la déclaration : avec un
+  `delay`, l'animation part de la valeur qu'a le champ à l'échéance.
+- **Écrasement** : un nouveau tween annule les canaux existants visant le même
+  `(holder, key)` — l'identité de l'objet est celle du `Map*`. Deux `ref` distincts sur la
+  même variable ne sont **pas** reconnus comme identiques (deux maps différentes) : limite
+  assumée, documentée dans le tutoriel.
+- **Réentrance** — mêmes règles que `ui`, pour la même raison (un rappel peut déclarer un
+  tween, donc faire `push_back` sur `s_tweens`) : identités `{slot, gen}` au lieu de
+  pointeurs, itération par index, **aucune** référence conservée à travers un appel Ollin
+  (les canaux sont copiés avant les écritures, qui exécutent le setter d'une `ref`), et
+  rappels de fin **collectés puis appelés après la passe**.
+- `free_tween` vide les canaux et relâche `curve_fn`/`on_done` : sinon le module garderait
+  l'objet animé vivant longtemps après la fin de l'animation.
+- À la fin, la cible **exacte** est écrite : une courbe à dépassement (`back`, `elastic`) ne
+  rend pas 1 en 1, et un arrondi laisserait 0,999.
+- Les 18 courbes sont un tableau `{nom, fonction}` : les noms exposés vivent dans des
+  littéraux de chaîne (donc camelCase), les fonctions C++ sont en `snake_case`.
+- **Hors périmètre** (à demander explicitement) : séquences (`then`, boucles, aller-retour),
+  chemins/splines, vitesse globale.
 
 ## Polices du moteur (`engine_font.h`)
 
