@@ -1199,6 +1199,17 @@ function menuHeader(text, back) {
   h.appendChild(s)
   return h
 }
+// Entrée de menu qui ouvre une page externe (nouvel onglet) au lieu d'un sous-menu.
+function menuLink(label, href) {
+  const a = document.createElement('a')
+  a.className = 'menu-item'
+  a.href = href
+  a.target = '_blank'
+  a.rel = 'noopener'
+  a.innerHTML = `<span>${label}</span>`
+  return a
+}
+
 function menuSep() {
   const d = document.createElement('div')
   d.className = 'menu-sep'
@@ -1288,6 +1299,10 @@ function renderMenuGithub() {
     try { GH.setRepo(v); renderMenuGithub() }
     catch (e) { alert(e.message) }
   }))
+  // Un token fine-grained EXPIRE : il faut pouvoir le remplacer sans se déconnecter, sinon
+  // le seul recours est la déconnexion, qui efface aussi la session en cours.
+  projectMenu.appendChild(menuItem('🔑 Changer le token', true, renderMenuConnect))
+  projectMenu.appendChild(menuLink('➕ Créer un token sur GitHub ↗', TOKEN_URL))
   projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
@@ -1386,6 +1401,7 @@ async function renderMenuExamples() {
 }
 
 // ── GitHub : état + parcours ──────────────────────────────────────────────
+const TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new'
 let ghLogin = null
 let statusTimer = null
 function setStatus(msg, transient, isError) {
@@ -1397,29 +1413,40 @@ function setStatus(msg, transient, isError) {
   if (transient) statusTimer = setTimeout(() => { el.textContent = ''; el.style.color = '' }, 4000)
 }
 
+// Sert à la première connexion ET au remplacement d'un token expiré : seuls le titre et
+// le libellé du bouton changent, le parcours est le même.
 function renderMenuConnect() {
+  const deja = GH.isConnected()
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Se connecter à GitHub', renderMenuGithub))
+  projectMenu.appendChild(menuHeader(deja ? 'Changer le token GitHub' : 'Se connecter à GitHub', renderMenuGithub))
   const wrap = document.createElement('div'); wrap.className = 'menu-form'
   const info = document.createElement('div'); info.className = 'menu-info'
   info.innerHTML = 'Colle un <b>fine-grained token</b> GitHub (permission Contents : lecture/écriture) et le dépôt cible au format <b>owner/repo</b>. '
-    + '<a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Créer un token ↗</a>'
+    + `<a href="${TOKEN_URL}" target="_blank" rel="noopener">Créer un token ↗</a>`
   const input = document.createElement('input')
   input.type = 'password'; input.className = 'menu-input'; input.placeholder = 'github_pat_… / ghp_…'
   const repo = document.createElement('input')
   repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo() || ''
   repo.placeholder = 'owner/repo (ex. moncompte/ollin-projects)'
   repo.title = 'Dépôt cible au format owner/repo — doit exister sur GitHub.'
-  const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = 'Connecter'
+  const libelle = deja ? 'Enregistrer' : 'Connecter'
+  const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = libelle
   const err = document.createElement('div'); err.className = 'menu-err'
   const connect = async () => {
     const t = input.value.trim(); if (!t) return
     const r = repo.value.trim()
     if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
     try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
+    // Le token en place est gardé de côté : un remplacement raté ne doit pas déconnecter
+    // quelqu'un dont l'ancien token fonctionnait encore.
+    const ancien = GH.getToken()
     GH.setToken(t); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
     try { const u = await GH.getUser(); ghLogin = u.login; renderMenuRoot() }
-    catch (e) { GH.clearToken(); err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = 'Connecter' }
+    catch (e) {
+      if (ancien) GH.setToken(ancien)
+      else GH.clearToken()
+      err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = libelle
+    }
   }
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
