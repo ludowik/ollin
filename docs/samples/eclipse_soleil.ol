@@ -189,23 +189,21 @@ func dessineCouronne()
     ## Halo interne, dense près du limbe et fondu vers l'extérieur : c'est lui qui donne la
     ## nacre de la couronne, les aigrettes ne faisant que la strier.
     graphics.noStroke()
-    ## Neuf disques suffisent : chacun est un grand remplissage, et c'est LUI qui pèse sur
-    ## la carte graphique — bien plus que les aigrettes, pourtant plus nombreuses.
-    for k = 1, 9 do
-        var f = k / 9
-        graphics.fill(Color(0.48, 0.52, 0.58, 0.09 * (1 - f)))
-        graphics.circle(soleilX(), soleilY(), rl * (1 + 1.2 * f))
+    for k = 1, 18 do
+        var f = k / 18
+        graphics.fill(Color(0.48, 0.52, 0.58, 0.05 * (1 - f)))
+        graphics.circle(soleilX(), soleilY(), rl * (1 + 1.5 * f))
     end
     ## Aigrettes : chacune en TROIS segments d'opacité décroissante — un trait d'opacité
     ## constante finissait net, et l'ensemble ressemblait à une brosse.
-    for i = 0, 239 do
-        var ang = i * math.TAU / 240
+    for i = 0, 419 do
+        var ang = i * math.TAU / 420
         var n = math.noise(math.cos(ang) * 1.3 + 8, math.sin(ang) * 1.3 + 8)
-        var longueur = rl * (0.25 + 1.4 * n * n)
-        for k = 0, 2 do
-            var r0 = rl * 0.99 + longueur * k / 3
-            var r1 = rl * 0.99 + longueur * (k + 1) / 3
-            graphics.stroke(Color(0.62, 0.65, 0.70, 0.13 - 0.04 * k), 1)
+        var longueur = rl * (0.25 + 1.7 * n * n)
+        for k = 0, 3 do
+            var r0 = rl * 0.99 + longueur * k / 4
+            var r1 = rl * 0.99 + longueur * (k + 1) / 4
+            graphics.stroke(Color(0.62, 0.65, 0.70, 0.13 - 0.028 * k), 1)
             graphics.line(soleilX() + math.cos(ang) * r0, soleilY() + math.sin(ang) * r0,
                           soleilX() + math.cos(ang) * r1, soleilY() + math.sin(ang) * r1)
         end
