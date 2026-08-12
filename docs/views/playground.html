@@ -444,6 +444,29 @@ canvas#canvas {
 /* ── liste latérale de fichiers ───────────────────────────────────────────── */
 #editor-main { flex: 1; min-height: 0; display: flex; }
 #editor-wrap { flex: 1; min-width: 0; }
+
+/* ── aperçu d'une ressource (à la place de l'éditeur) ─────────────────────── */
+#res-view {
+  flex: 1; min-width: 0; min-height: 0; overflow: auto;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  padding: 16px; background: var(--bg);
+}
+#res-view .res-head {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  font-size: 12px; color: var(--muted);
+}
+#res-view .res-name { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
+#res-view .res-sp { flex: 1; }
+/* Damier : sans lui, une image à fond transparent se confondrait avec le panneau. */
+#res-view .res-frame {
+  max-width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px;
+  background-color: #1b1b22;
+  background-image: linear-gradient(45deg, #24242c 25%, transparent 25%, transparent 75%, #24242c 75%),
+                    linear-gradient(45deg, #24242c 25%, transparent 25%, transparent 75%, #24242c 75%);
+  background-size: 16px 16px; background-position: 0 0, 8px 8px;
+}
+#res-view img { display: block; max-width: 100%; image-rendering: pixelated; }
+#res-view .res-note { font-size: 12px; color: var(--muted); text-align: center; }
 #file-rail {
   width: 172px; flex-shrink: 0; display: flex; flex-direction: column;
   background: var(--surface); border-right: 1px solid var(--border); overflow: hidden;
@@ -579,6 +602,8 @@ canvas#canvas {
         <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,.obj,.glb,.gltf" multiple style="display:none">
       </aside>
       <div id="editor-wrap"></div>
+      <!-- Aperçu d'une ressource : prend la place de l'éditeur (même parent, même flex). -->
+      <div id="res-view" style="display:none"></div>
     </div>
   </div>
   <div id="divider" style="display:none"></div>

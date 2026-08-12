@@ -890,7 +890,7 @@ function renderFiles() {
   for (const path of scripts(currentProject)) {
     const isEntry = path === currentProject.entry
     const row = document.createElement('div')
-    row.className = 'file-item' + (path === currentFile ? ' active' : '')
+    row.className = 'file-item' + (path === currentFile && currentRes === null ? ' active' : '')
     row.title = path
     const label = document.createElement('span')
     label.className = 'file-name'
@@ -923,12 +923,19 @@ function iconBtn(txt, title, on) {
 }
 
 function openFile(path) {
-  if (path === currentFile) return
+  if (path === currentFile) {
+    if (currentRes !== null) showResource(null)   // même fichier, mais on quittait un aperçu
+    return
+  }
   flushEditorToFile()
   currentFile = path
   setEditorText(currentProject.files[path] ?? '')
   if (!isExample()) localStorage.setItem(fileKey(currentProject.id), path)
   renderGhRail(); renderFiles()
+  if (currentRes !== null) {
+    showResource(null)   // rend l'éditeur visible (et rafraîchit les deux rails)
+    return
+  }
   view.focus()
 }
 
@@ -990,7 +997,72 @@ async function setEntry(path) {
   renderGhRail(); renderFiles()
 }
 
-// ── ressources (images) ──
+// ── ressources (images, modèles…) ──
+// Sélectionner une ressource l'AFFICHE à la place de l'éditeur ; `currentRes` retient
+// laquelle (null = on édite). Les deux rails s'y réfèrent pour la ligne active, si bien
+// qu'un seul élément paraît sélectionné à la fois.
+let currentRes = null
+const resView   = document.getElementById('res-view')
+const editorBox = document.getElementById('editor-wrap')
+
+const IMG_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
+
+function resMime(ext) {
+  const e = (ext || '').toLowerCase()
+  return e === 'jpg' ? 'image/jpeg' : 'image/' + e
+}
+
+// Affiche l'éditeur (res = null) ou l'aperçu d'une ressource.
+function showResource(name) {
+  currentRes = name
+  const editing = name === null
+  editorBox.style.display = editing ? '' : 'none'
+  resView.style.display = editing ? 'none' : 'flex'
+  renderFiles(); renderResources()
+  if (editing) {
+    view.focus()
+    return
+  }
+  const r = (currentProject.resources || {})[name] || {}
+  const ext = (r.ext || name.split('.').pop() || '').toLowerCase()
+  const octets = Math.round((r.b64 || '').length * 3 / 4)
+  resView.innerHTML = ''
+
+  const head = document.createElement('div'); head.className = 'res-head'
+  const nm = document.createElement('span'); nm.className = 'res-name'; nm.textContent = name
+  const sp = document.createElement('span'); sp.className = 'res-sp'
+  const info = document.createElement('span')
+  head.append(nm, sp, info)
+  const close = document.createElement('button')
+  close.className = 'file-act'; close.textContent = '✕'; close.title = "Revenir à l'éditeur"
+  close.addEventListener('click', () => showResource(null))
+  head.appendChild(close)
+  resView.appendChild(head)
+
+  if (IMG_EXT.includes(ext)) {
+    const frame = document.createElement('div'); frame.className = 'res-frame'
+    const img = document.createElement('img')
+    img.src = 'data:' + resMime(ext) + ';base64,' + (r.b64 || '')
+    // Les dimensions ne sont connues qu'au décodage — l'aperçu les complète alors.
+    img.addEventListener('load', () => {
+      info.textContent = `${img.naturalWidth} × ${img.naturalHeight} · ${fmtSize(octets)}`
+    })
+    img.addEventListener('error', () => { info.textContent = 'image illisible' })
+    frame.appendChild(img)
+    resView.appendChild(frame)
+  } else {
+    info.textContent = fmtSize(octets)
+    const note = document.createElement('div'); note.className = 'res-note'
+    note.textContent = ext ? `Ressource « ${ext} » — pas d'aperçu pour ce format.`
+                           : "Ressource binaire — pas d'aperçu."
+    resView.appendChild(note)
+  }
+}
+
+function fmtSize(n) {
+  return n < 1024 ? n + ' o' : (n / 1024).toFixed(1) + ' Ko'
+}
+
 function renderResources() {
   resList.innerHTML = ''
   if (!currentProject) return
@@ -1001,7 +1073,7 @@ function renderResources() {
   }
   for (const name of names) {
     const row = document.createElement('div')
-    row.className = 'file-item'; row.title = name
+    row.className = 'file-item' + (name === currentRes ? ' active' : ''); row.title = name
     const label = document.createElement('span'); label.className = 'file-name'; label.textContent = name
     row.appendChild(label)
     if (!isExample()) {
@@ -1010,6 +1082,8 @@ function renderResources() {
       acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteResource(name) }))
       row.appendChild(acts)
     }
+    // Re-cliquer la ressource affichée revient à l'éditeur (bascule).
+    row.addEventListener('click', () => showResource(name === currentRes ? null : name))
     resList.appendChild(row)
   }
 }
@@ -1021,6 +1095,7 @@ async function renameResource(name) {
   if (currentProject.resources[n] !== undefined) { alert('Ce nom est déjà pris.'); return }
   currentProject.resources[n] = currentProject.resources[name]
   delete currentProject.resources[name]
+  if (currentRes === name) currentRes = n
   await persist(currentProject)
   if (ollin && ollin.preloadImage) {
     const r = currentProject.resources[n]
@@ -1033,6 +1108,10 @@ async function deleteResource(name) {
   if (!confirm(`Supprimer la ressource « ${name} » ?`)) return
   delete currentProject.resources[name]
   await persist(currentProject)
+  if (currentRes === name) {
+    showResource(null)   // la ressource affichée n'existe plus
+    return
+  }
   renderResources()
 }
 
