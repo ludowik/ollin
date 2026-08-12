@@ -43,7 +43,7 @@ global vel = 0.0            ## vitesse d'avance courante
 global turnVel = 0.0        ## vitesse de rotation courante
 global ACCEL = 5.0          ## nervosité de l'avance (plus grand = plus sec)
 global TURN_ACCEL = 7.0
-global EYE_RISE = 6.0       ## lissage de la hauteur d'œil (reste des marches aux fortes pentes)
+global EYE_RISE = 6.0       ## lissage de la hauteur d'œil (terrain en marches de 1)
 
 ## Rapproche `cur` de `target` d'une fraction du chemin restant. La fraction dépend
 ## de deltaTime via une exponentielle : le résultat ne change donc pas avec le
@@ -153,15 +153,10 @@ func elevation(x, z)
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
-## Hauteur CONTINUE du terrain, seule formule de relief du programme. Amplitude 44 (et
-## non 60) : depuis la normalisation de math.noise sur [0,1], le bruit s'étale ~1,35× plus
-## → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
-func cornerHeight(x, z)
-    return (elevation(x, z) - 0.42) * 44 + SEA
-end
-
+## Amplitude 44 (et non 60) : depuis la normalisation de math.noise sur [0,1], le bruit
+## s'étale ~1,35× plus → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
 func rawHeight(x, z)
-    return math.floor(cornerHeight(x, z))
+    return math.floor((elevation(x, z) - 0.42) * 44 + SEA)
 end
 
 ## Élimine les extrema d'1 colonne : un pic isolé (plus haut que ses 4 voisins) est
@@ -181,42 +176,16 @@ func heightAt(x, z)
     return h
 end
 
-## Sommet (entier) de la colonne, comme la cuisson le calcule.
+## Sommet cuit de la colonne : le dessus du cube le plus haut est à colTop + 0.5.
 func colTop(x, z)
     return math.max(heightAt(x, z), 0)
 end
 
-## Hauteur ABSOLUE du coin situé en (x, z) — les coins des cubes sont aux DEMI-entiers,
-## un cube étant centré sur (x, z) entiers. Fonction pure du coin : les quatre colonnes
-## qui s'y rejoignent obtiennent forcément la MÊME valeur, donc une seule surface, sans
-## pli ni fissure. Bornée à la TRANCHE du plus haut des quatre cubes de sommet : plus bas,
-## le coin passerait sous la base de ce cube et en découvrirait la face inférieure (taches
-## sombres) ; plus haut, le bruit continu — que heightAt rabote de ses pics isolés —
-## étirerait le cube en pointe.
-func cornerTop(x, z)
-    var a = colTop(x - 0.5, z - 0.5)
-    var b = colTop(x + 0.5, z - 0.5)
-    var c = colTop(x - 0.5, z + 0.5)
-    var d = colTop(x + 0.5, z + 0.5)
-    var hi = math.max(math.max(a, b), math.max(c, d))
-    return math.clamp(cornerHeight(x, z), hi - 0.5, hi + 0.5)
-end
-
-## Hauteur du SOL sous (x, z) : interpolation bilinéaire des 4 coins de la colonne, donc
-## la pente réellement affichée — l'œil et la collision suivent la surface au lieu des
-## marches d'un bloc. Au-dessus de l'eau, on reste à la surface (WATER).
+## Hauteur du SOL sous (x, z) : le dessus du cube de sommet, ou la surface de l'eau si la
+## colonne est immergée (on flotte). Le terrain monte donc par marches d'un bloc — c'est
+## l'esprit voxel : tous les cubes ont la même taille.
 func ground(x, z)
-    var ix = math.floor(x)
-    var iz = math.floor(z)
-    var u = x - ix
-    var v = z - iz
-    var a = cornerTop(ix - 0.5, iz - 0.5)
-    var b = cornerTop(ix + 0.5, iz - 0.5)
-    var c = cornerTop(ix - 0.5, iz + 0.5)
-    var d = cornerTop(ix + 0.5, iz + 0.5)
-    var lo = a + (b - a) * u
-    var hi = c + (d - c) * u
-    return math.max(lo + (hi - lo) * v, WATER)
+    return math.max(colTop(math.floor(x), math.floor(z)) + 0.5, WATER)
 end
 
 ## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
@@ -271,18 +240,13 @@ func canopy(x, y, z, r, round)
     end
 end
 
-## Arbre à la colonne (x,z), sol en h ; `kmin` = plus bas coin du dessus déformé. Hauteur
-## de tronc et forme du houppier variées, dérivées du hash (déterministe par colonne) →
-## chaque arbre diffère.
-func putTree(x, z, h, kmin)
+## Arbre à la colonne (x,z), sol en h. Hauteur de tronc et forme du houppier variées,
+## dérivées du hash (déterministe par colonne) → chaque arbre diffère.
+func putTree(x, z, h)
     var th = 3 + treeHash(x, z, 1) % 4      ## tronc : 3..6 cubes
     var shape = treeHash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
     graphics.tile(T_TRUNK)
-    ## Le dessus du cube de sommet descend sous h + 0.5 dès que le terrain penche : un
-    ## tronc parti de h + 1 flotterait au-dessus du creux. On démarre donc au cube dont la
-    ## BASE (h + k - 0.5) passe sous le plus bas coin.
-    var k0 = math.min(1, math.floor(kmin - h + 0.5))
-    for k = k0, th do
+    for k = 1, th do
         graphics.cube(x, h + k, z,  1, 1, 1)
     end
     graphics.tile(T_LEAF)
@@ -327,24 +291,8 @@ func bakeChunk(cx, cz)
             var hs = math.max(hg[(lz + 2) * W2 + (lx + 1) + 1], 0)
             var hn = math.max(hg[lz * W2 + (lx + 1) + 1], 0)
             var mn = math.min(math.min(he, hw), math.min(hs, hn))
-            ## Les 4 coins du dessus, calculés UNE fois : ils servent au cube de sommet et
-            ## décident de la pose de l'eau (même source → contact eau/sol cohérent).
-            var k1 = cornerTop(x - 0.5, z - 0.5)
-            var k2 = cornerTop(x + 0.5, z - 0.5)
-            var k3 = cornerTop(x - 0.5, z + 0.5)
-            var k4 = cornerTop(x + 0.5, z + 0.5)
-            var kmin = math.min(math.min(k1, k2), math.min(k3, k4))
-            var flat = top + 0.5
             for y = 0, top do
                 if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
-                    ## Seul le cube du sommet reçoit des coins de hauteurs différentes :
-                    ## son dessus épouse le relief NON arrondi au lieu d'être plat. Les
-                    ## cubes du dessous, invisibles, restent des cubes.
-                    if y == top then
-                        graphics.corners(k1 - flat, k2 - flat, k3 - flat, k4 - flat)
-                    else
-                        graphics.corners()
-                    end
                     setBlockTiles(b, h, y)
                     ## Cube IMMERGÉ : assombri selon sa profondeur (moins de lumière au fond).
                     ## C'est le FOND qui s'assombrit avec la profondeur, pas l'eau (uniforme).
@@ -357,11 +305,9 @@ func bakeChunk(cx, cz)
                     graphics.cube(x, y, z,  1, 1, 1)
                 end
             end
-            graphics.corners()   ## eau et arbres : dessus plats
-            ## Nappe posée dès qu'un COIN du sol plonge sous la surface, et non selon la
-            ## hauteur ENTIÈRE de la colonne : le bord de l'eau suit alors le rivage lissé
-            ## au lieu de s'arrêter en marches, et un creux immergé n'est jamais à sec.
-            if kmin < WATER then
+            ## Nappe posée dès que le dessus de la colonne passe sous la surface : même
+            ## comparaison que ground, donc le contact eau/terrain ne peut pas se désaccorder.
+            if top + 0.5 < WATER then
                 ## eau = UN plan semi-transparent UNIFORME au niveau de la mer (surface
                 ## continue) ; l'atténuation avec la profondeur est portée par les cubes du fond.
                 graphics.tile(T_WATER)
@@ -373,7 +319,7 @@ func bakeChunk(cx, cz)
             var grassy = h > SEA and h < SEA + 8 and b <> 0
             var tree = grassy and ((b == 2 and hp < 6) or hp == 0)
             if tree then
-                putTree(x, z, h, kmin)
+                putTree(x, z, h)
             end
         end
     end
@@ -705,8 +651,8 @@ func draw()
         streamUnload(pcx, pcz, 0)
     end
 
-    ## Le sol lissé (ground interpole les coins) supprime l'essentiel des marches ; il en
-    ## reste aux fortes pentes, d'où le rattrapage progressif de la hauteur d'œil.
+    ## Le terrain monte par marches d'un bloc : poser l'œil dessus le ferait sauter
+    ## d'un cran d'un seul coup. On le laisse rejoindre la marche progressivement.
     camY = approach(camY, ground(camX, camZ) + EYE, EYE_RISE)
     cam.setPos(camX, camY, camZ)
     cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),
