@@ -37,16 +37,27 @@ class ViewDistance
         ## Cadence d'affichage MESURÉE, pas supposée : un mobile peut brider à 30 Hz sans
         ## que la puissance de calcul soit divisée pour autant. Avec un seuil calé sur 60,
         ## chaque frame paraîtrait en retard et le rayon s'effondrerait jusqu'à `lo`.
-        ## `fps` ne sert donc que d'amorce, remplacée dès la première fenêtre par la
-        ## période observée (cf. update).
-        self.period = 1.0 / fps
-        self.PERIOD_MIN = 1.0 / 121       ## bornes plausibles d'un écran (121 Hz … 29 Hz)
-        self.PERIOD_MAX = 1.0 / 29
-        self.SLOW_MARGIN = 1.25           ## au-delà de période × marge = frame « en retard »
-        self.SLOW_DT = self.period * self.SLOW_MARGIN
+        ## `fps` ne sert que d'amorce, remplacé dès la première fenêtre par la cadence VOTÉE.
+        ##
+        ## Le vote plutôt que la plus courte frame : le navigateur livre parfois deux images
+        ## rapprochées (rattrapage), et 2 % de telles frames suffisaient à faire croire à un
+        ## écran 120 Hz, donc à traiter toutes les frames normales comme des retards.
+        ## Ici chaque cadence plausible compte ses frames « à l'heure » (dt <= période ×
+        ## MARGIN) et on retient la PLUS ÉLEVÉE qui en réunit VOTE_PART : quelques frames
+        ## aberrantes ne pèsent alors rien.
+        self.CAD = [120, 90, 60, 50, 40, 30]   ## cadences candidates, décroissantes
+        self.ok = [0, 0, 0, 0, 0, 0]           ## frames à l'heure pour chaque candidate
+        self.MARGIN = 1.25                     ## tolérance sur la période (= seuil de retard)
+        self.VOTE_PART = 0.7                   ## part de frames à l'heure pour élire une cadence
+        self.hzKeep = fps                      ## cadence retenue (amorce)
+        self.voted = false                     ## une cadence a-t-elle déjà été élue ?
+        self.miss = 0                          ## fenêtres consécutives ne confirmant pas hzKeep
+        ## La cadence d'un écran ne change quasiment jamais : une baisse du vote est d'abord
+        ## mise sur le compte d'une surcharge passagère (sinon un rendu qui décroche ferait
+        ## croire à un écran plus lent, et le repli du rayon ne se déclencherait plus). Elle
+        ## n'est adoptée qu'après DEMOTE fenêtres — le temps qu'un vrai bridage se confirme.
+        self.DEMOTE = 20
         self.STALL_DT = 0.30              ## frame irréelle (onglet en arrière-plan, reprise)
-        self.fastest = 0.0                ## plus courte frame de la fenêtre courante
-        self.measured = false             ## la cadence a-t-elle déjà été mesurée ?
         self.WIN = 0.5
         ## Une fenêtre doit aussi compter assez de frames : à 30 Hz, 0,5 s n'en donne que
         ## 15 et la part de frames lentes devient trop bruitée pour décider (une seule
@@ -65,7 +76,7 @@ class ViewDistance
         self.stable = 0.0
         self.BTN = 54
         self.BTN_Y = 40
-        self.MARGIN = 12      ## marge bord droit
+        self.BTN_MARGIN = 12  ## marge bord droit
         self.GAP = 10         ## écart entre boutons
     end
 
@@ -83,14 +94,19 @@ class ViewDistance
         end
         self.t = self.t + dt
         self.n = self.n + 1
-        if dt > self.SLOW_DT then self.slow = self.slow + 1 end
-        if self.fastest == 0.0 or dt < self.fastest then self.fastest = dt end
+        for j = 1, #self.CAD do
+            if dt <= self.MARGIN / self.CAD[j] then
+                self.ok[j] = self.ok[j] + 1
+            end
+        end
         if self.t < self.WIN or self.n < self.MIN_N then return 0 end
-        ## Calibrer AVANT de juger : la fenêtre d'amorce serait sinon comparée à une
-        ## cadence supposée, et une seule fenêtre mal jugée suffit à rétrécir le rayon.
-        if self.measurePeriod() then
-            self.t = 0.0
-            self.n = 0
+        ## La cadence est élue sur la MÊME fenêtre que celle qu'on juge : les frames en
+        ## retard sont exactement celles qui ne sont pas « à l'heure » pour cette cadence.
+        var first = not self.voted
+        self.slow = self.n - self.voteCadence()
+        if first then
+            self.t = 0.0                       ## fenêtre d'amorce : elle a servi à élire la
+            self.n = 0                         ## cadence, la juger n'aurait aucun sens
             self.slow = 0
             return 0
         end
@@ -127,36 +143,51 @@ class ViewDistance
         return ev
     end
 
-    ## Période de rafraîchissement = plus COURTE frame de la fenêtre : aucune frame ne peut
-    ## battre le vsync, donc la plus rapide le donne. En vsync les frames ratées coûtent un
-    ## multiple de la période (33 ms, 50 ms…), jamais 5 % de plus, d'où la fiabilité du
-    ## minimum. Elle descend d'un coup (cadence plus élevée constatée) mais ne remonte que
-    ## de 5 % par fenêtre, pour ne pas prendre un régime dégradé passager pour la cadence de
-    ## l'écran. Bornée aux cadences plausibles → au pire on vise 30 fps.
-    ## Renvoie true la PREMIÈRE fois (fenêtre d'amorce, à ne pas juger).
-    func measurePeriod()
-        if self.fastest <= 0 then
-            return false
+    ## Élit la cadence de la fenêtre et renvoie le nombre de frames à l'heure pour elle.
+    ## Une cadence plus basse que celle retenue n'est adoptée qu'après DEMOTE fenêtres.
+    func voteCadence()
+        var vote = self.CAD[#self.CAD]
+        var kept = self.ok[#self.CAD]
+        for j = 1, #self.CAD do
+            if self.ok[j] >= self.n * self.VOTE_PART then
+                vote = self.CAD[j]
+                kept = self.ok[j]
+                break
+            end
         end
-        var first = not self.measured
-        var p = self.fastest
-        if self.measured and self.fastest > self.period then
-            p = math.min(self.fastest, self.period * 1.05)   ## remontée prudente
+        if not self.voted then
+            self.hzKeep = vote                 ## première élection : adoptée telle quelle,
+            self.voted = true                  ## sinon l'amorce fausserait le tout premier jugement
+            self.miss = 0
+        elseif vote >= self.hzKeep then
+            self.hzKeep = vote
+            self.miss = 0
+        else
+            self.miss = self.miss + 1
+            if self.miss >= self.DEMOTE then
+                self.hzKeep = vote
+                self.miss = 0
+            end
         end
-        self.period = math.clamp(p, self.PERIOD_MIN, self.PERIOD_MAX)
-        self.SLOW_DT = self.period * self.SLOW_MARGIN
-        self.fastest = 0.0
-        self.measured = true
-        return first
+        ## Frames à l'heure pour la cadence RETENUE (pas pour celle votée) : c'est elle qui
+        ## définit ce qu'est un retard.
+        var atTime = kept
+        for j = 1, #self.CAD do
+            if self.CAD[j] == self.hzKeep then
+                atTime = self.ok[j]
+            end
+            self.ok[j] = 0
+        end
+        return atTime
     end
 
-    ## Cadence d'affichage détectée (Hz), pour l'affichage de mise au point.
+    ## Cadence d'affichage retenue (Hz), affichable pour la mise au point.
     func hz()
-        return math.floor(1.0 / self.period + 0.5)
+        return self.hzKeep
     end
 
     ## Boutons alignés de droite à gauche : 0 = +, 1 = −, 2 = A.
-    func btnX(i)   return W - self.MARGIN - self.BTN - i * (self.BTN + self.GAP) end
+    func btnX(i)   return W - self.BTN_MARGIN - self.BTN - i * (self.BTN + self.GAP) end
 
     ## Traite un appui : + / − → passe en manuel et ajuste le rayon (borné) ; A → rebascule
     ## en auto-adaptation. Renvoie 1 (grandi) / -1 (rétréci) / 2 (bouton consommé sans
