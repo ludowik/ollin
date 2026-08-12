@@ -204,7 +204,8 @@ struct Style {
     float check_inset;// retrait du remplissage dans le carré, fraction du carré
     float track_frac; // épaisseur de la glissière
     float bar_thick_frac;  // épaisseur d'une barre de la poignée, fraction du carré
-    float bar_gap_frac;    // écart entre deux barres
+    float bar_gap_frac;    // écart entre deux barres (0.124 × 21,6 ≈ 2 px de séparation
+                           // pour une zone de 600 px de haut ; cf. metrics)
     float bar_width_frac;  // largeur des barres, fraction du carré
 };
 
@@ -229,7 +230,7 @@ const Style STYLE = {
     0.26f,                 // check_inset
     0.26f,                 // track_frac
     0.105f,                // bar_thick_frac
-    0.17f,                 // bar_gap_frac
+    0.124f,                // bar_gap_frac
     0.5f,                  // bar_width_frac
 };
 
