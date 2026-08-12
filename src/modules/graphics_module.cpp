@@ -65,6 +65,7 @@ static int s_blend_mode = BLEND_ALPHA;
 static std::string s_shot_path;
 static bool s_shot_pending = false;
 static void flush_pending_screenshot();   // défini plus bas (utilisé par gfx_end_draw)
+static void gfx_reset_capture();          // idem (utilisé par gfx_canvas)
 // reset3dLightingState / reset3dGraphicsState / end3dInternal : déclarés dans graphics_internal.h (définis dans graphics3d.cpp)
 // Un SEUL graphics.run par programme. Le moteur (runEntryHooks) appelle
 // graphics.run(draw) automatiquement si draw() existe ; si le script l'appelle
@@ -79,6 +80,7 @@ static int gfx_canvas(CallCtx& ctx) {
     int h = argc > 1 ? gfx_to_int(args[1]) : 600;
     const char* title = (argc > 2 && args[2].is_string()) ? args[2].as_string().c_str() : "Ollin";
     s_shot_pending = false;   // nouveau programme → oublier une capture en attente
+    gfx_reset_capture();      // idem pour la capture demandée par l'hôte
     s_blend_mode = BLEND_ALPHA;
     // Éclairage 3D remis à neuf ICI (avant que setup()/top-level ne pose ambient/
     // light) — et non dans gfx_run, qui s'exécute APRÈS et effacerait la config.
@@ -730,6 +732,13 @@ static std::string s_capture_b64;
 
 void gfx_request_capture() {
     s_capture_pending = true;
+    s_capture_b64.clear();
+}
+
+// Oublie toute demande et toute image non retirée : un nouveau programme ne doit pas
+// honorer la capture demandée pour le précédent (attente expirée puis « Relancer »).
+static void gfx_reset_capture() {
+    s_capture_pending = false;
     s_capture_b64.clear();
 }
 

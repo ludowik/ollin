@@ -121,13 +121,27 @@ export async function init(ctx) {
     })
   }
 
+  // Une capture à la fois : deux clics rapprochés se marcheraient dessus (la demande est
+  // un état unique côté moteur, et le premier arrivé retire le PNG — le second attendrait
+  // en vain puis annoncerait un échec).
+  let capturing = false
+
   async function capture() {
-    if (!mod || !mod.requestCapture) return
+    if (!mod || !mod.requestCapture || capturing) return
     if (!project) {
       // Un exemple lu depuis le dépôt n'a pas de ressources où ranger l'image.
       statusEl.textContent = 'capture : crée un projet depuis cet exemple'
       return
     }
+    capturing = true
+    try {
+      await takeShot()
+    } finally {
+      capturing = false
+    }
+  }
+
+  async function takeShot() {
     // En pause, aucune frame ne passe : on reprend le temps de la capture.
     const wasPaused = paused
     if (wasPaused) {
@@ -143,8 +157,12 @@ export async function init(ctx) {
       statusEl.textContent = 'capture indisponible (aucune image rendue)'
       return
     }
-    const name = 'capture-' + stamp() + '.png'
     project.resources = project.resources || {}
+    // Nom LIBRE : l'horodatage est à la seconde, donc deux captures rapprochées se
+    // partageraient une clé et la seconde écraserait la première image du projet.
+    let name = 'capture-' + stamp() + '.png'
+    for (let n = 2; project.resources[name] !== undefined; n++)
+      name = 'capture-' + stamp() + '-' + n + '.png'
     project.resources[name] = { b64, ext: 'png' }
     await Store.saveProject(project)
     // Immédiatement utilisable par le programme (image.load(name)), comme une image

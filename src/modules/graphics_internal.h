@@ -6,6 +6,7 @@
 // (défini côté 2D, lu côté 3D) et des ponts de fonctions inter-fichiers.
 #include "value.h"
 #include <raylib.h>
+#include <string>
 
 // ── Helpers partagés ────────────────────────────────────────────────────────
 inline int gfx_to_int(const Value& v) {
@@ -65,6 +66,5 @@ unsigned int gfx3d_get_texture();      // id GL de la texture 3D courante (0 = b
 void gfx3d_set_texture(unsigned int id);
 
 // ── Modèles externes : préchargement des octets (chargement GPU différé) ────
-#include <string>
 #include <vector>
 void model_preload_bytes(const std::string& name, std::vector<unsigned char> bytes, const std::string& ext);
