@@ -194,7 +194,7 @@ func dessineCouronne()
         graphics.fill(Color(0.48, 0.52, 0.58, 0.05 * (1 - f)))
         graphics.circle(soleilX(), soleilY(), rl * (1 + 1.5 * f))
     end
-    ## Aigrettes : chacune en TROIS segments d'opacité décroissante — un trait d'opacité
+    ## Aigrettes : chacune en QUATRE segments d'opacité décroissante — un trait d'opacité
     ## constante finissait net, et l'ensemble ressemblait à une brosse.
     for i = 0, 419 do
         var ang = i * math.TAU / 420

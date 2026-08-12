@@ -201,7 +201,9 @@ func draw()
     ## progressif et neutre. À l'œil nu, une éclipse par la seule pénombre passe presque
     ## inaperçue — le produit des 16 étapes ne retire que ~15 % de la lumière.
     for k = 0, 15 do
-        var r = R_PENOMBRE - (R_PENOMBRE - R_OMBRE) * k / 16
+        ## /15 et non /16 : le dernier disque doit atteindre le bord de l'OMBRE, sinon la
+        ## bande qui lui est accolée n'aurait jamais l'assombrissement complet.
+        var r = R_PENOMBRE - (R_PENOMBRE - R_OMBRE) * k / 15
         voilerIntersection(mx, my, rl, ox, oy, r * rl, Color(0.991, 0.991, 0.995))
     end
 
