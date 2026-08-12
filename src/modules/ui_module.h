@@ -101,13 +101,18 @@ inline std::vector<std::pair<std::string, Value>> ui_list_items(const Value& sou
         }
         return out;
     }
-    bool is_enum = source.as_map()->kind == Map::ENUM;
-    bool by_value = is_enum;
+    // Clés collectées AVANT tout libellé : value_to_string peut appeler la méta-méthode
+    // `__str` d'une clé, donc du code Ollin, qui muterait la map et invaliderait
+    // l'itérateur en pleine boucle.
+    bool by_value = source.as_map()->kind == Map::ENUM;
+    std::vector<Value> keys;
     for (const auto& kv : source.as_map()->data) {
         if (!kv.second.is_number())
             by_value = false;
-        out.push_back({value_to_string(kv.first), kv.first});
+        keys.push_back(kv.first);
     }
+    for (const auto& k : keys)
+        out.push_back({value_to_string(k), k});
     if (by_value) {
         std::sort(out.begin(), out.end(), [&](const auto& a, const auto& b) {
             return source.map_get(a.second).as_num() < source.map_get(b.second).as_num();
@@ -137,8 +142,7 @@ inline void ui_check_list_args(const Value* args, int argc) {
 
 // Une liste est en MONO-sélection : il y a toujours un élément retenu. Une variable liée
 // à nil est donc initialisée au premier élément, comme un slider prend son défaut.
-inline void ui_list_init(const Value* args, int argc) {
-    (void)argc;
+inline void ui_list_init(const Value* args) {
     if (!ref_get(args[2]).is_nil())
         return;
     auto items = ui_list_items(args[1]);

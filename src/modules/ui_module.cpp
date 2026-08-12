@@ -353,22 +353,26 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
     if (head > widest)
         widest = head;
     for (int slot : rows) {
-        const Node& n = s_nodes[slot];
-        float need = text_width(n.label, m.font);
-        if (n.kind == Node::CHECKBOX)
-            need += m.box + m.pad;
-        if (n.kind == Node::MENU)
+        // Champs COPIÉS, aucune référence sur le nœud : la largeur d'une liste demande la
+        // valeur retenue, dont la lecture exécute un getter du script — lequel peut
+        // déclarer un widget et réallouer s_nodes.
+        Node::Kind kind = s_nodes[slot].kind;
+        float need = text_width(s_nodes[slot].label, m.font);
+        if (kind == Node::CHECKBOX || kind == Node::LIST_ITEM)
+            need += m.box + m.pad;   // case à cocher, ou marque de l'élément retenu
+        if (kind == Node::MENU)
             need += m.pad + text_width(CHEVRON, m.font);
-        if (n.kind == Node::SLIDER) {
+        if (kind == Node::SLIDER) {
             // Place pour la valeur affichée à droite : la plus large des deux bornes.
-            float vw = text_width(slider_text(n.vmin, n.integral), m.font);
-            float vmaxw = text_width(slider_text(n.vmax, n.integral), m.font);
+            bool integral = s_nodes[slot].integral;
+            float vw = text_width(slider_text(s_nodes[slot].vmin, integral), m.font);
+            float vmaxw = text_width(slider_text(s_nodes[slot].vmax, integral), m.font);
             need += m.pad + (vmaxw > vw ? vmaxw : vw);
         }
-        if (n.kind == Node::LIST)
-            need += m.pad + text_width(list_text(n.target), m.font);
-        if (n.kind == Node::LIST_ITEM)
-            need += m.box + m.pad;   // marque de l'élément retenu, comme une case
+        if (kind == Node::LIST) {
+            Value target = s_nodes[slot].target;
+            need += m.pad + text_width(list_text(target), m.font);
+        }
         if (need > widest)
             widest = need;
     }
@@ -438,7 +442,7 @@ static int add_slider(CallCtx& ctx, const Value* args, int argc, int parent) {
 // source sans rien recalculer par frame.
 static int add_list(CallCtx& ctx, const Value* args, int argc, int parent) {
     ui_check_list_args(args, argc);
-    ui_list_init(args, argc);   // appelle le script (getter/setter) → AVANT d'allouer le nœud
+    ui_list_init(args);   // appelle le script (getter/setter) → AVANT d'allouer le nœud
     int slot = alloc_node(Node::LIST, args[0].as_string(), parent);
     s_nodes[slot].source = args[1];
     s_nodes[slot].target = args[2];

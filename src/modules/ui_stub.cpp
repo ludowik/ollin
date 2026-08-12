@@ -35,7 +35,7 @@ int stub_slider(CallCtx& ctx) {
 
 int stub_list(CallCtx& ctx) {
     ui_check_list_args(ctx.args + 1, ctx.argc - 1);
-    ui_list_init(ctx.args + 1, ctx.argc - 1);
+    ui_list_init(ctx.args + 1);
     return ctx.ret(make_inert());
 }
 
@@ -92,7 +92,7 @@ Value make_ui_module() {
     }));
     m.map_set(Value(std::string("list")), Value::make_builtin([](CallCtx& ctx) -> int {
         ui_check_list_args(ctx.args, ctx.argc);
-        ui_list_init(ctx.args, ctx.argc);
+        ui_list_init(ctx.args);
         return ctx.ret(make_inert());
     }));
     m.map_set(Value(std::string("menu")), Value::make_builtin([](CallCtx& ctx) -> int {
