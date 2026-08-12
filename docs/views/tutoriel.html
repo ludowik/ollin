@@ -2249,6 +2249,10 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 
 <div class="callout tip">Les deux derniers arguments sont reconnus par leur <strong>type</strong> : une chaîne ou une fonction donne la courbe, la fonction suivante est le rappel de fin. Aucun ordre à retenir.</div>
 
+<p><code>tween.curves()</code> se prête directement à une <a href="#ui">liste</a> du module <code>ui</code> : la source est le catalogue du moteur, et la variable liée reçoit le nom choisi. C'est ce que fait l'exemple « Animations (tween) ».</p>
+
+<pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.courbe, surCourbe)</code></pre>
+
 <h3>Ce qu'il faut savoir</h3>
 <ul>
   <li>La valeur de départ est lue <strong>au démarrage</strong> de l'animation, pas à la déclaration : avec un <code>delay</code>, le tween part de la valeur qu'aura le champ à l'échéance.</li>

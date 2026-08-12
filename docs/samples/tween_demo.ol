@@ -2,7 +2,8 @@
 ## cible, sur une durée, selon une courbe. Le moteur avance les tweens à chaque frame :
 ## rien à appeler dans draw(), on déclare et on oublie.
 ##
-## Clique n'importe où pour relancer les animations. Le menu choisit la courbe.
+## Clique n'importe où pour relancer les animations. La liste « Courbe » du menu choisit la
+## courbe appliquée à la vedette, le slider règle la durée.
 
 global config = {courbe: "easeInOutQuad"}
 
@@ -19,8 +20,9 @@ func xDepart()
     return W * 0.12
 end
 
-## Arrivée à l'écart du menu (coin haut droit) : les courbes à dépassement — back,
-## elastic — vont AU-DELÀ de la cible avant de revenir, et la pastille passerait dessous.
+## Arrivée à l'écart du menu (coin haut droit), liste DÉPLIÉE comprise : les courbes à
+## dépassement — back, elastic — vont au-delà de la cible avant de revenir, et la pastille
+## finirait sous les choix affichés.
 func xArrivee()
     return W * 0.72
 end
@@ -48,6 +50,12 @@ func lancer()
     tween.to(vedette, {taille: H * 0.02}, duree * 0.6, "easeInQuad").delay(duree + 0.3)
 end
 
+## Le rappel reçoit l'élément choisi ; config.courbe est déjà écrite quand il part, donc
+## il suffit de relancer.
+func surCourbe(nom)
+    lancer()
+end
+
 func setup()
     graphics.canvas(W, H, "tween")
 
@@ -55,15 +63,12 @@ func setup()
         pastilles[i] = {x: 0}
     end
 
-    ## Un bouton par courbe : le menu écrit config.courbe puis relance. La liste vient de
-    ## tween.curves(), donc elle suit le catalogue du moteur sans être recopiée ici.
-    var menu = ui.menu("Courbe")
-    for nom in tween.curves() do
-        menu.button(nom, func()
-            config.courbe = nom
-            lancer()
-        end)
-    end
+    ## UNE liste au lieu de dix-huit boutons : elle écrit config.courbe (le nom choisi,
+    ## puisqu'un tableau renvoie ses valeurs) puis appelle le rappel. Sa source est
+    ## tween.curves(), donc elle suit le catalogue du moteur sans le recopier ici.
+    var menu = ui.menu("Animation")
+    menu.list("Courbe", tween.curves(), ref config.courbe, surCourbe)
+    menu.slider("Durée", ref duree, 0.3, 3)
     ui.show(menu)
 
     lancer()
