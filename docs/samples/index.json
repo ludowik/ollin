@@ -11,6 +11,7 @@
   { "name": "Persistance (data)", "file": "data_demo.ol" },
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },
   { "name": "Éclipse de Lune", "file": "eclipse_lune.ol" },
+  { "name": "Éclipse de Soleil", "file": "eclipse_soleil.ol" },
   { "name": "Primitives 3D",  "file": "primitives_3d.ol" },
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
   { "name": "Modèles 3D (.obj / .glb)", "file": "model_3d.ol" },

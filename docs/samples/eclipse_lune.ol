@@ -8,6 +8,8 @@
 ##
 ## Le menu choisit le type d'éclipse (l'écart entre la Lune et l'axe de l'ombre), la
 ## vitesse, et l'affichage des repères.
+##
+## Le pendant de cet exemple est « Éclipse de Soleil », où c'est la Lune qui masque.
 
 const R_OMBRE = 2.7      ## rayon du cône d'ombre, en rayons lunaires
 const R_PENOMBRE = 4.6   ## rayon de la pénombre
