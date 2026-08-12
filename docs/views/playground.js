@@ -813,9 +813,15 @@ const ghRailBody   = document.getElementById('gh-rail-body')
 const newFileBtn   = document.getElementById('new-file-btn')
 const resList      = document.getElementById('res-list')
 const newResBtn    = document.getElementById('new-res-btn')
+const resView      = document.getElementById('res-view')
+const editorBox    = document.getElementById('editor-wrap')
 
 let currentProject = null    // objet projet complet
 let currentFile    = null    // chemin du fichier ouvert
+// Ressource AFFICHÉE à la place de l'éditeur (null = on édite). Déclarée ici, avec l'état :
+// renderFiles et openFile la lisent bien plus haut dans le fichier, et une déclaration
+// `let` posée après eux les exposerait à « Cannot access before initialization ».
+let currentRes     = null
 let examples       = []      // [{name, file}] pour « Nouveau depuis un exemple »
 
 // Mode exemple : le projet courant est TRANSITOIRE (chargé depuis le dépôt, jamais
@@ -998,13 +1004,6 @@ async function setEntry(path) {
 }
 
 // ── ressources (images, modèles…) ──
-// Sélectionner une ressource l'AFFICHE à la place de l'éditeur ; `currentRes` retient
-// laquelle (null = on édite). Les deux rails s'y réfèrent pour la ligne active, si bien
-// qu'un seul élément paraît sélectionné à la fois.
-let currentRes = null
-const resView   = document.getElementById('res-view')
-const editorBox = document.getElementById('editor-wrap')
-
 const IMG_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
 
 function resMime(ext) {
@@ -1018,7 +1017,8 @@ function showResource(name) {
   const editing = name === null
   editorBox.style.display = editing ? '' : 'none'
   resView.style.display = editing ? 'none' : 'flex'
-  renderFiles(); renderResources()
+  resView.innerHTML = ''   // vidé DANS LES DEUX CAS : sinon la data URL de l'image
+  renderFiles(); renderResources()   // resterait dans le DOM après retour à l'éditeur
   if (editing) {
     view.focus()
     return
@@ -1026,7 +1026,6 @@ function showResource(name) {
   const r = (currentProject.resources || {})[name] || {}
   const ext = (r.ext || name.split('.').pop() || '').toLowerCase()
   const octets = Math.round((r.b64 || '').length * 3 / 4)
-  resView.innerHTML = ''
 
   const head = document.createElement('div'); head.className = 'res-head'
   const nm = document.createElement('span'); nm.className = 'res-name'; nm.textContent = name
@@ -1095,11 +1094,15 @@ async function renameResource(name) {
   if (currentProject.resources[n] !== undefined) { alert('Ce nom est déjà pris.'); return }
   currentProject.resources[n] = currentProject.resources[name]
   delete currentProject.resources[name]
-  if (currentRes === name) currentRes = n
+  const affichee = currentRes === name
   await persist(currentProject)
   if (ollin && ollin.preloadImage) {
     const r = currentProject.resources[n]
     ollin.preloadImage(n, r.b64, r.ext)
+  }
+  if (affichee) {
+    showResource(n)   // l'aperçu porte le nom dans son en-tête : le reconstruire
+    return
   }
   renderResources()
 }
