@@ -1303,8 +1303,8 @@ function renderMenuGithub() {
   // Dépôt ET token derrière la MÊME entrée : ce sont les deux moitiés d'un seul réglage
   // (un token ne vaut que pour le dépôt auquel il donne accès), et un token fine-grained
   // expire — il faut pouvoir le remplacer sans passer par la déconnexion.
-  projectMenu.appendChild(menuItem('🗄 Dépôt : ' + (GH.getRepo() || '(non configuré)'), true, renderMenuConnect))
-  projectMenu.appendChild(menuLink('➕ Créer un token sur GitHub ↗', TOKEN_URL))
+  projectMenu.appendChild(menuItem('🗄 ' + (GH.getRepo() || 'Dépôt à configurer'), false, renderMenuConnect))
+  projectMenu.appendChild(menuLink('➕ Créer un token ↗', TOKEN_URL))
   projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
