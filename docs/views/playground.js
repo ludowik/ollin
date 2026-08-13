@@ -1300,15 +1300,10 @@ function renderMenuGithub() {
     const span = hdr.querySelector('span')
     GH.getUser().then(u => { ghLogin = u.login; if (span) span.textContent = 'GitHub : @' + u.login }).catch(() => {})
   }
-  projectMenu.appendChild(menuItem('🗄 Dépôt : ' + (GH.getRepo() || '(non configuré)'), false, () => {
-    const v = prompt('Dépôt cible (format obligatoire : owner/repo) :', GH.getRepo() || '')
-    if (v === null) return
-    try { GH.setRepo(v); renderMenuGithub() }
-    catch (e) { alert(e.message) }
-  }))
-  // Un token fine-grained EXPIRE : il faut pouvoir le remplacer sans se déconnecter, sinon
-  // le seul recours est la déconnexion, qui efface aussi la session en cours.
-  projectMenu.appendChild(menuItem('🔑 Changer le token', true, renderMenuConnect))
+  // Dépôt ET token derrière la MÊME entrée : ce sont les deux moitiés d'un seul réglage
+  // (un token ne vaut que pour le dépôt auquel il donne accès), et un token fine-grained
+  // expire — il faut pouvoir le remplacer sans passer par la déconnexion.
+  projectMenu.appendChild(menuItem('🗄 Dépôt : ' + (GH.getRepo() || '(non configuré)'), true, renderMenuConnect))
   projectMenu.appendChild(menuLink('➕ Créer un token sur GitHub ↗', TOKEN_URL))
   projectMenu.appendChild(menuItem('⏻ Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
@@ -1420,29 +1415,35 @@ function setStatus(msg, transient, isError) {
   if (transient) statusTimer = setTimeout(() => { el.textContent = ''; el.style.color = '' }, 4000)
 }
 
-// Sert à la première connexion comme au remplacement d'un token expiré.
+// Réglage GitHub complet — dépôt ET token — pour la première connexion comme pour un
+// changement ultérieur. Déjà connecté, le champ token peut rester vide : on ne change alors
+// que le dépôt, sans avoir à recoller un token qui fonctionne.
 function renderMenuConnect() {
   const deja = GH.isConnected()
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader(deja ? 'Changer le token GitHub' : 'Se connecter à GitHub', renderMenuGithub))
+  projectMenu.appendChild(menuHeader(deja ? 'Dépôt et token GitHub' : 'Se connecter à GitHub', renderMenuGithub))
   const wrap = document.createElement('div'); wrap.className = 'menu-form'
   const info = document.createElement('div'); info.className = 'menu-info'
-  info.innerHTML = 'Colle un <b>fine-grained token</b> GitHub (permission Contents : lecture/écriture) et le dépôt cible au format <b>owner/repo</b>. '
+  info.innerHTML = 'Dépôt cible au format <b>owner/repo</b> (il doit exister) et <b>fine-grained token</b> GitHub avec la permission Contents : lecture/écriture. '
+    + (deja ? 'Token vide = on garde le token actuel. ' : '')
     + `<a href="${TOKEN_URL}" target="_blank" rel="noopener">Créer un token ↗</a>`
-  const input = document.createElement('input')
-  input.type = 'password'; input.className = 'menu-input'; input.placeholder = 'github_pat_… / ghp_…'
   const repo = document.createElement('input')
   repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo() || ''
   repo.placeholder = 'owner/repo (ex. moncompte/ollin-projects)'
   repo.title = 'Dépôt cible au format owner/repo — doit exister sur GitHub.'
+  const input = document.createElement('input')
+  input.type = 'password'; input.className = 'menu-input'
+  input.placeholder = deja ? 'nouveau token (facultatif)' : 'github_pat_… / ghp_…'
   const libelle = deja ? 'Enregistrer' : 'Connecter'
   const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = libelle
   const err = document.createElement('div'); err.className = 'menu-err'
   const connect = async () => {
-    const t = input.value.trim(); if (!t) return
+    const t = input.value.trim()
+    if (!t && !deja) return
     const r = repo.value.trim()
     if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
     try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
+    if (!t) { renderMenuGithub(); return }
     btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
     // Éprouvé avant d'être rangé : un token refusé ne remplace donc pas celui qui
     // fonctionnait, et aucun autre chemin ne peut partir avec un token non validé.
@@ -1452,9 +1453,11 @@ function renderMenuConnect() {
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
   repo.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
-  wrap.append(info, input, repo, btn, err)
+  wrap.append(info, repo, input, btn, err)
   projectMenu.appendChild(wrap)
-  input.focus()
+  // Déjà connecté, on vient le plus souvent changer de dépôt ; sinon, coller le token.
+  if (deja) repo.focus()
+  else input.focus()
 }
 
 // Si GitHub est connecté (dépôt paramétré), tout NOUVEAU projet est aussitôt créé
