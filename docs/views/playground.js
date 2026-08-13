@@ -1416,24 +1416,31 @@ function setStatus(msg, transient, isError) {
 }
 
 // Réglage GitHub complet — dépôt ET token — pour la première connexion comme pour un
-// changement ultérieur. Déjà connecté, le champ token peut rester vide : on ne change alors
-// que le dépôt, sans avoir à recoller un token qui fonctionne.
+// changement ultérieur. Les deux champs montrent les valeurs EN PLACE : on retrouve ainsi ce
+// qui est enregistré, on le corrige au lieu de le retaper, et un token inchangé n'est pas
+// revérifié. Vider le champ token garde le token actuel (pour l'effacer : Déconnexion).
 function renderMenuConnect() {
   const deja = GH.isConnected()
+  const tokenActuel = GH.getToken() || ''
   projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader(deja ? 'Dépôt et token GitHub' : 'Se connecter à GitHub', renderMenuGithub))
   const wrap = document.createElement('div'); wrap.className = 'menu-form'
   const info = document.createElement('div'); info.className = 'menu-info'
   info.innerHTML = 'Dépôt cible au format <b>owner/repo</b> (il doit exister) et <b>fine-grained token</b> GitHub avec la permission Contents : lecture/écriture. '
-    + (deja ? 'Token vide = on garde le token actuel. ' : '')
     + `<a href="${TOKEN_URL}" target="_blank" rel="noopener">Créer un token ↗</a>`
   const repo = document.createElement('input')
   repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo() || ''
   repo.placeholder = 'owner/repo (ex. moncompte/ollin-projects)'
   repo.title = 'Dépôt cible au format owner/repo — doit exister sur GitHub.'
   const input = document.createElement('input')
-  input.type = 'password'; input.className = 'menu-input'
-  input.placeholder = deja ? 'nouveau token (facultatif)' : 'github_pat_… / ghp_…'
+  input.type = 'password'; input.className = 'menu-input'; input.value = tokenActuel
+  input.placeholder = 'github_pat_… / ghp_…'
+  // Le token est masqué comme un mot de passe : sans cette bascule, le champ prérempli
+  // n'afficherait qu'une rangée de points, donc rien de vérifiable.
+  const voir = document.createElement('label'); voir.className = 'menu-check'
+  const box = document.createElement('input'); box.type = 'checkbox'
+  box.addEventListener('change', () => { input.type = box.checked ? 'text' : 'password' })
+  voir.append(box, document.createTextNode('Afficher le token'))
   const libelle = deja ? 'Enregistrer' : 'Connecter'
   const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = libelle
   const err = document.createElement('div'); err.className = 'menu-err'
@@ -1443,7 +1450,8 @@ function renderMenuConnect() {
     const r = repo.value.trim()
     if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
     try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
-    if (!t) { renderMenuGithub(); return }
+    // Inchangé : déjà validé quand il a été enregistré, inutile de rappeler GitHub.
+    if (!t || t === tokenActuel) { renderMenuGithub(); return }
     btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
     // Éprouvé avant d'être rangé : un token refusé ne remplace donc pas celui qui
     // fonctionnait, et aucun autre chemin ne peut partir avec un token non validé.
@@ -1453,7 +1461,7 @@ function renderMenuConnect() {
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
   repo.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
-  wrap.append(info, repo, input, btn, err)
+  wrap.append(info, repo, input, voir, btn, err)
   projectMenu.appendChild(wrap)
   // Déjà connecté, on vient le plus souvent changer de dépôt ; sinon, coller le token.
   if (deja) repo.focus()
