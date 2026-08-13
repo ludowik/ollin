@@ -419,6 +419,8 @@ canvas#canvas {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
   background: transparent; border: none; color: var(--text); text-align: left;
   padding: 9px 10px; font-size: 13px; border-radius: 6px; cursor: pointer;
+  /* La classe sert aussi à des <a> (liens externes) : sans ça ils seraient soulignés. */
+  text-decoration: none;
 }
 .menu-item:hover { background: var(--surface2); }
 .menu-arrow { color: var(--dim); font-size: 16px; }

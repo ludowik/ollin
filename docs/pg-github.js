@@ -46,8 +46,7 @@ export function setRepo(v) {
 }
 
 // ── requêtes bas niveau ───────────────────────────────────────────────────
-async function gh(path, { method = 'GET', body = null } = {}) {
-  const token = getToken()
+async function gh(path, { method = 'GET', body = null, token = getToken() } = {}) {
   if (!token) throw new Error('Non connecté à GitHub (token manquant)')
   return fetch(API + path, {
     method,
@@ -93,6 +92,15 @@ export async function getUser() {
 }
 async function login() {
   return _login || (await getUser()).login
+}
+export function knownLogin() {
+  return _login
+}
+
+// Éprouve un token SANS le ranger : le stockage ne contient ainsi jamais de token non
+// validé, qu'aucun autre chemin (auto-push, synchro) ne doit pouvoir utiliser.
+export async function verifyToken(t) {
+  return ghJson('/user', { token: t })
 }
 
 // Résout le dépôt cible : { owner, repo, base }.

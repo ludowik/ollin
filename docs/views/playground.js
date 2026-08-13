@@ -1199,14 +1199,18 @@ function menuHeader(text, back) {
   h.appendChild(s)
   return h
 }
-// Entrée de menu qui ouvre une page externe (nouvel onglet) au lieu d'un sous-menu.
+// Entrée de menu qui ouvre une page externe. Un vrai lien plutôt qu'un bouton : aucun
+// écouteur de clic à porter, et le navigateur gère l'ouverture.
 function menuLink(label, href) {
   const a = document.createElement('a')
   a.className = 'menu-item'
   a.href = href
   a.target = '_blank'
   a.rel = 'noopener'
-  a.innerHTML = `<span>${label}</span>`
+  const s = document.createElement('span')
+  s.textContent = label
+  a.appendChild(s)
+  a.addEventListener('click', closeMenu)
   return a
 }
 
@@ -1289,6 +1293,9 @@ function renderMenuGithub() {
   }
   const hdr = menuHeader('GitHub' + (ghLogin ? ' : @' + ghLogin : ''), renderMenuRoot)
   projectMenu.appendChild(hdr)
+  if (!ghLogin) {
+    ghLogin = GH.knownLogin()   // déjà résolu par un push/pull : pas de requête de plus
+  }
   if (!ghLogin) {
     const span = hdr.querySelector('span')
     GH.getUser().then(u => { ghLogin = u.login; if (span) span.textContent = 'GitHub : @' + u.login }).catch(() => {})
@@ -1413,8 +1420,7 @@ function setStatus(msg, transient, isError) {
   if (transient) statusTimer = setTimeout(() => { el.textContent = ''; el.style.color = '' }, 4000)
 }
 
-// Sert à la première connexion ET au remplacement d'un token expiré : seuls le titre et
-// le libellé du bouton changent, le parcours est le même.
+// Sert à la première connexion comme au remplacement d'un token expiré.
 function renderMenuConnect() {
   const deja = GH.isConnected()
   projectMenu.innerHTML = ''
@@ -1437,16 +1443,11 @@ function renderMenuConnect() {
     const r = repo.value.trim()
     if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
     try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
-    // Le token en place est gardé de côté : un remplacement raté ne doit pas déconnecter
-    // quelqu'un dont l'ancien token fonctionnait encore.
-    const ancien = GH.getToken()
-    GH.setToken(t); btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
-    try { const u = await GH.getUser(); ghLogin = u.login; renderMenuRoot() }
-    catch (e) {
-      if (ancien) GH.setToken(ancien)
-      else GH.clearToken()
-      err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = libelle
-    }
+    btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
+    // Éprouvé avant d'être rangé : un token refusé ne remplace donc pas celui qui
+    // fonctionnait, et aucun autre chemin ne peut partir avec un token non validé.
+    try { const u = await GH.verifyToken(t); GH.setToken(t); ghLogin = u.login; renderMenuGithub() }
+    catch (e) { err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = libelle }
   }
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
