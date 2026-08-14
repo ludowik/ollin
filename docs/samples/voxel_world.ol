@@ -89,7 +89,13 @@ global T_SANDD = 9
 
 ## Couleur de base + bruit INDÉPENDANT par canal → variation de teinte, pas seulement
 ## de luminosité (les tuiles paraissent moins plates).
-func putTile(idx, br, bg, bb, jit)
+##
+## `trous` (0 = tuile pleine) perce la tuile : le moteur écarte les pixels dont l'alpha est
+## sous 0,5, si bien que le cube laisse voir le ciel à travers. C'est ainsi qu'un feuillage
+## s'aère sans qu'on retire un seul cube — la forme du houppier reste entière, seule la
+## matière devient claire. Les trous suivent un bruit fin : des amas irréguliers, alors
+## qu'un pixel sur deux aurait donné un grillage.
+func putTile(idx, br, bg, bb, jit, trous = 0)
     var cx = (idx % ACOLS) * TILE
     var cy = math.floor(idx / ACOLS) * TILE
     for py = 0, TILE - 1 do
@@ -99,8 +105,18 @@ func putTile(idx, br, bg, bb, jit)
             var nr = (math.noise(wx + 9,  wy + 9)   - 0.5) * 2 * jit
             var ng = (math.noise(wx + 41, wy + 67)  - 0.5) * 2 * jit
             var nb = (math.noise(wx + 113, wy + 151) - 0.5) * 2 * jit
+            var a = 1
+            if trous > 0 then
+                ## Les BORDS de la tuile restent pleins : un trou au bord ouvrirait une fente
+                ## continue entre deux cubes voisins, bien plus voyante qu'un trou isolé.
+                var bord = math.min(math.min(px, py), math.min(TILE - 1 - px, TILE - 1 - py))
+                var n = math.noise((cx + px) * 0.55 + 200, (cy + py) * 0.55 + 200)
+                if bord >= 2 and n > 1 - trous then
+                    a = 0
+                end
+            end
             image.setPixel(atlas, cx + px, cy + py,
-                math.clamp(br + nr, 0, 1), math.clamp(bg + ng, 0, 1), math.clamp(bb + nb, 0, 1), 1)
+                math.clamp(br + nr, 0, 1), math.clamp(bg + ng, 0, 1), math.clamp(bb + nb, 0, 1), a)
         end
     end
 end
@@ -115,7 +131,7 @@ func buildAtlas()
     putTile(T_SNOW,  0.95, 0.97, 1.00, 0.07)
     putTile(T_WATER, 0.20, 0.45, 0.80, 0.14)
     putTile(T_TRUNK, 0.40, 0.26, 0.13, 0.16)
-    putTile(T_LEAF,  0.18, 0.42, 0.16, 0.22)
+    putTile(T_LEAF,  0.18, 0.42, 0.16, 0.22, 0.42)   ## seule tuile ajourée : le feuillage
     putTile(T_STONE, 0.36, 0.36, 0.40, 0.16)
     putTile(T_SANDD, 0.72, 0.63, 0.40, 0.12)
     image.endPixels(atlas)

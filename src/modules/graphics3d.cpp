@@ -467,6 +467,11 @@ static void load_lit_shader() {
         "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
         "        vec2 auv = (cell + uv) / atlasGrid;\n"
         "        texel = texture(texture0, auv);\n"
+        // Test alpha (feuillages ajourés) : un trou de la TUILE perce le cube. Franc plutôt
+        // que fondu, donc indépendant de l'ordre de dessin — les cubes restent opaques et
+        // n'ont pas à être triés. Limité au chemin d'atlas : une texture semi-transparente
+        // posée sur un modèle garde son fondu.
+        "        if (texel.a < 0.5) discard;\n"
         "    } else {\n"                                 // chemin classique (modèles, texture immédiate)
         "        texel = texture(texture0, fragTexCoord);\n"
         "    }\n"
