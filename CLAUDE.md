@@ -397,6 +397,8 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | NEW_CLASS     | A      | A=dest                     | R[A] = nouvelle classe vide (T_CLASS)            |
 | CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
 | SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
+
+**Destructuration multi-retour : UN seul chemin, deux appelants.** `var a, b = f()` (`visit(VarDeclStmt)`) et `a, b = f()` (`visit(MultiAssignStmt)`) émettent la même séquence — appel compilé à une base connue, `MOVE_RESULTS` si l'appel a produit ses valeurs ailleurs, puis `SPREAD_RESULTS`. La réaffectation ne l'avait pas : elle ne comptait qu'une valeur et les cibles suivantes lisaient les temporaires voisins, donc des valeurs décalées (`a, b, c = f()` donnait `1, 1, 2` pour un retour `1, 2, 3`). Toute nouvelle forme de cible doit passer par ce chemin, pas le réinventer.
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | HALT          | —      |                            | arrêt                                            |

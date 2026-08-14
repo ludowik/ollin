@@ -2082,9 +2082,30 @@ void Compiler::visit(const MultiAssignStmt& s) {
     // Évalue tous les RHS dans des registres temporaires consécutifs
     int base = reg_top_;
     int n = (int)s.values.size();
-    for (int i = 0; i < n; ++i) {
-        int r = alloc_reg();
-        compile_into(*s.values[i], r);
+    int n_targets = (int)s.targets.size();
+    // Multi-retour, MÊME chemin que `var a, b = f()` (visit(VarDeclStmt)) : la VM laisse les
+    // k valeurs de retour à partir de `base`, et SPREAD_RESULTS met à nil les cibles au-delà
+    // de k. Sans ce chemin, une seule valeur était comptée : les cibles suivantes lisaient
+    // des registres temporaires voisins, d'où des valeurs DÉCALÉES (a, b, c = f() donnait
+    // 1, 1, 2 pour un retour 1, 2, 3).
+    if (n_targets > 1 && n == 1 && is_multi_value_expr(s.values[0].get())) {
+        if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
+            chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n_targets, 0));
+        } else {
+            s.values[0]->accept(*this);
+            if (last_reg_ != base)
+                chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)base, (uint8_t)last_reg_, 0));
+        }
+        if (base + n_targets > reg_count_)
+            reg_count_ = base + n_targets;
+        chunk.emit(make_abc((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n_targets, 0));
+        reg_top_ = base + n_targets;
+        n = n_targets; // chaque cible a désormais sa valeur en base+i
+    } else {
+        for (int i = 0; i < n; ++i) {
+            int r = alloc_reg();
+            compile_into(*s.values[i], r);
+        }
     }
 
     // Assigne chaque cible depuis son temporaire (ou nil si plus de valeurs que de cibles)

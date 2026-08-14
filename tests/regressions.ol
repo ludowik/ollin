@@ -1041,4 +1041,55 @@ assert(liGarde == "bleu")
 assert(twT.isDone() and twT.progress() == 1)
 twT.cancel()
 
+## Réaffectation multiple (sans `var`) d'un appel multi-retour : la même valeur devait
+## atteindre la même cible qu'à la déclaration. Le compilateur ne comptait qu'UNE valeur
+## et les cibles suivantes lisaient des registres voisins → valeurs décalées (1, 1, 2).
+func maTrois()
+    return 1, 2, 3
+end
+func maUne()
+    return 7
+end
+global maG1 = 0
+global maG2 = 0
+var maA, maB, maC = maTrois()
+maA, maB, maC = maTrois()
+assert(maA == 1 and maB == 2 and maC == 3)
+maG1, maG2 = maTrois()
+assert(maG1 == 1 and maG2 == 2)
+## Moins de valeurs que de cibles : les cibles au-delà passent à nil, pas à un reste de registre.
+var maX = 5
+var maY = 5
+maX, maY = maUne()
+assert(maX == 7 and maY == nil)
+## Cibles qui ne sont pas de simples variables.
+var maM = {}
+maM.u, maM.v = maTrois()
+assert(maM.u == 1 and maM.v == 2)
+var maT = [0, 0, 0]
+maT[1], maT[3] = maTrois()
+assert(maT[1] == 1 and maT[2] == 0 and maT[3] == 2)
+## Échange : deux valeurs pour deux cibles reste un cas parallèle, pas un multi-retour.
+var maP = 1
+var maQ = 2
+maP, maQ = maQ, maP
+assert(maP == 2 and maQ == 1)
+## Méthode et varargs empruntent le même chemin que la fonction nommée.
+class MaPaire
+    func deux()
+        return 8, 9
+    end
+end
+var maObj = MaPaire()
+var maD1 = 0
+var maD2 = 0
+maD1, maD2 = maObj.deux()
+assert(maD1 == 8 and maD2 == 9)
+func maVarargs(...)
+    var maV1, maV2 = ...
+    maV1, maV2 = ...
+    assert(maV1 == "a" and maV2 == "b")
+end
+maVarargs("a", "b")
+
 print("regressions ok")
