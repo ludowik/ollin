@@ -153,6 +153,13 @@ exemple `.ol`, la web app, un commentaire, la documentation. La suite couvre `sy
 cas par cas qu'un changement « ne peut rien casser » est un pari qui coûte plus cher qu'elle.
 Un commit ne part que sur un « TOUT VERT ».
 
+**Tenu par git, pas par la mémoire** : `tools/git-hooks/pre-commit` (versionné) recompile
+`build/ollin` puis lance la suite, et refuse le commit si l'un des deux échoue. Il est branché
+par `core.hooksPath` au démarrage de session (`.claude/hooks/session-start.sh`) — `.git/hooks`
+n'étant pas versionné, il disparaîtrait à chaque conteneur neuf. La recompilation est
+essentielle : sans elle, une modification C++ non compilée serait validée par l'ANCIEN binaire.
+`git commit --no-verify` le contourne, à réserver aux cas où la suite ne peut pas tourner.
+
 ## Versionning
 
 - Branche unique : **`main`** — tout le développement se fait directement sur main
