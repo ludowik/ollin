@@ -489,13 +489,12 @@ canvas#canvas {
   /* Scroll horizontal fluide sur iOS */
   #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  /* toolbar compact : icônes seules, TOUJOURS sur une seule ligne. */
-  #toolbar { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
+  /* Barre compacte : le resserrement est commun (app-bar.css) ; ici, ce qui est propre
+     au playground — libellés, raccourci et état effacés, bouton Exécuter resserré. */
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  .bar-btn, #run-btn, #stop-btn { padding: 0 8px !important; }
-  .bar-btn.icon-only { width: 32px; }
+  #run-btn, #stop-btn { padding: 0 8px; }
 }
 </style>
 

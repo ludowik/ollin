@@ -74,3 +74,13 @@
 
 /* Bouton carré (icône seule) : même hauteur, sans le remplissage horizontal du texte. */
 .app-bar .bar-btn.icon-only { padding: 0; width: 34px; justify-content: center; }
+
+/* Écran étroit : la barre se resserre — même seuil et mêmes valeurs pour les trois vues.
+   C'était réglé vue par vue (le playground à 8 px de marge, les autres à 14), d'où un logo
+   qui changeait de place selon la vue sur téléphone. Ce que chaque vue garde en propre,
+   c'est le seuil auquel SES libellés s'effacent : il dépend du nombre de boutons. */
+@media (max-width: 640px) {
+  .app-bar { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
+  .app-bar .bar-btn { padding: 0 8px; }
+  .app-bar .bar-btn.icon-only { width: 32px; }
+}

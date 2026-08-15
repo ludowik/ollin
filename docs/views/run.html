@@ -25,8 +25,9 @@
            height: calc(var(--bar-h) + env(safe-area-inset-top));
            padding-top: env(safe-area-inset-top); }
     #status { color:var(--bar-ink); font-size:12px; }
-    /* Écran étroit : icônes seules (les libellés seraient à l'étroit). */
-    @media (max-width: 600px) { #bar { gap:8px; } .bar-label { display:none; } }
+    /* Écran étroit : icônes seules (les libellés seraient à l'étroit). Le resserrement
+       de la barre lui-même est commun (app-bar.css). */
+    @media (max-width: 600px) { .bar-label { display:none; } }
 
     /* Marges de sécurité (coins arrondis / barre home) exclues de la zone. */
     #stage-wrap { flex:1; display:flex; min-height:0;
