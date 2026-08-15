@@ -42,6 +42,36 @@ body {
   min-height: 100vh;
 }
 
+/* ── barre de menu ───────────────────────────────────────────────────────── */
+/* Même barre que le playground et le mode plein écran : hauteur de 48 px sous
+   l'encoche, bordure basse, boutons cadrés à DROITE. Les trois vues ont ainsi la
+   même barre au même endroit. Elle est fixe : la sidebar et le contenu défilent
+   dessous, d'où le décalage de `body` et le `top` de `nav` ci-dessous. */
+:root { --bar-h: 48px; }
+
+#tuto-bar {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 150;
+  display: flex; align-items: center; gap: 12px;
+  height: calc(var(--bar-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) 14px 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+#tuto-bar .sp { flex: 1; }
+#tuto-bar .bar-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+  border-radius: 6px; padding: 8px 12px;
+  font: inherit; font-size: 12px; font-weight: 500; text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+#tuto-bar .bar-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+body { padding-top: calc(var(--bar-h) + env(safe-area-inset-top)); }
+
 /* ── sidebar ─────────────────────────────────────────────────────────────── */
 nav {
   width: var(--sidebar-w);
@@ -50,8 +80,8 @@ nav {
   border-right: 1px solid var(--border);
   padding: 32px 0;
   position: sticky;
-  top: 0;
-  height: 100vh;
+  top: calc(var(--bar-h) + env(safe-area-inset-top));
+  height: calc(100vh - var(--bar-h) - env(safe-area-inset-top));
   overflow-y: auto;
 }
 
@@ -240,8 +270,8 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 .hamburger {
   display: none;
   position: fixed;
-  top: 14px; left: 14px;
-  z-index: 200;
+  top: calc(4px + env(safe-area-inset-top)); left: 14px;
+  z-index: 200;   /* au-dessus de la barre : il y est logé, à gauche */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -325,8 +355,9 @@ pre:hover .code-actions,
 
   nav {
     position: fixed;
-    top: 0; left: 0;
-    height: 100vh;
+    /* Sous la barre, pas par-dessus : ouvert, le menu laisse la barre visible. */
+    top: calc(var(--bar-h) + env(safe-area-inset-top)); left: 0;
+    height: calc(100vh - var(--bar-h) - env(safe-area-inset-top));
     z-index: 100;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
@@ -336,7 +367,7 @@ pre:hover .code-actions,
 
   main {
     max-width: 100%;
-    padding: 72px 20px 48px;
+    padding: 24px 20px 48px;
   }
 
   .hero { padding: 24px 20px; margin-bottom: 32px; }
@@ -358,6 +389,16 @@ pre:hover .code-actions,
 }
 </style>
 
+<!-- Barre de menu — même position et même style que celles du playground et du mode
+     plein écran. Un seul bouton pour l'instant : l'accès au playground. -->
+<div id="tuto-bar">
+  <span class="sp"></span>
+  <a class="bar-btn" href="#/playground" title="Ouvrir le playground">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
+    <span>Playground</span>
+  </a>
+</div>
+
 <button class="hamburger" id="ham" aria-label="Menu">
   <span></span><span></span><span></span>
 </button>
@@ -373,7 +414,6 @@ pre:hover .code-actions,
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     Recharger
   </button>
-  <a href="#/playground" style="font-weight:600;color:var(--accent)">▶ Playground</a>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
   <a href="#types">Types</a>
