@@ -27,6 +27,17 @@ if [ -d "$CLAUDE_PROJECT_DIR/.git" ]; then
   fi
 fi
 
+# ── Hook git pre-commit : tests obligatoires avant chaque commit ─────────────
+# Les hooks vivent dans .git/hooks, qui n'est pas versionné et disparaît donc à
+# chaque conteneur neuf. Les nôtres sont dans tools/git-hooks/ (versionnés) et
+# branchés ici par core.hooksPath — la règle « run.sh avant chaque commit » est
+# ainsi tenue par git, pas par la mémoire.
+if [ -d "$CLAUDE_PROJECT_DIR/tools/git-hooks" ]; then
+  chmod +x "$CLAUDE_PROJECT_DIR"/tools/git-hooks/* 2>/dev/null || true
+  git -C "$CLAUDE_PROJECT_DIR" config core.hooksPath tools/git-hooks 2>/dev/null \
+    && echo "hook git pre-commit actif (tests avant chaque commit)"
+fi
+
 # Install missing Raylib system dependencies on Linux
 # (most are pre-installed in the remote image)
 if [ "$(uname)" = "Linux" ]; then

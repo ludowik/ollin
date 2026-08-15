@@ -1,0 +1,36 @@
+#!/bin/bash
+# Interdit un commit dont la suite de tests ne passe pas (règle projet : `tests/run.sh`
+# avant CHAQUE commit, sans exception). Versionné dans le dépôt donc présent après un
+# clone frais ; branché par `core.hooksPath`, posé au démarrage de session.
+#
+# Le binaire est reconstruit d'abord : sans ça, une modification C++ non compilée serait
+# validée par l'ANCIEN `build/ollin` — un test vert qui ne dit rien du code commité.
+#
+# Contournement, à réserver aux cas où la suite ne peut pas tourner (pas de compilateur) :
+#   git commit --no-verify
+set -uo pipefail
+
+racine=$(git rev-parse --show-toplevel)
+cd "$racine" || exit 1
+
+if [ ! -f tests/run.sh ]; then
+    exit 0   # dépôt partiel (worktree d'outillage) : rien à vérifier
+fi
+
+if command -v cmake >/dev/null 2>&1 && [ -d build ]; then
+    if ! cmake --build build -j"$(nproc 2>/dev/null || echo 4)" --target ollin >/tmp/pre-commit-build.log 2>&1; then
+        echo "pre-commit : la compilation a échoué — commit refusé (détail : /tmp/pre-commit-build.log)"
+        tail -15 /tmp/pre-commit-build.log
+        exit 1
+    fi
+fi
+
+if ! bash tests/run.sh >/tmp/pre-commit-tests.log 2>&1; then
+    echo "pre-commit : tests en échec — commit refusé."
+    grep -E "ECHEC|FAIL|Results:|assert" /tmp/pre-commit-tests.log | tail -15
+    echo "(sortie complète : /tmp/pre-commit-tests.log)"
+    exit 1
+fi
+
+echo "pre-commit : tests OK"
+exit 0
