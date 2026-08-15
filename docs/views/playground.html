@@ -45,19 +45,10 @@ body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0;
 body.kbd-editing #toolbar { display: none; }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
-#toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 0 14px;
-  height: 48px;   /* +10% (44 → 48) */
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  /* PAS d'overflow ici : overflow-x:auto forcerait overflow-y:auto et
-     rognerait le menu déroulant (positionné sous la toolbar). Le mode
-     icônes-seules (@media ≤1080px) suffit à tout faire tenir. */
-}
+/* Apparence : app-bar.css (commun aux trois vues).
+   PAS d'overflow ici : overflow-x:auto forcerait overflow-y:auto et rognerait le menu
+   déroulant (positionné sous la barre). Le mode icônes-seules (@media ≤1080px) suffit
+   à tout faire tenir. */
 
 /* Toolbar large mais fenêtre étroite : boutons en icônes seules pour tout garder
    visible (dont Exécuter/Pause) bien avant le passage en layout mobile. */
@@ -65,16 +56,6 @@ body.kbd-editing #toolbar { display: none; }
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #project-label { display: none; }
-}
-
-.logo {
-  font-weight: 700;
-  font-size: 16px;
-  color: var(--accent);
-  letter-spacing: -0.3px;
-  margin-right: 4px;
-  text-decoration: none;
-  flex-shrink: 0;
 }
 
 .sep { width: 1px; height: 20px; background: var(--border); }
@@ -96,25 +77,6 @@ body.kbd-editing #toolbar { display: none; }
 
 #status { font-size: 12px; color: var(--dim); }
 
-/* Boutons d'action de la barre (Recharger / Formater / Copier / Plein écran) :
-   un SEUL style → bordure, couleur, largeur et survol cohérents (évite la dérive
-   des styles inline divergents). Le bouton Exécuter reste distinct (plein accent). */
-.tool-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--dim);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.tool-btn:hover { border-color: var(--accent); color: var(--accent); }
-
 /* Bascule « Auto » (relance automatique) — révélée par JS (toutes cibles). */
 #autoexec-wrap { user-select: none; }
 #autoexec-wrap input { margin: 0; width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
@@ -124,11 +86,12 @@ body.kbd-editing #toolbar { display: none; }
   display: flex;
   align-items: center;
   gap: 6px;
+  height: 32px;   /* alignée sur les boutons de barre (app-bar.css) */
   background: var(--accent);
   color: #fff;
   border: 1px solid transparent;
   border-radius: 6px;
-  padding: 8px 14px;
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -148,11 +111,12 @@ body.kbd-editing #toolbar { display: none; }
   display: flex;
   align-items: center;
   gap: 6px;
+  height: 32px;   /* alignée sur les boutons de barre (app-bar.css) */
   background: transparent;
   border: 1px solid var(--red);
   color: var(--red);
   border-radius: 6px;
-  padding: 8px 14px;
+  padding: 0 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -365,23 +329,14 @@ canvas#canvas {
 .help-keys .plus { color: var(--dim); font-size: 11px; margin: 0 2px; }
 
 /* ── bascule barre latérale ───────────────────────────────────────────────── */
-#rail-toggle {
-  display: flex; align-items: center; justify-content: center;
-  background: transparent; border: 1px solid var(--border); color: var(--dim);
-  border-radius: 6px; padding: 8px 8px; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-#rail-toggle:hover { border-color: var(--accent); color: var(--accent); }
-#rail-toggle.active { color: var(--accent); border-color: var(--accent); }
+/* Bouton de barre à icône seule (app-bar.css) ; ne reste ici que l'état « actif ». */
+#rail-toggle.active { color: var(--bar-accent); border-color: var(--bar-accent); }
 
 /* ── menu Projet (drill-down) ─────────────────────────────────────────────── */
 #project-wrap { position: relative; }
-#project-btn {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
-  border-radius: 6px; padding: 8px 10px; font-size: 12px; font-weight: 500; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
+/* Bouton de barre (app-bar.css) au FOND PLEIN : il ouvre un menu et porte la pastille
+   de synchro, d'où sa mise en avant ; sa taille reste celle des autres. */
+#project-btn { background: var(--surface2); color: var(--text); padding: 0 10px; }
 #project-btn { position: relative; }
 #project-btn:hover:not(:disabled) { border-color: var(--accent); }
 #project-btn:disabled { opacity: 0.5; cursor: default; }
@@ -539,18 +494,18 @@ canvas#canvas {
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
-  .tool-btn, #project-btn, #rail-toggle,
-  #run-btn, #stop-btn { padding: 8px 8px !important; }
+  .bar-btn, #run-btn, #stop-btn { padding: 0 8px !important; }
+  .bar-btn.icon-only { width: 32px; }
 }
 </style>
 
-<div id="toolbar">
-  <a href="#/tutoriel" class="logo">Ollin</a>
-  <button id="rail-toggle" title="Afficher / masquer les fichiers">
+<div id="toolbar" class="app-bar">
+  <a href="#/tutoriel" class="bar-logo">Ollin</a>
+  <button id="rail-toggle" class="bar-btn icon-only" title="Afficher / masquer les fichiers">
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg>
   </button>
   <div id="project-wrap">
-    <button id="project-btn" title="Projets" disabled aria-haspopup="true" aria-expanded="false">
+    <button id="project-btn" class="bar-btn" title="Projets" disabled aria-haspopup="true" aria-expanded="false">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4.5A1 1 0 012.5 3.5H6l1.5 1.5H13.5a1 1 0 011 1v6a1 1 0 01-1 1h-11a1 1 0 01-1-1z"/></svg>
       <span id="project-label" class="btn-label">Projet</span>
       <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M3 6l5 5 5-5z"/></svg>
@@ -559,19 +514,19 @@ canvas#canvas {
   </div>
   <div class="spacer"></div>
   <span id="status">Chargement…</span>
-  <button id="reload-btn" class="tool-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)">
+  <button id="reload-btn" class="bar-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="btn-label">Recharger</span>
   </button>
-  <button id="format-btn" class="tool-btn" title="Reformater le code (indentation) — Alt+Maj+F">
+  <button id="format-btn" class="bar-btn" title="Reformater le code (indentation) — Alt+Maj+F">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3.5h12M6 6.5h8M6 9.5h8M2 12.5h12"/></svg>
     <span class="btn-label">Formater</span>
   </button>
-  <button id="copy-btn" class="tool-btn" title="Copier le code">
+  <button id="copy-btn" class="bar-btn" title="Copier le code">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
     <span class="btn-label">Copier</span>
   </button>
-  <label id="autoexec-wrap" class="tool-btn" title="Relance automatique 2 s après la dernière modification" style="display:none">
+  <label id="autoexec-wrap" class="bar-btn" title="Relance automatique 2 s après la dernière modification" style="display:none">
     <input type="checkbox" id="autoexec-chk">
     <span class="btn-label">Auto</span>
   </label>
@@ -583,7 +538,7 @@ canvas#canvas {
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
     <span class="btn-label">Pause</span>
   </button>
-  <button id="standalone-btn" class="tool-btn" title="Exécuter en plein écran dans une page dédiée">
+  <button id="standalone-btn" class="bar-btn" title="Exécuter en plein écran dans une page dédiée">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
     <span class="btn-label">Plein écran</span>
   </button>

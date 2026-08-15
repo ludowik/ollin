@@ -18,23 +18,13 @@
        ces elements (touch-action ne s'herite pas). #out garde le defilement natif. */
     #bar, canvas { touch-action:none; }
 
-    /* Barre de menu — sous l'encoche (safe-area-inset-top). Ne fait PAS partie
-       de la zone graphique. */
-    #bar { flex:none; display:flex; align-items:center; gap:10px; font-size:13px;
-           background:var(--surface);
-           height: calc(48px + env(safe-area-inset-top));
-           padding: env(safe-area-inset-top) 14px 0;
-           border-bottom:1px solid var(--border); }
-    #bar a { text-decoration:none; }
-    #bar .bar-logo { font-weight:700; font-size:16px; color:var(--accent); letter-spacing:-0.3px; }
-    #bar .sp { flex:1; }
-    /* Boutons de la barre (Recharger / Relancer / Pause) : style unique. */
-    .bar-btn { display:flex; align-items:center; gap:5px; background:transparent; line-height:1;
-               border:1px solid var(--border); color:var(--dim); border-radius:6px;
-               padding:8px 12px; font:inherit; font-size:12px; font-weight:500; cursor:pointer;
-               transition:background 0.15s, border-color 0.15s, color 0.15s; }
-    .bar-btn:hover { border-color:var(--accent); color:var(--accent); }
-    #status { color:var(--dim); font-size:12px; }
+    /* Apparence de la barre : app-bar.css (commun aux trois vues). Ici, seulement ce
+       qui tient à cette vue : passer sous l'encoche, et ne PAS faire partie de la zone
+       graphique. */
+    #bar { flex:none;
+           height: calc(var(--bar-h) + env(safe-area-inset-top));
+           padding-top: env(safe-area-inset-top); }
+    #status { color:var(--bar-ink); font-size:12px; }
     /* Écran étroit : icônes seules (les libellés seraient à l'étroit). */
     @media (max-width: 600px) { #bar { gap:8px; } .bar-label { display:none; } }
 
@@ -51,11 +41,11 @@
     #out.ok  { color:#b8f5c0; }
   </style>
 
-  <div id="bar">
+  <div id="bar" class="app-bar">
     <!-- « Ollin » à gauche comme dans les autres barres ; le reste cadré à droite :
          Recharger · Relancer · Capture · Pause · Éditeur. -->
     <span class="bar-logo">Ollin</span>
-    <span class="sp"></span>
+    <span class="spacer"></span>
     <span id="status">Chargement…</span>
     <button id="reload-btn" class="bar-btn" title="Recharger la page (instance WASM neuve, chemin sûr)">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>

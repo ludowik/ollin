@@ -43,37 +43,16 @@ body {
 }
 
 /* ── barre de menu ───────────────────────────────────────────────────────── */
-/* Même barre que le playground et le mode plein écran : hauteur de 48 px sous
-   l'encoche, bordure basse, boutons cadrés à DROITE. Les trois vues ont ainsi la
-   même barre au même endroit. Elle est fixe : la sidebar et le contenu défilent
-   dessous, d'où le décalage de `body` et le `top` de `nav` ci-dessous. */
-:root { --bar-h: 48px; }
-
+/* Apparence : app-bar.css (commun aux trois vues). Ici, seulement ce qui tient à
+   cette vue-ci : la barre est FIXE (la sidebar et le contenu défilent dessous) et
+   doit passer sous l'encoche. */
 #tuto-bar {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 150;
-  display: flex; align-items: center; gap: 10px;
   height: calc(var(--bar-h) + env(safe-area-inset-top));
-  padding: env(safe-area-inset-top) 14px 0;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top);
 }
-#tuto-bar .bar-logo {
-  font-weight: 700; font-size: 16px; color: var(--accent); letter-spacing: -0.3px;
-}
-#tuto-bar .sp { flex: 1; }
-#tuto-bar .bar-btn {
-  display: flex; align-items: center; gap: 5px;
-  background: transparent; border: 1px solid var(--border); color: var(--text-dim);
-  border-radius: 6px; padding: 0 12px; height: 32px;
-  /* Hauteur POSÉE, pas déduite : l'interligne 1,7 du corps de la doc donnait sinon des
-     boutons plus hauts que ceux des deux autres barres (38 px contre 32, mesuré). */
-  font: inherit; font-size: 12px; font-weight: 500; line-height: 1; text-decoration: none;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-#tuto-bar .bar-btn:hover { border-color: var(--accent); color: var(--accent); }
 
 body { padding-top: calc(var(--bar-h) + env(safe-area-inset-top)); }
 
@@ -272,19 +251,15 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 .two-col .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 
 /* ── hamburger (mobile only) ─────────────────────────────────────────────── */
-/* Élément ORDINAIRE de la barre, juste après le logo : il se range comme les autres
-   fonctions au lieu de flotter par-dessus le contenu. */
-.hamburger {
+/* Bouton de barre ordinaire (app-bar.css) : ne reste ici que ce qui fait de lui un
+   hamburger — trois barres empilées, et l'affichage réservé au petit écran.
+   Sélecteur préfixé par #tuto-bar : `.app-bar .bar-btn` (display:flex) l'emporterait
+   sinon sur un simple `.hamburger`, et le bouton apparaîtrait en grand écran. */
+#tuto-bar .hamburger {
   display: none;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  width: 34px; height: 32px;
-  align-items: center; justify-content: center;
-  cursor: pointer;
-  flex-direction: column; gap: 4px;
-  padding: 7px 8px;
-  flex-shrink: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 9px;
 }
 .hamburger span {
   display: block; width: 100%; height: 2px;
@@ -356,7 +331,7 @@ pre:hover .code-actions,
 @media (max-width: 768px) {
   body { display: block; }
 
-  .hamburger { display: flex; }
+  #tuto-bar .hamburger { display: flex; }
 
   #tuto-bar .bar-label { display: none; }   /* icônes seules : la barre reste sur une ligne */
 
@@ -398,12 +373,12 @@ pre:hover .code-actions,
 
 <!-- Barre de menu — même position et même style que celles du playground et du mode
      plein écran. Un seul bouton pour l'instant : l'accès au playground. -->
-<div id="tuto-bar">
+<div id="tuto-bar" class="app-bar">
   <span class="bar-logo">Ollin</span>
-  <button class="hamburger" id="ham" aria-label="Menu">
+  <button class="hamburger bar-btn icon-only" id="ham" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
-  <span class="sp"></span>
+  <span class="spacer"></span>
   <button id="hard-reload-btn" class="bar-btn" title="Recharger en vidant le cache (récupère le dernier WASM)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
     <span class="bar-label">Recharger</span>

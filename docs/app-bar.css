@@ -1,0 +1,76 @@
+/* Barre de menu — DÉFINITION UNIQUE, partagée par les trois vues (documentation,
+   playground, plein écran). Chargée par le shell (index.html), donc valable quelle que
+   soit la vue montée.
+
+   Elle existe parce que les trois barres avaient dérivé : trois fonds, trois bordures,
+   trois couleurs de bouton, deux espacements, deux hauteurs de bouton et deux familles de
+   police — chaque vue redéfinissant les mêmes règles à sa façon. Une valeur d'apparence de
+   barre ne doit vivre qu'ICI ; une vue ne pose que ce qui lui est propre (safe-area,
+   touch-action, boutons qui n'existent que chez elle). */
+
+:root {
+  --bar-h: 48px;
+  --bar-bg: #1a1d2e;
+  --bar-border: #2e3150;
+  --bar-ink: #7c85a2;         /* texte au repos des boutons */
+  --bar-accent: #7c83ff;
+  --bar-font: system-ui, -apple-system, sans-serif;
+}
+
+.app-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--bar-h);
+  padding: 0 14px;
+  background: var(--bar-bg);
+  border-bottom: 1px solid var(--bar-border);
+  /* La police est POSÉE : les vues ont des corps de texte différents (la doc a un
+     interligne de 1,7, le plein écran une police à chasse fixe) et les boutons en
+     héritaient, d'où des tailles et des dessins de lettres différents d'une barre à
+     l'autre. */
+  font: 500 12px/1 var(--bar-font);
+  flex-shrink: 0;
+}
+
+/* Un <button> n'hérite PAS de la police de son parent : sans cette règle, un bouton qui
+   ne la déclare pas repasse à la police par défaut du navigateur (constaté : « Exécuter »
+   en Arial au milieu d'une barre en system-ui). */
+.app-bar button, .app-bar input, .app-bar select { font: inherit; }
+
+.app-bar .spacer { flex: 1; }
+
+.app-bar .bar-logo {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--bar-accent);
+  letter-spacing: -0.3px;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+/* Bouton de barre : le même objet partout — bordure, hauteur et couleur comprises.
+   La hauteur est posée sur le bouton, pas déduite du texte, sinon l'interligne de la vue
+   hôte la ferait varier. */
+.app-bar .bar-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--bar-border);
+  border-radius: 6px;
+  color: var(--bar-ink);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.app-bar .bar-btn:hover { border-color: var(--bar-accent); color: var(--bar-accent); }
+.app-bar .bar-btn:disabled { opacity: 0.4; cursor: default; }
+.app-bar .bar-btn:disabled:hover { border-color: var(--bar-border); color: var(--bar-ink); }
+
+/* Bouton carré (icône seule) : même hauteur, sans le remplissage horizontal du texte. */
+.app-bar .bar-btn.icon-only { padding: 0; width: 34px; justify-content: center; }
