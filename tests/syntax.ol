@@ -788,6 +788,31 @@ fifo.enqueue(20)
 assert(fifo.dequeue() == 10)
 assert(fifo.dequeue() == 20)
 
+## méthodes de chaînes : mêmes fonctions que le module `string`, appelées sur la chaîne
+## (le receveur est passé en premier argument). Les longueurs et les positions comptent
+## des CARACTÈRES, pas des octets — un accent occupe deux octets en UTF-8.
+assert("Ollin".len() == 5)
+assert("héllo".len() == 5)
+assert("Ollin".upper() == "OLLIN")
+assert("ÉCLAIR".lower() == "éclair")
+assert("  bord  ".trim() == "bord")
+assert("  bord  ".ltrim() == "bord  ")
+assert("  bord  ".rtrim() == "  bord")
+assert("abcdef".substr(2, 3) == "bcd")     ## début en 1, longueur
+assert("abcdef".substr(2) == "bcdef")      ## sans longueur : jusqu'à la fin
+assert("abcdef".substr(10, 2) == "")       ## début hors chaîne : vide, pas d'erreur
+assert("héllo".char(2) == "é")             ## le 2e CARACTÈRE, pas le 2e octet
+assert("abc".char(9) == "")                ## hors chaîne : vide
+
+## la forme module et la forme méthode donnent le même résultat
+var mot = "Ollin"
+assert(string.upper(mot) == mot.upper())
+assert(string.substr(mot, 2, 3) == mot.substr(2, 3))
+
+## le résultat est une chaîne comme une autre : les appels se chaînent
+assert("  MiXte  ".trim().lower().substr(1, 2) == "mi")
+assert(("a" + "b").upper() == "AB")
+
 ## ── 17. Import ───────────────────────────────────────────────────────────────
 
 ## import plat : les symboles du fichier sont injectés dans le scope courant
