@@ -138,13 +138,13 @@ prétexte de cette colonne.
 
 | Fichier | Maintenu par | Rôle |
 |---|---|---|
-| `tests/syntax.ol` | Claude | source de vérité syntaxe + suite de tests complète |
-| `tests/regressions.ol` | Claude | non-régression des bugs corrigés en revue (coins peu couverts par `syntax.ol` : multi-retour closure/méthode, `super` 3 niveaux, clobber de registre sur appel 0-arg, lvalues chaînées, range ouvert…) |
+| `tests/syntax.ol` | Claude | source de vérité syntaxe + suite de tests complète — **toute forme du langage y figure** |
+| `tests/regressions.ol` | Claude | non-régression des bugs corrigés en revue : COMBINAISONS et pièges d'implémentation (registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…), jamais une forme syntaxique à elle seule — celle-ci va dans `syntax.ol` |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `tools/ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutoriel.html` et `tools/ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutoriel.html` et `tools/ollin-vscode/`. **Tout élément syntaxique du langage vit dans `tests/syntax.ol`** : une forme couverte seulement par `regressions.ol` est un manque à combler, pas une couverture. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 **Règle (permanente) : exécuter `bash tests/run.sh` avant CHAQUE commit, sans exception.**
 Pas seulement après une évolution du moteur (VM, compilateur, modules natifs) : aussi pour un

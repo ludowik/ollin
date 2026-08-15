@@ -64,6 +64,13 @@ assert(r == nil)
 a = 99
 assert(a == 99)
 
+## affectation multiple sur des variables DÉJÀ déclarées (sans `var`) : les valeurs sont
+## distribuées comme à la déclaration, y compris depuis un appel à retours multiples.
+a, b = 1, 2
+assert(a == 1 and b == 2)
+a, b = b, a                 ## échange : le membre droit est évalué avant d'écrire
+assert(a == 2 and b == 1)
+
 ## affectations composées
 var c = 10
 c += 3
@@ -436,6 +443,21 @@ func minmax(a, b)
 end
 var lo, hi = minmax(7, 3)
 assert(lo == 3 and hi == 7)
+
+## les mêmes valeurs, affectées à des cibles DÉJÀ déclarées : variables, champ de map ou
+## élément de tableau. Une cible au-delà du nombre de valeurs reçues devient nil.
+lo, hi = minmax(2, 8)
+assert(lo == 2 and hi == 8)
+var cible = {}
+var tab = [0, 0]
+cible.min, tab[2] = minmax(5, 1)
+assert(cible.min == 1 and tab[2] == 5)
+func seule()
+    return 4
+end
+var trop1, trop2 = 7, 7
+trop1, trop2 = seule()      ## une seule valeur rendue → la 2e cible passe à nil
+assert(trop1 == 4 and trop2 == nil)
 
 ## récursion
 func fact(n)
@@ -864,6 +886,18 @@ assert(d.speak() == "Rex says woof")
 assert(d.fetch() == "Rex fetches!")
 assert(d.name == "Rex")
 
+## `super.` ne sert pas qu'au constructeur : il appelle la version PARENTE de n'importe
+## quelle méthode, y compris quand l'enfant la redéfinit sous le même nom.
+class Chien extends Animal
+    func init(name)
+        super.init(name, "woof")
+    end
+    func speak()
+        return "[" + super.speak() + "]"      ## redéfinie ET appelée sur le parent
+    end
+end
+assert(Chien("Rex").speak() == "[Rex says woof]")
+
 ## héritage sans init propre (hérite du parent)
 class Cat extends Animal
     func purr()
@@ -913,6 +947,41 @@ var v2 = Vec2(3, 4)
 var v3 = v1 + v2
 assert(v3.x == 4)
 assert(v3.y == 6)
+
+## le jeu complet : chaque opérateur a sa méta-méthode. Les comparaisons manquantes sont
+## dérivées de celles-ci — `a > b` est `not a.__le(b)`, `a >= b` est `not a.__lt(b)`, et
+## `a <> b` nie `__eq` : il suffit donc de définir __eq, __lt et __le.
+class Nombre
+    func init(v)
+        self.v = v
+    end
+    func __add(o)  return Nombre(self.v + o.v)  end
+    func __sub(o)  return Nombre(self.v - o.v)  end
+    func __mul(o)  return Nombre(self.v * o.v)  end
+    func __div(o)  return Nombre(self.v / o.v)  end
+    func __mod(o)  return Nombre(self.v % o.v)  end
+    func __neg()   return Nombre(-self.v)  end
+    func __eq(o)   return self.v == o.v  end
+    func __lt(o)   return self.v < o.v  end
+    func __le(o)   return self.v <= o.v  end
+    func __str()   return "Nombre({self.v})"  end
+end
+
+var n10 = Nombre(10)
+var n4 = Nombre(4)
+assert((n10 + n4).v == 14)
+assert((n10 - n4).v == 6)
+assert((n10 * n4).v == 40)
+assert((n10 / n4).v == 2.5)
+assert((n10 % n4).v == 2)
+assert((-n10).v == -10)
+assert(n10 == Nombre(10))
+assert(n10 <> n4)
+assert(n4 < n10 and not (n10 < n4))
+assert(n10 <= Nombre(10))
+assert(n10 > n4)              ## dérivé de __le
+assert(n10 >= Nombre(10))     ## dérivé de __lt
+assert("{n10}" == "Nombre(10)")
 
 ## méthodes statiques (appelables sur la classe, pas de self)
 class Factory
