@@ -50,8 +50,9 @@
   </style>
 
   <div id="bar">
-    <!-- Tout est cadré à droite : Recharger · Relancer · Capture · Pause · Éditeur,
-         puis « Ollin » au bout, comme dans les autres barres. -->
+    <!-- « Ollin » à gauche comme dans les autres barres ; le reste cadré à droite :
+         Recharger · Relancer · Capture · Pause · Éditeur. -->
+    <span class="bar-logo">Ollin</span>
     <span class="sp"></span>
     <span id="status">Chargement…</span>
     <button id="reload-btn" class="bar-btn" title="Recharger la page (instance WASM neuve, chemin sûr)">
@@ -76,7 +77,6 @@
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
       <span class="bar-label">Éditeur</span>
     </a>
-    <span class="bar-logo">Ollin</span>
   </div>
   <div id="stage-wrap">
     <div id="output-pane">
