@@ -359,6 +359,7 @@ pre:hover .code-actions,
   /* Le hamburger est logé dans la barre, à gauche : le contenu de la barre commence
      après lui, sinon « Ollin » se retrouverait dessous. */
   #tuto-bar { padding-left: 64px; }
+  #tuto-bar .bar-label { display: none; }   /* icônes seules : la barre reste sur une ligne */
 
   nav {
     position: fixed;
@@ -399,12 +400,16 @@ pre:hover .code-actions,
 <!-- Barre de menu — même position et même style que celles du playground et du mode
      plein écran. Un seul bouton pour l'instant : l'accès au playground. -->
 <div id="tuto-bar">
-  <span class="bar-logo">Ollin</span>
   <span class="sp"></span>
+  <button id="hard-reload-btn" class="bar-btn" title="Recharger en vidant le cache (récupère le dernier WASM)">
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
+    <span class="bar-label">Recharger</span>
+  </button>
   <a class="bar-btn" href="#/playground" title="Ouvrir le playground">
     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
-    <span>Playground</span>
+    <span class="bar-label">Playground</span>
   </a>
+  <span class="bar-logo">Ollin</span>
 </div>
 
 <button class="hamburger" id="ham" aria-label="Menu">
@@ -418,10 +423,6 @@ pre:hover .code-actions,
     <p>Documentation</p>
     <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-14 15:15</span></p>
   </div>
-  <button id="hard-reload-btn" title="Recharger en vidant le cache (récupère le dernier WASM)" style="display:flex;align-items:center;justify-content:center;gap:6px;margin:0 16px 8px;padding:6px 10px;font-size:0.78em;background:var(--bg2);border:1px solid var(--border);border-radius:4px;color:var(--muted);cursor:pointer;width:calc(100% - 32px)">
-    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
-    Recharger
-  </button>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
   <a href="#types">Types</a>
