@@ -24,6 +24,7 @@
            border-bottom:1px solid var(--border); }
     #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
     #bar a:hover { text-decoration:underline; }
+    #bar .bar-logo { font-weight:700; font-size:16px; color:var(--accent); letter-spacing:-0.3px; }
     #bar .sp { flex:1; }
     /* Boutons de la barre (Recharger / Relancer / Pause) : style unique. */
     .bar-btn { display:flex; align-items:center; gap:5px; background:transparent;
@@ -49,7 +50,9 @@
   </style>
 
   <div id="bar">
-    <!-- Tout est cadré à droite : Recharger · Relancer · Pause · Éditeur. -->
+    <!-- « Ollin » à gauche comme dans les autres barres ; le reste cadré à droite :
+         Recharger · Relancer · Capture · Pause · Éditeur. -->
+    <span class="bar-logo">Ollin</span>
     <span class="sp"></span>
     <span id="status">Chargement…</span>
     <button id="reload-btn" class="bar-btn" title="Recharger la page (instance WASM neuve, chemin sûr)">
