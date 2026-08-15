@@ -227,9 +227,13 @@ func construireVoile()
     for f in [0.985, 0.94, 0.90, 0.86, 0.82, 0.78, 0.74, 0.70, 0.62, 0.52, 0.40, 0.26, 0.12, 0.0] do
         rayons[#rayons + 1] = R_OMBRE * f
     end
+    ## Couleur prise au MILIEU de la bande, pas à son bord interne : au bord, chaque bande
+    ## prend la teinte la plus sombre qu'elle contient, et tout le dégradé se trouve décalé
+    ## d'une demi-bande vers l'extérieur — le bord de la pénombre partait alors à 0,96 au
+    ## lieu de 1,00, sans transition.
     var ext = R_PENOMBRE
     for i = 1, #rayons do
-        voile[i] = {ext: ext, int: rayons[i], couleur: voileA(rayons[i])}
+        voile[i] = {ext: ext, int: rayons[i], couleur: voileA((ext + rayons[i]) / 2)}
         ext = rayons[i]
     end
 end

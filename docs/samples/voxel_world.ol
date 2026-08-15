@@ -536,17 +536,34 @@ func movePlayer()
         return
     end
     var sp = vel * deltaTime
-    var nx = camX + math.sin(yaw) * sp
-    var nz = camZ + math.cos(yaw) * sp
-    var g0 = ground(camX, camZ)
+    ## Déplacement découpé en sous-pas d'un DEMI-BLOC au plus. La garde ci-dessous ne
+    ## compare que le sol de départ et celui d'arrivée : un pas plus large qu'un bloc peut
+    ## enjamber un mur étroit sans jamais l'échantillonner. Cela n'arrive qu'en dessous de
+    ## huit images par seconde — une frame très longue, par exemple pendant une cuisson de
+    ## chunks — mais le joueur se retrouve alors DANS le terrain.
+    var pas = math.max(math.ceil(math.abs(sp) / 0.5), 1)
+    var dx = math.sin(yaw) * sp / pas
+    var dz = math.cos(yaw) * sp / pas
     var moved = false
-    if ground(nx, camZ) - g0 <= STEP then
-        camX = nx
-        moved = true
-    end
-    if ground(camX, nz) - g0 <= STEP then
-        camZ = nz
-        moved = true
+    for i = 1, pas do
+        var g0 = ground(camX, camZ)
+        var nx = camX + dx
+        var nz = camZ + dz
+        var bloque = true
+        if ground(nx, camZ) - g0 <= STEP then
+            camX = nx
+            moved = true
+            bloque = false
+        end
+        if ground(camX, nz) - g0 <= STEP then
+            camZ = nz
+            moved = true
+            bloque = false
+        end
+        ## Mur atteint : les sous-pas restants n'iraient pas plus loin.
+        if bloque then
+            break
+        end
     end
     ## Face à un mur, on retombe à zéro : sinon la vitesse continuerait de monter
     ## dans le vide et le joueur bondirait en se dégageant.
