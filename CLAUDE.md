@@ -146,9 +146,12 @@ prétexte de cette colonne.
 
 **Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `syntax.ol`, `docs/views/tutoriel.html` et `tools/ollin-vscode/`. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
-**Règle** : après toute évolution du moteur (VM, compilateur, modules natifs…), exécuter
-`bash tests/run.sh` (couvre `syntax.ol`, `regressions.ol`, `test_errors.sh`, `check_naming.sh`)
-pour valider l'absence de régression avant de considérer le changement terminé.
+**Règle (permanente) : exécuter `bash tests/run.sh` avant CHAQUE commit, sans exception.**
+Pas seulement après une évolution du moteur (VM, compilateur, modules natifs) : aussi pour un
+exemple `.ol`, la web app, un commentaire, la documentation. La suite couvre `syntax.ol`,
+`regressions.ol`, `test_errors.sh` et `check_naming.sh`, et dure quelques secondes — juger au
+cas par cas qu'un changement « ne peut rien casser » est un pari qui coûte plus cher qu'elle.
+Un commit ne part que sur un « TOUT VERT ».
 
 ## Versionning
 
