@@ -1092,4 +1092,54 @@ func maVarargs(...)
 end
 maVarargs("a", "b")
 
+## ── Comportement des boucles et des appels (déplacé de syntax.ol) ───────────
+## Ce ne sont pas des formes du langage mais des règles de SÉMANTIQUE, et chacune a été
+## cassée au moins une fois par une optimisation du compilateur (aliasage de la variable
+## de boucle, recyclage de registres, fermeture des upvalues en fin de tour).
+
+## Modifier la variable de boucle dans le corps n'affecte pas l'itération : le compteur
+## est isolé de la variable visible (chemin sans alias).
+var boS = 0
+var boN = 0
+for i = 1, 3 do
+    boS += i
+    i = i + 100
+    boN += 1
+end
+assert(boS == 6 and boN == 3)
+
+## La variable de boucle est locale à la boucle : une variable externe de même nom est
+## masquée pendant, puis restaurée.
+var boExt = 99
+for boExt = 1, 3 do end
+assert(boExt == 99)
+
+## Une variable PAR ITÉRATION : les upvalues sont fermées en fin de tour, donc chaque
+## closure garde la valeur de son propre tour (modèle Lua 5.4 / `let`).
+var boCl = []
+var boI = 0
+for v in [10, 20, 30] do
+    boI += 1
+    boCl[boI] = func() return v end
+end
+assert(boCl[1]() == 10 and boCl[2]() == 20 and boCl[3]() == 30)
+
+## L'ancienne parade — capturer par valeur via une fonction appelée sur place — donne le
+## même résultat : elle n'est plus nécessaire, mais elle doit rester correcte.
+var boIife = []
+for i = 1, 3 do
+    boIife[i] = (func(x) return func() return x end end)(i)
+end
+assert(boIife[1]() == 1 and boIife[2]() == 2 and boIife[3]() == 3)
+
+## Résultat d'un appel comme opérande GAUCHE : il ne doit pas être écrasé par l'évaluation
+## de l'opérande droit (le cas 0-arg avait ce défaut — registre du retour réutilisé).
+func apCinq() return 5 end
+func apTrois() return 3 end
+assert(apCinq() + 2 == 7)
+assert(apCinq() * 2 == 10)
+assert(apCinq() ^ 2 == 25)
+assert(apCinq() + apTrois() == 8)
+assert((apCinq() < 10) == 1)
+
 print("regressions ok")

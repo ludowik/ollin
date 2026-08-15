@@ -277,36 +277,6 @@ for i = 5, 1, -1 do
 end
 assert(s4 == 15)
 
-## modifier la variable de boucle dans le corps n'affecte PAS l'itération
-## (la valeur de contrôle est isolée — chemin sans alias)
-var s4b = 0
-var cnt4 = 0
-for i = 1, 3 do
-    s4b += i
-    i = i + 100      ## sans effet sur l'itération
-    cnt4 += 1
-end
-assert(s4b == 6 and cnt4 == 3)
-
-## la variable de boucle est LOCALE à la boucle : une variable externe de
-## même nom n'est pas modifiée par la boucle (shadow, puis restaurée)
-var ish = 99
-for ish = 1, 3 do end
-assert(ish == 99)
-
-## closures créées dans une boucle : chaque itération a SA variable (les upvalues sont
-## fermées en fin de tour), donc chaque closure garde la valeur de son propre tour
-var cl = []
-var ci = 0
-for v in [10, 20, 30] do ci += 1  cl[ci] = func() return v end end
-var pad_after = 1
-assert(cl[1]() == 10 and cl[2]() == 20 and cl[3]() == 30)
-## capture par valeur via IIFE : même résultat, l'astuce n'est plus nécessaire
-var cv = []
-var cj = 0
-for v in [10, 20, 30] do cj += 1  cv[cj] = (func(x) return func() return x end end)(v) end
-assert(cv[1]() == 10 and cv[2]() == 20 and cv[3]() == 30)
-
 ## break dans for range
 var s5 = 0
 for i in [1;100] do
@@ -384,25 +354,10 @@ func add(a, b)
 end
 assert(add(3, 4) == 7)
 
-## appel (y compris 0-arg) comme opérande gauche d'un opérateur binaire :
-## le résultat de l'appel ne doit pas être écrasé par l'opérande droit
-func five() return 5 end
-func three() return 3 end
-assert(five() + 2 == 7)
-assert(five() * 2 == 10)
-assert(five() ^ 2 == 25)
-assert(five() + three() == 8)
-assert((five() < 10) == 1)
-
 ## postfix sur expression parenthésée : (expr)(args), (expr)[i], (expr).champ
 assert((func(x) return x * 2 end)(21) == 42)   ## appel d'une lambda parenthésée
 assert(([10, 20, 30])[2] == 20)                 ## index
 assert(({a: 7}).a == 7)                         ## champ
-## capture par valeur via IIFE (échappatoire closures dans une boucle)
-var caps = []
-for i = 1, 3 do caps[i] = (func(x) return func() return x end end)(i) end
-assert(caps[1]() == 1 and caps[2]() == 2 and caps[3]() == 3)
-
 ## appel optionnel f?() : nil → rien (nil), fonction → appel, autre → erreur
 assert(add?(3, 4) == 7)     ## callable → appel normal
 var maybe = nil
