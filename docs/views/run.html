@@ -1,7 +1,9 @@
 <!-- Vue RUN (exécution autonome) — fragment monté par app.js dans #view.
      Canvas partagé (shell) reparenté dans #output-pane par run.js. -->
   <style>
-    :root { --bg:#0e0e12; --fg:#e6e6ee; --dim:#8a8a99; --accent:#7c83ff; --border:#2a2a36; }
+    /* Mêmes valeurs que le playground et la doc : les trois barres doivent être
+       identiques, pas seulement ressemblantes. */
+    :root { --bg:#0f1117; --surface:#1a1d2e; --fg:#e6e6ee; --dim:#7c85a2; --accent:#7c83ff; --border:#2e3150; }
     * { box-sizing: border-box; }
     /* min-height:0 annule le min-height:100vh du shell (sur mobile 100vh = viewport
        LARGE → fenetre plus haute que l'ecran, defilante). overflow:hidden +
@@ -18,16 +20,16 @@
 
     /* Barre de menu — sous l'encoche (safe-area-inset-top). Ne fait PAS partie
        de la zone graphique. */
-    #bar { flex:none; display:flex; align-items:center; gap:12px; font-size:13px;
+    #bar { flex:none; display:flex; align-items:center; gap:10px; font-size:13px;
+           background:var(--surface);
            height: calc(48px + env(safe-area-inset-top));
            padding: env(safe-area-inset-top) 14px 0;
            border-bottom:1px solid var(--border); }
-    #bar a { color:var(--accent); text-decoration:none; display:flex; align-items:center; gap:6px; }
-    #bar a:hover { text-decoration:underline; }
+    #bar a { text-decoration:none; }
     #bar .bar-logo { font-weight:700; font-size:16px; color:var(--accent); letter-spacing:-0.3px; }
     #bar .sp { flex:1; }
     /* Boutons de la barre (Recharger / Relancer / Pause) : style unique. */
-    .bar-btn { display:flex; align-items:center; gap:5px; background:transparent;
+    .bar-btn { display:flex; align-items:center; gap:5px; background:transparent; line-height:1;
                border:1px solid var(--border); color:var(--dim); border-radius:6px;
                padding:8px 12px; font:inherit; font-size:12px; font-weight:500; cursor:pointer;
                transition:background 0.15s, border-color 0.15s, color 0.15s; }
@@ -73,7 +75,7 @@
     </button>
     <!-- Retour à l'éditeur : tout à DROITE, au même coin que le bouton « Plein
          écran » de l'éditeur (le même coin fait l'aller-retour). -->
-    <a href="#/playground" title="Retour à l'éditeur">
+    <a class="bar-btn" href="#/playground" title="Retour à l'éditeur">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
       <span class="bar-label">Éditeur</span>
     </a>
