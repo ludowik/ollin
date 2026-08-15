@@ -23,6 +23,15 @@
 // qu'un rechargement (ou hardReload) repart avec un jeton frais → dernière
 // version déployée. (Avant : Date.now() à chaque import → fuite par navigation.)
 const V = Date.now()
+
+// Feuille commune des barres de menu. Injectée ICI et non déclarée dans index.html :
+// index.html peut être servi depuis le cache du navigateur, et une version antérieure à
+// l'ajout du fichier ne le référencerait pas — alors que les vues, elles, sont toujours
+// chargées fraîches et n'ont plus de styles de barre en propre. Les barres seraient alors
+// sans style du tout (constaté). app.js, lui, est importé avec un jeton de version, donc
+// toujours frais : la feuille suit.
+document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
+
 const { hardReload } = await import('./pg-run.js?v=' + V)
 
 // Capture de crash à l'écran (diagnostic device — iOS plein écran sans console).
