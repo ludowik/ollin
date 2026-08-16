@@ -3,6 +3,7 @@
 ###
 
 ## ── 1. Commentaires ──────────────────────────────────────────────────────────
+## [grammaire: line_comment, block_comment]
 
 ## commentaire de fin de ligne
 
@@ -12,6 +13,7 @@ multi-lignes
 ###
 
 ## ── 2. Types & littéraux ─────────────────────────────────────────────────────
+## [grammaire: NUMBER, exponent, hexDigit, octDigit, binDigit, digit, STRING, strChar, placeholder, fmtSpec, convChar, BOOL, NIL, IDENT, letter]
 
 var n_int   = 42            ## entier (int64)
 var n_float = 3.14          ## flottant (double)
@@ -49,6 +51,7 @@ var faux  = false           ## booléen (stocké comme entier 0)
 var rien  = nil             ## valeur absente
 
 ## ── 3. Variables ─────────────────────────────────────────────────────────────
+## [grammaire: varDecl, globalDecl, assignStmt, program, stmt, exprStmt]
 ## Toute variable DOIT être déclarée avec `var` avant usage.
 ## Lire/affecter un nom non déclaré = erreur de compilation.
 ## `var` ne crée que des variables locales.
@@ -119,6 +122,7 @@ assert(shadow_test() == 7)
 assert(gshadow == 100)
 
 ## ── 4. Arithmétique ──────────────────────────────────────────────────────────
+## [grammaire: additive, multiplicative, power, unary, primary, expr]
 
 assert(2 + 3   == 5)
 assert(10 - 4  == 6)
@@ -146,6 +150,7 @@ assert(-2 ^ 2    == -4)        ## ^ plus prioritaire que le moins unaire
 assert(2 ^ 2 ^ 3 == 256)       ## associatif à droite : 2^(2^3)
 
 ## ── 5. Comparaisons ──────────────────────────────────────────────────────────
+## [grammaire: comparison]
 
 assert(1 == 1)
 assert(1 <> 2)
@@ -162,6 +167,7 @@ assert(1 == 1.0)
 assert(1.0 <> 2)
 
 ## ── 6. Logique ───────────────────────────────────────────────────────────────
+## [grammaire: logical, logicalAnd]
 
 assert(true  or  false)
 assert(false or  true)
@@ -193,6 +199,7 @@ assert(not not {a:1})  ## map non vide : truthy
 assert(not not [1])    ## array non vide : truthy
 
 ## ── 7. Opérateurs bits ───────────────────────────────────────────────────────
+## [grammaire: bitwiseOr, bitwiseXor, bitwiseAnd, shift]
 
 assert((12 & 10)  == 8)        ## ET
 assert((12 | 10)  == 14)       ## OU
@@ -203,6 +210,7 @@ assert((1 << 3)   == 8)
 assert((16 >> 2)  == 4)
 
 ## ── 8. If / else if / else ───────────────────────────────────────────────────
+## [grammaire: ifStmt]
 
 var score = 75
 var grade = "F"
@@ -222,6 +230,7 @@ if true then ok = true end
 assert(ok)
 
 ## ── 9. While ─────────────────────────────────────────────────────────────────
+## [grammaire: whileStmt]
 
 var i = 0
 while i < 5 do
@@ -248,6 +257,7 @@ end
 assert(sum == 25)   ## 1+3+5+7+9
 
 ## ── 10. For ──────────────────────────────────────────────────────────────────
+## [grammaire: forStmt, rangeLit]
 
 ## range inclusif [1;5] → 1,2,3,4,5
 var s1 = 0
@@ -347,6 +357,7 @@ end
 assert(cs2 == 9)   ## 1+3+5
 
 ## ── 11. Fonctions ────────────────────────────────────────────────────────────
+## [grammaire: funcDecl, params, param, returnStmt, retvals, call, lambdaExpr]
 
 ## déclaration et appel
 func add(a, b)
@@ -457,6 +468,7 @@ assert(handlers.add(10) == 15)
 assert(handlers.add(10, 20) == 30)
 
 ## ── 12. Closures ─────────────────────────────────────────────────────────────
+## [grammaire: lambdaExpr]
 
 ## upvalue : variable de la portée englobante
 var counter = 0
@@ -505,6 +517,7 @@ var double = func(x)  return x * 2  end
 assert(double(7) == 14)
 
 ## ── 13. Gestion d'erreurs ────────────────────────────────────────────────────
+## [grammaire: tryStmt, throwStmt]
 
 ## throw + catch
 var caught = nil
@@ -539,6 +552,7 @@ catch err
 end
 
 ## ── 14. Maps ─────────────────────────────────────────────────────────────────
+## [grammaire: mapLit, mapEntry, indexAssign]
 
 ## création
 var vide = {}
@@ -648,6 +662,7 @@ end
 assert(sum_map_vals({x: 1, y: 2, z: 3}) == 6)
 
 ## ── 15. Arrays ───────────────────────────────────────────────────────────────
+## [grammaire: arrayLit]
 
 ## création
 var arr = [10, 20, 30]
@@ -777,6 +792,7 @@ assert(string.upper("Ollin") == "Ollin".upper())
 assert("  MiXte  ".trim().lower().substr(1, 2) == "mi")
 
 ## ── 17. Import ───────────────────────────────────────────────────────────────
+## [grammaire: importStmt]
 
 ## import plat : les symboles du fichier sont injectés dans le scope courant
 import "utils_test1"
@@ -792,6 +808,7 @@ import "utils_test1"
 assert(CONST == 42)   ## toujours disponible
 
 ## ── 18. Classes ──────────────────────────────────────────────────────────────
+## [grammaire: classDecl, method, methodCall, superCall]
 
 ## classe de base
 class Animal
@@ -926,6 +943,7 @@ assert(f7.get() == 7)
 print("class tests ok")
 
 ## ── 19. Constantes ───────────────────────────────────────────────────────────
+## [grammaire: constDecl]
 
 ## 'const' : locale immuable, initialisation obligatoire
 const PI = 3.14159
@@ -1011,6 +1029,7 @@ math.noiseSeed(2)
 assert(math.noise(1.7) <> nb)
 
 ## ── 22. Switch ───────────────────────────────────────────────────────────────
+## [grammaire: switchStmt]
 
 ## cas de base — valeur entière
 var sw_r = 0
@@ -1136,6 +1155,7 @@ am_mixed.sort()
 assert(am_mixed[1] == nil and am_mixed[2] == 1 and am_mixed[3] == 2.5 and am_mixed[4] == "z")
 
 ## ── 25. Bloc do...end (portée lexicale) ───────────────────────────────────────
+## [grammaire: doStmt]
 var do_x = 0
 do
     var do_tmp = 42
@@ -1159,6 +1179,7 @@ do
 end
 
 ## ── 26. enum (constantes nommées, map gelée) ─────────────────────────────────
+## [grammaire: enumDecl, enumTarget, enumItem]
 ## Sans valeur : le premier vaut 1, chacun suit à +1.
 enum Couleur ROUGE, VERT, BLEU end
 assert(Couleur.ROUGE == 1 and Couleur.VERT == 2 and Couleur.BLEU == 3)
@@ -1195,6 +1216,7 @@ enum enumCfg.mode PLEIN, FENETRE end
 assert(enumCfg.mode.PLEIN == 1 and enumCfg.mode.FENETRE == 2)
 
 ## ── 27. ref (passage par référence) ──────────────────────────────────────────
+## [grammaire: refExpr]
 ## `ref x` donne à une fonction le moyen de LIRE et d'ÉCRIRE la variable x.
 ## La cible reste une variable ordinaire : on la lit et on l'écrit normalement.
 global refCible = 1

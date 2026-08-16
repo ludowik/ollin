@@ -2,6 +2,7 @@
 # Lance TOUTE la suite de tests Ollin en une commande :
 #   - suites « pass » (.ol qui doivent s'exécuter sans erreur, avec asserts)
 #   - suite d'erreurs (messages de rejet du compilateur)
+#   - garde-fous : nommage de l'API, couverture de la grammaire par syntax.ol
 # Usage : bash tests/run.sh   (le binaire ./build/ollin doit être compilé)
 set -u
 OLLIN=${OLLIN:-./build/ollin}
@@ -41,6 +42,11 @@ fi
 
 echo "── garde-fou nommage API ─────────────────────────"
 if ! bash tests/check_naming.sh; then
+    fails=$((fails + 1))
+fi
+
+echo "── garde-fou couverture grammaire ────────────────"
+if ! bash tests/check_grammar_coverage.sh; then
     fails=$((fails + 1))
 fi
 
