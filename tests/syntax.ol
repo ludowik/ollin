@@ -399,20 +399,12 @@ end
 var lo, hi = minmax(7, 3)
 assert(lo == 3 and hi == 7)
 
-## les mêmes valeurs, affectées à des cibles DÉJÀ déclarées : variables, champ de map ou
-## élément de tableau. Une cible au-delà du nombre de valeurs reçues devient nil.
-lo, hi = minmax(2, 8)
-assert(lo == 2 and hi == 8)
+## les mêmes valeurs, affectées à des cibles DÉJÀ déclarées — variable, champ de map,
+## élément de tableau (la distribution elle-même est éprouvée dans `regressions.ol`).
 var cible = {}
 var tab = [0, 0]
-cible.min, tab[2] = minmax(5, 1)
-assert(cible.min == 1 and tab[2] == 5)
-func seule()
-    return 4
-end
-var trop1, trop2 = 7, 7
-trop1, trop2 = seule()      ## une seule valeur rendue → la 2e cible passe à nil
-assert(trop1 == 4 and trop2 == nil)
+lo, cible.min, tab[2] = minmax(5, 1)
+assert(lo == 1 and cible.min == 5 and tab[2] == nil)
 
 ## récursion
 func fact(n)
@@ -765,30 +757,24 @@ fifo.enqueue(20)
 assert(fifo.dequeue() == 10)
 assert(fifo.dequeue() == 20)
 
-## méthodes de chaînes : mêmes fonctions que le module `string`, appelées sur la chaîne
-## (le receveur est passé en premier argument). Les longueurs et les positions comptent
-## des CARACTÈRES, pas des octets — un accent occupe deux octets en UTF-8.
+## méthodes de chaînes : les fonctions du module `string` s'appellent aussi SUR la chaîne,
+## qui devient le premier argument. Comptage par caractère et bornes hors chaîne :
+## comportement, donc `regressions.ol`.
 assert("Ollin".len() == 5)
-assert("héllo".len() == 5)
 assert("Ollin".upper() == "OLLIN")
-assert("ÉCLAIR".lower() == "éclair")
+assert("OLLIN".lower() == "ollin")
 assert("  bord  ".trim() == "bord")
 assert("  bord  ".ltrim() == "bord  ")
 assert("  bord  ".rtrim() == "  bord")
 assert("abcdef".substr(2, 3) == "bcd")     ## début en 1, longueur
 assert("abcdef".substr(2) == "bcdef")      ## sans longueur : jusqu'à la fin
-assert("abcdef".substr(10, 2) == "")       ## début hors chaîne : vide, pas d'erreur
-assert("héllo".char(2) == "é")             ## le 2e CARACTÈRE, pas le 2e octet
-assert("abc".char(9) == "")                ## hors chaîne : vide
+assert("abcdef".char(1) == "a")
 
-## la forme module et la forme méthode donnent le même résultat
-var mot = "Ollin"
-assert(string.upper(mot) == mot.upper())
-assert(string.substr(mot, 2, 3) == mot.substr(2, 3))
+## la forme module et la forme méthode désignent la même fonction
+assert(string.upper("Ollin") == "Ollin".upper())
 
 ## le résultat est une chaîne comme une autre : les appels se chaînent
 assert("  MiXte  ".trim().lower().substr(1, 2) == "mi")
-assert(("a" + "b").upper() == "AB")
 
 ## ── 17. Import ───────────────────────────────────────────────────────────────
 
@@ -834,24 +820,18 @@ class Dog extends Animal
     func fetch()
         return self.name + " fetches!"
     end
+    ## `super.` ne sert pas qu'au constructeur : il appelle la version parente de
+    ## n'importe quelle méthode, ici redéfinie sous le même nom.
+    func crier()
+        return "[" + super.speak() + "]"
+    end
 end
 
 var d = Dog("Rex")
 assert(d.speak() == "Rex says woof")
 assert(d.fetch() == "Rex fetches!")
 assert(d.name == "Rex")
-
-## `super.` ne sert pas qu'au constructeur : il appelle la version PARENTE de n'importe
-## quelle méthode, y compris quand l'enfant la redéfinit sous le même nom.
-class Chien extends Animal
-    func init(name)
-        super.init(name, "woof")
-    end
-    func speak()
-        return "[" + super.speak() + "]"      ## redéfinie ET appelée sur le parent
-    end
-end
-assert(Chien("Rex").speak() == "[Rex says woof]")
+assert(d.crier() == "[Rex says woof]")
 
 ## héritage sans init propre (hérite du parent)
 class Cat extends Animal
@@ -883,29 +863,8 @@ ctr.increment()
 ctr.increment()
 assert(ctr.value() == 3)
 
-## metaméthodes arithmétiques
-class Vec2
-    func init(x, y)
-        self.x = x
-        self.y = y
-    end
-    func __add(other)
-        return Vec2(self.x + other.x, self.y + other.y)
-    end
-    func __str()
-        return "Vec2(" + self.x + "," + self.y + ")"
-    end
-end
-
-var v1 = Vec2(1, 2)
-var v2 = Vec2(3, 4)
-var v3 = v1 + v2
-assert(v3.x == 4)
-assert(v3.y == 6)
-
-## le jeu complet : chaque opérateur a sa méta-méthode. Les comparaisons manquantes sont
-## dérivées de celles-ci — `a > b` est `not a.__le(b)`, `a >= b` est `not a.__lt(b)`, et
-## `a <> b` nie `__eq` : il suffit donc de définir __eq, __lt et __le.
+## méta-méthodes : un opérateur du langage par méthode. Les comparaisons dérivées
+## (`>`, `>=`, `<>`) et leur symétrie sont de la sémantique → `regressions.ol`.
 class Nombre
     func init(v)
         self.v = v
@@ -931,11 +890,8 @@ assert((n10 / n4).v == 2.5)
 assert((n10 % n4).v == 2)
 assert((-n10).v == -10)
 assert(n10 == Nombre(10))
-assert(n10 <> n4)
-assert(n4 < n10 and not (n10 < n4))
+assert(n4 < n10)
 assert(n10 <= Nombre(10))
-assert(n10 > n4)              ## dérivé de __le
-assert(n10 >= Nombre(10))     ## dérivé de __lt
 assert("{n10}" == "Nombre(10)")
 
 ## méthodes statiques (appelables sur la classe, pas de self)
@@ -989,32 +945,10 @@ const BASE = 10
 func with_base(x)  return BASE + x  end
 assert(with_base(5) == 15)
 
-## les erreurs ci-dessous sont des erreurs de COMPILATION :
-##
-##   const x          ## ERROR: must be initialized
-##   const x = 1
-##   x = 2               ## ERROR: cannot assign to const 'x'
-##   x += 1              ## ERROR: cannot assign to const 'x'
-##   const k = 1
-##   func f()  k = 0  end  ## ERROR: cannot assign to const 'k'
-
-## ── 20. Erreurs de redéclaration (erreurs de compilation) ───────────────────
-##
-##   var x = 1
-##   var x = 2          ## ERROR: local variable 'x' already declared in this scope
-##
-##   global g = 1
-##   global g = 2       ## ERROR: global variable 'g' already declared
-##
-##   func f(a)
-##       var a = 1      ## ERROR: local variable 'a' already declared in this scope
-##   end
-##
-## Une locale dans une AUTRE fonction ne provoque pas d'erreur :
-##   var x = 1          ## OK : portée top-level
-##   func f()
-##       var x = 2      ## OK : portée distincte (registres de f)
-##   end
+## Ce que le moteur doit REFUSER (const non initialisée, écriture sur une constante,
+## redéclaration d'une locale ou d'une globale) est vérifié par `tests/test_errors.sh`,
+## avec le message rendu. Ne pas le recopier ici en commentaire : deux descriptions du
+## même refus divergent tôt ou tard.
 
 ## ── 21. Module math ──────────────────────────────────────────────────────────
 
