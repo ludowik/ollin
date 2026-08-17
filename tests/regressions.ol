@@ -1130,4 +1130,69 @@ for v in [10, 20, 30] do
 end
 assert(boCl[1]() == 10 and boCl[2]() == 20 and boCl[3]() == 30)
 
+## ── tween : plan de lecture (repeat / yoyo / loop) ──────────────────────────
+## `repeat` et `yoyo` COMPOSENT : chacun transforme le plan construit jusque-là, d'où une
+## sémantique qui dépend de l'ordre des appels. Les positions sont relevées tous les
+## demi-temps, l'animation durant 1 s : on lit donc le milieu puis l'extrémité de chaque
+## parcours. En natif headless c'est `tween.update` qui avance (le moteur ne tourne pas).
+func plParcours(mods, tours)
+    var o = {x: 0}
+    var t = tween.to(o, {x: 10}, 1.0, "linear")
+    mods(t)
+    var vues = []
+    for i = 1, tours do
+        tween.update(0.5)
+        vues[#vues + 1] = math.round(o.x)
+    end
+    return vues
+end
+
+## repeat(2) : deux allers. À la fin du premier, la position revient au départ.
+var plR = plParcours(func(t) t.repeat(2) end, 5)
+assert(plR[1] == 5 and plR[2] == 0 and plR[3] == 5 and plR[4] == 10 and plR[5] == 10)
+
+## repeat(2).yoyo() : les deux allers, PUIS les deux retours (+1 +1 -1 -1). Entre deux
+## retours la position saute de 0 à 10, comme elle saute de 10 à 0 entre deux allers :
+## chaque segment rejoue le parcours entier dans son sens.
+var plRY = plParcours(func(t) t.repeat(2).yoyo() end, 9)
+assert(plRY[4] == 10 and plRY[5] == 5 and plRY[6] == 10 and plRY[8] == 0)
+
+## yoyo().repeat(2) : deux allers-retours (+1 -1 +1 -1) — l'ordre des appels compte.
+var plYR = plParcours(func(t) t.yoyo().repeat(2) end, 9)
+assert(plYR[2] == 10 and plYR[4] == 0 and plYR[6] == 10 and plYR[8] == 0)
+
+## Les bornes sont figées au premier démarrage : écrire dans l'objet en pleine animation ne
+## redéfinit pas le départ du parcours suivant (sinon un retour dériverait).
+var plO = {x: 0}
+var plT = tween.to(plO, {x: 10}, 1.0, "linear").repeat(2)
+tween.update(0.5)
+plO.x = 100
+tween.update(0.5)
+assert(plO.x == 0)
+plT.cancel()
+
+## Un plan sans fin ne se termine pas de lui-même, et sa progression est celle du tour
+## courant ; `progress` d'un plan fini couvre en revanche TOUS ses segments.
+var plL = {x: 0}
+var plTL = tween.to(plL, {x: 10}, 1.0, "linear").loop()
+tween.update(2.25)
+assert(not plTL.isDone() and math.abs(plTL.progress() - 0.25) < 0.001)
+plTL.cancel()
+var plF = {x: 0}
+var plTF = tween.to(plF, {x: 10}, 1.0, "linear").repeat(4)
+tween.update(2.0)
+assert(math.abs(plTF.progress() - 0.5) < 0.001)
+plTF.cancel()
+
+## Handle périmé : garder le handle d'une animation finie est normal, les modificateurs
+## doivent y être inoffensifs.
+var plD = {x: 0}
+var plTD = tween.to(plD, {x: 1}, 0.1, "linear")
+tween.update(0.2)
+assert(plTD.isDone())
+plTD.repeat(3)
+plTD.yoyo()
+plTD.loop()
+assert(plTD.isDone())
+
 print("regressions ok")

@@ -184,8 +184,18 @@ struct Chan {
     bool integral = false;   // départ ET cible entiers → on arrondit (pas de dérive en float)
 };
 
+// Plan de LECTURE : un segment par parcours de l'animation, +1 dans le sens déclaré,
+// -1 en arrière. `repeat(n)` répète la liste, `yoyo()` y ajoute son miroir (liste renversée,
+// sens inversés) — les deux COMPOSENT donc, et l'ordre des appels compte :
+//   .repeat(2)          → +1 +1          (deux allers)
+//   .repeat(2).yoyo()   → +1 +1 -1 -1    (deux allers, puis les deux retours)
+//   .yoyo().repeat(2)   → +1 -1 +1 -1    (deux allers-retours)
+// Un plan vide n'existe pas : tout tween démarre avec un segment.
 struct Tw {
     std::vector<Chan> chans;
+    std::vector<int8_t> plan{1};
+    size_t seg = 0;      // segment en cours dans le plan
+    bool endless = false;   // le plan est rejoué sans fin (loop)
     double dur = 0.0;
     double elapsed = 0.0;
     double delay = 0.0;
@@ -239,6 +249,7 @@ void free_tween(int slot) {
     t.gen++;
     t.chans.clear();       // relâche les Value retenues : sans cela le module garderait
     t.curve_fn = Value{};  // l'objet animé vivant longtemps après la fin de l'animation
+    t.plan.assign(1, 1);
     t.on_done = Value{};
     s_free.push_back(slot);
 }
@@ -542,8 +553,53 @@ int method_progress(CallCtx& ctx) {
     if (slot < 0)
         return ctx.ret(Value(1.0));
     const Tw& t = s_tweens[slot];
+    // Avancement sur le PLAN entier (segment courant compris) : un plan de quatre segments
+    // à mi-deuxième segment rend 0,375. Un plan sans fin rend l'avancement de son tour.
     double p = t.dur > 0.0 ? t.elapsed / t.dur : 1.0;
+    if (p > 1.0)
+        p = 1.0;
+    double total = t.endless ? 1.0 : (double)t.plan.size();
+    double base = t.endless ? 0.0 : (double)t.seg;
+    p = (base + p) / total;
     return ctx.ret(Value(p < 0.0 ? 0.0 : (p > 1.0 ? 1.0 : p)));
+}
+
+// Répète le plan courant `n` fois : `n` est un nombre de LECTURES, pas de répétitions
+// supplémentaires — repeat(2) joue deux fois, repeat(1) ne change rien.
+int method_repeat(CallCtx& ctx) {
+    double n = num_arg(ctx.args, ctx.argc, 1, "tween.repeat");
+    if (n < 1.0 || n != std::floor(n))
+        throw std::runtime_error("tween.repeat: le nombre de lectures doit être un entier >= 1");
+    int slot = handle_slot(ctx.args[0], "tween.repeat");
+    if (slot >= 0) {
+        std::vector<int8_t>& plan = s_tweens[slot].plan;
+        std::vector<int8_t> bloc = plan;
+        for (int k = 1; k < (int)n; k++)
+            plan.insert(plan.end(), bloc.begin(), bloc.end());
+    }
+    return ctx.ret(ctx.args[0]);
+}
+
+// Ajoute au plan courant sa lecture EN ARRIÈRE : le miroir, c'est la liste renversée avec
+// les sens inversés. Appliqué au plan entier, pas au dernier segment — d'où la composition
+// annoncée plus haut.
+int method_yoyo(CallCtx& ctx) {
+    int slot = handle_slot(ctx.args[0], "tween.yoyo");
+    if (slot >= 0) {
+        std::vector<int8_t>& plan = s_tweens[slot].plan;
+        for (size_t i = plan.size(); i > 0; i--)
+            plan.push_back((int8_t)-plan[i - 1]);
+    }
+    return ctx.ret(ctx.args[0]);
+}
+
+// Rejoue le plan sans fin. Le tween ne se libère alors plus de lui-même : il retient son
+// objet jusqu'à `cancel()` (ou la fin du programme).
+int method_loop(CallCtx& ctx) {
+    int slot = handle_slot(ctx.args[0], "tween.loop");
+    if (slot >= 0)
+        s_tweens[slot].endless = true;
+    return ctx.ret(ctx.args[0]);
 }
 
 // Retarde le DÉMARRAGE : la valeur de départ est lue au premier avancement réel, donc
@@ -567,6 +623,9 @@ Value make_tween_class() {
     cls.map_set(Value(std::string("isDone")), Value::make_builtin(method_is_done));
     cls.map_set(Value(std::string("progress")), Value::make_builtin(method_progress));
     cls.map_set(Value(std::string("delay")), Value::make_builtin(method_delay));
+    cls.map_set(Value(std::string("repeat")), Value::make_builtin(method_repeat));
+    cls.map_set(Value(std::string("yoyo")), Value::make_builtin(method_yoyo));
+    cls.map_set(Value(std::string("loop")), Value::make_builtin(method_loop));
     return cls;
 }
 
@@ -630,12 +689,28 @@ void advance(double dt) {
             }
             t.elapsed += step;
         }
+        // Fin d'un segment : on passe au suivant en gardant le reliquat de temps, sinon une
+        // animation courte perdrait une fraction de seconde à chaque parcours.
         double p = 1.0;
-        bool ends = true;
+        bool ends = true;      // dernier segment terminé → le tween a fini
+        bool seg_ends = true;  // segment courant terminé
+        int8_t sens = 1;
         {
-            const Tw& t = s_tweens[i];
+            Tw& t = s_tweens[i];
+            while (t.elapsed >= t.dur && t.dur > 0.0) {
+                if (t.seg + 1 < t.plan.size()) {
+                    t.seg++;
+                } else if (t.endless) {
+                    t.seg = 0;
+                } else {
+                    break;
+                }
+                t.elapsed -= t.dur;
+            }
+            sens = t.plan[t.seg];
             if (t.elapsed < t.dur) {
                 p = t.elapsed / t.dur;
+                seg_ends = false;
                 ends = false;
             }
         }
@@ -645,11 +720,15 @@ void advance(double dt) {
             std::vector<Chan> chans = s_tweens[i].chans;
             Value curve_fn = s_tweens[i].curve_fn;
             int curve = s_tweens[i].curve;
-            double f = ends ? 1.0 : eased(curve_fn, curve, p);
+            double f = seg_ends ? 1.0 : eased(curve_fn, curve, p);
             for (const auto& c : chans) {
-                // À la fin, on pose la valeur cible EXACTE : une courbe à dépassement
-                // (back, elastic) ne rend pas 1 en 1, et un arrondi laisserait 0,999.
-                write_chan(c, ends ? c.to : c.from + (c.to - c.from) * f);
+                // Un segment de sens -1 se joue de la cible vers le départ. À la fin d'un
+                // segment on pose la valeur EXACTE de son extrémité : une courbe à
+                // dépassement (back, elastic) ne rend pas 1 en 1, et un arrondi
+                // laisserait 0,999.
+                double a = sens > 0 ? c.from : c.to;
+                double b = sens > 0 ? c.to : c.from;
+                write_chan(c, seg_ends ? b : a + (b - a) * f);
             }
         }
         if (ends && tween_alive(i, s_tweens[i].gen)) {
