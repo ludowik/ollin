@@ -14,8 +14,20 @@ set -euo pipefail
 export LC_ALL=${LC_ALL:-C.UTF-8}
 RUNS=${RUNS:-3}
 OLLIN=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.exe")
-LUA=$(command -v lua5.4 2>/dev/null || command -v lua54 2>/dev/null || { [ -x "/c/Tools/lua/lua55.exe" ] && echo "/c/Tools/lua/lua55.exe"; } || command -v lua 2>/dev/null || echo "")
-PY=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo "")
+# Interpréteurs de comparaison : les versions viennent du fichier écrit par le hook de
+# session, qui les a installées et les connaît donc exactement. Aucun numéro de version en
+# dur ici, et aucune devinette sur les noms de binaires.
+INTERP_ENV="$(dirname "$0")/../build/bench-interpreters.env"
+LUA=""
+PY=""
+if [ -f "$INTERP_ENV" ]; then
+    # shellcheck disable=SC1090
+    . "$INTERP_ENV"
+fi
+# Repli hors conteneur (machine de développement, Windows) : le hook n'y tourne pas.
+[ -n "$LUA" ] && command -v "$LUA" >/dev/null 2>&1 || LUA=$(command -v lua 2>/dev/null || echo "")
+[ -n "$LUA" ] || { [ -x "/c/Tools/lua/lua55.exe" ] && LUA="/c/Tools/lua/lua55.exe"; }
+[ -n "$PY" ] && command -v "$PY" >/dev/null 2>&1 || PY=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo "")
 DIR=$(dirname "$0")
 
 extract_time() {

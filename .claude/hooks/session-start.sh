@@ -38,19 +38,51 @@ if [ -d "$CLAUDE_PROJECT_DIR/tools/git-hooks" ]; then
     && echo "hook git pre-commit actif (tests avant chaque commit)"
 fi
 
-# Install missing Raylib system dependencies on Linux
-# (most are pre-installed in the remote image)
+# ── Dépendances système (la plupart sont déjà dans l'image) ──────────────────
 if [ "$(uname)" = "Linux" ]; then
   sudo apt-get update -y -qq --ignore-missing 2>/dev/null || true
-  # lua5.4 : interpréteur de RÉFÉRENCE des benchmarks (bench/bench_all.sh). Sans lui la
-  # colonne Lua affiche N/A et il n'y a plus de point de comparaison — l'image ne le
-  # fournit pas toujours, d'où l'installation ici plutôt qu'une compilation à la main.
   sudo apt-get install -y -qq --no-install-recommends \
-    build-essential cmake git python3 lua5.4 \
+    build-essential cmake git \
     libasound2-dev libx11-dev libxrandr-dev libxi-dev \
     libxcursor-dev libxinerama-dev 2>/dev/null || true
 
-  # Install Emscripten SDK
+  # ── Interpréteurs de comparaison des benchmarks (bench/bench_all.sh) ───────
+  # Lua est la RÉFÉRENCE du tableau et Python la troisième colonne : sans eux, le
+  # benchmark n'a plus de point de comparaison. On installe la version la plus RÉCENTE
+  # offerte par les dépôts, jamais un numéro en dur — il vieillirait en silence et le
+  # jour où la distribution avance, on continuerait de mesurer l'ancienne.
+  # Les candidats sont essayés du plus récent au plus ancien : les métadonnées d'un PPA
+  # inaccessible (403 du proxy) annoncent des paquets qui ne s'installent pas.
+  installer_le_plus_recent() {
+    local motif="$1" p
+    for p in $(apt-cache search --names-only "$motif" 2>/dev/null | awk '{print $1}' | sort -Vr); do
+      if command -v "$p" >/dev/null 2>&1; then
+        echo "$p"
+        return 0
+      fi
+      if sudo apt-get install -y -qq --no-install-recommends "$p" >/dev/null 2>&1; then
+        echo "$p"
+        return 0
+      fi
+    done
+    return 1
+  }
+  LUA_BIN=$(installer_le_plus_recent '^lua5\.[0-9]+$' || echo "")
+  PY_BIN=$(installer_le_plus_recent '^python3\.[0-9]+$' || echo "")
+
+  # Les versions retenues sont ÉCRITES ici : c'est ce hook qui les installe, donc il est
+  # le seul à les connaître de source sûre. `bench_all.sh` les lit au lieu de fouiller le
+  # PATH avec des motifs de noms — heuristique qui attrapait `python3.13-config`.
+  # Fichier dans build/, gitignoré : c'est un état d'environnement, pas du code.
+  mkdir -p "$CLAUDE_PROJECT_DIR/build"
+  {
+      echo "# Interpréteurs installés par .claude/hooks/session-start.sh — ne pas éditer."
+      echo "LUA=${LUA_BIN}"
+      echo "PY=${PY_BIN}"
+  } > "$CLAUDE_PROJECT_DIR/build/bench-interpreters.env"
+  echo "benchmarks : ${LUA_BIN:-lua absent} · ${PY_BIN:-python absent}"
+
+  # ── SDK Emscripten (cible WASM) ────────────────────────────────────────────
   EMSDK_DIR="$HOME/emsdk"
   if [ ! -d "$EMSDK_DIR" ]; then
     git clone https://github.com/emscripten-core/emsdk.git "$EMSDK_DIR"
@@ -62,7 +94,9 @@ if [ "$(uname)" = "Linux" ]; then
   grep -qxF "source $EMSDK_DIR/emsdk_env.sh" ~/.bashrc \
     || echo "source $EMSDK_DIR/emsdk_env.sh" >> ~/.bashrc
 
-  # Install Playwright for wasm/web testing
+  # ── Playwright + chromium (tests web/WASM) ─────────────────────────────────
+  # `--with-deps` échoue ici (le proxy refuse les PPA) : le paquet npm et le
+  # navigateur, eux, s'installent. Ne pas conclure que Playwright est absent.
   if ! command -v node &>/dev/null; then
     sudo apt-get install -y -qq --no-install-recommends nodejs npm 2>/dev/null || true
   fi
@@ -70,7 +104,7 @@ if [ "$(uname)" = "Linux" ]; then
   npx playwright install --with-deps chromium 2>/dev/null || true
 fi
 
-# Configure + build (Raylib fetched automatically via FetchContent)
+# ── Configuration + build natif (raylib via FetchContent) ───────────────────
 cmake -S "$CLAUDE_PROJECT_DIR" -B "$CLAUDE_PROJECT_DIR/build" \
       -DCMAKE_BUILD_TYPE=Release -Wno-dev --log-level=WARNING
 cmake --build "$CLAUDE_PROJECT_DIR/build" -j"$(nproc)"
