@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run all 5 benchmarks for Ollin, Lua 5.5, and Python 3.
+# Run all benchmarks for Ollin, Lua, and Python 3.
 # Usage: bash bench/bench_all.sh  (from repo root)
 #        RUNS=5 bash bench/bench_all.sh   (override number of runs)
 #
@@ -44,7 +44,18 @@ labels=("fib(35) récursif" "boucle 10M" "map 100K" "array 1M" "appels 1M"
 echo ""
 echo "  (meilleur de $RUNS runs par benchmark)"
 echo "┌──────────────────────┬──────────────┬──────────────┬──────────────┐"
-echo "│ Benchmark            │   Lua 5.5    │    Ollin     │   Python 3   │"
+# Version LUE sur l'interpréteur, jamais écrite en dur : l'en-tête annonçait « Lua 5.5 »
+# quelle que soit la version mesurée, ce qui rendait le tableau faux dès que le conteneur
+# fournissait une autre version.
+lua_label="Lua ?"
+if [ -n "$LUA" ]; then
+    lua_label="Lua $("$LUA" -v 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"
+fi
+py_label="Python ?"
+if [ -n "$PY" ]; then
+    py_label="Python $("$PY" -V 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+fi
+printf "│ Benchmark            │ %-12s │    Ollin     │ %-12s │\n" "$lua_label" "$py_label"
 echo "├──────────────────────┼──────────────┼──────────────┼──────────────┤"
 
 ollin_times=()

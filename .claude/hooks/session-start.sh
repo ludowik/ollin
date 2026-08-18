@@ -42,8 +42,11 @@ fi
 # (most are pre-installed in the remote image)
 if [ "$(uname)" = "Linux" ]; then
   sudo apt-get update -y -qq --ignore-missing 2>/dev/null || true
+  # lua5.4 : interpréteur de RÉFÉRENCE des benchmarks (bench/bench_all.sh). Sans lui la
+  # colonne Lua affiche N/A et il n'y a plus de point de comparaison — l'image ne le
+  # fournit pas toujours, d'où l'installation ici plutôt qu'une compilation à la main.
   sudo apt-get install -y -qq --no-install-recommends \
-    build-essential cmake git python3 \
+    build-essential cmake git python3 lua5.4 \
     libasound2-dev libx11-dev libxrandr-dev libxi-dev \
     libxcursor-dev libxinerama-dev 2>/dev/null || true
 

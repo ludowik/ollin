@@ -221,6 +221,7 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
 
 **Aucun environnement n'est normatif — tous sont des cibles** (cf. « Stack ») :
 - `bench_all.sh` localise seul les interpréteurs : Lua via `lua5.4`/`lua54`/`lua` dans le PATH (ou `C:\Tools\lua\lua55.exe` sous Windows), Python via `python3`/`python`. Une colonne affiche `N/A` si l'interpréteur manque.
+- **Conteneur distant** : `lua5.4` est installé par `.claude/hooks/session-start.sh` (paquet apt), Python y est déjà. L'image ne fournit pas toujours Lua et le conteneur est recréé à chaque reprise — si `lua5.4` manque malgré tout, `sudo apt-get install -y lua5.4` suffit ; **ne pas compiler Lua depuis les sources** (perte de temps, et `lua.org` est bloqué par le proxy).
 - **Ne jamais comparer des chiffres obtenus sur deux machines, ni sur deux sessions différentes** : ni les temps absolus ni les coefficients ne sont transposables (matériel, compilateur, version des interpréteurs). Un tableau de benchmarks ne vaut que pour la machine et le moment où il a été produit.
 - Pour attribuer un écart à un changement de code, mesurer les binaires comparés sur la **même machine, dans la même série** (cf. tourniquet ci-dessous).
 
