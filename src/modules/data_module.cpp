@@ -21,8 +21,14 @@ static std::string s_file[2];                            // natif : fichier side
 #endif
 
 // ── encodage typé d'une Value scalaire ↔ chaîne stockée ────────────────────────
-// 'i'<entier>, 'f'<double>, 's'<brut>. (le booléen Ollin est un entier).
+// 'i'<entier>, 'f'<double>, 's'<brut>, 'b'<0|1>.
+// Le préfixe 'b' est né avec le type booléen étanche : `true` n'étant plus l'entier 1, il
+// tombait dans le throw et data.set("drapeau", true) échouait sur un message qui promettait
+// pourtant le booléen. Une valeur écrite AVANT en 'i1' se relit en entier — c'est ce qu'elle
+// était, et le script la teste par vérité (if v), donc rien ne casse.
 static std::string encode_value(const Value& v) {
+    if (v.is_bool())
+        return std::string("b") + (v.as_bool() ? "1" : "0");
     if (v.is_integer())
         return std::string("i") + std::to_string(v.as_int());
     if (v.is_float()) {
@@ -42,6 +48,8 @@ static Value decode_value(const std::string& enc) {
         return Value((int64_t)std::stoll(rest));
     if (enc[0] == 'f')
         return Value(std::stod(rest));
+    if (enc[0] == 'b')
+        return Value::make_bool(rest == "1");
     return Value(rest);   // 's' : chaîne brute
 }
 

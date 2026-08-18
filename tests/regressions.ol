@@ -1257,4 +1257,29 @@ while false do
     assert(nil)   ## jamais atteint
 end
 
+## ── data : le booléen traverse la persistance ────────────────────────────────
+## Regression : `encode_value` ne connaissait que entier, flottant et chaîne, si bien que
+## `data.set(k, true)` échouait dès que `true` a cessé d'être l'entier 1 — sur un message
+## qui promettait pourtant le booléen. Le module n'avait aucun test de comportement.
+data.set("bt", true)
+data.set("bf", false)
+data.set("bn", 42)
+data.set("bs", "x")
+assert(data.get("bt") == true)
+assert(data.get("bf") == false)
+assert(data.get("bn") == 42 and data.get("bs") == "x")
+assert(data.has("bt") and not data.has("jamais_ecrit"))
+
+## Le type survit à l'encodage : ce qui revient est un BOOLÉEN, pas l'entier 1.
+assert(data.get("bt") <> 1)
+assert(data.get("bf") <> 0)
+
+## Valeur par défaut d'une clé absente, et suppression par nil.
+assert(data.get("jamais_ecrit", "defaut") == "defaut")
+data.set("bt", nil)
+assert(not data.has("bt"))
+data.set("bf", nil)
+data.set("bn", nil)
+data.set("bs", nil)
+
 print("regressions ok")

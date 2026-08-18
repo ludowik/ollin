@@ -39,12 +39,16 @@ fi
 
 travail=$(mktemp -d)
 scripts=""
-# Les worktrees sont retrouvés par leur PRÉFIXE et non par une liste accumulée : `construire`
-# est appelée dans une substitution de commande, donc dans un sous-shell — une variable
-# qu'elle remplirait n'atteindrait jamais ce nettoyage (worktree laissé derrière, constaté).
+# Les worktrees de CETTE exécution sont marqués par le PID dans leur nom, et le nettoyage ne
+# retire que ceux-là : un préfixe commun à toutes les exécutions ferait qu'un second icount.sh
+# lancé en parallèle détruirait les binaires du premier en pleine mesure. Le nom ne peut pas
+# venir d'une variable remplie par `construire`, appelée dans une substitution de commande
+# donc dans un sous-shell — une liste accumulée là n'atteindrait jamais ce nettoyage
+# (worktree laissé derrière, constaté).
+prefixe="/tmp/icount-$$-"
 nettoyer() {
     local w
-    for w in $(git worktree list --porcelain | sed -n 's|^worktree /tmp/icount-|/tmp/icount-|p'); do
+    for w in $(git worktree list --porcelain | sed -n "s|^worktree $prefixe|$prefixe|p"); do
         git worktree remove --force "$w" >/dev/null 2>&1
     done
     rm -rf "$travail"
@@ -91,8 +95,13 @@ construire() {
         echo "référence git inconnue : $ref" >&2
         return 1
     }
-    local dir="/tmp/icount-$sha"
+    local dir="$prefixe$sha"
+    # `rm -rf` seul laisserait l'enregistrement git derrière lui (exécution interrompue avant
+    # le trap) et `git worktree add` refuserait alors un chemin déjà connu, sans que le
+    # message n'explique rien. On dé-enregistre d'abord, puis on efface les restes.
+    git worktree remove --force "$dir" >/dev/null 2>&1
     rm -rf "$dir"
+    git worktree prune >/dev/null 2>&1
     git worktree add -q "$dir" "$sha" || return 1
     cmake -S "$dir" -B "$dir/build" -DCMAKE_BUILD_TYPE=Release -Wno-dev --log-level=ERROR >/dev/null 2>&1
     cmake --build "$dir/build" -j"$(nproc 2>/dev/null || echo 4)" --target ollin >/dev/null 2>&1 || {
