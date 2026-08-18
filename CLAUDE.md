@@ -243,11 +243,22 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
   Instructions en hausse = coût réel à corriger ; instructions stables et temps qui bouge =
   placement, et il n'y a rien à optimiser. Sa sensibilité est vérifiée (+0,61 % pour quatre
   comparaisons ajoutées à `op_ADD`), donc un 0,00 % n'est pas un outil aveugle.
-  **Mesure d'histoire, faite sur 12 commits** : le compte d'instructions est stable au
-  dix-millième d'un commit à l'autre (200 instructions d'écart sur 99 millions) tandis que
-  le temps de `fib` oscille de −2,5 % à +6,1 % — il n'y a donc **pas** de dérive cumulative
-  du travail, et le bruit de temps ne s'additionne pas d'un commit au suivant. Ne jamais
-  invoquer la disposition sans avoir lancé ce script.
+  Ne jamais invoquer la disposition sans avoir lancé ce script.
+- **Une mesure de dérive ne vaut que sur les commits qui touchent le MOTEUR** (`vm.cpp`,
+  `value.h`, `compiler.cpp`, `opcode.h`, `vm.h`, `collections/`). Les jalonner par « les N
+  derniers commits » ne prouve rien : la plupart portent sur les tests, la web app ou les
+  exemples, et un compte d'instructions y est stable par construction. `git log -- src/vm.cpp
+  src/value.h src/compiler.cpp src/opcode.h src/vm.h src/collections/` donne les bons jalons.
+  ⚠ Le conteneur distant part d'un **clone superficiel** (`.git/shallow`, ~60 commits) :
+  `git fetch --unshallow origin` est nécessaire avant toute mesure d'histoire, sinon
+  l'historique du moteur paraît ne compter que trois ou quatre commits.
+- **Ce que la dérive vaut réellement (10 jalons moteur, 24/07 → 18/08)** : le travail bouge
+  dans les DEUX sens et il faut le mesurer, jamais le supposer. Chaque fonctionnalité coûte
+  entre +0,4 % et +1,8 % sur `fib` (expansion de `...`, inline cache, variable par
+  itération), et les commits d'optimisation reprennent davantage (−5,5 % pour la clé `len`
+  comparée par pointeur). Bilan net sur le mois : **−3,8 % sur `fib`, −2,6 % sur la boucle
+  et sur la map**. Il n'y a donc pas de dette qui s'accumule, mais ce n'est pas parce que
+  rien ne bouge — c'est parce que les gains ont dépassé les coûts.
 
 ## Tests graphiques — DEUX chaînes qui MARCHENT (ne pas conclure « cassé »)
 
