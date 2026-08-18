@@ -490,17 +490,16 @@ inline Value::~Value() {
     release();
 }
 
-inline bool is_falsy(const Value& v) {
-    // principe : « le vide est faux » — un booléen répond pour lui-même, tout le reste
-    // garde ses règles (0, chaîne vide, tableau vide et map vide sont faux).
-    // Le test booléen vient EN PREMIER : les comparaisons rendent désormais des booléens,
-    // donc c'est le cas le plus fréquent sur le chemin chaud de JUMP_IF_FALSE.
-    if (v.is_bool())
-        return !v.as_bool();
-    if (v.is_nil())
-        return true;
-    if (v.is_integer())
-        return v.as_int() == 0;
+// Vérité des types dont la réponse demande un ACCÈS MÉMOIRE (longueur d'une chaîne, taille
+// d'un tableau ou d'une map). `noinline` l'empêche de grossir ses appelants : is_falsy est
+// inlinée sur une quinzaine de sites, dont JUMP_IF_FALSE, le plus chaud de la VM — chaque
+// test qu'on lui retire allège tout ce code.
+//
+// PAS de `gnu::cold` ici, mesuré : l'attribut marque aussi les APPELANTS comme improbables,
+// et run_goto les contient tous — la boucle numérique y perdait 33 % (bench_loop), pour un
+// compte d'instructions inchangé. Un attribut qui déclare un chemin froid dégrade donc la
+// fonction géante qui héberge tous les chemins chauds.
+[[gnu::noinline]] inline bool is_falsy_cold(const Value& v) {
     if (v.is_float())
         return v.as_float() == 0.0;
     if (v.is_string())
@@ -510,6 +509,21 @@ inline bool is_falsy(const Value& v) {
     if (v.is_map())
         return v.map_size() == 0; // instance : ≥1 clé (__class__) → truthy
     return false;                // T_CLASS, range, closure, function → truthy
+}
+
+inline bool is_falsy(const Value& v) {
+    // principe : « le vide est faux » — un booléen répond pour lui-même, tout le reste
+    // garde ses règles (0, chaîne vide, tableau vide et map vide sont faux).
+    // Ne restent inlinés que les trois tags qui répondent SANS toucher la mémoire, dans
+    // l'ordre de leur fréquence sur ce chemin : le booléen d'abord, les comparaisons en
+    // produisant un par test.
+    if (v.is_bool())
+        return !v.as_bool();
+    if (v.is_integer())
+        return v.as_int() == 0;
+    if (v.is_nil())
+        return true;
+    return is_falsy_cold(v);
 }
 
 inline Value num_value(double d) {
