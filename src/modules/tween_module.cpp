@@ -564,41 +564,42 @@ int method_progress(CallCtx& ctx) {
     return ctx.ret(Value(p < 0.0 ? 0.0 : (p > 1.0 ? 1.0 : p)));
 }
 
-// Répète le plan courant `n` fois : `n` est un nombre de LECTURES, pas de répétitions
-// supplémentaires — repeat(2) joue deux fois, repeat(1) ne change rien.
+// UNE seule méthode pour toutes les répétitions : `repeat([occurrences] [, allerRetour])`.
+//
+//   .repeat()             aller, aller, …                 sans fin
+//   .repeat(2)            aller, aller
+//   .repeat(2, true)      aller, aller, retour, retour    (le retour porte sur l'ENSEMBLE)
+//   .repeat(nil, true)    aller, retour, aller, retour, … sans fin
+//
+// Le compte est reconnu par sa POSITION et non par son type : `true` vaut 1 en Ollin (il n'y
+// a pas de type booléen), donc `repeat(true)` serait indistinguable de `repeat(1)`. D'où le
+// `nil` explicite pour dire « pas de compte » tout en demandant l'aller-retour.
+//
+// L'aller-retour ajoute au plan son miroir : le vecteur renversé, sens inversés. Deux appels
+// successifs composent donc, chacun agissant sur le plan construit jusque-là.
 int method_repeat(CallCtx& ctx) {
-    double n = num_arg(ctx.args, ctx.argc, 1, "tween.repeat");
-    if (n < 1.0 || n != std::floor(n))
-        throw std::runtime_error("tween.repeat: le nombre de lectures doit être un entier >= 1");
-    int slot = handle_slot(ctx.args[0], "tween.repeat");
+    static constexpr const char* FN = "tween.repeat";
+    double n = 0.0;   // 0 = aucun compte fourni ⇒ sans fin
+    if (ctx.argc > 1 && !ctx.args[1].is_nil()) {
+        if (!ctx.args[1].is_number())
+            throw std::runtime_error(std::string(FN) + ": le nombre d'occurrences doit être un nombre ou nil");
+        n = ctx.args[1].as_num();
+        if (n < 1.0 || n != std::floor(n))
+            throw std::runtime_error(std::string(FN) + ": le nombre d'occurrences doit être un entier >= 1");
+    }
+    bool aller_retour = ctx.argc > 2 && !is_falsy(ctx.args[2]);
+    int slot = handle_slot(ctx.args[0], FN);
     if (slot >= 0) {
-        std::vector<int8_t>& plan = s_tweens[slot].plan;
-        std::vector<int8_t> bloc = plan;
+        Tw& t = s_tweens[slot];
+        std::vector<int8_t> bloc = t.plan;
         for (int k = 1; k < (int)n; k++)
-            plan.insert(plan.end(), bloc.begin(), bloc.end());
+            t.plan.insert(t.plan.end(), bloc.begin(), bloc.end());
+        if (aller_retour) {
+            for (size_t i = t.plan.size(); i > 0; i--)
+                t.plan.push_back((int8_t)-t.plan[i - 1]);
+        }
+        t.endless = (n == 0.0);
     }
-    return ctx.ret(ctx.args[0]);
-}
-
-// Ajoute au plan courant sa lecture EN ARRIÈRE : le miroir, c'est la liste renversée avec
-// les sens inversés. Appliqué au plan entier, pas au dernier segment — d'où la composition
-// annoncée plus haut.
-int method_yoyo(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.yoyo");
-    if (slot >= 0) {
-        std::vector<int8_t>& plan = s_tweens[slot].plan;
-        for (size_t i = plan.size(); i > 0; i--)
-            plan.push_back((int8_t)-plan[i - 1]);
-    }
-    return ctx.ret(ctx.args[0]);
-}
-
-// Rejoue le plan sans fin. Le tween ne se libère alors plus de lui-même : il retient son
-// objet jusqu'à `cancel()` (ou la fin du programme).
-int method_loop(CallCtx& ctx) {
-    int slot = handle_slot(ctx.args[0], "tween.loop");
-    if (slot >= 0)
-        s_tweens[slot].endless = true;
     return ctx.ret(ctx.args[0]);
 }
 
@@ -624,8 +625,6 @@ Value make_tween_class() {
     cls.map_set(Value(std::string("progress")), Value::make_builtin(method_progress));
     cls.map_set(Value(std::string("delay")), Value::make_builtin(method_delay));
     cls.map_set(Value(std::string("repeat")), Value::make_builtin(method_repeat));
-    cls.map_set(Value(std::string("yoyo")), Value::make_builtin(method_yoyo));
-    cls.map_set(Value(std::string("loop")), Value::make_builtin(method_loop));
     return cls;
 }
 

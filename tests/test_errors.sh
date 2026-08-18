@@ -250,7 +250,7 @@ check_error "tween.value without a reference" \
 tween.value(v, 10, 1)' \
     "doit être une référence"
 
-check_error "tween.repeat with zero readings" \
+check_error "tween.repeat with zero occurrences" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 1).repeat(0)' \
     "entier >= 1"
@@ -259,6 +259,11 @@ check_error "tween.repeat with a fractional count" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 1).repeat(2.5)' \
     "entier >= 1"
+
+check_error "tween.repeat with a non-numeric count" \
+    'global o = {x: 0}
+tween.to(o, {x: 1}, 1).repeat("deux")' \
+    "un nombre ou nil"
 
 check_error "ui.list without a reference" \
     'global v = nil

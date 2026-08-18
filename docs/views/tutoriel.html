@@ -395,7 +395,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-17 14:14</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-18 07:25</span></p>
   </div>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
@@ -447,7 +447,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-17 14:14</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-18 07:25</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2240,32 +2240,35 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   </tbody>
 </table>
 
-<p>Le handle renvoyé porte <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code> et <code>delay(secondes)</code>. Les méthodes renvoient le tween, donc elles se chaînent.</p>
+<p>Le handle renvoyé porte <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code>, <code>delay(secondes)</code> et <code>repeat(…)</code>. Les méthodes renvoient le tween, donc elles se chaînent.</p>
 
-<h3>Boucler : <code>repeat</code>, <code>yoyo</code>, <code>loop</code></h3>
-<p>Une animation se lit par <strong>parcours</strong>. <code>repeat(n)</code> en joue <code>n</code>, <code>yoyo()</code> ajoute au programme sa lecture <strong>en arrière</strong>, et <code>loop()</code> le rejoue sans fin. Ces méthodes <strong>composent</strong> : chacune transforme le programme construit jusque-là, si bien que l'ordre des appels change le résultat.</p>
+<h3>Répéter : <code>repeat</code></h3>
+<p>Une animation se lit par <strong>parcours</strong>. <code>repeat([occurrences] [, allerRetour])</code> en règle le nombre : sans compte, la répétition est <strong>sans fin</strong> ; le second paramètre ajoute au programme sa lecture <strong>en arrière</strong>.</p>
 
 <table>
   <thead><tr><th>Écriture</th><th>Ce qui est joué</th></tr></thead>
   <tbody>
     <tr><td><code>tween.to(…)</code></td><td>un aller</td></tr>
     <tr><td><code>.repeat(2)</code></td><td>aller, aller</td></tr>
-    <tr><td><code>.repeat(2).yoyo()</code></td><td>aller, aller, retour, retour</td></tr>
-    <tr><td><code>.yoyo().repeat(2)</code></td><td>aller, retour, aller, retour</td></tr>
-    <tr><td><code>.loop()</code></td><td>aller, aller, … sans fin</td></tr>
-    <tr><td><code>.loop().yoyo()</code></td><td>aller-retour sans fin</td></tr>
+    <tr><td><code>.repeat(2, true)</code></td><td>aller, aller, retour, retour</td></tr>
+    <tr><td><code>.repeat()</code></td><td>aller, aller, … sans fin</td></tr>
+    <tr><td><code>.repeat(nil, true)</code></td><td>aller-retour sans fin</td></tr>
   </tbody>
 </table>
 
-<p>Chaque parcours rejoue l'animation <strong>entière</strong> dans son sens : entre deux allers la valeur revient donc au départ, et entre deux retours elle repart de la cible. Les bornes sont figées au premier démarrage — écrire dans l'objet en pleine animation ne redéfinit pas le départ du parcours suivant. <code>progress()</code> couvre tout le programme (un plan de quatre parcours rend 0,5 à la moitié du deuxième) ; pour <code>loop()</code>, il rend l'avancement du tour en cours.</p>
+<p>Le compte est reconnu par sa <strong>position</strong>, d'où le <code>nil</code> : <code>true</code> vaut 1 en Ollin, donc <code>repeat(true)</code> ne se distinguerait pas de <code>repeat(1)</code>.</p>
 
-<p><strong>Attention</strong> : un <code>loop()</code> ne se termine jamais de lui-même et retient l'objet animé tant que <code>cancel()</code> — ou <code>tween.cancelAll()</code> — n'a pas été appelé.</p>
+<p>L'aller-retour porte sur l'<strong>ensemble</strong> des occurrences, non sur chacune : <code>repeat(2, true)</code> joue les deux allers puis les deux retours. Pour alterner à chaque fois, composez deux appels — <code>repeat(nil, true).repeat(2)</code> donne deux allers-retours. C'est la différence avec GSAP ou Phaser, où <code>yoyo</code> inverse chaque répétition.</p>
+
+<p>Chaque parcours rejoue l'animation <strong>entière</strong> dans son sens : entre deux allers la valeur revient donc au départ, et entre deux retours elle repart de la cible. Les bornes sont figées au premier démarrage — écrire dans l'objet en pleine animation ne redéfinit pas le départ du parcours suivant. <code>progress()</code> couvre tout le programme (un plan de quatre parcours rend 0,5 à la moitié du deuxième) ; sans fin, il rend l'avancement du tour en cours.</p>
+
+<p><strong>Attention</strong> : une répétition sans fin ne se termine jamais d'elle-même et retient l'objet animé tant que <code>cancel()</code> — ou <code>tween.cancelAll()</code> — n'a pas été appelé.</p>
 
 <pre><code><span class="cmt">## Une pulsation : le rayon grossit puis revient, sans fin.</span>
-<span class="bi">tween</span>.to(balle, {r: <span class="num">40</span>}, <span class="num">0.6</span>, <span class="str">"easeInOutQuad"</span>).loop().yoyo()
+<span class="bi">tween</span>.to(balle, {r: <span class="num">40</span>}, <span class="num">0.6</span>, <span class="str">"easeInOutQuad"</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>)
 
 <span class="cmt">## Trois clignotements, puis on s'arrête sur la couleur de départ.</span>
-<span class="bi">tween</span>.to(balle, {teinte: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).yoyo().repeat(<span class="num">3</span>)</code></pre>
+<span class="bi">tween</span>.to(balle, {teinte: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>).repeat(<span class="num">3</span>)</code></pre>
 
 <pre><code><span class="cmt">## Le dessin lit des champs ; le temps ne l'intéresse pas.</span>
 <span class="kw">global</span> balle = {x: <span class="num">0</span>, r: <span class="num">20</span>, teinte: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
