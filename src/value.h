@@ -79,13 +79,14 @@ struct Value {
     static constexpr uint8_t T_FLOAT = 2;
     static constexpr uint8_t T_FUNCTION = 3; // func_idx dans ival (pas de tas)
     static constexpr uint8_t T_BUILTIN = 4;  // pointeur de fonction natif dans ival
-    static constexpr uint8_t T_STRING = 5;   // ── pivot : ref-comptés à partir d'ici ──
-    static constexpr uint8_t T_MAP = 6;
-    static constexpr uint8_t T_ARRAY = 7;
-    static constexpr uint8_t T_ITERATOR = 8;
-    static constexpr uint8_t T_CLOSURE = 9;
-    static constexpr uint8_t T_CLASS = 10;  // prototype de classe (Map* réutilisé)
-    static constexpr uint8_t T_RANGE = 11;  // range [a;b] (Range*, ref-counted)
+    static constexpr uint8_t T_BOOL = 5;     // true/false dans ival (0/1) — type ÉTANCHE, ≠ entier
+    static constexpr uint8_t T_STRING = 6;   // ── pivot : ref-comptés à partir d'ici ──
+    static constexpr uint8_t T_MAP = 7;
+    static constexpr uint8_t T_ARRAY = 8;
+    static constexpr uint8_t T_ITERATOR = 9;
+    static constexpr uint8_t T_CLOSURE = 10;
+    static constexpr uint8_t T_CLASS = 11;  // prototype de classe (Map* réutilisé)
+    static constexpr uint8_t T_RANGE = 12;  // range [a;b] (Range*, ref-counted)
 
   private:
     explicit Value(Map* p) : tag(T_MAP), str_hash(0), mptr(p) {
@@ -97,6 +98,12 @@ struct Value {
     explicit Value(Closure* p) : tag(T_CLOSURE), str_hash(0), cptr(p) {
     }
     explicit Value(Range* p) : tag(T_RANGE), str_hash(0), rptr(p) {
+    }
+    // Construction DIRECTE d'un booléen (liste d'initialisation, pas d'écriture après coup) :
+    // les comparaisons en produisent un par test, sur le chemin le plus chaud de la VM.
+    // Le tag-type évite de heurter Value(int64_t).
+    struct BoolTag {};
+    Value(BoolTag, bool b) : tag(T_BOOL), str_hash(0), ival(b ? 1 : 0) {
     }
     void release() noexcept;
     void release_cold() noexcept; // chemin froid (types ref-comptés) — non inliné
@@ -130,6 +137,12 @@ struct Value {
     }
     bool is_integer() const {
         return tag == T_INTEGER;
+    }
+    bool is_bool() const {
+        return tag == T_BOOL;
+    }
+    bool as_bool() const {
+        return ival != 0;
     }
     bool is_number() const {
         return tag == T_INTEGER || tag == T_FLOAT;
@@ -185,6 +198,12 @@ struct Value {
     }
     static Value make_closure(Closure* p) {
         return Value(p);
+    }
+    // Fabrique EXPLICITE, et non un constructeur `Value(bool)` : avec `Value(int64_t)` et
+    // `Value(double)` déjà présents, un tel constructeur ferait de `Value(0)` un booléen par
+    // conversion implicite silencieuse.
+    static Value make_bool(bool b) {
+        return Value(BoolTag{}, b);
     }
     static Value make_builtin(BuiltinFn fn) {
         Value v;
@@ -472,7 +491,12 @@ inline Value::~Value() {
 }
 
 inline bool is_falsy(const Value& v) {
-    // principe : « le vide est faux »
+    // principe : « le vide est faux » — un booléen répond pour lui-même, tout le reste
+    // garde ses règles (0, chaîne vide, tableau vide et map vide sont faux).
+    // Le test booléen vient EN PREMIER : les comparaisons rendent désormais des booléens,
+    // donc c'est le cas le plus fréquent sur le chemin chaud de JUMP_IF_FALSE.
+    if (v.is_bool())
+        return !v.as_bool();
     if (v.is_nil())
         return true;
     if (v.is_integer())

@@ -194,6 +194,10 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() ne invalide p
 std::string value_to_string(const Value& v) {
     if (v.is_nil())
         return "nil";
+    // En anglais comme les mots-clés du langage : ce qui s'affiche se recopie tel quel
+    // dans un script.
+    if (v.is_bool())
+        return v.as_bool() ? "true" : "false";
     if (v.is_string())
         return v.as_string();
     if (v.is_class())
@@ -468,6 +472,10 @@ static bool values_equal(const Value& av, const Value& bv) {
         return true;
     if (av.is_nil() || bv.is_nil())
         return false;
+    // Type étanche : deux booléens se comparent entre eux, et `true == 1` est faux — d'où
+    // le test des DEUX côtés, qui exclut la comparaison avec un nombre.
+    if (av.is_bool() || bv.is_bool())
+        return av.is_bool() && bv.is_bool() && av.as_bool() == bv.as_bool();
     if (av.is_integer() && bv.is_integer())
         return av.as_int() == bv.as_int();
     if (av.is_number() && bv.is_number())
@@ -973,22 +981,22 @@ dispatch_loop:
     }
 
     op_NOT:
-        regs[base + A] = Value((int64_t)(is_falsy(regs[base + B]) ? 1 : 0));
+        regs[base + A] = Value::make_bool(is_falsy(regs[base + B]));
         NEXT();
 
     op_AND:
-        regs[base + A] = Value((int64_t)(!is_falsy(regs[base + B]) && !is_falsy(regs[base + C]) ? 1 : 0));
+        regs[base + A] = Value::make_bool(!is_falsy(regs[base + B]) && !is_falsy(regs[base + C]));
         NEXT();
 
     op_OR:
-        regs[base + A] = Value((int64_t)(!is_falsy(regs[base + B]) || !is_falsy(regs[base + C]) ? 1 : 0));
+        regs[base + A] = Value::make_bool(!is_falsy(regs[base + B]) || !is_falsy(regs[base + C]));
         NEXT();
 
     op_EQ: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier == entier
-            regs[base + A] = Value((int64_t)(bv.as_int() == cv.as_int() ? 1 : 0));
+            regs[base + A] = Value::make_bool(bv.as_int() == cv.as_int());
             NEXT();
         }
         if (is_instance(bv)) {
@@ -998,7 +1006,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        regs[base + A] = Value((int64_t)(values_equal(bv, cv) ? 1 : 0));
+        regs[base + A] = Value::make_bool(values_equal(bv, cv));
         NEXT();
     }
 
@@ -1013,7 +1021,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        regs[base + A] = Value((int64_t)(values_equal(bv, cv) ? 0 : 1));
+        regs[base + A] = Value::make_bool(!values_equal(bv, cv));
         NEXT();
     }
 
@@ -1022,7 +1030,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier > entier
-            regs[base + A] = Value((int64_t)(bv.as_int() > cv.as_int()));
+            regs[base + A] = Value::make_bool(bv.as_int() > cv.as_int());
             NEXT();
         }
         if (is_instance(cv)) { // instance à droite : a > b == b < a → b.__lt(a)
@@ -1039,10 +1047,10 @@ dispatch_loop:
             }
         }
         if (bv.is_string() && cv.is_string()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.as_string() > cv.as_string()));
+            regs[base + A] = Value::make_bool(bv.as_string() > cv.as_string());
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(as_double(bv) > as_double(cv)));
+        regs[base + A] = Value::make_bool(as_double(bv) > as_double(cv));
         NEXT();
     }
 
@@ -1050,7 +1058,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier < entier
-            regs[base + A] = Value((int64_t)(bv.as_int() < cv.as_int()));
+            regs[base + A] = Value::make_bool(bv.as_int() < cv.as_int());
             NEXT();
         }
         if (is_instance(bv)) { // instance à gauche : a < b → a.__lt(b)
@@ -1067,10 +1075,10 @@ dispatch_loop:
             }
         }
         if (bv.is_string() && cv.is_string()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.as_string() < cv.as_string()));
+            regs[base + A] = Value::make_bool(bv.as_string() < cv.as_string());
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(as_double(bv) < as_double(cv)));
+        regs[base + A] = Value::make_bool(as_double(bv) < as_double(cv));
         NEXT();
     }
 
@@ -1079,7 +1087,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier >= entier
-            regs[base + A] = Value((int64_t)(bv.as_int() >= cv.as_int()));
+            regs[base + A] = Value::make_bool(bv.as_int() >= cv.as_int());
             NEXT();
         }
         if (is_instance(cv)) { // instance à droite : a >= b == b <= a → b.__le(a)
@@ -1096,10 +1104,10 @@ dispatch_loop:
             }
         }
         if (bv.is_string() && cv.is_string()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.as_string() >= cv.as_string()));
+            regs[base + A] = Value::make_bool(bv.as_string() >= cv.as_string());
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(as_double(bv) >= as_double(cv)));
+        regs[base + A] = Value::make_bool(as_double(bv) >= as_double(cv));
         NEXT();
     }
 
@@ -1107,7 +1115,7 @@ dispatch_loop:
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
         if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier <= entier
-            regs[base + A] = Value((int64_t)(bv.as_int() <= cv.as_int()));
+            regs[base + A] = Value::make_bool(bv.as_int() <= cv.as_int());
             NEXT();
         }
         if (is_instance(bv)) { // instance à gauche : a <= b → a.__le(b)
@@ -1124,10 +1132,10 @@ dispatch_loop:
             }
         }
         if (bv.is_string() && cv.is_string()) { // ordre lexicographique
-            regs[base + A] = Value((int64_t)(bv.as_string() <= cv.as_string()));
+            regs[base + A] = Value::make_bool(bv.as_string() <= cv.as_string());
             NEXT();
         }
-        regs[base + A] = Value((int64_t)(as_double(bv) <= as_double(cv)));
+        regs[base + A] = Value::make_bool(as_double(bv) <= as_double(cv));
         NEXT();
     }
 
@@ -1165,7 +1173,7 @@ dispatch_loop:
             if (is_ctor_)
                 regs[wb + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(is_falsy(regs[wb + 0]) ? 1 : 0)) : regs[wb + 0];
+                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[wb + 0])) : regs[wb + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : n; // pour SPREAD_RESULTS (multi-retour)
         }
@@ -1220,7 +1228,7 @@ dispatch_loop:
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(is_falsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
+                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : total; // pour SPREAD_RESULTS (multi-retour)
         }
@@ -1605,7 +1613,7 @@ dispatch_loop:
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value((int64_t)(is_falsy(regs[rbase + 0]) ? 1 : 0)) : regs[rbase + 0];
+                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
             ip = rip;
             last_results_ = is_ctor_ ? 1 : total;
         }

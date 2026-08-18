@@ -30,6 +30,10 @@ std::size_t ValueHash::operator()(const Value& v) const noexcept {
         return std::hash<int64_t>{}(v.ival);
     case Value::T_BUILTIN:
         return std::hash<int64_t>{}(v.ival);
+    case Value::T_BOOL:
+        // Type étanche : `true` n'est PAS la clé `1`. Le hash le distingue donc de
+        // l'entier, contrairement au couple INTEGER/FLOAT volontairement confondu.
+        return std::hash<int64_t>{}(v.ival) ^ 0x9e3779b9u;
     case Value::T_CLOSURE:
         return std::hash<void*>{}((void*)v.cptr);
     case Value::T_CLASS:
@@ -62,6 +66,8 @@ bool ValueEqual::operator()(const Value& a, const Value& b) const noexcept {
             return a.ival == b.ival;
         case Value::T_BUILTIN:
             return a.ival == b.ival;
+        case Value::T_BOOL:
+            return a.as_bool() == b.as_bool();
         case Value::T_CLOSURE:
             return a.cptr == b.cptr;
         case Value::T_CLASS:

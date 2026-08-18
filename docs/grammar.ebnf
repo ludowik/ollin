@@ -140,7 +140,8 @@ logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
              (* "and"/"or" COURT-CIRCUITENT et renvoient une VALEUR :
                 "a and b" → a si a est falsy, sinon b (b non évalué si a falsy) ;
                 "a or b"  → a si a est truthy, sinon b (b non évalué si a truthy).
-                Donc `f and f()` ou `obj and obj.x` sont sûrs. Falsy : nil, 0, "", [], {}. *)
+                Donc `f and f()` ou `obj and obj.x` sont sûrs.
+                Falsy : false, nil, 0, "", [], {} — « le vide est faux ». *)
 bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
 bitwiseXor     = bitwiseAnd { "~" bitwiseAnd } ;
              (* "~" binaire = XOR bit-à-bit ; "~" unaire = NOT, voir unary *)
@@ -218,7 +219,7 @@ rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
              (* step optionnel [a;b;step] ; les ranges sont first-class et itérables *)
 call           = IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
              (* appel optionnel f?(args) ≡  if f then f(args) else nil .
-                f falsy (nil, 0, "", [], {}) → aucun appel, résultat nil, ARGS NON ÉVALUÉS ;
+                f falsy (false, nil, 0, "", [], {}) → aucun appel, résultat nil, ARGS NON ÉVALUÉS ;
                 f appelable → appel ; f truthy non appelable → erreur (appel standard).
                 Implémenté avec JUMP_IF_FALSE + appel standard (pas d'opcode dédié).
                 S'applique à toutes les formes : f?(), expr?() (ex. m["cb"]?()),
@@ -265,6 +266,13 @@ convChar       = "d" | "i" | "o" | "u" | "x" | "X" | "c"
                     INTERP_START/MID/END. Le formatage {expr:spec} / {N:spec} partage le même
                     moteur (fonction interne __fmt / printf). *)
 BOOL           = "true" | "false" ;
+             (* TYPE À PART ENTIÈRE, étanche : `true` n'est pas l'entier 1, donc
+                true <> 1 et false <> 0. L'arithmétique et les comparaisons d'ordre sur un
+                booléen sont une erreur d'exécution, comme sur nil.
+                Produit par `not`, par les comparaisons (== <> < > <= >=) et par les
+                littéraux ; affiché "true"/"false".
+                « Le vide est faux » demeure : 0, "", [] et {} sont falsy sans être false.
+                Il n'existe pas de conversion `bool(v)` — `not not v` en tient lieu. *)
 NIL            = "nil" ;
 IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
 

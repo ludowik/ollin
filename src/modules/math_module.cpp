@@ -131,8 +131,18 @@ MATH1(atan, std::atan(x))
 MATH1(deg, x * (180.0 / M_PI))
 MATH1(rad, x*(M_PI / 180.0))
 MATH1(frac, x - std::floor(x))
-MATH1(is_nan, std::isnan(x) ? 1.0 : 0.0)
-MATH1(is_inf, std::isinf(x) ? 1.0 : 0.0)
+// Ces deux-là répondent par oui ou non, pas par un nombre : macro à part pour qu'elles
+// rendent un booléen sans passer par num_value.
+#define MATH1_BOOL(name, expr)                                                                                         \
+    static int math_##name(CallCtx& ctx) {                                                                             \
+        Value* args = ctx.args;                                                                                        \
+        int argc = ctx.argc;                                                                                           \
+        double x = num_arg(args, argc, 0, "math." #name);                                                              \
+        return ctx.ret(Value::make_bool(expr));                                                                        \
+    }
+
+MATH1_BOOL(is_nan, std::isnan(x))
+MATH1_BOOL(is_inf, std::isinf(x))
 
 static int math_map(CallCtx& ctx) {
     Value* args = ctx.args;

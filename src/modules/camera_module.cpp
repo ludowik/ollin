@@ -123,7 +123,7 @@ static int cam_is_open(CallCtx& ctx) {
         const cam = window.__ollinCam;
         return (cam && cam.state === 'open') ? 1 : 0;
     });
-    return ctx.ret(Value(int64_t(r)));
+    return ctx.ret(Value::make_bool(r != 0));
 }
 
 Value make_camera_module() {

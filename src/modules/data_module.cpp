@@ -191,7 +191,7 @@ static Value data_set(int scope, Value* args, int argc) {
 static Value data_has(int scope, Value* args, int argc) {
     if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.has: expected a string key");
-    return Value((int64_t)(s_store[scope].count(args[0].as_string()) ? 1 : 0));
+    return Value::make_bool(s_store[scope].count(args[0].as_string()) != 0);
 }
 static Value data_delete(int scope, Value* args, int argc) {
     if (argc < 1 || !args[0].is_string())

@@ -76,7 +76,7 @@ static Value eval_constant(const Expr& e, const std::vector<std::string>& files,
     if (auto* s = dynamic_cast<const StringExpr*>(&e))
         return Value(s->value);
     if (auto* b = dynamic_cast<const BoolExpr*>(&e))
-        return Value((int64_t)(b->value ? 1 : 0));
+        return Value::make_bool(b->value);
     if (dynamic_cast<const NilExpr*>(&e))
         return Value{};
     SourceLoc loc = (e.line > 0) ? e.sloc() : fallback;
@@ -303,7 +303,7 @@ void Compiler::compile_into(const Expr& e, int dest) {
     } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(Value(s->value))));
     } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(Value((int64_t)(b->value ? 1 : 0)))));
+        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(Value::make_bool(b->value))));
     } else if (dynamic_cast<const NilExpr*>(&e)) {
         chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
     } else if (auto* bin = dynamic_cast<const BinaryExpr*>(&e); bin && bin->op != '&' && bin->op != '|') {
@@ -1121,7 +1121,7 @@ void Compiler::visit(const InterpExpr& e) {
 
 void Compiler::visit(const BoolExpr& e) {
     last_reg_ = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.add_constant(Value((int64_t)(e.value ? 1 : 0)))));
+    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.add_constant(Value::make_bool(e.value))));
 }
 
 void Compiler::visit(const NilExpr&) {

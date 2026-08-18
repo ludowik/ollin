@@ -546,7 +546,7 @@ int method_cancel(CallCtx& ctx) {
 
 int method_is_done(CallCtx& ctx) {
     int slot = handle_slot(ctx.args[0], "tween.isDone");
-    return ctx.ret(Value(slot < 0 ? 1.0 : 0.0));
+    return ctx.ret(Value::make_bool(slot < 0));
 }
 
 int method_progress(CallCtx& ctx) {

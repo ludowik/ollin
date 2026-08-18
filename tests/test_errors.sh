@@ -280,6 +280,35 @@ check_error "ui.list with an empty source" \
 ui.list("Couleur", [], ref v)' \
     "list is empty"
 
+# ── Booléens : type étanche ────────────────────────────────────────────────────
+# L'étanchéité tient à un point de passage unique (VM::as_double) : l'arithmétique et les
+# comparaisons d'ordre refusent le booléen comme elles refusent nil.
+
+check_error "arithmetic on a boolean" \
+    'print(true + 1)' \
+    "expected number, got boolean"
+
+check_error "boolean on the right of an addition" \
+    'print(1 + true)' \
+    "expected number, got boolean"
+
+check_error "negating a boolean" \
+    'print(-true)' \
+    "expected number, got boolean"
+
+check_error "ordering two booleans" \
+    'print(true < false)' \
+    "expected number, got boolean"
+
+check_error "comparing a boolean with a number by order" \
+    'print(true >= 1)' \
+    "expected number, got boolean"
+
+check_error "compound assignment on a boolean" \
+    'var b = true
+b *= 2' \
+    "expected number, got boolean"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

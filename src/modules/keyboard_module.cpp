@@ -93,9 +93,9 @@ static int key_code(std::string name) {
 static int kbd_is_down(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (s_blocked)
-        return ctx.ret(Value((int64_t)0));   // éditeur focalisé → le jeu ne lit pas le clavier
+        return ctx.ret(Value::make_bool(false));   // éditeur focalisé → le jeu ne lit pas le clavier
     if (argc < 1 || !args[0].is_string())
-        return ctx.ret(Value((int64_t)0));
+        return ctx.ret(Value::make_bool(false));
     std::string name = args[0].as_string();
     for (char& c : name)
         c = (char)std::tolower((unsigned char)c);
@@ -111,7 +111,7 @@ static int kbd_is_down(CallCtx& ctx) {
         if (code >= 0)
             down = IsKeyDown(code);
     }
-    return ctx.ret(Value((int64_t)(down ? 1 : 0)));
+    return ctx.ret(Value::make_bool(down));
 }
 
 // Touches actuellement enfoncées (pour émettre keyrelease). Indexé par keycode

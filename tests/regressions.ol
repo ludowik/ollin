@@ -1197,4 +1197,64 @@ plTD.repeat(nil, true)
 plTD.repeat(2, true)
 assert(plTD.isDone())
 
+## ── Booléens : type étanche, mais « le vide est faux » conservé ───────────────
+## L'égalité doit tester les DEUX côtés du couple : un seul test aurait laissé
+## `true == 1` répondre vrai par la branche numérique, et `false == false` répondre FAUX
+## en tombant dans le cas par défaut (cas réellement rencontré à l'implémentation).
+assert((false == false) == true)
+assert((true == true) == true)
+assert((true == false) == false)
+assert(true <> 1 and 1 <> true)
+assert(false <> 0 and 0 <> false)
+assert(false <> nil and false <> "" and false <> [])
+
+## Un booléen est une CLÉ distincte de l'entier correspondant : le hachage doit séparer
+## ce que l'égalité sépare, sinon les deux clés se confondraient dans la map.
+var bk = {}
+bk[true] = "b"
+bk[1] = "i"
+bk[false] = "bf"
+bk[0] = "z"
+assert(bk[true] == "b" and bk[1] == "i" and bk[false] == "bf" and bk[0] == "z")
+assert(len(bk) == 4)
+
+## Les producteurs de booléens : `not`, les six comparaisons, et les prédicats natifs.
+assert((not nil) == true)
+assert((3 > 4) == false)
+assert(("a" < "b") == true)
+assert(math.isNan(math.sqrt(-1)) == true)
+assert(math.isInf(math.INF) == true)
+assert(math.isNan(1.0) == false)
+
+## Affichage : "true"/"false", en anglais comme les mots-clés — donc recopiable dans un
+## script. Vaut aussi pour la concaténation et l'interpolation.
+assert(("" + true) == "true")
+assert(("" + false) == "false")
+var bi = 1 == 1
+assert("{bi}" == "true")
+
+## Le booléen traverse les frontières sans se dénaturer : passage en argument, retour de
+## fonction, stockage en map, en tableau, capture par une closure.
+func bool_id(v)  return v  end
+assert(bool_id(true) == true and bool_id(false) == false)
+var bm = {ok: false}
+bm.ok = 1 == 1
+assert(bm.ok == true)
+var ba = [true, false]
+assert(ba[1] == true and ba[2] == false)
+var bcap = false
+func bool_set()  bcap = 2 > 1  end
+bool_set()
+assert(bcap == true)
+
+## Un booléen reste un test de vérité valide partout où une valeur est attendue.
+var bcount = 0
+for i = 1, 3 do
+    if i > 1 then bcount += 1 end
+end
+assert(bcount == 2)
+while false do
+    assert(nil)   ## jamais atteint
+end
+
 print("regressions ok")

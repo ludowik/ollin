@@ -164,8 +164,13 @@ class VM {
             return (double)v.as_int();
         if (v.is_float())
             return v.as_float();
+        // Point de passage UNIQUE de l'arithmétique et des comparaisons d'ordre : c'est ici
+        // que l'étanchéité du booléen se joue. `true + 1` et `true < false` sont donc
+        // refusés sans qu'aucun opcode n'ait à le savoir.
         if (v.is_nil())
             throw std::runtime_error("runtime: expected number, got nil");
+        if (v.is_bool())
+            throw std::runtime_error("runtime: expected number, got boolean");
         throw std::runtime_error("runtime: expected number, got string");
     }
 };

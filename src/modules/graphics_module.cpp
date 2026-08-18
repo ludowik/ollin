@@ -197,7 +197,7 @@ static int gfx_is_open(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    return ctx.ret(Value(WindowShouldClose() ? int64_t(0) : int64_t(1)));
+    return ctx.ret(Value::make_bool(!WindowShouldClose()));
 }
 
 static int gfx_begin_draw(CallCtx& ctx) {

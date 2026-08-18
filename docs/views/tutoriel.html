@@ -395,7 +395,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-18 07:25</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-18 16:18</span></p>
   </div>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
@@ -447,7 +447,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-18 07:25</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-18 16:18</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -473,7 +473,7 @@ pre:hover .code-actions,
 <table>
 <tr><th>Type</th><th>Littéral</th><th>Description</th></tr>
 <tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
-<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Booléens. <code>true</code> vaut 1, <code>false</code> vaut 0.</td></tr>
+<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Booléen, <strong>type à part entière</strong> : <code>true</code> n'est pas l'entier 1, donc <code>true &lt;&gt; 1</code>. Produit par <code>not</code> et par les comparaisons. L'arithmétique sur un booléen est une erreur.</td></tr>
 <tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code>, <code class="num">0xFF</code>, <code class="num">0o17</code>, <code class="num">0b1010</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>). Bases : décimale, <code>0x</code> hexadécimale, <code>0o</code> octale, <code>0b</code> binaire.</td></tr>
 <tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code>, <code class="num">6.022e23</code>, <code class="num">2e-3</code></td><td>Nombre à virgule flottante (double précision). Notation scientifique : un exposant <code>e</code>/<code>E</code> (signe optionnel) rend le littéral flottant (<code class="num">1e3</code> == 1000, <code class="num">2e-3</code> == 0.002).</td></tr>
 <tr><td>string</td><td><code class="str">"texte"</code></td><td>Chaîne UTF-8 immuable.</td></tr>
@@ -486,17 +486,20 @@ pre:hover .code-actions,
 <table>
 <tr><th>Valeur</th><th>Fausse si</th></tr>
 <tr><td>nil</td><td>toujours</td></tr>
-<tr><td>integer / bool</td><td>== 0</td></tr>
+<tr><td>bool</td><td><code class="bool">false</code></td></tr>
+<tr><td>integer</td><td>== 0</td></tr>
 <tr><td>float</td><td>== 0.0</td></tr>
 <tr><td>string</td><td>chaîne vide <code>""</code></td></tr>
 <tr><td>map</td><td>vide <code>{}</code></td></tr>
 <tr><td>array</td><td>vide <code>[]</code></td></tr>
 </table>
 
-<pre><code><span class="bi">assert</span>(<span class="num">1</span> == <span class="bool">true</span>)   <span class="cmt">## true est stocké comme 1</span>
-<span class="bi">assert</span>(<span class="num">0</span> == <span class="bool">false</span>)  <span class="cmt">## false comme 0</span>
+<pre><code><span class="bi">assert</span>(<span class="num">1</span> &lt;&gt; <span class="bool">true</span>)   <span class="cmt">## types distincts : le booléen est étanche</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="num">0</span>)        <span class="cmt">## zéro => faux, sans pour autant valoir false</span>
 <span class="bi">assert</span>(<span class="str">"non vide"</span>)  <span class="cmt">## chaîne non vide => vrai</span>
 <span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)      <span class="cmt">## chaîne vide => faux</span></code></pre>
+
+<p>Les deux règles sont indépendantes et il faut les tenir ensemble : <strong>zéro est faux</strong> (le vide est faux), et pourtant <strong>zéro n'est pas <code>false</code></strong> (les types ne se mélangent pas). Autrement dit, <code>if x</code> et <code>if not x</code> disent la vérité d'une valeur quel qu'en soit le type — c'est la façon d'écrire un test — alors que <code>x == false</code> ne vaut que pour un vrai booléen. Il n'existe pas de conversion <code>bool(v)</code> : <code>not not v</code> en tient lieu.</p>
 
 <h3>Arithmétique des types numériques</h3>
 <div class="callout">Deux entiers combinés donnent un entier — sauf la division <code>/</code>, qui donne toujours un flottant. Dès qu'un flottant intervient dans le calcul, le résultat est un flottant.</div>
@@ -608,9 +611,9 @@ multi-lignes
 </table>
 
 <h3>Logiques</h3>
-<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span>            <span class="cmt">## 1</span>
-<span class="kw">var</span> b = <span class="bool">true</span> <span class="kw">and</span> <span class="bool">false</span>           <span class="cmt">## 0</span>
-<span class="kw">var</span> c = <span class="kw">not</span> <span class="bool">true</span>                 <span class="cmt">## 0</span>
+<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span>            <span class="cmt">## true (l'opérande, pas un 1)</span>
+<span class="kw">var</span> b = <span class="bool">true</span> <span class="kw">and</span> <span class="bool">false</span>           <span class="cmt">## false</span>
+<span class="kw">var</span> c = <span class="kw">not</span> <span class="bool">true</span>                 <span class="cmt">## false</span>
 
 <span class="cmt">## précédence : not > and > or</span>
 <span class="bi">assert</span>(<span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="kw">and</span> <span class="bool">false</span>)  <span class="cmt">## true or (false and false)</span></code></pre>
@@ -1352,7 +1355,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 
 <h3>print</h3>
 <p>Affiche tous les arguments séparés par des espaces, suivi d'un retour à la ligne.</p>
-<pre><code><span class="bi">print</span>(<span class="str">"a ="</span>, <span class="num">42</span>, <span class="bool">true</span>)  <span class="cmt">## a = 42 1</span>
+<pre><code><span class="bi">print</span>(<span class="str">"a ="</span>, <span class="num">42</span>, <span class="bool">true</span>)  <span class="cmt">## a = 42 true</span>
 <span class="bi">print</span>()                 <span class="cmt">## ligne vide</span></code></pre>
 
 <h3>printf</h3>

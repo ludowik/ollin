@@ -746,7 +746,7 @@ Les ranges ouverts (`[a;b[`, `]a;b]`…) et `for k,v in …` gardent le chemin i
 > Notation d'intervalles `[a;b]` / `]a;b[` / step / first-class : voir `grammar.ebnf` (`rangeLit`).
 
 `MAKE_RANGE` (opcode ABC) : A=dest, B=base (start=R[B], end=R[B+1], step=R[B+2] si has_step), C=flags (bit0=incl_right, bit1=has_step). L'ajustement open-left est émis par le compilateur via ADD avant MAKE_RANGE.  
-`T_RANGE = 11` — Range* ref-counted avec `{start, end, step, incl_right}` (entiers uniquement).
+`T_RANGE = 12` — Range* ref-counted avec `{start, end, step, incl_right}` (entiers uniquement).
 
 ## Type map (implémentation)
 
@@ -825,6 +825,38 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
 - `module_member()` (vm.h) applique le même cache aux maps de module **immuables** (`string_module_`, `array_module_`) → hit systématique après le premier passage.
 - **Piège d'aliasing** : le registre destination peut aliaser celui de l'objet (`A==B`) ou de la clé (`A==C`). Capturer `obj.mptr` / `key.sptr` **avant** toute écriture de `regs[base+A]` — les lire après donne la valeur écrasée (le cache ne se remplissait jamais).
 
+## Type booléen (implémentation)
+
+> Syntaxe et sémantique (étanchéité, « le vide est faux ») : voir `grammar.ebnf` (`BOOL`).
+
+`T_BOOL` est un tag **non ref-compté**, donc placé **avant** le pivot `T_STRING` : rangé
+après, `tag < T_STRING` l'aurait cru ref-compté et `retain()` aurait déréférencé un
+pointeur bidon. Son ajout a décalé `T_STRING` et les sept types comptés d'un cran — sans
+risque, aucun bytecode n'étant sérialisé sur disque.
+
+- **Fabrique explicite** `Value::make_bool(bool)`, et surtout PAS de constructeur
+  `Value(bool)` : avec `Value(int64_t)` et `Value(double)` déjà présents, il ferait de
+  `Value(0)` un booléen par conversion implicite silencieuse.
+- **Producteurs** : `NOT`, `AND`, `OR`, les six comparaisons, les trois sites de
+  `negate_result` (RETURN), les littéraux (`BoolExpr`), et les prédicats natifs
+  (`math.isNan`/`isInf`, `keyboard.isDown`, `data.has`, `graphics.isOpen`/`isVisible`,
+  `camera.isOpen`, `tween.isDone`, champ `enabled` d'une `Light`).
+- **Étanchéité tenue en UN point** : `VM::as_double` (vm.h) refuse le booléen comme il
+  refuse `nil`. Toute l'arithmétique et toutes les comparaisons d'ordre y passent, donc
+  aucun opcode n'a eu à changer.
+- **Égalité** : `values_equal` teste les DEUX côtés (`av.is_bool() || bv.is_bool()`).
+  N'en tester qu'un laissait `false == false` tomber dans le cas par défaut et répondre
+  FAUX — cas réellement rencontré, figé dans `regressions.ol`.
+- **Clés de map** : `ValueHash`/`ValueEqual` ont leur cas `T_BOOL`, et le hash est décalé
+  d'une constante pour que `true` ne collisionne pas avec l'entier 1. Le couple
+  INTEGER/FLOAT reste volontairement confondu ; le booléen, non.
+- **`is_falsy`** garde toutes ses règles (« le vide est faux ») et gagne le test booléen
+  **en tête** : les comparaisons rendant désormais des booléens, c'est le cas le plus
+  fréquent sur le chemin chaud de `JUMP_IF_FALSE`.
+- `math.isNan`/`isInf` ont leur propre macro `MATH1_BOOL` : `MATH1` passe par `num_value`,
+  qui rendrait un nombre.
+- **Hors périmètre, à demander** : conversion `bool(v)` (`not not v` en tient lieu).
+
 ## Type entier natif (implémentation)
 
 > Règles de promotion (INT/FLOAT) et littéraux : voir `grammar.ebnf` (`additive`, `NUMBER`).
@@ -845,7 +877,7 @@ offset 4-7 : uint32_t str_hash  (hash contenu, valide uniquement T_STRING)
 offset 8-15: union { int64_t ival; double dval; InternedStr* sptr; Map* mptr; Array* aptr; Iterator* iptr; Closure* cptr; Range* rptr; }
 ```
 
-**Ordre des tags = invariant de perf** : tous les types **non ref-comptés** d'abord (0..4), puis le pivot `T_STRING` et tous les **ref-comptés** contigus (5..11). Ainsi `tag < T_STRING` sépare en **un seul test** les valeurs sans gestion mémoire (nil/int/float/function/builtin) de celles à retain/release (`Value::retain()`/`release()`). Tout nouveau type ref-compté doit être ajouté **après** le pivot, tout type non compté **avant**.
+**Ordre des tags = invariant de perf** : tous les types **non ref-comptés** d'abord (0..5, booléen compris), puis le pivot `T_STRING` et tous les **ref-comptés** contigus (6..12). Ainsi `tag < T_STRING` sépare en **un seul test** les valeurs sans gestion mémoire (nil/int/float/function/builtin/bool) de celles à retain/release (`Value::retain()`/`release()`). Tout nouveau type ref-compté doit être ajouté **après** le pivot, tout type non compté **avant**.
 
 | tag        | valeur (uint8_t) | union actif | plage / note        |
 |------------|-----------------|-------------|---------------------|
@@ -854,13 +886,14 @@ offset 8-15: union { int64_t ival; double dval; InternedStr* sptr; Map* mptr; Ar
 | T_FLOAT    | 2               | dval (double) | IEEE 754 double   |
 | T_FUNCTION | 3               | ival (int64_t, = func_idx) | index dans chunk.funcs (non compté) |
 | T_BUILTIN  | 4               | ival (pointeur natif) | fonction native (non compté) |
-| T_STRING   | 5               | sptr (InternedStr*) | **pivot** — ref-counted, str_hash = sptr->hash |
-| T_MAP      | 6               | mptr (Map*) | ref-counted     |
-| T_ARRAY    | 7               | aptr (Array*) | ref-counted   |
-| T_ITERATOR | 8               | iptr (Iterator*) | ref-counted |
-| T_CLOSURE  | 9               | cptr (Closure*) | ref-counted, holds func_idx + upvals |
-| T_CLASS    | 10              | mptr (Map*) | ref-counted ; même layout que T_MAP, distinct pour CALL_DYN |
-| T_RANGE    | 11              | rptr (Range*) | ref-counted ; intervalle entier      |
+| T_BOOL     | 5               | ival (0/1)  | booléen ÉTANCHE, non ref-compté (cf. « Type booléen ») |
+| T_STRING   | 6               | sptr (InternedStr*) | **pivot** — ref-counted, str_hash = sptr->hash |
+| T_MAP      | 7               | mptr (Map*) | ref-counted     |
+| T_ARRAY    | 8               | aptr (Array*) | ref-counted   |
+| T_ITERATOR | 9               | iptr (Iterator*) | ref-counted |
+| T_CLOSURE  | 10              | cptr (Closure*) | ref-counted, holds func_idx + upvals |
+| T_CLASS    | 11              | mptr (Map*) | ref-counted ; même layout que T_MAP, distinct pour CALL_DYN |
+| T_RANGE    | 12              | rptr (Range*) | ref-counted ; intervalle entier      |
 
 ## Closures / Upvalues
 

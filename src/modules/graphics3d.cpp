@@ -913,7 +913,7 @@ static void apply_light_from_instance(const Value& self) {
     s_light_col[1] = (float)inst_field(self, "g", 1.0);
     s_light_col[2] = (float)inst_field(self, "b", 1.0);
     s_light_col[3] = (float)inst_field(self, "a", 1.0);
-    s_light_on = inst_field(self, "enabled", 1.0) != 0.0;
+    s_light_on = !is_falsy(self.map_get(Value(std::string("enabled"))));
     s_lighting_used = true;
 }
 
@@ -961,7 +961,7 @@ static int light_enable(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     bool on = (argc > 1) ? !is_falsy(args[1]) : true;
-    self.map_set(Value(std::string("enabled")), Value((int64_t)(on ? 1 : 0)));
+    self.map_set(Value(std::string("enabled")), Value::make_bool(on));
     apply_light_from_instance(self);
     return ctx.ret(self);
 }
@@ -1000,7 +1000,7 @@ static int gfx_light(CallCtx& ctx) {
     inst.map_set(Value(std::string("g")), Value(c.g / 255.0));
     inst.map_set(Value(std::string("b")), Value(c.b / 255.0));
     inst.map_set(Value(std::string("a")), Value(c.a / 255.0));
-    inst.map_set(Value(std::string("enabled")), Value((int64_t)1));
+    inst.map_set(Value(std::string("enabled")), Value::make_bool(true));
     apply_light_from_instance(inst);
     return ctx.ret(inst);
 }
@@ -1425,11 +1425,11 @@ static int gfx_in_frustum(CallCtx& ctx) {
             }
             float dist = (a * x + b * y + c * z + d) / len;
             if (dist < -r) {
-                return ctx.ret(Value((int64_t)0));   // entièrement du mauvais côté d'un plan → hors-champ
+                return ctx.ret(Value::make_bool(false));   // entièrement du mauvais côté d'un plan → hors-champ
             }
         }
     }
-    return ctx.ret(Value((int64_t)1));
+    return ctx.ret(Value::make_bool(true));
 }
 
 // graphics.beginChunk() : démarre l'enregistrement d'un groupe de cubes. Les

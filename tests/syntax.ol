@@ -46,8 +46,8 @@ assert(0xFFFFFFFFFFFFFFFF == -1)   ## motif de bits complet → wrapping int64
 var s = "hello"             ## chaîne (immuable)
 var s_concat = "hello" + ", " + "world"  ## concaténation avec +
 assert(s_concat == "hello, world")
-var vrai  = true            ## booléen (stocké comme entier 1)
-var faux  = false           ## booléen (stocké comme entier 0)
+var vrai  = true            ## booléen : type à part entière, pas un entier
+var faux  = false
 var rien  = nil             ## valeur absente
 
 ## ── 3. Variables ─────────────────────────────────────────────────────────────
@@ -173,30 +173,38 @@ assert(true  or  false)
 assert(false or  true)
 assert(true  and true)
 assert(not false)
-assert(not nil   == 1)
-assert(not 0     == 1)
-assert(not ""    == 1)
 
 ## précédence : not > and > or
 assert(true or false and false)     ## true or (false and false)
 
-## résultat faux → valeur numérique 0
-var fa = false and true
-assert(fa == 0)
-var fo = false or false
-assert(fo == 0)
+## `and`/`or` rendent l'OPÉRANDE, pas un booléen normalisé (sémantique valeur)
+assert((false and true) == false)   ## le premier opérande, qui est falsy
+assert((3 and 7) == 7)              ## le second, le premier étant truthy
+assert((nil or "x") == "x")
 
-## vérité des types — principe « le vide est faux »
-assert(1    == true)
-assert(0    == false)
-assert(not not "x")    ## string non vide : truthy (== ne coerce pas les types)
+## le booléen est un TYPE À PART, étanche : `true` n'est pas l'entier 1
+assert(true  <> 1)
+assert(false <> 0)
+assert(nil   <> false)
+assert(true  == true)
+assert(not (true == false))
+
+## `not` et les comparaisons PRODUISENT un booléen
+assert((not 0)   == true)
+assert((1 == 1)  == true)
+assert((1 <> 1)  == false)
+assert((2 > 3)   == false)
+
+## vérité des types — principe « le vide est faux », inchangé
+assert(not 0)          ## zéro : falsy, sans pour autant valoir false
+assert(not not 1)
+assert(not not "x")    ## string non vide : truthy
 assert(not "")         ## string vide : falsy
-assert(not nil)        ## nil est falsy, mais nil <> false (types distincts)
-assert(nil <> false)   ## nil et false sont des types distincts
+assert(not nil)
 assert(not {})         ## map vide : falsy
 assert(not [])         ## array vide : falsy
 assert(not not {a:1})  ## map non vide : truthy
-assert(not not [1])    ## array non vide : truthy
+assert(not not [1])    ## array non vide : truthy    ## array non vide : truthy
 
 ## ── 7. Opérateurs bits ───────────────────────────────────────────────────────
 ## [grammaire: bitwiseOr, bitwiseXor, bitwiseAnd, shift]
