@@ -46,41 +46,15 @@ if [ "$(uname)" = "Linux" ]; then
     libasound2-dev libx11-dev libxrandr-dev libxi-dev \
     libxcursor-dev libxinerama-dev 2>/dev/null || true
 
-  # ── Interpréteurs de comparaison des benchmarks (bench/bench_all.sh) ───────
-  # Lua est la RÉFÉRENCE du tableau et Python la troisième colonne : sans eux, le
-  # benchmark n'a plus de point de comparaison. On installe la version la plus RÉCENTE
-  # offerte par les dépôts, jamais un numéro en dur — il vieillirait en silence et le
-  # jour où la distribution avance, on continuerait de mesurer l'ancienne.
-  # Les candidats sont essayés du plus récent au plus ancien : les métadonnées d'un PPA
-  # inaccessible (403 du proxy) annoncent des paquets qui ne s'installent pas.
-  installer_le_plus_recent() {
-    local motif="$1" p
-    for p in $(apt-cache search --names-only "$motif" 2>/dev/null | awk '{print $1}' | sort -Vr); do
-      if command -v "$p" >/dev/null 2>&1; then
-        echo "$p"
-        return 0
-      fi
-      if sudo apt-get install -y -qq --no-install-recommends "$p" >/dev/null 2>&1; then
-        echo "$p"
-        return 0
-      fi
-    done
-    return 1
-  }
-  LUA_BIN=$(installer_le_plus_recent '^lua5\.[0-9]+$' || echo "")
-  PY_BIN=$(installer_le_plus_recent '^python3\.[0-9]+$' || echo "")
-
-  # Les versions retenues sont ÉCRITES ici : c'est ce hook qui les installe, donc il est
-  # le seul à les connaître de source sûre. `bench_all.sh` les lit au lieu de fouiller le
-  # PATH avec des motifs de noms — heuristique qui attrapait `python3.13-config`.
-  # Fichier dans build/, gitignoré : c'est un état d'environnement, pas du code.
-  mkdir -p "$CLAUDE_PROJECT_DIR/build"
-  {
-      echo "# Interpréteurs installés par .claude/hooks/session-start.sh — ne pas éditer."
-      echo "LUA=${LUA_BIN}"
-      echo "PY=${PY_BIN}"
-  } > "$CLAUDE_PROJECT_DIR/build/bench-interpreters.env"
-  echo "benchmarks : ${LUA_BIN:-lua absent} · ${PY_BIN:-python absent}"
+  # ── Lua, référence du tableau de benchmarks (bench/bench_all.sh) ───────────
+  # Python est déjà dans l'image ; Lua non, et sans lui le benchmark perd son point de
+  # comparaison. Une seule ligne : la distribution ne propose qu'un Lua à la fois, donc
+  # rien à départager. NE PAS compiler Lua depuis les sources (lua.org est bloqué par le
+  # proxy). Le jour où Ubuntu avance, corriger ce nom de paquet.
+  sudo apt-get install -y -qq --no-install-recommends lua5.4 2>/dev/null || true
+  command -v lua5.4 >/dev/null 2>&1 \
+    && echo "benchmarks : lua5.4 présent" \
+    || echo "⚠ benchmarks : lua5.4 absent — la colonne de référence sera N/A"
 
   # ── SDK Emscripten (cible WASM) ────────────────────────────────────────────
   EMSDK_DIR="$HOME/emsdk"

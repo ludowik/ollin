@@ -14,20 +14,22 @@ set -euo pipefail
 export LC_ALL=${LC_ALL:-C.UTF-8}
 RUNS=${RUNS:-3}
 OLLIN=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.exe")
-# Interpréteurs de comparaison : les versions viennent du fichier écrit par le hook de
-# session, qui les a installées et les connaît donc exactement. Aucun numéro de version en
-# dur ici, et aucune devinette sur les noms de binaires.
-INTERP_ENV="$(dirname "$0")/../build/bench-interpreters.env"
-LUA=""
-PY=""
-if [ -f "$INTERP_ENV" ]; then
-    # shellcheck disable=SC1090
-    . "$INTERP_ENV"
-fi
-# Repli hors conteneur (machine de développement, Windows) : le hook n'y tourne pas.
-[ -n "$LUA" ] && command -v "$LUA" >/dev/null 2>&1 || LUA=$(command -v lua 2>/dev/null || echo "")
+# Interpréteurs de comparaison, cherchés dans le PATH sur une liste de noms EXPLICITES.
+# Pas de glob sur les noms de binaires : `python3.[0-9]*` attrapait `python3.13-config`,
+# qui n'exécute rien, et le tableau ressortait vide.
+premier_present() {
+    local nom
+    for nom in "$@"; do
+        if command -v "$nom" >/dev/null 2>&1; then
+            echo "$nom"
+            return 0
+        fi
+    done
+    return 1
+}
+LUA=$(premier_present lua5.4 lua5.3 lua54 lua || echo "")
 [ -n "$LUA" ] || { [ -x "/c/Tools/lua/lua55.exe" ] && LUA="/c/Tools/lua/lua55.exe"; }
-[ -n "$PY" ] && command -v "$PY" >/dev/null 2>&1 || PY=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo "")
+PY=$(premier_present python3 python || echo "")
 DIR=$(dirname "$0")
 
 extract_time() {
