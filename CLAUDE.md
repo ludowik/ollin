@@ -97,7 +97,7 @@ ollin/
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
 │                      ollin-vscode/ (extension VS Code, colorisation)
-├── bench/             benchmarks (.ol / .lua / .py)
+├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
 ```
 
@@ -237,6 +237,17 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
   figer une disposition favorable (le prochain changement la défera). Pour attribuer un
   écart à un commit, mesurer en **tourniquet** (tous les binaires une fois par tour, puis
   minimum par binaire) : une mesure au meilleur de trois est trop bruitée.
+- **« C'est la disposition du code » ne s'AFFIRME pas, ça se MESURE : `bash bench/icount.sh
+  [<réf>] [<réf>]`.** Le script compte les instructions exécutées (callgrind), chiffre
+  déterministe et indifférent à l'adresse du code comme au cache : il mesure le TRAVAIL.
+  Instructions en hausse = coût réel à corriger ; instructions stables et temps qui bouge =
+  placement, et il n'y a rien à optimiser. Sa sensibilité est vérifiée (+0,61 % pour quatre
+  comparaisons ajoutées à `op_ADD`), donc un 0,00 % n'est pas un outil aveugle.
+  **Mesure d'histoire, faite sur 12 commits** : le compte d'instructions est stable au
+  dix-millième d'un commit à l'autre (200 instructions d'écart sur 99 millions) tandis que
+  le temps de `fib` oscille de −2,5 % à +6,1 % — il n'y a donc **pas** de dérive cumulative
+  du travail, et le bruit de temps ne s'additionne pas d'un commit au suivant. Ne jamais
+  invoquer la disposition sans avoir lancé ce script.
 
 ## Tests graphiques — DEUX chaînes qui MARCHENT (ne pas conclure « cassé »)
 
