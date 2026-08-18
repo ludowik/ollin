@@ -1,5 +1,6 @@
 #include "tween_module.h"
 #include "module_utils.h"
+#include <algorithm>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -185,11 +186,12 @@ struct Chan {
 };
 
 // Plan de LECTURE : un segment par parcours de l'animation, +1 dans le sens déclaré,
-// -1 en arrière. `repeat(n)` répète la liste, `yoyo()` y ajoute son miroir (liste renversée,
-// sens inversés) — les deux COMPOSENT donc, et l'ordre des appels compte :
-//   .repeat(2)          → +1 +1          (deux allers)
-//   .repeat(2).yoyo()   → +1 +1 -1 -1    (deux allers, puis les deux retours)
-//   .yoyo().repeat(2)   → +1 -1 +1 -1    (deux allers-retours)
+// -1 en arrière. `repeat(n)` répète la liste ; son second paramètre y ajoute le miroir de
+// tout le plan (liste renversée, sens inversés). Deux appels COMPOSENT, chacun agissant sur
+// le plan construit jusque-là, donc l'ordre compte :
+//   .repeat(2)                    → +1 +1          (deux allers)
+//   .repeat(2, true)              → +1 +1 -1 -1    (deux allers, puis les deux retours)
+//   .repeat(nil, true).repeat(2)  → +1 -1 +1 -1    (deux allers-retours)
 // Un plan vide n'existe pas : tout tween démarre avec un segment.
 struct Tw {
     std::vector<Chan> chans;
@@ -249,7 +251,6 @@ void free_tween(int slot) {
     t.gen++;
     t.chans.clear();       // relâche les Value retenues : sans cela le module garderait
     t.curve_fn = Value{};  // l'objet animé vivant longtemps après la fin de l'animation
-    t.plan.assign(1, 1);
     t.on_done = Value{};
     s_free.push_back(slot);
 }
@@ -555,13 +556,14 @@ int method_progress(CallCtx& ctx) {
     const Tw& t = s_tweens[slot];
     // Avancement sur le PLAN entier (segment courant compris) : un plan de quatre segments
     // à mi-deuxième segment rend 0,375. Un plan sans fin rend l'avancement de son tour.
-    double p = t.dur > 0.0 ? t.elapsed / t.dur : 1.0;
-    if (p > 1.0)
-        p = 1.0;
+    // Le segment courant est plafonné AVANT la division : le dernier dépasse sa durée en
+    // attendant la passe qui terminera le tween. Ensuite (base + p) / total ≤ 1 par
+    // construction, donc seul le plancher reste à poser (délai, temps négatif).
+    double p = t.dur > 0.0 ? std::min(t.elapsed / t.dur, 1.0) : 1.0;
     double total = t.endless ? 1.0 : (double)t.plan.size();
     double base = t.endless ? 0.0 : (double)t.seg;
     p = (base + p) / total;
-    return ctx.ret(Value(p < 0.0 ? 0.0 : (p > 1.0 ? 1.0 : p)));
+    return ctx.ret(Value(p < 0.0 ? 0.0 : p));
 }
 
 // UNE seule méthode pour toutes les répétitions : `repeat([occurrences] [, allerRetour])`.
