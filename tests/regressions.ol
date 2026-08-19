@@ -1522,4 +1522,12 @@ assert(audio.volume(9) == 1)
 assert(audio.volume(-3) == 0)
 audio.volume(1)
 
+## La pause appartient à la SESSION : elle suspend l'AVANCEMENT du mélange, là où un volume
+## à zéro laisserait tout courir en silence et ferait reprendre le son plus loin.
+assert(not audio.isPaused())
+audio.pause()
+assert(audio.isPaused())
+audio.resume()
+assert(not audio.isPaused())
+
 print("regressions ok")

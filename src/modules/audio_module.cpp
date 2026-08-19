@@ -1,5 +1,6 @@
 #include "audio_module.h"
 #include "module_utils.h"
+#include "sound_internal.h"
 #include "raylib.h"
 
 // Session sonore, build AVEC raylib. Le périphérique n'est PAS ouvert au chargement du
@@ -53,6 +54,23 @@ int audio_sample_rate(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)k_audio_sample_rate));
 }
 
+// La pause appartient à la SESSION et non à chaque son : c'est l'équivalent sonore de la
+// pause d'une boucle de rendu. Elle suspend l'avancement, là où un volume à zéro laisserait
+// tout courir en silence et ferait reprendre le son plus loin qu'on l'a laissé.
+int audio_pause(CallCtx& ctx) {
+    sound_set_paused(true);
+    return ctx.ret(Value{});
+}
+
+int audio_resume(CallCtx& ctx) {
+    sound_set_paused(false);
+    return ctx.ret(Value{});
+}
+
+int audio_is_paused(CallCtx& ctx) {
+    return ctx.ret(Value::make_bool(sound_paused()));
+}
+
 } // namespace
 
 void audio_wake() {
@@ -76,6 +94,9 @@ Value make_audio_module() {
     m.map_set(Value(std::string("start")), Value::make_builtin(audio_start));
     m.map_set(Value(std::string("isReady")), Value::make_builtin(audio_is_ready));
     m.map_set(Value(std::string("volume")), Value::make_builtin(audio_volume));
+    m.map_set(Value(std::string("pause")), Value::make_builtin(audio_pause));
+    m.map_set(Value(std::string("resume")), Value::make_builtin(audio_resume));
+    m.map_set(Value(std::string("isPaused")), Value::make_builtin(audio_is_paused));
     m.map_set(Value(std::string("sampleRate")), Value::make_builtin(audio_sample_rate));
     return m;
 }

@@ -8,6 +8,7 @@
   { "name": "Interface (ui)", "file": "ui_demo.ol" },
   { "name": "Animations (tween)", "file": "tween_demo.ol" },
   { "name": "Séquence animée (tween)", "file": "tween_sequence.ol" },
+  { "name": "Son de synthèse (audio + sound)", "file": "sound_demo.ol" },
   { "name": "Image (loadData)", "file": "image_demo.ol" },
   { "name": "Persistance (data)", "file": "data_demo.ol" },
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },

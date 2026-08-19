@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-19 16:53</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-19 17:05</span></p>
   </div>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
@@ -445,6 +445,7 @@ pre:hover .code-actions,
   <a href="#mouse">Souris</a>
   <a href="#ui">Module ui</a>
   <a href="#tween">Module tween</a>
+  <a href="#sound">Son (audio + sound)</a>
   <a href="#data">Module data</a>
   <a href="#image">Module image</a>
   <a href="#window">Module window</a>
@@ -453,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-19 16:53</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-19 17:05</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2343,6 +2344,102 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   <li>Une valeur cible peut être une <strong>instance de classe</strong> : les champs numériques communs sont interpolés un à un, ce qui couvre <code>Color</code> comme un <code>Vec2</code> écrit par vos soins. Le tween écrit <strong>dans</strong> l'instance, il ne la remplace pas.</li>
   <li>La valeur finale posée est la cible <strong>exacte</strong> : une courbe à dépassement ne rend pas tout à fait 1 en fin de course, et un arrondi laisserait 0,999.</li>
   <li>Le rappel de fin peut déclarer d'autres tweens — de quoi enchaîner des étapes — ou tout annuler.</li>
+</ul>
+</section>
+
+<section id="sound">
+<h2>Modules <code>audio</code> et <code>sound</code></h2>
+<p>Le son se partage en deux : <code>audio</code> est la <strong>session</strong> — le périphérique, le volume général, la pause — et <code>sound</code> est <strong>ce qui sonne</strong>. Aucun fichier n'est nécessaire : tous les sons de cette page sont <strong>calculés</strong>.</p>
+
+<p><code>sound</code> offre deux natures d'objet, et la différence n'est pas cosmétique :</p>
+<ul>
+  <li>un <strong>oscillateur</strong> vivant, dont on déplace la fréquence <em>pendant</em> qu'il sonne — une sirène, un vibrato piloté à la souris ;</li>
+  <li>un <strong>tampon</strong> figé, calculé une fois puis déclenché — un bip, une note, une boucle rythmique.</li>
+</ul>
+
+<h3>Un oscillateur</h3>
+<pre><code><span class="kw">global</span> sirene = <span class="bi">sound</span>.saw(<span class="num">220</span>)
+
+<span class="kw">func</span> setup()
+    <span class="bi">graphics</span>.canvas(W, H)
+    sirene.volume(<span class="num">0.3</span>).start()
+<span class="kw">end</span>
+
+<span class="kw">func</span> draw()
+    <span class="cmt">## La fréquence suit la souris : c'est tout l'intérêt d'un oscillateur vivant.</span>
+    sirene.freq(<span class="num">200</span> + <span class="num">600</span> * <span class="bi">mouse</span>.x / W)
+<span class="kw">end</span></code></pre>
+
+<table>
+  <thead><tr><th>Fabrique</th><th>Rôle</th></tr></thead>
+  <tbody>
+    <tr><td><code>sound.osc(freq [, forme])</code></td><td>oscillateur, forme donnée par son nom</td></tr>
+    <tr><td><code>sound.sine / square / saw / triangle</code></td><td>raccourcis&nbsp;: la forme est dans le nom, donc jamais mal orthographiée</td></tr>
+    <tr><td><code>sound.noise()</code></td><td>bruit blanc (la fréquence ne s'y applique pas)</td></tr>
+  </tbody>
+</table>
+
+<p>Méthodes d'un oscillateur&nbsp;: <code>start</code>, <code>stop</code>, <code>isPlaying</code>, <code>freq</code>, <code>volume</code>, <code>pan</code>, <code>shape</code>, <code>envelope</code>, <code>trigger</code>, <code>release</code>. Comme ailleurs dans le moteur, <strong>sans argument elles lisent</strong>, avec un argument elles écrivent et rendent l'objet&nbsp;: <code>o.freq(440).volume(0.2).pan(-1)</code>.</p>
+
+<h3>Une enveloppe, pour jouer des notes</h3>
+<p>Un oscillateur qu'on démarre et qu'on arrête produit un son plat. L'enveloppe <strong>ADSR</strong> lui donne une attaque, un déclin, un maintien et un relâchement — c'est ce qui distingue une note d'un signal de test.</p>
+
+<pre><code><span class="kw">global</span> voix = <span class="bi">sound</span>.triangle(<span class="num">440</span>).envelope(<span class="num">0.01</span>, <span class="num">0.08</span>, <span class="num">0.5</span>, <span class="num">0.25</span>)
+
+<span class="kw">func</span> mouse.pressed(x, y)
+    <span class="cmt">## Avec une durée, le relâchement part tout seul à l'échéance.</span>
+    voix.freq(<span class="bi">sound</span>.note(<span class="str">"C4"</span>)).trigger(<span class="num">0.2</span>)
+<span class="kw">end</span></code></pre>
+
+<p><code>trigger()</code> sans durée tient la note jusqu'à <code>release()</code>. Une note relâchée <strong>libère sa voix</strong>, si bien qu'un programme peut en déclencher indéfiniment. Les hauteurs s'écrivent en clair&nbsp;: <code>sound.note("C#4")</code> rend 277,18&nbsp;Hz, et un <strong>nom de note est accepté partout où une fréquence l'est</strong>.</p>
+
+<h3>Un tampon calculé</h3>
+<p><code>sound.tone(freq, durée [, forme])</code> échantillonne une forme d'onde&nbsp;; <code>sound.generate(durée, formule)</code> échantillonne <strong>votre</strong> formule, qui reçoit le temps en secondes et rend une amplitude dans <code>[-1;1]</code>.</p>
+
+<pre><code><span class="kw">global</span> bip = <span class="bi">sound</span>.tone(<span class="num">880</span>, <span class="num">0.12</span>, <span class="str">"square"</span>).envelope(<span class="num">0.005</span>, <span class="num">0.02</span>, <span class="num">0.6</span>, <span class="num">0.05</span>)
+
+<span class="cmt">## Une cloche : un sinus qui s'éteint tout seul.</span>
+<span class="kw">global</span> cloche = <span class="bi">sound</span>.generate(<span class="num">1.2</span>, <span class="kw">func</span>(t)
+    <span class="kw">return</span> <span class="bi">math</span>.sin(t * <span class="num">6.283</span> * <span class="num">660</span>) * <span class="bi">math</span>.exp(-t * <span class="num">3</span>)
+<span class="kw">end</span>)
+
+bip.play()
+cloche.volume(<span class="num">0.4</span>).play()</code></pre>
+
+<p>La formule est évaluée <strong>une seule fois</strong>, à la construction — jamais pendant la lecture. Méthodes d'un tampon&nbsp;: <code>play</code>, <code>stop</code>, <code>isPlaying</code>, <code>volume</code>, <code>pan</code>, <code>rate</code>, <code>loop</code>, <code>envelope</code>, plus trois <strong>accesseurs</strong> qui lisent le son calculé.</p>
+
+<table>
+  <thead><tr><th>Accesseur</th><th>Rend</th></tr></thead>
+  <tbody>
+    <tr><td><code>duration()</code></td><td>la durée du tampon, en secondes</td></tr>
+    <tr><td><code>peak()</code></td><td>l'amplitude maximale, en valeur absolue</td></tr>
+    <tr><td><code>sample(t)</code></td><td>l'échantillon à l'instant <code>t</code>&nbsp;; zéro hors du tampon</td></tr>
+  </tbody>
+</table>
+
+<p><code>rate</code> change la <strong>vitesse de lecture</strong>, donc la hauteur <em>et</em> la durée, comme un disque qu'on accélère&nbsp;: ce n'est pas une transposition.</p>
+
+<h3>La session</h3>
+<table>
+  <thead><tr><th>Appel</th><th>Rôle</th></tr></thead>
+  <tbody>
+    <tr><td><code>audio.volume([v])</code></td><td>volume général, borné à <code>[0;1]</code></td></tr>
+    <tr><td><code>audio.pause() / resume()</code></td><td>suspend l'<strong>avancement</strong> du son, et non son seul volume</td></tr>
+    <tr><td><code>audio.isPaused() / isReady()</code></td><td>état de la pause, et du périphérique</td></tr>
+    <tr><td><code>audio.start()</code></td><td>ouvre le périphérique&nbsp;; rarement utile (voir ci-dessous)</td></tr>
+    <tr><td><code>audio.sampleRate()</code></td><td>44 100, l'unité de tous les calculs de synthèse</td></tr>
+  </tbody>
+</table>
+
+<div class="callout tip">Un navigateur <strong>refuse de sonner avant une interaction</strong>. Le moteur ouvre donc le périphérique au premier clic ou à la première touche, et il n'y a rien à écrire pour cela. En revanche, un son demandé dans <code>setup()</code> ne s'entendra qu'après ce premier geste.</div>
+
+<h3>Ce qu'il faut savoir</h3>
+<ul>
+  <li>Le calcul des ondes ne dépend pas du graphisme&nbsp;: un tampon se construit et se mesure même sans carte son, ce dont la suite de tests du moteur se sert.</li>
+  <li>Seize oscillateurs et trente-deux sons coexistent. Quand la table est pleine, le plus ancien <strong>arrêté</strong> est recyclé — un son qui joue n'est jamais volé —, et son ancien objet devient invalide.</li>
+  <li>Aucun code Ollin ne tourne dans le circuit audio&nbsp;: la formule d'un <code>generate</code> est échantillonnée d'avance, et la forme d'un oscillateur est calculée par le moteur. C'est ce qui évite les craquements.</li>
+  <li>En natif, le son continue même si un calcul occupe la machine virtuelle&nbsp;; dans le navigateur, le mélange partage le fil de la page, donc une frame très lourde peut s'entendre.</li>
+  <li>Hors périmètre pour l'instant&nbsp;: le chargement de fichiers, les effets, l'enregistrement et la spatialisation.</li>
 </ul>
 </section>
 

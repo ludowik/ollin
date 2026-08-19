@@ -570,6 +570,94 @@ Autres points :
   les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un
   script chaînant `ui.menu("x").button(...)` tourne aussi sans graphisme.
 
+## Modules `audio` et `sound` (implémentation)
+
+> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Modules audio et sound »).
+
+Le son se partage en deux modules : `audio` est la SESSION (périphérique, volume général,
+pause), `sound` est ce qui SONNE — un oscillateur vivant ou un tampon calculé. Deux modules
+et non trois : l'oscillateur est une fabrique de `sound` (`sound.osc`), décision prise pour
+garder une surface réduite.
+
+**Ni l'un ni l'autre n'est jamais nil**, contrairement à `graphics` : la génération d'ondes
+est un pur calcul, donc l'API entière existe dans un build sans raylib, où seule la sortie
+devient muette. C'est ce qui rend la synthèse testable dans le conteneur d'intégration, qui
+n'a aucun périphérique (`/dev/snd` absent) — sans quoi les tests ne pourraient vérifier que
+des refus.
+
+**Découpage des fichiers** (le patron de `graphics_internal.h`) :
+
+| Fichier | Compilé | Rôle |
+|---|---|---|
+| `audio_module.cpp` / `audio_stub.cpp` | selon raylib | session : ouverture différée, volume, pause |
+| `sound_module.cpp` | PARTOUT | API et état : voix, tampons, handles, validation |
+| `sound_output.cpp` / `sound_output_stub.cpp` | selon raylib | le flux et le mélangeur |
+| `sound_internal.h` | — | frontière : table de voix, table de tampons, époque de mélange |
+| `sound_env.h` | — | `adsr_level`, en forme fermée (cf. plus bas) |
+
+**Le rappel audio ne contient JAMAIS de code Ollin.** Il a une échéance de quelques
+millisecondes, et la manquer s'entend comme un clic. Conséquences, qui expliquent toute
+l'architecture : la forme d'un oscillateur est calculée en C++ (le script ne règle que des
+nombres), la formule d'un `sound.generate` est échantillonnée UNE fois sur le fil principal,
+le rappel n'alloue rien et ne prend aucun verrou, et les paramètres sont des atomiques lus un
+par un. Ils sont en **double** et non en float : `0,01` rangé en float remonte à
+`0,009999999776` et ne s'égale plus à lui-même, ce qui trahirait un script relisant ce qu'il
+a écrit. Vérifié sans verrou sur les deux cibles (`is_always_lock_free`).
+
+**UN SEUL flux pour toutes les voix**, mélangé par nos soins. Le rappel de raylib ne
+transporte aucune donnée utilisateur (sa signature n'a que le tampon et le nombre de trames),
+donc un flux par voix exigerait autant de fonctions distinctes ; et le mélangeur unique est
+l'endroit où vivent la pause globale et les tampons. Tampon de sortie de 1024 trames (~23 ms)
+— au navigateur le mélange partage le fil de la VM (le dos-end miniaudio passe par un
+`ScriptProcessorNode`, pas un AudioWorklet : celui-ci réclamerait la mémoire partagée, donc
+des en-têtes d'isolation que GitHub Pages ne permet pas de poser), si bien qu'une frame très
+lourde s'entend.
+
+**Gain lissé sur 5 ms**, par-dessus l'enveloppe : démarrer ou arrêter une onde carrée d'un
+coup produit un clic très audible, et une attaque nulle serait un saut.
+
+**Enveloppe en FORME FERMÉE** (`adsr_level(e, t, hold)`) et non en machine à états. Ce n'est
+pas un choix esthétique : la même fonction sert au mélangeur (temps réel) et au façonnage
+d'un tampon (hors ligne), si bien qu'un test lisant les échantillons d'un tampon **valide la
+courbe que le mélangeur emploie** — le seul moyen de la contrôler sans carte son. Le
+relâchement part du niveau atteint AU MOMENT du lâcher, sinon lâcher pendant l'attaque
+sauterait au niveau de maintien.
+
+**Recyclage des voix** : 16 voix, 32 tampons, tables de taille FIXE (le fil audio les
+parcourt pendant que le script en réclame). Quand la table est pleine, la voix arrêtée la
+plus ANCIENNE est reprise — « la première arrêtée » martelait toujours la voix 0, si bien
+qu'un oscillateur survivait à vingt créations quand son voisin n'en survivait pas à une. Une
+voix qui sonne n'est jamais volée, et `gen` détecte un handle périmé.
+
+**Durée de vie des échantillons d'un tampon** : le mélangeur ne les lit que tant que
+`playing` est vrai. Réutiliser un slot exige donc de le taire PUIS d'attendre qu'un bloc de
+mélange se soit écoulé — un bloc déjà en cours peut avoir lu `playing` avant qu'on l'éteigne.
+Le compteur de blocs (`sound_mix_epoch`) est l'unique point de synchronisation, sans verrou ;
+sans sortie, il avance à chaque appel puisque personne ne lit.
+
+**Gain de sortie compensé** : la loi de panoramique de raylib n'est pas unitaire au centre
+(`volume × 0,5 × c × (3 − c²)` par canal, soit **0,6875** pour un flux centré). Un volume
+demandé à 1 sortait donc à 0,687 — constaté par mesure au navigateur, retrouvé dans
+`raudio.c`, puis compensé sur le flux (`SetAudioStreamVolume`). Après correction : crête
+1,000 et RMS 0,704 pour un sinus à pleine échelle.
+
+**Ouverture différée au premier geste** (`audio_wake`, appelé depuis `run_user_callbacks`) :
+le navigateur refuse de sonner avant une interaction. Le clavier passe par
+`keyboard_pressed_any()` — la file d'appuis de raylib est CONSOMMÉE par `keyboard_poll`, donc
+la relire ailleurs ne rendrait rien. Corollaire pour les exemples : un son demandé dans
+`setup()` ne s'entend pas, et le geste qui ouvre le périphérique ne s'entend pas lui-même.
+
+**Notes nommées** : `sound.note("C#4")` par le tempérament égal. Un nom est accepté partout où
+une fréquence l'est, grâce au point de passage unique `sound_check_freq`.
+
+**Piège de test au navigateur** : un clic Playwright instantané s'ouvre et se referme dans la
+MÊME frame, et raylib, qui scrute l'entrée une fois par frame, ne le voit jamais. Passer
+`{delay: 150}`. Le signal se vérifie en branchant un `AnalyserNode` sur
+`window.miniaudio.devices[0].scriptNode` (RMS, crête, fréquence dominante).
+
+**Hors périmètre, à demander explicitement** : chargement de fichiers (`sound.load`), effets,
+enregistrement, spatialisation, synthèse en temps réel pilotée par une formule Ollin.
+
 ## Module `tween` (implémentation)
 
 > API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module tween »).

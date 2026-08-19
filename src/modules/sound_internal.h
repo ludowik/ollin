@@ -98,6 +98,12 @@ struct Buf {
 
 Buf* sound_buffers();
 
+// Pause GLOBALE : le mélangeur rend du silence et n'avance ni les phases ni les positions
+// de lecture. C'est ce qui la distingue d'un volume à zéro, où tout continuerait de courir
+// et où reprendre ferait retrouver le son plus loin qu'on l'a laissé.
+bool sound_paused();
+void sound_set_paused(bool paused);
+
 // Nombre de blocs de mélange déjà produits. Sert d'unique point de synchronisation entre le
 // fil principal et le fil audio pour la réutilisation d'un slot de tampon.
 uint64_t sound_mix_epoch();

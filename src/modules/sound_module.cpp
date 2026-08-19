@@ -2,6 +2,7 @@
 #include "audio_module.h"
 #include "module_utils.h"
 #include "sound_internal.h"
+#include <atomic>
 #include <cmath>
 #include <string>
 #include <vector>
@@ -528,12 +529,27 @@ Voice* sound_voices() {
     return table;
 }
 
+// Drapeau de pause : lu par le mélangeur à chaque bloc, écrit par la session (module audio).
+std::atomic<bool>& paused_flag() {
+    static std::atomic<bool> paused{false};
+    return paused;
+}
+
+bool sound_paused() {
+    return paused_flag().load(std::memory_order_relaxed);
+}
+
+void sound_set_paused(bool paused) {
+    paused_flag().store(paused, std::memory_order_relaxed);
+}
+
 Buf* sound_buffers() {
     static Buf table[k_max_buffers];
     return table;
 }
 
 void sound_reset() {
+    sound_set_paused(false);
     // Les tampons sont TUS mais leurs échantillons ne sont pas libérés : un bloc de mélange
     // déjà en cours peut encore les lire, et rien ne presse — le slot sera réutilisé plus
     // tard, une fois qu'un bloc se sera écoulé (cf. alloc_buffer).

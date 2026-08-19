@@ -32,7 +32,7 @@
         },
         "builtin": {
             "name": "support.function.builtin.ollin",
-            "match": "\\b(print|printf|time|cpuTime|assert|len|typeof|Color|math|graphics|string|colors|window|mouse|keyboard|image|data|ui|tween|camera|blend)\\b"
+            "match": "\\b(print|printf|time|cpuTime|assert|len|typeof|Color|math|graphics|string|colors|window|mouse|keyboard|image|data|ui|tween|camera|blend|audio|sound)\\b"
         },
         "number": {
             "name": "constant.numeric.ollin",

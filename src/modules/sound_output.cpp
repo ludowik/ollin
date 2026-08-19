@@ -99,6 +99,12 @@ void mix_callback(void* buffer, unsigned int frames) {
     float* out = (float*)buffer;
     for (unsigned int i = 0; i < frames * 2; i++)
         out[i] = 0.0f;
+    // En pause : du silence, et RIEN n'avance — ni les phases, ni les positions de lecture,
+    // ni les enveloppes. Le son reprend donc là où il s'est arrêté.
+    if (sound_paused()) {
+        s_mix_epoch.fetch_add(1, std::memory_order_release);
+        return;
+    }
     const double pas_temps = 1.0 / (double)k_audio_sample_rate;
     const float lissage = (float)(pas_temps / k_gain_ramp);
     Voice* voices = sound_voices();
