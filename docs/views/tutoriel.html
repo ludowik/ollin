@@ -2301,6 +2301,8 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
     {target: ombre, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## un autre objet</span>
 ])</code></pre>
 
+<p>L'exemple «&nbsp;Séquence animée (tween)&nbsp;» fait rebondir une balle en cinq étapes&nbsp;: la chute, l'écrasement à l'impact, la détente, la remontée et une pause. Ce sont les durées inégales — un dixième de seconde pour l'écrasement contre une demie pour la chute — qui donnent son poids à la balle.</p>
+
 <p>Le handle renvoyé est celui d'un tween ordinaire&nbsp;: <code>pause()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>delay()</code> et <code>repeat()</code> s'y appliquent tels quels. Écraser l'un des champs animés par un autre tween annule la séquence, comme pour <code>tween.to</code>.</p>
 
 <pre><code><span class="cmt">## Le dessin lit des champs ; le temps ne l'intéresse pas.</span>
