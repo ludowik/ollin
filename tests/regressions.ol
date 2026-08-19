@@ -1441,6 +1441,51 @@ var osSansE = sound.saw(100)
 assert(osSansE.start().isPlaying())
 osSansE.stop()
 
+## ── Module sound : tampons calculés ─────────────────────────────────────────────
+## Un tampon est un son CALCULÉ une fois puis déclenché. Ses accesseurs sont ce qui rend la
+## synthèse vérifiable sans carte son : on lit les échantillons au lieu de les écouter.
+var bufT = sound.tone(1, 1.0)
+assert(math.abs(bufT.duration() - 1.0) < 0.001)
+assert(math.abs(bufT.peak() - 1.0) < 0.001)
+
+## Un sinus à 1 Hz sur une seconde passe par 0, +1, 0, -1 aux quarts de tour : c'est la
+## forme même de l'onde qui est contrôlée, pas seulement la présence d'un tampon.
+assert(math.abs(bufT.sample(0)) < 0.001)
+assert(math.abs(bufT.sample(0.25) - 1.0) < 0.001)
+assert(math.abs(bufT.sample(0.5)) < 0.001)
+assert(math.abs(bufT.sample(0.75) + 1.0) < 0.001)
+
+## Hors du tampon, l'échantillon vaut zéro — le silence qui l'entoure, plutôt qu'une erreur.
+assert(bufT.sample(-1) == 0 and bufT.sample(99) == 0)
+
+## sound.generate échantillonne une FORMULE Ollin, une seule fois, hors du rappel audio.
+var bufG = sound.generate(0.5, func(t) return 0.5 end)
+assert(math.abs(bufG.duration() - 0.5) < 0.001)
+assert(math.abs(bufG.peak() - 0.5) < 0.001)
+assert(math.abs(bufG.sample(0.1) - 0.5) < 0.001)
+
+## Une valeur hors de [-1;1] est ramenée dans la plage : au-delà, la sortie saturerait.
+assert(math.abs(sound.generate(0.1, func(t) return 5 end).peak() - 1.0) < 0.001)
+
+## Enveloppe appliquée aux échantillons : c'est la MÊME fonction que celle du mélangeur, donc
+## ce test valide aussi la courbe des oscillateurs — que rien d'autre ne peut contrôler ici.
+var bufE = sound.generate(1.0, func(t) return 1 end)
+bufE.envelope(0.1, 0.2, 0.5, 0.25)
+assert(math.abs(bufE.sample(0.05) - 0.5) < 0.01)    ## mi-attaque
+assert(math.abs(bufE.sample(0.1) - 1.0) < 0.01)     ## sommet de l'attaque
+assert(math.abs(bufE.sample(0.2) - 0.75) < 0.01)    ## mi-déclin, entre 1 et le maintien
+assert(math.abs(bufE.sample(0.5) - 0.5) < 0.01)     ## maintien
+assert(bufE.sample(0.999) < 0.01)                   ## relâchement fini avec le son
+
+## Lecture : play/stop, et les réglages se chaînent comme ceux d'un oscillateur.
+assert(not bufE.isPlaying())
+assert(bufE.play().isPlaying())
+assert(bufE.volume(0.3).pan(0.5).rate(2).volume() == 0.3)
+assert(bufE.pan() == 0.5 and bufE.rate() == 2)
+assert(bufE.loop() == bufE)
+bufE.stop()
+assert(not bufE.isPlaying())
+
 ## ── Module audio (session) ──────────────────────────────────────────────────────
 ## Le module existe TOUJOURS, même sans périphérique : la génération d'ondes est un pur
 ## calcul, et la suite tourne dans un conteneur sans carte son. Seule la sortie est muette.

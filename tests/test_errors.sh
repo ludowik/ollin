@@ -436,6 +436,30 @@ check_error "sound.trigger with a zero duration" \
     'sound.sine(440).trigger(0)' \
     "la durée doit être > 0"
 
+check_error "sound.tone without a duration" \
+    'sound.tone(440)' \
+    "la durée doit être un nombre de secondes"
+
+check_error "sound.tone with too long a duration" \
+    'sound.tone(440, 60)' \
+    "la durée dépasse 10 secondes"
+
+check_error "sound.generate without a function" \
+    'sound.generate(0.1, 42)' \
+    "une fonction du temps"
+
+check_error "sound.rate out of range" \
+    'sound.tone(440, 0.1).rate(0)' \
+    "vitesse hors de"
+
+check_error "sound.loop with a number" \
+    'sound.tone(440, 0.1).loop(3)' \
+    "attendu true, false, ou aucun argument"
+
+check_error "sound.sample without a time" \
+    'sound.tone(440, 0.1).sample()' \
+    "attendu un temps en secondes"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

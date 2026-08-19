@@ -1,4 +1,5 @@
 #pragma once
+#include "sound_internal.h"
 #include "value.h"
 #include <stdexcept>
 #include <string>
@@ -95,6 +96,21 @@ inline double sound_check_hold(const Value* args, int argc, const char* fn) {
     if (args[0].as_num() <= 0.0)
         throw std::runtime_error(std::string(fn) + ": la durée doit être > 0");
     return args[0].as_num();
+}
+
+// Durée d'un tampon, en secondes. La borne haute protège d'une faute de frappe : générer
+// dix secondes demande déjà 441 000 appels à la fonction du script, et une durée donnée en
+// millisecondes par mégarde figerait le moteur.
+inline double sound_check_duration(const Value* args, int argc, int i, const char* fn) {
+    if (i >= argc || !args[i].is_number())
+        throw std::runtime_error(std::string(fn) + ": la durée doit être un nombre de secondes");
+    double d = args[i].as_num();
+    if (d <= 0.0)
+        throw std::runtime_error(std::string(fn) + ": la durée doit être > 0");
+    if (d > k_max_buffer_seconds)
+        throw std::runtime_error(std::string(fn) + ": la durée dépasse " +
+                                 std::to_string((int)k_max_buffer_seconds) + " secondes");
+    return d;
 }
 
 // Volume et panoramique : bornés en silence, comme le volume général. Un panoramique de

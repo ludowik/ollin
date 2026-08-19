@@ -1,6 +1,7 @@
 #include "sound_internal.h"
 #include "audio_module.h"
 #include "raylib.h"
+#include <atomic>
 #include <cmath>
 
 // Sortie sonore, build AVEC raylib : UN SEUL flux pour toutes les voix, mélangé ici.
@@ -24,6 +25,7 @@ constexpr double k_gain_ramp = 0.005;
 
 AudioStream s_stream{};
 bool s_stream_ready = false;
+std::atomic<uint64_t> s_mix_epoch{0};
 
 // Bruit propre à la voix : xorshift, quelques opérations entières. `rand()` serait
 // interdit ici — état global partagé, et rien ne garantit qu'il soit sans verrou.
@@ -46,6 +48,50 @@ inline float wave_sample(int shape, double phase, uint32_t& noise_state) {
         return noise_next(noise_state);
     default:  // sine
         return (float)std::sin(phase * 6.283185307179586);
+    }
+}
+
+// Mélange les TAMPONS déclenchés. Les échantillons ne sont lus que tant que `playing` est
+// vrai — invariant sur lequel repose la sûreté mémoire, le fil principal ne réutilisant un
+// slot qu'après l'avoir tu ET attendu un bloc.
+void mix_buffers(float* out, unsigned int frames) {
+    Buf* bufs = sound_buffers();
+    for (int k = 0; k < k_max_buffers; k++) {
+        Buf& b = bufs[k];
+        if (!b.playing.load(std::memory_order_relaxed))
+            continue;
+        const float* data = b.samples.data();
+        size_t n = b.samples.size();
+        if (n == 0) {
+            b.playing.store(false, std::memory_order_relaxed);
+            continue;
+        }
+        float volume = (float)b.volume.load(std::memory_order_relaxed);
+        float pan = (float)b.pan.load(std::memory_order_relaxed);
+        double avance = b.rate.load(std::memory_order_relaxed);
+        bool boucle = b.loop.load(std::memory_order_relaxed);
+        float g_gauche = pan > 0.0f ? 1.0f - pan : 1.0f;
+        float g_droite = pan < 0.0f ? 1.0f + pan : 1.0f;
+        for (unsigned int i = 0; i < frames; i++) {
+            if (b.pos >= (double)n) {
+                if (!boucle) {
+                    b.playing.store(false, std::memory_order_relaxed);
+                    break;
+                }
+                // Le reste du dépassement est conservé : le retrancher ferait perdre une
+                // fraction d'échantillon à chaque tour, donc dériver une boucle rythmique.
+                b.pos -= (double)n;
+            }
+            // Interpolation linéaire entre deux échantillons : à vitesse 1 elle rend la
+            // valeur exacte, et une hauteur modifiée ne s'entend pas crénelée.
+            size_t i0 = (size_t)b.pos;
+            size_t i1 = (i0 + 1 < n) ? i0 + 1 : (boucle ? 0 : i0);
+            float f = (float)(b.pos - (double)i0);
+            float s = (data[i0] * (1.0f - f) + data[i1] * f) * volume;
+            out[i * 2] += s * g_gauche;
+            out[i * 2 + 1] += s * g_droite;
+            b.pos += avance;
+        }
     }
 }
 
@@ -115,6 +161,10 @@ void mix_callback(void* buffer, unsigned int frames) {
         if (!actif && v.gain < 0.0001f)
             v.gain = 0.0f;
     }
+    mix_buffers(out, frames);
+    // Compté EN DERNIER : le fil principal en déduit qu'un bloc complet s'est écoulé, donc
+    // qu'aucune lecture de ce bloc ne traîne plus.
+    s_mix_epoch.fetch_add(1, std::memory_order_release);
 }
 
 } // namespace
@@ -128,6 +178,11 @@ void sound_output_ensure() {
     // craquerait au premier calcul un peu lourd.
     SetAudioStreamBufferSizeDefault(1024);
     s_stream = LoadAudioStream(k_audio_sample_rate, 32, 2);
+    // Compensation de la loi de panoramique de raylib, qui ne vaut PAS 1 au centre : son
+    // mélangeur applique `volume * 0.5 * c * (3 - c²)` par canal, soit 0,6875 pour un flux
+    // centré (c = 0,5). Sans ce correctif, un volume demandé à 1 sortait à 0,687 — mesuré au
+    // navigateur, analyseur branché sur la sortie, avant d'être retrouvé dans raudio.c.
+    SetAudioStreamVolume(s_stream, 1.0f / 0.6875f);
     SetAudioStreamCallback(s_stream, mix_callback);
     PlayAudioStream(s_stream);
     s_stream_ready = true;
@@ -137,4 +192,8 @@ void sound_output_ensure() {
 // playground, la page reste chargée). Les voix étant déjà éteintes par sound_reset, le
 // mélangeur rend du silence — il n'y a rien de plus à faire.
 void sound_output_silence() {
+}
+
+uint64_t sound_mix_epoch() {
+    return s_mix_epoch.load(std::memory_order_acquire);
 }

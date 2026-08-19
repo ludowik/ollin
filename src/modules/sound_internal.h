@@ -2,6 +2,7 @@
 #include "sound_env.h"
 #include <atomic>
 #include <cstdint>
+#include <vector>
 
 // Frontière entre l'API du module `sound` et sa SORTIE.
 //
@@ -65,3 +66,38 @@ void sound_output_ensure();
 // Fait taire la sortie sans la démonter : le périphérique et le flux survivent au
 // programme (au playground, la page reste chargée).
 void sound_output_silence();
+
+// ── Tampons : un son CALCULÉ (ou chargé), qu'on déclenche ────────────────────────
+// Les échantillons sont écrits une fois, par le fil principal, puis seulement LUS par le
+// mélangeur — et uniquement tant que `playing` est vrai. C'est cet invariant qui rend la
+// mémoire sûre sans verrou : réutiliser un slot exige donc de le taire d'abord, puis
+// d'attendre qu'un bloc de mélange se soit écoulé (cf. mix_epoch ci-dessous), car un bloc
+// déjà en cours peut avoir lu `playing` avant qu'on l'éteigne.
+
+constexpr int k_max_buffers = 32;
+
+// Durée maximale d'un tampon. Générer une seconde d'audio demande 44 100 appels à la
+// fonction du script : la borne empêche qu'une faute de frappe (une durée en millisecondes
+// prise pour des secondes) fige le moteur pendant des minutes.
+constexpr double k_max_buffer_seconds = 10.0;
+
+struct Buf {
+    std::vector<float> samples;   // mono ; le panoramique est appliqué à la lecture
+    std::atomic<bool> playing{false};
+    std::atomic<bool> loop{false};
+    std::atomic<double> volume{0.5};
+    std::atomic<double> pan{0.0};
+    std::atomic<double> rate{1.0};
+    // Privés au fil audio.
+    double pos = 0.0;
+    // Privés au fil principal.
+    uint32_t gen = 1;
+    bool used = false;
+    uint64_t retired_epoch = 0;   // bloc de mélange où le slot a été rendu
+};
+
+Buf* sound_buffers();
+
+// Nombre de blocs de mélange déjà produits. Sert d'unique point de synchronisation entre le
+// fil principal et le fil audio pour la réutilisation d'un slot de tampon.
+uint64_t sound_mix_epoch();
