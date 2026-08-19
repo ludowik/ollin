@@ -259,6 +259,13 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
   comparée par pointeur). Bilan net sur le mois : **−3,8 % sur `fib`, −2,6 % sur la boucle
   et sur la map**. Il n'y a donc pas de dette qui s'accumule, mais ce n'est pas parce que
   rien ne bouge — c'est parce que les gains ont dépassé les coûts.
+- **Ce que la dérive vaut réellement (10 jalons moteur, 24/07 → 18/08)** : le travail bouge
+  dans les DEUX sens et il faut le mesurer, jamais le supposer. Chaque fonctionnalité coûte
+  entre +0,4 % et +1,8 % sur `fib` (expansion de `...`, inline cache, variable par
+  itération), et les commits d'optimisation reprennent davantage (−5,5 % pour la clé `len`
+  comparée par pointeur). Bilan net sur le mois : **−3,8 % sur `fib`, −2,6 % sur la boucle
+  et sur la map**. Il n'y a donc pas de dette qui s'accumule, mais ce n'est pas parce que
+  rien ne bouge — c'est parce que les gains ont dépassé les coûts.
 
 ## Tests graphiques — DEUX chaînes qui MARCHENT (ne pas conclure « cassé »)
 
