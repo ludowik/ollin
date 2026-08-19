@@ -1371,4 +1371,23 @@ tween.to(sqX, {x: 50}, 1.0, "linear")
 tween.update(1.0)
 assert(sqX.x == 50 and tween.count() == 0)
 
+## ── Module audio (session) ──────────────────────────────────────────────────────
+## Le module existe TOUJOURS, même sans périphérique : la génération d'ondes est un pur
+## calcul, et la suite tourne dans un conteneur sans carte son. Seule la sortie est muette.
+assert(typeof(audio) == "map")
+assert(audio.sampleRate() == 44100)
+
+## Sans périphérique, start() rend false et isReady() reste false — sans lever.
+var auPret = audio.start()
+assert(typeof(auPret) == "bool")
+assert(audio.isReady() == auPret)
+
+## Le volume se relit tel qu'il a été posé, et se borne à [0;1] en silence : au-delà la
+## sortie saturerait, donc on corrige au lieu de refuser (comme une composante couleur).
+assert(audio.volume(0.25) == 0.25)
+assert(audio.volume() == 0.25)
+assert(audio.volume(9) == 1)
+assert(audio.volume(-3) == 0)
+audio.volume(1)
+
 print("regressions ok")

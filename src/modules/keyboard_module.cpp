@@ -117,6 +117,10 @@ static int kbd_is_down(CallCtx& ctx) {
 // Touches actuellement enfoncées (pour émettre keyrelease). Indexé par keycode
 // raylib (< 512). Zéro-initialisé (durée de vie statique).
 static bool s_down[512];
+// Une touche a-t-elle été enfoncée pendant CETTE frame ? La file de raylib est drainée
+// ici même, donc un autre module ne peut pas la relire — il demande ce drapeau (le son
+// s'ouvre au premier geste de l'utilisateur, cf. audio_wake).
+static bool s_pressed_any = false;
 
 // Remet l'état « enfoncé » à zéro. Appelé au début de chaque gfx_run : sur
 // l'instance WASM partagée, s_down est statique et survivrait sinon d'un run au
@@ -126,7 +130,12 @@ void keyboard_reset() {
         s_down[i] = false;
 }
 
+bool keyboard_pressed_any() {
+    return s_pressed_any;
+}
+
 void keyboard_poll() {
+    s_pressed_any = false;
     s_blocked = query_blocked();   // rafraîchi 1×/frame ; lu par isDown sans re-interroger le DOM
     VM* vm = VM::current();
     Value kbd = vm->get_global("keyboard");
@@ -161,6 +170,7 @@ void keyboard_poll() {
     // suit l'état « enfoncé » même sans callback keypressed, pour keyrelease.
     int key;
     while ((key = GetKeyPressed()) != 0) {
+        s_pressed_any = true;
         std::string name = key_name(key);
         if (name.empty())
             continue;
