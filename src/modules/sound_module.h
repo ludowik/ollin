@@ -1,6 +1,7 @@
 #pragma once
 #include "sound_internal.h"
 #include "value.h"
+#include <cmath>
 #include <stdexcept>
 #include <string>
 
@@ -52,13 +53,57 @@ inline int sound_shape_index(const std::string& name, const char* fn) {
 // Une faute d'appel doit être signalée même sans périphérique : c'est le stub qui tourne
 // dans le conteneur d'intégration, donc dans les tests.
 
+// Nom de note anglo-saxon vers hertz : "A4" = 440, "C#5", "Eb3", "C-1" pour l'octave la plus
+// grave. Le tempérament égal fait le calcul, aucune table de fréquences à recopier.
+inline double sound_note_hz(const std::string& nom, const char* fn) {
+    static const int k_demi_tons[] = {9, 11, 0, 2, 4, 5, 7};   // A B C D E F G
+    if (nom.empty())
+        throw std::runtime_error(std::string(fn) + ": nom de note vide");
+    char lettre = nom[0];
+    if (lettre >= 'a' && lettre <= 'g')
+        lettre = (char)(lettre - 'a' + 'A');
+    if (lettre < 'A' || lettre > 'G')
+        throw std::runtime_error(std::string(fn) + ": note inconnue '" + nom + "' — attendu A à G, comme \"C#4\"");
+    int demi = k_demi_tons[lettre - 'A'];
+    size_t k = 1;
+    if (k < nom.size() && (nom[k] == '#' || nom[k] == 'b')) {
+        demi += (nom[k] == '#') ? 1 : -1;
+        k++;
+    }
+    if (k >= nom.size())
+        throw std::runtime_error(std::string(fn) + ": note '" + nom + "' sans octave — écrire par exemple \"A4\"");
+    bool negatif = nom[k] == '-';
+    if (negatif)
+        k++;
+    if (k >= nom.size())
+        throw std::runtime_error(std::string(fn) + ": note '" + nom + "' sans octave — écrire par exemple \"A4\"");
+    int octave = 0;
+    for (; k < nom.size(); k++) {
+        if (nom[k] < '0' || nom[k] > '9')
+            throw std::runtime_error(std::string(fn) + ": note '" + nom + "' : octave illisible");
+        octave = octave * 10 + (nom[k] - '0');
+    }
+    if (negatif)
+        octave = -octave;
+    if (octave < -1 || octave > 9)
+        throw std::runtime_error(std::string(fn) + ": octave hors de [-1;9] dans '" + nom + "'");
+    // Numéro MIDI, puis tempérament égal autour du la 440.
+    int midi = (octave + 1) * 12 + demi;
+    return 440.0 * std::pow(2.0, (midi - 69) / 12.0);
+}
+
 // Fréquence audible utile. La borne haute n'est pas un caprice : au-delà de la moitié de
 // la fréquence d'échantillonnage, une onde se replie et descend au lieu de monter.
+//
+// Un NOM DE NOTE est accepté partout où une fréquence l'est — ici et nulle part ailleurs :
+// ce point de passage unique couvre sound.osc, sound.tone et osc.freq d'un seul coup.
 inline double sound_check_freq(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc || args[i].is_nil())
         return -1.0;   // absente : l'appelant garde sa valeur courante
+    if (args[i].is_string())
+        return sound_note_hz(args[i].as_string(), fn);
     if (!args[i].is_number())
-        throw std::runtime_error(std::string(fn) + ": la fréquence doit être un nombre de hertz");
+        throw std::runtime_error(std::string(fn) + ": la fréquence doit être un nombre de hertz ou un nom de note");
     double hz = args[i].as_num();
     if (hz < 0.0 || hz > 20000.0)
         throw std::runtime_error(std::string(fn) + ": fréquence hors de [0;20000] hertz");

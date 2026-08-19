@@ -1486,6 +1486,23 @@ assert(bufE.loop() == bufE)
 bufE.stop()
 assert(not bufE.isPlaying())
 
+## Notes nommées : le tempérament égal autour du la 440, sans table de fréquences recopiée.
+## Un NOM est accepté partout où une fréquence l'est — un seul point de passage dans le
+## moteur couvre donc sound.osc, sound.tone et osc.freq.
+assert(math.abs(sound.note("A4") - 440.0) < 0.01)
+assert(math.abs(sound.note("a4") - 440.0) < 0.01)      ## la casse est libre
+assert(math.abs(sound.note("C4") - 261.626) < 0.01)
+assert(math.abs(sound.note("A0") - 27.5) < 0.01)
+assert(math.abs(sound.note("C-1") - 8.1758) < 0.001)   ## octave la plus grave
+
+## Dièse et bémol donnent la même hauteur quand ils désignent la même note.
+assert(math.abs(sound.note("C#4") - sound.note("Db4")) < 0.001)
+
+## Les trois usages d'une fréquence acceptent le nom.
+assert(math.abs(sound.osc("A4").freq() - 440.0) < 0.01)
+assert(math.abs(sound.sine(100).freq("E4").freq() - 329.628) < 0.01)
+assert(math.abs(sound.tone("A5", 0.1).duration() - 0.1) < 0.001)
+
 ## ── Module audio (session) ──────────────────────────────────────────────────────
 ## Le module existe TOUJOURS, même sans périphérique : la génération d'ondes est un pur
 ## calcul, et la suite tourne dans un conteneur sans carte son. Seule la sortie est muette.

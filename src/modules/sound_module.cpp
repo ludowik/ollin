@@ -90,6 +90,14 @@ int make_osc(const Value* args, int argc, const char* fn, int shape_forced) {
     return slot;
 }
 
+// La conversion est exposée telle quelle : un script qui construit une gamme a besoin du
+// nombre, pas seulement d'un oscillateur.
+int sound_note(CallCtx& ctx) {
+    if (ctx.argc < 1 || !ctx.args[0].is_string())
+        throw std::runtime_error("sound.note: attendu un nom de note, comme \"C#4\"");
+    return ctx.ret(Value(sound_note_hz(ctx.args[0].as_string(), "sound.note")));
+}
+
 int sound_osc(CallCtx& ctx) {
     return ctx.ret(make_handle(make_osc(ctx.args, ctx.argc, "sound.osc", -1)));
 }
@@ -557,6 +565,7 @@ Value make_sound_module() {
     m.map_set(Value(std::string("saw")), Value::make_builtin(sound_shape_factory<SHAPE_SAW>));
     m.map_set(Value(std::string("triangle")), Value::make_builtin(sound_shape_factory<SHAPE_TRIANGLE>));
     m.map_set(Value(std::string("noise")), Value::make_builtin(sound_shape_factory<SHAPE_NOISE>));
+    m.map_set(Value(std::string("note")), Value::make_builtin(sound_note));
     m.map_set(Value(std::string("tone")), Value::make_builtin(sound_tone));
     m.map_set(Value(std::string("generate")), Value::make_builtin(sound_generate));
     return m;

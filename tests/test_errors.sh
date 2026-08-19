@@ -398,9 +398,13 @@ check_error "sound.osc with a negative frequency" \
     'sound.osc(-5)' \
     "hors de [0;20000]"
 
-check_error "sound.osc with a non-numeric frequency" \
+check_error "sound.osc with a frequency that is neither a number nor a note" \
+    'sound.osc({})' \
+    "un nombre de hertz ou un nom de note"
+
+check_error "sound.osc with an unreadable note name" \
     'sound.osc("la")' \
-    "doit être un nombre de hertz"
+    "note inconnue"
 
 check_error "sound.shape with a number" \
     'var o = sound.sine(440)
@@ -459,6 +463,22 @@ check_error "sound.loop with a number" \
 check_error "sound.sample without a time" \
     'sound.tone(440, 0.1).sample()' \
     "attendu un temps en secondes"
+
+check_error "sound.note with a letter beyond G" \
+    'sound.note("H4")' \
+    "note inconnue"
+
+check_error "sound.note without an octave" \
+    'sound.note("A")' \
+    "sans octave"
+
+check_error "sound.note with an octave out of range" \
+    'sound.note("A12")' \
+    "octave hors de"
+
+check_error "sound.note with a number" \
+    'sound.note(440)' \
+    "attendu un nom de note"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
