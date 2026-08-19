@@ -1,9 +1,12 @@
-// Vue PERF (dérive du travail du moteur) — init(ctx) appelée par app.js après montage
+// Vue PERF (performances du moteur) — init(ctx) appelée par app.js après montage
 // du fragment views/perf.html.
 //   ctx = { root, getOllin, hardReload, navigate, v }
 //
-// Les mesures viennent de docs/data/icount-history.json : une nouvelle série se publie en
-// réécrivant ce fichier, sans toucher à ce code.
+// Les mesures viennent de deux fichiers, aux statuts différents :
+//   data/icount-history.json  le TRAVAIL, série historique — sans elle la page n'a rien à dire
+//   data/bench-snapshot.json  le TEMPS, relevé unique — facultatif : sa section disparaît si
+//                             le fichier manque, le reste de la page tient debout
+// Publier de nouvelles mesures = réécrire ces fichiers, sans toucher à ce code.
 //
 // Les deux graphiques sont dessinés à la largeur RÉELLE du conteneur, et redessinés quand
 // elle change. Un viewBox figé rétréci par CSS ramènerait une police de 11 px à 3 px sur
@@ -48,6 +51,23 @@ export async function init(ctx) {
     return () => {};
   }
 
+  // Relevé de temps : absent, la page reste valide sans sa section (elle est retirée du DOM
+  // plutôt que laissée vide, un titre suivi d'un cadre creux passant pour une panne).
+  let bench = null;
+  try {
+    const rep = await fetch("data/bench-snapshot.json?v=" + ctx.v);
+    if (rep.ok) bench = await rep.json();
+  } catch (e) {
+    bench = null;
+  }
+  if (!bench) {
+    // Chaque élément à retirer porte un id : viser le voisin d'un autre (« le titre juste
+    // avant le tableau ») échouait, le titre étant frère du CONTENEUR défilant, pas du
+    // tableau lui-même.
+    ["titre-temps", "apropos-temps", "bloc-bench", "titre-detail", "defile-temps"]
+      .forEach(id => document.getElementById(id).remove());
+  }
+
   const JALONS = doc.jalons;
   const SERIES = doc.scripts.map(s => ({ id: s.id, nom: s.nom, classe: "s-" + s.id, css: "--s-" + s.id }));
   // TOUTES les séries doivent être présentes : n'en tester qu'une laisserait `montrer()`
@@ -67,9 +87,11 @@ export async function init(ctx) {
   const enClair = iso => Number(iso.slice(8, 10)) + " " + MOIS[Number(iso.slice(5, 7)) - 1];
   const mesures = JALONS.filter(connu).length;
 
-  document.getElementById("titre").textContent = "Dérive du travail du moteur — du " +
-    enClair(premier.date) + " au " + enClair(dernier.date) + " " + dernier.date.slice(0, 4);
   document.getElementById("intro").textContent =
+    "Ce que le moteur d'Ollin coûte à exécuter, mesuré de deux façons : le TRAVAIL qu'il " +
+    "demande, suivi du " + enClair(premier.date) + " au " + enClair(dernier.date) + " " +
+    dernier.date.slice(0, 4) + (bench ? ", et le TEMPS qu'il prend, relevé face à Lua et à Python." : ".");
+  document.getElementById("apropos-travail").textContent =
     "Instructions exécutées par " + SERIES.map(s => s.nom).join(", ") + ". " +
     JALONS.length + " jalons, un par journée où le cœur du moteur a été touché" +
     (mesures < JALONS.length ? " — dont " + (JALONS.length - mesures) + " sans valeur, faute de compiler. " : ". ") +
@@ -385,6 +407,105 @@ export async function init(ctx) {
     });
   }
 
+  // ── relevé de temps : barres horizontales, en multiples de la référence ────
+  // Une échelle PLAFONNÉE, pas comprimée : le coefficient le plus élevé (Python sur la
+  // boucle numérique) écraserait tout le reste, et une échelle non linéaire mentirait sur
+  // les rapports. Les barres qui dépassent sont écourtées d'une pointe, et leur valeur est
+  // écrite en toutes lettres au bout.
+  const coef = v => "×" + v.toFixed(2).replace(".", ",");
+  const secondes = v => v.toFixed(4).replace(".", ",") + " s";
+  const mediane = id => {
+    const t = bench.benchmarks.map(b => b[id]).sort((a, b) => a - b);
+    const m = Math.floor(t.length / 2);
+    return t.length % 2 ? t[m] : (t[m - 1] + t[m]) / 2;
+  };
+
+  if (bench) {
+    // La référence ne figure pas dans `concurrents` : le titre la nomme d'abord, sinon la
+    // page annoncerait un seul langage comparé alors que le graphique en montre deux.
+    document.getElementById("titre-temps").textContent = "Le temps, face à " +
+      [bench.reference.nom].concat(bench.concurrents.filter(c => c.id !== "ollin").map(c => c.nom)).join(" et à ");
+    document.getElementById("apropos-temps").textContent =
+      "Relevé du " + enClair(bench.date) + " " + bench.date.slice(0, 4) + " sur le commit " +
+      bench.commit + ", meilleur de " + bench.runs + " exécutions, en temps processeur. " +
+      bench.machine + " ; " + bench.build + ". Référence : " + bench.reference.nom +
+      ", dont le temps absolu vaut 1.";
+
+    const boite = document.getElementById("cles-bench");
+    bench.concurrents.forEach(c => {
+      const w = document.createElement("span");
+      const i = document.createElement("i");
+      i.className = "s-" + c.id;
+      const b = document.createElement("b");
+      b.textContent = "médiane " + coef(mediane(c.id));
+      w.append(i, document.createTextNode(c.nom), b);
+      boite.append(w);
+    });
+  }
+
+  const svgBench = document.getElementById("bench");
+
+  function dessinerBench(w) {
+    const petit = w < 560;
+    const B = bench.benchmarks, C = bench.concurrents;
+    const hLigne = 20 + C.length * 11;
+    const m = { t: 20, r: petit ? 40 : 54, b: 30, l: 6 };
+    const h = m.t + B.length * hLigne + m.b;
+    vider(svgBench);
+    svgBench.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svgBench.setAttribute("width", w);
+    svgBench.setAttribute("height", h);
+
+    const iw = w - m.l - m.r;
+    // Plafond : de quoi loger tous les coefficients d'Ollin, et un cran au-dessus de la
+    // référence — jamais le maximum absolu, qui viendrait d'un concurrent très lent.
+    const hautOllin = Math.max(...B.map(b => b.ollin));
+    const borne = Math.max(2, Math.ceil(hautOllin + 0.5));
+    const x = v => m.l + Math.min(v, borne) / borne * iw;
+
+    const grille = el("g", { class: "grille" }), axe = el("g", { class: "axe" });
+    for (let v = 0; v <= borne; v++) {
+      grille.append(el("line", { x1: x(v), x2: x(v), y1: m.t, y2: h - m.b }));
+      const t = el("text", { x: x(v), y: h - m.b + 16, "text-anchor": "middle", class: "mono" });
+      t.textContent = "×" + v;
+      axe.append(t);
+    }
+    svgBench.append(grille, axe);
+
+    B.forEach((b, i) => {
+      const y0 = m.t + i * hLigne;
+      const nom = el("text", { x: m.l + 2, y: y0 + 9, class: "etiq" });
+      nom.textContent = petit ? b.nom : b.nom + " — " + b.quoi;
+      svgBench.append(nom);
+      C.forEach((c, k) => {
+        const y = y0 + 15 + k * 11;
+        const depasse = b[c.id] > borne;
+        const bx = x(b[c.id]);
+        svgBench.append(el("rect", {
+          x: m.l, y: y, width: Math.max(1.5, bx - m.l), height: 7, rx: 3.5,
+          fill: "var(--s-" + c.id + ")", opacity: depasse ? 0.55 : 1,
+        }));
+        // Une valeur hors échelle est écrite CONTRE le bord droit, alignée à droite : posée
+        // au bout de la barre écourtée, elle sortait du cadre et se trouvait coupée en deux
+        // sur téléphone (« ×12, »).
+        const t = el("text", {
+          x: depasse ? w - 2 : bx + 6, y: y + 7, class: "val",
+          fill: "var(--s-" + c.id + ")", "text-anchor": depasse ? "end" : "start",
+        });
+        t.textContent = (depasse ? "▸ " : "") + coef(b[c.id]);
+        svgBench.append(t);
+      });
+      // Le repère de la référence, par-dessus les barres mais SEGMENTÉ par ligne : une seule
+      // verticale sur toute la hauteur traverserait les noms des benchmarks.
+      svgBench.append(el("line", {
+        x1: x(1), x2: x(1), y1: y0 + 13, y2: y0 + 13 + C.length * 11, class: "barre-ref",
+      }));
+    });
+    const ref = el("text", { x: x(1), y: m.t - 12, "text-anchor": "middle", class: "etiq" });
+    ref.textContent = bench.reference.nom + " = ×1";
+    svgBench.append(ref);
+  }
+
   // ── tableau ───────────────────────────────────────────────────────────────
   (function tableau() {
     const table = document.getElementById("valeurs");
@@ -426,6 +547,34 @@ export async function init(ctx) {
     table.append(thead, tbody);
   })();
 
+  // ── tableau du relevé de temps ─────────────────────────────────────────────
+  if (bench) {
+    const table = document.getElementById("temps");
+    const thead = document.createElement("thead"), tr = document.createElement("tr");
+    ["benchmark", "ce qu'il mesure", bench.reference.nom]
+      .concat(bench.concurrents.map(c => c.nom))
+      .forEach(c => {
+        const th = document.createElement("th");
+        th.textContent = c;
+        tr.append(th);
+      });
+    thead.append(tr);
+    const tbody = document.createElement("tbody");
+    bench.benchmarks.forEach(b => {
+      const ligne = document.createElement("tr");
+      const cases = [["", b.nom], ["sujet", b.quoi], ["n", secondes(b[bench.reference.id])]];
+      bench.concurrents.forEach(c => cases.push(["n", coef(b[c.id])]));
+      cases.forEach(([cls, txt]) => {
+        const td = document.createElement("td");
+        if (cls) td.className = cls;
+        td.textContent = txt;   // données de fichier : jamais via innerHTML
+        ligne.append(td);
+      });
+      tbody.append(ligne);
+    });
+    table.append(thead, tbody);
+  }
+
   // ── dessin, et redessin quand la largeur change ───────────────────────────
   function largeurUtile(svg) {
     const b = svg.parentElement, cs = getComputedStyle(b);
@@ -438,6 +587,7 @@ export async function init(ctx) {
     derniere = w;
     dessinerCourbes(w);
     dessinerEcarts(largeurUtile(svgEcarts));
+    if (bench) dessinerBench(largeurUtile(svgBench));
   }
   // Écouteurs de survol posés UNE seule fois, sur des éléments qui ne sont jamais
   // remplacés : ils délèguent au dernier dessin publié.

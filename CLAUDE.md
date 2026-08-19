@@ -144,7 +144,7 @@ prétexte de cette colonne.
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammaire: …]` de `syntax.ol` |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
-| `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : dérive du travail du moteur, lue depuis `docs/data/icount-history.json` |
+| `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : rapport de performances du moteur — le TRAVAIL (`docs/data/icount-history.json`, série historique) et le TEMPS (`docs/data/bench-snapshot.json`, relevé unique) |
 | `tools/ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
 **Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutoriel.html` et `tools/ollin-vscode/`. **Répartition des tests, sans recouvrement** : la FORME dans `tests/syntax.ol` (une construction du langage y figure toujours — une forme couverte seulement ailleurs est un manque), le COMPORTEMENT dans `tests/regressions.ol` (sémantique fine, cas limites, ce qui a déjà été cassé), l'ÉCHEC dans `tests/test_errors.sh` (ce qui doit être refusé, et avec quel message) — un échec RATTRAPÉ par `try`/`catch` reste du comportement, `test_errors.sh` ne sait vérifier qu'un message rendu sur la sortie d'erreur. Un test de sémantique qui n'exhibe aucune forme nouvelle n'a rien à faire dans `syntax.ol`. **La couverture est vérifiée par `tests/check_grammar_coverage.sh`** (dans `run.sh`) : chaque section de `syntax.ol` porte une étiquette `## [grammaire: forStmt, rangeLit]` citant les règles qu'elle exerce, et le script échoue si une règle de `grammar.ebnf` n'est citée nulle part — ou si une étiquette cite un nom qui n'existe pas. Il compare des NOMS, il ne lit pas le code : l'étiquette engage celui qui la pose. Ajouter une règle à la grammaire oblige donc à écrire son test. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
@@ -199,6 +199,13 @@ op_EXEMPLE: {
 ## Commande `perf`
 
 Quand l'utilisateur dit **"perf"**, lancer : `bash bench/bench_all.sh`
+
+**Publication des résultats (vue `#/perf`)** : les temps vont dans `docs/data/bench-snapshot.json`,
+qui est **remplacé** à chaque relevé, jamais complété — un temps ne valant que pour une machine
+et un moment, une série historique de temps n'aurait aucun sens (`icount-history.json`, lui,
+s'allonge). Le fichier porte donc date, commit, machine, build et nombre d'exécutions, et la vue
+les affiche : un relevé sans son contexte serait trompeur. La vue reste valide sans ce fichier
+(sa section disparaît).
 
 Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le tableau affiche : **temps absolu Lua** comme référence, **coefficient multiplicateur** (xN.NN) pour Ollin et Python.
 

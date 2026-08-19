@@ -1,7 +1,9 @@
-<!-- Vue PERF (dérive du travail du moteur) — fragment monté par app.js dans #view.
-     Les données viennent de docs/data/icount-history.json ; le dessin est fait par
-     views/perf.js à la largeur RÉELLE du conteneur (pas de viewBox figé, qui rendrait
-     les étiquettes illisibles sur téléphone). -->
+<!-- Vue PERF (performances du moteur) — fragment monté par app.js dans #view.
+     DEUX jeux de données, aux statuts volontairement différents :
+       docs/data/icount-history.json  — le TRAVAIL, série historique (déterministe)
+       docs/data/bench-snapshot.json  — le TEMPS, relevé unique (machine et date données)
+     Le dessin est fait par views/perf.js à la largeur RÉELLE du conteneur (pas de viewBox
+     figé, qui rendrait les étiquettes illisibles sur téléphone). -->
   <style>
     /* Mêmes valeurs que le tutoriel et le playground : les trois vues doivent être
        identiques, pas seulement ressemblantes. */
@@ -21,6 +23,9 @@
       --s-map: #199e70;
       --hausse: #e66767;   /* plus de travail qu'au jalon précédent */
       --baisse: #3987e5;   /* moins de travail */
+      /* Relevé de temps : une teinte par langage comparé, la référence restant neutre. */
+      --s-ollin: #7c83ff;
+      --s-python: #199e70;
       --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     }
     * { box-sizing: border-box; }
@@ -75,6 +80,24 @@
     .cles span { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); }
     .cles i { width: 16px; height: 2px; border-radius: 1px; flex: none; }
     .cles b { font: 600 13px var(--mono); color: var(--text); font-variant-numeric: tabular-nums; }
+    .cles i.s-ollin { background: var(--s-ollin); }
+    .cles i.s-python { background: var(--s-python); }
+    .barre-ref { stroke: var(--text); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0.55; }
+    .etiq { font: 400 11px var(--mono); fill: var(--text-dim); }
+    .val { font: 600 11px var(--mono); }
+
+    /* Encadré de mise en garde : un temps ne se transporte pas d'une machine à l'autre. */
+    .garde {
+      border-left: 3px solid var(--accent);
+      background: var(--surface2);
+      border-radius: 0 8px 8px 0;
+      padding: 12px 14px;
+      margin: 4px 0 16px;
+      font-size: 13px;
+      color: var(--text);
+    }
+    .garde strong { color: #fff; }
+
     .cles i.s-fib { background: var(--s-fib); }
     .cles i.s-loop { background: var(--s-loop); }
     .cles i.s-map { background: var(--s-map); }
@@ -95,6 +118,7 @@
     #bulle .ligne s { text-decoration: none; color: var(--text-dim); }
     #bulle .sujet { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 11px; }
 
+    h2.section { font-size: 18px; margin: 34px 0 6px; color: #fff; }
     h3 { font-size: 14.5px; margin: 26px 0 0; color: #fff; }
     .defile { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     table { border-collapse: collapse; width: 100%; margin-top: 12px; font: 400 12px var(--mono); }
@@ -124,8 +148,15 @@
 </div>
 
 <div class="perf-wrap">
-  <h1 id="titre">Dérive du travail du moteur</h1>
+  <h1 id="titre">Performances du moteur</h1>
   <p class="intro" id="intro"></p>
+
+  <div class="garde">
+    Deux grandeurs, deux statuts. Le <strong>travail</strong> — le nombre d'instructions exécutées — est <strong>déterministe</strong>&nbsp;: il se compare d'une version du moteur à l'autre, et c'est de lui qu'on parle quand on dit qu'une évolution coûte ou rapporte. Le <strong>temps</strong>, lui, dépend de la machine, du compilateur et jusqu'à l'adresse à laquelle le code est placé&nbsp;: il ne vaut que comme <strong>relevé</strong>, à une date et sur un matériel donnés.
+  </div>
+
+  <h2 class="section">Le travail, version après version</h2>
+  <p class="apropos" id="apropos-travail"></p>
 
   <div class="bilans" id="bilans"></div>
 
@@ -145,10 +176,29 @@
   <h3>Toutes les valeurs</h3>
   <div class="defile"><table id="valeurs"></table></div>
 
+  <h2 class="section" id="titre-temps">Le temps, face à deux autres langages</h2>
+  <p class="apropos" id="apropos-temps"></p>
+
+  <div class="bloc" id="bloc-bench">
+    <h2>Coefficient par rapport à la référence</h2>
+    <p class="apropos">Chaque barre est un multiple du temps de référence&nbsp;: à gauche du repère, le langage est plus rapide&nbsp;; à droite, plus lent. Les neuf tests portent chacun sur un chemin différent du moteur, et une somme de contrôle identique dans les trois langages garantit qu'ils font le même travail.</p>
+    <div class="cles" id="cles-bench"></div>
+    <svg id="bench" role="img" aria-label="Temps d'exécution d'Ollin et de Python, en multiple du temps de Lua, pour chacun des neuf benchmarks"></svg>
+  </div>
+
+  <h3 id="titre-detail">Détail du relevé</h3>
+  <div class="defile" id="defile-temps"><table id="temps"></table></div>
+
+  <h2 class="section">Méthode</h2>
   <p class="methode">
-    Le compte d'instructions est <strong>déterministe</strong> et indifférent à l'adresse du code comme au cache&nbsp;: il mesure le travail, là où un temps d'exécution varie de ±7&nbsp;% selon la seule disposition du code machine. Il se relève avec <code>bash bench/icount.sh &lt;réf&gt; [&lt;réf&gt;]</code>.
-    Un jalon par journée mesure l'état en <em>fin</em> de journée&nbsp;: l'écart affiché cumule tous les commits du jour, et le sujet indiqué — celui du dernier — n'en porte ni le mérite ni le blâme.
-    La borne basse de la série n'est pas l'historique git mais le <strong>langage</strong>&nbsp;: avant le 20 juin 2026, ces trois scripts ne s'exécutent pas.
+    <strong>Pourquoi deux instruments.</strong> Tous les gestionnaires d'opcodes de la machine virtuelle vivent dans une seule fonction (dispatch par <em>computed-goto</em>), si bien que modifier n'importe lequel déplace l'adresse de tous les autres et change le comportement du cache d'instructions. L'effet est mesuré à ±7&nbsp;%&nbsp;: ajouter du code mort dans un gestionnaire que le test n'exécute jamais suffit à le rendre 7&nbsp;% plus rapide. Un écart de quelques pour cent sur un temps ne dit donc rien d'un coût réel.
+    Le compte d'instructions, lui, est indifférent à l'adresse du code comme au cache. Instructions en hausse&nbsp;: coût réel, à corriger. Instructions stables et temps qui bouge&nbsp;: placement, rien à optimiser — et figer une disposition favorable ne servirait à rien, le prochain changement la défera.
+  </p>
+  <p class="methode">
+    <strong>Le travail.</strong> Relevé par <code>bash bench/icount.sh &lt;réf&gt; [&lt;réf&gt;]</code>, qui compile chaque version dans un espace de travail jetable et compte les instructions exécutées (callgrind). Un jalon par journée mesure l'état en <em>fin</em> de journée&nbsp;: l'écart affiché cumule tous les commits du jour, et le sujet indiqué — celui du dernier — n'en porte ni le mérite ni le blâme. Attribuer un écart à un commit précis demande de mesurer ce commit. Seules les journées touchant le cœur du moteur sont jalonnées&nbsp;; ailleurs le compte est stable par construction. La borne basse n'est pas l'historique git mais le <strong>langage</strong>&nbsp;: avant le 20 juin 2026, ces trois scripts ne s'exécutent pas.
+  </p>
+  <p class="methode">
+    <strong>Le temps.</strong> Relevé par <code>bash bench/bench_all.sh</code>. Chaque test est lancé plusieurs fois et le <em>meilleur</em> temps est retenu, un run unique étant trop sensible à la contention du processeur. Les trois langages mesurent le temps <strong>processeur</strong>, non le temps écoulé. Aucun environnement n'est normatif&nbsp;: ni les temps ni les coefficients ne se transportent d'une machine ou d'une session à l'autre, et deux chiffres ne se comparent que mesurés dans la même série.
   </p>
   <p id="souci" hidden></p>
 </div>
