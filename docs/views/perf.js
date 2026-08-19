@@ -55,6 +55,13 @@ export async function init(ctx) {
   const connu = j => SERIES.every(s => typeof j[s.id] === "number");
   const premier = JALONS.find(connu);
   const dernier = [...JALONS].reverse().find(connu);
+  // Aucun jalon complet : le fichier est inutilisable pour les graphiques (série renommée,
+  // valeurs toutes absentes). Dire pourquoi plutôt que d'échouer sur premier.date.
+  if (!premier) {
+    signaler(new Error("aucun jalon ne porte les " + SERIES.length + " séries attendues : " +
+                       SERIES.map(s => s.id).join(", ")));
+    return () => {};
+  }
   const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
                 "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
   const enClair = iso => Number(iso.slice(8, 10)) + " " + MOIS[Number(iso.slice(5, 7)) - 1];
