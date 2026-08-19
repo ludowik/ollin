@@ -1,5 +1,6 @@
 #include "graphics_internal.h"
 #include "audio_module.h"
+#include "sound_module.h"
 #include "ui_module.h"
 #include "tween_module.h"
 #include "engine_font.h"
@@ -1176,6 +1177,7 @@ static void run_user_callbacks(const Value& draw_fn) {
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || GetTouchPointCount() > 0 || keyboard_pressed_any())
         audio_wake();
     audio_update();
+    sound_update();
     // Tweens avancés AVANT la logique et le dessin : update() comme draw() voient donc
     // les valeurs de la frame courante. Même dt que la globale deltaTime.
     tween_update_all(s_frame_dt);

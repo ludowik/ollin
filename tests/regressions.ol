@@ -1371,6 +1371,56 @@ tween.to(sqX, {x: 50}, 1.0, "linear")
 tween.update(1.0)
 assert(sqX.x == 50 and tween.count() == 0)
 
+## ── Module sound : oscillateurs ─────────────────────────────────────────────────
+## Sans périphérique, tout l'API répond quand même : les voix existent, leurs paramètres
+## se lisent et s'écrivent. Seule la sortie est muette, ce qui rend la synthèse testable
+## dans un conteneur sans carte son.
+var osA = sound.sine(440)
+assert(osA.freq() == 440 and osA.shape() == "sine")
+assert(osA.volume() == 0.5 and osA.pan() == 0)
+assert(not osA.isPlaying())
+
+## Les écritures rendent le HANDLE, donc se chaînent ; les lectures rendent la valeur.
+assert(osA.freq(880).volume(0.25).pan(-1) == osA)
+assert(osA.freq() == 880 and osA.volume() == 0.25 and osA.pan() == -1)
+
+## start/stop bascule l'état, et se chaîne aussi.
+osA.start()
+assert(osA.isPlaying())
+osA.stop()
+assert(not osA.isPlaying())
+
+## Volume et panoramique sont BORNÉS en silence, comme le volume général.
+assert(osA.volume(5) == osA and osA.volume() == 1)
+assert(osA.pan(-9) == osA and osA.pan() == -1)
+assert(osA.pan(9) == osA and osA.pan() == 1)
+
+## Chaque raccourci fixe sa forme d'onde, et `shape` la relit par son nom.
+assert(sound.square(100).shape() == "square")
+assert(sound.saw(100).shape() == "saw")
+assert(sound.triangle(100).shape() == "triangle")
+assert(sound.noise().shape() == "noise")
+assert(sound.osc(220, "square").shape() == "square")
+
+## La forme se change en marche, comme la fréquence.
+assert(osA.shape("saw").shape() == "saw")
+
+## Recyclage : quand la table est pleine, la voix arrêtée la PLUS ANCIENNE est reprise —
+## un rang de création, et non le premier slot venu, qui martelait toujours le même. Le
+## handle repris est détecté comme périmé au lieu de désigner la voix du suivant.
+var osVieux = sound.sine(200)
+var osNeuf = nil
+for i = 1, 20 do
+    osNeuf = sound.sine(300)
+end
+var osPerime = false
+try
+    osVieux.freq()
+catch e
+    osPerime = true
+end
+assert(osPerime and osNeuf.freq() == 300)
+
 ## ── Module audio (session) ──────────────────────────────────────────────────────
 ## Le module existe TOUJOURS, même sans périphérique : la génération d'ondes est un pur
 ## calcul, et la suite tourne dans un conteneur sans carte son. Seule la sortie est muette.

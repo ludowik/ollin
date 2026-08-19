@@ -36,6 +36,7 @@ set(OLLIN_SOURCES
     src/modules/array_module.cpp
     src/modules/data_module.cpp
     src/modules/tween_module.cpp
+    src/modules/sound_module.cpp
 )
 
 if(EMSCRIPTEN)
@@ -62,7 +63,7 @@ if(EMSCRIPTEN)
         target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
     endif()
 
-    add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/camera_module.cpp src/modules/audio_module.cpp)
+    add_executable(ollin_wasm src/wasm_main.cpp ${OLLIN_SOURCES} src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/camera_module.cpp src/modules/audio_module.cpp src/modules/sound_output.cpp)
     target_include_directories(ollin_wasm PRIVATE src libs)
     target_compile_options(ollin_wasm PRIVATE -Wall -Wextra -fexceptions)
     set_target_properties(ollin_wasm PROPERTIES OUTPUT_NAME "ollin" SUFFIX ".js")
@@ -117,12 +118,12 @@ else()
         if(TARGET raylib)
             target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
         endif()
-        set(OLLIN_GRAPHICS_SOURCE src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/camera_stub.cpp src/modules/audio_module.cpp)
+        set(OLLIN_GRAPHICS_SOURCE src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/camera_stub.cpp src/modules/audio_module.cpp src/modules/sound_output.cpp)
         set(OLLIN_GRAPHICS_LIB raylib)
         set(OLLIN_GRAPHICS_DEFINES OLLIN_HAS_RAYLIB)
     else()
         message(STATUS "Native build with graphics stub (no window). Set -DOLLIN_NATIVE_RAYLIB=ON for raylib.")
-        set(OLLIN_GRAPHICS_SOURCE src/modules/graphics_stub.cpp src/modules/image_stub.cpp src/modules/ui_stub.cpp src/modules/camera_stub.cpp src/modules/audio_stub.cpp)
+        set(OLLIN_GRAPHICS_SOURCE src/modules/graphics_stub.cpp src/modules/image_stub.cpp src/modules/ui_stub.cpp src/modules/camera_stub.cpp src/modules/audio_stub.cpp src/modules/sound_output_stub.cpp)
         set(OLLIN_GRAPHICS_LIB "")
         set(OLLIN_GRAPHICS_DEFINES "")
     endif()
@@ -141,7 +142,7 @@ else()
 
     find_program(EMCC emcc)
     if(EMCC)
-        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/audio_module.cpp)
+        set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/audio_module.cpp src/modules/sound_output.cpp)
         add_custom_command(
             OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm
             DEPENDS ${WASM_SOURCES}

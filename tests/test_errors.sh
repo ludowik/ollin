@@ -381,6 +381,45 @@ var t = tween.to(o, {x: 1}, 1)
 tween.to(t, {x: 1}, 1)' \
     "ne peut pas être l'objet animé"
 
+# ── modules audio / sound ────────────────────────────────────────────────────
+check_error "audio.volume with a string" \
+    'audio.volume("fort")' \
+    "expected a number between 0 and 1"
+
+check_error "sound.osc with an unknown waveform" \
+    'sound.osc(440, "bruit")' \
+    "forme d'onde inconnue"
+
+check_error "sound.osc above the audible range" \
+    'sound.osc(30000)' \
+    "hors de [0;20000]"
+
+check_error "sound.osc with a negative frequency" \
+    'sound.osc(-5)' \
+    "hors de [0;20000]"
+
+check_error "sound.osc with a non-numeric frequency" \
+    'sound.osc("la")' \
+    "doit être un nombre de hertz"
+
+check_error "sound.shape with a number" \
+    'var o = sound.sine(440)
+o.shape(3)' \
+    "doit être un nom"
+
+check_error "sound.volume with a string" \
+    'var o = sound.sine(440)
+o.volume("fort")' \
+    "le volume doit être un nombre"
+
+check_error "oscillator recycled while its handle is kept" \
+    'var vieux = sound.sine(200)
+for i = 1, 20 do
+    sound.sine(300)
+end
+vieux.freq()' \
+    "existe plus"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]
