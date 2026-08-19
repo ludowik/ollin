@@ -5,7 +5,6 @@
 ## Clique n'importe où pour mettre la scène en pause ou la reprendre.
 
 global balle = {x: 0, y: 0, rx: 0, ry: 0, teinte: Color(0.45, 0.8, 1)}
-global ombre = {largeur: 0, opacite: 0.35}
 
 ## Les trois points d'attente : le même clignotement pour tous, mais décalé dans le temps
 ## par un délai proportionnel à leur rang.
@@ -51,13 +50,6 @@ func lancerRebond()
         {delay: 0.15},
     ]).repeat()
 
-    ## L'ombre suit le rebond sans en faire partie : deux tweens sur des objets différents
-    ## avancent côte à côte. Elle s'élargit quand la balle descend, donc un aller-retour
-    ## sans fin d'une durée calée sur la chute suffit.
-    ombre.largeur = r * 0.9
-    ombre.opacite = 0.12
-    tween.to(ombre, {largeur: r * 2.4, opacite: 0.4}, 0.45, "easeInQuad").repeat(nil, true)
-
     ## Le même clignotement pour les trois points, décalé par un délai croissant : le
     ## départ d'une animation se retarde, sa déclaration n'a pas à attendre.
     for i = 1, #points do
@@ -87,11 +79,26 @@ func draw()
     graphics.clear(Color(0.08, 0.09, 0.13))
     graphics.noStroke()
 
-    ## Le sol, puis l'ombre : deux repères qui rendent le poids de la balle lisible.
-    graphics.fill(Color(1, 1, 1, 0.08))
-    graphics.rect(0, sol() + rayon(), W, H)
-    graphics.fill(Color(0, 0, 0, ombre.opacite))
-    graphics.ellipse(balle.x, sol() + rayon() * 0.9, ombre.largeur * 2, rayon() * 0.45)
+    ## Le sol est franchement CLAIR : une ombre noire posée sur un fond sombre ne se
+    ## verrait pas, et c'est elle qui donne au rebond sa hauteur lisible.
+    ## Une BANDE, pas tout le bas de l'écran : la barre d'avancement et le texte restent
+    ## ainsi sur le fond sombre, où ils sont lisibles.
+    var ySol = sol() + rayon()
+    graphics.fill(Color(0.29, 0.33, 0.42))
+    graphics.rect(0, ySol, W, H * 0.055)
+
+    ## L'ombre est DÉRIVÉE de la hauteur de la balle, pas animée : un tween parallèle
+    ## d'une durée propre dériverait par rapport à la séquence, et l'ombre s'étalerait
+    ## alors que la balle remonte (constaté). Le dessin lit la position, un point.
+    var chute = (balle.y - plafond()) / (sol() - plafond())
+    var largeOmbre = rayon() * (0.7 + 1.5 * chute)
+    var noir = 0.15 + 0.6 * chute
+    ## Deux ellipses concentriques : la plus large et la plus pâle adoucit le bord, sans
+    ## avoir besoin d'un flou.
+    graphics.fill(Color(0.04, 0.05, 0.08, noir * 0.45))
+    graphics.ellipse(balle.x, ySol + rayon() * 0.28, largeOmbre * 2.6, rayon() * 0.7)
+    graphics.fill(Color(0.04, 0.05, 0.08, noir))
+    graphics.ellipse(balle.x, ySol + rayon() * 0.28, largeOmbre * 1.7, rayon() * 0.42)
 
     ## La balle : une ellipse, puisque l'écrasement anime ses deux rayons séparément.
     graphics.fill(balle.teinte)

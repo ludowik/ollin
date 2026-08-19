@@ -415,8 +415,9 @@ void drop_conflicts(const std::vector<Chan>& chans) {
     }
 }
 
-// Canaux d'une table {champ: cible} vers un objet. Écrit deux fois auparavant (tween.to et
-// tween.sequence), avec le même message mot pour mot.
+// Canaux d'une table {champ: cible} vers un objet : la validation des clés et la lecture des
+// valeurs de départ, écrites deux fois auparavant. `fn` préfixe les messages — « tween.to »
+// pour l'un, « tween.sequence: étape N » pour l'autre.
 void add_map_chans(std::vector<Chan>& out, const Value& objet, const Value& vers, const char* fn) {
     // Les deux seules façons de passer un tween là où on attend des nombres. Sans ces deux
     // tests le handle serait animé comme une map ordinaire, et le refus parlerait d'un champ
@@ -884,6 +885,10 @@ void advance(double dt) {
         // Fin d'une ÉTAPE : on passe à la suivante en gardant le reliquat de temps, sinon une
         // animation courte perdrait une fraction de seconde à chaque parcours. Quand la suite
         // est épuisée, le segment de plan suivant la rejoue (en sens inverse si -1).
+        // Génération du tween au DÉBUT de son avancement : tous les tests de vitalité qui
+        // suivent la comparent, car `alive` seul ne distingue pas « toujours là » de « annulé,
+        // puis slot repris par un autre tween » (cf. alloc_tween, qui repose alive = true).
+        uint32_t gen0 = s_tweens[i].gen;
         double p = 1.0;
         bool ends = true;      // dernier segment terminé → le tween a fini
         bool seg_ends = true;  // étape courante terminée
@@ -895,7 +900,7 @@ void advance(double dt) {
         // appels, et la vitalité du slot est revérifiée après chacun.
         {
             while (true) {
-                if (!s_tweens[i].alive)
+                if (!tween_alive(i, gen0))
                     break;
                 Tw& t = s_tweens[i];
                 double dur = t.etapes[etape_index(t, t.pos)].dur;
@@ -913,11 +918,16 @@ void advance(double dt) {
                 // sans jamais lire ses bornes ni écrire sa cible. Chaque appel repart de
                 // s_tweens[i] : le premier peut exécuter un getter Ollin qui réalloue le
                 // vecteur, ce qui rendrait `t` pendante pour le second.
+                //
+                // La vitalité est vérifiée sur la GÉNÉRATION, pas sur `alive` seul : le code
+                // appelé peut annuler ce tween PUIS en déclarer un autre, qui reprend le slot
+                // libéré et le repose vivant. `franchie` indexerait alors les étapes d'un
+                // inconnu, plus courtes le cas échéant.
                 demarrer_etape(s_tweens[i], franchie);
-                if (!s_tweens[i].alive)
+                if (!tween_alive(i, gen0))
                     break;
                 poser_fin_etape(s_tweens[i], franchie);
-                if (!s_tweens[i].alive)
+                if (!tween_alive(i, gen0))
                     break;   // le code appelé a annulé ce tween
                 Tw& t2 = s_tweens[i];                 // référence RELUE après les appels
                 t2.elapsed -= t2.etapes[franchie].dur;
@@ -931,7 +941,7 @@ void advance(double dt) {
                     t2.pos = 0;
                 }
             }
-            if (!s_tweens[i].alive)
+            if (!tween_alive(i, gen0))
                 continue;   // annulé en cours de franchissement : plus rien à écrire
             Tw& t = s_tweens[i];
             sens = t.plan[t.seg];
@@ -944,7 +954,7 @@ void advance(double dt) {
             }
         }
         demarrer_etape(s_tweens[i], idx);   // hors de toute référence retenue
-        if (!s_tweens[i].alive)
+        if (!tween_alive(i, gen0))
             continue;
         // Écritures et rappel de courbe : ils exécutent du code Ollin (setter d'une `ref`,
         // courbe personnalisée), donc plus aucune référence à s_tweens ne doit survivre.
@@ -962,7 +972,7 @@ void advance(double dt) {
                 write_chan(c, seg_ends ? b : a + (b - a) * f);
             }
         }
-        if (ends && tween_alive(i, s_tweens[i].gen)) {
+        if (ends && tween_alive(i, gen0)) {
             Value cb = s_tweens[i].on_done;
             free_tween(i);
             if (cb.is_callable())
