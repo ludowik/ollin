@@ -69,6 +69,7 @@ const ROUTES = {
   tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
   run:        { html: 'views/run.html',        js: './views/run.js' },
+  perf:       { html: 'views/perf.html',       js: './views/perf.js' },
 }
 const DEFAULT_VIEW = 'tutoriel'
 // Dernière ROUTE complète visitée (vue + sous-chemin : ancre tutoriel, sample…),
@@ -86,6 +87,7 @@ const VIEWPORT = {
   tutoriel:   'width=device-width, initial-scale=1.0',
   playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
   run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
+  perf:       'width=device-width, initial-scale=1.0',
 }
 function applyViewport(view) {
   const meta = document.querySelector('meta[name="viewport"]')
