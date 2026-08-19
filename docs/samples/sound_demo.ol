@@ -1,9 +1,10 @@
 ## Modules audio et sound — TOUT ce qu'on entend ici est calculé : pas un fichier chargé.
 ##
-## Clique une touche du clavier pour jouer sa note (un tampon calculé au démarrage, avec son
-## enveloppe), et glisse dans la bande du haut pour piloter un oscillateur vivant, dont la
-## fréquence suit le doigt PENDANT qu'il sonne. C'est là toute la différence entre les deux
-## natures d'objet du module.
+## Pose le doigt sur les touches et FAIS-LE GLISSER : chaque touche traversée joue sa note,
+## sans qu'il faille cliquer l'une après l'autre. Les notes sont des tampons calculés au
+## démarrage, avec leur enveloppe. Dans la bande du haut, le glissement pilote un oscillateur
+## vivant dont la fréquence suit le doigt PENDANT qu'il sonne — c'est là toute la différence
+## entre les deux natures d'objet du module.
 
 global notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
 global sons = []          ## un tampon par note, calculé une fois dans setup()
@@ -11,8 +12,11 @@ global derniere = 0       ## touche allumée, pour le retour visuel
 global lueur = 0.0        ## décroît à chaque frame — le clavier « respire »
 
 global archet = nil       ## l'oscillateur vivant
-global glisse = false
+global glisse = false     ## le doigt est dans la bande de l'archet
 global hauteur = 0.0      ## 0..1, position du doigt dans la bande
+
+global appui = false      ## le doigt (ou le bouton) est posé
+global sousDoigt = 0      ## touche actuellement sous le doigt, 0 = aucune
 
 func hautBande()
     return H * 0.12
@@ -54,36 +58,60 @@ func jouer(i)
     lueur = 1.0
 end
 
-func mouse.pressed(x, y)
-    if y >= hautBande() and y <= basBande() then
-        glisse = true
-        hauteur = (x / W)
-        return
+## Touche sous le point (x, y), ou 0 si le point n'est pas sur le clavier.
+func toucheSous(x, y)
+    if y < hautClavier() then
+        return 0
     end
-    if y >= hautClavier() then
-        var i = math.floor(x / largeurTouche()) + 1
-        if i >= 1 and i <= #notes then
-            jouer(i)
+    var i = math.floor(x / largeurTouche()) + 1
+    if i < 1 or i > #notes then
+        return 0
+    end
+    return i
+end
+
+## Ce que le doigt survole décide, à l'appui comme au glissement : c'est ce qui permet de
+## balayer le clavier sans lever le doigt. Une note ne repart que si l'on CHANGE de touche —
+## sinon un déplacement de trois pixels la redéclencherait à chaque frame.
+func suivreDoigt(x, y)
+    glisse = y >= hautBande() and y <= basBande()
+    if glisse then
+        hauteur = x / W
+        if hauteur < 0 then
+            hauteur = 0
+        elseif hauteur > 1 then
+            hauteur = 1
+        end
+    end
+
+    var t = toucheSous(x, y)
+    if t <> sousDoigt then
+        sousDoigt = t
+        if t > 0 then
+            jouer(t)
         end
     end
 end
 
-## `moved` est appelé à chaque déplacement du pointeur ; on ne suit que si le glissement est
-## en cours, l'appui ayant eu lieu dans la bande.
+func mouse.pressed(x, y)
+    appui = true
+    sousDoigt = 0     ## remis à zéro pour que la touche sous le doigt soit jouée
+    suivreDoigt(x, y)
+end
+
+## `moved` est appelé à chaque déplacement du pointeur, bouton enfoncé ou non : sans le
+## drapeau d'appui, une souris qui traverse l'écran jouerait toute la gamme.
 func mouse.moved(x, y)
-    if not glisse then
+    if not appui then
         return
     end
-    hauteur = x / W
-    if hauteur < 0 then
-        hauteur = 0
-    elseif hauteur > 1 then
-        hauteur = 1
-    end
+    suivreDoigt(x, y)
 end
 
 func mouse.released(x, y)
+    appui = false
     glisse = false
+    sousDoigt = 0
 end
 
 func keyboard.keypressed(key)
@@ -131,7 +159,10 @@ func draw()
         graphics.text("{archet.freq():.0f} Hz", W * 0.04, hautBande() + H * 0.11)
     end
 
-    ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur.
+    ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur. La
+    ## touche SOUS LE DOIGT est cerclée, pour que le balayage se voie autant qu'il s'entende.
+    graphics.stroke(Color(0.62, 0.7, 0.85))
+    graphics.text("pose le doigt et balaie les touches", W * 0.04, hautClavier() - H * 0.03)
     graphics.noStroke()
     var l = largeurTouche()
     for i = 1, #notes do
@@ -141,6 +172,11 @@ func draw()
         graphics.noStroke()
         graphics.fill(Color(0.16 + 0.5 * vive, 0.18 + 0.35 * vive, 0.3 + 0.4 * vive))
         graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
+        if i == sousDoigt then
+            graphics.noFill()
+            graphics.stroke(Color(0.55, 0.85, 1), 3)
+            graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
+        end
         graphics.stroke(Color(0.8, 0.86, 0.96))
         graphics.text(notes[i], l * (i - 1) + l * 0.28, hautClavier() + H * 0.07)
     end
