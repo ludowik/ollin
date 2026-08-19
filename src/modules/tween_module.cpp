@@ -213,6 +213,7 @@ struct Tw {
     size_t pos = 0;      // étape en cours, comptée dans l'ordre du segment courant
     std::vector<int8_t> plan{1};
     size_t seg = 0;      // segment en cours dans le plan
+    double cycle = 0.0;  // durée d'un parcours complet, figée à la construction
     bool endless = false;   // le plan est rejoué sans fin (loop)
     double elapsed = 0.0;
     double delay = 0.0;
@@ -404,6 +405,30 @@ void drop_conflicts(const std::vector<Chan>& chans) {
     }
 }
 
+// Canaux d'une table {champ: cible} vers un objet. Écrit deux fois auparavant (tween.to et
+// tween.sequence), avec le même message mot pour mot.
+void add_map_chans(std::vector<Chan>& out, const Value& objet, const Value& vers, const char* fn) {
+    for (const auto& kv : vers.as_map()->data) {
+        if (!kv.first.is_string())
+            throw std::runtime_error(std::string(fn) + ": les clés doivent être des noms de champs");
+        Value cur = objet.map_get(kv.first);
+        if (cur.is_nil())
+            throw std::runtime_error(std::string(fn) + ": le champ '" + kv.first.as_string() +
+                                     "' est absent de l'objet");
+        add_chan(out, objet, kv.first, cur, kv.second, fn);
+    }
+}
+
+// Triage d'une courbe donnée par le script : un nom, ou une fonction.
+void read_curve(const Value& v, int& curve, Value& curve_fn, const char* fn) {
+    if (v.is_string())
+        curve = curve_index(v.as_string(), fn);
+    else if (v.is_callable())
+        curve_fn = v;
+    else
+        throw std::runtime_error(std::string(fn) + ": courbe attendue : un nom ou une fonction");
+}
+
 // Reconnaît les deux derniers arguments par leur TYPE (chaîne/fonction = courbe,
 // fonction = rappel de fin), donc aucun ordre imposé — comme ui.slider.
 void read_options(const Value* args, int argc, int first, int& curve, Value& curve_fn, Value& on_done,
@@ -424,6 +449,27 @@ void read_options(const Value* args, int argc, int first, int& curve, Value& cur
                                      " attendu : nom de courbe, fonction, ou nil");
         }
     }
+}
+
+// Fin commune à tween.to, tween.value et tween.sequence : allouer, poser les étapes et le
+// rappel de fin, rendre le handle. Les trois l'écrivaient à l'identique.
+int creer_tween(std::vector<Etape>&& etapes, const Value& on_done) {
+    int slot = alloc_tween();
+    Tw& t = s_tweens[slot];
+    t.etapes = std::move(etapes);
+    t.on_done = on_done;
+    t.cycle = duree_cycle(t);
+    return slot;
+}
+
+// Étape d'UNE animation : le cas de tween.to et tween.value.
+Etape etape_simple(std::vector<Chan>&& chans, double dur, int curve, const Value& curve_fn) {
+    Etape e;
+    e.chans = std::move(chans);
+    e.dur = dur;
+    e.curve = curve;
+    e.curve_fn = curve_fn;
+    return e;
 }
 
 double duration_arg(const Value* args, int argc, int i, const char* fn) {
@@ -454,26 +500,11 @@ int tween_to(CallCtx& ctx) {
     read_options(args, argc, 3, curve, curve_fn, on_done, "tween.to");
 
     std::vector<Chan> chans;
-    for (const auto& kv : args[1].as_map()->data) {
-        if (!kv.first.is_string())
-            throw std::runtime_error("tween.to: les clés doivent être des noms de champs");
-        Value cur = args[0].map_get(kv.first);
-        if (cur.is_nil()) {
-            throw std::runtime_error("tween.to: le champ '" + kv.first.as_string() + "' est absent de l'objet");
-        }
-        add_chan(chans, args[0], kv.first, cur, kv.second, "tween.to");
-    }
+    add_map_chans(chans, args[0], args[1], "tween.to");
     drop_conflicts(chans);
-    int slot = alloc_tween();
-    Tw& t = s_tweens[slot];
-    Etape e;
-    e.chans = std::move(chans);
-    e.dur = dur;
-    e.curve = curve;
-    e.curve_fn = curve_fn;
-    t.etapes.push_back(std::move(e));
-    t.on_done = on_done;
-    return ctx.ret(make_handle(slot));
+    std::vector<Etape> etapes;
+    etapes.push_back(etape_simple(std::move(chans), dur, curve, curve_fn));
+    return ctx.ret(make_handle(creer_tween(std::move(etapes), on_done)));
 }
 
 // tween.value(ref v, cible, durée [, courbe] [, surFin])
@@ -509,16 +540,9 @@ int tween_value(CallCtx& ctx) {
     // qu'ils désignent la même variable, donc pas d'écrasement automatique ici (les
     // canaux structurés, qui écrivent dans une instance, sont eux bien dédoublonnés).
     drop_conflicts(chans);
-    int slot = alloc_tween();
-    Tw& t = s_tweens[slot];
-    Etape e;
-    e.chans = std::move(chans);
-    e.dur = dur;
-    e.curve = curve;
-    e.curve_fn = curve_fn;
-    t.etapes.push_back(std::move(e));
-    t.on_done = on_done;
-    return ctx.ret(make_handle(slot));
+    std::vector<Etape> etapes;
+    etapes.push_back(etape_simple(std::move(chans), dur, curve, curve_fn));
+    return ctx.ret(make_handle(creer_tween(std::move(etapes), on_done)));
 }
 
 // tween.sequence(objet, [ {to: {champ: cible}, delay: secondes [, curve: nom] [, target: objet]}, … ])
@@ -562,6 +586,7 @@ int tween_sequence(CallCtx& ctx) {
     }
 
     std::vector<Etape> etapes;
+    std::vector<Chan> tous;   // tous les canaux de la suite, pour une seule passe d'annulation
     for (int64_t k = 1; k <= nb; k++) {   // tableaux Ollin : indexés à 1
         Value brut = args[1].array_get(k);
         const std::string ou = std::string(FN) + ": étape " + std::to_string(k);
@@ -591,38 +616,24 @@ int tween_sequence(CallCtx& ctx) {
             throw std::runtime_error(ou + " : `delay` manquant ou <= 0");
         Etape e;
         e.dur = delai;
-        if (!courbe.is_nil()) {
-            if (courbe.is_string())
-                e.curve = curve_index(courbe.as_string(), FN);
-            else if (courbe.is_callable())
-                e.curve_fn = courbe;
-            else
-                throw std::runtime_error(ou + " : `curve` doit être un nom de courbe ou une fonction");
-        }
+        if (!courbe.is_nil())
+            read_curve(courbe, e.curve, e.curve_fn, ou.c_str());
         e.attente = vers.is_nil();
         if (!vers.is_nil()) {
             if (!is_object(cible))
                 throw std::runtime_error(ou + " : `target` doit être un objet");
             if (!vers.is_map() || vers.map_size() == 0)
                 throw std::runtime_error(ou + " : `to` doit être une map {champ: cible} non vide");
-            for (const auto& kv : vers.as_map()->data) {
-                if (!kv.first.is_string())
-                    throw std::runtime_error(ou + " : les champs de `to` doivent être des noms");
-                Value cur = cible.map_get(kv.first);
-                if (cur.is_nil())
-                    throw std::runtime_error(ou + " : le champ '" + kv.first.as_string() + "' est absent de l'objet");
-                add_chan(e.chans, cible, kv.first, cur, kv.second, FN);
-            }
-            drop_conflicts(e.chans);
+            add_map_chans(e.chans, cible, vers, ou.c_str());
+            tous.insert(tous.end(), e.chans.begin(), e.chans.end());
         }
         etapes.push_back(std::move(e));
     }
 
-    int slot = alloc_tween();
-    Tw& t = s_tweens[slot];
-    t.etapes = std::move(etapes);
-    t.on_done = on_done;
-    return ctx.ret(make_handle(slot));
+    // Une seule passe d'annulation pour TOUTE la séquence : appelée par étape, elle pouvait
+    // libérer un tween à qui il restait des canaux visés par une étape suivante.
+    drop_conflicts(tous);
+    return ctx.ret(make_handle(creer_tween(std::move(etapes), on_done)));
 }
 
 int tween_cancel_all(CallCtx& ctx) {
@@ -702,7 +713,7 @@ int method_progress(CallCtx& ctx) {
     // plafond avant la division ; ensuite (base + p) / total ≤ 1 par construction, et seul le
     // plancher reste à poser (délai, temps négatif). Un plan sans fin rend l'avancement de
     // son tour courant.
-    double cycle = duree_cycle(t);
+    double cycle = t.cycle;
     double fait = 0.0;
     for (size_t k = 0; k < t.pos && k < t.etapes.size(); k++)
         fait += t.etapes[etape_index(t, k)].dur;
@@ -821,10 +832,11 @@ void demarrer_etape(Tw& t, size_t idx) {
 
 // Pose les canaux d'une étape à l'extrémité qu'elle vise, dans le sens du segment courant.
 // Appelée quand l'étape est franchie en un seul pas de temps : sans elle, une étape plus
-// courte que le pas ne laisserait aucune trace.
-void poser_fin_etape(Tw& t, size_t pos) {
+// courte que le pas ne laisserait aucune trace. `idx` est l'index RÉEL de l'étape, comme
+// pour demarrer_etape : deux conventions d'index dans le même appelant seraient un piège.
+void poser_fin_etape(Tw& t, size_t idx) {
     int8_t sens = t.plan[t.seg];
-    std::vector<Chan> chans = t.etapes[etape_index(t, pos)].chans;
+    std::vector<Chan> chans = t.etapes[idx].chans;
     for (const auto& c : chans)
         write_chan(c, sens > 0 ? c.to : c.from);
 }
@@ -880,9 +892,13 @@ void advance(double dt) {
                 size_t franchie = etape_index(t, t.pos);
                 // L'étape franchie est DÉMARRÉE puis POSÉE à son extrémité exacte avant qu'on
                 // la quitte : sinon une étape plus courte qu'un pas de temps serait sautée
-                // sans jamais lire ses bornes ni écrire sa cible.
-                demarrer_etape(t, franchie);          // ← peut exécuter un getter Ollin
-                poser_fin_etape(t, t.pos);            // ← peut exécuter un setter Ollin
+                // sans jamais lire ses bornes ni écrire sa cible. Chaque appel repart de
+                // s_tweens[i] : le premier peut exécuter un getter Ollin qui réalloue le
+                // vecteur, ce qui rendrait `t` pendante pour le second.
+                demarrer_etape(s_tweens[i], franchie);
+                if (!s_tweens[i].alive)
+                    break;
+                poser_fin_etape(s_tweens[i], franchie);
                 if (!s_tweens[i].alive)
                     break;   // le code appelé a annulé ce tween
                 Tw& t2 = s_tweens[i];                 // référence RELUE après les appels
