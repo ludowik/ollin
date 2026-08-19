@@ -480,8 +480,8 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 > API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module ui »).
 
-Widgets dessinés par le moteur, en pile dans le coin haut droit. Trois points
-d'accroche dans la boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`) :
+Widgets dessinés par le moteur, en pile dans le coin haut droit. Le moteur appelle le
+module en trois endroits de sa boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`) :
 
 - **`ui_poll()` AVANT `mouse_poll(...)`** : il renvoie true s'il a consommé le clic, et
   `mouse_poll(click_taken)` neutralise alors `pressed`/`released`/`doubleClicked`. C'est
@@ -592,7 +592,7 @@ des refus.
 | `audio_module.cpp` / `audio_stub.cpp` | selon raylib | session : ouverture différée, volume, pause |
 | `sound_module.cpp` | PARTOUT | API et état : voix, tampons, handles, validation |
 | `sound_output.cpp` / `sound_output_stub.cpp` | selon raylib | le flux et le mélangeur |
-| `sound_internal.h` | — | frontière : table de voix, table de tampons, époque de mélange |
+| `sound_internal.h` | — | frontière : table de voix, table de tampons, compteur de blocs mélangés |
 | `sound_env.h` | — | `adsr_level`, en forme fermée (cf. plus bas) |
 
 **Le rappel audio ne contient JAMAIS de code Ollin.** Il a une échéance de quelques
@@ -666,7 +666,7 @@ Anime un champ d'objet (ou une variable passée par `ref`) de sa valeur courante
 cible, sur une durée, selon une courbe. **Aucune dépendance raylib** → un seul fichier, pas
 de stub, et le module tourne à l'identique en natif headless (où les tests le pilotent).
 
-- **Deux points d'accroche** : `tween_update_all(s_frame_dt)` dans `run_user_callbacks`
+- **Le moteur appelle le module en deux endroits** : `tween_update_all(s_frame_dt)` dans `run_user_callbacks`
   (graphics_module.cpp) **avant** `call_update_if_any()` — `update()` comme `draw()` voient
   donc les valeurs de la frame courante ; `tween_reset()` dans `ollin_run` (wasm_main.cpp)
   à côté de `ui_reset`, sans quoi un tween du programme précédent retiendrait ses objets.

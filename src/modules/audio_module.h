@@ -11,7 +11,10 @@
 // d'intégration n'en a aucun (`/dev/snd` absent).
 Value make_audio_module();
 
-// Points d'accroche, appelés par la boucle de rendu et le démarrage d'un programme :
+// Le moteur appelle ces trois fonctions lui-même — depuis sa boucle de rendu et au
+// lancement d'un programme. Elles ne sont pas destinées au script : oublier l'une d'elles
+// serait un défaut du moteur, pas une faute de l'utilisateur.
+//
 // audio_wake()   au premier geste de l'utilisateur (clic, touche). Le navigateur refuse de
 //                sonner avant une interaction, si bien qu'ouvrir le périphérique au
 //                chargement ne servirait à rien ; le moteur le fait donc à ce moment-là et
