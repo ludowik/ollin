@@ -266,6 +266,8 @@ struct Value {
             return "int";
         case T_FLOAT:
             return "float";
+        case T_BOOL:
+            return "bool";
         case T_STRING:
             return "string";
         case T_MAP:

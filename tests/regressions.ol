@@ -1208,6 +1208,11 @@ assert(true <> 1 and 1 <> true)
 assert(false <> 0 and 0 <> false)
 assert(false <> nil and false <> "" and false <> [])
 
+## Le type se NOMME : `typeof` avait gardé le cas par défaut « unknown » quand le booléen
+## est devenu un type à part entière, si bien qu'un script ne pouvait pas le reconnaître.
+assert(typeof(true) == "bool" and typeof(false) == "bool")
+assert(typeof(1 < 2) == "bool" and typeof(not nil) == "bool")
+
 ## Un booléen est une CLÉ distincte de l'entier correspondant : le hachage doit séparer
 ## ce que l'égalité sépare, sinon les deux clés se confondraient dans la map.
 var bk = {}
