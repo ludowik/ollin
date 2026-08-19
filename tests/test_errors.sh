@@ -354,6 +354,16 @@ check_error "tween.sequence with a list that is not an array" \
 tween.sequence(o, {to: {x: 1}})' \
     "tableau d'étapes"
 
+check_error "tween.sequence with a curve after the list" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, delay: 1}], "easeInOutQuad")' \
+    "courbe se déclare par étape"
+
+check_error "tween.sequence with two end callbacks" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, delay: 1}], func() end, func() end)' \
+    "un seul rappel de fin"
+
 check_error "tween.sequence with an unknown curve" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "aucune"}])' \

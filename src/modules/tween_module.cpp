@@ -544,15 +544,21 @@ int tween_sequence(CallCtx& ctx) {
     if (nb == 0)
         throw std::runtime_error(std::string(FN) + ": la séquence est vide");
 
+    // Après la liste, un SEUL argument est admis : le rappel de fin. On ne passe pas par
+    // read_options, qui prendrait une chaîne pour une courbe — or la courbe se déclare par
+    // étape, et une chaîne nommant la courbe par défaut y était acceptée sans effet.
     Value on_done;
-    {
-        int curve_ignore = k_curve_default;
-        Value curve_fn_ignore;
-        read_options(args, argc, 2, curve_ignore, curve_fn_ignore, on_done, FN);
-        if (!curve_fn_ignore.is_nil())
-            on_done = curve_fn_ignore;   // une seule fonction attendue ici : le rappel de fin
-        if (curve_ignore != k_curve_default)
+    for (int i = 2; i < argc; i++) {
+        if (args[i].is_nil())
+            continue;
+        if (args[i].is_string())
             throw std::runtime_error(std::string(FN) + ": la courbe se déclare par étape (clé `curve`)");
+        if (!args[i].is_callable())
+            throw std::runtime_error(std::string(FN) + ": argument " + std::to_string(i + 1) +
+                                     " attendu : fonction de rappel de fin, ou nil");
+        if (!on_done.is_nil())
+            throw std::runtime_error(std::string(FN) + ": un seul rappel de fin");
+        on_done = args[i];
     }
 
     std::vector<Etape> etapes;
@@ -853,9 +859,15 @@ void advance(double dt) {
         bool seg_ends = true;  // étape courante terminée
         int8_t sens = 1;
         size_t idx = 0;
+        // Cette boucle appelle du code Ollin (getter d'une `ref` dans demarrer_etape, setter
+        // dans poser_fin_etape). Ce code peut déclarer un tween, donc faire push_back sur
+        // s_tweens et RÉALLOUER le vecteur : aucune référence `Tw&` ne doit traverser ces
+        // appels, et la vitalité du slot est revérifiée après chacun.
         {
-            Tw& t = s_tweens[i];
             while (true) {
+                if (!s_tweens[i].alive)
+                    break;
+                Tw& t = s_tweens[i];
                 double dur = t.etapes[etape_index(t, t.pos)].dur;
                 if (dur <= 0.0 || t.elapsed < dur)
                     break;
@@ -863,25 +875,31 @@ void advance(double dt) {
                 // elapsed >= dur. C'est ce dépassement qui dit « terminé » plus bas — le
                 // soustraire ferait croire au tween qu'il redémarre cette étape, et il
                 // réécrivait alors la valeur de DÉPART au lieu de la cible (constaté).
-                bool derniere = t.pos + 1 >= t.etapes.size() && t.seg + 1 >= t.plan.size() && !t.endless;
-                if (derniere)
+                if (t.pos + 1 >= t.etapes.size() && t.seg + 1 >= t.plan.size() && !t.endless)
                     break;
-                // L'étape franchie est DÉMARRÉE puis POSÉE à son extrémité exacte avant
-                // qu'on la quitte : sinon une étape plus courte qu'un pas de temps serait
-                // sautée sans jamais lire ses bornes ni écrire sa cible.
-                demarrer_etape(t, etape_index(t, t.pos));
-                poser_fin_etape(t, t.pos);
-                t.elapsed -= dur;
-                if (t.pos + 1 < t.etapes.size()) {
-                    t.pos++;
-                } else if (t.seg + 1 < t.plan.size()) {
-                    t.seg++;
-                    t.pos = 0;
+                size_t franchie = etape_index(t, t.pos);
+                // L'étape franchie est DÉMARRÉE puis POSÉE à son extrémité exacte avant qu'on
+                // la quitte : sinon une étape plus courte qu'un pas de temps serait sautée
+                // sans jamais lire ses bornes ni écrire sa cible.
+                demarrer_etape(t, franchie);          // ← peut exécuter un getter Ollin
+                poser_fin_etape(t, t.pos);            // ← peut exécuter un setter Ollin
+                if (!s_tweens[i].alive)
+                    break;   // le code appelé a annulé ce tween
+                Tw& t2 = s_tweens[i];                 // référence RELUE après les appels
+                t2.elapsed -= t2.etapes[franchie].dur;
+                if (t2.pos + 1 < t2.etapes.size()) {
+                    t2.pos++;
+                } else if (t2.seg + 1 < t2.plan.size()) {
+                    t2.seg++;
+                    t2.pos = 0;
                 } else {
-                    t.seg = 0;   // sans fin : on rejoue le plan depuis son premier segment
-                    t.pos = 0;
+                    t2.seg = 0;   // sans fin : on rejoue le plan depuis son premier segment
+                    t2.pos = 0;
                 }
             }
+            if (!s_tweens[i].alive)
+                continue;   // annulé en cours de franchissement : plus rien à écrire
+            Tw& t = s_tweens[i];
             sens = t.plan[t.seg];
             idx = etape_index(t, t.pos);
             double dur = t.etapes[idx].dur;
@@ -890,8 +908,10 @@ void advance(double dt) {
                 seg_ends = false;
                 ends = false;
             }
-            demarrer_etape(t, idx);
         }
+        demarrer_etape(s_tweens[i], idx);   // hors de toute référence retenue
+        if (!s_tweens[i].alive)
+            continue;
         // Écritures et rappel de courbe : ils exécutent du code Ollin (setter d'une `ref`,
         // courbe personnalisée), donc plus aucune référence à s_tweens ne doit survivre.
         {
