@@ -66,21 +66,21 @@ const exampleFile = Run.sampleFromAnchor(ctx.anchor)
 const ollinTheme = EditorView.theme({
   // Taille de base = version NAVIGATEUR (13px). Le mobile la redéfinit
   // (playground.html, @media max-width:640px → 12px, anti-zoom iOS).
-  '&': { background: '#000000', color: '#c9d1e0', fontSize: '13px', height: '100%' },
+  '&': { background: '#000000', color: '#dde4ef', fontSize: '13px', height: '100%' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65' },
-  '.cm-content': { padding: '14px 0', caretColor: '#7c83ff' },
+  '.cm-content': { padding: '14px 0', caretColor: '#9ba1ff' },
   ...CODE_DISPLAY,   // réglages d'affichage partagés (cm-shared.js)
-  '.cm-gutters': { background: '#000000', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150' },
+  '.cm-gutters': { background: '#000000', color: '#5a628a', border: 'none', borderRight: '1px solid #3a3f63' },
   ...CODE_THEME_BASE,   // ligne active, curseur, sélection (partagés cm-shared.js)
   '&.cm-focused': { outline: 'none' },
 
   /* autocomplete dropdown */
   '.cm-tooltip.cm-tooltip-autocomplete': { background: '#1e2133', border: '1px solid #3a3f5c', borderRadius: '6px', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', padding: '2px 0' },
   '.cm-tooltip-autocomplete > ul': { fontFamily: "'JetBrains Mono','Fira Code',Consolas,monospace", fontSize: '12.5px', maxHeight: '280px' },
-  '.cm-tooltip-autocomplete > ul > li': { padding: '3px 10px 3px 6px', color: '#c9d1e0', lineHeight: '1.5' },
+  '.cm-tooltip-autocomplete > ul > li': { padding: '3px 10px 3px 6px', color: '#dde4ef', lineHeight: '1.5' },
   '.cm-tooltip-autocomplete > ul > li[aria-selected]': { background: '#2d3259', color: '#ffffff' },
-  '.cm-completionLabel': { color: '#c9d1e0' },
-  '.cm-completionDetail': { color: '#7c85a2', fontStyle: 'italic', marginLeft: '6px' },
+  '.cm-completionLabel': { color: '#dde4ef' },
+  '.cm-completionDetail': { color: '#a3adc4', fontStyle: 'italic', marginLeft: '6px' },
   '.cm-completionIcon': { opacity: 0.7, width: '16px', marginRight: '4px' },
   '.cm-completionIcon-keyword': { color: '#569CD6' },
   '.cm-completionIcon-function': { color: '#DCDCAA' },
@@ -92,14 +92,14 @@ const ollinTheme = EditorView.theme({
   /* panneau de recherche (Ctrl+F) accordé au thème sombre */
   // fontSize: inherit → toute la barre suit la taille de fonte de l'éditeur (13px
   // navigateur / 12px mobile) ; la hauteur des champs en découle. Largeur laissée par défaut.
-  '.cm-panels': { background: '#1a1d2e', color: '#c9d1e0', fontSize: 'inherit' },
-  '.cm-panels.cm-panels-top': { borderBottom: '1px solid #2e3150' },
+  '.cm-panels': { background: '#1a1d2e', color: '#dde4ef', fontSize: 'inherit' },
+  '.cm-panels.cm-panels-top': { borderBottom: '1px solid #3a3f63' },
   '.cm-search': { padding: '8px' },
-  '.cm-search label': { color: '#7c85a2' },
-  '.cm-textfield': { background: '#0f1117', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', fontSize: 'inherit', padding: '3px 6px' },
-  '.cm-button': { background: '#242742', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '4px', backgroundImage: 'none', fontSize: 'inherit' },
+  '.cm-search label': { color: '#a3adc4' },
+  '.cm-textfield': { background: '#0f1117', color: '#dde4ef', border: '1px solid #3a3f63', borderRadius: '4px', fontSize: 'inherit', padding: '3px 6px' },
+  '.cm-button': { background: '#242742', color: '#dde4ef', border: '1px solid #3a3f63', borderRadius: '4px', backgroundImage: 'none', fontSize: 'inherit' },
   '.cm-button:hover': { background: '#2d3259' },
-  '.cm-panel.cm-search [name=close]': { color: '#7c85a2', fontSize: '18px', padding: '0 8px' },
+  '.cm-panel.cm-search [name=close]': { color: '#a3adc4', fontSize: '18px', padding: '0 8px' },
 })
 
 // ── Autocompletion ────────────────────────────────────────────────────────
@@ -1629,9 +1629,9 @@ function showExampleBanner(file) {
   removeExampleBanner()
   const bar = document.createElement('div')
   bar.id = 'example-banner'
-  bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 12px;background:#1e2133;border-bottom:1px solid #2e3150;font-size:12px;color:#a9b2cf'
+  bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 12px;background:#1e2133;border-bottom:1px solid #3a3f63;font-size:12px;color:#a9b2cf'
   const txt = document.createElement('span')
-  txt.innerHTML = '📄 Exemple <b style="color:#c9d1e0">' + file + '</b> — non enregistré (un rafraîchissement recharge l\'exemple)'
+  txt.innerHTML = '📄 Exemple <b style="color:#dde4ef">' + file + '</b> — non enregistré (un rafraîchissement recharge l\'exemple)'
   const btn = document.createElement('button')
   btn.textContent = 'Créer un projet'
   btn.style.cssText = 'margin-left:auto;background:var(--accent);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer'

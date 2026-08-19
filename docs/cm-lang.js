@@ -67,5 +67,5 @@ export const ollinHighlight = HighlightStyle.define([
   { tag: tags.number,   color: '#B5CEA8' },
   { tag: tags.string,   color: '#CE9178' },
   { tag: tags.comment,  color: '#6A9955', fontStyle: 'italic' },
-  { tag: tags.operator, color: '#c9d1e0' },
+  { tag: tags.operator, color: '#dde4ef' },
 ])

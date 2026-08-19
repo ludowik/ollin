@@ -14,13 +14,13 @@ import { ollinLang, ollinHighlight } from '../cm-lang.js'
 
 // ── Thème éditeur (blocs read-only du tutoriel) ─────────────────────────────
 const ollinTheme = EditorView.theme({
-  '&': { background: '#1a1d2e', color: '#c9d1e0', border: '1px solid #2e3150', borderRadius: '8px', fontSize: 'var(--code-size)' },
+  '&': { background: '#1a1d2e', color: '#dde4ef', border: '1px solid #3a3f63', borderRadius: '8px', fontSize: 'var(--code-size)' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto', fontSize: 'var(--code-size)' },
-  '.cm-content': { padding: '14px 0', caretColor: '#7c83ff', fontSize: 'var(--code-size)' },
+  '.cm-content': { padding: '14px 0', caretColor: '#9ba1ff', fontSize: 'var(--code-size)' },
   ...CODE_DISPLAY,
   ...CODE_THEME_BASE,   // ligne active, curseur, sélection (partagés)
-  '.cm-gutters': { background: '#1a1d2e', color: '#3d4463', border: 'none', borderRight: '1px solid #2e3150', borderRadius: '8px 0 0 8px' },
-  '&.cm-focused': { outline: 'none', borderColor: '#7c83ff' },
+  '.cm-gutters': { background: '#1a1d2e', color: '#5a628a', border: 'none', borderRight: '1px solid #3a3f63', borderRadius: '8px 0 0 8px' },
+  '&.cm-focused': { outline: 'none', borderColor: '#9ba1ff' },
   '.cm-content[contenteditable="false"]': { cursor: 'default' },
 })
 
@@ -128,7 +128,7 @@ export async function init(ctx) {
     position: 'fixed', top: '0', left: '50%', zIndex: '200',
     transform: 'translate(-50%, -48px)', width: '40px', height: '40px',
     borderRadius: '50%', background: 'var(--surface, #1a1d2e)',
-    border: '1px solid var(--border, #2e3150)', color: 'var(--accent, #7c83ff)',
+    border: '1px solid var(--border, #3a3f63)', color: 'var(--accent, #9ba1ff)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     boxShadow: '0 4px 16px rgba(0,0,0,0.4)', pointerEvents: 'none',
     opacity: '0', transition: 'opacity 0.15s',

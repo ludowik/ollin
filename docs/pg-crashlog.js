@@ -77,7 +77,7 @@ function show(title, message, stack) {
   const mk = (label, fn) => {
     const b = document.createElement('button')
     b.textContent = label
-    b.style.cssText = 'flex:1;padding:10px;font:600 13px system-ui,sans-serif;background:#7c83ff;color:#fff;border:none;border-radius:7px'
+    b.style.cssText = 'flex:1;padding:10px;font:600 13px system-ui,sans-serif;background:#9ba1ff;color:#fff;border:none;border-radius:7px'
     b.addEventListener('click', fn)
     return b
   }

@@ -121,6 +121,15 @@ d'ouverture), et les crochets ne sont comptés que sur les lignes **sans `;`**, 
 (`[a;b[`) pouvant fermer avec `[`. Tout mot-clé ouvrant un bloc doit figurer dans
 `OPENERS` : `enum` y manquait depuis son ajout au langage.
 
+**Contraste (règle permanente)** : la palette des vues est tenue à des seuils mesurés, pas à
+l'œil. Texte courant ≥ 7:1, texte atténué et libellé de bouton ≥ 4,5:1 sur **chacun** des trois
+fonds (`--bg`, `--surface`, `--surface2`), contour d'un élément interactif ≥ 3:1. D'où **deux**
+jetons de trait, à ne pas confondre : `--border` ne fait que séparer des zones (décoratif, ~1,6:1)
+tandis que `--border-strong` identifie un bouton, un champ ou un sélecteur — les fondre rendait un
+bouton indiscernable de son fond (1,3:1, constaté). Un fond accentué porte l'encre SOMBRE
+(`--accent-ink`) : l'accent étant clair pour ressortir du fond, du blanc dessus ne donnait que
+2,4:1. Toute nouvelle couleur se vérifie par le calcul WCAG avant d'être posée.
+
 **Règle** : `init(ctx)` doit retourner un `cleanup()` qui retire tout écouteur **global** (window/document) et met la boucle raylib en pause — sinon fuite/boucle fantôme au changement de vue.
 
 ## Syntaxe

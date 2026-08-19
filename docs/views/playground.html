@@ -9,14 +9,20 @@
   --bg:      #0f1117;
   --surface: #1a1d2e;
   --surface2:#242742;
-  --border:  #2e3150;
-  --text:    #c9d1e0;
-  --dim:     #7c85a2;
-  --accent:  #7c83ff;
+  --border:  #3a3f63;
+  --text:    #dde4ef;
+  --dim:     #a3adc4;
+  --accent:  #9ba1ff;
+  /* Encre posée SUR une surface accentuée : l'accent est clair pour ressortir du fond
+     sombre, si bien que du blanc dessus ne donnait que 2,4:1 — illisible. */
+  --accent-ink: #0f1117;
+  /* Contour d'un élément INTERACTIF (bouton, champ, sélecteur), à distinguer de --border
+     qui ne sépare que des zones : 3,6:1 contre la surface, comme l'exige un composant. */
+  --border-strong: #6b70ab;
   --green:   #4ade80;
   --red:     #f87171;
   --yellow:  #fbbf24;
-  --blue:    #3b82f6;
+  --blue:    #5b9bff;
   --mono:    'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
 }
 
@@ -62,7 +68,7 @@ body.kbd-editing #toolbar { display: none; }
 
 #examples {
   background: var(--surface2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   color: var(--text);
   font-size: 12px;
   padding: 4px 8px;
@@ -88,7 +94,7 @@ body.kbd-editing #toolbar { display: none; }
   gap: 6px;
   height: 32px;   /* alignée sur les boutons de barre (app-bar.css) */
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 0 14px;
@@ -246,7 +252,7 @@ canvas#canvas {
   min-width: 38px;
   padding: 5px 0;
   background: var(--surface2);
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
   color: var(--text);
   font-family: var(--mono);
@@ -255,10 +261,10 @@ canvas#canvas {
   line-height: 1;
   cursor: pointer;
 }
-.kbar-key:active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.kbar-key:active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 /* Bouton Exécuter : poussé à l'extrême droite (margin auto), accent — la barre
    d'outils étant masquée en saisie, il permet de lancer sans fermer le clavier. */
-.kbar-run { margin-left: auto; background: var(--accent); color: #fff; border-color: transparent; padding: 5px 14px; }
+.kbar-run { margin-left: auto; background: var(--accent); color: var(--accent-ink); border-color: transparent; padding: 5px 14px; }
 
 /* ── Popup d'aide (raccourcis) ──────────────────────────────────────────────── */
 #help-overlay {
@@ -391,7 +397,7 @@ canvas#canvas {
 .menu-info a { color: var(--accent); text-decoration: none; }
 .menu-info code { font-family: var(--mono); color: var(--text); font-size: 11px; }
 .menu-input {
-  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  background: var(--bg); border: 1px solid var(--border-strong); color: var(--text);
   border-radius: 6px; padding: 7px 9px; font-size: 12px; font-family: var(--mono); outline: none;
 }
 .menu-input:focus { border-color: var(--accent); }
@@ -400,7 +406,7 @@ canvas#canvas {
   cursor: pointer; user-select: none;
 }
 .menu-btn {
-  background: var(--accent); color: #fff; border: none; border-radius: 6px;
+  background: var(--accent); color: var(--accent-ink); border: none; border-radius: 6px;
   padding: 7px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
 .menu-btn:disabled { opacity: 0.6; cursor: default; }

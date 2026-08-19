@@ -8,8 +8,8 @@ export const CODE_DISPLAY = {
   '.cm-line': { padding: '0 9px 4px', lineHeight: '1.12' },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 4px', minWidth: '1.8em', fontSize: '11.5px', userSelect: 'none' },
   '.cm-foldGutter .cm-gutterElement': { padding: '0', color: '#566089', cursor: 'pointer' },
-  '.cm-foldGutter .cm-gutterElement:hover': { color: '#7c83ff' },
-  '.cm-foldPlaceholder': { background: '#242742', border: '1px solid #2e3150', color: '#7c85a2', borderRadius: '4px', padding: '0 6px', margin: '0 2px' },
+  '.cm-foldGutter .cm-gutterElement:hover': { color: '#9ba1ff' },
+  '.cm-foldPlaceholder': { background: '#242742', border: '1px solid #3a3f63', color: '#a3adc4', borderRadius: '4px', padding: '0 6px', margin: '0 2px' },
 }
 
 // Règles de thème STRICTEMENT identiques entre les deux vues (ligne active,
@@ -17,8 +17,8 @@ export const CODE_DISPLAY = {
 // (un changement de teinte de sélection/caret ne se fait plus qu'ici).
 export const CODE_THEME_BASE = {
   '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
-  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#7c85a2' },
-  '&.cm-focused .cm-cursor': { borderLeftColor: '#7c83ff', borderLeftWidth: '2px' },
+  '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#a3adc4' },
+  '&.cm-focused .cm-cursor': { borderLeftColor: '#9ba1ff', borderLeftWidth: '2px' },
   '.cm-selectionBackground': { background: 'rgba(255,255,255,0.18) !important' },
   '&.cm-focused .cm-selectionBackground': { background: 'rgba(255,255,255,0.25) !important' },
 }
