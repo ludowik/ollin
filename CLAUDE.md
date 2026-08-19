@@ -252,20 +252,34 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
   ⚠ Le conteneur distant part d'un **clone superficiel** (`.git/shallow`, ~60 commits) :
   `git fetch --unshallow origin` est nécessaire avant toute mesure d'histoire, sinon
   l'historique du moteur paraît ne compter que trois ou quatre commits.
-- **Ce que la dérive vaut réellement (10 jalons moteur, 24/07 → 18/08)** : le travail bouge
-  dans les DEUX sens et il faut le mesurer, jamais le supposer. Chaque fonctionnalité coûte
-  entre +0,4 % et +1,8 % sur `fib` (expansion de `...`, inline cache, variable par
-  itération), et les commits d'optimisation reprennent davantage (−5,5 % pour la clé `len`
-  comparée par pointeur). Bilan net sur le mois : **−3,8 % sur `fib`, −2,6 % sur la boucle
-  et sur la map**. Il n'y a donc pas de dette qui s'accumule, mais ce n'est pas parce que
-  rien ne bouge — c'est parce que les gains ont dépassé les coûts.
-- **Ce que la dérive vaut réellement (10 jalons moteur, 24/07 → 18/08)** : le travail bouge
-  dans les DEUX sens et il faut le mesurer, jamais le supposer. Chaque fonctionnalité coûte
-  entre +0,4 % et +1,8 % sur `fib` (expansion de `...`, inline cache, variable par
-  itération), et les commits d'optimisation reprennent davantage (−5,5 % pour la clé `len`
-  comparée par pointeur). Bilan net sur le mois : **−3,8 % sur `fib`, −2,6 % sur la boucle
-  et sur la map**. Il n'y a donc pas de dette qui s'accumule, mais ce n'est pas parce que
-  rien ne bouge — c'est parce que les gains ont dépassé les coûts.
+- **Ce que la dérive vaut réellement — mesuré sur les 34 journées de commits moteur du
+  20/06 au 18/08** (une journée sur deux mois entiers, `bench/icount.sh`) :
+
+  | | 20/06 | 18/08 | bilan |
+  |---|---|---|---|
+  | `fib` | 121 470 752 | 97 753 231 | **−19,5 %** |
+  | boucle | 112 555 011 | 32 603 058 | **−71,0 %** (÷3,4) |
+  | map | 101 653 234 | 52 997 247 | **−47,9 %** (÷1,9) |
+
+  Le travail bouge dans les DEUX sens, et fortement : il faut le mesurer, jamais le
+  supposer. Hausses réelles constatées — +9,4 % (`switch`), +7,7 % (suppression de
+  `T_MODULE`), +4,6 % (globales `W`/`H`), +1,8 % (expansion de `...`, `CW`/`CH`), +0,6 %
+  (inline cache, variable par itération). Gains — **−67 % sur la boucle** (chemin rapide
+  `FOR_PREP`/`FOR_LOOP` + compteur de tours), −35 % sur la map (`StringTable` robin_hood),
+  −8 % sur `fib` (clés calculées), −5,5 % (clé `len` par pointeur). Il n'y a donc aucune
+  dette qui s'accumule, et surtout pas parce que « rien ne bouge » : les gains ont
+  largement dépassé les coûts.
+- **Limite de méthode à énoncer avec tout tableau d'histoire** : un jalon par JOURNÉE
+  mesure l'état en fin de journée, donc l'écart cumule TOUS les commits du jour et le sujet
+  affiché (le dernier) n'en porte ni le mérite ni le blâme. Exemple vérifié : le −67 % de la
+  boucle apparaît sous « renuméroter les tags », un commit de 34 lignes dans `value.h` qui
+  annonçait « loop neutre » — l'intervalle contenait quatorze commits, dont le chemin rapide
+  du `for` numérique. Attribuer un écart à un commit précis demande de mesurer CE commit.
+- **Jusqu'où on peut remonter (sondé)** : le dépôt part du 12/06/2026, mais la borne n'est
+  pas git — c'est le LANGAGE. Au 12/06 la cible s'appelle `tau` (renommage ultérieur) et
+  refuse `<=`, `for i = 1, n` et les maps ; du 13 au 18/06 seul `fib` s'exécute ; **à partir
+  du 20/06 les trois scripts passent**. Le 19/06 part en *segmentation fault* sur `fib`, et
+  le 25/06 ne compile pas : deux trous inévitables dans une série qui traverse ces dates.
 
 ## Tests graphiques — DEUX chaînes qui MARCHENT (ne pas conclure « cassé »)
 
