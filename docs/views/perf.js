@@ -50,7 +50,9 @@ export async function init(ctx) {
 
   const JALONS = doc.jalons;
   const SERIES = doc.scripts.map(s => ({ id: s.id, nom: s.nom, classe: "s-" + s.id, css: "--s-" + s.id }));
-  const connu = j => j[SERIES[0].id] !== null;
+  // TOUTES les séries doivent être présentes : n'en tester qu'une laisserait `montrer()`
+  // calculer y(null) pour les autres, donc des coordonnées NaN sans message.
+  const connu = j => SERIES.every(s => typeof j[s.id] === "number");
   const premier = JALONS.find(connu);
   const dernier = [...JALONS].reverse().find(connu);
   const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
@@ -122,6 +124,11 @@ export async function init(ctx) {
     document.addEventListener("pointerdown", h, true);
     horsGraphe.push(h);
   }
+
+  // Le dernier dessin publie ici ses fonctions de survol ; les écouteurs, eux, sont posés
+  // une fois pour toutes après le premier dessin.
+  let survolCourbes = null;
+  let survolEcarts = null;
 
   // ── courbes ───────────────────────────────────────────────────────────────
   function dessinerCourbes(w) {
@@ -251,14 +258,16 @@ export async function init(ctx) {
       viseur.setAttribute("opacity", 0);
       vider(points);
     };
-    svgCourbes.addEventListener("pointermove", viser);
-    svgCourbes.addEventListener("pointerdown", viser);
-    svgCourbes.addEventListener("pointerleave", ev => { if (ev.pointerType === "mouse") effacer(); });
-    svgCourbes.addEventListener("pointercancel", effacer);
-    fermerAilleurs(svgCourbes, effacer);
+    // L'état de CE dessin, relu par les écouteurs posés une seule fois (plus bas).
+    survolCourbes = { viser: viser, effacer: effacer };
   }
 
   // ── écarts d'un jalon au suivant ──────────────────────────────────────────
+  // La série détaillée est la PREMIÈRE du fichier de données, pas un « fib » câblé ici :
+  // renommer une série dans le JSON aurait sinon donné des barres NaN, sans erreur.
+  const SERIE_ECARTS = SERIES[0];
+  document.getElementById("serie-ecarts").textContent = SERIE_ECARTS.id;
+
   function dessinerEcarts(w) {
     const petit = w < 560;
     const h = petit ? Math.round(w * 0.62) : 300;
@@ -274,9 +283,12 @@ export async function init(ctx) {
     JALONS.forEach(j => {
       if (!connu(j)) return;
       if (avant !== null) {
-        pts.push({ date: jourMois(j.date), commit: j.commit, sujet: j.sujet, v: (j.fib - avant) / avant * 100 });
+        pts.push({
+          date: jourMois(j.date), commit: j.commit, sujet: j.sujet,
+          v: (j[SERIE_ECARTS.id] - avant) / avant * 100,
+        });
       }
-      avant = j.fib;
+      avant = j[SERIE_ECARTS.id];
     });
 
     const borne = Math.max(10, Math.ceil(Math.max(...pts.map(p => Math.abs(p.v))) / 4) * 4);
@@ -327,7 +339,7 @@ export async function init(ctx) {
         const b = document.createElement("b");
         b.textContent = pct(p.v);
         const s = document.createElement("s");
-        s.textContent = "sur fib";
+        s.textContent = "sur " + SERIE_ECARTS.id;
         ligne.append(b, s);
         const su = document.createElement("div");
         su.className = "sujet";
@@ -346,10 +358,10 @@ export async function init(ctx) {
       marques.append(barre, zone);
     });
     svgEcarts.append(marques);
-    fermerAilleurs(svgEcarts, () => {
+    survolEcarts = { effacer: () => {
       barres.forEach(b => b.removeAttribute("opacity"));
       masquer();
-    });
+    } };
     // ligne de base par-dessus les barres, mais transparente au pointeur : sinon elle
     // vole le survol exactement sur son axe.
     svgEcarts.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(0), y2: y(0), class: "zero" }));
@@ -420,10 +432,23 @@ export async function init(ctx) {
     dessinerCourbes(w);
     dessinerEcarts(largeurUtile(svgEcarts));
   }
+  // Écouteurs de survol posés UNE seule fois, sur des éléments qui ne sont jamais
+  // remplacés : ils délèguent au dernier dessin publié.
+  const viserCourbes = ev => { if (survolCourbes) survolCourbes.viser(ev); };
+  const quitterCourbes = ev => {
+    if (survolCourbes && ev.pointerType === "mouse") survolCourbes.effacer();
+  };
+  const annulerCourbes = () => { if (survolCourbes) survolCourbes.effacer(); };
   const surRotation = () => setTimeout(redessiner, 120);
   let observateur = null;
   try {
     redessiner();
+    svgCourbes.addEventListener("pointermove", viserCourbes);
+    svgCourbes.addEventListener("pointerdown", viserCourbes);
+    svgCourbes.addEventListener("pointerleave", quitterCourbes);
+    svgCourbes.addEventListener("pointercancel", annulerCourbes);
+    fermerAilleurs(svgCourbes, annulerCourbes);
+    fermerAilleurs(svgEcarts, () => { if (survolEcarts) survolEcarts.effacer(); });
     addEventListener("resize", redessiner);
     addEventListener("orientationchange", surRotation);
     if (window.ResizeObserver) {
