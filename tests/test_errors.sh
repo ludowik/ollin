@@ -309,6 +309,56 @@ check_error "compound assignment on a boolean" \
 b *= 2' \
     "expected number, got boolean"
 
+# ── tween.sequence ─────────────────────────────────────────────────────────────
+# Une clé inconnue est REFUSÉE avec la liste des clés admises : sans ce refus, un
+# `duration` ou un `easing` mal choisi serait ignoré en silence et l'étape partirait sans
+# durée. C'est la faute qu'on cherche le plus longtemps.
+
+check_error "tween.sequence with an unknown step key" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, duration: 1}])' \
+    "clé inconnue 'duration'"
+
+check_error "tween.sequence with an empty list" \
+    'global o = {x: 0}
+tween.sequence(o, [])' \
+    "séquence est vide"
+
+check_error "tween.sequence with a step that is not a map" \
+    'global o = {x: 0}
+tween.sequence(o, [3])' \
+    "doit être une map"
+
+check_error "tween.sequence with a missing delay" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}}])' \
+    "manquant ou <= 0"
+
+check_error "tween.sequence with a negative delay" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, delay: -1}])' \
+    "manquant ou <= 0"
+
+check_error "tween.sequence with a non-numeric delay" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, delay: "vite"}])' \
+    "doit être un nombre de secondes"
+
+check_error "tween.sequence with an absent field" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {absent: 1}, delay: 1}])' \
+    "est absent de l'objet"
+
+check_error "tween.sequence with a list that is not an array" \
+    'global o = {x: 0}
+tween.sequence(o, {to: {x: 1}})' \
+    "tableau d'étapes"
+
+check_error "tween.sequence with an unknown curve" \
+    'global o = {x: 0}
+tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "aucune"}])' \
+    "courbe inconnue"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

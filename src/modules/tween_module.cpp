@@ -185,26 +185,38 @@ struct Chan {
     bool integral = false;   // départ ET cible entiers → on arrondit (pas de dérive en float)
 };
 
-// Plan de LECTURE : un segment par parcours de l'animation, +1 dans le sens déclaré,
+// Une ÉTAPE de la suite : les canaux qu'elle anime, sa durée et sa courbe. Une étape sans
+// canal est une attente pure (`{delay: 0.2}` dans une séquence). `tween.to` et `tween.value`
+// créent une suite d'UNE étape : tout le module ne connaît donc qu'un seul chemin, et une
+// séquence n'est pas un cas particulier.
+struct Etape {
+    std::vector<Chan> chans;
+    bool attente = false;   // étape déclarée sans `to` : elle ne fait que laisser passer du temps
+    bool demarree = false;  // bornes déjà lues ? (au PREMIER passage seulement — un retour
+                            // rejoue les mêmes bornes, sinon il ne va nulle part)
+    double dur = 0.0;
+    int curve = k_curve_default;
+    Value curve_fn;   // courbe fournie par le script (prioritaire sur `curve`)
+};
+
+// Plan de LECTURE : un segment par parcours de la SUITE, +1 dans le sens déclaré,
 // -1 en arrière. `repeat(n)` répète la liste ; son second paramètre y ajoute le miroir de
 // tout le plan (liste renversée, sens inversés). Deux appels COMPOSENT, chacun agissant sur
 // le plan construit jusque-là, donc l'ordre compte :
 //   .repeat(2)                    → +1 +1          (deux allers)
 //   .repeat(2, true)              → +1 +1 -1 -1    (deux allers, puis les deux retours)
 //   .repeat(nil, true).repeat(2)  → +1 -1 +1 -1    (deux allers-retours)
-// Un plan vide n'existe pas : tout tween démarre avec un segment.
+// Un plan vide n'existe pas : tout tween démarre avec un segment. Un segment de sens -1
+// rejoue les étapes en ordre INVERSE, chacune à l'envers.
 struct Tw {
-    std::vector<Chan> chans;
+    std::vector<Etape> etapes;
+    size_t pos = 0;      // étape en cours, comptée dans l'ordre du segment courant
     std::vector<int8_t> plan{1};
     size_t seg = 0;      // segment en cours dans le plan
     bool endless = false;   // le plan est rejoué sans fin (loop)
-    double dur = 0.0;
     double elapsed = 0.0;
     double delay = 0.0;
-    int curve = k_curve_default;
-    Value curve_fn;   // courbe fournie par le script (prioritaire sur `curve`)
     Value on_done;
-    bool started = false;
     bool paused = false;
     bool alive = false;
     uint64_t born_pass = 0;   // passe d'avancement où le tween est né (cf. advance)
@@ -222,6 +234,20 @@ bool s_engine_driven = false;
 uint64_t s_pass = 0;
 
 void advance(double dt);
+
+// Durée d'un parcours complet de la suite (identique dans les deux sens).
+double duree_cycle(const Tw& t) {
+    double d = 0.0;
+    for (const auto& e : t.etapes)
+        d += e.dur;
+    return d;
+}
+
+// Index RÉEL de la k-ième étape du segment courant : un segment de sens -1 rejoue la suite
+// en ordre inverse, donc la k-ième jouée est l'avant-dernière, etc.
+size_t etape_index(const Tw& t, size_t k) {
+    return t.plan[t.seg] > 0 ? k : t.etapes.size() - 1 - k;
+}
 
 bool tween_alive(int slot, uint32_t gen) {
     return slot >= 0 && slot < (int)s_tweens.size() && s_tweens[slot].alive && s_tweens[slot].gen == gen;
@@ -249,9 +275,8 @@ void free_tween(int slot) {
     Tw& t = s_tweens[slot];
     t.alive = false;
     t.gen++;
-    t.chans.clear();       // relâche les Value retenues : sans cela le module garderait
-    t.curve_fn = Value{};  // l'objet animé vivant longtemps après la fin de l'animation
-    t.on_done = Value{};
+    t.etapes.clear();      // relâche les Value retenues : sans cela le module garderait
+    t.on_done = Value{};   // l'objet animé vivant longtemps après la fin de l'animation
     s_free.push_back(slot);
 }
 
@@ -351,21 +376,30 @@ void drop_conflicts(const std::vector<Chan>& chans) {
     for (int i = 0; i < (int)s_tweens.size(); i++) {
         if (!s_tweens[i].alive)
             continue;
-        auto& mine = s_tweens[i].chans;
-        for (int c = (int)mine.size() - 1; c >= 0; c--) {
-            if (!is_object(mine[c].holder))
-                continue;
-            for (const auto& nc : chans) {
-                // Même champ = même objet (identité du Map*) ET même clé (chaînes internées
-                // → comparaison de pointeur suffisante, mais map_get reste explicite).
-                if (is_object(nc.holder) && mine[c].holder.as_map() == nc.holder.as_map() &&
-                    mine[c].key.is_string() && nc.key.is_string() && mine[c].key.as_string() == nc.key.as_string()) {
-                    mine.erase(mine.begin() + c);
-                    break;
+        bool reste = false;
+        for (auto& etape : s_tweens[i].etapes) {
+            auto& mine = etape.chans;
+            for (int c = (int)mine.size() - 1; c >= 0; c--) {
+                if (!is_object(mine[c].holder))
+                    continue;
+                for (const auto& nc : chans) {
+                    // Même champ = même objet (identité du Map*) ET même clé (chaînes
+                    // internées → comparaison de pointeur suffisante, mais map_get reste
+                    // explicite).
+                    if (is_object(nc.holder) && mine[c].holder.as_map() == nc.holder.as_map() &&
+                        mine[c].key.is_string() && nc.key.is_string() &&
+                        mine[c].key.as_string() == nc.key.as_string()) {
+                        mine.erase(mine.begin() + c);
+                        break;
+                    }
                 }
             }
+            // Une étape d'ATTENTE n'a légitimement aucun canal : elle compte comme du travail
+            // restant, sinon écraser un champ annulerait la séquence entière.
+            if (!mine.empty() || etape.attente)
+                reste = true;
         }
-        if (mine.empty())
+        if (!reste)
             free_tween(i);
     }
 }
@@ -432,10 +466,12 @@ int tween_to(CallCtx& ctx) {
     drop_conflicts(chans);
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
-    t.chans = std::move(chans);
-    t.dur = dur;
-    t.curve = curve;
-    t.curve_fn = curve_fn;
+    Etape e;
+    e.chans = std::move(chans);
+    e.dur = dur;
+    e.curve = curve;
+    e.curve_fn = curve_fn;
+    t.etapes.push_back(std::move(e));
     t.on_done = on_done;
     return ctx.ret(make_handle(slot));
 }
@@ -475,10 +511,110 @@ int tween_value(CallCtx& ctx) {
     drop_conflicts(chans);
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
-    t.chans = std::move(chans);
-    t.dur = dur;
-    t.curve = curve;
-    t.curve_fn = curve_fn;
+    Etape e;
+    e.chans = std::move(chans);
+    e.dur = dur;
+    e.curve = curve;
+    e.curve_fn = curve_fn;
+    t.etapes.push_back(std::move(e));
+    t.on_done = on_done;
+    return ctx.ret(make_handle(slot));
+}
+
+// tween.sequence(objet, [ {to: {champ: cible}, delay: secondes [, curve: nom] [, target: objet]}, … ])
+//
+// Une SUITE d'étapes jouées l'une après l'autre. La clé de temps est `delay` dans les deux
+// rôles : durée de l'animation quand l'étape porte `to`, simple attente sinon — une seule clé
+// de temps, dont le sens se lit à la présence de `to`.
+//
+// Toute clé inconnue est REFUSÉE avec la liste des clés admises : sans ce refus, un
+// `duration` ou un `easing` mal choisi serait ignoré en silence et l'étape partirait sans
+// durée. C'est la faute qu'on cherche le plus longtemps.
+int tween_sequence(CallCtx& ctx) {
+    static constexpr const char* FN = "tween.sequence";
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc < 2)
+        throw std::runtime_error(std::string(FN) + ": expected objet, [étapes]");
+    if (!is_object(args[0]))
+        throw std::runtime_error(std::string(FN) + ": le premier argument doit être un objet");
+    if (!args[1].is_array())
+        throw std::runtime_error(std::string(FN) + ": le deuxième argument doit être un tableau d'étapes");
+    int64_t nb = args[1].array_size();
+    if (nb == 0)
+        throw std::runtime_error(std::string(FN) + ": la séquence est vide");
+
+    Value on_done;
+    {
+        int curve_ignore = k_curve_default;
+        Value curve_fn_ignore;
+        read_options(args, argc, 2, curve_ignore, curve_fn_ignore, on_done, FN);
+        if (!curve_fn_ignore.is_nil())
+            on_done = curve_fn_ignore;   // une seule fonction attendue ici : le rappel de fin
+        if (curve_ignore != k_curve_default)
+            throw std::runtime_error(std::string(FN) + ": la courbe se déclare par étape (clé `curve`)");
+    }
+
+    std::vector<Etape> etapes;
+    for (int64_t k = 1; k <= nb; k++) {   // tableaux Ollin : indexés à 1
+        Value brut = args[1].array_get(k);
+        const std::string ou = std::string(FN) + ": étape " + std::to_string(k);
+        if (!brut.is_map())
+            throw std::runtime_error(ou + " doit être une map {to: …, delay: …}");
+        Value cible = args[0], vers, courbe;
+        double delai = -1.0;
+        for (const auto& kv : brut.as_map()->data) {
+            if (!kv.first.is_string())
+                throw std::runtime_error(ou + " : les clés doivent être des noms");
+            const std::string& cle = kv.first.as_string();
+            if (cle == "to") {
+                vers = kv.second;
+            } else if (cle == "delay") {
+                if (!kv.second.is_number())
+                    throw std::runtime_error(ou + " : `delay` doit être un nombre de secondes");
+                delai = kv.second.as_num();
+            } else if (cle == "curve") {
+                courbe = kv.second;
+            } else if (cle == "target") {
+                cible = kv.second;
+            } else {
+                throw std::runtime_error(ou + " : clé inconnue '" + cle + "' — admises : to, delay, curve, target");
+            }
+        }
+        if (!(delai > 0.0))
+            throw std::runtime_error(ou + " : `delay` manquant ou <= 0");
+        Etape e;
+        e.dur = delai;
+        if (!courbe.is_nil()) {
+            if (courbe.is_string())
+                e.curve = curve_index(courbe.as_string(), FN);
+            else if (courbe.is_callable())
+                e.curve_fn = courbe;
+            else
+                throw std::runtime_error(ou + " : `curve` doit être un nom de courbe ou une fonction");
+        }
+        e.attente = vers.is_nil();
+        if (!vers.is_nil()) {
+            if (!is_object(cible))
+                throw std::runtime_error(ou + " : `target` doit être un objet");
+            if (!vers.is_map() || vers.map_size() == 0)
+                throw std::runtime_error(ou + " : `to` doit être une map {champ: cible} non vide");
+            for (const auto& kv : vers.as_map()->data) {
+                if (!kv.first.is_string())
+                    throw std::runtime_error(ou + " : les champs de `to` doivent être des noms");
+                Value cur = cible.map_get(kv.first);
+                if (cur.is_nil())
+                    throw std::runtime_error(ou + " : le champ '" + kv.first.as_string() + "' est absent de l'objet");
+                add_chan(e.chans, cible, kv.first, cur, kv.second, FN);
+            }
+            drop_conflicts(e.chans);
+        }
+        etapes.push_back(std::move(e));
+    }
+
+    int slot = alloc_tween();
+    Tw& t = s_tweens[slot];
+    t.etapes = std::move(etapes);
     t.on_done = on_done;
     return ctx.ret(make_handle(slot));
 }
@@ -554,12 +690,17 @@ int method_progress(CallCtx& ctx) {
     if (slot < 0)
         return ctx.ret(Value(1.0));
     const Tw& t = s_tweens[slot];
-    // Avancement sur le PLAN entier (segment courant compris) : un plan de quatre segments
-    // à mi-deuxième segment rend 0,375. Un plan sans fin rend l'avancement de son tour.
-    // Le segment courant est plafonné AVANT la division : le dernier dépasse sa durée en
-    // attendant la passe qui terminera le tween. Ensuite (base + p) / total ≤ 1 par
-    // construction, donc seul le plancher reste à poser (délai, temps négatif).
-    double p = t.dur > 0.0 ? std::min(t.elapsed / t.dur, 1.0) : 1.0;
+    // Avancement sur le PLAN entier, en TEMPS : les étapes d'une séquence n'ont pas la même
+    // durée, donc compter les étapes franchies donnerait une progression qui saute. Le
+    // dernier segment dépasse sa durée en attendant la passe qui terminera le tween, d'où le
+    // plafond avant la division ; ensuite (base + p) / total ≤ 1 par construction, et seul le
+    // plancher reste à poser (délai, temps négatif). Un plan sans fin rend l'avancement de
+    // son tour courant.
+    double cycle = duree_cycle(t);
+    double fait = 0.0;
+    for (size_t k = 0; k < t.pos && k < t.etapes.size(); k++)
+        fait += t.etapes[etape_index(t, k)].dur;
+    double p = cycle > 0.0 ? std::min((fait + t.elapsed) / cycle, 1.0) : 1.0;
     double total = t.endless ? 1.0 : (double)t.plan.size();
     double base = t.endless ? 0.0 : (double)t.seg;
     p = (base + p) / total;
@@ -658,6 +799,30 @@ void write_chan(const Chan& c, double v) {
     holder.map_set(c.key, out);
 }
 
+// Lit les valeurs de départ d'une étape, une seule fois : elle part de ce que l'étape
+// précédente a laissé. Aux passages suivants (répétition, marche arrière) les bornes sont
+// conservées, sinon un retour ne va nulle part.
+void demarrer_etape(Tw& t, size_t idx) {
+    if (t.etapes[idx].demarree)
+        return;
+    t.etapes[idx].demarree = true;
+    for (auto& c : t.etapes[idx].chans) {
+        Value cur = c.ref.is_map() ? ref_get(c.ref) : c.holder.map_get(c.key);
+        if (cur.is_number())
+            c.from = cur.as_num();
+    }
+}
+
+// Pose les canaux d'une étape à l'extrémité qu'elle vise, dans le sens du segment courant.
+// Appelée quand l'étape est franchie en un seul pas de temps : sans elle, une étape plus
+// courte que le pas ne laisserait aucune trace.
+void poser_fin_etape(Tw& t, size_t pos) {
+    int8_t sens = t.plan[t.seg];
+    std::vector<Chan> chans = t.etapes[etape_index(t, pos)].chans;
+    for (const auto& c : chans)
+        write_chan(c, sens > 0 ? c.to : c.from);
+}
+
 void advance(double dt) {
     if (dt <= 0.0 || s_tweens.empty())
         return;
@@ -678,55 +843,66 @@ void advance(double dt) {
                 step = -t.delay;   // le reliquat du pas sert à l'animation
                 t.delay = 0.0;
             }
-            // Valeur de départ relue AU DÉMARRAGE : le tween part de la valeur courante,
-            // pas de celle qu'avait la variable à la déclaration.
-            if (!t.started) {
-                t.started = true;
-                for (auto& c : t.chans) {
-                    Value cur = c.ref.is_map() ? ref_get(c.ref) : c.holder.map_get(c.key);
-                    if (cur.is_number())
-                        c.from = cur.as_num();
-                }
-            }
             t.elapsed += step;
         }
-        // Fin d'un segment : on passe au suivant en gardant le reliquat de temps, sinon une
-        // animation courte perdrait une fraction de seconde à chaque parcours.
+        // Fin d'une ÉTAPE : on passe à la suivante en gardant le reliquat de temps, sinon une
+        // animation courte perdrait une fraction de seconde à chaque parcours. Quand la suite
+        // est épuisée, le segment de plan suivant la rejoue (en sens inverse si -1).
         double p = 1.0;
         bool ends = true;      // dernier segment terminé → le tween a fini
-        bool seg_ends = true;  // segment courant terminé
+        bool seg_ends = true;  // étape courante terminée
         int8_t sens = 1;
+        size_t idx = 0;
         {
             Tw& t = s_tweens[i];
-            while (t.elapsed >= t.dur && t.dur > 0.0) {
-                if (t.seg + 1 < t.plan.size()) {
-                    t.seg++;
-                } else if (t.endless) {
-                    t.seg = 0;
-                } else {
+            while (true) {
+                double dur = t.etapes[etape_index(t, t.pos)].dur;
+                if (dur <= 0.0 || t.elapsed < dur)
                     break;
+                // Dernière étape du dernier segment : on sort SANS soustraire, en gardant
+                // elapsed >= dur. C'est ce dépassement qui dit « terminé » plus bas — le
+                // soustraire ferait croire au tween qu'il redémarre cette étape, et il
+                // réécrivait alors la valeur de DÉPART au lieu de la cible (constaté).
+                bool derniere = t.pos + 1 >= t.etapes.size() && t.seg + 1 >= t.plan.size() && !t.endless;
+                if (derniere)
+                    break;
+                // L'étape franchie est DÉMARRÉE puis POSÉE à son extrémité exacte avant
+                // qu'on la quitte : sinon une étape plus courte qu'un pas de temps serait
+                // sautée sans jamais lire ses bornes ni écrire sa cible.
+                demarrer_etape(t, etape_index(t, t.pos));
+                poser_fin_etape(t, t.pos);
+                t.elapsed -= dur;
+                if (t.pos + 1 < t.etapes.size()) {
+                    t.pos++;
+                } else if (t.seg + 1 < t.plan.size()) {
+                    t.seg++;
+                    t.pos = 0;
+                } else {
+                    t.seg = 0;   // sans fin : on rejoue le plan depuis son premier segment
+                    t.pos = 0;
                 }
-                t.elapsed -= t.dur;
             }
             sens = t.plan[t.seg];
-            if (t.elapsed < t.dur) {
-                p = t.elapsed / t.dur;
+            idx = etape_index(t, t.pos);
+            double dur = t.etapes[idx].dur;
+            if (t.elapsed < dur) {
+                p = dur > 0.0 ? t.elapsed / dur : 1.0;
                 seg_ends = false;
                 ends = false;
             }
+            demarrer_etape(t, idx);
         }
         // Écritures et rappel de courbe : ils exécutent du code Ollin (setter d'une `ref`,
         // courbe personnalisée), donc plus aucune référence à s_tweens ne doit survivre.
         {
-            std::vector<Chan> chans = s_tweens[i].chans;
-            Value curve_fn = s_tweens[i].curve_fn;
-            int curve = s_tweens[i].curve;
+            std::vector<Chan> chans = s_tweens[i].etapes[idx].chans;
+            Value curve_fn = s_tweens[i].etapes[idx].curve_fn;
+            int curve = s_tweens[i].etapes[idx].curve;
             double f = seg_ends ? 1.0 : eased(curve_fn, curve, p);
             for (const auto& c : chans) {
-                // Un segment de sens -1 se joue de la cible vers le départ. À la fin d'un
-                // segment on pose la valeur EXACTE de son extrémité : une courbe à
-                // dépassement (back, elastic) ne rend pas 1 en 1, et un arrondi
-                // laisserait 0,999.
+                // Un segment de sens -1 se joue de la cible vers le départ. À la fin d'une
+                // étape on pose la valeur EXACTE de son extrémité : une courbe à dépassement
+                // (back, elastic) ne rend pas 1 en 1, et un arrondi laisserait 0,999.
                 double a = sens > 0 ? c.from : c.to;
                 double b = sens > 0 ? c.to : c.from;
                 write_chan(c, seg_ends ? b : a + (b - a) * f);
@@ -760,6 +936,7 @@ void tween_reset() {
 Value make_tween_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("to")), Value::make_builtin(tween_to));
+    m.map_set(Value(std::string("sequence")), Value::make_builtin(tween_sequence));
     m.map_set(Value(std::string("value")), Value::make_builtin(tween_value));
     m.map_set(Value(std::string("update")), Value::make_builtin(tween_update));
     m.map_set(Value(std::string("cancelAll")), Value::make_builtin(tween_cancel_all));

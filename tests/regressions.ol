@@ -1282,4 +1282,88 @@ data.set("bf", nil)
 data.set("bn", nil)
 data.set("bs", nil)
 
+## ── tween.sequence : une suite d'étapes ──────────────────────────────────────
+## La clé de temps est `delay` dans les deux rôles : durée quand l'étape porte `to`,
+## attente sinon.
+var sqO = {x: 0, y: 0}
+var sqT = tween.sequence(sqO, [
+    {to: {x: 10}, delay: 1.0, curve: "linear"},
+    {delay: 0.5},
+    {to: {y: 20}, delay: 1.0, curve: "linear"},
+])
+tween.update(0.5)
+assert(sqO.x == 5 and sqO.y == 0)
+tween.update(0.5)
+assert(sqO.x == 10)
+tween.update(0.5)              ## l'attente ne bouge rien
+assert(sqO.x == 10 and sqO.y == 0)
+tween.update(1.0)
+assert(sqO.y == 20 and sqT.isDone())
+
+## La valeur de départ d'une étape est celle que la précédente a laissée, pas celle
+## qu'avait le champ à la déclaration de la séquence.
+var sqE = {v: 0}
+tween.sequence(sqE, [
+    {to: {v: 100}, delay: 1.0, curve: "linear"},
+    {to: {v: 150}, delay: 1.0, curve: "linear"},
+])
+tween.update(1.0)
+tween.update(0.5)
+assert(sqE.v == 125)
+tween.cancelAll()
+
+## Une étape peut changer d'objet par `target`.
+var sqA = {x: 0}
+var sqB = {x: 0}
+tween.sequence(sqA, [
+    {to: {x: 4}, delay: 1.0, curve: "linear"},
+    {target: sqB, to: {x: 8}, delay: 1.0, curve: "linear"},
+])
+tween.update(2.0)
+assert(sqA.x == 4 and sqB.x == 8)
+
+## `progress` court sur toute la suite, en TEMPS : compter les étapes franchies ferait
+## sauter la progression, les durées étant inégales.
+var sqP = {v: 0}
+var sqPT = tween.sequence(sqP, [
+    {to: {v: 1}, delay: 3.0, curve: "linear"},
+    {to: {v: 2}, delay: 1.0, curve: "linear"},
+])
+tween.update(2.0)
+assert(math.abs(sqPT.progress() - 0.5) < 0.001)
+sqPT.cancel()
+
+## `repeat` porte sur la suite ENTIÈRE, et l'aller-retour la rejoue à l'envers, chaque
+## étape inversée. Regression : un pas de temps plus grand qu'une étape la franchissait
+## sans lire ses bornes, et le retour repartait alors d'une valeur fausse.
+var sqR = {x: 0}
+tween.sequence(sqR, [
+    {to: {x: 10}, delay: 1.0, curve: "linear"},
+    {to: {x: 30}, delay: 1.0, curve: "linear"},
+]).repeat(nil, true)
+tween.update(2.0)              ## un seul pas pour tout l'aller
+assert(sqR.x == 30)
+tween.update(0.5)
+assert(sqR.x == 20)            ## retour : l'étape 2 rejouée de 30 vers 10
+tween.update(0.5)
+assert(sqR.x == 10)
+tween.update(1.0)
+assert(sqR.x == 0)             ## puis l'étape 1, de 10 vers 0
+tween.cancelAll()
+
+## Une attente seule est une séquence valide, et elle se termine.
+var sqW = {v: 5}
+var sqWT = tween.sequence(sqW, [{delay: 0.5}])
+tween.update(0.3)
+assert(sqW.v == 5 and not sqWT.isDone())
+tween.update(0.3)
+assert(sqWT.isDone())
+
+## Écrasement : un tween visant le même champ annule la séquence, comme pour tween.to.
+var sqX = {x: 0}
+tween.sequence(sqX, [{to: {x: 100}, delay: 1.0, curve: "linear"}])
+tween.to(sqX, {x: 50}, 1.0, "linear")
+tween.update(1.0)
+assert(sqX.x == 50 and tween.count() == 0)
+
 print("regressions ok")
