@@ -369,6 +369,18 @@ check_error "tween.sequence with an unknown curve" \
 tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "aucune"}])' \
     "courbe inconnue"
 
+check_error "tween.sequence with a tween as target" \
+    'global o = {x: 0}
+var inner = tween.sequence(o, [{to: {x: 1}, delay: 1}])
+tween.sequence(o, [{to: inner, delay: 1}])' \
+    "ne s'imbrique pas"
+
+check_error "tween.to on a tween handle" \
+    'global o = {x: 0}
+var t = tween.to(o, {x: 1}, 1)
+tween.to(t, {x: 1}, 1)' \
+    "ne peut pas être l'objet animé"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

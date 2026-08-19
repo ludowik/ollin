@@ -307,6 +307,16 @@ int handle_slot(const Value& self, const char* fn) {
     return (int)slot.as_int();
 }
 
+// Un handle de tween est une map comme une autre : sans ce test il serait pris pour l'objet
+// à animer, et le refus parlerait d'un champ '__class__' absent au lieu de dire ce qui est
+// réellement en cause (imbrication non prise en charge).
+bool is_tween_handle(const Value& v) {
+    if (!v.is_map())
+        return false;
+    Value cls = v.map_get(Value(std::string("__class__")));
+    return cls.is_class() && cls.as_map() == tween_class().as_map();
+}
+
 // ── Construction des canaux ─────────────────────────────────────────────────────
 
 bool is_object(const Value& v) {
@@ -408,6 +418,14 @@ void drop_conflicts(const std::vector<Chan>& chans) {
 // Canaux d'une table {champ: cible} vers un objet. Écrit deux fois auparavant (tween.to et
 // tween.sequence), avec le même message mot pour mot.
 void add_map_chans(std::vector<Chan>& out, const Value& objet, const Value& vers, const char* fn) {
+    // Les deux seules façons de passer un tween là où on attend des nombres. Sans ces deux
+    // tests le handle serait animé comme une map ordinaire, et le refus parlerait d'un champ
+    // '__class__' absent.
+    if (is_tween_handle(vers))
+        throw std::runtime_error(std::string(fn) +
+                                 ": un tween ne peut pas servir de cible — une séquence ne s'imbrique pas");
+    if (is_tween_handle(objet))
+        throw std::runtime_error(std::string(fn) + ": un tween ne peut pas être l'objet animé");
     for (const auto& kv : vers.as_map()->data) {
         if (!kv.first.is_string())
             throw std::runtime_error(std::string(fn) + ": les clés doivent être des noms de champs");
