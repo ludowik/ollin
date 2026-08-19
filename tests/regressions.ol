@@ -1421,6 +1421,26 @@ catch e
 end
 assert(osPerime and osNeuf.freq() == 300)
 
+## Enveloppe : portée par l'oscillateur, pas par un objet séparé (p5 en a un parce qu'il
+## peut moduler n'importe quel paramètre ; ici la cible est unique). La lecture rend une map.
+var osE = sound.sine(440)
+assert(osE.envelope().attack == 0.01 and osE.envelope().sustain == 0.7)
+assert(osE.envelope(0.02, 0.1, 0.5, 0.3) == osE)
+var envE = osE.envelope()
+assert(envE.attack == 0.02 and envE.decay == 0.1 and envE.sustain == 0.5 and envE.release == 0.3)
+
+## trigger rend la voix audible, release la lâche — l'extinction, elle, appartient au
+## mélangeur (donc au navigateur : le conteneur d'intégration n'a pas de sortie). La forme
+## de la courbe est vérifiée par les tampons, qui appliquent la MÊME fonction.
+assert(not osE.isPlaying())
+assert(osE.trigger(0.2) == osE and osE.isPlaying())
+assert(osE.release() == osE)
+
+## Sans enveloppe, un oscillateur se comporte comme avant son introduction : start/stop seuls.
+var osSansE = sound.saw(100)
+assert(osSansE.start().isPlaying())
+osSansE.stop()
+
 ## ── Module audio (session) ──────────────────────────────────────────────────────
 ## Le module existe TOUJOURS, même sans périphérique : la génération d'ondes est un pur
 ## calcul, et la suite tourne dans un conteneur sans carte son. Seule la sortie est muette.

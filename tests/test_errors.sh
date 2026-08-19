@@ -420,6 +420,22 @@ end
 vieux.freq()' \
     "existe plus"
 
+check_error "sound.envelope with a negative time" \
+    'sound.sine(440).envelope(-1, 0.1, 0.5, 0.1)' \
+    "aucune valeur ne peut être négative"
+
+check_error "sound.envelope with a sustain above 1" \
+    'sound.sine(440).envelope(0.1, 0.1, 5, 0.1)' \
+    "le maintien est un niveau"
+
+check_error "sound.envelope with too few values" \
+    'sound.sine(440).envelope(0.1, 0.1)' \
+    "attendu attaque, déclin, maintien, relâchement"
+
+check_error "sound.trigger with a zero duration" \
+    'sound.sine(440).trigger(0)' \
+    "la durée doit être > 0"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

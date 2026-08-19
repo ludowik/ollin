@@ -77,11 +77,14 @@ int make_osc(const Value* args, int argc, const char* fn, int shape_forced) {
     v.born = ++s_born_counter;
     v.active.store(false, std::memory_order_relaxed);
     v.shape.store(shape, std::memory_order_relaxed);
-    v.freq.store((float)(hz < 0.0 ? 440.0 : hz), std::memory_order_relaxed);
-    v.volume.store(0.5f, std::memory_order_relaxed);
-    v.pan.store(0.0f, std::memory_order_relaxed);
+    v.freq.store(hz < 0.0 ? 440.0 : hz, std::memory_order_relaxed);
+    v.volume.store(0.5, std::memory_order_relaxed);
+    v.pan.store(0.0, std::memory_order_relaxed);
     v.gain = 0.0f;
     v.phase = 0.0;
+    v.env_used.store(false, std::memory_order_relaxed);
+    v.gate.store(false, std::memory_order_relaxed);
+    v.env_hold.store(-1.0, std::memory_order_relaxed);
     return slot;
 }
 
@@ -122,8 +125,8 @@ int method_freq(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.freq");
     double hz = sound_check_freq(ctx.args + 1, ctx.argc - 1, 0, "sound.freq");
     if (hz < 0.0)
-        return ctx.ret(Value((double)voices()[i].freq.load(std::memory_order_relaxed)));
-    voices()[i].freq.store((float)hz, std::memory_order_relaxed);
+        return ctx.ret(Value(voices()[i].freq.load(std::memory_order_relaxed)));
+    voices()[i].freq.store(hz, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }
 
@@ -131,8 +134,8 @@ int method_volume(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.volume");
     double v = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.volume", "le volume", 0.0);
     if (v < -1.0)
-        return ctx.ret(Value((double)voices()[i].volume.load(std::memory_order_relaxed)));
-    voices()[i].volume.store((float)v, std::memory_order_relaxed);
+        return ctx.ret(Value(voices()[i].volume.load(std::memory_order_relaxed)));
+    voices()[i].volume.store(v, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }
 
@@ -140,8 +143,8 @@ int method_pan(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.pan");
     double p = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.pan", "le panoramique", -1.0);
     if (p < -1.5)
-        return ctx.ret(Value((double)voices()[i].pan.load(std::memory_order_relaxed)));
-    voices()[i].pan.store((float)p, std::memory_order_relaxed);
+        return ctx.ret(Value(voices()[i].pan.load(std::memory_order_relaxed)));
+    voices()[i].pan.store(p, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }
 
@@ -151,6 +154,53 @@ int method_shape(CallCtx& ctx) {
         return ctx.ret(Value(std::string(sound_shape_name(voices()[i].shape.load(std::memory_order_relaxed)))));
     voices()[i].shape.store(sound_check_shape(ctx.args + 1, ctx.argc - 1, 0, "sound.shape"),
                             std::memory_order_relaxed);
+    return ctx.ret(ctx.args[0]);
+}
+
+// L'enveloppe est portée par l'oscillateur, et non par un objet séparé comme dans p5 : là
+// elle peut moduler n'importe quel paramètre de Web Audio, ici elle n'a qu'une cible — le
+// volume d'une voix. Un second type de handle n'apporterait donc rien à retenir.
+int method_envelope(CallCtx& ctx) {
+    int i = handle_slot(ctx.args[0], "sound.envelope");
+    Voice& v = voices()[i];
+    if (ctx.argc < 2) {
+        Value m = Value::make_map();
+        m.map_set(Value(std::string("attack")), Value(v.env_attack.load(std::memory_order_relaxed)));
+        m.map_set(Value(std::string("decay")), Value(v.env_decay.load(std::memory_order_relaxed)));
+        m.map_set(Value(std::string("sustain")), Value(v.env_sustain.load(std::memory_order_relaxed)));
+        m.map_set(Value(std::string("release")), Value(v.env_release.load(std::memory_order_relaxed)));
+        return ctx.ret(m);
+    }
+    sound_check_envelope(ctx.args + 1, ctx.argc - 1, "sound.envelope");
+    v.env_attack.store(ctx.args[1].as_num(), std::memory_order_relaxed);
+    v.env_decay.store(ctx.args[2].as_num(), std::memory_order_relaxed);
+    v.env_sustain.store(ctx.args[3].as_num(), std::memory_order_relaxed);
+    v.env_release.store(ctx.args[4].as_num(), std::memory_order_relaxed);
+    v.env_used.store(true, std::memory_order_relaxed);
+    return ctx.ret(ctx.args[0]);
+}
+
+// trigger([durée]) — joue la note. Sans durée elle est TENUE jusqu'à release() ; avec, le
+// relâchement part tout seul à l'échéance, ce qui suffit pour un bip ou une note de mélodie.
+int method_trigger(CallCtx& ctx) {
+    int i = handle_slot(ctx.args[0], "sound.trigger");
+    double hold = sound_check_hold(ctx.args + 1, ctx.argc - 1, "sound.trigger");
+    Voice& v = voices()[i];
+    v.env_used.store(true, std::memory_order_relaxed);
+    v.env_hold.store(hold, std::memory_order_relaxed);
+    v.gate.store(true, std::memory_order_relaxed);
+    // Le compteur est incrémenté EN DERNIER : c'est lui que le mélangeur observe pour
+    // repartir de l'attaque, et il doit trouver les autres paramètres déjà posés.
+    v.trigger_id.fetch_add(1, std::memory_order_relaxed);
+    audio_wake();
+    sound_output_ensure();
+    v.active.store(true, std::memory_order_relaxed);
+    return ctx.ret(ctx.args[0]);
+}
+
+int method_release(CallCtx& ctx) {
+    int i = handle_slot(ctx.args[0], "sound.release");
+    voices()[i].gate.store(false, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }
 
@@ -164,6 +214,9 @@ Value make_osc_class() {
     cls.map_set(Value(std::string("volume")), Value::make_builtin(method_volume));
     cls.map_set(Value(std::string("pan")), Value::make_builtin(method_pan));
     cls.map_set(Value(std::string("shape")), Value::make_builtin(method_shape));
+    cls.map_set(Value(std::string("envelope")), Value::make_builtin(method_envelope));
+    cls.map_set(Value(std::string("trigger")), Value::make_builtin(method_trigger));
+    cls.map_set(Value(std::string("release")), Value::make_builtin(method_release));
     return cls;
 }
 

@@ -63,15 +63,43 @@ void mix_callback(void* buffer, unsigned int frames) {
         // l'arrêt claque.
         if (!actif && v.gain <= 0.0f)
             continue;
-        float cible = actif ? v.volume.load(std::memory_order_relaxed) : 0.0f;
+        float volume = (float)v.volume.load(std::memory_order_relaxed);
+        float cible = actif ? volume : 0.0f;
         int shape = v.shape.load(std::memory_order_relaxed);
-        double avance = (double)v.freq.load(std::memory_order_relaxed) * pas_temps;
-        float pan = v.pan.load(std::memory_order_relaxed);
+        double avance = v.freq.load(std::memory_order_relaxed) * pas_temps;
+        float pan = (float)v.pan.load(std::memory_order_relaxed);
+        // Enveloppe : lue une fois par bloc. La faire varier au sein d'un bloc n'apporterait
+        // rien — 23 ms séparent deux blocs, soit moins qu'une frame.
+        bool env_used = v.env_used.load(std::memory_order_relaxed);
+        Adsr env;
+        if (env_used) {
+            env.attack = v.env_attack.load(std::memory_order_relaxed);
+            env.decay = v.env_decay.load(std::memory_order_relaxed);
+            env.sustain = v.env_sustain.load(std::memory_order_relaxed);
+            env.release = v.env_release.load(std::memory_order_relaxed);
+            uint32_t tid = v.trigger_id.load(std::memory_order_relaxed);
+            if (tid != v.seen_trigger) {
+                v.seen_trigger = tid;
+                v.env_t = 0.0;
+                double hold = v.env_hold.load(std::memory_order_relaxed);
+                v.env_hold_at = hold >= 0.0 ? hold : -1.0;
+            }
+            // Lâcher demandé par le script : l'instant est figé ici, car le relâchement part
+            // du niveau atteint À CE MOMENT et non du niveau de maintien.
+            if (!v.gate.load(std::memory_order_relaxed) && v.env_hold_at < 0.0)
+                v.env_hold_at = v.env_t;
+        }
         // Panoramique sans creux au centre : chaque côté reste à plein volume tant qu'on
         // n'a pas dépassé le milieu.
         float g_gauche = pan > 0.0f ? 1.0f - pan : 1.0f;
         float g_droite = pan < 0.0f ? 1.0f + pan : 1.0f;
         for (unsigned int i = 0; i < frames; i++) {
+            if (env_used && actif) {
+                cible = volume * (float)adsr_level(env, v.env_t, v.env_hold_at);
+                v.env_t += pas_temps;
+            }
+            // Le lissage s'applique PAR-DESSUS l'enveloppe : une attaque nulle serait sinon
+            // un saut, donc un clic. Cinq millisecondes ne s'entendent pas comme un fondu.
             v.gain += (cible - v.gain) * lissage;
             float s = wave_sample(shape, v.phase, v.noise_state) * v.gain;
             out[i * 2] += s * g_gauche;
@@ -80,6 +108,10 @@ void mix_callback(void* buffer, unsigned int frames) {
             if (v.phase >= 1.0)
                 v.phase -= 1.0;
         }
+        // Une note relâchée cesse d'occuper la voix : sans cela un programme qui déclenche
+        // des notes épuiserait la table, chaque voix restant marquée « en train de sonner ».
+        if (env_used && actif && adsr_finished(env, v.env_t, v.env_hold_at))
+            v.active.store(false, std::memory_order_relaxed);
         if (!actif && v.gain < 0.0001f)
             v.gain = 0.0f;
     }

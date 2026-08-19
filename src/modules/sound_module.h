@@ -72,6 +72,31 @@ inline int sound_check_shape(const Value* args, int argc, int i, const char* fn)
     return sound_shape_index(args[i].as_string(), fn);
 }
 
+// Enveloppe : quatre nombres, dont trois durées en secondes et un niveau de maintien dans
+// [0;1]. Une durée négative est refusée — c'est une faute de frappe, pas une intention.
+inline void sound_check_envelope(const Value* args, int argc, const char* fn) {
+    if (argc < 4)
+        throw std::runtime_error(std::string(fn) + ": attendu attaque, déclin, maintien, relâchement");
+    for (int i = 0; i < 4; i++) {
+        if (!args[i].is_number())
+            throw std::runtime_error(std::string(fn) + ": les quatre valeurs doivent être des nombres");
+        if (args[i].as_num() < 0.0)
+            throw std::runtime_error(std::string(fn) + ": aucune valeur ne peut être négative");
+    }
+    if (args[2].as_num() > 1.0)
+        throw std::runtime_error(std::string(fn) + ": le maintien est un niveau, entre 0 et 1");
+}
+
+inline double sound_check_hold(const Value* args, int argc, const char* fn) {
+    if (argc < 1 || args[0].is_nil())
+        return -1.0;   // note TENUE : elle sonnera jusqu'à release()
+    if (!args[0].is_number())
+        throw std::runtime_error(std::string(fn) + ": la durée doit être un nombre de secondes");
+    if (args[0].as_num() <= 0.0)
+        throw std::runtime_error(std::string(fn) + ": la durée doit être > 0");
+    return args[0].as_num();
+}
+
 // Volume et panoramique : bornés en silence, comme le volume général. Un panoramique de
 // -1 est à gauche, 0 au centre, 1 à droite (convention de raylib et de p5).
 inline double sound_check_unit(const Value* args, int argc, int i, const char* fn, const char* quoi, double mini) {
