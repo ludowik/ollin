@@ -18,7 +18,9 @@
 // 1. Deux doigts levés dans le MÊME événement. emscripten transmet l'UNION des doigts
 //    encore posés (`e.touches`) et de ceux qui viennent de se lever (`e.changedTouches`),
 //    et raylib, qui n'en retire qu'un seul par événement (il sort de sa boucle au premier),
-//    laisse l'autre dans sa liste jusqu'au prochain événement tactile — parfois jamais.
+//    laisse l'autre dans sa liste jusqu'au prochain événement tactile — parfois jamais. Ce
+//    cas est couvert par CONSTRUCTION (l'identifiant levé est mémorisé) et NON par mesure :
+//    le harnais de test, aux événements synthétiques, ne le reproduit pas.
 // 2. Perte de focus (onglet changé, application quittée) : le navigateur n'envoie AUCUN
 //    touchend, donc tous les doigts restent « posés » indéfiniment. `IsWindowFocused()` ne
 //    suffit pas — MESURÉ : avec le seul test de focus, une note tenue continuait de sonner
@@ -33,13 +35,8 @@
 // téléphone : tout ce que cette liste ignore — un événement manqué, un identifiant que la
 // couche graphique renumérote, un focus rapporté à faux le temps d'une barre d'adresse —
 // devenait une annulation. Un doute doit laisser le doigt vivant ; seul un `touchend`, un
-// `touchcancel` ou une perte de focus le tue.
-//
-// État des preuves, à ne pas confondre : la perte de focus est corrigée par MESURE, et la
-// non-régression aussi (un contact absent des listes du navigateur reste vivant). Le lever
-// simultané, lui, est couvert par CONSTRUCTION — l'identifiant levé est mémorisé — mais le
-// harnais de test (événements tactiles synthétiques) ne le reproduit pas : raylib y rend le
-// même compte que le navigateur.
+// `touchcancel` ou une perte de focus le tue. La non-régression est MESURÉE : un contact que
+// le navigateur ne mentionne plus dans aucune liste reste vivant.
 
 namespace {
 
@@ -136,6 +133,13 @@ int leves_masque(const int* ids, int n) {
         return masque;
     }, ids, n);
 }
+
+void oublier_tous_leves() {
+    EM_ASM({
+        if (window.__ollinTouchGone)
+            window.__ollinTouchGone.clear();
+    });
+}
 #else
 void install_dom_watch() {
 }
@@ -144,6 +148,9 @@ void install_dom_watch() {
 // n'existe pas : le bureau ne rapporte aucun contact tactile.
 int leves_masque(const int*, int) {
     return 0;
+}
+
+void oublier_tous_leves() {
 }
 #endif
 
@@ -159,9 +166,8 @@ Value callback(const Value& m, const char* nom) {
     return m.map_get(Value(std::string(nom)));
 }
 
-// Relevé filtré de l'image courante, établi UNE fois par `touch_poll`. `count` et `points` le
-// relisent : un script qui interroge l'état dix fois dans la même image ne refait ni le filtre
-// ni la traversée de la frontière JavaScript, et voit exactement ce que les rappels ont vu.
+// Relevé filtré de l'image courante, établi UNE fois par `touch_poll` : l'état que lisent
+// `count` et `points` est exactement celui que les rappels ont vu.
 Point s_cur[k_max_points];
 int s_cur_count = 0;
 
@@ -171,6 +177,16 @@ void relever_contacts() {
     int brut = GetTouchPointCount();
     if (brut > k_max_points)
         brut = k_max_points;
+    // Aucun contact rapporté : aucun fantôme possible, donc rien à filtrer et l'ensemble des
+    // identifiants levés ne sert plus à rien. On ne franchit la frontière qu'à la TRANSITION,
+    // sans quoi une image sans le moindre doigt — la quasi-totalité d'un programme — paierait
+    // un aller-retour pour recevoir un masque nul.
+    if (brut == 0) {
+        s_cur_count = 0;
+        if (s_prev_count > 0)
+            oublier_tous_leves();
+        return;
+    }
     int ids[k_max_points];
     for (int i = 0; i < brut; i++)
         ids[i] = GetTouchPointId(i);
@@ -194,12 +210,15 @@ int touch_count(CallCtx& ctx) {
 // Les contacts en cours, sous forme de tableau de {id, x, y} : de quoi dessiner un retour
 // visuel ou piloter une manette à deux doigts sans passer par les rappels.
 int touch_points(CallCtx& ctx) {
+    // Clés internées une fois : un script qui lit `points()` à chaque image pour dessiner un
+    // retour visuel construisait sinon trois chaînes par contact et par appel.
+    static const Value K_ID(std::string("id")), K_X(std::string("x")), K_Y(std::string("y"));
     Value arr = Value::make_array();
     for (int i = 0; i < s_cur_count; i++) {
         Value m = Value::make_map();
-        m.map_set(Value(std::string("id")), Value((int64_t)s_cur[i].id));
-        m.map_set(Value(std::string("x")), Value((double)s_cur[i].x));
-        m.map_set(Value(std::string("y")), Value((double)s_cur[i].y));
+        m.map_set(K_ID, Value((int64_t)s_cur[i].id));
+        m.map_set(K_X, Value((double)s_cur[i].x));
+        m.map_set(K_Y, Value((double)s_cur[i].y));
         arr.array_push(m);
     }
     return ctx.ret(arr);
@@ -221,19 +240,16 @@ void touch_poll() {
     Value moved = callback(m, "moved");
     Value ended = callback(m, "ended");
 
-    const Point* cur = s_cur;
-    int n = s_cur_count;
-
     // Posés et déplacés : un identifiant absent de l'image précédente est un doigt nouveau.
     // Trois arguments passent par la forme générique de call_value : le VM n'offre pas de
     // surcharge à trois, et en ajouter une pour un seul appelant ne se justifie pas.
-    for (int i = 0; i < n; i++) {
-        int j = index_of(s_prev, s_prev_count, cur[i].id);
-        Value args[3] = {Value((int64_t)cur[i].id), Value((double)cur[i].x), Value((double)cur[i].y)};
+    for (int i = 0; i < s_cur_count; i++) {
+        int j = index_of(s_prev, s_prev_count, s_cur[i].id);
+        Value args[3] = {Value((int64_t)s_cur[i].id), Value((double)s_cur[i].x), Value((double)s_cur[i].y)};
         if (j < 0) {
             if (began.is_callable())
                 vm->call_value(began, args, 3);
-        } else if (moved.is_callable() && (cur[i].x != s_prev[j].x || cur[i].y != s_prev[j].y)) {
+        } else if (moved.is_callable() && (s_cur[i].x != s_prev[j].x || s_cur[i].y != s_prev[j].y)) {
             vm->call_value(moved, args, 3);
         }
     }
@@ -241,7 +257,7 @@ void touch_poll() {
     // Levés : un identifiant de l'image précédente qui a disparu. On rend sa DERNIÈRE
     // position connue — celle du lever n'est plus lisible, raylib ayant retiré le point.
     for (int i = 0; i < s_prev_count; i++) {
-        if (index_of(cur, n, s_prev[i].id) >= 0)
+        if (index_of(s_cur, s_cur_count, s_prev[i].id) >= 0)
             continue;
         if (ended.is_callable()) {
             Value args[3] = {Value((int64_t)s_prev[i].id), Value((double)s_prev[i].x),
@@ -252,9 +268,9 @@ void touch_poll() {
 
     // La liste courante devient la référence de l'image suivante. Copiée APRÈS les appels :
     // un rappel du script peut lever une erreur, et l'état resterait alors cohérent.
-    for (int i = 0; i < n; i++)
-        s_prev[i] = cur[i];
-    s_prev_count = n;
+    for (int i = 0; i < s_cur_count; i++)
+        s_prev[i] = s_cur[i];
+    s_prev_count = s_cur_count;
 }
 
 void touch_reset() {

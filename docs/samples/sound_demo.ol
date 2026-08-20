@@ -96,15 +96,15 @@ func voixPour(contact)
     if voixDe[contact] <> nil then
         return voix[voixDe[contact]]
     end
+    ## Les voix prises, relevées en UNE passe : les chercher dans la boucle ci-dessous
+    ## reparcourait `voixDe` autant de fois qu'il y a de voix.
+    var pris = {}
+    for c, j in voixDe do
+        pris[j] = true
+    end
     var choisie = 0
     for i = 1, #voix do
-        var pris = false
-        for c, j in voixDe do
-            if j == i then
-                pris = true
-            end
-        end
-        if not pris and (choisie == 0 or rendueA[i] < rendueA[choisie]) then
+        if pris[i] == nil and (choisie == 0 or rendueA[i] < rendueA[choisie]) then
             choisie = i
         end
     end
@@ -307,18 +307,18 @@ func update()
     end
 end
 
-## Une touche est-elle TENUE, par un doigt ou par le pointeur ? Elle reste alors allumée,
-## puisque sa note dure aussi longtemps que l'appui.
-func tenue(i)
-    if i == sousSouris then
-        return true
+## Les touches TENUES, par un doigt ou par le pointeur : elles restent allumées, puisque leur
+## note dure aussi longtemps que l'appui. Relevé en UNE passe, à réutiliser pour les huit
+## touches — interroger chaque touche reparcourait la liste des doigts autant de fois.
+func touchesTenues()
+    var t = {}
+    if sousSouris <> 0 then
+        t[sousSouris] = true
     end
-    for id, t in sousDoigts do
-        if t == i then
-            return true
-        end
+    for id, sous in sousDoigts do
+        t[sous] = true
     end
-    return false
+    return t
 end
 
 func draw()
@@ -347,15 +347,16 @@ func draw()
     graphics.text("chiffres 1 à 8 : notes brèves", W * 0.04, hautClavier() - H * 0.03)
     graphics.noStroke()
     var l = largeurTouche()
+    var tenues = touchesTenues()
     for i = 1, #notes do
         ## Tenue : pleine lumière tant que l'appui dure. Sinon, la lueur d'une note brève.
-        var vive = tenue(i) and 1 or ((i == derniere) and lueur or 0)
+        var vive = (tenues[i] <> nil) and 1 or ((i == derniere) and lueur or 0)
         ## noStroke AVANT le rectangle, stroke seulement pour le texte : posé dans l'autre
         ## ordre, le contour du texte cerne aussi les touches suivantes.
         graphics.noStroke()
         graphics.fill(Color(0.16 + 0.5 * vive, 0.18 + 0.35 * vive, 0.3 + 0.4 * vive))
         graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
-        if tenue(i) then
+        if tenues[i] <> nil then
             graphics.noFill()
             graphics.stroke(Color(0.55, 0.85, 1), 3)
             graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
