@@ -17,8 +17,6 @@
 
 constexpr int k_max_voices = 16;
 
-enum { SOUND_SHAPE_COUNT = 5 };
-
 struct Voice {
     // Écrits par le script, lus par le fil audio.
     std::atomic<bool> active{false};

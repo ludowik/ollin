@@ -99,11 +99,13 @@ func voixPour(contact)
     return nil
 end
 
-## Tenir la note d'une touche, ou relâcher si le contact ne presse plus rien.
+## Tenir la note d'une touche, ou relâcher si le contact ne presse plus rien. Rend la touche
+## RÉELLEMENT tenue : zéro si aucune voix n'était libre, sinon la touche s'allumerait sans
+## qu'aucun son ne sorte, et elle resterait muette même une fois une voix libérée.
 func tenir(contact, i)
     var o = voixPour(contact)
     if o == nil then
-        return
+        return 0
     end
     if i > 0 then
         o.freq(sound.note(notes[i])).trigger()   ## sans durée : la note se tient
@@ -112,6 +114,7 @@ func tenir(contact, i)
     else
         o.release()
     end
+    return i
 end
 
 func relacher(contact)
@@ -142,19 +145,15 @@ func toucheSous(x, y)
     return i
 end
 
-## Noyau commun aux deux entrées : ce que le contact SURVOLE décide, à la pose comme au
-## glissement. Une note ne repart que si l'on CHANGE de touche — sinon un déplacement de trois
-## pixels la redéclencherait à chaque image. `avant` est la touche que ce contact pressait,
-## `rend` la nouvelle.
 ## Ce que le contact survole décide, à la pose comme au glissement. La note ne change que si
 ## l'on CHANGE de touche : sinon un déplacement de trois pixels la redéclencherait à chaque
 ## image. `avant` est la touche que ce contact pressait, `rend` la nouvelle.
 func suivre(contact, avant, x, y)
     var t = toucheSous(x, y)
-    if t <> avant then
-        tenir(contact, t)
+    if t == avant then
+        return avant
     end
-    return t
+    return tenir(contact, t)
 end
 
 ## La bande de l'archet, pilotée par UN contact à la fois.

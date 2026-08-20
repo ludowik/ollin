@@ -138,7 +138,12 @@ void mix_callback(void* buffer, unsigned int frames) {
             }
             // Lâcher demandé par le script : l'instant est figé ici, car le relâchement part
             // du niveau atteint À CE MOMENT et non du niveau de maintien.
-            if (!v.gate.load(std::memory_order_relaxed) && v.env_hold_at < 0.0)
+            //
+            // Le PLUS TÔT des deux gagne : une note déclenchée avec une durée a déjà son
+            // instant de lâcher, et ne tester que « pas encore lâchée » rendait release()
+            // sans effet dans ce cas — trigger(2.0) suivi d'un release() au bout de 0,2 s
+            // laissait sonner les deux secondes entières.
+            if (!v.gate.load(std::memory_order_relaxed) && (v.env_hold_at < 0.0 || v.env_t < v.env_hold_at))
                 v.env_hold_at = v.env_t;
         }
         // Panoramique sans creux au centre : chaque côté reste à plein volume tant qu'on

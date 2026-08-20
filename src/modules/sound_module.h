@@ -29,7 +29,7 @@ void sound_update();
 // Les noms exposés vivent dans des littéraux de chaîne, donc en camelCase comme le reste
 // de l'API. `noise` n'a pas de fréquence, mais l'accepte sans s'en servir : refuser
 // obligerait l'appelant à connaître ce cas particulier.
-enum SoundShape { SHAPE_SINE = 0, SHAPE_SQUARE, SHAPE_SAW, SHAPE_TRIANGLE, SHAPE_NOISE };
+enum SoundShape { SHAPE_SINE = 0, SHAPE_SQUARE, SHAPE_SAW, SHAPE_TRIANGLE, SHAPE_NOISE, SHAPE_COUNT };
 
 inline const char* sound_shape_names() {
     return "sine, square, saw, triangle, noise";
@@ -37,11 +37,11 @@ inline const char* sound_shape_names() {
 
 inline const char* sound_shape_name(int shape) {
     static const char* k_names[] = {"sine", "square", "saw", "triangle", "noise"};
-    return (shape >= 0 && shape < 5) ? k_names[shape] : k_names[0];
+    return (shape >= 0 && shape < SHAPE_COUNT) ? k_names[shape] : k_names[0];
 }
 
 inline int sound_shape_index(const std::string& name, const char* fn) {
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < SHAPE_COUNT; i++) {
         if (name == sound_shape_name(i))
             return i;
     }
