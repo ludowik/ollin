@@ -609,9 +609,14 @@ survolée a changé, ce qui rend le doublon sans effet.
   transmet l'UNION de `e.touches` et de `e.changedTouches` — deux doigts levés ensemble
   laissent donc un fantôme ; (2) à la perte de focus, aucun `touchend` n'arrive et tous les
   doigts restent « posés ». Le module écoute donc le navigateur (écouteurs de CAPTURE sur
-  `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`). `count()` et `points()`
-  passent par le même filtre, sinon un script lisant l'état verrait un contact que les rappels
-  tiennent pour levé.
+  `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`).
+- **UN relevé par image, UNE traversée de la frontière JavaScript.** `touch_poll` établit la
+  liste filtrée de l'image (`s_cur`) ; `count()` et `points()` la relisent. Deux raisons : les
+  accesseurs voient exactement ce que les rappels ont vu, et un script qui interroge l'état
+  plusieurs fois par image ne paie rien. Le filtre passe les identifiants bruts en un seul
+  `EM_ASM_INT` qui rend un **masque de bits** des contacts levés — interroger l'ensemble contact
+  par contact coûtait un aller-retour par doigt. Le même passage oublie les identifiants levés
+  que raylib ne rapporte plus.
 - **SENS DU FILTRE — le navigateur prouve un LEVER, il n'autorise pas une pose.** Ne jamais
   l'inverser. Prendre la liste des doigts posés du DOM pour vérité et n'accepter que ce qu'elle
   contient a été livré une première fois, puis **signalé par l'utilisateur sur un vrai
@@ -620,8 +625,7 @@ survolée a changé, ce qui rend le doublon sans effet.
   d'adresse) devenait une annulation. Le module tient donc `__ollinTouchGone`, l'ensemble des
   identifiants dont le lever a été VU, et ne retire que ceux-là ; un identifiant en sort dès
   qu'un doigt se repose avec ce numéro (le navigateur les recycle, sinon le doigt suivant
-  naîtrait déjà mort) ou dès que raylib cesse de le rapporter, sans quoi l'ensemble grossirait
-  pendant toute la session. `__ollinTouchHeld` (miroir de
+  naîtrait déjà mort) ou dès que raylib cesse de le rapporter. `__ollinTouchHeld` (miroir de
   `e.touches`) ne sert qu'à alimenter le premier lors d'un `blur`, où aucun `touchend` n'arrive.
   Règle générale : un doute laisse le doigt vivant.
   **`IsWindowFocused()` a été retiré du filtre** : il ne suffisait pas (mesuré — une note tenue
