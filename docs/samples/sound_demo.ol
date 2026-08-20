@@ -1,11 +1,16 @@
 ## Modules audio et sound — TOUT ce qu'on entend ici est calculé : pas un fichier chargé.
 ##
-## Pose les doigts sur les touches et fais-les GLISSER : chaque touche traversée joue sa note,
-## et PLUSIEURS DOIGTS jouent plusieurs notes à la fois — c'est le module `touch` qui les suit,
-## chacun par son identifiant. Les notes sont des tampons calculés au démarrage, avec leur
-## enveloppe. Dans la bande du haut, le glissement pilote un oscillateur vivant dont la
-## fréquence suit le doigt PENDANT qu'il sonne — c'est là toute la différence entre les deux
-## natures d'objet du module `sound`.
+## Pose les doigts sur les touches : chaque note SONNE TANT QUE le doigt reste appuyé, et
+## plusieurs doigts jouent plusieurs notes à la fois — c'est le module `touch` qui les suit,
+## chacun par son identifiant. Fais glisser sans lever : la note suit la touche survolée.
+##
+## L'exemple montre les DEUX natures d'objet du module `sound`, chacune pour ce qu'elle sait
+## faire :
+##   un OSCILLATEUR tenu pour une touche pressée — sa durée n'est pas connue d'avance, et son
+##     enveloppe la relâche au lever du doigt ;
+##   un TAMPON calculé pour les chiffres 1 à 8 du clavier physique — une note brève, figée,
+##     rejouée telle quelle ;
+##   et un oscillateur de plus dans la bande du haut, dont la fréquence suit le doigt.
 ##
 ## À la souris, un seul pointeur : le module `mouse` prend alors le relais.
 
@@ -20,6 +25,12 @@ global hauteur = 0.0      ## 0..1, position du doigt dans la bande
 
 global appui = false      ## le bouton de la souris est enfoncé
 global sousSouris = 0     ## touche sous le pointeur, 0 = aucune
+
+## Les voix TENUES : une par contact possible, créées une fois pour toutes dans setup(). Les
+## créer à la demande serait un piège — une voix relâchée devient libre, donc recyclable par
+## la création suivante, et l'ancien objet ne désignerait plus rien.
+global voix = []          ## oscillateurs disponibles
+global voixDe = {}        ## contact (identifiant de doigt, ou "souris") → index dans `voix`
 
 ## Une entrée par doigt POSÉ : identifiant → touche qu'il presse. C'est ce qui permet
 ## plusieurs notes en même temps, là où un seul pointeur ne peut en désigner qu'une.
@@ -55,14 +66,65 @@ func setup()
         sons[i].envelope(0.01, 0.12, 0.35, 0.25).volume(0.5)
     end
 
-    ## L'oscillateur, lui, reste silencieux jusqu'au premier glissement : son volume est nul
-    ## et c'est `start` qui le met en marche, pas `play`.
+    ## Une voix tenue par contact : huit doigts au plus, plus le pointeur. L'enveloppe donne
+    ## l'attaque et le relâchement ; sans durée passée à `trigger`, la note se tient.
+    for i = 1, 9 do
+        voix[i] = sound.triangle(440).volume(0.3).envelope(0.01, 0.09, 0.5, 0.18)
+    end
+
+    ## L'archet reste silencieux jusqu'au premier glissement : son volume est nul et c'est
+    ## `start` qui le met en marche, pas `play`.
     archet = sound.saw(220).volume(0.0)
     archet.start()
 end
 
+## Voix libre pour ce contact, ou celle qu'il tient déjà. Toutes prises : on ne joue pas —
+## mieux vaut une note manquante qu'une note volée à un doigt encore posé.
+func voixPour(contact)
+    if voixDe[contact] <> nil then
+        return voix[voixDe[contact]]
+    end
+    for i = 1, #voix do
+        var pris = false
+        for c, j in voixDe do
+            if j == i then
+                pris = true
+            end
+        end
+        if not pris then
+            voixDe[contact] = i
+            return voix[i]
+        end
+    end
+    return nil
+end
+
+## Tenir la note d'une touche, ou relâcher si le contact ne presse plus rien.
+func tenir(contact, i)
+    var o = voixPour(contact)
+    if o == nil then
+        return
+    end
+    if i > 0 then
+        o.freq(sound.note(notes[i])).trigger()   ## sans durée : la note se tient
+        derniere = i
+        lueur = 1.0
+    else
+        o.release()
+    end
+end
+
+func relacher(contact)
+    if voixDe[contact] == nil then
+        return
+    end
+    voix[voixDe[contact]].release()
+    voixDe[contact] = nil
+end
+
+## Note BRÈVE, pour le clavier physique : un tampon figé, rejoué tel quel. Rejouer repart du
+## début, inutile de l'arrêter d'abord.
 func jouer(i)
-    ## Rejouer un tampon repart de son début : inutile de l'arrêter d'abord.
     sons[i].play()
     derniere = i
     lueur = 1.0
@@ -84,10 +146,13 @@ end
 ## glissement. Une note ne repart que si l'on CHANGE de touche — sinon un déplacement de trois
 ## pixels la redéclencherait à chaque image. `avant` est la touche que ce contact pressait,
 ## `rend` la nouvelle.
-func suivre(avant, x, y)
+## Ce que le contact survole décide, à la pose comme au glissement. La note ne change que si
+## l'on CHANGE de touche : sinon un déplacement de trois pixels la redéclencherait à chaque
+## image. `avant` est la touche que ce contact pressait, `rend` la nouvelle.
+func suivre(contact, avant, x, y)
     var t = toucheSous(x, y)
-    if t <> avant and t > 0 then
-        jouer(t)
+    if t <> avant then
+        tenir(contact, t)
     end
     return t
 end
@@ -113,7 +178,7 @@ func touch.began(id, x, y)
         glisse = true
         majArchet(x, y)
     end
-    sousDoigts[id] = suivre(0, x, y)
+    sousDoigts[id] = suivre(id, 0, x, y)
 end
 
 func touch.moved(id, x, y)
@@ -126,7 +191,7 @@ func touch.moved(id, x, y)
             glisse = false
         end
     end
-    sousDoigts[id] = suivre(sousDoigts[id], x, y)
+    sousDoigts[id] = suivre(id, sousDoigts[id], x, y)
 end
 
 func touch.ended(id, x, y)
@@ -134,6 +199,7 @@ func touch.ended(id, x, y)
         doigtArchet = nil
         glisse = false
     end
+    relacher(id)          ## le lever du doigt relâche la note, qui s'éteint sur son enveloppe
     sousDoigts[id] = nil
 end
 
@@ -146,7 +212,7 @@ func mouse.pressed(x, y)
         glisse = true
         majArchet(x, y)
     end
-    sousSouris = suivre(0, x, y)
+    sousSouris = suivre("souris", 0, x, y)
 end
 
 func mouse.moved(x, y)
@@ -158,11 +224,12 @@ func mouse.moved(x, y)
     elseif glisse then
         glisse = false
     end
-    sousSouris = suivre(sousSouris, x, y)
+    sousSouris = suivre("souris", sousSouris, x, y)
 end
 
 func mouse.released(x, y)
     appui = false
+    relacher("souris")
     sousSouris = 0
     if doigtArchet == nil then
         glisse = false
@@ -195,8 +262,12 @@ func update()
     end
 end
 
-## Une touche est-elle pressée par l'un des doigts posés ?
-func presseeParUnDoigt(i)
+## Une touche est-elle TENUE, par un doigt ou par le pointeur ? Elle reste alors allumée,
+## puisque sa note dure aussi longtemps que l'appui.
+func tenue(i)
+    if i == sousSouris then
+        return true
+    end
     for id, t in sousDoigts do
         if t == i then
             return true
@@ -227,17 +298,19 @@ func draw()
     ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur. La
     ## touche SOUS LE DOIGT est cerclée, pour que le balayage se voie autant qu'il s'entende.
     graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("pose plusieurs doigts, et balaie", W * 0.04, hautClavier() - H * 0.03)
+    graphics.text("tiens plusieurs doigts posés — chiffres 1 à 8 : notes brèves",
+                  W * 0.04, hautClavier() - H * 0.03)
     graphics.noStroke()
     var l = largeurTouche()
     for i = 1, #notes do
-        var vive = (i == derniere) and lueur or 0
+        ## Tenue : pleine lumière tant que l'appui dure. Sinon, la lueur d'une note brève.
+        var vive = tenue(i) and 1 or ((i == derniere) and lueur or 0)
         ## noStroke AVANT le rectangle, stroke seulement pour le texte : posé dans l'autre
         ## ordre, le contour du texte cerne aussi les touches suivantes.
         graphics.noStroke()
         graphics.fill(Color(0.16 + 0.5 * vive, 0.18 + 0.35 * vive, 0.3 + 0.4 * vive))
         graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
-        if i == sousSouris or presseeParUnDoigt(i) then
+        if tenue(i) then
             graphics.noFill()
             graphics.stroke(Color(0.55, 0.85, 1), 3)
             graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
