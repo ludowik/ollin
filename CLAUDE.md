@@ -604,9 +604,23 @@ survolée a changé, ce qui rend le doublon sans effet.
   ainsi un état cohérent.
 - Trois arguments passent par la forme générique `call_value(fn, args, argc)` — le VM n'a pas
   de surcharge à trois, et en ajouter une pour un seul appelant ne se justifie pas.
-- **Limite en amont** : sur `touchend`, raylib ne retire de sa liste qu'UN contact changé (il
-  sort de la boucle au premier). Deux doigts levés dans le même événement laisseraient donc
-  un contact fantôme — rien à corriger de notre côté, mais à savoir.
+- **La liste de raylib MENT, et le module la filtre.** Deux cas : (1) sur `touchend`, raylib
+  ne retire qu'UN contact changé (il sort de sa boucle au premier), alors qu'emscripten lui
+  transmet l'UNION de `e.touches` et de `e.changedTouches` — deux doigts levés ensemble
+  laissent donc un fantôme ; (2) à la perte de focus, aucun `touchend` n'arrive et tous les
+  doigts restent « posés ». Le module maintient donc, côté navigateur, la liste vraie
+  (écouteurs de CAPTURE sur `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`)
+  et n'accepte de raylib que les contacts qu'elle contient. `count()` et `points()` passent
+  par le même filtre, sinon un script lisant l'état verrait un contact que les rappels
+  tiennent pour levé.
+  **`IsWindowFocused()` ne suffit pas** (mesuré) : au navigateur, une note tenue continuait de
+  sonner après un `blur` avec ce seul test — c'est l'écouteur DOM qui fait le travail.
+  ⚠ Le cas (1) est couvert par CONSTRUCTION, pas par mesure : le harnais de test (événements
+  tactiles synthétiques via CDP) ne le reproduit pas, raylib y rendant le même compte que le
+  navigateur. Ne pas prétendre l'avoir vérifié.
+- **Piège d'écriture d'un `EM_ASM`** : c'est une MACRO, donc une virgule HORS parenthèses y
+  sépare ses arguments — un littéral de tableau `['a', 'b']` ou d'objet `{a: 1, b: 2}` ne
+  compile pas. Écrire `'a b'.split(' ')` et poser les champs un par un.
 - Testé au navigateur par `Input.dispatchTouchEvent` (CDP) avec deux points simultanés, dans
   un contexte `hasTouch: true` : deux notes mesurées ensemble (do 262 Hz et sol 392 Hz à
   −45 dB, plancher à −156 dB), et RMS nul après le lever. ⚠ Le spectre de l'`AnalyserNode`
