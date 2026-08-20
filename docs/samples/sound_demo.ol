@@ -83,8 +83,9 @@ func setup()
     end
 
     ## L'archet reste silencieux jusqu'au premier glissement : son volume est nul et c'est
-    ## `start` qui le met en marche, pas `play`.
-    archet = sound.saw(220).volume(0.0)
+    ## `start` qui le met en marche, pas `play`. Triangle et non dent de scie : sur un
+    ## glissando, une forme riche en harmoniques devient criarde dans l'aigu.
+    archet = sound.triangle(220).volume(0.0)
     archet.start()
 end
 
