@@ -47,6 +47,17 @@ Sortir au plus **4 findings**, du plus grave au moins grave, une ligne chacun :
 qualifie, sortir exactement `(none)`. Réponse **en français** (règle projet).
 Ne pas appeler l'outil ReportFindings même s'il est disponible.
 
+## Turn 3 — CORRIGER, sans demander
+
+Une revue se termine par les corrections, pas par une question. Appliquer chaque
+finding immédiatement — recompiler, lancer `bash tests/run.sh`, committer, pousser
+— puis dire en une phrase ce qui a été corrigé. Ne JAMAIS écrire « veux-tu que je
+corrige ? » : la réponse est toujours oui, et la poser fait perdre un tour.
+
+Seule exception : un finding dont la correction changerait un comportement voulu,
+ou déborderait largement du périmètre revu. Le dire alors en une ligne, et
+corriger tout le reste.
+
 ## Après la revue — avancer le repère
 
 Si la cible retenue était un **intervalle commité** (cas 3, 4 ou 5), poser le

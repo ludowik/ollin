@@ -24,6 +24,12 @@ poser une question de clarification **brève** avant de coder ; ne pas deviner
 large. Ne modifier que ce qui est demandé (pas de refactor/nettoyage collatéral
 non sollicité). Agir sans confirmation seulement si l'intention est univoque.
 
+**Une revue se CORRIGE (règle permanente)** : tout constat produit par une revue de code
+— `/code-review`, `/simplify`, ou une relecture demandée en clair — est corrigé dans le même
+tour, sans demander confirmation. La question « veux-tu que je corrige ? » est proscrite : la
+réponse est toujours oui. Seule exception, à énoncer en une ligne : un constat dont la
+correction changerait un comportement voulu ou déborderait largement du périmètre revu.
+
 **`todo.md` n'est PAS à Claude (règle permanente)** : ne jamais le lire pour se donner
 du travail, ne jamais l'éditer, ne jamais proposer ce qu'il contient. Traiter uniquement
 ce que l'utilisateur demande.
