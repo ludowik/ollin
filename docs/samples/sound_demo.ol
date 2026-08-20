@@ -20,27 +20,35 @@ global derniere = 0       ## touche allumée, pour le retour visuel
 global lueur = 0.0        ## décroît à chaque frame — le clavier « respire »
 
 global archet = nil       ## l'oscillateur vivant
-global glisse = false     ## le doigt est dans la bande de l'archet
 global hauteur = 0.0      ## 0..1, position du doigt dans la bande
+## Contact qui pilote l'archet : identifiant de doigt, "souris", ou nil s'il ne sonne pas. La
+## bande n'obéit qu'à UN contact, sinon deux positions se disputeraient la même fréquence —
+## et « l'archet sonne » se lit sur cette seule variable, sans drapeau à tenir d'accord.
+global pilote = nil
 
 global appui = false      ## le bouton de la souris est enfoncé
-global sousSouris = 0     ## touche sous le pointeur, 0 = aucune
 
 ## Les voix TENUES : une par contact possible, créées une fois pour toutes dans setup(). Les
 ## créer à la demande serait un piège — une voix relâchée devient libre, donc recyclable par
 ## la création suivante, et l'ancien objet ne désignerait plus rien.
 global voix = []          ## oscillateurs disponibles
 global voixDe = {}        ## contact (identifiant de doigt, ou "souris") → index dans `voix`
+global prisePar = {}      ## la relation inverse : index de voix → contact qui la tient
 ## Instant où chaque voix a été rendue. Une voix rendue continue de s'éteindre sur son
 ## relâchement : reprendre la plus RÉCEMMENT rendue couperait net cette queue de note.
 global rendueA = []
 
-## Une entrée par doigt POSÉ : identifiant → touche qu'il presse. C'est ce qui permet
-## plusieurs notes en même temps, là où un seul pointeur ne peut en désigner qu'une.
+## Une entrée par contact POSÉ (doigt ou pointeur) : identifiant → touche qu'il presse. C'est
+## ce qui permet plusieurs notes en même temps. Le pointeur y figure sous le nom "souris",
+## comme un contact de plus — tout le reste du programme le traite alors sans cas particulier.
 global sousDoigts = {}
-## Doigt qui pilote l'archet, s'il y en a un : la bande n'obéit qu'à UN doigt, sinon deux
-## positions se disputeraient la même fréquence.
-global doigtArchet = nil
+## Les touches tenues, réutilisée d'une image à l'autre : une map neuve par image serait une
+## allocation, et la vider coûte huit écritures.
+global tenues = {}
+
+## Chiffre du clavier → indice de note : comparer la touche à `"" + i` fabriquerait huit
+## chaînes à chaque frappe, y compris pour les touches qui ne sont pas des chiffres.
+global CHIFFRE = {}
 
 ## Bornée par la LARGEUR autant que par la hauteur : sur un écran de téléphone tenu debout,
 ## une taille tirée de la seule hauteur donne des lignes plus larges que l'écran.
@@ -60,7 +68,6 @@ func hautClavier()
     return H * 0.55
 end
 
-## Une touche par note, en bas de l'écran.
 func largeurTouche()
     return W / #notes
 end
@@ -87,6 +94,10 @@ func setup()
     ## glissando, une forme riche en harmoniques devient criarde dans l'aigu.
     archet = sound.triangle(220).volume(0.0)
     archet.start()
+
+    for i = 1, #notes do
+        CHIFFRE["" + i] = i
+    end
 end
 
 ## Voix libre pour ce contact, ou celle qu'il tient déjà. On prend la plus ANCIENNEMENT
@@ -94,18 +105,13 @@ end
 ## couperait sa queue de note. Toutes prises : on ne joue pas — mieux vaut une note manquante
 ## qu'une note volée à un doigt encore posé.
 func voixPour(contact)
-    if voixDe[contact] <> nil then
-        return voix[voixDe[contact]]
-    end
-    ## Les voix prises, relevées en UNE passe : les chercher dans la boucle ci-dessous
-    ## reparcourait `voixDe` autant de fois qu'il y a de voix.
-    var pris = {}
-    for c, j in voixDe do
-        pris[j] = true
+    var j = voixDe[contact]
+    if j then
+        return voix[j]
     end
     var choisie = 0
     for i = 1, #voix do
-        if pris[i] == nil and (choisie == 0 or rendueA[i] < rendueA[choisie]) then
+        if not prisePar[i] and (choisie == 0 or rendueA[i] < rendueA[choisie]) then
             choisie = i
         end
     end
@@ -113,6 +119,7 @@ func voixPour(contact)
         return nil
     end
     voixDe[contact] = choisie
+    prisePar[choisie] = contact
     return voix[choisie]
 end
 
@@ -120,9 +127,8 @@ end
 ## RÉELLEMENT tenue : zéro si aucune voix n'était libre, sinon la touche s'allumerait sans
 ## qu'aucun son ne sorte, et elle resterait muette même une fois une voix libérée.
 func tenir(contact, i)
-    ## Ne presse plus rien : on rend la voix au lieu de la garder. La demander d'abord, puis
-    ## découvrir qu'on n'en a pas besoin, immobilisait une voix par doigt qui ne fait que
-    ## glisser dans la bande — trois d'entre eux suffisaient à faire taire une touche.
+    ## Rendre la voix AVANT de la demander : un doigt qui ne fait que glisser dans la bande en
+    ## immobilisait une sinon, et trois suffisaient à faire taire une touche.
     if i == 0 then
         relacher(contact)
         return 0
@@ -131,19 +137,21 @@ func tenir(contact, i)
     if o == nil then
         return 0
     end
-    o.freq(sound.note(notes[i])).trigger()   ## sans durée : la note se tient
+    o.freq(sound.note(notes[i])).trigger()
     derniere = i
     lueur = 1.0
     return i
 end
 
 func relacher(contact)
-    if voixDe[contact] == nil then
+    var j = voixDe[contact]
+    if not j then
         return
     end
-    voix[voixDe[contact]].release()
-    rendueA[voixDe[contact]] = elapsedTime   ## pour ne pas la reprendre pendant son extinction
+    voix[j].release()
+    rendueA[j] = elapsedTime   ## pour ne pas la reprendre pendant son extinction
     voixDe[contact] = nil
+    prisePar[j] = nil
 end
 
 ## Note BRÈVE, pour le clavier physique : un tampon figé, rejoué tel quel. Rejouer repart du
@@ -167,8 +175,7 @@ func toucheSous(x, y)
 end
 
 ## Ce que le contact survole décide, à la pose comme au glissement. La note ne change que si
-## l'on CHANGE de touche : sinon un déplacement de trois pixels la redéclencherait à chaque
-## image. `avant` est la touche que ce contact pressait, `rend` la nouvelle.
+## l'on CHANGE de touche : sinon un déplacement de trois pixels la redéclencherait par image.
 func suivre(contact, avant, x, y)
     var t = toucheSous(x, y)
     if t == avant then
@@ -177,27 +184,22 @@ func suivre(contact, avant, x, y)
     return tenir(contact, t)
 end
 
-## Le pointeur passe la main au tactile. Rien à réconcilier du côté des doigts — le module
-## `touch` garantit un `ended` pour tout contact disparu — mais les rappels de `mouse` ne sont
-## volontairement PAS filtrés par le moteur, et sans ce relais, garder le bouton enfoncé puis
-## poser un doigt laissait la voix de la souris tenue pour toujours, sa touche allumée, et
-## `mouse.released` n'arrivait jamais.
+## L'émulation de la souris cesse à la pose du second doigt, en pleine pression : le moteur
+## n'émettra JAMAIS le `mouse.released` correspondant, et sans ce relais la voix du pointeur
+## restait tenue pour toujours.
 func passerLaMainAuTactile()
     if touch.count() > 0 and appui then
         appui = false
         relacher("souris")
-        sousSouris = 0
+        sousDoigts["souris"] = nil
+        if pilote == "souris" then
+            pilote = nil
+        end
     end
 end
 
-## La bande de l'archet, pilotée par UN contact à la fois.
 func majArchet(x, y)
-    hauteur = x / W
-    if hauteur < 0 then
-        hauteur = 0
-    elseif hauteur > 1 then
-        hauteur = 1
-    end
+    hauteur = math.clamp(x / W, 0, 1)
 end
 
 func dansBande(y)
@@ -206,41 +208,36 @@ end
 
 ## ── Multitouche : plusieurs doigts, chacun suivi par son identifiant ────────────
 func touch.began(id, x, y)
-    if dansBande(y) and doigtArchet == nil then
-        doigtArchet = id
-        glisse = true
+    if dansBande(y) and not pilote then
+        pilote = id
         majArchet(x, y)
     end
     sousDoigts[id] = suivre(id, 0, x, y)
 end
 
 func touch.moved(id, x, y)
-    if id == doigtArchet then
+    if id == pilote then
         if dansBande(y) then
             majArchet(x, y)
         else
-            ## Le doigt a quitté la bande : il rend l'archet, et peut jouer des notes.
-            doigtArchet = nil
-            glisse = false
+            pilote = nil   ## sorti de la bande : il rend l'archet, et peut jouer des notes
         end
     end
     sousDoigts[id] = suivre(id, sousDoigts[id], x, y)
 end
 
 func touch.ended(id, x, y)
-    if id == doigtArchet then
-        doigtArchet = nil
-        glisse = false
+    if id == pilote then
+        pilote = nil
     end
     relacher(id)          ## le lever du doigt relâche la note, qui s'éteint sur son enveloppe
     sousDoigts[id] = nil
 end
 
 ## ── Souris : un seul pointeur, pour l'ordinateur ────────────────────────────────
-## Sur un écran tactile, le système émule la souris quand un seul doigt touche : les deux
-## familles de rappels partent alors, et le moteur ne filtre rien (c'est au script de
-## choisir). Sans ce garde-fou, un doigt déclenchait la note DEUX fois — deux voix à la même
-## hauteur, donc deux fois plus fort, et deux voix consommées au lieu d'une.
+## Sur un écran tactile, le système émule la souris sous un doigt unique : les deux familles
+## de rappels partent alors, et le moteur ne filtre rien — c'est au script de choisir. Sans ce
+## garde-fou, un doigt jouait la note DEUX fois, donc deux fois plus fort.
 func sourisIgnoree()
     return touch.count() > 0
 end
@@ -250,23 +247,25 @@ func mouse.pressed(x, y)
         return
     end
     appui = true
-    if dansBande(y) then
-        glisse = true
+    if dansBande(y) and not pilote then
+        pilote = "souris"
         majArchet(x, y)
     end
-    sousSouris = suivre("souris", 0, x, y)
+    sousDoigts["souris"] = suivre("souris", 0, x, y)
 end
 
 func mouse.moved(x, y)
     if not appui or sourisIgnoree() then
         return
     end
-    if glisse and dansBande(y) then
-        majArchet(x, y)
-    elseif glisse then
-        glisse = false
+    if pilote == "souris" then
+        if dansBande(y) then
+            majArchet(x, y)
+        else
+            pilote = nil
+        end
     end
-    sousSouris = suivre("souris", sousSouris, x, y)
+    sousDoigts["souris"] = suivre("souris", sousDoigts["souris"], x, y)
 end
 
 ## Pas de garde-fou ici : une voix prise par le pointeur doit être rendue dans tous les cas,
@@ -274,18 +273,17 @@ end
 func mouse.released(x, y)
     appui = false
     relacher("souris")
-    sousSouris = 0
-    if doigtArchet == nil then
-        glisse = false
+    sousDoigts["souris"] = nil
+    if pilote == "souris" then
+        pilote = nil
     end
 end
 
 func keyboard.keypressed(key)
     ## Les chiffres 1 à 8 jouent les huit notes : de quoi essayer au clavier physique.
-    for i = 1, #notes do
-        if key == "" + i then
-            jouer(i)
-        end
+    var i = CHIFFRE[key]
+    if i then
+        jouer(i)
     end
 end
 
@@ -295,79 +293,79 @@ func update()
     ## L'oscillateur suit le doigt : une fréquence qui bouge pendant que le son sort, ce
     ## qu'un tampon figé ne saurait pas faire. Le volume s'ouvre et se ferme en douceur.
     var cible = 0.0
-    if glisse then
+    if pilote then
         cible = 0.25
         archet.freq(110 + hauteur * 660)
     end
     var v = archet.volume()
     archet.volume(v + (cible - v) * math.min(1, deltaTime * 8))
 
-    lueur -= deltaTime * 2.5
-    if lueur < 0 then
-        lueur = 0
-    end
+    lueur = math.max(lueur - deltaTime * 2.5, 0)
 end
 
-## Les touches TENUES, par un doigt ou par le pointeur : elles restent allumées, puisque leur
-## note dure aussi longtemps que l'appui. Relevé en UNE passe, à réutiliser pour les huit
-## touches — interroger chaque touche reparcourait la liste des doigts autant de fois.
-func touchesTenues()
-    var t = {}
-    if sousSouris <> 0 then
-        t[sousSouris] = true
+## Les touches TENUES restent allumées, puisque leur note dure aussi longtemps que l'appui.
+## Relevé en UNE passe, à réutiliser pour les huit touches : interroger chaque touche
+## reparcourait la liste des contacts autant de fois.
+func releverTenues()
+    for i = 1, #notes do
+        tenues[i] = nil
     end
-    for id, sous in sousDoigts do
-        t[sous] = true
+    for contact, sous in sousDoigts do
+        tenues[sous] = true
     end
-    return t
 end
 
 func draw()
     graphics.clear(Color(0.08, 0.09, 0.13))
     graphics.noStroke()
     graphics.fontSize(tailleTexte())
+    ## Géométrie lue une fois : ces trois fonctions étaient rappelées une trentaine de fois.
+    var hb = hautBande()
+    var bb = basBande()
+    var hc = hautClavier()
 
     ## La bande de l'archet : sa teinte dit s'il sonne.
-    var chaud = glisse and 1 or 0
+    var chaud = pilote and 1 or 0
     graphics.fill(Color(0.13 + 0.2 * chaud, 0.15, 0.24))
-    graphics.rect(0, hautBande(), W, basBande() - hautBande())
-    if glisse then
+    graphics.rect(0, hb, W, bb - hb)
+    if pilote then
         graphics.fill(Color(0.55, 0.85, 1))
-        graphics.rect(hauteur * W - 2, hautBande(), 4, basBande() - hautBande())
+        graphics.rect(hauteur * W - 2, hb, 4, bb - hb)
     end
     graphics.stroke(Color(0.75, 0.82, 0.95))
-    graphics.text("glisse ici : oscillateur vivant", W * 0.04, hautBande() + H * 0.05)
-    if glisse then
-        graphics.text("{archet.freq():.0f} Hz", W * 0.04, hautBande() + H * 0.11)
+    graphics.text("glisse ici : oscillateur vivant", W * 0.04, hb + H * 0.05)
+    if pilote then
+        graphics.text("{archet.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
     end
 
     ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur. La
     ## touche SOUS LE DOIGT est cerclée, pour que le balayage se voie autant qu'il s'entende.
     graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("tiens plusieurs doigts posés", W * 0.04, hautClavier() - H * 0.07)
-    graphics.text("chiffres 1 à 8 : notes brèves", W * 0.04, hautClavier() - H * 0.03)
+    graphics.text("tiens plusieurs doigts posés", W * 0.04, hc - H * 0.07)
+    graphics.text("chiffres 1 à 8 : notes brèves", W * 0.04, hc - H * 0.03)
     graphics.noStroke()
     var l = largeurTouche()
-    var tenues = touchesTenues()
+    releverTenues()
     for i = 1, #notes do
+        var tenue = tenues[i]
         ## Tenue : pleine lumière tant que l'appui dure. Sinon, la lueur d'une note brève.
-        var vive = (tenues[i] <> nil) and 1 or ((i == derniere) and lueur or 0)
+        var vive = tenue and 1 or ((i == derniere) and lueur or 0)
         ## noStroke AVANT le rectangle, stroke seulement pour le texte : posé dans l'autre
         ## ordre, le contour du texte cerne aussi les touches suivantes.
         graphics.noStroke()
         graphics.fill(Color(0.16 + 0.5 * vive, 0.18 + 0.35 * vive, 0.3 + 0.4 * vive))
-        graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
-        if tenues[i] <> nil then
+        graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
+        if tenue then
             graphics.noFill()
             graphics.stroke(Color(0.55, 0.85, 1), 3)
-            graphics.rect(l * (i - 1) + 2, hautClavier(), l - 4, H - hautClavier())
+            graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
         end
         graphics.stroke(Color(0.8, 0.86, 0.96))
-        graphics.text(notes[i], l * (i - 1) + l * 0.28, hautClavier() + H * 0.07)
+        graphics.text(notes[i], l * (i - 1) + l * 0.28, hc + H * 0.07)
     end
 
     ## Ce que valent les accesseurs d'un tampon : rien d'autre ne permet de les voir.
     graphics.stroke(Color(0.62, 0.7, 0.85))
     graphics.text("tampon : {sons[1].duration():.2f} s, crête {sons[1].peak():.2f}",
-                  W * 0.04, basBande() - H * 0.04)
+                  W * 0.04, bb - H * 0.04)
 end
