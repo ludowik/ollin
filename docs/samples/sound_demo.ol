@@ -42,6 +42,12 @@ global sousDoigts = {}
 ## positions se disputeraient la même fréquence.
 global doigtArchet = nil
 
+## Bornée par la LARGEUR autant que par la hauteur : sur un écran de téléphone tenu debout,
+## une taille tirée de la seule hauteur donne des lignes plus larges que l'écran.
+func tailleTexte()
+    return math.min(W * 0.055, H * 0.03)
+end
+
 func hautBande()
     return H * 0.12
 end
@@ -343,7 +349,7 @@ end
 func draw()
     graphics.clear(Color(0.08, 0.09, 0.13))
     graphics.noStroke()
-    graphics.fontSize(H * 0.03)
+    graphics.fontSize(tailleTexte())
 
     ## La bande de l'archet : sa teinte dit s'il sonne.
     var chaud = glisse and 1 or 0
@@ -362,8 +368,8 @@ func draw()
     ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur. La
     ## touche SOUS LE DOIGT est cerclée, pour que le balayage se voie autant qu'il s'entende.
     graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("tiens plusieurs doigts posés — chiffres 1 à 8 : notes brèves",
-                  W * 0.04, hautClavier() - H * 0.03)
+    graphics.text("tiens plusieurs doigts posés", W * 0.04, hautClavier() - H * 0.07)
+    graphics.text("chiffres 1 à 8 : notes brèves", W * 0.04, hautClavier() - H * 0.03)
     graphics.noStroke()
     var l = largeurTouche()
     for i = 1, #notes do
