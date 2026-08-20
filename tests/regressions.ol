@@ -1545,4 +1545,32 @@ assert(audio.isPaused())
 audio.resume()
 assert(not audio.isPaused())
 
+## Égalité par IDENTITÉ des types référence. Seules les maps étaient couvertes : deux
+## variables désignant le même tableau se comparaient fausses, et `a <> a` était vrai.
+var idTab = [1, 2]
+var idTabAlias = idTab
+assert(idTab == idTabAlias)
+assert(not (idTab <> idTabAlias))
+assert(idTab <> [1, 2])          ## contenu identique, objets distincts
+var idRange = [1;5]
+var idRangeAlias = idRange
+assert(idRange == idRangeAlias)
+assert(idRange <> [1;5])
+func idFonc()
+end
+var idFoncAlias = idFonc
+assert(idFonc == idFoncAlias)
+assert(idFonc <> print)
+func faireFerm(n)
+    return func() return n end
+end
+var idFerm = faireFerm(1)
+var idFermAlias = idFerm
+assert(idFerm == idFermAlias)
+assert(idFerm <> faireFerm(1))   ## deux closures distinctes de la même fonction
+## Un tableau n'est pas égal à une map, ni à un nombre — mais 1 et 1.0 restent égaux.
+assert(idTab <> {})
+assert(idTab <> 1)
+assert(1 == 1.0)
+
 print("regressions ok")

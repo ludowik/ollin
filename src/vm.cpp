@@ -482,7 +482,31 @@ static bool values_equal(const Value& av, const Value& bv) {
         return av.as_num() == bv.as_num();
     if (av.is_string() && bv.is_string())
         return av.sptr == bv.sptr;
-    return (av.is_map() && bv.is_map() && av.mptr == bv.mptr) || (av.is_class() && bv.is_class() && av.mptr == bv.mptr);
+    // Tout ce qui reste a une IDENTITÉ, jamais un contenu : deux valeurs sont égales quand
+    // elles désignent le même objet. Le test de tag vient APRÈS les cas numériques, sinon
+    // `1 == 1.0` cesserait d'être vrai. Ne couvrir que les maps laissait `a == a` FAUX pour
+    // un tableau, un range, une closure ou une fonction — et `a <> a` vrai.
+    if (av.tag != bv.tag)
+        return false;
+    switch (av.tag) {
+    case Value::T_MAP:
+    case Value::T_CLASS:
+        return av.mptr == bv.mptr;
+    case Value::T_ARRAY:
+        return av.aptr == bv.aptr;
+    case Value::T_RANGE:
+        return av.rptr == bv.rptr;
+    case Value::T_CLOSURE:
+        return av.cptr == bv.cptr;
+    case Value::T_ITERATOR:
+        return av.iptr == bv.iptr;
+    case Value::T_FUNCTION:
+    case Value::T_BUILTIN:
+        // L'union porte l'index de fonction ou le pointeur natif : même valeur = même cible.
+        return av.as_int() == bv.as_int();
+    default:
+        return false;
+    }
 }
 
 // ── VM::errLine / VM::current / VM::callValue ────────────────────────────────
