@@ -2,6 +2,9 @@
 #include "module_utils.h"
 #include "sound_internal.h"
 #include "raylib.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
 
 // Session sonore, build AVEC raylib. Le périphérique n'est PAS ouvert au chargement du
 // module : le navigateur refuse de sonner avant une interaction, et ouvrir trop tôt
@@ -14,6 +17,50 @@ namespace {
 bool s_ready = false;
 bool s_tried = false;     // une tentative a déjà eu lieu → ne pas la refaire à chaque frame
 double s_volume = 1.0;
+
+#ifdef __EMSCRIPTEN__
+// Un contexte audio SUSPENDU ne se reprend que depuis le gestionnaire du geste lui-même.
+// C'est la règle de Safari sur iOS, et elle condamne notre réveil : `audio_wake` part de la
+// boucle de rendu, donc hors de la pile d'appels du geste, et son `resume` est refusé — pour
+// toujours. Le son était alors mort jusqu'à la fermeture de l'onglet (MESURÉ : contexte
+// suspendu de force, puis trois gestes de plus sans aucun retour du son).
+//
+// Safari suspend de lui-même sur une interruption (appel entrant, retour d'arrière-plan,
+// verrouillage), et le contexte naît suspendu quand il est créé avant tout geste. D'où un
+// écouteur DOM, posé UNE fois et gardé : chaque geste retente la reprise, ce qui couvre les
+// deux cas sans que le moteur ait à savoir lequel s'est produit.
+void install_gesture_resume() {
+    static bool pose = false;
+    if (pose)
+        return;
+    pose = true;
+    EM_ASM({
+        if (window.__ollinAudioResume)
+            return;
+        window.__ollinAudioResume = 1;
+        var reprendre = function() {
+            var ma = window.miniaudio;
+            if (!ma || !ma.devices)
+                return;
+            for (var i = 0; i < ma.devices.length; i++) {
+                var d = ma.devices[i];
+                if (d && d.webaudio && d.webaudio.state !== 'running' && d.webaudio.resume)
+                    d.webaudio.resume();
+            }
+        };
+        // Pas de littéral de tableau ni d'objet ici : EM_ASM est une MACRO, et une virgule
+        // hors parenthèses y sépare ses arguments.
+        var opt = { capture: true };
+        opt.passive = true;
+        var noms = 'pointerdown touchstart touchend mousedown keydown'.split(' ');
+        for (var i = 0; i < noms.length; i++)
+            document.addEventListener(noms[i], reprendre, opt);
+    });
+}
+#else
+void install_gesture_resume() {
+}
+#endif
 
 // Ouvre le périphérique une seule fois. L'échec n'est pas une erreur de script : une
 // machine sans carte son (conteneur d'intégration, serveur) doit exécuter le programme
@@ -84,6 +131,10 @@ void audio_update() {
 // invaliderait les tampons encore référencés. Seul l'état propre au programme est remis à
 // zéro — le volume, qu'un script précédent a pu baisser.
 void audio_reset() {
+    // L'écouteur de reprise doit être en place AVANT le premier geste, donc au démarrage du
+    // programme et non à l'ouverture du périphérique — celle-ci n'a lieu qu'après un geste,
+    // qui serait déjà perdu.
+    install_gesture_resume();
     s_volume = 1.0;
     if (s_ready)
         SetMasterVolume(1.0f);

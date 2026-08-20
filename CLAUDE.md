@@ -735,6 +735,24 @@ demandé à 1 sortait donc à 0,687 — constaté par mesure au navigateur, retr
 `raudio.c`, puis compensé sur le flux (`SetAudioStreamVolume`). Après correction : crête
 1,000 et RMS 0,704 pour un sinus à pleine échelle.
 
+**Un contexte SUSPENDU ne se reprend que depuis le gestionnaire du geste** — règle de Safari
+sur iOS, et elle condamne `audio_wake`, qui part de la boucle de rendu : son `resume` implicite
+est refusé, définitivement. Signalé par l'utilisateur (« après un rechargement le son ne
+fonctionne plus », rien ne le ramène sauf fermer l'onglet). D'où `install_gesture_resume`
+(`audio_module.cpp`), un écouteur DOM posé UNE fois par `audio_reset` — donc **avant** le
+premier geste, puisqu'à l'ouverture du périphérique ce geste serait déjà perdu — et gardé
+ensuite : chaque geste retente la reprise, ce qui couvre indifféremment le contexte né
+suspendu et l'interruption iOS (appel entrant, retour d'arrière-plan), sans que le moteur ait
+à distinguer les deux.
+- **MESURÉ dans les deux sens**, en suspendant le contexte de force comme le fait Safari :
+  avant, RMS 0 et trois gestes de plus n'y changeaient rien (contexte `suspended`) ; après, le
+  premier geste suffit (RMS 0 → 0,0869, `suspended` → `running`).
+- ⚠ **Playwright lance Chrome avec `--autoplay-policy=no-user-gesture-required`**, ce qui
+  masque TOUT problème de geste : six scénarios de rechargement y passaient au vert alors que
+  le bug était réel. Ajouter `--autoplay-policy=document-user-activation-required` pour un
+  navigateur fidèle — et savoir que même ainsi, Chrome tolère ce que Safari refuse : la
+  reproduction est passée par la suspension forcée du contexte, pas par le rechargement.
+
 **Ouverture différée au premier geste** (`audio_wake`, appelé depuis `run_user_callbacks`) :
 le navigateur refuse de sonner avant une interaction. Le clavier passe par
 `keyboard_pressed_any()` — la file d'appuis de raylib est CONSOMMÉE par `keyboard_poll`, donc
