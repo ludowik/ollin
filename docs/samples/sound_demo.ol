@@ -170,6 +170,44 @@ func suivre(contact, avant, x, y)
     return tenir(contact, t)
 end
 
+## Ce contact tactile est-il encore posé ? On interroge la liste VIVE plutôt que de se fier
+## au dernier événement reçu.
+func doigtActif(id)
+    for i, p in touch.points() do
+        if p.id == id then
+            return true
+        end
+    end
+    return false
+end
+
+## Réconciliation avec la liste des contacts, une fois par image. Un lever peut ne PAS être
+## rapporté — deux doigts levés dans le même événement, dont la couche graphique n'en retire
+## qu'un — et l'on se retrouverait alors avec une note tenue par un doigt fantôme, sans aucun
+## geste capable de la reprendre. Se fier aux seuls événements ne suffit donc pas.
+func purgerFantomes()
+    if doigtArchet <> nil and not doigtActif(doigtArchet) then
+        doigtArchet = nil
+        glisse = false
+    end
+    ## L'itération d'une map travaille sur un instantané : retirer une entrée en cours de
+    ## route est donc sûr.
+    for id, t in sousDoigts do
+        if not doigtActif(id) then
+            relacher(id)
+            sousDoigts[id] = nil
+        end
+    end
+    ## Le pointeur passe la main au tactile : sans cela, garder le bouton enfoncé puis poser
+    ## un doigt laissait sa voix tenue pour toujours, sa touche allumée, et `mouse.released`
+    ## n'arrivait jamais.
+    if touch.count() > 0 and appui then
+        appui = false
+        relacher("souris")
+        sousSouris = 0
+    end
+end
+
 ## La bande de l'archet, pilotée par UN contact à la fois.
 func majArchet(x, y)
     hauteur = x / W
@@ -270,6 +308,8 @@ func keyboard.keypressed(key)
 end
 
 func update()
+    purgerFantomes()
+
     ## L'oscillateur suit le doigt : une fréquence qui bouge pendant que le son sort, ce
     ## qu'un tampon figé ne saurait pas faire. Le volume s'ouvre et se ferme en douceur.
     var cible = 0.0
