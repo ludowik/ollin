@@ -36,13 +36,44 @@ inline float noise_next(uint32_t& state) {
     return (float)((double)state / 2147483648.0 - 1.0);
 }
 
-inline float wave_sample(int shape, double phase, uint32_t& noise_state) {
+// Correction d'une DISCONTINUITÉ (PolyBLEP). Une dent de scie ou un créneau calculés
+// directement sautent d'une valeur à l'autre entre deux échantillons : ce saut porte des
+// harmoniques bien au-delà de la moitié de la fréquence d'échantillonnage, qui se REPLIENT
+// vers le bas en raies inharmoniques. D'où un son métallique et faux, d'autant plus sensible
+// que la hauteur glisse — les raies repliées descendent quand la note monte.
+//
+// Le remède : au voisinage du saut, retrancher le polynôme qui l'arrondit sur la durée d'un
+// échantillon. `t` est la phase (dans [0;1[), `dt` son avance par échantillon.
+inline double poly_blep(double t, double dt) {
+    if (t < dt) {
+        t = t / dt - 1.0;
+        return -t * t;
+    }
+    if (t > 1.0 - dt) {
+        t = (t - 1.0) / dt + 1.0;
+        return t * t;
+    }
+    return 0.0;
+}
+
+inline float wave_sample(int shape, double phase, double dt, uint32_t& noise_state) {
     switch (shape) {
-    case 1:   // square
-        return phase < 0.5 ? 1.0f : -1.0f;
-    case 2:   // saw
-        return (float)(2.0 * phase - 1.0);
-    case 3:   // triangle
+    case 1: {   // square : deux discontinuités par tour, en 0 et en 0,5
+        double s = phase < 0.5 ? 1.0 : -1.0;
+        s += poly_blep(phase, dt);
+        double demi = phase + 0.5;
+        if (demi >= 1.0)
+            demi -= 1.0;
+        s -= poly_blep(demi, dt);
+        return (float)s;
+    }
+    case 2:   // saw : une seule discontinuité, au passage de 1 à 0
+        return (float)(2.0 * phase - 1.0 - poly_blep(phase, dt));
+    case 3:
+        // Triangle laissé DIRECT : il n'a aucun saut, seulement deux ruptures de pente, et
+        // ses harmoniques décroissent en 1/n² au lieu de 1/n — son repliement est plus de
+        // vingt décibels sous celui des deux formes ci-dessus. Le corriger demanderait un
+        // second polynôme (sur la pente) pour un gain inaudible.
         return (float)(1.0 - 4.0 * std::fabs(phase - 0.5));
     case 4:   // noise
         return noise_next(noise_state);
@@ -158,7 +189,7 @@ void mix_callback(void* buffer, unsigned int frames) {
             // Le lissage s'applique PAR-DESSUS l'enveloppe : une attaque nulle serait sinon
             // un saut, donc un clic. Cinq millisecondes ne s'entendent pas comme un fondu.
             v.gain += (cible - v.gain) * lissage;
-            float s = wave_sample(shape, v.phase, v.noise_state) * v.gain;
+            float s = wave_sample(shape, v.phase, avance, v.noise_state) * v.gain;
             out[i * 2] += s * g_gauche;
             out[i * 2 + 1] += s * g_droite;
             v.phase += avance;

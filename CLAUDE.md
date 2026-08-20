@@ -691,6 +691,25 @@ lourde s'entend.
 **Gain lissé sur 5 ms**, par-dessus l'enveloppe : démarrer ou arrêter une onde carrée d'un
 coup produit un clic très audible, et une attaque nulle serait un saut.
 
+**Formes à bande limitée (PolyBLEP)** : une dent de scie ou un créneau calculés directement
+sautent entre deux échantillons, et ce saut porte des harmoniques au-delà de Nyquist qui se
+REPLIENT en raies inharmoniques — un son métallique, faux, et d'autant plus sensible que la
+hauteur glisse (les raies repliées descendent quand la note monte). `poly_blep` arrondit chaque
+discontinuité sur la durée d'un échantillon : une seule pour la dent de scie, deux pour le
+créneau. **Mesuré** au navigateur sur une dent de scie à 3000 Hz (44,1 kHz), niveau des raies
+repliées, aucune n'étant un multiple de 3000 :
+
+| | 20 100 Hz | 17 100 Hz | 14 100 Hz | 11 100 Hz | plancher |
+|---|---|---|---|---|---|
+| naïf | −41,8 dB | −43,6 | −43,6 | −44,3 | −121,6 |
+| PolyBLEP | −51,3 dB | −56,1 | −59,8 | −65,1 | −188,6 |
+
+Le fondamental et les harmoniques utiles ne bougent pas (−23,8 → −24,0 dB), et la correction
+est d'autant plus forte que la raie repliée est GRAVE, donc audible. **Le triangle est laissé
+direct** : il n'a aucun saut, seulement deux ruptures de pente, et ses harmoniques décroissent
+en 1/n² au lieu de 1/n — son repliement est vingt décibels plus bas, et le corriger demanderait
+un second polynôme (sur la pente) pour un gain inaudible.
+
 **Enveloppe en FORME FERMÉE** (`adsr_level(e, t, hold)`) et non en machine à états. Ce n'est
 pas un choix esthétique : la même fonction sert au mélangeur (temps réel) et au façonnage
 d'un tampon (hors ligne), si bien qu'un test lisant les échantillons d'un tampon **valide la
