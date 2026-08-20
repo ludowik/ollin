@@ -103,17 +103,20 @@ end
 ## RÉELLEMENT tenue : zéro si aucune voix n'était libre, sinon la touche s'allumerait sans
 ## qu'aucun son ne sorte, et elle resterait muette même une fois une voix libérée.
 func tenir(contact, i)
+    ## Ne presse plus rien : on rend la voix au lieu de la garder. La demander d'abord, puis
+    ## découvrir qu'on n'en a pas besoin, immobilisait une voix par doigt qui ne fait que
+    ## glisser dans la bande — trois d'entre eux suffisaient à faire taire une touche.
+    if i == 0 then
+        relacher(contact)
+        return 0
+    end
     var o = voixPour(contact)
     if o == nil then
         return 0
     end
-    if i > 0 then
-        o.freq(sound.note(notes[i])).trigger()   ## sans durée : la note se tient
-        derniere = i
-        lueur = 1.0
-    else
-        o.release()
-    end
+    o.freq(sound.note(notes[i])).trigger()   ## sans durée : la note se tient
+    derniere = i
+    lueur = 1.0
     return i
 end
 
