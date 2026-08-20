@@ -590,6 +590,20 @@ lever n'étant plus lisible), une position changée donne `moved`. C'est tout le
 souris n'est recopiée depuis le tactile que `if (pointCount == 1)`, si bien qu'au second
 doigt la souris cesse de suivre quoi que ce soit.
 
+**`mouse.released` est déduit de l'ÉTAT du bouton, pas de l'événement.** `IsMouseButtonReleased`
+n'arrive JAMAIS quand l'émulation de la souris cesse en pleine pression — ce que fait le
+navigateur dès la pose d'un second doigt (`rcore_web.c` ne recopie la position que
+`if (pointCount == 1)`). Un appui restait alors sans relâchement, et tout script tenant un état
+« bouton enfoncé » (glisser-déposer, tracé, note tenue) le gardait pour toujours ; l'exemple
+sonore portait un relais pour le rattraper, désormais retiré. `mouse_poll` compare donc
+`s_down` (le script a reçu un `pressed`) à `IsMouseButtonDown`, ce qui couvre du même coup la
+perte de focus et tout autre événement manqué, sans énumérer les causes. `mouse_reset` (appelé
+dans `ollin_run`) évite qu'un programme neuf hérite d'un bouton enfoncé.
+- ⚠ Ce trou N'EST PAS reproductible au harnais : la souris de Playwright est un vrai événement
+  souris, pas l'émulation du navigateur, donc l'événement de relâchement y arrive toujours. Ce
+  qui est mesuré est indirect — avec la correction, un appui maintenu puis deux doigts posés
+  donnent trois notes (RMS 0,149) contre une seule avant (0,087).
+
 **Les rappels de `mouse` ne sont PAS filtrés** (décision explicite de l'utilisateur) : sur un
 doigt unique le système émule la souris, donc les deux familles partent et un script qui
 déclare les deux reçoit le geste deux fois. Corollaire pour les exemples : écrire chaque
@@ -716,6 +730,15 @@ d'un tampon (hors ligne), si bien qu'un test lisant les échantillons d'un tampo
 courbe que le mélangeur emploie** — le seul moyen de la contrôler sans carte son. Le
 relâchement part du niveau atteint AU MOMENT du lâcher, sinon lâcher pendant l'attaque
 sauterait au niveau de maintien.
+
+**`free()` rend une voix explicitement** : sans elle, un script ne pouvait pas créer ses
+oscillateurs à la demande — `alloc_voice` reprend la voix arrêtée la plus ancienne, donc tout
+handle encore détenu risquait de désigner un slot recyclé (l'erreur est signalée, mais le
+programme est cassé). D'où le pool pré-alloué que tout script polyphonique devait écrire, et
+que `sound_demo.ol` portait (une trentaine de lignes, supprimées). `free` lâche l'enveloppe
+comme `release`, marque le slot inutilisé et périme le handle ; le slot n'est réellement
+repris qu'à l'extinction, la recherche de slot libre testant désormais aussi le SON
+(`voice_sonne`) — couper net produirait un clic et perdrait la queue de note.
 
 **Recyclage des voix** : 16 voix, 32 tampons, tables de taille FIXE (le fil audio les
 parcourt pendant que le script en réclame). Quand la table est pleine, la voix arrêtée la

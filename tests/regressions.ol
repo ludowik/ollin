@@ -1573,4 +1573,29 @@ assert(idTab <> {})
 assert(idTab <> 1)
 assert(1 == 1.0)
 
+## `free()` rend la voix au moteur ET périme le handle : le réutiliser doit être signalé, pas
+## silencieux. Sans cette libération explicite, tout script polyphonique devait pré-allouer un
+## pool, faute de savoir quand un slot arrêté serait recyclé.
+var oscLibre = sound.sine(440)
+oscLibre.free()
+var perime = false
+try
+    oscLibre.freq(880)
+catch e
+    perime = true
+end
+assert(perime)
+## Une voix rendue SANS enveloppe est libre tout de suite : on peut en créer autant que la
+## table en compte, l'une après l'autre.
+for i = 1, 40 do
+    sound.sine(220 + i).free()
+end
+## Une voix encore en extinction n'est PAS reprise : son slot est libre, son son ne l'est pas.
+var tenue = sound.sine(330).envelope(0.01, 0.05, 0.5, 5.0)
+tenue.trigger()
+tenue.free()
+var autre = sound.sine(660)
+assert(autre.isPlaying() == false)
+autre.free()
+
 print("regressions ok")

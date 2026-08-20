@@ -7,3 +7,5 @@
 // mouse.released(x,y) / mouse.moved(x,y).
 // click_taken : un widget de l'UI a déjà pris ce clic → ne pas appeler pressed/released.
 void mouse_poll(bool click_taken = false);
+// Remise à zéro au démarrage d'un programme (ollin_run), comme les autres modules d'entrée.
+void mouse_reset();

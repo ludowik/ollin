@@ -28,15 +28,9 @@ global pilote = nil
 
 global appui = false      ## le bouton de la souris est enfoncé
 
-## Les voix TENUES : une par contact possible, créées une fois pour toutes dans setup(). Les
-## créer à la demande serait un piège — une voix relâchée devient libre, donc recyclable par
-## la création suivante, et l'ancien objet ne désignerait plus rien.
-global voix = []          ## oscillateurs disponibles
-global voixDe = {}        ## contact (identifiant de doigt, ou "souris") → index dans `voix`
-global prisePar = {}      ## la relation inverse : index de voix → contact qui la tient
-## Instant où chaque voix a été rendue. Une voix rendue continue de s'éteindre sur son
-## relâchement : reprendre la plus RÉCEMMENT rendue couperait net cette queue de note.
-global rendueA = []
+## Un oscillateur TENU par contact, créé à la pose et rendu au lever par `free()`. C'est le
+## moteur qui gère la réserve : il ne reprend une voix rendue qu'une fois son extinction finie.
+global voixDe = {}        ## contact (identifiant de doigt, ou "souris") → oscillateur
 
 ## Une entrée par contact POSÉ (doigt ou pointeur) : identifiant → touche qu'il presse. C'est
 ## ce qui permet plusieurs notes en même temps. Le pointeur y figure sous le nom "souris",
@@ -82,13 +76,6 @@ func setup()
         sons[i].envelope(0.01, 0.12, 0.35, 0.25).volume(0.5)
     end
 
-    ## Une voix tenue par contact : huit doigts au plus, plus le pointeur. L'enveloppe donne
-    ## l'attaque et le relâchement ; sans durée passée à `trigger`, la note se tient.
-    for i = 1, 9 do
-        voix[i] = sound.triangle(440).volume(0.3).envelope(0.01, 0.09, 0.5, 0.18)
-        rendueA[i] = 0
-    end
-
     ## L'archet reste silencieux jusqu'au premier glissement : son volume est nul et c'est
     ## `start` qui le met en marche, pas `play`. Triangle et non dent de scie : sur un
     ## glissando, une forme riche en harmoniques devient criarde dans l'aigu.
@@ -100,27 +87,22 @@ func setup()
     end
 end
 
-## Voix libre pour ce contact, ou celle qu'il tient déjà. On prend la plus ANCIENNEMENT
-## rendue : la dernière rendue s'éteint encore sur son relâchement, et la redéclencher
-## couperait sa queue de note. Toutes prises : on ne joue pas — mieux vaut une note manquante
-## qu'une note volée à un doigt encore posé.
+## L'oscillateur de ce contact, créé au besoin. L'enveloppe donne l'attaque et le
+## relâchement ; sans durée passée à `trigger`, la note se tient jusqu'au lever du doigt.
+## Le moteur peut refuser si toutes ses voix sonnent encore : mieux vaut alors une note
+## manquante qu'une note volée à un doigt encore posé.
 func voixPour(contact)
-    var j = voixDe[contact]
-    if j then
-        return voix[j]
+    var o = voixDe[contact]
+    if o then
+        return o
     end
-    var choisie = 0
-    for i = 1, #voix do
-        if not prisePar[i] and (choisie == 0 or rendueA[i] < rendueA[choisie]) then
-            choisie = i
-        end
-    end
-    if choisie == 0 then
+    try
+        o = sound.triangle(440).volume(0.3).envelope(0.01, 0.09, 0.5, 0.18)
+    catch e
         return nil
     end
-    voixDe[contact] = choisie
-    prisePar[choisie] = contact
-    return voix[choisie]
+    voixDe[contact] = o
+    return o
 end
 
 ## Tenir la note d'une touche, ou relâcher si le contact ne presse plus rien. Rend la touche
@@ -144,14 +126,12 @@ func tenir(contact, i)
 end
 
 func relacher(contact)
-    var j = voixDe[contact]
-    if not j then
+    var o = voixDe[contact]
+    if not o then
         return
     end
-    voix[j].release()
-    rendueA[j] = elapsedTime   ## pour ne pas la reprendre pendant son extinction
+    o.free()             ## lâche l'enveloppe et rend la voix — la note finit de s'éteindre
     voixDe[contact] = nil
-    prisePar[j] = nil
 end
 
 ## Note BRÈVE, pour le clavier physique : un tampon figé, rejoué tel quel. Rejouer repart du
@@ -182,20 +162,6 @@ func suivre(contact, avant, x, y)
         return avant
     end
     return tenir(contact, t)
-end
-
-## L'émulation de la souris cesse à la pose du second doigt, en pleine pression : le moteur
-## n'émettra JAMAIS le `mouse.released` correspondant, et sans ce relais la voix du pointeur
-## restait tenue pour toujours.
-func passerLaMainAuTactile()
-    if touch.count() > 0 and appui then
-        appui = false
-        relacher("souris")
-        sousDoigts["souris"] = nil
-        if pilote == "souris" then
-            pilote = nil
-        end
-    end
 end
 
 func majArchet(x, y)
@@ -288,8 +254,6 @@ func keyboard.keypressed(key)
 end
 
 func update()
-    passerLaMainAuTactile()
-
     ## L'oscillateur suit le doigt : une fréquence qui bouge pendant que le son sort, ce
     ## qu'un tampon figé ne saurait pas faire. Le volume s'ouvre et se ferme en douceur.
     var cible = 0.0

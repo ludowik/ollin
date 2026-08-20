@@ -50,15 +50,21 @@ int handle_slot(const Value& self, const char* fn) {
 // survivre à vingt créations quand son voisin ne survivait pas à une seule (constaté).
 uint64_t s_born_counter = 0;
 
+bool voice_sonne(const Voice& v) {
+    return v.active.load(std::memory_order_relaxed) || v.gain > 0.0f;
+}
+
 int alloc_voice() {
     Voice* v = voices();
     for (int i = 0; i < k_max_voices; i++) {
-        if (!v[i].used)
+        // Rendue par `free` mais pas encore éteinte : le slot est libre, le SON non. La
+        // reprendre couperait la queue de note que le script vient de relâcher.
+        if (!v[i].used && !voice_sonne(v[i]))
             return i;
     }
     int choisi = -1;
     for (int i = 0; i < k_max_voices; i++) {
-        if (v[i].active.load(std::memory_order_relaxed) || v[i].gain > 0.0f)
+        if (voice_sonne(v[i]))
             continue;
         if (choisi < 0 || v[i].born < v[choisi].born)
             choisi = i;
@@ -213,6 +219,25 @@ int method_release(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.release");
     voices()[i].gate.store(false, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
+}
+
+// free() — « je n'en ai plus besoin ». Sans cela, un script ne pouvait PAS créer ses
+// oscillateurs à la demande : `alloc_voice` reprend la voix arrêtée la plus ancienne, donc
+// tout handle encore détenu risquait de désigner un slot recyclé (l'erreur est signalée, mais
+// le programme est cassé). D'où le pool pré-alloué que tout script polyphonique devait écrire.
+//
+// La note n'est PAS coupée : on lâche l'enveloppe comme le ferait `release`, et le slot n'est
+// rendu qu'à l'extinction — `alloc_voice` refuse déjà une voix dont le gain n'est pas retombé.
+// Couper net produirait un clic, et perdrait la queue de note que le script vient de relâcher.
+int method_free(CallCtx& ctx) {
+    int i = handle_slot(ctx.args[0], "sound.free");
+    Voice& v = voices()[i];
+    v.gate.store(false, std::memory_order_relaxed);
+    if (!v.env_used.load(std::memory_order_relaxed))
+        v.active.store(false, std::memory_order_relaxed);   // sans enveloppe, rien à éteindre
+    v.used = false;
+    v.gen++;   // le handle devient périmé : le réutiliser est signalé, pas silencieux
+    return ctx.ret(Value{});
 }
 
 
@@ -512,6 +537,7 @@ Value make_osc_class() {
     cls.map_set(Value(std::string("envelope")), Value::make_builtin(method_envelope));
     cls.map_set(Value(std::string("trigger")), Value::make_builtin(method_trigger));
     cls.map_set(Value(std::string("release")), Value::make_builtin(method_release));
+    cls.map_set(Value(std::string("free")), Value::make_builtin(method_free));
     return cls;
 }
 

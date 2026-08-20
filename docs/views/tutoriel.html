@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-20 16:24</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-20 16:45</span></p>
   </div>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-20 16:24</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-20 16:45</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2419,7 +2419,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   </tbody>
 </table>
 
-<p>Méthodes d'un oscillateur&nbsp;: <code>start</code>, <code>stop</code>, <code>isPlaying</code>, <code>freq</code>, <code>volume</code>, <code>pan</code>, <code>shape</code>, <code>envelope</code>, <code>trigger</code>, <code>release</code>. Comme ailleurs dans le moteur, <strong>sans argument elles lisent</strong>, avec un argument elles écrivent et rendent l'objet&nbsp;: <code>o.freq(440).volume(0.2).pan(-1)</code>.</p>
+<p>Méthodes d'un oscillateur&nbsp;: <code>start</code>, <code>stop</code>, <code>isPlaying</code>, <code>freq</code>, <code>volume</code>, <code>pan</code>, <code>shape</code>, <code>envelope</code>, <code>trigger</code>, <code>release</code>, <code>free</code>. Comme ailleurs dans le moteur, <strong>sans argument elles lisent</strong>, avec un argument elles écrivent et rendent l'objet&nbsp;: <code>o.freq(440).volume(0.2).pan(-1)</code>.</p>
 
 <h3>Une enveloppe, pour jouer des notes</h3>
 <p>Un oscillateur qu'on démarre et qu'on arrête produit un son plat. L'enveloppe <strong>ADSR</strong> lui donne une attaque, un déclin, un maintien et un relâchement — c'est ce qui distingue une note d'un signal de test.</p>
@@ -2431,7 +2431,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
     voix.freq(<span class="bi">sound</span>.note(<span class="str">"C4"</span>)).trigger(<span class="num">0.2</span>)
 <span class="kw">end</span></code></pre>
 
-<p><code>trigger()</code> sans durée tient la note jusqu'à <code>release()</code>. Une note relâchée <strong>libère sa voix</strong>, si bien qu'un programme peut en déclencher indéfiniment. Les hauteurs s'écrivent en clair&nbsp;: <code>sound.note("C#4")</code> rend 277,18&nbsp;Hz, et un <strong>nom de note est accepté partout où une fréquence l'est</strong>.</p>
+<p><code>trigger()</code> sans durée tient la note jusqu'à <code>release()</code>. Une note relâchée <strong>libère sa voix</strong>, si bien qu'un programme peut en déclencher indéfiniment. Quand tu n'as plus besoin d'un oscillateur, <code>free()</code> le rend au moteur&nbsp;: la note finit de s'éteindre, puis la voix redevient disponible — c'est ce qui permet d'en créer un par doigt posé plutôt que de les pré-allouer. Le handle est alors périmé, et le réutiliser lève une erreur explicite. Les hauteurs s'écrivent en clair&nbsp;: <code>sound.note("C#4")</code> rend 277,18&nbsp;Hz, et un <strong>nom de note est accepté partout où une fréquence l'est</strong>.</p>
 
 <h3>Un tampon calculé</h3>
 <p><code>sound.tone(freq, durée [, forme])</code> échantillonne une forme d'onde&nbsp;; <code>sound.generate(durée, formule)</code> échantillonne <strong>votre</strong> formule, qui reçoit le temps en secondes et rend une amplitude dans <code>[-1;1]</code>.</p>

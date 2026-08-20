@@ -22,6 +22,8 @@ static int   s_last_click_x    = -9999;
 static int   s_last_click_y    = -9999;
 static const float DBLCLICK_DELAY = 0.30f;
 static const int   DBLCLICK_DIST  = 8;
+// Le script a reçu un `pressed` sans son `released` : invariant à tenir, quoi qu'il arrive.
+static bool s_down = false;
 
 void mouse_poll(bool click_taken) {
     VM* vm = VM::current();
@@ -59,9 +61,22 @@ void mouse_poll(bool click_taken) {
             s_last_click_x    = mx;
             s_last_click_y    = my;
         }
+        // Un clic capté par un widget n'appartient pas au script : il ne doit pas non plus
+        // recevoir le relâchement (les deux rappels sont déjà neutralisés ci-dessus).
+        s_down = !click_taken;
     }
-    if (released.is_callable() && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-        vm->call_value(released, x, y);
+    // Relâchement déduit de l'ÉTAT du bouton, et non de l'événement `IsMouseButtonReleased` :
+    // celui-ci n'arrive JAMAIS quand l'émulation de la souris cesse en pleine pression — ce
+    // que fait le navigateur dès la pose d'un second doigt (rcore_web.c ne recopie la
+    // position que `if (pointCount == 1)`). Un appui restait alors sans relâchement, et tout
+    // script tenant un état « bouton enfoncé » (glisser-déposer, tracé, note tenue) le gardait
+    // pour toujours. Lire l'état couvre du même coup la perte de focus et tout autre événement
+    // manqué, sans avoir à énumérer les causes.
+    if (s_down && !IsMouseButtonDown(MOUSE_BUTTON_LEFT)) {
+        s_down = false;
+        if (released.is_callable())
+            vm->call_value(released, x, y);
+    }
     if (moved.is_callable()) {
         Vector2 d = GetMouseDelta();
         if (d.x != 0.0f || d.y != 0.0f)
@@ -75,6 +90,13 @@ void mouse_poll(bool click_taken) {
             vm->call_value(scrolled, x, y, dx, dy);
         }
     }
+}
+
+// Un programme neuf ne doit pas hériter d'un bouton « enfoncé » laissé par le précédent : les
+// statiques survivent au VM (playground).
+void mouse_reset() {
+    s_down = false;
+    s_last_click_time = -1.0f;
 }
 
 // Le module `mouse` est une map vide : l'utilisateur y affecte pressed /
