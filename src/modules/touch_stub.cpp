@@ -19,6 +19,9 @@ int stub_points(CallCtx& ctx) {
 
 } // namespace
 
+void touch_begin_frame() {
+}
+
 void touch_poll() {
 }
 

@@ -21,7 +21,11 @@
 // deux fois. À lui de choisir laquelle il écoute.
 Value make_touch_module();
 
-// Appelé une fois par image par la boucle de rendu, après mouse_poll.
+// Relève les contacts de l'image. À appeler AVANT tous les autres rappels d'entrée : un
+// rappel de `mouse` qui lit `touch.count()` doit voir les doigts de CETTE image.
+void touch_begin_frame();
+
+// Compare le relevé à celui de l'image précédente et appelle began/moved/ended.
 void touch_poll();
 
 // Au lancement d'un programme : oublie les contacts du précédent, sinon un doigt encore

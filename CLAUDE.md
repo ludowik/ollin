@@ -612,6 +612,19 @@ survolée a changé, ce qui rend le doublon sans effet.
 
 - Table de taille fixe, 8 contacts (`MAX_TOUCH_POINTS` de raylib) ; un neuvième doigt est
   ignoré, comme raylib l'ignore.
+- **`touch_begin_frame()` AVANT `mouse_poll`, `touch_poll()` après.** Le relevé des contacts
+  est une étape de la frame à part entière, et non le début de `touch_poll` : les rappels de
+  `mouse` s'exécutent avant, et beaucoup interrogent `touch.count()` pour savoir si le geste
+  vient d'un doigt (le système émule la souris sur un doigt unique). Relever dans `touch_poll`
+  rendait cette lecture en retard d'une image — un doigt posé y était vu comme « aucun
+  contact », l'émulation de la souris s'attribuait le geste, et l'archet de `sound_demo` ne
+  suivait plus le doigt (signalé par l'utilisateur, diagnostiqué en affichant à l'écran la
+  valeur que le script voyait).
+- ⚠ **Un identifiant de contact peut valoir 0, et `0` est FAUX en Ollin.** Toute variable
+  qui retient un identifiant se compare donc à `nil` explicitement, jamais par véracité :
+  `sound_demo` testait `if pilote then`, et l'archet restait muet sous le premier doigt du
+  navigateur. Corollaire pour les tests : un harnais qui n'emploie que les identifiants 1, 2, 3
+  ne peut PAS voir ce défaut — il faut exercer l'identifiant 0.
 - `touch_poll()` est appelé APRÈS `mouse_poll` dans `run_user_callbacks` ; `touch_reset()`
   dans `ollin_run`, sinon un doigt resté « posé » ferait croire à un geste en cours.
 - La liste de référence est recopiée APRÈS les appels au script : un rappel qui lève laisse
@@ -624,7 +637,7 @@ survolée a changé, ce qui rend le doublon sans effet.
   laissent donc un fantôme ; (2) à la perte de focus, aucun `touchend` n'arrive et tous les
   doigts restent « posés ». Le module écoute donc le navigateur (écouteurs de CAPTURE sur
   `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`).
-- **UN relevé par image, UNE traversée de la frontière JavaScript.** `touch_poll` établit la
+- **UN relevé par image, UNE traversée de la frontière JavaScript.** `touch_begin_frame` établit la
   liste filtrée de l'image (`s_cur`) ; `count()` et `points()` la relisent. Deux raisons : les
   accesseurs voient exactement ce que les rappels ont vu, et un script qui interroge l'état
   plusieurs fois par image ne paie rien. Le filtre passe les identifiants bruts en un seul

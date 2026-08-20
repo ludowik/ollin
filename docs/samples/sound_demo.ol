@@ -21,7 +21,9 @@ global lueur = 0.0        ## décroît à chaque frame — le clavier « respire
 
 global archet = nil       ## l'oscillateur vivant
 global hauteur = 0.0      ## 0..1, position du doigt dans la bande
-## Contact qui pilote l'archet : identifiant de doigt, "souris", ou nil s'il ne sonne pas. La
+## Contact qui pilote l'archet : identifiant de doigt, "souris", ou nil s'il ne sonne pas. Se
+## compare TOUJOURS à nil, jamais par véracité : un identifiant de doigt peut valoir 0, que le
+## langage tient pour faux — l'archet restait alors muet sous le premier doigt du navigateur. La
 ## bande n'obéit qu'à UN contact, sinon deux positions se disputeraient la même fréquence —
 ## et « l'archet sonne » se lit sur cette seule variable, sans drapeau à tenir d'accord.
 global pilote = nil
@@ -174,7 +176,7 @@ end
 
 ## ── Multitouche : plusieurs doigts, chacun suivi par son identifiant ────────────
 func touch.began(id, x, y)
-    if dansBande(y) and not pilote then
+    if dansBande(y) and pilote == nil then
         pilote = id
         majArchet(x, y)
     end
@@ -213,7 +215,7 @@ func mouse.pressed(x, y)
         return
     end
     appui = true
-    if dansBande(y) and not pilote then
+    if dansBande(y) and pilote == nil then
         pilote = "souris"
         majArchet(x, y)
     end
@@ -257,7 +259,7 @@ func update()
     ## L'oscillateur suit le doigt : une fréquence qui bouge pendant que le son sort, ce
     ## qu'un tampon figé ne saurait pas faire. Le volume s'ouvre et se ferme en douceur.
     var cible = 0.0
-    if pilote then
+    if pilote <> nil then
         cible = 0.25
         archet.freq(110 + hauteur * 660)
     end
@@ -289,16 +291,16 @@ func draw()
     var hc = hautClavier()
 
     ## La bande de l'archet : sa teinte dit s'il sonne.
-    var chaud = pilote and 1 or 0
+    var chaud = (pilote <> nil) and 1 or 0
     graphics.fill(Color(0.13 + 0.2 * chaud, 0.15, 0.24))
     graphics.rect(0, hb, W, bb - hb)
-    if pilote then
+    if pilote <> nil then
         graphics.fill(Color(0.55, 0.85, 1))
         graphics.rect(hauteur * W - 2, hb, 4, bb - hb)
     end
     graphics.stroke(Color(0.75, 0.82, 0.95))
     graphics.text("glisse ici : oscillateur vivant", W * 0.04, hb + H * 0.05)
-    if pilote then
+    if pilote <> nil then
         graphics.text("{archet.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
     end
 

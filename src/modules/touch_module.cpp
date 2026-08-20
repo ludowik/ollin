@@ -166,8 +166,8 @@ Value callback(const Value& m, const char* nom) {
     return m.map_get(Value(std::string(nom)));
 }
 
-// Relevé filtré de l'image courante, établi UNE fois par `touch_poll` : l'état que lisent
-// `count` et `points` est exactement celui que les rappels ont vu.
+// Relevé filtré de l'image courante, établi UNE fois par `touch_begin_frame` : l'état que
+// lisent `count` et `points` est exactement celui que les rappels ont vu.
 Point s_cur[k_max_points];
 int s_cur_count = 0;
 
@@ -226,12 +226,18 @@ int touch_points(CallCtx& ctx) {
 
 } // namespace
 
-void touch_poll() {
-    // Relevé d'abord, et hors de la garde qui suit : `count`/`points` doivent rendre l'état de
-    // l'image même si le script n'a déclaré aucun rappel.
+// Le relevé est une étape de la frame À PART ENTIÈRE, et non le début de `touch_poll` : les
+// rappels de `mouse` s'exécutent AVANT, et beaucoup interrogent `touch.count()` pour savoir si
+// le geste vient d'un doigt (le système émule la souris sur un doigt unique). Relever dans
+// `touch_poll` rendait donc cette lecture en retard d'une image — un doigt posé y était vu
+// comme « aucun contact », et l'émulation de la souris s'attribuait le geste (constaté :
+// l'archet de `sound_demo` ne suivait plus le doigt).
+void touch_begin_frame() {
     install_dom_watch();
     relever_contacts();
+}
 
+void touch_poll() {
     VM* vm = VM::current();
     Value m = vm->get_global("touch");
     if (!m.is_map())

@@ -1170,6 +1170,9 @@ static void run_user_callbacks(const Value& draw_fn) {
     // Les widgets voient le clic AVANT le script : s'ils le consomment, mouse.pressed
     // n'est pas appelé — cliquer un bouton ne déclenche donc pas aussi l'action de la
     // scène. C'est la raison d'être d'un module natif plutôt qu'une classe Ollin.
+    // Les contacts d'abord : un rappel de `mouse` peut lire touch.count() (l'émulation de la
+    // souris sur un doigt unique rend le geste deux fois, et c'est au script de trancher).
+    touch_begin_frame();
     mouse_poll(ui_poll());
     // Le multitouche vient APRÈS la souris, et ne la remplace pas : sur un doigt unique le
     // système émule la souris, donc les deux familles de rappels partent. Un script choisit
