@@ -613,13 +613,15 @@ survolée a changé, ce qui rend le doublon sans effet.
   passent par le même filtre, sinon un script lisant l'état verrait un contact que les rappels
   tiennent pour levé.
 - **SENS DU FILTRE — le navigateur prouve un LEVER, il n'autorise pas une pose.** Ne jamais
-  l'inverser : prendre la liste des doigts posés du DOM pour vérité et n'accepter qu'elle a été
-  livré, puis **signalé par l'utilisateur sur un vrai téléphone** — des contacts encore appuyés
-  étaient perdus, car tout ce que cette liste ignore (événement manqué, identifiant renuméroté,
-  focus rapporté à faux le temps d'une barre d'adresse) devenait une annulation. Le module tient
-  donc `__ollinTouchGone`, l'ensemble des identifiants dont le lever a été VU, et ne retire que
-  ceux-là ; un identifiant en sort dès qu'un doigt se repose avec ce numéro (le navigateur les
-  recycle, sinon le doigt suivant naîtrait déjà mort). `__ollinTouchHeld` (miroir de
+  l'inverser. Prendre la liste des doigts posés du DOM pour vérité et n'accepter que ce qu'elle
+  contient a été livré une première fois, puis **signalé par l'utilisateur sur un vrai
+  téléphone** : des contacts encore appuyés étaient perdus, car tout ce que cette liste ignore
+  (événement manqué, identifiant renuméroté, focus rapporté à faux le temps d'une barre
+  d'adresse) devenait une annulation. Le module tient donc `__ollinTouchGone`, l'ensemble des
+  identifiants dont le lever a été VU, et ne retire que ceux-là ; un identifiant en sort dès
+  qu'un doigt se repose avec ce numéro (le navigateur les recycle, sinon le doigt suivant
+  naîtrait déjà mort) ou dès que raylib cesse de le rapporter, sans quoi l'ensemble grossirait
+  pendant toute la session. `__ollinTouchHeld` (miroir de
   `e.touches`) ne sert qu'à alimenter le premier lors d'un `blur`, où aucun `touchend` n'arrive.
   Règle générale : un doute laisse le doigt vivant.
   **`IsWindowFocused()` a été retiré du filtre** : il ne suffisait pas (mesuré — une note tenue

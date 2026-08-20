@@ -116,6 +116,23 @@ bool contact_vivant(int id) {
         return (window.__ollinTouchGone && window.__ollinTouchGone.has($0)) ? 0 : 1;
     }, id) != 0;
 }
+
+// Un identifiant levé ne sert que tant que raylib le rapporte encore : passé ce point il n'y a
+// plus de fantôme à filtrer. Sans cet oubli, l'ensemble grossirait pendant toute la session,
+// le navigateur ne recyclant pas forcément ses identifiants.
+void oublier_leves_absents(const int* ids, int n) {
+    EM_ASM({
+        if (!window.__ollinTouchGone || window.__ollinTouchGone.size === 0)
+            return;
+        var vus = new Set();
+        for (var i = 0; i < $1; i++)
+            vus.add(HEAP32[($0 >> 2) + i]);
+        window.__ollinTouchGone.forEach(function(id) {
+            if (!vus.has(id))
+                window.__ollinTouchGone.delete(id);
+        });
+    }, ids, n);
+}
 #else
 void install_dom_watch() {
 }
@@ -124,6 +141,9 @@ void install_dom_watch() {
 // n'existe pas : le bureau ne rapporte aucun contact tactile.
 bool contact_vivant(int) {
     return true;
+}
+
+void oublier_leves_absents(const int*, int) {
 }
 #endif
 
@@ -149,16 +169,18 @@ int contacts_vivants(Point* out) {
     int brut = GetTouchPointCount();
     if (brut > k_max_points)
         brut = k_max_points;
+    int ids[k_max_points];
     for (int i = 0; i < brut; i++) {
-        int id = GetTouchPointId(i);
-        if (!contact_vivant(id))
+        ids[i] = GetTouchPointId(i);
+        if (!contact_vivant(ids[i]))
             continue;
         Vector2 p = GetTouchPosition(i);
-        out[n].id = id;
+        out[n].id = ids[i];
         out[n].x = p.x;
         out[n].y = p.y;
         n++;
     }
+    oublier_leves_absents(ids, brut);
     return n;
 }
 
