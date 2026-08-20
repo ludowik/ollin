@@ -25,13 +25,22 @@
 //    après un `blur`.
 //
 // Dans les deux cas le script verrait un contact fantôme, et une note tenue par ce contact ne
-// s'arrêterait plus. On interroge donc le NAVIGATEUR pour la liste vraie, et on filtre.
+// s'arrêterait plus. On écoute donc le navigateur — mais SEULEMENT pour retirer.
 //
-// État des preuves, à ne pas confondre : le cas 2 est corrigé par MESURE (sans le filtre, le
-// son continue après la perte de focus ; avec, il s'arrête). Le cas 1 est couvert par
-// CONSTRUCTION — on prend la liste du navigateur pour vérité — mais le harnais de test
-// (événements tactiles synthétiques) ne le reproduit pas : raylib y rend le même compte que
-// le navigateur.
+// SENS DU FILTRE, à ne pas inverser : le navigateur sert de preuve de LEVER, jamais
+// d'autorisation de poser. Prendre sa liste de doigts posés pour la vérité et n'accepter que
+// ce qu'elle contient a été essayé, et perdait des contacts encore appuyés sur un vrai
+// téléphone : tout ce que cette liste ignore — un événement manqué, un identifiant que la
+// couche graphique renumérote, un focus rapporté à faux le temps d'une barre d'adresse —
+// devenait une annulation. Un doute doit laisser le doigt vivant ; seul un `touchend`, un
+// `touchcancel` ou une perte de focus le tue.
+//
+// État des preuves, à ne pas confondre : la perte de focus est corrigée par MESURE (sans le
+// filtre, une note tenue continue de sonner après un `blur` ; avec, elle s'arrête), et la
+// non-régression l'est aussi (un contact absent des listes du navigateur reste vivant). Le
+// lever simultané, lui, est couvert par CONSTRUCTION — l'identifiant levé est mémorisé — mais
+// le harnais de test (événements tactiles synthétiques) ne le reproduit pas : raylib y rend le
+// même compte que le navigateur.
 
 namespace {
 
@@ -49,44 +58,62 @@ Point s_prev[k_max_points];
 int s_prev_count = 0;
 
 #ifdef __EMSCRIPTEN__
-// Liste de référence tenue par le NAVIGATEUR lui-même, en écoute de CAPTURE : on n'intercepte
-// donc rien à raylib, qui garde ses propres écouteurs et son émulation de la souris. `e.touches`
-// exclut déjà les doigts levés, ce qui règle le cas des levers simultanés ; la perte de focus,
-// elle, vide la liste faute d'événement tactile.
+// Écoute en CAPTURE sur window : on n'intercepte rien à raylib, qui garde ses propres écouteurs
+// et son émulation de la souris. Deux ensembles, aux rôles bien distincts :
+//   `poses` — miroir de `e.touches`, qui ne sert QU'À alimenter le second lors d'un blur ;
+//   `leves` — les identifiants dont on a VU le lever, seul ensemble que le filtre consulte.
+// Un identifiant sort de `leves` dès qu'un doigt se repose avec ce numéro : le navigateur les
+// recycle, et sans cela le doigt suivant naîtrait déjà mort.
 void install_dom_watch() {
     static bool pose = false;
     if (pose)
         return;
     pose = true;
     EM_ASM({
-        if (window.__ollinTouchIds)
+        if (window.__ollinTouchGone)
             return;
-        window.__ollinTouchIds = new Set();
-        var maj = function(e) {
+        window.__ollinTouchGone = new Set();
+        window.__ollinTouchHeld = new Set();
+        var poses = function(e) {
             var s = new Set();
-            for (var i = 0; i < e.touches.length; i++)
+            for (var i = 0; i < e.touches.length; i++) {
                 s.add(e.touches[i].identifier);
-            window.__ollinTouchIds = s;
+                window.__ollinTouchGone.delete(e.touches[i].identifier);
+            }
+            window.__ollinTouchHeld = s;
+        };
+        var leves = function(e) {
+            for (var i = 0; i < e.changedTouches.length; i++)
+                window.__ollinTouchGone.add(e.changedTouches[i].identifier);
+            poses(e);
         };
         // Pas de littéral de tableau ni d'objet ici : EM_ASM est une MACRO, et une virgule
         // hors parenthèses y sépare ses arguments — le bloc ne compile alors plus.
-        var noms = 'touchstart touchmove touchend touchcancel'.split(' ');
         var opt = { capture: true };
         opt.passive = true;
-        for (var i = 0; i < noms.length; i++)
-            window.addEventListener(noms[i], maj, opt);
-        var vider = function() { window.__ollinTouchIds = new Set(); };
-        window.addEventListener('blur', vider);
+        var poses_noms = 'touchstart touchmove'.split(' ');
+        for (var i = 0; i < poses_noms.length; i++)
+            window.addEventListener(poses_noms[i], poses, opt);
+        var leves_noms = 'touchend touchcancel'.split(' ');
+        for (var i = 0; i < leves_noms.length; i++)
+            window.addEventListener(leves_noms[i], leves, opt);
+        // Perte de focus : aucun touchend n'arrive, donc on déclare levés tous les doigts que
+        // l'on savait posés. C'est la seule raison d'être de `__ollinTouchHeld`.
+        var abandonner = function() {
+            window.__ollinTouchHeld.forEach(function(id) { window.__ollinTouchGone.add(id); });
+            window.__ollinTouchHeld = new Set();
+        };
+        window.addEventListener('blur', abandonner);
         document.addEventListener('visibilitychange', function() {
             if (document.hidden)
-                vider();
+                abandonner();
         });
     });
 }
 
 bool contact_vivant(int id) {
     return EM_ASM_INT({
-        return (window.__ollinTouchIds && window.__ollinTouchIds.has($0)) ? 1 : 0;
+        return (window.__ollinTouchGone && window.__ollinTouchGone.has($0)) ? 0 : 1;
     }, id) != 0;
 }
 #else
@@ -116,8 +143,9 @@ Value callback(const Value& m, const char* nom) {
 // pas voir un contact que les rappels considèrent comme levé.
 int contacts_vivants(Point* out) {
     int n = 0;
-    if (!IsWindowFocused())
-        return 0;
+    // Pas de test de focus ici : `IsWindowFocused()` répond faux sur un vrai téléphone dès
+    // qu'un ornement du navigateur prend la main, et coupait alors des doigts encore posés.
+    // La perte de focus est traitée là où elle est certaine, par l'écouteur `blur`.
     int brut = GetTouchPointCount();
     if (brut > k_max_points)
         brut = k_max_points;

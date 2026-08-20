@@ -608,16 +608,28 @@ survolée a changé, ce qui rend le doublon sans effet.
   ne retire qu'UN contact changé (il sort de sa boucle au premier), alors qu'emscripten lui
   transmet l'UNION de `e.touches` et de `e.changedTouches` — deux doigts levés ensemble
   laissent donc un fantôme ; (2) à la perte de focus, aucun `touchend` n'arrive et tous les
-  doigts restent « posés ». Le module maintient donc, côté navigateur, la liste vraie
-  (écouteurs de CAPTURE sur `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`)
-  et n'accepte de raylib que les contacts qu'elle contient. `count()` et `points()` passent
-  par le même filtre, sinon un script lisant l'état verrait un contact que les rappels
+  doigts restent « posés ». Le module écoute donc le navigateur (écouteurs de CAPTURE sur
+  `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`). `count()` et `points()`
+  passent par le même filtre, sinon un script lisant l'état verrait un contact que les rappels
   tiennent pour levé.
-  **`IsWindowFocused()` ne suffit pas** (mesuré) : au navigateur, une note tenue continuait de
-  sonner après un `blur` avec ce seul test — c'est l'écouteur DOM qui fait le travail.
+- **SENS DU FILTRE — le navigateur prouve un LEVER, il n'autorise pas une pose.** Ne jamais
+  l'inverser : prendre la liste des doigts posés du DOM pour vérité et n'accepter qu'elle a été
+  livré, puis **signalé par l'utilisateur sur un vrai téléphone** — des contacts encore appuyés
+  étaient perdus, car tout ce que cette liste ignore (événement manqué, identifiant renuméroté,
+  focus rapporté à faux le temps d'une barre d'adresse) devenait une annulation. Le module tient
+  donc `__ollinTouchGone`, l'ensemble des identifiants dont le lever a été VU, et ne retire que
+  ceux-là ; un identifiant en sort dès qu'un doigt se repose avec ce numéro (le navigateur les
+  recycle, sinon le doigt suivant naîtrait déjà mort). `__ollinTouchHeld` (miroir de
+  `e.touches`) ne sert qu'à alimenter le premier lors d'un `blur`, où aucun `touchend` n'arrive.
+  Règle générale : un doute laisse le doigt vivant.
+  **`IsWindowFocused()` a été retiré du filtre** : il ne suffisait pas (mesuré — une note tenue
+  continuait de sonner après un `blur` avec ce seul test) et il coupait des doigts posés sur un
+  vrai appareil. La perte de focus se traite là où elle est certaine, dans l'écouteur `blur`.
   ⚠ Le cas (1) est couvert par CONSTRUCTION, pas par mesure : le harnais de test (événements
   tactiles synthétiques via CDP) ne le reproduit pas, raylib y rendant le même compte que le
-  navigateur. Ne pas prétendre l'avoir vérifié.
+  navigateur. Ne pas prétendre l'avoir vérifié. La NON-RÉGRESSION, elle, est mesurée : en
+  vidant de force les ensembles côté navigateur pendant qu'un doigt est posé, l'ancien filtre
+  faisait tomber le son à zéro (RMS 0,0865 → 0) et le nouveau le tient (0,0872 → 0,0861).
 - **Piège d'écriture d'un `EM_ASM`** : c'est une MACRO, donc une virgule HORS parenthèses y
   sépare ses arguments — un littéral de tableau `['a', 'b']` ou d'objet `{a: 1, b: 2}` ne
   compile pas. Écrire `'a b'.split(' ')` et poser les champs un par un.
