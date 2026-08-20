@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-19 17:24</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-20 09:53</span></p>
   </div>
   <div class="section-label">Démarrage</div>
   <a href="#intro">Introduction</a>
@@ -443,6 +443,7 @@ pre:hover .code-actions,
   <a href="#graphics">Graphics + Colors</a>
   <a href="#keyboard">Clavier</a>
   <a href="#mouse">Souris</a>
+  <a href="#touch">Multitouche</a>
   <a href="#ui">Module ui</a>
   <a href="#tween">Module tween</a>
   <a href="#sound">Son (audio + sound)</a>
@@ -454,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-19 17:24</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-20 09:53</span></h1>
   <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
 
   <div class="badges">
@@ -2123,6 +2124,45 @@ print(v3)          ## Vec2(4,6)</code></pre>
 </section>
 
 <!-- ── ui ─────────────────────────────────────────────────────────────────── -->
+<section id="touch">
+<h2>Module <code>touch</code></h2>
+<p>Suit <strong>plusieurs doigts à la fois</strong>, chacun par un identifiant stable. C'est ce qu'il faut pour deux notes tenues ensemble, une manette à deux pouces ou un pincement — là où <code>mouse</code> ne rapporte qu'un seul point.</p>
+
+<table>
+  <thead><tr><th>Rappel</th><th>Appelé quand</th></tr></thead>
+  <tbody>
+    <tr><td><code>touch.began(id, x, y)</code></td><td>un doigt se pose</td></tr>
+    <tr><td><code>touch.moved(id, x, y)</code></td><td>un doigt se déplace</td></tr>
+    <tr><td><code>touch.ended(id, x, y)</code></td><td>un doigt se lève, à sa dernière position connue</td></tr>
+  </tbody>
+</table>
+
+<p>L'état se lit aussi directement, sans rappel&nbsp;: <code>touch.count()</code> donne le nombre de contacts, <code>touch.points()</code> un tableau de <code>{id, x, y}</code>. Les coordonnées sont dans le même repère que celles de <code>mouse</code>.</p>
+
+<pre><code><span class="cmt">## Une note par doigt : l'identifiant sert de clé, donc plusieurs sonnent ensemble.</span>
+<span class="kw">global</span> sous = {}
+
+<span class="kw">func</span> touch.began(id, x, y)
+    sous[id] = toucheSous(x, y)
+    <span class="bi">sound</span>.tone(<span class="bi">sound</span>.note(notes[sous[id]]), <span class="num">0.5</span>).play()
+<span class="kw">end</span>
+
+<span class="kw">func</span> touch.ended(id, x, y)
+    sous[id] = <span class="kw">nil</span>
+<span class="kw">end</span></code></pre>
+
+<div class="callout tip">Les rappels de <code>mouse</code> ne sont <strong>pas</strong> supprimés&nbsp;: sur un doigt unique, le système émule la souris, si bien qu'un script déclarant les deux familles reçoit le geste <strong>deux fois</strong>. Écrivez donc chaque chemin pour qu'un doublon soit sans effet, ou n'écoutez qu'une famille.</div>
+
+<h3>Ce qu'il faut savoir</h3>
+<ul>
+  <li>Jusqu'à <strong>huit</strong> contacts sont suivis. Un neuvième doigt est ignoré, comme le fait le moteur graphique lui-même.</li>
+  <li>Sur un ordinateur, une souris n'a qu'un pointeur&nbsp;: <code>touch.count()</code> y vaut toujours zéro, et c'est <code>mouse</code> qui rend service.</li>
+  <li>Le suivi est reconstruit par le moteur&nbsp;: la couche graphique ne donne qu'une photographie des contacts à chaque image, sans dire lequel vient d'apparaître. C'est la comparaison d'une image à la suivante qui produit les trois rappels.</li>
+  <li>L'identifiant reste le même du début à la fin d'un geste, mais il est <strong>réutilisé</strong> ensuite&nbsp;: ne le conservez pas au-delà de <code>ended</code>.</li>
+  <li>Une page web doit poser <code>touch-action: none</code> sur son canvas, sans quoi deux doigts déclenchent le zoom du navigateur au lieu d'atteindre le programme. Les vues du site le font déjà.</li>
+</ul>
+</section>
+
 <section id="ui">
 <h2>Module ui</h2>
 <p>Boutons, cases à cocher et sliders dessinés par le <strong>moteur</strong>, en pile dans le coin haut droit de la zone de tracé. Aucune dépendance au navigateur : le même code tourne en natif, sous un affichage virtuel et dans le playground.</p>

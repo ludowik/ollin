@@ -570,6 +570,43 @@ Autres points :
   les tests. Le stub renvoie un **handle inerte** portant les mêmes méthodes, pour qu'un
   script chaînant `ui.menu("x").button(...)` tourne aussi sans graphisme.
 
+## Module `touch` (multitouche, implémentation)
+
+> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module touch »).
+
+raylib ne donne qu'une PHOTOGRAPHIE des contacts à chaque image (`GetTouchPointCount`,
+`GetTouchPointId`, `GetTouchPosition`) : aucun événement ne dit lequel vient d'apparaître.
+Le module garde donc la liste de l'image précédente et la compare — un identifiant nouveau
+donne `began`, un identifiant disparu donne `ended` (avec sa DERNIÈRE position, celle du
+lever n'étant plus lisible), une position changée donne `moved`. C'est tout le module.
+
+**Sans lui, `mouse` ne peut rapporter qu'un doigt** : dans `rcore_web.c`, la position de la
+souris n'est recopiée depuis le tactile que `if (pointCount == 1)`, si bien qu'au second
+doigt la souris cesse de suivre quoi que ce soit.
+
+**Les rappels de `mouse` ne sont PAS filtrés** (décision explicite de l'utilisateur) : sur un
+doigt unique le système émule la souris, donc les deux familles partent et un script qui
+déclare les deux reçoit le geste deux fois. Corollaire pour les exemples : écrire chaque
+chemin de façon IDEMPOTENTE — dans `sound_demo.ol`, `suivre()` n'agit que si la touche
+survolée a changé, ce qui rend le doublon sans effet.
+
+- Table de taille fixe, 8 contacts (`MAX_TOUCH_POINTS` de raylib) ; un neuvième doigt est
+  ignoré, comme raylib l'ignore.
+- `touch_poll()` est appelé APRÈS `mouse_poll` dans `run_user_callbacks` ; `touch_reset()`
+  dans `ollin_run`, sinon un doigt resté « posé » ferait croire à un geste en cours.
+- La liste de référence est recopiée APRÈS les appels au script : un rappel qui lève laisse
+  ainsi un état cohérent.
+- Trois arguments passent par la forme générique `call_value(fn, args, argc)` — le VM n'a pas
+  de surcharge à trois, et en ajouter une pour un seul appelant ne se justifie pas.
+- **Limite en amont** : sur `touchend`, raylib ne retire de sa liste qu'UN contact changé (il
+  sort de la boucle au premier). Deux doigts levés dans le même événement laisseraient donc
+  un contact fantôme — rien à corriger de notre côté, mais à savoir.
+- Testé au navigateur par `Input.dispatchTouchEvent` (CDP) avec deux points simultanés, dans
+  un contexte `hasTouch: true` : deux notes mesurées ensemble (do 262 Hz et sol 392 Hz à
+  −45 dB, plancher à −156 dB), et RMS nul après le lever. ⚠ Le spectre de l'`AnalyserNode`
+  est LISSÉ dans le temps (0,8 par défaut) et garde une traîne : c'est le RMS temporel qui
+  prouve l'extinction.
+
 ## Modules `audio` et `sound` (implémentation)
 
 > API : voir le tutoriel (`docs/views/tutoriel.html`, section « Modules audio et sound »).

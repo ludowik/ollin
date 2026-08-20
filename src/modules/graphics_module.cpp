@@ -1,6 +1,7 @@
 #include "graphics_internal.h"
 #include "audio_module.h"
 #include "sound_module.h"
+#include "touch_module.h"
 #include "ui_module.h"
 #include "tween_module.h"
 #include "engine_font.h"
@@ -1170,6 +1171,10 @@ static void run_user_callbacks(const Value& draw_fn) {
     // n'est pas appelé — cliquer un bouton ne déclenche donc pas aussi l'action de la
     // scène. C'est la raison d'être d'un module natif plutôt qu'une classe Ollin.
     mouse_poll(ui_poll());
+    // Le multitouche vient APRÈS la souris, et ne la remplace pas : sur un doigt unique le
+    // système émule la souris, donc les deux familles de rappels partent. Un script choisit
+    // celle qu'il écoute (décision assumée : rien n'est filtré).
+    touch_poll();
     // Le son s'ouvre au premier geste : le navigateur refuse de sonner avant une
     // interaction, et le script n'a donc rien à écrire pour que ses bips partent.
     // Le clavier passe par son module : keyboard_poll a déjà CONSOMMÉ la file de raylib,

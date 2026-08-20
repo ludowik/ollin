@@ -2,6 +2,7 @@
 #include "lexer.h"
 #include "modules/audio_module.h"
 #include "modules/sound_module.h"
+#include "modules/touch_module.h"
 #include "modules/camera_module.h"
 #include "modules/engine_font.h"
 #include "modules/ui_module.h"
@@ -32,6 +33,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     tween_reset();   // idem : un tween resté vivant retiendrait les objets du programme précédent
     audio_reset();   // volume général : un programme précédent a pu le baisser
     sound_reset();   // sinon un oscillateur du programme précédent continuerait de sonner
+    touch_reset();   // un doigt resté « posé » ferait croire à un geste en cours
     engine_font_reset();   // les atlas appartenaient au contexte GL précédent
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();

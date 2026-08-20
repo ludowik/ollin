@@ -1503,6 +1503,21 @@ assert(math.abs(sound.osc("A4").freq() - 440.0) < 0.01)
 assert(math.abs(sound.sine(100).freq("E4").freq() - 329.628) < 0.01)
 assert(math.abs(sound.tone("A5", 0.1).duration() - 0.1) < 0.001)
 
+## ── Module touch (multitouche) ──────────────────────────────────────────────────
+## Sans surface tactile — c'est le cas du conteneur d'intégration — le module existe quand
+## même : un script qui lit l'état tourne sans rien voir, au lieu d'échouer sur un nil.
+assert(typeof(touch) == "map")
+assert(touch.count() == 0)
+assert(typeof(touch.points()) == "array" and #touch.points() == 0)
+
+## Les rappels s'affectent comme ceux de `mouse` : le moteur appelle ce qui existe, et
+## l'absence des trois n'est pas une faute.
+global tcVus = []
+func touch.began(id, x, y)
+    tcVus[#tcVus + 1] = id
+end
+assert(#tcVus == 0)
+
 ## ── Module audio (session) ──────────────────────────────────────────────────────
 ## Le module existe TOUJOURS, même sans périphérique : la génération d'ondes est un pur
 ## calcul, et la suite tourne dans un conteneur sans carte son. Seule la sortie est muette.
