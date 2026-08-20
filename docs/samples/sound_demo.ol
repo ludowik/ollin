@@ -31,6 +31,9 @@ global sousSouris = 0     ## touche sous le pointeur, 0 = aucune
 ## la création suivante, et l'ancien objet ne désignerait plus rien.
 global voix = []          ## oscillateurs disponibles
 global voixDe = {}        ## contact (identifiant de doigt, ou "souris") → index dans `voix`
+## Instant où chaque voix a été rendue. Une voix rendue continue de s'éteindre sur son
+## relâchement : reprendre la plus RÉCEMMENT rendue couperait net cette queue de note.
+global rendueA = []
 
 ## Une entrée par doigt POSÉ : identifiant → touche qu'il presse. C'est ce qui permet
 ## plusieurs notes en même temps, là où un seul pointeur ne peut en désigner qu'une.
@@ -70,6 +73,7 @@ func setup()
     ## l'attaque et le relâchement ; sans durée passée à `trigger`, la note se tient.
     for i = 1, 9 do
         voix[i] = sound.triangle(440).volume(0.3).envelope(0.01, 0.09, 0.5, 0.18)
+        rendueA[i] = 0
     end
 
     ## L'archet reste silencieux jusqu'au premier glissement : son volume est nul et c'est
@@ -78,12 +82,15 @@ func setup()
     archet.start()
 end
 
-## Voix libre pour ce contact, ou celle qu'il tient déjà. Toutes prises : on ne joue pas —
-## mieux vaut une note manquante qu'une note volée à un doigt encore posé.
+## Voix libre pour ce contact, ou celle qu'il tient déjà. On prend la plus ANCIENNEMENT
+## rendue : la dernière rendue s'éteint encore sur son relâchement, et la redéclencher
+## couperait sa queue de note. Toutes prises : on ne joue pas — mieux vaut une note manquante
+## qu'une note volée à un doigt encore posé.
 func voixPour(contact)
     if voixDe[contact] <> nil then
         return voix[voixDe[contact]]
     end
+    var choisie = 0
     for i = 1, #voix do
         var pris = false
         for c, j in voixDe do
@@ -91,12 +98,15 @@ func voixPour(contact)
                 pris = true
             end
         end
-        if not pris then
-            voixDe[contact] = i
-            return voix[i]
+        if not pris and (choisie == 0 or rendueA[i] < rendueA[choisie]) then
+            choisie = i
         end
     end
-    return nil
+    if choisie == 0 then
+        return nil
+    end
+    voixDe[contact] = choisie
+    return voix[choisie]
 end
 
 ## Tenir la note d'une touche, ou relâcher si le contact ne presse plus rien. Rend la touche
@@ -125,6 +135,7 @@ func relacher(contact)
         return
     end
     voix[voixDe[contact]].release()
+    rendueA[voixDe[contact]] = elapsedTime   ## pour ne pas la reprendre pendant son extinction
     voixDe[contact] = nil
 end
 
@@ -205,10 +216,19 @@ func touch.ended(id, x, y)
     sousDoigts[id] = nil
 end
 
-## ── Souris : un seul pointeur, et les rappels partent AUSSI sur un doigt unique (le
-## système émule la souris). Les deux chemins sont donc écrits pour être idempotents :
-## rejouer la même touche est sans effet, puisque `suivre` exige un changement.
+## ── Souris : un seul pointeur, pour l'ordinateur ────────────────────────────────
+## Sur un écran tactile, le système émule la souris quand un seul doigt touche : les deux
+## familles de rappels partent alors, et le moteur ne filtre rien (c'est au script de
+## choisir). Sans ce garde-fou, un doigt déclenchait la note DEUX fois — deux voix à la même
+## hauteur, donc deux fois plus fort, et deux voix consommées au lieu d'une.
+func sourisIgnoree()
+    return touch.count() > 0
+end
+
 func mouse.pressed(x, y)
+    if sourisIgnoree() then
+        return
+    end
     appui = true
     if dansBande(y) then
         glisse = true
@@ -218,7 +238,7 @@ func mouse.pressed(x, y)
 end
 
 func mouse.moved(x, y)
-    if not appui then
+    if not appui or sourisIgnoree() then
         return
     end
     if glisse and dansBande(y) then
@@ -229,6 +249,8 @@ func mouse.moved(x, y)
     sousSouris = suivre("souris", sousSouris, x, y)
 end
 
+## Pas de garde-fou ici : une voix prise par le pointeur doit être rendue dans tous les cas,
+## y compris si un doigt s'est posé entre-temps.
 func mouse.released(x, y)
     appui = false
     relacher("souris")
