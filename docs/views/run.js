@@ -1,32 +1,32 @@
-// Vue RUN (exécution autonome plein écran) — init(ctx) appelée par app.js après
-// montage du fragment views/run.html.
+// RUN view (standalone full-screen execution) — init(ctx), called by app.js once the
+// views/run.html fragment is mounted.
 //   ctx = { root, getOllin, hardReload, navigate, v }
-// Recharge le projet ACTIF depuis IndexedDB (écrit par le playground) et
-// l'exécute via la logique PARTAGÉE (pg-run.js) — mêmes préchargement et gestion
-// d'erreurs que le Run inline du playground.
+// It reloads the ACTIVE project from IndexedDB (written by the playground) and runs it through
+// the SHARED logic (pg-run.js), with the same preloading and error handling as the playground's
+// inline Run.
 
 export async function init(ctx) {
   const { getOllin } = ctx
-  let mod = null   // module WASM (capturé par stop() ; pas de global smuggling)
+  let mod = null   // the WASM module, captured by stop(); nothing smuggled through a global
 
-  // Modules partagés (cache-bustés avec le jeton de version de la SPA : une même
-  // session réutilise la même URL → pas de croissance du registre de modules).
+  // Shared modules, cache-busted with the app's version token: one session reuses the same URL,
+  // so the module registry does not grow.
   const Store = await (await import('../pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
   const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
 
-  // Barre du plein ecran collee au haut du visible quand le clavier s'ouvre.
-  // TÉLÉPHONE uniquement (pas tablette/iPad, interface « bureau ») : pointeur
-  // grossier ET petit écran (petit côté < 600px sépare téléphones ≤ ~430 et iPad ≥ 744).
+  // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
+  // only, not tablets or iPads, which get the desktop interface: a coarse pointer AND a small
+  // screen (a short side under 600px separates phones, at most ~430, from iPads, at least 744).
   const isPhone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
                && Math.min(window.screen.width, window.screen.height) < 600
   const unpinViewport = isPhone ? pinToVisualViewport() : () => {}
 
   const statusEl = document.getElementById('status')
   const outEl    = document.getElementById('out')
-  const canvasEl = document.getElementById('canvas')   // canvas PARTAGÉ (shell)
+  const canvasEl = document.getElementById('canvas')   // the SHARED canvas, from the shell
 
-  // Reparenter le canvas partagé dans la zone graphique de cette vue.
+  // Reparent the shared canvas into this view's graphics area.
   const pane = document.getElementById('output-pane')
   canvasEl.style.display = 'none'
   pane.appendChild(canvasEl)
@@ -38,37 +38,36 @@ export async function init(ctx) {
     outEl.className   = (text && String(text).startsWith('error:')) ? 'err' : 'ok'
   }
 
-  // (Re)lance le programme courant. Réutilisé au démarrage ET par « Recharger ».
+  // (Re)starts the current program. Used both at startup and by "Reload".
   async function launch() {
     statusEl.textContent = ''
-    // Modèles 3D référencés → préchargés depuis samples/ (best-effort ; sans effet
-    // pour un projet dont les modèles sont déjà dans ses ressources).
+    // The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a
+    // project whose models are already among its resources).
     const imported = await preloadSampleImports(mod, code, ctx.v)
-    await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // modèles des imports aussi
-    // Portée « projet » du module `data` : cohérente avec le playground (même clé).
+    await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // the imports' models too
+    // The `data` module's project scope, consistent with the playground: the same key.
     window.__ollinDataProject = exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_')
-    // Dimensions de rendu FRAÎCHES transmises au moteur (le module `window` lit
-    // __ollinRenderW/H en priorité). Sans ça, la valeur posée par le playground
-    // PERSISTE sur window → W/H figés à l'ancienne taille en plein écran.
+    // FRESH render dimensions are handed to the engine (the `window` module reads
+    // __ollinRenderW/H first). Without this, the value set by the playground PERSISTS on window,
+    // and W/H stay frozen at the old size in full screen.
     const rr = pane.getBoundingClientRect()
     window.__ollinRenderW = Math.round(rr.width)
     window.__ollinRenderH = Math.round(rr.height)
     runProgram(mod, code, canvasEl, {
       filename:  project ? (project.entry || '') : (exampleFile || ''),
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
-      // Programme graphique : focus clavier au canvas (programmes interactifs).
-      // preventScroll : sinon mobile défile pour amener le canvas dans le viewport.
+      // A graphics program: keyboard focus goes to the canvas, for interactive programs.
+      // preventScroll, otherwise mobile scrolls to bring the canvas into the viewport.
       onRunning: () => { statusEl.textContent = ''; try { canvasEl.focus({ preventScroll: true }) } catch (_) {} },
       onOutput:  (out) => showText(out),
     })
   }
 
-  // ── Contrôles d'exécution : Recharger + Relancer + Pause/Reprendre ──────────
-  // DEUX relances distinctes :
-  //  • « Recharger » recharge la PAGE → nouvelle instance WASM (module frais).
-  //  • « Relancer » ré-exécute DANS LA MÊME instance WASM (sans reload) : plus
-  //    rapide (pas de flash de rechargement), et sûr depuis la correction de la
-  //    ré-entrance des pools d'objets (voir MapPool::release).
+  // Execution controls: Reload, Restart, Pause/Resume. TWO distinct restarts:
+  //  • "Reload" reloads the PAGE, hence a new WASM instance, from a fresh module.
+  //  • "Restart" runs again WITHIN THE SAME WASM instance, with no reload: faster, with no
+  //    reload flash, and safe since the object pools' re-entrance was fixed (see
+  //    MapPool::release).
   const reloadBtn   = document.getElementById('reload-btn')
   const relaunchBtn = document.getElementById('relaunch-btn')
   const pauseBtn    = document.getElementById('pause-btn')
@@ -93,11 +92,10 @@ export async function init(ctx) {
       setPauseUI()
     })
   }
-  // ── Capture d'écran → ressource PNG du projet ────────────────────────────────
-  // La capture est produite par le MOTEUR en fin de frame (seul instant où le
-  // framebuffer contient l'écran composé : sans preserveDrawingBuffer, canvas.toDataURL
-  // rendrait une image vide). D'où l'aller-retour : requestCapture pose la demande, puis
-  // on attend qu'une frame livre le PNG.
+  // Screenshot, stored as a PNG resource of the project. The capture is produced by the ENGINE at
+  // the end of a frame, the only moment when the framebuffer holds the composed screen: without
+  // preserveDrawingBuffer, canvas.toDataURL would give an empty image. Hence the round trip —
+  // request_capture files the request, then we wait for a frame to deliver the PNG.
   const shotBtn = document.getElementById('shot-btn')
 
   function stamp() {
@@ -106,8 +104,8 @@ export async function init(ctx) {
     return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
   }
 
-  // Attend le PNG, au plus `tries` frames : une capture manquée ne doit pas laisser le
-  // bouton bloqué (programme sans draw(), erreur d'exécution…).
+  // Waits for the PNG, for at most `tries` frames: a missed capture must not leave the button
+  // stuck (a program with no draw(), a runtime error…).
   function waitCapture(tries = 40) {
     return new Promise((resolve) => {
       const poll = () => {
@@ -121,15 +119,15 @@ export async function init(ctx) {
     })
   }
 
-  // Une capture à la fois : deux clics rapprochés se marcheraient dessus (la demande est
-  // un état unique côté moteur, et le premier arrivé retire le PNG — le second attendrait
-  // en vain puis annoncerait un échec).
+  // One capture at a time: two clicks close together would tread on each other, the request
+  // being a single piece of state on the engine's side, and the first to arrive taking the PNG
+  // away — the second would wait in vain and then report a failure.
   let capturing = false
 
   async function capture() {
     if (!mod || !mod.requestCapture || capturing) return
     if (!project) {
-      // Un exemple lu depuis le dépôt n'a pas de ressources où ranger l'image.
+      // A sample read from the repository has no resources to store the image in.
       statusEl.textContent = 'capture : crée un projet depuis cet exemple'
       return
     }
@@ -142,7 +140,7 @@ export async function init(ctx) {
   }
 
   async function takeShot() {
-    // En pause, aucune frame ne passe : on reprend le temps de la capture.
+    // While paused no frame goes by, so the loop is resumed for the length of the capture.
     const wasPaused = paused
     if (wasPaused) {
       try { mod.resumeMainLoop() } catch (_) {}
@@ -158,15 +156,15 @@ export async function init(ctx) {
       return
     }
     project.resources = project.resources || {}
-    // Nom LIBRE : l'horodatage est à la seconde, donc deux captures rapprochées se
-    // partageraient une clé et la seconde écraserait la première image du projet.
+    // A FREE name: the timestamp is to the second, so two captures close together would share a
+    // key and the second would overwrite the project's first image.
     let name = 'capture-' + stamp() + '.png'
     for (let n = 2; project.resources[name] !== undefined; n++)
       name = 'capture-' + stamp() + '-' + n + '.png'
     project.resources[name] = { b64, ext: 'png' }
     await Store.saveProject(project)
-    // Immédiatement utilisable par le programme (image.load(name)), comme une image
-    // ajoutée depuis l'éditeur.
+    // Immediately usable by the program (image.load(name)), like an image added from the
+    // editor.
     try { if (mod.preloadImage) mod.preloadImage(name, b64, 'png') } catch (_) {}
     statusEl.textContent = name
   }
@@ -176,12 +174,12 @@ export async function init(ctx) {
   }
   if (reloadBtn) {
     reloadBtn.addEventListener('click', () => {
-      location.reload()   // module WASM neuf (chemin sûr, conserve le hash #/run/…)
+      location.reload()   // a brand-new WASM module (the safe path, and it keeps the #/run/… hash)
     })
   }
   if (relaunchBtn) {
     relaunchBtn.addEventListener('click', () => {
-      // relance IN-PLACE : ré-exécute dans la MÊME instance WASM (pas de reload page)
+      // An IN-PLACE restart: it runs again in the SAME WASM instance, with no page reload.
       if (paused) {
         try { mod && mod.resumeMainLoop() } catch (_) {}
         paused = false
@@ -194,16 +192,16 @@ export async function init(ctx) {
   const stop = () => {
     try { mod && mod.pauseMainLoop && mod.pauseMainLoop() } catch (_) {}
     window.__ollinFrameError = undefined
-    window.__ollinRenderW = undefined   // indice de taille propre à cette vue → ne pas fuiter
+    window.__ollinRenderW = undefined   // a size hint private to this view: it must not leak
     window.__ollinRenderH = undefined
     unpinViewport()
   }
 
-  // Deux sources : soit un EXEMPLE lu direct depuis le dépôt (route
-  // #/run/sample/<fichier>, rechargé frais → un refresh reprend la version du
-  // dépôt), soit le PROJET ACTIF depuis IndexedDB.
+  // Two sources: either a SAMPLE read straight from the repository (the #/run/sample/<file>
+  // route, fetched fresh, so a refresh takes the repository's version again), or the ACTIVE
+  // PROJECT from IndexedDB.
   const exampleFile = sampleFromAnchor(ctx.anchor)
-  // Le lien « Éditeur » préserve l'exemple courant (sinon retour en mode projet).
+  // The "Editor" link preserves the current sample; otherwise it would go back to project mode.
   if (exampleFile) {
     const back = document.querySelector('#bar a')
     if (back) back.setAttribute('href', '#/playground/sample/' + exampleFile)
@@ -212,7 +210,7 @@ export async function init(ctx) {
   let code = null
   if (exampleFile) {
     try {
-      code = await fetchSample(exampleFile, ctx.v)   // rejette sur 404 (pas d'exécution d'une page HTML)
+      code = await fetchSample(exampleFile, ctx.v)   // it rejects on a 404, so an HTML page is never run
     } catch (e) {
       statusEl.textContent = ''
       showText('error: ' + (e && e.message ? e.message : 'exemple introuvable : ' + exampleFile))

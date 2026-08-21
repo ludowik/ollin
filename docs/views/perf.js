@@ -1,16 +1,16 @@
-// Vue PERF (performances du moteur) — init(ctx) appelée par app.js après montage
-// du fragment views/perf.html.
+// PERF view (engine performance) — init(ctx), called by app.js once the views/perf.html fragment
+// is mounted.
 //   ctx = { root, getOllin, hardReload, navigate, v }
 //
-// Les mesures viennent de deux fichiers, aux statuts différents :
-//   data/icount-history.json  le TRAVAIL, série historique — sans elle la page n'a rien à dire
-//   data/bench-snapshot.json  le TEMPS, relevé unique — facultatif : sa section disparaît si
-//                             le fichier manque, le reste de la page tient debout
-// Publier de nouvelles mesures = réécrire ces fichiers, sans toucher à ce code.
+// The measurements come from two files, of different standing:
+//   data/icount-history.json  the WORK, a historical series — without it the page has nothing to say
+//   data/bench-snapshot.json  the TIME, a single reading — optional: its section disappears when
+//                             the file is missing, and the rest of the page still stands
+// Publishing new measurements means rewriting those files, and touching none of this code.
 //
-// Les deux graphiques sont dessinés à la largeur RÉELLE du conteneur, et redessinés quand
-// elle change. Un viewBox figé rétréci par CSS ramènerait une police de 11 px à 3 px sur
-// téléphone — le graphique reste alors « visible » mais illisible.
+// Both charts are drawn at the container's REAL width, and redrawn when it changes. A frozen
+// viewBox shrunk by CSS would bring an 11px font down to 3px on a phone — the chart would still
+// be "visible" but unreadable.
 
 export async function init(ctx) {
   const NBSP = " ";
@@ -40,7 +40,7 @@ export async function init(ctx) {
                         "). Les valeurs restent lisibles dans le tableau.";
   }
 
-  // ── données ───────────────────────────────────────────────────────────────
+  // Data.
   let doc;
   try {
     const rep = await fetch("data/icount-history.json?v=" + ctx.v);
@@ -51,8 +51,8 @@ export async function init(ctx) {
     return () => {};
   }
 
-  // Relevé de temps : absent, la page reste valide sans sa section (elle est retirée du DOM
-  // plutôt que laissée vide, un titre suivi d'un cadre creux passant pour une panne).
+  // The time reading: when absent, the page stays valid without its section, which is removed
+  // from the DOM rather than left empty — a heading over a hollow frame reads as a breakdown.
   let bench = null;
   try {
     const rep = await fetch("data/bench-snapshot.json?v=" + ctx.v);
@@ -61,22 +61,22 @@ export async function init(ctx) {
     bench = null;
   }
   if (!bench) {
-    // Chaque élément à retirer porte un id : viser le voisin d'un autre (« le titre juste
-    // avant le tableau ») échouait, le titre étant frère du CONTENEUR défilant, pas du
-    // tableau lui-même.
+    // Every element to remove carries an id: aiming at another's neighbour ("the heading just
+    // before the table") failed, the heading being a sibling of the scrolling CONTAINER rather
+    // than of the table itself.
     ["titre-temps", "apropos-temps", "bloc-bench", "titre-detail", "defile-temps"]
       .forEach(id => document.getElementById(id).remove());
   }
 
   const JALONS = doc.jalons;
   const SERIES = doc.scripts.map(s => ({ id: s.id, nom: s.nom, classe: "s-" + s.id, css: "--s-" + s.id }));
-  // TOUTES les séries doivent être présentes : n'en tester qu'une laisserait `montrer()`
-  // calculer y(null) pour les autres, donc des coordonnées NaN sans message.
+  // ALL the series must be present: testing only one would leave `montrer()` computing y(null)
+  // for the others, hence NaN coordinates with no message.
   const connu = j => SERIES.every(s => typeof j[s.id] === "number");
   const premier = JALONS.find(connu);
   const dernier = [...JALONS].reverse().find(connu);
-  // Aucun jalon complet : le fichier est inutilisable pour les graphiques (série renommée,
-  // valeurs toutes absentes). Dire pourquoi plutôt que d'échouer sur premier.date.
+  // No complete milestone: the file is unusable for the charts (a renamed series, values all
+  // missing). Say why, rather than failing on premier.date.
   if (!premier) {
     signaler(new Error("aucun jalon ne porte les " + SERIES.length + " séries attendues : " +
                        SERIES.map(s => s.id).join(", ")));
@@ -97,7 +97,7 @@ export async function init(ctx) {
     (mesures < JALONS.length ? " — dont " + (JALONS.length - mesures) + " sans valeur, faute de compiler. " : ". ") +
     "Mesuré avec " + doc.outil + " ; " + doc.machine + ".";
 
-  // ── bilans ────────────────────────────────────────────────────────────────
+  // Summaries.
   const boiteBilans = document.getElementById("bilans");
   SERIES.forEach(s => {
     const a = premier[s.id], b = dernier[s.id];
@@ -119,8 +119,8 @@ export async function init(ctx) {
     boiteBilans.append(carte);
   });
 
-  // ── clés de lecture (elles portent la valeur finale : sur téléphone le graphique
-  //    n'a plus de marge droite pour l'étiquette de bout de courbe) ─────────────
+  // The reading keys carry the final value: on a phone the chart has no right margin left for an
+  // end-of-curve label.
   const boiteCles = document.getElementById("cles");
   SERIES.forEach(s => {
     const w = document.createElement("span");
@@ -132,7 +132,7 @@ export async function init(ctx) {
     boiteCles.append(w);
   });
 
-  // ── bulle ─────────────────────────────────────────────────────────────────
+  // Tooltip.
   function poser(cx, cy) {
     bulle.style.opacity = 1;
     const marge = 14, lb = bulle.offsetWidth, hb = bulle.offsetHeight;
@@ -145,8 +145,8 @@ export async function init(ctx) {
   }
   const masquer = () => { bulle.style.opacity = 0; };
 
-  // Au doigt, le lever émet pointerleave juste après l'appui : ne refermer au départ du
-  // pointeur que pour une SOURIS, et laisser un appui hors du graphique fermer le reste.
+  // With a finger, lifting emits pointerleave right after the press, so we only close on the
+  // pointer leaving for a MOUSE, and let a press outside the chart close it otherwise.
   const horsGraphe = [];
   function fermerAilleurs(svg, effacer) {
     const h = ev => { if (!svg.contains(ev.target)) effacer(); };
@@ -154,12 +154,12 @@ export async function init(ctx) {
     horsGraphe.push(h);
   }
 
-  // Le dernier dessin publie ici ses fonctions de survol ; les écouteurs, eux, sont posés
-  // une fois pour toutes après le premier dessin.
+  // The latest drawing publishes its hover functions here; the listeners themselves are
+  // installed once and for all after the first drawing.
   let survolCourbes = null;
   let survolEcarts = null;
 
-  // ── courbes ───────────────────────────────────────────────────────────────
+  // Curves.
   function dessinerCourbes(w) {
     const petit = w < 560;
     const h = petit ? Math.round(w * 0.86) : 400;
@@ -287,13 +287,13 @@ export async function init(ctx) {
       viseur.setAttribute("opacity", 0);
       vider(points);
     };
-    // L'état de CE dessin, relu par les écouteurs posés une seule fois (plus bas).
+    // The state of THIS drawing, read back by the listeners installed once, further down.
     survolCourbes = { viser: viser, effacer: effacer };
   }
 
-  // ── écarts d'un jalon au suivant ──────────────────────────────────────────
-  // La série détaillée est la PREMIÈRE du fichier de données, pas un « fib » câblé ici :
-  // renommer une série dans le JSON aurait sinon donné des barres NaN, sans erreur.
+  // Gaps from one milestone to the next. The detailed series is the FIRST of the data file, not a
+  // "fib" wired in here: renaming a series in the JSON would otherwise have given NaN bars, with
+  // no error.
   const SERIE_ECARTS = SERIES[0];
   document.getElementById("serie-ecarts").textContent = SERIE_ECARTS.id;
 
@@ -342,7 +342,7 @@ export async function init(ctx) {
       const hb = Math.max(1.5, Math.abs(y(p.v) - y(0)));
       const r = Math.min(4, larg / 2, hb);
       const bx = x(k) - larg / 2, by = versHaut ? y(p.v) : y(0);
-      // bout arrondi côté donnée, carré sur la ligne de base
+      // Rounded at the data end, square on the baseline.
       const d = versHaut
         ? "M" + bx + " " + (by + hb) + " L" + bx + " " + (by + r) + " Q" + bx + " " + by + " " + (bx + r) + " " + by +
           " L" + (bx + larg - r) + " " + by + " Q" + (bx + larg) + " " + by + " " + (bx + larg) + " " + (by + r) +
@@ -351,8 +351,8 @@ export async function init(ctx) {
           " L" + (bx + larg - r) + " " + (by + hb) + " Q" + (bx + larg) + " " + (by + hb) + " " + (bx + larg) + " " + (by + hb - r) +
           " L" + (bx + larg) + " " + by + " Z";
       const barre = el("path", { d: d, fill: versHaut ? "var(--hausse)" : "var(--baisse)" });
-      // `fill="transparent"` ne compte pas comme « peint » pour pointer-events : sans
-      // pointer-events="all", la zone de survol n'attrape rien.
+      // `fill="transparent"` does not count as "painted" for pointer-events: without
+      // pointer-events="all" the hover area catches nothing.
       const zone = el("rect", {
         x: x(k) - pasX / 2, y: m.t, width: pasX, height: ih,
         fill: "transparent", "pointer-events": "all",
@@ -391,8 +391,8 @@ export async function init(ctx) {
       barres.forEach(b => b.removeAttribute("opacity"));
       masquer();
     } };
-    // ligne de base par-dessus les barres, mais transparente au pointeur : sinon elle
-    // vole le survol exactement sur son axe.
+    // The baseline goes over the bars but stays transparent to the pointer; otherwise it steals
+    // the hover exactly along its axis.
     svgEcarts.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(0), y2: y(0), class: "zero" }));
 
     [...pts].sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).slice(0, petit ? 2 : 4).forEach(p => {
@@ -407,11 +407,10 @@ export async function init(ctx) {
     });
   }
 
-  // ── relevé de temps : barres horizontales, en multiples de la référence ────
-  // Une échelle PLAFONNÉE, pas comprimée : le coefficient le plus élevé (Python sur la
-  // boucle numérique) écraserait tout le reste, et une échelle non linéaire mentirait sur
-  // les rapports. Les barres qui dépassent sont écourtées d'une pointe, et leur valeur est
-  // écrite en toutes lettres au bout.
+  // The time reading: horizontal bars, in multiples of the reference. The scale is CAPPED rather
+  // than compressed: the highest coefficient (Python on the numeric loop) would crush everything
+  // else, and a non-linear scale would lie about the ratios. Bars that go past the cap are cut
+  // short with a point, and their value is written out at the end.
   const coef = v => "×" + v.toFixed(2).replace(".", ",");
   const secondes = v => v.toFixed(4).replace(".", ",") + " s";
   const mediane = id => {
@@ -421,8 +420,8 @@ export async function init(ctx) {
   };
 
   if (bench) {
-    // La référence ne figure pas dans `concurrents` : le titre la nomme d'abord, sinon la
-    // page annoncerait un seul langage comparé alors que le graphique en montre deux.
+    // The reference is not among `concurrents`, so the heading names it first; otherwise the page
+    // would announce a single language compared while the chart shows two.
     document.getElementById("titre-temps").textContent = "Le temps, face à " +
       [bench.reference.nom].concat(bench.concurrents.filter(c => c.id !== "ollin").map(c => c.nom)).join(" et à ");
     document.getElementById("apropos-temps").textContent =
@@ -457,8 +456,8 @@ export async function init(ctx) {
     svgBench.setAttribute("height", h);
 
     const iw = w - m.l - m.r;
-    // Plafond : de quoi loger tous les coefficients d'Ollin, et un cran au-dessus de la
-    // référence — jamais le maximum absolu, qui viendrait d'un concurrent très lent.
+    // The cap: enough to hold all of Ollin's coefficients, and one notch above the reference —
+    // never the absolute maximum, which would come from a very slow competitor.
     const hautOllin = Math.max(...B.map(b => b.ollin));
     const borne = Math.max(2, Math.ceil(hautOllin + 0.5));
     const x = v => m.l + Math.min(v, borne) / borne * iw;
@@ -485,9 +484,9 @@ export async function init(ctx) {
           x: m.l, y: y, width: Math.max(1.5, bx - m.l), height: 7, rx: 3.5,
           fill: "var(--s-" + c.id + ")", opacity: depasse ? 0.55 : 1,
         }));
-        // Une valeur hors échelle est écrite CONTRE le bord droit, alignée à droite : posée
-        // au bout de la barre écourtée, elle sortait du cadre et se trouvait coupée en deux
-        // sur téléphone (« ×12, »).
+        // A value beyond the scale is written AGAINST the right edge, right-aligned: placed at
+        // the end of the shortened bar it went out of frame and was cut in two on a phone
+        // ("×12,").
         const t = el("text", {
           x: depasse ? w - 2 : bx + 6, y: y + 7, class: "val",
           fill: "var(--s-" + c.id + ")", "text-anchor": depasse ? "end" : "start",
@@ -495,8 +494,8 @@ export async function init(ctx) {
         t.textContent = (depasse ? "▸ " : "") + coef(b[c.id]);
         svgBench.append(t);
       });
-      // Le repère de la référence, par-dessus les barres mais SEGMENTÉ par ligne : une seule
-      // verticale sur toute la hauteur traverserait les noms des benchmarks.
+      // The reference marker, over the bars but SEGMENTED line by line: a single vertical over
+      // the whole height would cross the benchmark names.
       svgBench.append(el("line", {
         x1: x(1), x2: x(1), y1: y0 + 13, y2: y0 + 13 + C.length * 11, class: "barre-ref",
       }));
@@ -506,7 +505,7 @@ export async function init(ctx) {
     svgBench.append(ref);
   }
 
-  // ── tableau ───────────────────────────────────────────────────────────────
+  // Table.
   (function tableau() {
     const table = document.getElementById("valeurs");
     const thead = document.createElement("thead"), tr = document.createElement("tr");
@@ -538,7 +537,7 @@ export async function init(ctx) {
       cases.forEach(([cls, txt]) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
-        td.textContent = txt;   // données de fichier : jamais via innerHTML
+        td.textContent = txt;   // file data: never through innerHTML
         ligne.append(td);
       });
       tbody.append(ligne);
@@ -547,7 +546,7 @@ export async function init(ctx) {
     table.append(thead, tbody);
   })();
 
-  // ── tableau du relevé de temps ─────────────────────────────────────────────
+  // Table of the time reading.
   if (bench) {
     const table = document.getElementById("temps");
     const thead = document.createElement("thead"), tr = document.createElement("tr");
@@ -567,7 +566,7 @@ export async function init(ctx) {
       cases.forEach(([cls, txt]) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
-        td.textContent = txt;   // données de fichier : jamais via innerHTML
+        td.textContent = txt;   // file data: never through innerHTML
         ligne.append(td);
       });
       tbody.append(ligne);
@@ -575,7 +574,7 @@ export async function init(ctx) {
     table.append(thead, tbody);
   }
 
-  // ── dessin, et redessin quand la largeur change ───────────────────────────
+  // Drawing, and redrawing when the width changes.
   function largeurUtile(svg) {
     const b = svg.parentElement, cs = getComputedStyle(b);
     return Math.max(240, Math.floor(b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)));
@@ -589,8 +588,8 @@ export async function init(ctx) {
     dessinerEcarts(largeurUtile(svgEcarts));
     if (bench) dessinerBench(largeurUtile(svgBench));
   }
-  // Écouteurs de survol posés UNE seule fois, sur des éléments qui ne sont jamais
-  // remplacés : ils délèguent au dernier dessin publié.
+  // The hover listeners are installed ONCE, on elements that are never replaced: they delegate to
+  // the latest published drawing.
   const viserCourbes = ev => { if (survolCourbes) survolCourbes.viser(ev); };
   const quitterCourbes = ev => {
     if (survolCourbes && ev.pointerType === "mouse") survolCourbes.effacer();
@@ -616,8 +615,8 @@ export async function init(ctx) {
     signaler(e);
   }
 
-  // cleanup : tout écouteur GLOBAL posé ici doit être retiré, sinon il survit au
-  // changement de vue (app.js remplace #view mais pas window/document).
+  // Cleanup: every GLOBAL listener installed here must be removed, otherwise it survives the
+  // change of view (app.js replaces #view, but not window or document).
   return () => {
     removeEventListener("resize", redessiner);
     removeEventListener("orientationchange", surRotation);
