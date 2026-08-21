@@ -1,10 +1,10 @@
 #!/bin/bash
-# Exécute un script .ol avec le binaire natif-raylib sous un affichage virtuel
-# (Xvfb) — permet de tester le graphique sans écran, et de capturer via
-# graphics.screenshot("fichier.png") (chemin relatif au CWD).
+# Runs a .ol script with the native-raylib binary under a virtual display (Xvfb), which allows
+# the graphics to be tested with no screen and captured through graphics.screenshot("file.png")
+# (a path relative to the working directory).
 #
-# Usage :  bash tools/run-headless.sh <script.ol> [args...]
-# Prérequis : bash tools/native-gfx.sh (build-gfx/ollin) + Xvfb installé.
+# Usage:         bash tools/run-headless.sh <script.ol> [args...]
+# Prerequisites: bash tools/native-gfx.sh (build-gfx/ollin), and Xvfb installed.
 set -e
 cd "$(dirname "$0")/.."
 

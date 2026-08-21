@@ -3,8 +3,8 @@ import re, datetime, os, glob
 ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 docs = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'docs'))
 
-# Les <span data-build-date>…</span> (hero + sidebar) vivent dans les fragments
-# de vue depuis le passage en SPA ; on balaie donc index.html ET docs/views/*.html.
+# The <span data-build-date>…</span> elements (hero and sidebar) live in the view fragments
+# since the move to a single page, so we sweep index.html AND docs/views/*.html.
 targets = [os.path.join(docs, 'index.html')] + glob.glob(os.path.join(docs, 'views', '*.html'))
 
 updated = 0

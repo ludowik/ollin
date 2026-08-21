@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vérifie que le compilateur rejette les redéclarations et assignations illégales
+# Checks that the compiler rejects illegal redeclarations and assignments
 OLLIN=./build/ollin
 PASS=0
 FAIL=0
@@ -84,7 +84,7 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
-# ── littéraux numériques malformés ────────────────────────────────────────────
+# Malformed numeric literals.
 check_error "octal digit invalide"      'print(0o18)'   "invalid octal literal"
 check_error "octal 9"                    'print(0o9)'    "invalid octal literal"
 check_error "hex lettre invalide"        'print(0xFFg)'  "invalid hexadecimal literal"
@@ -109,7 +109,7 @@ check_error "exposant puis point"        'print(1e5.0)'  "invalid number literal
 check_error "hex hors limites"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
 check_error "decimal hors limites"       'print(99999999999999999999999)' "out of range"
 
-# ── appel optionnel : non-nil non-callable → erreur (nil seul est ignoré) ──────
+# Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "appel optionnel sur entier" \
     'var x = 42
 print(x?())' \
@@ -122,7 +122,7 @@ var a = A()
 print(a.x?())' \
     "method call on non-function value"
 
-# ── la variable de boucle est locale à la boucle (pas de fuite après) ──────────
+# The loop variable is local to the loop, and does not leak afterwards.
 check_error "var for numérique non visible après" \
     'for i = 1, 3 do end
 print(i)' \
@@ -280,9 +280,8 @@ check_error "ui.list with an empty source" \
 ui.list("Couleur", [], ref v)' \
     "list is empty"
 
-# ── Booléens : type étanche ────────────────────────────────────────────────────
-# L'étanchéité tient à un point de passage unique (VM::as_double) : l'arithmétique et les
-# comparaisons d'ordre refusent le booléen comme elles refusent nil.
+# Booleans: a sealed type. The sealing rests on a single point of passage (VM::as_double):
+# arithmetic and the ordering comparisons refuse a boolean as they refuse nil.
 
 check_error "arithmetic on a boolean" \
     'print(true + 1)' \
@@ -310,9 +309,9 @@ b *= 2' \
     "expected number, got boolean"
 
 # ── tween.sequence ─────────────────────────────────────────────────────────────
-# Une clé inconnue est REFUSÉE avec la liste des clés admises : sans ce refus, un
-# `duration` ou un `easing` mal choisi serait ignoré en silence et l'étape partirait sans
-# durée. C'est la faute qu'on cherche le plus longtemps.
+# An unknown key is REFUSED, with the list of the accepted ones: without that refusal a
+# mistaken `duration` or `easing` would be silently ignored and the step would start with no
+# duration. That is the mistake one hunts for longest.
 
 check_error "tween.sequence with an unknown step key" \
     'global o = {x: 0}

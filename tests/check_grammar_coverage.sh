@@ -1,22 +1,22 @@
 #!/bin/bash
-# Garde-fou de COUVERTURE : chaque règle de docs/grammar.ebnf doit être citée par une
-# étiquette `## [grammaire: …]` de tests/syntax.ol.
+# COVERAGE guard: every rule of docs/grammar.ebnf must be cited by a `## [grammaire: …]`
+# label in tests/syntax.ol.
 #
-# Pourquoi : rien ne vérifiait que syntax.ol couvre encore toutes les formes du langage —
-# un fichier amputé de la moitié de ses sections passait « TOUT VERT », puisque la suite se
-# contente de l'exécuter. Ajouter une production à la grammaire sans écrire son test
-# devient maintenant impossible (cas déjà survenu avec `enum`).
+# Why: nothing checked that syntax.ol still covers every form of the language — a file
+# stripped of half its sections passed as "TOUT VERT", the suite doing no more than run it.
+# Adding a production to the grammar without writing its test is now impossible (which had
+# already happened with `enum`).
 #
-# Ce que le script NE vérifie PAS : que la section étiquetée exerce réellement la forme.
-# Il compare des noms, il ne lit pas le code — l'étiquette engage celui qui la pose.
+# What the script does NOT check: that the labelled section really exercises the form. It
+# compares names and does not read the code — the label commits whoever writes it.
 set -uo pipefail
 
 racine=$(cd "$(dirname "$0")/.." && pwd)
 grammaire="$racine/docs/grammar.ebnf"
 tests="$racine/tests/syntax.ol"
 
-# Règles volontairement exemptées : purement lexicales et sans forme propre à écrire —
-# elles n'existent que comme sous-parties d'un token déjà couvert.
+# Rules deliberately exempted: purely lexical, with no form of their own to write — they
+# exist only as parts of a token already covered.
 exemptees=" "
 
 manquantes=()
@@ -27,8 +27,8 @@ while read -r regle; do
     fi
 done < <(grep -oE "^[a-zA-Z_]+ *=" "$grammaire" | sed 's/ *=//' | sort -u)
 
-# Sens inverse : une étiquette qui cite un nom absent de la grammaire (faute de frappe ou
-# règle renommée) passerait inaperçue et donnerait une fausse assurance.
+# The other direction: a label citing a name absent from the grammar (a typo, or a renamed
+# rule) would go unnoticed and give false confidence.
 inconnues=()
 while read -r cite; do
     if ! grep -qE "^${cite} *=" "$grammaire"; then

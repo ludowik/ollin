@@ -1,9 +1,9 @@
 #!/bin/bash
-# Lance TOUTE la suite de tests Ollin en une commande :
-#   - suites « pass » (.ol qui doivent s'exécuter sans erreur, avec asserts)
-#   - suite d'erreurs (messages de rejet du compilateur)
-#   - garde-fous : nommage de l'API, couverture de la grammaire par syntax.ol
-# Usage : bash tests/run.sh   (le binaire ./build/ollin doit être compilé)
+# Runs the WHOLE Ollin test suite in one command:
+#   - the "pass" suites (.ol files that must run without error, with asserts)
+#   - the error suite (the compiler's rejection messages)
+#   - the guards: the API's naming, and the grammar's coverage by syntax.ol
+# Usage: bash tests/run.sh   (the ./build/ollin binary must be compiled)
 set -u
 OLLIN=${OLLIN:-./build/ollin}
 here=$(dirname "$0")

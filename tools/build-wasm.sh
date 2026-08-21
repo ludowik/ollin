@@ -10,8 +10,8 @@ if ! command -v emcc &>/dev/null; then
         || { echo "emcc not found — run: source C:/Tools/emsdk/emsdk_env.sh"; exit 1; }
 fi
 
-# Réutiliser un raylib déjà téléchargé (FetchContent) si présent — évite un clone
-# github à chaque build et permet de builder hors-ligne / proxy restreint.
+# Reuse an already downloaded raylib (FetchContent) when there is one: it avoids a github
+# clone on every build and allows building offline or behind a restrictive proxy.
 EXTRA=""
 for d in build_wasm/_deps/raylib-src build/_deps/raylib-src; do
     if [ -f "$d/src/raylib.h" ]; then

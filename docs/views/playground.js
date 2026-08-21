@@ -88,7 +88,7 @@ const ollinTheme = EditorView.theme({
   '[aria-selected] .cm-completionLabel': { color: '#ffffff' },
   '[aria-selected] .cm-completionDetail': { color: '#a0aabf' },
 
-  /* panneau de recherche (Ctrl+F) accordé au thème sombre */
+  /* the search panel (Ctrl+F), tuned to the dark theme */
   // fontSize: inherit makes the whole bar follow the editor's font size (13px in a browser, 12px
   // on mobile), and the field heights follow from it. The width is left at its default.
   '.cm-panels': { background: '#1a1d2e', color: '#dde4ef', fontSize: 'inherit' },
