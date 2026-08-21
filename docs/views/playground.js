@@ -1,8 +1,8 @@
-// Vue PLAYGROUND — init(ctx) appelée par app.js après montage du fragment.
+// PLAYGROUND view — init(ctx), called by app.js once the fragment is mounted.
 //   ctx = { root, getOllin, hardReload, navigate }
-// getOllin() : runtime WASM PARTAGÉ (une instance SPA). Le corps garde son
-// indentation d'origine (déplacé tel quel depuis playground.html pour éviter
-// toute corruption des chaînes multi-lignes lors d'une réindentation).
+// getOllin() gives the SHARED WASM runtime, one instance for the whole app. The body keeps its
+// original indentation (moved here as it was from playground.html, to avoid corrupting the
+// multi-line strings during a reindentation).
 import {
   EditorState,
   EditorView, lineNumbers, keymap, drawSelection, highlightActiveLine, highlightActiveLineGutter,
@@ -17,61 +17,60 @@ import { ollinLang, ollinHighlight } from '../cm-lang.js'
 
 export async function init(ctx) {
 const { getOllin, hardReload } = ctx
-const disposers = []   // écouteurs globaux à retirer au démontage
+const disposers = []   // the global listeners to remove on unmount
 
-// Stockage via la couche d'abstraction (pg-provider) : `Store` = magasin de
-// travail (défaut local), `GH` = fournisseur distant (défaut GitHub). Brancher
-// un autre backend se fait dans pg-provider.js, sans toucher aux sites d'appel.
+// Storage through the abstraction layer (pg-provider): `Store` is the working store (local by
+// default), `GH` the remote provider (GitHub by default). Plugging in another backend happens in
+// pg-provider.js, with no change to the call sites.
 const Prov  = await import('../pg-provider.js?v=' + ctx.v)
 const Store = await Prov.getProvider(ctx.v)
 const GH    = await Prov.getRemote(ctx.v)
-const Run   = await import('../pg-run.js?v=' + ctx.v)   // exécution partagée avec run.html
-const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // formateur « à la demande »
+const Run   = await import('../pg-run.js?v=' + ctx.v)   // execution shared with run.html
+const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // the on-demand formatter
 const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
 const { createRemoteSync } = await import('../pg-sync.js?v=' + ctx.v)
 
-// Coordinateur de sauvegarde distante : chaque sauvegarde locale d'un projet lié
-// planifie un push GitHub différé (anti-rafale, single-flight, tolérant hors-ligne).
-// La mécanique réelle est fournie plus bas (sharedRemotePush / canAutoPush).
+// The remote-save coordinator: every local save of a linked project schedules a deferred GitHub
+// push (debounced, single-flight, offline-tolerant). The actual machinery is supplied further
+// down (sharedRemotePush and canAutoPush).
 const sync = createRemoteSync({
   doPush:  p => sharedRemotePush(p),
   canPush: p => canAutoPush(p),
   onError: (err, p) => onRemoteSyncError(err, p),
 })
 disposers.push(() => sync.cancel())
-// Indice de taille de rendu propre à cette vue : nettoyé au démontage pour ne pas
-// fuiter vers la vue #/run (qui pose la sienne, mais on évite tout résidu).
+// A render-size hint private to this view, cleared on unmount so as not to leak into the #/run
+// view (which sets its own, but no residue is left all the same).
 disposers.push(() => { window.__ollinRenderW = undefined; window.__ollinRenderH = undefined })
 
-// TÉLÉPHONE uniquement (pas tablette/iPad, dont l'interface reste « bureau ») :
-// pointeur grossier ET petit écran. Le petit côté sépare proprement téléphones
-// (≤ ~430) et iPad (≥ 744) indépendamment de l'orientation. Toutes les
-// adaptations liées au clavier logiciel sont gardées par ce drapeau.
+// PHONES only, not tablets or iPads, whose interface stays the desktop one: a coarse pointer AND
+// a small screen. The short side separates phones (at most ~430) from iPads (at least 744)
+// cleanly, whatever the orientation. Every adaptation tied to the software keyboard is guarded by
+// this flag.
 const isPhone = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
              && Math.min(window.screen.width, window.screen.height) < 600
 
-// Barre d'outils collee au haut du VISIBLE quand le clavier mobile s'ouvre
-// (sinon elle derive/disparait sur iOS). Actif tant que la vue est montee.
+// The toolbar sticks to the top of the VISIBLE area when the mobile keyboard opens; otherwise it
+// drifts away and vanishes on iOS. Active for as long as the view is mounted.
 if (isPhone) disposers.push(pinToVisualViewport())
 
-// Mode EXEMPLE : route #/playground/sample/<fichier> → on ouvre l'exemple
-// directement depuis le dépôt (samples/…), SANS copie ni persistance. Édition
-// libre à l'écran mais non enregistrée ; un refresh recharge la version du dépôt.
-// Bouton « Créer un projet » pour forker à la demande. (parse partagé, pg-run.js)
+// SAMPLE mode: the #/playground/sample/<file> route opens the sample straight from the
+// repository (samples/…), with NO copy and no persistence. Editing on screen is free but is not
+// saved; a refresh reloads the repository's version. The "Create a project" button forks it on
+// demand. (The route parsing is shared, in pg-run.js.)
 const exampleFile = Run.sampleFromAnchor(ctx.anchor)
 
-// ── Ollin syntax ──────────────────────────────────────────────────────────
-// KEYWORDS / BUILTINS / ollinLang / ollinHighlight : importés de cm-lang.js.
+// Ollin syntax: KEYWORDS, BUILTINS, ollinLang and ollinHighlight are imported from cm-lang.js.
 
 const ollinTheme = EditorView.theme({
-  // Taille de base = version NAVIGATEUR (13px). Le mobile la redéfinit
-  // (playground.html, @media max-width:640px → 12px, anti-zoom iOS).
+  // The base size is the BROWSER one (13px). Mobile redefines it (playground.html,
+  // @media max-width:640px, 12px, against iOS's zoom).
   '&': { background: '#000000', color: '#dde4ef', fontSize: '13px', height: '100%' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65' },
   '.cm-content': { padding: '14px 0', caretColor: '#9ba1ff' },
-  ...CODE_DISPLAY,   // réglages d'affichage partagés (cm-shared.js)
+  ...CODE_DISPLAY,   // shared display settings (cm-shared.js)
   '.cm-gutters': { background: '#000000', color: '#5a628a', border: 'none', borderRight: '1px solid #3a3f63' },
-  ...CODE_THEME_BASE,   // ligne active, curseur, sélection (partagés cm-shared.js)
+  ...CODE_THEME_BASE,   // active line, cursor, selection (shared, cm-shared.js)
   '&.cm-focused': { outline: 'none' },
 
   /* autocomplete dropdown */
@@ -90,8 +89,8 @@ const ollinTheme = EditorView.theme({
   '[aria-selected] .cm-completionDetail': { color: '#a0aabf' },
 
   /* panneau de recherche (Ctrl+F) accordé au thème sombre */
-  // fontSize: inherit → toute la barre suit la taille de fonte de l'éditeur (13px
-  // navigateur / 12px mobile) ; la hauteur des champs en découle. Largeur laissée par défaut.
+  // fontSize: inherit makes the whole bar follow the editor's font size (13px in a browser, 12px
+  // on mobile), and the field heights follow from it. The width is left at its default.
   '.cm-panels': { background: '#1a1d2e', color: '#dde4ef', fontSize: 'inherit' },
   '.cm-panels.cm-panels-top': { borderBottom: '1px solid #3a3f63' },
   '.cm-search': { padding: '8px' },
@@ -102,18 +101,18 @@ const ollinTheme = EditorView.theme({
   '.cm-panel.cm-search [name=close]': { color: '#a3adc4', fontSize: '18px', padding: '0 8px' },
 })
 
-// ── Autocompletion ────────────────────────────────────────────────────────
+// Autocompletion.
 const kw  = label => ({ label, type: 'keyword' })
 const cst = (label, detail) => ({ label, type: 'constant', detail })
 
-// Fonction connue : à l'acceptation, insère l'appel avec ses paramètres de base
-// PRÉ-SAISIS (ex. circle → « circle(x, y, rayon) »), la liste des params étant
-// sélectionnée pour être remplacée directement. Sans paramètre → « name() »,
-// curseur après la parenthèse. Les params sont tirés de la signature (detail).
+// A known function: on acceptance it inserts the call with its base parameters PRE-FILLED
+// (circle becomes "circle(x, y, radius)"), the parameter list being selected so it can be
+// replaced straight away. With no parameter it inserts "name()", the cursor after the bracket.
+// The parameters are taken from the signature (detail).
 const fn = (label, detail) => {
   const mo = detail && detail.match(/\(([^]*)\)/)
   let params = mo ? mo[1].trim() : ''
-  if (params === '...') params = ''            // varargs → parenthèses vides
+  if (params === '...') params = ''            // varargs give empty brackets
   return {
     label, type: 'function', detail,
     apply: (view, c, from, to) => {
@@ -122,16 +121,16 @@ const fn = (label, detail) => {
       const open = from + name.length + 1
       view.dispatch({
         changes: { from, to, insert },
-        selection: params ? { anchor: open, head: open + params.length }   // params sélectionnés
-                          : { anchor: from + insert.length },              // curseur après ()
+        selection: params ? { anchor: open, head: open + params.length }   // the parameters are selected
+                          : { anchor: from + insert.length },              // the cursor lands after the ()
       })
     },
   }
 }
 
-// « func » : insère seulement « func » + espace (curseur après), prêt à taper
-// le nom. Le squelette complet (params + corps + end) est produit à l'acceptation
-// du NOM de fonction connu — sans jamais doubler les parenthèses.
+// "func" inserts only "func" and a space, the cursor after it, ready for the name to be typed.
+// The complete skeleton (parameters, body, end) is produced on acceptance of a known function
+// NAME, and never doubles the brackets.
 const AC_FUNC = {
   label: 'func', type: 'keyword', detail: 'définir une fonction',
   apply: (view, c, from, to) => {
@@ -153,7 +152,7 @@ const AC_BUILTINS = [
   fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (octets utilisés)'),
 ]
 
-// Globales injectées par le moteur (disponibles sans déclaration) — cf. CLAUDE.md.
+// The globals injected by the engine, available without a declaration (see CLAUDE.md).
 const glob = (label, detail) => ({ label, type: 'variable', detail })
 const AC_GLOBALS = [
   glob('deltaTime',   'moteur — secondes depuis la frame précédente'),
@@ -164,9 +163,9 @@ const AC_GLOBALS = [
   glob('CH', 'moteur — centre Y (H / 2)'),
 ]
 
-// Hooks de cycle de vie appelés par le moteur : insérés en squelette COMPLET
-// (func … end), le « func » n'étant pas répété s'il est déjà tapé. Le curseur
-// se place dans le corps (nouvelle ligne indentée). Évite les fautes de frappe.
+// The lifecycle hooks the engine calls, inserted as a COMPLETE skeleton (func … end), the "func"
+// not being repeated when it is already typed. The cursor lands in the body, on a new indented
+// line. It avoids typos.
 function lifecycle(name, params, detail) {
   return {
     label: name, type: 'function', detail,
@@ -176,7 +175,7 @@ function lifecycle(name, params, detail) {
       const head = `${prefix}${name}(${params})\n    `
       view.dispatch({
         changes: { from, to, insert: head + '\nend' },
-        selection: { anchor: from + head.length },   // curseur dans le corps indenté
+        selection: { anchor: from + head.length },   // the cursor lands in the indented body
       })
     },
   }
@@ -229,7 +228,7 @@ const MODULE_MEMBERS = {
     fn('graphics.text','text(str,x,y,size[,color])'),
     fn('graphics.fps','fps()→int'),                fn('graphics.isOpen','isOpen()→bool'),
     fn('graphics.close','close()'),                fn('graphics.quit','quit()'),
-    // ── 3D ──
+    // 3D.
     fn('graphics.camera','camera(px,py,pz, tx,ty,tz [, fovy])'),
     fn('graphics.begin3d','begin3d(cam)'),         fn('graphics.end3d','end3d()'),
     fn('graphics.grid','grid(slices, spacing)'),
@@ -249,7 +248,7 @@ const MODULE_MEMBERS = {
     fn('graphics.ambient','ambient(v | couleur)'),
     fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
     fn('graphics.texture','texture(img)'),         fn('graphics.noTexture','noTexture()'),
-    // quaternions
+    // Quaternions.
     fn('graphics.quat','quat() → Quat (identité)'),
     fn('graphics.quatAxis','quatAxis(ax,ay,az, deg) → Quat'),
     fn('graphics.quatEuler','quatEuler(pitch,yaw,roll) → Quat'),
@@ -314,8 +313,8 @@ const MODULE_MEMBERS = {
   ],
 }
 
-// Commande « démarrer l'autocomplétion » (binding Ctrl-Space de CodeMirror) —
-// réutilisée pour rouvrir la liste après avoir complété un nom de module.
+// The "start autocompletion" command (CodeMirror's Ctrl-Space binding), reused to reopen the list
+// after a module name has been completed.
 const startCompletion = (completionKeymap.find(b => b.key === 'Ctrl-Space') || {}).run
 
 function ollinComplete(context) {
@@ -325,11 +324,11 @@ function ollinComplete(context) {
     const prefix = dotWord.text.slice(0, dot)
     const members = MODULE_MEMBERS[prefix]
     if (members) {
-      // On veut l'ordre ALPHABÉTIQUE (CM classe par « pertinence floue » sinon →
-      // ordre déroutant) MAIS en gardant le filtrage CM (donc le surlignage gras de
-      // la sous-chaîne matchée). Levier : le tri CM se fait sur `score + boost` ; on
-      // pose un `boost` dominant, décroissant selon le rang alphabétique → l'ordre
-      // devient alphabétique, et le surlignage (issu du filtrage CM) est conservé.
+      // We want ALPHABETICAL order — CM otherwise ranks by "fuzzy relevance", which is
+      // disconcerting — while KEEPING CM's filtering, hence the bold highlight of the matched
+      // substring. The lever: CM sorts on `score + boost`, so we set a dominant `boost`,
+      // decreasing with the alphabetical rank. The order becomes alphabetical and the highlight,
+      // which comes from CM's filtering, is preserved.
       const opts = members.map(m => ({ ...m, label: m.label.slice(prefix.length + 1) }))
       const rank = new Map(
         [...opts].sort((a, b) => a.label.localeCompare(b.label)).map((o, i) => [o.label, i]))
@@ -343,8 +342,8 @@ function ollinComplete(context) {
   }
   const word = context.matchBefore(/\w+/)
   if (!word || (word.from === word.to && !context.explicit)) return null
-  // Compléter un module (math, graphics…) insère « nom. » et rouvre aussitôt la
-  // liste sur ses membres — on n'a plus à taper le point à la main.
+  // Completing a module (math, graphics…) inserts "name." and reopens the list at once on its
+  // members, so the dot no longer has to be typed by hand.
   const moduleNames = Object.keys(MODULE_MEMBERS).map(m => ({
     label: m, type: 'namespace',
     apply: (view, c, from, to) => {
@@ -359,10 +358,9 @@ function ollinComplete(context) {
   }
 }
 
-// ── Repliement de blocs (fold) ──────────────────────────────────────────────
-// Ollin est une StreamLanguage (pas d'arbre Lezer) → on fournit les bornes de
-// bloc via le facet standard `foldService`. Un bloc s'ouvre sur func/if/while/
-// for/class/try/switch et se ferme sur `end` ; on suit la profondeur.
+// Block folding. Ollin is a StreamLanguage, with no Lezer tree, so the block bounds are supplied
+// through the standard `foldService` facet. A block opens on func, if, while, for, class, try or
+// switch and closes on `end`; we track the depth.
 const FOLD_OPENERS = /\b(?:func|if|while|for|class|try|switch)\b/g
 const FOLD_ENDS    = /\bend\b/g
 const countMatches = (s, re) => (s.match(re) || []).length
@@ -372,31 +370,29 @@ function ollinFoldRange(state, lineStart) {
   const head = first.text.replace(/##.*$/, '')          // ignorer les commentaires
   let depth = countMatches(head, FOLD_OPENERS) - countMatches(head, FOLD_ENDS)
   if (depth <= 0)
-    return null                                          // pas un ouvrant net (ou refermé sur la ligne)
+    return null                                          // not a net opener, or closed again on the line
   for (let n = first.number + 1; n <= state.doc.lines; n++) {
     const line = state.doc.line(n)
     const body = line.text.replace(/##.*$/, '')
     depth += countMatches(body, FOLD_OPENERS) - countMatches(body, FOLD_ENDS)
     if (depth <= 0) {
       const from = first.to                              // fin de la ligne d'ouverture
-      const to = state.doc.line(n - 1).to                // fin de la dernière ligne avant `end`
+      const to = state.doc.line(n - 1).to                // the end of the last line before `end`
       return to > from ? { from, to } : null
     }
   }
   return null
 }
 
-// ── Editor ────────────────────────────────────────────────────────────────
-// Le contenu est piloté par le projet actif (voir la section « Projets » plus
-// bas) : l'éditeur démarre vide puis reçoit le fichier courant après Store.init.
+// Editor. Its content is driven by the active project (see the "Projects" section below): the
+// editor starts empty, then receives the current file after Store.init.
 let saveTimer   = null
-let autoexecTimer = null  // mode Auto : relance différée après la dernière modif
+let autoexecTimer = null  // Auto mode: a deferred restart after the last edit
 let loadingFile = false   // true pendant un chargement programmatique → pas d'autosave
 
-// Tab sur un CURSEUR SIMPLE : insère des espaces jusqu'au prochain multiple de 4
-// (tab stop) À LA POSITION DU CURSEUR — pas d'indentation de ligne. Sur une
-// sélection, renvoie false → indentWithTab prend le relais (indente le bloc ;
-// Maj+Tab désindente).
+// Tab on a PLAIN CURSOR inserts spaces up to the next multiple of four (a tab stop) AT THE
+// CURSOR'S POSITION, and does not indent the line. On a selection it returns false, and
+// indentWithTab takes over, indenting the block (Shift+Tab outdents).
 const softTab = (view) => {
     const state = view.state
     if (state.selection.ranges.some(r => !r.empty))
@@ -408,51 +404,50 @@ const softTab = (view) => {
     return true
 }
 
-// Keymap de l'éditeur, gardé en référence : réutilisé tel quel par le garde-fou
-// clavier « pendant un run » (voir plus bas) pour déléguer aux VRAIES commandes
-// CodeMirror au lieu de les réimplémenter.
-// Tab : accepte une complétion si popup, sinon insère au curseur (softTab), sinon
-// (sélection) indente le bloc. closeBracketsKeymap ensuite : Backspace supprime
-// une paire vide «()» d'un coup.
+// The editor's keymap, kept as a reference: the "during a run" keyboard guard (further down)
+// reuses it as it is, so as to delegate to the REAL CodeMirror commands rather than reimplement
+// them. Tab accepts a completion when the popup is up, otherwise inserts at the cursor (softTab),
+// otherwise — on a selection — indents the block. closeBracketsKeymap comes next: Backspace
+// deletes an empty "()" pair in one go.
 const editKeymap = [{ key: 'Tab', run: acceptCompletion }, { key: 'Tab', run: softTab }, ...closeBracketsKeymap, ...completionKeymap, indentWithTab, ...defaultKeymap, ...historyKeymap, ...foldKeymap]
 
-// Extensions de l'éditeur, réutilisées pour recréer un état VIERGE à chaque
-// chargement de fichier (setEditorText) → historique d'annulation propre par
-// fichier (cf. setEditorText).
+// The editor's extensions, reused to recreate a BLANK state on every file load (setEditorText),
+// which gives each file its own clean undo history (see setEditorText).
 const editorExtensions = [
       ollinLang, syntaxHighlighting(ollinHighlight), lineNumbers(), ollinTheme,
       EditorView.lineWrapping,
-      // iOS Safari : la barre prédictive « QuickType » intercepte le 1er
-      // Backspace (→ « sans effet ») et double des caractères. autocorrect/
-      // autocapitalize/spellcheck ne suffisent pas toujours à la masquer :
-      // autocomplete='off' + inputmode='text' la coupent plus franchement.
+      // On iOS Safari the predictive "QuickType" bar intercepts the first Backspace, which then
+      // seems to do nothing, and doubles characters. autocorrect, autocapitalize and spellcheck
+      // are not always enough to hide it: autocomplete='off' plus inputmode='text' cut it out
+      // more firmly.
       EditorView.contentAttributes.of({
         autocorrect: 'off', autocapitalize: 'off', autocomplete: 'off',
         spellcheck: 'false', inputmode: 'text',
       }),
       codeFolding(), foldGutter(), foldService.of(ollinFoldRange),
       history(), drawSelection(), highlightActiveLine(), highlightActiveLineGutter(),
-      // Recherche CodeMirror : Ctrl+F ouvre le panneau et scanne TOUT le document (le
-      // modèle, pas le DOM — CM ne rend que les lignes visibles, donc la recherche
-      // native du navigateur manquait le reste du fichier). highlightSelectionMatches
-      // surligne les autres occurrences du mot sélectionné.
+      // CodeMirror's search: Ctrl+F opens the panel and scans the WHOLE document — the model,
+      // not the DOM, CM rendering only the visible lines, so the browser's native search missed
+      // the rest of the file. highlightSelectionMatches marks the other occurrences of the
+      // selected word.
       search({ top: true }), highlightSelectionMatches(),
       keymap.of(editKeymap),
       keymap.of([
-        // Alt+Espace : déclenche l'autocomplétion (alternative portable à Ctrl+Espace,
-        // réservé par macOS pour la source de saisie).
+        // Alt+Space triggers the autocompletion, a portable alternative to Ctrl+Space, which
+        // macOS reserves for the input source.
         { key: 'Alt-Space', run: (v) => (startCompletion ? startCompletion(v) : false) },
         { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
-        // Changer de fichier (projet multi-fichiers) : Ctrl+Tab est réservé par le
-        // navigateur → Alt+PageUp/PageDown (analogue web-safe).
+        // Switching file in a multi-file project: Ctrl+Tab is reserved by the browser, hence
+        // Alt+PageUp and Alt+PageDown, the web-safe equivalent.
         { key: 'Alt-PageUp', run: () => { cycleFile(-1); return true } },
         { key: 'Alt-PageDown', run: () => { cycleFile(1); return true } },
         { key: 'Escape', run: () => { if (isRunning) { stopExec(); return true } return false } },
         { key: 'Shift-Alt-f', run: () => { doFormat(); return true } },   // reformater
-        // F4 : aller à la première erreur de syntaxe/exécution (lien de la zone sortie).
+        // F4 goes to the first syntax or runtime error (the link in the output area).
         { key: 'F4', run: () => { if (lastErrorLoc) { gotoError(lastErrorLoc); return true } return false } },
-        // Chord (Cmd+K puis C/U sur Mac, Ctrl+K puis C/U ailleurs) : commenter / dé-commenter.
-        // Variantes : Mod relâché avant la 2e touche, OU Mod maintenu (Mod+K Mod+C).
+        // A chord (Cmd+K then C or U on a Mac, Ctrl+K then C or U elsewhere): comment and
+        // uncomment. Both variants work: Mod released before the second key, or Mod held
+        // (Mod+K Mod+C).
         { key: 'Mod-k c', run: (v) => toggleLineComment(v, true) },
         { key: 'Mod-k u', run: (v) => toggleLineComment(v, false) },
         { key: 'Mod-k Mod-c', run: (v) => toggleLineComment(v, true) },
@@ -460,15 +455,15 @@ const editorExtensions = [
       ]),
       keymap.of(searchKeymap),   // Ctrl+F (rechercher), Ctrl+G (suivant), etc.
       indentUnit.of('    '),
-      // Auto-paires natives : «(» insère «()», entoure la sélection si elle
-      // existe, et Backspace supprime la paire vide (closeBracketsKeymap).
+      // Native auto-pairs: "(" inserts "()", wraps the selection when there is one, and
+      // Backspace deletes the empty pair (closeBracketsKeymap).
       closeBrackets(),
       autocompletion({ override: [ollinComplete], activateOnTyping: true }),
       EditorView.updateListener.of(update => {
         if (!update.docChanged || loadingFile) return
         clearTimeout(saveTimer)
         saveTimer = setTimeout(scheduleSave, 500)
-        // Mode Auto : chaque modif réarme un compte à rebours ; 2 s d'inactivité → relance.
+        // Auto mode: every edit rearms a countdown, and two seconds of quiet restart the run.
         const chk = document.getElementById('autoexec-chk')
         if (chk && chk.checked) {
           clearTimeout(autoexecTimer)
@@ -477,10 +472,10 @@ const editorExtensions = [
       }),
 ]
 
-// Raccourcis affichés par la popup d'aide (F1 / bouton « Aide »).
-// ⚠ SOURCE UNIQUE : à garder synchronisé avec les keymaps ci-dessus (editKeymap,
-// le keymap.of([...]) Alt-Enter/F4/Alt-k…, searchKeymap, foldKeymap, historyKeymap)
-// et le raccourci d'exécution géré dans onGlobalKeydown.
+// The shortcuts shown by the help popup (F1, or the "Help" button).
+// ⚠ SINGLE SOURCE: to be kept in step with the keymaps above (editKeymap, the keymap.of([...])
+// holding Alt-Enter, F4, Alt-k…, searchKeymap, foldKeymap, historyKeymap) and with the run
+// shortcut handled in onGlobalKeydown.
 const SHORTCUTS = [
   { cat: 'Exécution', items: [
     { keys: ['Alt', '↵'],   desc: 'Exécuter / relancer le script' },
@@ -521,10 +516,10 @@ const view = new EditorView({
   parent: document.getElementById('editor-wrap'),
 })
 
-// Commente (add=true) / dé-commente (add=false) les lignes couvertes par la
-// sélection. Préfixe de commentaire Ollin = '## ' (cf. grammar.ebnf line_comment).
-// Insertion/retrait au 1er caractère non-blanc → l'indentation est préservée ;
-// les lignes vides sont ignorées à l'ajout. Raccourcis : Alt+K puis C / U.
+// Comments (add=true) or uncomments (add=false) the lines the selection covers. Ollin's comment
+// prefix is '## ' (see grammar.ebnf, line_comment). The insertion and removal happen at the first
+// non-blank character, so the indentation is preserved; empty lines are skipped when adding. The
+// shortcuts are Alt+K then C or U.
 function toggleLineComment(v, add) {
   const { state } = v
   const { from, to } = state.selection.main
@@ -547,31 +542,31 @@ function toggleLineComment(v, add) {
   return true
 }
 
-// ── Backspace/nav quand le runtime graphique est armé ──────────────────────
-// Dès qu'un projet graphique tourne (Run), le runtime raylib (couche GLFW
-// d'Emscripten) installe un écouteur keydown GLOBAL (window, phase capture) qui
-// fait preventDefault UNIQUEMENT sur Backspace et Tab (vérifié dans
-// wasm/ollin.js — GLFW.onKeydown) pour empêcher le navigateur de reculer/
-// défiler. Cet écouteur reste tant que le contexte graphique vit (un simple
-// Arrêt ne le retire pas). Or CodeMirror IGNORE tout keydown déjà
-// defaultPrevented → dans l'éditeur, Backspace et Tab « n'ont plus d'effet ».
-// Parade : un écouteur enregistré ICI en phase capture. Tant que le runtime a été
-// armé (un programme graphique a tourné) et que l'éditeur a le focus, on exécute
-// Backspace/Tab via les VRAIES commandes CodeMirror (le même `editKeymap` que
-// l'éditeur → deleteCharBackward, deleteGroupBackward, indentMore/Less,
-// acceptCompletion…), puis on stoppe l'événement pour que GLFW ne le voie pas. On
-// ne touche QU'À ces deux touches : toutes les autres passent normalement à
-// CodeMirror (GLFW ne les bloque pas), donc aucune régression d'édition.
+// Backspace and navigation once the graphics runtime is armed.
 //
-// Le drapeau « armé » vit au niveau PAGE (window), pas au niveau vue : l'écouteur
-// GLFW est global et n'est JAMAIS retiré au changement de vue (runtime WASM
-// partagé, aucun CloseWindow). Un drapeau par-vue repartirait à false à chaque
-// remontage → après un run puis un aller-retour de vue, GLFW mangerait encore
-// Backspace/Tab alors que la parade serait éteinte (bug intermittent).
+// As soon as a graphics project runs, the raylib runtime (Emscripten's GLFW layer) installs a
+// GLOBAL keydown listener (on window, in the capture phase) that calls preventDefault ONLY on
+// Backspace and Tab (checked in wasm/ollin.js, GLFW.onKeydown), to stop the browser going back or
+// scrolling. That listener stays for as long as the graphics context lives — a plain Stop does not
+// remove it. But CodeMirror IGNORES any keydown already defaultPrevented, so in the editor
+// Backspace and Tab "no longer do anything".
+//
+// The counter-measure is a listener registered HERE in the capture phase. As long as the runtime
+// has been armed (a graphics program has run) and the editor has focus, Backspace and Tab are
+// executed through the REAL CodeMirror commands — the very `editKeymap` the editor uses, hence
+// deleteCharBackward, deleteGroupBackward, indentMore and indentLess, acceptCompletion… — and the
+// event is then stopped so GLFW never sees it. ONLY those two keys are touched: every other one
+// reaches CodeMirror as usual (GLFW does not block them), so no editing behaviour regresses.
+//
+// The "armed" flag lives at PAGE level (on window), not at view level: the GLFW listener is global
+// and is NEVER removed on a change of view (the WASM runtime is shared, there is no CloseWindow).
+// A per-view flag would start again at false on every remount, so after a run and a round trip
+// between views GLFW would still eat Backspace and Tab while the counter-measure was off — an
+// intermittent bug.
 const isRuntimeArmed = () => !!window.__ollinGfxKbdArmed
-// Exécute, pour l'événement `e`, le premier binding de `editKeymap` qui matche
-// (même sémantique de priorité que CodeMirror). Gère les modificateurs Mod/Alt
-// et la variante `shift` des bindings. Renvoie true si une commande a agi.
+// Runs, for the event `e`, the first binding of `editKeymap` that matches, with the same priority
+// semantics as CodeMirror. It handles the Mod and Alt modifiers and the bindings' `shift` variant.
+// Returns true when a command acted.
 function runEditKeymap(e) {
   for (const b of editKeymap) {
     if (!b.key) continue
@@ -579,34 +574,34 @@ function runEditKeymap(e) {
     if (parts[parts.length - 1] !== e.key) continue
     if ((parts.includes('Mod') || parts.includes('Ctrl') || parts.includes('Cmd')) !== (e.ctrlKey || e.metaKey)) continue
     if (parts.includes('Alt') !== e.altKey) continue
-    // Sémantique CM : avec Maj on n'exécute QUE b.shift (jamais b.run), sinon un
-    // binding sans variante Maj (ex. softTab) se déclencherait à tort sur Maj+Tab.
+    // CM's semantics: with Shift down we run ONLY b.shift, never b.run; otherwise a binding with
+    // no Shift variant (softTab, say) would fire wrongly on Shift+Tab.
     const cmd = e.shiftKey ? b.shift : b.run
     if (cmd && cmd(view)) return true
   }
   return false
 }
-// Chord Cmd/Ctrl+K → C/U : géré par code physique (e.code) car certains navigateurs
-// ou layouts peuvent substituer le caractère (ex. Safari/macOS).
+// The Cmd/Ctrl+K then C or U chord is handled by physical code (e.code), because some browsers or
+// layouts may substitute the character (Safari on macOS, for one).
 let chordAltKPending = false
 const onGlobalKeydown = e => {
-  // F1 : bascule la popup d'aide (raccourcis). En capture → marche quel que soit
-  // le focus ; preventDefault pour couper l'aide native du navigateur.
+  // F1 toggles the help popup (the shortcuts). In the capture phase it works whatever has focus;
+  // preventDefault cuts out the browser's own help.
   if (e.key === 'F1') {
     e.preventDefault()
     e.stopImmediatePropagation()
     toggleHelp()
     return
   }
-  // Échap ferme d'abord l'aide si elle est ouverte (avant d'arrêter un run).
+  // Escape closes the help first when it is open, before stopping a run.
   if (e.key === 'Escape' && helpOpen()) {
     e.preventDefault()
     e.stopImmediatePropagation()
     closeHelp()
     return
   }
-  // Alt+Maj+Entrée : lance ET active le mode Auto (relance automatique à chaque
-  // modif). Testé AVANT Alt+Entrée (qui matcherait aussi, altKey étant vrai).
+  // Alt+Shift+Enter runs AND turns Auto mode on, restarting on every edit. Tested BEFORE
+  // Alt+Enter, which would match too, altKey being true.
   if (e.key === 'Enter' && e.altKey && e.shiftKey) {
     e.preventDefault()
     e.stopImmediatePropagation()
@@ -619,23 +614,22 @@ const onGlobalKeydown = e => {
     relaunch()
     return
   }
-  // Alt+Entrée : lance ou RELANCE l'exécution — géré en capture pour marcher
-  // même quand le focus est sur le CANVAS (programme graphique en cours), pas
-  // seulement dans l'éditeur.
+  // Alt+Enter runs or RESTARTS the execution. It is handled in the capture phase so as to work
+  // even when the CANVAS has focus, during a graphics program, and not only in the editor.
   if (e.key === 'Enter' && e.altKey) {
     e.preventDefault()
     e.stopImmediatePropagation()
     relaunch()
     return
   }
-  // Échap : stoppe l'exécution en cours (focus éditeur OU canvas).
+  // Escape stops the running program, with focus on the editor OR the canvas.
   if (e.key === 'Escape' && isRunning) {
     e.preventDefault()
     e.stopImmediatePropagation()
     stopExec()
     return
   }
-  // Chord Cmd/Ctrl+K → C/U via code physique (contourne les substitutions de caractère).
+  // The Cmd/Ctrl+K then C or U chord, by physical code, which sidesteps character substitutions.
   if ((e.metaKey || e.ctrlKey) && e.code === 'KeyK' && view.hasFocus) {
     e.preventDefault()
     e.stopImmediatePropagation()
@@ -652,25 +646,26 @@ const onGlobalKeydown = e => {
     }
   }
   if (!isRuntimeArmed() || !view.hasFocus) return
-  if (e.key !== 'Backspace' && e.key !== 'Tab') return   // seules touches mangées par GLFW
+  if (e.key !== 'Backspace' && e.key !== 'Tab') return   // the only keys GLFW eats
   if (runEditKeymap(e)) {
     e.preventDefault()
     e.stopImmediatePropagation()
   }
 }
-window.addEventListener('keydown', onGlobalKeydown, true)   // capture + avant l'écouteur GLFW
+window.addEventListener('keydown', onGlobalKeydown, true)   // in capture, and before GLFW's listener
 disposers.push(() => window.removeEventListener('keydown', onGlobalKeydown, true))
 
-// L'écouteur clavier GLFW est global (window) : sans garde, taper/naviguer dans
-// l'éditeur piloterait aussi un programme graphique en cours (ex. le sample voxel).
-// On signale au moteur (keyboard_module) d'ignorer le clavier tant que l'ÉDITEUR a
-// le focus ; dès qu'il le perd (canvas/bouton), le jeu reçoit de nouveau les touches.
-// Reprise de l'édition sur MOBILE : réactiver le clavier (focus éditeur) pendant un
-// programme en cours l'ARRÊTE → retour propre au mode édition, l'éditeur reprenant
-// la place du canvas (sinon on taperait « derrière » un programme qui tourne).
-// Téléphone uniquement : sur desktop ET tablette/iPad, cliquer l'éditeur pendant
-// un run ne doit pas interrompre (on peut vouloir lire le code en regardant le canvas).
-let isRunning = false   // déclaré tôt : onEditorFocus le lit dès le view.focus() d'init
+// GLFW's keyboard listener is global, on window, so without a guard typing or navigating in the
+// editor would also drive a running graphics program (the voxel sample, say). We tell the engine
+// (keyboard_module) to ignore the keyboard for as long as the EDITOR has focus; as soon as it
+// loses focus, to the canvas or a button, the game receives the keys again.
+//
+// Resuming editing on a PHONE: re-enabling the keyboard, by focusing the editor, during a running
+// program STOPS it, which is a clean return to edit mode, the editor taking the canvas's place —
+// otherwise one would be typing "behind" a running program. Phones only: on desktop AND on
+// tablets, clicking the editor during a run must not interrupt it, since one may want to read the
+// code while watching the canvas.
+let isRunning = false   // declared early: onEditorFocus reads it as soon as the init calls view.focus()
 const onEditorFocus = () => {
   window.__ollinKbdBlocked = true
   if (isPhone && isRunning) clearAndStop()
@@ -685,11 +680,10 @@ disposers.push(() => {
   window.__ollinKbdBlocked = false   // quitte la vue → ne pas bloquer le run autonome
 })
 
-// ── Déplacement du curseur au glissement horizontal (tactile / mobile) ──────
-// L'éditeur est en retour-à-la-ligne → aucun scroll horizontal, on utilise donc
-// le glissement HORIZONTAL du doigt pour déplacer le curseur : 1 cran par
-// largeur de glyphe glissée, déplacement LINÉAIRE dans le document (franchit les
-// fins de ligne). Le glissement vertical reste le scroll natif.
+// Moving the cursor by a horizontal drag (touch, mobile). The editor wraps lines, so there is no
+// horizontal scrolling, and the finger's HORIZONTAL drag moves the cursor instead: one step per
+// glyph width dragged, moving LINEARLY through the document, across line ends. A vertical drag
+// stays the native scroll.
 ;(function () {
   const H_THRESHOLD = 8      // px avant de trancher la direction du geste
   const dom = view.scrollDOM
@@ -714,7 +708,7 @@ disposers.push(() => {
       active = Math.abs(dx) > Math.abs(dy)   // horizontal → on prend la main ; vertical → scroll natif
     }
     if (!active) return
-    e.preventDefault()   // on gère : pas de scroll ni de sélection native
+    e.preventDefault()   // we handle it: no native scrolling or selection
     const cw = view.defaultCharacterWidth || 8
     const pos = Math.max(0, Math.min(view.state.doc.length, head0 + Math.round(dx / cw)))
     view.dispatch({ selection: { anchor: pos }, scrollIntoView: true })
@@ -725,17 +719,17 @@ disposers.push(() => {
   dom.addEventListener('touchcancel', end, { passive: true })
 })()
 
-// ── Barre d'aide à la saisie (symboles) — tactile uniquement ────────────────
-// Insère un symbole au curseur SANS voler le focus (sinon le clavier se ferme).
-// Affichée seulement sur appareil tactile, quand l'éditeur a le focus.
+// The typing-aid bar (symbols), on touch devices only. It inserts a symbol at the cursor WITHOUT
+// stealing the focus, which would close the keyboard. It is shown only on a touch device, when
+// the editor has focus.
 ;(function () {
   const kbar = document.getElementById('kbar')
   if (!kbar) return
   const onDown = (e) => {
     const key = e.target.closest('.kbar-key')
     if (!key) return
-    e.preventDefault()   // garde le focus de l'éditeur → le clavier reste ouvert
-    if (key.hasAttribute('data-run')) {   // ▶ Exécuter (barre d'outils masquée en saisie)
+    e.preventDefault()   // keeps the editor's focus, so the keyboard stays open
+    if (key.hasAttribute('data-run')) {   // ▶ Run (the toolbar is hidden while typing)
       relaunch()
       return
     }
@@ -743,7 +737,7 @@ disposers.push(() => {
     if (move) {
       const forward = move === '1'
       const sel = view.state.selection.main
-      // Sélection : on la replie sur le bord visé (comme les flèches) ; curseur : ±1 caractère.
+      // On a selection it collapses to the edge aimed at, as the arrows do; on a cursor it moves by one character.
       const anchor = sel.empty ? view.moveByChar(sel, forward).head : (forward ? sel.to : sel.from)
       view.dispatch({ selection: { anchor }, scrollIntoView: true })
       view.focus()
@@ -762,22 +756,21 @@ disposers.push(() => {
   kbar.addEventListener('pointerdown', onDown)
   disposers.push(() => kbar.removeEventListener('pointerdown', onDown))
 
-  // Affichage/masquage : tactile uniquement, et SEULEMENT quand le CLAVIER est
-  // réellement ouvert. On ne se fie PAS au focus seul : au lancement, l'init fait
-  // un view.focus() programmatique qui N'OUVRE PAS le clavier (iOS) → la barre ne
-  // doit pas apparaître. On détecte le clavier via visualViewport (la zone visible
-  // rétrécit franchement quand il s'ouvre).
+  // Shown or hidden on touch devices only, and ONLY when the KEYBOARD really is open. Focus alone
+  // is NOT trusted: at startup the init does a programmatic view.focus(), which does NOT open the
+  // keyboard on iOS, and the bar must not appear. The keyboard is detected through visualViewport,
+  // the visible area shrinking sharply when it opens.
   if (isPhone) {
     const runBtnEl = document.getElementById('run-btn')
     const vv = window.visualViewport
-    // Clavier ouvert ≈ la zone visible perd > 120px par rapport au layout viewport.
+    // An open keyboard means the visible area loses more than 120px against the layout viewport.
     const keyboardOpen = () => (vv ? (window.innerHeight - vv.height > 120) : false)
     const update = () => {
       const editing = document.activeElement === view.contentDOM
       const running = runBtnEl && runBtnEl.classList.contains('running')
       kbar.classList.toggle('show', editing && keyboardOpen() && !running)
-      // En saisie (clavier ouvert), masquer la barre d'outils → l'éditeur récupère
-      // sa hauteur (précieux sur petit écran). Restaurée à la fermeture du clavier.
+      // While typing, with the keyboard up, the toolbar is hidden so the editor gets its height
+      // back, which is precious on a small screen. It is restored when the keyboard closes.
       document.body.classList.toggle('kbd-editing', editing && keyboardOpen())
     }
     view.contentDOM.addEventListener('focus', update)
@@ -791,19 +784,18 @@ disposers.push(() => {
       if (vv) {
         vv.removeEventListener('resize', update)
       }
-      document.body.classList.remove('kbd-editing')   // pas de barre masquée résiduelle
+      document.body.classList.remove('kbd-editing')   // no toolbar left hidden behind
     })
   }
 })()
 
 view.focus()
-window.__ollinView = view    // accès à l'éditeur pour le débogage/console (nettoyé au démontage)
-// (La réouverture de la dernière vue est gérée au niveau du routeur, app.js.)
+window.__ollinView = view    // access to the editor for debugging and the console (cleared on unmount)
+// (Reopening the last view is handled at the router level, in app.js.)
 
-// ── Projets & fichiers ──────────────────────────────────────────────────────
-// L'éditeur édite le fichier COURANT du projet ACTIF. Le menu Projet (drill-down)
-// et la liste latérale de fichiers pilotent l'état. Le Run reste mono-fichier à
-// cette étape (il exécute le fichier affiché) ; le multi-fichiers vient en 1.3.
+// Projects and files. The editor edits the CURRENT file of the ACTIVE project. The Project menu
+// (a drill-down) and the side file list drive the state. Run is still single-file at this stage:
+// it runs the file on display.
 const projectBtn   = document.getElementById('project-btn')
 const projectLabel = document.getElementById('project-label')
 const projectMenu  = document.getElementById('project-menu')
@@ -818,25 +810,25 @@ const editorBox    = document.getElementById('editor-wrap')
 
 let currentProject = null    // objet projet complet
 let currentFile    = null    // chemin du fichier ouvert
-// Ressource AFFICHÉE à la place de l'éditeur (null = on édite). Déclarée ici, avec l'état :
-// renderFiles et openFile la lisent bien plus haut dans le fichier, et une déclaration
-// `let` posée après eux les exposerait à « Cannot access before initialization ».
+// The resource DISPLAYED in place of the editor (null means we are editing). Declared here, with
+// the state: renderFiles and openFile read it much higher up in the file, and a `let` declared
+// after them would expose them to "Cannot access before initialization".
 let currentRes     = null
 let examples       = []      // [{name, file}] pour « Nouveau depuis un exemple »
 
-// Mode exemple : le projet courant est TRANSITOIRE (chargé depuis le dépôt, jamais
-// persisté). On voit/navigue tous ses fichiers, mais aucune écriture en base ni
-// mutation de structure (créer/renommer/supprimer) — « Créer un projet » pour éditer.
-// Un exemple = le projet TRANSITOIRE (id sentinelle), jamais un enregistrement en
-// base. Ne pas se fier à un flag persistable : il pouvait fuiter en base et masquer
-// à tort renommage/suppression (auto-réparé par Store.init).
+// In sample mode the current project is TRANSIENT, loaded from the repository and never
+// persisted. All of its files can be seen and navigated, but nothing is written to the database
+// and the structure cannot be changed (no creating, renaming or deleting) — "Create a project" is
+// the way to edit. A sample IS the TRANSIENT project (the sentinel id), never a record in the
+// database. A persistable flag is not to be trusted: it could leak into the database and wrongly
+// hide renaming and deletion (Store.init self-repairs that).
 const isExample = () => !!(currentProject && currentProject.id === Store.TRANSIENT_ID)
 
 const fileKey = id => 'ollin-pg-file:' + id           // dernier fichier ouvert / projet
 const scripts = p => Object.keys(p.files).filter(f => f !== Store.MANIFEST).sort()
 
-// Affiche/masque les boutons de MUTATION de structure (＋ fichier / ＋ ressource) :
-// masqués en mode exemple (projet transitoire non éditable), visibles sinon.
+// Shows or hides the structure-CHANGING buttons (＋ file, ＋ resource): hidden in sample mode,
+// the transient project not being editable, and visible otherwise.
 function setStructuralUI(enabled) {
   newFileBtn.style.display = enabled ? '' : 'none'
   newResBtn.style.display  = enabled ? '' : 'none'
@@ -844,10 +836,10 @@ function setStructuralUI(enabled) {
 
 function setEditorText(text) {
   loadingFile = true
-  // Recrée l'état complet → historique d'annulation VIERGE. Charger un fichier ne
-  // doit pas être annulable (sinon Ctrl+Z vide le fichier), et chaque fichier a son
-  // propre historique (sinon Ctrl+Z après changement de fichier ferait resurgir le
-  // contenu du fichier précédent). setState remplace doc + historique d'un coup.
+  // The whole state is recreated, hence a BLANK undo history. Loading a file must not be
+  // undoable — Ctrl+Z would otherwise empty the file — and each file has its own history, without
+  // which a Ctrl+Z after switching files would bring back the previous file's content. setState
+  // replaces the document and the history in one go.
   view.setState(EditorState.create({ doc: text, extensions: editorExtensions }))
   loadingFile = false
 }
@@ -863,20 +855,20 @@ function scheduleSave() {
   persist(currentProject)
 }
 
-// Sauvegarde unifiée d'une modif du projet courant : persiste en local
-// (instantané) PUIS planifie un push distant différé si le projet y est éligible.
-// Source unique remplaçant les Store.saveProject dispersés (frappe + mutations de
-// structure) → toute modification suit le même chemin de synchronisation.
+// The unified save of a change to the current project: it persists locally, at once, THEN
+// schedules a deferred remote push when the project is eligible. This single source replaced the
+// scattered Store.saveProject calls (typing and structure changes alike), so every change follows
+// the same synchronisation path.
 function persist(project) {
-  project.dirty = true   // modif locale → à pousser (drapeau unique de synchro)
-  updateSyncBadge()      // pastille bleue (local à pousser)
-  sync.schedule(project) // push distant différé (no-op si non éligible)
+  project.dirty = true   // a local change, to be pushed (the single sync flag)
+  updateSyncBadge()      // a blue badge: local changes to push
+  sync.schedule(project) // the deferred remote push, a no-op when not eligible
   return Store.saveProject(project).catch(e => console.error('saveProject', e))
 }
 
-// ── liste latérale de fichiers ──
-// Rail GitHub réduit à un indicateur : nom du dépôt (informatif). La synchro est
-// entièrement automatique (drapeau dirty) — plus de boutons Push/Pull manuels.
+// The side file list. The GitHub rail is reduced to an indicator: the repository's name, for
+// information. The synchronisation is entirely automatic (the dirty flag), with no manual Push or
+// Pull buttons.
 function renderGhRail() {
   const p = currentProject
   const show = !!(p && !isExample() && p.remote && p.remote.slug && GH.isConnected() && GH.getRepo())
@@ -930,7 +922,7 @@ function iconBtn(txt, title, on) {
 
 function openFile(path) {
   if (path === currentFile) {
-    if (currentRes !== null) showResource(null)   // même fichier, mais on quittait un aperçu
+    if (currentRes !== null) showResource(null)   // the same file, but we were leaving a preview
     return
   }
   flushEditorToFile()
@@ -939,14 +931,14 @@ function openFile(path) {
   if (!isExample()) localStorage.setItem(fileKey(currentProject.id), path)
   renderGhRail(); renderFiles()
   if (currentRes !== null) {
-    showResource(null)   // rend l'éditeur visible (et rafraîchit les deux rails)
+    showResource(null)   // makes the editor visible, and refreshes both rails
     return
   }
   view.focus()
 }
 
-// Bascule au fichier précédent (dir=-1) / suivant (dir=+1) du projet, en boucle.
-// Marche aussi en mode exemple (navigation en lecture ; openFile n'y persiste rien).
+// Switches to the project's previous (dir=-1) or next (dir=+1) file, wrapping around. It works in
+// sample mode too, as read-only navigation: openFile persists nothing there.
 function cycleFile(dir) {
   if (!currentProject) return
   const list = scripts(currentProject)
@@ -957,7 +949,7 @@ function cycleFile(dir) {
 }
 
 async function newFile() {
-  if (!currentProject || isExample()) return   // aucun projet éditable (ex. exemple 404)
+  if (!currentProject || isExample()) return   // no editable project (a 404 sample, say)
   let name = prompt('Nom du nouveau fichier (.ol) :', 'nouveau.ol')
   if (!name) return
   name = name.trim()
@@ -1003,7 +995,7 @@ async function setEntry(path) {
   renderGhRail(); renderFiles()
 }
 
-// ── ressources (images, modèles…) ──
+// Resources (images, models…).
 const IMG_EXT = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp']
 
 function resMime(ext) {
@@ -1011,14 +1003,14 @@ function resMime(ext) {
   return e === 'jpg' ? 'image/jpeg' : 'image/' + e
 }
 
-// Affiche l'éditeur (res = null) ou l'aperçu d'une ressource.
+// Shows the editor (res = null) or the preview of a resource.
 function showResource(name) {
   currentRes = name
   const editing = name === null
   editorBox.style.display = editing ? '' : 'none'
   resView.style.display = editing ? 'none' : 'flex'
-  resView.innerHTML = ''   // vidé DANS LES DEUX CAS : sinon la data URL de l'image
-  renderFiles(); renderResources()   // resterait dans le DOM après retour à l'éditeur
+  resView.innerHTML = ''   // emptied IN BOTH CASES: the image's data URL would otherwise
+  renderFiles(); renderResources()   // stay in the DOM after the return to the editor
   if (editing) {
     view.focus()
     return
@@ -1042,7 +1034,7 @@ function showResource(name) {
     const frame = document.createElement('div'); frame.className = 'res-frame'
     const img = document.createElement('img')
     img.src = 'data:' + resMime(ext) + ';base64,' + (r.b64 || '')
-    // Les dimensions ne sont connues qu'au décodage — l'aperçu les complète alors.
+    // The dimensions are only known once decoded, and the preview fills them in then.
     img.addEventListener('load', () => {
       info.textContent = `${img.naturalWidth} × ${img.naturalHeight} · ${fmtSize(octets)}`
     })
@@ -1081,7 +1073,7 @@ function renderResources() {
       acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteResource(name) }))
       row.appendChild(acts)
     }
-    // Re-cliquer la ressource affichée revient à l'éditeur (bascule).
+    // Clicking the displayed resource again returns to the editor: it toggles.
     row.addEventListener('click', () => showResource(name === currentRes ? null : name))
     resList.appendChild(row)
   }
@@ -1101,7 +1093,7 @@ async function renameResource(name) {
     ollin.preloadImage(n, r.b64, r.ext)
   }
   if (affichee) {
-    showResource(n)   // l'aperçu porte le nom dans son en-tête : le reconstruire
+    showResource(n)   // the preview carries the name in its header, so rebuild it
     return
   }
   renderResources()
@@ -1112,20 +1104,20 @@ async function deleteResource(name) {
   delete currentProject.resources[name]
   await persist(currentProject)
   if (currentRes === name) {
-    showResource(null)   // la ressource affichée n'existe plus
+    showResource(null)   // the displayed resource no longer exists
     return
   }
   renderResources()
 }
 
 
-// ── chargement / bascule de projet ──
+// Loading and switching project.
 async function loadProject(id) {
   const p = await Store.getProject(id)
   if (!p) return
-  if (isRunning) clearAndStop()   // changer de PROJET = autre script → ferme la prévisualisation
+  if (isRunning) clearAndStop()   // changing PROJECT means another script, so close the preview
   removeExampleBanner()   // quitte le mode exemple
-  setStructuralUI(true)   // projet réel → mutations autorisées
+  setStructuralUI(true)   // a real project, so changes are allowed
   flushEditorToFile()
   currentProject = p
   Store.setActiveId(id)
@@ -1140,23 +1132,23 @@ async function loadProject(id) {
   renderGhRail(); renderFiles()
   renderResources()
   view.focus()
-  // Réconciliation distante à l'ouverture (pastille immédiate + auto-pull/garde-fou).
+  // Remote reconciliation on opening: an immediate badge, plus the auto-pull and its guard.
   syncOnOpen(p)   // non bloquant
 }
 
 async function switchProject(id) {
-  if (currentProject && !isExample()) {       // un exemple (transitoire) n'a rien à sauver
-    flushEditorToFile()                       // récupérer les dernières frappes
+  if (currentProject && !isExample()) {       // a sample, being transient, has nothing to save
+    flushEditorToFile()                       // pick up the last keystrokes
     await Store.saveProject(currentProject)   // puis persister avant de quitter
   }
   await loadProject(id)
 }
 
-// Ouvre un projet depuis le menu. En MODE EXEMPLE (aucun projet courant), on quitte
-// le mode par une NAVIGATION (comme forkExampleToProject) → re-montage propre en mode
-// projet et URL correcte (un refresh rouvre le projet, pas l'exemple). Sinon, bascule
-// en place. Corrige : en mode sample, ouvrir/créer un projet ne montrait rien alors
-// que le projet était bien créé (visible seulement après relance de l'app).
+// Opens a project from the menu. In SAMPLE mode, with no current project, we leave that mode by
+// NAVIGATING (as forkExampleToProject does), which gives a clean remount in project mode and a
+// correct URL — a refresh reopens the project rather than the sample. Otherwise it switches in
+// place. This fixed a bug: in sample mode, opening or creating a project showed nothing although
+// the project really was created, and it only appeared after restarting the app.
 async function openProject(id) {
   if (exampleFile) {
     Store.setActiveId(id)
@@ -1166,7 +1158,7 @@ async function openProject(id) {
   }
 }
 
-// ── menu Projet (drill-down) ──
+// The Project menu (a drill-down).
 function closeMenu() {
   projectMenu.style.display = 'none'
   projectBtn.setAttribute('aria-expanded', 'false')
@@ -1199,8 +1191,8 @@ function menuHeader(text, back) {
   h.appendChild(s)
   return h
 }
-// Entrée de menu qui ouvre une page externe. Un vrai lien plutôt qu'un bouton : aucun
-// écouteur de clic à porter, et le navigateur gère l'ouverture.
+// A menu entry that opens an external page. A real link rather than a button: no click listener
+// to carry, and the browser handles the opening.
 function menuLink(label, href) {
   const a = document.createElement('a')
   a.className = 'menu-item'
@@ -1233,13 +1225,13 @@ function renderMenuRoot() {
     const name = await askFreeProjectName('Sans titre'); if (!name) return
     const p = await Store.createProject(name)
     closeMenu()
-    await autoPushNewProject(p)   // dépôt paramétré → créé sur GitHub
+    await autoPushNewProject(p)   // with a repository set, it is created on GitHub
     await openProject(p.id)
   }))
   projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
-  // Actions sur le PROJET COURANT : masquées en mode exemple (projet transitoire,
-  // rien à renommer/dupliquer/supprimer en base).
+  // Actions on the CURRENT PROJECT, hidden in sample mode: the project being transient, there is
+  // nothing in the database to rename, duplicate or delete.
   if (currentProject && !isExample()) {
     projectMenu.appendChild(menuSep())
     projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
@@ -1261,7 +1253,7 @@ function renderMenuRoot() {
       delete copy.files[Store.MANIFEST]
       await Store.saveProject(copy)
       closeMenu()
-      await autoPushNewProject(copy)   // dépôt paramétré → créé sur GitHub
+      await autoPushNewProject(copy)   // with a repository set, it is created on GitHub
       await switchProject(copy.id)
     }))
     projectMenu.appendChild(menuItem('🗑 Supprimer', false, async () => {
@@ -1282,8 +1274,8 @@ function renderMenuRoot() {
   projectMenu.appendChild(menuItem('⌨ Raccourcis clavier (F1)', false, () => { closeMenu(); openHelp() }))
 }
 
-// Sous-menu GitHub : regroupe toutes les fonctionnalités (connexion, dépôt,
-// pousser/récupérer, ouvrir, déconnexion). Accédé depuis « 🐙 GitHub » à la racine.
+// The GitHub sub-menu gathers every feature (connecting, the repository, pushing and pulling,
+// opening, disconnecting). It is reached from "🐙 GitHub" at the root.
 function renderMenuGithub() {
   projectMenu.innerHTML = ''
   if (!GH.isConnected()) {
@@ -1294,24 +1286,24 @@ function renderMenuGithub() {
   const hdr = menuHeader('GitHub' + (ghLogin ? ' : @' + ghLogin : ''), renderMenuRoot)
   projectMenu.appendChild(hdr)
   if (!ghLogin) {
-    ghLogin = GH.knownLogin()   // déjà résolu par un push/pull : pas de requête de plus
+    ghLogin = GH.knownLogin()   // already resolved by a push or pull: no extra request
   }
   if (!ghLogin) {
     const span = hdr.querySelector('span')
     GH.getUser().then(u => { ghLogin = u.login; if (span) span.textContent = 'GitHub : @' + u.login }).catch(() => {})
   }
-  // Dépôt ET token derrière la MÊME entrée : ce sont les deux moitiés d'un seul réglage
-  // (un token ne vaut que pour le dépôt auquel il donne accès), et un token fine-grained
-  // expire — il faut pouvoir le remplacer sans passer par la déconnexion.
+  // The repository AND the token sit behind the SAME entry: they are two halves of one setting (a
+  // token is only good for the repository it grants access to), and a fine-grained token expires,
+  // so it must be replaceable without going through a disconnection.
   projectMenu.appendChild(menuItem('GitHub repo', false, renderMenuConnect))
   projectMenu.appendChild(menuLink('Renouveler le token', TOKEN_URL))
   projectMenu.appendChild(menuItem('Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
-// Menu « Ouvrir un projet » UNIFIÉ : locaux (🖥 non liés), synchronisés (🔄 liés)
-// et distants seuls (☁ présents sur GitHub, absents en local). Les deux premières
-// sections se calculent sans réseau (le lien = remote.slug local) → affichées tout
-// de suite ; la section distante est fusionnée en arrière-plan.
+// A UNIFIED "Open a project" menu: local ones (🖥 unlinked), synchronised ones (🔄 linked) and
+// remote-only ones (☁ present on GitHub, absent locally). The first two sections are computed
+// without the network — the link being the local remote.slug — and so are shown at once; the
+// remote section is merged in in the background.
 async function renderMenuOpen() {
   const local = await Store.listProjects()
   projectMenu.innerHTML = ''
@@ -1327,9 +1319,9 @@ async function renderMenuOpen() {
     if (!currentProject || id !== currentProject.id) await openProject(id)
   }
 
-  // Reconstruit le corps : sections non vides uniquement + pied distant (état réseau).
+  // Rebuilds the body: only the non-empty sections, plus the remote footer with the network state.
   const render = (remoteOnly, footer) => {
-    if (!projectMenu.contains(body)) return   // menu changé entre-temps
+    if (!projectMenu.contains(body)) return   // the menu changed meanwhile
     body.innerHTML = ''
     const group = (label, items, mk) => {
       if (!items.length) return
@@ -1347,7 +1339,7 @@ async function renderMenuOpen() {
     }
   }
 
-  // Pied distant selon l'état de connexion / réseau.
+  // The remote footer, according to the connection and network state.
   const info = txt => { const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = txt; return d }
   if (!GH.isConnected()) {
     render([], menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
@@ -1366,7 +1358,7 @@ async function renderMenuOpen() {
   }
 }
 
-// Ouvre un projet DISTANT SEUL : pull → sauvegarde locale → chargement.
+// Opens a REMOTE-ONLY project: pull, save locally, load.
 async function openRemoteProject(slug) {
   closeMenu()
   const existing = await Store.getProject(slug)
@@ -1376,7 +1368,7 @@ async function openRemoteProject(slug) {
   setStatus('Récupération…')
   try {
     const p = await GH.pullProject(slug)
-    p.dirty = false   // fraîchement récupéré = synchro
+    p.dirty = false   // freshly fetched, hence synchronised
     await Store.saveProject(p)
     await loadProject(p.id)
     setStatus('Projet ouvert ✓', true)
@@ -1391,9 +1383,9 @@ async function renderMenuExamples() {
     const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun exemple.'
     projectMenu.appendChild(d); return
   }
-  // Ouvre l'exemple en LECTURE DIRECTE depuis le dépôt (route #/playground/
-  // sample/<fichier>) : pas de copie, un refresh recharge la version du dépôt.
-  // Pour garder/éditer, le bandeau propose « Créer un projet ».
+  // Opens the sample for DIRECT READING from the repository (the #/playground/sample/<file>
+  // route): no copy, and a refresh reloads the repository's version. To keep or edit it, the
+  // banner offers "Create a project".
   for (const ex of examples) {
     projectMenu.appendChild(menuItem('📄 ' + ex.name, false, () => {
       closeMenu()
@@ -1402,7 +1394,7 @@ async function renderMenuExamples() {
   }
 }
 
-// ── GitHub : état + parcours ──────────────────────────────────────────────
+// GitHub: state and flows.
 const TOKEN_URL = 'https://github.com/settings/personal-access-tokens/new'
 let ghLogin = null
 let statusTimer = null
@@ -1415,10 +1407,10 @@ function setStatus(msg, transient, isError) {
   if (transient) statusTimer = setTimeout(() => { el.textContent = ''; el.style.color = '' }, 4000)
 }
 
-// Réglage GitHub complet — dépôt ET token — pour la première connexion comme pour un
-// changement ultérieur. Les deux champs montrent les valeurs EN PLACE : on retrouve ainsi ce
-// qui est enregistré, on le corrige au lieu de le retaper, et un token inchangé n'est pas
-// revérifié. Vider le champ token garde le token actuel (pour l'effacer : Déconnexion).
+// The complete GitHub setting — the repository AND the token — for the first connection as well as
+// for a later change. Both fields show the values IN PLACE, so what is stored can be seen and
+// corrected rather than retyped, and an unchanged token is not checked again. Emptying the token
+// field keeps the current token; to erase it, disconnect.
 function renderMenuConnect() {
   const deja = GH.isConnected()
   const tokenActuel = GH.getToken() || ''
@@ -1435,8 +1427,8 @@ function renderMenuConnect() {
   const input = document.createElement('input')
   input.type = 'password'; input.className = 'menu-input'; input.value = tokenActuel
   input.placeholder = 'github_pat_… / ghp_…'
-  // Le token est masqué comme un mot de passe : sans cette bascule, le champ prérempli
-  // n'afficherait qu'une rangée de points, donc rien de vérifiable.
+  // The token is masked like a password, so without this toggle the prefilled field would show
+  // nothing but a row of dots, and nothing could be checked.
   const voir = document.createElement('label'); voir.className = 'menu-check'
   const box = document.createElement('input'); box.type = 'checkbox'
   box.addEventListener('change', () => { input.type = box.checked ? 'text' : 'password' })
@@ -1450,11 +1442,11 @@ function renderMenuConnect() {
     const r = repo.value.trim()
     if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
     try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
-    // Inchangé : déjà validé quand il a été enregistré, inutile de rappeler GitHub.
+    // Unchanged: it was validated when it was stored, so there is no need to call GitHub again.
     if (!t || t === tokenActuel) { renderMenuGithub(); return }
     btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
-    // Éprouvé avant d'être rangé : un token refusé ne remplace donc pas celui qui
-    // fonctionnait, et aucun autre chemin ne peut partir avec un token non validé.
+    // Tested before being stored, so a rejected token does not replace the one that worked, and
+    // no other path can set off with an unvalidated token.
     try { const u = await GH.verifyToken(t); GH.setToken(t); ghLogin = u.login; renderMenuGithub() }
     catch (e) { err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = libelle }
   }
@@ -1463,22 +1455,21 @@ function renderMenuConnect() {
   repo.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
   wrap.append(info, repo, input, voir, btn, err)
   projectMenu.appendChild(wrap)
-  // Déjà connecté, on vient le plus souvent changer de dépôt ; sinon, coller le token.
+  // When already connected one usually comes to change repository; otherwise, to paste the token.
   if (deja) repo.focus()
   else input.focus()
 }
 
-// Si GitHub est connecté (dépôt paramétré), tout NOUVEAU projet est aussitôt créé
-// sur le dépôt. Best-effort : en cas d'échec (réseau/permissions/conflit de slug),
-// le projet reste en local et un message le signale — « Pousser vers GitHub » reste
-// disponible pour réessayer.
+// When GitHub is connected, with a repository set, every NEW project is created on the repository
+// at once. Best-effort: on failure (network, permissions, a slug conflict) the project stays local
+// and a message says so — "Push to GitHub" remains available for another try.
 async function autoPushNewProject(p) {
   if (!GH.isConnected() || !GH.getRepo()) return
   setStatus('Création sur GitHub…')
   try {
     await GH.ensureRepo()
     await GH.pushProject(p, null, {})
-    p.dirty = false   // fraîchement poussé = synchro
+    p.dirty = false   // freshly pushed, hence synchronised
     await Store.saveProject(p)   // persiste project.remote (slug, folderSha) + dirty
     setStatus('Projet créé sur GitHub ✓', true)
   } catch (e) {
@@ -1486,11 +1477,10 @@ async function autoPushNewProject(p) {
   }
 }
 
-// ── Synchro par drapeau `dirty` ─────────────────────────────────────────────
-// Modèle unique : un projet modifié localement porte `dirty=true` (à pousser) ;
-// un push réussi le remet à `false`. Plus de hash de contenu ni de détection de
-// conflit à base de SHA — le local fait autorité au push (usage mono-personne).
-// Pastille bi-état : bleu = à pousser (dirty) · vert = synchro.
+// Synchronisation through the `dirty` flag. One model: a project changed locally carries
+// `dirty=true`, meaning "to be pushed", and a successful push sets it back to `false`. No content
+// hash, no SHA-based conflict detection — the local side is authoritative on a push, the use being
+// single-person. The badge has two states: blue means "to push" (dirty), green means synchronised.
 
 function setSyncDot(state) {
   projectBtn.classList.toggle('sync-local',   state === 'local')
@@ -1498,15 +1488,15 @@ function setSyncDot(state) {
   projectBtn.classList.toggle('sync-ok',      state === 'ok')
 }
 
-// Éligible à l'auto-push : projet réel, GitHub connecté + dépôt configuré, et
-// `dirty`. Pas besoin d'être déjà lié — le 1er push crée le dossier distant.
+// Eligible for an auto-push: a real project, GitHub connected with a repository configured, and
+// `dirty`. It need not already be linked — the first push creates the remote folder.
 function canAutoPush(p) {
   return !!(p && !isExample() && GH.isConnected() && GH.getRepo() && p.dirty)
 }
 
-// Push réel (auto-sync ET premier envoi). Pastille « syncing » pendant l'envoi ;
-// au succès, `dirty=false` et pastille verte. Propage l'erreur → le coordinateur
-// re-planifie (le projet reste `dirty`, donc sera repoussé).
+// The real push (both the auto-sync and the first send). The badge reads "syncing" while sending,
+// and on success `dirty` becomes false and the badge turns green. The error is propagated, so the
+// coordinator reschedules: the project stays `dirty` and will be pushed later.
 async function sharedRemotePush(project) {
   if (project === currentProject) setSyncDot('syncing')
   await GH.ensureRepo()
@@ -1515,18 +1505,18 @@ async function sharedRemotePush(project) {
   await Store.saveProject(project)
   if (project === currentProject) {
     updateSyncBadge()
-    renderGhRail()   // 1er push → le rail GitHub (nom du dépôt) devient visible
+    renderGhRail()   // on the first push the GitHub rail, with the repository's name, becomes visible
   }
 }
 
-// onError du coordinateur (auto uniquement) : hors-ligne / token invalide. Le
-// projet reste `dirty` (push non confirmé) → repoussé plus tard. Discret.
+// The coordinator's onError (for the automatic path only): offline, or an invalid token. The
+// project stays `dirty`, the push being unconfirmed, and is pushed later. Kept discreet.
 function onRemoteSyncError(err, project) {
   if (project === currentProject) updateSyncBadge()
 }
 
-// Pastille depuis l'état courant : dirty → bleu, sinon vert. Aucune pastille hors
-// GitHub (déconnecté, dépôt non configuré, ou exemple).
+// The badge from the current state: blue when dirty, green otherwise. There is no badge outside
+// GitHub (disconnected, no repository configured, or a sample).
 function updateSyncBadge() {
   const p = currentProject
   if (!p || isExample() || !GH.isConnected() || !GH.getRepo()) {
@@ -1541,12 +1531,12 @@ const OPEN_CONFLICT_MSG =
   + 'OK = récupérer GitHub (tes modifs locales seront perdues)\n'
   + 'Annuler = garder ta version locale (elle écrasera GitHub au prochain envoi)'
 
-// Réconciliation à l'ouverture d'un projet (non bloquante ; hors-ligne → garde le
-// local). Compare le SHA du dossier distant au dernier connu :
-//  • distant inchangé (ou inexistant) → rien ; si `dirty`, planifie le push.
-//  • distant changé + local PROPRE → adopte le distant (auto-pull).
-//  • distant changé + local `dirty` → demande à l'utilisateur (garde-fou) :
-//    récupérer le distant, ou garder le local (qui écrasera au prochain push).
+// Reconciliation on opening a project (non-blocking; offline it keeps the local version). It
+// compares the remote folder's SHA with the last known one:
+//  • the remote is unchanged, or does not exist: nothing to do, and if `dirty`, schedule the push;
+//  • the remote changed and the local side is CLEAN: adopt the remote (an auto-pull);
+//  • the remote changed and the local side is `dirty`: ask the user (the guard) whether to fetch
+//    the remote or keep the local version, which will overwrite it on the next push.
 async function syncOnOpen(project) {
   updateSyncBadge()
   if (isExample() || !GH.isConnected() || !GH.getRepo()) return
@@ -1557,7 +1547,7 @@ async function syncOnOpen(project) {
   } catch (_) {
     return   // hors-ligne / token invalide : on garde le local
   }
-  if (!currentProject || currentProject.id !== project.id) return   // projet changé entre-temps
+  if (!currentProject || currentProject.id !== project.id) return   // the project changed meanwhile
   const known = (project.remote && project.remote.folderSha) || null
   const remoteChanged = GH.folderMoved(cur, known)
   if (remoteChanged && (!project.dirty || confirm(OPEN_CONFLICT_MSG))) {
@@ -1567,7 +1557,7 @@ async function syncOnOpen(project) {
   if (project.dirty) sync.schedule(project)   // garde le local → le pousser
 }
 
-// Remplace le projet courant par la version distante (pull) et pose `dirty=false`.
+// Replaces the current project with the remote version (a pull) and sets `dirty` to false.
 async function adoptRemote(project, slug) {
   setStatus('Récupération depuis GitHub…')
   try {
@@ -1575,7 +1565,7 @@ async function adoptRemote(project, slug) {
     p.id = project.id
     p.dirty = false
     await Store.saveProject(p)
-    await loadProject(p.id)   // recharge l'éditeur + relit remote.folderSha
+    await loadProject(p.id)   // reloads the editor and rereads remote.folderSha
     setStatus('Projet à jour ✓', true)
   } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
 }
@@ -1584,9 +1574,9 @@ projectBtn.addEventListener('click', e => {
   e.stopPropagation()
   if (projectMenu.style.display === 'block') closeMenu(); else openMenu()
 })
-// Les clics DANS le menu ne remontent pas au document : sinon, quand un item
-// reconstruit le menu (innerHTML=''), sa cible est détachée et le test
-// « clic à l'extérieur » ci-dessous fermerait le menu par erreur (drill-down).
+// Clicks INSIDE the menu do not bubble up to the document: otherwise, when an item rebuilds the
+// menu (innerHTML=''), its target is detached and the "click outside" test below would close the
+// menu by mistake, breaking the drill-down.
 projectMenu.addEventListener('click', e => e.stopPropagation())
 const onDocClick = e => {
   if (projectMenu.style.display === 'block' && !projectMenu.contains(e.target) && e.target !== projectBtn)
@@ -1596,7 +1586,7 @@ document.addEventListener('click', onDocClick)
 disposers.push(() => document.removeEventListener('click', onDocClick))
 newFileBtn.addEventListener('click', newFile)
 
-// ── bascule de la barre latérale (état NON mémorisé : fermée à chaque ouverture) ──
+// Toggling the side bar. Its state is NOT remembered: it starts closed every time.
 const railToggle = document.getElementById('rail-toggle')
 const fileRailEl = document.getElementById('file-rail')
 let railHidden = true
@@ -1618,9 +1608,8 @@ railToggle.addEventListener('click', onRailToggle)
 disposers.push(() => railToggle.removeEventListener('click', onRailToggle))
 applyRail()
 
-// ── Mode exemple : lecture directe depuis le dépôt (sans copie) ─────────────
-// Bandeau au-dessus de l'éditeur signalant que rien n'est enregistré, avec un
-// bouton pour forker en projet éditable.
+// Sample mode: direct reading from the repository, with no copy. A banner above the editor says
+// that nothing is being saved, with a button to fork it into an editable project.
 function removeExampleBanner() {
   const b = document.getElementById('example-banner')
   if (b) b.remove()
@@ -1645,8 +1634,8 @@ function showExampleBanner(file) {
 async function loadExample(file) {
   currentProject = null
   currentFile = null
-  // ctx.v change à chaque chargement de page → un refresh re-fetch la version
-  // fraîche. collectSampleProject rejette sur 404 du fichier d'entrée.
+  // ctx.v changes on every page load, so a refresh fetches the fresh version.
+  // collectSampleProject rejects on a 404 for the entry file.
   let bundle
   try {
     bundle = await Run.collectSampleProject(file, ctx.v)
@@ -1657,25 +1646,25 @@ async function loadExample(file) {
     setStatus('Exemple introuvable : ' + file, true, true)
     return
   }
-  // Projet TRANSITOIRE : entrée + imports + assets, visibles et navigables, mais non
-  // persistés (id sentinelle TRANSIENT_ID). Un refresh recharge la version du dépôt.
+  // A TRANSIENT project: the entry file, the imports and the assets, all visible and navigable
+  // but not persisted (the TRANSIENT_ID sentinel). A refresh reloads the repository's version.
   currentProject = {
     id: Store.TRANSIENT_ID, name: file, entry: bundle.entry,
     files: bundle.files, resources: bundle.resources,
   }
   currentFile = bundle.entry
   setEditorText(currentProject.files[bundle.entry] ?? '')
-  setStructuralUI(false)         // pas de création/renommage/suppression sur un exemple
+  setStructuralUI(false)         // no creating, renaming or deleting on a sample
   renderGhRail(); renderFiles()
   renderResources()
   showExampleBanner(file)
   projectLabel.textContent = file
-  // Le rail reste FERMÉ par défaut (comme pour un projet) — le bouton latéral l'ouvre.
+  // The rail stays CLOSED by default, as for a project; the side button opens it.
 }
 
-// Ensemble des noms de projets DÉJÀ PRIS (en minuscules), local + distant GitHub si
-// connecté. `exclude` = { id, slug } à ignorer (le projet lui-même lors d'un renommage).
-// Récupéré une seule fois → la boucle de saisie ne re-télécharge pas à chaque essai.
+// The set of project names ALREADY TAKEN, in lower case, locally plus on GitHub when connected.
+// `exclude` is an { id, slug } to ignore (the project itself, during a rename). It is fetched once,
+// so the input loop does not download again on every attempt.
 async function takenProjectNames(exclude = {}) {
   const names = new Set()
   let remoteFailed = false
@@ -1689,15 +1678,16 @@ async function takenProjectNames(exclude = {}) {
         if (r.slug === exclude.slug) continue
         names.add((r.name || '').trim().toLowerCase())
       }
-    } catch (_) { remoteFailed = true }   // distant injoignable → signalé à l'appelant
+    } catch (_) { remoteFailed = true }   // the remote is unreachable, which is reported to the caller
   }
   names.delete('')
   return { names, remoteFailed }
 }
 
-// Demande un nom de projet LIBRE (ni en local ni sur le dépôt distant) : reboucle
-// tant que le nom est vide ou déjà pris. Renvoie le nom validé, ou null si annulé.
-// `opts` : { label, exclude:{id,slug} } (exclusion = le projet lui-même en renommage).
+// Asks for a FREE project name, taken neither locally nor on the remote repository, looping for
+// as long as the name is empty or already taken. It returns the validated name, or null if
+// cancelled. `opts` is { label, exclude:{id,slug} }, the exclusion being the project itself during
+// a rename.
 async function askFreeProjectName(defName, opts = {}) {
   const label = opts.label || 'Nom du projet :'
   if (GH.isConnected() && GH.getRepo()) setStatus('Vérification des noms…')
@@ -1718,11 +1708,10 @@ async function askFreeProjectName(defName, opts = {}) {
   return null
 }
 
-// Fork explicite : convertit l'exemple affiché en projet éditable persistant, en
-// copiant TOUS ses fichiers (entrée + imports) et ses ressources (assets), pas
-// seulement le fichier ouvert.
+// An explicit fork: it turns the displayed sample into a persistent, editable project, copying ALL
+// of its files (the entry file and the imports) and its resources, not only the open file.
 async function forkExampleToProject(file) {
-  flushEditorToFile()   // capter les frappes non enregistrées du fichier courant
+  flushEditorToFile()   // capture the current file's unsaved keystrokes
   const name = await askFreeProjectName(file.replace(/\.ol$/, ''))
   if (!name) return
   const p = await Store.createProject(name)
@@ -1730,17 +1719,17 @@ async function forkExampleToProject(file) {
     p.files     = { ...currentProject.files }
     p.resources = { ...currentProject.resources }
     p.entry     = currentProject.entry
-    delete p.files[Store.MANIFEST]   // régénéré par saveProject
+    delete p.files[Store.MANIFEST]   // regenerated by saveProject
   } else {
     p.files[p.entry] = view.state.doc.toString()
   }
   await Store.saveProject(p)
-  await autoPushNewProject(p)   // dépôt paramétré → créé sur GitHub
+  await autoPushNewProject(p)   // with a repository set, it is created on GitHub
   Store.setActiveId(p.id)
   ctx.navigate('playground')   // quitte le mode exemple → re-montage en mode projet
 }
 
-// ── init ──
+// Init.
 async function initProjects() {
   await Store.init()
   examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => [])
@@ -1756,27 +1745,27 @@ async function initProjects() {
 }
 initProjects()
 
-// ── Output ────────────────────────────────────────────────────────────────
+// Output.
 const outputEl   = document.getElementById('output')
 const canvasEl   = document.getElementById('canvas')
 const outputPane = document.getElementById('output-pane')
 const dividerEl  = document.getElementById('divider')
 const outputHdr  = document.getElementById('output-header')
 
-// Le canvas est PARTAGÉ (rangé dans le shell hors exécution). On le reparente
-// dans la zone de rendu de cette vue ; app.js le range à nouveau au démontage.
+// The canvas is SHARED, kept in the shell outside a run. We reparent it into this view's render
+// area, and app.js puts it back on unmount.
 canvasEl.style.display = 'none'
 outputPane.appendChild(canvasEl)
 
-// La zone de rendu (sortie + canvas) n'apparaît qu'en exécution/pause ;
-// au repos l'éditeur occupe TOUT l'espace.
+// The render area (output plus canvas) only appears while running or paused; at rest the editor
+// takes up ALL the space.
 function setOutputVisible(visible) {
   outputPane.style.display = visible ? '' : 'none'
   if (dividerEl) dividerEl.style.display = visible ? '' : 'none'
   if (visible) {
-    restoreSplit()                       // rétablir le découpage choisi
+    restoreSplit()                       // restore the chosen split
   } else {
-    // éditeur plein écran : retirer les bases flex fixes posées par le drag
+    // A full-screen editor: remove the fixed flex bases the drag had set.
     editorPane.style.flex = ''
     outputPane.style.flex = ''
   }
@@ -1784,7 +1773,7 @@ function setOutputVisible(visible) {
 
 const runBtn   = document.getElementById('run-btn')
 const stopBtn  = document.getElementById('stop-btn')
-let   isPaused  = false   // isRunning est déclaré plus haut (lu par onEditorFocus à l'init)
+let   isPaused  = false   // isRunning is declared above, read by onEditorFocus at init time
 
 const ICON_RUN   = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>'
 const ICON_STOP  = '<svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>'
@@ -1798,7 +1787,7 @@ function setRunning(running) {
     runBtn.innerHTML = ICON_STOP + '<span class="btn-label"> Arrêter</span>'
     stopBtn.style.display = 'flex'
     stopBtn.disabled = false
-    document.getElementById('kbar')?.classList.remove('show')   // pas d'aide à la saisie pendant l'exécution
+    document.getElementById('kbar')?.classList.remove('show')   // no typing aid while the program runs
   } else {
     runBtn.classList.remove('running')
     runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Alt+↵</kbd>'
@@ -1816,14 +1805,14 @@ function clearAndStop() {
   if (outputHdr) outputHdr.style.display = 'flex'
   outputEl.textContent   = ''
   outputEl.className     = ''
-  lastErrorLoc = null   // sortie vidée → plus de cible F4 périmée
+  lastErrorLoc = null   // the output is empty, so there is no stale F4 target
   outputPane.style.overflow = ''
   setRunning(false)
-  setOutputVisible(false)   // retour éditeur plein écran
+  setOutputVisible(false)   // back to the full-screen editor
 }
 
-// Localisation de la dernière erreur affichée (null si la sortie n'est pas une
-// erreur) → cible du raccourci F4 « aller à la première erreur ».
+// The location of the last error shown (null when the output is not an error), which is the target
+// of the F4 "go to the first error" shortcut.
 let lastErrorLoc = null
 
 function showOutput(text) {
@@ -1845,22 +1834,22 @@ function showOutput(text) {
   }
 }
 
-// Extrait la localisation d'un message d'erreur.
-// Nouveau format (SourceLoc) : « fichier.ol:42: … »
-// Ancien format (compatibilité) : « [fichier.ol: ]line N: … »
-// Renvoie { file?, line, str, index } ; null si aucune localisation trouvée.
+// Extracts the location from an error message.
+// The new format (SourceLoc) is "file.ol:42: …".
+// The old one, kept for compatibility, is "[file.ol: ]line N: …".
+// It returns { file?, line, str, index }, or null when no location is found.
 function errLoc(text) {
-  // Nouveau format : fichier.ol:42 (obligatoirement un .ol pour éviter les faux positifs)
+  // The new format, file.ol:42; the .ol is required, to avoid false positives.
   let m = /(([\w./-]+\.ol):(\d+))/.exec(text || '')
   if (m) return { file: m[2], line: parseInt(m[3], 10), str: m[1], index: m.index }
-  // Ancien format : [fichier.ol: ]line N
+  // The old format, [file.ol: ]line N.
   m = /(?:([\w./-]+\.ol)\s*:\s*)?line\s+(\d+)/.exec(text || '')
   if (!m) return null
   return { file: m[1] || null, line: parseInt(m[2], 10), str: m[0], index: m.index }
 }
 
-// Affiche l'erreur dans la zone de sortie ; la portion « fichier:ligne » devient
-// un LIEN cliquable qui amène à la ligne fautive (pas de saut automatique).
+// Shows the error in the output area, the "file:line" part becoming a clickable LINK that goes to
+// the offending line. There is no automatic jump.
 function renderErrorWithLink(text) {
   const loc = errLoc(text)
   lastErrorLoc = loc
@@ -1876,13 +1865,13 @@ function renderErrorWithLink(text) {
   outputEl.appendChild(document.createTextNode(text.slice(loc.index + loc.str.length)))
 }
 
-// Ouvre le fichier fautif si besoin et positionne le curseur sur la ligne
-// (sélectionnée → surlignée jusqu'à la prochaine frappe). Appelé au CLIC du lien.
+// Opens the offending file if need be and puts the cursor on the line, selected so it stays
+// highlighted until the next keystroke. Called when the link is CLICKED.
 function gotoError(loc) {
   if (!loc) return
   let file = loc.file
-  // Résout le fichier nommé (chemin de l'import) vers une clé du projet : match
-  // exact, sinon par nom de base (les clés projet peuvent différer du résolu).
+  // Resolves the named file (the import's path) to a project key: an exact match, otherwise by
+  // base name, the project's keys possibly differing from the resolved path.
   if (file && currentProject) {
     if (currentProject.files[file] === undefined) {
       const base = file.split('/').pop()
@@ -1899,12 +1888,12 @@ function gotoError(loc) {
   view.focus()
 }
 
-// ── Run ───────────────────────────────────────────────────────────────────
+// Run.
 let ollin = null
 
-// Attend que le viewport visuel revienne à sa hauteur pleine (clavier refermé),
-// avec un repli par timeout si aucun événement resize n'arrive. Sert à mesurer la
-// zone de rendu APRÈS fermeture du clavier (sinon dimensions réduites).
+// Waits for the visual viewport to return to its full height, the keyboard having closed, with a
+// timeout as a fallback should no resize event arrive. It serves to measure the render area AFTER
+// the keyboard closes; otherwise the dimensions would be the reduced ones.
 function waitViewportRestored(timeout = 500) {
   const vv = window.visualViewport
   if (!vv || window.innerHeight - vv.height < 100)
@@ -1924,13 +1913,13 @@ function waitViewportRestored(timeout = 500) {
   })
 }
 
-// Démarre l'exécution (à froid). Ne toggle pas : voir run()/relaunch()/stopExec().
+// Starts the execution, from cold. It does not toggle: see run(), relaunch() and stopExec().
 async function launch() {
   if (!ollin) return
-  clearTimeout(autoexecTimer)   // tout lancement (bouton, Alt+Entrée, auto) vaut relance → annule celle en attente
-  // Lancement clavier OUVERT (tactile) : le fermer d'abord et attendre le retour du
-  // viewport. Sinon la zone de rendu serait mesurée RÉDUITE (clavier) → canvas trop
-  // petit, taille erronée une fois le clavier refermé.
+  clearTimeout(autoexecTimer)   // every start (button, Alt+Enter, auto) counts as a restart, so cancel the pending one
+  // Starting with the keyboard OPEN, on a touch device: close it first and wait for the viewport
+  // to come back. Otherwise the render area would be measured REDUCED, by the keyboard, giving too
+  // small a canvas and a wrong size once the keyboard closed.
   if (isPhone && document.activeElement === view.contentDOM) {
     view.contentDOM.blur()
     await waitViewportRestored()
@@ -1938,29 +1927,29 @@ async function launch() {
   try { ollin.pauseMainLoop() } catch(_) {}
   setRunning(false)
   outputEl.className = ''
-  lastErrorLoc = null   // nouvelle exécution : F4 ne doit plus viser l'erreur précédente
-  // Afficher la zone AVANT execute puis MESURER en JS et transmettre au moteur : la
-  // lecture DOM côté C++ à l'init est sujette à une course de layout (flex tout juste
-  // passé de display:none → parfois clientWidth=0 au moment de la lecture, W/H=0 →
-  // canvas à vide). Le JS, lui, a un layout fiable après reflow (getBoundingClientRect).
-  // Le module `window` lit __ollinRenderW/H en priorité (voir window_module.cpp).
+  lastErrorLoc = null   // a new run: F4 must no longer aim at the previous error
+  // Show the area BEFORE execute, then MEASURE in JS and hand the result to the engine: reading
+  // the DOM from C++ at init time is subject to a layout race — a flex box just out of
+  // display:none sometimes reads clientWidth=0, hence W/H=0 and an empty canvas. JS, on the other
+  // hand, has a reliable layout after the reflow (getBoundingClientRect). The `window` module
+  // reads __ollinRenderW/H first (see window_module.cpp).
   setOutputVisible(true)
   const _rr = outputPane.getBoundingClientRect()
   window.__ollinRenderW = Math.round(_rr.width)
   window.__ollinRenderH = Math.round(_rr.height)
   flushEditorToFile()
-  // Préchargement + exécution + gestion d'erreurs : logique PARTAGÉE avec le mode
-  // autonome (run.html) via pg-run.js — plus de duplication ni de divergence.
+  // Preloading, execution and error handling: logic SHARED with the standalone mode (run.html)
+  // through pg-run.js, so there is no duplication and no drift.
   Run.loadProjectIntoRuntime(ollin, currentProject)
   const code = currentProject ? (currentProject.files[currentProject.entry] ?? '')
                               : view.state.doc.toString()
-  // Mode exemple/brouillon : modèles 3D référencés (graphics.model("x.obj"))
-  // préchargés depuis samples/ (les projets utilisateur passent par leurs ressources).
+  // In sample or draft mode the 3D models referenced (graphics.model("x.obj")) are preloaded from
+  // samples/; user projects go through their own resources.
   if (!currentProject) {
     const imported = await Run.preloadSampleImports(ollin, code, ctx.v)
-    await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // modèles des imports aussi
+    await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // the imports' models too
   }
-  // Portée « projet » du module `data` : id du projet, ou 'sample:<fichier>' pour un exemple.
+  // The `data` module's project scope: the project's id, or 'sample:<file>' for a sample.
   window.__ollinDataProject = isExample() ? ('sample:' + exampleFile) : (currentProject ? currentProject.id : '_')
   Run.runProgram(ollin, code, canvasEl, {
     filename:  currentProject ? (currentProject.entry || '') : (exampleFile || ''),
@@ -1968,36 +1957,36 @@ async function launch() {
     onRunning: () => {
       outputPane.style.overflow = 'hidden'
       if (outputHdr) outputHdr.style.display = 'none'
-      setRunning(true)   // le drapeau __ollinGfxKbdArmed est posé par runProgram (pg-run.js)
+      setRunning(true)   // the __ollinGfxKbdArmed flag is set by runProgram (pg-run.js)
     },
     onOutput:  (out) => showOutput(out),
   })
 }
 
-// Bouton Exécuter : bascule (le bouton affiche « Arrêter » pendant l'exécution).
+// The Run button toggles: it reads "Stop" while the program runs.
 function run() {
   if (!ollin) return
   if (isRunning) { clearAndStop(); return }
   launch()
 }
 
-// Alt+Entrée : lance, ou RELANCE à froid si déjà en cours.
+// Alt+Enter runs, or RESTARTS from cold when a program is already running.
 function relaunch() {
   if (!ollin) return
   if (isRunning) clearAndStop()
   launch()
 }
 
-// Échap : arrête l'exécution en cours (sinon sans effet).
+// Escape stops the running program, and does nothing otherwise.
 function stopExec() {
   if (isRunning) clearAndStop()
 }
 
 runBtn.addEventListener('click', run)
 
-// ── Mode Auto (relance différée) — disponible sur toutes les cibles ────────────
-// Aucune restriction de pointeur : un poste tactile avec clavier (ex. iPad) édite
-// autant qu'un desktop. Le bouton est visible dès que l'élément existe.
+// Auto mode (a deferred restart), available on every target. There is no pointer restriction: a
+// touch device with a keyboard, an iPad say, edits as much as a desktop. The button is visible as
+// soon as the element exists.
 const autoexecWrap = document.getElementById('autoexec-wrap')
 const autoexecChk  = document.getElementById('autoexec-chk')
 if (autoexecWrap) {
@@ -2005,10 +1994,10 @@ if (autoexecWrap) {
   const onAutoexec = () => {
     autoexecWrap.classList.toggle('on', autoexecChk.checked)
     if (!autoexecChk.checked) {
-      clearTimeout(autoexecTimer)   // décoché → annule une relance en attente
+      clearTimeout(autoexecTimer)   // unchecked: cancel any pending restart
       return
     }
-    if (!isRunning) relaunch()      // coché → lance tout de suite si le script ne tourne pas déjà
+    if (!isRunning) relaunch()      // checked: start at once unless the script is already running
   }
   autoexecChk.addEventListener('change', onAutoexec)
   disposers.push(() => autoexecChk.removeEventListener('change', onAutoexec))
@@ -2025,10 +2014,9 @@ stopBtn.addEventListener('click', () => {
   }
 })
 
-// ── Formater ────────────────────────────────────────────────────────────────
-// Réindente le code (pg-format.js) à la demande. Ne change QUE l'indentation, et
-// préserve le curseur (même ligne + colonne dans le contenu). S'abstient si les
-// blocs sont déséquilibrés (message d'erreur, aucune modification).
+// Format: reindents the code (pg-format.js) on demand. It changes ONLY the indentation and
+// preserves the cursor, at the same line and column in the content. It abstains when the blocks
+// are unbalanced, giving an error message and changing nothing.
 function doFormat() {
   const r = Fmt.formatOllin(view.state.doc.toString())
   if (!r.ok) { setStatus('Formatage impossible : ' + r.error, true, true); return }
@@ -2038,7 +2026,7 @@ function doFormat() {
   const contentCol = Math.max(0, head - oldLine.from - (oldLine.text.length - oldLine.text.trimStart().length))
   const ln = oldLine.number
   view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: r.code } })
-  const nl = view.state.doc.line(Math.min(ln, view.state.doc.lines))   // même n° de ligne (nombre préservé)
+  const nl = view.state.doc.line(Math.min(ln, view.state.doc.lines))   // the same line number, the count being preserved
   const newIndent = nl.text.length - nl.text.trimStart().length
   view.dispatch({ selection: { anchor: Math.min(nl.from + newIndent + contentCol, nl.to) }, scrollIntoView: true })
   view.focus()
@@ -2046,9 +2034,9 @@ function doFormat() {
 }
 document.getElementById('format-btn').addEventListener('click', doFormat)
 
-// ── Copy ──────────────────────────────────────────────────────────────────
+// Copy.
 const copyBtn = document.getElementById('copy-btn')
-const ICON_COPY = ICONS.copy   // partagés (cm-shared.js)
+const ICON_COPY = ICONS.copy   // shared (cm-shared.js)
 const ICON_OK   = ICONS.ok
 copyBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(view.state.doc.toString()).then(() => {
@@ -2063,15 +2051,14 @@ copyBtn.addEventListener('click', () => {
   })
 })
 
-// ── Mode plein écran (vue #/run, MÊME fenêtre) ──────────────────────────────
-// Bascule vers la vue #/run DANS la fenêtre courante (pas de nouvel onglet : un
-// nouvel onglet crée un contexte GLFW distinct dont l'écouteur clavier casse
-// Backspace/Tab au retour éditeur). Le projet actif est commité dans IndexedDB
-// avant la bascule — la vue #/run le recharge depuis là.
+// Full-screen mode (the #/run view, in the SAME window). It switches to #/run IN the current
+// window rather than a new tab: a new tab creates a separate GLFW context whose keyboard listener
+// breaks Backspace and Tab on returning to the editor. The active project is committed to
+// IndexedDB before the switch, and the #/run view reloads it from there.
 const standaloneBtn = document.getElementById('standalone-btn')
 standaloneBtn.addEventListener('click', async () => {
   if (exampleFile) {
-    // Mode exemple : exécute le MÊME exemple frais en autonome (pas de projet).
+    // Sample mode: run the SAME sample, fresh, standalone, with no project.
     ctx.navigate('run', 'sample/' + exampleFile)
     return
   }
@@ -2085,12 +2072,12 @@ standaloneBtn.addEventListener('click', async () => {
   ctx.navigate('run')
 })
 
-// ── Popup d'aide (raccourcis) ────────────────────────────────────────────────
-// Rendue une fois depuis SHORTCUTS ; ouverte par le bouton « Aide » ou F1.
+// The help popup (the shortcuts), rendered once from SHORTCUTS and opened by the "Help" button or
+// by F1.
 const helpOverlay = document.getElementById('help-overlay')
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-// Sur macOS, CodeMirror mappe Ctrl→⌘ (spec Mod-) ; on affiche donc les symboles Mac
-// (⌘ ⌥ ⇧) pour que l'aide corresponde aux vraies touches. Ailleurs : Ctrl/Alt/Maj.
+// On macOS, CodeMirror maps Ctrl to ⌘ (the Mod- spec), so we show the Mac symbols (⌘ ⌥ ⇧) for the
+// help to match the real keys. Elsewhere it is Ctrl, Alt and Shift.
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '')
 const osKey = k => IS_MAC ? k.replace(/Ctrl\+?/g, '⌘').replace(/Alt\+?/g, '⌥').replace(/Maj\+?/g, '⇧') : k
 function renderHelp() {
@@ -2122,20 +2109,17 @@ function toggleHelp() {
 document.getElementById('help-close')?.addEventListener('click', closeHelp)
 helpOverlay?.addEventListener('click', e => { if (e.target === helpOverlay) closeHelp() })
 
-// ── Recharger + vider le cache ──────────────────────────────────────────────
-// Vide le Cache API puis recharge (le code de l'éditeur est conservé dans
-// localStorage). Utile pour récupérer un WASM fraîchement déployé.
+// Reload and empty the cache: it clears the Cache API then reloads (the editor's code is kept in
+// localStorage). Useful for picking up a freshly deployed WASM.
 const reloadBtn = document.getElementById('reload-btn')
-reloadBtn.addEventListener('click', hardReload)   // rechargement dur partagé (pg-run.js via ctx)
+reloadBtn.addEventListener('click', hardReload)   // the shared hard reload (pg-run.js, through ctx)
 
-// ── Image upload ──────────────────────────────────────────────────────────
-// Les images sont gérées UNIQUEMENT via la section « Ressources » du rail (comme
-// les fichiers) : le « ＋ » ouvre ce sélecteur (masqué). Pas de bouton dédié dans
-// la barre d'outils — cohérent avec les fichiers, et les ressources sont moins
-// utilisées.
+// Image upload. Images are handled ONLY through the rail's "Resources" section, as the files are:
+// the "＋" opens this hidden picker. There is no dedicated button in the toolbar, which keeps it
+// consistent with the files, resources being used less often.
 const imgFileInput = document.getElementById('img-file-input')
 
-// Les images chargées deviennent des RESSOURCES du projet actif (persistées).
+// The images loaded become RESOURCES of the active project, and are persisted.
 imgFileInput.addEventListener('change', () => {
   const files = Array.from(imgFileInput.files)
   if (!files.length || !currentProject || isExample()) return
@@ -2148,7 +2132,7 @@ imgFileInput.addEventListener('change', () => {
       currentProject.resources[name] = { b64, ext }
       await persist(currentProject)
       if (ollin) {
-        // Modèles 3D → preloadModel ; images → preloadImage.
+        // 3D models go to preloadModel, images to preloadImage.
         if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && ollin.preloadModel) {
           ollin.preloadModel(name, b64, ext)
         } else if (ollin.preloadImage) {
@@ -2162,14 +2146,14 @@ imgFileInput.addEventListener('change', () => {
   imgFileInput.value = ''
 })
 
-// Le « ＋ » de la section Ressources ouvre le même sélecteur de fichiers.
+// The "＋" of the Resources section opens the same file picker.
 newResBtn.addEventListener('click', () => imgFileInput.click())
 
-// ── WASM ──────────────────────────────────────────────────────────────────
+// WASM.
 const statusEl = document.getElementById('status')
 
-// Runtime WASM PARTAGÉ (chargé une fois par app.js, réutilisé par toutes les
-// vues). Il est déjà lié au <canvas> partagé du shell.
+// The SHARED WASM runtime, loaded once by app.js and reused by every view. It is already bound to
+// the shell's shared <canvas>.
 getOllin().then(m => {
   ollin              = m
   runBtn.disabled    = false
@@ -2179,7 +2163,7 @@ getOllin().then(m => {
   statusEl.textContent = 'Erreur WASM : ' + (err?.message ?? err)
 })
 
-// ── Divider resize ────────────────────────────────────────────────────────
+// Divider resize.
 const divider    = document.getElementById('divider')
 const editorPane = document.getElementById('editor-pane')
 let   dragging   = false
@@ -2191,8 +2175,8 @@ function applySplit(pct) {
   outputPane.style.flex = `0 0 ${100 - pct}%`
 }
 
-// Rétablit le découpage sauvegardé (appelé quand la zone de rendu réapparaît).
-// Au repos (zone masquée) on ne pose AUCUN flex → l'éditeur remplit tout.
+// Restores the saved split, when the render area comes back. At rest, with the area hidden, NO
+// flex is set, so the editor fills everything.
 function restoreSplit() {
   const pct = parseFloat(localStorage.getItem(SPLIT_KEY))
   if (pct >= 15 && pct <= 85) {
@@ -2243,15 +2227,15 @@ disposers.push(() => {
   document.removeEventListener('touchend',   onDocTouchEnd)
 })
 
-// Quitter la vue pendant une exécution graphique : mettre en pause la boucle
-// raylib (sinon elle continuerait de tourner sur un canvas détaché), désarmer
-// l'interception clavier, DÉTRUIRE l'éditeur CM6 (retire ses observers/listeners
-// globaux → pas de fuite à chaque re-visite) et libérer la référence de debug.
+// Leaving the view during a graphics run: pause the raylib loop, which would otherwise keep
+// running on a detached canvas, disarm the keyboard interception, DESTROY the CM6 editor (which
+// removes its global observers and listeners, so nothing leaks on every revisit) and release the
+// debug reference.
 disposers.push(() => {
   try { ollin && ollin.pauseMainLoop() } catch (_) {}
-  // NB : on ne remet PAS __ollinGfxKbdArmed à false — l'écouteur GLFW reste posé
-  // sur window après le démontage, la parade doit donc rester armée page-wide.
-  clearTimeout(autoexecTimer)   // pas de relance fantôme après le démontage de la vue
+  // __ollinGfxKbdArmed is NOT set back to false: the GLFW listener stays on window after the
+  // unmount, so the counter-measure must remain armed page-wide.
+  clearTimeout(autoexecTimer)   // no ghost restart after the view is unmounted
   try { view.destroy() } catch (_) {}
   if (window.__ollinView === view) window.__ollinView = undefined
 })
