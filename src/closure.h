@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <vector>
 
-// Included from the bottom of chunk.h — Value is complete here.
+// Included from the bottom of chunk.h, where Value is a complete type.
 
 struct Upvalue {
     int refcount = 1;
@@ -24,9 +24,9 @@ struct Closure {
             if (--u->refcount == 0)
                 delete u;
     }
-    // Possède des Upvalue* ref-comptés : non copiable (une copie partagerait les
-    // pointeurs sans retain → double-free au 2e destructeur). Toujours manipulé
-    // via Closure* (new / refcount), jamais par valeur.
+    // Owns ref-counted Upvalue*, hence non-copyable: a copy would share the pointers without
+    // retaining them and the second destructor would double-free. Always handled through
+    // Closure* (new / refcount), never by value.
     Closure(const Closure&) = delete;
     Closure& operator=(const Closure&) = delete;
 };

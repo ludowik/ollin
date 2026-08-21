@@ -3,12 +3,12 @@
 #include <cstdint>
 #include <string>
 
-// Utilitaires UTF-8 partagés (string_module : char/substr ; vm : len).
-// Tolérants aux séquences malformées : un octet de tête invalide ou un codepoint
-// tronqué est compté comme 1 codepoint d'1 octet → jamais d'accès hors-bornes.
+// Shared UTF-8 helpers (string_module: char/substr; vm: len).
+// Malformed sequences are tolerated: an invalid lead byte or a truncated codepoint counts as
+// one 1-byte codepoint, so decoding never reads out of bounds.
 
-// Nombre d'octets du codepoint commençant à s[i] (1..4), borné par la fin de s
-// et par la présence d'octets de continuation valides (10xxxxxx).
+// Byte length (1..4) of the codepoint starting at s[i], bounded by the end of s and by the
+// presence of valid continuation bytes (10xxxxxx).
 inline size_t utf8_step(const std::string& s, size_t i) {
     unsigned char c = (unsigned char)s[i];
     size_t len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
@@ -21,7 +21,6 @@ inline size_t utf8_step(const std::string& s, size_t i) {
     return adv;
 }
 
-// Nombre de codepoints dans s.
 inline size_t utf8_count(const std::string& s) {
     size_t i = 0, cp = 0;
     while (i < s.size()) {
@@ -31,8 +30,8 @@ inline size_t utf8_count(const std::string& s) {
     return cp;
 }
 
-// Offset (en octets) du début du codepoint d'index cpIndex (0-based) ; renvoie
-// s.size() si cpIndex dépasse le nombre de codepoints.
+// Byte offset of the codepoint at index cpIndex (0-based); returns s.size() when cpIndex is
+// past the last codepoint.
 inline size_t utf8_byte_offset(const std::string& s, size_t cp_index) {
     size_t i = 0, cp = 0;
     while (i < s.size() && cp < cp_index) {
@@ -42,9 +41,8 @@ inline size_t utf8_byte_offset(const std::string& s, size_t cp_index) {
     return i;
 }
 
-// Décode le codepoint à l'octet i ; *nbytes = nb d'octets consommés. Séquence
-// malformée (tronquée / octet de tête invalide) → renvoie l'octet brut, nbytes=1
-// (cohérent avec utf8Step). Ne lit jamais hors de s.
+// A malformed sequence (truncated, or an invalid lead byte) yields the raw byte with
+// *nbytes = 1, matching utf8Step. Never reads past the end of s.
 inline uint32_t utf8_decode(const std::string& s, size_t i, size_t* nbytes) {
     unsigned char c = (unsigned char)s[i];
     size_t lead_len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
@@ -62,7 +60,6 @@ inline uint32_t utf8_decode(const std::string& s, size_t i, size_t* nbytes) {
     return cp;
 }
 
-// Encode un codepoint en UTF-8 (ajouté à out).
 inline void utf8_encode(uint32_t cp, std::string& out) {
     if (cp < 0x80) {
         out += (char)cp;

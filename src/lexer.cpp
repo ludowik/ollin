@@ -51,8 +51,8 @@ Token Lexer::number(bool leading_dot) {
     else
         digits += src[start];
 
-    // littéraux hexadécimaux (0x..), octaux (0o..) et binaires (0b..) — entiers
-    // '_' autorisé uniquement entre deux chiffres (cf. grammar.ebnf)
+    // Hex (0x..), octal (0o..) and binary (0b..) integer literals. '_' is allowed only
+    // between two digits (see grammar.ebnf).
     if (!leading_dot && src[start] == '0' && !at_end()) {
         char p = peek();
         if (p == 'x' || p == 'X' || p == 'o' || p == 'O' || p == 'b' || p == 'B') {
@@ -87,7 +87,7 @@ Token Lexer::number(bool leading_dot) {
                 any = true;
                 last_was_digit = true;
             }
-            // pas de chiffre, underscore final, ou caractère alphanumérique/'.' collé
+            // no digit, a trailing underscore, or an alphanumeric / '.' stuck to the end
             if (!any || !last_was_digit)
                 invalid();
             if (!at_end() && (std::isalnum((unsigned char)peek()) || peek() == '.'))
@@ -96,7 +96,7 @@ Token Lexer::number(bool leading_dot) {
         }
     }
 
-    // décimal : '_' uniquement entre deux chiffres, un seul '.', pas d'alnum/'.' collé
+    // Decimal: '_' only between digits, a single '.', nothing alphanumeric stuck to the end.
     bool last_was_digit = !leading_dot; // src[start] est un chiffre si !leading_dot
     bool prev_underscore = false;
     while (!at_end()) {
@@ -120,7 +120,6 @@ Token Lexer::number(bool leading_dot) {
         }
     }
     // exposant scientifique optionnel : [eE] [+-]? chiffres → le nombre est flottant.
-    // (les littéraux hex/oct/bin sont déjà retournés plus haut, jamais ici.)
     if (!at_end() && (peek() == 'e' || peek() == 'E')) {
         if (prev_underscore) // '_' juste avant l'exposant → invalide (ex. 1_e5)
             throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
@@ -141,7 +140,7 @@ Token Lexer::number(bool leading_dot) {
         last_was_digit = true;
         prev_underscore = false;
     }
-    // '_' final (ou non suivi d'un chiffre), ou caractère alphanumérique / '.' / '_' collé
+    // trailing '_' (or one not followed by a digit), or an alphanumeric / '.' / '_' stuck to the end
     if (prev_underscore || (!at_end() && (std::isalnum((unsigned char)peek()) || peek() == '.' || peek() == '_')))
         throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
     return {TokenType::NUMBER, digits, line};
@@ -158,10 +157,9 @@ Token Lexer::string() {
     return {TokenType::STRING, val, line};
 }
 
-// Emplacement POSITIONNEL vs expression à interpoler : positionnel si le préfixe
-// (jusqu'au 1er ':') est vide ou uniquement des chiffres → {}, {0}, {1:.3f}, {:.3f}.
-// Ces {…} sont laissés LITTÉRAUX dans la chaîne (remplis par printf). Toute autre
-// forme ({x}, {a+b}, {x:.3f}) est une expression interpolée.
+// POSITIONAL slot vs interpolated expression: positional when the prefix (up to the first
+// ':') is empty or all digits — {}, {0}, {1:.3f}, {:.3f}. Those braces stay LITERAL in the
+// string and are filled in by printf; any other form ({x}, {a+b}, {x:.3f}) is an expression.
 static bool is_positional_placeholder(const std::string& s) {
     size_t i = 0;
     while (i < s.size() && std::isspace((unsigned char)s[i])) i++;
@@ -170,9 +168,9 @@ static bool is_positional_placeholder(const std::string& s) {
     return i == s.size() || s[i] == ':';
 }
 
-// Sépare une interpolation « expr:spec » sur le ':' de PREMIER NIVEAU (hors
-// parenthèses/crochets/accolades et chaînes imbriquées) → préserve les map-littéraux
-// {a:1}. Sans ':' de 1er niveau : spec vide, expr = tout le contenu.
+// Splits "expr:spec" on the TOP-LEVEL ':' — outside brackets, braces, parens and nested
+// strings — so that a map literal {a:1} survives. With no top-level ':', the spec is empty
+// and the whole content is the expression.
 static void split_interp_spec(const std::string& s, std::string& expr, std::string& spec) {
     int depth = 0;
     bool in_str = false;
@@ -208,8 +206,8 @@ void Lexer::interp_string(std::vector<Token>& out) {
             literal += '{';
             advance();
         } else if (c == '{') {
-            // Capturer le contenu {…} (accolades/strings imbriquées) SANS émettre,
-            // pour décider : emplacement positionnel (littéral) vs expression interpolée.
+            // Capture the {…} content (nested braces and strings) WITHOUT emitting anything:
+            // we must first decide between a positional slot and an interpolated expression.
             int depth = 1;
             int inner_start = pos;
             while (!at_end() && depth > 0) {
@@ -237,7 +235,7 @@ void Lexer::interp_string(std::vector<Token>& out) {
             std::string inner = src.substr(inner_start, pos - inner_start);
             advance(); // consomme '}'
 
-            // Positionnel ({}, {0}, {1:.3f}) → laissé littéral (rempli par printf).
+            // Positional ({}, {0}, {1:.3f}): left literal, filled in by printf.
             if (is_positional_placeholder(inner)) {
                 literal += '{';
                 literal += inner;
@@ -245,7 +243,6 @@ void Lexer::interp_string(std::vector<Token>& out) {
                 continue;
             }
 
-            // Expression interpolée, avec spec de format optionnel ({expr:spec}).
             std::string expr_src, spec;
             split_interp_spec(inner, expr_src, spec);
 
@@ -264,7 +261,7 @@ void Lexer::interp_string(std::vector<Token>& out) {
             if (spec.empty()) {
                 emit_sub(expr_src);
             } else {
-                // Désucrage : {expr:spec} → __fmt(expr, "spec") (moteur de format partagé).
+                // Desugaring: {expr:spec} becomes __fmt(expr, "spec"), the shared formatter.
                 emit_tok({TokenType::IDENTIFIER, "__fmt", str_line});
                 emit_tok({TokenType::LPAREN, "(", str_line});
                 emit_sub(expr_src);
@@ -369,10 +366,9 @@ std::vector<Token> Lexer::tokenize() {
             }
             break;
         case ';':
-            // Toujours émis : le séparateur de range [a;b] en a besoin (y compris
-            // pour les ranges ouverts à gauche ]a;b] où le compteur de crochets ne
-            // pouvait pas distinguer ouverture/fermeture). Un ';' hors range est
-            // rejeté par le parser (message clair au niveau instruction).
+            // Always emitted: the range separator [a;b] needs it, including for left-open
+            // ranges ]a;b] where a bracket counter cannot tell opening from closing. A ';'
+            // outside a range is rejected by the parser, which reports it per statement.
             emit({TokenType::SEMICOLON, ";", line});
             break;
         case '-':

@@ -4,9 +4,8 @@
 #include <string>
 #include <string_view>
 
-// Objet d'internement : refcount + hash + contenu au même endroit.
-// retain = ++p->refcount (zéro lookup)
-// release = if (--p->refcount == 0) string_table().erase(p) (lookup seulement à la mort)
+// Interned string: refcount, hash and bytes live together, so retain is a single increment
+// and only release — when the count reaches zero — needs a table lookup.
 struct InternedStr {
     int refcount = 1;
     uint32_t hash;
@@ -16,8 +15,8 @@ struct InternedStr {
 };
 
 struct StringTable {
-    // Clé = string_view pointant dans InternedStr::str (stable, heap-alloué).
-    // Zéro copie du contenu : la string n'existe qu'une seule fois dans InternedStr.
+    // The key is a string_view into InternedStr::str (heap-allocated, hence stable), so the
+    // bytes exist exactly once.
     robin_hood::unordered_map<std::string_view, InternedStr*> table_;
 
     InternedStr* intern(std::string s) {

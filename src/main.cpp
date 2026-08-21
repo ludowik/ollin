@@ -23,7 +23,8 @@ int main(int argc, char* argv[]) {
     auto sep = script_path.find_last_of("/\\");
     std::string dir = (sep != std::string::npos) ? script_path.substr(0, sep + 1) : "";
 
-    // Persistance `data` : sidecar « <script>.data.json » (projet) + fichier home (global).
+    // `data` persistence: a "<script>.data.json" sidecar for the project, plus a home file
+    // for the global store.
     {
         const char* home = std::getenv("HOME");
         std::string global = (home ? std::string(home) + "/" : "") + ".ollin-data-global.json";
@@ -35,7 +36,7 @@ int main(int argc, char* argv[]) {
         auto source_files = std::make_shared<std::vector<std::string>>();
         Program program;
 
-        // config.ol optionnel — file_idx 0 si présent
+        // config.ol is optional — it takes file_idx 0 when present
         {
             std::string cfg_path = dir + "config.ol";
             std::ifstream f(cfg_path);
@@ -60,8 +61,8 @@ int main(int argc, char* argv[]) {
         source_files->push_back(script_path);
         append_program(program, Parser(Lexer(ss.str(), script_path, fi).tokenize(),
                                      dir, imported, nullptr, source_files).parse());
-        // Après parse() le program.source_files = *source_files (snapshot) ; le
-        // compilateur utilise chunk.source_files copié depuis program.source_files.
+        // parse() snapshots *source_files into program.source_files, which the compiler then
+        // copies into chunk.source_files.
         program.source_files = *source_files;
 
         VM vm;

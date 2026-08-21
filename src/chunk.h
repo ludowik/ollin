@@ -23,10 +23,10 @@ struct FuncProto {
     std::vector<UpvalDesc> upvals;
 };
 
-// Clé de déduplication des constantes : STRICTE par type (tag) + motif binaire de
-// l'union. À NE PAS confondre avec ValueEqual (clés de map) qui fusionne
-// INTEGER(1) et FLOAT(1.0) → chargerait le mauvais type. De même int 0 / float 0.0
-// / nil partagent des bits nuls mais des tags distincts → doivent rester séparés.
+// Constant-pool key: strict on the tag AND on the raw bits of the union. Do NOT reuse
+// ValueEqual (map keys) here — it merges INTEGER(1) with FLOAT(1.0), which would load a value
+// of the wrong type. Likewise int 0, float 0.0 and nil share zeroed bits but differ by tag,
+// so they must stay distinct entries.
 struct ConstKey {
     uint8_t tag;
     uint64_t bits;

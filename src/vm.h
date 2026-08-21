@@ -9,8 +9,8 @@
 
 std::string value_to_string(const Value& v);
 
-// Mémoire tas en cours d'usage (octets), multi-plateforme. Base de la builtin mem()
-// et de l'overlay mémoire du moteur graphique.
+// Heap bytes currently in use, cross-platform. Backs the mem() builtin and the engine's
+// memory overlay.
 uint64_t ollin_heap_bytes();
 
 class VM {
@@ -23,19 +23,19 @@ class VM {
     Value call_value(const Value& fn, const Value& a);
     Value call_value(const Value& fn, const Value& a, const Value& b);
     Value call_value(const Value& fn, const Value& a, const Value& b, const Value& c, const Value& d);
-    // Comme callValue mais récupère jusqu'à out_cap valeurs de retour (multi-retour
-    // natif→Ollin) ; renvoie le nombre effectivement écrit dans out.
+    // Like call_value, but collects up to out_cap return values (native->Ollin multi-return);
+    // returns how many were actually written to out.
     int call_value_multi(const Value& fn, const Value* args, int argc, Value* out, int out_cap);
     Value get_global(const std::string& name) const; // returns nil if not found
     void set_global(const std::string& name, const Value& value);
-    // Après execute() : appelle setup() une fois, puis lance la boucle graphique via
-    // graphics.run(draw) si un draw() est défini. Partagé par les points d'entrée
-    // natif et WASM (une seule version gardée : graphics peut être nil/non-map).
+    // Runs after execute(): calls setup() once, then starts the render loop through
+    // graphics.run(draw) when a draw() exists. Shared by the native and WASM entry points,
+    // hence tolerant of a nil or non-map `graphics`.
     void run_entry_hooks();
 
-    // Marqueur « graphics.canvas() a été appelé pour ce programme » (VM neuf par run).
-    // Permet à runEntryHooks de créer un canvas IMPLICITE (à W×H) si un draw() existe
-    // mais qu'aucun canvas n'a été créé explicitement. Posé par gfx_canvas.
+    // Set by gfx_canvas to record that graphics.canvas() ran for this program (the VM is new
+    // on every run). It lets run_entry_hooks create an IMPLICIT canvas at W×H when a draw()
+    // exists but no canvas was created explicitly.
     void mark_gfx_canvas() { gfx_canvas_created_ = true; }
     bool gfx_canvas_created() const { return gfx_canvas_created_; }
 
@@ -55,25 +55,23 @@ class VM {
         uint32_t return_ip = 0;
         int reg_base = 0;
         int result_base = 0;  // où RETURN/RETURN_V écrit les résultats (= reg_base sauf CALL_VARARGS,
-                              // qui exécute dans une zone fraîche mais renvoie au registre statique appelant)
+                              // running in a fresh window but returning to the caller's static register)
         int varargs_base = 0; // = reg_base + fp.reg_count (where varargs live in regs)
         int n_varargs = 0;    // count of extra variadic args (0 if none)
         bool is_ctor = false; // true = frame is a constructor; RETURN overrides R[0] with instance
         int return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
         bool negate_result = false; // true: RETURN nie (logique) le résultat avant return_dest
-                                    // (utilisé par <> via __eq, et par >/>=/</<= côté « inverse »)
+                                    // (used by <> through __eq, and by >/>=/</<= on the flipped side)
         std::unique_ptr<std::vector<Upvalue*>> upvals;
         std::unique_ptr<std::vector<Upvalue*>> open_upvals;
     };
 
-    // Inline cache monomorphe pour GET_INDEX sur une map non-instance (modules,
-    // maps data). Indexé par position d'instruction. Hit = même map (mptr) + même
-    // version (invalidée à chaque mutation, cf. Map::version/g_map_epoch) + même clé
-    // internée → renvoie la valeur résolue sans proto_chain_get.
-    // `val` est une référence NON possédante vers l'emplacement dans la map : un hit
-    // implique une version inchangée, donc la map contient toujours l'entrée et garde
-    // la valeur vivante. Posséder une copie retiendrait l'objet en mémoire bien après
-    // sa libération par le script (et coûterait un retain/release par remplissage).
+    // Monomorphic inline cache for GET_INDEX, one slot per instruction. A hit needs the same
+    // map, the same version (bumped on every mutation, see Map::version / g_map_epoch) and the
+    // same interned key; it then answers without proto_chain_get.
+    // `val` is a NON-owning pointer into the map. A hit implies the version is unchanged, so
+    // the entry is still there and keeps the value alive. Owning a copy would retain the object
+    // long after the script dropped it, and cost a retain/release on every fill.
     struct GetIndexCache {
         const Map* map = nullptr;
         uint64_t version = 0;
@@ -82,10 +80,10 @@ class VM {
     };
     std::vector<GetIndexCache> gicache_;
 
-    // Membre d'une map de module IMMUABLE (string_module_, array_module_), avec le
-    // même inline cache par site : ces maps ne changent jamais → hit systématique
-    // après le premier passage. `key_sptr` = clé internée, nullptr si non-string
-    // (indexation d'une chaîne par entier p. ex.) → lookup direct, non caché.
+    // Member of an IMMUTABLE module map (string_module_, array_module_), through the same
+    // per-site cache: these maps never change, so every pass after the first is a hit. A null
+    // `key_sptr` means the key is not a string (indexing a string by integer, say) and the
+    // lookup is done directly, uncached.
     const Value* module_member(const Value& mod, const Value& key, const InternedStr* key_sptr) {
         const Map* m = mod.mptr;
         if (!key_sptr)
@@ -106,8 +104,8 @@ class VM {
     Chunk owned_chunk;
     const Chunk* ch = nullptr;
     Value string_module_;
-    // Pseudo-méthodes des tableaux, construites une fois (cf. array_module.cpp).
-    // Interne au moteur : PAS un module global exposé aux scripts.
+    // Array pseudo-methods, built once (see array_module.cpp). Engine-internal: NOT a global
+    // module exposed to scripts.
     Value array_module_;
     uint32_t ip = 0;
     std::vector<Value> globals;
@@ -115,47 +113,45 @@ class VM {
     std::vector<Value> regs;
     std::vector<Frame> call_stack;
     std::vector<Handler> handler_stack;
-    // Nombre de valeurs produites par le dernier appel/retour. Consommé
-    // UNIQUEMENT par SPREAD_RESULTS (émis juste après un appel en destructuration
-    // multi-retour) pour mettre à nil les cibles au-delà de ce que l'appel a
-    // réellement renvoyé (sinon elles liraient des registres périmés).
+    // How many values the last call or return produced. Consumed ONLY by SPREAD_RESULTS,
+    // emitted right after a call in a multi-return destructuring, to nil out the targets beyond
+    // what the call actually returned — otherwise they would read stale registers.
     int last_results_ = 1;
 
     static Value proto_chain_get(const Value& obj, const Value& key);
 
-    // Suite de la chaîne de prototypes (__class__ d'une map, __parent__ d'une classe),
-    // la data PROPRE de obj ayant déjà été consultée par l'appelant → évite un second
-    // lookup de la même clé dans obj (cf. op_GET_INDEX).
+    // Rest of the prototype chain (a map's __class__, a class's __parent__). The caller has
+    // already searched obj's OWN data, so this avoids looking the same key up twice
+    // (see op_GET_INDEX).
     static Value proto_chain_rest(const Value& obj, const Value& key);
 
     static bool is_instance(const Value& v);
 
     uint32_t try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
-    // Instancie `cls` : instance en regs[base_reg], args en regs[base_reg+arg_off+i].
-    // done=true si aucun frame poussé (init absent/builtin, résultat déjà écrit) ;
-    // sinon retourne l'adresse du corps de init (frame constructeur poussé).
+    // Instantiates `cls`: the instance lands in regs[base_reg], arguments in
+    // regs[base_reg+arg_off+i]. done=true when no frame was pushed (no init, or a builtin one,
+    // and the result is already written); otherwise returns the address of init's body.
     uint32_t instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done);
     uint32_t try_meta_unary(const Value& name, int dest, Value lhs);
     void close_upvals();                     // tout le frame (retour, throw) — chemin CHAUD
     void close_upvals_above(int threshold);   // portée qui se termine (fin d'itération)
-    // Déroule la pile jusqu'au handler `h`, remet regs à sa taille, écrit la valeur
-    // capturée dans le registre de catch et positionne `ip` sur le corps du catch.
-    // Partagé par op_THROW (throw utilisateur) et le catch(runtime_error) C++.
+    // Unwinds to handler `h`, shrinks regs back, writes the caught value into the catch
+    // register and points `ip` at the catch body. Shared by op_THROW (a script-level throw) and
+    // by the C++ catch(runtime_error).
     void unwind_to_handler(const Handler& h, Value thrown);
     void grow_regs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
 
-    // Invoque un builtin : construit le CallCtx, appelle, met à jour last_results_,
-    // renvoie le nombre de valeurs produites. Point d'entrée UNIQUE des 6 sites
-    // d'appel builtin → le calcul de result_cap n'est écrit qu'ici (impossible à
-    // oublier/se tromper à un futur site). `results` = slots résultat (= args), `cap`
-    // = nombre de slots sûrs.
+    // Calls a builtin: builds the CallCtx, invokes it, updates last_results_ and returns the
+    // number of values produced. It is the SINGLE entry point of the six builtin call sites, so
+    // that result_cap is computed in exactly one place and a future site cannot get it wrong.
+    // `results` are the result slots (the arguments), `cap` the number of safe slots.
     int invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap);
-    // Variante registres : les résultats vont dans regs[result_base..] et `cap` est
-    // dérivé du frame courant (varargs_base - result_base) — le calcul piégeux,
-    // centralisé ici. Utilisée par CALL_DYN et CALL_METHOD.
+    // Register variant: results go to regs[result_base..] and `cap` is derived from the current
+    // frame (varargs_base - result_base) — the error-prone computation, kept in one place.
+    // Used by CALL_DYN and CALL_METHOD.
     int invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc);
 
-    // Pousse un frame d'appel, remplit les défauts et varargs, retourne fp.addr.
+    // Pushes a call frame, fills in defaults and varargs, returns fp.addr.
     uint32_t push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                            uint32_t return_ip, bool is_ctor = false, int return_dest = -1, int result_base = -1);
 
@@ -164,9 +160,9 @@ class VM {
             return (double)v.as_int();
         if (v.is_float())
             return v.as_float();
-        // Point de passage UNIQUE de l'arithmétique et des comparaisons d'ordre : c'est ici
-        // que l'étanchéité du booléen se joue. `true + 1` et `true < false` sont donc
-        // refusés sans qu'aucun opcode n'ait à le savoir.
+        // The SINGLE gate of all arithmetic and ordering comparisons: this is where the
+        // boolean stays a type of its own. `true + 1` and `true < false` are therefore refused
+        // without any opcode having to know about it.
         if (v.is_nil())
             throw std::runtime_error("runtime: expected number, got nil");
         if (v.is_bool())

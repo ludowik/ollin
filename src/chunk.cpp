@@ -3,8 +3,7 @@
 #include <stdexcept>
 
 uint16_t Chunk::add_constant(Value v) {
-    // Déduplication stricte par type : (tag, 8 octets bruts de l'union). Une même
-    // valeur littérale ne réserve qu'une entrée du pool (comme addIdentifier).
+    // Strict per-type dedup on (tag, raw union bytes): one pool entry per distinct literal.
     uint64_t bits;
     std::memcpy(&bits, &v.ival, sizeof(bits)); // motif binaire de l'union (défini)
     ConstKey key{v.tag, bits};
@@ -57,7 +56,6 @@ size_t Chunk::emit_jump(Op op, uint8_t a) {
 }
 
 void Chunk::patch_jump(size_t pos, uint16_t target) {
-    // patch the lower 16 bits (Bx) of the instruction at pos
     Instr old = code[pos];
     code[pos] = (old & 0xFFFF0000u) | target;
 }
