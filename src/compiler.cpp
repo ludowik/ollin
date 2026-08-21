@@ -117,10 +117,9 @@ static Op token_to_op(TokenType op) {
     }
 }
 
-// Opcode d'un opérateur binaire NON court-circuit (arith / comparaison / bitwise).
-// '&' et '|' (and/or) sont exclus : ils compilent en court-circuit (JUMP_IF_FALSE),
-// jamais via cet opcode. Partagé par visit(BinaryExpr) et compileInto → évite de
-// dupliquer le switch (et supprime les anciens cas '&'/'|' morts).
+// Opcode of a NON short-circuit binary operator (arithmetic, comparison, bitwise). '&' and '|'
+// (and/or) are excluded: they compile to short-circuit jumps (JUMP_IF_FALSE), never through this
+// opcode. Shared by visit(BinaryExpr) and compile_into so the switch is not duplicated.
 static Op binary_arith_opcode(char op) {
     switch (op) {
     case '+':
@@ -177,10 +176,9 @@ static Op unary_opcode(char op) {
     }
 }
 
-// Épilogue void implicite d'une fonction/méthode. Omis si le corps se termine déjà
-// par un RETURN/RETURN_V : la dernière instruction retourne inconditionnellement,
-// donc un RETURN de plus serait inatteignable (code mort). Ne concerne PAS le
-// `return` explicite sans valeur, qui doit toujours être émis.
+// Implicit void epilogue of a function or method. Omitted when the body already ends with a
+// RETURN or RETURN_V: that last instruction returns unconditionally, so one more would be
+// unreachable. This does NOT cover an explicit valueless `return`, which is always emitted.
 static void emit_implicit_return(Chunk& chunk) {
     if (!chunk.code.empty()) {
         Op last = (Op)i_op(chunk.code.back());
@@ -207,8 +205,8 @@ struct CollectLocalsVisitor : StmtQuery {
         : out(out), seen(seen), collect_funcs(collect_funcs), files(files), funcs(funcs) {}
 
     void visit(const VarDeclStmt& s) override {
-        if (!s.is_global) { // 'global' → table des globaux, pas de registre
-                            // 'constant' → locale normale (immuable à la compilation)
+        if (!s.is_global) { // 'global' goes to the globals table, with no register;
+                            // 'constant' is an ordinary local, immutable at compile time
             for (auto& n : s.names) {
                 if (!seen.insert(n).second) {
                     throw std::runtime_error(s.sloc().str(files) + ": local variable '" + n + "' already declared in this scope");
@@ -218,22 +216,22 @@ struct CollectLocalsVisitor : StmtQuery {
         }
     }
     void visit(const FuncDeclStmt& s) override {
-        // Ne pas descendre dans le corps : les locales d'une fonction sont dans sa propre portée.
+        // Do not descend into the body: a function's locals live in its own scope.
         if (collect_funcs && seen.insert(s.name).second) {
             out.push_back(s.name);
             if (funcs)
                 funcs->insert(s.name);
         }
     }
-    // Blocs utilisateur : portée lexicale stricte — ne pas descendre.
-    // Les locales de chaque bloc sont collectées séparément dans compileBlock.
+    // User blocks have strict lexical scope, so we do not descend: each block's locals are
+    // collected separately in compile_block.
     void visit(const ForIterStmt&) override {}
     void visit(const WhileStmt&) override {}
     void visit(const IfStmt&) override {}
     void visit(const TryCatchStmt&) override {}
     void visit(const DoStmt&) override {}
     void visit(const SwitchStmt&) override {}
-    // BlockStmt = conteneur interne (import) sans portée propre : descendre normalement.
+    // A BlockStmt is an internal container (import) with no scope of its own, so descend.
     void visit(const BlockStmt& s) override { run(s.stmts); }
 };
 
@@ -245,9 +243,8 @@ static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std:
     v.run(stmts);
 }
 
-// ── pre-scan global declarations (program-wide, incl. nested in functions) ────
-// Les globaux déclarés avec 'global' sont visibles partout, quel que soit
-// l'endroit de leur déclaration → on les collecte tous avant la compilation.
+// Globals declared with 'global' are visible everywhere, wherever the declaration sits, so
+// they are all collected before compilation — including those nested inside functions.
 struct CollectGlobalsVisitor : StmtQuery {
     std::unordered_set<std::string>& out;
     std::unordered_set<std::string>& enums;
@@ -257,9 +254,9 @@ struct CollectGlobalsVisitor : StmtQuery {
                           const std::vector<std::string>& files)
         : out(out), enums(enums), files(files) {}
 
-    // Descente : la topologie de l'arbre est déclarée par les nœuds (Stmt::for_each_body,
-    // ast.h), pas réénumérée ici — une nouvelle instruction à corps est donc parcourue
-    // sans toucher ce visiteur. Les `visit` ci-dessous ne font plus que COLLECTER.
+    // The tree's topology is declared by the nodes themselves (Stmt::for_each_body, ast.h)
+    // rather than re-enumerated here, so a new statement with a body is walked without touching
+    // this visitor. The `visit` methods below only COLLECT.
     void walk(const std::vector<std::unique_ptr<Stmt>>& stmts) {
         for (auto& s : stmts) {
             s->accept(*this);
@@ -307,15 +304,15 @@ void Compiler::compile_into(const Expr& e, int dest) {
     } else if (dynamic_cast<const NilExpr*>(&e)) {
         chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
     } else if (auto* bin = dynamic_cast<const BinaryExpr*>(&e); bin && bin->op != '&' && bin->op != '|') {
-        // Binaire non court-circuit : émettre l'op FINALE directement dans dest, sans
-        // temporaire+MOVE. Sûr : une instruction 3-adresses lit rL/rR AVANT d'écrire
-        // dest (aucun aliasing possible même si dest est aussi un opérande, ex.
-        // a = a - b → SUB Ra,Ra,Rb). dest < reg_top_ chez tous les appelants, donc les
-        // temporaires d'opérandes (alloués à reg_top_+) ne recouvrent jamais dest.
+        // Non short-circuit binary: emit the FINAL op straight into dest, with no temporary and
+        // no MOVE. This is safe because a 3-address instruction reads r_l and r_r BEFORE writing
+        // dest, so aliasing is harmless even when dest is also an operand (a = a - b gives
+        // SUB Ra,Ra,Rb). Every caller has dest < reg_top_, so operand temporaries — allocated
+        // from reg_top_ up — never overlap dest.
         int saved = reg_top_;
         bin->left->accept(*this);
         int r_l = last_reg_;
-        if (reg_top_ <= r_l) // protège rL d'un appel 0-arg (cf. visit(BinaryExpr))
+        if (reg_top_ <= r_l)   // protects r_l from a 0-argument call (see visit(BinaryExpr))
             reg_top_ = r_l + 1;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
@@ -325,7 +322,7 @@ void Compiler::compile_into(const Expr& e, int dest) {
         reg_top_ = saved;
         last_reg_ = dest;
     } else if (auto* un = dynamic_cast<const UnaryExpr*>(&e)) {
-        // Unaire : op directement dans dest (même sûreté que ci-dessus, un seul opérande).
+        // Unary: emit into dest directly, safe for the same reason with a single operand.
         int saved = reg_top_;
         un->operand->accept(*this);
         int r_in = last_reg_;
@@ -368,8 +365,8 @@ Chunk Compiler::compile(const Program& prog) {
 
     for (auto& s : prog.stmts)
         s->accept(*this);
-    // Même garde que pour les fonctions : les registres sont des opérandes 8 bits.
-    // Sans elle, un script top-level > 255 registres tronquait silencieusement.
+    // Same guard as for functions: registers are 8-bit operands, and without it a top-level
+    // script needing more than 255 of them was silently truncated.
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": top-level code uses more than 255 registers");
     chunk.top_reg_count = (uint8_t)std::max(reg_count_, 8);
@@ -381,16 +378,16 @@ Chunk Compiler::compile(const Program& prog) {
 
 // ── statements ────────────────────────────────────────────────────────────────
 
-// Vrai si l'expression est un appel (toute forme) — utilisé pour la
-// destructuration multi-retour, qui doit lire plusieurs valeurs à la base.
+// True when the expression is a call, in any form. Used by multi-return destructuring, which
+// must read several values from the call base.
 static bool is_call_node(const Expr* e) {
     return dynamic_cast<const CallExpr*>(e) || dynamic_cast<const ExprCallExpr*>(e) ||
            dynamic_cast<const MethodCallExpr*>(e);
 }
 
-// Expression pouvant produire PLUSIEURS valeurs si elle est en dernière position d'une
-// liste (arguments d'appel, éléments de tableau, retour, destructuration) : `...` ou un
-// appel. Ailleurs (position non terminale) elle est ajustée à une seule valeur.
+// Expression that may produce SEVERAL values when it sits last in a list (call arguments,
+// array elements, return, destructuring): `...` or a call. Anywhere else it is adjusted to a
+// single value.
 static bool is_multi_value_expr(const Expr* e) {
     return dynamic_cast<const VarArgExpr*>(e) || is_call_node(e);
 }
@@ -398,29 +395,29 @@ static bool is_multi_value_expr(const Expr* e) {
 void Compiler::visit(const VarDeclStmt& s) {
     note_line(s.line, s.file_idx);
 
-    // Active une locale différée : la déplace de pending_var_reg_ vers local_regs_
-    // (portée lexicale : elle devient visible À PARTIR d'ici). Renvoie son registre.
-    // À n'appeler qu'APRÈS avoir compilé les initialisateurs, pour que `var a = a`
-    // lise le `a` extérieur, pas la locale en cours de déclaration.
+    // Activates a deferred local by moving it from pending_var_reg_ to local_regs_, which is
+    // where lexical scope begins for it, and returns its register. Call it only AFTER compiling
+    // the initializers, so that `var a = a` reads the outer `a` and not the local being
+    // declared.
     auto activate_local = [&](const std::string& name) -> int {
         auto it = pending_var_reg_.find(name);
         if (it == pending_var_reg_.end())
-            return local_regs_.at(name); // déjà active (sécurité)
+            return local_regs_.at(name);   // already active
         int reg = it->second;
         pending_var_reg_.erase(it);
         local_regs_[name] = reg;
         return reg;
     };
-    // Registre réservé d'une locale encore différée (sans l'activer).
+    // Register reserved for a still-deferred local, without activating it.
     auto reserved_reg = [&](const std::string& name) -> int {
         auto it = pending_var_reg_.find(name);
         return it != pending_var_reg_.end() ? it->second : local_regs_.at(name);
     };
 
-    // Multi-retour : plusieurs cibles, une seule valeur qui est un APPEL (de
-    // n'importe quelle forme : fonction nommée, closure, appel dynamique, méthode).
-    // On compile l'appel à une base connue ; la VM y laisse toutes les valeurs de
-    // retour (RETURN copie R[A..A+k-1] → base..base+k-1). On lit ensuite base+i.
+    // Multi-return: several targets and a single value that is a CALL, in any form — named
+    // function, closure, dynamic call, method. The call is compiled at a known base where the VM
+    // leaves all its return values (RETURN copies R[A..A+k-1] to base..base+k-1), and we then
+    // read base+i.
     // (Généralise l'ancien chemin qui ne gérait que CALL_FUNC nommé → corrige le
     // crash sur closure et la perte de valeurs pour méthodes/appels dynamiques.)
     if (s.names.size() > 1 && s.values.size() == 1 && is_multi_value_expr(s.values[0].get())) {
