@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <unordered_set>
 
-// ── upvalue resolution ────────────────────────────────────────────────────────
 
 int Compiler::resolve_upvalue(const std::string& name) {
     auto it = cur_upval_idx_.find(name);
@@ -69,7 +68,6 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
     return uv_i;
 }
 
-// ── constant evaluator (for default parameter values) ─────────────────────────
 static Value eval_constant(const Expr& e, const std::vector<std::string>& files, SourceLoc fallback = {}) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e))
         return n->is_integer ? Value(n->ival) : num_value(n->value);
@@ -83,7 +81,6 @@ static Value eval_constant(const Expr& e, const std::vector<std::string>& files,
     throw std::runtime_error(loc.str(files) + ": default values must be literal constants (not a runtime expression)");
 }
 
-// ── arithmetic op helpers ─────────────────────────────────────────────────────
 static Op char_to_op(char op) {
     switch (op) {
     case '+':
@@ -188,10 +185,8 @@ static void emit_implicit_return(Chunk& chunk) {
     chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 0, 0));
 }
 
-// ── pre-scan locals in a block (for register pre-allocation) ─────────────────
 // collect_funcs=true inside function bodies (nested FuncDecls need a local register)
 // collect_funcs=false at top level (top-level funcs are accessed via func_table)
-// ── pre-scan local declarations ───────────────────────────────────────────────
 struct CollectLocalsVisitor : StmtQuery {
     std::vector<std::string>& out;
     std::unordered_set<std::string>& seen;
@@ -292,7 +287,6 @@ static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std
     v.walk(stmts);
 }
 
-// ── compile expression into a specific destination register ──────────────────
 void Compiler::compile_into(const Expr& e, int dest) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest,
@@ -338,7 +332,6 @@ void Compiler::compile_into(const Expr& e, int dest) {
     }
 }
 
-// ── top-level compile ─────────────────────────────────────────────────────────
 Chunk Compiler::compile(const Program& prog) {
     chunk.source_files = prog.source_files;
     reg_top_ = 0;
@@ -376,7 +369,6 @@ Chunk Compiler::compile(const Program& prog) {
     return std::move(chunk);
 }
 
-// ── statements ────────────────────────────────────────────────────────────────
 
 // True when the expression is a call, in any form. Used by multi-return destructuring, which
 // must read several values from the call base.
@@ -418,29 +410,29 @@ void Compiler::visit(const VarDeclStmt& s) {
     // function, closure, dynamic call, method. The call is compiled at a known base where the VM
     // leaves all its return values (RETURN copies R[A..A+k-1] to base..base+k-1), and we then
     // read base+i.
-    // (Généralise l'ancien chemin qui ne gérait que CALL_FUNC nommé → corrige le
-    // crash sur closure et la perte de valeurs pour méthodes/appels dynamiques.)
+    // This generalizes the earlier path, which only handled a named CALL_FUNC — hence a crash
+    // on closures and lost values for methods and dynamic calls.
     if (s.names.size() > 1 && s.values.size() == 1 && is_multi_value_expr(s.values[0].get())) {
         int base = reg_top_;
         int n = (int)s.names.size();
         if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
-            // var a, b = ...  → n varargs (nil-paddées) à base ; last_results_ = n
+            // var a, b = ... gives n varargs at base, nil-padded, with last_results_ = n
             chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n, 0));
         } else {
-            s.values[0]->accept(*this); // appel : k valeurs de retour ; last_results_ = k
-            if (last_reg_ != base) // appel lui-même spread → recompose à base
+            s.values[0]->accept(*this);   // a call: k return values, last_results_ = k
+            if (last_reg_ != base)   // the call itself spread, so recompose at base
                 chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)base, (uint8_t)last_reg_, 0));
         }
         if (base + n > reg_count_)
-            reg_count_ = base + n; // ces registres sont vivants (lus ci-dessous)
-        // Met à nil les cibles au-delà de ce que l'appel a renvoyé (k < n) : sinon
-        // elles liraient des registres périmés (ex. var a,b = len(x) → b doit être nil).
+            reg_count_ = base + n;   // these registers are live, read just below
+        // Nil out the targets beyond what the call returned (k < n): otherwise they would read
+        // stale registers, and `var a, b = len(x)` must leave b nil.
         chunk.emit(make_abc((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n, 0));
         for (int i = 0; i < n; ++i) {
             if (s.is_global) {
                 chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.add_identifier(s.names[i])));
             } else {
-                int dest = activate_local(s.names[i]); // l'appel est déjà compilé → activation sûre
+                int dest = activate_local(s.names[i]);   // the call is compiled, so this is safe
                 if (base + i != dest)
                     chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(base + i), 0));
             }
@@ -466,9 +458,9 @@ void Compiler::visit(const VarDeclStmt& s) {
         return;
     }
 
-    // Compile chaque initialisateur dans son registre réservé, la locale n'étant PAS
-    // encore active (portée lexicale : `var a = a` lit le `a` extérieur). Les
-    // initialisateurs de TOUTES les cibles voient donc la portée d'avant la déclaration.
+    // Compile every initializer into its reserved register while the local is NOT yet active,
+    // so that `var a = a` reads the outer `a`. Every target's initializer therefore sees the
+    // scope as it was before the declaration.
     for (int i = 0; i < (int)s.names.size(); ++i) {
         int dest = reserved_reg(s.names[i]);
         if (i < (int)s.values.size()) {
@@ -477,7 +469,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
         }
     }
-    // Initialisateurs compilés → les locales deviennent visibles à partir d'ici.
+    // With the initializers compiled, the locals become visible from here on.
     for (auto& n : s.names)
         activate_local(n);
     // Register constants so any later assignment is caught at compile time
@@ -486,7 +478,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             const_names_.insert(n);
 }
 
-static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body); // défini plus bas
+static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body);   // defined below
 
 void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
                               const std::unordered_set<std::string>& skip) {
@@ -500,11 +492,11 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std
     }
 }
 
-// Registres à conserver après une boucle. Une closure du corps peut capturer la
-// variable de boucle ET les locales du corps : leurs upvalues restent OUVERTES (elles
-// pointent dans les registres) jusqu'au retour du frame, donc rendre ces registres aux
-// temporaires écraserait les valeurs capturées. `compile_block` a déjà réservé les
-// locales du corps (reg_top_ courant) ; on garde le plus haut des deux.
+// Registers to keep reserved after a loop. A closure in the body may capture the loop variable
+// AND the body's locals: their upvalues stay OPEN — they point into the registers — until the
+// frame returns, so handing those registers back to temporaries would overwrite the captured
+// values. compile_block has already reserved the body's locals (the current reg_top_), and we
+// keep the higher of the two.
 static int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
                               int reg_top_after_body) {
     if (!body_has_func(body))
@@ -600,9 +592,9 @@ void Compiler::visit(const SwitchStmt& s) {
     int saved = reg_top_;
     s.subject->accept(*this);
     int subj_r = last_reg_;
-    // Réserver le registre du sujet : un sujet appel 0-argument laisse
-    // reg_top_ == subj_r, donc sans cette garde l'évaluation des valeurs de 'case'
-    // réalloue et écrase le sujet (mauvaise branche prise). Ex. : switch f().
+    // Reserve the subject's register: a 0-argument call as subject leaves reg_top_ == subj_r,
+    // so without this guard evaluating the 'case' values would reallocate over the subject and
+    // the wrong branch would be taken. `switch f()` is the case in point.
     if (reg_top_ <= subj_r)
         reg_top_ = subj_r + 1;
     if (reg_top_ > reg_count_)
@@ -763,7 +755,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     note_line(s.line, s.file_idx);
     int saved_top = reg_top_;
 
-    // catch_r doit être connu avant d'émettre TRY → pré-alloué comme temporaire.
+    // catch_r must be known before TRY is emitted, so it is pre-allocated as a temporary.
     int catch_r = 0;
     if (!s.catch_var.empty()) {
         catch_r = reg_top_++;
@@ -778,7 +770,7 @@ void Compiler::visit(const TryCatchStmt& s) {
 
     chunk.patch_jump(try_patch, (uint16_t)chunk.current_pos());
 
-    // Bloc catch : catch_var lié à catch_r, autres locales scopées normalement.
+    // Catch block: catch_var is bound to catch_r, other locals are scoped as usual.
     {
         auto saved_regs = local_regs_;
         auto saved_pending = pending_var_reg_;
@@ -877,11 +869,11 @@ void Compiler::visit(const FuncDeclStmt& s) {
     bool outer_has_vars = !outer_scopes_.back().regs.empty();
 
     if (!is_nested) {
-        // Fonction top-level : pré-marque dans func_table pour optimiser les appels
-        // récursifs (CALL_DYN au lieu de CALL_FUNC quand la fonction peut être closure)
+        // Top-level function: pre-registered in func_table so recursive calls are optimized
+        // (CALL_DYN instead of CALL_FUNC when the function may be a closure)
         func_table[s.name] = FuncInfo{func_idx, n_fixed, s.variadic, outer_has_vars};
     }
-    // Fonctions imbriquées : pas de func_table — elles vivent dans un registre local
+    // Nested functions get no func_table entry: they live in a local register.
 
     // Compile body
     for (auto& stmt : s.body) {
@@ -914,8 +906,8 @@ void Compiler::visit(const FuncDeclStmt& s) {
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
     if (is_nested) {
-        // Fonction imbriquée : stockée dans le registre local pré-alloué par collectLocals.
-        // Aucune entrée dans func_table, aucun accès aux globaux.
+        // Nested function: stored in the local register pre-allocated by collect_locals, with no
+        // func_table entry and no access to globals.
         int dest = local_regs_.at(s.name);
         if (has_upvals) {
             chunk.emit(make_abx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)dest, func_idx));
@@ -923,7 +915,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
             chunk.emit(make_abx((uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
         }
     } else if (has_upvals) {
-        // Fonction top-level closure : MAKE_CLOSURE + STORE_GLOBAL
+        // Top-level closure: MAKE_CLOSURE then STORE_GLOBAL
         func_table[s.name].is_closure = true;
         int tmp = reg_top_++;
         if (reg_top_ > reg_count_)
@@ -932,9 +924,9 @@ void Compiler::visit(const FuncDeclStmt& s) {
         chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.add_identifier(s.name)));
         reg_top_--;
     } else {
-        // Fonction top-level non-closure : LOAD_FUNC + STORE_GLOBAL.
-        // Nécessaire même sans outer vars pour que getGlobal("draw") fonctionne
-        // (auto-détection WASM) et pour que la fonction soit accessible comme valeur.
+        // Top-level non-closure: LOAD_FUNC then STORE_GLOBAL. Needed even without outer
+        // variables, so that get_global("draw") works (the WASM auto-detection) and so the
+        // function is reachable as a value.
         func_table[s.name].is_closure = false;
         int tmp = reg_top_++;
         if (reg_top_ > reg_count_)
@@ -1021,7 +1013,7 @@ void Compiler::visit(const FuncExpr& s) {
     last_reg_ = dest;
 }
 
-// Compile chaque expression dans base+i (cf. déclaration).
+// Compiles each expression into base+i.
 void Compiler::compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs) {
     for (int i = 0; i < (int)exprs.size(); ++i) {
         int target = base + i;
@@ -1039,8 +1031,8 @@ void Compiler::visit(const ReturnStmt& s) {
     note_line(s.line, s.file_idx);
     if (!in_function())
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": return outside function");
-    // return <explicites>, <appel> : le dernier retour, s'il est un appel, s'étend à
-    // TOUTES ses valeurs (sémantique Lua). (`return ...` reste géré par spread_varargs.)
+    // return <explicit values>, <call>: when the last returned expression is a call it expands
+    // to ALL its values, as in Lua. `return ...` is still handled by spread_varargs.
     if (!s.spread_varargs && !s.values.empty() && is_call_node(s.values.back().get())) {
         int base = reg_top_;
         int n_expl = (int)s.values.size() - 1;
@@ -1078,7 +1070,6 @@ void Compiler::visit(const ReturnStmt& s) {
     }
 }
 
-// ── expressions ───────────────────────────────────────────────────────────────
 
 void Compiler::visit(const NumberExpr& e) {
     last_reg_ = alloc_reg();
@@ -1093,8 +1084,8 @@ void Compiler::visit(const StringExpr& e) {
 
 void Compiler::visit(const InterpExpr& e) {
     note_line(e.line, e.file_idx);
-    // Résultat = literals[0] + str(exprs[0]) + literals[1] + ... + literals[n]
-    // ADD sur string gauche auto-convertit le côté droit via valueToString.
+    // Result is literals[0] + str(exprs[0]) + literals[1] + ... + literals[n]; an ADD with a
+    // string on the left converts the right-hand side through value_to_string.
     int result = alloc_reg();
     chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)result,
                        (uint16_t)chunk.add_constant(Value(e.literals[0]))));
@@ -1135,7 +1126,6 @@ void Compiler::visit(const VarExpr& e) {
             return;
         }
     }
-    // Référence à une fonction globale
     auto fit = func_table.find(e.name);
     if (fit != func_table.end()) {
         last_reg_ = alloc_reg();
@@ -1162,10 +1152,10 @@ void Compiler::visit(const VarExpr& e) {
 }
 
 void Compiler::visit(const BinaryExpr& e) {
-    // ── and (&) / or (|) : court-circuit — la droite n'est évaluée que si besoin.
-    // Sémantique valeur (modèle Lua) : `a and b` = a si a falsy, sinon b ;
-    // `a or b` = a si a truthy, sinon b. (Les opcodes AND/OR restent utilisés
-    // par les comparaisons chaînées, où les deux côtés sont déjà calculés.)
+    // and (&) / or (|) short-circuit: the right side is evaluated only when needed, and the
+    // result is a VALUE as in Lua — `a and b` is a when a is falsy, b otherwise; `a or b` is a
+    // when a is truthy, b otherwise. The AND/OR opcodes remain in use for chained comparisons,
+    // where both sides are already computed.
     if (e.op == '&' || e.op == '|') {
         e.left->accept(*this);
         int r_l = last_reg_;
@@ -1176,13 +1166,13 @@ void Compiler::visit(const BinaryExpr& e) {
             reg_count_ = reg_top_;
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)r_l, 0));
         if (e.op == '&') {
-            // a falsy → garder a (dans dst) et sauter l'évaluation de b
+            // a falsy: keep a, already in dst, and skip evaluating b
             size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
             e.right->accept(*this);
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
             chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
         } else {
-            // a truthy → garder a ; a falsy → évaluer b
+            // a truthy: keep a; a falsy: evaluate b
             size_t eval_right = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
             size_t done = chunk.emit_jump(Op::JUMP);
             chunk.patch_jump(eval_right, (uint16_t)chunk.current_pos());
@@ -1196,8 +1186,8 @@ void Compiler::visit(const BinaryExpr& e) {
     }
     e.left->accept(*this);
     int r_l = last_reg_;
-    // protéger le registre du résultat gauche : un appel 0-arg (ou toute expr
-    // qui laisse reg_top_ <= rL) verrait sinon l'opérande droit le réécraser.
+    // Protect the left result's register: a 0-argument call — or any expression leaving
+    // reg_top_ <= r_l — would otherwise see the right operand overwrite it.
     if (reg_top_ <= r_l)
         reg_top_ = r_l + 1;
     if (reg_top_ > reg_count_)
@@ -1211,11 +1201,11 @@ void Compiler::visit(const BinaryExpr& e) {
     chunk.emit(make_abc((uint8_t)binary_arith_opcode(e.op), (uint8_t)last_reg_, (uint8_t)r_l, (uint8_t)r_r));
 }
 
-// a < b < c  →  chaque opérande dans un registre dédié, comparaisons pairées, AND final
+// a < b < c: each operand in its own register, comparisons taken pairwise, AND at the end.
 void Compiler::visit(const ChainedCompareExpr& e) {
-    int n = (int)e.operands.size(); // n opérandes, n-1 opérateurs
+    int n = (int)e.operands.size();   // n operands, n-1 operators
 
-    // évaluer tous les opérandes dans des registres temporaires contigus
+    // Evaluate every operand into contiguous temporaries.
     int base_tmp = reg_top_;
     std::vector<int> regs;
     for (int i = 0; i < n; i++) {
@@ -1228,7 +1218,7 @@ void Compiler::visit(const ChainedCompareExpr& e) {
         }
     }
 
-    // allouer n-1 registres de résultat de comparaison
+    // Allocate n-1 registers for the comparison results.
     int cmp_base = reg_top_;
     reg_top_ += n - 1;
     if (reg_top_ > reg_count_)
@@ -1256,7 +1246,7 @@ void Compiler::visit(const ChainedCompareExpr& e) {
     for (int i = 0; i < n - 1; i++)
         chunk.emit(make_abc(cmp_op(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i], (uint8_t)regs[i + 1]));
 
-    // AND itératif des résultats partiels dans cmp_base
+    // Fold the partial results together with AND, into cmp_base.
     for (int i = 1; i < n - 1; i++)
         chunk.emit(make_abc((uint8_t)Op::AND, (uint8_t)cmp_base, (uint8_t)cmp_base, (uint8_t)(cmp_base + i)));
 
@@ -1311,8 +1301,9 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
     if (is_vararg) {
         chunk.emit(make_abc((uint8_t)Op::CALL_VARARGS, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
     } else {
-        // dernier argument = appel : ses k valeurs de retour doivent être contiguës aux
-        // fixes (à call_base+n_fixed) ; last_results_ = k au runtime → CALL_VA (argc = n_fixed + k).
+        // The last argument is a call: its k return values must sit contiguously after the fixed
+        // ones, at call_base+n_fixed. last_results_ is k at runtime, hence CALL_VA with
+        // argc = n_fixed + k.
         int want = call_base + n_fixed;
         reg_top_ = want;
         args.back()->accept(*this);
@@ -1333,7 +1324,7 @@ void Compiler::visit(const CallExpr& e) {
         return;
     }
     if (e.optional) {
-        // appel optionnel nommé : callee résolu AVANT les args, garde, puis args
+        // Optional named call: resolve the callee BEFORE the arguments, guard, then arguments.
         int call_base = reg_top_;
         int argc = (int)e.args.size();
         int func_reg = call_base + argc;
@@ -1353,8 +1344,8 @@ void Compiler::visit(const CallExpr& e) {
         reg_top_ = func_reg + 1;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
-        // f?(args) ≡ if f then f(args) else nil  — JUMP_IF_FALSE (nil est falsy) saute
-        // les args : ils ne sont donc PAS évalués si f est falsy.
+        // f?(args) is `if f then f(args) else nil`: JUMP_IF_FALSE (nil being falsy) jumps over
+        // the arguments, which are therefore NOT evaluated when f is falsy.
         size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
         for (int i = 0; i < argc; ++i) {
@@ -1432,14 +1423,14 @@ void Compiler::visit(const ExprCallExpr& e) {
     int argc = (int)e.args.size();
 
     if (e.optional) {
-        // appel optionnel : évaluer le callee AVANT les args, garde, puis args
+        // Optional call: evaluate the callee BEFORE the arguments, guard, then arguments.
         int func_reg = call_base + argc;
         reg_top_ = call_base + 1;
-        compile_into(*e.callee, call_base); // callee dans call_base (check+résultat)
+        compile_into(*e.callee, call_base);   // callee in call_base: both the check and the result
         reg_top_ = func_reg + 1;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
-        // f?(args) ≡ if f then f(args) else nil — JUMP_IF_FALSE saute les args (non évalués)
+        // f?(args) is `if f then f(args) else nil`; JUMP_IF_FALSE skips the arguments
         size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
         for (int i = 0; i < argc; ++i) { // temps au-dessus de func_reg
@@ -1475,9 +1466,9 @@ void Compiler::visit(const ExprCallExpr& e) {
 void Compiler::visit(const VarArgExpr&) {
     if (!in_function())
         throw std::runtime_error(sloc().str(chunk.source_files) + ": ... outside a variadic function");
-    // Valeur SIMPLE par défaut (1ʳᵉ vararg, ou nil si aucune) : count=1 → padding nil.
-    // Les consommateurs multi-valeurs (appel/tableau/retour/destructuration terminale)
-    // émettent eux-mêmes LOAD_VARARGS count=0 pour l'expansion complète.
+    // A SINGLE value by default (the first vararg, or nil when there is none): count=1, padded
+    // with nil. Multi-value consumers — a call, an array, a return, a trailing destructuring —
+    // emit LOAD_VARARGS with count=0 themselves for the full expansion.
     int base = reg_top_;
     chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 1, 0));
     last_reg_ = base;
@@ -1502,9 +1493,9 @@ void Compiler::visit(const IndexExpr& e) {
     int saved = reg_top_;
     e.obj->accept(*this);
     int obj_r = last_reg_;
-    // Réserver le registre objet avant d'évaluer la clé : un appel 0-argument
-    // laisse reg_top_ == son registre résultat, donc sans cette garde l'évaluation
-    // de la clé réalloue et écrase l'objet (cf. BinaryExpr). Ex. : f().x, f()[i].
+    // Reserve the object's register before evaluating the key: a 0-argument call leaves
+    // reg_top_ at its own result register, so without this guard evaluating the key would
+    // reallocate over the object (same as in BinaryExpr). See f().x and f()[i].
     if (reg_top_ <= obj_r)
         reg_top_ = obj_r + 1;
     if (reg_top_ > reg_count_)
@@ -1526,8 +1517,8 @@ void Compiler::visit(const ArrayExpr& e) {
     for (int i = 0; i < n; ++i) {
         const Expr* elem = e.elements[i].get();
         bool last_pos = (i == n - 1);
-        // En DERNIÈRE position, un élément multi-valeurs s'étend (sémantique Lua) :
-        // `...` → toutes les varargs ; un appel → toutes ses valeurs de retour.
+        // In LAST position a multi-value element expands, as in Lua: `...` to every vararg, a
+        // call to all of its return values.
         if (last_pos && dynamic_cast<const VarArgExpr*>(elem)) {
             chunk.emit(make_abc((uint8_t)Op::ARRAY_PUSH_VARARGS, (uint8_t)dest, 0, 0));
         } else if (last_pos && is_call_node(elem)) {
@@ -1615,10 +1606,10 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     chunk.emit(make_abc((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
     reg_top_ = tmp_src;
 
-    // Variables de boucle scopées : on les aliase directement sur les registres où
-    // FOR_ITER_NEXT écrit (block+1 = clé/primaire, block+2 = val). Pas de copie : la
-    // valeur est réécrite à chaque tour (modifier la variable dans le corps est donc
-    // sans effet). Liaisons sauvegardées puis restaurées → aucune fuite après la boucle.
+    // The loop variables are scoped by aliasing them onto the registers FOR_ITER_NEXT writes
+    // (block+1 is the key or primary, block+2 the value). No copy is made: the value is rewritten
+    // every turn, so assigning to the variable inside the body has no effect. The bindings are
+    // saved and restored, so nothing leaks past the loop.
     auto save_bind = [&](const std::string& n, int reg, bool& had, int& old) {
         auto it = local_regs_.find(n);
         had = (it != local_regs_.end());
@@ -1644,9 +1635,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     break_patches.push_back({});
     continue_patches.push_back({});
     compile_block(body);
-    // Fin d'itération : les variables de boucle et les locales du corps sont hors de
-    // portée, donc leurs upvalues sont fermées → le tour suivant en crée de neuves
-    // (une variable par itération). `continue` saute ICI, donc y passe aussi.
+    // End of an iteration: the loop variables and the body's locals go out of scope, so their
+    // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
+    // `continue` jumps HERE, so it goes through the same closing.
     bool close_scope = body_has_func(body);
     uint16_t iter_end = (uint16_t)chunk.current_pos();
     if (close_scope)
@@ -1657,8 +1648,8 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit = (uint16_t)chunk.current_pos();
-    // Sortie (fin normale, itérateur épuisé ou `break`) : même fermeture, pour que la
-    // dernière itération se comporte comme les autres.
+    // Exit (normal end, exhausted iterator, or `break`): the same closing, so that the last
+    // iteration behaves like the others.
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
     chunk.patch_jump(exit_patch, exit);
@@ -1674,8 +1665,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
 
 void Compiler::visit(const ForIterStmt& s) {
     note_line(s.line, s.file_idx);
-    // chemin rapide : for i in <range littéral inclus aux deux bornes>, 1 variable
-    // (couvre la forme `for i = a, b[, step]`). Évite Range + itérateur + dispatch virtuel.
+    // Fast path: `for i in <range literal, inclusive on both bounds>` with one variable, which
+    // covers the `for i = a, b[, step]` form. It avoids the Range object, the iterator and the
+    // virtual dispatch.
     if (s.var2.empty()) {
         if (auto* r = dynamic_cast<const RangeExpr*>(s.iter_expr.get())) {
             if (r->incl_left && r->incl_right) {
@@ -1687,8 +1679,7 @@ void Compiler::visit(const ForIterStmt& s) {
     compile_iterator_loop(*s.iter_expr, s.var1, s.var2, s.body);
 }
 
-// ── analyse de sûreté pour aliaser la variable de boucle au registre de contrôle ──
-// Vrai si l'expression contient une lambda (capture potentielle de la var de boucle).
+// True when the expression contains a lambda, which could capture the loop variable.
 static bool expr_has_lambda(const Expr* e) {
     if (!e)
         return false;
@@ -1748,9 +1739,9 @@ static bool expr_has_lambda(const Expr* e) {
     return true; // type inconnu → conservatif
 }
 
-// Vrai si le corps est sûr pour aliaser la var de boucle 'v' au registre de contrôle :
-// aucune réassignation de v, aucune lambda, aucune structure de contrôle imbriquée
-// (conservatif — couvre les corps « feuilles » comme s += i).
+// True when the body is safe for aliasing the loop variable 'v' onto the control register: no
+// assignment to v, no lambda, no nested control structure. Deliberately conservative, so it
+// covers leaf bodies such as s += i.
 static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& v) {
     for (auto& sp : body) {
         const Stmt* s = sp.get();
@@ -1787,47 +1778,47 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
             if (expr_has_lambda(th->value.get()))
                 return false;
         } else if (auto* ia = dynamic_cast<const IndexAssignStmt*>(s)) {
-            // obj==v n'écrit pas v (écrit dans son conteneur) ; vérifier key/value
-            // et le conteneur chaîné éventuel (obj_expr).
+            // obj == v does not write v, it writes into its container; check the key, the value
+            // and the chained container (obj_expr) if there is one.
             if (expr_has_lambda(ia->key.get()) || expr_has_lambda(ia->value.get()) ||
                 (ia->obj_expr && expr_has_lambda(ia->obj_expr.get())))
                 return false;
         } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
                    dynamic_cast<const CommentStmt*>(s)) {
-            // sûr
+            // safe
         } else {
-            return false; // if/while/for/block/try/switch/funcdecl/… → conservatif
+            return false;   // if/while/for/block/try/switch/funcdecl/…: stay conservative
         }
     }
     return true;
 }
 
-// Vrai si le corps contient une fonction/closure (n'importe où, récursivement).
-// Sert à décider si on peut recycler les registres de boucle à la sortie : une
-// closure peut capturer (upvalue ouverte) le registre de la variable de boucle ;
-// dans ce cas on le garde réservé pour qu'il ne soit pas réécrit après la boucle.
+// True when the body contains a function or closure anywhere, recursively. It decides whether
+// the loop registers can be recycled on exit: a closure may capture the loop variable's register
+// through an open upvalue,
+// in which case the register stays reserved so nothing overwrites it after the loop.
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body);
-// Ce nœud PORTE-t-il une fonction directement (déclaration, ou lambda dans une de ses
-// propres expressions) ? La DESCENTE dans les sous-corps est faite par stmt_has_func
-// via Stmt::for_each_body — aucune liste de sortes composites à tenir ici, c'est ce qui
-// avait laissé `do ... end` de côté (closure lisant un registre recyclé).
+// Does this node CARRY a function directly — a declaration, or a lambda in one of its own
+// expressions? DESCENDING into the sub-bodies is stmt_has_func's job, through
+// Stmt::for_each_body, so no list of composite kinds is maintained here. Such a list is exactly
+// what had left `do ... end` out, with a closure reading a recycled register.
 struct HasFuncQuery : StmtQuery {
     bool result = false;
     void visit(const FuncDeclStmt&) override {
         result = true;
     }
-    // Une classe PORTE ses méthodes, qui sont des fonctions pouvant capturer une variable
-    // du bloc englobant par upvalue (vérifié : une méthode déclarée dans une boucle lit
-    // bien la variable de boucle) → « oui » est ici la réponse EXACTE, pas un repli.
+    // A class CARRIES its methods, which are functions and can capture a variable of the
+    // enclosing block through an upvalue — verified: a method declared inside a loop does read
+    // the loop variable. So "yes" is the EXACT answer here, not a fallback.
     void visit(const ClassDeclStmt&) override {
         result = true;
     }
-    // Switch et enum répondent « oui » sans examiner leurs expressions. C'est un repli,
-    // et il est CONSERVÉ : affiner ne débloque aucune optimisation, car l'aliasage de la
-    // variable de boucle est refusé par loop_body_alias_safe dès qu'une structure est
-    // imbriquée. body_has_func ne pilote que reg_top_, donc le nombre de registres
-    // réservés — mesuré sur une boucle 10M contenant un switch : aucun gain (+0,9 %,
-    // sous le bruit de disposition du code). Ne pas ré-affiner sans nouvelle mesure.
+    // Switch and enum answer "yes" without looking at their expressions. That is a fallback,
+    // and it is KEPT: refining it unlocks no optimization, because loop_body_alias_safe already
+    // refuses to alias the loop variable as soon as a structure is nested. body_has_func only
+    // drives reg_top_, hence the number of reserved registers — measured on a 10M loop
+    // containing a switch: no gain at all (+0.9 %, below the code-layout noise). Do not refine
+    // it again without a new measurement.
     void visit(const SwitchStmt&) override {
         result = true;
     }
@@ -1873,7 +1864,7 @@ struct HasFuncQuery : StmtQuery {
                 return;
             }
     }
-    // Nœuds à corps : seules leurs EXPRESSIONS propres sont examinées ici.
+    // Nodes with bodies: only their OWN expressions are examined here.
     void visit(const WhileStmt& s) override {
         result = expr_has_lambda(s.cond.get());
     }
@@ -1891,8 +1882,8 @@ struct HasFuncQuery : StmtQuery {
                 return;
             }
     }
-    // TryCatchStmt, BlockStmt, DoStmt : aucune expression propre → rien à examiner,
-    // la descente suffit. BreakStmt/ContinueStmt/CommentStmt : rien non plus.
+    // TryCatchStmt, BlockStmt and DoStmt have no expressions of their own, so descending is
+    // enough; BreakStmt, ContinueStmt and CommentStmt have nothing either.
 };
 static bool stmt_has_func(const Stmt* s) {
     HasFuncQuery q;
@@ -1920,7 +1911,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
 
-    // bornes compilées AVANT de scoper i (pour que `for i = i, …` lise l'ancien i)
+    // Bounds are compiled BEFORE i is scoped, so that `for i = i, …` reads the outer i.
     compile_into(*r.start, ctl);
     compile_into(*r.end, ctl + 1);
     if (r.step)
@@ -1929,10 +1920,10 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)(ctl + 2), chunk.add_constant(Value((int64_t)1))));
     reg_top_ = ctl + 3;
 
-    // Variable de boucle scopée. Si le corps n'écrit jamais i → aliasée sur ctl
-    // (pas de copie). Sinon → registre séparé + copie par tour (le corps peut
-    // modifier i sans toucher le compteur, comportement sans effet). Liaison
-    // restaurée à la sortie → aucune fuite après la boucle.
+    // The loop variable is scoped. When the body never writes i it is aliased onto ctl, with no
+    // copy; otherwise it gets its own register and a copy each turn, so the body can modify i
+    // without touching the counter — an assignment with no effect. The binding is restored on
+    // exit, so nothing leaks past the loop.
     bool can_alias = loop_body_alias_safe(body, var1);
     int var_reg = ctl;
     if (!can_alias) {
@@ -1959,9 +1950,8 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     continue_patches.push_back({});
     compile_block(body);
 
-    // Fin d'itération : fermeture des upvalues de la portée du corps (cf. boucle à
-    // itérateur). Fermer ne modifie pas les registres, donc FOR_LOOP retrouve son
-    // compteur intact.
+    // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
+    // Closing does not modify the registers, so FOR_LOOP finds its counter intact.
     bool close_scope = body_has_func(body);
     uint16_t loop_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
@@ -1982,18 +1972,18 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (had_old)
         local_regs_[var1] = old_reg;
     else
-        local_regs_.erase(var1); // restaure la portée
-    // recyclage des registres : si une closure du corps capture i, on garde son
-    // registre réservé (sinon il serait réécrit après la boucle → upvalue corrompue).
-    // NE PAS redescendre sous ce que compile_block a réservé pour les LOCALES du corps,
-    // qu'une closure peut aussi capturer : les rendre disponibles comme temporaires
-    // écrasait leur valeur sous une upvalue encore ouverte.
+        local_regs_.erase(var1);   // restore the scope
+    // Register recycling: when a closure in the body captures i we keep its register reserved,
+    // otherwise it would be overwritten after the loop and the upvalue would be corrupted.
+    // Do NOT drop below what compile_block reserved for the body's LOCALS, which a closure can
+    // capture too: handing those back as temporaries overwrote their value under an upvalue that
+    // was still open.
     reg_top_ = keep_captured_regs(body, var_reg + 1, ctl, reg_top_);
 }
 
-// Écriture visible sur un enum : refusée dès la compilation pour nommer
-// l'énumération et l'élément. La VM garde les chemins indirects (alias, clé
-// calculée) avec un message générique. Une locale de même nom masque l'enum.
+// A visible write to an enum is refused at compile time, which lets the message name both the
+// enumeration and the element. The VM still catches the indirect paths (an alias, a computed key)
+// with a generic message. A local of the same name shadows the enum.
 void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
                                  int file_idx) {
     if (enum_names_.empty())
@@ -2022,12 +2012,12 @@ void Compiler::visit(const IndexAssignStmt& s) {
         reject_enum_write(s.obj, s.obj_expr.get(), key_lit ? key_lit->value : std::string(), s.line, s.file_idx);
     }
 
-    // Charge le conteneur (map/array) à indexer.
+    // Load the container (map or array) to index.
     int obj_r;
     if (s.obj_expr) {
-        // Cible chaînée (a.b.c, a[i][j]…) : le conteneur est une expression, on
-        // l'évalue dans un registre. maps/arrays étant des références comptées,
-        // le SET_INDEX qui suit mute bien l'objet d'origine.
+        // Chained target (a.b.c, a[i][j]…): the container is an expression, evaluated into a
+        // register. Maps and arrays being ref-counted, the SET_INDEX that follows does mutate the
+        // original object.
         obj_r = alloc_reg();
         compile_into(*s.obj_expr, obj_r);
     } else {
@@ -2076,15 +2066,14 @@ void Compiler::visit(const MultiAssignStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
 
-    // Évalue tous les RHS dans des registres temporaires consécutifs
+    // Evaluate every right-hand side into consecutive temporaries.
     int base = reg_top_;
     int n = (int)s.values.size();
     int n_targets = (int)s.targets.size();
-    // Multi-retour, MÊME chemin que `var a, b = f()` (visit(VarDeclStmt)) : la VM laisse les
-    // k valeurs de retour à partir de `base`, et SPREAD_RESULTS met à nil les cibles au-delà
-    // de k. Sans ce chemin, une seule valeur était comptée : les cibles suivantes lisaient
-    // des registres temporaires voisins, d'où des valeurs DÉCALÉES (a, b, c = f() donnait
-    // 1, 1, 2 pour un retour 1, 2, 3).
+    // Multi-return, taking the SAME path as `var a, b = f()` (visit(VarDeclStmt)): the VM leaves
+    // the k return values from `base` on, and SPREAD_RESULTS nils the targets beyond k. Without
+    // this path only one value was counted, so the later targets read neighbouring temporaries
+    // and the values came out SHIFTED — `a, b, c = f()` gave 1, 1, 2 for a 1, 2, 3 return.
     if (n_targets > 1 && n == 1 && is_multi_value_expr(s.values[0].get())) {
         if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
             chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n_targets, 0));
@@ -2107,9 +2096,9 @@ void Compiler::visit(const MultiAssignStmt& s) {
 
     // Assigne chaque cible depuis son temporaire (ou nil si plus de valeurs que de cibles)
     for (int i = 0; i < (int)s.targets.size(); ++i) {
-        int val_r = (i < n) ? base + i : alloc_reg(); // nil si pas de valeur
+        int val_r = (i < n) ? base + i : alloc_reg();   // nil when there is no value
         const LValue& lv = s.targets[i];
-        // FIELD_INDEX (a.b[k]) écrit dans a.b, pas dans a → hors de portée du refus.
+        // FIELD_INDEX (a.b[k]) writes into a.b, not into a, so the refusal does not apply.
         if (lv.kind == LValue::FIELD || lv.kind == LValue::INDEX)
             reject_enum_write(lv.name, nullptr, lv.kind == LValue::FIELD ? lv.field : std::string(), s.line,
                               s.file_idx);
@@ -2172,7 +2161,7 @@ void Compiler::visit(const DoStmt& s) {
     compile_block(s.body);
 }
 
-// ── compileMethodFunc : compile une méthode avec 'self' implicite en R[0] ──────
+// Compiles a method, with an implicit 'self' in R[0].
 uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     auto outer_regs = std::move(local_regs_);
     auto outer_pending = std::move(pending_var_reg_);
@@ -2199,12 +2188,12 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     int n_fixed;
 
     if (s.is_static) {
-        // méthode statique : pas de self, params en R[0..n-1]
+        // Static method: no self, parameters in R[0..n-1].
         for (int i = 0; i < n_params; ++i)
             local_regs_[s.params[i]] = i;
         n_fixed = n_params;
     } else {
-        // méthode d'instance : self en R[0], params en R[1..n]
+        // Instance method: self in R[0], parameters in R[1..n].
         local_regs_["self"] = 0;
         for (int i = 0; i < n_params; ++i)
             local_regs_[s.params[i]] = i + 1;
@@ -2228,7 +2217,7 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     size_t jump_patch = chunk.emit_jump(Op::JUMP);
     uint32_t func_addr = (uint32_t)chunk.current_pos();
 
-    // defaults : pour méthode instance, index 0 = self (pas de défaut)
+    // Defaults: for an instance method index 0 is self, which has none.
     std::vector<Value> defs(n_fixed);
     int defs_offset = s.is_static ? 0 : 1;
     for (int i = 0; i < n_params; ++i)
@@ -2265,12 +2254,11 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     return func_idx;
 }
 
-// ── visit(ClassDeclStmt) ──────────────────────────────────────────────────────
 void Compiler::visit(const ClassDeclStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
 
-    // Créer la valeur classe (T_CLASS = map vide)
+    // Create the class value (T_CLASS, an empty map).
     int dest = reg_top_++;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
@@ -2287,7 +2275,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
         reg_top_ = dest + 1;
     }
 
-    // Héritage : stocker la classe parente comme __parent__
+    // Inheritance: store the parent class as __parent__.
     if (!s.parent.empty()) {
         int par_r = reg_top_++, key_r = reg_top_++;
         if (reg_top_ > reg_count_)
@@ -2298,15 +2286,15 @@ void Compiler::visit(const ClassDeclStmt& s) {
         reg_top_ = dest + 1;
     }
 
-    // 'super' dans ces méthodes se résout par la classe parente LEXICALE.
+    // 'super' inside those methods resolves through the LEXICAL parent class.
     std::string saved_parent = current_class_parent_;
     current_class_parent_ = s.parent;
 
-    // Compiler chaque méthode et la stocker dans la map classe
+    // Compile each method and store it in the class map.
     for (auto& method : s.methods) {
-        // 'static' interdit sur init et sur les méta-méthodes : ces appels
-        // (constructeur, opérateurs) injectent self par construction — un
-        // membre statique y produirait un décalage d'arguments silencieux.
+        // 'static' is forbidden on init and on the meta-methods: those calls — the constructor,
+        // the operators — inject self by construction, so a static member there would silently
+        // shift the arguments.
         if (method->is_static) {
             if (method->name == "init")
                 throw std::runtime_error(method->sloc().str(chunk.source_files) +
@@ -2332,17 +2320,16 @@ void Compiler::visit(const ClassDeclStmt& s) {
 
     current_class_parent_ = saved_parent;
 
-    // Stocker la classe comme global (le nom est déjà dans declared_globals_
-    // via le pré-scan collectGlobals — source unique de vérité)
+    // Store the class as a global. The name is already in declared_globals_ through the
+    // collect_globals pre-scan, which stays the single source of truth.
     chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
 
     reg_top_ = saved;
 }
 
-// ── visit(EnumDeclStmt) ───────────────────────────────────────────────────────
-// NEW_MAP, une paire (clé, valeur) par élément, SEAL_ENUM, puis rangement : global
+// NEW_MAP, one (key, value) pair per element, SEAL_ENUM, then storage: a global
 // pour `enum Name`, SET_INDEX sur la map cible pour `enum a.b`. Le scellement vient
-// après le remplissage, qui passe lui-même par SET_INDEX.
+// after the filling, which itself goes through SET_INDEX.
 void Compiler::visit(const EnumDeclStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
@@ -2362,7 +2349,7 @@ void Compiler::visit(const EnumDeclStmt& s) {
     chunk.emit(make_abc((uint8_t)Op::SEAL_ENUM, (uint8_t)dest, 0, 0));
 
     if (!s.obj_expr) {
-        // Nom déjà dans declared_globals_ ET enum_names_ via le pré-scan collect_globals.
+        // The name is already in declared_globals_ AND enum_names_ from the collect_globals pass.
         chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
     } else {
         int obj_r = alloc_reg();
@@ -2375,24 +2362,22 @@ void Compiler::visit(const EnumDeclStmt& s) {
     reg_top_ = saved;
 }
 
-// ── visit(MethodCallExpr) ─────────────────────────────────────────────────────
-// Layout : R[call_base+0]=self, R[call_base+1]=méthode, R[call_base+2..]=args
-// CALL_METHOD décale les args de 1 vers le bas (overwrite méthode) avant l'appel.
+// Layout: R[call_base+0] is self, R[call_base+1] the method, R[call_base+2..] the arguments.
+// CALL_METHOD shifts the arguments down by one, overwriting the method, before calling.
 void Compiler::visit(const MethodCallExpr& e) {
     int call_base = reg_top_;
     int argc = (int)e.args.size();
 
     if (e.is_super) {
-        // self est en local_regs_["self"] — copier en call_base. Hors méthode,
-        // 'self' n'existe pas → diagnostic propre plutôt qu'un crash (map::at).
+        // self lives in local_regs_["self"] and is copied to call_base. Outside a method 'self'
+        // does not exist, hence a clean diagnostic instead of a map::at crash.
         auto self_it = local_regs_.find("self");
         if (self_it == local_regs_.end())
             throw std::runtime_error(sloc().str(chunk.source_files) +
                                      ": 'super' can only be used inside a method");
-        // La classe parente est fixée LEXICALEMENT (classe où la méthode est
-        // définie), et non via self.__class__.__parent__ : sinon B.m() exécuté sur
-        // une instance C reverrait toujours sur B → récursion infinie dans une
-        // hiérarchie à 3+ niveaux.
+        // The parent class is fixed LEXICALLY — the class where the method is defined — rather
+        // than through self.__class__.__parent__: otherwise B.m() running on a C instance would
+        // always land back on B, an infinite recursion in a hierarchy of three levels or more.
         if (current_class_parent_.empty())
             throw std::runtime_error(sloc().str(chunk.source_files) +
                                      ": 'super' : la classe courante n'a pas de parent");
@@ -2402,7 +2387,7 @@ void Compiler::visit(const MethodCallExpr& e) {
             reg_count_ = reg_top_;
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)self_src, 0));
 
-        // Temporaires : tmp = classe parente (globale), key_r = clé
+        // Temporaries: tmp holds the parent class (a global), key_r the key.
         int tmp = reg_top_++, key_r = reg_top_++;
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
@@ -2434,7 +2419,7 @@ void Compiler::visit(const MethodCallExpr& e) {
     }
 
     // obj.m?() ≡ if m then m(args) else nil : JUMP_IF_FALSE saute AVANT les args
-    // si la méthode (R[call_base+1]) est falsy → args non évalués.
+    // when the method (R[call_base+1]) is falsy, the arguments are not evaluated.
     size_t skip = 0;
     if (e.optional)
         skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)(call_base + 1));
