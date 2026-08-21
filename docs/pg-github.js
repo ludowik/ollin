@@ -1,15 +1,15 @@
-// ── Ollin Playground — provider GitHub (dépôt de projets paramétrable) ──────
+// Ollin playground — the GitHub provider, with a configurable project repository.
 //
-// Synchronise les projets avec un dépôt GitHub (un dossier par projet, miroir
-// exact du modèle local de pg-store.js). Auth par Personal Access Token
-// (fine-grained, portée Contents) collé une fois et rangé dans le localStorage.
+// It synchronises the projects with a GitHub repository (one folder per project, an exact mirror
+// of pg-store.js's local model). Authentication is by personal access token (fine-grained, of
+// Contents scope), pasted once and kept in localStorage.
 //
-// Le dépôt cible est paramétrable (getRepo/setRepo, défaut `ollin-projects`) :
-//   - "mon-repo"        → sous le compte de l'utilisateur authentifié
-//   - "owner/mon-repo"  → dépôt d'une orga / partagé (non créé automatiquement)
+// The target repository is configurable (getRepo/setRepo, `ollin-projects` by default):
+//   - "my-repo"        goes under the authenticated user's account
+//   - "owner/my-repo"  is an organisation or shared repository, never created automatically
 //
-// api.github.com renvoie CORS ouvert pour les appels REST authentifiés → tout
-// marche depuis le navigateur, sans serveur intermédiaire.
+// api.github.com answers with CORS open for authenticated REST calls, so everything works from
+// the browser, with no server in between.
 
 const API        = 'https://api.github.com'
 const TOKEN_KEY  = 'ollin-gh-token'
@@ -17,7 +17,7 @@ const REPO_KEY   = 'ollin-gh-repo'
 const MANIFEST   = 'ollin.project.json'
 const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'])
 
-// ── token ─────────────────────────────────────────────────────────────────
+// Token.
 export function setToken(t) {
   if (t) localStorage.setItem(TOKEN_KEY, t.trim())
   else localStorage.removeItem(TOKEN_KEY)
@@ -34,7 +34,7 @@ export function isConnected() {
   return !!getToken()
 }
 
-// ── dépôt cible (obligatoire, format owner/repo) ────────────────────────────
+// The target repository (mandatory, in owner/repo form).
 export function getRepo() {
   return localStorage.getItem(REPO_KEY) || null
 }
@@ -45,7 +45,7 @@ export function setRepo(v) {
   localStorage.setItem(REPO_KEY, s)
 }
 
-// ── requêtes bas niveau ───────────────────────────────────────────────────
+// Low-level requests.
 async function gh(path, { method = 'GET', body = null, token = getToken() } = {}) {
   if (!token) throw new Error('Non connecté à GitHub (token manquant)')
   return fetch(API + path, {
@@ -70,7 +70,7 @@ async function ghJson(path, opts) {
   return res.status === 204 ? null : res.json()
 }
 
-// ── base64 ↔ UTF-8 ─────────────────────────────────────────────────────────
+// base64 to and from UTF-8.
 function decodeUtf8(b64) {
   const bin = atob((b64 || '').replace(/\n/g, ''))
   const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
@@ -83,7 +83,7 @@ function encodeUtf8(str) {
   return btoa(bin)
 }
 
-// ── identité + cible ─────────────────────────────────────────────────────────
+// Identity and target.
 let _login = null
 export async function getUser() {
   const u = await ghJson('/user')
@@ -97,13 +97,13 @@ export function knownLogin() {
   return _login
 }
 
-// Éprouve un token SANS le ranger : le stockage ne contient ainsi jamais de token non
-// validé, qu'aucun autre chemin (auto-push, synchro) ne doit pouvoir utiliser.
+// Tests a token WITHOUT storing it, so the store never holds an unvalidated token that another
+// path (an auto-push, a sync) could use.
 export async function verifyToken(t) {
   return ghJson('/user', { token: t })
 }
 
-// Résout le dépôt cible : { owner, repo, base }.
+// Resolves the target repository: { owner, repo, base }.
 async function ctx() {
   const val = getRepo()
   if (!val || !val.includes('/')) throw new Error('Dépôt non configuré — renseigne owner/repo dans les paramètres GitHub')
@@ -111,8 +111,7 @@ async function ctx() {
   return { owner, repo, base: `/repos/${owner}/${repo}` }
 }
 
-// ── repo ──────────────────────────────────────────────────────────────────
-// Vérifie que le dépôt existe (doit être créé manuellement sur GitHub).
+// Repository. Checks that it exists; it has to be created by hand on GitHub.
 export async function ensureRepo() {
   const { owner, repo, base } = await ctx()
   const res = await gh(base)
@@ -123,9 +122,9 @@ export async function ensureRepo() {
   throw new Error('GitHub ' + msg)
 }
 
-// Arbre complet de la branche par défaut (+ contexte du dépôt).
-// `pre` (optionnel) = { owner, repo, base, branch } déjà résolus par l'appelant
-// (ex. pushProject) → évite de relire les métadonnées du dépôt une 2e fois.
+// The complete tree of the default branch, plus the repository's context. The optional `pre`
+// is { owner, repo, base, branch }, already resolved by the caller (pushProject, say), which
+// avoids reading the repository's metadata a second time.
 async function fullTree(pre) {
   let owner, repo, base, branch
   if (pre && pre.base && pre.branch) {
@@ -137,7 +136,7 @@ async function fullTree(pre) {
   }
   const res = await gh(`${base}/git/trees/${branch}?recursive=1`)
   if (!res.ok) {
-    if (res.status === 409 || res.status === 404) return { owner, repo, base, branch, tree: [] }  // dépôt vide
+    if (res.status === 409 || res.status === 404) return { owner, repo, base, branch, tree: [] }  // an empty repository
     let msg = String(res.status)
     try { const e = await res.json(); if (e && e.message) msg = res.status + ' — ' + e.message } catch (_) {}
     throw new Error('GitHub ' + msg)
@@ -146,7 +145,7 @@ async function fullTree(pre) {
   return { owner, repo, base, branch, tree: t.tree || [] }
 }
 
-// ── liste des projets distants ───────────────────────────────────────────────
+// Listing the remote projects.
 export async function listRemoteProjects() {
   const { base, tree } = await fullTree()
   const out = []
@@ -164,15 +163,14 @@ export async function listRemoteProjects() {
   return out
 }
 
-// SHA de l'arbre (tree) Git du sous-dossier <slug> à la racine du dépôt.
-// Lu via l'API Git Data (git/trees) — FORTEMENT cohérente : juste après un
-// push, elle reflète immédiatement le nouvel état. (L'API de LISTE des commits,
-// git/commits?path=, est servie par un index EN RETARD → elle renvoyait un SHA
-// périmé juste après un push → conflit/pastille systématiques. À ne pas utiliser
-// pour ça.) Le tree sha change ssi le CONTENU du dossier change, et il est
-// propre au dossier (un push sur un autre projet ne le modifie pas).
-// Renvoie null si le dossier est absent du dépôt. LÈVE si l'API échoue :
-// l'appelant ne doit pas confondre « dossier absent » et « lecture impossible ».
+// The SHA of the Git tree of the <slug> sub-folder at the repository's root. It is read through
+// the Git Data API (git/trees), which is STRONGLY consistent: right after a push it reflects the
+// new state at once. (The commit LISTING API, git/commits?path=, is served by a LAGGING index,
+// and returned a stale SHA right after a push, hence systematic conflicts and badges. It is not
+// to be used for this.) The tree sha changes if and only if the folder's CONTENT changes, and it
+// belongs to that folder alone: a push on another project does not touch it. It returns null when
+// the folder is absent from the repository, and THROWS when the API fails — the caller must not
+// confuse "no such folder" with "cannot be read".
 async function folderTreeSha(base, branch, slug) {
   const res = await gh(`${base}/git/trees/${encodeURIComponent(branch)}`)
   if (!res.ok) throw new Error('GitHub trees ' + res.status)
@@ -187,21 +185,19 @@ export async function remoteFolderSha(slug) {
   return folderTreeSha(base, branch, slug)
 }
 
-// RÈGLE UNIQUE « le dossier distant a bougé depuis notre dernière synchro ».
-// Seule définition partagée par les deux garde-fous : la pastille de fraîcheur
-// (à l'ouverture, playground) ET le garde-fou de conflit (au push, ci-dessous).
-// `current` = SHA du tree du dossier (via folderTreeSha/remoteFolderSha),
-// `known` = SHA de notre dernière synchro (project.remote.folderSha). A bougé si
-// le dossier existe sur le distant (current non nul) et que son tree diffère.
-// NB : la POLITIQUE diffère selon l'appelant et reste à leur charge — la pastille
-// exige en plus `known` connu (rappel : silence si incertain), le push alerte
-// même sans `known` (anti-écrasement : dans le doute on prévient). Ce ne sont
-// pas des duplications mais deux décisions volontairement distinctes.
+// The SINGLE RULE for "the remote folder has moved since our last sync". It is the one definition
+// shared by both guards: the freshness badge (on opening, in the playground) AND the conflict
+// guard (on pushing, below). `current` is the folder's tree SHA (through folderTreeSha or
+// remoteFolderSha), `known` the SHA of our last sync (project.remote.folderSha). It has moved if
+// the folder exists on the remote (a non-null current) and its tree differs. The POLICY, however,
+// differs between callers and stays theirs: the badge also requires `known` to be known (silence
+// when uncertain), whereas the push warns even without it (against overwriting: when in doubt,
+// warn). These are not duplicates but two deliberately distinct decisions.
 export function folderMoved(current, known) {
   return current !== null && current !== (known || null)
 }
 
-// ── pull d'un projet ─────────────────────────────────────────────────────────
+// Pulling a project.
 export async function pullProject(slug) {
   const { owner, repo, base, branch, tree } = await fullTree()
   const prefix = slug + '/'
@@ -222,9 +218,8 @@ export async function pullProject(slug) {
     entry = m.entry || entry
   } catch (_) {}
   const now = Date.now()
-  // Best-effort : si la lecture échoue, on repart sans base (la pastille restera
-  // muette jusqu'au prochain push/pull) plutôt que d'échouer tout le pull alors
-  // que les fichiers sont déjà récupérés.
+  // Best-effort: if the read fails we carry on with no baseline — the badge stays mute until the
+  // next push or pull — rather than failing the whole pull when the files are already fetched.
   let folderSha = null
   try {
     folderSha = await folderTreeSha(base, branch, slug)
@@ -232,18 +227,17 @@ export async function pullProject(slug) {
   return { id: slug, name, entry, files, resources, remote: { repo: `${owner}/${repo}`, branch, slug, folderSha }, createdAt: now, updatedAt: now }
 }
 
-// ── push d'un projet ─────────────────────────────────────────────────────────
-// Rend le dossier `<slug>/` identique au projet local, en UN commit atomique
-// (Git Data API). Répercute ajouts, modifs ET suppressions ; si le projet a été
-// renommé (remote.slug ≠ slug), supprime aussi l'ancien dossier.
+// Pushing a project: it makes the `<slug>/` folder identical to the local project, in ONE atomic
+// commit (the Git Data API). Additions, edits AND deletions are carried over; and if the project
+// has been renamed (remote.slug differs from slug), the old folder is deleted too.
 export async function pushProject(project, message, opts = {}) {
   const { owner, repo, base } = await ctx()
   const info = await ghJson(base)
   const branch = info.default_branch || 'main'
   const slug = project.id
 
-  // Dépôt vide (aucun commit) → l'initialiser via l'API Contents : un PUT crée
-  // le commit initial + la branche (la Git Data API refuse un dépôt vide → 409).
+  // An empty repository, with no commit, is initialised through the Contents API: a PUT creates
+  // the initial commit and the branch (the Git Data API refuses an empty repository with a 409).
   let refRes = await gh(`${base}/git/ref/heads/${branch}`)
   if (!refRes.ok) {
     if (refRes.status === 409 || refRes.status === 404) {
@@ -264,14 +258,14 @@ export async function pushProject(project, message, opts = {}) {
   const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
   const baseTree = baseCommit.tree.sha
 
-  // État distant courant (sert aux suppressions ; le renommage retire l'ancien dossier).
+  // The current remote state, used for the deletions; a rename removes the old folder.
   const oldSlug = project.remote && project.remote.slug
   const trackedSlug = oldSlug || slug
-  const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })   // réutilise le contexte déjà résolu
+  const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })   // reuses the context already resolved
 
-  // Pas de garde-fou de conflit ici : le modèle de synchro (drapeau `dirty`, usage
-  // mono-personne) fait du LOCAL l'autorité au push. La réconciliation avec un
-  // distant divergent se fait à l'OUVERTURE (syncOnOpen, côté playground), pas ici.
+  // No conflict guard here: the sync model (the `dirty` flag, single-person use) makes the LOCAL
+  // side authoritative on a push. Reconciling with a divergent remote happens on OPENING
+  // (syncOnOpen, on the playground side), not here.
 
   const tree = []
   for (const rel in (project.files || {})) {
@@ -283,8 +277,8 @@ export async function pushProject(project, message, opts = {}) {
     tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
 
-  // Suppressions : fichiers distants (slug courant + ancien slug si renommage)
-  // absents localement → sha:null.
+  // Deletions: remote files (under the current slug, plus the old one on a rename) absent
+  // locally get sha:null.
   const desired = new Set(tree.map(t => t.path))
   const scan = new Set([slug])
   if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
@@ -301,10 +295,10 @@ export async function pushProject(project, message, opts = {}) {
   })
   await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
 
-  // Base des prochains garde-fous = le tree sha du dossier, lu dans la réponse
-  // du POST git/trees (entrées de 1er niveau) → aucune relecture réseau, et
-  // strictement le même identifiant que celui que relira folderTreeSha. Repli
-  // (Git Data fortement cohérent) si l'entrée n'y figurait pas.
+  // The baseline for the next guards is the folder's tree sha, read from the POST git/trees
+  // response (its top-level entries), so there is no further network read and it is strictly the
+  // same identifier folderTreeSha will read back. A fallback covers the case where the entry was
+  // not there (Git Data being strongly consistent).
   let folderSha = (newTree.tree || []).find(e => e.path === slug && e.type === 'tree')?.sha || null
   if (!folderSha) {
     try {

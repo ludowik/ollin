@@ -1,50 +1,49 @@
-// ── Ollin Playground — couche de stockage des projets (IndexedDB) ───────────
+// Ollin playground — the project storage layer (IndexedDB).
 //
-// Un projet = un dossier identifié par son slug, décrit par un manifeste
-// standard `ollin.project.json` à sa racine (voir le champ MANIFEST). Cette
-// même structure est miroir côté GitHub (repo `ollin-projects/<slug>/`).
+// A project is a folder identified by its slug and described by a standard
+// `ollin.project.json` manifest at its root (see the MANIFEST field). The same structure is
+// mirrored on the GitHub side (the `ollin-projects/<slug>/` repository).
 //
-// Modèle d'un projet :
+// A project's model:
 //   {
-//     id:        "mon-jeu",        // = slug (Option A : identité = nom du dossier)
-//     name:      "Mon jeu",        // affichage
-//     entry:     "main.ol",        // script lancé par Run
-//     files:     { "ollin.project.json": "...", "main.ol": "...", ... },  // texte
-//     resources: { "assets/logo.png": { b64, ext } },                     // binaires
+//     id:        "my-game",        // = the slug; the identity IS the folder name
+//     name:      "My game",        // for display
+//     entry:     "main.ol",        // the script Run launches
+//     files:     { "ollin.project.json": "...", "main.ol": "...", ... },  // text
+//     resources: { "assets/logo.png": { b64, ext } },                     // binaries
 //     createdAt, updatedAt,        // ms epoch
-//     remote:    null              // rempli en Phase 2 (repo/branch/sha)
+//     remote:    null              // filled in by the remote sync (repo/branch/sha)
 //   }
 //
-// `ollin.project.json` est un VRAI fichier de `files` (pas des colonnes à
-// part) → zéro divergence entre local et GitHub, projet exporté autodescriptif.
+// `ollin.project.json` is a REAL entry of `files` rather than a set of columns of its own, hence
+// no divergence between the local store and GitHub, and a self-describing exported project.
 
 const DB_NAME    = 'ollin-playground'
 const DB_VERSION = 1
 const STORE      = 'projects'
-const ACTIVE_KEY = 'ollin-pg-active'    // id du projet actif (localStorage)
-const LEGACY_KEY = 'ollin-pg-code'      // ancien buffer unique (migration)
+const ACTIVE_KEY = 'ollin-pg-active'    // the active project's id (localStorage)
+const LEGACY_KEY = 'ollin-pg-code'      // the old single buffer (migration)
 
 export const MANIFEST = 'ollin.project.json'
 const DEFAULT_ENTRY   = 'main.ol'
 const DEFAULT_CODE    = 'print("hello world!")\n'
 
-// Id sentinelle du projet transitoire (exemple ouvert en lecture directe) : jamais
-// persisté. Sert de seul critère « est-ce un exemple ? » côté UI (un flag persistable
-// pouvait fuiter en base et bloquer renommage/suppression).
+// The sentinel id of the transient project (a sample opened for direct reading), which is never
+// persisted. It is the only criterion for "is this a sample?" on the UI side: a persistable flag
+// could leak into the database and block renaming and deletion.
 export const TRANSIENT_ID = '__exemple__'
 
-// ── slug ────────────────────────────────────────────────────────────────────
-// "Mon jeu !" → "mon-jeu". ASCII, minuscules, séparateurs = tirets.
+// Slug: "My game !" becomes "my-game". ASCII, lower case, hyphens as separators.
 export function slugify(name) {
   const s = (name || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // retire les accents
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // strips the accents
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return s || 'projet'
 }
 
-// ── ouverture de la base ────────────────────────────────────────────────────
+// Opening the database.
 let _dbPromise = null
 
 function openDB() {
@@ -75,29 +74,28 @@ function reqAsync(request) {
   })
 }
 
-// ── manifeste ────────────────────────────────────────────────────────────────
-// Régénéré à chaque sauvegarde depuis {id, name, entry} → le fichier reste en
-// phase avec les colonnes, et voyage tel quel vers GitHub / export.
+// The manifest, regenerated on every save from {id, name, entry}, so the file stays in step with
+// the columns and travels as it is to GitHub or an export.
 function writeManifest(project) {
   const manifest = { uid: project.id, name: project.name, entry: project.entry }
   project.files[MANIFEST] = JSON.stringify(manifest, null, 2)
 }
 
-// ── API publique ─────────────────────────────────────────────────────────────
+// Public API.
 
-// Ouvre la base et effectue la migration au premier lancement.
+// Opens the database, and migrates on first launch.
 export async function init() {
   await openDB()
   await migrateIfNeeded()
   await healExampleFlags()
 }
 
-// Auto-réparation : un enregistrement a pu être persisté par erreur avec le marqueur
-// `example` du projet transitoire (ancien bug) → l'UI le traitait comme jetable (ni
-// renommage ni suppression). On retire le marqueur ; si l'id est la sentinelle du
-// transitoire, on lui réattribue un slug réel dérivé du nom. Les ids de réattribution
-// sont calculés AVANT la transaction d'écriture — uniqueId ouvre sa propre transaction,
-// l'attendre pendant le rw le fermerait (piège IndexedDB).
+// Self-repair: a record may have been persisted by mistake with the transient project's
+// `example` marker (an old bug), and the UI then treated it as disposable, allowing neither
+// renaming nor deletion. We remove the marker; and if the id is the transient sentinel, we give
+// it a real slug derived from the name. The reassigned ids are computed BEFORE the write
+// transaction — uniqueId opens a transaction of its own, and awaiting it during the rw one would
+// close that one (an IndexedDB trap).
 async function healExampleFlags() {
   const ro = await tx('readonly')
   const all = await reqAsync(ro.getAll())
@@ -131,14 +129,14 @@ async function healExampleFlags() {
   await done
 }
 
-// Résumés triés du plus récent au plus ancien (sans le contenu lourd).
+// Summaries sorted from the most recent to the oldest, without the heavy content.
 export async function listProjects() {
   const store = await tx('readonly')
   const all = await reqAsync(store.getAll())
   return all
     .map(p => ({ id: p.id, name: p.name, entry: p.entry, updatedAt: p.updatedAt,
                  fileCount: Object.keys(p.files || {}).length,
-                 remote: p.remote || null }))   // lien distant (slug) → menu « Ouvrir » unifié
+                 remote: p.remote || null }))   // the remote link (a slug), for a unified "Open" menu
     .sort((a, b) => b.updatedAt - a.updatedAt)
 }
 
@@ -147,9 +145,9 @@ export async function getProject(id) {
   return (await reqAsync(store.get(id))) || null
 }
 
-// Génère un id (slug) unique en base à partir du nom : mon-jeu, mon-jeu-2, …
-// `exclude` : id à ignorer dans le test d'unicité (le projet lui-même, lors d'un
-// renommage) → renommer vers le même slug ne produit pas de suffixe -2.
+// Builds an id (a slug) unique in the database from the name: my-game, my-game-2, … `exclude` is
+// an id to ignore in the uniqueness test (the project itself, during a rename), so renaming to
+// the same slug does not append a -2 suffix.
 async function uniqueId(name, exclude) {
   const base = slugify(name)
   const store = await tx('readonly')
@@ -173,7 +171,7 @@ export async function createProject(name) {
     createdAt: now,
     updatedAt: now,
     remote: null,
-    dirty: true,   // à pousser sur le distant (drapeau de synchro)
+    dirty: true,   // to be pushed to the remote (the sync flag)
   }
   writeManifest(project)
   const store = await tx('readwrite')
@@ -181,7 +179,7 @@ export async function createProject(name) {
   return project
 }
 
-// Upsert : met à jour updatedAt et régénère le manifeste.
+// Upsert: it updates updatedAt and regenerates the manifest.
 export async function saveProject(project) {
   project.updatedAt = Date.now()
   if (!project.files) project.files = {}
@@ -192,20 +190,20 @@ export async function saveProject(project) {
   return project
 }
 
-// Renomme un projet. Cohérence Option A : l'id/slug (= nom du dossier) SUIT le
-// nom. Si le slug du nouveau nom diffère, l'enregistrement est recréé sous le
-// nouvel id (l'ancien est supprimé) — côté GitHub cela se traduira par un
-// déplacement du dossier au prochain push (Phase 2). Renvoie le projet à jour.
+// Renames a project. For consistency the id, being the slug, hence the folder name, FOLLOWS the
+// name. If the new name's slug differs, the record is recreated under the new id and the old one
+// deleted — on the GitHub side this becomes a folder move on the next push. Returns the updated
+// project.
 export async function renameProject(id, name) {
   const project = await getProject(id)
   if (!project) return null
   const newId = await uniqueId(name, id)
   project.name = name
-  project.dirty = true   // renommage = changement à pousser (le nom, et le dossier distant si le slug change)
+  project.dirty = true   // a rename is a change to push: the name, and the remote folder if the slug changes
   if (newId === id) {
-    return saveProject(project)          // slug inchangé : simple mise à jour
+    return saveProject(project)          // an unchanged slug means a plain update
   }
-  // Le dossier suit le nom : recréer sous le nouvel id, atomiquement.
+  // The folder follows the name: recreate it under the new id, atomically.
   project.id = newId
   project.updatedAt = Date.now()
   writeManifest(project)
@@ -221,7 +219,7 @@ export async function deleteProject(id) {
   if (getActiveId() === id) setActiveId(null)
 }
 
-// ── projet actif (localStorage) ───────────────────────────────────────────────
+// The active project (localStorage).
 export function getActiveId() {
   return localStorage.getItem(ACTIVE_KEY) || null
 }
@@ -231,10 +229,9 @@ export function setActiveId(id) {
   else localStorage.removeItem(ACTIVE_KEY)
 }
 
-// ── migration ─────────────────────────────────────────────────────────────────
-// Au premier lancement (base vide) : crée un projet « Sans titre » à partir de
-// l'ancien buffer `ollin-pg-code` s'il existe, sinon d'un code par défaut.
-// L'ancienne clé localStorage est conservée (sécurité, non détruite).
+// Migration. On first launch, with an empty database, it creates an "Untitled" project from the
+// old `ollin-pg-code` buffer if there is one, otherwise from a default piece of code. The old
+// localStorage key is kept, as a safety net, and never destroyed.
 async function migrateIfNeeded() {
   const store = await tx('readonly')
   const count = await reqAsync(store.count())
@@ -252,7 +249,7 @@ async function migrateIfNeeded() {
     createdAt: now,
     updatedAt: now,
     remote: null,
-    dirty: true,   // à pousser sur le distant (drapeau de synchro)
+    dirty: true,   // to be pushed to the remote (the sync flag)
   }
   writeManifest(project)
   const rw = await tx('readwrite')

@@ -1,47 +1,46 @@
-// ── Ollin Playground — couche d'abstraction des fournisseurs de stockage ─────
+// Ollin playground — the storage-provider abstraction layer.
 //
-// Point d'indirection UNIQUE entre les vues (playground, run) et le stockage.
-// Une vue ne connaît plus un module concret (`pg-store`, `pg-github`) mais un
-// FOURNISSEUR obtenu ici — brancher un autre backend (Google Drive, Dropbox,
-// Supabase Storage, Firebase Storage, GitHub via Octokit…) se fait en ajoutant
-// une entrée au registre + un module respectant le contrat, sans toucher aux
-// vues. Le choix du backend devient transparent (un seul point de bascule).
+// The SINGLE point of indirection between the views (playground, run) and the storage. A view no
+// longer knows a concrete module (`pg-store`, `pg-github`) but a PROVIDER obtained here, so
+// plugging in another backend (Google Drive, Dropbox, Supabase Storage, Firebase Storage, GitHub
+// through Octokit…) takes an entry in the registry plus a module honouring the contract, and no
+// change to the views. The choice of backend becomes transparent, with a single switch point.
 //
-// Deux contrats DISTINCTS, car les rôles diffèrent :
+// Two DISTINCT contracts, the roles being different:
 //
-// ── ProjectProvider (magasin de TRAVAIL, CRUD, local et rapide) ──────────────
-// Surface = celle de pg-store.js (identité voulue → migration sans réécrire les
-// sites d'appel). Un fournisseur DOIT exposer :
+// ProjectProvider — the WORKING store: CRUD, local and fast. Its surface is that of pg-store.js
+// (an intended identity, so the migration did not rewrite the call sites). A provider MUST
+// expose:
 //   async init()
 //   async listProjects()                       → [{id,name,entry,updatedAt,fileCount}]
-//   async getProject(id)                        → projet complet | null
-//   async createProject(name)                   → projet
-//   async saveProject(project)                  → projet   (upsert)
-//   async renameProject(id, name)               → projet | null
+//   async getProject(id)                        → the complete project, or null
+//   async createProject(name)                   → a project
+//   async saveProject(project)                  → a project (upsert)
+//   async renameProject(id, name)               → a project, or null
 //   async deleteProject(id)
-//   getActiveId() / setActiveId(id)             (id du projet actif, synchrone)
+//   getActiveId() / setActiveId(id)             (the active project's id, synchronous)
 //   slugify(name)                               → slug
-//   MANIFEST : string   TRANSIENT_ID : string   (constantes)
+//   MANIFEST : string   TRANSIENT_ID : string   (constants)
 //
-// ── RemoteProvider (SYNCHRO d'un magasin distant, réseau, faillible) ─────────
-// Surface = celle de pg-github.js. Un fournisseur distant DOIT exposer :
+// RemoteProvider — the SYNC with a remote store: networked, fallible. Its surface is that of
+// pg-github.js. A remote provider MUST expose:
 //   isConnected() ; setToken(t)/getToken()/clearToken()
-//   getRepo()/setRepo(v)                        (cible : dépôt, dossier Drive, bucket…)
+//   getRepo()/setRepo(v)                        (the target: a repository, a Drive folder, a bucket…)
 //   async getUser() ; async ensureRepo()
 //   async listRemoteProjects()                  → [{slug,name}]
-//   async pullProject(slug)                     → projet (modèle identique au local)
+//   async pullProject(slug)                     → a project, in the same model as the local one
 //   async pushProject(project, message, opts)   → project.remote (repo/branch/slug/sha)
 //   async remoteFolderSha(slug) ; folderMoved(current, known)
 //
-// Le MODÈLE de projet ({id,name,entry,files{},resources{}} + manifeste réel
-// `ollin.project.json`) est commun aux deux contrats et à tous les backends →
-// un projet voyage tel quel de l'un à l'autre, aucune conversion.
+// The project MODEL ({id,name,entry,files{},resources{}} plus the real `ollin.project.json`
+// manifest) is common to both contracts and to every backend, so a project travels from one to
+// the other as it is, with no conversion.
 //
-// Imports VERSIONNÉS (?v=) comme dans les vues : le cache-busting de déploiement
-// est préservé (un backend chargé ici passe par le même jeton de version).
+// Imports are VERSIONED (?v=) as in the views: the deployment's cache-busting is preserved, a
+// backend loaded here going through the same version token.
 
-// Backends disponibles. Ajouter un fournisseur = une entrée ici (chemin du
-// module) + un module respectant le contrat ci-dessus. `default` = choix implicite.
+// The available backends. Adding a provider means one entry here (the module's path) plus a
+// module honouring the contract above. `default` is the implicit choice.
 const STORE_KINDS = {
   local: './pg-store.js',
 }
@@ -52,8 +51,8 @@ const REMOTE_KINDS = {
 const STORE_DEFAULT  = 'local'
 const REMOTE_DEFAULT = 'github'
 
-// Clés (localStorage) du backend choisi — permettent une bascule persistante sans
-// toucher aux vues (une future UI de réglages écrit ces clés ; à défaut, le défaut).
+// The localStorage keys of the chosen backend, which allow a persistent switch without touching
+// the views (a settings UI would write these keys; failing that, the default applies).
 const STORE_PREF_KEY  = 'ollin-pg-store-kind'
 const REMOTE_PREF_KEY = 'ollin-pg-remote-kind'
 
@@ -68,9 +67,8 @@ const REMOTE_CONTRACT = [
   'remoteFolderSha', 'folderMoved',
 ]
 
-// Vérifie qu'un module chargé honore le contrat — échoue TÔT et clairement si un
-// nouveau backend oublie un membre (plutôt qu'un `undefined is not a function`
-// plus loin dans une vue).
+// Checks that a loaded module honours the contract, failing EARLY and clearly when a new backend
+// forgets a member, rather than as an `undefined is not a function` further along in a view.
 function assertContract(mod, contract, label) {
   const missing = contract.filter(k => mod[k] === undefined)
   if (missing.length)
@@ -83,8 +81,8 @@ function preferred(key, kinds, fallback) {
   return (chosen && kinds[chosen]) ? chosen : fallback
 }
 
-// Magasin de travail (CRUD). `v` = jeton de version de la SPA (cache-busting).
-// `kind` explicite, sinon la préférence persistée, sinon le défaut.
+// The working store (CRUD). `v` is the app's version token, for cache-busting. An explicit
+// `kind` wins, otherwise the persisted preference, otherwise the default.
 export async function getProvider(v, kind) {
   const k = kind || preferred(STORE_PREF_KEY, STORE_KINDS, STORE_DEFAULT)
   const path = STORE_KINDS[k]
@@ -92,7 +90,7 @@ export async function getProvider(v, kind) {
   return assertContract(await import(`${path}?v=${v}`), STORE_CONTRACT, `store:${k}`)
 }
 
-// Fournisseur distant (synchro). Même logique de sélection que getProvider.
+// The remote provider (sync). The same selection logic as getProvider.
 export async function getRemote(v, kind) {
   const k = kind || preferred(REMOTE_PREF_KEY, REMOTE_KINDS, REMOTE_DEFAULT)
   const path = REMOTE_KINDS[k]
@@ -107,7 +105,7 @@ export function listRemoteKinds() {
   return Object.keys(REMOTE_KINDS)
 }
 
-// Bascule persistante du backend (écrit la préférence lue par getProvider/getRemote).
+// Persistent backend switch: it writes the preference read by getProvider and getRemote.
 export function setStoreKind(kind) {
   if (!STORE_KINDS[kind]) throw new Error('Fournisseur de stockage inconnu : ' + kind)
   localStorage.setItem(STORE_PREF_KEY, kind)
