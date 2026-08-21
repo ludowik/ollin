@@ -621,8 +621,8 @@ enum RgMix A, B = "texte", C end
 assert(RgMix.A == 1 and RgMix.B == "texte" and RgMix.C == 2)
 enum RgNeg X = -3, Y end
 assert(RgNeg.X == -3 and RgNeg.Y == -2)
-enum RgAlias UN = 1, PREMIER = 1 end       ## valeur répétée = alias, permis
-assert(RgAlias.UN == RgAlias.PREMIER)
+enum RgAlias UN = 1, FIRST = 1 end       ## valeur répétée = alias, permis
+assert(RgAlias.UN == RgAlias.FIRST)
 
 ## Un enum est une map ordinaire en LECTURE : len, itération, valeurs de tout type.
 enum RgCol ROUGE, VERT, BLEU end
@@ -801,24 +801,24 @@ assert(dfTry[1]() == 1 and dfTry[3]() == 3)
 ## {function} au lieu de la valeur).
 var clNum = []
 for i = 1, 3 do
-    var copie = i * 10
-    clNum[#clNum + 1] = func() return copie end
+    var copy = i * 10
+    clNum[#clNum + 1] = func() return copy end
 end
 assert(clNum[1]() == 10 and clNum[2]() == 20 and clNum[3]() == 30)
 
 var clIter = []
 for v in ["a", "b", "c"] do
-    var copie = v
-    clIter[#clIter + 1] = func() return copie end
+    var copy = v
+    clIter[#clIter + 1] = func() return copy end
 end
 assert(clIter[1]() == "a" and clIter[2]() == "b" and clIter[3]() == "c")
 
-var clPaire = []
+var clPair = []
 for k, v in {x: 1} do
-    var copie = k + "=" + v
-    clPaire[#clPaire + 1] = func() return copie end
+    var copy = k + "=" + v
+    clPair[#clPair + 1] = func() return copy end
 end
-assert(clPaire[1]() == "x=1")
+assert(clPair[1]() == "x=1")
 
 
 ## Fermeture des upvalues en fin d'itération (CLOSE_UPVALS) : les chemins de sortie et
@@ -871,27 +871,27 @@ assert(upReturn()() == 2)
 ## `ref x` est désucré par le parser en {__ref, get, set} : deux closures qui lisent
 ## et écrivent la cible. Les upvalues font le travail, y compris pour une locale.
 global rfGlobal = 5
-var rfLocale = 1
-global rfObj = {champ: "a", sous: {x: 1}}
+var rfLocal = 1
+global rfObj = {field: "a", sous: {x: 1}}
 
 func rfLire(r) return r.get() end
-func rfEcrire(r, v) r.set(v) end
+func rfWrite(r, v) r.set(v) end
 
 assert((ref rfGlobal).__ref)              ## marque de validation pour les modules natifs
 assert(rfLire(ref rfGlobal) == 5)
-rfEcrire(ref rfGlobal, 42)
+rfWrite(ref rfGlobal, 42)
 assert(rfGlobal == 42)
-rfEcrire(ref rfLocale, 7)                 ## écriture d'une LOCALE depuis une autre fonction
-assert(rfLocale == 7)
-rfEcrire(ref rfObj.champ, "b")
-assert(rfObj.champ == "b")
-rfEcrire(ref rfObj.sous.x, 99)            ## chemin de deux niveaux
+rfWrite(ref rfLocal, 7)                 ## écriture d'une LOCALE depuis une autre fonction
+assert(rfLocal == 7)
+rfWrite(ref rfObj.field, "b")
+assert(rfObj.field == "b")
+rfWrite(ref rfObj.sous.x, 99)            ## chemin de deux niveaux
 assert(rfObj.sous.x == 99)
 
 ## Le paramètre du setter généré ne doit JAMAIS masquer la cible : `ref v` a produit
 ## `func(v) v = v end` dans une version naïve, donc une écriture sans effet.
 var v = 1
-rfEcrire(ref v, 9)
+rfWrite(ref v, 9)
 assert(v == 9)
 
 ## La référence est une valeur ordinaire : stockable, transmissible.
@@ -1027,12 +1027,12 @@ enum LiDiff
     normal,
     difficile
 end
-var liCouleurs = ["rouge", "vert", "bleu"]
+var liTints = ["rouge", "vert", "bleu"]
 var liReglages = {volume: 0.8, brillance: 0.5, alpha: 1}
 var liC = nil
 var liD = nil
 var liR = nil
-ui.list("Couleur", liCouleurs, ref liC)
+ui.list("Couleur", liTints, ref liC)
 ui.list("Difficulté", LiDiff, ref liD)
 ui.list("Réglage", liReglages, ref liR)
 assert(liC == "rouge")           ## 1er élément du tableau, sa VALEUR
@@ -1041,7 +1041,7 @@ assert(liR == "alpha")           ## map triée par libellé → premier dans l'o
 
 ## Une sélection déjà posée est respectée (l'initialisation ne vaut que pour nil).
 var liGarde = "bleu"
-ui.list("Couleur", liCouleurs, ref liGarde)
+ui.list("Couleur", liTints, ref liGarde)
 assert(liGarde == "bleu")
 
 ## Handle d'un tween terminé : interrogeable sans erreur (garder le handle est normal).
@@ -1082,15 +1082,15 @@ var maQ = 2
 maP, maQ = maQ, maP
 assert(maP == 2 and maQ == 1)
 ## Méthode et varargs empruntent le même chemin que la fonction nommée.
-class MaPaire
+class MyPair
     func deux()
         return 8, 9
     end
 end
-var maObj = MaPaire()
+var myObj = MyPair()
 var maD1 = 0
 var maD2 = 0
-maD1, maD2 = maObj.deux()
+maD1, maD2 = myObj.deux()
 assert(maD1 == 8 and maD2 == 9)
 func maVarargs(...)
     var maV1, maV2 = ...
@@ -1135,12 +1135,12 @@ assert(boCl[1]() == 10 and boCl[2]() == 20 and boCl[3]() == 30)
 ## second paramètre ajoute le retour de l'ENSEMBLE. Les positions sont relevées tous les
 ## demi-temps, l'animation durant 1 s : on lit donc le milieu puis l'extrémité de chaque
 ## parcours. En natif headless c'est `tween.update` qui avance (le moteur ne tourne pas).
-func plParcours(mods, tours)
+func plWalk(mods, turns)
     var o = {x: 0}
     var t = tween.to(o, {x: 10}, 1.0, "linear")
     mods(t)
     var vues = []
-    for i = 1, tours do
+    for i = 1, turns do
         tween.update(0.5)
         vues[#vues + 1] = math.round(o.x)
     end
@@ -1148,18 +1148,18 @@ func plParcours(mods, tours)
 end
 
 ## repeat(2) : deux allers. À la fin du premier, la position revient au départ.
-var plR = plParcours(func(t) t.repeat(2) end, 5)
+var plR = plWalk(func(t) t.repeat(2) end, 5)
 assert(plR[1] == 5 and plR[2] == 0 and plR[3] == 5 and plR[4] == 10 and plR[5] == 10)
 
 ## repeat(2, true) : les deux allers, PUIS les deux retours (+1 +1 -1 -1). Entre deux
 ## retours la position saute de 0 à 10, comme elle saute de 10 à 0 entre deux allers :
 ## chaque segment rejoue le parcours entier dans son sens.
-var plRY = plParcours(func(t) t.repeat(2, true) end, 9)
+var plRY = plWalk(func(t) t.repeat(2, true) end, 9)
 assert(plRY[4] == 10 and plRY[5] == 5 and plRY[6] == 10 and plRY[8] == 0)
 
 ## Deux appels COMPOSENT : le second agit sur le plan déjà construit. repeat(nil, true)
 ## puis repeat(2) donne deux allers-retours (+1 -1 +1 -1).
-var plYR = plParcours(func(t) t.repeat(nil, true).repeat(2) end, 9)
+var plYR = plWalk(func(t) t.repeat(nil, true).repeat(2) end, 9)
 assert(plYR[2] == 10 and plYR[4] == 0 and plYR[6] == 10 and plYR[8] == 0)
 
 ## Les bornes sont figées au premier démarrage : écrire dans l'objet en pleine animation ne
