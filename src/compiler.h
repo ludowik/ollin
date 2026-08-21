@@ -18,20 +18,18 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     int current_line_ = 0;
     int current_file_idx_ = 0;
 
-    // ── register allocator ────────────────────────────────────────────────────
     std::unordered_map<std::string, int> local_regs_;
-    // Locales `var`/`const` dont le registre est réservé mais qui ne sont PAS encore
-    // déclarées (portée lexicale : visibles seulement à partir de leur ligne). Une
-    // référence avant la déclaration ne les trouve donc pas dans local_regs_ → tombe
-    // sur global/upvalue/erreur. Activées (déplacées vers local_regs_) au VarDeclStmt.
-    // Sauvée/restaurée partout où local_regs_ l'est (portées imbriquées).
+    // `var` and `const` locals whose register is reserved but which are NOT declared yet: lexical
+    // scope makes them visible only from their own line on. A reference before the declaration
+    // therefore does not find them in local_regs_ and falls through to a global, an upvalue, or an
+    // error. They are activated — moved into local_regs_ — at the VarDeclStmt, and this map is saved
+    // and restored wherever local_regs_ is, for nested scopes.
     std::unordered_map<std::string, int> pending_var_reg_;
     int reg_top_ = 0;    // next free register
     int reg_count_ = 0;  // max reg ever used → FuncProto.reg_count
     int locals_top_ = 0; // reg_top_ after pre-scanning locals (temps start here)
     int last_reg_ = -1;  // result register of last compiled expression
 
-    // ── function scope ────────────────────────────────────────────────────────
     struct FuncInfo {
         uint8_t func_idx;
         int n_fixed;
@@ -41,14 +39,13 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::unordered_map<std::string, FuncInfo> func_table;
     std::unordered_set<std::string> declared_globals_; // globals déclarés (source + builtins + modules)
     std::unordered_set<std::string> const_names_;      // locals declared with 'const'
-    // Enums déclarés sous un nom simple → refus des écritures visibles dès la
-    // compilation (message nommant l'élément). La VM garde tous les autres chemins.
+    // Enums declared under a plain name, so that visible writes are refused at compile time with a
+    // message naming the element. The VM still covers every other path.
     std::unordered_set<std::string> enum_names_;
     std::string current_func_name;                     // "" = global scope
-    // Nom de la classe parente de la classe dont on compile actuellement une
-    // méthode ("" hors classe / classe sans parent). 'super' se résout par CETTE
-    // classe lexicale, pas par la classe dynamique de self (sinon récursion
-    // infinie dans une hiérarchie à 3+ niveaux).
+    // Name of the parent of the class whose method is being compiled; empty outside a class, or for
+    // a class with no parent. 'super' resolves through THIS lexical class and not through self's
+    // dynamic class, which would recurse forever in a hierarchy of three levels or more.
     std::string current_class_parent_;
     int current_func_idx_ = -1;                        // index in chunk.funcs (-1 = main chunk)
 
@@ -56,7 +53,6 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         return !current_func_name.empty();
     }
 
-    // ── upvalue resolution ────────────────────────────────────────────────────
     struct OuterScope {
         std::unordered_map<std::string, int> regs;
         std::unordered_map<std::string, int> upval_idx; // name → upvalue index in this scope's proto
@@ -72,7 +68,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     uint8_t compile_method_func(const FuncDeclStmt& s);
     void compile_iterator_loop(const Expr& src, const std::string& var1, const std::string& var2,
                              const std::vector<std::unique_ptr<Stmt>>& body);
-    // chemin rapide for numérique (range littéral inclus aux 2 bornes, 1 variable)
+    // Fast path for the numeric for: a range literal inclusive on both bounds, one variable.
     void compile_numeric_for(const RangeExpr& r, const std::string& var1, const std::vector<std::unique_ptr<Stmt>>& body);
 
     int alloc_reg() {
@@ -82,9 +78,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         return r;
     }
 
-    // Enregistre la ligne source courante (pour les diagnostics runtime) — remplace
-    // le prologue `if (line > 0) { current_line_ = line; chunk.setLine(line); }`
-    // dupliqué dans chaque visit().
+    // Records the current source line for runtime diagnostics, replacing the
+    // `if (line > 0) { current_line_ = line; chunk.set_line(line); }` prologue that used to be
+    // duplicated in every visit().
     void note_line(int line, int fi = -1) {
         if (line > 0) {
             current_line_ = line;
@@ -98,25 +94,26 @@ class Compiler : public StmtVisitor, public ExprVisitor {
 
     void compile_into(const Expr& e, int dest);
     void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);
-    // Portée lexicale stricte : sauvegarde local_regs_/reg_top_/locals_top_, alloue
-    // les locales déclarées dans body (sans descendre dans les sous-blocs), compile,
-    // puis restaure. Les registres restent réservés si le corps contient des closures.
+    // Strict lexical scope: saves local_regs_, reg_top_ and locals_top_, allocates the locals
+    // declared in body without descending into sub-blocks, compiles, then restores. The registers
+    // stay reserved when the body contains closures.
     void compile_block(const std::vector<std::unique_ptr<Stmt>>& body);
 
-    // Réserve un registre pour chaque locale pré-scannée. Les fonctions (funcs) sont
-    // liées d'emblée dans local_regs_ (récursion / références en avant) ; les var/const
-    // sont différées dans pending_var_reg_ (portée lexicale). `skip` = noms du prologue
-    // de la portée COURANTE (params, self, catch var) : laissés tels quels. Un nom hérité
-    // d'une portée englobante n'est PAS dans skip → il obtient un registre neuf (masquage).
+    // Reserves a register for every pre-scanned local. Functions are bound in local_regs_ straight
+    // away, for recursion and forward references, while var and const are deferred in
+    // pending_var_reg_ for lexical scope. `skip` holds the names from the CURRENT scope's prologue
+    // (parameters, self, the catch variable), left as they are. A name inherited from an enclosing
+    // scope is NOT in skip, so it gets a fresh register and shadows the outer one.
     void bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
                         const std::unordered_set<std::string>& skip = {});
 
-    // Charge la valeur appelable nommée `name` dans le registre `reg` (locale, upvalue,
-    // fonction top-level via LOAD_FUNC, ou global via LOAD_GLOBAL).
+    // Loads the callable named `name` into register `reg`: a local, an upvalue, a top-level function
+    // through LOAD_FUNC, or a global through LOAD_GLOBAL.
     void emit_callee_value(const std::string& name, int reg);
-    // Compile un appel dont le DERNIER argument est multi-valeurs (… ou appel) : callee
-    // sous le bloc d'arguments, args fixes, puis expansion — émet CALL_VARARGS (…) ou
-    // CALL_VA (appel). emitCallee(reg) place l'appelable. Résultat via last_reg_ = call_base.
+    // Compiles a call whose LAST argument is multi-valued, either `...` or a call: the callee sits
+    // below the argument block, then the fixed arguments, then the expansion — emitting CALL_VARARGS
+    // for `...` and CALL_VA for a call. emit_callee(reg) places the callable, and the result comes
+    // back through last_reg_ = call_base.
     void emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
                         const std::function<void(int)>& emit_callee);
 
@@ -142,8 +139,8 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     void visit(const SwitchStmt&) override;
     void visit(const DoStmt&) override;
 
-    // Refus d'écriture sur un enum, détecté à la compilation pour nommer
-    // l'énumération et l'élément. `field` vide = clé non littérale.
+    // Refuses a write to an enum, detected at compile time so the message can name the enumeration
+    // and the element. An empty `field` means the key is not a literal.
     void reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
                            int file_idx);
 

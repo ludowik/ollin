@@ -10,23 +10,21 @@
 
 Value make_ui_module();
 
-// Appelés par la boucle de rendu (graphics_module.cpp) :
-// ui_poll()  AVANT mouse_poll — renvoie true si un widget a pris le clic, auquel cas
-//            le clic ne doit PAS être transmis aux callbacks mouse.* du script.
-// ui_draw()  APRÈS draw() — dessine la pile de widgets par-dessus la scène.
-// ui_reset() au démarrage d'un PROGRAMME (ollin_run, wasm_main.cpp) — PAS dans
-//            gfx_run : les widgets sont déclarés au niveau du fichier, donc AVANT
-//            graphics.run, et un reset là les effacerait tous. Nécessaire car les
-//            statiques survivent au VM entre deux exécutions du playground.
+// Called by the render loop (graphics_module.cpp):
+// ui_poll()  BEFORE mouse_poll; returns true when a widget took the click, in which case the click
+//            must NOT reach the script's mouse.* callbacks.
+// ui_draw()  AFTER draw(); paints the widget stack over the scene.
+// ui_reset() when a PROGRAM starts (ollin_run, wasm_main.cpp) — NOT in gfx_run: widgets are declared
+//            at file level, hence BEFORE graphics.run, and a reset there would erase them all. It is
+//            needed because the statics survive the VM between two playground runs.
 bool ui_poll();
 void ui_draw();
 void ui_reset();
 
-// ── Validation des arguments, PARTAGÉE par le module et le stub ──────────────────
-// Une faute d'appel doit être signalée même sans raylib (le binaire de test utilise
-// le stub) : un seul endroit pour les messages, aucune divergence possible.
-// `args`/`argc` désignent les arguments UTILISATEUR : sur un appel de méthode, le
-// receveur (self) a déjà été retiré par l'appelant.
+// Argument validation, SHARED by the module and the stub.
+// A misuse must be reported even without raylib, since the test binary uses the stub, so the
+// messages live in a single place and cannot diverge. `args` and `argc` are the USER arguments: on a
+// method call the receiver (self) has already been removed by the caller.
 inline void ui_check_button_args(const Value* args, int argc) {
     if (argc < 2)
         throw std::runtime_error("ui.button: expected label, function");
@@ -47,9 +45,9 @@ inline void ui_check_checkbox_args(const Value* args, int argc) {
         throw std::runtime_error("ui.checkbox: third argument must be a function");
 }
 
-// ui.slider(libellé, ref v, min, max [, défaut] [, surChange]) — les deux derniers
-// arguments sont reconnus par leur TYPE : un nombre est la valeur par défaut, une
-// fonction le rappel de changement. Aucun ordre imposé, donc aucune ambiguïté.
+// ui.slider(label, ref v, min, max [, default] [, onChange]) — the last two arguments are
+// recognized by their TYPE: a number is the default value, a function the change callback. No order
+// is imposed, and none is ambiguous.
 inline void ui_check_slider_args(const Value* args, int argc) {
     if (argc < 4)
         throw std::runtime_error("ui.slider: expected label, ref variable, min, max");
@@ -67,7 +65,7 @@ inline void ui_check_slider_args(const Value* args, int argc) {
     }
 }
 
-// Valeur par défaut d'un slider : le premier argument numérique après max, sinon min.
+// A slider's default: the first numeric argument after max, or min when there is none.
 inline Value ui_slider_default(const Value* args, int argc) {
     for (int i = 4; i < argc; ++i) {
         if (args[i].is_number())
@@ -76,21 +74,21 @@ inline Value ui_slider_default(const Value* args, int argc) {
     return args[2];
 }
 
-// Une variable liée qui vaut nil est INITIALISÉE à la déclaration : le script peut la
-// lire dès la première frame. Partagé avec le stub, qui n'a pas de rendu mais doit
-// donner la même valeur au script.
+// A bound variable holding nil is INITIALIZED at declaration time, so the script can read it from
+// the first frame on. Shared with the stub, which has no rendering but must give the script the same
+// value.
 inline void ui_slider_init(const Value* args, int argc) {
     if (ref_get(args[1]).is_nil())
         ref_set(args[1], ui_slider_default(args, argc));
 }
 
-// Éléments d'une liste : le LIBELLÉ affiché et la VALEUR renvoyée. Un tableau donne ses
-// valeurs, une map (ou un enum) ses clés — la même règle que `for … in`, dont la variable
-// unique reçoit la valeur d'un tableau et la clé d'une map.
+// A list's items: the LABEL displayed and the VALUE returned. An array gives its values, a map (or
+// an enum) its keys — the same rule as `for … in`, whose single variable receives an array's value
+// and a map's key.
 //
-// L'ORDRE est figé ici, car une map n'en a pas : un enum est trié par valeur, ce qui
-// restitue l'ordre de déclaration, une map ordinaire par libellé, faute de mieux. Sans
-// cela la liste se réordonnerait d'une ouverture à l'autre.
+// The ORDER is fixed here, because a map has none: an enum is sorted by value, which restores the
+// declaration order, and an ordinary map by label, for want of anything better. Without this the
+// list would reorder itself from one opening to the next.
 inline std::vector<std::pair<std::string, Value>> ui_list_items(const Value& source) {
     std::vector<std::pair<std::string, Value>> out;
     if (source.is_array()) {
@@ -101,9 +99,8 @@ inline std::vector<std::pair<std::string, Value>> ui_list_items(const Value& sou
         }
         return out;
     }
-    // Clés collectées AVANT tout libellé : value_to_string peut appeler la méta-méthode
-    // `__str` d'une clé, donc du code Ollin, qui muterait la map et invaliderait
-    // l'itérateur en pleine boucle.
+    // The keys are collected BEFORE any label: value_to_string may call a key's __str meta-method,
+    // hence Ollin code, which could mutate the map and invalidate the iterator mid-loop.
     bool by_value = source.as_map()->kind == Map::ENUM;
     std::vector<Value> keys;
     for (const auto& kv : source.as_map()->data) {
@@ -140,8 +137,8 @@ inline void ui_check_list_args(const Value* args, int argc) {
         throw std::runtime_error("ui.list: fourth argument must be a function");
 }
 
-// Une liste est en MONO-sélection : il y a toujours un élément retenu. Une variable liée
-// à nil est donc initialisée au premier élément, comme un slider prend son défaut.
+// A list is SINGLE-selection: one item is always chosen. A variable bound to nil is therefore
+// initialized to the first item, just as a slider takes its default.
 inline void ui_list_init(const Value* args) {
     if (!ref_get(args[2]).is_nil())
         return;
