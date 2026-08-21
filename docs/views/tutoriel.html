@@ -504,8 +504,8 @@ pre:hover .code-actions,
 
 <pre><code><span class="bi">assert</span>(<span class="num">1</span> &lt;&gt; <span class="bool">true</span>)   <span class="cmt">## types distincts : le booléen est étanche</span>
 <span class="bi">assert</span>(<span class="kw">not</span> <span class="num">0</span>)        <span class="cmt">## zéro => faux, sans pour autant valoir false</span>
-<span class="bi">assert</span>(<span class="str">"non vide"</span>)  <span class="cmt">## chaîne non vide => vrai</span>
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)      <span class="cmt">## chaîne vide => faux</span></code></pre>
+<span class="bi">assert</span>(<span class="str">"non vide"</span>)  <span class="cmt">## string non vide => vrai</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)      <span class="cmt">## string vide => faux</span></code></pre>
 
 <p>Les deux règles sont indépendantes et il faut les tenir ensemble : <strong>zéro est faux</strong> (le vide est faux), et pourtant <strong>zéro n'est pas <code>false</code></strong> (les types ne se mélangent pas). Autrement dit, <code>if x</code> et <code>if not x</code> disent la vérité d'une valeur quel qu'en soit le type — c'est la façon d'écrire un test — alors que <code>x == false</code> ne vaut que pour un vrai booléen. Il n'existe pas de conversion <code>bool(v)</code> : <code>not not v</code> en tient lieu.</p>
 
@@ -546,16 +546,16 @@ a *= <span class="num">2</span>
 
 <h3>Variables globales — <code><span class="kw">global</span></code></h3>
 <p>Le mot-clé <code><span class="kw">global</span></code> déclare une variable <strong>globale</strong>, visible dans tout le programme. Elle peut être déclarée n'importe où et lue ou modifiée depuis n'importe quelle fonction. Une variable locale (<code><span class="kw">var</span></code>) de même nom masque le global <strong>à partir de sa déclaration</strong> : avant cette ligne, le nom désigne encore le global (ainsi <code><span class="kw">var</span> x = x</code> initialise avec la valeur extérieure).</p>
-<pre><code><span class="kw">global</span> compteur = <span class="num">0</span>
+<pre><code><span class="kw">global</span> counter = <span class="num">0</span>
 
 <span class="kw">func</span> incr()
-    compteur += <span class="num">1</span>  <span class="cmt">## modifie le global depuis une fonction</span>
+    counter += <span class="num">1</span>  <span class="cmt">## modifie le global depuis une fn</span>
 <span class="kw">end</span>
 
 incr()
 incr()
-<span class="bi">assert</span>(compteur == <span class="num">2</span>)
-<span class="bi">print</span>(compteur)    <span class="cmt">## 2</span></code></pre>
+<span class="bi">assert</span>(counter == <span class="num">2</span>)
+<span class="bi">print</span>(counter)    <span class="cmt">## 2</span></code></pre>
 
 <div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible partout. Affecter un nom non déclaré reste une erreur de compilation.</div>
 
@@ -567,12 +567,12 @@ incr()
 <span class="bi">assert</span>(PI == <span class="num">3.14159</span>)
 <span class="bi">assert</span>(MAX == <span class="num">100</span>)
 
-<span class="kw">func</span> aire(r)
+<span class="kw">func</span> area(r)
     <span class="kw">const</span> DEUX_PI = <span class="num">2</span> * PI
     <span class="kw">return</span> DEUX_PI * r * r
 <span class="kw">end</span>
 
-<span class="bi">print</span>(aire(<span class="num">1</span>))  <span class="cmt">## 6.28318…</span></code></pre>
+<span class="bi">print</span>(area(<span class="num">1</span>))  <span class="cmt">## 6.28318…</span></code></pre>
 
 <div class="callout warn">Les erreurs suivantes sont détectées à la <strong>compilation</strong> :
 <pre style="margin-top:8px"><code><span class="kw">const</span> x  <span class="cmt">## ERROR: must be initialized</span>
@@ -678,8 +678,8 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <h2>Chaînes</h2>
 <pre><code><span class="kw">var</span> s = <span class="str">"bonjour"</span>
 <span class="bi">assert</span>(s == <span class="str">"bonjour"</span>)
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## chaîne vide est fausse</span>
-<span class="bi">assert</span>(<span class="str">"texte"</span>)  <span class="cmt">## non vide est vrai</span></code></pre>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## string vide est fausse</span>
+<span class="bi">assert</span>(<span class="str">"text"</span>)  <span class="cmt">## non vide est vrai</span></code></pre>
 
 <p>La concaténation se fait avec <code>+</code> :</p>
 <pre><code><span class="kw">var</span> greeting = <span class="str">"Hello, "</span> + <span class="str">"world"</span> + <span class="str">"!"</span>
@@ -688,9 +688,9 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <h3>Interpolation</h3>
 <p>Toute expression entre accolades <code>{…}</code> est évaluée et insérée. <code>\{</code> insère une accolade littérale.</p>
-<pre><code><span class="kw">var</span> nom = <span class="str">"Ada"</span>
+<pre><code><span class="kw">var</span> name = <span class="str">"Ada"</span>
 <span class="kw">var</span> n = <span class="num">42</span>
-<span class="bi">assert</span>(<span class="str">"Bonjour {nom}, n={n}"</span> == <span class="str">"Bonjour Ada, n=42"</span>)
+<span class="bi">assert</span>(<span class="str">"Bonjour {name}, n={n}"</span> == <span class="str">"Bonjour Ada, n=42"</span>)
 <span class="bi">assert</span>(<span class="str">"calcul : {n * 2 + 1}"</span> == <span class="str">"calcul : 85"</span>)</code></pre>
 <p>Un <strong>format</strong> optionnel suit un <code>:</code> — une spécification de conversion C (sans le <code>%</code>) : <code>.3f</code> (précision), <code>04x</code> (largeur + zéros), <code>-8s</code> (aligné à gauche)… :</p>
 <pre><code><span class="bi">assert</span>(<span class="str">"pi = {3.14159:.2f}"</span> == <span class="str">"pi = 3.14"</span>)
@@ -880,10 +880,10 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="bi">assert</span>(add(<span class="num">3</span>, <span class="num">4</span>) == <span class="num">7</span>)</code></pre>
 
 <h3>Fonction sur un champ de map</h3>
-<p><code>func obj.champ(...)</code> définit une fonction directement sur un champ de map ou de module — sucre pour <code>obj.champ = func(...) ... end</code>. Utile pour les hooks moteur (ex. <code>keyboard.keypressed</code>).</p>
+<p><code>func obj.field(...)</code> définit une fonction directement sur un champ de map ou de module — sucre pour <code>obj.field = func(...) ... end</code>. Utile pour les hooks moteur (ex. <code>keyboard.keypressed</code>).</p>
 <pre><code><span class="kw">var</span> obj = {}
-<span class="kw">func</span> obj.salut(nom)
-    <span class="kw">return</span> <span class="str">"salut "</span> + nom
+<span class="kw">func</span> obj.salut(name)
+    <span class="kw">return</span> <span class="str">"salut "</span> + name
 <span class="kw">end</span>
 <span class="bi">assert</span>(obj.salut(<span class="str">"ollin"</span>) == <span class="str">"salut ollin"</span>)</code></pre>
 
@@ -936,8 +936,8 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <h2>Arguments variadiques</h2>
 <p><code>...</code> capture tous les arguments supplémentaires.</p>
 
-<pre><code><span class="kw">func</span> log(niveau, ...)
-    <span class="bi">printf</span>(<span class="str">"[{}] "</span>, niveau)
+<pre><code><span class="kw">func</span> log(level, ...)
+    <span class="bi">printf</span>(<span class="str">"[{}] "</span>, level)
     <span class="bi">print</span>(...)
 <span class="kw">end</span>
 
@@ -1001,8 +1001,8 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <p>Chaque <strong>itération</strong> a ses propres variables : une fonction créée dans le corps capture la variable de boucle et les locales du corps telles qu'elles étaient à <em>son</em> tour, et non leur valeur finale.</p>
 <pre><code><span class="kw">var</span> fns = []
 <span class="kw">for</span> i = <span class="num">1</span>, <span class="num">3</span> <span class="kw">do</span>
-    <span class="kw">var</span> carre = i * i
-    fns.push(<span class="kw">func</span>() <span class="kw">return</span> i + carre <span class="kw">end</span>)
+    <span class="kw">var</span> square = i * i
+    fns.push(<span class="kw">func</span>() <span class="kw">return</span> i + square <span class="kw">end</span>)
 <span class="kw">end</span>
 
 <span class="bi">assert</span>(fns[<span class="num">1</span>]() == <span class="num">2</span>)     <span class="cmt">## 1 + 1</span>
@@ -1057,7 +1057,7 @@ inc()
 <p>Dictionnaire clé→valeur. La syntaxe de littéral accepte des chaînes, des identifiants, ou des <strong>clés calculées</strong> <code>[expr]</code> ; à l'exécution, toute valeur peut servir de clé (<code>nil</code>, entier, float, string, bool, array, map, fonction…).</p>
 
 <h3>Création</h3>
-<pre><code><span class="kw">var</span> vide = {}
+<pre><code><span class="kw">var</span> empty = {}
 
 <span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
 
@@ -1074,23 +1074,23 @@ inc()
 <span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}    <span class="cmt">## identique</span>
 <span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}  <span class="cmt">## identique</span></code></pre>
 <p>Entre crochets, une <strong>expression</strong> est évaluée à l'exécution et sa valeur devient la clé :</p>
-<pre><code><span class="kw">var</span> ref = <span class="str">"couleur"</span>
-<span class="kw">var</span> m = {[ref]: <span class="str">"rouge"</span>}     <span class="cmt">## clé = valeur de ref => "couleur"</span>
-<span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>)
-<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## "ref" littéral n'est PAS une clé</span>
+<pre><code><span class="kw">var</span> ref = <span class="str">"color"</span>
+<span class="kw">var</span> m = {[ref]: <span class="str">"rouge"</span>}     <span class="cmt">## key = value de ref => "color"</span>
+<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"rouge"</span>)
+<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## "ref" littéral n'est PAS une key</span>
 
-<span class="cmt">## la clé calculée peut être de tout type</span>
+<span class="cmt">## la key calculée peut être de tout type</span>
 <span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"deux"</span>}
 <span class="bi">assert</span>(n[<span class="num">2</span>] == <span class="str">"deux"</span>)</code></pre>
 <p>La même règle vaut pour <strong>l'accès</strong> : entre crochets, un littéral string désigne la clé telle quelle, une variable désigne sa valeur. Lecture, écriture et affectation composée sont identiques :</p>
-<pre><code><span class="kw">var</span> ref = <span class="str">"couleur"</span>
+<pre><code><span class="kw">var</span> ref = <span class="str">"color"</span>
 <span class="kw">var</span> m = {}
-m[ref]     = <span class="str">"rouge"</span>              <span class="cmt">## écrit le slot "couleur" (valeur de ref)</span>
-m[<span class="str">"taille"</span>] = <span class="num">10</span>                  <span class="cmt">## écrit le slot "taille" (littéral)</span>
-<span class="bi">assert</span>(m[<span class="str">"couleur"</span>] == <span class="str">"rouge"</span>)   <span class="cmt">## relu via littéral</span>
-<span class="bi">assert</span>(m.couleur     == <span class="str">"rouge"</span>)  <span class="cmt">## ou via point</span>
-m[<span class="str">"taille"</span>] += <span class="num">5</span>
-<span class="bi">assert</span>(m[<span class="str">"taille"</span>] == <span class="num">15</span>)</code></pre>
+m[ref]     = <span class="str">"rouge"</span>              <span class="cmt">## écrit le slot "color" (value de ref)</span>
+m[<span class="str">"size"</span>] = <span class="num">10</span>                  <span class="cmt">## écrit le slot "size" (littéral)</span>
+<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"rouge"</span>)   <span class="cmt">## relu via littéral</span>
+<span class="bi">assert</span>(m.color     == <span class="str">"rouge"</span>)  <span class="cmt">## ou via point</span>
+m[<span class="str">"size"</span>] += <span class="num">5</span>
+<span class="bi">assert</span>(m[<span class="str">"size"</span>] == <span class="num">15</span>)</code></pre>
 
 <h3>Lecture</h3>
 <div class="two-col">
@@ -1104,7 +1104,7 @@ point.z  <span class="cmt">## nil</span></code></pre></div>
 
 <h3>Écriture</h3>
 <pre><code><span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
-point[<span class="str">"z"</span>] = <span class="num">0</span>   <span class="cmt">## nouvelle clé</span>
+point[<span class="str">"z"</span>] = <span class="num">0</span>   <span class="cmt">## nouvelle key</span>
 point.z = <span class="num">5</span>      <span class="cmt">## équivalent</span>
 
 point[<span class="str">"x"</span>] += <span class="num">1</span>  <span class="cmt">## compound via crochet</span>
@@ -1129,7 +1129,7 @@ m[<span class="num">42</span>]    = <span class="str">"int key"</span>
 m[<span class="num">3.14</span>]  = <span class="str">"float key"</span>
 m[<span class="bool">true</span>]  = <span class="str">"bool key"</span>
 
-<span class="cmt">## 1 et 1.0 sont la même clé</span>
+<span class="cmt">## 1 et 1.0 sont la même key</span>
 m[<span class="num">1</span>] = <span class="str">"one"</span>
 <span class="bi">assert</span>(m[<span class="num">1.0</span>] == <span class="str">"one"</span>)</code></pre>
 
@@ -1149,8 +1149,8 @@ b.x = <span class="num">99</span>
 
 <pre><code><span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
 
-<span class="kw">for</span> nom, score <span class="kw">in</span> scores <span class="kw">do</span>
-    <span class="bi">printf</span>(<span class="str">"{} => {}"</span>, nom, score)
+<span class="kw">for</span> name, score <span class="kw">in</span> scores <span class="kw">do</span>
+    <span class="bi">printf</span>(<span class="str">"{} => {}"</span>, name, score)
 <span class="kw">end</span>
 <span class="cmt">## Alice => 95
 ## Bob => 82
@@ -1182,16 +1182,16 @@ b.x = <span class="num">99</span>
 <h2>Enum</h2>
 <p><code>enum</code> déclare des constantes nommées. Le résultat est une <strong>map gelée</strong> : elle se lit, s'itère et se mesure comme n'importe quelle map, mais toute écriture est refusée.</p>
 
-<pre><code><span class="kw">enum</span> Couleur ROUGE, VERT, BLEU <span class="kw">end</span>
-<span class="bi">print</span>(Couleur.ROUGE, Couleur.VERT, Couleur.BLEU)   <span class="cmt">## 1 2 3</span></code></pre>
+<pre><code><span class="kw">enum</span> Tint RED, GREEN, BLUE <span class="kw">end</span>
+<span class="bi">print</span>(Tint.RED, Tint.GREEN, Tint.BLUE)   <span class="cmt">## 1 2 3</span></code></pre>
 
 <h3>Numérotation</h3>
 <p>Un élément sans valeur prend le compteur, qui part de <strong>1</strong> et avance de un. Un <strong>littéral entier</strong> fixe la valeur et fait repartir le compteur juste après. Toute <strong>autre expression</strong> est acceptée comme valeur mais laisse le compteur où il est — le compilateur ne peut pas évaluer un appel de fonction.</p>
 
-<pre><code><span class="kw">enum</span> Etat REPOS = <span class="num">0</span>, MARCHE, SAUT = <span class="num">10</span>, CHUTE <span class="kw">end</span>
+<pre><code><span class="kw">enum</span> State REPOS = <span class="num">0</span>, MARCHE, SAUT = <span class="num">10</span>, CHUTE <span class="kw">end</span>
 <span class="cmt">## 0, 1, 10, 11</span>
 
-<span class="kw">enum</span> Mixte A, B = <span class="str">"texte"</span>, C <span class="kw">end</span>
+<span class="kw">enum</span> Mixed A, B = <span class="str">"texte"</span>, C <span class="kw">end</span>
 <span class="cmt">## 1, "texte", 2 — la chaîne ne déplace pas le compteur</span></code></pre>
 
 <div class="callout">Corollaire : <code>A = 1 + 1</code> est une expression, pas un littéral, donc elle ne déplace pas le compteur même si elle vaut deux.</div>
@@ -1199,15 +1199,15 @@ b.x = <span class="num">99</span>
 <h3>Valeurs de tout type</h3>
 <p>Une valeur peut être un nombre, une chaîne, un objet, un tableau ou une fonction. Deux éléments de même valeur sont un alias, ce qui est permis ; deux éléments de même <strong>nom</strong> sont une erreur de compilation.</p>
 
-<pre><code><span class="kw">enum</span> Palette ROUGE = <span class="bi">Color</span>(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>), VERT = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">1</span>, <span class="num">0</span>) <span class="kw">end</span></code></pre>
+<pre><code><span class="kw">enum</span> Palette RED = <span class="bi">Color</span>(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>), GREEN = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">1</span>, <span class="num">0</span>) <span class="kw">end</span></code></pre>
 
 <h3>Immuabilité</h3>
 <p>Écrire dans un enum échoue. Quand la cible est visiblement l'énumération, l'erreur arrive dès la <strong>compilation</strong> et nomme l'élément ; les chemins indirects — alias, clé calculée — sont arrêtés à l'<strong>exécution</strong>.</p>
 
-<pre><code>Couleur.ROUGE = <span class="num">5</span>        <span class="cmt">## erreur de compilation : cannot modify enum 'Couleur' element 'ROUGE'</span>
+<pre><code>Tint.RED = <span class="num">5</span>        <span class="cmt">## erreur de compilation : cannot modify enum 'Tint' element 'RED'</span>
 
-<span class="kw">var</span> m = Couleur
-m.ROUGE = <span class="num">5</span>              <span class="cmt">## erreur d'exécution : cannot modify an enum</span></code></pre>
+<span class="kw">var</span> m = Tint
+m.RED = <span class="num">5</span>              <span class="cmt">## erreur d'exécution : cannot modify an enum</span></code></pre>
 
 <div class="callout warn">Le gel est <strong>superficiel</strong> : il protège l'énumération, pas ce qu'elle contient. Si un élément est un tableau ou un objet, ce tableau ou cet objet reste modifiable — <code>E.L[1] = 9</code> passe. Geler en profondeur rendrait immuable un objet qui peut être référencé ailleurs.</div>
 
@@ -1224,11 +1224,11 @@ m.ROUGE = <span class="num">5</span>              <span class="cmt">## erreur d'
 <h2>Références</h2>
 <p><code>ref x</code> donne à une fonction le moyen de <strong>lire et d'écrire</strong> la variable <code>x</code>, au lieu d'en recevoir une copie. C'est ce qui permet à un module de tenir une variable à jour — le cas typique étant une case à cocher liée à un réglage.</p>
 
-<pre><code><span class="kw">global</span> grille = <span class="kw">true</span>
-ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grille)
+<pre><code><span class="kw">global</span> grid = <span class="kw">true</span>
+ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
-    <span class="kw">if</span> grille <span class="kw">then</span>          <span class="cmt">## lecture NORMALE : ref ne change rien à l'usage de la variable</span>
+    <span class="kw">if</span> grid <span class="kw">then</span>          <span class="cmt">## lecture NORMALE : ref ne change rien à l'usage de la variable</span>
         dessineGrille()
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
@@ -1238,18 +1238,18 @@ ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grill
 <h3>Manipuler une référence reçue</h3>
 <p>Une fonction qui reçoit une référence la lit avec <code>get()</code> et l'écrit avec <code>set(v)</code>.</p>
 
-<pre><code><span class="kw">func</span> <span class="fn">basculer</span>(r)
+<pre><code><span class="kw">func</span> <span class="fn">toggleIt</span>(r)
     r.set(<span class="kw">not</span> r.get())
 <span class="kw">end</span>
 
-<span class="kw">global</span> actif = <span class="kw">false</span>
-basculer(<span class="kw">ref</span> actif)
-<span class="bi">assert</span>(actif)</code></pre>
+<span class="kw">global</span> active = <span class="kw">false</span>
+toggleIt(<span class="kw">ref</span> active)
+<span class="bi">assert</span>(active)</code></pre>
 
 <h3>Cibles acceptées</h3>
 <p>Un nom — global ou local — ou un chemin de champs. Le nom doit être <strong>déclaré</strong> : <code>ref inconnue</code> est une erreur de <em>compilation</em>, ce qui est tout l'intérêt par rapport au passage d'un nom sous forme de chaîne.</p>
 
-<pre><code><span class="kw">ref</span> compteur           <span class="cmt">## un global ou une locale</span>
+<pre><code><span class="kw">ref</span> counter           <span class="cmt">## un global ou une locale</span>
 <span class="kw">ref</span> cfg.tuiles         <span class="cmt">## un champ</span>
 <span class="kw">ref</span> cfg.rendu.ombres   <span class="cmt">## un chemin de champs</span>
 <span class="kw">ref</span> t[<span class="num">1</span>]              <span class="cmt">## REFUSÉ : le chemin serait réévalué à chaque accès</span></code></pre>
@@ -1265,7 +1265,7 @@ basculer(<span class="kw">ref</span> actif)
 <p>Tableau dynamique distinct des maps. Les indices commencent à <strong>1</strong>. Comme les maps, les arrays sont partagés par référence.</p>
 
 <h3>Création</h3>
-<pre><code><span class="kw">var</span> vide = []
+<pre><code><span class="kw">var</span> empty = []
 
 <span class="kw">var</span> t = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]
 
@@ -1337,7 +1337,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="kw">end</span></code></pre>
 
 <h3>Throw de n'importe quel type</h3>
-<pre><code><span class="kw">func</span> diviser(a, b)
+<pre><code><span class="kw">func</span> divide(a, b)
     <span class="kw">if</span> b == <span class="num">0</span> <span class="kw">then</span>
         <span class="kw">throw</span> {code: <span class="num">42</span>, msg: <span class="str">"division par zéro"</span>}
     <span class="kw">end</span>
@@ -1345,7 +1345,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="kw">end</span>
 
 <span class="kw">try</span>
-    <span class="kw">var</span> r = diviser(<span class="num">10</span>, <span class="num">0</span>)
+    <span class="kw">var</span> r = divide(<span class="num">10</span>, <span class="num">0</span>)
 <span class="kw">catch</span> e
     <span class="bi">printf</span>(<span class="str">"erreur {}: {}"</span>, e[<span class="str">"code"</span>], e[<span class="str">"msg"</span>])
 <span class="kw">end</span></code></pre>
@@ -1386,7 +1386,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="cmt">## ... code à mesurer ...</span>
 
 <span class="kw">var</span> t1 = <span class="bi">time</span>()
-<span class="bi">printf</span>(<span class="str">"durée : {} s"</span>, t1 - t0)</code></pre>
+<span class="bi">printf</span>(<span class="str">"duration : {} s"</span>, t1 - t0)</code></pre>
 
 <h3>Exemple complet</h3>
 <pre><code><span class="cmt">## Benchmark : somme de 1 million d'itérations</span>
@@ -1403,12 +1403,12 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 
 <h3>mem</h3>
 <p>Retourne la mémoire tas actuellement utilisée par le programme, en <strong>octets</strong> (entier). Utile pour surveiller les allocations. La valeur reflète l'ensemble du process (valeurs Ollin + runtime) — regarde surtout sa <em>variation</em>.</p>
-<pre><code><span class="kw">var</span> avant = <span class="bi">mem</span>()
+<pre><code><span class="kw">var</span> before = <span class="bi">mem</span>()
 <span class="kw">var</span> a = []
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">100000</span>] <span class="kw">do</span>
     a[i] = i
 <span class="kw">end</span>
-<span class="bi">printf</span>(<span class="str">"array : {} Ko"</span>, (<span class="bi">mem</span>() - avant) / <span class="num">1024</span>)</code></pre>
+<span class="bi">printf</span>(<span class="str">"array : {} Ko"</span>, (<span class="bi">mem</span>() - before) / <span class="num">1024</span>)</code></pre>
 
 <h3>len</h3>
 <p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments). Disponible aussi en méthode sur les arrays : <code>arr.len()</code>.</p>
@@ -1682,7 +1682,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">var</span> m = {x: <span class="num">1</span>}
 <span class="bi">print</span>(m == m)                      <span class="cmt">## 1 : même référence</span>
 
-<span class="cmt">## instance + __eq => comparaison par valeur</span>
+<span class="cmt">## instance + __eq => comparaison par value</span>
 <span class="kw">class</span> Point
     <span class="kw">func</span> init(x, y)
         self.x = x
@@ -1722,7 +1722,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">140</span>, <span class="str">"cycle"</span>)
 <span class="kw">var</span> x = <span class="num">0</span>
 
-<span class="cmt">## logique : appelée AVANT draw, dt = secondes depuis la frame précédente</span>
+<span class="cmt">## logique : appelée AVANT draw, dt = seconds depuis la frame précédente</span>
 <span class="kw">func</span> update(dt)
     x = x + <span class="num">120</span> * dt  <span class="cmt">## 120 px/seconde, quel que soit le FPS</span>
     <span class="kw">if</span> x > <span class="num">260</span> <span class="kw">then</span> x = <span class="num">0</span> <span class="kw">end</span>
@@ -1763,11 +1763,11 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
     <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif. <code>x, y</code> désignent le coin supérieur gauche ou le centre selon <code>rectMode</code>. <code>r</code> = rayon des coins en <strong>pixels</strong>, borné à la moitié du petit côté (au-delà, on obtient une gélule) ; le contour reste à l'intérieur de la géométrie déclarée, comme pour les angles droits. Finesse des coins : <code>segments</code></td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
-    <tr><td><code>graphics.screenshot(fichier)</code></td><td>Capture le rendu courant dans un PNG (à appeler dans <code>draw</code>) ; sur WASM, déclenche un téléchargement</td></tr>
+    <tr><td><code>graphics.screenshot(file)</code></td><td>Capture le rendu courant dans un PNG (à appeler dans <code>draw</code>) ; sur WASM, déclenche un téléchargement</td></tr>
     <tr><td><code>graphics.text(text, x, y)</code></td><td>Affiche une chaîne — couleur de <code>stroke</code> (on écrit au stylo), taille de <code>fontSize</code>. <code>noStroke()</code> ne masque PAS le texte : seule la couleur est empruntée au trait. Sans canvas, ne dessine rien</td></tr>
     <tr><td><code>graphics.fontSize([n])</code></td><td>Fixe la hauteur de police pour <code>text</code> et renvoie <strong>toujours</strong> la hauteur courante — sans argument, c'est donc un accesseur. État remis à 18 chaque frame (valeur la plus courante). Accepte une taille <strong>fractionnaire</strong> (utile pour un dessin mis à l'échelle) et n'impose aucun minimum</td></tr>
-    <tr><td><code>graphics.font([nom])</code></td><td>Choisit la police courante et renvoie <strong>toujours</strong> son nom. Trois polices sont embarquées dans le moteur : <code>"sans"</code> (défaut, proportionnelle), <code>"mono"</code> (à espacement fixe) et <code>"pixel"</code> (la police bitmap de raylib, look rétro). Un nom inconnu lève une erreur qui liste les polices disponibles. État de style, donc remis au défaut chaque frame et sauvegardé par <code>pushStyle</code></td></tr>
-    <tr><td><code>graphics.textSize(texte)</code></td><td>Largeur <strong>et</strong> hauteur du texte avec la police et la taille courantes, en deux valeurs : <code>var w, h = graphics.textSize("abc")</code>. De quoi centrer ou encadrer un libellé sans réimplémenter la mesure. Sans canvas, renvoie 0, 0</td></tr>
+    <tr><td><code>graphics.font([name])</code></td><td>Choisit la police courante et renvoie <strong>toujours</strong> son nom. Trois polices sont embarquées dans le moteur : <code>"sans"</code> (défaut, proportionnelle), <code>"mono"</code> (à espacement fixe) et <code>"pixel"</code> (la police bitmap de raylib, look rétro). Un nom inconnu lève une erreur qui liste les polices disponibles. État de style, donc remis au défaut chaque frame et sauvegardé par <code>pushStyle</code></td></tr>
+    <tr><td><code>graphics.textSize(text)</code></td><td>Largeur <strong>et</strong> hauteur du texte avec la police et la taille courantes, en deux valeurs : <code>var w, h = graphics.textSize("abc")</code>. De quoi centrer ou encadrer un libellé sans réimplémenter la mesure. Sans canvas, renvoie 0, 0</td></tr>
     <tr><td><code>graphics.point(x, y)</code></td><td>Trace un point aux coordonnées données</td></tr>
     <tr><td><code>graphics.circle(x, y, r)</code></td><td>Cercle de centre (x,y) et rayon r — fill/stroke selon styles ; ancrage selon <code>ellipseMode</code></td></tr>
     <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>Ellipse de centre (x,y), largeur w et hauteur h — fill/stroke selon styles ; ancrage selon <code>ellipseMode</code></td></tr>
@@ -1832,10 +1832,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>Color(autre)</code></td><td>copie d'un objet <code>Color</code></td></tr>
   </tbody>
 </table>
-<pre><code><span class="kw">var</span> gris  = <span class="bi">Color</span>(<span class="num">0.5</span>)                <span class="cmt">## gris moyen opaque</span>
-<span class="kw">var</span> voile = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0.3</span>)             <span class="cmt">## noir à 30% (gris + alpha)</span>
+<pre><code><span class="kw">var</span> gray  = <span class="bi">Color</span>(<span class="num">0.5</span>)                <span class="cmt">## gris moyen opaque</span>
+<span class="kw">var</span> veil = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0.3</span>)             <span class="cmt">## noir à 30% (gris + alpha)</span>
 <span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
-<span class="kw">var</span> bleu  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## bleu semi-transparent</span>
+<span class="kw">var</span> blue  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## bleu semi-transparent</span>
 <span class="bi">print</span>(rouge)                           <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
 
 <span class="cmt">## accès direct aux composantes</span>
@@ -1881,18 +1881,18 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <h3>Couleur personnalisée et aléatoire</h3>
 
-<pre><code><span class="cmt">## couleur personnalisée (composantes dans [0,1])</span>
+<pre><code><span class="cmt">## color personnalisée (composantes dans [0,1])</span>
 <span class="kw">var</span> teal = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.6</span>, <span class="num">0.6</span>)
 <span class="bi">print</span>(teal)  <span class="cmt">## Color(0.000000,0.600000,0.600000,1.000000)</span>
 
-<span class="cmt">## couleur aléatoire : Color.random() (pas besoin de la réimplémenter)</span>
+<span class="cmt">## color aléatoire : Color.random() (pas besoin de la réimplémenter)</span>
 <span class="kw">var</span> c = <span class="bi">Color</span>.random()
 <span class="bi">print</span>(c.r, c.g, c.b)</code></pre>
 
 <h3>3D</h3>
 <p>Le dessin 3D partage la même boucle et le même état que la 2D. On place une <strong>caméra</strong>, puis on dessine des formes entre <code>graphics.begin3d(cam)</code> et <code>graphics.end3d()</code>. Comme en 2D, <code>fill</code>/<code>stroke</code> pilotent le remplissage et le contour (fil de fer) — mais l'<strong>épaisseur du fil de fer 3D est fixe (1&nbsp;px)</strong> : <code>graphics.strokeSize</code> ne s'applique qu'en 2D. Après <code>end3d()</code>, on peut dessiner un <strong>HUD 2D</strong> par-dessus dans la même frame.</p>
 
-<p>La caméra est un <strong>objet</strong> (classe <code>Camera</code>, comme <code>Color</code>) : on la crée une fois puis on la pilote par ses méthodes. <code>cam.setPos(x,y,z)</code> fixe la position, <code>cam.lookAt(x,y,z)</code> réoriente vers une cible, <code>cam.move(dx,dy,dz)</code> translate la caméra et sa cible (visée conservée), <code>cam.orbit(angle, rayon [, hauteur])</code> la place en orbite autour de sa cible (<code>angle</code> en radians).</p>
+<p>La caméra est un <strong>objet</strong> (classe <code>Camera</code>, comme <code>Color</code>) : on la crée une fois puis on la pilote par ses méthodes. <code>cam.setPos(x,y,z)</code> fixe la position, <code>cam.lookAt(x,y,z)</code> réoriente vers une cible, <code>cam.move(dx,dy,dz)</code> translate la caméra et sa cible (visée conservée), <code>cam.orbit(angle, radius [, height])</code> la place en orbite autour de sa cible (<code>angle</code> en radians).</p>
 
 <div class="callout tip">En 3D, appelle <code>graphics.clear(<em>couleur opaque</em>)</code> au début de chaque frame : un effacement opaque remet à zéro le <strong>tampon de profondeur</strong> (indispensable au test de profondeur), en plus de la couleur.</div>
 
@@ -1902,7 +1902,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Crée une caméra perspective (objet <code>Camera</code>) regardant <code>(tx,ty,tz)</code> depuis <code>(px,py,pz)</code> ; <code>fovy</code> = champ de vision vertical en degrés (45 par défaut)</td></tr>
     <tr><td><code>graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>Caméra orthographique — projection sans perspective ; <code>size</code> = nombre d'unités visibles en hauteur (10 par défaut). Mêmes méthodes que <code>camera()</code></td></tr>
     <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Fixe la position / la cible de la caméra</td></tr>
-    <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, rayon [, hauteur])</code></td><td>Translate la caméra (visée conservée) / la met en orbite autour de sa cible (<code>angle</code> en radians)</td></tr>
+    <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, radius [, height])</code></td><td>Translate la caméra (visée conservée) / la met en orbite autour de sa cible (<code>angle</code> en radians)</td></tr>
     <tr><td><code>cam.zoom(factor)</code></td><td>Multiplie la taille visible (ortho : ajuste <code>size</code> ; perspective : rapproche/éloigne le long de l'axe de visée)</td></tr>
     <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>Encadrent les dessins 3D dans <code>draw()</code></td></tr>
     <tr><td><code>graphics.grid(slices, spacing)</code></td><td>Repère quadrillé au sol (plan XZ), centré sur l'origine (couleur grise fixe)</td></tr>
@@ -1926,11 +1926,11 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(couleur)</code></td><td>Lumière ambiante (base uniforme). <code>v</code> ∈ [0,1]</td></tr>
-    <tr><td><code>graphics.light("dir", dx,dy,dz [, couleur])</code></td><td>Lumière directionnelle (<code>(dx,dy,dz)</code> = direction de propagation) → objet <code>Light</code></td></tr>
-    <tr><td><code>graphics.light("point", x,y,z [, couleur])</code></td><td>Lumière ponctuelle à la position <code>(x,y,z)</code> → objet <code>Light</code></td></tr>
+    <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(color)</code></td><td>Lumière ambiante (base uniforme). <code>v</code> ∈ [0,1]</td></tr>
+    <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>Lumière directionnelle (<code>(dx,dy,dz)</code> = direction de propagation) → objet <code>Light</code></td></tr>
+    <tr><td><code>graphics.light("point", x,y,z [, color])</code></td><td>Lumière ponctuelle à la position <code>(x,y,z)</code> → objet <code>Light</code></td></tr>
     <tr><td><code>lum.setDir(x,y,z)</code> · <code>lum.setPos(x,y,z)</code></td><td>Réoriente / repositionne la lumière</td></tr>
-    <tr><td><code>lum.setColor(couleur)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
+    <tr><td><code>lum.setColor(color)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
     <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applique une image (handle <code>image</code>) comme texture aux solides suivants ; <code>fill</code> devient une teinte multipliée. Pour un terrain multi-matières, voir l'<a href="#voxel">atlas de tuiles</a> plus bas</td></tr>
   </tbody>
 </table>
@@ -1958,14 +1958,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
 
-<pre><code><span class="cmt">## la caméra est un objet : créée une fois, pilotée par ses méthodes</span>
+<pre><code><span class="cmt">## la caméra est un object : créée une fois, pilotée par ses méthodes</span>
 <span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
 <span class="bi">graphics</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## éclairage : base ambiante…</span>
 <span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …+ un « soleil » directionnel</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## efface couleur + profondeur</span>
-    cam.orbit(elapsedTime * <span class="num">0.5</span>, <span class="num">10</span>, <span class="num">6</span>)   <span class="cmt">## orbite autour de la cible (angle en radians)</span>
+    <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## efface color + profondeur</span>
+    cam.orbit(elapsedTime * <span class="num">0.5</span>, <span class="num">10</span>, <span class="num">6</span>)   <span class="cmt">## orbite autour de la target (angle en radians)</span>
     <span class="bi">graphics</span>.noStroke()
     <span class="bi">graphics</span>.begin3d(cam)
         <span class="bi">graphics</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
@@ -2017,7 +2017,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.drawChunk(handle)</code></td><td>Redessine la partie <strong>opaque</strong> d'un chunk cuit en un seul appel (dans <code>begin3d</code>)</td></tr>
     <tr><td><code>graphics.drawChunkAlpha(handle)</code></td><td>Dessine la partie <strong>transparente</strong> (instances à <code>fill</code> alpha &lt; 1, ex. eau). À appeler APRÈS tout l'opaque</td></tr>
     <tr><td><code>graphics.freeChunk(handle)</code></td><td>Libère les tampons GPU d'un chunk (lointain) → mémoire récupérée</td></tr>
-    <tr><td><code>graphics.inFrustum(x,y,z [, rayon])</code></td><td>La sphère (centre, rayon) est-elle (au moins en partie) visible par la caméra ? → <code>1</code>/<code>0</code>. Sert au culling par chunk ; à appeler dans <code>begin3d</code></td></tr>
+    <tr><td><code>graphics.inFrustum(x,y,z [, radius])</code></td><td>La sphère (centre, rayon) est-elle (au moins en partie) visible par la caméra ? → <code>1</code>/<code>0</code>. Sert au culling par chunk ; à appeler dans <code>begin3d</code></td></tr>
   </tbody>
 </table>
 <p>Un chunk est automatiquement <strong>scindé</strong> en deux groupes selon l'alpha du <code>fill</code> : opaque (<code>drawChunk</code>) et transparent (<code>drawChunkAlpha</code>). <strong>Ordre obligatoire</strong> : dessine TOUT l'opaque, PUIS TOUTE la transparence — sinon le mélange alpha est incorrect.</p>
@@ -2139,16 +2139,16 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <p>L'état se lit aussi directement, sans rappel&nbsp;: <code>touch.count()</code> donne le nombre de contacts, <code>touch.points()</code> un tableau de <code>{id, x, y}</code>. Les coordonnées sont dans le même repère que celles de <code>mouse</code>.</p>
 
-<pre><code><span class="cmt">## Une note par doigt : l'identifiant sert de clé, donc plusieurs sonnent ensemble.</span>
-<span class="kw">global</span> sous = {}
+<pre><code><span class="cmt">## Une note par doigt : l'identifiant sert de key, donc plusieurs sonnent ensemble.</span>
+<span class="kw">global</span> under = {}
 
 <span class="kw">func</span> touch.began(id, x, y)
-    sous[id] = toucheSous(x, y)
-    <span class="bi">sound</span>.tone(<span class="bi">sound</span>.note(notes[sous[id]]), <span class="num">0.5</span>).play()
+    under[id] = keyAt(x, y)
+    <span class="bi">sound</span>.tone(<span class="bi">sound</span>.note(notes[under[id]]), <span class="num">0.5</span>).play()
 <span class="kw">end</span>
 
 <span class="kw">func</span> touch.ended(id, x, y)
-    sous[id] = <span class="kw">nil</span>
+    under[id] = <span class="kw">nil</span>
 <span class="kw">end</span></code></pre>
 
 <div class="callout tip">Les rappels de <code>mouse</code> ne sont <strong>pas</strong> supprimés&nbsp;: sur un doigt unique, le système émule la souris, si bien qu'un script déclarant les deux familles reçoit le geste <strong>deux fois</strong>. Écrivez donc chaque chemin pour qu'un doublon soit sans effet, ou n'écoutez qu'une famille.</div>
@@ -2171,19 +2171,19 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <p>L'interface est <strong>fermée au démarrage</strong> : elle se réduit à une poignée à trois barres dans le coin, pour ne pas masquer la scène. Un clic dessus déplie le menu affiché, dont la ligne de tête reprend la poignée et le titre du menu ; un clic sur cette tête referme.</p>
 
-<pre><code><span class="kw">global</span> grille = <span class="kw">true</span>
-<span class="kw">global</span> vitesse = <span class="kw">nil</span>   <span class="cmt">## le slider l'initialise à son défaut</span>
+<pre><code><span class="kw">global</span> grid = <span class="kw">true</span>
+<span class="kw">global</span> speed = <span class="kw">nil</span>   <span class="cmt">## le slider l'initialise à son default</span>
 
-<span class="kw">func</span> <span class="fn">remettreAZero</span>()
+<span class="kw">func</span> <span class="fn">resetAll</span>()
     t = <span class="num">0</span>
 <span class="kw">end</span>
 
-ui.button(<span class="str">"Remettre à zéro"</span>, remettreAZero)
-ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grille)
-ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> vitesse, <span class="num">0.25</span>, <span class="num">3</span>, <span class="num">1.0</span>)
+ui.button(<span class="str">"Remettre à zéro"</span>, resetAll)
+ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
+ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> speed, <span class="num">0.25</span>, <span class="num">3</span>, <span class="num">1.0</span>)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
-    <span class="kw">if</span> grille <span class="kw">then</span>       <span class="cmt">## lecture NORMALE de la variable liée</span>
+    <span class="kw">if</span> grid <span class="kw">then</span>       <span class="cmt">## lecture NORMALE de la variable liée</span>
         dessineGrille()
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
@@ -2192,10 +2192,10 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> vitess
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>ui.button(libellé, fonction)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
-    <tr><td><code>ui.checkbox(libellé, ref variable [, surChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>surChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
-    <tr><td><code>ui.slider(libellé, ref variable, min, max [, défaut] [, surChange])</code></td><td>Ajoute une valeur numérique réglable à la souris, liée à une variable passée par <a href="#ref">référence</a>. Si la variable vaut <code>nil</code>, elle est initialisée au <strong>défaut</strong> (ou à <code>min</code> en son absence). Les deux derniers arguments sont reconnus par leur type : un nombre est le défaut, une fonction le rappel appelé à chaque changement avec la nouvelle valeur.</td></tr>
-    <tr><td><code>ui.list(libellé, source, <span class="kw">ref</span> variable [, surChange])</code></td><td>Liste en <strong>mono-sélection</strong> : la ligne montre l'élément retenu, un clic déplie les choix. <code>source</code> = tableau, map ou enum</td></tr>
+    <tr><td><code>ui.button(label, fn)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
+    <tr><td><code>ui.checkbox(label, ref variable [, onChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>onChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
+    <tr><td><code>ui.slider(label, ref variable, min, max [, default] [, onChange])</code></td><td>Ajoute une valeur numérique réglable à la souris, liée à une variable passée par <a href="#ref">référence</a>. Si la variable vaut <code>nil</code>, elle est initialisée au <strong>défaut</strong> (ou à <code>min</code> en son absence). Les deux derniers arguments sont reconnus par leur type : un nombre est le défaut, une fonction le rappel appelé à chaque changement avec la nouvelle valeur.</td></tr>
+    <tr><td><code>ui.list(label, source, <span class="kw">ref</span> variable [, onChange])</code></td><td>Liste en <strong>mono-sélection</strong> : la ligne montre l'élément retenu, un clic déplie les choix. <code>source</code> = tableau, map ou enum</td></tr>
     <tr><td><code>ui.clear()</code></td><td>Retire tous les widgets — pour reconstruire une interface qui change en cours de route.</td></tr>
   </tbody>
 </table>
@@ -2203,18 +2203,18 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> vitess
 <h3>Listes</h3>
 <p>Une liste choisit <strong>un</strong> élément parmi plusieurs. Sa source est un <strong>tableau</strong>, une <strong>map</strong> ou un <strong>enum</strong>, et la règle d'affichage est celle de <code><span class="kw">for</span> … <span class="kw">in</span></code> : un tableau donne ses <strong>valeurs</strong>, une map ou un enum ses <strong>clés</strong>. La variable liée reçoit exactement ce qui est affiché — la valeur pour un tableau, la clé pour une map ou un enum.</p>
 
-<pre><code><span class="kw">global</span> formes = [<span class="str">"cercle"</span>, <span class="str">"carré"</span>, <span class="str">"triangle"</span>]
-<span class="kw">enum</span> Sens
-    horaire,
-    antihoraire
+<pre><code><span class="kw">global</span> shapes = [<span class="str">"cercle"</span>, <span class="str">"carré"</span>, <span class="str">"triangle"</span>]
+<span class="kw">enum</span> Dir
+    clockwise,
+    counterClockwise
 <span class="kw">end</span>
-<span class="kw">global</span> forme = <span class="kw">nil</span>      <span class="cmt">## la liste l'initialise au 1er élément</span>
-<span class="kw">global</span> sens = <span class="kw">nil</span>
+<span class="kw">global</span> shape = <span class="kw">nil</span>      <span class="cmt">## la liste l'initialise au 1er élément</span>
+<span class="kw">global</span> dir = <span class="kw">nil</span>
 
 <span class="kw">func</span> setup()
     <span class="kw">var</span> menu = ui.menu(<span class="str">"Réglages"</span>)
-    menu.list(<span class="str">"Forme"</span>, formes, <span class="kw">ref</span> forme)        <span class="cmt">## forme reçoit "cercle", "carré"…</span>
-    menu.list(<span class="str">"Sens"</span>, Sens, <span class="kw">ref</span> sens, surSens)   <span class="cmt">## sens reçoit "horaire" ou "antihoraire"</span>
+    menu.list(<span class="str">"Forme"</span>, shapes, <span class="kw">ref</span> shape)        <span class="cmt">## shape reçoit "cercle", "carré"…</span>
+    menu.list(<span class="str">"Sens"</span>, Dir, <span class="kw">ref</span> dir, onDir)   <span class="cmt">## dir reçoit "clockwise" ou "counterClockwise"</span>
     ui.show(menu)
 <span class="kw">end</span></code></pre>
 
@@ -2229,22 +2229,22 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> vitess
 <h3>Menus</h3>
 <p>Les widgets peuvent être rangés dans des <strong>menus</strong>. Un seul menu est affiché à la fois : un sous-menu apparaît comme une ligne cliquable marquée d'un chevron, cliquer dessus descend d'un niveau, et une ligne <code>&lt;</code> remonte. Un menu se déclare comme un widget, et porte les mêmes méthodes de déclaration.</p>
 
-<pre><code><span class="kw">var</span> reglages = ui.menu(<span class="str">"Réglages"</span>)
-reglages.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grille)
+<pre><code><span class="kw">var</span> settings = ui.menu(<span class="str">"Réglages"</span>)
+settings.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
 
-<span class="kw">var</span> affichage = reglages.menu(<span class="str">"Affichage"</span>)   <span class="cmt">## sous-menu de reglages</span>
-affichage.checkbox(<span class="str">"Trait épais"</span>, <span class="kw">ref</span> epais)
+<span class="kw">var</span> display = settings.menu(<span class="str">"Affichage"</span>)   <span class="cmt">## sous-menu de settings</span>
+display.checkbox(<span class="str">"Trait épais"</span>, <span class="kw">ref</span> thick)
 
-<span class="kw">var</span> jeu = ui.menu(<span class="str">"Jeu"</span>)
-jeu.button(<span class="str">"Rejouer"</span>, rejouer)
+<span class="kw">var</span> game = ui.menu(<span class="str">"Jeu"</span>)
+game.button(<span class="str">"Rejouer"</span>, replay)
 
-ui.show(reglages)   <span class="cmt">## menu global affiché</span>
-ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span></code></pre>
+ui.show(settings)   <span class="cmt">## menu global affiché</span>
+ui.show(game)        <span class="cmt">## bascule vers un autre menu global</span></code></pre>
 
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>ui.menu(libellé)</code></td><td>Crée un menu à la racine et renvoie son handle. <code>menu.menu(libellé)</code> crée un sous-menu.</td></tr>
+    <tr><td><code>ui.menu(label)</code></td><td>Crée un menu à la racine et renvoie son handle. <code>menu.menu(label)</code> crée un sous-menu.</td></tr>
     <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>Mêmes déclarations que leurs équivalents <code>ui.*</code>, rangées dans ce menu.</td></tr>
     <tr><td><code>ui.show(menu)</code></td><td>Remplace le menu global affiché, et déplie l'interface. La navigation repart de zéro : <code>ui.back()</code> ne remonte pas au menu précédent. <code>ui.show(nil)</code> revient au menu racine.</td></tr>
     <tr><td><code>ui.back()</code></td><td>Remonte d'un niveau. Sans effet quand le menu global est affiché.</td></tr>
@@ -2281,8 +2281,8 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>tween.to(objet, {champ: cible, …}, durée [, courbe] [, surFin])</code></td><td>Anime un ou plusieurs champs de l'objet. Renvoie un <code>Tween</code></td></tr>
-    <tr><td><code>tween.value(<span class="kw">ref</span> v, cible, durée [, courbe] [, surFin])</code></td><td>Anime une variable simple</td></tr>
+    <tr><td><code>tween.to(object, {field: target, …}, duration [, curve] [, onDone])</code></td><td>Anime un ou plusieurs champs de l'objet. Renvoie un <code>Tween</code></td></tr>
+    <tr><td><code>tween.value(<span class="kw">ref</span> v, target, duration [, curve] [, onDone])</code></td><td>Anime une variable simple</td></tr>
     <tr><td><code>tween.curves()</code></td><td>Tableau des noms de courbes disponibles</td></tr>
     <tr><td><code>tween.count()</code></td><td>Nombre d'animations en cours</td></tr>
     <tr><td><code>tween.cancelAll()</code></td><td>Annule tout (changement d'écran, fin de partie)</td></tr>
@@ -2290,7 +2290,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
   </tbody>
 </table>
 
-<p>Le handle renvoyé porte <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code>, <code>delay(secondes)</code> et <code>repeat(…)</code>. Les méthodes renvoient le tween, donc elles se chaînent.</p>
+<p>Le handle renvoyé porte <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code>, <code>delay(seconds)</code> et <code>repeat(…)</code>. Les méthodes renvoient le tween, donc elles se chaînent.</p>
 
 <h3>Répéter : <code>repeat</code></h3>
 <p>Une animation se lit par <strong>parcours</strong>. <code>repeat([occurrences] [, allerRetour])</code> en règle le nombre : sans compte, la répétition est <strong>sans fin</strong> ; le second paramètre ajoute au programme sa lecture <strong>en arrière</strong>.</p>
@@ -2314,14 +2314,14 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 
 <p><strong>Attention</strong> : une répétition sans fin ne se termine jamais d'elle-même et retient l'objet animé tant que <code>cancel()</code> — ou <code>tween.cancelAll()</code> — n'a pas été appelé.</p>
 
-<pre><code><span class="cmt">## Une pulsation : le rayon grossit puis revient, sans fin.</span>
-<span class="bi">tween</span>.to(balle, {r: <span class="num">40</span>}, <span class="num">0.6</span>, <span class="str">"easeInOutQuad"</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>)
+<pre><code><span class="cmt">## Une pulsation : le radius grossit puis revient, sans fin.</span>
+<span class="bi">tween</span>.to(ball, {r: <span class="num">40</span>}, <span class="num">0.6</span>, <span class="str">"easeInOutQuad"</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>)
 
-<span class="cmt">## Trois clignotements, puis on s'arrête sur la couleur de départ.</span>
-<span class="bi">tween</span>.to(balle, {teinte: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>).repeat(<span class="num">3</span>)</code></pre>
+<span class="cmt">## Trois clignotements, puis on s'arrête sur la color de départ.</span>
+<span class="bi">tween</span>.to(ball, {teinte: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>).repeat(<span class="num">3</span>)</code></pre>
 
 <h3>Enchaîner : <code>tween.sequence</code></h3>
-<p><code>tween.sequence(objet, [étapes])</code> joue une <strong>suite</strong> d'animations l'une après l'autre. Chaque étape est une map, et la clé de temps s'appelle <code>delay</code> dans les deux rôles&nbsp;: la <strong>durée</strong> de l'animation quand l'étape porte <code>to</code>, une simple <strong>attente</strong> quand elle ne le porte pas.</p>
+<p><code>tween.sequence(object, [steps])</code> joue une <strong>suite</strong> d'animations l'une après l'autre. Chaque étape est une map, et la clé de temps s'appelle <code>delay</code> dans les deux rôles&nbsp;: la <strong>durée</strong> de l'animation quand l'étape porte <code>to</code>, une simple <strong>attente</strong> quand elle ne le porte pas.</p>
 
 <table>
   <thead><tr><th>Clé</th><th>Rôle</th></tr></thead>
@@ -2337,11 +2337,11 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 
 <p>La valeur de départ d'une étape est celle que la précédente a <strong>laissée</strong>, lue à son démarrage — deux étapes qui se suivent s'enchaînent donc sans saut. <code>repeat</code> porte sur la <strong>suite entière</strong> et son aller-retour la rejoue à l'envers, chaque étape inversée. <code>progress()</code> court sur toute la suite, en temps&nbsp;: des étapes de durées inégales donnent une progression régulière.</p>
 
-<pre><code><span class="bi">tween</span>.sequence(balle, [
+<pre><code><span class="bi">tween</span>.sequence(ball, [
     {to: {y: <span class="num">300</span>}, delay: <span class="num">0.4</span>, curve: <span class="str">"easeOutQuad"</span>},
     {to: {y: <span class="num">100</span>}, delay: <span class="num">0.6</span>, curve: <span class="str">"easeInQuad"</span>},
     {delay: <span class="num">0.2</span>},                                <span class="cmt">## une pause</span>
-    {target: ombre, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## un autre objet</span>
+    {target: ombre, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## un autre object</span>
 ])</code></pre>
 
 <p>L'exemple «&nbsp;Séquence animée (tween)&nbsp;» fait rebondir une balle en cinq étapes&nbsp;: la chute, l'écrasement à l'impact, la détente, la remontée et une pause. Ce sont les durées inégales — un dixième de seconde pour l'écrasement contre une demie pour la chute — qui donnent son poids à la balle.</p>
@@ -2349,20 +2349,20 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 <p>Le handle renvoyé est celui d'un tween ordinaire&nbsp;: <code>pause()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>delay()</code> et <code>repeat()</code> s'y appliquent tels quels. Écraser l'un des champs animés par un autre tween annule la séquence, comme pour <code>tween.to</code>.</p>
 
 <pre><code><span class="cmt">## Le dessin lit des champs ; le temps ne l'intéresse pas.</span>
-<span class="kw">global</span> balle = {x: <span class="num">0</span>, r: <span class="num">20</span>, teinte: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
+<span class="kw">global</span> ball = {x: <span class="num">0</span>, r: <span class="num">20</span>, teinte: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
 
 <span class="kw">func</span> setup()
     <span class="bi">graphics</span>.canvas(W, H)
     <span class="cmt">## Plusieurs champs d'un coup, dont une COULEUR (interpolée composante par composante).</span>
-    <span class="bi">tween</span>.to(balle, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, teinte: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
+    <span class="bi">tween</span>.to(ball, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, teinte: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
     <span class="cmt">## Puis un retour, 0,3 s après la fin du premier.</span>
-    <span class="bi">tween</span>.to(balle, {r: <span class="num">20</span>}, <span class="num">0.8</span>, <span class="str">"easeInQuad"</span>).delay(<span class="num">1.5</span>)
+    <span class="bi">tween</span>.to(ball, {r: <span class="num">20</span>}, <span class="num">0.8</span>, <span class="str">"easeInQuad"</span>).delay(<span class="num">1.5</span>)
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
-    <span class="bi">graphics</span>.fill(balle.teinte)
-    <span class="bi">graphics</span>.circle(balle.x, CH, balle.r)
+    <span class="bi">graphics</span>.fill(ball.teinte)
+    <span class="bi">graphics</span>.circle(ball.x, CH, ball.r)
 <span class="kw">end</span></code></pre>
 
 <h3>Courbes</h3>
@@ -2374,7 +2374,7 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 
 <p><code>tween.curves()</code> se prête directement à une <a href="#ui">liste</a> du module <code>ui</code> : la source est le catalogue du moteur, et la variable liée reçoit le nom choisi. C'est ce que fait l'exemple « Animations (tween) ».</p>
 
-<pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.courbe, surCourbe)</code></pre>
+<pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.curve, surCourbe)</code></pre>
 
 <h3>Ce qu'il faut savoir</h3>
 <ul>
@@ -2398,16 +2398,16 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 </ul>
 
 <h3>Un oscillateur</h3>
-<pre><code><span class="kw">global</span> sirene = <span class="bi">sound</span>.saw(<span class="num">220</span>)
+<pre><code><span class="kw">global</span> siren = <span class="bi">sound</span>.saw(<span class="num">220</span>)
 
 <span class="kw">func</span> setup()
     <span class="bi">graphics</span>.canvas(W, H)
-    sirene.volume(<span class="num">0.3</span>).start()
+    siren.volume(<span class="num">0.3</span>).start()
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
     <span class="cmt">## La fréquence suit la souris : c'est tout l'intérêt d'un oscillateur vivant.</span>
-    sirene.freq(<span class="num">200</span> + <span class="num">600</span> * <span class="bi">mouse</span>.x / W)
+    siren.freq(<span class="num">200</span> + <span class="num">600</span> * <span class="bi">mouse</span>.x / W)
 <span class="kw">end</span></code></pre>
 
 <table>
@@ -2424,27 +2424,27 @@ ui.show(jeu)        <span class="cmt">## bascule vers un autre menu global</span
 <h3>Une enveloppe, pour jouer des notes</h3>
 <p>Un oscillateur qu'on démarre et qu'on arrête produit un son plat. L'enveloppe <strong>ADSR</strong> lui donne une attaque, un déclin, un maintien et un relâchement — c'est ce qui distingue une note d'un signal de test.</p>
 
-<pre><code><span class="kw">global</span> voix = <span class="bi">sound</span>.triangle(<span class="num">440</span>).envelope(<span class="num">0.01</span>, <span class="num">0.08</span>, <span class="num">0.5</span>, <span class="num">0.25</span>)
+<pre><code><span class="kw">global</span> voice = <span class="bi">sound</span>.triangle(<span class="num">440</span>).envelope(<span class="num">0.01</span>, <span class="num">0.08</span>, <span class="num">0.5</span>, <span class="num">0.25</span>)
 
 <span class="kw">func</span> mouse.pressed(x, y)
-    <span class="cmt">## Avec une durée, le relâchement part tout seul à l'échéance.</span>
-    voix.freq(<span class="bi">sound</span>.note(<span class="str">"C4"</span>)).trigger(<span class="num">0.2</span>)
+    <span class="cmt">## Avec une duration, le relâchement part tout seul à l'échéance.</span>
+    voice.freq(<span class="bi">sound</span>.note(<span class="str">"C4"</span>)).trigger(<span class="num">0.2</span>)
 <span class="kw">end</span></code></pre>
 
 <p><code>trigger()</code> sans durée tient la note jusqu'à <code>release()</code>. Une note relâchée <strong>libère sa voix</strong>, si bien qu'un programme peut en déclencher indéfiniment. Quand tu n'as plus besoin d'un oscillateur, <code>free()</code> le rend au moteur&nbsp;: la note finit de s'éteindre, puis la voix redevient disponible — c'est ce qui permet d'en créer un par doigt posé plutôt que de les pré-allouer. Le handle est alors périmé, et le réutiliser lève une erreur explicite. Les hauteurs s'écrivent en clair&nbsp;: <code>sound.note("C#4")</code> rend 277,18&nbsp;Hz, et un <strong>nom de note est accepté partout où une fréquence l'est</strong>.</p>
 
 <h3>Un tampon calculé</h3>
-<p><code>sound.tone(freq, durée [, forme])</code> échantillonne une forme d'onde&nbsp;; <code>sound.generate(durée, formule)</code> échantillonne <strong>votre</strong> formule, qui reçoit le temps en secondes et rend une amplitude dans <code>[-1;1]</code>.</p>
+<p><code>sound.tone(freq, duration [, forme])</code> échantillonne une forme d'onde&nbsp;; <code>sound.generate(duration, formule)</code> échantillonne <strong>votre</strong> formule, qui reçoit le temps en secondes et rend une amplitude dans <code>[-1;1]</code>.</p>
 
-<pre><code><span class="kw">global</span> bip = <span class="bi">sound</span>.tone(<span class="num">880</span>, <span class="num">0.12</span>, <span class="str">"square"</span>).envelope(<span class="num">0.005</span>, <span class="num">0.02</span>, <span class="num">0.6</span>, <span class="num">0.05</span>)
+<pre><code><span class="kw">global</span> beep = <span class="bi">sound</span>.tone(<span class="num">880</span>, <span class="num">0.12</span>, <span class="str">"square"</span>).envelope(<span class="num">0.005</span>, <span class="num">0.02</span>, <span class="num">0.6</span>, <span class="num">0.05</span>)
 
 <span class="cmt">## Une cloche : un sinus qui s'éteint tout seul.</span>
-<span class="kw">global</span> cloche = <span class="bi">sound</span>.generate(<span class="num">1.2</span>, <span class="kw">func</span>(t)
+<span class="kw">global</span> bell = <span class="bi">sound</span>.generate(<span class="num">1.2</span>, <span class="kw">func</span>(t)
     <span class="kw">return</span> <span class="bi">math</span>.sin(t * <span class="num">6.283</span> * <span class="num">660</span>) * <span class="bi">math</span>.exp(-t * <span class="num">3</span>)
 <span class="kw">end</span>)
 
-bip.play()
-cloche.volume(<span class="num">0.4</span>).play()</code></pre>
+beep.play()
+bell.volume(<span class="num">0.4</span>).play()</code></pre>
 
 <p>La formule est évaluée <strong>une seule fois</strong>, à la construction — jamais pendant la lecture. Méthodes d'un tampon&nbsp;: <code>play</code>, <code>stop</code>, <code>isPlaying</code>, <code>volume</code>, <code>pan</code>, <code>rate</code>, <code>loop</code>, <code>envelope</code>, plus trois <strong>accesseurs</strong> qui lisent le son calculé.</p>
 
@@ -2489,10 +2489,10 @@ cloche.volume(<span class="num">0.4</span>).play()</code></pre>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>data.set(clé, valeur)</code></td><td>Écrit et persiste (<code>set(clé, nil)</code> supprime la clé)</td></tr>
-    <tr><td><code>data.get(clé [, défaut])</code></td><td>Lit la valeur, ou <code>défaut</code> (ou <code>nil</code>) si absente</td></tr>
-    <tr><td><code>data.has(clé)</code></td><td><code>true</code>/<code>false</code></td></tr>
-    <tr><td><code>data.delete(clé)</code></td><td>Supprime la clé</td></tr>
+    <tr><td><code>data.set(key, value)</code></td><td>Écrit et persiste (<code>set(key, nil)</code> supprime la clé)</td></tr>
+    <tr><td><code>data.get(key [, default])</code></td><td>Lit la valeur, ou <code>défaut</code> (ou <code>nil</code>) si absente</td></tr>
+    <tr><td><code>data.has(key)</code></td><td><code>true</code>/<code>false</code></td></tr>
+    <tr><td><code>data.delete(key)</code></td><td>Supprime la clé</td></tr>
     <tr><td><code>data.keys()</code></td><td>Tableau des clés</td></tr>
     <tr><td><code>data.clear()</code></td><td>Efface toute la portée</td></tr>
     <tr><td><code>data.shared.*</code></td><td>Mêmes fonctions, en portée <strong>partagée</strong> (ex. <code>data.shared.get("theme")</code>)</td></tr>
@@ -2520,7 +2520,7 @@ cloche.volume(<span class="num">0.4</span>).play()</code></pre>
     <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
     <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## redimensionné</span>
 <span class="kw">end</span></code></pre>
-<div class="callout"><code>image.load(nom)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.loadData("png", base64)</code> — voir l'exemple « Image (loadData) » du playground.</div>
+<div class="callout"><code>image.load(name)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.loadData("png", base64)</code> — voir l'exemple « Image (loadData) » du playground.</div>
 
 <h3>Render texture (dessin hors-écran)</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
@@ -2541,7 +2541,7 @@ image.endDraw()
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>image.load(nom)</code></td><td>Charge une texture (natif : disque ; WASM : image « Images » ou ressource servie même origine) — retourne un handle <code>{id, width, height}</code></td></tr>
+    <tr><td><code>image.load(name)</code></td><td>Charge une texture (natif : disque ; WASM : image « Images » ou ressource servie même origine) — retourne un handle <code>{id, width, height}</code></td></tr>
     <tr><td><code>image.loadData(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
     <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
     <tr><td><code>image.beginDraw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
