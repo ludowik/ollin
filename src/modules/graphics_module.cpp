@@ -21,8 +21,8 @@
 #include <emscripten.h>
 #endif
 
-// gfxToInt : fourni en inline par graphics_internal.h (partagé 2D/3D).
-// gfxToColor : déclaré dans graphics_internal.h, défini ici (lu aussi par graphics3d.cpp).
+// gfx_to_int is provided inline by graphics_internal.h, shared between 2D and 3D.
+// gfx_to_color is declared in graphics_internal.h and defined here; graphics3d.cpp reads it too.
 Color gfx_to_color(const Value& v) {
     if (!v.is_map() && !v.is_class())
         throw std::runtime_error("expected a Color object");
@@ -33,7 +33,7 @@ Color gfx_to_color(const Value& v) {
     return {get_comp("r", 0), get_comp("g", 0), get_comp("b", 0), get_comp("a", 1)};
 }
 
-// Composante [0,1] → octet [0,255] (bornée).
+// A [0,1] component to a clamped [0,255] byte.
 static uint8_t comp01(double v) {
     if (v < 0.0)
         v = 0.0;
@@ -49,32 +49,32 @@ static Color rgba_color(double r, double g, double b, double a) {
 static int s_physW = 0, s_physH = 0;
 static int s_logicalW = 0; // largeur logique de la zone (pour l'overlay mémoire/FPS)
 static int s_logicalH = 0; // hauteur logique de la zone
-// Contexte de dessin PERSISTANT : draw() rend dans cette RenderTexture, qui n'est
-// PAS effacée entre les frames (c'est à draw() d'appeler graphics.clear() s'il
-// veut repartir d'un fond net). Elle est re-affichée à l'écran chaque frame, avec
-// l'overlay FPS PAR-DESSUS (donc l'overlay reste net, il ne bave pas).
+// PERSISTENT drawing context: draw() renders into this RenderTexture, which is NOT cleared between
+// frames — it is up to draw() to call graphics.clear() when it wants a fresh background. It is
+// blitted to the screen every frame with the FPS overlay ON TOP, so the overlay stays crisp and does
+// not smear.
 static RenderTexture2D s_target{};
 static bool s_target_ready = false;
 static int s_targetW = 0, s_targetH = 0;   // taille réelle de la RT (sur-échantillonnée)
-// Sur-échantillonnage visé RELATIF au logique (anti-aliasing), borné par la
-// résolution physique et un plafond (cf. gfx_canvas) — PAS multiplié par le DPR.
+// Target supersampling RELATIVE to the logical size, for anti-aliasing, bounded below by the physical
+// resolution and above by a ceiling (see gfx_canvas) — and NOT multiplied by the DPR.
 static const int SSAA = 2;
-// Mode de fusion courant (choisi par graphics.blendMode), suivi pour pouvoir le
-// restaurer après un fondu (clear avec alpha) et le remettre à ALPHA chaque frame.
+// Current blend mode, set by graphics.blendMode and tracked so it can be restored after a fade — a
+// clear with alpha — and reset to ALPHA every frame.
 static int s_blend_mode = BLEND_ALPHA;
-// Capture d'écran DIFFÉRÉE en fin de frame (draw() rend dans la RT ; la capture
-// doit lire l'écran composé). Remis à zéro à chaque gfx_canvas (pas de fuite
-// d'une requête d'un programme précédent dans l'instance WASM partagée).
+// Screenshot DEFERRED to the end of the frame: draw() renders into the RT, while the capture must read
+// the composed screen. Cleared on every gfx_canvas, so a request from a previous program does not leak
+// through the shared WASM instance.
 static std::string s_shot_path;
 static bool s_shot_pending = false;
 static void flush_pending_screenshot();   // défini plus bas (utilisé par gfx_end_draw)
 static void gfx_reset_capture();          // idem (utilisé par gfx_canvas)
-// reset3dLightingState / reset3dGraphicsState / end3dInternal : déclarés dans graphics_internal.h (définis dans graphics3d.cpp)
-// Un SEUL graphics.run par programme. Le moteur (runEntryHooks) appelle
-// graphics.run(draw) automatiquement si draw() existe ; si le script l'appelle
-// AUSSI explicitement, on aurait deux boucles → double CloseWindow (crash natif)
-// ou double emscripten_set_main_loop (WASM). Ce garde-fou ignore le 2ᵉ appel.
-// Remis à false dans gfx_canvas (début de programme) → re-run playground OK.
+// reset_3d_lighting_state, reset_3d_graphics_state and end_3d_internal are declared in graphics_internal.h and defined in graphics3d.cpp.
+// ONE graphics.run per program. The engine (run_entry_hooks) calls graphics.run(draw) automatically
+// when a draw() exists; if the script ALSO calls it explicitly we would get two loops, hence a double
+// CloseWindow (a native crash) or a double emscripten_set_main_loop on WASM. This guard ignores the
+// second call, and is reset to false in gfx_canvas — the start of a program — so a playground re-run
+// works.
 static bool s_run_active = false;
 
 static int gfx_canvas(CallCtx& ctx) {
@@ -85,18 +85,17 @@ static int gfx_canvas(CallCtx& ctx) {
     s_shot_pending = false;   // nouveau programme → oublier une capture en attente
     gfx_reset_capture();      // idem pour la capture demandée par l'hôte
     s_blend_mode = BLEND_ALPHA;
-    // Éclairage 3D remis à neuf ICI (avant que setup()/top-level ne pose ambient/
-    // light) — et non dans gfx_run, qui s'exécute APRÈS et effacerait la config.
+    // The 3D lighting is reset HERE, before setup() or the top level set ambient and light — and not
+    // in gfx_run, which runs AFTER and would wipe the configuration.
     reset3d_lighting_state();
     s_run_active = false;   // nouveau programme → autorise (un seul) graphics.run
 #ifdef __EMSCRIPTEN__
-    // RÉUTILISER le contexte WebGL entre deux runs (playground) au lieu de
-    // CloseWindow + InitWindow. Chaque InitWindow (re)crée un contexte WebGL sur le
-    // même canvas et recompile le shader par défaut de raylib ; à force de churn,
-    // iOS PERD les contextes et le chargement de ce shader échoue dès la première
-    // exécution suivante (« detachShader must be an instance of WebGLProgram »,
-    // même en 2D — c'est le shader par défaut, pas le nôtre). On garde donc UN
-    // seul contexte pour toute la session et on se contente de le redimensionner.
+    // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
+    // InitWindow. Every InitWindow (re)creates a WebGL context on the same canvas and recompiles
+    // raylib's default shader; with enough churn iOS LOSES the contexts and loading that shader fails
+    // from the very next run on ("detachShader must be an instance of WebGLProgram", even in 2D — it
+    // is the default shader, not ours). So we keep ONE context for the whole session and merely
+    // resize it.
     bool reuse = IsWindowReady();
     if (reuse) {
         if (s_target_ready) {                 // libérer l'ancienne cible (contexte réutilisé → ids valides)
@@ -152,20 +151,20 @@ static int gfx_canvas(CallCtx& ctx) {
 #endif
     s_logicalW = w;
     s_logicalH = h;
-    // Repositionne les globales moteur sur la taille réelle du canvas : W/H aux
-    // dimensions logiques, CW/CH au centre (float). Ainsi graphics.canvas(w, h)
-    // recalcule W/H/CW/CH même quand w/h diffèrent des valeurs initiales window.
+    // Repositions the engine globals on the canvas's real size: W and H to the logical dimensions, CW
+    // and CH to the centre as floats. graphics.canvas(w, h) therefore recomputes them even when w and h
+    // differ from the initial window values.
     if (VM* vm = VM::current()) {
         vm->set_global("W", Value((int64_t)w));
         vm->set_global("H", Value((int64_t)h));
         vm->set_global("CW", Value((double)w / 2.0));
         vm->set_global("CH", Value((double)h / 2.0));
     }
-    // Cible de rendu persistante. On vise un sur-échantillonnage RELATIF au
-    // logique (~SSAA×) pour l'anti-aliasing, MAIS sans jamais descendre sous la
-    // résolution physique (netteté HiDPI). On NE multiplie donc PAS SSAA par le
-    // DPR (sinon sur mobile dpr≥2 la texture explosait : mémoire + dépassement de
-    // GL_MAX_TEXTURE_SIZE → écran noir). La taille est en plus plafonnée.
+    // Persistent render target. We aim for supersampling RELATIVE to the logical size for
+    // anti-aliasing, but never below the physical resolution, to stay sharp on HiDPI. SSAA is
+    // therefore NOT multiplied by the DPR: on mobile, with a DPR of 2 or more, the texture used to
+    // blow up — memory, and GL_MAX_TEXTURE_SIZE exceeded, giving a black screen. The size is capped as
+    // well.
     const int MAX_RT = 4096;   // borne sûre (≤ GL_MAX_TEXTURE_SIZE sur la plupart des GPU)
     s_targetW = s_physW > s_logicalW * SSAA ? s_physW : s_logicalW * SSAA;
     s_targetH = s_physH > s_logicalH * SSAA ? s_physH : s_logicalH * SSAA;
@@ -176,9 +175,9 @@ static int gfx_canvas(CallCtx& ctx) {
         s_targetH = MAX_RT;
     }
     s_target = LoadRenderTexture(s_targetW, s_targetH);
-    // Vérifie l'allocation : si le FBO/la texture n'a pas été créé (taille trop
-    // grande, VRAM insuffisante…), on reste en rendu DIRECT (renderFrame bascule
-    // sur le repli) au lieu d'échantillonner une texture invalide (écran noir).
+    // Check the allocation: when the FBO or the texture could not be created — too large, not enough
+    // VRAM — we stay in DIRECT rendering (render_frame falls back) rather than sample an invalid
+    // texture and show a black screen.
     s_target_ready = (s_target.id != 0 && s_target.texture.id != 0);
     if (s_target_ready) {
         SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // lissage à la réduction
@@ -228,11 +227,11 @@ static int gfx_clear(CallCtx& ctx) {
         c = rgba_color(k.r, k.g, k.b, k.a);
     }
     if (c.a < 255) {
-        // Couleur semi-transparente → FONDU (comme p5.js background(r,g,b,a<255))
-        // et NON un effacement net : on peint un rectangle plein écran translucide
-        // en fusion ALPHA, qui estompe le contenu persistant vers `c`. Idéal pour
-        // des traînées. On force ALPHA le temps du rectangle puis on restaure le
-        // mode de fusion courant (celui posé par graphics.blendMode dans draw()).
+        // A semi-transparent colour means a FADE, as in p5.js background(r,g,b,a<255), and NOT a clean
+        // erase: we paint a translucent full-screen rectangle in ALPHA blending, which fades the
+        // persistent content towards `c`. Ideal for trails. ALPHA is forced for the duration of the
+        // rectangle, then the current blend mode — the one graphics.blendMode set in draw() — is
+        // restored.
         BeginBlendMode(BLEND_ALPHA);
         rlPushMatrix();                 // fondu indépendant de la transfo courante
         rlLoadIdentity();               // (comme ClearBackground) → couvre tout le canvas
@@ -245,9 +244,9 @@ static int gfx_clear(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Mode de fusion des dessins suivants. Accepte une chaîne ("alpha", "add",
-// "multiply", "subtract", "add_colors", "premultiply") ou une constante du
-// module `blend`. Remis à "alpha" au début de chaque frame (resetStyles).
+// Blend mode for the drawing that follows. Accepts a string ("alpha", "add", "multiply", "subtract",
+// "add_colors", "premultiply") or a constant from the `blend` module. Reset to "alpha" at the start of
+// every frame, in reset_styles.
 static int gfx_blend_mode(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     int mode = BLEND_ALPHA;
@@ -276,25 +275,24 @@ static int gfx_blend_mode(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── Style state ───────────────────────────────────────────────────────────────
 static float s_stroke_size = 2.0f;
 static float s_font_size = 18.0f;   // taille de police (état), comme s_stroke_size
-// Police courante, index dans le registre du moteur (engine_font.h) : un ÉTAT de style
-// comme la taille, donc sauvegardé par push/pushStyle et remis au défaut chaque frame.
+// Current font, an index into the engine registry (engine_font.h). It is a style STATE like the size,
+// so push and pushStyle save it and every frame resets it to the default.
 static int s_font_idx = engine_font_default();
-// Ancrage de rect : x,y = coin supérieur gauche (défaut) ou centre. C'est un ÉTAT,
-// comme blendMode : cela ne change pas la géométrie mais son interprétation.
+// Anchoring for rect: x,y is the top-left corner by default, or the centre. It is a STATE like
+// blendMode — it does not change the geometry but how it is read.
 static const int RECT_CORNER = 0;
 static const int RECT_CENTER = 1;
 static int s_rect_mode = RECT_CORNER;
-// Ancrage de circle/ellipse. Ces primitives sont centrées depuis toujours : le
-// défaut reste donc "center", à l'inverse de rect.
+// Anchoring for circle and ellipse. Those primitives have always been centred, so the default stays
+// "center", unlike rect.
 static const int ELLIPSE_CORNER = 0;
 static const int ELLIPSE_CENTER = 1;
 static int s_ellipse_mode = ELLIPSE_CENTER;
 
-// En mode coin, l'appelant a passé le coin supérieur gauche de la boîte
-// englobante : le ramener au centre, seule forme comprise par les tracés.
+// In corner mode the caller passed the top-left corner of the bounding box, so we bring it back to the
+// centre, the only form the drawing routines understand.
 static void anchor_oval(float* cx, float* cy, float rx, float ry) {
     if (s_ellipse_mode == ELLIPSE_CORNER) {
         *cx += rx;
@@ -315,15 +313,15 @@ static void apply_font_size(float sz) {
     s_font_size = sz;
 }
 
-// Police du tracé de texte, telle que le script l'a choisie.
+// Font used for text drawing, as chosen by the script.
 static Font current_font() {
     return engine_font(s_font_idx);
 }
 
-// Trait sous-pixel : la RenderTexture n'a pas de MSAA → une épaisseur < 1 rend des
-// pointillés (couverture partielle non lissée). On approxime l'anti-aliasing en
-// gardant un trait CONTINU de 1px et en modulant l'alpha par la couverture
-// (l'épaisseur) → trait fin, continu, de plus en plus pâle quand la taille baisse.
+// Sub-pixel strokes: the RenderTexture has no MSAA, so a thickness below 1 renders as dots — partial
+// coverage without smoothing. We approximate anti-aliasing by keeping a CONTINUOUS 1 px stroke and
+// modulating the alpha by the coverage, that is by the thickness, giving a thin continuous line that
+// pales as the size drops.
 static void subpixel_stroke(float& w, Color& c) {
     if (w < 1.0f) {
         float cov = w < 0.0f ? 0.0f : w;
@@ -332,7 +330,7 @@ static void subpixel_stroke(float& w, Color& c) {
     }
 }
 
-// Épaisseur + couleur de contour courantes, ajustées pour le rendu sous-pixel.
+// Current stroke thickness and colour, adjusted for sub-pixel rendering.
 struct StrokeWC {
     float w;
     Color c;
@@ -352,7 +350,7 @@ static void apply_fill(bool en, Color c = WHITE) {
     s_fill_color = c;
 }
 
-// Accesseurs d'état de style (déclarés dans graphics_internal.h) — lus par graphics3d.cpp.
+// Style-state accessors, declared in graphics_internal.h and read by graphics3d.cpp.
 int gfx_logical_width() {
     return s_logicalW;
 }
@@ -380,10 +378,10 @@ int gfx_segments() {
     return s_segments;
 }
 
-// ── Contextes de style (pile) ───────────────────────────────────────────────
-// Capture/restaure TOUT l'état de dessin : trait, remplissage, mode de fusion,
-// teinte d'image (image_module) et texture 3D courante (graphics3d). Utilisé par
-// push/pop (matrice + style) et pushStyle/popStyle (style seul).
+// Style contexts, kept on a stack.
+// Saves and restores the WHOLE drawing state: stroke, fill, blend mode, image tint (image_module) and
+// the current 3D texture (graphics3d). Used by push/pop, which cover the matrix and the style, and by
+// pushStyle/popStyle, which cover the style alone.
 struct StyleState {
     float stroke_size;
     float font_size;
@@ -464,8 +462,8 @@ static int gfx_stroke_size(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.fontSize([hauteur]) : fixe la hauteur de la police, et renvoie TOUJOURS la
-// hauteur courante — sans argument, c'est donc un simple accesseur.
+// graphics.fontSize([height]) sets the font height and ALWAYS returns the current one, so with no
+// argument it is simply an accessor.
 static int gfx_font_size(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -474,9 +472,9 @@ static int gfx_font_size(CallCtx& ctx) {
     return ctx.ret(Value((double)s_font_size));
 }
 
-// graphics.font([nom]) : choisit la police courante parmi celles du moteur, et renvoie
-// TOUJOURS son nom. Un nom inconnu est une erreur nommant les polices disponibles :
-// mieux vaut le signaler que dessiner silencieusement avec une autre police.
+// graphics.font([name]) picks the current font among the engine's and ALWAYS returns its name. An
+// unknown name is an error that lists the available fonts: better to report it than to silently draw
+// with a different one.
 static int gfx_font(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -499,8 +497,8 @@ static int gfx_font(CallCtx& ctx) {
     return ctx.ret(Value(std::string(engine_font_name(s_font_idx))));
 }
 
-// graphics.textSize(texte) : largeur et hauteur du texte AVEC la police et la taille
-// courantes — deux valeurs, pour centrer ou aligner sans réimplémenter la mesure.
+// graphics.textSize(text) gives the width and height of the text WITH the current font and size — two
+// values, so centring or aligning needs no reimplementation of the measurement.
 static int gfx_text_size(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -509,8 +507,8 @@ static int gfx_text_size(CallCtx& ctx) {
     std::string text = args[0].as_string();
     Font font = current_font();
     if (font.texture.id == 0 || font.baseSize == 0) {
-        // Sans zone graphique aucune police n'est chargée : renvoyer 0 plutôt que de
-        // diviser par la hauteur native (comme graphics.text, qui ne dessine rien).
+        // With no drawing area no font is loaded, so we return 0 rather than divide by the native
+        // height — the same choice as graphics.text, which draws nothing.
         ctx.set_result(0, Value(0.0));
         ctx.set_result(1, Value(0.0));
         return 2;
@@ -521,9 +519,9 @@ static int gfx_text_size(CallCtx& ctx) {
     return 2;
 }
 
-// Argument d'un mode d'ancrage : "corner" (0) ou "center" (1) — valeurs partagées
-// par les constantes RECT_*, ELLIPSE_* et SPRITE_*. Sans argument, on revient au
-// défaut de la primitive, qui n'est pas le même pour rect et pour ellipse.
+// An anchoring-mode argument: "corner" (0) or "center" (1), the values shared by the RECT_*, ELLIPSE_*
+// and SPRITE_* constants. With no argument we return to the primitive's default, which is not the same
+// for rect as for ellipse.
 static int anchor_mode_arg(CallCtx& ctx, const char* fn, int dflt) {
     if (ctx.argc == 0)
         return dflt;
@@ -568,8 +566,8 @@ static int gfx_stroke(CallCtx& ctx) {
     }
     ColorRGBA k = parse_color(args, argc, "stroke");
     apply_stroke(true, rgba_color(k.r, k.g, k.b, k.a));
-    // Taille optionnelle : seulement avec un objet Color en 1er arg — stroke(Color, taille).
-    // (Pour les formes numériques, utiliser graphics.strokeSize : les nombres = couleur.)
+    // The optional size is accepted only with a Color object as first argument — stroke(Color, size).
+    // For the numeric forms use graphics.strokeSize, since there the numbers are the colour.
     if ((args[0].is_map() || args[0].is_class()) && argc > 1 && args[1].is_number())
         apply_stroke_size((float)args[1].as_num());
     return ctx.ret(Value{});
@@ -602,7 +600,7 @@ static int gfx_no_fill(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Teinte globale des images (graphics.sprite / image.draw) : objet Color ou r,g,b[,a].
+// Global image tint for graphics.sprite and image.draw: a Color object, or r,g,b[,a].
 static int gfx_tint(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
@@ -644,8 +642,8 @@ static int gfx_rect(CallCtx& ctx) {
     double hn = gfx_to_num(args[3]);
     double xn = gfx_to_num(args[0]);
     double yn = gfx_to_num(args[1]);
-    // Mode centre : x,y désignent le CENTRE. Le décalage est appliqué avant la
-    // conversion en entier, sinon une taille impaire biaiserait la position.
+    // Centre mode: x,y denote the CENTRE. The offset is applied before the conversion to integers,
+    // otherwise an odd size would bias the position.
     if (s_rect_mode == RECT_CENTER) {
         xn -= wn * 0.5;
         yn -= hn * 0.5;
@@ -655,9 +653,9 @@ static int gfx_rect(CallCtx& ctx) {
     int w = (int)wn;
     int h = (int)hn;
     Rectangle rec = {(float)x, (float)y, (float)w, (float)h};
-    // Rayon de coin optionnel, en PIXELS — c'est de la géométrie, donc un argument.
-    // raylib attend une FRACTION de 0 à 1 dont il tire radius = min(w,h)*roundness/2 :
-    // on convertit, et on borne à la moitié du petit côté (au-delà, c'est une gélule).
+    // Optional corner radius, in PIXELS — it is geometry, hence an argument. raylib expects a FRACTION
+    // from 0 to 1, from which it derives radius = min(w,h)*roundness/2, so we convert and clamp to half
+    // the shorter side; beyond that it is a capsule.
     double r = (argc > 4 && args[4].is_number()) ? args[4].as_num() : 0.0;
     int side = (w < h) ? w : h;
     if (r > 0.0 && side > 0) {
@@ -668,13 +666,12 @@ static int gfx_rect(CallCtx& ctx) {
             DrawRectangleRounded(rec, roundness, s_segments, s_fill_color);
         if (s_has_stroke) {
             StrokeWC s = stroke_params();
-            // Conventions OPPOSÉES dans raylib : DrawRectangleLinesEx trace la bande à
-            // l'INTÉRIEUR du rectangle, DrawRectangleRoundedLinesEx à l'EXTÉRIEUR — son
-            // cas roundness<=0 le montre, il élargit de lineThick avant de déléguer.
-            // On rétrécit donc de l'épaisseur pour que le contour reste DANS la géométrie
-            // déclarée, comme sur le chemin à angles droits. Le rayon suit : la bande
-            // intérieure porte r - épaisseur, si bien qu'un rayon entièrement mangé par
-            // le trait redonne exactement le rectangle carré.
+            // raylib uses OPPOSITE conventions: DrawRectangleLinesEx draws the band INSIDE the
+            // rectangle, DrawRectangleRoundedLinesEx OUTSIDE it — its roundness<=0 case shows this, as
+            // it widens by lineThick before delegating. We therefore shrink by the thickness so the
+            // outline stays WITHIN the declared geometry, as on the square-cornered path. The radius
+            // follows: the inner band carries r minus the thickness, so a radius entirely eaten by the
+            // stroke gives back exactly the square rectangle.
             float t = s.w;
             float iw = (float)w - 2.0f * t;
             float ih = (float)h - 2.0f * t;
@@ -686,10 +683,9 @@ static int gfx_rect(CallCtx& ctx) {
                     iround = 1.0f;
                 DrawRectangleRoundedLinesEx({(float)x + t, (float)y + t, iw, ih}, iround, s_segments, t, s.c);
             } else {
-                // Trait plus épais que la moitié du petit côté : la bande couvre toute
-                // la forme. Le chemin à angles droits la remplit alors (mesuré : un
-                // carré 20x20 au trait 12 allume ses 400 pixels) → même dégradation ici,
-                // plutôt que de ne rien dessiner.
+                // A stroke thicker than half the shorter side covers the whole shape. The
+                // square-cornered path then fills it — measured: a 20x20 square with a 12 stroke lights
+                // all 400 pixels — so we degrade the same way here rather than draw nothing.
                 DrawRectangleRounded(rec, roundness, s_segments, s.c);
             }
         }
@@ -711,11 +707,11 @@ static int gfx_fps(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)GetFPS()));
 }
 
-// Capture le framebuffer AFFICHÉ dans un PNG. Comme draw() rend dans la
-// RenderTexture persistante (liée pendant draw), on ne peut pas capturer l'écran
-// composité ici : on DIFFÈRE la capture à la fin de la frame (après composition),
-// dans renderFrame (ou dans gfx_end_draw pour le chemin manuel). Sur WASM,
-// TakeScreenshot déclenche un téléchargement. (s_shot_path/s_shot_pending : voir haut.)
+// Captures the DISPLAYED framebuffer into a PNG. Since draw() renders into the persistent
+// RenderTexture, which is bound during draw, the composed screen cannot be captured here: the capture
+// is DEFERRED to the end of the frame, after composition, in render_frame — or in gfx_end_draw on the
+// manual path. On WASM, TakeScreenshot triggers a download. See s_shot_path and s_shot_pending
+// above.
 static int gfx_screenshot(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_string())
@@ -725,11 +721,11 @@ static int gfx_screenshot(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Capture demandée par l'HÔTE (bouton du mode plein écran, cf. wasm_main) et non par
-// le script : le PNG est produit en MÉMOIRE, encodé en base64, puis retiré par
-// gfx_take_capture. Comme graphics.screenshot, elle est DIFFÉRÉE en fin de frame — c'est
-// le seul moment où le framebuffer par défaut contient l'écran composé (sans
-// preserveDrawingBuffer, le navigateur l'efface après composition).
+// A capture requested by the HOST — the fullscreen button, see wasm_main — rather than by the script:
+// the PNG is produced IN MEMORY, encoded as base64, then collected by gfx_take_capture. Like
+// graphics.screenshot it is DEFERRED to the end of the frame, the only moment when the default
+// framebuffer holds the composed screen: without preserveDrawingBuffer the browser clears it after
+// compositing.
 static bool s_capture_pending = false;
 static std::string s_capture_b64;
 
@@ -738,8 +734,8 @@ void gfx_request_capture() {
     s_capture_b64.clear();
 }
 
-// Oublie toute demande et toute image non retirée : un nouveau programme ne doit pas
-// honorer la capture demandée pour le précédent (attente expirée puis « Relancer »).
+// Forgets any request and any image not collected: a new program must not honour a capture asked for
+// the previous one, after a timeout followed by "Run again".
 static void gfx_reset_capture() {
     s_capture_pending = false;
     s_capture_b64.clear();
@@ -765,14 +761,14 @@ static void flush_pending_capture() {
     UnloadImage(img);
 }
 
-// Exécute une capture en attente : appelé en fin de frame par renderFrame, quand
-// le framebuffer par défaut contient l'image composée (écran réellement affiché).
+// Performs a pending capture. Called at the end of the frame by render_frame, when the default
+// framebuffer holds the composed image — what is actually on screen.
 static void flush_pending_screenshot() {
     if (!s_shot_pending && !s_capture_pending)
         return;
-    // Le batch rlgl doit être EXÉCUTÉ avant toute lecture de pixels : la composition de la
-    // render texture n'est encore qu'un quad en attente, et lire l'écran ici rendait une
-    // image entièrement noire (constaté au navigateur).
+    // The rlgl batch must be FLUSHED before any pixel read: the render texture's composition is still
+    // only a pending quad, and reading the screen here gave an entirely black image (observed in the
+    // browser).
     rlDrawRenderBatchActive();
     flush_pending_capture();
     if (!s_shot_pending)
@@ -786,21 +782,20 @@ static int gfx_text(CallCtx& ctx) {
     if (argc < 3)
         throw std::runtime_error("graphics.text: expected text, x, y");
     const char* text = args[0].is_string() ? args[0].as_string().c_str() : "";
-    // Style pris dans l'ÉTAT courant, comme toutes les autres primitives : couleur
-    // de trait (écrire, c'est tracer au stylo) et taille de police via fontSize().
-    // Seule la géométrie passe en argument.
+    // The style comes from the current STATE, like every other primitive: the stroke colour — writing
+    // is drawing with a pen — and the font size through fontSize(). Only the geometry is passed as an
+    // argument.
     //
-    // DrawTextEx et non DrawText : ce dernier prend un int, donc tronquerait la
-    // taille (biais systématique vers le bas sur une taille mise à l'échelle), et
-    // relève toute valeur < 10 à 10. Ici la taille flottante est transmise telle
-    // quelle, sans plancher.
-    // L'espacement de DrawText vaut fontSize/baseSize en division ENTIÈRE, donc il
-    // avance par paliers (1 de 10 à 19, 2 de 20 à 29…) ; on garde la même intention
-    // en continu, soit le facteur d'échelle lui-même.
+    // DrawTextEx rather than DrawText: the latter takes an int, so it would truncate the size (a
+    // systematic downward bias on a scaled size) and raises anything below 10 to 10. Here the floating
+    // size is passed through untouched, with no floor.
+    // DrawText's spacing is fontSize/baseSize in INTEGER division, so it advances in steps — 1 from 10
+    // to 19, 2 from 20 to 29 — and we keep the same intent continuously, which is the scale factor
+    // itself.
     Font font = current_font();
-    // Garde que DrawText appliquait et que l'appel direct à DrawTextEx perdait :
-    // sans canvas, la police par défaut n'est pas chargée (glyphs nul, baseSize à 0)
-    // → division par zéro puis déréférencement nul. Ne rien dessiner, comme avant.
+    // A guard DrawText applied and that calling DrawTextEx directly lost: with no canvas the default
+    // font is not loaded (null glyphs, baseSize at 0), which means a division by zero and then a null
+    // dereference. Draw nothing, as before.
     if (font.texture.id == 0 || font.baseSize == 0)
         return ctx.ret(Value{});
     float spacing = s_font_size / (float)font.baseSize;
@@ -817,12 +812,12 @@ static int gfx_close(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── Polygon ───────────────────────────────────────────────────────────────────
 static void poly_fill(std::vector<Vector2> pts, Color color) {
     int n = (int)pts.size();
     if (n < 3)
         return;
-    // Normalise vers CCW (coordonnées écran Y↓ : shoelace > 0 = CW → inverser)
+    // Normalize to counter-clockwise. With screen coordinates (Y down) a positive shoelace means
+    // clockwise, so the order is reversed.
     float area = 0;
     for (int i = 0; i < n; i++) {
         const auto& a = pts[i];
@@ -831,7 +826,7 @@ static void poly_fill(std::vector<Vector2> pts, Color color) {
     }
     if (area > 0)
         std::reverse(pts.begin(), pts.end());
-    // Fan depuis le centroïde
+    // A fan from the centroid.
     float cx = 0, cy = 0;
     for (const auto& p : pts) {
         cx += p.x;
@@ -869,11 +864,11 @@ static std::vector<Vector2> parse_points(const Value& v, const char* fn) {
     return pts;
 }
 
-// Tracé d'une polyligne épaisse avec JOINTURES/EMBOUTS ARRONDIS. À forte épaisseur,
-// des DrawLineEx indépendants laissent des encoches aux sommets (coins non jointés,
-// aspect « roue dentée »). Un disque de rayon épaisseur/2 posé sur chaque sommet
-// comble le creux extérieur et donne une jointure ronde (embouts ronds aux extrémités
-// d'une polyligne ouverte). Négligeable en dessous de ~2px → sauté (perf, sans effet).
+// Draws a thick polyline with ROUND JOINS and CAPS. At high thickness, independent DrawLineEx calls
+// leave notches at the vertices — unjoined corners, a cogwheel look. A disc of radius thickness/2 at
+// each vertex fills the outer gap and gives a round join, and round caps at the ends of an open
+// polyline. Below about 2 px it is imperceptible and skipped, for performance and with no visible
+// effect.
 static void draw_thick_path(const std::vector<Vector2>& pts, bool closed, float w, Color c) {
     int n = (int)pts.size();
     if (n < 2)
@@ -918,11 +913,10 @@ static int gfx_polyline(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Contour épais d'une ellipse = anneau triangulé entre un contour INTÉRIEUR
-// (r - épaisseur/2) et EXTÉRIEUR (r + épaisseur/2), l'épaisseur étant centrée sur
-// le tracé (sémantique p5.js). Auparavant on dessinait `segs` segments épais
-// (DrawLineEx) : à forte épaisseur, leurs coins non jointés dépassaient et
-// donnaient un aspect « roue dentée » (pointes). L'anneau, lui, reste lisse.
+// A thick ellipse outline is a triangulated ring between an INNER contour (r - thickness/2) and an
+// OUTER one (r + thickness/2), the thickness being centred on the path, as in p5.js. We used to draw
+// `segs` thick segments with DrawLineEx: at high thickness their unjoined corners stuck out and gave a
+// cogwheel look. The ring stays smooth.
 static void draw_ellipse_stroke(float cx, float cy, float rx, float ry, float thick, Color color, int segs) {
     float h = thick * 0.5f;
     float rxi = rx - h;
@@ -946,7 +940,7 @@ static void draw_ellipse_stroke(float cx, float cy, float rx, float ry, float th
         Vector2 o1 = {cx + rxo * c1, cy + ryo * s1};
         Vector2 i0 = {cx + rxi * c0, cy + ryi * s0};
         Vector2 i1 = {cx + rxi * c1, cy + ryi * s1};
-        // Quad (o0,o1,i1,i0) → 2 triangles, même sens que drawEllipseFill.
+        // The quad (o0,o1,i1,i0) becomes two triangles, wound like draw_ellipse_fill.
         DrawTriangle(o0, o1, i1, color);
         DrawTriangle(o0, i1, i0, color);
     }
@@ -968,7 +962,7 @@ static void draw_oval(float cx, float cy, float rx, float ry, int segs) {
     if (s_has_stroke) {
         StrokeWC s = stroke_params();
         if (rx == ry) {
-            // Cercle : anneau natif raylib (contour lisse, épaisseur centrée sur r).
+            // A circle uses raylib's native ring: a smooth outline, thickness centred on r.
             float inner = rx - s.w * 0.5f;
             if (inner < 0.0f) {
                 inner = 0.0f;
@@ -1000,7 +994,7 @@ static int gfx_circle(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Secteur (part de tarte) : triangles depuis le centre sur l'arc [start;stop].
+// A sector, or pie slice: triangles from the centre over the arc [start;stop].
 static void draw_arc_fill(float cx, float cy, float rx, float ry, float start, float stop, Color color, int segs) {
     for (int i = 0; i < segs; i++) {
         float a0 = start + (stop - start) * (float)i / segs;
@@ -1010,8 +1004,8 @@ static void draw_arc_fill(float cx, float cy, float rx, float ry, float start, f
     }
 }
 
-// Contour de l'arc SEUL (courbe, sans les rayons) : anneau triangulé sur [start;stop],
-// épaisseur centrée sur le tracé — même construction que drawEllipseStroke.
+// The arc's outline ALONE — the curve, without the radii: a ring triangulated over [start;stop] with
+// the thickness centred on the path, built exactly like draw_ellipse_stroke.
 static void draw_arc_stroke(float cx, float cy, float rx, float ry, float start, float stop, float thick, Color color,
                           int segs) {
     float h = thick * 0.5f;
@@ -1036,15 +1030,16 @@ static void draw_arc_stroke(float cx, float cy, float rx, float ry, float start,
         Vector2 o1 = {cx + rxo * c1, cy + ryo * s1};
         Vector2 i0 = {cx + rxi * c0, cy + ryi * s0};
         Vector2 i1 = {cx + rxi * c1, cy + ryi * s1};
-        // Winding aligné sur drawArcFill (front-face, sinon back-face-culled → invisible).
+        // Winding matches draw_arc_fill (front-facing), otherwise it would be culled and invisible.
         DrawTriangle(o0, i1, o1, color);
         DrawTriangle(o0, i0, i1, color);
     }
 }
 
-// arc(x, y, w, h, start, stop) : arc elliptique. w/h = tailles pleines (comme ellipse).
-// start/stop en radians, sens horaire (y vers le bas → angle croissant = horaire).
-// fill → secteur plein ; stroke → courbe de l'arc seule. segs proportionnel à l'angle.
+// arc(x, y, w, h, start, stop) draws an elliptical arc. w and h are full sizes, as for ellipse, and
+// start and stop are in radians, clockwise — with y pointing down, an increasing angle turns clockwise.
+// A fill gives a solid sector, a stroke the arc's curve alone, and segs is proportional to the
+// angle.
 static int gfx_arc(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "graphics.arc";
@@ -1094,31 +1089,30 @@ static int gfx_point(CallCtx& ctx) {
 static bool s_quit = false; // boucle native seulement (WASM : emscripten_cancel_main_loop)
 #endif
 
-// Delta de frame mesuré NOUS-MÊMES : horloge murale (GetTime()) lue à un point
-// UNIQUE par frame (entrée de renderFrame). On n'utilise PAS GetFrameTime()/
-// GetFPS() de raylib : dans notre boucle web (1 requestAnimationFrame par frame,
-// dessin dans une RenderTexture persistante), leur mesure frame = update + draw
-// ne compte pas l'attente rAF ENTRE deux frames → dt sous-évalué. Conséquences :
-// deltaTime trop petit (simulation au ralenti) et FPS sur-évalué (76 affiché
-// pour 60 réels). L'écart mur entre deux entrées de frame, lui, est exact.
+// The frame delta is measured BY US: a wall clock (GetTime()) read at a SINGLE point per frame, on
+// entry to render_frame. raylib's GetFrameTime() and GetFPS() are NOT used: in our web loop — one
+// requestAnimationFrame per frame, drawing into a persistent RenderTexture — their notion of a frame,
+// update plus draw, leaves out the rAF wait BETWEEN two frames, so dt comes out too small. The
+// consequences were a deltaTime too small, hence a simulation in slow motion, and an overestimated FPS
+// (76 displayed for a real 60). The wall gap between two frame entries, by contrast, is exact.
 static double s_frame_dt = 0.0;          // durée de la dernière frame (secondes)
 static double s_last_frame_time = -1.0;  // horodatage de la frame précédente
 static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
 
-// Overlay mémoire/FPS dessiné par le moteur après chaque frame, dans le coin BAS
-// droit — le haut est laissé à l'interface `ui`. Couleur vive + ombre portée : lisible
-// quel que soit le fond de la scène.
+// Memory and FPS overlay drawn by the engine after each frame, in the BOTTOM right corner — the top is
+// left to the `ui` interface. A bright colour plus a drop shadow keeps it readable whatever the scene's
+// background.
 static const int OVERLAY_SIZE = 16;
 static const int OVERLAY_MARGIN = 8;
 
 static void draw_fps_overlay() {
-    // FPS calculé depuis NOTRE delta (fiable), lissé pour éviter le scintillement.
+    // FPS computed from OUR delta, which is reliable, and smoothed to avoid flicker.
     if (s_frame_dt > 0.0) {
         double inst = 1.0 / s_frame_dt;
         s_fps_ema = (s_fps_ema <= 0.0) ? inst : (s_fps_ema * 0.9 + inst * 0.1);
     }
     int fps = (int)(s_fps_ema + 0.5);
-    // Mémoire utilisée à côté du FPS (Ko sous 1 Mo, sinon Mo).
+    // Memory used, next to the FPS: KB below 1 MB, MB above.
     double kb = ollin_heap_bytes() / 1024.0;
     const char* buf = (kb >= 1024.0) ? TextFormat("%.1f Mo  %d fps", kb / 1024.0, fps)
                                      : TextFormat("%.0f Ko  %d fps", kb, fps);
@@ -1142,10 +1136,10 @@ static int gfx_quit(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Temps accumulé depuis le démarrage du programme (remis à 0 à chaque gfx_run).
+// Time accumulated since the program started, reset to 0 on every gfx_run.
 static double s_elapsed_time = 0.0;
 
-// Met à jour deltaTime/elapsedTime dans la VM et appelle update(dt) si définie.
+// Updates deltaTime and elapsedTime in the VM and calls update(dt) when it is defined.
 static Value s_update_callback;
 static void call_update_if_any() {
     double dt = s_frame_dt;   // notre mesure fiable, pas GetFrameTime() (cf. plus haut)
@@ -1157,37 +1151,37 @@ static void call_update_if_any() {
         vm->call_value(s_update_callback, Value(dt));
 }
 
-// Rend UNE frame. Le contexte n'est PAS effacé d'office : draw() dessine dans la
-// cible persistante s_target (c'est à draw() d'appeler graphics.clear() s'il veut
-// repartir d'un fond net), puis on ré-affiche s_target à l'écran et on pose
-// l'overlay FPS PAR-DESSUS (donc net, jamais accumulé). `tex`/`drawing` renvoient
-// l'état des blocs ouverts pour un nettoyage sûr si draw() lève (boucle web).
-// Prélude commun d'une frame : styles par défaut, entrées, logique (update),
-// puis rendu utilisateur (draw). Partagé par les deux chemins de renderFrame.
+// Renders ONE frame. The context is NOT cleared by default: draw() paints into the persistent target
+// s_target — it is up to draw() to call graphics.clear() for a fresh background — then s_target is
+// blitted to the screen and the FPS overlay is laid ON TOP, so it stays crisp and never accumulates.
+// `tex` and `drawing` report which blocks are open, for a safe cleanup should draw() throw inside the
+// web loop.
+// The shared prelude of a frame: default styles, input, logic (update), then the user's rendering
+// (draw). Shared by both paths of render_frame.
 static void run_user_callbacks(const Value& draw_fn) {
     reset_styles();
     keyboard_poll();
-    // Les widgets voient le clic AVANT le script : s'ils le consomment, mouse.pressed
-    // n'est pas appelé — cliquer un bouton ne déclenche donc pas aussi l'action de la
-    // scène. C'est la raison d'être d'un module natif plutôt qu'une classe Ollin.
-    // Les contacts d'abord : un rappel de `mouse` peut lire touch.count() (l'émulation de la
-    // souris sur un doigt unique rend le geste deux fois, et c'est au script de trancher).
+    // The widgets see the click BEFORE the script: when they consume it, mouse.pressed is not called,
+    // so clicking a button does not also trigger the scene's action. That is the reason for a native
+    // module rather than an Ollin class.
+    // Contacts first: a `mouse` callback may read touch.count(), since mouse emulation on a single
+    // finger delivers the gesture twice and it is up to the script to decide.
     touch_begin_frame();
     mouse_poll(ui_poll());
-    // Le multitouche vient APRÈS la souris, et ne la remplace pas : sur un doigt unique le
-    // système émule la souris, donc les deux familles de rappels partent. Un script choisit
-    // celle qu'il écoute (décision assumée : rien n'est filtré).
+    // Multitouch comes AFTER the mouse and does not replace it: on a single finger the system emulates
+    // the mouse, so both families of callbacks fire. A script picks the one it listens to — a deliberate
+    // decision: nothing is filtered.
     touch_poll();
-    // Le son s'ouvre au premier geste : le navigateur refuse de sonner avant une
-    // interaction, et le script n'a donc rien à écrire pour que ses bips partent.
-    // Le clavier passe par son module : keyboard_poll a déjà CONSOMMÉ la file de raylib,
-    // donc GetKeyPressed ne rendrait plus rien ici.
+    // Sound opens on the first gesture: the browser refuses to sound before an interaction, so the
+    // script has nothing to write for its beeps to come out. The keyboard goes through its own module,
+    // because keyboard_poll has already CONSUMED raylib's queue and GetKeyPressed would return nothing
+    // here.
     if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) || GetTouchPointCount() > 0 || keyboard_pressed_any())
         audio_wake();
     audio_update();
     sound_update();
-    // Tweens avancés AVANT la logique et le dessin : update() comme draw() voient donc
-    // les valeurs de la frame courante. Même dt que la globale deltaTime.
+    // The tweens are advanced BEFORE the logic and the drawing, so update() and draw() both see this
+    // frame's values. Same dt as the deltaTime global.
     tween_update_all(s_frame_dt);
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
@@ -1198,19 +1192,19 @@ static void run_user_callbacks(const Value& draw_fn) {
 static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
     *tex = false;
     *drawing = false;
-    // Delta de frame : écart mur depuis l'entrée de la frame précédente (inclut
-    // l'attente rAF, contrairement à GetFrameTime). Première frame → dt = 0.
+    // Frame delta: the wall gap since the previous frame's entry, which includes the rAF wait, unlike
+    // GetFrameTime. On the first frame dt is 0.
     double now = GetTime();
     s_frame_dt = (s_last_frame_time < 0.0) ? 0.0 : (now - s_last_frame_time);
     s_last_frame_time = now;
     if (s_target_ready) {
         BeginTextureMode(s_target);   // lie le FBO ; N'EFFACE PAS
         *tex = true;
-        // La RT est en résolution physique, mais BeginTextureMode a posé une
-        // projection en pixels physiques. On la remplace par les extents LOGIQUES
-        // (origine haut-gauche, comme raylib) → draw() garde les coordonnées
-        // logiques [0,w]×[0,h] tout en rendant à pleine résolution physique.
-        // (Sur la PROJECTION, pas la modelview → survit à graphics.resetTransform.)
+        // The RT is at physical resolution, but BeginTextureMode installed a projection in physical
+        // pixels. We replace it with the LOGICAL extents, origin at the top left as raylib does, so
+        // draw() keeps logical coordinates over [0,w]×[0,h] while rendering at full physical
+        // resolution. This goes on the PROJECTION and not the modelview, so it survives
+        // graphics.resetTransform.
         rlMatrixMode(RL_PROJECTION);
         rlLoadIdentity();
         rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
@@ -1224,17 +1218,16 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
-        // Composition OPAQUE (src=ONE, dst=ZERO) : on recopie le RGB du RT tel
-        // quel, en ignorant SON canal alpha — sinon un RT à alpha faible (après un
-        // fondu clear(...,a) ou des dessins translucides) apparaîtrait fantomatique.
-        // Indispensable aussi pour ne PAS hériter du blend mode laissé par draw()
-        // (ex. ADD), qui fausserait la composition et l'overlay.
+        // OPAQUE composition (src=ONE, dst=ZERO): the RT's RGB is copied as is, ignoring ITS alpha
+        // channel — otherwise an RT with low alpha, after a clear(...,a) fade or translucent drawing,
+        // would look ghostly. It is also essential not to inherit the blend mode draw() left behind
+        // (ADD, say), which would distort both the composition and the overlay.
         rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
         BeginBlendMode(BLEND_CUSTOM);
-        // s_target est en pixels SSAA×physiques et stockée bottom-up → source =
-        // taille réelle de la RT, hauteur négative pour l'afficher à l'endroit ;
-        // destination en coordonnées logiques (remplit l'écran via le viewport
-        // physique). La réduction SSAA→physique par le filtre bilinéaire lisse.
+        // s_target is in SSAA-times-physical pixels and stored bottom-up, so the source is the RT's real
+        // size with a negative height to display it upright, and the destination is in logical
+        // coordinates, filling the screen through the physical viewport. The SSAA-to-physical reduction
+        // by the bilinear filter is what smooths the image.
         DrawTexturePro(s_target.texture,
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
@@ -1245,7 +1238,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         *drawing = false;
         EndDrawing();
     } else {
-        // Repli : aucun canvas persistant configuré → rendu direct (ancien comportement).
+        // Fallback: no persistent canvas configured, so render directly, as the engine used to.
         BeginDrawing();
         *drawing = true;
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
@@ -1261,10 +1254,10 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
 #ifdef __EMSCRIPTEN__
 static Value s_run_callback;
 static void emscripten_frame() {
-    // Une erreur d'exécution dans update()/draw() survient ici, hors du try/catch
-    // de ollin_run (la boucle est asynchrone). Sans capture, l'exception ferait
-    // planter le WASM en silence (écran figé). On l'attrape, on stoppe la boucle
-    // et on remonte le message au playground pour l'afficher à la place du canvas.
+    // A runtime error in update() or draw() surfaces here, outside ollin_run's try/catch, since the loop
+    // is asynchronous. Uncaught, the exception would crash the WASM silently and freeze the screen. We
+    // catch it, stop the loop, and hand the message to the playground to display in place of the
+    // canvas.
     bool tex = false, drawing = false;
     try {
         render_frame(s_run_callback, &tex, &drawing);
@@ -1313,9 +1306,9 @@ static int gfx_run(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── Transformations matricielles + contextes de style ──────────────────────────
-// push/pop        : sauvent/restaurent À LA FOIS la matrice ET le style (Processing/p5).
-// pushMatrix/pop  : matrice seule.  pushStyle/pop : style seul.
+// Matrix transformations and style contexts.
+// push and pop save and restore BOTH the matrix AND the style, as in Processing and p5.
+// pushMatrix and popMatrix cover the matrix alone; pushStyle and popStyle the style alone.
 static int gfx_push(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -1372,7 +1365,7 @@ static int gfx_pop_style(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.translate(x, y [, z]) : z optionnel (défaut 0) → 2D et 3D.
+// graphics.translate(x, y [, z]): z is optional and defaults to 0, so this serves 2D and 3D alike.
 static int gfx_translate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 2)
@@ -1384,15 +1377,15 @@ static int gfx_translate(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Rotation de deg° (argument 0) autour de l'axe (ax,ay,az) — facteur commun de
-// rotate (axe Z par défaut) et de rotateX/rotateY/rotateZ.
+// A rotation of deg degrees (argument 0) about the axis (ax,ay,az) — the common factor of rotate,
+// whose default axis is Z, and of rotateX, rotateY and rotateZ.
 static void rotate_axis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
     rlRotatef((float)num_arg(args, argc, 0, fn), ax, ay, az);
 }
 
-// graphics.rotate(deg [, ax, ay, az]) : sans axe → autour de Z ; avec les 3
-// composantes → rotation 3D autour de (ax,ay,az). Un axe PARTIEL (2 ou 3 args)
-// est une ERREUR — on ne retombe pas silencieusement sur Z.
+// graphics.rotate(deg [, ax, ay, az]): with no axis it turns about Z, with all three components it is
+// a 3D rotation about (ax,ay,az). A PARTIAL axis, two or three arguments, is an ERROR — we do not
+// silently fall back to Z.
 static int gfx_rotate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 1) {
@@ -1422,8 +1415,8 @@ static int gfx_rotate_z(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.scale(s | sx,sy | sx,sy,sz) : 1 arg = uniforme (s,s,s) ; 2 args =
-// (sx,sy,1) (2D) ; 3 args = (sx,sy,sz).
+// graphics.scale(s | sx,sy | sx,sy,sz): one argument is uniform (s,s,s), two give (sx,sy,1) for 2D, and
+// three give (sx,sy,sz).
 static int gfx_scale(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
@@ -1452,7 +1445,6 @@ static int gfx_reset_transform(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── graphics.sprite(img, x, y [, w, h]) ──────────────────────────────────────
 
 static int gfx_sprite(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -1478,9 +1470,9 @@ static int gfx_sprite(CallCtx& ctx) {
 }
 
 
-// Module `blend` : modes de fusion exposés via les enums raylib DIRECTEMENT
-// (source de vérité — pas de littéraux à maintenir/vérifier). Défini ici plutôt
-// que dans modules.cpp car ce dernier compile aussi sans raylib.
+// The `blend` module exposes the blend modes through raylib's enums DIRECTLY, keeping a single source
+// of truth with no literals to maintain or check. It is defined here rather than in modules.cpp,
+// because that file also compiles without raylib.
 Value make_blend_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("ALPHA")), Value((int64_t)BLEND_ALPHA));
@@ -1543,6 +1535,6 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("point")), Value::make_builtin(gfx_point));
     m.map_set(Value(std::string("sprite")), Value::make_builtin(gfx_sprite));
     register3d_graphics(m);   // 3D (caméra, begin3d/end3d, primitives, éclairage, texture) — graphics3d.cpp
-    // Les constantes couleur ne sont PAS ici : utiliser le module `colors`.
+    // The colour constants are NOT here: use the `colors` module.
     return m;
 }
