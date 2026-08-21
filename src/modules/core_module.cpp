@@ -29,20 +29,23 @@ std::string format_one(const Value& v, const std::string& spec) {
         std::snprintf(out.data(), (size_t)need + 1, cfmt.c_str(), arg);
         return out;
     };
+    // The numeric conversions share one refusal: written per case, the same message appeared three
+    // times and could drift.
+    auto need_number = [&]() {
+        if (!v.is_number())
+            throw std::runtime_error("format: '%" + spec + "' expects a number");
+    };
     switch (conv) {
         case 'c': {
-            if (!v.is_number())
-                throw std::runtime_error("format: '%" + spec + "' attend un nombre");
+            need_number();
             return render("%" + body + "c", (int)v.as_num());
         }
         case 'd': case 'i': case 'o': case 'u': case 'x': case 'X': {
-            if (!v.is_number())
-                throw std::runtime_error("format: '%" + spec + "' attend un nombre");
+            need_number();
             return render("%" + body + "ll" + conv, (long long)v.as_num());   // 'll' = int64
         }
         case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': {
-            if (!v.is_number())
-                throw std::runtime_error("format: '%" + spec + "' attend un nombre");
+            need_number();
             return render("%" + spec, (double)v.as_num());
         }
         case 's': {

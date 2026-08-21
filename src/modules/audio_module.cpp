@@ -29,15 +29,15 @@ double s_volume = 1.0;
 // listener, installed ONCE and kept: every gesture retries the resume, which covers both cases
 // without the engine having to know which one occurred.
 void install_gesture_resume() {
-    static bool pose = false;
-    if (pose)
+    static bool installed = false;
+    if (installed)
         return;
-    pose = true;
+    installed = true;
     EM_ASM({
         if (window.__ollinAudioResume)
             return;
         window.__ollinAudioResume = 1;
-        var reprendre = function() {
+        var resume = function() {
             var ma = window.miniaudio;
             if (!ma || !ma.devices)
                 return;
@@ -51,9 +51,9 @@ void install_gesture_resume() {
         // separates its arguments.
         var opt = { capture: true };
         opt.passive = true;
-        var noms = 'pointerdown touchstart touchend mousedown keydown'.split(' ');
-        for (var i = 0; i < noms.length; i++)
-            document.addEventListener(noms[i], reprendre, opt);
+        var names = 'pointerdown touchstart touchend mousedown keydown'.split(' ');
+        for (var i = 0; i < names.length; i++)
+            document.addEventListener(names[i], resume, opt);
     });
 }
 #else

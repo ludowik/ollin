@@ -1595,9 +1595,9 @@ end
 ## par free() doit redevenir disponible immediatement : sinon la 17e creation echouait sur
 ## « no oscillator available », alors que chaque voix avait bien ete liberee.
 for i = 1, 20 do
-    var voix = sound.sine(330 + i).envelope(0.01, 0.05, 0.5, 5.0)
-    voix.trigger(0.05)
-    voix.free()
+    var v = sound.sine(330 + i).envelope(0.01, 0.05, 0.5, 5.0)
+    v.trigger(0.05)
+    v.free()
 end
 var autre = sound.sine(660)
 assert(autre.isPlaying() == false)

@@ -66,7 +66,7 @@ void install_dom_watch() {
     EM_ASM({
         window.__ollinTouchGone = new Set();
         window.__ollinTouchHeld = new Set();
-        var poses = function(e) {
+        var held = function(e) {
             var s = new Set();
             for (var i = 0; i < e.touches.length; i++) {
                 s.add(e.touches[i].identifier);
@@ -77,29 +77,29 @@ void install_dom_watch() {
         var lifted = function(e) {
             for (var i = 0; i < e.changedTouches.length; i++)
                 window.__ollinTouchGone.add(e.changedTouches[i].identifier);
-            poses(e);
+            held(e);
         };
         // No array or object literal here: EM_ASM is a MACRO, and a comma outside parentheses
         // separates its arguments, at which point the block no longer compiles.
         var opt = { capture: true };
         opt.passive = true;
-        var brancher = function(noms, fn) {
-            var liste = noms.split(' ');
-            for (var i = 0; i < liste.length; i++)
-                window.addEventListener(liste[i], fn, opt);
+        var bind = function(names, fn) {
+            var list = names.split(' ');
+            for (var i = 0; i < list.length; i++)
+                window.addEventListener(list[i], fn, opt);
         };
-        brancher('touchstart touchmove', poses);
-        brancher('touchend touchcancel', lifted);
+        bind('touchstart touchmove', held);
+        bind('touchend touchcancel', lifted);
         // Focus loss: no touchend arrives, so we declare lifted every finger we knew was down. That
         // is the only reason __ollinTouchHeld exists.
-        var abandon_all = function() {
+        var dropAll = function() {
             window.__ollinTouchHeld.forEach(function(id) { window.__ollinTouchGone.add(id); });
             window.__ollinTouchHeld = new Set();
         };
-        window.addEventListener('blur', abandon_all);
+        window.addEventListener('blur', dropAll);
         document.addEventListener('visibilitychange', function() {
             if (document.hidden)
-                abandon_all();
+                dropAll();
         });
     });
 }
@@ -113,22 +113,22 @@ void install_dom_watch() {
 // browser does not necessarily recycle its identifiers.
 int lifted_mask(const int* ids, int n) {
     return EM_ASM_INT({
-        var partis = window.__ollinTouchGone;
-        if (!partis)
+        var gone = window.__ollinTouchGone;
+        if (!gone)
             return 0;
-        var masque = 0;
-        var vus = new Set();
+        var mask = 0;
+        var seen = new Set();
         for (var i = 0; i < $1; i++) {
             var id = HEAP32[($0 >> 2) + i];
-            vus.add(id);
-            if (partis.has(id))
-                masque |= 1 << i;
+            seen.add(id);
+            if (gone.has(id))
+                mask |= 1 << i;
         }
-        partis.forEach(function(id) {
-            if (!vus.has(id))
-                partis.delete(id);
+        gone.forEach(function(id) {
+            if (!seen.has(id))
+                gone.delete(id);
         });
-        return masque;
+        return mask;
     }, ids, n);
 }
 
