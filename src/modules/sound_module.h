@@ -5,30 +5,28 @@
 #include <stdexcept>
 #include <string>
 
-// Module `sound` : ce qui SONNE. Deux natures d'objet, deux mécaniques :
-//   un OSCILLATEUR vivant, dont on déplace la fréquence pendant qu'il sonne ;
-//   un TAMPON figé (calculé ou chargé), qu'on déclenche — à venir.
+// The `sound` module: what SOUNDS. Two kinds of object, two mechanics:
+//   a live OSCILLATOR, whose frequency can be moved while it sounds;
+//   a frozen BUFFER (computed or loaded), which is triggered.
 //
-// Règle qui gouverne tout le module : AUCUN code Ollin ne tourne dans le rappel audio.
-// Celui-ci a une échéance de quelques millisecondes — la manquer s'entend comme un clic —
-// et appeler la VM depuis là signifierait exécuter du bytecode et allouer sous cette
-// contrainte. La forme d'onde est donc calculée en C++, le script ne réglant que des
-// nombres ; et une formule écrite en Ollin sera échantillonnée UNE fois, hors du rappel.
+// The rule that governs the whole module: NO Ollin code runs in the audio callback. That callback
+// has a deadline of a few milliseconds — missing it is heard as a click — and calling the VM from
+// there would mean running bytecode and allocating under that constraint. The waveform is therefore
+// computed in C++, with the script only setting numbers, and a formula written in Ollin is sampled
+// ONCE, outside the callback.
 Value make_sound_module();
 
-// Remise à zéro au démarrage d'un programme (ollin_run), comme ui_reset : les statiques
-// survivent au VM entre deux exécutions du playground, et un oscillateur du programme
-// précédent continuerait de sonner.
+// Reset when a program starts (ollin_run), like ui_reset: the statics survive the VM between two
+// playground runs, and an oscillator from the previous program would keep sounding.
 void sound_reset();
 
-// Une fois par frame : ouvre le flux de sortie dès que le périphérique est prêt (au
-// navigateur, cela n'arrive qu'après le premier geste de l'utilisateur).
+// Once per frame: opens the output stream as soon as the device is ready — in a browser, only
+// after the user's first gesture.
 void sound_update();
 
-// ── Formes d'onde ───────────────────────────────────────────────────────────────
-// Les noms exposés vivent dans des littéraux de chaîne, donc en camelCase comme le reste
-// de l'API. `noise` n'a pas de fréquence, mais l'accepte sans s'en servir : refuser
-// obligerait l'appelant à connaître ce cas particulier.
+// The exposed names live in string literals, hence camelCase like the rest of the API. `noise` has
+// no frequency but accepts one and ignores it: refusing would force the caller to know about that
+// special case.
 enum SoundShape { SHAPE_SINE = 0, SHAPE_SQUARE, SHAPE_SAW, SHAPE_TRIANGLE, SHAPE_NOISE, SHAPE_COUNT };
 
 inline const char* sound_shape_names() {
@@ -49,31 +47,31 @@ inline int sound_shape_index(const std::string& name, const char* fn) {
                              sound_shape_names());
 }
 
-// ── Validation, PARTAGÉE par le module et le stub ────────────────────────────────
-// Une faute d'appel doit être signalée même sans périphérique : c'est le stub qui tourne
-// dans le conteneur d'intégration, donc dans les tests.
+// Validation, SHARED by the module and the stub.
+// A misuse must be reported even without a device: the stub is what runs in the integration
+// container, and therefore in the tests.
 
-// Nom de note anglo-saxon vers hertz : "A4" = 440, "C#5", "Eb3", "C-1" pour l'octave la plus
-// grave. Le tempérament égal fait le calcul, aucune table de fréquences à recopier.
+// Note name to hertz: "A4" is 440, then "C#5", "Eb3", and "C-1" for the lowest octave. Equal
+// temperament does the arithmetic, so there is no frequency table to copy.
 inline double sound_note_hz(const std::string& name, const char* fn) {
-    static const int k_demi_tons[] = {9, 11, 0, 2, 4, 5, 7};   // A B C D E F G
+    static const int k_semitones[] = {9, 11, 0, 2, 4, 5, 7};   // A B C D E F G
     if (name.empty())
         throw std::runtime_error(std::string(fn) + ": empty note name");
-    char lettre = name[0];
-    if (lettre >= 'a' && lettre <= 'g')
-        lettre = (char)(lettre - 'a' + 'A');
-    if (lettre < 'A' || lettre > 'G')
+    char letter = name[0];
+    if (letter >= 'a' && letter <= 'g')
+        letter = (char)(letter - 'a' + 'A');
+    if (letter < 'A' || letter > 'G')
         throw std::runtime_error(std::string(fn) + ": unknown note '" + name + "' — expected A to G, like \"C#4\"");
-    int demi = k_demi_tons[lettre - 'A'];
+    int semitone = k_semitones[letter - 'A'];
     size_t k = 1;
     if (k < name.size() && (name[k] == '#' || name[k] == 'b')) {
-        demi += (name[k] == '#') ? 1 : -1;
+        semitone += (name[k] == '#') ? 1 : -1;
         k++;
     }
     if (k >= name.size())
         throw std::runtime_error(std::string(fn) + ": note '" + name + "' has no octave — write for example \"A4\"");
-    bool negatif = name[k] == '-';
-    if (negatif)
+    bool negative = name[k] == '-';
+    if (negative)
         k++;
     if (k >= name.size())
         throw std::runtime_error(std::string(fn) + ": note '" + name + "' has no octave — write for example \"A4\"");
@@ -83,20 +81,20 @@ inline double sound_note_hz(const std::string& name, const char* fn) {
             throw std::runtime_error(std::string(fn) + ": note '" + name + "': unreadable octave");
         octave = octave * 10 + (name[k] - '0');
     }
-    if (negatif)
+    if (negative)
         octave = -octave;
     if (octave < -1 || octave > 9)
         throw std::runtime_error(std::string(fn) + ": octave out of [-1;9] in '" + name + "'");
-    // Numéro MIDI, puis tempérament égal autour du la 440.
-    int midi = (octave + 1) * 12 + demi;
+    // MIDI number, then equal temperament around A 440.
+    int midi = (octave + 1) * 12 + semitone;
     return 440.0 * std::pow(2.0, (midi - 69) / 12.0);
 }
 
-// Fréquence audible utile. La borne haute n'est pas un caprice : au-delà de la moitié de
-// la fréquence d'échantillonnage, une onde se replie et descend au lieu de monter.
+// Usable audible frequency. The upper bound is not arbitrary: past half the sample rate a wave
+// folds back and goes down instead of up.
 //
-// Un NOM DE NOTE est accepté partout où une fréquence l'est — ici et nulle part ailleurs :
-// ce point de passage unique couvre sound.osc, sound.tone et osc.freq d'un seul coup.
+// A NOTE NAME is accepted everywhere a frequency is — here and nowhere else: this single gate
+// covers sound.osc, sound.tone and osc.freq at once.
 inline double sound_check_freq(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc || args[i].is_nil())
         return -1.0;   // absente : l'appelant garde sa valeur courante
@@ -118,8 +116,8 @@ inline int sound_check_shape(const Value* args, int argc, int i, const char* fn)
     return sound_shape_index(args[i].as_string(), fn);
 }
 
-// Enveloppe : quatre nombres, dont trois durées en secondes et un niveau de maintien dans
-// [0;1]. Une durée négative est refusée — c'est une faute de frappe, pas une intention.
+// Envelope: four numbers, three of them durations in seconds and one a sustain level in [0;1]. A
+// negative duration is refused — it is a typo, not an intention.
 inline void sound_check_envelope(const Value* args, int argc, const char* fn) {
     if (argc < 4)
         throw std::runtime_error(std::string(fn) + ": expected attack, decay, sustain, release");
@@ -143,9 +141,9 @@ inline double sound_check_hold(const Value* args, int argc, const char* fn) {
     return args[0].as_num();
 }
 
-// Durée d'un tampon, en secondes. La borne haute protège d'une faute de frappe : générer
-// dix secondes demande déjà 441 000 appels à la fonction du script, et une durée donnée en
-// millisecondes par mégarde figerait le moteur.
+// Length of a buffer, in seconds. The upper bound guards against a typo: generating ten seconds
+// already takes 441,000 calls into the script's function, and a duration accidentally given in
+// milliseconds would freeze the engine.
 inline double sound_check_duration(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc || !args[i].is_number())
         throw std::runtime_error(std::string(fn) + ": duration must be a number of seconds");
@@ -158,8 +156,8 @@ inline double sound_check_duration(const Value* args, int argc, int i, const cha
     return d;
 }
 
-// Volume et panoramique : bornés en silence, comme le volume général. Un panoramique de
-// -1 est à gauche, 0 au centre, 1 à droite (convention de raylib et de p5).
+// Volume and pan are clamped silently, like the master volume. A pan of -1 is left, 0 centre and
+// 1 right, following raylib and p5.
 inline double sound_check_unit(const Value* args, int argc, int i, const char* fn, const char* quoi, double mini) {
     if (i >= argc || args[i].is_nil())
         return -2.0;   // absent : l'appelant garde sa valeur courante

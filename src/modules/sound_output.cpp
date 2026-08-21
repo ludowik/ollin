@@ -4,31 +4,30 @@
 #include <atomic>
 #include <cmath>
 
-// Sortie sonore, build AVEC raylib : UN SEUL flux pour toutes les voix, mélangé ici.
+// Sound output, build WITH raylib: ONE stream for every voice, mixed here.
 //
-// Un flux par voix serait impossible sans duplication : le rappel de raylib ne transporte
-// aucune donnée utilisateur (sa signature n'a que le tampon et le nombre de trames), donc
-// il faudrait autant de fonctions distinctes que de voix. Un mélangeur unique est aussi
-// l'endroit naturel où viendront la pause globale et les tampons déclenchés.
+// One stream per voice would be impossible without duplication: raylib's callback carries no user
+// data — its signature has only the buffer and the frame count — so it would take as many distinct
+// functions as voices. A single mixer is also the natural home for the global pause and for
+// triggered buffers.
 //
-// TOUT ce fichier, sous le rappel, s'exécute sur le fil audio (natif) ou dans le rappel
-// Web Audio (navigateur), sous une échéance de quelques millisecondes : aucune allocation,
-// aucun verrou, aucun appel à la VM. Les paramètres réglés par le script sont lus
-// atomiquement, un par un.
+// EVERYTHING in this file below the callback runs on the audio thread (native) or inside the Web
+// Audio callback (browser), under a deadline of a few milliseconds: no allocation, no lock, no call
+// into the VM. The parameters set by the script are read atomically, one by one.
 
 namespace {
 
-// Lissage du gain, en secondes. Démarrer ou arrêter une onde carrée d'un coup produit un
-// clic très audible : le gain rejoint sa cible en quelques millisecondes — trop vite pour
-// s'entendre comme un fondu, assez lentement pour supprimer la discontinuité.
+// Gain ramp, in seconds. Starting or stopping a square wave abruptly produces a very audible
+// click, so the gain reaches its target over a few milliseconds — too fast to be heard as a fade,
+// slow enough to remove the discontinuity.
 constexpr double k_gain_ramp = 0.005;
 
 AudioStream s_stream{};
 bool s_stream_ready = false;
 std::atomic<uint64_t> s_mix_epoch{0};
 
-// Bruit propre à la voix : xorshift, quelques opérations entières. `rand()` serait
-// interdit ici — état global partagé, et rien ne garantit qu'il soit sans verrou.
+// Per-voice noise: xorshift, a few integer operations. rand() would be forbidden here — shared
+// global state, with no guarantee of being lock-free.
 inline float noise_next(uint32_t& state) {
     state ^= state << 13;
     state ^= state >> 17;
@@ -36,14 +35,13 @@ inline float noise_next(uint32_t& state) {
     return (float)((double)state / 2147483648.0 - 1.0);
 }
 
-// Correction d'une DISCONTINUITÉ (PolyBLEP). Une dent de scie ou un créneau calculés
-// directement sautent d'une valeur à l'autre entre deux échantillons : ce saut porte des
-// harmoniques bien au-delà de la moitié de la fréquence d'échantillonnage, qui se REPLIENT
-// vers le bas en raies inharmoniques. D'où un son métallique et faux, d'autant plus sensible
-// que la hauteur glisse — les raies repliées descendent quand la note monte.
+// Correction of a DISCONTINUITY (PolyBLEP). A sawtooth or a square computed directly jumps from
+// one value to another between two samples, and that jump carries harmonics far above half the
+// sample rate, which FOLD back down as inharmonic partials. Hence a metallic, out-of-tune sound,
+// all the more noticeable as the pitch glides — the folded partials go down as the note goes up.
 //
-// Le remède : au voisinage du saut, retrancher le polynôme qui l'arrondit sur la durée d'un
-// échantillon. `t` est la phase (dans [0;1[), `dt` son avance par échantillon.
+// The remedy: near the jump, subtract the polynomial that rounds it over the duration of one
+// sample. `t` is the phase, in [0;1), and `dt` its advance per sample.
 inline double poly_blep(double t, double dt) {
     if (t < dt) {
         t = t / dt - 1.0;
@@ -58,22 +56,22 @@ inline double poly_blep(double t, double dt) {
 
 inline float wave_sample(int shape, double phase, double dt, uint32_t& noise_state) {
     switch (shape) {
-    case 1: {   // square : deux discontinuités par tour, en 0 et en 0,5
+    case 1: {   // square: two discontinuities per turn, at 0 and at 0.5
         double s = phase < 0.5 ? 1.0 : -1.0;
         s += poly_blep(phase, dt);
-        double demi = phase + 0.5;
-        if (demi >= 1.0)
-            demi -= 1.0;
-        s -= poly_blep(demi, dt);
+        double half = phase + 0.5;
+        if (half >= 1.0)
+            half -= 1.0;
+        s -= poly_blep(half, dt);
         return (float)s;
     }
-    case 2:   // saw : une seule discontinuité, au passage de 1 à 0
+    case 2:   // saw: a single discontinuity, where 1 wraps to 0
         return (float)(2.0 * phase - 1.0 - poly_blep(phase, dt));
     case 3:
-        // Triangle laissé DIRECT : il n'a aucun saut, seulement deux ruptures de pente, et
-        // ses harmoniques décroissent en 1/n² au lieu de 1/n — son repliement est plus de
-        // vingt décibels sous celui des deux formes ci-dessus. Le corriger demanderait un
-        // second polynôme (sur la pente) pour un gain inaudible.
+        // The triangle is left DIRECT: it has no jump, only two slope breaks, and its harmonics
+        // fall off as 1/n² instead of 1/n, so its folding sits more than twenty decibels below that
+        // of the two shapes above. Correcting it would take a second polynomial, on the slope, for
+        // an inaudible gain.
         return (float)(1.0 - 4.0 * std::fabs(phase - 0.5));
     case 4:   // noise
         return noise_next(noise_state);
@@ -82,9 +80,9 @@ inline float wave_sample(int shape, double phase, double dt, uint32_t& noise_sta
     }
 }
 
-// Mélange les TAMPONS déclenchés. Les échantillons ne sont lus que tant que `playing` est
-// vrai — invariant sur lequel repose la sûreté mémoire, le fil principal ne réutilisant un
-// slot qu'après l'avoir tu ET attendu un bloc.
+// Mixes the triggered BUFFERS. The samples are read only while `playing` is true — the invariant
+// the memory safety rests on, since the main thread reuses a slot only after silencing it AND
+// waiting for one block.
 void mix_buffers(float* out, unsigned int frames) {
     Buf* bufs = sound_buffers();
     for (int k = 0; k < k_max_buffers; k++) {
@@ -99,29 +97,29 @@ void mix_buffers(float* out, unsigned int frames) {
         }
         float volume = (float)b.volume.load(std::memory_order_relaxed);
         float pan = (float)b.pan.load(std::memory_order_relaxed);
-        double avance = b.rate.load(std::memory_order_relaxed);
+        double step = b.rate.load(std::memory_order_relaxed);
         bool looping = b.loop.load(std::memory_order_relaxed);
-        float g_gauche = pan > 0.0f ? 1.0f - pan : 1.0f;
-        float g_droite = pan < 0.0f ? 1.0f + pan : 1.0f;
+        float g_left = pan > 0.0f ? 1.0f - pan : 1.0f;
+        float g_right = pan < 0.0f ? 1.0f + pan : 1.0f;
         for (unsigned int i = 0; i < frames; i++) {
             if (b.pos >= (double)n) {
                 if (!looping) {
                     b.playing.store(false, std::memory_order_relaxed);
                     break;
                 }
-                // Le reste du dépassement est conservé : le retrancher ferait perdre une
-                // fraction d'échantillon à chaque tour, donc dériver une boucle rythmique.
+                // The overshoot is kept: dropping it would lose a fraction of a sample every turn
+                // and a rhythmic loop would drift.
                 b.pos -= (double)n;
             }
-            // Interpolation linéaire entre deux échantillons : à vitesse 1 elle rend la
-            // valeur exacte, et une hauteur modifiée ne s'entend pas crénelée.
+            // Linear interpolation between two samples: at rate 1 it returns the exact value, and a
+            // shifted pitch does not sound aliased.
             size_t i0 = (size_t)b.pos;
             size_t i1 = (i0 + 1 < n) ? i0 + 1 : (looping ? 0 : i0);
             float f = (float)(b.pos - (double)i0);
             float s = (data[i0] * (1.0f - f) + data[i1] * f) * volume;
-            out[i * 2] += s * g_gauche;
-            out[i * 2 + 1] += s * g_droite;
-            b.pos += avance;
+            out[i * 2] += s * g_left;
+            out[i * 2 + 1] += s * g_right;
+            b.pos += step;
         }
     }
 }
@@ -130,29 +128,28 @@ void mix_callback(void* buffer, unsigned int frames) {
     float* out = (float*)buffer;
     for (unsigned int i = 0; i < frames * 2; i++)
         out[i] = 0.0f;
-    // En pause : du silence, et RIEN n'avance — ni les phases, ni les positions de lecture,
-    // ni les enveloppes. Le son reprend donc là où il s'est arrêté.
+    // While paused: silence, and NOTHING advances — neither the phases, nor the read positions, nor
+    // the envelopes. The sound therefore resumes where it stopped.
     if (sound_paused()) {
         s_mix_epoch.fetch_add(1, std::memory_order_release);
         return;
     }
-    const double pas_temps = 1.0 / (double)k_audio_sample_rate;
-    const float lissage = (float)(pas_temps / k_gain_ramp);
+    const double dt_sample = 1.0 / (double)k_audio_sample_rate;
+    const float ramp = (float)(dt_sample / k_gain_ramp);
     Voice* voices = sound_voices();
     for (int k = 0; k < k_max_voices; k++) {
         Voice& v = voices[k];
-        bool actif = v.active.load(std::memory_order_relaxed);
-        // Une voix arrêtée reste mélangée le temps que son gain retombe à zéro, sinon
-        // l'arrêt claque.
-        if (!actif && v.gain <= 0.0f)
+        bool is_active = v.active.load(std::memory_order_relaxed);
+        // A stopped voice keeps being mixed until its gain reaches zero, otherwise stopping clicks.
+        if (!is_active && v.gain <= 0.0f)
             continue;
         float volume = (float)v.volume.load(std::memory_order_relaxed);
-        float cible = actif ? volume : 0.0f;
+        float target = is_active ? volume : 0.0f;
         int shape = v.shape.load(std::memory_order_relaxed);
-        double avance = v.freq.load(std::memory_order_relaxed) * pas_temps;
+        double step = v.freq.load(std::memory_order_relaxed) * dt_sample;
         float pan = (float)v.pan.load(std::memory_order_relaxed);
-        // Enveloppe : lue une fois par bloc. La faire varier au sein d'un bloc n'apporterait
-        // rien — 23 ms séparent deux blocs, soit moins qu'une frame.
+        // The envelope is read once per block. Varying it within a block would gain nothing: two
+        // blocks are 23 ms apart, less than a frame.
         bool env_used = v.env_used.load(std::memory_order_relaxed);
         Adsr env;
         if (env_used) {
@@ -167,45 +164,44 @@ void mix_callback(void* buffer, unsigned int frames) {
                 double hold = v.env_hold.load(std::memory_order_relaxed);
                 v.env_hold_at = hold >= 0.0 ? hold : -1.0;
             }
-            // Lâcher demandé par le script : l'instant est figé ici, car le relâchement part
-            // du niveau atteint À CE MOMENT et non du niveau de maintien.
+            // A release asked for by the script: the moment is frozen here, because the release
+            // starts from the level reached AT THAT POINT and not from the sustain level.
             //
-            // Le PLUS TÔT des deux gagne : une note déclenchée avec une durée a déjà son
-            // instant de lâcher, et ne tester que « pas encore lâchée » rendait release()
-            // sans effet dans ce cas — trigger(2.0) suivi d'un release() au bout de 0,2 s
-            // laissait sonner les deux secondes entières.
+            // The EARLIER of the two wins: a note triggered with a duration already has its release
+            // moment, and testing only for "not released yet" made release() a no-op in that case —
+            // trigger(2.0) followed by release() after 0.2 s let the full two seconds sound.
             if (!v.gate.load(std::memory_order_relaxed) && (v.env_hold_at < 0.0 || v.env_t < v.env_hold_at))
                 v.env_hold_at = v.env_t;
         }
-        // Panoramique sans creux au centre : chaque côté reste à plein volume tant qu'on
-        // n'a pas dépassé le milieu.
-        float g_gauche = pan > 0.0f ? 1.0f - pan : 1.0f;
-        float g_droite = pan < 0.0f ? 1.0f + pan : 1.0f;
+        // Pan without a dip at the centre: each side stays at full volume until the middle is
+        // passed.
+        float g_left = pan > 0.0f ? 1.0f - pan : 1.0f;
+        float g_right = pan < 0.0f ? 1.0f + pan : 1.0f;
         for (unsigned int i = 0; i < frames; i++) {
-            if (env_used && actif) {
-                cible = volume * (float)adsr_level(env, v.env_t, v.env_hold_at);
-                v.env_t += pas_temps;
+            if (env_used && is_active) {
+                target = volume * (float)adsr_level(env, v.env_t, v.env_hold_at);
+                v.env_t += dt_sample;
             }
-            // Le lissage s'applique PAR-DESSUS l'enveloppe : une attaque nulle serait sinon
-            // un saut, donc un clic. Cinq millisecondes ne s'entendent pas comme un fondu.
-            v.gain += (cible - v.gain) * lissage;
-            float s = wave_sample(shape, v.phase, avance, v.noise_state) * v.gain;
-            out[i * 2] += s * g_gauche;
-            out[i * 2 + 1] += s * g_droite;
-            v.phase += avance;
+            // The ramp applies ON TOP OF the envelope: a zero attack would otherwise be a jump, and
+            // therefore a click. Five milliseconds are not heard as a fade.
+            v.gain += (target - v.gain) * ramp;
+            float s = wave_sample(shape, v.phase, step, v.noise_state) * v.gain;
+            out[i * 2] += s * g_left;
+            out[i * 2 + 1] += s * g_right;
+            v.phase += step;
             if (v.phase >= 1.0)
                 v.phase -= 1.0;
         }
-        // Une note relâchée cesse d'occuper la voix : sans cela un programme qui déclenche
-        // des notes épuiserait la table, chaque voix restant marquée « en train de sonner ».
-        if (env_used && actif && adsr_finished(env, v.env_t, v.env_hold_at))
+        // A released note stops occupying its voice: without this, a program triggering notes would
+        // exhaust the table, every voice staying marked as still sounding.
+        if (env_used && is_active && adsr_finished(env, v.env_t, v.env_hold_at))
             v.active.store(false, std::memory_order_relaxed);
-        if (!actif && v.gain < 0.0001f)
+        if (!is_active && v.gain < 0.0001f)
             v.gain = 0.0f;
     }
     mix_buffers(out, frames);
-    // Compté EN DERNIER : le fil principal en déduit qu'un bloc complet s'est écoulé, donc
-    // qu'aucune lecture de ce bloc ne traîne plus.
+    // Counted LAST: the main thread infers from it that a whole block has elapsed, so no read from
+    // that block is still in flight.
     s_mix_epoch.fetch_add(1, std::memory_order_release);
 }
 
@@ -214,25 +210,25 @@ void mix_callback(void* buffer, unsigned int frames) {
 void sound_output_ensure() {
     if (s_stream_ready || !IsAudioDeviceReady())
         return;
-    // ~23 ms à 44,1 kHz : assez court pour que le son suive le clic, assez long pour
-    // survivre à une frame chargée. Au navigateur le mélange partage le fil de la VM
-    // (le dos-end passe par un ScriptProcessorNode), donc un tampon plus petit
-    // craquerait au premier calcul un peu lourd.
+    // About 23 ms at 44.1 kHz: short enough for the sound to follow the click, long enough to
+    // survive a heavy frame. In a browser the mixing shares the VM's thread — the backend goes
+    // through a ScriptProcessorNode — so a smaller buffer would crackle on the first heavy
+    // computation.
     SetAudioStreamBufferSizeDefault(1024);
     s_stream = LoadAudioStream(k_audio_sample_rate, 32, 2);
-    // Compensation de la loi de panoramique de raylib, qui ne vaut PAS 1 au centre : son
-    // mélangeur applique `volume * 0.5 * c * (3 - c²)` par canal, soit 0,6875 pour un flux
-    // centré (c = 0,5). Sans ce correctif, un volume demandé à 1 sortait à 0,687 — mesuré au
-    // navigateur, analyseur branché sur la sortie, avant d'être retrouvé dans raudio.c.
+    // Compensates raylib's pan law, which is NOT unity at the centre: its mixer applies
+    // volume * 0.5 * c * (3 - c²) per channel, that is 0.6875 for a centred stream (c = 0.5).
+    // Without this correction a volume asked at 1 came out at 0.687 — measured in the browser with
+    // an analyser on the output, then found again in raudio.c.
     SetAudioStreamVolume(s_stream, 1.0f / 0.6875f);
     SetAudioStreamCallback(s_stream, mix_callback);
     PlayAudioStream(s_stream);
     s_stream_ready = true;
 }
 
-// Le flux n'est PAS déchargé : il appartient au périphérique, qui survit au programme (au
-// playground, la page reste chargée). Les voix étant déjà éteintes par sound_reset, le
-// mélangeur rend du silence — il n'y a rien de plus à faire.
+// The stream is NOT unloaded: it belongs to the device, which outlives the program, the playground
+// page staying loaded. The voices having already been silenced by sound_reset, the mixer returns
+// silence and there is nothing more to do.
 void sound_output_silence() {
 }
 

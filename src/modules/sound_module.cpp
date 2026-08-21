@@ -7,12 +7,12 @@
 #include <string>
 #include <vector>
 
-// Module `sound` : l'API et l'état, dans TOUS les builds. La sortie, elle, dépend de
-// raylib (sound_output.cpp / sound_output_stub.cpp) — voir sound_internal.h.
+// The `sound` module: its API and state, in EVERY build. The output, by contrast, depends on
+// raylib (sound_output.cpp / sound_output_stub.cpp) — see sound_internal.h.
 //
-// Un oscillateur est une VOIX dans une table fixe. Le script n'en manipule qu'un handle
-// {slot, gen}, jamais un pointeur : `gen` détecte un handle périmé au lieu de désigner la
-// voix qui a recyclé le slot.
+// An oscillator is a VOICE in a fixed table. The script only ever handles a {slot, gen} handle and
+// never a pointer: `gen` detects a stale handle instead of silently addressing whichever voice
+// recycled the slot.
 
 namespace {
 
@@ -41,13 +41,13 @@ int handle_slot(const Value& self, const char* fn) {
     return i;
 }
 
-// Un slot libre, sinon la voix ARRÊTÉE la plus ANCIENNE : le script n'a aucun moyen de
-// rendre un oscillateur (il n'y a pas de finaliseur), donc un programme qui en crée à la
-// demande épuiserait la table sans ce recyclage. Une voix qui sonne n'est jamais volée.
+// A free slot, otherwise the OLDEST STOPPED voice. Without this recycling a program creating
+// oscillators on demand would exhaust the table, and a voice that is still sounding is never
+// stolen.
 //
-// Le rang de création décide, et non le premier slot venu : « le premier arrêté » martelait
-// toujours la voix 0 et ne touchait jamais les autres, si bien qu'un oscillateur pouvait
-// survivre à vingt créations quand son voisin ne survivait pas à une seule (constaté).
+// The creation rank decides, rather than the first slot that comes: "the first stopped one" kept
+// hammering voice 0 and never touched the others, so one oscillator could survive twenty creations
+// while its neighbour did not survive a single one (observed).
 uint64_t s_born_counter = 0;
 
 bool voice_sounding(const Voice& v) {
@@ -57,8 +57,8 @@ bool voice_sounding(const Voice& v) {
 int alloc_voice() {
     Voice* v = voices();
     for (int i = 0; i < k_max_voices; i++) {
-        // Rendue par `free` mais pas encore éteinte : le slot est libre, le SON non. La
-        // reprendre couperait la queue de note que le script vient de relâcher.
+        // Returned by `free` but not yet silent: the slot is free, the SOUND is not. Taking it back
+        // would cut off the note tail the script has just released.
         if (!v[i].used && !voice_sounding(v[i]))
             return i;
     }
@@ -97,8 +97,8 @@ int make_osc(const Value* args, int argc, const char* fn, int shape_forced) {
     return slot;
 }
 
-// La conversion est exposée telle quelle : un script qui construit une gamme a besoin du
-// nombre, pas seulement d'un oscillateur.
+// The conversion is exposed as such: a script building a scale needs the number, not only an
+// oscillator.
 int sound_note(CallCtx& ctx) {
     if (ctx.argc < 1 || !ctx.args[0].is_string())
         throw std::runtime_error("sound.note: expected a note name, like \"C#4\"");
@@ -109,8 +109,8 @@ int sound_osc(CallCtx& ctx) {
     return ctx.ret(make_handle(make_osc(ctx.args, ctx.argc, "sound.osc", -1)));
 }
 
-// Raccourcis par forme d'onde, comme p5 : plus lisibles qu'un nom passé en chaîne, et un
-// nom fautif y devient impossible.
+// Per-waveform shortcuts, as in p5: more readable than a name passed as a string, and a misspelled
+// name becomes impossible.
 template <int SHAPE>
 int sound_shape_factory(CallCtx& ctx) {
     static const char* k_fn[] = {"sound.sine", "sound.square", "sound.saw", "sound.triangle", "sound.noise"};
@@ -136,8 +136,8 @@ int method_is_playing(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(voices()[i].active.load(std::memory_order_relaxed)));
 }
 
-// Les accesseurs suivent la règle de `graphics.font` : sans argument ils LISENT, avec un
-// argument ils écrivent et rendent le handle, ce qui permet de les chaîner.
+// The accessors follow the graphics.font rule: with no argument they READ, with one they write and
+// return the handle, which makes them chainable.
 int method_freq(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.freq");
     double hz = sound_check_freq(ctx.args + 1, ctx.argc - 1, 0, "sound.freq");
@@ -174,9 +174,9 @@ int method_shape(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// L'enveloppe est portée par l'oscillateur, et non par un objet séparé comme dans p5 : là
-// elle peut moduler n'importe quel paramètre de Web Audio, ici elle n'a qu'une cible — le
-// volume d'une voix. Un second type de handle n'apporterait donc rien à retenir.
+// The envelope belongs to the oscillator rather than to a separate object as in p5: there it can
+// modulate any Web Audio parameter, here it has a single target — a voice's volume. A second kind of
+// handle would therefore add nothing worth remembering.
 int method_envelope(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.envelope");
     Voice& v = voices()[i];
@@ -197,8 +197,8 @@ int method_envelope(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// trigger([durée]) — joue la note. Sans durée elle est TENUE jusqu'à release() ; avec, le
-// relâchement part tout seul à l'échéance, ce qui suffit pour un bip ou une note de mélodie.
+// trigger([duration]) plays the note. Without a duration it is HELD until release(); with one, the
+// release starts by itself at the deadline, which is enough for a beep or a melody note.
 int method_trigger(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.trigger");
     double hold = sound_check_hold(ctx.args + 1, ctx.argc - 1, "sound.trigger");
@@ -206,8 +206,8 @@ int method_trigger(CallCtx& ctx) {
     v.env_used.store(true, std::memory_order_relaxed);
     v.env_hold.store(hold, std::memory_order_relaxed);
     v.gate.store(true, std::memory_order_relaxed);
-    // Le compteur est incrémenté EN DERNIER : c'est lui que le mélangeur observe pour
-    // repartir de l'attaque, et il doit trouver les autres paramètres déjà posés.
+    // The counter is incremented LAST: it is what the mixer watches to restart from the attack, and
+    // it must find the other parameters already set.
     v.trigger_id.fetch_add(1, std::memory_order_relaxed);
     audio_wake();
     sound_output_ensure();
@@ -221,14 +221,14 @@ int method_release(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// free() — « je n'en ai plus besoin ». Sans cela, un script ne pouvait PAS créer ses
-// oscillateurs à la demande : `alloc_voice` reprend la voix arrêtée la plus ancienne, donc
-// tout handle encore détenu risquait de désigner un slot recyclé (l'erreur est signalée, mais
-// le programme est cassé). D'où le pool pré-alloué que tout script polyphonique devait écrire.
+// free() means "I no longer need this". Without it a script could NOT create its oscillators on
+// demand: alloc_voice takes back the oldest stopped voice, so any handle still held risked
+// addressing a recycled slot — the error is reported, but the program is broken. Hence the
+// pre-allocated pool every polyphonic script had to write.
 //
-// La note n'est PAS coupée : on lâche l'enveloppe comme le ferait `release`, et le slot n'est
-// rendu qu'à l'extinction — `alloc_voice` refuse déjà une voix dont le gain n'est pas retombé.
-// Couper net produirait un clic, et perdrait la queue de note que le script vient de relâcher.
+// The note is NOT cut: the envelope is released as `release` would, and the slot is only handed back
+// once silent — alloc_voice already refuses a voice whose gain has not fallen. Cutting abruptly
+// would click, and would lose the note tail the script has just released.
 int method_free(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.free");
     Voice& v = voices()[i];
@@ -241,10 +241,10 @@ int method_free(CallCtx& ctx) {
 }
 
 
-// ── Tampons : un son CALCULÉ, qu'on déclenche ────────────────────────────────────
-// Même patron que les voix : table fixe, handle {slot, gen}. La différence est la durée de
-// vie des ÉCHANTILLONS, que le mélangeur lit depuis un autre fil — d'où le protocole de
-// réutilisation décrit dans sound_internal.h.
+// Buffers: a COMPUTED sound, triggered on demand.
+// Same pattern as the voices: a fixed table and a {slot, gen} handle. What differs is the lifetime
+// of the SAMPLES, which the mixer reads from another thread — hence the reuse protocol described in
+// sound_internal.h.
 
 Buf* bufs() {
     return sound_buffers();
@@ -271,9 +271,8 @@ int buffer_slot(const Value& self, const char* fn) {
     return i;
 }
 
-// Un slot libre, sinon le plus anciennement rendu — à condition qu'un bloc de mélange se
-// soit écoulé depuis. Sans cette attente, un bloc déjà en cours pourrait lire les
-// échantillons pendant qu'on les remplace.
+// A free slot, otherwise the one returned longest ago — provided a mix block has elapsed since.
+// Without that wait, a block already under way could read the samples while they are replaced.
 int alloc_buffer() {
     Buf* b = bufs();
     for (int i = 0; i < k_max_buffers; i++) {
@@ -311,8 +310,8 @@ int new_buffer(std::vector<float>&& samples) {
     return slot;
 }
 
-// Forme d'onde échantillonnée hors ligne. C'est la MÊME table de formes que l'oscillateur,
-// mais calculée ici une fois pour toutes : un tampon ne coûte plus rien à la lecture.
+// Waveform sampled offline. It is the SAME shape table as the oscillator's, but computed here once
+// and for all, so a buffer costs nothing to play.
 double wave_at(int shape, double phase, uint32_t& noise_state) {
     switch (shape) {
     case SHAPE_SQUARE:
@@ -352,9 +351,8 @@ int sound_tone(CallCtx& ctx) {
     return ctx.ret(make_buffer_handle(new_buffer(std::move(samples))));
 }
 
-// La formule du script est échantillonnée UNE fois, ici, sur le fil principal : elle
-// n'entre jamais dans le rappel audio, où exécuter du bytecode sous échéance dure
-// s'entendrait comme un craquement.
+// The script's formula is sampled ONCE, here, on the main thread: it never enters the audio
+// callback, where running bytecode under a hard deadline would be heard as a crackle.
 int sound_generate(CallCtx& ctx) {
     const char* FN = "sound.generate";
     double duration = sound_check_duration(ctx.args, ctx.argc, 0, FN);
@@ -367,8 +365,8 @@ int sound_generate(CallCtx& ctx) {
     double pas = 1.0 / (double)k_audio_sample_rate;
     for (size_t i = 0; i < n; i++) {
         Value r = vm->call_value(f, Value((double)i * pas));
-        // Une valeur non numérique vaut zéro : lever au 30 000ᵉ échantillon donnerait un
-        // message incompréhensible, et la formule est le plus souvent juste ailleurs.
+        // A non-numeric value counts as zero: throwing on the 30,000th sample would give an
+        // incomprehensible message, and the formula is usually right everywhere else.
         double v = r.is_number() ? r.as_num() : 0.0;
         samples[i] = (float)(v < -1.0 ? -1.0 : (v > 1.0 ? 1.0 : v));
     }
@@ -415,8 +413,8 @@ int buf_pan(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// `rate` change la vitesse de lecture, donc la hauteur ET la durée — comme un disque qu'on
-// accélère. C'est le nom de p5, et il dit bien qu'il ne s'agit pas d'une transposition.
+// `rate` changes the playback speed, hence both the pitch AND the length, like speeding up a
+// record. It is p5's name, and it makes clear this is not a transposition.
 int buf_rate(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.rate");
     if (ctx.argc < 2 || ctx.args[1].is_nil())
@@ -442,9 +440,9 @@ int buf_loop(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// ── Accesseurs : ce qui rend la synthèse VÉRIFIABLE ──────────────────────────────
-// Sans eux, la seule chose qu'un test puisse contrôler serait les refus : le conteneur
-// d'intégration n'a pas de carte son, et personne n'écoute.
+// Accessors: what makes synthesis VERIFIABLE.
+// Without them the only thing a test could check would be the refusals: the integration container
+// has no sound card, and nobody is listening.
 
 int buf_duration(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.duration");
@@ -462,9 +460,9 @@ int buf_peak(CallCtx& ctx) {
     return ctx.ret(Value(crete));
 }
 
-// Échantillon à l'instant t, en secondes. Hors du tampon : zéro, comme le silence qui
-// l'entoure — plutôt qu'une erreur, car un test qui balaie le temps dépasse volontiers la
-// fin de quelques microsecondes.
+// Sample at time t, in seconds. Outside the buffer it returns zero, like the surrounding silence,
+// rather than an error: a test sweeping over time readily overshoots the end by a few
+// microseconds.
 int buf_sample(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.sample");
     if (ctx.argc < 2 || !ctx.args[1].is_number())
@@ -479,9 +477,9 @@ int buf_sample(CallCtx& ctx) {
     return ctx.ret(Value((double)d[idx]));
 }
 
-// Enveloppe appliquée AUX ÉCHANTILLONS, une fois : un tampon n'a pas de note tenue, donc le
-// relâchement se termine exactement à la fin du son. C'est la même fonction que celle du
-// mélangeur (sound_env.h), si bien qu'un test sur un tampon valide la courbe des deux.
+// The envelope is applied TO THE SAMPLES, once: a buffer has no held note, so the release ends
+// exactly at the end of the sound. It is the same function the mixer uses (sound_env.h), so a test
+// on a buffer validates the curve for both.
 int buf_envelope(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.envelope");
     sound_check_envelope(ctx.args + 1, ctx.argc - 1, "sound.envelope");
@@ -548,14 +546,14 @@ Value osc_class() {
 
 } // namespace
 
-// La table de voix vit ICI, dans le fichier compilé partout : la sortie n'y accède que par
-// sound_voices(), donc le mélangeur n'a pas besoin de connaître le module.
+// The voice table lives HERE, in the file compiled everywhere: the output reaches it only through
+// sound_voices(), so the mixer needs to know nothing about the module.
 Voice* sound_voices() {
     static Voice table[k_max_voices];
     return table;
 }
 
-// Drapeau de pause : lu par le mélangeur à chaque bloc, écrit par la session (module audio).
+// Pause flag: read by the mixer on every block, written by the session (the audio module).
 std::atomic<bool>& paused_flag() {
     static std::atomic<bool> paused{false};
     return paused;
@@ -576,9 +574,9 @@ Buf* sound_buffers() {
 
 void sound_reset() {
     sound_set_paused(false);
-    // Les tampons sont TUS mais leurs échantillons ne sont pas libérés : un bloc de mélange
-    // déjà en cours peut encore les lire, et rien ne presse — le slot sera réutilisé plus
-    // tard, une fois qu'un bloc se sera écoulé (cf. alloc_buffer).
+    // The buffers are SILENCED but their samples are not freed: a mix block already under way may
+    // still read them, and there is no hurry — the slot will be reused later, once a block has
+    // elapsed (see alloc_buffer).
     Buf* b = sound_buffers();
     for (int i = 0; i < k_max_buffers; i++) {
         b[i].playing.store(false, std::memory_order_relaxed);
