@@ -7,41 +7,39 @@
 #include <emscripten.h>
 #endif
 
-// Multitouche, build AVEC raylib.
+// Multitouch, build WITH raylib.
 //
-// Tout le travail est un DIFF : raylib expose l'état courant (GetTouchPointCount,
-// GetTouchPointId, GetTouchPosition) et rien d'autre. On garde donc la liste de l'image
-// précédente et on la compare, ce qui donne les trois événements que le script attend.
+// All the work is a DIFF: raylib exposes the current state (GetTouchPointCount, GetTouchPointId,
+// GetTouchPosition) and nothing else. We therefore keep the previous frame's list and compare, which
+// yields the three events the script expects.
 //
-// MAIS cette liste MENT dans deux cas, et le module ne peut pas la recopier telle quelle :
+// BUT that list LIES in two cases, and the module cannot copy it as is:
 //
-// 1. Deux doigts levés dans le MÊME événement. emscripten transmet l'UNION des doigts
-//    encore posés (`e.touches`) et de ceux qui viennent de se lever (`e.changedTouches`),
-//    et raylib, qui n'en retire qu'un seul par événement (il sort de sa boucle au premier),
-//    laisse l'autre dans sa liste jusqu'au prochain événement tactile — parfois jamais. Ce
-//    cas est couvert par CONSTRUCTION (l'identifiant levé est mémorisé) et NON par mesure :
-//    le harnais de test, aux événements synthétiques, ne le reproduit pas.
-// 2. Perte de focus (onglet changé, application quittée) : le navigateur n'envoie AUCUN
-//    touchend, donc tous les doigts restent « posés » indéfiniment. `IsWindowFocused()` ne
-//    suffit pas — MESURÉ : avec le seul test de focus, une note tenue continuait de sonner
-//    après un `blur`.
+// 1. Two fingers lifted in the SAME event. emscripten passes the UNION of the fingers still down
+//    (e.touches) and those that have just lifted (e.changedTouches), and raylib, which removes only
+//    one per event — it leaves its loop at the first — keeps the other in its list until the next
+//    touch event, sometimes forever. This case is covered by CONSTRUCTION (the lifted identifier is
+//    remembered) and NOT by measurement: the test harness, with its synthetic events, does not
+//    reproduce it.
+// 2. Focus loss (tab switched, application left): the browser sends NO touchend at all, so every
+//    finger stays "down" indefinitely. IsWindowFocused() is not enough — MEASURED: with only that
+//    focus test, a held note kept sounding after a blur.
 //
-// Dans les deux cas le script verrait un contact fantôme, et une note tenue par ce contact ne
-// s'arrêterait plus. On écoute donc le navigateur — mais SEULEMENT pour retirer.
+// In both cases the script would see a phantom contact, and a note held by that contact would never
+// stop. So we listen to the browser — but ONLY to remove.
 //
-// SENS DU FILTRE, à ne pas inverser : le navigateur sert de preuve de LEVER, jamais
-// d'autorisation de poser. Prendre sa liste de doigts posés pour la vérité et n'accepter que
-// ce qu'elle contient a été essayé, et perdait des contacts encore appuyés sur un vrai
-// téléphone : tout ce que cette liste ignore — un événement manqué, un identifiant que la
-// couche graphique renumérote, un focus rapporté à faux le temps d'une barre d'adresse —
-// devenait une annulation. Un doute doit laisser le doigt vivant ; seul un `touchend`, un
-// `touchcancel` ou une perte de focus le tue. La non-régression est MESURÉE : un contact que
-// le navigateur ne mentionne plus dans aucune liste reste vivant.
+// DIRECTION OF THE FILTER, never to be inverted: the browser is proof of a LIFT, never permission to
+// press. Taking its list of pressed fingers as the truth and accepting only what it contains was
+// tried, and lost contacts that were still pressed on a real phone: everything that list ignores — a
+// missed event, an identifier renumbered by the graphics layer, a focus wrongly reported for as long
+// as an address bar is up — became a cancellation. A doubt must leave the finger alive; only a
+// touchend, a touchcancel or a focus loss kills it. The absence of regression is MEASURED: a contact
+// the browser no longer mentions in any list stays alive.
 
 namespace {
 
-// raylib suit jusqu'à MAX_TOUCH_POINTS contacts (8 par défaut). La table est de taille fixe :
-// un doigt de plus est simplement ignoré, comme le fait raylib lui-même.
+// raylib tracks up to MAX_TOUCH_POINTS contacts, 8 by default. The table has a fixed size, and one
+// finger more is simply ignored, exactly as raylib itself ignores it.
 constexpr int k_max_points = 8;
 
 struct Point {
@@ -54,12 +52,12 @@ Point s_prev[k_max_points];
 int s_prev_count = 0;
 
 #ifdef __EMSCRIPTEN__
-// Écoute en CAPTURE sur window : on n'intercepte rien à raylib, qui garde ses propres écouteurs
-// et son émulation de la souris. Deux ensembles, aux rôles bien distincts :
-//   `__ollinTouchHeld` — miroir de `e.touches`, qui ne sert QU'À alimenter le second au blur ;
-//   `__ollinTouchGone` — les identifiants dont on a VU le lever, seul ensemble que le filtre lit.
-// Un identifiant sort de `Gone` dès qu'un doigt se repose avec ce numéro : le navigateur les
-// recycle, et sans cela le doigt suivant naîtrait déjà mort.
+// Listening in CAPTURE on window: nothing is intercepted from raylib, which keeps its own listeners
+// and its mouse emulation. Two sets, with clearly distinct roles:
+//   __ollinTouchHeld — a mirror of e.touches, whose ONLY purpose is to feed the second one on blur;
+//   __ollinTouchGone — the identifiers whose lift we have SEEN, the only set the filter reads.
+// An identifier leaves Gone as soon as a finger presses again with that number: the browser recycles
+// them, and without this the next finger would be born already dead.
 void install_dom_watch() {
     static bool installed = false;
     if (installed)
@@ -81,8 +79,8 @@ void install_dom_watch() {
                 window.__ollinTouchGone.add(e.changedTouches[i].identifier);
             poses(e);
         };
-        // Pas de littéral de tableau ni d'objet ici : EM_ASM est une MACRO, et une virgule
-        // hors parenthèses y sépare ses arguments — le bloc ne compile alors plus.
+        // No array or object literal here: EM_ASM is a MACRO, and a comma outside parentheses
+        // separates its arguments, at which point the block no longer compiles.
         var opt = { capture: true };
         opt.passive = true;
         var brancher = function(noms, fn) {
@@ -92,8 +90,8 @@ void install_dom_watch() {
         };
         brancher('touchstart touchmove', poses);
         brancher('touchend touchcancel', lifted);
-        // Perte de focus : aucun touchend n'arrive, donc on déclare levés tous les doigts que
-        // l'on savait posés. C'est la seule raison d'être de `__ollinTouchHeld`.
+        // Focus loss: no touchend arrives, so we declare lifted every finger we knew was down. That
+        // is the only reason __ollinTouchHeld exists.
         var abandon_all = function() {
             window.__ollinTouchHeld.forEach(function(id) { window.__ollinTouchGone.add(id); });
             window.__ollinTouchHeld = new Set();
@@ -106,13 +104,13 @@ void install_dom_watch() {
     });
 }
 
-// UNE traversée de la frontière JavaScript par image : on passe les identifiants que raylib
-// rapporte et l'on récupère, en un masque de bits, ceux dont le lever a été vu. Interroger
-// l'ensemble contact par contact coûtait un aller-retour par doigt.
+// ONE crossing of the JavaScript boundary per frame: we pass the identifiers raylib reports and get
+// back, as a bit mask, those whose lift has been seen. Querying the set contact by contact cost one
+// round trip per finger.
 //
-// Le même passage OUBLIE les identifiants levés que raylib ne rapporte plus : il n'y a alors
-// plus de fantôme à filtrer, et sans cet oubli l'ensemble grossirait toute la session (le
-// navigateur ne recycle pas forcément ses identifiants).
+// The same pass FORGETS the lifted identifiers raylib no longer reports: there is then no phantom
+// left to filter, and without that forgetting the set would grow for the whole session, since the
+// browser does not necessarily recycle its identifiers.
 int lifted_mask(const int* ids, int n) {
     return EM_ASM_INT({
         var partis = window.__ollinTouchGone;
@@ -144,8 +142,8 @@ void forget_all_lifted() {
 void install_dom_watch() {
 }
 
-// Hors navigateur, la liste de raylib est la seule source, et le cas des levers simultanés
-// n'existe pas : le bureau ne rapporte aucun contact tactile.
+// Outside the browser raylib's list is the only source, and simultaneous lifts do not arise: the
+// desktop reports no touch contacts at all.
 int lifted_mask(const int*, int) {
     return 0;
 }
@@ -166,21 +164,21 @@ Value callback(const Value& m, const char* nom) {
     return m.map_get(Value(std::string(nom)));
 }
 
-// Relevé filtré de l'image courante, établi UNE fois par `touch_begin_frame` : l'état que
-// lisent `count` et `points` est exactement celui que les rappels ont vu.
+// Filtered sample of the current frame, taken ONCE by touch_begin_frame: the state count and points
+// read is exactly the one the callbacks saw.
 Point s_cur[k_max_points];
 int s_cur_count = 0;
 
 void sample_contacts() {
-    // Pas de test de focus ici : `IsWindowFocused()` répond faux sur un vrai téléphone dès
-    // qu'un ornement du navigateur prend la main, et coupait alors des doigts encore posés.
+    // No focus test here: IsWindowFocused() answers false on a real phone as soon as a browser
+    // ornament takes over, and it then cut off fingers that were still down.
     int brut = GetTouchPointCount();
     if (brut > k_max_points)
         brut = k_max_points;
-    // Aucun contact rapporté : aucun fantôme possible, donc rien à filtrer et l'ensemble des
-    // identifiants levés ne sert plus à rien. On ne franchit la frontière qu'à la TRANSITION,
-    // sans quoi une image sans le moindre doigt — la quasi-totalité d'un programme — paierait
-    // un aller-retour pour recevoir un masque nul.
+    // No contact reported means no phantom is possible, so there is nothing to filter and the set of
+    // lifted identifiers is of no further use. We cross the boundary only at the TRANSITION, since
+    // otherwise a frame without a single finger — nearly all of a program — would pay a round trip to
+    // receive an empty mask.
     if (brut == 0) {
         s_cur_count = 0;
         if (s_prev_count > 0)
@@ -207,11 +205,11 @@ int touch_count(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)s_cur_count));
 }
 
-// Les contacts en cours, sous forme de tableau de {id, x, y} : de quoi dessiner un retour
-// visuel ou piloter une manette à deux doigts sans passer par les rappels.
+// The current contacts, as an array of {id, x, y}: enough to draw visual feedback or drive a
+// two-finger control without going through the callbacks.
 int touch_points(CallCtx& ctx) {
-    // Clés internées une fois : un script qui lit `points()` à chaque image pour dessiner un
-    // retour visuel construisait sinon trois chaînes par contact et par appel.
+    // The keys are interned once: a script reading points() every frame to draw feedback would
+    // otherwise build three strings per contact per call.
     static const Value K_ID(std::string("id")), K_X(std::string("x")), K_Y(std::string("y"));
     Value arr = Value::make_array();
     for (int i = 0; i < s_cur_count; i++) {
@@ -226,12 +224,11 @@ int touch_points(CallCtx& ctx) {
 
 } // namespace
 
-// Le relevé est une étape de la frame À PART ENTIÈRE, et non le début de `touch_poll` : les
-// rappels de `mouse` s'exécutent AVANT, et beaucoup interrogent `touch.count()` pour savoir si
-// le geste vient d'un doigt (le système émule la souris sur un doigt unique). Relever dans
-// `touch_poll` rendait donc cette lecture en retard d'une image — un doigt posé y était vu
-// comme « aucun contact », et l'émulation de la souris s'attribuait le geste (constaté :
-// l'archet de `sound_demo` ne suivait plus le doigt).
+// Sampling is a frame step IN ITS OWN RIGHT, not the beginning of touch_poll: the `mouse` callbacks
+// run BEFORE, and many of them query touch.count() to know whether the gesture comes from a finger
+// (the system emulates the mouse for a single finger). Sampling inside touch_poll left that reading
+// one frame behind — a finger already down was seen as "no contact", and the mouse emulation claimed
+// the gesture. Observed: the bow in sound_demo no longer followed the finger.
 void touch_begin_frame() {
     install_dom_watch();
     sample_contacts();
@@ -246,9 +243,9 @@ void touch_poll() {
     Value moved = callback(m, "moved");
     Value ended = callback(m, "ended");
 
-    // Posés et déplacés : un identifiant absent de l'image précédente est un doigt nouveau.
-    // Trois arguments passent par la forme générique de call_value : le VM n'offre pas de
-    // surcharge à trois, et en ajouter une pour un seul appelant ne se justifie pas.
+    // Presses and moves: an identifier absent from the previous frame is a new finger. Three
+    // arguments go through the generic form of call_value, since the VM has no three-argument
+    // overload and adding one for a single caller would not be justified.
     for (int i = 0; i < s_cur_count; i++) {
         int j = index_of(s_prev, s_prev_count, s_cur[i].id);
         Value args[3] = {Value((int64_t)s_cur[i].id), Value((double)s_cur[i].x), Value((double)s_cur[i].y)};
@@ -260,8 +257,8 @@ void touch_poll() {
         }
     }
 
-    // Levés : un identifiant de l'image précédente qui a disparu. On rend sa DERNIÈRE
-    // position connue — celle du lever n'est plus lisible, raylib ayant retiré le point.
+    // Lifts: an identifier from the previous frame that has vanished. We report its LAST known
+    // position, the one at lift-off no longer being readable since raylib removed the point.
     for (int i = 0; i < s_prev_count; i++) {
         if (index_of(s_cur, s_cur_count, s_prev[i].id) >= 0)
             continue;
@@ -272,8 +269,8 @@ void touch_poll() {
         }
     }
 
-    // La liste courante devient la référence de l'image suivante. Copiée APRÈS les appels :
-    // un rappel du script peut lever une erreur, et l'état resterait alors cohérent.
+    // The current list becomes the next frame's reference. It is copied AFTER the calls, so that if
+    // a script callback throws, the state stays consistent.
     for (int i = 0; i < s_cur_count; i++)
         s_prev[i] = s_cur[i];
     s_prev_count = s_cur_count;
@@ -284,8 +281,8 @@ void touch_reset() {
     s_cur_count = 0;
 }
 
-// Le module est une map vide : le script y affecte began / moved / ended, et lit count /
-// points. Même patron que `mouse`.
+// The module is an empty map: the script assigns began, moved and ended to it, and reads count and
+// points. Same pattern as `mouse`.
 Value make_touch_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("count")), Value::make_builtin(touch_count));

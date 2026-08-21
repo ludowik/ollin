@@ -5,21 +5,20 @@
 #include <string>
 #include <vector>
 
-// Module `tween` : fait évoluer un champ d'objet (ou une variable passée par `ref`) de sa
-// valeur COURANTE vers une valeur cible, sur une durée, selon une courbe.
+// The `tween` module moves an object's field — or a variable passed by `ref` — from its CURRENT
+// value to a target, over a duration, along a curve.
 //
-// Le moteur avance les tweens à chaque frame (tween_update_all) : rien à câbler dans
-// draw(), et c'est la raison d'être d'un module natif — une classe Ollin devrait réclamer
-// un appel par frame, dont l'oubli est le premier bug d'une bibliothèque de ce genre.
+// The engine advances the tweens every frame (tween_update_all), so nothing has to be wired into
+// draw(), and that is the very reason for a native module: an Ollin class would require a call per
+// frame, and forgetting it is the first bug of any library of this kind.
 //
-// Aucune dépendance graphique : le module tourne à l'identique en natif headless, où
-// tween.update(dt) le pilote à la main (tests).
+// No graphics dependency: the module runs identically in the headless native build, where
+// tween.update(dt) drives it by hand for the tests.
 
 namespace {
 
-// ── Courbes ─────────────────────────────────────────────────────────────────────
-// Toutes prennent et rendent une progression normalisée sur [0;1]. Les noms exposés
-// vivent dans des littéraux de chaîne, donc en camelCase comme le reste de l'API Ollin.
+// They all take and return a progress normalized to [0;1]. The exposed names live in string
+// literals, hence camelCase like the rest of the Ollin API.
 
 double ease_linear(double t) {
     return t;
@@ -83,7 +82,7 @@ double ease_in_out_expo(double t) {
     return 1.0 - 0.5 * std::pow(2.0, 10.0 - 20.0 * t);
 }
 
-// Le dépassement de `back` vient de la constante 1,70158 du modèle de Penner.
+// The overshoot of `back` comes from the 1.70158 constant of Penner's model.
 double ease_in_back(double t) {
     return t * t * (2.70158 * t - 1.70158);
 }
@@ -172,10 +171,9 @@ int curve_index(const std::string& name, const char* fn) {
     throw std::runtime_error(std::string(fn) + ": unknown curve '" + name + "' — available: " + curve_names());
 }
 
-// ── État ────────────────────────────────────────────────────────────────────────
 
-// Un canal = UN champ numérique animé. Une cible structurée (un Color, un Vec2) en
-// produit un par composante, si bien que le reste du module ne connaît que des nombres.
+// A channel is ONE animated numeric field. A structured target (a Color, a Vec2) produces one per
+// component, so the rest of the module only ever deals with numbers.
 struct Chan {
     Value holder;   // map/instance dont on écrit la clé ; nil quand la cible est une `ref`
     Value ref;      // référence (`ref x`) ; nil quand holder est posé
@@ -185,29 +183,29 @@ struct Chan {
     bool integral = false;   // départ ET cible entiers → on arrondit (pas de dérive en float)
 };
 
-// Une ÉTAPE de la suite : les canaux qu'elle anime, sa durée et sa courbe. Une étape sans
-// canal est une attente pure (`{delay: 0.2}` dans une séquence). `tween.to` et `tween.value`
-// créent une suite d'UNE étape : tout le module ne connaît donc qu'un seul chemin, et une
-// séquence n'est pas un cas particulier.
+// A STEP of the sequence: the channels it animates, its duration and its curve. A step with no
+// channel is a pure wait ({delay: 0.2} inside a sequence). tween.to and tween.value create a
+// one-step sequence, so the whole module knows a single path and a sequence is not a special
+// case.
 struct Step {
     std::vector<Chan> chans;
     bool is_wait = false;   // étape déclarée sans `to` : elle ne fait que laisser passer du temps
     bool started = false;  // bornes déjà lues ? (au PREMIER passage seulement — un retour
-                            // rejoue les mêmes bornes, sinon il ne va nulle part)
+                            // replays the same bounds, otherwise it goes nowhere)
     double dur = 0.0;
     int curve = k_curve_default;
     Value curve_fn;   // curve fournie par le script (prioritaire sur `curve`)
 };
 
-// Plan de LECTURE : un segment par parcours de la SUITE, +1 dans le sens déclaré,
-// -1 en arrière. `repeat(n)` répète la liste ; son second paramètre y ajoute le miroir de
-// tout le plan (liste renversée, sens inversés). Deux appels COMPOSENT, chacun agissant sur
-// le plan construit jusque-là, donc l'ordre compte :
-//   .repeat(2)                    → +1 +1          (deux allers)
-//   .repeat(2, true)              → +1 +1 -1 -1    (deux allers, puis les deux retours)
-//   .repeat(nil, true).repeat(2)  → +1 -1 +1 -1    (deux allers-retours)
-// Un plan vide n'existe pas : tout tween démarre avec un segment. Un segment de sens -1
-// rejoue les étapes en ordre INVERSE, chacune à l'envers.
+// PLAYBACK plan: one segment per pass over the SEQUENCE, +1 in the declared direction and -1
+// backwards. repeat(n) repeats the list; its second parameter appends the mirror of the whole plan
+// (list reversed, directions flipped). Two calls COMPOSE, each acting on the plan built so far, so
+// the order matters:
+//   .repeat(2)                    -> +1 +1          (two forward passes)
+//   .repeat(2, true)              -> +1 +1 -1 -1    (two forward, then the two back)
+//   .repeat(nil, true).repeat(2)  -> +1 -1 +1 -1    (two round trips)
+// An empty plan does not exist: every tween starts with one segment. A -1 segment replays the steps
+// in REVERSE order, each one backwards.
 struct Tw {
     std::vector<Step> steps;
     size_t pos = 0;      // étape en cours, comptée dans l'ordre du segment courant
@@ -227,16 +225,15 @@ struct Tw {
 std::vector<Tw> s_tweens;
 std::vector<int> s_free;
 bool s_engine_driven = false;
-// Numéro de la passe d'avancement en cours. Un tween déclaré PENDANT une passe (par une
-// courbe ou un rappel) ne doit pas y être avancé : il consommerait un pas de temps
-// antérieur à sa naissance. Sans ce compteur, le résultat dépendrait du slot obtenu —
-// au-dessus de l'index courant il était avancé, sur un slot recyclé plus bas il ne
-// l'était pas.
+// Number of the advance pass under way. A tween declared DURING a pass — by a curve or a callback —
+// must not be advanced in it: it would consume a time step from before it existed. Without this
+// counter the outcome depended on the slot obtained: above the current index it was advanced, on a
+// recycled slot lower down it was not.
 uint64_t s_pass = 0;
 
 void advance(double dt);
 
-// Durée d'un parcours complet de la suite (identique dans les deux sens).
+// Duration of one full pass over the sequence, the same in both directions.
 double cycle_duration(const Tw& t) {
     double d = 0.0;
     for (const auto& e : t.steps)
@@ -244,8 +241,8 @@ double cycle_duration(const Tw& t) {
     return d;
 }
 
-// Index RÉEL de la k-ième étape du segment courant : un segment de sens -1 rejoue la suite
-// en ordre inverse, donc la k-ième jouée est l'avant-dernière, etc.
+// REAL index of the k-th step of the current segment: a -1 segment replays the sequence in reverse,
+// so the k-th played is the last but one, and so on.
 size_t step_index(const Tw& t, size_t k) {
     return t.plan[t.seg] > 0 ? k : t.steps.size() - 1 - k;
 }
@@ -281,9 +278,9 @@ void free_tween(int slot) {
     s_free.push_back(slot);
 }
 
-// ── Handles côté script : instance de classe native portant {slot, gen} ─────────
-// Jamais un pointeur : déclarer un tween depuis un rappel de fin fait push_back sur
-// s_tweens, ce qui invaliderait toute référence conservée.
+// Script-side handles: a native class instance carrying {slot, gen}.
+// Never a pointer: declaring a tween from a completion callback push_backs onto s_tweens, which
+// would invalidate any reference kept.
 
 Value tween_class();
 
@@ -295,8 +292,8 @@ Value make_handle(int slot) {
     return h;
 }
 
-// Slot d'un handle, ou -1 si le tween est terminé/annulé (un handle périmé n'est PAS une
-// faute : garder le handle d'une animation finie est normal).
+// A handle's slot, or -1 when the tween is finished or cancelled. A stale handle is NOT a mistake:
+// keeping the handle of a finished animation is perfectly normal.
 int handle_slot(const Value& self, const char* fn) {
     Value slot = self.map_get(Value(std::string("slot")));
     Value gen = self.map_get(Value(std::string("gen")));
@@ -307,9 +304,9 @@ int handle_slot(const Value& self, const char* fn) {
     return (int)slot.as_int();
 }
 
-// Un handle de tween est une map comme une autre : sans ce test il serait pris pour l'objet
-// à animer, et le refus parlerait d'un champ '__class__' absent au lieu de dire ce qui est
-// réellement en cause (imbrication non prise en charge).
+// A tween handle is a map like any other: without this test it would be taken for the object to
+// animate, and the refusal would complain about a missing '__class__' field instead of naming the
+// real cause, which is that nesting is not supported.
 bool is_tween_handle(const Value& v) {
     if (!v.is_map())
         return false;
@@ -317,16 +314,15 @@ bool is_tween_handle(const Value& v) {
     return cls.is_class() && cls.as_map() == tween_class().as_map();
 }
 
-// ── Construction des canaux ─────────────────────────────────────────────────────
 
 bool is_object(const Value& v) {
     return v.is_map() || v.is_class();
 }
 
-// Champs numériques communs à deux instances de MÊME classe (Color → r,g,b,a ; un Vec2
-// utilisateur → x,y). L'interpolation est donc structurelle : aucun type n'est câblé ici.
-// Écrit DANS l'instance courante (`cur`), qui joue elle-même le rôle de holder : le tween
-// modifie l'objet, il ne le remplace pas.
+// Numeric fields common to two instances of the SAME class: r,g,b,a for a Color, x,y for a
+// user-defined Vec2. The interpolation is therefore structural, and no type is hard-wired here. It
+// writes INTO the current instance (`cur`), which acts as its own holder: the tween modifies the
+// object, it does not replace it.
 void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt, const std::string& field,
                       const char* fn) {
     Value cls_a = cur.map_get(Value(std::string("__class__")));
@@ -358,9 +354,9 @@ void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt
 
 void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, const Value& cur, const Value& tgt,
               const char* fn) {
-    // Copie, PAS une référence : les deux branches du ternaire ont des types différents,
-    // donc le résultat est un temporaire — une `const std::string&` serait pendante dès la
-    // fin de l'instruction, et les messages d'erreur ci-dessous liraient n'importe quoi.
+    // A copy, NOT a reference: the two branches of the ternary have different types, so the result
+    // is a temporary — a const std::string& would dangle at the end of the statement, and the error
+    // messages below would read garbage.
     std::string field = key.is_string() ? key.as_string() : std::string("(ref)");
     if (cur.is_number() && tgt.is_number()) {
         Chan c;
@@ -380,9 +376,9 @@ void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, con
                              " → " + tgt.type_name() + ") — expected a number or a class instance");
 }
 
-// Annule les canaux qui visent déjà (holder, clé) : sans cela deux tweens se battraient
-// pour le même champ et le résultat dépendrait de l'ordre d'itération. Un tween qui perd
-// tous ses canaux est libéré, mais son rappel de fin n'est PAS appelé (il n'a pas fini).
+// Cancels the channels already targeting (holder, key): without this two tweens would fight over the
+// same field and the outcome would depend on the iteration order. A tween that loses all its channels
+// is freed, but its completion callback is NOT called — it did not finish.
 void drop_conflicts(const std::vector<Chan>& chans) {
     for (int i = 0; i < (int)s_tweens.size(); i++) {
         if (!s_tweens[i].alive)
@@ -394,9 +390,8 @@ void drop_conflicts(const std::vector<Chan>& chans) {
                 if (!is_object(mine[c].holder))
                     continue;
                 for (const auto& nc : chans) {
-                    // Même champ = même objet (identité du Map*) ET même clé (chaînes
-                    // internées → comparaison de pointeur suffisante, mais map_get reste
-                    // explicite).
+                    // Same field means the same object (Map* identity) AND the same key. Interned
+                    // strings would make a pointer comparison enough, but map_get stays explicit.
                     if (is_object(nc.holder) && mine[c].holder.as_map() == nc.holder.as_map() &&
                         mine[c].key.is_string() && nc.key.is_string() &&
                         mine[c].key.as_string() == nc.key.as_string()) {
@@ -405,8 +400,8 @@ void drop_conflicts(const std::vector<Chan>& chans) {
                     }
                 }
             }
-            // Une étape d'ATTENTE n'a légitimement aucun canal : elle compte comme du travail
-            // restant, sinon écraser un champ annulerait la séquence entière.
+            // A WAIT step legitimately has no channel: it counts as work remaining, otherwise
+            // overwriting one field would cancel the whole sequence.
             if (!mine.empty() || step.is_wait)
                 reste = true;
         }
@@ -415,13 +410,13 @@ void drop_conflicts(const std::vector<Chan>& chans) {
     }
 }
 
-// Canaux d'une table {champ: cible} vers un objet : la validation des clés et la lecture des
-// valeurs de départ, écrites deux fois auparavant. `fn` préfixe les messages — « tween.to »
-// pour l'un, « tween.sequence: étape N » pour l'autre.
+// Channels from a {field: target} table onto an object: key validation and reading the start values,
+// which used to be written twice. `fn` prefixes the messages — "tween.to" for one caller,
+// "tween.sequence: step N" for the other.
 void add_map_chans(std::vector<Chan>& out, const Value& objet, const Value& vers, const char* fn) {
-    // Les deux seules façons de passer un tween là où on attend des nombres. Sans ces deux
-    // tests le handle serait animé comme une map ordinaire, et le refus parlerait d'un champ
-    // '__class__' absent.
+    // The only two ways to pass a tween where numbers are expected. Without these tests the handle
+    // would be animated like an ordinary map, and the refusal would complain about a missing
+    // '__class__' field.
     if (is_tween_handle(vers))
         throw std::runtime_error(std::string(fn) +
                                  ": a tween cannot be a target — sequences do not nest");
@@ -438,7 +433,7 @@ void add_map_chans(std::vector<Chan>& out, const Value& objet, const Value& vers
     }
 }
 
-// Triage d'une courbe donnée par le script : un nom, ou une fonction.
+// Sorting out a curve given by the script: either a name or a function.
 void read_curve(const Value& v, int& curve, Value& curve_fn, const char* fn) {
     if (v.is_string())
         curve = curve_index(v.as_string(), fn);
@@ -448,8 +443,8 @@ void read_curve(const Value& v, int& curve, Value& curve_fn, const char* fn) {
         throw std::runtime_error(std::string(fn) + ": expected a curve: a name or a function");
 }
 
-// Reconnaît les deux derniers arguments par leur TYPE (chaîne/fonction = courbe,
-// fonction = rappel de fin), donc aucun ordre imposé — comme ui.slider.
+// Recognizes the last two arguments by their TYPE — a string or function is the curve, a function the
+// completion callback — so no order is imposed, as in ui.slider.
 void read_options(const Value* args, int argc, int first, int& curve, Value& curve_fn, Value& on_done,
                   const char* fn) {
     for (int i = first; i < argc; i++) {
@@ -470,8 +465,8 @@ void read_options(const Value* args, int argc, int first, int& curve, Value& cur
     }
 }
 
-// Fin commune à tween.to, tween.value et tween.sequence : allouer, poser les étapes et le
-// rappel de fin, rendre le handle. Les trois l'écrivaient à l'identique.
+// The tail shared by tween.to, tween.value and tween.sequence: allocate, install the steps and the
+// completion callback, return the handle. All three used to write it identically.
 int creer_tween(std::vector<Step>&& steps, const Value& on_done) {
     int slot = alloc_tween();
     Tw& t = s_tweens[slot];
@@ -481,7 +476,7 @@ int creer_tween(std::vector<Step>&& steps, const Value& on_done) {
     return slot;
 }
 
-// Étape d'UNE animation : le cas de tween.to et tween.value.
+// The single step of ONE animation: the tween.to and tween.value case.
 Step etape_simple(std::vector<Chan>&& chans, double dur, int curve, const Value& curve_fn) {
     Step e;
     e.chans = std::move(chans);
@@ -498,9 +493,8 @@ double duration_arg(const Value* args, int argc, int i, const char* fn) {
     return d;
 }
 
-// ── API ─────────────────────────────────────────────────────────────────────────
 
-// tween.to(objet, {champ: cible, …}, durée [, courbe] [, surFin])
+// tween.to(object, {field: target, …}, duration [, curve] [, onDone])
 int tween_to(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -526,7 +520,7 @@ int tween_to(CallCtx& ctx) {
     return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
 }
 
-// tween.value(ref v, cible, durée [, courbe] [, surFin])
+// tween.value(ref v, target, duration [, curve] [, onDone])
 int tween_value(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -555,24 +549,24 @@ int tween_value(CallCtx& ctx) {
         throw std::runtime_error(std::string("tween.value: valeur non interpolable (") + cur.type_name() + " → " +
                                  args[1].type_name() + ")");
     }
-    // Deux `ref x` distincts sont deux maps différentes : on ne peut pas reconnaître
-    // qu'ils désignent la même variable, donc pas d'écrasement automatique ici (les
-    // canaux structurés, qui écrivent dans une instance, sont eux bien dédoublonnés).
+    // Two distinct `ref x` are two different maps: we cannot tell that they denote the same
+    // variable, so there is no automatic overwrite here. Structured channels, which write into an
+    // instance, are properly deduplicated.
     drop_conflicts(chans);
     std::vector<Step> steps;
     steps.push_back(etape_simple(std::move(chans), dur, curve, curve_fn));
     return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
 }
 
-// tween.sequence(objet, [ {to: {champ: cible}, delay: secondes [, courbe: nom] [, target: objet]}, … ])
+// tween.sequence(object, [ {to: {field: target}, delay: seconds [, curve: name] [, target: object]}, … ])
 //
-// Une SUITE d'étapes jouées l'une après l'autre. La clé de temps est `delay` dans les deux
-// rôles : durée de l'animation quand l'étape porte `to`, simple attente sinon — une seule clé
-// de temps, dont le sens se lit à la présence de `to`.
+// A SEQUENCE of steps played one after another. The time key is `delay` in both roles: the animation's
+// duration when the step carries `to`, a plain wait otherwise — a single time key, whose meaning is
+// read from the presence of `to`.
 //
-// Toute clé inconnue est REFUSÉE avec la liste des clés admises : sans ce refus, un
-// `duration` ou un `easing` mal choisi serait ignoré en silence et l'étape partirait sans
-// durée. C'est la faute qu'on cherche le plus longtemps.
+// Any unknown key is REFUSED along with the list of accepted ones: without that refusal a mistaken
+// `duration` or `easing` would be silently ignored and the step would start with no duration. That is
+// the mistake one hunts for the longest.
 int tween_sequence(CallCtx& ctx) {
     static constexpr const char* FN = "tween.sequence";
     Value* args = ctx.args;
@@ -587,9 +581,9 @@ int tween_sequence(CallCtx& ctx) {
     if (nb == 0)
         throw std::runtime_error(std::string(FN) + ": the sequence is empty");
 
-    // Après la liste, un SEUL argument est admis : le rappel de fin. On ne passe pas par
-    // read_options, qui prendrait une chaîne pour une courbe — or la courbe se déclare par
-    // étape, et une chaîne nommant la courbe par défaut y était acceptée sans effet.
+    // After the list only ONE argument is accepted: the completion callback. We do not go through
+    // read_options, which would take a string for a curve — and the curve is declared per step, so a
+    // string naming a default curve used to be accepted there with no effect.
     Value on_done;
     for (int i = 2; i < argc; i++) {
         if (args[i].is_nil())
@@ -649,8 +643,8 @@ int tween_sequence(CallCtx& ctx) {
         steps.push_back(std::move(e));
     }
 
-    // Une seule passe d'annulation pour TOUTE la séquence : appelée par étape, elle pouvait
-    // libérer un tween à qui il restait des canaux visés par une étape suivante.
+    // A single cancellation pass for the WHOLE sequence: called per step, it could free a tween that
+    // still had channels targeted by a later step.
     drop_conflicts(tous);
     return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
 }
@@ -679,9 +673,9 @@ int tween_curves(CallCtx& ctx) {
     return ctx.ret(a);
 }
 
-// tween.update(dt) — pilotage manuel, pour un programme SANS boucle graphique (tests,
-// natif headless). No-op dès que le moteur avance les tweens lui-même, sinon un appel
-// laissé dans draw() doublerait la vitesse.
+// tween.update(dt) drives the module by hand, for a program with NO render loop (tests, headless
+// native). It is a no-op as soon as the engine advances the tweens itself, otherwise a call left in
+// draw() would double the speed.
 int tween_update(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -691,10 +685,9 @@ int tween_update(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── Méthodes du handle ──────────────────────────────────────────────────────────
 
-// CALL_METHOD injecte le receveur en args[0] pour une instance : les arguments
-// utilisateur commencent donc à args[1], comme dans ui_module.
+// CALL_METHOD injects the receiver as args[0] for an instance, so the user arguments start at
+// args[1], as in ui_module.
 int method_pause(CallCtx& ctx) {
     int slot = handle_slot(ctx.args[0], "tween.pause");
     if (slot >= 0)
@@ -726,12 +719,12 @@ int method_progress(CallCtx& ctx) {
     if (slot < 0)
         return ctx.ret(Value(1.0));
     const Tw& t = s_tweens[slot];
-    // Avancement sur le PLAN entier, en TEMPS : les étapes d'une séquence n'ont pas la même
-    // durée, donc compter les étapes franchies donnerait une progression qui saute. Le
-    // dernier segment dépasse sa durée en attendant la passe qui terminera le tween, d'où le
-    // plafond avant la division ; ensuite (base + p) / total ≤ 1 par construction, et seul le
-    // plancher reste à poser (délai, temps négatif). Un plan sans fin rend l'avancement de
-    // son tour courant.
+    // Progress over the WHOLE plan, measured in TIME: a sequence's steps do not share one duration,
+    // so counting the steps crossed would give a progress that jumps. The last segment overshoots its
+    // duration while waiting for the pass that will finish the tween, hence the ceiling before the
+    // division; after that (base + p) / total is at most 1 by construction, and only the floor
+    // remains to be applied, for a delay or a negative time. An endless plan reports the progress of
+    // its current pass.
     double cycle = t.cycle;
     double fait = 0.0;
     for (size_t k = 0; k < t.pos && k < t.steps.size(); k++)
@@ -743,19 +736,19 @@ int method_progress(CallCtx& ctx) {
     return ctx.ret(Value(p < 0.0 ? 0.0 : p));
 }
 
-// UNE seule méthode pour toutes les répétitions : `repeat([occurrences] [, allerRetour])`.
+// ONE method for every kind of repetition: repeat([count] [, pingPong]).
 //
-//   .repeat()             aller, aller, …                 sans fin
-//   .repeat(2)            aller, aller
-//   .repeat(2, true)      aller, aller, retour, retour    (le retour porte sur l'ENSEMBLE)
-//   .repeat(nil, true)    aller, retour, aller, retour, … sans fin
+//   .repeat()             forward, forward, …                   endless
+//   .repeat(2)            forward, forward
+//   .repeat(2, true)      forward, forward, back, back          (the return covers the WHOLE plan)
+//   .repeat(nil, true)    forward, back, forward, back, …       endless
 //
-// Le compte est reconnu par sa POSITION et non par son type : `true` vaut 1 en Ollin (il n'y
-// a pas de type booléen), donc `repeat(true)` serait indistinguable de `repeat(1)`. D'où le
-// `nil` explicite pour dire « pas de compte » tout en demandant l'aller-retour.
+// The count is recognized by its POSITION rather than its type: `true` used to equal 1 in Ollin, which
+// had no boolean type, so repeat(true) would have been indistinguishable from repeat(1). Hence the
+// explicit nil to say "no count" while still asking for the round trip.
 //
-// L'aller-retour ajoute au plan son miroir : le vecteur renversé, sens inversés. Deux appels
-// successifs composent donc, chacun agissant sur le plan construit jusque-là.
+// The round trip appends the plan's mirror: the vector reversed, the directions flipped. Two
+// successive calls therefore compose, each acting on the plan built so far.
 int method_repeat(CallCtx& ctx) {
     static constexpr const char* FN = "tween.repeat";
     double n = 0.0;   // 0 = aucun compte fourni ⇒ sans fin
@@ -782,8 +775,8 @@ int method_repeat(CallCtx& ctx) {
     return ctx.ret(ctx.args[0]);
 }
 
-// Retarde le DÉMARRAGE : la valeur de départ est lue au premier avancement réel, donc
-// après le délai — un tween retardé part de la valeur qu'aura la variable à ce moment.
+// Delays the START: the initial value is read at the first real advance, hence after the delay, so a
+// delayed tween starts from whatever the variable holds at that moment.
 int method_delay(CallCtx& ctx) {
     double d = num_arg(ctx.args, ctx.argc, 1, "tween.delay");
     if (d < 0.0)
@@ -812,11 +805,10 @@ Value tween_class() {
     return cls;
 }
 
-// ── Avancement ──────────────────────────────────────────────────────────────────
 
-// Prend la courbe PAR VALEUR (copie de la Value) et non une référence sur le tween : une
-// courbe fournie par le script peut déclarer un tween, donc réallouer s_tweens, et toute
-// référence sur un élément serait alors pendante.
+// Takes the curve BY VALUE (a copy of the Value) rather than a reference into the tween: a curve
+// supplied by the script can declare a tween, hence reallocate s_tweens, and any reference to an
+// element would then dangle.
 double eased(Value curve_fn, int curve, double p) {
     if (curve_fn.is_callable()) {
         Value r = VM::current()->call_value(curve_fn, Value(p));
@@ -835,9 +827,8 @@ void write_chan(const Chan& c, double v) {
     holder.map_set(c.key, out);
 }
 
-// Lit les valeurs de départ d'une étape, une seule fois : elle part de ce que l'étape
-// précédente a laissé. Aux passages suivants (répétition, marche arrière) les bornes sont
-// conservées, sinon un retour ne va nulle part.
+// Reads a step's start values, once: it begins from whatever the previous step left. On later passes
+// — a repetition, or going backwards — the bounds are kept, otherwise a return trip goes nowhere.
 void start_step(Tw& t, size_t idx) {
     if (t.steps[idx].started)
         return;
@@ -849,10 +840,10 @@ void start_step(Tw& t, size_t idx) {
     }
 }
 
-// Pose les canaux d'une étape à l'extrémité qu'elle vise, dans le sens du segment courant.
-// Appelée quand l'étape est franchie en un seul pas de temps : sans elle, une étape plus
-// courte que le pas ne laisserait aucune trace. `idx` est l'index RÉEL de l'étape, comme
-// pour start_step : deux conventions d'index dans le même appelant seraient un piège.
+// Settles a step's channels at the end it aims for, in the current segment's direction. Called when
+// the step is crossed within a single time step: without it, a step shorter than the step would leave
+// no trace. `idx` is the step's REAL index, as for start_step — two index conventions in the same
+// caller would be a trap.
 void settle_step_end(Tw& t, size_t idx) {
     int8_t sens = t.plan[t.seg];
     std::vector<Chan> chans = t.steps[idx].chans;
@@ -864,8 +855,8 @@ void advance(double dt) {
     if (dt <= 0.0 || s_tweens.empty())
         return;
     s_pass++;
-    // Rappels de fin COLLECTÉS puis appelés après la passe : un rappel peut créer ou
-    // annuler des tweens, donc faire push_back sur s_tweens pendant qu'on l'itère.
+    // Completion callbacks are COLLECTED and only called after the pass: a callback can create or
+    // cancel tweens, hence push_back onto s_tweens while we iterate it.
     std::vector<Value> finished;
     for (int i = 0; i < (int)s_tweens.size(); i++) {
         if (!s_tweens[i].alive || s_tweens[i].paused || s_tweens[i].born_pass == s_pass)
@@ -882,22 +873,21 @@ void advance(double dt) {
             }
             t.elapsed += step;
         }
-        // Fin d'une ÉTAPE : on passe à la suivante en gardant le reliquat de temps, sinon une
-        // animation courte perdrait une fraction de seconde à chaque parcours. Quand la suite
-        // est épuisée, le segment de plan suivant la rejoue (en sens inverse si -1).
-        // Génération du tween au DÉBUT de son avancement : tous les tests de vitalité qui
-        // suivent la comparent, car `alive` seul ne distingue pas « toujours là » de « annulé,
-        // puis slot repris par un autre tween » (cf. alloc_tween, qui repose alive = true).
+        // End of a STEP: we move to the next one keeping the leftover time, otherwise a short
+        // animation would lose a fraction of a second on every pass. When the sequence is exhausted,
+        // the next plan segment replays it, backwards for a -1 segment.
+        // The tween's generation is taken at the START of its advance: every liveness test below
+        // compares against it, because `alive` alone cannot tell "still here" from "cancelled, then
+        // slot taken over by another tween" (see alloc_tween, which sets alive = true again).
         uint32_t gen0 = s_tweens[i].gen;
         double p = 1.0;
         bool ends = true;      // dernier segment terminé → le tween a fini
         bool seg_ends = true;  // étape courante terminée
         int8_t sens = 1;
         size_t idx = 0;
-        // Cette boucle appelle du code Ollin (getter d'une `ref` dans start_step, setter
-        // dans settle_step_end). Ce code peut déclarer un tween, donc faire push_back sur
-        // s_tweens et RÉALLOUER le vecteur : aucune référence `Tw&` ne doit traverser ces
-        // appels, et la vitalité du slot est revérifiée après chacun.
+        // This loop calls Ollin code: a `ref` getter in start_step, a setter in settle_step_end. That
+        // code can declare a tween, hence push_back onto s_tweens and REALLOCATE the vector, so no
+        // Tw& reference may cross these calls and the slot's liveness is rechecked after each one.
         {
             while (true) {
                 if (!tween_alive(i, gen0))
@@ -906,23 +896,23 @@ void advance(double dt) {
                 double dur = t.steps[step_index(t, t.pos)].dur;
                 if (dur <= 0.0 || t.elapsed < dur)
                     break;
-                // Dernière étape du dernier segment : on sort SANS soustraire, en gardant
-                // elapsed >= dur. C'est ce dépassement qui dit « terminé » plus bas — le
-                // soustraire ferait croire au tween qu'il redémarre cette étape, et il
-                // réécrivait alors la valeur de DÉPART au lieu de la cible (constaté).
+                // Last step of the last segment: we leave WITHOUT subtracting, keeping
+                // elapsed >= dur. That overshoot is what says "finished" below — subtracting it made
+                // the tween believe it was restarting this step, and it then rewrote the START value
+                // instead of the target (observed).
                 if (t.pos + 1 >= t.steps.size() && t.seg + 1 >= t.plan.size() && !t.endless)
                     break;
                 size_t franchie = step_index(t, t.pos);
-                // L'étape franchie est DÉMARRÉE puis POSÉE à son extrémité exacte avant qu'on
-                // la quitte : sinon une étape plus courte qu'un pas de temps serait sautée
-                // sans jamais lire ses bornes ni écrire sa cible. Chaque appel repart de
-                // s_tweens[i] : le premier peut exécuter un getter Ollin qui réalloue le
-                // vecteur, ce qui rendrait `t` pendante pour le second.
+                // The crossed step is STARTED and then SETTLED at its exact end before we leave it:
+                // otherwise a step shorter than one time step would be skipped without ever reading
+                // its bounds or writing its target. Each call goes back to s_tweens[i], because the
+                // first may run an Ollin getter that reallocates the vector, which would leave `t`
+                // dangling for the second.
                 //
-                // La vitalité est vérifiée sur la GÉNÉRATION, pas sur `alive` seul : le code
-                // appelé peut annuler ce tween PUIS en déclarer un autre, qui reprend le slot
-                // libéré et le repose vivant. `franchie` indexerait alors les étapes d'un
-                // inconnu, plus courtes le cas échéant.
+                // Liveness is checked on the GENERATION and not on `alive` alone: the code called can
+                // cancel this tween AND THEN declare another, which takes the freed slot and marks it
+                // alive again. The crossed index would then address a stranger's steps, possibly
+                // fewer of them.
                 start_step(s_tweens[i], franchie);
                 if (!tween_alive(i, gen0))
                     break;
@@ -956,17 +946,17 @@ void advance(double dt) {
         start_step(s_tweens[i], idx);   // hors de toute référence retenue
         if (!tween_alive(i, gen0))
             continue;
-        // Écritures et rappel de courbe : ils exécutent du code Ollin (setter d'une `ref`,
-        // courbe personnalisée), donc plus aucune référence à s_tweens ne doit survivre.
+        // The writes and the curve callback run Ollin code — a `ref` setter, a custom curve — so no
+        // reference into s_tweens may survive here.
         {
             std::vector<Chan> chans = s_tweens[i].steps[idx].chans;
             Value curve_fn = s_tweens[i].steps[idx].curve_fn;
             int curve = s_tweens[i].steps[idx].curve;
             double f = seg_ends ? 1.0 : eased(curve_fn, curve, p);
             for (const auto& c : chans) {
-                // Un segment de sens -1 se joue de la cible vers le départ. À la fin d'une
-                // étape on pose la valeur EXACTE de son extrémité : une courbe à dépassement
-                // (back, elastic) ne rend pas 1 en 1, et un arrondi laisserait 0,999.
+                // A -1 segment plays from the target back to the start. At a step's end we write the
+                // EXACT value of its endpoint: an overshooting curve (back, elastic) does not return 1
+                // at 1, and rounding would leave 0.999.
                 double a = sens > 0 ? c.from : c.to;
                 double b = sens > 0 ? c.to : c.from;
                 write_chan(c, seg_ends ? b : a + (b - a) * f);
