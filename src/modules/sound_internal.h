@@ -65,6 +65,12 @@ void sound_output_ensure();
 // since in the playground the page stays loaded.
 void sound_output_silence();
 
+// Is a mix actually running? Only then does a released voice keep sounding on its own, and only
+// then is its slot worth protecting: with no output (a headless build, or the browser before the
+// first gesture opens the device) nothing ever finishes an envelope, so a slot given back by
+// free() would never come back into use.
+bool sound_output_running();
+
 // Buffers: a COMPUTED (or loaded) sound, triggered on demand.
 // The samples are written once, by the main thread, then only READ by the mixer — and only while
 // `playing` is true. That invariant is what makes the memory safe without a lock: reusing a slot

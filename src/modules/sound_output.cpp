@@ -232,6 +232,10 @@ void sound_output_ensure() {
 void sound_output_silence() {
 }
 
+bool sound_output_running() {
+    return s_stream_ready;
+}
+
 uint64_t sound_mix_epoch() {
     return s_mix_epoch.load(std::memory_order_acquire);
 }

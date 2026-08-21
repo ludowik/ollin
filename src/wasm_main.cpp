@@ -30,13 +30,13 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     // Release stale GL texture handles before GL context may be reset.
     image_reset();
     camera_reset();
-    ui_reset();   // widgets du programme précédent (les statiques survivent au VM)
-    tween_reset();   // idem : un tween resté vivant retiendrait les objets du programme précédent
-    audio_reset();   // volume général : un programme précédent a pu le baisser
-    sound_reset();   // sinon un oscillateur du programme précédent continuerait de sonner
-    touch_reset();   // un doigt resté « posé » ferait croire à un geste en cours
-    mouse_reset();   // ni à un bouton resté enfoncé
-    engine_font_reset();   // les atlas appartenaient au contexte GL précédent
+    ui_reset();   // the previous program's widgets: the statics outlive the VM
+    tween_reset();   // likewise: a surviving tween would retain the previous program's objects
+    audio_reset();   // the master volume, which a previous program may have turned down
+    sound_reset();   // otherwise an oscillator of the previous program would keep sounding
+    touch_reset();   // a finger left "down" would look like a gesture under way
+    mouse_reset();   // nor a button left pressed
+    engine_font_reset();   // the atlases belonged to the previous GL context
     // Stop any running graphics loop before destroying the old VM.
     emscripten_cancel_main_loop();
     s_vm = std::make_unique<VM>();

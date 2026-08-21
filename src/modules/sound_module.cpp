@@ -50,7 +50,12 @@ int handle_slot(const Value& self, const char* fn) {
 // while its neighbour did not survive a single one (observed).
 uint64_t s_born_counter = 0;
 
+// A voice only sounds if something renders it. Without an output, an envelope is never finished,
+// so a slot given back by free() would stay protected for ever and the sixteenth creation would
+// fail with "no oscillator available" (measured with the headless binary).
 bool voice_sounding(const Voice& v) {
+    if (!sound_output_running())
+        return false;
     return v.active.load(std::memory_order_relaxed) || v.gain > 0.0f;
 }
 
@@ -234,9 +239,9 @@ int method_free(CallCtx& ctx) {
     Voice& v = voices()[i];
     v.gate.store(false, std::memory_order_relaxed);
     if (!v.env_used.load(std::memory_order_relaxed))
-        v.active.store(false, std::memory_order_relaxed);   // sans enveloppe, rien à éteindre
+        v.active.store(false, std::memory_order_relaxed);   // with no envelope, nothing to fade out
     v.used = false;
-    v.gen++;   // le handle devient périmé : le réutiliser est signalé, pas silencieux
+    v.gen++;   // the handle goes stale: reusing it is reported, not silently ignored
     return ctx.ret(Value{});
 }
 

@@ -12,6 +12,10 @@ void sound_output_ensure() {
 void sound_output_silence() {
 }
 
+bool sound_output_running() {
+    return false;
+}
+
 // With no output nobody reads the samples, so the epoch advances on every call, which makes a
 // buffer slot immediately reusable.
 uint64_t sound_mix_epoch() {

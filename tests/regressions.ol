@@ -1590,10 +1590,15 @@ assert(perime)
 for i = 1, 40 do
     sound.sine(220 + i).free()
 end
-## Une voix encore en extinction n'est PAS reprise : son slot est libre, son son ne l'est pas.
-var tenue = sound.sine(330).envelope(0.01, 0.05, 0.5, 5.0)
-tenue.trigger()
-tenue.free()
+## Un slot n'est protege que si quelque chose le fait SONNER. Sans sortie audio — build headless,
+## ou navigateur avant le premier geste — aucune enveloppe ne s'acheve jamais, donc une voix rendue
+## par free() doit redevenir disponible immediatement : sinon la 17e creation echouait sur
+## « no oscillator available », alors que chaque voix avait bien ete liberee.
+for i = 1, 20 do
+    var voix = sound.sine(330 + i).envelope(0.01, 0.05, 0.5, 5.0)
+    voix.trigger(0.05)
+    voix.free()
+end
 var autre = sound.sine(660)
 assert(autre.isPlaying() == false)
 autre.free()
