@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <vector>
 
-// mem() : mesure de la mémoire tas utilisée — API par plateforme.
+// mem(): heap usage, through a per-platform API.
 #if defined(__EMSCRIPTEN__)
 #include <malloc.h>
 #elif defined(__APPLE__)
@@ -25,13 +25,12 @@
 
 static VM* s_current_vm = nullptr;
 
-// Validation partagée des bornes d'un range / for numérique. Source de vérité
-// unique pour les deux voies d'itération (objet Range via MAKE_RANGE, et chemin
-// rapide via FOR_PREP branche float) : le pas doit être non nul, et les bornes
-// finies — une borne NaN/infinie ne satisferait jamais la condition de fin et
-// ferait boucler l'itération indéfiniment. (La branche int de FOR_PREP n'appelle
-// pas cette fonction : les entiers sont finis par construction, elle garde son
-// propre test de pas nul.)
+// Shared validation of the bounds of a range or numeric for, and the single source of truth
+// for both iteration paths (a Range object through MAKE_RANGE, and the fast path through the
+// float branch of FOR_PREP): the step must be non-zero and the bounds finite — a NaN or
+// infinite bound would never satisfy the end condition and the loop would never stop. The int
+// branch of FOR_PREP does not call this: integers are finite by construction, and it keeps its
+// own zero-step test.
 static void validate_numeric_range(double start, double end, double step, const std::string& loc) {
     if (step == 0.0)
         throw std::runtime_error(loc + ": runtime: step cannot be 0");
@@ -39,7 +38,7 @@ static void validate_numeric_range(double start, double end, double step, const 
         throw std::runtime_error(loc + ": runtime: bornes de range non finies (NaN/infini interdit)");
 }
 
-// ── Interned meta-key constants (initialized once, reused across all calls) ───
+// Interned meta-key constants, initialized once and reused across all calls.
 struct MetaKeys {
     Value class_, parent_, str_, name_, init_, len_;
     Value add_, sub_, mul_, div_, mod_, neg_, eq_, lt_, le_;
@@ -61,15 +60,14 @@ bool VM::is_instance(const Value& v) {
     return (v.is_map() || v.is_class()) && !v.map_get(MK().class_).is_nil();
 }
 
-// Pseudo-méthode `len` intégrée des maps : synthétisée par GET_INDEX quand la map
-// ne définit pas elle-même "len". Fonction NOMMÉE (pas un lambda) pour que
-// CALL_METHOD la reconnaisse par pointeur et lui injecte la map en self — les
-// maps n'injectent pas self par défaut (sinon math.noise(x) recevrait le module).
+// Built-in `len` pseudo-method of maps, synthesized by GET_INDEX when the map does not define
+// "len" itself. A NAMED function rather than a lambda, so that CALL_METHOD recognizes it by
+// pointer and injects the map as self — maps do not inject self by default, otherwise
+// math.noise(x) would receive the module.
 static int builtin_map_len(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
 }
 
-// ── protoChainGet ─────────────────────────────────────────────────────────────
 Value VM::proto_chain_get(const Value& obj, const Value& key) {
     if (obj.is_map() || obj.is_class()) {
         Value v = obj.map_get(key);
@@ -101,7 +99,7 @@ Value VM::proto_chain_rest(const Value& obj, const Value& key) {
     return Value{};
 }
 
-// ── growRegs : croît par doublement, max 4096, size reste exacte ─────────────
+// Grows by doubling, capped at 4096; size stays exact.
 void VM::grow_regs(size_t needed) {
     if (regs.size() >= needed)
         return;
@@ -121,11 +119,11 @@ int VM::invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap) {
 }
 
 int VM::invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc) {
-    // cap = reg_count du frame courant - (result_base - reg_base) = varargs_base - result_base.
+    // cap = current frame's reg_count - (result_base - reg_base) = varargs_base - result_base.
     return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base);
 }
 
-// ── invokeStr : mini-loop to call __str without recursion ─────────────────────
+// invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: regs.resize() ne invalide pas obj
     Value cls = obj.map_get(MK().class_);
     if (cls.is_nil())
@@ -190,12 +188,11 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() ne invalide p
     return result;
 }
 
-// ── valueToString ─────────────────────────────────────────────────────────────
 std::string value_to_string(const Value& v) {
     if (v.is_nil())
         return "nil";
-    // En anglais comme les mots-clés du langage : ce qui s'affiche se recopie tel quel
-    // dans un script.
+    // In English like the language keywords: what is printed can be pasted straight back into
+    // a script.
     if (v.is_bool())
         return v.as_bool() ? "true" : "false";
     if (v.is_string())
@@ -230,7 +227,6 @@ std::string value_to_string(const Value& v) {
     return os.str();
 }
 
-// ── Builtins ──────────────────────────────────────────────────────────────────
 
 static int builtin_assert(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -247,16 +243,15 @@ static int builtin_time(CallCtx& ctx) {
     return ctx.ret(Value(std::chrono::duration<double>(now.time_since_epoch()).count()));
 }
 
-// Temps PROCESSEUR consommé depuis le démarrage, en secondes. À préférer à time()
-// pour mesurer une durée : time() lit une horloge murale que le système peut
-// ajuster en cours de route (NTP), ce qui produit des valeurs aberrantes.
+// CPU time consumed since startup, in seconds. Prefer it to time() for measuring a duration:
+// time() reads a wall clock the system may adjust mid-run (NTP), which yields wild values.
 static int builtin_cpu_time(CallCtx& ctx) {
     (void)ctx;
     return ctx.ret(Value((double)std::clock() / (double)CLOCKS_PER_SEC));
 }
 
-// Mémoire tas en cours d'usage (octets) — par plateforme : octets « in use » de
-// l'allocateur (WASM/macOS/glibc) ou working set (Windows) ; 0 si indisponible.
+// Heap bytes in use, per platform: the allocator's in-use bytes (WASM, macOS, glibc) or the
+// working set (Windows); 0 when unavailable.
 uint64_t ollin_heap_bytes() {
     uint64_t bytes = 0;
 #if defined(__EMSCRIPTEN__)
@@ -277,8 +272,7 @@ uint64_t ollin_heap_bytes() {
     return bytes;
 }
 
-// mem() : octets de tas actuellement utilisés par le process (valeurs Ollin +
-// runtime + libs). Renvoie un entier.
+// mem(): heap bytes currently used by the process — Ollin values, runtime and libraries.
 static int builtin_mem(CallCtx& ctx) {
     (void)ctx;
     return ctx.ret(Value((int64_t)ollin_heap_bytes()));
@@ -324,10 +318,10 @@ static const struct {
     {"len", builtin_len},
 };
 
-// resolveFuncVal : func value → func_idx (+ upvals) ; défini plus bas.
+// resolve_func_val: function value to func_idx (plus upvals); defined below.
 static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals);
 
-// ── Meta-method dispatch helpers ──────────────────────────────────────────────
+// Meta-method dispatch helpers.
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
 // The caller sets ip = addr, then dispatches (NEXT() or continue in switch).
 
@@ -359,7 +353,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
     return push_call_frame(nb, fi, 1, std::move(fuv), ip, false, dest);
 }
 
-// ── unwindToHandler : déroulé commun throw / erreur runtime C++ ───────────────
+// unwind_to_handler: the unwinding shared by a script throw and a C++ runtime error.
 void VM::unwind_to_handler(const Handler& h, Value thrown) {
     while (call_stack.size() > h.call_depth) {
         close_upvals();
@@ -369,10 +363,10 @@ void VM::unwind_to_handler(const Handler& h, Value thrown) {
         regs.resize(h.regs_size);
     regs[h.reg_base + h.catch_reg] = std::move(thrown);
     ip = h.catch_addr;
-    // NB : le caller restaure `base` (variable locale de la boucle de dispatch).
+    // Note that the caller restores `base`, a local of the dispatch loop.
 }
 
-// ── instantiateClass : partagé par CALL_DYN et CALL_METHOD ────────────────────
+// instantiate_class, shared by CALL_DYN and CALL_METHOD.
 uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done) {
     done = false;
     Value inst = Value::make_map();
@@ -399,8 +393,9 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
     uint8_t fi = resolve_func_val(init_fn, fuv);
     int total = argc + 1;
     grow_regs((size_t)(base_reg + std::max((int)ch->funcs[fi].reg_count, total)));
-    // Décale les args pour insérer self en base_reg : base_reg+arg_off+i → base_reg+1+i.
-    // Sens de parcours selon dest vs src pour éviter d'écraser des args non déplacés.
+    // Shifts the arguments to make room for self at base_reg: base_reg+arg_off+i becomes
+    // base_reg+1+i. The direction of the walk depends on dest versus src, so that arguments not
+    // yet moved are not overwritten.
     if (arg_off >= 1)
         for (int i = 0; i < argc; ++i)
             regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
@@ -411,10 +406,9 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
     return push_call_frame(base_reg, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
 }
 
-// ── close_upvals : ferme et libère TOUTES les upvalues ouvertes du frame ──────
-// Chemin CHAUD : appelé à chaque retour de fonction. Volontairement distinct de
-// close_upvals_above — l'y fondre grossissait ce code et coûtait 5 % sur bench_fib
-// (30 M de retours), pour un partage de trois lignes.
+// Closes and releases ALL the frame's open upvalues. HOT path: called on every function
+// return. Deliberately kept apart from close_upvals_above — merging the two grew this code and
+// cost 5 % on bench_fib (30 M returns) for three shared lines.
 void VM::close_upvals() {
     auto& ouv = call_stack.back().open_upvals;
     if (!ouv)
@@ -429,10 +423,10 @@ void VM::close_upvals() {
     }
 }
 
-// Fin d'une portée INTERNE au frame (itération de boucle) : seules les upvalues dont le
-// registre est >= threshold sont fermées, et RETIRÉES de la liste — MAKE_CLOSURE n'en
-// réutilise donc plus pour ce registre, si bien que le tour suivant obtient une variable
-// neuve. Les autres restent la propriété du frame.
+// End of a scope INSIDE the frame (one loop iteration): only the upvalues whose register is
+// >= threshold are closed, and they are REMOVED from the list, so MAKE_CLOSURE no longer
+// reuses one for that register and the next turn gets a fresh variable. The others stay owned
+// by the frame.
 void VM::close_upvals_above(int threshold) {
     auto& ouv = call_stack.back().open_upvals;
     if (!ouv)
@@ -453,7 +447,7 @@ void VM::close_upvals_above(int threshold) {
     ouv->resize(kept);
 }
 
-// ── Helper: resolve function value → func_idx + upvals ───────────────────────
+// Resolves a function value to func_idx plus upvals.
 static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals) {
     if (fv.is_func_val())
         return (uint8_t)fv.as_int();
@@ -466,14 +460,14 @@ static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upv
     throw std::runtime_error("runtime: call on non-function value");
 }
 
-// ── EQ comparison (shared by op_EQ and op_NEQ) ────────────────────────────────
+// Equality, shared by op_EQ and op_NEQ.
 static bool values_equal(const Value& av, const Value& bv) {
     if (av.is_nil() && bv.is_nil())
         return true;
     if (av.is_nil() || bv.is_nil())
         return false;
-    // Type étanche : deux booléens se comparent entre eux, et `true == 1` est faux — d'où
-    // le test des DEUX côtés, qui exclut la comparaison avec un nombre.
+    // The boolean is a type of its own: two booleans compare with each other and `true == 1`
+    // is false, hence the test on BOTH sides, which rules out comparing against a number.
     if (av.is_bool() || bv.is_bool())
         return av.is_bool() && bv.is_bool() && av.as_bool() == bv.as_bool();
     if (av.is_integer() && bv.is_integer())
@@ -482,10 +476,10 @@ static bool values_equal(const Value& av, const Value& bv) {
         return av.as_num() == bv.as_num();
     if (av.is_string() && bv.is_string())
         return av.sptr == bv.sptr;
-    // Tout ce qui reste a une IDENTITÉ, jamais un contenu : deux valeurs sont égales quand
-    // elles désignent le même objet. Le test de tag vient APRÈS les cas numériques, sinon
-    // `1 == 1.0` cesserait d'être vrai. Ne couvrir que les maps laissait `a == a` FAUX pour
-    // un tableau, un range, une closure ou une fonction — et `a <> a` vrai.
+    // Everything left has an IDENTITY, never a content: two values are equal when they denote
+    // the same object. The tag test comes AFTER the numeric cases, otherwise `1 == 1.0` would
+    // stop being true. Covering only maps left `a == a` FALSE for an array, a range, a closure
+    // or a function — and `a <> a` true.
     if (av.tag != bv.tag)
         return false;
     switch (av.tag) {
@@ -502,14 +496,13 @@ static bool values_equal(const Value& av, const Value& bv) {
         return av.iptr == bv.iptr;
     case Value::T_FUNCTION:
     case Value::T_BUILTIN:
-        // L'union porte l'index de fonction ou le pointeur natif : même valeur = même cible.
+        // The union holds the function index or the native pointer: same value, same target.
         return av.as_int() == bv.as_int();
     default:
         return false;
     }
 }
 
-// ── VM::errLine / VM::current / VM::callValue ────────────────────────────────
 
 std::string VM::err_line() const {
     uint32_t idx = ip > 0 ? ip - 1 : 0;
@@ -544,30 +537,30 @@ Value VM::get_global(const std::string& name) const {
 }
 
 void VM::run_entry_hooks() {
-    // `graphics` peut être nil (stub natif, ou script sans référence à graphics) ou
-    // réassigné à un non-map → garde isMap() obligatoire avant mapGet.
+    // `graphics` may be nil (the native stub, or a script that never mentions it) or reassigned
+    // to a non-map, so the is_map() guard before map_get is mandatory.
     Value gfx = get_global("graphics");
     Value draw = get_global("draw");
     bool graphical = draw.is_callable() && gfx.is_map();
 
-    // setup() : appelée une fois après le chargement, avant la boucle update/draw.
+    // setup() runs once after loading, before the update/draw loop.
     Value setup = get_global("setup");
     if (setup.is_callable())
         call_value(setup);
 
-    // Canvas IMPLICITE : la seule présence d'un draw() suffit à démarrer une session
-    // graphique. Si NI le top-level NI setup() n'ont appelé graphics.canvas(), on le
-    // crée aux dimensions W×H (globales moteur, pré-initialisées aux dimensions window).
-    // Fait APRÈS setup() — car setup() est un endroit courant pour appeler canvas()
-    // (cf. tutoriel) : le créer avant provoquerait un double InitWindow (crash WASM).
+    // IMPLICIT canvas: the mere presence of a draw() is enough to start a graphics session.
+    // When NEITHER the top level NOR setup() called graphics.canvas(), we create it at W×H
+    // (engine globals, pre-initialized to the window dimensions).
+    // Done AFTER setup(), because setup() is a common place to call canvas() oneself: creating
+    // it earlier would mean a double InitWindow, which crashes on WASM.
     if (graphical && !gfx_canvas_created_) {
         Value canvas_fn = gfx.map_get(Value(std::string("canvas")));
         if (canvas_fn.is_builtin()) {
-            // Dimensions de la zone de rendu. On NE lit PAS getGlobal("W") : si le
-            // script ne référence pas W/H, ces identifiants n'existent pas dans le
-            // chunk → getGlobal renvoie nil → 0. On relit le module `window`
-            // directement (source des globales W/H, et en WASM = taille mesurée en JS
-            // fournie via __ollinRenderW → fiable, pas de course de layout).
+            // Size of the render area. We do NOT read get_global("W"): when the script never
+            // mentions W or H those identifiers are absent from the chunk, get_global returns
+            // nil, and we would get 0. Reading the `window` module directly is reliable — it is
+            // the source of the W/H globals, and on WASM it is the size measured in JS and
+            // handed over through __ollinRenderW, so there is no layout race.
             int w = 0, h = 0;
             Value winm = make_builtin_module("window");
             if (winm.is_map()) {
@@ -576,8 +569,9 @@ void VM::run_entry_hooks() {
                 if (vw.is_number()) w = (int)vw.as_num();
                 if (vh.is_number()) h = (int)vh.as_num();
             }
-            // Si la taille reste inexploitable, canvas() sans argument → défauts de
-            // gfx_canvas (800×600) plutôt qu'un canvas 0×0 sans contexte GL (crash).
+            // If the size is still unusable, call canvas() with no argument and let gfx_canvas
+            // apply its defaults (800×600), rather than a 0×0 canvas with no GL context, which
+            // would crash.
             if (w > 0 && h > 0) {
                 Value wh[2] = { Value((int64_t)w), Value((int64_t)h) };
                 invoke_builtin(canvas_fn.as_builtin(), wh, 2, 2);
@@ -588,7 +582,7 @@ void VM::run_entry_hooks() {
         }
     }
 
-    // draw() présent → lance la boucle graphique via graphics.run(draw).
+    // With a draw() present, start the render loop through graphics.run(draw).
     if (graphical) {
         Value run_fn = gfx.map_get(Value(std::string("run")));
         if (run_fn.is_builtin())
@@ -598,8 +592,8 @@ void VM::run_entry_hooks() {
 
 Value VM::call_value(const Value& fn, const Value* args, int argc) {
     if (fn.is_builtin()) {
-        // Buffer local writable : le builtin y écrit son résultat (args de l'appelant
-        // peuvent être en lecture seule). Au moins 1 slot pour recevoir la valeur.
+        // A writable local buffer: the builtin writes its result there, since the caller's
+        // arguments may be read-only. At least one slot, to receive the value.
         std::vector<Value> buf(std::max(argc, 1));
         for (int i = 0; i < argc; ++i)
             buf[i] = args[i];
@@ -694,11 +688,8 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
     return call_value(fn, args, 4);
 }
 
-// ── pushCallFrame ─────────────────────────────────────────────────────────────
-// Point d'entrée unique pour toute construction de frame d'appel :
-//   1. growRegs au minimum nécessaire
-//   2. rempli les défauts pour les args manquants (argc < n_fixed)
-//   3. déplace les varargs au-delà de reg_count
+// The single entry point for building a call frame: grow_regs to the minimum needed, fill in
+// defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
 //   4. construit et empile le Frame
 //   5. retourne fp.addr (le caller fait ip = pushCallFrame(...))
 uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
@@ -731,9 +722,7 @@ uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr
     return fp.addr;
 }
 
-// ── runGoto: dispatch loop, stops when call_stack.size() <= stop_depth ────────
 void VM::run_goto(size_t stop_depth) {
-// ── Computed-goto dispatch (GCC / Clang) ─────────────────────────────────────
 // Table in the exact order of enum Op (chunk.h).
 // Each handler ends with NEXT() → direct jump to the next handler.
 #define NEXT()                                                                                                         \
@@ -817,8 +806,9 @@ void VM::run_goto(size_t stop_depth) {
     uint8_t A, B, C;
     uint16_t Bx;
     int base = call_stack.back().reg_base;
-    // Inline cache GET_INDEX dimensionné sur le code courant (un slot par instruction).
-    // Réentrance (run_goto imbriqué via call_value) : même ch → taille identique → no-op.
+    // The GET_INDEX inline cache is sized on the current code, one slot per instruction. Under
+    // reentrancy (a run_goto nested through call_value) the chunk is the same, so the size
+    // matches and this is a no-op.
     if (gicache_.size() != ch->code.size())
         gicache_.assign(ch->code.size(), GetIndexCache{});
 dispatch_loop:
@@ -858,9 +848,10 @@ dispatch_loop:
         }
         if (bv.is_string() || cv.is_string()) {
             {
-                // Copier les opérandes AVANT valueToString : si l'un est une instance
-                // avec __str, invokeStr réalloue regs → les références bv/cv pendraient.
-                // Bloc interne : Value (destructeur non trivial) hors portée avant NEXT().
+                // Copy the operands BEFORE value_to_string: if one is an instance with __str,
+                // invoke_str reallocates regs and the bv/cv references would dangle.
+                // Inner block, so the Values (non-trivial destructors) leave scope before
+                // NEXT().
                 Value b2 = bv;
                 Value c2 = cv;
                 regs[base + A] = Value(value_to_string(b2) + value_to_string(c2));
@@ -1037,7 +1028,7 @@ dispatch_loop:
     op_NEQ: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        // a <> b via __eq puis négation (sinon == et <> seraient vrais en même temps).
+        // a <> b goes through __eq then negates, otherwise == and <> could both be true.
         if (is_instance(bv)) {
             if (uint32_t addr = try_meta_binary(MK().eq_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
@@ -1290,22 +1281,22 @@ dispatch_loop:
     op_GET_INDEX: {
         const Value& obj = regs[base + B];
         const Value& key = regs[base + C];
-        // Capturer AVANT toute écriture de regs[base+A] : le dest peut aliaser le
-        // registre de la clé (A==C) ou de l'objet (A==B) → lire obj/key après
-        // `regs[A] = found` lirait la valeur écrasée (bug d'aliasing).
+        // Capture BEFORE writing regs[base+A]: the destination may alias the key register
+        // (A==C) or the object one (A==B), so reading obj or key after `regs[A] = found` would
+        // read the overwritten value.
         const Map* obj_map = (obj.is_map() || obj.is_class()) ? obj.mptr : nullptr;
         const InternedStr* key_sptr = key.is_string() ? key.sptr : nullptr;
-        // Inline cache (clé string) : hit si même map/classe (mptr), non mutée depuis
-        // (version) et même clé internée (sptr). Ne cache que les hits sur la data
+        // Inline cache (string key): a hit needs the same map or class (mptr), unmutated since
+        // (version), and the same interned key (sptr). Only hits on the object's own data
         // PROPRE de l'objet (cf. remplissage plus bas).
         if (obj_map && key_sptr) {
             GetIndexCache& c = gicache_[ip - 1];
             if (c.map == obj_map && c.version == obj_map->version && c.key == key_sptr) {
                 {
-                    // Copie AVANT d'écrire le registre : si dest aliase l'objet (A==B)
-                    // et détenait la dernière référence à la map, l'écriture la
-                    // détruirait — or c.val pointe DANS cette map. Le temporaire
-                    // retient d'abord. Bloc fermé avant NEXT() (règle computed-goto).
+                    // Copy BEFORE writing the register: if the destination aliases the object
+                    // (A==B) and held the last reference to the map, the write would destroy
+                    // it — and c.val points INSIDE that map. The temporary retains first. Block
+                    // closed before NEXT(), per the computed-goto rule.
                     Value hit = *c.val;
                     regs[base + A] = std::move(hit);
                 }
@@ -1315,15 +1306,15 @@ dispatch_loop:
         if (obj.is_map() || obj.is_class()) {
             // Data PROPRE d'abord (T_MAP et T_CLASS partagent le layout Map).
             const Map* own = obj.mptr;
-            // `nil` vaut ABSENT dans tout le moteur (cf. proto_chain_get) : une clé
-            // propre valant nil doit continuer à laisser la main à la chaîne de
-            // prototypes et au repli `len`, pas à masquer la méthode de classe.
+            // Throughout the engine `nil` means ABSENT (see proto_chain_get): an own key holding
+            // nil must still defer to the prototype chain and to the `len` fallback, not shadow
+            // the class method.
             const Value* slot = own->find_ptr(key);
             if (slot && !slot->is_nil()) {
-                // Trouvée directement → sa validité ne dépend QUE de (mptr, version) :
-                // cacheable même sur une instance (muter l'instance bump sa version,
+                // Found directly, so validity depends ONLY on (mptr, version): cacheable even
+                // on an instance, since mutating the instance bumps its version,
                 // et sa data propre masque toujours la classe). Pas de test
-                // is_instance ici — il coûterait un lookup "__class__" par accès.
+                // is_instance here — it would cost a "__class__" lookup on every access.
                 if (key_sptr) {
                     GetIndexCache& c = gicache_[ip - 1];
                     c.map = own;
@@ -1334,12 +1325,12 @@ dispatch_loop:
                 Value hit = *slot;   // lire avant d'écrire le registre (cf. hit du cache)
                 regs[base + A] = std::move(hit);
             } else {
-                // Absente de la data propre : chaîne de prototypes (__class__ /
-                // __parent__). NON cachée — une mutation de la CLASSE ne bump pas la
-                // version de l'instance. Le `len` intégré n'est qu'un repli tout-froid
-                // (rien trouvé nulle part) → le strcmp reste hors du chemin chaud.
+                // Absent from the own data: walk the prototype chain (__class__ / __parent__).
+                // NOT cached, because mutating the CLASS does not bump the instance's version.
+                // The built-in `len` is only an all-cold fallback (nothing found anywhere), which
+                // keeps the strcmp off the hot path.
                 Value chained = proto_chain_rest(obj, key);
-                // Clé `len` comparée par POINTEUR interné (comme __class__/__parent__),
+                // The `len` key is compared by interned POINTER, like __class__ and __parent__,
                 // plus par contenu : plus aucun strcmp dans GET_INDEX.
                 if (chained.is_nil() && key_sptr == MK().len_.sptr && !is_instance(obj))
                     regs[base + A] = Value::make_builtin(builtin_map_len);
@@ -1347,17 +1338,16 @@ dispatch_loop:
                     regs[base + A] = std::move(chained);
             }
         } else if (obj.is_string()) {
-            // Pseudo-méthodes des chaînes : servies par le module `string`, qui ne
-            // change jamais → toujours un hit de cache après le premier passage.
+            // String pseudo-methods are served by the `string` module, which never changes, so
+            // every pass after the first is a cache hit.
             // (Le module vit aussi longtemps que la VM : pas de risque d'aliasing.)
             const Value* meth = module_member(string_module_, key, key_sptr);
             regs[base + A] = meth ? *meth : Value{};
         } else if (obj.is_array()) {
             if (key_sptr) {
-                // Pseudo-méthodes : un seul lookup dans la map construite au démarrage
-                // (cf. array_module.cpp), comme pour les chaînes — et cachée par site,
-                // la map étant immuable. Absente = erreur, pas nil (un tableau n'a pas
-                // de champs libres).
+                // Pseudo-methods: a single lookup in the map built at startup (see
+                // array_module.cpp), as for strings, and cached per site since that map is
+                // immutable. A missing field is an error, not nil: an array has no free fields.
                 const Value* meth = module_member(array_module_, key, key_sptr);
                 if (!meth)
                     throw std::runtime_error(err_line() + ": runtime: array has no field '" + key.as_string() + "'");
@@ -1469,9 +1459,9 @@ dispatch_loop:
         {
             Iterator* it = regs[base + A].iptr;
             Value primary;
-            // Cas range dévirtualisé : appel direct (inlinable) à advance(), sans
-            // indirection vtable par élément. Les autres itérateurs gardent la voie
-            // virtuelle. Même logique d'avancement (advance()), pas de duplication.
+            // Devirtualized range case: a direct, inlinable call to advance() instead of one
+            // vtable indirection per element. Other iterators keep the virtual path, and the
+            // stepping logic itself is shared, not duplicated.
             bool ok = (it->kind == Iterator::KIND_RANGE) ? static_cast<RangeIterator*>(it)->advance(primary)
                                                          : it->next_primary(primary);
             if (!ok) {
@@ -1513,10 +1503,10 @@ dispatch_loop:
     }
 
     op_CALL_VA: {
-        // Comme CALL_DYN mais argc dynamique : C args fixes + last_results_ valeurs
-        // du dernier argument étendu (... ou appel multi-valeurs), déjà matérialisées
-        // à la suite des fixes. Le callee (B) est SOUS le bloc d'arguments (jamais
-        // écrasé par le nombre variable de valeurs).
+        // Like CALL_DYN but with a dynamic argc: C fixed arguments plus last_results_ values
+        // from the last expanded argument (`...` or a multi-value call), already materialized
+        // after the fixed ones. The callee (B) sits BELOW the argument block, so the varying
+        // number of values never overwrites it.
         int argc_va = C + last_results_;
         if (regs[base + B].is_builtin()) {
             invoke_builtin_regs(regs[base + B].as_builtin(), base + A, argc_va);
@@ -1540,10 +1530,11 @@ dispatch_loop:
     }
 
     op_CALL_VARARGS: {
-        // A=fixed_base, B=func_reg, C=n_fixe ; dernier argument = `...` (varargs du frame
-        // courant). Rassemble fixes + varargs dans une zone FRAÎCHE au-dessus des varargs
-        // de l'appelant (jamais écrasés → un `...` ultérieur reste correct), appelle, et
-        // renvoie les résultats au registre statique fixed_base (result_base du frame appelé).
+        // A=fixed_base, B=func_reg, C=number of fixed arguments; the last argument is `...`,
+        // the current frame's varargs. Gathers the fixed arguments and the varargs into a FRESH
+        // area above the caller's varargs — which are never overwritten, so a later `...` is
+        // still correct — calls, and returns the results at the static register fixed_base, the
+        // callee frame's result_base.
         {
             Frame& cur = call_stack.back();
             int n_va = cur.n_varargs;
@@ -1612,8 +1603,8 @@ dispatch_loop:
     }
 
     op_RETURN_SPREAD: {
-        // return <explicites>, <appel> : B explicites + last_results_ valeurs de l'appel,
-        // toutes contiguës à base+A. Comme RETURN_V mais source contiguë (pas de varargs).
+        // return <explicit values>, <call>: B explicit values plus last_results_ from the call,
+        // all contiguous at base+A. Like RETURN_V, but with a contiguous source and no varargs.
         {
             close_upvals();
             bool is_ctor_ = call_stack.back().is_ctor;
@@ -1648,12 +1639,12 @@ dispatch_loop:
     }
 
     op_MAKE_CLOSURE: {
-        // Bloc interne : le unique_ptr (destructeur non trivial) doit sortir de
-        // portée AVANT NEXT() (règle computed-goto).
+        // Inner block: the unique_ptr has a non-trivial destructor and must leave scope BEFORE
+        // NEXT(), per the computed-goto rule.
         {
         uint8_t fi = (uint8_t)Bx;
-        // unique_ptr : si la capture lève (bytecode incohérent), le Closure est
-        // libéré au lieu de fuir (RAII sur le chemin d'exception).
+        // A unique_ptr so that if capturing throws (inconsistent bytecode) the Closure is freed
+        // instead of leaking.
         auto cl = std::make_unique<Closure>(fi);
         for (auto& desc : ch->funcs[fi].upvals) {
             Upvalue* uv;
@@ -1730,9 +1721,9 @@ dispatch_loop:
             else if (fn.is_static_builtin())
                 fn_is_static = true;
             Value& recv = regs[cb];
-            // Les maps n'injectent pas self (un module comme `math` ne doit pas se
-            // recevoir : math.noise(x) → noise(x)). Exception : la pseudo-méthode
-            // `len` intégrée des maps, reconnue par pointeur, a besoin de la map.
+            // Maps do not inject self: a module such as `math` must not receive itself, so
+            // math.noise(x) calls noise(x). The one exception is the built-in `len`
+            // pseudo-method, recognized by pointer, which needs the map.
             bool map_len_call = recv.is_map() && fn.is_builtin() && fn.as_builtin() == builtin_map_len;
             bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_len_call;
             bool inject_self = recv_is_instance && !fn_is_static;
@@ -1794,9 +1785,10 @@ dispatch_loop:
     }
 
     op_FOR_PREP: {
-        // for numérique : R[A]=i, R[A+1]=limite, R[A+2]=pas (consécutifs, inclus aux 2 bornes).
-        // Valide, fige le type. Si la boucle est vide → ip=Bx (sortie). Sinon tombe dans le
-        // corps : i n'est PAS pré-décrémenté (évite le wrap à la borne basse).
+        // Numeric for: R[A]=i, R[A+1]=limit, R[A+2]=step, consecutive and inclusive on both
+        // bounds. Validates and freezes the type. An empty loop jumps to ip=Bx; otherwise we
+        // fall into the body, i NOT being pre-decremented, which avoids wrapping at the lower
+        // bound.
         bool empty;
         {
             Value& vi = regs[base + A];
@@ -1810,10 +1802,10 @@ dispatch_loop:
                     throw std::runtime_error(err_line() + ": runtime: for: step cannot be 0");
                 empty = (st > 0) ? (i0 > lim) : (i0 < lim);
                 if (!empty) {
-                    // Compteur de tours RESTANTS (après la 1re itération), calculé une seule
-                    // fois en arithmétique non signée → sûr au débordement, et FOR_LOOP n'a
-                    // plus besoin de garde anti-débordement ni de comparer la limite. La
-                    // limite (R[A+1]) est remplacée par ce compteur.
+                    // Count of REMAINING turns after the first iteration, computed once in
+                    // unsigned arithmetic so it is overflow-safe. FOR_LOOP then needs neither an
+                    // overflow guard nor a limit comparison, and the limit in R[A+1] is replaced
+                    // by this counter.
                     uint64_t ustep = (st > 0) ? (uint64_t)st : (0ull - (uint64_t)st);
                     uint64_t urange = (st > 0) ? ((uint64_t)lim - (uint64_t)i0) : ((uint64_t)i0 - (uint64_t)lim);
                     regs[base + A + 1] = Value((int64_t)(urange / ustep));
@@ -1839,9 +1831,9 @@ dispatch_loop:
             Value& vl = regs[base + A + 1];
             Value& vs = regs[base + A + 2];
             if (vi.is_integer()) { // type figé par FOR_PREP
-                // R[A+1] = compteur de tours restants (posé par FOR_PREP). Tant qu'il est
-                // non nul : décrémenter, avancer i. Pas de garde anti-débordement : le
-                // compteur garantit que i + st reste dans la plage initiale.
+                // R[A+1] holds the remaining-turn counter set by FOR_PREP. While it is non-zero,
+                // decrement it and step i. No overflow guard is needed: the counter guarantees
+                // that i + st stays within the initial range.
                 uint64_t cnt = (uint64_t)vl.as_int();
                 if (cnt != 0) {
                     vl = Value((int64_t)(cnt - 1));
@@ -1858,20 +1850,20 @@ dispatch_loop:
             }
         }
         if (cont)
-            ip = Bx; // → corps ; sinon on tombe sur la sortie
+            ip = Bx;   // into the body; otherwise we fall through to the exit
         NEXT();
     }
 
     op_SPREAD_RESULTS:
-        // Destructuration multi-retour : l'appel précédent a laissé last_results_
-        // valeurs en R[A..]. Met les cibles restantes (A+last_results_ .. A+B-1) à
-        // nil, sinon elles liraient des registres périmés.
+        // Multi-return destructuring: the previous call left last_results_ values in R[A..].
+        // Set the remaining targets (A+last_results_ .. A+B-1) to nil, otherwise they would read
+        // stale registers.
         for (int i = last_results_; i < B; ++i)
             regs[base + A + i] = Value{};
         NEXT();
 
-    // Scellement d'un enum : émis APRÈS le remplissage, qui passe lui-même par
-    // SET_INDEX (et peut évaluer des appels pour les valeurs).
+    // Sealing an enum, emitted AFTER it is filled — the filling itself goes through SET_INDEX,
+    // and may evaluate calls to produce the values.
     op_SEAL_ENUM: {
         Value& target = regs[base + A];
         if (target.is_map())
@@ -1879,9 +1871,9 @@ dispatch_loop:
         NEXT();
     }
 
-    // Fin d'une portée qui se RÉPÈTE (itération de boucle) : les variables capturées
-    // par une closure sont figées dans leur upvalue, qui quitte la liste du frame. Le
-    // tour suivant en crée donc une neuve → une variable par itération.
+    // End of a scope that REPEATS (one loop iteration): variables captured by a closure are
+    // frozen in their upvalue, which leaves the frame's list. The next turn therefore creates a
+    // fresh one, giving one variable per iteration.
     op_CLOSE_UPVALS: {
         close_upvals_above(A);
         NEXT();
@@ -1894,11 +1886,11 @@ dispatch_loop:
 
     } catch (const std::runtime_error& e) {
         if (handler_stack.empty()) {
-            // Erreur NON rattrapée : préfixer la ligne source courante si le message
-            // n'en porte pas déjà une (les builtins lèvent sans localisation). Les
-            // erreurs rattrapées par try/catch gardent leur message brut (ci-dessous).
+            // UNCAUGHT error: prefix the current source line unless the message already carries
+            // one (builtins throw without a location). Errors caught by try/catch keep their raw
+            // message, below.
             std::string msg = e.what();
-            // Un message déjà localisé contient ":<chiffres>:" (pattern file:line:)
+            // An already-located message contains ":<digits>:", the file:line: pattern.
             auto has_loc = [&](const std::string& m) {
                 auto p = m.find(':');
                 while (p != std::string::npos && p + 1 < m.size()) {
@@ -1918,7 +1910,7 @@ dispatch_loop:
         Handler h = handler_stack.back();
         handler_stack.pop_back();
         unwind_to_handler(h, Value(std::string(e.what())));
-        // base (local) restauré ici — comme op_THROW ; unwindToHandler a posé ip.
+        // `base` (a local) is restored here, as in op_THROW; unwind_to_handler already set ip.
         base = call_stack.back().reg_base;
         goto dispatch_loop;
     }
@@ -1926,7 +1918,6 @@ dispatch_loop:
 #undef NEXT
 }
 
-// ── execute ───────────────────────────────────────────────────────────────────
 void VM::execute(Chunk chunk) {
     owned_chunk = std::move(chunk);
     ch = &owned_chunk;
@@ -1966,9 +1957,9 @@ void VM::execute(Chunk chunk) {
             globals[gi] = Value(0.0);
             globals_init[gi] = true;
         }
-    // W / H : dimensions de la zone de rendu, injectées par le moteur (défaut :
-    // window.width/height selon l'environnement). Lues avant le top-level pour
-    // que graphics.canvas(W, H) fonctionne directement.
+    // W and H are the render-area dimensions injected by the engine, defaulting to
+    // window.width/height for the environment. They are read before the top level so that
+    // graphics.canvas(W, H) works right away.
     {
         int64_t win_w = 0, win_h = 0;
         Value win = make_builtin_module("window");
