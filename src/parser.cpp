@@ -63,15 +63,14 @@ void Parser::skip_comments() {
         advance();
 }
 
-// Absorbe un COMMENT optionnel en fin d'instruction. (Les instructions sont
-// séparées par des retours à la ligne, non tokenisés ; il n'y a pas d'ASI.)
+// Absorbs an optional COMMENT at the end of a statement. Statements are separated by
+// newlines, which are not tokenized; there is no automatic semicolon insertion.
 void Parser::consume_opt_comment() {
     match(TokenType::COMMENT);
 }
 
-// Garde anti-débordement de pile : la descente récursive (parenthèses, appels,
-// blocs imbriqués) pouvait faire planter le processus sur une entrée très
-// imbriquée. On borne la profondeur et on lève une erreur propre à la place.
+// Stack-overflow guard: recursive descent (parentheses, calls, nested blocks) could crash the
+// process on deeply nested input. Depth is bounded and a clean error is raised instead.
 namespace {
 struct DepthGuard {
     int& d;
@@ -86,7 +85,6 @@ struct DepthGuard {
 };
 } // namespace
 
-// ── entrée principale ────────────────────────────────────────────────────────
 
 Program Parser::parse() {
     Program prog;
@@ -100,7 +98,6 @@ Program Parser::parse() {
     return prog;
 }
 
-// ── dispatch ─────────────────────────────────────────────────────────────────
 
 static bool is_assign_op(TokenType t) {
     return t == TokenType::EQUALS || t == TokenType::PLUS_EQUAL || t == TokenType::MINUS_EQUAL ||
@@ -116,8 +113,8 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         return std::make_unique<CommentStmt>(std::move(text));
     }
     case TokenType::SEMICOLON:
-        // ';' n'est valide qu'à l'intérieur d'un range [a;b] (consommé par
-        // rangeExpr). Au niveau instruction, c'est une erreur — message clair.
+        // ';' is only valid inside a range [a;b], where range_expr consumes it. At statement
+        // level it is an error, reported explicitly.
         throw std::runtime_error(peek().sloc().str(*source_files_) +
                                  ": ';' is not valid syntax — statements are terminated by newlines");
     case TokenType::WHILE:    return while_stmt();
@@ -138,12 +135,11 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     case TokenType::GLOBAL:   return global_decl();
     case TokenType::CONSTANT: return constant_decl();
     case TokenType::IDENTIFIER: {
-        // Une instruction débutant par un identifiant est soit une affectation
-        // (simple, indexée, ou chaînée), soit une multi-affectation, soit une
-        // instruction-expression. On parse une expression : selon ce qui suit
-        // (opérateur d'affectation, virgule, ou rien) on décide. La cible d'une
-        // affectation doit être une lvalue (VarExpr ou IndexExpr) — cela couvre
-        // uniformément a=, a.b=, a[i]=, a.b.c=, a[i][j]=, a.b[k]= (cf. grammaire).
+        // A statement starting with an identifier is an assignment (plain, indexed or
+        // chained), a multi-assignment, or an expression statement. We parse an expression and
+        // decide from what follows: an assignment operator, a comma, or nothing. An assignment
+        // target must be an lvalue (VarExpr or IndexExpr), which uniformly covers a=, a.b=,
+        // a[i]=, a.b.c=, a[i][j]= and a.b[k]= (see the grammar).
         int line = peek().line;
         int saved = pos;
         auto e = expr();
@@ -164,11 +160,11 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     return expr_stmt();
 }
 
-// Transforme une cible déjà parsée + l'opérateur d'affectation courant en
-// instruction. VarExpr → AssignStmt ; IndexExpr (a.b, a[i], et chaînes) →
-// IndexAssignStmt avec le conteneur en obj_expr.
+// Turns an already parsed target plus the current assignment operator into a statement:
+// VarExpr becomes an AssignStmt, IndexExpr (a.b, a[i] and chains) an IndexAssignStmt carrying
+// the container in obj_expr.
 std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> target, int line) {
-    TokenType opt = advance().type; // opérateur d'affectation
+    TokenType opt = advance().type;   // assignment operator
     auto value = expr();
     consume_opt_comment();
     if (auto* ve = dynamic_cast<VarExpr*>(target.get())) {
@@ -210,7 +206,6 @@ std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> targ
     throw std::runtime_error(cur_loc(line).str(*source_files_) + ": invalid assignment target");
 }
 
-// ── instructions ─────────────────────────────────────────────────────────────
 
 std::unique_ptr<Stmt> Parser::var_decl() {
     int line = peek().line;
@@ -319,8 +314,8 @@ std::unique_ptr<Stmt> Parser::if_stmt() {
     while (check(TokenType::ELSE) || check(TokenType::ELSEIF)) {
         bool is_elif = check(TokenType::ELSEIF);
         advance(); // ELSE or ELSEIF
-        // Pas de sucre "else if" : pour un elseif on écrit 'elseif'. Un 'else' suivi
-        // d'un 'if' est une branche else contenant un bloc if imbriqué (statement normal).
+        // There is no "else if" sugar: an elseif is spelled 'elseif'. An 'else' followed by an
+        // 'if' is an else branch containing a nested if block, like any other statement.
         if (is_elif) {
             ElseIfClause ei;
             ei.cond = expr();
@@ -447,7 +442,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
         consume_opt_comment();
     };
 
-    // Définition sur un champ de map : func obj.field(params) ... end
+    // Definition on a map field: func obj.field(params) ... end
     // → desugar en  obj.field = func(params) ... end
     if (check(TokenType::DOT)) {
         advance(); // DOT
@@ -476,7 +471,7 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
     auto s = std::make_unique<ReturnStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     // retvals optionnels : pas de valeur si on est sur une fermeture de bloc
-    // (end/else/elseif/catch), un séparateur, un commentaire ou EOF.
+    // (end/else/elseif/catch), a separator, a comment, or EOF.
     if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)
         && !check(TokenType::END) && !check(TokenType::ELSE)
         && !check(TokenType::ELSEIF) && !check(TokenType::CATCH)) {
@@ -549,7 +544,7 @@ std::unique_ptr<Stmt> Parser::for_stmt() {
     std::string first_var = expect(TokenType::IDENTIFIER).lexeme;
 
     if (match(TokenType::EQUALS)) {
-        // for i=start,end[,step]  →  désucré en  for i in [start;end[;step]]
+        // for i=start,end[,step] is desugared into for i in [start;end[;step]]
         auto range = std::make_unique<RangeExpr>();
         range->line = line;
         range->incl_left = true;
@@ -611,7 +606,6 @@ std::unique_ptr<Stmt> Parser::expr_stmt() {
     return s;
 }
 
-// ── expressions ──────────────────────────────────────────────────────────────
 
 std::unique_ptr<Expr> Parser::expr() {
     DepthGuard guard(depth_, peek().sloc().str(*source_files_));
@@ -764,23 +758,22 @@ std::unique_ptr<Expr> Parser::multiplicative() {
     return left;
 }
 
-// `ref x` / `ref a.b.c` — passage par RÉFÉRENCE, désucré ici même (aucun type ni
-// opcode nouveau) en un objet portant la lecture et l'écriture de la cible :
+// `ref x` and `ref a.b.c`: pass by REFERENCE, desugared right here — no new type, no new
+// opcode — into an object carrying the read and the write of the target:
 //
 //   {__ref: true, get: func() return x end, set: func(v) x = v end}
 //
-// Les closures capturent la cible par upvalue si elle est locale, ou lisent/écrivent
-// le global sinon — c'est le mécanisme des upvalues qui fait tout le travail.
-// `__ref` ne sert qu'à la validation côté module natif (une map avec get/set n'est
-// pas forcément une référence : le module `data` en a aussi).
+// The closures capture the target as an upvalue when it is local, and read or write the global
+// otherwise: the upvalue machinery does all the work. `__ref` exists only so native modules can
+// validate — a map with get/set is not necessarily a reference, the `data` module has some too.
 static const char* REF_PARAM = "__ref_v";   // nom du paramètre du setter : ne doit
                                             // JAMAIS collisionner avec la cible (`ref v`)
 
 std::unique_ptr<Expr> Parser::ref_expr() {
     int line = peek().line;
     advance(); // REF
-    // Cible : IDENT { "." IDENT }. L'indexation par crochets est refusée — le chemin
-    // serait réévalué à chaque accès, donc `ref t[i]` suivrait les changements de i.
+    // Target: IDENT { "." IDENT }. Bracket indexing is refused, because the path is
+    // re-evaluated on every access and `ref t[i]` would follow later changes to i.
     if (!check(TokenType::IDENTIFIER))
         throw std::runtime_error(cur_loc(line).str(*source_files_) + ": ref attend un nom de variable, pas '" +
                                  peek().lexeme + "'");
@@ -798,8 +791,8 @@ std::unique_ptr<Expr> Parser::ref_expr() {
         e->line = line;
         e->file_idx = current_file_idx_;
     };
-    // Construit l'accès aux `n` premiers segments (VarExpr, ou IndexExpr chaîné).
-    // Appelé plusieurs fois : chaque arbre généré a besoin du sien.
+    // Builds the access to the first `n` segments (a VarExpr, or a chain of IndexExpr). Called
+    // several times: each generated tree needs its own, since a unique_ptr cannot be copied.
     auto make_access = [&](size_t n) {
         std::unique_ptr<Expr> e = std::make_unique<VarExpr>(path[0]);
         set_loc(e.get());
@@ -839,7 +832,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
             a->value = std::move(val);
             assign = std::move(a);
         } else {
-            // a.b.c = v  →  conteneur = accès à `a.b`, clé = "c"
+            // a.b.c = v: the container is the access to `a.b`, the key is "c"
             auto ia = std::make_unique<IndexAssignStmt>();
             ia->obj_expr = make_access(path.size() - 1);
             auto k = std::make_unique<StringExpr>(path.back());
@@ -872,7 +865,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     return m;
 }
 
-// Précédence (modèle Lua) : '^' (puissance) lie plus fort que le moins unaire.
+// Precedence follows Lua: '^' binds tighter than unary minus.
 //   multiplicative → unary → power → primary
 //   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (droite)
 std::unique_ptr<Expr> Parser::unary() {
@@ -907,7 +900,7 @@ std::unique_ptr<Expr> Parser::power() {
         return left; // '^' = puissance (modèle Lua)
     advance();
     skip_comments();
-    // opérande droit = unary → autorise 2 ^ -1 et associativité à droite (2^2^3)
+    // A unary right operand allows 2 ^ -1, and right associativity gives 2^2^3.
     return std::make_unique<BinaryExpr>('p', std::move(left), unary());
 }
 
@@ -970,7 +963,6 @@ std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
     return base;
 }
 
-// ── Range helpers ─────────────────────────────────────────────────────────────
 
 // Scan forward from current position looking for SEMICOLON at depth 0 before
 // COMMA or RBRACKET at depth 0. Returns true if this looks like a range.
@@ -1028,8 +1020,8 @@ std::unique_ptr<Expr> Parser::range_expr(bool incl_left) {
         throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected ']' or '[' to close range");
     }
 
-    // Ajustement open-left (incl_left=false → start += step) : émis par le
-    // COMPILATEUR à partir du drapeau node->incl_left. Rien à faire ici.
+    // The open-left adjustment (incl_left = false, so start += step) is emitted by the
+    // COMPILER from node->incl_left. Nothing to do here.
     return node;
 }
 
@@ -1046,7 +1038,6 @@ std::unique_ptr<Expr> Parser::primary() {
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'b' || lex[1] == 'B'))
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 2)));
             // flottant si '.' OU exposant scientifique ('e'/'E') ; sinon entier.
-            // (les préfixes hex/oct/bin sont déjà traités au-dessus.)
             if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos &&
                 lex.find('E') == std::string::npos)
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
@@ -1084,7 +1075,7 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::IDENTIFIER)) {
         std::string name = advance().lexeme;
-        // super.method(args) — appel de la méthode parente avec le self courant
+        // super.method(args): calls the parent method with the current self
         if (name == "super") {
             expect(TokenType::DOT);
             std::string method_name = expect(TokenType::IDENTIFIER).lexeme;
@@ -1221,7 +1212,7 @@ std::unique_ptr<Expr> Parser::primary() {
         auto e = expr();
         skip_comments();
         expect(TokenType::RPAREN);
-        // postfix sur une expression parenthésée : (expr)(args), (expr)[i], (expr).champ
+        // Postfix on a parenthesized expression: (expr)(args), (expr)[i], (expr).field
         return parse_postfix(std::move(e));
     }
     throw std::runtime_error(peek().sloc().str(*source_files_) + ": unexpected token '" + peek().lexeme + "'");
@@ -1251,7 +1242,7 @@ std::unique_ptr<Stmt> Parser::class_decl() {
             throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected 'func' inside class body");
         int method_line = peek().line;
         // funcDeclStmt() renvoie un IndexAssignStmt pour la forme `func obj.field()`
-        // — invalide dans une classe. Vérifier le type au lieu d'un static_cast
+        // which is invalid in a class. Check the type rather than static_cast'ing
         // aveugle (qui provoquait un segfault).
         auto raw = func_decl_stmt();
         auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
@@ -1268,9 +1259,9 @@ std::unique_ptr<Stmt> Parser::class_decl() {
     return s;
 }
 
-// Valeur d'un littéral entier, éventuellement précédé de '-' : seule forme qui
-// déplace le compteur d'un enum (une expression quelconque ne peut pas être
-// évaluée à la compilation). Renvoie false si ce n'en est pas un.
+// Value of an integer literal, possibly preceded by '-': the only form that moves an enum's
+// counter, since an arbitrary expression cannot be evaluated at compile time. Returns false
+// when the expression is not one.
 static bool enum_int_literal(const Expr* e, int64_t* out) {
     if (auto* u = dynamic_cast<const UnaryExpr*>(e)) {
         int64_t inner = 0;
@@ -1294,10 +1285,10 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
     s->line = line;
     s->file_idx = current_file_idx_;
 
-    // Cible : nom simple (globale) ou chemin `a.b.c` (champ d'une map). Les segments
-    // sont lus d'abord, le dernier devient `name` et les précédents sont repliés en
-    // conteneur. On n'appelle pas parse_postfix : il accepterait aussi `a[0]` et
-    // `a.f()`, que la grammaire n'admet pas comme cible d'enum.
+    // Target: a plain name (a global) or a path `a.b.c` (a map field). Segments are read
+    // first, the last one becomes `name` and the earlier ones fold into the container. We do
+    // not call parse_postfix, which would also accept `a[0]` and `a.f()` — forms the grammar
+    // does not allow as an enum target.
     std::vector<std::string> path;
     path.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (check(TokenType::DOT)) {
@@ -1356,9 +1347,9 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
     return s;
 }
 
-// Noms exportés par un module (rangés dans la map de `import "m" as m`). Chaque
-// sorte d'instruction répond pour elle-même (Stmt::exported_names, ast.h) : rien à
-// tenir à jour ici quand le langage gagne une instruction déclarative.
+// Names a module exports, stored in the map of `import "m" as m`. Each kind of statement
+// answers for itself (Stmt::exported_names, ast.h), so nothing here needs updating when the
+// language gains a new declaring statement.
 static std::vector<std::string> collect_top_level_names(const std::vector<std::unique_ptr<Stmt>>& stmts) {
     std::vector<std::string> names;
     for (auto& s : stmts)
@@ -1380,15 +1371,14 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     }
     consume_opt_comment();
 
-    // Résoudre le chemin par rapport au répertoire du script courant
+    // Resolve the path relative to the current script's directory.
     std::string resolved =
         (!path.empty() && (path[0] == '/' || (path.size() > 1 && path[1] == ':'))) ? path : base_dir_ + path;
 
     auto block = std::make_unique<BlockStmt>();
 
-    // Construit `var al = {}` puis `al[n] = n` pour chaque nom exporté (référence
-    // les globales déjà injectées). Partagé par le cas « déjà importé » et le
-    // cas frais.
+    // Builds `var al = {}` then `al[n] = n` for every exported name, referencing the globals
+    // already injected. Shared by the already-imported case and the fresh one.
     auto emit_alias_map = [&](const std::string& al, const std::vector<std::string>& names) {
         auto vd = std::make_unique<VarDeclStmt>();
         vd->names.push_back(al);
@@ -1404,9 +1394,9 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
         }
     };
 
-    // Déjà importé (dédup / rupture de cycle) : ne PAS ré-injecter les instructions.
-    // Si un alias est demandé, reconstruire sa map depuis les noms mis en cache au
-    // 1er import — sinon un 2e `import "m" as b` donnerait une map vide.
+    // Already imported (dedup, and cycle breaking): do NOT inject the statements again. When an
+    // alias is asked for, rebuild its map from the names cached on the first import, otherwise a
+    // second `import "m" as b` would yield an empty map.
     if (imported_paths_->count(resolved)) {
         if (!alias.empty()) {
             auto it = module_names_->find(resolved);
@@ -1416,8 +1406,8 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     }
     imported_paths_->insert(resolved);
 
-    // Lire le fichier importé : d'abord depuis le registre en mémoire (fourni
-    // par l'hôte, ex. le playground WASM), sinon depuis le disque.
+    // Read the imported file from the in-memory registry first (provided by the host, the WASM
+    // playground for instance), then from disk.
     std::string src_text;
     if (!source_get(resolved, src_text) && !(resolved != path && source_get(path, src_text))) {
         std::ifstream f(resolved);
@@ -1431,9 +1421,9 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     auto sep2 = resolved.find_last_of("/\\");
     std::string sub_dir = (sep2 != std::string::npos) ? resolved.substr(0, sep2 + 1) : base_dir_;
 
-    // Enregistre le fichier importé dans la table partagée des sources, puis
-    // lexe et parse avec ce file_idx pour que tokens et nœuds AST portent la bonne
-    // origine. La table est partagée par tous les parseurs de la chaîne.
+    // Register the imported file in the shared source table, then lex and parse with that
+    // file_idx so tokens and AST nodes carry the right origin. The table is shared by every
+    // parser in the chain.
     int sub_file_idx = (int)source_files_->size();
     source_files_->push_back(resolved);
     Program sub_prog;
@@ -1445,8 +1435,8 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
         throw; // message already contains "file:line:" prefix
     }
 
-    // Mémorise les noms exportés (même pour un import flat) → un import aliasé
-    // ultérieur du même module pourra reconstruire sa map.
+    // Remember the exported names even for a flat import, so a later aliased import of the same
+    // module can rebuild its map.
     auto top_names = collect_top_level_names(sub_prog.stmts);
     (*module_names_)[resolved] = top_names;
 
