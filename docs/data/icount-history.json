@@ -1,32 +1,32 @@
 {
- "_": "Historique du TRAVAIL du moteur, en instructions exécutées. Produit par bench/icount.sh (callgrind), un jalon par journée où le cœur a été touché. Lu par docs/views/perf.js. Pour prolonger la série : ajouter des entrées à la fin de jalons.",
- "outil": "bench/icount.sh",
+ "_": "History of the engine WORK, in executed instructions. Produced by bench/icount.sh (callgrind), one milestone per day on which the core was touched. Read by docs/views/perf.js. To extend the series, append entries to milestones.",
+ "tool": "bench/icount.sh",
  "machine": "conteneur Linux x86-64, GCC, build Release",
  "scripts": [
   {
    "id": "fib",
-   "nom": "fib(24) récursif",
+   "name": "fib(24) récursif",
    "source": "func fib(n) … return fib(n-1) + fib(n-2)"
   },
   {
    "id": "loop",
-   "nom": "boucle 300 000",
+   "name": "boucle 300 000",
    "source": "for i = 1, 300000 do s += i end"
   },
   {
    "id": "map",
-   "nom": "map 20 000 clés",
+   "name": "map 20 000 clés",
    "source": "20 000 écritures m[\"k\"+i] = i, puis for k, v in m"
   }
  ],
- "jalons": [
+ "milestones": [
   {
    "date": "2026-06-20",
    "commit": "fe99827",
    "fib": 121470752,
    "loop": 112555011,
    "map": 101653234,
-   "sujet": "varargs + Frame POD"
+   "subject": "varargs + Frame POD"
   },
   {
    "date": "2026-06-21",
@@ -34,7 +34,7 @@
    "fib": 116969297,
    "loop": 109555006,
    "map": 100813220,
-   "sujet": "fuite close_upvals()"
+   "subject": "fuite close_upvals()"
   },
   {
    "date": "2026-06-22",
@@ -42,7 +42,7 @@
    "fib": 127988198,
    "loop": 114719860,
    "map": 65479409,
-   "sujet": "switch + StringTable robin_hood"
+   "subject": "switch + StringTable robin_hood"
   },
   {
    "date": "2026-06-24",
@@ -50,7 +50,7 @@
    "fib": 127614898,
    "loop": 114422086,
    "map": 65462229,
-   "sujet": "builtin len()"
+   "subject": "builtin len()"
   },
   {
    "date": "2026-06-25",
@@ -58,7 +58,7 @@
    "fib": null,
    "loop": null,
    "map": null,
-   "sujet": "ne compile pas"
+   "subject": "ne compile pas"
   },
   {
    "date": "2026-06-26",
@@ -66,7 +66,7 @@
    "fib": 117114988,
    "loop": 97625698,
    "map": 63244665,
-   "sujet": "clés calculées [expr]"
+   "subject": "clés calculées [expr]"
   },
   {
    "date": "2026-06-27",
@@ -74,7 +74,7 @@
    "fib": 119215825,
    "loop": 98826364,
    "map": 63596080,
-   "sujet": "registre protégé"
+   "subject": "registre protégé"
   },
   {
    "date": "2026-06-28",
@@ -82,7 +82,7 @@
    "fib": 92055658,
    "loop": 32828616,
    "map": 50982385,
-   "sujet": "14 commits, dont le chemin rapide FOR_PREP/FOR_LOOP"
+   "subject": "14 commits, dont le chemin rapide FOR_PREP/FOR_LOOP"
   },
   {
    "date": "2026-06-29",
@@ -90,7 +90,7 @@
    "fib": 92135813,
    "loop": 32534357,
    "map": 51009570,
-   "sujet": "comparaison lexicographique de chaînes"
+   "subject": "comparaison lexicographique de chaînes"
   },
   {
    "date": "2026-06-30",
@@ -98,7 +98,7 @@
    "fib": 91590639,
    "loop": 32219165,
    "map": 50960250,
-   "sujet": "comparaison de chaînes, réappliquée"
+   "subject": "comparaison de chaînes, réappliquée"
   },
   {
    "date": "2026-07-01",
@@ -106,7 +106,7 @@
    "fib": 91517197,
    "loop": 32820950,
    "map": 50983112,
-   "sujet": "globales moteur deltaTime"
+   "subject": "globales moteur deltaTime"
   },
   {
    "date": "2026-07-02",
@@ -114,7 +114,7 @@
    "fib": 94444726,
    "loop": 34322350,
    "map": 51304398,
-   "sujet": "globales moteur W et H"
+   "subject": "globales moteur W et H"
   },
   {
    "date": "2026-07-06",
@@ -122,7 +122,7 @@
    "fib": 93841744,
    "loop": 33422745,
    "map": 52970313,
-   "sujet": "corrections de revue"
+   "subject": "corrections de revue"
   },
   {
    "date": "2026-07-07",
@@ -130,7 +130,7 @@
    "fib": 93991978,
    "loop": 33122562,
    "map": 54148838,
-   "sujet": "déduplication dans la VM"
+   "subject": "déduplication dans la VM"
   },
   {
    "date": "2026-07-08",
@@ -138,7 +138,7 @@
    "fib": 94219106,
    "loop": 33124765,
    "map": 52594853,
-   "sujet": "codegen piloté par destination"
+   "subject": "codegen piloté par destination"
   },
   {
    "date": "2026-07-09",
@@ -146,7 +146,7 @@
    "fib": 93772146,
    "loop": 33727908,
    "map": 52515647,
-   "sujet": "indexation des chaînes par codepoint"
+   "subject": "indexation des chaînes par codepoint"
   },
   {
    "date": "2026-07-10",
@@ -154,7 +154,7 @@
    "fib": 95423400,
    "loop": 34028645,
    "map": 52576254,
-   "sujet": "globales CW et CH"
+   "subject": "globales CW et CH"
   },
   {
    "date": "2026-07-14",
@@ -162,7 +162,7 @@
    "fib": 95948958,
    "loop": 34328856,
    "map": 52537082,
-   "sujet": "overlay mémoire"
+   "subject": "overlay mémoire"
   },
   {
    "date": "2026-07-16",
@@ -170,7 +170,7 @@
    "fib": 93998322,
    "loop": 34628852,
    "map": 52497073,
-   "sujet": "corruption des pools corrigée"
+   "subject": "corruption des pools corrigée"
   },
   {
    "date": "2026-07-18",
@@ -178,7 +178,7 @@
    "fib": 93475534,
    "loop": 34031634,
    "map": 52521234,
-   "sujet": "préfixe « line N: » sur les erreurs"
+   "subject": "préfixe « line N: » sur les erreurs"
   },
   {
    "date": "2026-07-19",
@@ -186,7 +186,7 @@
    "fib": 93792050,
    "loop": 33748188,
    "map": 52558254,
-   "sujet": "BuiltinFn vers CallCtx"
+   "subject": "BuiltinFn vers CallCtx"
   },
   {
    "date": "2026-07-20",
@@ -194,7 +194,7 @@
    "fib": 101002219,
    "loop": 32854390,
    "map": 53806284,
-   "sujet": "suppression de T_MODULE"
+   "subject": "suppression de T_MODULE"
   },
   {
    "date": "2026-07-21",
@@ -202,7 +202,7 @@
    "fib": 100264587,
    "loop": 32865100,
    "map": 53804570,
-   "sujet": "SourceLoc unifié"
+   "subject": "SourceLoc unifié"
   },
   {
    "date": "2026-07-22",
@@ -210,7 +210,7 @@
    "fib": 100264668,
    "loop": 32865291,
    "map": 53804781,
-   "sujet": "interpolation de chaînes"
+   "subject": "interpolation de chaînes"
   },
   {
    "date": "2026-07-24",
@@ -218,7 +218,7 @@
    "fib": 101616180,
    "loop": 33466264,
    "map": 54424440,
-   "sujet": "image.mapPixel"
+   "subject": "image.mapPixel"
   },
   {
    "date": "2026-07-24",
@@ -226,7 +226,7 @@
    "fib": 103424087,
    "loop": 32270233,
    "map": 53849547,
-   "sujet": "expansion multi-valeurs de ..."
+   "subject": "expansion multi-valeurs de ..."
   },
   {
    "date": "2026-08-01",
@@ -234,7 +234,7 @@
    "fib": 104030277,
    "loop": 32575101,
    "map": 53895226,
-   "sujet": "inline cache monomorphe sur GET_INDEX"
+   "subject": "inline cache monomorphe sur GET_INDEX"
   },
   {
    "date": "2026-08-01",
@@ -242,7 +242,7 @@
    "fib": 98343300,
    "loop": 32589979,
    "map": 53166888,
-   "sujet": "clé len comparée par pointeur"
+   "subject": "clé len comparée par pointeur"
   },
   {
    "date": "2026-08-04",
@@ -250,7 +250,7 @@
    "fib": 98197762,
    "loop": 32594366,
    "map": 53211117,
-   "sujet": "enum"
+   "subject": "enum"
   },
   {
    "date": "2026-08-04",
@@ -258,7 +258,7 @@
    "fib": 98573738,
    "loop": 32295119,
    "map": 53112175,
-   "sujet": "for_each_body"
+   "subject": "for_each_body"
   },
   {
    "date": "2026-08-07",
@@ -266,7 +266,7 @@
    "fib": 99175795,
    "loop": 32299996,
    "map": 53092539,
-   "sujet": "une variable par itération de boucle"
+   "subject": "une variable par itération de boucle"
   },
   {
    "date": "2026-08-14",
@@ -274,7 +274,7 @@
    "fib": 99178462,
    "loop": 32302639,
    "map": 53094644,
-   "sujet": "réaffectation multiple d'un appel multi-retour"
+   "subject": "réaffectation multiple d'un appel multi-retour"
   },
   {
    "date": "2026-08-18",
@@ -282,7 +282,7 @@
    "fib": 98878598,
    "loop": 32303057,
    "map": 53017250,
-   "sujet": "le booléen devient un type à part entière"
+   "subject": "le booléen devient un type à part entière"
   },
   {
    "date": "2026-08-18",
@@ -290,7 +290,7 @@
    "fib": 97753231,
    "loop": 32603058,
    "map": 52997247,
-   "sujet": "is_falsy scindée"
+   "subject": "is_falsy scindée"
   },
   {
    "date": "2026-08-18",
@@ -298,7 +298,7 @@
    "fib": 97753231,
    "loop": 32603058,
    "map": 52997247,
-   "sujet": "data + icount (aucun chemin chaud touché)"
+   "subject": "data + icount (aucun chemin chaud touché)"
   }
  ]
 }

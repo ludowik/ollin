@@ -17,7 +17,7 @@ export async function init(ctx) {
   const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
   const pct = v => (Math.abs(v) < 0.05 ? "" : v > 0 ? "+" : "−") + Math.abs(v).toFixed(1).replace(".", ",") + " %";
   const millions = n => (n / 1e6).toFixed(1).replace(".", ",") + " M";
-  const jourMois = iso => iso.slice(8, 10) + "/" + iso.slice(5, 7);
+  const dayMonth = iso => iso.slice(8, 10) + "/" + iso.slice(5, 7);
 
   const SVGNS = "http://www.w3.org/2000/svg";
   const el = (t, a) => {
@@ -25,29 +25,29 @@ export async function init(ctx) {
     for (const k in a) n.setAttribute(k, a[k]);
     return n;
   };
-  const vider = n => {
+  const emptyNode = n => {
     while (n.firstChild) n.removeChild(n.firstChild);
   };
 
-  const bulle = document.getElementById("bulle");
-  const souci = document.getElementById("souci");
-  const svgCourbes = document.getElementById("courbes");
-  const svgEcarts = document.getElementById("ecarts");
+  const tip = document.getElementById("tip");
+  const problem = document.getElementById("problem");
+  const svgCurves = document.getElementById("curves");
+  const svgGaps = document.getElementById("gaps");
 
-  function signaler(e) {
-    souci.hidden = false;
-    souci.textContent = "Les graphiques n'ont pas pu être dessinés (" + (e && e.message ? e.message : e) +
+  function report(e) {
+    problem.hidden = false;
+    problem.textContent = "Les graphiques n'ont pas pu être dessinés (" + (e && e.message ? e.message : e) +
                         "). Les valeurs restent lisibles dans le tableau.";
   }
 
   // Data.
   let doc;
   try {
-    const rep = await fetch("data/icount-history.json?v=" + ctx.v);
-    if (!rep.ok) throw new Error("HTTP " + rep.status);
-    doc = await rep.json();
+    const resp = await fetch("data/icount-history.json?v=" + ctx.v);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    doc = await resp.json();
   } catch (e) {
-    signaler(e);
+    report(e);
     return () => {};
   }
 
@@ -55,8 +55,8 @@ export async function init(ctx) {
   // from the DOM rather than left empty — a heading over a hollow frame reads as a breakdown.
   let bench = null;
   try {
-    const rep = await fetch("data/bench-snapshot.json?v=" + ctx.v);
-    if (rep.ok) bench = await rep.json();
+    const resp = await fetch("data/bench-snapshot.json?v=" + ctx.v);
+    if (resp.ok) bench = await resp.json();
   } catch (e) {
     bench = null;
   }
@@ -64,346 +64,346 @@ export async function init(ctx) {
     // Every element to remove carries an id: aiming at another's neighbour ("the heading just
     // before the table") failed, the heading being a sibling of the scrolling CONTAINER rather
     // than of the table itself.
-    ["titre-temps", "apropos-temps", "bloc-bench", "titre-detail", "defile-temps"]
+    ["title-times", "about-times", "block-bench", "title-detail", "scroll-times"]
       .forEach(id => document.getElementById(id).remove());
   }
 
-  const JALONS = doc.jalons;
-  const SERIES = doc.scripts.map(s => ({ id: s.id, nom: s.nom, classe: "s-" + s.id, css: "--s-" + s.id }));
+  const MILESTONES = doc.milestones;
+  const SERIES = doc.scripts.map(s => ({ id: s.id, name: s.name, cssClass: "s-" + s.id, css: "--s-" + s.id }));
   // ALL the series must be present: testing only one would leave `montrer()` computing y(null)
   // for the others, hence NaN coordinates with no message.
-  const connu = j => SERIES.every(s => typeof j[s.id] === "number");
-  const premier = JALONS.find(connu);
-  const dernier = [...JALONS].reverse().find(connu);
+  const known = j => SERIES.every(s => typeof j[s.id] === "number");
+  const first = MILESTONES.find(known);
+  const last = [...MILESTONES].reverse().find(known);
   // No complete milestone: the file is unusable for the charts (a renamed series, values all
   // missing). Say why, rather than failing on premier.date.
-  if (!premier) {
-    signaler(new Error("aucun jalon ne porte les " + SERIES.length + " séries attendues : " +
+  if (!first) {
+    report(new Error("aucun jalon ne porte les " + SERIES.length + " séries attendues : " +
                        SERIES.map(s => s.id).join(", ")));
     return () => {};
   }
-  const MOIS = ["janvier", "février", "mars", "avril", "mai", "juin",
+  const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin",
                 "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-  const enClair = iso => Number(iso.slice(8, 10)) + " " + MOIS[Number(iso.slice(5, 7)) - 1];
-  const mesures = JALONS.filter(connu).length;
+  const inWords = iso => Number(iso.slice(8, 10)) + " " + MONTHS[Number(iso.slice(5, 7)) - 1];
+  const measured = MILESTONES.filter(known).length;
 
   document.getElementById("intro").textContent =
     "Ce que le moteur d'Ollin coûte à exécuter, mesuré de deux façons : le TRAVAIL qu'il " +
-    "demande, suivi du " + enClair(premier.date) + " au " + enClair(dernier.date) + " " +
-    dernier.date.slice(0, 4) + (bench ? ", et le TEMPS qu'il prend, relevé face à Lua et à Python." : ".");
-  document.getElementById("apropos-travail").textContent =
-    "Instructions exécutées par " + SERIES.map(s => s.nom).join(", ") + ". " +
-    JALONS.length + " jalons, un par journée où le cœur du moteur a été touché" +
-    (mesures < JALONS.length ? " — dont " + (JALONS.length - mesures) + " sans valeur, faute de compiler. " : ". ") +
-    "Mesuré avec " + doc.outil + " ; " + doc.machine + ".";
+    "demande, suivi du " + inWords(first.date) + " au " + inWords(last.date) + " " +
+    last.date.slice(0, 4) + (bench ? ", et le TEMPS qu'il prend, relevé face à Lua et à Python." : ".");
+  document.getElementById("about-work").textContent =
+    "Instructions exécutées par " + SERIES.map(s => s.name).join(", ") + ". " +
+    MILESTONES.length + " jalons, un par journée où le cœur du moteur a été touché" +
+    (measured < MILESTONES.length ? " — dont " + (MILESTONES.length - measured) + " sans valeur, faute de compiler. " : ". ") +
+    "Mesuré avec " + doc.tool + " ; " + doc.machine + ".";
 
   // Summaries.
-  const boiteBilans = document.getElementById("bilans");
+  const summaryBox = document.getElementById("summary");
   SERIES.forEach(s => {
-    const a = premier[s.id], b = dernier[s.id];
+    const a = first[s.id], b = last[s.id];
     const v = (b - a) / a * 100;
-    const carte = document.createElement("div");
-    carte.className = "bilan";
-    const quoi = document.createElement("div");
-    quoi.className = "quoi";
+    const card = document.createElement("div");
+    card.className = "card";
+    const what = document.createElement("div");
+    what.className = "what";
     const past = document.createElement("span");
-    past.className = "pastille " + s.classe;
-    quoi.append(past, document.createTextNode(s.nom));
+    past.className = "dot " + s.cssClass;
+    what.append(past, document.createTextNode(s.name));
     const val = document.createElement("div");
-    val.className = "valeur";
+    val.className = "value";
     val.textContent = pct(v);
     const det = document.createElement("div");
     det.className = "detail";
     det.textContent = fmt(a) + " → " + fmt(b) + (v < 0 ? " (÷" + (a / b).toFixed(2).replace(".", ",") + ")" : "");
-    carte.append(quoi, val, det);
-    boiteBilans.append(carte);
+    card.append(what, val, det);
+    summaryBox.append(card);
   });
 
   // The reading keys carry the final value: on a phone the chart has no right margin left for an
   // end-of-curve label.
-  const boiteCles = document.getElementById("cles");
+  const keyBox = document.getElementById("keys");
   SERIES.forEach(s => {
     const w = document.createElement("span");
     const i = document.createElement("i");
-    i.className = s.classe;
+    i.className = s.cssClass;
     const b = document.createElement("b");
-    b.textContent = millions(dernier[s.id]);
-    w.append(i, document.createTextNode(s.nom), b);
-    boiteCles.append(w);
+    b.textContent = millions(last[s.id]);
+    w.append(i, document.createTextNode(s.name), b);
+    keyBox.append(w);
   });
 
   // Tooltip.
-  function poser(cx, cy) {
-    bulle.style.opacity = 1;
-    const marge = 14, lb = bulle.offsetWidth, hb = bulle.offsetHeight;
-    let px = cx + marge, py = cy - 10;
-    if (px + lb > innerWidth - 8) px = Math.max(8, cx - lb - marge);
+  function place(cx, cy) {
+    tip.style.opacity = 1;
+    const margin = 14, lb = tip.offsetWidth, hb = tip.offsetHeight;
+    let px = cx + margin, py = cy - 10;
+    if (px + lb > innerWidth - 8) px = Math.max(8, cx - lb - margin);
     if (py + hb > innerHeight - 8) py = innerHeight - hb - 8;
     if (py < 8) py = 8;
-    bulle.style.left = px + "px";
-    bulle.style.top = py + "px";
+    tip.style.left = px + "px";
+    tip.style.top = py + "px";
   }
-  const masquer = () => { bulle.style.opacity = 0; };
+  const hide = () => { tip.style.opacity = 0; };
 
   // With a finger, lifting emits pointerleave right after the press, so we only close on the
   // pointer leaving for a MOUSE, and let a press outside the chart close it otherwise.
-  const horsGraphe = [];
-  function fermerAilleurs(svg, effacer) {
-    const h = ev => { if (!svg.contains(ev.target)) effacer(); };
+  const outsideHandlers = [];
+  function closeOnOutside(svg, clearHover) {
+    const h = ev => { if (!svg.contains(ev.target)) clearHover(); };
     document.addEventListener("pointerdown", h, true);
-    horsGraphe.push(h);
+    outsideHandlers.push(h);
   }
 
   // The latest drawing publishes its hover functions here; the listeners themselves are
   // installed once and for all after the first drawing.
-  let survolCourbes = null;
-  let survolEcarts = null;
+  let hoverCurves = null;
+  let hoverGaps = null;
 
   // Curves.
-  function dessinerCourbes(w) {
-    const petit = w < 560;
-    const h = petit ? Math.round(w * 0.86) : 400;
-    const m = { t: 12, r: petit ? 12 : 92, b: petit ? 42 : 46, l: petit ? 40 : 58 };
-    vider(svgCourbes);
-    svgCourbes.setAttribute("viewBox", "0 0 " + w + " " + h);
-    svgCourbes.setAttribute("width", w);
-    svgCourbes.setAttribute("height", h);
+  function drawCurves(w) {
+    const small = w < 560;
+    const h = small ? Math.round(w * 0.86) : 400;
+    const m = { t: 12, r: small ? 12 : 92, b: small ? 42 : 46, l: small ? 40 : 58 };
+    emptyNode(svgCurves);
+    svgCurves.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svgCurves.setAttribute("width", w);
+    svgCurves.setAttribute("height", h);
 
-    const iw = w - m.l - m.r, ih = h - m.t - m.b, n = JALONS.length;
+    const iw = w - m.l - m.r, ih = h - m.t - m.b, n = MILESTONES.length;
     const x = i => m.l + i * iw / (n - 1);
-    const haut = Math.max(...JALONS.filter(connu).flatMap(j => SERIES.map(s => j[s.id])));
-    const pasY = 25e6;
-    const ymax = Math.ceil(haut / 1e7) * 1e7;
+    const top = Math.max(...MILESTONES.filter(known).flatMap(j => SERIES.map(s => j[s.id])));
+    const stepY = 25e6;
+    const ymax = Math.ceil(top / 1e7) * 1e7;
     const y = v => m.t + ih - (v / ymax) * ih;
 
-    const grille = el("g", { class: "grille" }), axe = el("g", { class: "axe" });
-    for (let v = 0; v <= ymax; v += pasY) {
-      grille.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v) }));
+    const grid = el("g", { class: "grid" }), axis = el("g", { class: "axis" });
+    for (let v = 0; v <= ymax; v += stepY) {
+      grid.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v) }));
       const t = el("text", { x: m.l - 8, y: y(v) + 4, "text-anchor": "end", class: "mono" });
-      t.textContent = v === 0 ? "0" : (petit ? String(v / 1e6) : millions(v));
-      axe.append(t);
+      t.textContent = v === 0 ? "0" : (small ? String(v / 1e6) : millions(v));
+      axis.append(t);
     }
-    if (petit) {
+    if (small) {
       const u = el("text", { x: m.l - 8, y: m.t - 1, "text-anchor": "end", class: "mono" });
       u.textContent = "M";
-      axe.append(u);
+      axis.append(u);
     }
-    svgCourbes.append(grille);
+    svgCurves.append(grid);
 
-    const pas = petit ? 8 : 3;
-    let vue = "";
-    JALONS.forEach((j, i) => {
-      if (i % pas !== 0 && i !== n - 1) return;
-      const d = jourMois(j.date);
-      if (d === vue) return;
-      vue = d;
+    const step = small ? 8 : 3;
+    let shown = "";
+    MILESTONES.forEach((j, i) => {
+      if (i % step !== 0 && i !== n - 1) return;
+      const d = dayMonth(j.date);
+      if (d === shown) return;
+      shown = d;
       const t = el("text", {
         x: x(i), y: h - m.b + 20, class: "mono",
         "text-anchor": i === n - 1 ? "end" : i === 0 ? "start" : "middle",
       });
       t.textContent = d;
-      axe.append(t);
+      axis.append(t);
     });
-    const leg = el("text", { x: m.l, y: h - m.b + 37, class: "mono discret" });
-    leg.textContent = petit ? n + " jalons moteur" : n + " jalons — un par journée de commit moteur";
-    axe.append(leg);
-    svgCourbes.append(axe);
+    const leg = el("text", { x: m.l, y: h - m.b + 37, class: "mono dim" });
+    leg.textContent = small ? n + " jalons moteur" : n + " jalons — un par journée de commit moteur";
+    axis.append(leg);
+    svgCurves.append(axis);
 
     SERIES.forEach(s => {
-      let d = "", ouvert = false;
-      JALONS.forEach((j, i) => {
+      let d = "", open = false;
+      MILESTONES.forEach((j, i) => {
         const v = j[s.id];
-        if (v === null) { ouvert = false; return; }
-        d += (ouvert ? " L" : " M") + x(i).toFixed(1) + " " + y(v).toFixed(1);
-        ouvert = true;
+        if (v === null) { open = false; return; }
+        d += (open ? " L" : " M") + x(i).toFixed(1) + " " + y(v).toFixed(1);
+        open = true;
       });
-      svgCourbes.append(el("path", { class: "courbe", d: d.trim(), stroke: "var(" + s.css + ")" }));
-      const dv = dernier[s.id];
-      svgCourbes.append(el("circle", { cx: x(n - 1), cy: y(dv), r: 4.5, fill: "var(" + s.css + ")", class: "anneau" }));
-      if (!petit) {
-        const b = el("text", { x: x(n - 1) + 12, y: y(dv) + 4, class: "bout", fill: "var(" + s.css + ")" });
+      svgCurves.append(el("path", { class: "curve", d: d.trim(), stroke: "var(" + s.css + ")" }));
+      const dv = last[s.id];
+      svgCurves.append(el("circle", { cx: x(n - 1), cy: y(dv), r: 4.5, fill: "var(" + s.css + ")", class: "ring" }));
+      if (!small) {
+        const b = el("text", { x: x(n - 1) + 12, y: y(dv) + 4, class: "end", fill: "var(" + s.css + ")" });
         b.textContent = millions(dv);
-        svgCourbes.append(b);
+        svgCurves.append(b);
       }
     });
 
-    const viseur = el("line", { class: "viseur", y1: m.t, y2: m.t + ih });
+    const crosshair = el("line", { class: "crosshair", y1: m.t, y2: m.t + ih });
     const points = el("g");
-    svgCourbes.append(viseur, points);
+    svgCurves.append(crosshair, points);
 
-    function montrer(i, cx, cy) {
-      const j = JALONS[i];
-      viseur.setAttribute("x1", x(i));
-      viseur.setAttribute("x2", x(i));
-      viseur.setAttribute("opacity", connu(j) ? 0.5 : 0);
-      vider(points);
-      if (connu(j)) {
+    function show(i, cx, cy) {
+      const j = MILESTONES[i];
+      crosshair.setAttribute("x1", x(i));
+      crosshair.setAttribute("x2", x(i));
+      crosshair.setAttribute("opacity", known(j) ? 0.5 : 0);
+      emptyNode(points);
+      if (known(j)) {
         SERIES.forEach(s => points.append(el("circle", {
-          cx: x(i), cy: y(j[s.id]), r: 4.5, fill: "var(" + s.css + ")", class: "anneau",
+          cx: x(i), cy: y(j[s.id]), r: 4.5, fill: "var(" + s.css + ")", class: "ring",
         })));
       }
-      vider(bulle);
-      const quand = document.createElement("div");
-      quand.className = "quand";
-      quand.textContent = j.date + "  ·  " + j.commit;
-      bulle.append(quand);
-      if (!connu(j)) {
+      emptyNode(tip);
+      const when = document.createElement("div");
+      when.className = "when";
+      when.textContent = j.date + "  ·  " + j.commit;
+      tip.append(when);
+      if (!known(j)) {
         const l = document.createElement("div");
-        l.className = "ligne";
+        l.className = "row";
         l.textContent = "valeur inconnue";
-        bulle.append(l);
+        tip.append(l);
       } else {
         SERIES.forEach(s => {
           const l = document.createElement("div");
-          l.className = "ligne";
+          l.className = "row";
           const i2 = document.createElement("i");
-          i2.className = s.classe;
+          i2.className = s.cssClass;
           const b = document.createElement("b");
           b.textContent = fmt(j[s.id]);
           const nm = document.createElement("s");
           nm.textContent = s.id;
           l.append(i2, b, nm);
-          bulle.append(l);
+          tip.append(l);
         });
       }
       const su = document.createElement("div");
-      su.className = "sujet";
-      su.textContent = j.sujet;
-      bulle.append(su);
-      poser(cx, cy);
+      su.className = "subject";
+      su.textContent = j.subject;
+      tip.append(su);
+      place(cx, cy);
     }
-    function viser(ev) {
-      const bb = svgCourbes.getBoundingClientRect();
+    function aim(ev) {
+      const bb = svgCurves.getBoundingClientRect();
       const ux = (ev.clientX - bb.left) / bb.width * w;
-      let choisi = 0, dist = Infinity;
-      JALONS.forEach((_, i) => {
+      let chosen = 0, dist = Infinity;
+      MILESTONES.forEach((_, i) => {
         const d = Math.abs(x(i) - ux);
-        if (d < dist) { dist = d; choisi = i; }
+        if (d < dist) { dist = d; chosen = i; }
       });
-      montrer(choisi, ev.clientX, ev.clientY);
+      show(chosen, ev.clientX, ev.clientY);
     }
-    const effacer = () => {
-      masquer();
-      viseur.setAttribute("opacity", 0);
-      vider(points);
+    const clearHover = () => {
+      hide();
+      crosshair.setAttribute("opacity", 0);
+      emptyNode(points);
     };
     // The state of THIS drawing, read back by the listeners installed once, further down.
-    survolCourbes = { viser: viser, effacer: effacer };
+    hoverCurves = { aim: aim, clearHover: clearHover };
   }
 
   // Gaps from one milestone to the next. The detailed series is the FIRST of the data file, not a
   // "fib" wired in here: renaming a series in the JSON would otherwise have given NaN bars, with
   // no error.
-  const SERIE_ECARTS = SERIES[0];
-  document.getElementById("serie-ecarts").textContent = SERIE_ECARTS.id;
+  const GAPS_SERIES = SERIES[0];
+  document.getElementById("gaps-series").textContent = GAPS_SERIES.id;
 
-  function dessinerEcarts(w) {
-    const petit = w < 560;
-    const h = petit ? Math.round(w * 0.62) : 300;
-    const m = { t: 22, r: petit ? 8 : 22, b: petit ? 26 : 44, l: petit ? 34 : 56 };
-    vider(svgEcarts);
-    svgEcarts.setAttribute("viewBox", "0 0 " + w + " " + h);
-    svgEcarts.setAttribute("width", w);
-    svgEcarts.setAttribute("height", h);
+  function drawGaps(w) {
+    const small = w < 560;
+    const h = small ? Math.round(w * 0.62) : 300;
+    const m = { t: 22, r: small ? 8 : 22, b: small ? 26 : 44, l: small ? 34 : 56 };
+    emptyNode(svgGaps);
+    svgGaps.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svgGaps.setAttribute("width", w);
+    svgGaps.setAttribute("height", h);
 
     const iw = w - m.l - m.r, ih = h - m.t - m.b;
     const pts = [];
-    let avant = null;
-    JALONS.forEach(j => {
-      if (!connu(j)) return;
-      if (avant !== null) {
+    let prev = null;
+    MILESTONES.forEach(j => {
+      if (!known(j)) return;
+      if (prev !== null) {
         pts.push({
-          date: jourMois(j.date), commit: j.commit, sujet: j.sujet,
-          v: (j[SERIE_ECARTS.id] - avant) / avant * 100,
+          date: dayMonth(j.date), commit: j.commit, subject: j.subject,
+          v: (j[GAPS_SERIES.id] - prev) / prev * 100,
         });
       }
-      avant = j[SERIE_ECARTS.id];
+      prev = j[GAPS_SERIES.id];
     });
 
-    const borne = Math.max(10, Math.ceil(Math.max(...pts.map(p => Math.abs(p.v))) / 4) * 4);
-    const y = v => m.t + ih / 2 - (v / borne) * (ih / 2);
-    const pasX = iw / pts.length;
-    const larg = Math.max(3, Math.min(20, pasX - (petit ? 2 : 4)));
-    const x = k => m.l + (k + 0.5) * pasX;
+    const bound = Math.max(10, Math.ceil(Math.max(...pts.map(p => Math.abs(p.v))) / 4) * 4);
+    const y = v => m.t + ih / 2 - (v / bound) * (ih / 2);
+    const stepX = iw / pts.length;
+    const barW = Math.max(3, Math.min(20, stepX - (small ? 2 : 4)));
+    const x = k => m.l + (k + 0.5) * stepX;
 
-    const grille = el("g", { class: "grille" }), axe = el("g", { class: "axe" });
-    const ticks = petit ? [-borne, 0, borne] : [-borne, -borne / 2, 0, borne / 2, borne];
+    const grid = el("g", { class: "grid" }), axis = el("g", { class: "axis" });
+    const ticks = small ? [-bound, 0, bound] : [-bound, -bound / 2, 0, bound / 2, bound];
     ticks.forEach(v => {
-      grille.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v) }));
+      grid.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(v), y2: y(v) }));
       const t = el("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end", class: "mono" });
-      t.textContent = petit ? (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) : pct(v).replace(" %", "%");
-      axe.append(t);
+      t.textContent = small ? (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) : pct(v).replace(" %", "%");
+      axis.append(t);
     });
-    svgEcarts.append(grille, axe);
+    svgGaps.append(grid, axis);
 
-    const marques = el("g"), barres = [];
+    const marks = el("g"), bars = [];
     pts.forEach((p, k) => {
-      const versHaut = p.v >= 0;
+      const upwards = p.v >= 0;
       const hb = Math.max(1.5, Math.abs(y(p.v) - y(0)));
-      const r = Math.min(4, larg / 2, hb);
-      const bx = x(k) - larg / 2, by = versHaut ? y(p.v) : y(0);
+      const r = Math.min(4, barW / 2, hb);
+      const bx = x(k) - barW / 2, by = upwards ? y(p.v) : y(0);
       // Rounded at the data end, square on the baseline.
-      const d = versHaut
+      const d = upwards
         ? "M" + bx + " " + (by + hb) + " L" + bx + " " + (by + r) + " Q" + bx + " " + by + " " + (bx + r) + " " + by +
-          " L" + (bx + larg - r) + " " + by + " Q" + (bx + larg) + " " + by + " " + (bx + larg) + " " + (by + r) +
-          " L" + (bx + larg) + " " + (by + hb) + " Z"
+          " L" + (bx + barW - r) + " " + by + " Q" + (bx + barW) + " " + by + " " + (bx + barW) + " " + (by + r) +
+          " L" + (bx + barW) + " " + (by + hb) + " Z"
         : "M" + bx + " " + by + " L" + bx + " " + (by + hb - r) + " Q" + bx + " " + (by + hb) + " " + (bx + r) + " " + (by + hb) +
-          " L" + (bx + larg - r) + " " + (by + hb) + " Q" + (bx + larg) + " " + (by + hb) + " " + (bx + larg) + " " + (by + hb - r) +
-          " L" + (bx + larg) + " " + by + " Z";
-      const barre = el("path", { d: d, fill: versHaut ? "var(--hausse)" : "var(--baisse)" });
+          " L" + (bx + barW - r) + " " + (by + hb) + " Q" + (bx + barW) + " " + (by + hb) + " " + (bx + barW) + " " + (by + hb - r) +
+          " L" + (bx + barW) + " " + by + " Z";
+      const bar = el("path", { d: d, fill: upwards ? "var(--rise)" : "var(--fall)" });
       // `fill="transparent"` does not count as "painted" for pointer-events: without
       // pointer-events="all" the hover area catches nothing.
       const zone = el("rect", {
-        x: x(k) - pasX / 2, y: m.t, width: pasX, height: ih,
+        x: x(k) - stepX / 2, y: m.t, width: stepX, height: ih,
         fill: "transparent", "pointer-events": "all",
       });
-      const entrer = ev => {
-        barre.setAttribute("opacity", 0.72);
-        vider(bulle);
-        const quand = document.createElement("div");
-        quand.className = "quand";
-        quand.textContent = p.date + "  ·  " + p.commit;
-        const ligne = document.createElement("div");
-        ligne.className = "ligne";
+      const enter = ev => {
+        bar.setAttribute("opacity", 0.72);
+        emptyNode(tip);
+        const when = document.createElement("div");
+        when.className = "when";
+        when.textContent = p.date + "  ·  " + p.commit;
+        const row = document.createElement("div");
+        row.className = "row";
         const b = document.createElement("b");
         b.textContent = pct(p.v);
         const s = document.createElement("s");
-        s.textContent = "sur " + SERIE_ECARTS.id;
-        ligne.append(b, s);
+        s.textContent = "sur " + GAPS_SERIES.id;
+        row.append(b, s);
         const su = document.createElement("div");
-        su.className = "sujet";
-        su.textContent = p.sujet;
-        bulle.append(quand, ligne, su);
-        poser(ev.clientX, ev.clientY);
+        su.className = "subject";
+        su.textContent = p.subject;
+        tip.append(when, row, su);
+        place(ev.clientX, ev.clientY);
       };
-      zone.addEventListener("pointerenter", entrer);
-      zone.addEventListener("pointerdown", entrer);
+      zone.addEventListener("pointerenter", enter);
+      zone.addEventListener("pointerdown", enter);
       zone.addEventListener("pointerleave", ev => {
         if (ev.pointerType !== "mouse") return;
-        barre.removeAttribute("opacity");
-        masquer();
+        bar.removeAttribute("opacity");
+        hide();
       });
-      barres.push(barre);
-      marques.append(barre, zone);
+      bars.push(bar);
+      marks.append(bar, zone);
     });
-    svgEcarts.append(marques);
-    survolEcarts = { effacer: () => {
-      barres.forEach(b => b.removeAttribute("opacity"));
-      masquer();
+    svgGaps.append(marks);
+    hoverGaps = { clearHover: () => {
+      bars.forEach(b => b.removeAttribute("opacity"));
+      hide();
     } };
     // The baseline goes over the bars but stays transparent to the pointer; otherwise it steals
     // the hover exactly along its axis.
-    svgEcarts.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(0), y2: y(0), class: "zero" }));
+    svgGaps.append(el("line", { x1: m.l, x2: m.l + iw, y1: y(0), y2: y(0), class: "zero" }));
 
-    [...pts].sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).slice(0, petit ? 2 : 4).forEach(p => {
-      const k = pts.indexOf(p), versHaut = p.v >= 0;
-      const ty = versHaut ? y(p.v) - 8 : y(p.v) + 17;
-      const anc = k < 2 ? "start" : k > pts.length - 3 ? "end" : "middle";
-      const t = el("text", { x: x(k), y: ty, "text-anchor": anc, class: "note" });
+    [...pts].sort((a, b) => Math.abs(b.v) - Math.abs(a.v)).slice(0, small ? 2 : 4).forEach(p => {
+      const k = pts.indexOf(p), upwards = p.v >= 0;
+      const ty = upwards ? y(p.v) - 8 : y(p.v) + 17;
+      const anchor = k < 2 ? "start" : k > pts.length - 3 ? "end" : "middle";
+      const t = el("text", { x: x(k), y: ty, "text-anchor": anchor, class: "note" });
       t.textContent = pct(p.v);
-      const d = el("text", { x: x(k), y: versHaut ? ty - 12 : ty + 13, "text-anchor": anc, class: "note discret" });
+      const d = el("text", { x: x(k), y: upwards ? ty - 12 : ty + 13, "text-anchor": anchor, class: "note dim" });
       d.textContent = p.date;
-      svgEcarts.append(t, d);
+      svgGaps.append(t, d);
     });
   }
 
@@ -412,8 +412,8 @@ export async function init(ctx) {
   // else, and a non-linear scale would lie about the ratios. Bars that go past the cap are cut
   // short with a point, and their value is written out at the end.
   const coef = v => "×" + v.toFixed(2).replace(".", ",");
-  const secondes = v => v.toFixed(4).replace(".", ",") + " s";
-  const mediane = id => {
+  const seconds = v => v.toFixed(4).replace(".", ",") + " s";
+  const median = id => {
     const t = bench.benchmarks.map(b => b[id]).sort((a, b) => a - b);
     const m = Math.floor(t.length / 2);
     return t.length % 2 ? t[m] : (t[m - 1] + t[m]) / 2;
@@ -422,35 +422,35 @@ export async function init(ctx) {
   if (bench) {
     // The reference is not among `concurrents`, so the heading names it first; otherwise the page
     // would announce a single language compared while the chart shows two.
-    document.getElementById("titre-temps").textContent = "Le temps, face à " +
-      [bench.reference.nom].concat(bench.concurrents.filter(c => c.id !== "ollin").map(c => c.nom)).join(" et à ");
-    document.getElementById("apropos-temps").textContent =
-      "Relevé du " + enClair(bench.date) + " " + bench.date.slice(0, 4) + " sur le commit " +
+    document.getElementById("title-times").textContent = "Le temps, face à " +
+      [bench.reference.name].concat(bench.competitors.filter(c => c.id !== "ollin").map(c => c.name)).join(" et à ");
+    document.getElementById("about-times").textContent =
+      "Relevé du " + inWords(bench.date) + " " + bench.date.slice(0, 4) + " sur le commit " +
       bench.commit + ", meilleur de " + bench.runs + " exécutions, en temps processeur. " +
-      bench.machine + " ; " + bench.build + ". Référence : " + bench.reference.nom +
+      bench.machine + " ; " + bench.build + ". Référence : " + bench.reference.name +
       ", dont le temps absolu vaut 1.";
 
-    const boite = document.getElementById("cles-bench");
-    bench.concurrents.forEach(c => {
+    const box = document.getElementById("keys-bench");
+    bench.competitors.forEach(c => {
       const w = document.createElement("span");
       const i = document.createElement("i");
       i.className = "s-" + c.id;
       const b = document.createElement("b");
-      b.textContent = "médiane " + coef(mediane(c.id));
-      w.append(i, document.createTextNode(c.nom), b);
-      boite.append(w);
+      b.textContent = "médiane " + coef(median(c.id));
+      w.append(i, document.createTextNode(c.name), b);
+      box.append(w);
     });
   }
 
   const svgBench = document.getElementById("bench");
 
-  function dessinerBench(w) {
-    const petit = w < 560;
-    const B = bench.benchmarks, C = bench.concurrents;
-    const hLigne = 20 + C.length * 11;
-    const m = { t: 20, r: petit ? 40 : 54, b: 30, l: 6 };
-    const h = m.t + B.length * hLigne + m.b;
-    vider(svgBench);
+  function drawBench(w) {
+    const small = w < 560;
+    const B = bench.benchmarks, C = bench.competitors;
+    const rowH = 20 + C.length * 11;
+    const m = { t: 20, r: small ? 40 : 54, b: 30, l: 6 };
+    const h = m.t + B.length * rowH + m.b;
+    emptyNode(svgBench);
     svgBench.setAttribute("viewBox", "0 0 " + w + " " + h);
     svgBench.setAttribute("width", w);
     svgBench.setAttribute("height", h);
@@ -458,100 +458,100 @@ export async function init(ctx) {
     const iw = w - m.l - m.r;
     // The cap: enough to hold all of Ollin's coefficients, and one notch above the reference —
     // never the absolute maximum, which would come from a very slow competitor.
-    const hautOllin = Math.max(...B.map(b => b.ollin));
-    const borne = Math.max(2, Math.ceil(hautOllin + 0.5));
-    const x = v => m.l + Math.min(v, borne) / borne * iw;
+    const topOllin = Math.max(...B.map(b => b.ollin));
+    const bound = Math.max(2, Math.ceil(topOllin + 0.5));
+    const x = v => m.l + Math.min(v, bound) / bound * iw;
 
-    const grille = el("g", { class: "grille" }), axe = el("g", { class: "axe" });
-    for (let v = 0; v <= borne; v++) {
-      grille.append(el("line", { x1: x(v), x2: x(v), y1: m.t, y2: h - m.b }));
+    const grid = el("g", { class: "grid" }), axis = el("g", { class: "axis" });
+    for (let v = 0; v <= bound; v++) {
+      grid.append(el("line", { x1: x(v), x2: x(v), y1: m.t, y2: h - m.b }));
       const t = el("text", { x: x(v), y: h - m.b + 16, "text-anchor": "middle", class: "mono" });
       t.textContent = "×" + v;
-      axe.append(t);
+      axis.append(t);
     }
-    svgBench.append(grille, axe);
+    svgBench.append(grid, axis);
 
     B.forEach((b, i) => {
-      const y0 = m.t + i * hLigne;
-      const nom = el("text", { x: m.l + 2, y: y0 + 9, class: "etiq" });
-      nom.textContent = petit ? b.nom : b.nom + " — " + b.quoi;
-      svgBench.append(nom);
+      const y0 = m.t + i * rowH;
+      const name = el("text", { x: m.l + 2, y: y0 + 9, class: "tick" });
+      name.textContent = small ? b.name : b.name + " — " + b.what;
+      svgBench.append(name);
       C.forEach((c, k) => {
         const y = y0 + 15 + k * 11;
-        const depasse = b[c.id] > borne;
+        const beyond = b[c.id] > bound;
         const bx = x(b[c.id]);
         svgBench.append(el("rect", {
           x: m.l, y: y, width: Math.max(1.5, bx - m.l), height: 7, rx: 3.5,
-          fill: "var(--s-" + c.id + ")", opacity: depasse ? 0.55 : 1,
+          fill: "var(--s-" + c.id + ")", opacity: beyond ? 0.55 : 1,
         }));
         // A value beyond the scale is written AGAINST the right edge, right-aligned: placed at
         // the end of the shortened bar it went out of frame and was cut in two on a phone
         // ("×12,").
         const t = el("text", {
-          x: depasse ? w - 2 : bx + 6, y: y + 7, class: "val",
-          fill: "var(--s-" + c.id + ")", "text-anchor": depasse ? "end" : "start",
+          x: beyond ? w - 2 : bx + 6, y: y + 7, class: "val",
+          fill: "var(--s-" + c.id + ")", "text-anchor": beyond ? "end" : "start",
         });
-        t.textContent = (depasse ? "▸ " : "") + coef(b[c.id]);
+        t.textContent = (beyond ? "▸ " : "") + coef(b[c.id]);
         svgBench.append(t);
       });
       // The reference marker, over the bars but SEGMENTED line by line: a single vertical over
       // the whole height would cross the benchmark names.
       svgBench.append(el("line", {
-        x1: x(1), x2: x(1), y1: y0 + 13, y2: y0 + 13 + C.length * 11, class: "barre-ref",
+        x1: x(1), x2: x(1), y1: y0 + 13, y2: y0 + 13 + C.length * 11, class: "ref-line",
       }));
     });
-    const ref = el("text", { x: x(1), y: m.t - 12, "text-anchor": "middle", class: "etiq" });
-    ref.textContent = bench.reference.nom + " = ×1";
+    const ref = el("text", { x: x(1), y: m.t - 12, "text-anchor": "middle", class: "tick" });
+    ref.textContent = bench.reference.name + " = ×1";
     svgBench.append(ref);
   }
 
   // Table.
-  (function tableau() {
-    const table = document.getElementById("valeurs");
+  (function buildTable() {
+    const table = document.getElementById("values");
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    const colonnes = ["date", "commit"];
-    SERIES.forEach(s => colonnes.push(s.id, "Δ " + s.id));
-    colonnes.push("dernier commit du jour");
-    colonnes.forEach(c => {
+    const columns = ["date", "commit"];
+    SERIES.forEach(s => columns.push(s.id, "Δ " + s.id));
+    columns.push("dernier commit du jour");
+    columns.forEach(c => {
       const th = document.createElement("th");
       th.textContent = c;
       tr.append(th);
     });
     thead.append(tr);
     const tbody = document.createElement("tbody");
-    let avant = null;
-    JALONS.forEach(j => {
-      const ligne = document.createElement("tr");
-      const cases = [["", jourMois(j.date)], ["", j.commit]];
+    let prev = null;
+    MILESTONES.forEach(j => {
+      const row = document.createElement("tr");
+      const cells = [["", dayMonth(j.date)], ["", j.commit]];
       SERIES.forEach(s => {
         const v = j[s.id];
-        cases.push(["n", v === null ? "—" : fmt(v)]);
-        if (v === null || avant === null) {
-          cases.push(["n", "—"]);
+        cells.push(["n", v === null ? "—" : fmt(v)]);
+        if (v === null || prev === null) {
+          cells.push(["n", "—"]);
         } else {
-          const d = (v - avant[s.id]) / avant[s.id] * 100;
-          cases.push([d > 0.05 ? "n hausse" : d < -0.05 ? "n baisse" : "n", pct(d)]);
+          const d = (v - prev[s.id]) / prev[s.id] * 100;
+          cells.push([d > 0.05 ? "n rise" : d < -0.05 ? "n fall" : "n", pct(d)]);
         }
       });
-      cases.push(["sujet", j.sujet]);
-      cases.forEach(([cls, txt]) => {
+      cells.push(["subject", j.subject]);
+      cells.forEach(([cls, txt]) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
         td.textContent = txt;   // file data: never through innerHTML
-        ligne.append(td);
+        row.append(td);
       });
-      tbody.append(ligne);
-      if (connu(j)) avant = j;
+      tbody.append(row);
+      if (known(j)) prev = j;
     });
     table.append(thead, tbody);
   })();
 
   // Table of the time reading.
   if (bench) {
-    const table = document.getElementById("temps");
+    const table = document.getElementById("times");
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    ["benchmark", "ce qu'il mesure", bench.reference.nom]
-      .concat(bench.concurrents.map(c => c.nom))
+    ["benchmark", "ce qu'il mesure", bench.reference.name]
+      .concat(bench.competitors.map(c => c.name))
       .forEach(c => {
         const th = document.createElement("th");
         th.textContent = c;
@@ -560,68 +560,68 @@ export async function init(ctx) {
     thead.append(tr);
     const tbody = document.createElement("tbody");
     bench.benchmarks.forEach(b => {
-      const ligne = document.createElement("tr");
-      const cases = [["", b.nom], ["sujet", b.quoi], ["n", secondes(b[bench.reference.id])]];
-      bench.concurrents.forEach(c => cases.push(["n", coef(b[c.id])]));
-      cases.forEach(([cls, txt]) => {
+      const row = document.createElement("tr");
+      const cells = [["", b.name], ["subject", b.what], ["n", seconds(b[bench.reference.id])]];
+      bench.competitors.forEach(c => cells.push(["n", coef(b[c.id])]));
+      cells.forEach(([cls, txt]) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
         td.textContent = txt;   // file data: never through innerHTML
-        ligne.append(td);
+        row.append(td);
       });
-      tbody.append(ligne);
+      tbody.append(row);
     });
     table.append(thead, tbody);
   }
 
   // Drawing, and redrawing when the width changes.
-  function largeurUtile(svg) {
+  function usableWidth(svg) {
     const b = svg.parentElement, cs = getComputedStyle(b);
     return Math.max(240, Math.floor(b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)));
   }
-  let derniere = 0;
-  function redessiner() {
-    const w = largeurUtile(svgCourbes);
-    if (w === derniere) return;
-    derniere = w;
-    dessinerCourbes(w);
-    dessinerEcarts(largeurUtile(svgEcarts));
-    if (bench) dessinerBench(largeurUtile(svgBench));
+  let lastWidth = 0;
+  function redraw() {
+    const w = usableWidth(svgCurves);
+    if (w === lastWidth) return;
+    lastWidth = w;
+    drawCurves(w);
+    drawGaps(usableWidth(svgGaps));
+    if (bench) drawBench(usableWidth(svgBench));
   }
   // The hover listeners are installed ONCE, on elements that are never replaced: they delegate to
   // the latest published drawing.
-  const viserCourbes = ev => { if (survolCourbes) survolCourbes.viser(ev); };
-  const quitterCourbes = ev => {
-    if (survolCourbes && ev.pointerType === "mouse") survolCourbes.effacer();
+  const onAimCurves = ev => { if (hoverCurves) hoverCurves.aim(ev); };
+  const onLeaveCurves = ev => {
+    if (hoverCurves && ev.pointerType === "mouse") hoverCurves.clearHover();
   };
-  const annulerCourbes = () => { if (survolCourbes) survolCourbes.effacer(); };
-  const surRotation = () => setTimeout(redessiner, 120);
-  let observateur = null;
+  const onCancelCurves = () => { if (hoverCurves) hoverCurves.clearHover(); };
+  const onRotation = () => setTimeout(redraw, 120);
+  let observer = null;
   try {
-    redessiner();
-    svgCourbes.addEventListener("pointermove", viserCourbes);
-    svgCourbes.addEventListener("pointerdown", viserCourbes);
-    svgCourbes.addEventListener("pointerleave", quitterCourbes);
-    svgCourbes.addEventListener("pointercancel", annulerCourbes);
-    fermerAilleurs(svgCourbes, annulerCourbes);
-    fermerAilleurs(svgEcarts, () => { if (survolEcarts) survolEcarts.effacer(); });
-    addEventListener("resize", redessiner);
-    addEventListener("orientationchange", surRotation);
+    redraw();
+    svgCurves.addEventListener("pointermove", onAimCurves);
+    svgCurves.addEventListener("pointerdown", onAimCurves);
+    svgCurves.addEventListener("pointerleave", onLeaveCurves);
+    svgCurves.addEventListener("pointercancel", onCancelCurves);
+    closeOnOutside(svgCurves, onCancelCurves);
+    closeOnOutside(svgGaps, () => { if (hoverGaps) hoverGaps.clearHover(); });
+    addEventListener("resize", redraw);
+    addEventListener("orientationchange", onRotation);
     if (window.ResizeObserver) {
-      observateur = new ResizeObserver(redessiner);
-      observateur.observe(document.querySelector(".perf-wrap"));
+      observer = new ResizeObserver(redraw);
+      observer.observe(document.querySelector(".perf-wrap"));
     }
   } catch (e) {
-    signaler(e);
+    report(e);
   }
 
   // Cleanup: every GLOBAL listener installed here must be removed, otherwise it survives the
   // change of view (app.js replaces #view, but not window or document).
   return () => {
-    removeEventListener("resize", redessiner);
-    removeEventListener("orientationchange", surRotation);
-    horsGraphe.forEach(h => document.removeEventListener("pointerdown", h, true));
-    if (observateur) observateur.disconnect();
-    masquer();
+    removeEventListener("resize", redraw);
+    removeEventListener("orientationchange", onRotation);
+    outsideHandlers.forEach(h => document.removeEventListener("pointerdown", h, true));
+    if (observer) observer.disconnect();
+    hide();
   };
 }
