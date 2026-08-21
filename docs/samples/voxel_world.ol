@@ -109,9 +109,9 @@ func putTile(idx, br, bg, bb, jit, trous = 0)
             if trous > 0 then
                 ## Les BORDS de la tuile restent pleins : un trou au bord ouvrirait une fente
                 ## continue entre deux cubes voisins, bien plus voyante qu'un trou isolé.
-                var bord = math.min(math.min(px, py), math.min(TILE - 1 - px, TILE - 1 - py))
+                var edge = math.min(math.min(px, py), math.min(TILE - 1 - px, TILE - 1 - py))
                 var n = math.noise((cx + px) * 0.55 + 200, (cy + py) * 0.55 + 200)
-                if bord >= 2 and n > 1 - trous then
+                if edge >= 2 and n > 1 - trous then
                     a = 0
                 end
             end
@@ -541,27 +541,27 @@ func movePlayer()
     ## enjamber un mur étroit sans jamais l'échantillonner. Cela n'arrive qu'en dessous de
     ## huit images par seconde — une frame très longue, par exemple pendant une cuisson de
     ## chunks — mais le joueur se retrouve alors DANS le terrain.
-    var pas = math.max(math.ceil(math.abs(sp) / 0.5), 1)
-    var dx = math.sin(yaw) * sp / pas
-    var dz = math.cos(yaw) * sp / pas
+    var steps = math.max(math.ceil(math.abs(sp) / 0.5), 1)
+    var dx = math.sin(yaw) * sp / steps
+    var dz = math.cos(yaw) * sp / steps
     var moved = false
-    for i = 1, pas do
+    for i = 1, steps do
         var g0 = ground(camX, camZ)
         var nx = camX + dx
         var nz = camZ + dz
-        var bloque = true
+        var blocked = true
         if ground(nx, camZ) - g0 <= STEP then
             camX = nx
             moved = true
-            bloque = false
+            blocked = false
         end
         if ground(camX, nz) - g0 <= STEP then
             camZ = nz
             moved = true
-            bloque = false
+            blocked = false
         end
         ## Mur atteint : les sous-pas restants n'iraient pas plus loin.
-        if bloque then
+        if blocked then
             break
         end
     end

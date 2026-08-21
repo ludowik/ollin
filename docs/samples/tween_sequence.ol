@@ -4,48 +4,48 @@
 ##
 ## Clique n'importe où pour mettre la scène en pause ou la reprendre.
 
-global balle = {x: 0, y: 0, rx: 0, ry: 0, teinte: Color(0.45, 0.8, 1)}
+global ball = {x: 0, y: 0, rx: 0, ry: 0, tint: Color(0.45, 0.8, 1)}
 
 ## Les trois points d'attente : le même clignotement pour tous, mais décalé dans le temps
 ## par un délai proportionnel à leur rang.
 global points = []
 
 ## Le handle de la séquence : il sert à lire son avancement et à la suspendre.
-global rebond = nil
-global suspendu = false
+global bounce = nil
+global paused = false
 
-func rayon()
+func radius()
     return H * 0.045
 end
 
-func sol()
+func floorY()
     return H * 0.72
 end
 
-func plafond()
+func ceilingY()
     return H * 0.22
 end
 
 ## Le rebond, en cinq étapes. L'écrasement à l'impact et la détente qui suit ne durent
 ## qu'un dixième de seconde : c'est ce décalage entre les durées qui donne du poids à la
 ## balle, et c'est exactement ce qu'une suite d'étapes sait exprimer.
-func lancerRebond()
-    var r = rayon()
-    balle.x = CW
-    balle.y = plafond()
-    balle.rx = r
-    balle.ry = r
+func startBounce()
+    var r = radius()
+    ball.x = CW
+    ball.y = ceilingY()
+    ball.rx = r
+    ball.ry = r
 
-    rebond = tween.sequence(balle, [
+    bounce = tween.sequence(ball, [
         ## Chute : la balle accélère, et s'étire un peu dans le sens du mouvement.
-        {to: {y: sol(), rx: r * 0.88, ry: r * 1.15}, delay: 0.45, curve: "easeInQuad"},
+        {to: {y: floorY(), rx: r * 0.88, ry: r * 1.15}, delay: 0.45, curve: "easeInQuad"},
         ## Impact : elle s'écrase. La cible est lue au démarrage de l'étape, donc elle
         ## part de l'étirement laissé par la chute — aucune valeur à recopier ici.
         {to: {rx: r * 1.45, ry: r * 0.55}, delay: 0.08},
         ## Détente, avant de repartir.
         {to: {rx: r * 0.92, ry: r * 1.1}, delay: 0.1},
         ## Remontée : elle ralentit en approchant du sommet et retrouve sa forme ronde.
-        {to: {y: plafond(), rx: r, ry: r}, delay: 0.55, curve: "easeOutQuad"},
+        {to: {y: ceilingY(), rx: r, ry: r}, delay: 0.55, curve: "easeOutQuad"},
         ## Une étape sans `to` : elle ne fait que laisser passer du temps.
         {delay: 0.15},
     ]).repeat()
@@ -63,15 +63,15 @@ func setup()
     for i = 1, 3 do
         points[i] = {r: 0}
     end
-    lancerRebond()
+    startBounce()
 end
 
 func mouse.pressed(x, y)
-    suspendu = not suspendu
-    if suspendu then
-        rebond.pause()
+    paused = not paused
+    if paused then
+        bounce.pause()
     else
-        rebond.resume()
+        bounce.resume()
     end
 end
 
@@ -83,49 +83,49 @@ func draw()
     ## verrait pas, et c'est elle qui donne au rebond sa hauteur lisible.
     ## Une BANDE, pas tout le bas de l'écran : la barre d'avancement et le texte restent
     ## ainsi sur le fond sombre, où ils sont lisibles.
-    var ySol = sol() + rayon()
+    var yFloor = floorY() + radius()
     graphics.fill(Color(0.29, 0.33, 0.42))
-    graphics.rect(0, ySol, W, H * 0.055)
+    graphics.rect(0, yFloor, W, H * 0.055)
 
     ## L'ombre est DÉRIVÉE de la hauteur de la balle, pas animée : un tween parallèle
     ## d'une durée propre dériverait par rapport à la séquence, et l'ombre s'étalerait
     ## alors que la balle remonte (constaté). Le dessin lit la position, un point.
-    var chute = (balle.y - plafond()) / (sol() - plafond())
-    var largeOmbre = rayon() * (0.7 + 1.5 * chute)
-    var noir = 0.15 + 0.6 * chute
+    var fall = (ball.y - ceilingY()) / (floorY() - ceilingY())
+    var shadowW = radius() * (0.7 + 1.5 * fall)
+    var dark = 0.15 + 0.6 * fall
     ## Deux ellipses concentriques : la plus large et la plus pâle adoucit le bord, sans
     ## avoir besoin d'un flou.
-    graphics.fill(Color(0.04, 0.05, 0.08, noir * 0.45))
-    graphics.ellipse(balle.x, ySol + rayon() * 0.28, largeOmbre * 2.6, rayon() * 0.7)
-    graphics.fill(Color(0.04, 0.05, 0.08, noir))
-    graphics.ellipse(balle.x, ySol + rayon() * 0.28, largeOmbre * 1.7, rayon() * 0.42)
+    graphics.fill(Color(0.04, 0.05, 0.08, dark * 0.45))
+    graphics.ellipse(ball.x, yFloor + radius() * 0.28, shadowW * 2.6, radius() * 0.7)
+    graphics.fill(Color(0.04, 0.05, 0.08, dark))
+    graphics.ellipse(ball.x, yFloor + radius() * 0.28, shadowW * 1.7, radius() * 0.42)
 
     ## La balle : une ellipse, puisque l'écrasement anime ses deux rayons séparément.
-    graphics.fill(balle.teinte)
-    graphics.ellipse(balle.x, balle.y, balle.rx * 2, balle.ry * 2)
+    graphics.fill(ball.tint)
+    graphics.ellipse(ball.x, ball.y, ball.rx * 2, ball.ry * 2)
 
     ## L'avancement de la SUITE entière, en temps : les étapes n'ont pas la même durée,
     ## et la barre progresse pourtant régulièrement.
-    var large = W * 0.6
-    var gauche = CW - large / 2
+    var barW = W * 0.6
+    var left = CW - barW / 2
     var yb = H * 0.9
     graphics.fill(Color(1, 1, 1, 0.1))
-    graphics.rect(gauche, yb, large, H * 0.008)
+    graphics.rect(left, yb, barW, H * 0.008)
     graphics.fill(Color(0.45, 0.8, 1))
-    graphics.rect(gauche, yb, large * rebond.progress(), H * 0.008)
+    graphics.rect(left, yb, barW * bounce.progress(), H * 0.008)
 
     ## Les trois points, à droite de la barre : ils clignotent même en pause, car seule la
     ## séquence est suspendue.
     graphics.fill(Color(0.65, 0.72, 0.85))
     for i = 1, #points do
-        graphics.circle(gauche + large + H * 0.03 * i, yb + H * 0.004, points[i].r)
+        graphics.circle(left + barW + H * 0.03 * i, yb + H * 0.004, points[i].r)
     end
 
     graphics.fontSize(H * 0.028)
     graphics.stroke(Color(0.85, 0.88, 0.95))
-    if suspendu then
-        graphics.text("en pause — clique pour reprendre", gauche, H * 0.84)
+    if paused then
+        graphics.text("en pause — clique pour reprendre", left, H * 0.84)
     else
-        graphics.text("clique pour mettre en pause", gauche, H * 0.84)
+        graphics.text("clique pour mettre en pause", left, H * 0.84)
     end
 end

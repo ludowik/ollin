@@ -14,18 +14,18 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 
 ## Une entrée par modèle : tout ce qui change d'un objet à l'autre est ici, le reste
 ## du programme n'en dépend pas.
-global modeles = [
-    {nom: "Nœud (.obj)", fichier: "knot.obj", teinte: colors.ORANGE, ambient: 0.25, marge: 1.15, hauteur: 0.15},
-    {nom: "Cube texturé (.glb)", fichier: "cube_tex.glb", teinte: colors.WHITE, ambient: 0.5, marge: 1.2, hauteur: 0.12}
+global models = [
+    {name: "Nœud (.obj)", file: "knot.obj", tint: colors.ORANGE, ambient: 0.25, margin: 1.15, height: 0.15},
+    {name: "Cube texturé (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12}
 ]
-global modele = nil   ## entrée affichée
+global current = nil   ## entrée affichée
 global sz = nil       ## dimensions du modèle, pour le cadrage
 
-func choisir(i)
-    modele = modeles[i]
+func choose(i)
+    current = models[i]
     ## graphics.model met le modèle en cache : le rappeler dans draw() ne recharge rien.
-    sz = graphics.modelSize(graphics.model(modele.fichier))
-    graphics.ambient(modele.ambient)
+    sz = graphics.modelSize(graphics.model(current.file))
+    graphics.ambient(current.ambient)
 end
 
 func setup()
@@ -33,11 +33,11 @@ func setup()
     graphics.light("dir", -1, -1, -0.6)
 
     var menu = ui.menu("Modèle")
-    menu.button(modeles[1].nom, func() choisir(1) end)
-    menu.button(modeles[2].nom, func() choisir(2) end)
+    menu.button(models[1].name, func() choose(1) end)
+    menu.button(models[2].name, func() choose(2) end)
     ui.show(menu)
 
-    choisir(1)
+    choose(1)
 end
 
 ## Souris ET tactile : sur le web, le doigt pilote le pointeur → mêmes callbacks.
@@ -55,19 +55,19 @@ end
 
 func draw()
     graphics.clear(colors.BLACK)
-    var dist = graphics.fitDistance(sz.radius) * modele.marge
-    cam.setPos(sz.cx, sz.cy + dist * modele.hauteur, sz.cz + dist)   ## caméra FIXE, cadrée
+    var dist = graphics.fitDistance(sz.radius) * current.margin
+    cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## caméra FIXE, cadrée
     cam.lookAt(sz.cx, sz.cy, sz.cz)
     ball.idle(30)   ## rotation douce quand on ne glisse pas
 
     graphics.begin3d(cam)
-        graphics.fill(modele.teinte)
+        graphics.fill(current.tint)
         graphics.translate(sz.cx, sz.cy, sz.cz)            ## pivoter autour du centre du modèle
         graphics.rotateq(ball.orient())
         graphics.translate(-sz.cx, -sz.cy, -sz.cz)
-        graphics.drawModel(graphics.model(modele.fichier), 0, 0, 0, 1)
+        graphics.drawModel(graphics.model(current.file), 0, 0, 0, 1)
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.text(modele.nom + " — glisse pour tourner", 12, 12)
+    graphics.text(current.name + " — glisse pour tourner", 12, 12)
 end

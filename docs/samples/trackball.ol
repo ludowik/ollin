@@ -16,7 +16,7 @@
 ##   ## dans draw() : graphics.rotateq(ball.orient())
 
 class Trackball
-    func init(sensibilite)
+    func init(sensitivity)
         self.q = graphics.quat()
         self.dragging = false
         self.lastx = 0
@@ -24,9 +24,9 @@ class Trackball
         ## Degrés de rotation par pixel glissé. Le défaut ne s'applique qu'en l'ABSENCE
         ## d'argument : `or` prendrait aussi le dessus sur 0, qui fige volontairement la
         ## rotation (zéro est faux en Ollin).
-        self.sensibilite = 0.5
-        if sensibilite <> nil then
-            self.sensibilite = sensibilite
+        self.sensitivity = 0.5
+        if sensitivity <> nil then
+            self.sensitivity = sensitivity
         end
     end
 
@@ -48,8 +48,8 @@ class Trackball
         if not self.dragging then
             return
         end
-        var dx = (x - self.lastx) * self.sensibilite
-        var dy = (y - self.lasty) * self.sensibilite
+        var dx = (x - self.lastx) * self.sensitivity
+        var dy = (y - self.lasty) * self.sensitivity
         self.lastx = x
         self.lasty = y
         ## dx → rotation autour de Y, dy → autour de X ; composée À GAUCHE, donc dans le

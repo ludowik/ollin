@@ -21,25 +21,25 @@ global glow = 0.0        ## décroît à chaque frame — le clavier « respire 
 
 global bow = nil       ## l'oscillateur vivant
 global bowPos = 0.0      ## 0..1, position du doigt dans la bande
-## Contact qui bowHolder l'bow : identifiant de doigt, "souris", ou nil s'il ne sonne pas. Se
+## Contact qui pilote l'archet : identifiant de doigt, "mouse", ou nil s'il ne sonne pas. Se
 ## compare TOUJOURS à nil, jamais par véracité : un identifiant de doigt peut valoir 0, que le
-## langage tient pour faux — l'bow restait alors muet sous le premier doigt du navigateur. La
+## langage tient pour faux — l'archet restait alors muet sous le premier doigt du navigateur. La
 ## bande n'obéit qu'à UN contact, sinon deux positions se disputeraient la même fréquence —
-## et « l'bow sonne » se lit sur cette seule variable, sans drapeau à holdKey d'accord.
+## et « l'archet sonne » se lit sur cette seule variable, sans drapeau à tenir d'accord.
 global bowHolder = nil
 
 global mouseDown = false      ## le bouton de la souris est enfoncé
 
 ## Un oscillateur TENU par contact, créé à la pose et rendu au lever par `free()`. C'est le
 ## moteur qui gère la réserve : il ne reprend une voix rendue qu'une fois son extinction finie.
-global voiceOf = {}        ## contact (identifiant de doigt, ou "souris") → oscillateur
+global voiceOf = {}        ## contact (identifiant de doigt, ou "mouse") → oscillateur
 
 ## Une entrée par contact POSÉ (doigt ou pointeur) : identifiant → touche qu'il presse. C'est
-## ce qui permet plusieurs notes en même temps. Le pointeur y figure sous le nom "souris",
+## ce qui permet plusieurs notes en même temps. Le pointeur y figure sous le nom "mouse",
 ## comme un contact de plus — tout le reste du programme le traite alors sans cas particulier.
 global underFinger = {}
-## Les touches heldKeys, réutilisée d'une image à l'autre : une map neuve par image serait une
-## allocation, et la vider coûte huit écritures.
+## Les touches tenues, dans une map réutilisée d'une image à l'autre : une map neuve par image
+## serait une allocation, et la vider coûte huit écritures.
 global heldKeys = {}
 
 ## Chiffre du clavier → indice de note : comparer la touche à `"" + i` fabriquerait huit
@@ -78,7 +78,7 @@ func setup()
         buffers[i].envelope(0.01, 0.12, 0.35, 0.25).volume(0.5)
     end
 
-    ## L'bow reste silencieux jusqu'au premier glissement : son volume est nul et c'est
+    ## L'archet reste silencieux jusqu'au premier glissement : son volume est nul et c'est
     ## `start` qui le met en marche, pas `play`. Triangle et non dent de scie : sur un
     ## glissando, une forme riche en harmoniques devient criarde dans l'aigu.
     bow = sound.triangle(220).volume(0.0)
@@ -158,10 +158,10 @@ end
 
 ## Ce que le contact survole décide, à la pose comme au glissement. La note ne change que si
 ## l'on CHANGE de touche : sinon un déplacement de trois pixels la redéclencherait par image.
-func follow(contact, avant, x, y)
+func follow(contact, prev, x, y)
     var t = keyAt(x, y)
-    if t == avant then
-        return avant
+    if t == prev then
+        return prev
     end
     return holdKey(contact, t)
 end
@@ -216,33 +216,33 @@ func mouse.pressed(x, y)
     end
     mouseDown = true
     if inBand(y) and bowHolder == nil then
-        bowHolder = "souris"
+        bowHolder = "mouse"
         moveBow(x, y)
     end
-    underFinger["souris"] = follow("souris", 0, x, y)
+    underFinger["mouse"] = follow("mouse", 0, x, y)
 end
 
 func mouse.moved(x, y)
     if not mouseDown or mouseIgnored() then
         return
     end
-    if bowHolder == "souris" then
+    if bowHolder == "mouse" then
         if inBand(y) then
             moveBow(x, y)
         else
             bowHolder = nil
         end
     end
-    underFinger["souris"] = follow("souris", underFinger["souris"], x, y)
+    underFinger["mouse"] = follow("mouse", underFinger["mouse"], x, y)
 end
 
 ## Pas de garde-fou ici : une voix prise par le pointeur doit être rendue dans tous les cas,
 ## y compris si un doigt s'est posé entre-temps.
 func mouse.released(x, y)
     mouseDown = false
-    releaseVoice("souris")
-    underFinger["souris"] = nil
-    if bowHolder == "souris" then
+    releaseVoice("mouse")
+    underFinger["mouse"] = nil
+    if bowHolder == "mouse" then
         bowHolder = nil
     end
 end
@@ -258,13 +258,13 @@ end
 func update()
     ## L'oscillateur suit le doigt : une fréquence qui bouge pendant que le son sort, ce
     ## qu'un tampon figé ne saurait pas faire. Le volume s'ouvre et se ferme en douceur.
-    var cible = 0.0
+    var target = 0.0
     if bowHolder <> nil then
-        cible = 0.25
+        target = 0.25
         bow.freq(110 + bowPos * 660)
     end
     var v = bow.volume()
-    bow.volume(v + (cible - v) * math.min(1, deltaTime * 8))
+    bow.volume(v + (target - v) * math.min(1, deltaTime * 8))
 
     glow = math.max(glow - deltaTime * 2.5, 0)
 end
@@ -276,8 +276,8 @@ func collectHeldKeys()
     for i = 1, #notes do
         heldKeys[i] = nil
     end
-    for contact, sous in underFinger do
-        heldKeys[sous] = true
+    for contact, below in underFinger do
+        heldKeys[below] = true
     end
 end
 
@@ -290,9 +290,9 @@ func draw()
     var bb = bandBottom()
     var hc = keyboardTop()
 
-    ## La bande de l'bow : sa teinte dit s'il sonne.
-    var chaud = (bowHolder <> nil) and 1 or 0
-    graphics.fill(Color(0.13 + 0.2 * chaud, 0.15, 0.24))
+    ## La bande de l'archet : sa teinte dit s'il sonne.
+    var warm = (bowHolder <> nil) and 1 or 0
+    graphics.fill(Color(0.13 + 0.2 * warm, 0.15, 0.24))
     graphics.rect(0, hb, W, bb - hb)
     if bowHolder <> nil then
         graphics.fill(Color(0.55, 0.85, 1))
@@ -304,7 +304,7 @@ func draw()
         graphics.text("{bow.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
     end
 
-    ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa glow. La
+    ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur. La
     ## touche SOUS LE DOIGT est cerclée, pour que le balayage se voie autant qu'il s'entende.
     graphics.stroke(Color(0.62, 0.7, 0.85))
     graphics.text("tiens plusieurs doigts posés", W * 0.04, hc - H * 0.07)
@@ -313,15 +313,15 @@ func draw()
     var l = keyWidth()
     collectHeldKeys()
     for i = 1, #notes do
-        var tenue = heldKeys[i]
-        ## Tenue : pleine lumière tant que l'appui dure. Sinon, la glow d'une note brève.
-        var vive = tenue and 1 or ((i == lastKey) and glow or 0)
+        var held = heldKeys[i]
+        ## Tenue : pleine lumière tant que l'appui dure. Sinon, la lueur d'une note brève.
+        var bright = held and 1 or ((i == lastKey) and glow or 0)
         ## noStroke AVANT le rectangle, stroke seulement pour le texte : posé dans l'autre
         ## ordre, le contour du texte cerne aussi les touches suivantes.
         graphics.noStroke()
-        graphics.fill(Color(0.16 + 0.5 * vive, 0.18 + 0.35 * vive, 0.3 + 0.4 * vive))
+        graphics.fill(Color(0.16 + 0.5 * bright, 0.18 + 0.35 * bright, 0.3 + 0.4 * bright))
         graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
-        if tenue then
+        if held then
             graphics.noFill()
             graphics.stroke(Color(0.55, 0.85, 1), 3)
             graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
