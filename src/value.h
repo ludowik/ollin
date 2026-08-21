@@ -7,27 +7,27 @@
 #include <utility>
 #include <vector>
 
-// static_cast<int64_t>(d) n'est DÉFINI que si la partie entière de d tient dans
-// int64 (sinon UB, et trap sur WASM). Piège : (double)INT64_MAX arrondit à 2^63,
-// qui n'est PAS un int64 valide → borne haute STRICTE. INT64_MIN = -2^63 est exact,
-// et -lo == 2^63. Source de vérité unique : numValue, ValueHash (clés float) et
-// RangeIterator s'appuient tous dessus (évite le littéral 2^63 dupliqué).
+// static_cast<int64_t>(d) is only DEFINED when the integral part of d fits in an int64;
+// otherwise it is UB, and traps on WASM. The trap: (double)INT64_MAX rounds up to 2^63, which
+// is NOT a valid int64, hence a STRICT upper bound. INT64_MIN = -2^63 is exact, and -lo is
+// 2^63. Single source of truth for num_value, ValueHash (float keys) and RangeIterator, so the
+// 2^63 literal is not duplicated.
 inline bool double_fits_int64(double d) {
     constexpr double lo = static_cast<double>(std::numeric_limits<int64_t>::min()); // -2^63 (exact)
     return d >= lo && d < -lo;                                                      // -lo == 2^63, exclu
 }
 
-// Tagged union Value — 16 octets : tag(1) + _pad(3) + str_hash(4) + union(8).
+// Tagged union, 16 bytes: tag(1) + _pad(3) + str_hash(4) + union(8).
 //
 //   NIL     : tag == T_NIL
-//   Integer : tag == T_INTEGER  → int64_t  (range ±2^63)
-//   Float   : tag == T_FLOAT    → double IEEE 754
-//   String  : tag == T_STRING   → InternedStr*  (ref-counted, str_hash = sptr->hash)
-//   Map     : tag == T_MAP      → Map*     (heap, ref-counted, clés Value)
-//   Array   : tag == T_ARRAY    → Array*   (heap, ref-counted, 1-based)
-//   Range   : tag == T_RANGE    → Range*   (heap, ref-counted)
-//   Iterator: tag == T_ITERATOR → Iterator* (heap, ref-counted)
-//   Function: tag == T_FUNCTION → func_idx (int64_t ival, index dans chunk.funcs)
+//   Integer : tag == T_INTEGER  -> int64_t (range +-2^63)
+//   Float   : tag == T_FLOAT    -> IEEE 754 double
+//   String  : tag == T_STRING   -> InternedStr* (ref-counted, str_hash = sptr->hash)
+//   Map     : tag == T_MAP      -> Map* (heap, ref-counted, Value keys)
+//   Array   : tag == T_ARRAY    -> Array* (heap, ref-counted, 1-based)
+//   Range   : tag == T_RANGE    -> Range* (heap, ref-counted)
+//   Iterator: tag == T_ITERATOR -> Iterator* (heap, ref-counted)
+//   Function: tag == T_FUNCTION -> func_idx (int64_t ival, index into chunk.funcs)
 
 struct Map;
 struct Array;
@@ -36,20 +36,18 @@ struct Iterator;
 struct Closure;
 struct Value;
 class VM;
-// Contexte d'appel d'un builtin. Modèle Lua : le builtin écrit ses valeurs de
-// retour dans les slots résultat (args[0..], qui sont les registres à partir du
-// call_base) et retourne leur nombre. `result_cap` = nombre de slots sûrs
-// (= reg_count du frame - A) ; toute écriture est bornée à cette capacité, ce
-// qui interdit tout débordement hors du frame (cf. invariant registre).
+// Call context of a builtin, on the Lua model: the builtin writes its return values into the
+// result slots (args[0..], the registers from call_base on) and returns how many. `result_cap`
+// is the number of safe slots (the frame's reg_count minus A); every write is clamped to it,
+// which makes overflowing past the frame impossible (see the register invariant).
 struct CallCtx {
     VM*    vm;
     Value* args;
     int    argc;
     int    result_cap = 0;
 
-    // Retour simple d'une valeur (migration mécanique de `return v;`).
     int ret(const Value& v);
-    // Écrit la i-ème valeur de retour (bornée par result_cap). Suivi de `return n;`.
+    // Writes the i-th return value, clamped to result_cap. Follow with `return n;`.
     void set_result(int i, const Value& v);
 };
 
@@ -68,12 +66,10 @@ struct Value {
         Range* rptr;
     };
 
-    // Ordre des tags = INVARIANT de perf : tous les types NON ref-comptés
-    // d'abord (0..4), puis le pivot T_STRING et tous les types ref-comptés
-    // contigus (5..11). Ainsi `tag < T_STRING` sépare en UN test les valeurs
-    // sans gestion mémoire (nil/int/float/function/builtin) de celles à
-    // retain/release. Tout nouveau type ref-compté doit être ajouté APRÈS le
-    // pivot ; tout type non compté AVANT.
+    // Tag order is a PERFORMANCE INVARIANT: every NON ref-counted type first, then the
+    // T_STRING pivot and all ref-counted types contiguously. `tag < T_STRING` therefore tells
+    // values needing no memory management from those needing retain/release in a SINGLE test.
+    // Any new ref-counted type goes AFTER the pivot, any new plain type BEFORE it.
     static constexpr uint8_t T_NIL = 0; // ── non ref-comptés (POD / valeur) ──
     static constexpr uint8_t T_INTEGER = 1;
     static constexpr uint8_t T_FLOAT = 2;
@@ -99,9 +95,9 @@ struct Value {
     }
     explicit Value(Range* p) : tag(T_RANGE), str_hash(0), rptr(p) {
     }
-    // Construction DIRECTE d'un booléen (liste d'initialisation, pas d'écriture après coup) :
-    // les comparaisons en produisent un par test, sur le chemin le plus chaud de la VM.
-    // Le tag-type évite de heurter Value(int64_t).
+    // Builds a boolean DIRECTLY, in the initializer list rather than by assigning afterwards:
+    // comparisons produce one per test, on the hottest path of the VM. The tag type keeps this
+    // from colliding with Value(int64_t).
     struct BoolTag {};
     Value(BoolTag, bool b) : tag(T_BOOL), str_hash(0), ival(b ? 1 : 0) {
     }
@@ -199,9 +195,9 @@ struct Value {
     static Value make_closure(Closure* p) {
         return Value(p);
     }
-    // Fabrique EXPLICITE, et non un constructeur `Value(bool)` : avec `Value(int64_t)` et
-    // `Value(double)` déjà présents, un tel constructeur ferait de `Value(0)` un booléen par
-    // conversion implicite silencieuse.
+    // An EXPLICIT factory rather than a `Value(bool)` constructor: with `Value(int64_t)` and
+    // `Value(double)` already present, such a constructor would silently turn `Value(0)` into a
+    // boolean by implicit conversion.
     static Value make_bool(bool b) {
         return Value(BoolTag{}, b);
     }
@@ -211,10 +207,10 @@ struct Value {
         v.ival = (int64_t)(intptr_t)fn;
         return v;
     }
-    // Builtin déclaré STATIQUE (méthode de classe) : CALL_METHOD ne lui injecte pas
-    // self, comme un `static func` Ollin → mêmes règles pour les classes Ollin et
-    // builtin (arguments explicites en R[0..], sans receveur devant). Le marqueur est
-    // porté par str_hash (inutilisé pour T_BUILTIN, mais préservé à la copie — pas _pad).
+    // A builtin declared STATIC (a class method): CALL_METHOD does not inject self, exactly as
+    // for an Ollin `static func`, so Ollin and builtin classes follow the same rules (explicit
+    // arguments in R[0..], no receiver in front). The marker lives in str_hash — unused for
+    // T_BUILTIN but preserved on copy, unlike _pad.
     static Value make_static_builtin(BuiltinFn fn) {
         Value v = make_builtin(fn);
         v.str_hash = 1;
@@ -304,22 +300,17 @@ inline void CallCtx::set_result(int i, const Value& v) {
         args[i] = v;
 }
 
-// ── Array (1-based, ref-counted) — définition complète ───────────────────────
 #include "collections/array.h"
 
-// ── Map (pure hashmap, clés Value) — définition complète ─────────────────────
 #include "collections/map.h"
 
-// ── Iterator (protocole d'itération — Map, Array) ────────────────────────────
 #include "collections/iterator.h"
 
-// ── Range ([a;b] littéral, itérable) ─────────────────────────────────────────
 #include "collections/range.h"
 
-// ── Closure / Upvalue ─────────────────────────────────────────────────────────
 #include "closure.h"
 
-// ── inline Value implementations (nécessitent Map, Array, Iterator complets) ─
+// Inline Value implementations: they need Map, Array and Iterator to be complete types.
 
 inline Value Value::make_map() {
     return Value(map_pool().acquire());
@@ -369,9 +360,9 @@ inline int64_t Value::map_size() const {
     return (int64_t)mptr->data.size();
 }
 
-// Chemin chaud : pour nil/int/float (tag < T_STRING) il n'y a rien à libérer.
-// On garde ce test trivial inlinable à chaque site d'appel et on déporte le
-// switch ref-compté dans release_cold() (non inliné) → move-assign s'inline.
+// Hot path: for nil/int/float (tag < T_STRING) there is nothing to free. That trivial test
+// stays inlinable at every call site while the ref-counted switch lives in release_cold(),
+// which is not inlined — this is what lets move-assign inline.
 inline void Value::release() noexcept {
     if (tag < T_STRING)
         return; // POD : rien à libérer (un seul test, inliné)
@@ -420,10 +411,9 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
     }
 }
 
-// Symétrique de release() : incrémente le refcount du type ref-compté pointé.
-// Corps trivial (++refcount) → reste inlinable AVEC le switch (pas besoin de la
-// découpe cold de release, dont les corps sont lourds). Grâce au pivot, les
-// types non comptés (dont T_FUNCTION/T_BUILTIN) sortent dès `tag < T_STRING`.
+// Mirror of release(). The body is a single ++refcount, so it stays inlinable WITH its switch
+// and needs no cold split — unlike release, whose cases are heavy. Thanks to the pivot, plain
+// types (T_FUNCTION and T_BUILTIN included) leave at `tag < T_STRING`.
 inline void Value::retain() const noexcept {
     if (tag < T_STRING)
         return; // POD / non comptés : rien à retenir (un seul test)
@@ -463,8 +453,8 @@ inline Value Value::make_iter_from(const Value& src) {
 }
 
 inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.ival) {
-    // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets) ; seul
-    // un type ref-compté (tag >= T_STRING) demande un retain.
+    // Raw copy of the union (ival/dval/ptr alias the same 8 bytes); only a ref-counted type
+    // (tag >= T_STRING) needs a retain.
     retain();
 }
 inline Value& Value::operator=(const Value& o) {
@@ -472,7 +462,7 @@ inline Value& Value::operator=(const Value& o) {
         return *this;
     o.retain(); // retain d'abord (protège si this et o partagent la même ressource)
     release();
-    // copie brute de l'union (ival/dval/ptr aliasent les 8 mêmes octets)
+    // Raw copy of the union (ival/dval/ptr alias the same 8 bytes).
     tag = o.tag;
     str_hash = o.str_hash;
     ival = o.ival;
@@ -492,15 +482,15 @@ inline Value::~Value() {
     release();
 }
 
-// Vérité des types dont la réponse demande un ACCÈS MÉMOIRE (longueur d'une chaîne, taille
-// d'un tableau ou d'une map). `noinline` l'empêche de grossir ses appelants : is_falsy est
-// inlinée sur une quinzaine de sites, dont JUMP_IF_FALSE, le plus chaud de la VM — chaque
-// test qu'on lui retire allège tout ce code.
+// Truthiness for the types whose answer needs a MEMORY ACCESS (length of a string, size of an
+// array or a map). `noinline` keeps it from bloating its callers: is_falsy is inlined at some
+// fifteen sites, JUMP_IF_FALSE among them — the hottest in the VM — so every test moved out of
+// it lightens all that code.
 //
-// PAS de `gnu::cold` ici, mesuré : l'attribut marque aussi les APPELANTS comme improbables,
-// et run_goto les contient tous — la boucle numérique y perdait 33 % (bench_loop), pour un
-// compte d'instructions inchangé. Un attribut qui déclare un chemin froid dégrade donc la
-// fonction géante qui héberge tous les chemins chauds.
+// NO `gnu::cold` here, and this was measured: the attribute also marks the CALLERS as unlikely,
+// and run_goto contains them all — the numeric loop lost 33 % (bench_loop) for an unchanged
+// instruction count. An attribute declaring a cold path therefore degrades the giant function
+// that hosts every hot path.
 [[gnu::noinline]] inline bool is_falsy_cold(const Value& v) {
     if (v.is_float())
         return v.as_float() == 0.0;
@@ -514,11 +504,10 @@ inline Value::~Value() {
 }
 
 inline bool is_falsy(const Value& v) {
-    // principe : « le vide est faux » — un booléen répond pour lui-même, tout le reste
-    // garde ses règles (0, chaîne vide, tableau vide et map vide sont faux).
-    // Ne restent inlinés que les trois tags qui répondent SANS toucher la mémoire, dans
-    // l'ordre de leur fréquence sur ce chemin : le booléen d'abord, les comparaisons en
-    // produisant un par test.
+    // The rule is "empty is false": a boolean answers for itself, everything else keeps its
+    // own (0, the empty string, the empty array and the empty map are false).
+    // Only the three tags that answer WITHOUT touching memory stay inlined, ordered by how
+    // often they occur here — the boolean first, since every comparison produces one.
     if (v.is_bool())
         return !v.as_bool();
     if (v.is_integer())
@@ -529,8 +518,9 @@ inline bool is_falsy(const Value& v) {
 }
 
 inline Value num_value(double d) {
-    // Repli en entier si d est un entier exact représentable en int64. doubleFitsInt64
-    // garde le cast (UB sur NaN/inf/hors plage) ; le round-trip vérifie l'exactitude.
+    // Falls back to an integer when d is an exact integer representable as int64.
+    // double_fits_int64 guards the cast (UB on NaN, inf and out-of-range); the round trip
+    // confirms exactness.
     if (double_fits_int64(d)) {
         int64_t i = static_cast<int64_t>(d);
         if (static_cast<double>(i) == d)

@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-// ── forward declarations ──────────────────────────────────────────────────────
 struct CommentStmt;
 struct VarDeclStmt;
 struct WhileStmt;
@@ -48,7 +47,6 @@ struct FuncExpr;
 struct ChainedCompareExpr;
 struct InterpExpr;
 
-// ── interfaces visiteur ───────────────────────────────────────────────────────
 struct StmtVisitor {
     virtual void visit(const CommentStmt&) = 0;
     virtual void visit(const VarDeclStmt&) = 0;
@@ -96,9 +94,8 @@ struct ExprVisitor {
     virtual ~ExprVisitor() = default;
 };
 
-// ── classes de base ───────────────────────────────────────────────────────────
 struct Stmt;
-// Rappel reçu par Stmt::for_each_body, une fois par sous-corps.
+// Callback handed to Stmt::for_each_body, once per sub-body.
 using BodyFn = std::function<void(const std::vector<std::unique_ptr<Stmt>>&)>;
 
 struct Stmt {
@@ -106,24 +103,24 @@ struct Stmt {
     int file_idx = 0;
     SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
     virtual void accept(StmtVisitor&) const = 0;
-    // Noms que cette instruction déclare au niveau d'un module, donc rangés dans la
-    // map créée par `import "m" as m` (aucun par défaut). La réponse vit ICI, à côté
-    // du nœud : une nouvelle sorte d'instruction déclarative doit y répondre, sinon
-    // ses noms restent invisibles à l'import — le cas s'est produit avec `enum`.
+    // Names this statement declares at module level, hence stored in the map built by
+    // `import "m" as m` (none by default). The answer lives HERE, next to the node: a new kind
+    // of declaring statement must answer, or its names stay invisible to imports — which is
+    // exactly what happened to `enum`.
     virtual void exported_names(std::vector<std::string>& out) const {
         (void)out;
     }
-    // Sous-corps de cette instruction (aucun par défaut) : un parcours d'arbre s'appuie
-    // là-dessus au lieu de réénumérer les sortes composites. À redéfinir sur toute
-    // nouvelle instruction à corps, sinon un parcours ne descend pas dedans.
-    // NB : `accept`/`visit` sert à agir SELON la sorte d'instruction, `for_each_body`
-    // à DESCENDRE. Les deux se combinent (cf. CollectGlobalsVisitor).
+    // Sub-bodies of this statement (none by default). Tree walks rely on this instead of
+    // re-enumerating the composite kinds, so any new statement with a body must override it or
+    // walks will not descend into it.
+    // Note the division of labour: `accept`/`visit` acts ACCORDING TO the kind of statement,
+    // `for_each_body` DESCENDS. The two combine (see CollectGlobalsVisitor).
     virtual void for_each_body(const BodyFn& f) const {
         (void)f;
     }
     virtual ~Stmt() = default;
 };
-// Base pour les visiteurs lecture seule : méthodes non overridées = no-op.
+// Base for read-only visitors: any method left un-overridden is a no-op.
 struct StmtQuery : StmtVisitor {
     void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
         for (auto& s : stmts)
@@ -178,7 +175,6 @@ struct Expr {
     virtual ~Expr() = default;
 };
 
-// ── expressions ───────────────────────────────────────────────────────────────
 struct BoolExpr : Expr {
     bool value;
     explicit BoolExpr(bool v) : value(v) {
@@ -240,8 +236,8 @@ struct UnaryExpr : Expr {
     }
 };
 
-// 1 < x < 10  →  (1 < x) and (x < 10), x évalué une seule fois
-// ops[i] est le char-opérateur entre operands[i] et operands[i+1]
+// 1 < x < 10 becomes (1 < x) and (x < 10), with x evaluated once.
+// ops[i] is the operator character between operands[i] and operands[i+1].
 struct ChainedCompareExpr : Expr {
     std::vector<std::unique_ptr<Expr>> operands;
     std::vector<char> ops;
@@ -259,7 +255,6 @@ struct CallExpr : Expr {
     }
 };
 
-// ── instructions ──────────────────────────────────────────────────────────────
 struct CommentStmt : Stmt {
     std::string text;
     explicit CommentStmt(std::string t) : text(std::move(t)) {
@@ -411,8 +406,8 @@ struct NilExpr : Expr {
 };
 
 struct MapEntry {
-    // key : StringExpr littéral pour `ident:` / `"s":` / `["s"]:` ;
-    //       expression quelconque pour les clés calculées `[expr]:`
+    // key is a literal StringExpr for `ident:`, `"s":` and `["s"]:`, and an arbitrary
+    // expression for computed keys `[expr]:`.
     std::unique_ptr<Expr> key;
     std::unique_ptr<Expr> value;
 };
@@ -434,9 +429,9 @@ struct IndexExpr : Expr {
 
 struct IndexAssignStmt : Stmt {
     std::string obj; // nom de la variable conteneur (utilisé si obj_expr est nul)
-    // Conteneur sous forme d'EXPRESSION pour les cibles CHAÎNÉES (a.b.c, a[i][j],
-    // a.b[k]…). Si non nul, prime sur `obj` : le compilateur l'évalue pour obtenir
-    // la map/array à indexer. Sinon on retombe sur le nom simple `obj`.
+    // Container as an EXPRESSION, for CHAINED targets (a.b.c, a[i][j], a.b[k]…). When set it
+    // takes precedence over `obj`: the compiler evaluates it to get the map or array to index.
+    // Otherwise the plain name `obj` is used.
     std::unique_ptr<Expr> obj_expr;
     std::unique_ptr<Expr> key;
     TokenType op = TokenType::EQUALS; // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
@@ -463,8 +458,8 @@ struct MultiAssignStmt : Stmt {
 };
 
 // for [var1,] var2 in iterable_expr
-// 1 var  → var1 reçoit la valeur primaire (val pour array/range, key pour map)
-// 2 vars → var1=key/index, var2=val
+// One variable: var1 receives the primary value (the value for an array or range, the key for
+// a map). Two variables: var1 is the key or index, var2 the value.
 struct ForIterStmt : Stmt {
     std::string var1; // toujours lié (key si 2 vars, primary si 1 var)
     std::string var2; // vide = forme 1 var
@@ -526,7 +521,7 @@ struct FuncExpr : Expr {
     }
 };
 
-// Appel via une expression (callee quelconque : IndexExpr, CallExpr, VarExpr…)
+// Call through an expression, the callee being anything: IndexExpr, CallExpr, VarExpr…
 struct ExprCallExpr : Expr {
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
@@ -536,7 +531,7 @@ struct ExprCallExpr : Expr {
     }
 };
 
-// Appel de méthode : receiver.method(args) — self auto-passé
+// Method call receiver.method(args), with self passed automatically.
 struct MethodCallExpr : Expr {
     std::unique_ptr<Expr> receiver; // nullptr si is_super
     std::string method;
@@ -548,7 +543,6 @@ struct MethodCallExpr : Expr {
     }
 };
 
-// Déclaration de classe
 struct ClassDeclStmt : Stmt {
     std::string name;
     std::string parent; // vide si pas d'extends
@@ -565,9 +559,9 @@ struct ClassDeclStmt : Stmt {
     }
 };
 
-// enum Name A[=expr], B, C end  —  ou  enum obj.champ A, B end (obj_expr non nul).
-// Un élément sans valeur explicite reçoit du parser un littéral synthétique portant
-// la valeur du compteur : `value` est donc toujours renseigné (cf. parser::enum_decl).
+// enum Name A[=expr], B, C end — or enum obj.field A, B end, where obj_expr is set.
+// An element without an explicit value gets a synthetic literal from the parser carrying the
+// counter's value, so `value` is always set (see parser::enum_decl).
 struct EnumItem {
     std::string name;
     std::unique_ptr<Expr> value;
@@ -608,8 +602,8 @@ struct SwitchStmt : Stmt {
     }
 };
 
-// Chaîne interpolée "texte {expr} texte {expr} texte"
-// literals[i] précède exprs[i] ; literals.size() == exprs.size() + 1 (toujours)
+// Interpolated string "text {expr} text {expr} text".
+// literals[i] precedes exprs[i], and literals.size() is always exprs.size() + 1.
 struct InterpExpr : Expr {
     std::vector<std::string> literals;
     std::vector<std::unique_ptr<Expr>> exprs;

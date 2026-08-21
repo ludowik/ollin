@@ -1,10 +1,10 @@
 #pragma once
 #include <cstdint>
 
-// ── 32-bit fixed-size instruction format ─────────────────────────────────────
-// Format ABC:  [OP:8][A:8][B:8][C:8]   — 3-address ops
-// Format ABx:  [OP:8][A:8][Bx:16]      — reg + 16-bit index/addr
-// Format Bx:   [OP:8][0:8][Bx:16]      — unconditional jump
+// 32-bit fixed-size instruction format.
+// Format ABC:  [OP:8][A:8][B:8][C:8]   3-address ops
+// Format ABx:  [OP:8][A:8][Bx:16]      register + 16-bit index or address
+// Format Bx:   [OP:8][0:8][Bx:16]      unconditional jump
 
 using Instr = uint32_t;
 
@@ -88,17 +88,17 @@ enum class Op : uint8_t {
     NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags
-                    // (bit0=incl_right,bit1=has_step)
+                    // (bit0 = incl_right, bit1 = has_step)
     FOR_PREP, // ABx: for numérique — R[A]=i, R[A+1]=limite, R[A+2]=pas. valide, normalise int/float, i-=pas, ip=Bx
-              // (vers FOR_LOOP)
+              // (towards FOR_LOOP)
     FOR_LOOP, // ABx: i+=pas ; si dans la limite (incl) → R[A]=i, ip=Bx (corps) ; sinon continue (sortie)
     SPREAD_RESULTS, // AB: destructuration multi-retour — met R[A+last_results..A+B-1] à nil
     CALL_VA,        // ABC: A=arg_base, B=func_val_reg, C=n_fixe ; argc = C + last_results_ (dernier
-                    // argument = appel multi-valeurs, déjà matérialisé après les fixes)
+                    // argument is a multi-value call, already materialized after the fixed ones)
     CALL_VARARGS,   // ABC: A=arg_base(fixes), B=func_val_reg, C=n_fixe ; dernier argument = `...`.
-                    // Rassemble fixes + varargs du frame courant dans une zone FRAÎCHE (au-dessus
-                    // des varargs de l'appelant → aucun écrasement), appelle, et renvoie les
-                    // résultats à A (result_base du frame appelé).
+                    // Gathers the fixed arguments and the current frame's varargs into a FRESH area
+                    // (above the caller's varargs, so nothing is overwritten), calls, and returns
+                    // the results at A, the callee frame's result_base.
     ARRAY_PUSH_SPREAD,  // AB: pousse last_results_ valeurs R[B..] dans le tableau R[A] (spread appel)
     ARRAY_PUSH_VARARGS, // A: pousse TOUTES les varargs du frame courant dans le tableau R[A] ([..., ...])
     MOVE_RESULTS,       // AB: copie last_results_ valeurs R[B..] → R[A..] (recompose un spread imbriqué)

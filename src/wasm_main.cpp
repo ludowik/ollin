@@ -78,15 +78,16 @@ static void preload_source_js(const std::string& path, const std::string& conten
     source_preload(path, content);
 }
 
-// Charge les données persistées (module `data`) avant un run. La SPA lit
-// localStorage (portée projet + globale) et passe les deux blobs JSON.
+// Loads persisted `data` before a run: the SPA reads localStorage (project and global scopes)
+// and passes both JSON blobs.
 static void data_load_js(const std::string& project_blob, const std::string& global_blob) {
     data_load(project_blob, global_blob);
 }
 
-// Capture d'écran demandée par l'HÔTE (bouton du mode plein écran). Deux temps, car la
-// capture n'est possible qu'en fin de frame : requestCapture pose la demande, takeCapture
-// rend le PNG en base64 dès qu'une frame l'a produite (chaîne vide sinon).
+// Screenshot requested by the HOST (the fullscreen button). It takes two steps because a
+// capture is only possible at the end of a frame: request_capture records the request, and
+// take_capture returns the PNG as base64 once a frame has produced it (empty string until
+// then).
 static void request_capture_js() {
     gfx_request_capture();
 }
