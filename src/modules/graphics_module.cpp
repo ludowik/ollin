@@ -266,7 +266,7 @@ static int gfx_blend_mode(CallCtx& ctx) {
         } else if (s == "premultiply") {
             mode = BLEND_ALPHA_PREMULTIPLY;
         } else {
-            throw std::runtime_error("graphics.blendMode: mode inconnu '" + s + "'");
+            throw std::runtime_error("graphics.blendMode: unknown mode '" + s + "'");
         }
     } else if (argc > 0 && args[0].is_number()) {
         mode = (int)args[0].as_num();   // constante du module `blend`
@@ -528,13 +528,13 @@ static int anchor_mode_arg(CallCtx& ctx, const char* fn, int dflt) {
     if (ctx.argc == 0)
         return dflt;
     if (!ctx.args[0].is_string())
-        throw std::runtime_error(std::string(fn) + ": attendu \"corner\" ou \"center\"");
+        throw std::runtime_error(std::string(fn) + ": expected \"corner\" or \"center\"");
     const std::string& s = ctx.args[0].as_string();
     if (s == "corner")
         return 0;
     if (s == "center")
         return 1;
-    throw std::runtime_error(std::string(fn) + ": mode inconnu '" + s + "'");
+    throw std::runtime_error(std::string(fn) + ": unknown mode '" + s + "'");
 }
 
 static int gfx_rect_mode(CallCtx& ctx) {
@@ -853,7 +853,7 @@ static std::vector<Vector2> parse_points(const Value& v, const char* fn) {
         return pts;
     auto req = [&](const Value& c) -> float {
         if (!c.is_number())
-            throw std::runtime_error(std::string(fn) + ": les coordonnées de point doivent être des nombres");
+            throw std::runtime_error(std::string(fn) + ": point coordinates must be numbers");
         return (float)c.as_num();
     };
     if (items[0].is_array()) {

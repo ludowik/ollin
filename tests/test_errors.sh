@@ -96,7 +96,7 @@ check_error "hex sans chiffre"           'print(0x)'     "invalid hexadecimal li
 check_error "binaire chiffre invalide"   'print(0b2)'    "invalid binary literal"
 check_error "binaire sans chiffre"       'print(0b)'     "invalid binary literal"
 check_error "binaire underscore final"   'print(0b1_)'   "invalid binary literal"
-check_error "** supprimé (puissance = ^)" 'print(2 ** 3)' "utilisez '^' pour la puissance"
+check_error "** supprimé (puissance = ^)" 'print(2 ** 3)' "use '^' for exponentiation"
 check_error "decimal alnum colle"        'print(42abc)'  "invalid number literal"
 check_error "decimal underscore final"   'print(1_)'     "invalid number literal"
 check_error "decimal underscore double"  'print(1__0)'   "invalid number literal"
@@ -228,12 +228,12 @@ ui.slider("Taille", ref v, "a", 10)' \
 check_error "tween.to with zero duration" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 0)' \
-    "durée doit être > 0"
+    "duration must be > 0"
 
 check_error "tween.to with unknown curve" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 1, "rebond")' \
-    "courbe inconnue"
+    "unknown curve"
 
 check_error "tween.to on a missing field" \
     'global o = {x: 0}
@@ -248,22 +248,22 @@ tween.to(o, {x: 1}, 1)' \
 check_error "tween.value without a reference" \
     'global v = 1
 tween.value(v, 10, 1)' \
-    "doit être une référence"
+    "must be a reference"
 
 check_error "tween.repeat with zero occurrences" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 1).repeat(0)' \
-    "entier >= 1"
+    "integer >= 1"
 
 check_error "tween.repeat with a fractional count" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 1).repeat(2.5)' \
-    "entier >= 1"
+    "integer >= 1"
 
 check_error "tween.repeat with a non-numeric count" \
     'global o = {x: 0}
 tween.to(o, {x: 1}, 1).repeat("deux")' \
-    "un nombre ou nil"
+    "a number or nil"
 
 check_error "ui.list without a reference" \
     'global v = nil
@@ -317,17 +317,17 @@ b *= 2' \
 check_error "tween.sequence with an unknown step key" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, duration: 1}])' \
-    "clé inconnue 'duration'"
+    "unknown key 'duration'"
 
 check_error "tween.sequence with an empty list" \
     'global o = {x: 0}
 tween.sequence(o, [])' \
-    "séquence est vide"
+    "sequence is empty"
 
 check_error "tween.sequence with a step that is not a map" \
     'global o = {x: 0}
 tween.sequence(o, [3])' \
-    "doit être une map"
+    "must be a map"
 
 check_error "tween.sequence with a missing delay" \
     'global o = {x: 0}
@@ -342,7 +342,7 @@ tween.sequence(o, [{to: {x: 1}, delay: -1}])' \
 check_error "tween.sequence with a non-numeric delay" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, delay: "vite"}])' \
-    "doit être un nombre de secondes"
+    "must be a number of seconds"
 
 check_error "tween.sequence with an absent field" \
     'global o = {x: 0}
@@ -352,12 +352,12 @@ tween.sequence(o, [{to: {absent: 1}, delay: 1}])' \
 check_error "tween.sequence with a list that is not an array" \
     'global o = {x: 0}
 tween.sequence(o, {to: {x: 1}})' \
-    "tableau d'étapes"
+    "array of steps"
 
 check_error "tween.sequence with a curve after the list" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, delay: 1}], "easeInOutQuad")' \
-    "courbe se déclare par étape"
+    "curve is declared per step"
 
 check_error "tween.sequence with two end callbacks" \
     'global o = {x: 0}
@@ -367,19 +367,19 @@ tween.sequence(o, [{to: {x: 1}, delay: 1}], func() end, func() end)' \
 check_error "tween.sequence with an unknown curve" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "aucune"}])' \
-    "courbe inconnue"
+    "unknown curve"
 
 check_error "tween.sequence with a tween as target" \
     'global o = {x: 0}
 var inner = tween.sequence(o, [{to: {x: 1}, delay: 1}])
 tween.sequence(o, [{to: inner, delay: 1}])' \
-    "ne s'imbrique pas"
+    "do not nest"
 
 check_error "tween.to on a tween handle" \
     'global o = {x: 0}
 var t = tween.to(o, {x: 1}, 1)
 tween.to(t, {x: 1}, 1)' \
-    "ne peut pas être l'objet animé"
+    "cannot be the animated object"
 
 # ── modules audio / sound ────────────────────────────────────────────────────
 check_error "audio.volume with a string" \
@@ -388,33 +388,33 @@ check_error "audio.volume with a string" \
 
 check_error "sound.osc with an unknown waveform" \
     'sound.osc(440, "bruit")' \
-    "forme d'onde inconnue"
+    "unknown waveform"
 
 check_error "sound.osc above the audible range" \
     'sound.osc(30000)' \
-    "hors de [0;20000]"
+    "out of [0;20000]"
 
 check_error "sound.osc with a negative frequency" \
     'sound.osc(-5)' \
-    "hors de [0;20000]"
+    "out of [0;20000]"
 
 check_error "sound.osc with a frequency that is neither a number nor a note" \
     'sound.osc({})' \
-    "un nombre de hertz ou un nom de note"
+    "a number of hertz or a note name"
 
 check_error "sound.osc with an unreadable note name" \
     'sound.osc("la")' \
-    "note inconnue"
+    "unknown note"
 
 check_error "sound.shape with a number" \
     'var o = sound.sine(440)
 o.shape(3)' \
-    "doit être un nom"
+    "must be a name"
 
 check_error "sound.volume with a string" \
     'var o = sound.sine(440)
 o.volume("fort")' \
-    "le volume doit être un nombre"
+    "volume must be a number"
 
 check_error "oscillator recycled while its handle is kept" \
     'var vieux = sound.sine(200)
@@ -422,63 +422,63 @@ for i = 1, 20 do
     sound.sine(300)
 end
 vieux.freq()' \
-    "existe plus"
+    "no longer exists"
 
 check_error "sound.envelope with a negative time" \
     'sound.sine(440).envelope(-1, 0.1, 0.5, 0.1)' \
-    "aucune valeur ne peut être négative"
+    "no value may be negative"
 
 check_error "sound.envelope with a sustain above 1" \
     'sound.sine(440).envelope(0.1, 0.1, 5, 0.1)' \
-    "le maintien est un niveau"
+    "sustain is a level"
 
 check_error "sound.envelope with too few values" \
     'sound.sine(440).envelope(0.1, 0.1)' \
-    "attendu attaque, déclin, maintien, relâchement"
+    "expected attack, decay, sustain, release"
 
 check_error "sound.trigger with a zero duration" \
     'sound.sine(440).trigger(0)' \
-    "la durée doit être > 0"
+    "duration must be > 0"
 
 check_error "sound.tone without a duration" \
     'sound.tone(440)' \
-    "la durée doit être un nombre de secondes"
+    "duration must be a number of seconds"
 
 check_error "sound.tone with too long a duration" \
     'sound.tone(440, 60)' \
-    "la durée dépasse 10 secondes"
+    "duration exceeds 10 seconds"
 
 check_error "sound.generate without a function" \
     'sound.generate(0.1, 42)' \
-    "une fonction du temps"
+    "a function of time"
 
 check_error "sound.rate out of range" \
     'sound.tone(440, 0.1).rate(0)' \
-    "vitesse hors de"
+    "rate out of"
 
 check_error "sound.loop with a number" \
     'sound.tone(440, 0.1).loop(3)' \
-    "attendu true, false, ou aucun argument"
+    "expected true, false, or no argument"
 
 check_error "sound.sample without a time" \
     'sound.tone(440, 0.1).sample()' \
-    "attendu un temps en secondes"
+    "expected a time in seconds"
 
 check_error "sound.note with a letter beyond G" \
     'sound.note("H4")' \
-    "note inconnue"
+    "unknown note"
 
 check_error "sound.note without an octave" \
     'sound.note("A")' \
-    "sans octave"
+    "has no octave"
 
 check_error "sound.note with an octave out of range" \
     'sound.note("A12")' \
-    "octave hors de"
+    "octave out of"
 
 check_error "sound.note with a number" \
     'sound.note(440)' \
-    "attendu un nom de note"
+    "expected a note name"
 
 echo ""
 echo "Results: $PASS passed, $FAIL failed"

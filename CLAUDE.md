@@ -9,6 +9,16 @@ français**. Les rapports, revues de code, synthèses et résultats sont rendus 
 structure de données comme livrable à l'utilisateur, même si un outil/skill
 produit du JSON en interne (le convertir en rapport lisible avant de le présenter).
 
+**Langue du DÉPÔT : anglais (règle permanente)**. Tout ce qui est écrit dans le dépôt est en
+anglais — identifiants C++ et Ollin, commentaires, messages d'erreur du moteur, noms des
+exemples et de leurs variables. Un identifiant ne mélange JAMAIS les deux langues
+(`voice_sonne`, `leves_masque` étaient des fautes). Trois exceptions, et elles seules :
+mes **réponses** à l'utilisateur (français, cf. ci-dessus), **CLAUDE.md** lui-même, et la
+**documentation destinée à l'utilisateur d'Ollin** (`docs/views/tutoriel.html`, les vues de la
+web app, les commentaires d'en-tête des exemples qui s'affichent comme texte de présentation).
+La frontière est donc : ce qui S'EXÉCUTE ou se lit dans le code est en anglais, ce qui
+S'ADRESSE au lecteur francophone reste en français.
+
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans
 verbe (« Vérifié : … », « Corrigé et poussé. »), pas de listes de mots-clés en

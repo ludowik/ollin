@@ -2391,7 +2391,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         auto self_it = local_regs_.find("self");
         if (self_it == local_regs_.end())
             throw std::runtime_error(sloc().str(chunk.source_files) +
-                                     ": 'super' n'est utilisable que dans une méthode");
+                                     ": 'super' can only be used inside a method");
         // La classe parente est fixée LEXICALEMENT (classe où la méthode est
         // définie), et non via self.__class__.__parent__ : sinon B.m() exécuté sur
         // une instance C reverrait toujours sur B → récursion infinie dans une

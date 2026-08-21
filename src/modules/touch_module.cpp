@@ -61,10 +61,10 @@ int s_prev_count = 0;
 // Un identifiant sort de `Gone` dès qu'un doigt se repose avec ce numéro : le navigateur les
 // recycle, et sans cela le doigt suivant naîtrait déjà mort.
 void install_dom_watch() {
-    static bool pose = false;
-    if (pose)
+    static bool installed = false;
+    if (installed)
         return;
-    pose = true;
+    installed = true;
     EM_ASM({
         window.__ollinTouchGone = new Set();
         window.__ollinTouchHeld = new Set();
@@ -76,7 +76,7 @@ void install_dom_watch() {
             }
             window.__ollinTouchHeld = s;
         };
-        var leves = function(e) {
+        var lifted = function(e) {
             for (var i = 0; i < e.changedTouches.length; i++)
                 window.__ollinTouchGone.add(e.changedTouches[i].identifier);
             poses(e);
@@ -91,17 +91,17 @@ void install_dom_watch() {
                 window.addEventListener(liste[i], fn, opt);
         };
         brancher('touchstart touchmove', poses);
-        brancher('touchend touchcancel', leves);
+        brancher('touchend touchcancel', lifted);
         // Perte de focus : aucun touchend n'arrive, donc on déclare levés tous les doigts que
         // l'on savait posés. C'est la seule raison d'être de `__ollinTouchHeld`.
-        var abandonner = function() {
+        var abandon_all = function() {
             window.__ollinTouchHeld.forEach(function(id) { window.__ollinTouchGone.add(id); });
             window.__ollinTouchHeld = new Set();
         };
-        window.addEventListener('blur', abandonner);
+        window.addEventListener('blur', abandon_all);
         document.addEventListener('visibilitychange', function() {
             if (document.hidden)
-                abandonner();
+                abandon_all();
         });
     });
 }
@@ -113,7 +113,7 @@ void install_dom_watch() {
 // Le même passage OUBLIE les identifiants levés que raylib ne rapporte plus : il n'y a alors
 // plus de fantôme à filtrer, et sans cet oubli l'ensemble grossirait toute la session (le
 // navigateur ne recycle pas forcément ses identifiants).
-int leves_masque(const int* ids, int n) {
+int lifted_mask(const int* ids, int n) {
     return EM_ASM_INT({
         var partis = window.__ollinTouchGone;
         if (!partis)
@@ -134,7 +134,7 @@ int leves_masque(const int* ids, int n) {
     }, ids, n);
 }
 
-void oublier_tous_leves() {
+void forget_all_lifted() {
     EM_ASM({
         if (window.__ollinTouchGone)
             window.__ollinTouchGone.clear();
@@ -146,11 +146,11 @@ void install_dom_watch() {
 
 // Hors navigateur, la liste de raylib est la seule source, et le cas des levers simultanés
 // n'existe pas : le bureau ne rapporte aucun contact tactile.
-int leves_masque(const int*, int) {
+int lifted_mask(const int*, int) {
     return 0;
 }
 
-void oublier_tous_leves() {
+void forget_all_lifted() {
 }
 #endif
 
@@ -171,7 +171,7 @@ Value callback(const Value& m, const char* nom) {
 Point s_cur[k_max_points];
 int s_cur_count = 0;
 
-void relever_contacts() {
+void sample_contacts() {
     // Pas de test de focus ici : `IsWindowFocused()` répond faux sur un vrai téléphone dès
     // qu'un ornement du navigateur prend la main, et coupait alors des doigts encore posés.
     int brut = GetTouchPointCount();
@@ -184,16 +184,16 @@ void relever_contacts() {
     if (brut == 0) {
         s_cur_count = 0;
         if (s_prev_count > 0)
-            oublier_tous_leves();
+            forget_all_lifted();
         return;
     }
     int ids[k_max_points];
     for (int i = 0; i < brut; i++)
         ids[i] = GetTouchPointId(i);
-    int leves = leves_masque(ids, brut);
+    int lifted = lifted_mask(ids, brut);
     s_cur_count = 0;
     for (int i = 0; i < brut; i++) {
-        if (leves & (1 << i))
+        if (lifted & (1 << i))
             continue;
         Vector2 p = GetTouchPosition(i);
         s_cur[s_cur_count].id = ids[i];
@@ -234,7 +234,7 @@ int touch_points(CallCtx& ctx) {
 // l'archet de `sound_demo` ne suivait plus le doigt).
 void touch_begin_frame() {
     install_dom_watch();
-    relever_contacts();
+    sample_contacts();
 }
 
 void touch_poll() {

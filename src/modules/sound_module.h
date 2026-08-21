@@ -45,7 +45,7 @@ inline int sound_shape_index(const std::string& name, const char* fn) {
         if (name == sound_shape_name(i))
             return i;
     }
-    throw std::runtime_error(std::string(fn) + ": forme d'onde inconnue '" + name + "' — disponibles : " +
+    throw std::runtime_error(std::string(fn) + ": unknown waveform '" + name + "' — available: " +
                              sound_shape_names());
 }
 
@@ -55,38 +55,38 @@ inline int sound_shape_index(const std::string& name, const char* fn) {
 
 // Nom de note anglo-saxon vers hertz : "A4" = 440, "C#5", "Eb3", "C-1" pour l'octave la plus
 // grave. Le tempérament égal fait le calcul, aucune table de fréquences à recopier.
-inline double sound_note_hz(const std::string& nom, const char* fn) {
+inline double sound_note_hz(const std::string& name, const char* fn) {
     static const int k_demi_tons[] = {9, 11, 0, 2, 4, 5, 7};   // A B C D E F G
-    if (nom.empty())
-        throw std::runtime_error(std::string(fn) + ": nom de note vide");
-    char lettre = nom[0];
+    if (name.empty())
+        throw std::runtime_error(std::string(fn) + ": empty note name");
+    char lettre = name[0];
     if (lettre >= 'a' && lettre <= 'g')
         lettre = (char)(lettre - 'a' + 'A');
     if (lettre < 'A' || lettre > 'G')
-        throw std::runtime_error(std::string(fn) + ": note inconnue '" + nom + "' — attendu A à G, comme \"C#4\"");
+        throw std::runtime_error(std::string(fn) + ": unknown note '" + name + "' — expected A to G, like \"C#4\"");
     int demi = k_demi_tons[lettre - 'A'];
     size_t k = 1;
-    if (k < nom.size() && (nom[k] == '#' || nom[k] == 'b')) {
-        demi += (nom[k] == '#') ? 1 : -1;
+    if (k < name.size() && (name[k] == '#' || name[k] == 'b')) {
+        demi += (name[k] == '#') ? 1 : -1;
         k++;
     }
-    if (k >= nom.size())
-        throw std::runtime_error(std::string(fn) + ": note '" + nom + "' sans octave — écrire par exemple \"A4\"");
-    bool negatif = nom[k] == '-';
+    if (k >= name.size())
+        throw std::runtime_error(std::string(fn) + ": note '" + name + "' has no octave — write for example \"A4\"");
+    bool negatif = name[k] == '-';
     if (negatif)
         k++;
-    if (k >= nom.size())
-        throw std::runtime_error(std::string(fn) + ": note '" + nom + "' sans octave — écrire par exemple \"A4\"");
+    if (k >= name.size())
+        throw std::runtime_error(std::string(fn) + ": note '" + name + "' has no octave — write for example \"A4\"");
     int octave = 0;
-    for (; k < nom.size(); k++) {
-        if (nom[k] < '0' || nom[k] > '9')
-            throw std::runtime_error(std::string(fn) + ": note '" + nom + "' : octave illisible");
-        octave = octave * 10 + (nom[k] - '0');
+    for (; k < name.size(); k++) {
+        if (name[k] < '0' || name[k] > '9')
+            throw std::runtime_error(std::string(fn) + ": note '" + name + "': unreadable octave");
+        octave = octave * 10 + (name[k] - '0');
     }
     if (negatif)
         octave = -octave;
     if (octave < -1 || octave > 9)
-        throw std::runtime_error(std::string(fn) + ": octave hors de [-1;9] dans '" + nom + "'");
+        throw std::runtime_error(std::string(fn) + ": octave out of [-1;9] in '" + name + "'");
     // Numéro MIDI, puis tempérament égal autour du la 440.
     int midi = (octave + 1) * 12 + demi;
     return 440.0 * std::pow(2.0, (midi - 69) / 12.0);
@@ -103,10 +103,10 @@ inline double sound_check_freq(const Value* args, int argc, int i, const char* f
     if (args[i].is_string())
         return sound_note_hz(args[i].as_string(), fn);
     if (!args[i].is_number())
-        throw std::runtime_error(std::string(fn) + ": la fréquence doit être un nombre de hertz ou un nom de note");
+        throw std::runtime_error(std::string(fn) + ": frequency must be a number of hertz or a note name");
     double hz = args[i].as_num();
     if (hz < 0.0 || hz > 20000.0)
-        throw std::runtime_error(std::string(fn) + ": fréquence hors de [0;20000] hertz");
+        throw std::runtime_error(std::string(fn) + ": frequency out of [0;20000] hertz");
     return hz;
 }
 
@@ -114,7 +114,7 @@ inline int sound_check_shape(const Value* args, int argc, int i, const char* fn)
     if (i >= argc || args[i].is_nil())
         return SHAPE_SINE;
     if (!args[i].is_string())
-        throw std::runtime_error(std::string(fn) + ": la forme d'onde doit être un nom — " + sound_shape_names());
+        throw std::runtime_error(std::string(fn) + ": waveform must be a name — " + sound_shape_names());
     return sound_shape_index(args[i].as_string(), fn);
 }
 
@@ -122,24 +122,24 @@ inline int sound_check_shape(const Value* args, int argc, int i, const char* fn)
 // [0;1]. Une durée négative est refusée — c'est une faute de frappe, pas une intention.
 inline void sound_check_envelope(const Value* args, int argc, const char* fn) {
     if (argc < 4)
-        throw std::runtime_error(std::string(fn) + ": attendu attaque, déclin, maintien, relâchement");
+        throw std::runtime_error(std::string(fn) + ": expected attack, decay, sustain, release");
     for (int i = 0; i < 4; i++) {
         if (!args[i].is_number())
-            throw std::runtime_error(std::string(fn) + ": les quatre valeurs doivent être des nombres");
+            throw std::runtime_error(std::string(fn) + ": all four values must be numbers");
         if (args[i].as_num() < 0.0)
-            throw std::runtime_error(std::string(fn) + ": aucune valeur ne peut être négative");
+            throw std::runtime_error(std::string(fn) + ": no value may be negative");
     }
     if (args[2].as_num() > 1.0)
-        throw std::runtime_error(std::string(fn) + ": le maintien est un niveau, entre 0 et 1");
+        throw std::runtime_error(std::string(fn) + ": sustain is a level, between 0 and 1");
 }
 
 inline double sound_check_hold(const Value* args, int argc, const char* fn) {
     if (argc < 1 || args[0].is_nil())
         return -1.0;   // note TENUE : elle sonnera jusqu'à release()
     if (!args[0].is_number())
-        throw std::runtime_error(std::string(fn) + ": la durée doit être un nombre de secondes");
+        throw std::runtime_error(std::string(fn) + ": duration must be a number of seconds");
     if (args[0].as_num() <= 0.0)
-        throw std::runtime_error(std::string(fn) + ": la durée doit être > 0");
+        throw std::runtime_error(std::string(fn) + ": duration must be > 0");
     return args[0].as_num();
 }
 
@@ -148,13 +148,13 @@ inline double sound_check_hold(const Value* args, int argc, const char* fn) {
 // millisecondes par mégarde figerait le moteur.
 inline double sound_check_duration(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc || !args[i].is_number())
-        throw std::runtime_error(std::string(fn) + ": la durée doit être un nombre de secondes");
+        throw std::runtime_error(std::string(fn) + ": duration must be a number of seconds");
     double d = args[i].as_num();
     if (d <= 0.0)
-        throw std::runtime_error(std::string(fn) + ": la durée doit être > 0");
+        throw std::runtime_error(std::string(fn) + ": duration must be > 0");
     if (d > k_max_buffer_seconds)
-        throw std::runtime_error(std::string(fn) + ": la durée dépasse " +
-                                 std::to_string((int)k_max_buffer_seconds) + " secondes");
+        throw std::runtime_error(std::string(fn) + ": duration exceeds " +
+                                 std::to_string((int)k_max_buffer_seconds) + " seconds");
     return d;
 }
 
@@ -164,7 +164,7 @@ inline double sound_check_unit(const Value* args, int argc, int i, const char* f
     if (i >= argc || args[i].is_nil())
         return -2.0;   // absent : l'appelant garde sa valeur courante
     if (!args[i].is_number())
-        throw std::runtime_error(std::string(fn) + ": " + quoi + " doit être un nombre");
+        throw std::runtime_error(std::string(fn) + ": " + quoi + " must be a number");
     double v = args[i].as_num();
     return v < mini ? mini : (v > 1.0 ? 1.0 : v);
 }

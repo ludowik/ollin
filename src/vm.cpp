@@ -34,7 +34,7 @@ static VM* s_current_vm = nullptr;
 // propre test de pas nul.)
 static void validate_numeric_range(double start, double end, double step, const std::string& loc) {
     if (step == 0.0)
-        throw std::runtime_error(loc + ": runtime: le pas ne peut pas être 0");
+        throw std::runtime_error(loc + ": runtime: step cannot be 0");
     if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(step))
         throw std::runtime_error(loc + ": runtime: bornes de range non finies (NaN/infini interdit)");
 }
@@ -1803,11 +1803,11 @@ dispatch_loop:
             Value& vl = regs[base + A + 1];
             Value& vs = regs[base + A + 2];
             if (!vi.is_number() || !vl.is_number() || !vs.is_number())
-                throw std::runtime_error(err_line() + ": runtime: for: bornes numériques attendues");
+                throw std::runtime_error(err_line() + ": runtime: for: expected numeric bounds");
             if (vi.is_integer() && vl.is_integer() && vs.is_integer()) {
                 int64_t i0 = vi.as_int(), lim = vl.as_int(), st = vs.as_int();
                 if (st == 0)
-                    throw std::runtime_error(err_line() + ": runtime: for: le pas ne peut pas être 0");
+                    throw std::runtime_error(err_line() + ": runtime: for: step cannot be 0");
                 empty = (st > 0) ? (i0 > lim) : (i0 < lim);
                 if (!empty) {
                     // Compteur de tours RESTANTS (après la 1re itération), calculé une seule

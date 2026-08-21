@@ -1287,7 +1287,7 @@ static int gfx_model(CallCtx& ctx) {
     }
     const std::string& name = args[0].as_string();
     if (!model_get(name)) {
-        throw std::runtime_error("graphics.model: modèle introuvable ou illisible : " + name);
+        throw std::runtime_error("graphics.model: model not found or unreadable: " + name);
     }
     Value h = Value::make_map();
     h.map_set(Value(std::string("name")), Value(name));
@@ -1304,11 +1304,11 @@ static int gfx_draw_model(CallCtx& ctx) {
     }
     Value name_v = args[0].map_get(Value(std::string("name")));
     if (!name_v.is_string()) {
-        throw std::runtime_error("graphics.drawModel: handle de modèle invalide");
+        throw std::runtime_error("graphics.drawModel: invalid model handle");
     }
     Model* mdl = model_get(name_v.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.drawModel: modèle introuvable : " + name_v.as_string());
+        throw std::runtime_error("graphics.drawModel: model not found: " + name_v.as_string());
     }
     float x = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.drawModel") : 0.0f;
     float y = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.drawModel") : 0.0f;
@@ -1349,11 +1349,11 @@ static int gfx_model_size(CallCtx& ctx) {
     }
     Value name_v = args[0].map_get(Value(std::string("name")));
     if (!name_v.is_string()) {
-        throw std::runtime_error("graphics.modelSize: handle de modèle invalide");
+        throw std::runtime_error("graphics.modelSize: invalid model handle");
     }
     Model* mdl = model_get(name_v.as_string());
     if (!mdl) {
-        throw std::runtime_error("graphics.modelSize: modèle introuvable : " + name_v.as_string());
+        throw std::runtime_error("graphics.modelSize: model not found: " + name_v.as_string());
     }
     BoundingBox bb = GetModelBoundingBox(*mdl);
     float w = bb.max.x - bb.min.x;
@@ -1524,7 +1524,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     }
     Value idv = args[0].map_get(Value(std::string("id")));
     if (!idv.is_integer()) {
-        throw std::runtime_error("graphics.drawChunk: handle de chunk invalide");
+        throw std::runtime_error("graphics.drawChunk: invalid chunk handle");
     }
     int id = (int)idv.as_int();
     if (id < 1 || id > (int)s_groups.size()) {

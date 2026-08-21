@@ -37,7 +37,7 @@ int handle_slot(const Value& self, const char* fn) {
         throw std::runtime_error(std::string(fn) + ": expected an oscillator");
     int i = (int)slot.as_int();
     if (i < 0 || i >= k_max_voices || voices()[i].gen != (uint32_t)gen.as_int())
-        throw std::runtime_error(std::string(fn) + ": cet oscillateur n'existe plus");
+        throw std::runtime_error(std::string(fn) + ": this oscillator no longer exists");
     return i;
 }
 
@@ -50,7 +50,7 @@ int handle_slot(const Value& self, const char* fn) {
 // survivre à vingt créations quand son voisin ne survivait pas à une seule (constaté).
 uint64_t s_born_counter = 0;
 
-bool voice_sonne(const Voice& v) {
+bool voice_sounding(const Voice& v) {
     return v.active.load(std::memory_order_relaxed) || v.gain > 0.0f;
 }
 
@@ -59,22 +59,22 @@ int alloc_voice() {
     for (int i = 0; i < k_max_voices; i++) {
         // Rendue par `free` mais pas encore éteinte : le slot est libre, le SON non. La
         // reprendre couperait la queue de note que le script vient de relâcher.
-        if (!v[i].used && !voice_sonne(v[i]))
+        if (!v[i].used && !voice_sounding(v[i]))
             return i;
     }
-    int choisi = -1;
+    int chosen = -1;
     for (int i = 0; i < k_max_voices; i++) {
-        if (voice_sonne(v[i]))
+        if (voice_sounding(v[i]))
             continue;
-        if (choisi < 0 || v[i].born < v[choisi].born)
-            choisi = i;
+        if (chosen < 0 || v[i].born < v[chosen].born)
+            chosen = i;
     }
-    if (choisi >= 0) {
-        v[choisi].gen++;
-        return choisi;
+    if (chosen >= 0) {
+        v[chosen].gen++;
+        return chosen;
     }
-    throw std::runtime_error("sound: plus d'oscillateur disponible (" + std::to_string(k_max_voices) +
-                             " en même temps, tous en train de sonner)");
+    throw std::runtime_error("sound: no oscillator available (" + std::to_string(k_max_voices) +
+                             " at a time, all still sounding)");
 }
 
 int make_osc(const Value* args, int argc, const char* fn, int shape_forced) {
@@ -101,7 +101,7 @@ int make_osc(const Value* args, int argc, const char* fn, int shape_forced) {
 // nombre, pas seulement d'un oscillateur.
 int sound_note(CallCtx& ctx) {
     if (ctx.argc < 1 || !ctx.args[0].is_string())
-        throw std::runtime_error("sound.note: attendu un nom de note, comme \"C#4\"");
+        throw std::runtime_error("sound.note: expected a note name, like \"C#4\"");
     return ctx.ret(Value(sound_note_hz(ctx.args[0].as_string(), "sound.note")));
 }
 
@@ -149,7 +149,7 @@ int method_freq(CallCtx& ctx) {
 
 int method_volume(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.volume");
-    double v = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.volume", "le volume", 0.0);
+    double v = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.volume", "volume", 0.0);
     if (v < -1.0)
         return ctx.ret(Value(voices()[i].volume.load(std::memory_order_relaxed)));
     voices()[i].volume.store(v, std::memory_order_relaxed);
@@ -158,7 +158,7 @@ int method_volume(CallCtx& ctx) {
 
 int method_pan(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.pan");
-    double p = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.pan", "le panoramique", -1.0);
+    double p = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.pan", "pan", -1.0);
     if (p < -1.5)
         return ctx.ret(Value(voices()[i].pan.load(std::memory_order_relaxed)));
     voices()[i].pan.store(p, std::memory_order_relaxed);
@@ -267,7 +267,7 @@ int buffer_slot(const Value& self, const char* fn) {
         throw std::runtime_error(std::string(fn) + ": expected a sound");
     int i = (int)slot.as_int();
     if (i < 0 || i >= k_max_buffers || bufs()[i].gen != (uint32_t)gen.as_int())
-        throw std::runtime_error(std::string(fn) + ": ce son n'existe plus");
+        throw std::runtime_error(std::string(fn) + ": this sound no longer exists");
     return i;
 }
 
@@ -281,20 +281,20 @@ int alloc_buffer() {
             return i;
     }
     uint64_t maintenant = sound_mix_epoch();
-    int choisi = -1;
+    int chosen = -1;
     for (int i = 0; i < k_max_buffers; i++) {
         if (b[i].playing.load(std::memory_order_relaxed))
             continue;
         if (b[i].retired_epoch >= maintenant)
             continue;   // rendu trop récemment : un bloc peut encore le lire
-        if (choisi < 0 || b[i].retired_epoch < b[choisi].retired_epoch)
-            choisi = i;
+        if (chosen < 0 || b[i].retired_epoch < b[chosen].retired_epoch)
+            chosen = i;
     }
-    if (choisi < 0)
-        throw std::runtime_error("sound: plus de son disponible (" + std::to_string(k_max_buffers) +
-                                 " en même temps)");
-    b[choisi].gen++;
-    return choisi;
+    if (chosen < 0)
+        throw std::runtime_error("sound: no sound slot available (" + std::to_string(k_max_buffers) +
+                                 " at a time)");
+    b[chosen].gen++;
+    return chosen;
 }
 
 int new_buffer(std::vector<float>&& samples) {
@@ -335,10 +335,10 @@ int sound_tone(CallCtx& ctx) {
     const char* FN = "sound.tone";
     double hz = sound_check_freq(ctx.args, ctx.argc, 0, FN);
     if (hz < 0.0)
-        throw std::runtime_error(std::string(FN) + ": fréquence attendue en premier argument");
-    double duree = sound_check_duration(ctx.args, ctx.argc, 1, FN);
+        throw std::runtime_error(std::string(FN) + ": expected a frequency as first argument");
+    double duration = sound_check_duration(ctx.args, ctx.argc, 1, FN);
     int shape = sound_check_shape(ctx.args, ctx.argc, 2, FN);
-    size_t n = (size_t)(duree * k_audio_sample_rate);
+    size_t n = (size_t)(duration * k_audio_sample_rate);
     std::vector<float> samples(n);
     double phase = 0.0;
     double avance = hz / (double)k_audio_sample_rate;
@@ -357,11 +357,11 @@ int sound_tone(CallCtx& ctx) {
 // s'entendrait comme un craquement.
 int sound_generate(CallCtx& ctx) {
     const char* FN = "sound.generate";
-    double duree = sound_check_duration(ctx.args, ctx.argc, 0, FN);
+    double duration = sound_check_duration(ctx.args, ctx.argc, 0, FN);
     if (ctx.argc < 2 || !ctx.args[1].is_callable())
-        throw std::runtime_error(std::string(FN) + ": second argument attendu : une fonction du temps");
+        throw std::runtime_error(std::string(FN) + ": expected a second argument: a function of time");
     Value f = ctx.args[1];
-    size_t n = (size_t)(duree * k_audio_sample_rate);
+    size_t n = (size_t)(duration * k_audio_sample_rate);
     std::vector<float> samples(n);
     VM* vm = VM::current();
     double pas = 1.0 / (double)k_audio_sample_rate;
@@ -399,7 +399,7 @@ int buf_is_playing(CallCtx& ctx) {
 
 int buf_volume(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.volume");
-    double v = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.volume", "le volume", 0.0);
+    double v = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.volume", "volume", 0.0);
     if (v < -1.0)
         return ctx.ret(Value(bufs()[i].volume.load(std::memory_order_relaxed)));
     bufs()[i].volume.store(v, std::memory_order_relaxed);
@@ -408,7 +408,7 @@ int buf_volume(CallCtx& ctx) {
 
 int buf_pan(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.pan");
-    double p = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.pan", "le panoramique", -1.0);
+    double p = sound_check_unit(ctx.args + 1, ctx.argc - 1, 0, "sound.pan", "pan", -1.0);
     if (p < -1.5)
         return ctx.ret(Value(bufs()[i].pan.load(std::memory_order_relaxed)));
     bufs()[i].pan.store(p, std::memory_order_relaxed);
@@ -422,10 +422,10 @@ int buf_rate(CallCtx& ctx) {
     if (ctx.argc < 2 || ctx.args[1].is_nil())
         return ctx.ret(Value(bufs()[i].rate.load(std::memory_order_relaxed)));
     if (!ctx.args[1].is_number())
-        throw std::runtime_error("sound.rate: la vitesse doit être un nombre");
+        throw std::runtime_error("sound.rate: rate must be a number");
     double r = ctx.args[1].as_num();
     if (r <= 0.0 || r > 16.0)
-        throw std::runtime_error("sound.rate: vitesse hors de ]0;16]");
+        throw std::runtime_error("sound.rate: rate out of ]0;16]");
     bufs()[i].rate.store(r, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }
@@ -437,7 +437,7 @@ int buf_loop(CallCtx& ctx) {
         return ctx.ret(ctx.args[0]);
     }
     if (!ctx.args[1].is_bool())
-        throw std::runtime_error("sound.loop: attendu true, false, ou aucun argument");
+        throw std::runtime_error("sound.loop: expected true, false, or no argument");
     bufs()[i].loop.store(ctx.args[1].as_bool(), std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }
@@ -468,7 +468,7 @@ int buf_peak(CallCtx& ctx) {
 int buf_sample(CallCtx& ctx) {
     int i = buffer_slot(ctx.args[0], "sound.sample");
     if (ctx.argc < 2 || !ctx.args[1].is_number())
-        throw std::runtime_error("sound.sample: attendu un temps en secondes");
+        throw std::runtime_error("sound.sample: expected a time in seconds");
     double t = ctx.args[1].as_num();
     const std::vector<float>& d = bufs()[i].samples;
     if (t < 0.0)
@@ -491,8 +491,8 @@ int buf_envelope(CallCtx& ctx) {
     e.sustain = ctx.args[3].as_num();
     e.release = ctx.args[4].as_num();
     std::vector<float>& d = bufs()[i].samples;
-    double duree = (double)d.size() / (double)k_audio_sample_rate;
-    double hold = duree - e.release;
+    double duration = (double)d.size() / (double)k_audio_sample_rate;
+    double hold = duration - e.release;
     if (hold < 0.0)
         hold = 0.0;
     for (size_t k = 0; k < d.size(); k++) {

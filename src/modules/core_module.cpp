@@ -20,11 +20,11 @@ std::string format_one(const Value& v, const std::string& spec) {
     std::string body = spec.substr(0, spec.size() - 1);   // flags + largeur + précision
     for (char c : body)
         if (!std::strchr("-+ #0123456789.", c))
-            throw std::runtime_error("format: caractère invalide dans la spec '" + spec + "'");
+            throw std::runtime_error("format: invalid character in spec '" + spec + "'");
     auto render = [](const std::string& cfmt, auto arg) {
         int need = std::snprintf(nullptr, 0, cfmt.c_str(), arg);
         if (need < 0)
-            throw std::runtime_error("format: spec invalide");
+            throw std::runtime_error("format: invalid spec");
         std::string out((size_t)need, '\0');
         std::snprintf(out.data(), (size_t)need + 1, cfmt.c_str(), arg);
         return out;
@@ -50,7 +50,7 @@ std::string format_one(const Value& v, const std::string& spec) {
             return render("%" + spec, s.c_str());
         }
         default:
-            throw std::runtime_error("format: conversion inconnue '" + spec + "'");
+            throw std::runtime_error("format: unknown conversion '" + spec + "'");
     }
 }
 
@@ -77,10 +77,10 @@ static std::string apply_format(const std::string& fmt, const std::vector<Value>
                     try {
                         idx = std::stoi(idx_part);
                     } catch (...) {
-                        throw std::runtime_error("printf: index invalide '{" + content + "}'");
+                        throw std::runtime_error("printf: invalid index '{" + content + "}'");
                     }
                     if (idx < 1)
-                        throw std::runtime_error("printf: index 1-based, doit être >= 1 (reçu " + idx_part + ")");
+                        throw std::runtime_error("printf: index is 1-based, must be >= 1 (got " + idx_part + ")");
                 }
                 long long ai = (long long)idx - 1 + offset;   // {1} → 1er arg réel (args[offset])
                 if (ai >= 0 && ai < (long long)args.size())
@@ -100,7 +100,7 @@ static int core_fmt(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
     if (argc < 2 || !args[1].is_string())
-        throw std::runtime_error("__fmt: (valeur, spec) attendu");
+        throw std::runtime_error("__fmt: expected (value, spec)");
     std::vector<Value> vargs(args, args + argc);   // copie : formatOne peut réallouer regs (__str)
     return ctx.ret(Value(format_one(vargs[0], vargs[1].as_string())));
 }

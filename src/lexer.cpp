@@ -232,7 +232,7 @@ void Lexer::interp_string(std::vector<Token>& out) {
                 }
             }
             if (at_end() || peek() == '\n' || depth > 0)
-                throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": accolade non fermée dans l'interpolation");
+                throw std::runtime_error(filename_ + ":" + std::to_string(str_line) + ": unclosed brace in interpolation");
 
             std::string inner = src.substr(inner_start, pos - inner_start);
             advance(); // consomme '}'
@@ -388,7 +388,7 @@ std::vector<Token> Lexer::tokenize() {
                 emit({TokenType::STAR_EQUAL, "*=", line});
             } else if (!at_end() && peek() == '*')
                 throw std::runtime_error("line " + std::to_string(line) +
-                                         ": '**' n'existe plus — utilisez '^' pour la puissance");
+                                         ": '**' no longer exists — use '^' for exponentiation");
             else
                 emit({TokenType::STAR, "*", line});
             break;

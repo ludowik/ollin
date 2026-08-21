@@ -100,12 +100,12 @@ void mix_buffers(float* out, unsigned int frames) {
         float volume = (float)b.volume.load(std::memory_order_relaxed);
         float pan = (float)b.pan.load(std::memory_order_relaxed);
         double avance = b.rate.load(std::memory_order_relaxed);
-        bool boucle = b.loop.load(std::memory_order_relaxed);
+        bool looping = b.loop.load(std::memory_order_relaxed);
         float g_gauche = pan > 0.0f ? 1.0f - pan : 1.0f;
         float g_droite = pan < 0.0f ? 1.0f + pan : 1.0f;
         for (unsigned int i = 0; i < frames; i++) {
             if (b.pos >= (double)n) {
-                if (!boucle) {
+                if (!looping) {
                     b.playing.store(false, std::memory_order_relaxed);
                     break;
                 }
@@ -116,7 +116,7 @@ void mix_buffers(float* out, unsigned int frames) {
             // Interpolation linéaire entre deux échantillons : à vitesse 1 elle rend la
             // valeur exacte, et une hauteur modifiée ne s'entend pas crénelée.
             size_t i0 = (size_t)b.pos;
-            size_t i1 = (i0 + 1 < n) ? i0 + 1 : (boucle ? 0 : i0);
+            size_t i1 = (i0 + 1 < n) ? i0 + 1 : (looping ? 0 : i0);
             float f = (float)(b.pos - (double)i0);
             float s = (data[i0] * (1.0f - f) + data[i1] * f) * volume;
             out[i * 2] += s * g_gauche;

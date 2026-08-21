@@ -1093,7 +1093,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 advance(); // consume '?'
             if (!check(TokenType::LPAREN))
                 throw std::runtime_error(peek().sloc().str(*source_files_) +
-                                         ": super: seuls les appels de méthode sont supportés");
+                                         ": super: only method calls are supported");
             advance(); // LPAREN
             auto mc = std::make_unique<MethodCallExpr>();
             mc->receiver = nullptr;
@@ -1257,7 +1257,7 @@ std::unique_ptr<Stmt> Parser::class_decl() {
         auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
         if (!fd)
             throw std::runtime_error(cur_loc(method_line).str(*source_files_) +
-                                     ": une méthode de classe doit être 'func nom(...)' (pas 'func obj.champ(...)')");
+                                     ": a class method must be 'func name(...)' (not 'func obj.field(...)')");
         raw.release();
         auto method = std::unique_ptr<FuncDeclStmt>(fd);
         method->is_static = is_static;
