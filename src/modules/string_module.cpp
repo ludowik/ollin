@@ -4,9 +4,9 @@
 #include <cmath>
 #include <unordered_set>
 
-// (int)d est un COMPORTEMENT INDÉFINI (et trappe sur WASM) si d est NaN/inf ou
-// hors plage int. On borne le double AVANT le cast ; les contrôles de bornes des
-// appelants transforment ensuite un index hors limites en "".
+// (int)d is UNDEFINED BEHAVIOUR — and traps on WASM — when d is NaN, infinite, or out of int
+// range. The double is clamped BEFORE the cast, and the callers' bound checks then turn an
+// out-of-range index into "".
 static int to_int_safe(double d) {
     if (std::isnan(d))
         return 0;
@@ -17,9 +17,9 @@ static int to_int_safe(double d) {
     return (int)d;
 }
 
-// Casse par codepoint : ASCII + Latin-1 Supplement (lettres latines accentuées).
-// Au-delà (Latin étendu, grec, cyrillique…) : inchangé — la casse Unicode complète
-// nécessiterait des tables de données disproportionnées pour ce langage.
+// Case mapping per codepoint, covering ASCII and Latin-1 Supplement (accented Latin letters).
+// Beyond that — Latin Extended, Greek, Cyrillic — codepoints are left unchanged: full Unicode
+// casing would need data tables out of proportion with this language.
 static void append_upper(uint32_t cp, std::string& out) {
     if (cp < 0x80)
         out += (char)((cp >= 'a' && cp <= 'z') ? cp - 32 : cp);
@@ -70,8 +70,7 @@ static int str_lower(CallCtx& ctx) {
     return ctx.ret(Value(std::move(out)));
 }
 
-// Rogne les codepoints présents dans `chars` (par codepoint, pas par octet) aux
-// extrémités choisies (left/right).
+// Trims the codepoints listed in `chars` — by codepoint, not by byte — from the chosen ends.
 static std::string trim_cp(const std::string& s, const std::string& chars, bool left, bool right) {
     std::unordered_set<uint32_t> set;
     for (size_t i = 0; i < chars.size();) {
@@ -127,8 +126,8 @@ static int str_rtrim(CallCtx& ctx) {
     return ctx.ret(Value(trim_cp(s, chars, false, true)));
 }
 
-// string.char(s, i) : i-ème CARACTÈRE (codepoint UTF-8), 1-based ; renvoyé sous
-// forme de string ; "" si hors limites. (Index par codepoint, pas par octet.)
+// string.char(s, i): the i-th CHARACTER (UTF-8 codepoint), 1-based, returned as a string, or ""
+// when out of range. The index counts codepoints, not bytes.
 static int str_char(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -142,9 +141,9 @@ static int str_char(CallCtx& ctx) {
     return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
-// string.substr(s, start[, length]) : sous-chaîne à partir du caractère start
-// (1-based), de length CARACTÈRES (jusqu'à la fin si omis) ; bornes ajustées, ""
-// si hors plage. (Comptage par codepoint UTF-8, pas par octet.)
+// string.substr(s, start[, length]): the substring from character `start` (1-based) spanning
+// `length` CHARACTERS, to the end when omitted. Bounds are clamped, and "" is returned when out
+// of range. Counting is by UTF-8 codepoint, not by byte.
 static int str_substr(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -165,9 +164,9 @@ static int str_substr(CallCtx& ctx) {
     return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
-// string.len(s) : nombre de CARACTÈRES (codepoints UTF-8) de la chaîne. Contrairement
-// au builtin global len (polymorphe : array/map/string/range), celui-ci n'accepte
-// QU'une string — un autre type lève une erreur (via strArg).
+// string.len(s): the number of CHARACTERS (UTF-8 codepoints). Unlike the global len builtin,
+// which is polymorphic over arrays, maps, strings and ranges, this one accepts ONLY a string and
+// throws on any other type, through str_arg.
 static int str_len(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;

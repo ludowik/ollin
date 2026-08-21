@@ -3,11 +3,10 @@
 #include "vm.h"
 #include <stdexcept>
 
-// ── Références (`ref x` côté script) ────────────────────────────────────────────
-// Le parser désucre `ref x` en {__ref: true, get: func, set: func} (parser.cpp,
-// ref_expr). Un module natif lit et écrit la variable référencée par ces deux
-// closures. La marque `__ref` distingue une VRAIE référence d'une map qui aurait
-// simplement des membres get/set — le module `data` en a.
+// The parser desugars `ref x` into {__ref: true, get: func, set: func} (parser.cpp, ref_expr),
+// and a native module reads and writes the referenced variable through those two closures. The
+// `__ref` marker tells a REAL reference from a map that merely happens to have get/set members —
+// the `data` module has some.
 static inline bool is_ref(const Value& v) {
     if (!v.is_map())
         return false;
@@ -24,9 +23,9 @@ static inline void ref_set(const Value& r, const Value& value) {
     VM::current()->call_value(r.map_get(Value(std::string("set"))), value);
 }
 
-// Précondition : l'appelant DOIT avoir garanti i < argc (aucun contrôle de borne
-// ici — forme rapide utilisée après une garde argc). Pour un contrôle de borne
-// intégré, utiliser la surcharge (args, argc, i, fn) ci-dessous.
+// Precondition: the caller MUST have ensured i < argc. This fast form does no bound check and is
+// meant for use after an argc guard; for a built-in check, use the (args, argc, i, fn) overload
+// below.
 static inline double num_arg(const Value* args, int i, const char* fn) {
     const Value& v = args[i];
     if (v.is_integer())
@@ -51,7 +50,7 @@ static inline const std::string& str_arg(const Value* args, int argc, int i, con
     return args[i].as_string();
 }
 
-// Composantes couleur normalisées [0,1].
+// Colour components normalized to [0,1].
 struct ColorRGBA {
     double r, g, b, a;
 };
@@ -60,14 +59,14 @@ static inline double color_clamp01(double v) {
     return v < 0.0 ? 0.0 : (v > 1.0 ? 1.0 : v);
 }
 
-// Interprète des arguments couleur « flexibles » en composantes [0,1] — signature
-// partagée par le constructeur Color et par graphics.clear/fill/stroke :
-//   objet Color (instance) → ses champs r,g,b,a
-//   1 nombre  n            → (n,n,n,1)   gris
-//   2 nombres n,a          → (n,n,n,a)   gris + alpha
-//   3 nombres r,g,b        → (r,g,b,1)
-//   4 nombres r,g,b,a      → (r,g,b,a)
-// Précondition : argc >= 1. Lève une erreur si la forme est invalide.
+// Reads "flexible" colour arguments into [0,1] components. The same signature serves the Color
+// constructor and graphics.clear/fill/stroke:
+//   a Color instance   -> its r,g,b,a fields
+//   1 number  n        -> (n,n,n,1)   grey
+//   2 numbers n,a      -> (n,n,n,a)   grey plus alpha
+//   3 numbers r,g,b    -> (r,g,b,1)
+//   4 numbers r,g,b,a  -> (r,g,b,a)
+// Precondition: argc >= 1. Throws when the shape is invalid.
 static inline ColorRGBA parse_color(const Value* args, int argc, const char* fn) {
     if (args[0].is_map() || args[0].is_class()) {
         auto field = [&](const char* k, double def) -> double {

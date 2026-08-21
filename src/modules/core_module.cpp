@@ -7,12 +7,12 @@
 
 Value make_color_class();
 
-// Cœur de formatage partagé par l'interpolation ({expr:spec}) ET printf ({N:spec}).
-// `spec` = spécification de conversion C SANS le '%' (ex. ".3f", "04x", ">8s"). On
-// lit le caractère de conversion final pour coercer la valeur au bon type C — un
-// mismatch de type avec snprintf serait un comportement indéfini. Les flags/largeur/
-// précision (le « corps ») passent verbatim mais sont validés (allowlist stricte) →
-// aucune injection de conversion ni de '%'. Spec vide → représentation par défaut.
+// Formatting core, shared by interpolation ({expr:spec}) AND printf ({N:spec}). `spec` is a C
+// conversion specification WITHOUT the '%', such as ".3f", "04x" or ">8s". We read the trailing
+// conversion character to coerce the value to the right C type, since a type mismatch with
+// snprintf is undefined behaviour. The flags, width and precision — the "body" — pass through
+// verbatim but are validated against a strict allowlist, so neither a conversion nor a '%' can be
+// injected. An empty spec means the default representation.
 std::string format_one(const Value& v, const std::string& spec) {
     if (spec.empty())
         return value_to_string(v);
@@ -54,8 +54,8 @@ std::string format_one(const Value& v, const std::string& spec) {
     }
 }
 
-// printf : substitution positionnelle. Chaque emplacement {N} / {} peut porter un
-// format {N:spec} / {:spec}, appliqué via formatOne (même moteur que l'interpolation).
+// printf does positional substitution. Each {N} or {} slot may carry a format, {N:spec} or
+// {:spec}, applied through format_one — the same engine as interpolation.
 static std::string apply_format(const std::string& fmt, const std::vector<Value>& args, int offset) {
     std::string out;
     int auto_idx = 1;   // indexation 1-based (cohérent avec les arrays Ollin) : {1} = 1er argument
@@ -94,8 +94,8 @@ static std::string apply_format(const std::string& fmt, const std::vector<Value>
     return out;
 }
 
-// __fmt(valeur, spec) : builtin INTERNE (préfixe __ → hors API publique), cible du
-// désucrage de l'interpolation {expr:spec}. Non destiné à un appel direct.
+// __fmt(value, spec) is an INTERNAL builtin — the __ prefix keeps it out of the public API — and
+// the target of the {expr:spec} interpolation desugaring. Not meant to be called directly.
 static int core_fmt(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -108,9 +108,9 @@ static int core_fmt(CallCtx& ctx) {
 static int core_print(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    // Copie AVANT toute conversion : valueToString peut invoquer __str, qui exécute
-    // du bytecode et peut réallouer regs → `args` (pointeur dans regs) deviendrait
-    // pendant pour les arguments suivants. Même précaution que core_printf.
+    // Copy BEFORE any conversion: value_to_string may invoke __str, which runs bytecode and can
+    // reallocate regs, leaving `args` — a pointer into regs — dangling for the remaining
+    // arguments. Same precaution as in core_printf.
     std::vector<Value> vargs(args, args + argc);
     for (int i = 0; i < argc; ++i) {
         if (i)

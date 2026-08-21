@@ -10,8 +10,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-// ── Bruit de Perlin (improved noise, Ken Perlin) + fBm ──────────────────────
-// Table de permutation de référence (256 valeurs), dupliquée en s_perm[512].
+// Perlin improved noise plus fBm.
+// Reference permutation table (256 values), duplicated into s_perm[512].
 static const unsigned char PERLIN_REF[256] = {
     151, 160, 137, 91,  90,  15,  131, 13,  201, 95,  96,  53,  194, 233, 7,   225, 140, 36,  103, 30,  69,  142,
     8,   99,  37,  240, 21,  10,  23,  190, 6,   148, 247, 120, 234, 75,  0,   26,  197, 62,  94,  252, 219, 203,
@@ -35,8 +35,8 @@ static void noise_init_default() {
     }
 }
 
-// Rebat la table via un PRNG déterministe local (xorshift64), indépendant de
-// rand()/math.seed → le bruit et l'aléatoire ne s'influencent pas.
+// Reshuffles the table with a local deterministic PRNG (xorshift64), independent of rand() and
+// math.seed, so noise and randomness do not influence each other.
 static void noise_reseed(uint64_t seed) {
     int p[256];
     for (int i = 0; i < 256; i++)
@@ -95,10 +95,10 @@ static double perlin3(double x, double y, double z) {
 
 static const int NOISE_OCTAVES = 4;
 static const double NOISE_FALLOFF = 0.5;
-// Amplitude PRATIQUE de la moyenne fBm ci-dessus (max |moyenne| mesuré) : dépend de
-// OCTAVES/FALLOFF et de la dimension. On divise par elle pour que la sortie couvre
-// [0,1]. À re-mesurer si OCTAVES/FALLOFF changent ; le clamp [0,1] en aval reste le
-// garde-fou si l'amplitude réelle dépasse légèrement.
+// PRACTICAL amplitude of the fBm average above (the measured max |average|). It depends on
+// OCTAVES, FALLOFF and the dimension, and dividing by it makes the output span [0,1]. Re-measure
+// if OCTAVES or FALLOFF change; the downstream [0,1] clamp remains the guard should the real
+// amplitude overshoot slightly.
 static const double NOISE_AMP_1D = 0.37;
 static const double NOISE_AMP_2D = 0.55;
 static const double NOISE_AMP_3D = 0.62;
@@ -131,8 +131,8 @@ MATH1(atan, std::atan(x))
 MATH1(deg, x * (180.0 / M_PI))
 MATH1(rad, x*(M_PI / 180.0))
 MATH1(frac, x - std::floor(x))
-// Ces deux-là répondent par oui ou non, pas par un nombre : macro à part pour qu'elles
-// rendent un booléen sans passer par num_value.
+// These two answer yes or no rather than with a number, hence a separate macro so they return a
+// boolean without going through num_value.
 #define MATH1_BOOL(name, expr)                                                                                         \
     static int math_##name(CallCtx& ctx) {                                                                             \
         Value* args = ctx.args;                                                                                        \
@@ -312,8 +312,8 @@ static int math_noise(CallCtx& ctx) {
         freq *= 2.0;
         amp *= NOISE_FALLOFF;
     }
-    // Le bruit de Perlin amélioré ne couvre PAS ±1 : on normalise par l'amplitude
-    // pratique selon la dimension (voir NOISE_AMP_*), puis on clampe → couvre [0,1].
+    // Improved Perlin noise does NOT span ±1, so we normalize by the practical amplitude for the
+    // dimension (see NOISE_AMP_*) and clamp, which then covers [0,1].
     double amp01 = argc >= 3 ? NOISE_AMP_3D : (argc == 2 ? NOISE_AMP_2D : NOISE_AMP_1D);
     double n = (total / max_amp / amp01 + 1.0) * 0.5;
     if (n < 0.0)
@@ -341,7 +341,7 @@ Value make_math_module() {
     m.map_set(Value(std::string("TAU")), Value(2.0 * M_PI));
     m.map_set(Value(std::string("E")), Value(2.718281828459045235360));
     m.map_set(Value(std::string("INF")), Value(std::numeric_limits<double>::infinity()));
-    // arithmétique
+    // arithmetic
     m.map_set(Value(std::string("abs")), Value::make_builtin(math_abs));
     m.map_set(Value(std::string("sign")), Value::make_builtin(math_sign));
     m.map_set(Value(std::string("floor")), Value::make_builtin(math_floor));
@@ -359,7 +359,7 @@ Value make_math_module() {
     m.map_set(Value(std::string("log2")), Value::make_builtin(math_log2));
     m.map_set(Value(std::string("log10")), Value::make_builtin(math_log10));
     m.map_set(Value(std::string("logn")), Value::make_builtin(math_logn));
-    // trigonométrie
+    // trigonometry
     m.map_set(Value(std::string("sin")), Value::make_builtin(math_sin));
     m.map_set(Value(std::string("cos")), Value::make_builtin(math_cos));
     m.map_set(Value(std::string("tan")), Value::make_builtin(math_tan));
@@ -373,7 +373,7 @@ Value make_math_module() {
     m.map_set(Value(std::string("isNan")), Value::make_builtin(math_is_nan));
     m.map_set(Value(std::string("isInf")), Value::make_builtin(math_is_inf));
     m.map_set(Value(std::string("map")), Value::make_builtin(math_map));
-    // aléatoire
+    // randomness
     m.map_set(Value(std::string("rand")), Value::make_builtin(math_rand));
     m.map_set(Value(std::string("randInt")), Value::make_builtin(math_rand_int));
     m.map_set(Value(std::string("seed")), Value::make_builtin(math_seed));

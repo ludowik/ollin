@@ -1,8 +1,8 @@
-// Pseudo-méthodes des tableaux (arr.len(), arr.push(v), arr.map(fn)…).
+// Array pseudo-methods: arr.len(), arr.push(v), arr.map(fn) and so on.
 //
-// Construites UNE fois au démarrage dans une map, comme le module `string` :
-// GET_INDEX résout `arr.<m>` par un simple lookup (cf. VM::array_module_) au lieu
-// d'une chaîne de comparaisons de chaînes reconstruisant une closure par accès.
+// They are built ONCE at startup into a map, like the `string` module, so that GET_INDEX resolves
+// `arr.<m>` with a plain lookup (see VM::array_module_) instead of a chain of string comparisons
+// rebuilding a closure on every access.
 //
 // Le tableau est le PREMIER argument : CALL_METHOD injecte le receveur en self
 // pour un tableau, donc `arr.push(v)` arrive ici en (arr, v).
@@ -11,9 +11,8 @@
 #include <algorithm>
 #include <stdexcept>
 
-// Convention de message uniforme : « array.<methode>: expected (array, <params>) ».
-// Le nom reste préfixé `array.` — c'est la même fonction native quelle que soit la
-// forme d'appel.
+// Uniform message convention: "array.<method>: expected (array, <params>)". The name keeps the
+// `array.` prefix because it is the same native function whatever the call form.
 static void arr_check(const CallCtx& ctx, int min_argc, const char* sig) {
     if (ctx.argc < min_argc || !ctx.args[0].is_array())
         throw std::runtime_error(std::string("array.") + sig);
@@ -104,16 +103,16 @@ static int arr_reduce(CallCtx& ctx) {
     return ctx.ret(acc);
 }
 
-// Tri en place, stable. Sans comparateur : ordre par RANG DE TYPE
-// (nil < nombres < chaînes < reste), puis par valeur au sein d'un même rang.
+// In-place stable sort. Without a comparator the order is by TYPE RANK (nil < numbers < strings
+// < the rest), then by value within a rank.
 static int arr_sort(CallCtx& ctx) {
     arr_check(ctx, 1, "sort: expected (array[, cmp])");
     Value& arr = ctx.args[0];
     if (ctx.argc >= 2 && ctx.args[1].is_callable()) {
         Value fn = ctx.args[1];
         VM* vm = ctx.vm;
-        // Une exception levée par le comparateur ne peut pas traverser stable_sort
-        // (UB) : on la capture, on rend un ordre stable, puis on la relance après.
+        // An exception thrown by the comparator cannot cross stable_sort (that would be UB), so it
+        // is captured, a stable order is returned, and it is rethrown afterwards.
         std::exception_ptr ex;
         std::stable_sort(arr.aptr->items.begin(), arr.aptr->items.end(), [&fn, vm, &ex](const Value& a, const Value& b) {
             if (ex)

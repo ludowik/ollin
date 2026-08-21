@@ -1,5 +1,5 @@
 #pragma once
-// Inclus par chunk.h après iterator.h — ne pas inclure directement.
+// Included by chunk.h after iterator.h; do not include directly.
 #include <cmath>
 
 struct Range {
@@ -20,16 +20,16 @@ struct RangeIterator : Iterator {
         : Iterator(KIND_RANGE), current(r->start), end(r->end), step(r->step), incl_right(r->incl_right) {
     }
 
-    // public + non virtuel : appelé directement par FOR_ITER_NEXT1 (dévirtualisation
-    // via Iterator::kind) → inlinable. next()/next_primary() restent les points
-    // d'entrée du protocole virtuel générique et délèguent à advance().
+    // Public and non-virtual, so FOR_ITER_NEXT1 can call it directly — devirtualized through
+    // Iterator::kind — and inline it. next() and next_primary() remain the entry points of the
+    // generic virtual protocol and delegate here.
     bool advance(Value& out) {
         bool done =
             (step > 0) ? (incl_right ? current > end : current >= end) : (incl_right ? current < end : current <= end);
         if (done)
             return false;
-        // Repli en entier si current est un entier exact tenant dans int64
-        // (doubleFitsInt64 garde le cast — cf. value.h).
+        // Falls back to an integer when current is an exact integer fitting in an int64;
+        // double_fits_int64 guards the cast, see value.h.
         out = (double_fits_int64(current) && current == std::floor(current)) ? Value((int64_t)current)
                                                                            : Value(current);
         current += step;

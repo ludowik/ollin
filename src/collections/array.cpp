@@ -1,3 +1,3 @@
 #include "value.h"
-// Toute la logique Array est inline dans array.h.
-// Ce fichier existe pour faire d'array un module compilable indépendant.
+// All the Array logic is inline in array.h; this file exists so that array is an independently
+// compilable module.

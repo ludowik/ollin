@@ -9,8 +9,8 @@ Value make_window_module() {
     // Sans repli, getElementById renvoie null → null.clientWidth plante.
     auto win = emscripten::val::global("window");
     int w = 0, h = 0;
-    // 1) Taille FOURNIE par l'hôte (playground : zone de rendu mesurée en JS après
-    // affichage — fiable, pas de course de layout comme la lecture DOM à l'init).
+    // 1) Size PROVIDED by the host. In the playground it is the render area measured in JS after
+    // layout, which is reliable — unlike reading the DOM at init, where a layout race is possible.
     auto ow = win["__ollinRenderW"];
     auto oh = win["__ollinRenderH"];
     if (ow.isNumber() && oh.isNumber()) {
@@ -27,7 +27,7 @@ Value make_window_module() {
         }
     }
     // 3) Dernier repli : viewport → W/H toujours une taille RÉELLE, jamais 0
-    // (sinon canvas à vide, sans contexte GL → crash).
+    // (otherwise the canvas would be empty, with no GL context, and crash).
     if (w <= 0 || h <= 0) {
         w = win["innerWidth"].as<int>();
         h = win["innerHeight"].as<int>();

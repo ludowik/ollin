@@ -20,9 +20,9 @@ static double color_component(const Value& v, const char* name) {
     return d;
 }
 
-// Classe Color pour les fabriques statiques (random/gray) : la classe globale
-// (réutilisée, pas de nouvelle alloc, __class__ == Color), avec repli sur une classe
-// fraîche si le global n'est pas encore matérialisé.
+// The Color class used by the static factories (random, gray): the global one, reused rather than
+// allocated anew so that __class__ is Color, falling back to a fresh class when the global is not
+// materialized yet.
 static Value color_class() {
     Value c = VM::current()->get_global("Color");
     return c.is_class() ? c : make_color_class();
@@ -69,11 +69,9 @@ static int color_str(CallCtx& ctx) {
                  std::to_string(a) + ")"));
 }
 
-// ── random ────────────────────────────────────────────────────────────────────
-// Méthode STATIQUE : fabrique une Color r,g,b aléatoires dans [0,1], a = 1.
-// Comme `static func random() return Color(...) end` en Ollin, elle ne dépend
-// d'aucun receveur/argument : la classe vient du global `Color` (repli sur une
-// classe fraîche si le global n'est pas encore matérialisé).
+// STATIC method: builds a Color with random r,g,b in [0,1] and a = 1. Like
+// `static func random() return Color(...) end` in Ollin it depends on no receiver and no
+// argument; the class comes from the `Color` global.
 
 static int color_random(CallCtx& ctx) {
     Value* args = ctx.args;
@@ -91,8 +89,7 @@ static int color_random(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// ── pastel ────────────────────────────────────────────────────────────────────
-// args[0] = self  → retourne une nouvelle instance Color pastel (mélange 50% blanc)
+// args[0] is self; returns a new pastel Color instance, mixed 50 % with white.
 
 static int color_pastel(CallCtx& ctx) {
     Value* args = ctx.args;
@@ -136,10 +133,9 @@ static int color_grayscale(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// ── gray (statique, AVEC paramètre) ──────────────────────────────────────────
-// Color.gray(v) → nouvelle Color grise de luminance v (clampée à [0,1]), a = 1.
-// Méthode statique avec un paramètre : grâce au flag static builtin, `v` est en
-// args[0] que l'appel soit Color.gray(x) OU c.gray(x) (aucun self injecté).
+// Color.gray(v): a new grey Color of luminance v, clamped to [0,1], with a = 1. A static method
+// with a parameter: thanks to the static-builtin flag, `v` is in args[0] whether the call is
+// Color.gray(x) or c.gray(x), since no self is injected.
 static int color_gray(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
@@ -163,19 +159,18 @@ Value make_color_class() {
     cls.map_set(Value(std::string("__name__")), Value(std::string("Color")));
     cls.map_set(Value(std::string("init")), Value::make_builtin(color_init));
     cls.map_set(Value(std::string("__str")), Value::make_builtin(color_str));
-    // Fabriques STATIQUES (pas de self) — cohérent avec `static func` en Ollin :
+    // STATIC factories, which receive no self, matching `static func` in Ollin:
     cls.map_set(Value(std::string("random")), Value::make_static_builtin(color_random));
     cls.map_set(Value(std::string("gray")), Value::make_static_builtin(color_gray));
-    // Méthodes d'INSTANCE (reçoivent self) :
+    // INSTANCE methods, which do receive self:
     cls.map_set(Value(std::string("pastel")), Value::make_builtin(color_pastel));
     cls.map_set(Value(std::string("grayscale")), Value::make_builtin(color_grayscale));
     return cls;
 }
 
-// ── makeColorsModule ──────────────────────────────────────────────────────────
 
-// Chaque constante est une vraie instance Color (clé __class__ posée) → les méthodes
-// (pastel/grayscale/random) et __str fonctionnent dessus, comme sur Color(...).
+// Every constant is a real Color instance, with __class__ set, so the methods (pastel, grayscale,
+// random) and __str work on it exactly as on Color(...).
 static Value make_color_instance(const Value& cls, double r, double g, double b, double a = 1.0) {
     Value inst = Value::make_map();
     inst.map_set(Value(std::string("__class__")), cls);

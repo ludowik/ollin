@@ -1,5 +1,5 @@
 #pragma once
-// Inclus par chunk.h après la définition de Value — ne pas inclure directement.
+// Included by chunk.h after Value is defined; do not include directly.
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -72,16 +72,15 @@ struct ArrayPool {
         }
         return new Array();
     }
-    // clear() ne libère PAS la capacité du vector : ne pooler que les petits
-    // tableaux, sinon un tableau transitoire volumineux resterait épinglé dans ce
-    // pool static (mémoire jamais rendue, OOM possible sur WASM). Les gros sont
-    // détruits → buffer rendu à l'allocateur.
+    // clear() does NOT free the vector's capacity, so only small arrays are pooled: a large
+    // transient array would stay pinned in this static pool, its memory never returned, which can
+    // mean an out-of-memory on WASM. Large ones are destroyed and their buffer handed back.
     static constexpr size_t POOL_MAX_CAP = 4096;
     void release(Array* a) {
-        // RÉ-ENTRANCE : a->items.clear() libère les éléments, ce qui peut ré-entrer le
-        // pool (un élément array → release → buf[n++]) et faire CROÎTRE n. On vide donc
-        // AVANT, puis on (re)teste la capacité avec le n à jour — sinon buf[n++] écrirait
-        // buf[CAP] (= &n) quand un release imbriqué a rempli le pool pendant le clear.
+        // REENTRANCY: a->items.clear() releases the elements, which can re-enter the pool (an
+        // array element releases and does buf[n++]) and make n GROW. So clear FIRST, then test the
+        // capacity again with the up-to-date n — otherwise buf[n++] would write buf[CAP], which is
+        // &n, whenever a nested release filled the pool during the clear.
         if (a->items.capacity() > POOL_MAX_CAP) {
             delete a; // gros tableau : jamais poolé
             return;

@@ -5,9 +5,9 @@
 Value make_core_module();
 Value make_math_module();
 Value make_graphics_module();
-// Module `blend` : défini dans la paire graphics (graphics_module avec les enums
+// The `blend` module is defined in the graphics pair (graphics_module holds the enums
 // raylib BlendMode / graphics_stub → nil), pas ici — modules.cpp compile aussi
-// sans raylib, donc ne peut pas référencer l'enum. Voir makeGraphicsModule.
+// without raylib, and so cannot reference the enum. See make_graphics_module.
 Value make_blend_module();
 Value make_string_module();
 Value make_colors_module();

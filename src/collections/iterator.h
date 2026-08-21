@@ -1,13 +1,13 @@
 #pragma once
-// Inclus par chunk.h après Map et Array — ne pas inclure directement.
+// Included by chunk.h after Map and Array; do not include directly.
 #include <cstdint> // uint8_t (underlying type de Iterator::Kind)
 #include <utility>
 #include <vector>
 
 struct Iterator {
-    // Tag concret : permet à la VM (FOR_ITER_NEXT1) de dévirtualiser le cas range —
-    // appel direct inlinable au lieu d'un appel virtuel par élément — sans dupliquer
-    // la logique d'avancement (advance() reste l'unique implémentation).
+    // Concrete tag, so the VM (FOR_ITER_NEXT1) can devirtualize the range case — an inlinable
+    // direct call instead of one virtual call per element — without duplicating the stepping
+    // logic: advance() remains the single implementation.
     enum Kind : uint8_t { KIND_MAP, KIND_ARRAY, KIND_RANGE };
     Kind kind;
     int refcount = 1;
@@ -91,14 +91,14 @@ struct ArrayIteratorPool {
         }
         return new ArrayIterator(a);
     }
-    // Comme ArrayPool : le snapshot `items` peut être volumineux et clear() ne
-    // libère pas la capacité → ne pooler que les petits, détruire les gros.
+    // As in ArrayPool: the `items` snapshot may be large and clear() does not free the
+    // capacity, so only small ones are pooled and large ones destroyed.
     static constexpr size_t POOL_MAX_CAP = 4096;
     void release(ArrayIterator* it) {
-        // RÉ-ENTRANCE : it->items.clear() libère les valeurs du snapshot, ce qui peut
-        // ré-entrer les pools (une valeur map/array → release → buf[n++]) et faire
-        // croître n ici. On vide AVANT, puis on (re)teste la capacité — sinon buf[n++]
-        // déborderait sur &n. (Cf. MapPool / ArrayPool.)
+        // REENTRANCY: it->items.clear() releases the snapshot's values, which can re-enter the
+        // pools (a map or array value releases and does buf[n++]) and make n grow here. Clear
+        // FIRST, then test the capacity again — otherwise buf[n++] would overflow onto &n. Same
+        // as MapPool and ArrayPool.
         if (it->items.capacity() > POOL_MAX_CAP) {
             delete it;
             return;
