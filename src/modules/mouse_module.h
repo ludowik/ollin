@@ -1,11 +1,11 @@
 #pragma once
 // Module mouse — pointeur (souris / tap tactile) pour les applications graphiques.
-// Implémentation : mouse_module.cpp (nécessite raylib).
+// Implementation in mouse_module.cpp, which requires raylib.
 
-// Appelé une fois par frame depuis la boucle de rendu (graphics_module.cpp) :
-// détecte les actions pointeur et appelle, si elles existent, mouse.pressed(x,y) /
+// Called once per frame from the render loop (graphics_module.cpp): detects pointer actions and
+// calls mouse.pressed(x,y) and the others when they exist. /
 // mouse.released(x,y) / mouse.moved(x,y).
-// click_taken : un widget de l'UI a déjà pris ce clic → ne pas appeler pressed/released.
+// click_taken means a UI widget already took this click, so pressed/released are not called.
 void mouse_poll(bool click_taken = false);
-// Remise à zéro au démarrage d'un programme (ollin_run), comme les autres modules d'entrée.
+// Reset when a program starts (ollin_run), like the other input modules.
 void mouse_reset();

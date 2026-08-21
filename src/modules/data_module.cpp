@@ -8,10 +8,9 @@
 #include <emscripten.h>
 #endif
 
-// Deux portées : PROJET (isolée par projet) et GLOBALE (partagée entre projets).
-// Les valeurs vivent en mémoire pendant le run (encodées, typées) ; chaque écriture
-// est persistée immédiatement (write-through). Le blob de chaque portée est chargé
-// au début du run par l'hôte (dataLoad).
+// Two scopes: PROJECT, isolated per project, and GLOBAL, shared across projects. Values live in
+// memory during the run, encoded and typed, and every write is persisted immediately
+// (write-through). Each scope's blob is loaded at the start of the run by the host (data_load).
 
 enum Scope { S_PROJECT = 0, S_GLOBAL = 1 };
 
@@ -20,12 +19,12 @@ static std::map<std::string, std::string> s_store[2];   // [portée] : clé → 
 static std::string s_file[2];                            // natif : fichier sidecar par portée
 #endif
 
-// ── encodage typé d'une Value scalaire ↔ chaîne stockée ────────────────────────
+// Typed encoding of a scalar Value to and from the stored string.
 // 'i'<entier>, 'f'<double>, 's'<brut>, 'b'<0|1>.
-// Le préfixe 'b' est né avec le type booléen étanche : `true` n'étant plus l'entier 1, il
-// tombait dans le throw et data.set("drapeau", true) échouait sur un message qui promettait
-// pourtant le booléen. Une valeur écrite AVANT en 'i1' se relit en entier — c'est ce qu'elle
-// était, et le script la teste par vérité (if v), donc rien ne casse.
+// The 'b' prefix came with the boolean becoming a type of its own: `true` no longer being the
+// integer 1, it fell into the throw and data.set("flag", true) failed on a message that promised
+// booleans. A value written EARLIER as 'i1' reads back as an integer — which is what it was, and
+// scripts test it for truth (if v), so nothing breaks.
 static std::string encode_value(const Value& v) {
     if (v.is_bool())
         return std::string("b") + (v.as_bool() ? "1" : "0");
@@ -53,7 +52,7 @@ static Value decode_value(const std::string& enc) {
     return Value(rest);   // 's' : chaîne brute
 }
 
-// ── (dé)sérialisation d'une portée en objet JSON plat {clé:valeur} ──────────────
+// Serializing a scope to and from a flat JSON object {key: value}.
 static void json_escape(const std::string& s, std::string& out) {
     out += '"';
     for (char c : s) {
@@ -157,7 +156,6 @@ static void deserialize(int scope, const std::string& blob) {
     }
 }
 
-// ── persistance write-through ──────────────────────────────────────────────────
 static void persist(int scope) {
 #ifdef __EMSCRIPTEN__
     std::string blob = serialize(scope);
@@ -176,7 +174,7 @@ static void persist(int scope) {
 #endif
 }
 
-// ── implémentations partagées (paramétrées par la portée) ───────────────────────
+// Shared implementations, parameterized by scope.
 static Value data_get(int scope, Value* args, int argc) {
     if (argc < 1 || !args[0].is_string())
         throw std::runtime_error("data.get: expected a string key");
@@ -222,7 +220,6 @@ static Value data_clear(int scope, Value* args, int argc) {
     return Value();
 }
 
-// ── hôte ────────────────────────────────────────────────────────────────────────
 void data_load(const std::string& project_blob, const std::string& global_blob) {
     deserialize(S_PROJECT, project_blob);
     deserialize(S_GLOBAL, global_blob);
@@ -249,8 +246,8 @@ void data_set_native_paths(const std::string& project_file, const std::string& g
 }
 #endif
 
-// Remplit une map avec les 6 opérations d'une portée (lambdas non capturantes →
-// pointeurs de fonction ; la portée est figée par une fonction dédiée par portée).
+// Fills a map with a scope's six operations. The lambdas capture nothing, so they decay to
+// function pointers, and the scope is fixed by having one dedicated function per scope.
 static void fill_scope(Value& m, int scope) {
     if (scope == S_PROJECT) {
         m.map_set(Value(std::string("get")), Value::make_builtin([](CallCtx& ctx) { return ctx.ret(data_get(S_PROJECT, ctx.args, ctx.argc)); }));

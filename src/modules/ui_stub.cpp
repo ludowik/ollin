@@ -1,11 +1,11 @@
 #include "ui_module.h"
 #include "vm.h"
 
-// Build sans raylib : aucune zone où dessiner, donc déclarer un widget ne produit
-// rien de visible. Les arguments sont tout de même VÉRIFIÉS (mêmes messages, cf.
-// ui_module.h) : une faute d'appel se voit ainsi en natif headless, là où tournent
-// les tests. Les déclarations renvoient un handle inerte, avec les mêmes méthodes,
-// pour qu'un script chaînant `ui.menu("x").button(...)` tourne aussi sans graphisme.
+// Build without raylib: there is no area to draw in, so declaring a widget produces nothing
+// visible. The arguments are still VALIDATED, with the same messages (see ui_module.h), so a
+// misuse shows up in the headless native build where the tests run. Declarations return an inert
+// handle carrying the same methods, so that a script chaining ui.menu("x").button(...) runs
+// without graphics too.
 
 namespace {
 

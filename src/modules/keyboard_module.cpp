@@ -8,13 +8,13 @@
 #include <emscripten.h>
 #endif
 
-// Le clavier GLFW est GLOBAL (window) : dans le playground, taper/naviguer dans
-// l'éditeur alimenterait aussi le programme graphique en cours. La page pose
-// window.__ollinKbdBlocked=true quand l'ÉDITEUR a le focus → on ignore alors les
-// entrées côté jeu. Hors web (natif), pas d'éditeur : jamais bloqué.
+// The GLFW keyboard is GLOBAL to the window: in the playground, typing or navigating in the
+// editor would also feed the running graphical program. The page sets
+// window.__ollinKbdBlocked = true when the EDITOR has focus, and we then ignore input on the game
+// side. Outside the web there is no editor, so nothing is ever blocked.
 //
-// Le drapeau est mis en cache par keyboardPoll (1×/frame) : interroger le DOM
-// (EM_ASM) à chaque isDown serait coûteux (chemin chaud).
+// The flag is cached by keyboard_poll, once per frame: querying the DOM through EM_ASM on every
+// isDown would be costly on a hot path.
 static bool s_blocked = false;
 
 static bool query_blocked() {
@@ -25,21 +25,20 @@ static bool query_blocked() {
 #endif
 }
 
-// ── Clavier ─────────────────────────────────────────────────────────────────
-// On affecte des fonctions au module `keyboard` ; le moteur les appelle si elles
-// existent (aucune activation nécessaire) :
-//   keyboard.keypressed = func(key) ... end   → touche enfoncée (événement)
-//   keyboard.keyrelease = func(key) ... end   → touche relâchée (événement)
-// Et un builtin d'état MAINTENU (pour un déplacement continu) :
-//   keyboard.isDown(key) → true/false selon que la touche est enfoncée maintenant.
-// `key` est un NOM de touche : "a".."z", "0".."9", "space", "return", "escape",
-//   "backspace", "tab", "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", etc.
+// Functions are assigned to the `keyboard` module and the engine calls whichever exist, with no
+// activation needed:
+//   keyboard.keypressed = func(key) ... end   key pressed (an event)
+//   keyboard.keyrelease = func(key) ... end   key released (an event)
+// plus a HELD-state builtin, for continuous movement:
+//   keyboard.isDown(key) -> whether the key is down right now.
+// `key` is a key NAME: "a".."z", "0".."9", "space", "return", "escape", "backspace", "tab",
+// "left"/"right"/"up"/"down", "shift"/"ctrl"/"alt", and so on.
 //
-// La détection a lieu dans keyboardPoll(), appelé une fois par frame par la
-// boucle de rendu (graphics_module.cpp) — le clavier ne fonctionne donc que
-// pendant un graphics.run(...) (ou via la fonction draw auto-appelée).
+// Detection happens in keyboard_poll(), called once per frame by the render loop
+// (graphics_module.cpp), so the keyboard only works during a graphics.run(...) — or through the
+// automatically called draw function.
 
-// Nom lisible d'une touche raylib ; "" si non gérée (ignorée).
+// Readable name of a raylib key; "" when unhandled, and then ignored.
 static std::string key_name(int key) {
     if (key >= KEY_A && key <= KEY_Z)
         return std::string(1, (char)('a' + (key - KEY_A)));
@@ -88,8 +87,8 @@ static int key_code(std::string name) {
     return -1;
 }
 
-// keyboard.isDown(key) : la touche est-elle enfoncée à cet instant ? true/false.
-// shift/ctrl/alt testent les deux côtés du clavier.
+// keyboard.isDown(key): is the key down right now? shift, ctrl and alt test both sides of the
+// keyboard.
 static int kbd_is_down(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (s_blocked)
@@ -114,17 +113,17 @@ static int kbd_is_down(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(down));
 }
 
-// Touches actuellement enfoncées (pour émettre keyrelease). Indexé par keycode
-// raylib (< 512). Zéro-initialisé (durée de vie statique).
+// Keys currently held, so that keyrelease can be emitted. Indexed by raylib keycode (< 512), and
+// zero-initialized by static lifetime.
 static bool s_down[512];
-// Une touche a-t-elle été enfoncée pendant CETTE frame ? La file de raylib est drainée
-// ici même, donc un autre module ne peut pas la relire — il demande ce drapeau (le son
-// s'ouvre au premier geste de l'utilisateur, cf. audio_wake).
+// Was any key pressed during THIS frame? raylib's queue is drained right here, so another module
+// cannot read it again and asks for this flag instead — sound opens on the user's first gesture,
+// see audio_wake.
 static bool s_pressed_any = false;
 
-// Remet l'état « enfoncé » à zéro. Appelé au début de chaque gfx_run : sur
-// l'instance WASM partagée, s_down est statique et survivrait sinon d'un run au
-// suivant (touche tenue à travers un reset → keyrelease sans keypressed).
+// Clears the held state. Called at the start of every gfx_run: on the shared WASM instance
+// s_down is static and would otherwise survive from one run to the next, so a key held across a
+// reset would produce a keyrelease with no keypressed.
 void keyboard_reset() {
     for (int i = 0; i < 512; i++)
         s_down[i] = false;
@@ -148,9 +147,9 @@ void keyboard_poll() {
     bool want_release = released.is_callable();
 
     if (s_blocked) {
-        // Éditeur focalisé : le jeu ne reçoit plus le clavier. On RELÂCHE proprement les
-        // touches encore suivies (keyrelease + clear) pour ne pas les laisser « coincées »,
-        // et on draine la file d'appuis pour ne pas les rejouer au déblocage.
+        // The editor has focus, so the game no longer receives the keyboard. We RELEASE the keys
+        // still tracked (keyrelease, then clear) so none stays stuck, and drain the press queue so
+        // they are not replayed when input is unblocked.
         for (int k = 0; k < 512; k++) {
             if (!s_down[k])
                 continue;
@@ -166,8 +165,8 @@ void keyboard_poll() {
         return;
     }
 
-    // Appuis de la frame (file des touches — robuste au timing). On draine et on
-    // suit l'état « enfoncé » même sans callback keypressed, pour keyrelease.
+    // This frame's presses, taken from the key queue, which is robust to timing. We drain it and
+    // track the held state even without a keypressed callback, for keyrelease's sake.
     int key;
     while ((key = GetKeyPressed()) != 0) {
         s_pressed_any = true;
@@ -180,7 +179,7 @@ void keyboard_poll() {
             vm->call_value(pressed, Value(name));
     }
 
-    // Relâchements : parcourt les touches suivies comme enfoncées.
+    // Releases: walk the keys tracked as held.
     for (int k = 0; k < 512; k++) {
         if (!s_down[k])
             continue;

@@ -12,7 +12,7 @@ struct Entry {
     bool ready;
 };
 
-// L'ordre fixe les index ; "sans" en tête, c'est la police par défaut.
+// The order fixes the indices; "sans" comes first and is the default font.
 Entry s_fonts[] = {
     {"sans", LoadFont_FontSans, {0}, false},
     {"mono", LoadFont_FontMono, {0}, false},
@@ -54,8 +54,8 @@ Font engine_font(int idx) {
     if (!e.ready && IsWindowReady()) {
         e.font = e.load();
         if (e.font.texture.id != 0) {
-            // L'atlas est rendu à 32 px et le plus souvent réduit : l'interpolation
-            // lisse les contours là où un filtre par point les rendrait dentelés.
+            // The atlas is rendered at 32 px and usually scaled down, so bilinear filtering
+            // smooths the outlines where a nearest filter would leave them jagged.
             SetTextureFilter(e.font.texture, TEXTURE_FILTER_BILINEAR);
             e.ready = true;
         }

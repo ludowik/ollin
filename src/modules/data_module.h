@@ -2,18 +2,18 @@
 #include "value.h"
 #include <string>
 
-// Module `data` : persistance clé→valeur par PROJET (isolée) et GLOBALE (partagée).
-// Valeurs scalaires (nombre / chaîne / booléen). Persistance write-through :
+// The `data` module: key-value persistence, PROJECT-scoped (isolated) and GLOBAL (shared).
+// Scalar values only — number, string, boolean. Write-through persistence:
 //   WASM  → localStorage (via window.__ollinData, fourni par la SPA)
 //   natif → fichier JSON « sidecar »
 Value make_data_module();
 
-// Charge les données au début d'un run (blobs JSON de chaque portée).
-// WASM : appelé par l'hôte JS (embind « dataLoad ») avant execute.
+// Loads the data at the start of a run, one JSON blob per scope. On WASM the JS host calls it
+// through embind ("dataLoad") before execute.
 void data_load(const std::string& project_blob, const std::string& global_blob);
 
 #ifndef __EMSCRIPTEN__
-// Natif : fixe les fichiers sidecar (projet = à côté du script, global = home) et
-// charge leur contenu. Les écritures (set/delete/clear) réécrivent ces fichiers.
+// Native: sets the sidecar files — project next to the script, global in the home directory —
+// and loads their contents. Writes (set, delete, clear) rewrite those files.
 void data_set_native_paths(const std::string& project_file, const std::string& global_file);
 #endif

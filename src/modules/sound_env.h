@@ -1,14 +1,14 @@
 #pragma once
 
-// Enveloppe ADSR — attaque, déclin, maintien, relâchement.
+// ADSR envelope: attack, decay, sustain, release.
 //
-// Écrite en FORME FERMÉE (le niveau à l'instant t) et non en machine à états, pour une
-// raison de vérifiabilité : la même fonction sert au mélangeur, qui la parcourt en temps
-// réel sur le fil audio, et au calcul d'un tampon, qui l'applique hors ligne. Un test qui
-// lit les échantillons d'un tampon valide donc la formule que le mélangeur emploie — or le
-// conteneur d'intégration n'a pas de carte son, et n'a aucun autre moyen de la contrôler.
+// Written in CLOSED FORM — the level at time t — rather than as a state machine, for
+// verifiability: the same function serves the mixer, which walks it in real time on the audio
+// thread, and the buffer computation, which applies it offline. A test reading a buffer's samples
+// therefore validates the very formula the mixer uses — and the integration container has no
+// sound card, so it has no other way to check it.
 //
-// Les durées sont en secondes, `sustain` est un niveau dans [0;1].
+// Durations are in seconds; `sustain` is a level in [0;1].
 
 struct Adsr {
     double attack = 0.01;
@@ -17,15 +17,15 @@ struct Adsr {
     double release = 0.2;
 };
 
-// Niveau au temps `t` compté depuis le déclenchement. `hold` est l'instant où le
-// relâchement commence — la durée passée à `trigger(durée)`, ou l'instant où le script a
-// appelé `release()`. Négatif : la note est encore tenue, donc le maintien se prolonge.
+// Level at time `t`, counted from the trigger. `hold` is when the release begins — the duration
+// passed to trigger(duration), or the moment the script called release(). A negative value means
+// the note is still held, so the sustain goes on.
 inline double adsr_level(const Adsr& e, double t, double hold) {
     if (t <= 0.0)
         return 0.0;
     if (hold >= 0.0 && t >= hold) {
-        // Le relâchement part du niveau atteint AU MOMENT du lâcher, pas du maintien :
-        // lâcher pendant l'attaque doit redescendre depuis là où l'on était.
+        // The release starts from the level reached AT the moment of letting go, not from the
+        // sustain: releasing during the attack must come down from wherever we were.
         double depart = adsr_level(e, hold, -1.0);
         if (e.release <= 0.0)
             return 0.0;
@@ -40,8 +40,8 @@ inline double adsr_level(const Adsr& e, double t, double hold) {
     return e.sustain;
 }
 
-// L'enveloppe est-elle retombée à zéro ? Sert au mélangeur pour libérer la voix : une note
-// relâchée doit cesser d'occuper un slot.
+// Has the envelope fallen back to zero? The mixer uses this to free the voice: a released note
+// must stop occupying a slot.
 inline bool adsr_finished(const Adsr& e, double t, double hold) {
     return hold >= 0.0 && t >= hold + e.release;
 }

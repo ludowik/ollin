@@ -13,17 +13,17 @@ void image_preload(const std::string& name, const std::vector<uint8_t>& bytes,
 // Convenience: decode base64 then preload. ext without dot, e.g. "png".
 void image_preload_b64(const std::string& name, const std::string& b64, const std::string& ext);
 
-// Codec base64 partagé — le décodeur sert à précharger toutes les ressources (images,
-// modèles 3D), l'encodeur à rendre une capture d'écran à l'hôte JS (une chaîne binaire
-// serait recodée en UTF-8 par embind, donc corrompue).
+// Shared base64 codec: the decoder preloads every kind of resource (images, 3D models), the
+// encoder hands a screenshot to the JS host — a raw binary string would be re-encoded as UTF-8 by
+// embind, and thus corrupted.
 std::vector<uint8_t> image_b64_decode(const std::string& b64);
 std::string image_b64_encode(const uint8_t* data, size_t len);
 
 // Called at the start of each ollin_run() to release stale GL handles
 void image_reset();
 
-// Renvoie l'id GL de texture d'un handle image (0 si introuvable) — utilisé par
-// la 3D (graphics.texture) pour texturer les meshes avec une image du module.
+// GL texture id of an image handle, or 0 when not found. Used by the 3D side
+// (graphics.texture) to texture meshes with an image from this module.
 unsigned int image_gl_texid(int id);
 
 // Called by graphics.sprite() — draws image id at (x,y) scaled to (dw,dh).
@@ -43,14 +43,14 @@ bool  image_tex_valid(int id);
 // Frees a streaming texture (GPU + CPU shadow) by id. No-op if invalid.
 void  image_free_tex(int id);
 
-// Teinte globale (graphics.tint / noTint) : appliquée par défaut à image.draw et
-// graphics.sprite. RGBA 0-255. `has`=false → pas de teinte (blanc).
+// Global tint (graphics.tint / noTint), applied by default to image.draw and graphics.sprite.
+// RGBA in 0-255; has=false means no tint, that is white.
 void image_set_tint(bool has, unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char* b, unsigned char* a);
 
-// Ancrage global des images (graphics.spriteMode) : x,y = coin supérieur gauche
-// ou centre. Comme la teinte, l'état vit ici car il s'applique aux DEUX surfaces
-// qui dessinent une image : graphics.sprite et image.draw.
+// Global image anchoring (graphics.spriteMode): x,y is either the top-left corner or the centre.
+// Like the tint, the state lives here because it applies to BOTH surfaces that draw an image,
+// graphics.sprite and image.draw.
 enum { SPRITE_CORNER = 0, SPRITE_CENTER = 1 };
 void image_set_sprite_mode(int mode);
 int image_get_sprite_mode();

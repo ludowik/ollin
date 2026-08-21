@@ -3,14 +3,12 @@
 
 Value make_tween_module();
 
-// Appelés par la boucle de rendu (graphics_module.cpp, run_user_callbacks) :
-// tween_update_all(dt) AVANT update()/draw() — les deux voient donc les valeurs de la
-//                      frame courante. Le premier appel marque le module « piloté par le
-//                      moteur » et neutralise tween.update côté script (sinon un appel
-//                      resté dans draw() doublerait la vitesse).
-// tween_reset()        au démarrage d'un PROGRAMME (ollin_run, wasm_main.cpp), comme
-//                      ui_reset : les statiques survivent au VM entre deux exécutions du
-//                      playground, et les tweens du programme précédent retiendraient ses
-//                      objets.
+// Called by the render loop (graphics_module.cpp, run_user_callbacks):
+// tween_update_all(dt) BEFORE update() and draw(), so both see this frame's values. The first call
+//                      marks the module as engine-driven and turns tween.update into a no-op for
+//                      scripts, since a call left in draw() would otherwise double the speed.
+// tween_reset()        when a PROGRAM starts (ollin_run, wasm_main.cpp), like ui_reset: the
+//                      statics survive the VM between two playground runs, and the previous
+//                      program's tweens would keep holding its objects.
 void tween_update_all(double dt);
 void tween_reset();

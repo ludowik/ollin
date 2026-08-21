@@ -4,8 +4,8 @@
 #include <string>
 
 // Multitouche, build SANS raylib : aucune surface tactile, donc jamais de contact. Le module
-// existe tout de même en entier, comme celui du son — un script qui lit `touch.count()` ou
-// itère `touch.points()` tourne alors sans rien voir, au lieu d'échouer sur un module nil.
+// still exists in full, like the sound one: a script reading touch.count() or iterating
+// touch.points() then runs and sees nothing, instead of failing on a nil module.
 
 namespace {
 

@@ -7,7 +7,6 @@
 
 Value make_color_class(); // défini plus bas — utilisé par color_random (repli)
 
-// ── helpers ───────────────────────────────────────────────────────────────────
 
 static double color_component(const Value& v, const char* name) {
     if (!v.is_number())
@@ -35,7 +34,6 @@ static Value color_field(const Value& self, const char* name) {
     return v;
 }
 
-// ── init ──────────────────────────────────────────────────────────────────────
 // args[0] = self ; args[1..] = forme couleur flexible (voir parseColor) :
 //   Color(gris) · Color(gris, a) · Color(r, g, b) · Color(r, g, b, a) · Color(autreColor)
 
@@ -53,7 +51,6 @@ static int color_init(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── __str ─────────────────────────────────────────────────────────────────────
 
 static int color_str(CallCtx& ctx) {
     Value* args = ctx.args;
@@ -110,7 +107,6 @@ static int color_pastel(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// ── grayscale ─────────────────────────────────────────────────────────────────
 // args[0] = self  → retourne une nouvelle instance Color en niveaux de gris (luminance Rec. 601)
 
 static int color_grayscale(CallCtx& ctx) {
@@ -152,7 +148,6 @@ static int color_gray(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// ── makeColorClass ────────────────────────────────────────────────────────────
 
 Value make_color_class() {
     Value cls = Value::make_class();

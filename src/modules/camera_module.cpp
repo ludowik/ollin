@@ -46,8 +46,8 @@ static int cam_open(CallCtx& ctx) {
         if (!window.__ollinCam) window.__ollinCam = {};
         const cam = window.__ollinCam;
         if (cam.state === 'open' || cam.state === 'opening') return;
-        // Garde avant toute création DOM : sinon chaque retry en contexte non sécurisé
-        // (état 'error') ajouterait un <video> orphelin de plus.
+        // Guard before creating any DOM node: otherwise every retry in an insecure context (the
+        // 'error' state) would leave one more orphan <video> behind.
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
             cam.state = 'error'; // contexte non sécurisé (HTTP hors localhost) → pas d'API caméra
             return;
@@ -80,8 +80,8 @@ static int cam_capture(CallCtx& ctx) {
     if (!s_cam_id || !image_tex_valid(s_cam_id))
         return ctx.ret(Value{});
 
-    // Buffer persistant réutilisé entre frames (chemin chaud, ~60 fps) : évite d'allouer
-    // ~1,2 Mo par capture. Redimensionné seulement si la résolution change.
+    // A persistent buffer reused across frames — a hot path at around 60 fps — which avoids
+    // allocating some 1.2 MB per capture. It is resized only when the resolution changes.
     static std::vector<uint8_t> pixels;
     size_t need = (size_t)s_cam_w * (size_t)s_cam_h * 4;
     if (pixels.size() != need)

@@ -1,7 +1,7 @@
 // Classe native Quat — rotations par quaternion (composition sans gimbal-lock +
-// interpolation slerp). Math pure raymath (aucune dépendance rlgl/GL) ; compilée
+// slerp interpolation). Pure raymath, with no rlgl or GL dependency; compiled
 // dans les builds raylib/WASM. Les angles de l'API publique sont en DEGRÉS
-// (cohérent avec rotate/rotateX-Y-Z) ; conversion interne en radians pour raymath.
+// (consistent with rotate and rotateX/Y/Z), converted internally to radians for raymath.
 #include "graphics_quat.h"
 #include "module_utils.h"
 #include "value.h"
@@ -15,9 +15,9 @@ static double quat_field(const Value& v, const char* k) {
 }
 
 Quaternion quat_from_instance(const Value& v, const char* fn) {
-    // Vérifie que c'est bien une instance Quat (et pas une autre map / un autre
+    // Checks this really is a Quat instance and not some other map or other
     // objet Camera, Light…) — sinon on fabriquerait un quaternion silencieusement
-    // faux (w manquant → 0). On contrôle __class__.__name__ == "Quat".
+    // wrong (a missing w reads as 0), so we check __class__.__name__ == "Quat".
     Value cls = v.is_map() ? v.map_get(Value(std::string("__class__"))) : Value{};
     Value name = cls.is_class() ? cls.map_get(Value(std::string("__name__"))) : Value{};
     if (!(name.is_string() && name.as_string() == "Quat"))
@@ -38,9 +38,8 @@ Value make_quat_instance(Quaternion q) {
     return inst;
 }
 
-// ── Méthodes d'instance (self = args[0]) ────────────────────────────────────
-// Un quaternion est une VALEUR : les méthodes renvoient un NOUVEAU Quat (pas de
-// mutation), donc chaînables : q.mul(a).normalize().
+// A quaternion is a VALUE: the methods return a NEW Quat instead of mutating, which makes them
+// chainable — q.mul(a).normalize().
 
 // q.mul(autre) : composition q · autre (applique d'abord autre, puis q).
 static int quat_mul(CallCtx& ctx) {
@@ -52,7 +51,7 @@ static int quat_mul(CallCtx& ctx) {
     return ctx.ret(make_quat_instance(QuaternionMultiply(a, b)));
 }
 
-// q.slerp(autre, t) : interpolation sphérique (t ∈ [0,1]).
+// q.slerp(other, t): spherical interpolation, t in [0,1].
 static int quat_slerp(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Quaternion a = quat_from_instance(args[0], "Quat.slerp");
@@ -63,7 +62,6 @@ static int quat_slerp(CallCtx& ctx) {
     return ctx.ret(make_quat_instance(QuaternionSlerp(a, b, t)));
 }
 
-// q.normalize() : quaternion normalisé.
 static int quat_normalize(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)argc;
@@ -77,7 +75,7 @@ static int quat_inverse(CallCtx& ctx) {
     return ctx.ret(make_quat_instance(QuaternionInvert(quat_from_instance(args[0], "Quat.inverse"))));
 }
 
-// q.rotateVec(x, y, z) : renvoie le vecteur (x,y,z) tourné par q, sous forme [x,y,z].
+// q.rotateVec(x, y, z): the vector (x,y,z) rotated by q, returned as [x,y,z].
 static int quat_rotate_vec(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Quaternion q = quat_from_instance(args[0], "Quat.rotateVec");
@@ -107,8 +105,7 @@ static Value quat_class() {
     return cls;
 }
 
-// ── Fabriques (module graphics) ─────────────────────────────────────────────
-// graphics.quat() : quaternion identité (aucune rotation).
+// graphics.quat(): the identity quaternion, no rotation.
 static int gfx_quat(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -122,15 +119,15 @@ static int gfx_quat_axis(CallCtx& ctx) {
     Vector3 axis = {(float)num_arg(args, argc, 0, "graphics.quatAxis"),
                     (float)num_arg(args, argc, 1, "graphics.quatAxis"),
                     (float)num_arg(args, argc, 2, "graphics.quatAxis")};
-    // Axe nul (0,0,0) : aucune rotation définie → identité. Explicite ici plutôt
-    // que de dépendre du comportement interne de raymath.
+    // A null axis (0,0,0) defines no rotation, so we return the identity explicitly rather than
+    // depend on raymath's internal behaviour.
     if (axis.x == 0.0f && axis.y == 0.0f && axis.z == 0.0f)
         return ctx.ret(make_quat_instance(QuaternionIdentity()));
     float rad = (float)num_arg(args, argc, 3, "graphics.quatAxis") * DEG2RAD;
     return ctx.ret(make_quat_instance(QuaternionFromAxisAngle(axis, rad)));
 }
 
-// graphics.quatEuler(pitch, yaw, roll) : depuis des angles d'Euler (en degrés).
+// graphics.quatEuler(pitch, yaw, roll): from Euler angles, in degrees.
 static int gfx_quat_euler(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     float pitch = (float)num_arg(args, argc, 0, "graphics.quatEuler") * DEG2RAD;

@@ -13,7 +13,6 @@
 #include <emscripten.h>
 #endif
 
-// ── teinte globale (graphics.tint / noTint) ─────────────────────────────────────
 static bool s_has_tint = false;
 static Color s_tint = WHITE;
 
@@ -30,7 +29,6 @@ void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char
     *a = s_tint.a;
 }
 
-// ── ancrage global des images (graphics.spriteMode) ─────────────────────────────
 static int s_sprite_mode = SPRITE_CORNER;
 
 void image_set_sprite_mode(int mode) {
@@ -41,9 +39,9 @@ int image_get_sprite_mode() {
     return s_sprite_mode;
 }
 
-// Rectangle de destination selon l'ancrage courant. Le décalage porte sur la
-// taille de DESTINATION (dw/dh déjà résolus) : centrer une image affichée en
-// 200x200 décale de 100, quelle que soit la taille de la source.
+// Destination rectangle for the current anchoring. The offset applies to the DESTINATION size
+// (dw/dh, already resolved): centring an image drawn at 200x200 shifts it by 100, whatever the
+// source size.
 static Rectangle sprite_dest(float x, float y, float dw, float dh) {
     if (s_sprite_mode == SPRITE_CENTER) {
         x -= dw * 0.5f;
@@ -52,7 +50,6 @@ static Rectangle sprite_dest(float x, float y, float dw, float dh) {
     return {x, y, dw, dh};
 }
 
-// ── storage ───────────────────────────────────────────────────────────────────
 
 struct TexHandle {
     int id = 0;
@@ -79,10 +76,9 @@ unsigned int image_gl_texid(int id) {
 // preloaded bytes: name → (bytes, ext with dot e.g. ".png")
 static std::unordered_map<std::string, std::pair<std::vector<uint8_t>, std::string>> s_preloaded;
 
-// ── base64 decode ─────────────────────────────────────────────────────────────
 
 static std::vector<uint8_t> b64decode(const std::string& s);
-// Wrapper public (déclaré dans image_module.h) — réutilisé pour d'autres ressources.
+// Public wrapper (declared in image_module.h), reused for other resources.
 std::vector<uint8_t> image_b64_decode(const std::string& b64) {
     return b64decode(b64);
 }
@@ -143,7 +139,6 @@ std::string image_b64_encode(const uint8_t* data, size_t len) {
     return out;
 }
 
-// ── WASM interop ──────────────────────────────────────────────────────────────
 
 void image_preload(const std::string& name, const std::vector<uint8_t>& bytes, const std::string& ext) {
     s_preloaded[name] = {bytes, ext};
@@ -170,7 +165,6 @@ void image_reset() {
     s_next_id = 1;
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
 
 static Value make_handle(int id, int w, int h, TexHandle* ptr) {
     static const Value K_ID(std::string("id")), K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
@@ -214,12 +208,13 @@ static void pixels_open(TexHandle& h) {
         if (!h.cpu.data)
             h.cpu = GenImageColor(h.rtt.texture.width, h.rtt.texture.height, BLANK);
     } else if (h.is_streaming) {
-        // Caméra : l'ombre CPU est maintenue à jour par image_push_pixels.
+        // Camera: the CPU shadow is kept up to date by image_push_pixels.
         if (!h.cpu.data)
             h.cpu = GenImageColor(h.tex.width, h.tex.height, BLANK);
     } else {
-        // Image chargée (image.load) : lire les vrais pixels depuis le GPU au lieu de
-        // générer du BLANK (sinon getPixel renvoie transparent et endPixels efface l'image).
+        // A loaded image (image.load): read the real pixels back from the GPU instead of
+        // generating BLANK, otherwise getPixel returns transparent and endPixels erases the
+        // image.
         if (!h.cpu.data) {
             Image fresh = LoadImageFromTexture(h.tex);
             if (!fresh.data)
@@ -249,16 +244,16 @@ static Texture2D load_from_memory(const std::vector<uint8_t>& bytes, const std::
     return tex;
 }
 
-// Extension (avec le point) déduite du chemin ; ".png" par défaut.
+// Extension, dot included, taken from the path; ".png" by default.
 static std::string ext_of(const std::string& path) {
     auto dot = path.find_last_of('.');
     return dot == std::string::npos ? std::string(".png") : path.substr(dot);
 }
 
 #ifdef __EMSCRIPTEN__
-// Récupère une ressource servie (même origine) de façon SYNCHRONE, pour garder
-// image.load() synchrone. XHR synchrone sur le thread principal n'autorise pas
-// responseType 'arraybuffer' → on lit responseText en binaire (x-user-defined).
+// Fetches a served, same-origin resource SYNCHRONOUSLY, to keep image.load() synchronous. A
+// synchronous XHR on the main thread does not allow responseType 'arraybuffer', so responseText is
+// read as binary through x-user-defined.
 static std::vector<uint8_t> fetch_bytes_sync(const std::string& url) {
     int len = 0;
     char* data = (char*)EM_ASM_INT(
@@ -292,7 +287,6 @@ static std::vector<uint8_t> fetch_bytes_sync(const std::string& url) {
 }
 #endif
 
-// ── image.load(path) ──────────────────────────────────────────────────────────
 
 static int img_load(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -306,8 +300,8 @@ static int img_load(CallCtx& ctx) {
         h.tex = load_from_memory(it->second.first, it->second.second);
     } else {
 #ifdef __EMSCRIPTEN__
-        // Pas d'upload : tenter de récupérer la ressource servie (même origine),
-        // relative à la page (ex. image.load("logo.png") → <base>/logo.png).
+        // Nothing was uploaded, so try to fetch the served, same-origin resource relative to the
+        // page — image.load("logo.png") reads <base>/logo.png.
         std::vector<uint8_t> bytes = fetch_bytes_sync(path);
         if (!bytes.empty())
             h.tex = load_from_memory(bytes, ext_of(path));
@@ -327,7 +321,6 @@ static int img_load(CallCtx& ctx) {
     return ctx.ret(make_handle(id, w, hh, ptr));
 }
 
-// ── image.loadData(format, base64) ──────────────────────────────────────────
 
 static int img_load_data(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -352,7 +345,6 @@ static int img_load_data(CallCtx& ctx) {
     return ctx.ret(make_handle(id, w, hh, ptr));
 }
 
-// ── image.create(w, h) ───────────────────────────────────────────────────────
 
 static int img_create(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -362,11 +354,11 @@ static int img_create(CallCtx& ctx) {
     TexHandle hnd;
     hnd.rtt = LoadRenderTexture(w, h);
     hnd.is_render = true;
-    // Ombre CPU PERSISTANTE (RGBA8) : source de vérité des pixels. Évite tout
-    // glReadPixels en cours de frame (LoadImageFromTexture) — qui casse le rendu
-    // WebGL/WASM (FBO courant perdu) — et accélère begin/setPixel/endPixels.
+    // A PERSISTENT CPU shadow (RGBA8), the source of truth for the pixels. It avoids any
+    // mid-frame glReadPixels through LoadImageFromTexture — which breaks WebGL/WASM rendering by
+    // losing the current FBO — and speeds up begin/setPixel/endPixels.
     hnd.cpu = GenImageColor(w, h, BLANK);
-    UpdateTexture(hnd.rtt.texture, hnd.cpu.data);   // texture initiale = transparente
+    UpdateTexture(hnd.rtt.texture, hnd.cpu.data);   // the initial texture is transparent
     int id = s_next_id++;
     hnd.id = id;
     auto uptr = std::make_unique<TexHandle>(std::move(hnd));
@@ -375,7 +367,6 @@ static int img_create(CallCtx& ctx) {
     return ctx.ret(make_handle(id, w, h, ptr));
 }
 
-// ── image.beginDraw(img) ────────────────────────────────────────────────────
 
 static int img_begin(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -391,7 +382,6 @@ static int img_begin(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.endDraw() ─────────────────────────────────────────────────────────
 
 static int img_end(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -401,7 +391,6 @@ static int img_end(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.draw(img, x, y [, w, h [, tint]]) ──────────────────────────────────
 
 static int img_draw(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -427,7 +416,6 @@ static int img_draw(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.unload(img) ────────────────────────────────────────────────────────
 
 static int img_unload(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -450,7 +438,6 @@ static int img_unload(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.beginPixels(img) ──────────────────────────────────────────────────
 
 static int img_begin_pixels(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -461,7 +448,6 @@ static int img_begin_pixels(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.endPixels(img) ────────────────────────────────────────────────────
 
 static int img_end_pixels(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -472,7 +458,6 @@ static int img_end_pixels(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.getPixel(img, x, y) ───────────────────────────────────────────────
 
 // Renvoie 4 valeurs (r, g, b, a) dans [0,1] : `var r, g, b, a = image.getPixel(img, x, y)`.
 // Multi-retour direct dans les registres (aucune allocation de map par pixel) → chemin
@@ -502,7 +487,6 @@ static int img_get_pixel(CallCtx& ctx) {
     return 4;
 }
 
-// ── image.setPixel(img, x, y, color | r, g, b, a) ───────────────────────────
 
 static int img_set_pixel(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
@@ -530,11 +514,10 @@ static int img_set_pixel(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image.mapPixel(img, f) ──────────────────────────────────────────────────
 
-// Applique f(x, y, r, g, b, a) → r, g, b, a à chaque pixel (x,y entiers 0-based ;
-// canaux [0,1]). beginPixels/endPixels sont gérés en interne. Les valeurs de retour
-// manquantes ou non numériques laissent le canal d'origine inchangé.
+// Applies f(x, y, r, g, b, a) -> r, g, b, a to every pixel, with x and y 0-based integers and the
+// channels in [0,1]. beginPixels and endPixels are handled internally. A missing or non-numeric
+// return value leaves the original channel untouched.
 static int img_map_pixel(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.mapPixel";
@@ -551,7 +534,7 @@ static int img_map_pixel(CallCtx& ctx) {
     try {
         for (int y = 0; y < hgt; ++y) {
             for (int x = 0; x < w; ++x) {
-                // lecture depuis l'ombre CPU courante (le callback a pu la muter au tour précédent)
+                // read from the current CPU shadow: the callback may have mutated it last turn
                 Color c;
                 if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 && x < h.cpu.width && y < h.cpu.height) {
                     const uint8_t* px = (const uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
@@ -568,7 +551,7 @@ static int img_map_pixel(CallCtx& ctx) {
                     if (out[i].is_number())
                         ch[i] = (uint8_t)(out[i].as_num() * 255.0 + 0.5);
                 Color nc = {ch[0], ch[1], ch[2], ch[3]};
-                // écriture recalculée : le callback a pu réallouer/redimensionner h.cpu
+                // recompute the write target: the callback may have reallocated or resized h.cpu
                 if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8 && x < h.cpu.width && y < h.cpu.height) {
                     uint8_t* px = (uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
                     px[0] = nc.r; px[1] = nc.g; px[2] = nc.b; px[3] = nc.a;
@@ -585,7 +568,6 @@ static int img_map_pixel(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── image_draw_sprite ─────────────────────────────────────────────────────────
 
 void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned char cr, unsigned char cg,
                        unsigned char cb, unsigned char ca) {
@@ -608,7 +590,6 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
     DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
 }
 
-// ── streaming texture (camera module) ────────────────────────────────────────
 
 Value image_alloc_tex(int w, int h, int* id_out) {
     Image blank = GenImageColor(w, h, BLANK);
@@ -656,7 +637,6 @@ void image_free_tex(int id) {
     s_images.erase(it);
 }
 
-// ── makeImageModule ───────────────────────────────────────────────────────────
 
 Value make_image_module() {
     Value m = Value::make_map();
