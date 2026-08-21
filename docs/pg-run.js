@@ -1,16 +1,14 @@
-// Logique d'exécution PARTAGÉE entre le Run inline (playground.html) et le mode
-// autonome (run.html). But : une seule source de vérité pour le préchargement
-// du projet dans le runtime WASM et pour la gestion des erreurs — top-level
-// (ex. image.load qui échoue) ET frame graphique (update/draw) — afin que les
-// deux modes se comportent à l'identique et ne divergent plus.
+// Execution logic SHARED by the inline Run (the playground) and the standalone mode (run.html).
+// One source of truth for preloading the project into the WASM runtime and for handling errors —
+// top-level ones (a failing image.load) AS WELL AS graphics frame ones (update/draw) — so that
+// the two modes behave identically and cannot drift apart.
 
 export const MANIFEST = 'ollin.project.json'
 
-// ── Persistance du module `data` (localStorage) ─────────────────────────────
-// Portées : 0 = projet (clé = window.__ollinDataProject, posé par la vue avant le
-// run), 1 = partagée (« data.shared »). Le moteur (C++) appelle
-// window.__ollinData.save(scope, blob) à CHAQUE écriture ; on (re)charge les deux
-// blobs avant chaque execute via mod.dataLoad(...).
+// Persistence of the `data` module, in localStorage. Scopes: 0 is the project (its key being
+// window.__ollinDataProject, set by the view before the run), 1 is shared ("data.shared"). The
+// engine (C++) calls window.__ollinData.save(scope, blob) on EVERY write; we load both blobs
+// again before each execute, through mod.dataLoad(...).
 const DATA_PREFIX = 'ollin-data:'
 function dataKey(scope) {
   if (scope === 1) return DATA_PREFIX + 'shared'
@@ -21,7 +19,7 @@ if (typeof window !== 'undefined' && !window.__ollinData) {
     save(scope, blob) { try { localStorage.setItem(dataKey(scope), blob) } catch (_) {} },
   }
 }
-// Charge les données persistées dans le runtime avant un run (no-op si dataLoad absent).
+// Loads the persisted data into the runtime before a run (a no-op if dataLoad is missing).
 export function loadDataInto(m) {
   if (!m || typeof m.dataLoad !== 'function') return
   let p = '', g = ''
@@ -30,14 +28,14 @@ export function loadDataInto(m) {
   m.dataLoad(p, g)
 }
 
-// Pousse fichiers (.ol) + ressources (images) d'un projet dans le runtime,
-// avant exécution. `m` = module WASM Ollin, `project` = { files, resources }.
+// Pushes a project's files (.ol) and resources (images) into the runtime, before execution.
+// `m` is the Ollin WASM module, `project` is { files, resources }.
 export function loadProjectIntoRuntime(m, project) {
   if (!m) return
   try {
-    // Toujours repartir d'une table de sources PROPRE — y compris en mode exemple
-    // (project null) : sinon, dans l'instance WASM partagée, les sources d'un
-    // projet précédemment exécuté resteraient importables (imports périmés).
+    // Always start from a CLEAN source table, sample mode (a null project) included:
+    // otherwise, in the shared WASM instance, the sources of a previously run project would
+    // stay importable, and the imports would be stale.
     if (m.resetSources) m.resetSources()
     if (!project) return
     for (const path in (project.files || {})) {
@@ -47,49 +45,49 @@ export function loadProjectIntoRuntime(m, project) {
     const res = project.resources || {}
     for (const name in res) {
       const ext = (res[name].ext || '').toLowerCase()
-      // Modèles 3D (OBJ/GLTF/GLB) → preloadModel ; sinon image.
+      // 3D models (OBJ, GLTF, GLB) go to preloadModel; anything else is an image.
       if ((ext === 'obj' || ext === 'gltf' || ext === 'glb') && m.preloadModel) {
         m.preloadModel(name, res[name].b64, ext)
       } else if (m.preloadImage) {
         m.preloadImage(name, res[name].b64, ext)
       }
     }
-  } catch (_) { /* préchargement best-effort */ }
+  } catch (_) { /* best-effort preloading */ }
 }
 
-// Exécute `code` et route le résultat via des hooks fournis par l'appelant :
-//   hooks.onError(msg)    erreur (top-level OU frame graphique), chaîne « error: … »
-//   hooks.onRunning()     le programme a ouvert un canvas (boucle graphique lancée)
-//   hooks.onOutput(text)  sortie texte d'un programme non graphique
-//   hooks.filename        (optionnel) nom du fichier source affiché dans les erreurs
+// Runs `code` and routes the result through hooks supplied by the caller:
+//   hooks.onError(msg)    an error (top-level OR graphics frame), as an "error: …" string
+//   hooks.onRunning()     the program has opened a canvas (the graphics loop has started)
+//   hooks.onOutput(text)  the text output of a non-graphics program
+//   hooks.filename        optional: the source file name shown in the errors
 export function runProgram(m, code, canvasEl, hooks) {
-  // Erreur dans une frame (update/draw) : le runtime WASM (emscripten_frame) a
-  // déjà arrêté la boucle et nous remonte le message ici.
+  // An error inside a frame (update/draw): the WASM runtime (emscripten_frame) has already
+  // stopped the loop and passes the message up to here.
   window.__ollinFrameError = (msg) => hooks.onError('error: ' + (msg || "erreur d'exécution"))
-  loadDataInto(m)   // restaure les données persistées (module `data`) avant le run
+  loadDataInto(m)   // restores the persisted data (the `data` module) before the run
   let out
   try {
     out = m.execute(code, hooks.filename || '')
   } catch (e) {
-    // Trap dur SYNCHRONE (relance in-place iOS) : rattrapé ici → surface l'overlay
-    // de diagnostic AVEC la stack (nom de la fonction fautive), que le message
-    // texte seul perdrait. N'ouvre l'overlay que pour une faute dure.
+    // A SYNCHRONOUS hard trap (an in-place restart on iOS) is caught here, which raises the
+    // diagnostic overlay WITH the stack — the name of the faulting function — that the text
+    // message alone would lose. The overlay only opens for a hard fault.
     try { window.__ollinCrash && window.__ollinCrash.captureError('execute (relance)', e) } catch (_) {}
     hooks.onError('error: ' + (e && e.message ? e.message : e))
     return
   }
-  // Une erreur du haut-niveau peut survenir APRÈS l'ouverture du canvas (ex.
-  // image.load juste après graphics.canvas) : la traiter avant la branche
-  // « canvas visible », sinon l'écran resterait muet.
+  // A top-level error can arise AFTER the canvas is open (an image.load right after
+  // graphics.canvas, say), so it is handled before the "canvas visible" branch; otherwise the
+  // screen would stay mute.
   if (typeof out === 'string' && out.startsWith('error:')) {
     hooks.onError(out)
     return
   }
   if (canvasEl && canvasEl.style.display === 'block') {
-    // Un canvas s'est ouvert → GLFW (glue Emscripten) a posé son écouteur keydown
-    // GLOBAL (window) qui mange Backspace/Tab. Il n'est jamais retiré ensuite (runtime
-    // partagé). On le signale au niveau PAGE pour que la parade clavier de l'éditeur
-    // (playground) reste armée même si le run a eu lieu dans la vue #/run.
+    // A canvas has opened, so GLFW (the Emscripten glue) has installed its GLOBAL keydown
+    // listener on window, which eats Backspace and Tab. It is never removed afterwards, the
+    // runtime being shared. We flag it at PAGE level so that the editor's keyboard counter-
+    // measure (in the playground) stays armed even when the run happened in the #/run view.
     window.__ollinGfxKbdArmed = true
     hooks.onRunning()
   } else {
@@ -97,7 +95,7 @@ export function runProgram(m, code, canvasEl, hooks) {
   }
 }
 
-// Octets → base64 (par blocs pour ne pas dépasser la pile d'arguments).
+// Bytes to base64, in chunks so as not to overflow the argument stack.
 function bytesToB64(bytes) {
   let bin = ''
   const CHUNK = 0x8000
@@ -107,9 +105,9 @@ function bytesToB64(bytes) {
   return btoa(bin)
 }
 
-// Mode EXEMPLE : précharge les modèles 3D référencés par graphics.model("x.obj")
-// en les récupérant depuis samples/ (les projets utilisateur, eux, passent par
-// leurs ressources). Best-effort : un modèle introuvable est simplement ignoré.
+// SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj"), fetching them from
+// samples/ (user projects go through their own resources instead). Best-effort: a model that
+// cannot be found is simply ignored.
 export async function preloadSampleModels(m, code, v) {
   if (!m || !m.preloadModel || typeof code !== 'string') return
   const seen = new Set()
@@ -125,22 +123,22 @@ export async function preloadSampleModels(m, code, v) {
   }
 }
 
-// Cache de sources .ol importées (chemin résolu → texte) pour la session : évite
-// de re-télécharger à chaque relance (page reload = module frais = cache vidé).
+// Session cache of imported .ol sources (resolved path to text), which avoids downloading them
+// again on every restart (a page reload means a fresh module, hence an empty cache).
 const _importSrcCache = new Map()
 
-// Mode EXEMPLE : précharge les fichiers .ol IMPORTÉS (import "x.ol") depuis samples/
-// dans le registre de sources du runtime, pour que `import` se résolve quand on lance
-// un exemple direct (les projets utilisateur préchargent déjà tous leurs fichiers).
-// Suit les imports en chaîne (BFS) en RÉSOLVANT chaque chemin comme le parseur
-// (relatif au dossier du fichier importateur) → clé de registre cohérente, y compris
-// en sous-dossier. Renvoie la CONCATÉNATION des sources importées (pour que
-// l'appelant y précharge aussi les modèles/assets référencés). Best-effort.
+// SAMPLE mode: preloads the IMPORTED .ol files (import "x.ol") from samples/ into the runtime's
+// source registry, so that `import` resolves when a sample is run directly (user projects
+// already preload all of their files). It follows chained imports breadth-first, RESOLVING each
+// path as the parser does — relative to the importing file's directory — which keeps the
+// registry keys consistent, sub-directories included. It returns the CONCATENATION of the
+// imported sources, so that the caller can preload the models and assets they reference too.
+// Best-effort.
 export async function preloadSampleImports(m, code, v) {
   if (!m || !m.preloadSource || typeof code !== 'string') return ''
   const seen = new Set()
   const collected = []
-  let queue = findImports(code).map((imp) => resolveImport('', imp))   // entrée : base_dir vide
+  let queue = findImports(code).map((imp) => resolveImport('', imp))   // the entry file: an empty base_dir
   while (queue.length) {
     const key = queue.shift()
     if (seen.has(key)) continue
@@ -154,7 +152,7 @@ export async function preloadSampleImports(m, code, v) {
         _importSrcCache.set(key, src)
       } catch (_) { continue }
     }
-    m.preloadSource(key, src)          // clé = chemin résolu (= ce que source_get() cherche)
+    m.preloadSource(key, src)          // the key is the resolved path, what source_get() looks for
     collected.push(src)
     const pdir = dirOf(key)
     for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
@@ -162,8 +160,8 @@ export async function preloadSampleImports(m, code, v) {
   return collected.join('\n')
 }
 
-// Helpers de résolution d'imports, PARTAGÉS (préchargement runtime ET collecte de
-// projet-exemple) → une seule règle, identique au parseur.
+// Import-resolution helpers, SHARED by the runtime preloading and the sample-project
+// collection, so there is a single rule, identical to the parser's.
 function findImports(src) {
   const re = /(?:^|\n)\s*import\s+["']([^"']+)["']/g
   const out = []
@@ -176,15 +174,14 @@ function findImports(src) {
   return out
 }
 const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
-// Résolution identique au parseur : base_dir + chemin (concat naïve), sauf chemin absolu.
+// Resolution identical to the parser's: base_dir plus the path (a naive concatenation), unless the path is absolute.
 const resolveImport = (parentDir, imp) => (imp[0] === '/' ? imp : parentDir + imp)
 
-// Ressources référencées par du code Ollin → noms de fichiers portant une des
-// extensions données. On collecte TOUTE chaîne littérale qui ressemble à un fichier,
-// sans exiger qu'elle soit l'argument direct de model()/image.load() : un nom peut
-// vivre dans une table de données ou une variable (cf. docs/samples/model_3d.ol).
-// Le préchargement est best-effort — une chaîne qui n'est pas une ressource donne un
-// 404 ignoré, alors qu'une ressource manquée fait échouer le programme.
+// The resources referenced by Ollin code: file names carrying one of the given extensions. We
+// collect EVERY string literal that looks like a file, without requiring it to be the direct
+// argument of model() or image.load(): a name may live in a data table or a variable (see
+// docs/samples/model_3d.ol). The preloading is best-effort — a string that is not a resource
+// gives a 404, which is ignored, whereas a missed resource makes the program fail.
 function findAssets(code, exts) {
   const re = new RegExp(`["']([^"'\\s]+\\.(?:${exts}))["']`, 'gi')
   const out = []
@@ -194,14 +191,14 @@ function findAssets(code, exts) {
 }
 
 const findModels = (code) => findAssets(code, 'obj|glb|gltf')
-// image.loadData (base64 embarqué) n'a pas d'asset à collecter → non concerné.
+// image.loadData (embedded base64) has no asset to collect, and so is not concerned.
 const findImages = (code) => findAssets(code, 'png|jpg|jpeg|gif|webp|bmp')
 
-// Construit un PROJET complet à partir d'un exemple du dépôt : le fichier d'entrée,
-// tous ses imports .ol transitifs (→ files), et les modèles 3D référencés (→ resources
-// binaires base64). Sert à ouvrir un exemple comme un vrai projet multi-fichiers et à
-// le forker fidèlement. Rejette si le fichier d'entrée est introuvable ; les imports/
-// assets manquants sont ignorés (best-effort). Renvoie { files, resources, entry }.
+// Builds a complete PROJECT from a sample of the repository: the entry file, all its transitive
+// .ol imports (as files) and the 3D models it references (as base64 binary resources). It serves
+// to open a sample as a real multi-file project and to fork it faithfully. It rejects if the
+// entry file cannot be found; missing imports and assets are ignored (best-effort). It returns
+// { files, resources, entry }.
 export async function collectSampleProject(entryFile, v) {
   const files = {}
   const resources = {}
@@ -227,8 +224,8 @@ export async function collectSampleProject(entryFile, v) {
     const pdir = dirOf(key)
     for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
   }
-  // Assets binaires référencés : modèles 3D (model("x.obj")) ET images externes
-  // (image.load("x.png")) → ressources base64 du projet.
+  // The binary assets referenced — 3D models (model("x.obj")) AND external images
+  // (image.load("x.png")) — become base64 resources of the project.
   const allCode = Object.values(files).join('\n')
   const seenAsset = new Set()
   for (const name of [...findModels(allCode), ...findImages(allCode)]) {
@@ -239,18 +236,18 @@ export async function collectSampleProject(entryFile, v) {
       if (!r.ok) continue
       const bytes = new Uint8Array(await r.arrayBuffer())
       resources[name] = { b64: bytesToB64(bytes), ext: name.split('.').pop().toLowerCase() }
-    } catch (_) { /* asset manquant → ignoré */ }
+    } catch (_) { /* a missing asset is ignored */ }
   }
   return { files, resources, entry: entryFile }
 }
 
-// Rechargement « dur », PARTAGÉ par toutes les pages : vide le Cache API (Service
-// Worker) puis recharge via une URL cache-bustée, ce qui contourne aussi le cache
-// HTTP de la page elle-même (un simple location.reload() peut resservir l'ancienne
-// page). Garantit qu'on récupère bien le dernier code déployé.
+// A "hard" reload, SHARED by every page: it empties the Cache API (the service worker) then
+// reloads through a cache-busted URL, which also bypasses the page's own HTTP cache — a plain
+// location.reload() may serve the old page again. It guarantees that the latest deployed code is
+// what comes back.
 export function hardReload() {
-  // Conserver le fragment (#/vue/…) : sinon un rechargement dur perd la route
-  // courante (ex. un exemple #/playground/sample/…) et retombe sur la vue défaut.
+  // Keep the fragment (#/view/…): otherwise a hard reload loses the current route (a sample at
+  // #/playground/sample/…, say) and falls back to the default view.
   const go = () => location.replace(location.pathname + '?t=' + Date.now() + location.hash)
   if ('caches' in window) {
     caches.keys().then(ks => Promise.all(ks.map(k => caches.delete(k)))).then(go).catch(go)
@@ -259,23 +256,23 @@ export function hardReload() {
   }
 }
 
-// Ajoute un cache-buster unique à une URL → force une version fraîche.
+// Adds a unique cache-buster to a URL, forcing a fresh version.
 export function freshUrl(url) {
-  // Insère le cache-buster AVANT le fragment (#ancre) pour ne pas le perdre.
+  // The cache-buster goes BEFORE the fragment (#anchor), so the fragment is not lost.
   const h = url.indexOf('#')
   const base = h >= 0 ? url.slice(0, h) : url
   const frag = h >= 0 ? url.slice(h) : ''
   return base + (base.includes('?') ? '&' : '?') + 't=' + Date.now() + frag
 }
 
-// ── Exemples lus direct depuis le dépôt (route #/<vue>/sample/<fichier>) ─────
-// Source unique du schéma de route + du fetch (utilisé par playground.js ET run.js).
+// Samples read straight from the repository (the #/<view>/sample/<file> route). Single source of
+// the route scheme and of the fetch, used by playground.js AND run.js.
 export function sampleFromAnchor(anchor) {
   return (anchor || '').startsWith('sample/') ? anchor.slice('sample/'.length) : null
 }
 
-// Récupère le code d'un exemple (frais : cache-buster + no-cache). Rejette si le
-// serveur ne renvoie pas 200 → évite d'exécuter/afficher un corps 404 (HTML).
+// Fetches a sample's code, fresh (cache-buster plus no-cache). It rejects unless the server
+// answers 200, which avoids running or displaying the body of a 404 (an HTML page).
 export async function fetchSample(file, v) {
   const r = await fetch('samples/' + file + '?v=' + v, { cache: 'no-cache' })
   if (!r.ok) throw new Error('exemple introuvable : ' + file)

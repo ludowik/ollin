@@ -1,45 +1,41 @@
-// Routeur de la web app monopage (SPA) Ollin.
+// Router of the Ollin single-page web app.
 //
-// Une seule page (index.html = shell) héberge plusieurs VUES montées à la
-// demande dans #view. Chaque vue = un fragment HTML (views/<nom>.html) + un
-// module d'init (views/<nom>.js exportant init(ctx) → cleanup()).
+// One page (index.html, the shell) hosts several VIEWS, mounted on demand in #view. Each view is
+// an HTML fragment (views/<name>.html) plus an init module (views/<name>.js, exporting
+// init(ctx) → cleanup()).
 //
-// Routage par hash :
-//   #/<vue>[/<ancre>]  → change de vue (ex. #/tutoriel, #/tutoriel/for)
-//   #<ancre> (sans /)  → ancre interne de la vue courante (défilement natif)
-//   (vide)             → dernière vue visitée, sinon vue par défaut (tutoriel)
-// Le préfixe « #/ » distingue une route d'une simple ancre : les liens de
-// section du tutoriel (href="#intro") restent de simples ancres et ne
-// déclenchent pas de changement de vue.
+// Hash routing:
+//   #/<view>[/<anchor>]  changes view (#/tutoriel, #/tutoriel/for)
+//   #<anchor> (with no /) is an internal anchor of the current view (native scrolling)
+//   (empty)              is the last visited view, otherwise the default one (the tutorial)
+// The "#/" prefix is what tells a route from a plain anchor: the tutorial's section links
+// (href="#intro") stay plain anchors and do not trigger a change of view.
 //
-// Le runtime WASM est chargé UNE SEULE FOIS (getOllin) et partagé par toutes
-// les vues, de même que le <canvas> (déplacé dans la vue active, puis rendu au
-// shell au démontage).
+// The WASM runtime is loaded ONCE (getOllin) and shared by every view, as is the <canvas>, which
+// is moved into the active view and given back to the shell on unmount.
 
-// Jeton de version UNIQUE pour ce chargement de page : sert de cache-buster à
-// TOUS les imports/fetch (routeur + vues + modules partagés via ctx.v). Un même
-// chargement réutilise donc la même URL de module (pas de copie neuve à chaque
-// navigation → pas de croissance non bornée du registre de modules), tandis
-// qu'un rechargement (ou hardReload) repart avec un jeton frais → dernière
-// version déployée. (Avant : Date.now() à chaque import → fuite par navigation.)
+// A UNIQUE version token for this page load, used as a cache-buster for ALL imports and fetches
+// (the router, the views, and the shared modules through ctx.v). One load therefore reuses the
+// same module URL — no fresh copy per navigation, hence no unbounded growth of the module
+// registry — while a reload (or a hardReload) starts again with a fresh token, hence the latest
+// deployed version. Before that, a Date.now() on every import leaked one copy per navigation.
 const V = Date.now()
 
-// Feuille commune des barres de menu. Injectée ICI et non déclarée dans index.html :
-// index.html peut être servi depuis le cache du navigateur, et une version antérieure à
-// l'ajout du fichier ne le référencerait pas — alors que les vues, elles, sont toujours
-// chargées fraîches et n'ont plus de styles de barre en propre. Les barres seraient alors
-// sans style du tout (constaté). app.js, lui, est importé avec un jeton de version, donc
-// toujours frais : la feuille suit.
+// The common stylesheet of the menu bars. Injected HERE rather than declared in index.html:
+// index.html may be served from the browser's cache, and a version predating the file would not
+// reference it — whereas the views are always loaded fresh and no longer carry bar styles of
+// their own. The bars would then have no style at all (observed). app.js, on the other hand, is
+// imported with a version token, hence always fresh, and the stylesheet follows.
 document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
 
 const { hardReload } = await import('./pg-run.js?v=' + V)
 
-// Capture de crash à l'écran (diagnostic device — iOS plein écran sans console).
-// Installé AVANT tout chargement WASM pour attraper aussi les fautes dures.
+// On-screen crash capture, for diagnosing a device (iOS in full screen, with no console).
+// Installed BEFORE any WASM load, so that hard faults are caught too.
 const { installCrashOverlay, wireModule } = await import('./pg-crashlog.js?v=' + V)
 installCrashOverlay()
 
-// ── Runtime WASM partagé (une instance pour toute la SPA) ───────────────────
+// The shared WASM runtime: one instance for the whole app.
 let ollinPromise = null
 function getOllin() {
   if (ollinPromise) return ollinPromise
@@ -61,10 +57,9 @@ function getOllin() {
   return ollinPromise
 }
 
-// ── Table des vues ──────────────────────────────────────────────────────────
-// anchorIsSection: l'ancre est un id de section à faire défiler (pas de
-// re-montage). Sinon l'ancre est un paramètre de vue (ex. sample/<fichier>) →
-// re-montage quand il change.
+// Table of views. anchorIsSection means the anchor is a section id to scroll to, with no
+// remount. Otherwise the anchor is a view parameter (sample/<file>, say), and the view is
+// remounted when it changes.
 const ROUTES = {
   tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
@@ -72,17 +67,17 @@ const ROUTES = {
   perf:       { html: 'views/perf.html',       js: './views/perf.js' },
 }
 const DEFAULT_VIEW = 'tutoriel'
-// Dernière ROUTE complète visitée (vue + sous-chemin : ancre tutoriel, sample…),
-// mémorisée pour la rouvrir au prochain lancement. On stocke la route entière
-// (pas juste la vue) → on retrouve l'exemple/l'ancre exacts. `run` est EXCLU
-// (transitoire, exige un projet actif) : on conserve la dernière route
-// tutoriel/playground pour ne pas rouvrir sur « aucun projet ».
+// The last complete ROUTE visited (the view plus its sub-path: a tutorial anchor, a sample…),
+// remembered so as to reopen it on the next launch. The whole route is stored, not just the
+// view, so the exact sample or anchor comes back. `run` is EXCLUDED, being transient and
+// requiring an active project: we keep the last tutorial or playground route, so as not to
+// reopen on "no project".
 const LAST_HASH_KEY = 'ollin-last-route'
 
-// Viewport par vue. Le playground et le mode run bloquent le zoom (maximum-scale)
-// pour éviter le zoom automatique d'iOS quand l'éditeur (police < 16px) prend le
-// focus — comportement de l'ancienne page autonome, perdu au passage en SPA (un
-// seul viewport partagé). Le tutoriel reste zoomable (lecture confortable).
+// A viewport per view. The playground and the run mode lock the zoom (maximum-scale) to avoid
+// iOS's automatic zoom when the editor — whose font is under 16px — takes focus. That was the
+// behaviour of the former standalone page, lost when moving to a single page with one shared
+// viewport. The tutorial stays zoomable, for comfortable reading.
 const VIEWPORT = {
   tutoriel:   'width=device-width, initial-scale=1.0',
   playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
@@ -100,23 +95,23 @@ const canvasHome = document.getElementById('canvas-home')
 let currentView    = null
 let currentCleanup = null
 let currentAnchor  = ''    // sous-chemin de la vue courante (ancre tutoriel, ou ex/<fichier>)
-let navSeq         = 0     // garde de ré-entrance : identifie la navigation courante
+let navSeq         = 0     // re-entrance guard: identifies the current navigation
 
 function parseHash() {
   const h = location.hash
   if (h.startsWith('#/')) {
     const parts = h.slice(2).split('/')
-    // anchor = tout ce qui suit la vue : ancre de section (tutoriel) OU sous-route
-    // paramétrée de la vue (ex. « ex/game_of_life.ol » pour le playground/run).
+    // anchor is everything after the view: a section anchor (the tutorial) OR a parameterised
+    // sub-route of the view ("ex/game_of_life.ol", for the playground or the run mode).
     return { view: parts[0] || DEFAULT_VIEW, anchor: parts.slice(1).join('/') }
   }
-  // Ancre nue (#intro) ou vide → vue courante/défaut, défilement sur l'ancre.
+  // A bare anchor (#intro), or none: the current or default view, scrolled to the anchor.
   return { view: currentView || DEFAULT_VIEW, anchor: h.startsWith('#') ? h.slice(1) : '' }
 }
 
-// Range le <canvas> partagé dans le shell (masqué) et REMET SES STYLES À PLAT :
-// une vue peut poser des styles inline (le tutoriel : margin/borderRadius/…) ;
-// sans reset ils fuiraient sur la vue suivante (canvas décentré, etc.).
+// Puts the shared <canvas> back in the shell (hidden) and FLATTENS ITS STYLES: a view may set
+// inline styles (the tutorial sets margin, borderRadius…), and without the reset they would leak
+// into the next view, leaving the canvas off-centre.
 function stowCanvas() {
   const canvas = document.getElementById('canvas')
   if (canvas && canvas.parentNode !== canvasHome) {
@@ -135,11 +130,11 @@ async function teardownCurrent() {
 
 async function mount(view, anchor) {
   const route = ROUTES[view] || ROUTES[DEFAULT_VIEW]
-  const seq = ++navSeq                 // toute navigation ultérieure invalide celle-ci
+  const seq = ++navSeq                 // any later navigation invalidates this one
   const stale = () => seq !== navSeq
 
   await teardownCurrent()
-  applyViewport(view)   // AVANT le montage → en place quand l'éditeur prend le focus
+  applyViewport(view)   // BEFORE the mount, so it is in place when the editor takes focus
 
   try {
     const res  = await fetch(route.html + '?v=' + V)
@@ -156,8 +151,8 @@ async function mount(view, anchor) {
     const ctx = { root: viewEl, getOllin, hardReload, navigate, v: V, anchor }
     const cleanup = (await mod.init(ctx)) || null
     if (stale()) {
-      // Une navigation plus récente a pris la main pendant l'init → nettoyer
-      // immédiatement cette vue périmée (sinon ses écouteurs globaux fuient).
+      // A more recent navigation took over during the init, so this stale view is cleaned up at
+      // once; otherwise its global listeners leak.
       if (cleanup) {
         try { cleanup() } catch (_) {}
       }
@@ -196,7 +191,7 @@ function scrollToAnchor(id) {
   }
 }
 
-// Navigation programmatique (utilisable par les vues via ctx.navigate).
+// Programmatic navigation, available to the views through ctx.navigate.
 function navigate(view, anchor) {
   location.hash = '#/' + view + (anchor ? '/' + anchor : '')
 }
@@ -204,15 +199,15 @@ function navigate(view, anchor) {
 async function route() {
   const { view, anchor } = parseHash()
   if (view === currentView && ROUTES[view]) {
-    // Ancre = section (tutoriel) → défilement sans re-montage.
+    // The anchor is a section (the tutorial): scroll, with no remount.
     if (ROUTES[view].anchorIsSection) {
       if (anchor) {
         scrollToAnchor(anchor)
       }
       return
     }
-    // Ancre = paramètre de vue (ex. sample/<fichier>) : même valeur → déjà monté ;
-    // changée (autre exemple) → re-monter.
+    // The anchor is a view parameter (sample/<file>): the same value is already mounted, a
+    // changed one (another sample) means a remount.
     if (anchor === currentAnchor) {
       return
     }
@@ -222,10 +217,9 @@ async function route() {
 
 addEventListener('hashchange', route)
 
-// L'app est-elle lancée en mode « installé » (ajout à l'écran d'accueil iOS, ou
-// display-mode standalone) ? Dans ce cas l'OS relance TOUJOURS l'URL figée au
-// moment de l'installation (souvent #/playground), et NON la dernière position —
-// il faut donc restaurer explicitement la dernière route mémorisée.
+// Is the app running "installed" (added to the iOS home screen, or in standalone display mode)?
+// In that case the OS ALWAYS relaunches the URL frozen at installation time (often #/playground)
+// and NOT the last position, so the last remembered route has to be restored explicitly.
 function isStandaloneApp() {
   try {
     return window.navigator.standalone === true ||
@@ -235,41 +229,40 @@ function isStandaloneApp() {
   }
 }
 
-// Démarrage : rouvrir la DERNIÈRE route visitée (mémorisée à chaque montage, hors
-// `run`). On la restaure quand :
-//   • l'onglet est rouvert « nu » (aucune route explicite), OU
-//   • l'app est installée (URL de lancement figée, pas la dernière position).
-// Sinon — onglet navigateur avec une route explicite (lien profond, marque-page)
-// — cette route a priorité. Défaut (aucune route mémorisée) = tutoriel.
+// Startup: reopen the LAST route visited (remembered on every mount, `run` excepted). It is
+// restored when the tab is reopened "bare", with no explicit route, OR when the app is installed
+// (a frozen launch URL rather than the last position). Otherwise — a browser tab with an
+// explicit route, a deep link, a bookmark — that route wins. With no remembered route the
+// default is the tutorial.
 function boot() {
   let last = null
   try {
     last = localStorage.getItem(LAST_HASH_KEY)
   } catch (_) {}
-  // Ne JAMAIS écraser une navigation EXPLICITE vers #/run : le bouton « Plein
-  // écran » ouvre index.html#/run dans un nouveau contexte ; en mode installé, la
-  // restauration ci-dessous le remplacerait par la dernière route (qui n'inclut
-  // jamais `run`) → le plein écran ne se lancerait plus.
+  // NEVER override an EXPLICIT navigation to #/run: the "Full screen" button opens
+  // index.html#/run in a new context, and in installed mode the restoration below would replace
+  // it with the last route (which never includes `run`), so full screen would no longer start.
   const explicitRun = location.hash.startsWith('#/run')
   if (!explicitRun && last && (isStandaloneApp() || !location.hash) && location.hash !== last) {
-    location.hash = last   // déclenche hashchange → route()
+    location.hash = last   // triggers hashchange, hence route()
     return
   }
   route()
 }
 boot()
 
-// ── État du déploiement GitHub Pages (une vérif, non bloquante) ──────────────
-// V = Date.now() → un chargement récupère TOUJOURS le dernier déploiement RÉUSSI.
-// Il suffit donc de regarder le STATUT du dernier déploiement github-pages :
-//   in_progress/queued/pending → une nouvelle version arrive (proposer de recharger)
-//   failure/error              → le dernier déploiement a échoué (on voit la version d'avant)
-//   success (ou API injoignable / rate-limit) → silencieux (on est à jour).
-// Repo public, CORS ouvert sur api.github.com. Best-effort :
-//  - token GitHub (auteur, via pg-github) utilisé s'il est présent → 5000 req/h au lieu de 60 ;
-//  - résultat TERMINAL mis en cache 2 min (sessionStorage) → évite de re-taper l'API à
-//    chaque rechargement (utile derrière un NAT partagé). L'état transitoire (déploiement
-//    en cours) n'est PAS mis en cache → « Recharger » revoit toujours l'état frais.
+// State of the GitHub Pages deployment: one check, non-blocking. Since V = Date.now(), a load
+// ALWAYS fetches the last SUCCESSFUL deployment, so it is enough to look at the STATUS of the
+// last github-pages deployment:
+//   in_progress, queued, pending  a new version is on its way (offer to reload)
+//   failure, error                the last deployment failed (we are seeing the previous version)
+//   success (or an unreachable, rate-limited API)  stay silent, we are up to date.
+// The repository is public and api.github.com allows CORS. Best-effort:
+//  - the GitHub token (the author's, through pg-github) is used when present, which raises the
+//    limit from 60 to 5000 requests an hour;
+//  - a TERMINAL result is cached for two minutes (sessionStorage), which avoids hitting the API
+//    on every reload (useful behind a shared NAT). The transient state, a deployment under way,
+//    is NOT cached, so "Reload" always sees fresh state.
 const DEPLOY_REPO = 'ludowik/ollin'
 const DEPLOY_CACHE_KEY = 'ollin-deploy-state'
 const DEPLOY_DISMISS_KEY = 'ollin-deploy-dismissed'
@@ -277,8 +270,8 @@ const DEPLOY_TTL = 120000
 const TRANSIENT = ['in_progress', 'queued', 'pending']
 
 async function checkPagesDeploy() {
-  // #6 : inutile sur le mode plein écran run (exécution d'un programme) — pas de
-  // bandeau par-dessus, et on évite les appels API sur cette vue.
+  // Pointless in the full-screen run mode, where a program is running: no banner over it, and
+  // no API calls from that view.
   if (location.hash.startsWith('#/run')) return
   let state = null
   try {
@@ -296,14 +289,14 @@ async function checkPagesDeploy() {
         const st = await api('/deployments/' + deps[0].id + '/statuses?per_page=1')
         state = Array.isArray(st) && st[0] ? st[0].state : null
       }
-      // ne cacher que les états stables → l'état « en cours » reste toujours revérifié
+      // Only stable states are cached, so an "under way" state is always checked again.
       if (state && !TRANSIENT.includes(state)) {
         try { sessionStorage.setItem(DEPLOY_CACHE_KEY, JSON.stringify({ t: Date.now(), state })) } catch (_) {}
       }
     }
   } catch (_) { return /* hors ligne / rate-limit / privé : silencieux */ }
-  // #3 : ne pas re-harceler — si l'utilisateur a fermé le bandeau pour CET état, on
-  // n'insiste plus de la session (un changement d'état réaffiche).
+  // No nagging: once the user has dismissed the banner for THIS state, we say no more for the
+  // session (a change of state shows it again).
   let dismissed = null
   try { dismissed = sessionStorage.getItem(DEPLOY_DISMISS_KEY) } catch (_) {}
   if (dismissed === state) return
@@ -314,7 +307,7 @@ async function checkPagesDeploy() {
   }
 }
 
-// Bandeau ancré EN BAS (ne recouvre pas la barre d'outils) ; style dans index.html.
+// A banner anchored at the BOTTOM, so it does not cover the toolbar; styled in index.html.
 function showDeployBanner(msg, offerReload, state) {
   if (document.getElementById('deploy-banner')) return
   const bar = document.createElement('div')

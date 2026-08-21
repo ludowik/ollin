@@ -43,7 +43,7 @@ export function formatOllin(src) {
   // Stack of BLOCK contexts. Each entry is { kind: 'block'|'switch'|'case', absorb: the
   // delimiters left open on the block's opening line, already counted by it }.
   const st = []
-  let delim = 0                 // profondeur des délimiteurs ouverts { [ ( (map/array/appels)
+  let delim = 0                 // depth of the open delimiters { [ ( (maps, arrays, calls)
   let absorbed = 0              // somme des `absorb` de la pile
   let inBlockComment = false
   const top = () => (st.length ? st[st.length - 1].kind : undefined)
@@ -52,13 +52,13 @@ export function formatOllin(src) {
   const level = () => st.length + delim - absorbed
 
   for (const raw of lines) {
-    const trimmed = raw.replace(/\s+$/, '')   // enlève les espaces de fin
+    const trimmed = raw.replace(/\s+$/, '')   // strips the trailing spaces
     const body = trimmed.trim()
 
     // Block comment ### … ###: the content is kept verbatim.
     const hashes = (body.match(/###/g) || []).length
     if (inBlockComment) {
-      out.push(trimmed)                        // ne pas reformater l'intérieur
+      out.push(trimmed)                        // do not reformat the inside
       if (hashes % 2 === 1) inBlockComment = false
       continue
     }
@@ -87,13 +87,13 @@ export function formatOllin(src) {
       }
     } else if (first === 'case' || first === 'default' ||
                (first === 'else' && inSwitch)) {
-      if (top() === 'case') popBlock()              // fin du case précédent
+      if (top() === 'case') popBlock()              // end of the previous case
       show = level()                           // au niveau du switch
       // `case … do`: the body's do block shares the case's level, and its `end` closes only
       // that block (the case runs to the next case or to the switch's `end`).
       pushBlock(/\bdo\s*$/.test(code) ? 'caseblock' : 'case')
     } else if (first === 'else' || first === 'elseif' || first === 'catch') {
-      show = level() - 1                       // ligne dé-indentée, pile inchangée
+      show = level() - 1                       // the line is outdented, the stack unchanged
     } else {
       // A line starting with a closing delimiter is outdented by one step.
       if (/^[})\]]/.test(code)) show = level() - 1
@@ -119,7 +119,7 @@ export function formatOllin(src) {
 
     out.push(UNIT.repeat(Math.max(0, show)) + body)
 
-    delim = Math.max(0, delim + delimBalance(code))   // maj délimiteurs pour la suite
+    delim = Math.max(0, delim + delimBalance(code))   // update the delimiters for what follows
 
     // A ### left open on this line (an odd number of ### outside a string) starts a comment block.
     if (bareCodeHashes(body) % 2 === 1) inBlockComment = true

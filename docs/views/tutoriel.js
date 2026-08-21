@@ -18,7 +18,7 @@ const ollinTheme = EditorView.theme({
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto', fontSize: 'var(--code-size)' },
   '.cm-content': { padding: '14px 0', caretColor: '#9ba1ff', fontSize: 'var(--code-size)' },
   ...CODE_DISPLAY,
-  ...CODE_THEME_BASE,   // ligne active, curseur, sélection (partagés)
+  ...CODE_THEME_BASE,   // active line, cursor, selection (shared)
   '.cm-gutters': { background: '#1a1d2e', color: '#5a628a', border: 'none', borderRight: '1px solid #3a3f63', borderRadius: '8px 0 0 8px' },
   '&.cm-focused': { outline: 'none', borderColor: '#9ba1ff' },
   '.cm-content[contenteditable="false"]': { cursor: 'default' },
@@ -53,8 +53,8 @@ function makeCopyBtn(getText) {
 
 export async function init(ctx) {
   const root = ctx.root
-  const disposers = []          // nettoyage au démontage de la vue
-  const editors   = []          // éditeurs CM6 statiques créés (à détruire au démontage)
+  const disposers = []          // cleanup when the view is unmounted
+  const editors   = []          // the static CM6 editors created, to destroy on unmount
 
   // SHARED execution (pg-run.js): the same preloading and error handling as the playground and
   // the standalone mode (try/catch, graphics frame errors).

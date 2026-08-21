@@ -9,7 +9,7 @@
 // rejection. So we listen to window 'error' and 'unhandledrejection' plus the emscripten abort
 // (wire_module), and keep a sliding stderr buffer.
 
-const STDERR_RING = []          // dernières lignes printErr (contexte)
+const STDERR_RING = []          // the last printErr lines, as context
 const RING_MAX = 60
 let overlayEl = null
 let shown = false
