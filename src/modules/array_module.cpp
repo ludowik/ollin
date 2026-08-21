@@ -4,8 +4,8 @@
 // `arr.<m>` with a plain lookup (see VM::array_module_) instead of a chain of string comparisons
 // rebuilding a closure on every access.
 //
-// Le tableau est le PREMIER argument : CALL_METHOD injecte le receveur en self
-// pour un tableau, donc `arr.push(v)` arrive ici en (arr, v).
+// The array is the FIRST argument: CALL_METHOD injects the receiver as self for an array, so
+// `arr.push(v)` arrives here as (arr, v).
 #include "array_module.h"
 #include "../vm.h"
 #include <algorithm>

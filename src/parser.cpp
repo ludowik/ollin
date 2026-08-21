@@ -220,7 +220,7 @@ std::unique_ptr<Stmt> Parser::var_decl() {
         while (match(TokenType::COMMA))
             s->values.push_back(expr());
     }
-    // sans '=' → valeurs absentes → nil dans le compilateur
+    // Without '=' the values are absent and become nil in the compiler.
     consume_opt_comment();
     return s;
 }
@@ -412,7 +412,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     advance(); // FUNC
     std::string name = expect(TokenType::IDENTIFIER).lexeme;
 
-    // Parse "(" params ")" NL body "end" dans les champs fournis.
+    // Parses "(" params ")" NL body "end" into the fields provided.
     auto parse_params_body = [&](std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,
                                bool& variadic, std::vector<std::unique_ptr<Stmt>>& body) {
         expect(TokenType::LPAREN);
@@ -470,7 +470,7 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
     s->line = line; s->file_idx = current_file_idx_;
-    // retvals optionnels : pas de valeur si on est sur une fermeture de bloc
+    // Return values are optional: none when we are on a block terminator.
     // (end/else/elseif/catch), a separator, a comment, or EOF.
     if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)
         && !check(TokenType::END) && !check(TokenType::ELSE)
@@ -767,7 +767,7 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 // otherwise: the upvalue machinery does all the work. `__ref` exists only so native modules can
 // validate — a map with get/set is not necessarily a reference, the `data` module has some too.
 static const char* REF_PARAM = "__ref_v";   // nom du paramètre du setter : ne doit
-                                            // JAMAIS collisionner avec la cible (`ref v`)
+                                            // must NEVER collide with the target (`ref v`)
 
 std::unique_ptr<Expr> Parser::ref_expr() {
     int line = peek().line;
@@ -1099,7 +1099,7 @@ std::unique_ptr<Expr> Parser::primary() {
             expect(TokenType::RPAREN);
             return parse_postfix(std::move(mc));
         }
-        // appel optionnel : F?()  → n'appelle que si F est callable, sinon nil
+        // Optional call F?(): calls only when F is callable, and yields nil otherwise.
         bool opt_call = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
         if (opt_call)
             advance(); // consume '?'
@@ -1241,9 +1241,9 @@ std::unique_ptr<Stmt> Parser::class_decl() {
         if (!check(TokenType::FUNC))
             throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected 'func' inside class body");
         int method_line = peek().line;
-        // funcDeclStmt() renvoie un IndexAssignStmt pour la forme `func obj.field()`
+        // func_decl_stmt() returns an IndexAssignStmt for the `func obj.field()` form
         // which is invalid in a class. Check the type rather than static_cast'ing
-        // aveugle (qui provoquait un segfault).
+        // blindly, which used to segfault.
         auto raw = func_decl_stmt();
         auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
         if (!fd)
@@ -1441,11 +1441,11 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     (*module_names_)[resolved] = top_names;
 
     if (alias.empty()) {
-        // import flat : injecter directement toutes les instructions
+        // Flat import: inject every statement directly.
         for (auto& s : sub_prog.stmts)
             block->stmts.push_back(std::move(s));
     } else {
-        // import as name : var name = {}; <stmts>; name[k] = k pour chaque nom top-level
+        // Aliased import: var name = {}; <stmts>; name[k] = k for every top-level name.
         auto vd = std::make_unique<VarDeclStmt>();
         vd->names.push_back(alias);
         vd->values.push_back(std::make_unique<MapExpr>());

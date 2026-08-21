@@ -1273,7 +1273,7 @@ void Compiler::emit_callee_value(const std::string& name, int reg) {
         chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)reg, (uint8_t)uv, 0));
         return;
     }
-    // builtins et fonctions top-level (closures comprises) sont des globaux (STORE_GLOBAL)
+    // Builtins and top-level functions, closures included, are globals (STORE_GLOBAL).
     chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)reg, chunk.add_identifier(name)));
 }
 
@@ -1389,7 +1389,7 @@ void Compiler::visit(const CallExpr& e) {
     int argc = (int)e.args.size();
     compile_consecutive(call_base, e.args);
 
-    // Tous les appels passent par CALL_DYN — builtins sont des globaux T_BUILTIN
+    // Every call goes through CALL_DYN; builtins are T_BUILTIN globals.
     {
         int func_reg = reg_top_++;
         if (reg_top_ > reg_count_)
@@ -2094,7 +2094,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
         }
     }
 
-    // Assigne chaque cible depuis son temporaire (ou nil si plus de valeurs que de cibles)
+    // Assign each target from its temporary, or nil when there are fewer values than targets.
     for (int i = 0; i < (int)s.targets.size(); ++i) {
         int val_r = (i < n) ? base + i : alloc_reg();   // nil when there is no value
         const LValue& lv = s.targets[i];
@@ -2117,7 +2117,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
                 }
             }
         } else {
-            // FIELD ou INDEX : charger l'objet
+            // FIELD or INDEX: load the object.
             int obj_r = alloc_reg();
             auto it = local_regs_.find(lv.name);
             if (it != local_regs_.end()) {
@@ -2264,7 +2264,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
         reg_count_ = reg_top_;
     chunk.emit(make_abc((uint8_t)Op::NEW_CLASS, (uint8_t)dest, 0, 0));
 
-    // Stocker le nom de la classe comme __name__ (utile pour print/debug)
+    // Store the class name as __name__, which print and debugging use.
     {
         int key_r = reg_top_++, val_r = reg_top_++;
         if (reg_top_ > reg_count_)
@@ -2328,7 +2328,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
 }
 
 // NEW_MAP, one (key, value) pair per element, SEAL_ENUM, then storage: a global
-// pour `enum Name`, SET_INDEX sur la map cible pour `enum a.b`. Le scellement vient
+// for `enum Name`, or SET_INDEX on the target map for `enum a.b`. The sealing comes
 // after the filling, which itself goes through SET_INDEX.
 void Compiler::visit(const EnumDeclStmt& s) {
     note_line(s.line, s.file_idx);
@@ -2418,7 +2418,7 @@ void Compiler::visit(const MethodCallExpr& e) {
             reg_count_ = reg_top_;
     }
 
-    // obj.m?() ≡ if m then m(args) else nil : JUMP_IF_FALSE saute AVANT les args
+    // obj.m?() is `if m then m(args) else nil`: JUMP_IF_FALSE jumps BEFORE the arguments,
     // when the method (R[call_base+1]) is falsy, the arguments are not evaluated.
     size_t skip = 0;
     if (e.optional)

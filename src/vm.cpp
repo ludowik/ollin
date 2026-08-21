@@ -661,7 +661,7 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
     uint32_t saved_ip = ip;
     ip = push_call_frame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
     run_goto(call_stack.size() - 1);
-    // Les valeurs de retour de f sont en regs[call_base..], last_results_ en donne le compte.
+    // f's return values sit in regs[call_base..], and last_results_ says how many.
     int avail = (int)regs.size() - call_base;
     int n = last_results_ < avail ? last_results_ : avail;
     if (n > out_cap)
@@ -691,7 +691,7 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 // The single entry point for building a call frame: grow_regs to the minimum needed, fill in
 // defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
 //   4. construit et empile le Frame
-//   5. retourne fp.addr (le caller fait ip = pushCallFrame(...))
+//   5. returns fp.addr (the caller does ip = push_call_frame(...))
 uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                            uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
@@ -1288,7 +1288,7 @@ dispatch_loop:
         const InternedStr* key_sptr = key.is_string() ? key.sptr : nullptr;
         // Inline cache (string key): a hit needs the same map or class (mptr), unmutated since
         // (version), and the same interned key (sptr). Only hits on the object's own data
-        // PROPRE de l'objet (cf. remplissage plus bas).
+        // of the object (see the fill below).
         if (obj_map && key_sptr) {
             GetIndexCache& c = gicache_[ip - 1];
             if (c.map == obj_map && c.version == obj_map->version && c.key == key_sptr) {
@@ -1304,7 +1304,7 @@ dispatch_loop:
             }
         }
         if (obj.is_map() || obj.is_class()) {
-            // Data PROPRE d'abord (T_MAP et T_CLASS partagent le layout Map).
+            // Own data first (T_MAP and T_CLASS share the Map layout).
             const Map* own = obj.mptr;
             // Throughout the engine `nil` means ABSENT (see proto_chain_get): an own key holding
             // nil must still defer to the prototype chain and to the `len` fallback, not shadow
@@ -1313,7 +1313,7 @@ dispatch_loop:
             if (slot && !slot->is_nil()) {
                 // Found directly, so validity depends ONLY on (mptr, version): cacheable even
                 // on an instance, since mutating the instance bumps its version,
-                // et sa data propre masque toujours la classe). Pas de test
+                // and its own data always shadows the class). No
                 // is_instance here — it would cost a "__class__" lookup on every access.
                 if (key_sptr) {
                     GetIndexCache& c = gicache_[ip - 1];
@@ -1331,7 +1331,7 @@ dispatch_loop:
                 // keeps the strcmp off the hot path.
                 Value chained = proto_chain_rest(obj, key);
                 // The `len` key is compared by interned POINTER, like __class__ and __parent__,
-                // plus par contenu : plus aucun strcmp dans GET_INDEX.
+                // rather than by content, so GET_INDEX has no strcmp left.
                 if (chained.is_nil() && key_sptr == MK().len_.sptr && !is_instance(obj))
                     regs[base + A] = Value::make_builtin(builtin_map_len);
                 else
@@ -1340,7 +1340,7 @@ dispatch_loop:
         } else if (obj.is_string()) {
             // String pseudo-methods are served by the `string` module, which never changes, so
             // every pass after the first is a cache hit.
-            // (Le module vit aussi longtemps que la VM : pas de risque d'aliasing.)
+            // (The module lives as long as the VM, so there is no aliasing risk.)
             const Value* meth = module_member(string_module_, key, key_sptr);
             regs[base + A] = meth ? *meth : Value{};
         } else if (obj.is_array()) {

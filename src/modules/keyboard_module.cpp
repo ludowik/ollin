@@ -194,7 +194,7 @@ void keyboard_poll() {
     }
 }
 
-// Le module `keyboard` expose isDown() ; l'utilisateur y affecte en plus
+// The `keyboard` module exposes isDown(); the user additionally assigns
 // keypressed / keyrelease, lues par keyboardPoll().
 Value make_keyboard_module() {
     Value m = Value::make_map();

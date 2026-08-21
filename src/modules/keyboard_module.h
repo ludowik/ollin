@@ -1,14 +1,14 @@
 #pragma once
-// Module keyboard — capture clavier pour les applications graphiques.
+// The keyboard module: keyboard capture for graphical programs.
 // Implementation in keyboard_module.cpp, which requires raylib.
 
 // Called once per frame from the render loop (graphics_module.cpp):
-// pompe les touches et appelle, si elles existent, keyboard.keypressed(key) /
+// pumps the keys and calls keyboard.keypressed(key) and the others when they exist. /
 // keyboard.keyrelease(key) (key = nom de touche).
 void keyboard_poll();
 
 // True when keyboard_poll saw at least one press during the current frame. Needed
-// parce que la file d'appuis de raylib est CONSOMMÉE par keyboard_poll : la relire
+// because raylib's press queue is CONSUMED by keyboard_poll, so reading it again
 // ailleurs ne rendrait plus rien.
 bool keyboard_pressed_any();
 

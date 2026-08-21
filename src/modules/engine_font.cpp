@@ -12,7 +12,7 @@ struct Entry {
     bool ready;
 };
 
-// The order fixes the indices; "sans" comes first and is the default font.
+// The order fixes the indices; "sans" comes first and is the default.
 Entry s_fonts[] = {
     {"sans", LoadFont_FontSans, {0}, false},
     {"mono", LoadFont_FontMono, {0}, false},

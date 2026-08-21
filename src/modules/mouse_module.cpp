@@ -5,15 +5,15 @@
 #include <string>
 #include <cmath>
 
-// On affecte des fonctions au module `mouse` ; le moteur les appelle si elles
+// Functions are assigned to the `mouse` module and the engine calls whichever
 // exist, with no activation needed, passing the position (x, y) in the logical
 // logique de la zone graphique :
-//   mouse.pressed  = func(x, y) ... end   → appui du bouton gauche
+//   mouse.pressed  = func(x, y) ... end   left button pressed
 //   mouse.released = func(x, y) ... end   released
 //   mouse.moved    = func(x, y) ... end   pointer moved
 //
 // Detection happens in mouse_poll(), called once per frame by the render loop
-// de rendu (graphics_module.cpp) — le pointeur ne fonctionne donc que pendant un
+// loop (graphics_module.cpp), so the pointer only works during a
 // graphics.run(...) — or through the automatically called draw function.
 
 static float s_last_click_time = -1.0f;
@@ -98,8 +98,8 @@ void mouse_reset() {
     s_last_click_time = -1.0f;
 }
 
-// Le module `mouse` est une map vide : l'utilisateur y affecte pressed /
-// released / moved, lues par mousePoll().
+// The `mouse` module is an empty map: the user assigns pressed, released and moved to it, and
+// mouse_poll reads them.
 Value make_mouse_module() {
     return Value::make_map();
 }

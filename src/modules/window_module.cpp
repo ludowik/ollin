@@ -4,9 +4,9 @@
 #include <emscripten/val.h>
 
 Value make_window_module() {
-    // Zone de dessin disponible : le conteneur #output-pane du playground s'il
+    // Available drawing area: the playground's #output-pane container when it
     // existe, sinon le viewport (page autonome run.html, page externe…).
-    // Sans repli, getElementById renvoie null → null.clientWidth plante.
+    // Without a fallback, getElementById returns null and null.clientWidth throws.
     auto win = emscripten::val::global("window");
     int w = 0, h = 0;
     // 1) Size PROVIDED by the host. In the playground it is the render area measured in JS after
@@ -26,7 +26,7 @@ Value make_window_module() {
             h = pane["clientHeight"].as<int>();
         }
     }
-    // 3) Dernier repli : viewport → W/H toujours une taille RÉELLE, jamais 0
+    // 3) Last resort, the viewport, so W and H always hold a REAL size and never 0.
     // (otherwise the canvas would be empty, with no GL context, and crash).
     if (w <= 0 || h <= 0) {
         w = win["innerWidth"].as<int>();

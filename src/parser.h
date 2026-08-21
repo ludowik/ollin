@@ -21,8 +21,8 @@ class Parser {
     int pos = 0;
     std::string base_dir_;
     std::shared_ptr<std::unordered_set<std::string>> imported_paths_;
-    // Cache partagé path résolu → noms top-level exportés, pour bâtir la map d'un
-    // import aliasé même quand le module a déjà été importé (dédup ≠ cycle).
+    // Shared cache from resolved path to exported top-level names, so an aliased import can build
+    // its map even when the module was already imported (dedup is not a cycle).
     std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names_;
     std::shared_ptr<std::vector<std::string>> source_files_;
     int current_file_idx_ = 0;
@@ -56,9 +56,9 @@ const Token& peek() const;
     std::unique_ptr<Stmt> return_stmt();
     std::unique_ptr<Stmt> multi_assign_stmt();
     std::unique_ptr<Stmt> expr_stmt();
-    // Construit l'instruction d'affectation à partir d'une cible déjà parsée
-    // (VarExpr → AssignStmt ; IndexExpr → IndexAssignStmt chaîné). Rejette toute
-    // autre forme (« invalid assignment target »).
+    // Builds the assignment statement from an already parsed target: a VarExpr becomes an
+    // AssignStmt, an IndexExpr a chained IndexAssignStmt. Any other form is rejected with
+    // "invalid assignment target".
     std::unique_ptr<Stmt> finish_assign_from_expr(std::unique_ptr<Expr> target, int line);
     std::unique_ptr<Stmt> for_stmt();
     std::unique_ptr<Stmt> import_stmt();

@@ -4,9 +4,9 @@
 #include "value.h"
 #include <raymath.h>
 
-// Construit une instance Quat (classe native) depuis un Quaternion raymath.
+// Builds a Quat instance (the native class) from a raymath Quaternion.
 Value make_quat_instance(Quaternion q);
 // Reads a Quat instance back as a raymath Quaternion; throws when it is not a Quat.
 Quaternion quat_from_instance(const Value& v, const char* fn);
-// Enregistre les fabriques quat / quat_axis / quat_euler dans le module graphics.
+// Registers the quat, quat_axis and quat_euler factories in the graphics module.
 void register_quat(Value& m);

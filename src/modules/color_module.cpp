@@ -107,7 +107,7 @@ static int color_pastel(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// args[0] = self  → retourne une nouvelle instance Color en niveaux de gris (luminance Rec. 601)
+// args[0] is self; returns a new greyscale Color instance, using Rec. 601 luminance.
 
 static int color_grayscale(CallCtx& ctx) {
     Value* args = ctx.args;

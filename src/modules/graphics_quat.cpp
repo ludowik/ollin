@@ -1,6 +1,6 @@
-// Classe native Quat — rotations par quaternion (composition sans gimbal-lock +
+// The native Quat class: quaternion rotations, composing without gimbal lock, plus
 // slerp interpolation). Pure raymath, with no rlgl or GL dependency; compiled
-// dans les builds raylib/WASM. Les angles de l'API publique sont en DEGRÉS
+// in the raylib and WASM builds. The public API takes angles in DEGREES
 // (consistent with rotate and rotateX/Y/Z), converted internally to radians for raymath.
 #include "graphics_quat.h"
 #include "module_utils.h"
@@ -41,7 +41,7 @@ Value make_quat_instance(Quaternion q) {
 // A quaternion is a VALUE: the methods return a NEW Quat instead of mutating, which makes them
 // chainable — q.mul(a).normalize().
 
-// q.mul(autre) : composition q · autre (applique d'abord autre, puis q).
+// q.mul(other): the composition q times other, applying other first and then q.
 static int quat_mul(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Quaternion a = quat_from_instance(args[0], "Quat.mul");
@@ -113,7 +113,7 @@ static int gfx_quat(CallCtx& ctx) {
     return ctx.ret(make_quat_instance(QuaternionIdentity()));
 }
 
-// graphics.quatAxis(ax, ay, az, deg) : rotation de deg° autour de l'axe (ax,ay,az).
+// graphics.quatAxis(ax, ay, az, deg): a rotation of deg degrees about the axis (ax,ay,az).
 static int gfx_quat_axis(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 axis = {(float)num_arg(args, argc, 0, "graphics.quatAxis"),

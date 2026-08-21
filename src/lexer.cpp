@@ -119,7 +119,7 @@ Token Lexer::number(bool leading_dot) {
             break;
         }
     }
-    // exposant scientifique optionnel : [eE] [+-]? chiffres → le nombre est flottant.
+    // Optional scientific exponent, [eE] [+-]? digits, which makes the number a float.
     if (!at_end() && (peek() == 'e' || peek() == 'E')) {
         if (prev_underscore) // '_' juste avant l'exposant → invalide (ex. 1_e5)
             throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");

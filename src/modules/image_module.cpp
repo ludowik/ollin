@@ -459,9 +459,9 @@ static int img_end_pixels(CallCtx& ctx) {
 }
 
 
-// Renvoie 4 valeurs (r, g, b, a) dans [0,1] : `var r, g, b, a = image.getPixel(img, x, y)`.
-// Multi-retour direct dans les registres (aucune allocation de map par pixel) → chemin
-// chaud du traitement pixel par pixel.
+// Returns four values (r, g, b, a) in [0,1]: `var r, g, b, a = image.getPixel(img, x, y)`. The
+// multi-return goes straight into the registers, with no map allocated per pixel, which matters on
+// the hot path of pixel-by-pixel processing.
 static int img_get_pixel(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.getPixel";

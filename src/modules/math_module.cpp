@@ -269,8 +269,8 @@ static int math_rand(CallCtx& ctx) {
     return ctx.ret(Value(lo + r * (hi - lo)));
 }
 
-// Argument entier : (int64_t)numArg est UB (trap WASM) si le double est NaN/inf
-// ou hors plage int64. doubleFitsInt64 (value.h) garde le cast → erreur claire.
+// Integer argument: (int64_t)num_arg is UB — and traps on WASM — when the double is NaN, infinite
+// or out of int64 range. double_fits_int64 (value.h) guards the cast and yields a clear error.
 static int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
     double d = num_arg(args, argc, i, fn);
     if (!double_fits_int64(d))
@@ -296,7 +296,7 @@ static int math_rand_int(CallCtx& ctx) {
     return ctx.ret(Value(lo + (int64_t)(rand() % (hi - lo + 1))));
 }
 
-// Bruit de Perlin fractal (fBm), 1/2/3 dimensions → FLOAT dans [0, 1].
+// Fractal Perlin noise (fBm) in 1, 2 or 3 dimensions, returning a FLOAT in [0, 1].
 static int math_noise(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;

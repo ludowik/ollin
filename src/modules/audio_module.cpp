@@ -6,29 +6,28 @@
 #include <emscripten.h>
 #endif
 
-// Session sonore, build AVEC raylib. Le périphérique n'est PAS ouvert au chargement du
-// module : le navigateur refuse de sonner avant une interaction, et ouvrir trop tôt
-// donnerait un contexte suspendu dont on ne saurait plus quoi faire. L'ouverture est donc
-// différée jusqu'au premier geste de l'utilisateur (audio_wake) ou à un appel explicite
-// d'audio.start().
+// Sound session, build WITH raylib. The device is NOT opened when the module loads: the browser
+// refuses to sound before an interaction, and opening too early would give a suspended context
+// with nothing useful to do about it. Opening is therefore deferred until the user's first gesture
+// (audio_wake), or an explicit call to audio.start().
 
 namespace {
 
 bool s_ready = false;
-bool s_tried = false;     // une tentative a déjà eu lieu → ne pas la refaire à chaque frame
+bool s_tried = false;     // an attempt already happened; do not retry it every frame
 double s_volume = 1.0;
 
 #ifdef __EMSCRIPTEN__
-// Un contexte audio SUSPENDU ne se reprend que depuis le gestionnaire du geste lui-même.
-// C'est la règle de Safari sur iOS, et elle condamne notre réveil : `audio_wake` part de la
-// boucle de rendu, donc hors de la pile d'appels du geste, et son `resume` est refusé — pour
-// toujours. Le son était alors mort jusqu'à la fermeture de l'onglet (MESURÉ : contexte
-// suspendu de force, puis trois gestes de plus sans aucun retour du son).
+// A SUSPENDED audio context can only be resumed from the gesture handler itself. That is Safari's
+// rule on iOS, and it dooms our wake-up: audio_wake starts from the render loop, hence outside the
+// gesture's call stack, and its resume is refused — for good. The sound was then dead until the tab
+// was closed (MEASURED: with the context suspended by force, three further gestures brought no
+// sound back).
 //
-// Safari suspend de lui-même sur une interruption (appel entrant, retour d'arrière-plan,
-// verrouillage), et le contexte naît suspendu quand il est créé avant tout geste. D'où un
-// écouteur DOM, posé UNE fois et gardé : chaque geste retente la reprise, ce qui couvre les
-// deux cas sans que le moteur ait à savoir lequel s'est produit.
+// Safari suspends of its own accord on an interruption (an incoming call, coming back from the
+// background, locking), and a context created before any gesture is born suspended. Hence a DOM
+// listener, installed ONCE and kept: every gesture retries the resume, which covers both cases
+// without the engine having to know which one occurred.
 void install_gesture_resume() {
     static bool pose = false;
     if (pose)
@@ -48,8 +47,8 @@ void install_gesture_resume() {
                     d.webaudio.resume();
             }
         };
-        // Pas de littéral de tableau ni d'objet ici : EM_ASM est une MACRO, et une virgule
-        // hors parenthèses y sépare ses arguments.
+        // No array or object literal here: EM_ASM is a MACRO, and a comma outside parentheses
+        // separates its arguments.
         var opt = { capture: true };
         opt.passive = true;
         var noms = 'pointerdown touchstart touchend mousedown keydown'.split(' ');
@@ -62,9 +61,8 @@ void install_gesture_resume() {
 }
 #endif
 
-// Ouvre le périphérique une seule fois. L'échec n'est pas une erreur de script : une
-// machine sans carte son (conteneur d'intégration, serveur) doit exécuter le programme
-// jusqu'au bout, en silence.
+// Opens the device once. A failure is not a script error: a machine with no sound card (the
+// integration container, a server) must run the program through to the end, in silence.
 bool audio_open() {
     if (s_ready)
         return true;
@@ -86,7 +84,7 @@ int audio_is_ready(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(s_ready));
 }
 
-// Sans argument : rend le volume courant. Avec : le pose et le rend, pour se chaîner.
+// With no argument it returns the current volume; with one it sets it and returns it, to chain.
 int audio_volume(CallCtx& ctx) {
     audio_check_volume_args(ctx.args, ctx.argc);
     if (ctx.argc >= 1 && ctx.args[0].is_number()) {
@@ -101,9 +99,9 @@ int audio_sample_rate(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)k_audio_sample_rate));
 }
 
-// La pause appartient à la SESSION et non à chaque son : c'est l'équivalent sonore de la
-// pause d'une boucle de rendu. Elle suspend l'avancement, là où un volume à zéro laisserait
-// tout courir en silence et ferait reprendre le son plus loin qu'on l'a laissé.
+// Pause belongs to the SESSION rather than to each sound: it is the audio counterpart of pausing a
+// render loop. It suspends progress, where a zero volume would let everything run on in silence and
+// the sound would resume further along than where it was left.
 int audio_pause(CallCtx& ctx) {
     sound_set_paused(true);
     return ctx.ret(Value{});
@@ -127,13 +125,13 @@ void audio_wake() {
 void audio_update() {
 }
 
-// Le périphérique, lui, N'EST PAS refermé : il appartient à la page (WASM) et sa fermeture
-// invaliderait les tampons encore référencés. Seul l'état propre au programme est remis à
-// zéro — le volume, qu'un script précédent a pu baisser.
+// The device itself is NOT closed: it belongs to the page on WASM, and closing it would invalidate
+// buffers still referenced. Only the program's own state is reset — the volume, which a previous
+// script may have turned down.
 void audio_reset() {
-    // L'écouteur de reprise doit être en place AVANT le premier geste, donc au démarrage du
-    // programme et non à l'ouverture du périphérique — celle-ci n'a lieu qu'après un geste,
-    // qui serait déjà perdu.
+    // The resume listener must be in place BEFORE the first gesture, hence when the program starts
+    // rather than when the device opens — that happens only after a gesture, which would already be
+    // lost.
     install_gesture_resume();
     s_volume = 1.0;
     if (s_ready)

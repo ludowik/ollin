@@ -4,7 +4,7 @@
 // Sound output, build WITHOUT raylib: there is no device, so nothing to open and nothing to mix.
 // All the rest of the `sound` module works — voices exist, their parameters can be read and
 // written, validation refuses the same calls. That is what
-// rend les oscillateurs testables dans un conteneur sans carte son.
+// makes oscillators testable in a container with no sound card.
 
 void sound_output_ensure() {
 }

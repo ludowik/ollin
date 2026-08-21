@@ -1,33 +1,33 @@
 #pragma once
 #include "value.h"
 
-// Module `touch` : le MULTITOUCHE — plusieurs doigts suivis en même temps, chacun par un
+// The `touch` module: MULTITOUCH — several fingers tracked at once, each by a
 // identifiant stable.
 //
-// raylib donne à chaque image une PHOTOGRAPHIE des contacts (combien, où, quels
-// identifiants), mais aucun événement : c'est le moteur qui compare la liste de l'image
-// courante à celle de la précédente pour en déduire qu'un doigt s'est posé, a bougé ou
-// s'est levé. C'est ce suivi qui manquait, et sans lui `mouse` ne peut rapporter qu'un seul
-// point — raylib n'émulant la souris que lorsqu'un doigt exactement touche l'écran.
+// raylib gives a SNAPSHOT of the contacts each frame — how many, where, which identifiers — but no
+// events: the engine compares this frame's list with the previous one to deduce that a finger
+// landed, moved or lifted. That tracking is what was missing, and without it `mouse` can report
+// only one point, since raylib emulates the mouse only while exactly one finger touches the
+// screen.
 //
-// Le script affecte les fonctions qu'il veut, le moteur appelle celles qui existent :
-//   touch.began(id, x, y)  un doigt s'est posé
-//   touch.moved(id, x, y)  un doigt a bougé
-//   touch.ended(id, x, y)  un doigt s'est levé (dernière position connue)
-// et peut aussi lire l'état directement : touch.count(), touch.points().
+// The script assigns whichever functions it wants and the engine calls those that exist:
+//   touch.began(id, x, y)  a finger landed
+//   touch.moved(id, x, y)  a finger moved
+//   touch.ended(id, x, y)  a finger lifted (last known position)
+// The state can also be read directly, through touch.count() and touch.points().
 //
-// Les rappels de `mouse` ne sont PAS supprimés pour autant : sur un doigt unique, le
-// système émule la souris, si bien qu'un script déclarant les deux familles reçoit le geste
-// deux fois. À lui de choisir laquelle il écoute.
+// The `mouse` callbacks are NOT suppressed for all that: with a single finger the system emulates
+// the mouse, so a script declaring both families receives the gesture twice. It is up to the
+// script to choose which one it listens to.
 Value make_touch_module();
 
-// Relève les contacts de l'image. À appeler AVANT tous les autres rappels d'entrée : un
-// rappel de `mouse` qui lit `touch.count()` doit voir les doigts de CETTE image.
+// Samples this frame's contacts. To be called BEFORE every other input callback, since a
+// `mouse` callback reading touch.count() must see THIS frame's fingers.
 void touch_begin_frame();
 
-// Compare le relevé à celui de l'image précédente et appelle began/moved/ended.
+// Compares the sample with the previous frame's and calls began, moved and ended.
 void touch_poll();
 
-// Au lancement d'un programme : oublie les contacts du précédent, sinon un doigt encore
-// « posé » dans la liste ferait croire à un geste en cours.
+// When a program starts: forget the previous one's contacts, otherwise a finger still listed as
+// down would look like a gesture in progress.
 void touch_reset();

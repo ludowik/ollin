@@ -3,7 +3,7 @@
 #include "vm.h"
 #include <string>
 
-// Multitouche, build SANS raylib : aucune surface tactile, donc jamais de contact. Le module
+// Multitouch, build WITHOUT raylib: no touch surface, hence never a contact. The module
 // still exists in full, like the sound one: a script reading touch.count() or iterating
 // touch.points() then runs and sees nothing, instead of failing on a nil module.
 

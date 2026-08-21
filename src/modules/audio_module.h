@@ -2,44 +2,42 @@
 #include "value.h"
 #include <stdexcept>
 
-// Module `audio` : la SESSION sonore — ouverture du périphérique, volume général, état.
-// Un seul par programme, comme le canvas graphique.
+// The `audio` module: the sound SESSION — opening the device, master volume, state. One per
+// program, like the graphics canvas.
 //
-// Contrairement à `graphics`, ce module n'est JAMAIS nil : un build sans raylib garde
-// l'API entière, seule la sortie devient muette (audio_stub.cpp). La raison est que la
-// génération d'ondes est un pur calcul, donc testable sans périphérique — et le conteneur
-// d'intégration n'en a aucun (`/dev/snd` absent).
+// Unlike `graphics`, this module is NEVER nil: a build without raylib keeps the whole API and only
+// the output goes silent (audio_stub.cpp). The reason is that generating waveforms is pure
+// computation, and therefore testable without a device — and the integration container has none,
+// `/dev/snd` being absent.
 Value make_audio_module();
 
-// Le moteur appelle ces trois fonctions lui-même — depuis sa boucle de rendu et au
-// lancement d'un programme. Elles ne sont pas destinées au script : oublier l'une d'elles
-// serait un défaut du moteur, pas une faute de l'utilisateur.
+// The engine calls these three itself, from its render loop and when a program starts. They are
+// not meant for scripts: forgetting one would be an engine defect, not a user mistake.
 //
-// audio_wake()   au premier geste de l'utilisateur (clic, touche). Le navigateur refuse de
-//                sonner avant une interaction, si bien qu'ouvrir le périphérique au
-//                chargement ne servirait à rien ; le moteur le fait donc à ce moment-là et
-//                le script n'a rien à écrire.
-// audio_update() une fois par frame, après l'ouverture (relance des boucles, entretien).
-// audio_reset()  au démarrage d'un PROGRAMME (ollin_run), comme ui_reset : les statiques
-//                survivent au VM entre deux exécutions du playground.
+// audio_wake()   on the user's first gesture (a click, a key). The browser refuses to sound before
+//                an interaction, so opening the device at load time would achieve nothing; the
+//                engine does it at that moment and the script has nothing to write.
+// audio_update() once per frame after opening (restarting loops, upkeep).
+// audio_reset()  when a PROGRAM starts (ollin_run), like ui_reset: the statics survive the VM
+//                between two playground runs.
 void audio_wake();
 void audio_update();
 void audio_reset();
 
-// Fréquence d'échantillonnage de la sortie, et unité de tous les calculs de synthèse.
-// Une constante et non un réglage : la changer invaliderait les tampons déjà calculés.
+// Output sample rate, and the unit of every synthesis computation. A constant rather than a
+// setting: changing it would invalidate the buffers already computed.
 constexpr int k_audio_sample_rate = 44100;
 
-// ── Validation des arguments, PARTAGÉE par le module et le stub ──────────────────
-// Une faute d'appel doit être signalée même sans périphérique (le binaire de test n'en a
-// pas) : un seul endroit pour les messages, aucune divergence possible.
+// Argument validation, SHARED by the module and the stub.
+// A misuse must be reported even with no device — the test binary has none — so the messages live
+// in a single place and cannot diverge.
 inline void audio_check_volume_args(const Value* args, int argc) {
     if (argc >= 1 && !args[0].is_nil() && !args[0].is_number())
         throw std::runtime_error("audio.volume: expected a number between 0 and 1");
 }
 
-// Volume borné à [0;1] : au-delà, la sortie sature et le son se déforme au lieu d'être
-// plus fort. On corrige en silence plutôt que de refuser, comme les composantes couleur.
+// The volume is clamped to [0;1]: beyond that the output saturates and the sound distorts instead
+// of getting louder. We correct silently rather than refuse, as with colour components.
 inline double audio_clamp_volume(double v) {
     return v < 0.0 ? 0.0 : (v > 1.0 ? 1.0 : v);
 }
