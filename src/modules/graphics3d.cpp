@@ -1,6 +1,6 @@
-// Module graphics — PARTIE 3D. La 2D, la fenêtre/boucle de rendu, les styles et
-// les transforms sont dans graphics_module.cpp ; la frontière entre les deux
-// unités est graphics_internal.h. Compilé uniquement dans les builds raylib/WASM.
+// Module graphics — 3D PART. The 2D drawing, the window and render loop, the styles and the
+// transforms live in graphics_module.cpp; the boundary between the two units is
+// graphics_internal.h. Compiled only in the raylib/WASM builds.
 #include "graphics_internal.h"
 #include "graphics_quat.h"
 #include "image_module.h"
@@ -20,38 +20,36 @@
 #include <emscripten.h>
 #endif
 
-// État 3D propre à cette unité (déplacé depuis la zone de style 2D).
-// s_in_3d : vrai entre begin3d et end3d. s_cur_tex3d : texture 3D courante
-// (0 = blanche), remise à 0 chaque frame via reset3dFrameState().
+// 3D state private to this unit.
+// s_in_3d: true between begin3d and end3d. s_cur_tex3d: current 3D texture
+// (0 = white), reset every frame by reset3d_frame_state().
 static bool s_in_3d = false;
 static unsigned int s_cur_tex3d = 0;
 
-// Atlas de tuiles (terrain voxel) : une texture en grille (cols×rows). Chaque cube
-// porte un triplet de tuiles (dessus/côté/dessous) ; le shader choisit selon la
-// normale et échantillonne l'atlas. s_cur_tile = tuiles du prochain cube (état,
-// comme fill) ; -1 = pas de tuile (couleur pleine / texture0 classique).
+// Tile atlas (voxel terrain): one texture as a grid (cols×rows). Each cube carries a
+// triple of tiles (top/side/bottom); the shader picks according to the normal and samples
+// the atlas. s_cur_tile = tiles of the next cube (state, like fill); -1 = no tile
+// (plain colour / ordinary texture0).
 static unsigned int s_atlas_texid = 0;
 static float s_atlas_grid[2] = {1.0f, 1.0f};
 static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
-// Hauteurs des 4 coins du dessus du prochain cube (état, comme s_cur_tile), en unités
-// locales : (-x,-z), (+x,-z), (-x,+z), (+x,+z). Tout à 0 = cube ordinaire.
+// Heights of the four top corners of the next cube (state, like s_cur_tile), in local
+// units: (-x,-z), (+x,-z), (-x,+z), (+x,+z). All zero = an ordinary cube.
 static float s_cur_corner[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 static float s_anim_tile = -1.0f;   // tuile animée (UV qui défile, ex. eau) ; -1 = aucune
-// paramètres de l'ondulation de la tuile animée : {défilement, vitesse d'onde, fréquence
-// spatiale, amplitude}. Défauts = look eau ; réglables via graphics.tileAnim(t, ...).
+// Ripple parameters of the animated tile: {scroll, wave speed, spatial frequency,
+// amplitude}. Defaults give a water look; tunable through graphics.tileAnim(t, ...).
 static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
 
-// ── 3D ────────────────────────────────────────────────────────────────────────
-// L'affichage 3D s'appuie DIRECTEMENT sur l'API raylib (Camera3D / BeginMode3D…).
-// La caméra est une valeur de 1re classe (map) construite par graphics.camera ;
-// begin3d/end3d encadrent les dessins 3D dans draw(). Les formes suivent l'état
-// fill/stroke exactement comme les primitives 2D (plein si fill, fil de fer si
-// stroke, les deux si les deux). La profondeur est remise à neuf par un
-// graphics.clear(couleur opaque) en début de frame (ClearBackground efface le
-// tampon couleur ET le depth via rlClearScreenBuffers).
+// 3D display rests DIRECTLY on raylib's API (Camera3D / BeginMode3D…).
+// The camera is a first-class value (a map) built by graphics.camera; begin3d/end3d
+// bracket the 3D drawing inside draw(). The shapes follow the fill/stroke state exactly
+// as the 2D primitives do (solid if fill, wireframe if stroke, both if both). Depth is
+// cleared by a graphics.clear(opaque colour) at the start of the frame (ClearBackground
+// clears the colour buffer AND the depth buffer, through rlClearScreenBuffers).
 
-// Reconstruit une Camera3D raylib depuis le handle map (graphics.camera). up par
-// défaut = +Y ; projection perspective ; near/far = valeurs par défaut de raylib.
+// Rebuilds a raylib Camera3D from the map handle (graphics.camera). Default up = +Y,
+// perspective projection, raylib's default near/far.
 static Camera3D camera_from_map(const Value& v, const char* fn) {
     if (!v.is_map())
         throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
@@ -69,17 +67,17 @@ static Camera3D camera_from_map(const Value& v, const char* fn) {
     return cam;
 }
 
-// ── Classe Camera (native, comme Color) ─────────────────────────────────────
-// Une caméra est une INSTANCE de classe (map avec __class__) portant les champs
-// px,py,pz (position), tx,ty,tz (cible), fovy. Comme toute instance reste un
-// T_MAP, cameraFromMap la relit sans changement. Les méthodes MUTENT self en
-// place (caméra mutable entre frames) et renvoient self → appels chaînables.
+// Camera class (native, like Color).
+// A camera is a class INSTANCE (a map with __class__) carrying px,py,pz (position),
+// tx,ty,tz (target) and fovy. Since an instance is still a T_MAP, camera_from_map reads
+// it unchanged. The methods MUTATE self in place (a camera is mutable between frames)
+// and return self, so calls chain.
 static double cam_field(const Value& self, const char* k) {
     Value v = self.map_get(Value(std::string(k)));
     return v.is_number() ? v.as_num() : 0.0;
 }
 
-// cam.setPos(x,y,z) : fixe la position de la caméra.
+// cam.setPos(x,y,z): sets the camera position.
 static int cam_set_pos(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -89,7 +87,7 @@ static int cam_set_pos(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// cam.lookAt(x,y,z) : réoriente la caméra vers le point cible (x,y,z).
+// cam.lookAt(x,y,z): aims the camera at the target point (x,y,z).
 static int cam_look_at(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -99,8 +97,8 @@ static int cam_look_at(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// cam.move(dx,dy,dz) : translate la caméra ET sa cible du même delta → la
-// direction de visée est conservée (déplacement latéral/avant du point de vue).
+// cam.move(dx,dy,dz): translates the camera AND its target by the same delta, so the
+// viewing direction is preserved (a sideways or forward move of the viewpoint).
 static int cam_move(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -116,8 +114,8 @@ static int cam_move(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// cam.zoom(factor) : multiplie la taille du monde visible (ortho: fovy *= factor,
-// perspective: rapproche/éloigne la position le long de l'axe de visée).
+// cam.zoom(factor): multiplies the size of the visible world (ortho: fovy *= factor;
+// perspective: moves the position along the viewing axis).
 static int cam_zoom(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -138,10 +136,10 @@ static int cam_zoom(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// cam.orbit(angle, rayon [, hauteur]) : place la caméra en orbite autour de sa
-// cible, sur un cercle du plan XZ de rayon `rayon`. `angle` en RADIANS (composable
-// avec elapsedTime / math.cos-sin). `hauteur` optionnelle = altitude AU-DESSUS de
-// la cible (par défaut : conserve la hauteur courante).
+// cam.orbit(angle, radius [, height]): puts the camera in orbit around its target, on a
+// circle of the XZ plane. `angle` is in RADIANS (composable with elapsedTime and
+// math.cos/sin). The optional `height` is the altitude ABOVE the target (by default the
+// current height is kept).
 static int cam_orbit(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -157,8 +155,8 @@ static int cam_orbit(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// cam.getViewDir() : direction de visée NORMALISÉE (cible - position) → map {x,y,z}.
-// Cible confondue avec la position (vecteur nul) → renvoie {x:0, y:0, z:0}.
+// cam.getViewDir(): NORMALISED viewing direction (target - position), as a map {x,y,z}.
+// A target equal to the position (a null vector) returns {x:0, y:0, z:0}.
 static int cam_get_view_dir(CallCtx& ctx) {
     Value self = ctx.args[0];
     double dx = cam_field(self, "tx") - cam_field(self, "px");
@@ -189,15 +187,15 @@ static Value make_camera_class() {
     return cls;
 }
 
-// Classe Camera partagée (construite une fois, réutilisée par chaque instance).
+// Shared Camera class, built once and reused by every instance.
 static Value camera_class() {
     static Value cls = make_camera_class();
     return cls;
 }
 
-// graphics.camera(px,py,pz, tx,ty,tz [, fovy]) : INSTANCE de classe Camera.
-// Regarde (tx,ty,tz) depuis (px,py,pz), up = +Y, fovy = champ de vision vertical
-// (45° défaut). Mutable via ses méthodes (setPos/lookAt/move/orbit/zoom) ; getViewDir renvoie la direction de visée {x,y,z}.
+// graphics.camera(px,py,pz, tx,ty,tz [, fovy]): a Camera class INSTANCE. Looks at
+// (tx,ty,tz) from (px,py,pz), up = +Y, fovy = vertical field of view (45° by default).
+// Mutable through its methods (setPos/lookAt/move/orbit/zoom); getViewDir returns the viewing direction {x,y,z}.
 static int gfx_camera(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
@@ -212,9 +210,9 @@ static int gfx_camera(CallCtx& ctx) {
     return ctx.ret(cam);
 }
 
-// graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size]) : caméra orthographique.
-// Projection sans perspective — taille du monde visible = size unités en hauteur
-// (défaut 10). Mêmes méthodes que camera() ; zoom() ajuste size.
+// graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size]): an orthographic camera. No
+// perspective — the visible world is `size` units tall (10 by default). Same methods as
+// camera(); zoom() adjusts size.
 static int gfx_camera_ortho(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value cam = Value::make_map();
@@ -230,11 +228,11 @@ static int gfx_camera_ortho(CallCtx& ctx) {
     return ctx.ret(cam);
 }
 
-// ── Batcher 3D instancié + éclairé ──────────────────────────────────────────
-// begin3d ouvre la collecte ; cube/sphere/… EMPILENT une instance {transfo, tint}
-// dans le bucket de leur (mesh, texture) ; end3d résout chaque bucket en UN
-// DrawMeshInstanced custom (transfo + couleur PAR INSTANCE via 2 VBO d'instance)
-// avec le shader Blinn-Phong. → N formes de même (mesh,texture) = 1 draw call.
+// Instanced and lit 3D batcher.
+// begin3d opens the collection; cube/sphere/… PUSH an instance {transform, tint} into the
+// bucket of their (mesh, texture); end3d resolves each bucket into ONE custom
+// DrawMeshInstanced (transform + colour PER INSTANCE, through two instance VBOs) with the
+// Blinn-Phong shader. N shapes sharing a (mesh, texture) therefore cost one draw call.
 
 enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_CONE = 4, SH_TORUS = 5, SH_COUNT = 6 };
 
@@ -250,7 +248,7 @@ struct Bucket3D {
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
 
-// Modèles externes (déclarés ici car reset3dGraphicsState les référence ; défs plus bas).
+// External models, declared here because reset3d_graphics_state refers to them (definitions further down).
 struct PendingModel {
     std::vector<unsigned char> bytes;
     std::string ext;   // avec le point, ex. ".obj"
@@ -258,10 +256,10 @@ struct PendingModel {
 static std::map<std::string, PendingModel> s_model_bytes;   // octets préchargés (nom → données)
 static std::map<std::string, Model> s_model_cache;          // modèles chargés en GPU (paresseux)
 
-// ── Groupes d'instances CUITS (géométrie retenue) ───────────────────────────
-// beginChunk/endChunk enregistrent des cubes UNE fois dans des VBO persistants ;
-// drawChunk les redessine chaque frame en 1 appel — plus besoin de ré-émettre
-// chaque cube depuis Ollin à chaque frame (culling par chunk côté script).
+// BAKED instance groups (retained geometry).
+// beginChunk/endChunk record cubes ONCE into persistent VBOs; drawChunk redraws them
+// every frame in a single call, so Ollin no longer has to re-emit each cube every frame
+// (per-chunk culling on the script side).
 static bool s_recording = false;
 static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées (OPAQUE)
 static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés (OPAQUE)
@@ -286,8 +284,8 @@ static std::vector<int> s_free_groups;    // slots libérés réutilisables → 
 static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
 static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au begin3d — pour inFrustum appelé HORS du bloc 3D (où rlGetMatrixProjection renvoie l'ortho 2D restaurée par end3d)
 
-// Cache de meshes indexé par (shape, segments) — plusieurs résolutions coexistent
-// (ex. push→segments(8)→sphère + pop n'invalide pas la sphère 64 segments du même frame).
+// Mesh cache keyed by (shape, segments): several resolutions coexist, so a
+// push→segments(8)→sphere→pop does not invalidate the 64-segment sphere of the same frame.
 static std::map<std::pair<int,int>, Mesh> s_shape_cache;
 
 void reset3d_shape_cache() {
@@ -329,7 +327,7 @@ static Mesh get_shape_mesh(int shape) {
     return s_shape_cache[key];
 }
 
-// Texture blanche 1×1 : « pas de texture » → échantillon blanc → texture×tint = tint.
+// White 1×1 texture: "no texture" yields a white sample, so texture × tint = tint.
 static Texture2D s_white_tex{};
 static bool s_white_ready = false;
 static unsigned int white_tex_id() {
@@ -342,8 +340,8 @@ static unsigned int white_tex_id() {
     return s_white_tex.id;
 }
 
-// État d'éclairage (phase 1 : ambient + 1 lumière directionnelle). Opt-in : tant
-// qu'aucune lumière/ambient n'est posée, rendu PLAT (ambient blanc, lumière off).
+// Lighting state (phase 1: ambient + one directional light). Opt-in: as long as no light
+// or ambient is set, the render is FLAT (white ambient, light off).
 static bool s_lighting_used = false;
 static float s_amb3d[4] = {0.15f, 0.15f, 0.15f, 1.0f};
 static bool s_light_on = false;
@@ -352,7 +350,7 @@ static Vector3 s_light_pos = {0.0f, 0.0f, 0.0f};
 static Vector3 s_light_tgt = {0.0f, -1.0f, 0.0f};
 static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-// Shader Blinn-Phong instancié (transfo + couleur par instance) + texture.
+// Instanced Blinn-Phong shader (per-instance transform and colour) plus a texture.
 static Shader s_lit{};
 static bool s_lit_ready = false;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
@@ -361,14 +359,14 @@ static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_an
 static int s_loc_animparams = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
-// VBO d'instance PERSISTANTS (transfo + couleur) : réutilisés d'une frame à
-// l'autre (mis à jour par glBufferSubData), au lieu d'être créés/détruits à
-// chaque bucket/frame. Capacités en octets ; agrandissement seulement.
+// PERSISTENT instance VBOs (transform + colour): reused from one frame to the next
+// (updated by glBufferSubData) instead of being created and destroyed for every
+// bucket and frame. Capacities are in bytes, and only ever grow.
 static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0, s_inst_vbo_tile = 0, s_inst_vbo_corner = 0;
 static int s_inst_cap_xform = 0, s_inst_cap_color = 0, s_inst_cap_tile = 0, s_inst_cap_corner = 0;
 
-// Crée (1re fois / agrandissement) ou met à jour un VBO d'instance ; laisse le
-// VBO lié en sortie (pour le rlSetVertexAttribute qui suit).
+// Creates (first time, or on growth) or updates an instance VBO, and leaves the VBO
+// bound on exit, for the rlSetVertexAttribute that follows.
 static void upload_instance_vbo(unsigned int& vbo, int& cap, const void* data, int bytes) {
     if (vbo == 0 || bytes > cap) {
         if (vbo != 0)
@@ -408,11 +406,11 @@ static void load_lit_shader() {
         "    mat4 m = instanceTransform;\n"
         "    vec3 vp = vertexPosition;\n"
         "    vec3 vn = vertexNormal;\n"
-        // Hauteurs de coin (instanceCorner, en unités LOCALES) : les sommets du HAUT
-        // montent de l'interpolation bilinéaire des 4 coins — exacte aux coins, les
-        // sommets du mesh unitaire étant à ±0.5. Les sommets hauts des faces latérales
-        // suivent la même valeur → pas de fissure avec la face du dessus. La normale du
-        // dessus est refaite depuis les pentes, sinon le relief resterait plat à l'œil.
+            // Corner heights (instanceCorner, in LOCAL units): the TOP vertices rise by the
+        // bilinear interpolation of the four corners — exact at the corners, the unit mesh's
+        // vertices being at ±0.5. The top vertices of the side faces follow the same value, so
+        // there is no crack against the top face. The top normal is rebuilt from the slopes,
+        // otherwise the relief would still look flat.
         "    if (vp.y > 0.0) {\n"
         "        float u = vp.x + 0.5;\n"
         "        float v = vp.z + 0.5;\n"
@@ -467,10 +465,9 @@ static void load_lit_shader() {
         "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
         "        vec2 auv = (cell + uv) / atlasGrid;\n"
         "        texel = texture(texture0, auv);\n"
-        // Test alpha (feuillages ajourés) : un trou de la TUILE perce le cube. Franc plutôt
-        // que fondu, donc indépendant de l'ordre de dessin — les cubes restent opaques et
-        // n'ont pas à être triés. Limité au chemin d'atlas : une texture semi-transparente
-        // posée sur un modèle garde son fondu.
+        // Alpha test (pierced foliage): a hole in the TILE pierces the cube. Sharp rather than
+        // faded, hence independent of draw order — the cubes stay opaque and need no sorting.
+        // Limited to the atlas path: a semi-transparent texture laid on a model keeps its fade.
         "        if (texel.a < 0.5) discard;\n"
         "    } else {\n"                                 // chemin classique (modèles, texture immédiate)
         "        texel = texture(texture0, fragTexCoord);\n"
@@ -514,9 +511,9 @@ static void load_lit_shader() {
     s_lit_ready = true;
 }
 
-// Bucket courant pour (mesh, texture courante) — créé à la demande. Keyé par
-// mesh.vaoId → primitives unitaires ET meshes de modèles externes partagent le
-// même chemin instancié + éclairé (N formes de même (mesh,texture) = 1 draw call).
+// Current bucket for (mesh, current texture), created on demand. Keyed by mesh.vaoId, so
+// unit primitives AND the meshes of external models share the same instanced, lit path
+// (N shapes of the same (mesh, texture) = one draw call).
 static Bucket3D& bucket_for(const Mesh& mesh, unsigned int texId) {
     for (auto& b : s_buckets) {
         if (b.vaoId == mesh.vaoId && b.texId == texId) {
@@ -527,14 +524,14 @@ static Bucket3D& bucket_for(const Mesh& mesh, unsigned int texId) {
     return s_buckets.back();
 }
 
-// Empile une instance (transfo translate·scale + couleur) dans son bucket (mesh, texId).
+// Pushes an instance (translate·scale transform plus colour) into its (mesh, texId) bucket.
 static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vector3 size, Color col) {
     if (s_recording) {
-        // Mode enregistrement (beginChunk) : on cuit la transfo LOCALE (monde) et la
-        // couleur ; texId ignoré (groupe cuit = texture blanche + couleur par instance).
+        // Recording mode (beginChunk): we bake the LOCAL (world) transform and the colour;
+        // texId is ignored, a baked group being a white texture plus a per-instance colour.
         (void)texId;
         Matrix rm = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
-        // Routage OPAQUE vs TRANSPARENT selon l'alpha de la couleur (eau = alpha<1).
+        // OPAQUE versus TRANSPARENT routing according to the colour's alpha (water = alpha < 1).
         if (col.a < 250) {
             s_rec_mesh_w = mesh;
             s_rec_xw.push_back(rm);
@@ -565,11 +562,11 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
         return;
     }
     Bucket3D& b = bucket_for(mesh, texId);
-    // Placement local (scale puis translate) PUIS la transfo courante capturée ICI
-    // → chaque instance fige sa propre transfo. begin3d ayant ouvert le mode
-    // transform, rlGetMatrixTransform() reflète translate/rotate/scale qu'ils soient
-    // encadrés par push/pop ou « nus » (accumulés sur le bloc) — même sémantique que
-    // les primitives immédiates.
+    // Local placement (scale then translate) THEN the current transform, captured HERE, so
+    // that each instance freezes its own. begin3d having opened the transform mode,
+    // rlGetMatrixTransform() reflects translate/rotate/scale whether they are bracketed by
+    // push/pop or left "bare" (accumulated over the block) — the same semantics as the
+    // immediate primitives.
     Matrix local = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
     b.xforms.push_back(MatrixMultiply(local, rlGetMatrixTransform()));
     b.colors.push_back(col.r / 255.0f);
@@ -584,9 +581,9 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
     }
 }
 
-// Active le shader lit et pose les uniforms du frame (MVP = view·proj figée au
-// begin3d, position caméra, éclairage). Renvoie false si le shader est indisponible.
-// Partagé par flushBucket (instances collectées) ET drawChunk (groupe cuit).
+// Activates the lit shader and sets the frame's uniforms (MVP = the view·proj frozen at
+// begin3d, camera position, lighting). Returns false if the shader is unavailable.
+// Shared by flush_bucket (collected instances) AND draw_chunk (a baked group).
 static bool lit_begin_draw() {
     load_lit_shader();
     if (s_lit.id == 0) {
@@ -630,11 +627,9 @@ static bool lit_begin_draw() {
     return true;
 }
 
-// Attache les attributs d'instance (transfo mat4 = 4 vec4, puis couleur vec4,
-// divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
-// Attache les attributs d'instance (transfo mat4 = 4 vec4, couleur vec4, tuiles
-// vec3 ; divisor 1) depuis des VBO DÉJÀ REMPLIS. VAO supposé déjà actif. Partagé
-// par litBindInstances (groupe cuit) et flushBucket (VBO partagés).
+// Binds the instance attributes (transform mat4 = 4 vec4, colour vec4, tiles vec3, corners
+// vec4; divisor 1) from VBOs ALREADY FILLED. The VAO is assumed to be active. Shared by
+// lit_bind_instances (a baked group) and flush_bucket (shared VBOs).
 static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t, unsigned int vbo_k) {
     int loc_t = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
     rlEnableVertexBuffer(vbo_x);
@@ -663,7 +658,7 @@ static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned 
     }
 }
 
-// divisor 1) depuis des VBO DÉJÀ REMPLIS, sur le VAO du mesh.
+// Same binding, but on the mesh's VAO, which it activates and releases itself.
 static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t,
                               unsigned int vbo_k) {
     rlEnableVertexArray(vaoId);
@@ -672,7 +667,7 @@ static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned 
     rlDisableVertexArray();
 }
 
-// Dessin instancié (shader + attributs déjà en place). Lie la texture puis draw.
+// Instanced draw (shader and attributes already in place). Binds the texture, then draws.
 static void lit_draw_instanced(const Mesh& mesh, unsigned int texId, int n) {
     rlActiveTextureSlot(0);
     rlEnableTexture(texId ? texId : white_tex_id());
@@ -689,7 +684,7 @@ static void lit_draw_instanced(const Mesh& mesh, unsigned int texId, int n) {
     rlDisableTexture();
 }
 
-// Résout un bucket (instances collectées CETTE frame) en UN appel instancié.
+// Resolves a bucket (the instances collected THIS frame) into ONE instanced call.
 static void flush_bucket(const Bucket3D& b) {
     int n = (int)b.xforms.size();
     if (n == 0) {
@@ -699,8 +694,8 @@ static void flush_bucket(const Bucket3D& b) {
         return;
     }
     Mesh mesh = b.mesh;
-    // Tampon scratch réutilisé (pas d'alloc par bucket/frame) + VBO d'instance
-    // PARTAGÉS persistants (upload par frame, pas recréés).
+    // A reused scratch buffer (no allocation per bucket or frame) plus SHARED persistent
+    // instance VBOs (uploaded per frame, not recreated).
     static std::vector<float16> xf;
     xf.resize(n);
     for (int i = 0; i < n; i++) {
@@ -728,13 +723,13 @@ void reset3d_lighting_state() {
     s_amb3d[3] = 1.0f;
 }
 
-// Libère TOUTES les ressources GL 3D en cache (shader, meshes unitaires, texture
-// blanche, VBO d'instance) et remet les caches à zéro. À appeler par gfx_canvas
-// AVANT de détruire le contexte GL (CloseWindow) : sinon les ids GL survivraient
-// dans les caches et pointeraient vers des objets d'un contexte détruit au run
-// suivant (playground) → 3D corrompue/plantage. Équivalent 3D de image_reset().
-// NB : ne fait des appels GL que si un contexte est courant (garde IsWindowReady
-// côté appelant) ; sur le 1er run les flags *_ready sont false → no-op.
+// Frees ALL cached 3D GL resources (shader, unit meshes, white texture, instance VBOs)
+// and clears the caches. To be called by gfx_canvas BEFORE destroying the GL context
+// (CloseWindow): otherwise the GL ids would survive in the caches and point at objects of
+// a context destroyed by the next run (playground), giving corrupt 3D or a crash. This is
+// the 3D counterpart of image_reset().
+// It only makes GL calls when a context is current (the IsWindowReady guard sits in the
+// caller); on the first run the *_ready flags are false, so it is a no-op.
 void reset3d_graphics_state() {
     if (s_lit_ready) {
         UnloadShader(s_lit);
@@ -742,14 +737,14 @@ void reset3d_graphics_state() {
         s_lit_ready = false;
     }
     reset3d_shape_cache();
-    // Modèles chargés en GPU : invalides avec le contexte détruit → décharger et
-    // vider le cache (rechargés paresseusement depuis les octets au prochain usage).
+    // Models loaded into the GPU: invalid once the context is destroyed, so we unload them
+    // and clear the cache (they are reloaded lazily from the bytes on next use).
     for (auto& kv : s_model_cache) {
         UnloadModel(kv.second);
     }
     s_model_cache.clear();
-    // Groupes d'instances cuits : VBO liés au contexte → libérer et vider (le script
-    // les recuit dans setup au prochain run).
+    // Baked instance groups: their VBOs belong to the context, so we free and clear them
+    // (the script bakes them again in setup on the next run).
     for (auto& g : s_groups) {
         if (g.vbo_x) {
             rlUnloadVertexBuffer(g.vbo_x);
@@ -820,8 +815,8 @@ void reset3d_graphics_state() {
 }
 
 static void flush3d_buckets() {
-    // Vider le batch immédiat en attente (fil de fer/grille dessinés pendant la
-    // collecte) avant nos draw calls instanciés → ordre cohérent.
+    // Flush the pending immediate batch (wireframe and grid, drawn during the collection)
+    // before our instanced draw calls, so the order stays consistent.
     rlDrawRenderBatchActive();
     for (const auto& b : s_buckets) {
         flush_bucket(b);
@@ -848,12 +843,11 @@ static int gfx_begin3d(CallCtx& ctx) {
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
     s_proj3d = rlGetMatrixProjection();  // projection perspective figée → inFrustum correct même appelé hors du bloc 3D
-    // Entre dans le mode « transform » de rlgl pour TOUT le bloc 3D : ainsi
-    // translate/rotate/scale — AVEC OU SANS push/pop — écrivent dans
-    // RLGL.State.transform (espace monde, lu par rlGetMatrixTransform) au lieu de
-    // la modelview. Les solides instanciés (bake) ET les primitives immédiates
-    // (transformRequired) reçoivent alors la même transfo → cohérent, sans exiger
-    // push/pop. Refermé par le rlPopMatrix d'end3dInternal.
+    // Enters rlgl's "transform" mode for the WHOLE 3D block, so that translate/rotate/scale
+    // — WITH OR WITHOUT push/pop — write into RLGL.State.transform (world space, read by
+    // rlGetMatrixTransform) instead of into the modelview. The instanced solids (baked) AND
+    // the immediate primitives (transform_required) then receive the same transform, which is
+    // consistent without requiring push/pop. Closed again by end3d_internal's rlPopMatrix.
     rlPushMatrix();
     s_in_3d = true;
     return ctx.ret(Value{});
@@ -867,7 +861,7 @@ static int gfx_end3d(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.ambient(v | couleur) : lumière ambiante (active le mode éclairé).
+// graphics.ambient(v | colour): ambient light, which turns the lit mode on.
 static int gfx_ambient(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && (args[0].is_map() || args[0].is_class())) {
@@ -887,10 +881,10 @@ static int gfx_ambient(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── Classe Light (native, comme Camera/Color) ───────────────────────────────
-// Phase 1 : une seule lumière active (directionnelle ou ponctuelle). Un objet
-// Light porte sa config (type, direction/position, couleur, activée) et, à chaque
-// mutation, la répercute sur l'état d'éclairage global (dernier écrit = actif).
+// Light class (native, like Camera and Color).
+// Phase 1: a single active light, directional or point. A Light object carries its own
+// configuration (type, direction or position, colour, enabled) and, on every mutation,
+// pushes it into the global lighting state (last written wins).
 static double inst_field(const Value& self, const char* k, double def) {
     Value v = self.map_get(Value(std::string(k)));
     return v.is_number() ? v.as_num() : def;
@@ -917,7 +911,7 @@ static void apply_light_from_instance(const Value& self) {
     s_lighting_used = true;
 }
 
-// light.setDir(x,y,z) : oriente une lumière directionnelle (direction de propagation).
+// light.setDir(x,y,z): aims a directional light (direction of propagation).
 static int light_set_dir(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -929,7 +923,7 @@ static int light_set_dir(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// light.setPos(x,y,z) : positionne une lumière ponctuelle.
+// light.setPos(x,y,z): places a point light.
 static int light_set_pos(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -941,7 +935,7 @@ static int light_set_pos(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// light.setColor(couleur) : couleur de la lumière.
+// light.setColor(colour): the light's colour.
 static int light_set_color(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -956,7 +950,7 @@ static int light_set_color(CallCtx& ctx) {
     return ctx.ret(self);
 }
 
-// light.enable(bool) : active/désactive la lumière (défaut : active).
+// light.enable(bool): turns the light on or off (on by default).
 static int light_enable(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
@@ -981,8 +975,8 @@ static Value light_class() {
     return cls;
 }
 
-// graphics.light("dir"|"point", x,y,z [, couleur]) : crée un objet Light et
-// l'active. "dir" : (x,y,z) = direction de propagation ; "point" : position.
+// graphics.light("dir"|"point", x,y,z [, colour]): creates a Light object and enables it.
+// For "dir", (x,y,z) is the direction of propagation; for "point", the position.
 static int gfx_light(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     std::string type = (argc > 0 && args[0].is_string()) ? args[0].as_string() : "dir";
@@ -1005,8 +999,8 @@ static int gfx_light(CallCtx& ctx) {
     return ctx.ret(inst);
 }
 
-// graphics.grid(slices, spacing) : repère quadrillé au sol (plan XZ), centré sur
-// l'origine. Couleur grise fixe de raylib (n'utilise ni fill ni stroke).
+// graphics.grid(slices, spacing): a ground grid (XZ plane) centred on the origin. Its
+// grey is raylib's own and fixed (it uses neither fill nor stroke).
 static int gfx_grid(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     int slices = argc > 0 ? gfx_to_int(args[0]) : 10;
@@ -1015,7 +1009,7 @@ static int gfx_grid(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.texture(img) / graphics.noTexture() : texture 3D courante (handle image).
+// graphics.texture(img) / graphics.noTexture(): the current 3D texture (an image handle).
 static int gfx_texture(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].is_map()) {
@@ -1033,8 +1027,8 @@ static int gfx_no_texture(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.tileset(img, cols, rows) : déclare l'atlas de tuiles (terrain voxel).
-// Une seule texture en grille, échantillonnée par tuile selon la face du cube.
+// graphics.tileset(img, cols, rows): declares the tile atlas (voxel terrain). A single
+// grid texture, sampled tile by tile according to the cube's face.
 static int gfx_tileset(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc > 0 && args[0].is_map()) {
@@ -1044,14 +1038,14 @@ static int gfx_tileset(CallCtx& ctx) {
     s_atlas_grid[0] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tileset") : 1.0f;
     s_atlas_grid[1] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tileset") : 1.0f;
     if (s_atlas_texid != 0) {
-        // pixels nets (look voxel) : filtrage NEAREST, pas de mipmap.
+        // Crisp pixels (the voxel look): NEAREST filtering, no mipmap.
         rlTextureParameters(s_atlas_texid, RL_TEXTURE_MAG_FILTER, RL_TEXTURE_FILTER_NEAREST);
         rlTextureParameters(s_atlas_texid, RL_TEXTURE_MIN_FILTER, RL_TEXTURE_FILTER_NEAREST);
     }
     return ctx.ret(Value{});
 }
 
-// graphics.tiles(top, side, bottom) : tuiles du prochain cube (état, comme fill).
+// graphics.tiles(top, side, bottom): tiles of the next cube (state, like fill).
 static int gfx_tiles(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     s_cur_tile[0] = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tiles") : -1.0f;
@@ -1060,10 +1054,10 @@ static int gfx_tiles(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.corners(a, b, c, d) : hauteurs des 4 coins du DESSUS du prochain cube, en
-// unités de sa hauteur : (-x,-z), (+x,-z), (-x,+z), (+x,+z). État, comme graphics.tile.
-// Sans argument (ou tout à 0) → dessus plat, cube ordinaire. Deux cubes voisins qui
-// donnent la même valeur au coin qu'ils partagent forment une surface continue.
+// graphics.corners(a, b, c, d): heights of the four TOP corners of the next cube, in units
+// of its height: (-x,-z), (+x,-z), (-x,+z), (+x,+z). State, like graphics.tile. With no
+// argument (or all zero) the top is flat, an ordinary cube. Two neighbouring cubes giving
+// the same value to the corner they share form a continuous surface.
 static int gfx_corners(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     for (int k = 0; k < 4; k++) {
@@ -1072,7 +1066,7 @@ static int gfx_corners(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.tile(t) : même tuile sur les 6 faces (raccourci). tile(-1) = aucune.
+// graphics.tile(t): the same tile on all six faces (a shorthand). tile(-1) = none.
 static int gfx_tile(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     float t = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tile") : -1.0f;
@@ -1082,9 +1076,9 @@ static int gfx_tile(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.tileAnim(t [, defilement, vitesse, frequence, amplitude]) : tuile dont l'UV
-// défile/ondule dans le temps (eau). -1 = aucune. Les 4 paramètres optionnels règlent
-// l'ondulation (défauts = look eau) ; la phase spatiale est en coordonnées monde.
+// graphics.tileAnim(t [, scroll, speed, frequency, amplitude]): a tile whose UV scrolls and
+// ripples over time (water). -1 = none. The four optional parameters tune the ripple
+// (defaults give a water look); the spatial phase is in world coordinates.
 static int gfx_tile_anim(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     s_anim_tile = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.tileAnim") : -1.0f;
@@ -1103,8 +1097,8 @@ static int gfx_tile_anim(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.cube(x,y,z, w,h,l) : cube centré en (x,y,z). Plein si fill (instancié,
-// éclairé, texturé), arêtes si stroke (immédiat, non éclairé).
+// graphics.cube(x,y,z, w,h,l): a cube centred on (x,y,z). Solid if fill (instanced, lit,
+// textured), edges if stroke (immediate, unlit).
 static int gfx_cube(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cube"), (float)num_arg(args, argc, 1, "graphics.cube"),
@@ -1118,8 +1112,8 @@ static int gfx_cube(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.sphere(x,y,z, r) : sphère centrée en (x,y,z). Pleine si fill (instanciée,
-// éclairée, texturée), fil de fer si stroke (immédiat). Mesh unitaire = rayon 0.5.
+// graphics.sphere(x,y,z, r): a sphere centred on (x,y,z). Solid if fill (instanced, lit,
+// textured), wireframe if stroke (immediate). The unit mesh has radius 0.5.
 static int gfx_sphere(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)num_arg(args, argc, 0, "graphics.sphere"), (float)num_arg(args, argc, 1, "graphics.sphere"),
@@ -1132,9 +1126,9 @@ static int gfx_sphere(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.cylinder(x,y,z, r, h) : cylindre, (x,y,z) = centre de la base, rayon r,
-// hauteur h (vers +Y). Plein si fill (instancié), fil de fer si stroke (immédiat).
-// Mono-rayon (contrainte de l'instancing : mesh unitaire figé, rayon 1 hauteur 1).
+// graphics.cylinder(x,y,z, r, h): a cylinder, (x,y,z) being the centre of the base, of
+// radius r and height h (towards +Y). Solid if fill (instanced), wireframe if stroke
+// (immediate). Single-radius, a constraint of the instancing: the unit mesh is frozen at radius 1, height 1.
 static int gfx_cylinder(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cylinder"), (float)num_arg(args, argc, 1, "graphics.cylinder"),
@@ -1148,7 +1142,7 @@ static int gfx_cylinder(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.cone(x,y,z, r, h) : cône, (x,y,z) = centre de la base, rayon r, hauteur h (vers +Y).
+// graphics.cone(x,y,z, r, h): a cone, (x,y,z) being the centre of the base, of radius r and height h (towards +Y).
 static int gfx_cone(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)num_arg(args, argc, 0, "graphics.cone"), (float)num_arg(args, argc, 1, "graphics.cone"),
@@ -1162,16 +1156,16 @@ static int gfx_cone(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.torus(x,y,z, r, tube) : tore centré en (x,y,z), rayon major r, rayon du tube tube.
-// Le mesh unitaire a r=0.5, tube=0.25 → scale = (r/0.5, r/0.5, r/0.5) avec tube/r = 0.5 fixé.
-// Pour exposer les deux paramètres indépendants, on scale X=Z sur r, Y sur tube.
+// graphics.torus(x,y,z, r, tube): a torus centred on (x,y,z), of major radius r and tube radius tube.
+// The unit mesh has r=0.5 and tube=0.25, hence a uniform scale with tube/r fixed at 0.5.
+// To expose the two parameters independently, X and Z scale on r, and Y on tube.
 static int gfx_torus(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)num_arg(args, argc, 0, "graphics.torus"), (float)num_arg(args, argc, 1, "graphics.torus"),
                 (float)num_arg(args, argc, 2, "graphics.torus")};
     float r    = (float)num_arg(args, argc, 3, "graphics.torus");
     float tube = (float)num_arg(args, argc, 4, "graphics.torus");
-    // mesh : major=1 (XY), tube=0.3 (Z) → scale XY par r, Z par tube/0.3
+    // Mesh: major=1 (XY), tube=0.3 (Z), hence XY scaled by r and Z by tube/0.3.
     if (gfx_has_fill())
         push_instance(get_shape_mesh(SH_TORUS), s_cur_tex3d, pos, {r, r, tube / 0.3f}, gfx_fill_color());
     if (gfx_has_stroke())
@@ -1179,8 +1173,8 @@ static int gfx_torus(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.plane(x,y,z, sx,sz) : plan horizontal (XZ) centré en (x,y,z), taille
-// sx×sz. Instancié + éclairé (utilise la couleur fill ; sinon stroke pour rester visible).
+// graphics.plane(x,y,z, sx,sz): a horizontal plane (XZ) centred on (x,y,z), of size sx×sz.
+// Instanced and lit (it uses the fill colour, falling back to stroke to stay visible).
 static int gfx_plane(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 pos{(float)num_arg(args, argc, 0, "graphics.plane"), (float)num_arg(args, argc, 1, "graphics.plane"),
@@ -1194,7 +1188,7 @@ static int gfx_plane(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.line3d(x1,y1,z1, x2,y2,z2) : segment 3D — rendu comme un cylindre (rayon = strokeSize * 0.02).
+// graphics.line3d(x1,y1,z1, x2,y2,z2): a 3D segment, drawn as a cylinder (radius = strokeSize * 0.02).
 static int gfx_line3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Vector3 a{(float)num_arg(args, argc, 0, "graphics.line3d"), (float)num_arg(args, argc, 1, "graphics.line3d"),
@@ -1206,7 +1200,7 @@ static int gfx_line3d(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.point3d(x,y,z) : point 3D — rendu comme une petite sphère (rayon = strokeSize * 0.015).
+// graphics.point3d(x,y,z): a 3D point, drawn as a small sphere (radius = strokeSize * 0.015).
 static int gfx_point3d(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     float x = (float)num_arg(args, argc, 0, "graphics.point3d");
@@ -1217,10 +1211,10 @@ static int gfx_point3d(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.rotateq(q) : applique la rotation du quaternion q dans la pile de
-// transformation courante — comme rotate/rotateX-Y-Z mais depuis un Quat. Donc
-// composable, compatible push/pop, appliqué aux solides instanciés ET immédiats.
-// rlMultMatrixf gauche-multiplie (comme rlRotatef) → composition identique.
+// graphics.rotateq(q): applies the quaternion q's rotation in the current transformation
+// stack — like rotate/rotateX-Y-Z but from a Quat. It therefore composes, works with
+// push/pop, and applies to instanced solids AS WELL AS immediate ones. rlMultMatrixf
+// left-multiplies (like rlRotatef), so the composition is identical.
 static int gfx_rotateq(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
@@ -1230,23 +1224,23 @@ static int gfx_rotateq(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// ── Modèles externes (OBJ/GLTF…) ────────────────────────────────────────────
-// raylib n'a pas de LoadModel depuis mémoire : on stocke les OCTETS préchargés
-// (par nom) puis, au 1er usage (contexte GL prêt), on écrit dans le FS et LoadModel.
-// Le chargement GPU est PARESSEUX (après graphics.canvas → InitWindow) et mis en
-// cache. Le rendu réutilise le batcher : drawModel empile les meshes du modèle
-// comme instances → mêmes éclairage/fill/instancing que les primitives.
-// (PendingModel/s_model_bytes/s_model_cache sont déclarés plus haut car
-// reset3dGraphicsState les référence.)
+// External models (OBJ, GLTF…).
+// raylib has no LoadModel from memory, so we store the preloaded BYTES by name and, on
+// first use (once the GL context is ready), write them to the FS and call LoadModel.
+// The GPU load is LAZY (after graphics.canvas, hence after InitWindow) and cached. The
+// rendering reuses the batcher: draw_model pushes the model's meshes as instances, so
+// they get the same lighting, fill and instancing as the primitives.
+// (PendingModel, s_model_bytes and s_model_cache are declared above, because
+// reset3d_graphics_state refers to them.)
 
-// Préchargement depuis JS/natif : mémorise les octets bruts (chargement GPU différé).
+// Preloading from JS or native code: keeps the raw bytes, the GPU load being deferred.
 void model_preload_bytes(const std::string& name, std::vector<unsigned char> bytes, const std::string& ext) {
     s_model_bytes[name] = PendingModel{std::move(bytes), ext};
 }
 
-// Récupère (et charge en GPU à la demande) le modèle `name`. Cherche : cache →
-// octets préchargés (écriture FS + LoadModel) → chemin de fichier direct (natif /
-// asset écrit dans MEMFS). Renvoie nullptr si introuvable/illisible.
+// Fetches the model `name`, loading it into the GPU on demand. It looks in the cache,
+// then in the preloaded bytes (write to the FS, then LoadModel), then as a direct file
+// path (native, or an asset written into MEMFS). Returns nullptr if not found or unreadable.
 static Model* model_get(const std::string& name) {
     auto c = s_model_cache.find(name);
     if (c != s_model_cache.end()) {
@@ -1255,8 +1249,8 @@ static Model* model_get(const std::string& name) {
     Model m{};
     auto p = s_model_bytes.find(name);
     if (p != s_model_bytes.end()) {
-        // raylib LoadModel lit un FICHIER → on écrit les octets dans le FS (MEMFS
-        // sur WASM) puis on charge, et on nettoie le fichier de travail.
+        // raylib's LoadModel reads a FILE, so we write the bytes into the FS (MEMFS on WASM),
+        // load them, then clean up the working file.
         std::string path = std::string("ollin_model") + p->second.ext;
         FILE* f = fopen(path.c_str(), "wb");
         if (!f) {
@@ -1267,7 +1261,7 @@ static Model* model_get(const std::string& name) {
         m = LoadModel(path.c_str());
         remove(path.c_str());
     } else {
-        // Repli : charger directement depuis un chemin (natif, ou asset en MEMFS).
+        // Fallback: load straight from a path (native, or an asset in MEMFS).
         m = LoadModel(name.c_str());
     }
     if (m.meshCount <= 0) {
@@ -1278,8 +1272,8 @@ static Model* model_get(const std::string& name) {
     return &s_model_cache[name];
 }
 
-// graphics.model(name) : renvoie un handle {name} vers un modèle préchargé (ou un
-// chemin chargeable). Déclenche le chargement (erreur si introuvable).
+// graphics.model(name): returns a handle {name} to a preloaded model (or a loadable path).
+// It triggers the load, and raises an error if the model cannot be found.
 static int gfx_model(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_string()) {
@@ -1294,9 +1288,9 @@ static int gfx_model(CallCtx& ctx) {
     return ctx.ret(h);
 }
 
-// graphics.drawModel(handle [, x, y, z [, scale]]) : dans un bloc begin3d, empile
-// les meshes du modèle comme instances (transfo courante · translate · scale,
-// teinte = fill) → éclairage + instancing du batcher.
+// graphics.drawModel(handle [, x, y, z [, scale]]): inside a begin3d block, pushes the
+// model's meshes as instances (current transform · translate · scale, tint = fill), hence
+// the batcher's lighting and instancing.
 static int gfx_draw_model(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
@@ -1316,11 +1310,11 @@ static int gfx_draw_model(CallCtx& ctx) {
     float s = argc > 4 ? (float)num_arg(args, argc, 4, "graphics.drawModel") : 1.0f;
     Vector3 pos{x, y, z};
     Vector3 size{s, s, s};
-    // fill = teinte GLOBALE (multiplicateur). fill blanc → le modèle garde ses
-    // propres couleurs/textures ; fill coloré → il teinte le modèle.
+    // fill is a GLOBAL tint (a multiplier): a white fill leaves the model its own colours and
+    // textures, a coloured fill tints it.
     Color fill = gfx_has_fill() ? gfx_fill_color() : WHITE;
     for (int i = 0; i < mdl->meshCount; i++) {
-        // Matériau du mesh (GLB/GLTF) : texture diffuse + couleur de base.
+        // The mesh's material (GLB/GLTF): diffuse texture plus base colour.
         unsigned int texId = s_cur_tex3d;   // défaut : texture 3D courante (ou blanche)
         Color base = WHITE;
         int mi = mdl->meshMaterial ? mdl->meshMaterial[i] : 0;
@@ -1331,7 +1325,7 @@ static int gfx_draw_model(CallCtx& ctx) {
             }
             base = diff.color;             // baseColorFactor (glTF) — blanc par défaut (OBJ)
         }
-        // tint = couleur de base du matériau × fill (composantes).
+        // tint = the material's base colour times fill, component by component.
         Color tint{(unsigned char)(base.r * fill.r / 255), (unsigned char)(base.g * fill.g / 255),
                    (unsigned char)(base.b * fill.b / 255), (unsigned char)(base.a * fill.a / 255)};
         push_instance(mdl->meshes[i], texId, pos, size, tint);
@@ -1339,9 +1333,9 @@ static int gfx_draw_model(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.modelSize(handle) : dimensions du modèle (boîte englobante) →
-// map { w, h, d, cx, cy, cz, radius }. radius = rayon de la sphère englobante
-// (demi-diagonale). À appeler UNE fois (le parcours des sommets n'est pas gratuit).
+// graphics.modelSize(handle): the model's dimensions (its bounding box), as a map
+// { w, h, d, cx, cy, cz, radius }, radius being that of the bounding sphere (half the
+// diagonal). To be called ONCE: walking the vertices is not free.
 static int gfx_model_size(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
@@ -1370,11 +1364,11 @@ static int gfx_model_size(CallCtx& ctx) {
     return ctx.ret(r);
 }
 
-// graphics.fitDistance(radius [, fovy]) : distance de caméra pour qu'une sphère de
-// rayon `radius` tienne ENTIÈREMENT dans la vue, selon le RATIO d'écran courant
-// (portrait/paysage) et le champ de vision vertical `fovy` (degrés, 45 défaut). En
-// paysage la contrainte est verticale ; en portrait, horizontale — on prend le plus
-// petit demi-angle. À appeler chaque frame (bon marché) → suit les rotations d'écran.
+// graphics.fitDistance(radius [, fovy]): the camera distance at which a sphere of radius
+// `radius` fits ENTIRELY in the view, given the current screen RATIO (portrait or
+// landscape) and the vertical field of view `fovy` (in degrees, 45 by default). In
+// landscape the constraint is vertical, in portrait horizontal, so we take the smaller
+// half-angle. Cheap enough to call every frame, which follows screen rotations.
 static int gfx_fit_distance(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     double radius = num_arg(args, argc, 0, "graphics.fitDistance");
@@ -1389,30 +1383,30 @@ static int gfx_fit_distance(CallCtx& ctx) {
     return ctx.ret(Value((s > 1e-4) ? radius / s : radius * 10.0));
 }
 
-// graphics.inFrustum(x, y, z [, radius]) : la sphère (centre, rayon) est-elle
-// (au moins partiellement) DANS le champ de vision de la caméra courante ? →
-// 1 (visible) / 0 (hors-champ). Sert au culling par chunk (on ne dessine que le
-// visible). À appeler DANS un bloc begin3d/end3d (la vue/projection du frame y
-// sont posées). Test exact : 6 plans du frustum extraits de view·projection.
+// graphics.inFrustum(x, y, z [, radius]): is the sphere (centre, radius) at least partly
+// INSIDE the current camera's field of view? It answers true (visible) or false (off
+// screen), which serves per-chunk culling: only the visible part is drawn. To be called
+// INSIDE a begin3d/end3d block, where the frame's view and projection are set. The test
+// is exact: the six frustum planes are extracted from view·projection.
 static int gfx_in_frustum(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     float x = (float)num_arg(args, argc, 0, "graphics.inFrustum");
     float y = (float)num_arg(args, argc, 1, "graphics.inFrustum");
     float z = (float)num_arg(args, argc, 2, "graphics.inFrustum");
     float r = argc > 3 ? (float)num_arg(args, argc, 3, "graphics.inFrustum") : 0.0f;
-    // Utilise la projection FIGÉE au begin3d (s_proj3d), pas rlGetMatrixProjection()
-    // en direct : le culling par chunk est fait AVANT begin3d, où la projection
-    // courante est l'ortho 2D restaurée par le end3d précédent → frustum faux
-    // (chunks lointains cullés à tort ; ils « apparaissent » en approchant).
+    // Uses the projection FROZEN at begin3d (s_proj3d), not rlGetMatrixProjection() live:
+    // per-chunk culling happens BEFORE begin3d, where the current projection is the 2D ortho
+    // restored by the previous end3d, giving a wrong frustum (distant chunks wrongly culled;
+    // they "appear" as one draws near).
     Matrix vp = MatrixMultiply(s_view3d, s_proj3d);
-    // Lignes de VP (clip.x/y/z/w = ligne · (x,y,z,1)), layout colonne-major raylib.
+    // Rows of VP (clip.x/y/z/w = row · (x,y,z,1)), in raylib's column-major layout.
     float rows[4][4] = {
         {vp.m0, vp.m4, vp.m8, vp.m12},   // clip.x
         {vp.m1, vp.m5, vp.m9, vp.m13},   // clip.y
         {vp.m2, vp.m6, vp.m10, vp.m14},  // clip.z
         {vp.m3, vp.m7, vp.m11, vp.m15},  // clip.w
     };
-    // 6 plans = ligne_w ± ligne_i (gauche/droite, bas/haut, near/far).
+    // Six planes = row_w ± row_i (left/right, bottom/top, near/far).
     for (int i = 0; i < 3; i++) {
         for (int sgn = 0; sgn < 2; sgn++) {
             float a = rows[3][0] + (sgn ? -rows[i][0] : rows[i][0]);
@@ -1432,9 +1426,9 @@ static int gfx_in_frustum(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(true));
 }
 
-// graphics.beginChunk() : démarre l'enregistrement d'un groupe de cubes. Les
-// graphics.cube(...) suivants sont CUITS (pas dessinés). Appeler dans setup (le
-// contexte GL doit être prêt : après graphics.canvas).
+// graphics.beginChunk(): starts recording a group of cubes. The graphics.cube(...) calls
+// that follow are BAKED, not drawn. To be called in setup, the GL context having to be
+// ready, hence after graphics.canvas.
 static int gfx_begin_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -1451,7 +1445,7 @@ static int gfx_begin_chunk(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Construit un InstGroup (VBO persistants) depuis des vecteurs d'instances cuits.
+// Builds an InstGroup (persistent VBOs) from vectors of baked instances.
 static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, const std::vector<float>& cs,
                             const std::vector<float>& ts, const std::vector<float>& ks) {
     InstGroup g{};
@@ -1470,8 +1464,8 @@ static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, co
     return g;
 }
 
-// Range un groupe cuit dans s_groups en réutilisant un slot libéré si dispo (borne
-// la croissance en streaming infini) ; sinon agrandit. Renvoie l'id 1-based.
+// Stores a baked group in s_groups, reusing a freed slot when one is available, which
+// bounds the growth under endless streaming; otherwise it grows. Returns the 1-based id.
 static int place_group(const InstGroup& g) {
     if (!s_free_groups.empty()) {
         int idx = s_free_groups.back();
@@ -1483,10 +1477,10 @@ static int place_group(const InstGroup& g) {
     return (int)s_groups.size();
 }
 
-// graphics.endChunk() : cuit les cubes enregistrés dans des VBO persistants et
-// renvoie un handle { id, idw, count, wcount }. `id` = groupe OPAQUE, `idw` = groupe
-// TRANSPARENT (eau, idw=0 si aucune eau). À redessiner chaque frame : drawChunk
-// (opaque) puis, après TOUT l'opaque, drawChunkAlpha (eau).
+// graphics.endChunk(): bakes the recorded cubes into persistent VBOs and returns a handle
+// { id, idw, count, wcount }. `id` is the OPAQUE group, `idw` the TRANSPARENT one (water,
+// idw = 0 if there is none). It is redrawn every frame: drawChunk (opaque), then, after
+// ALL the opaque, drawChunkAlpha (water).
 static int gfx_end_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -1515,8 +1509,8 @@ static int gfx_end_chunk(CallCtx& ctx) {
     return ctx.ret(h);
 }
 
-// graphics.drawChunk(handle) : redessine un groupe cuit en UN appel instancié
-// (éclairé). À appeler DANS un bloc begin3d. Ne ré-émet AUCUN cube depuis Ollin.
+// graphics.drawChunk(handle): redraws a baked group in ONE instanced, lit call. To be
+// called INSIDE a begin3d block. It re-emits NO cube from Ollin.
 static int gfx_draw_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
@@ -1538,19 +1532,18 @@ static int gfx_draw_chunk(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
-    // Atlas lié si déclaré (tuiles≥0 échantillonnent l'atlas) ; sinon blanc (couleur
-    // pleine). CONTRAT : avec un tileset actif, donner une tuile à CHAQUE cube du
-    // chunk — un cube à tuile -1 échantillonnerait l'atlas @ fragTexCoord (tuile 0)
-    // au lieu d'une couleur pleine.
+    // The atlas is bound if declared (tiles >= 0 sample it), otherwise white (plain colour).
+    // CONTRACT: with a tileset active, give a tile to EVERY cube of the chunk — a cube with
+    // tile -1 would sample the atlas at fragTexCoord (tile 0) instead of a plain colour.
     lit_draw_instanced(g.mesh, s_atlas_texid, g.count);
     rlDisableShader();
     return ctx.ret(Value{});
 }
 
-// graphics.drawChunkAlpha(handle) : dessine le groupe TRANSPARENT du chunk (eau) en
-// mélange alpha (on voit le fond opaque déjà dessiné à travers). Depth test+write
-// gardés → la surface d'eau s'occlude proprement (pas d'accumulation entre couches).
-// À appeler DANS begin3d APRÈS avoir dessiné TOUT l'opaque (drawChunk) des chunks.
+// graphics.drawChunkAlpha(handle): draws the chunk's TRANSPARENT group (water) in alpha
+// blending, so the opaque background already drawn shows through. Depth test and write
+// are kept, so the water surface occludes itself cleanly, with no accumulation between
+// layers. To be called INSIDE begin3d AFTER drawing ALL the chunks' opaque parts.
 static int gfx_draw_chunk_alpha(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_map()) {
@@ -1579,9 +1572,9 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.freeChunk(handle) : libère les VBO d'un groupe cuit (chunk lointain
-// déchargé) → mémoire GPU récupérée. Le handle devient un no-op au dessin. Permet
-// un monde INFINI : on cuit les chunks autour du joueur, on libère les autres.
+// graphics.freeChunk(handle): frees a baked group's VBOs (an unloaded distant chunk),
+// reclaiming GPU memory. The handle becomes a no-op when drawn. This is what makes an
+// ENDLESS world possible: the chunks around the player are baked, the others freed.
 static void free_group_by_id(Value& handle, const char* key) {
     Value idv = handle.map_get(Value(std::string(key)));
     if (!idv.is_integer()) {
@@ -1610,8 +1603,8 @@ static void free_group_by_id(Value& handle, const char* key) {
         g.vbo_k = 0;
     }
     g.count = 0;
-    // slot rendu au pool UNIQUEMENT s'il était vivant → double-free idempotent
-    // (2ᵉ libération du même handle = no-op, pas de slot dupliqué dans le pool).
+    // The slot returns to the pool ONLY if it was alive, which makes a double free idempotent
+    // (a second free of the same handle is a no-op, with no duplicate slot in the pool).
     if (live) {
         s_free_groups.push_back(id - 1);
     }
@@ -1627,7 +1620,7 @@ static int gfx_free_chunk(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Remet la texture 3D courante (appelé chaque frame par resetStyles, côté 2D).
+// Resets the current 3D texture (called every frame by reset_styles, on the 2D side).
 void reset3d_frame_state() {
     s_cur_tex3d = 0;
     s_cur_tile[0] = -1.0f;
@@ -1638,7 +1631,7 @@ void reset3d_frame_state() {
     }
 }
 
-// Texture 3D courante — exposée pour la sauvegarde/restauration de style (push/pushStyle).
+// Current 3D texture, exposed for style save and restore (push/pushStyle).
 unsigned int gfx3d_get_texture() {
     return s_cur_tex3d;
 }
@@ -1646,7 +1639,7 @@ void gfx3d_set_texture(unsigned int id) {
     s_cur_tex3d = id;
 }
 
-// Enregistre les builtins 3D dans le module graphics (appelé par makeGraphicsModule).
+// Registers the 3D builtins in the graphics module (called by make_graphics_module).
 void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("camera")), Value::make_builtin(gfx_camera));
     m.map_set(Value(std::string("cameraOrtho")), Value::make_builtin(gfx_camera_ortho));
