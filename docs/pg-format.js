@@ -1,26 +1,26 @@
-// Formateur Ollin « à la demande » — réindentation par blocs (heuristique ligne
-// par ligne, pas d'AST). Ne change QUE l'indentation et les espaces superflus,
-// jamais la sémantique. Conventions (cf. tests/syntax.ol) :
-//   func / if…then / while…do / for…do / class / try / enum → +1 niveau, fermé par `end`
-//   switch                                            → +1 (niveau des `case`)
-//   case / else(dans switch) / default                → au niveau du switch, corps +1
-//   case … do                                         → le `do` est un bloc ordinaire du
-//     corps du case ; il partage le niveau du case et c'est SON `end` qui le ferme
-//   else / elseif / catch                             → ligne dé-indentée, corps au niveau
-// Une ligne qui ouvre À LA FOIS un bloc et un délimiteur — `f(x, func()` — ne vaut
-// qu'UN niveau : le bloc « absorbe » les délimiteurs restés ouverts sur sa ligne
-// d'ouverture, sans quoi son corps serait indenté deux fois.
-// Chaînes "…" et commentaires (## ligne, ### bloc ###) : contenu jamais touché.
-// En cas de blocs déséquilibrés, renvoie { ok:false } sans rien reformater.
+// On-demand Ollin formatter — reindentation by blocks, line by line and without an AST. It
+// changes ONLY the indentation and the superfluous spaces, never the meaning. Conventions
+// (see tests/syntax.ol):
+//   func / if…then / while…do / for…do / class / try / enum → +1 level, closed by `end`
+//   switch                                            → +1 (the level of the `case`s)
+//   case / else (inside a switch) / default            → at the switch's level, body +1
+//   case … do                                          → the `do` is an ordinary block of the
+//     case's body; it shares the case's level and it is ITS `end` that closes it
+//   else / elseif / catch                              → the line is outdented, the body is not
+// A line that opens BOTH a block and a delimiter — `f(x, func()` — counts for ONE level only:
+// the block "absorbs" the delimiters left open on its opening line, without which its body
+// would be indented twice.
+// Strings "…" and comments (## a line, ### a block ###) never have their content touched.
+// On unbalanced blocks it returns { ok:false } and reformats nothing.
 
 const UNIT = '    '
-// Tous les mots-clés ouvrant un bloc fermé par `end` (cf. docs/grammar.ebnf) ;
-// `switch` et `do` sont traités à part (pile propre / opener seulement en tête de ligne).
+// Every keyword opening a block closed by `end` (see docs/grammar.ebnf); `switch` and `do` are
+// handled apart (their own stack, and an opener only at the start of a line).
 const OPENERS = /\b(?:func|if|while|for|class|try|enum)\b/g
 const count = (s, re) => (s.match(re) || []).length
 
-// Retire chaînes et commentaire de fin de ligne → ne reste que le code « nu »
-// pour compter/repérer les mots-clés sans faux positifs.
+// Removes strings and the end-of-line comment, leaving only the "bare" code, so that keywords
+// can be counted and spotted without false positives.
 function bareCode(s) {
   let r = '', i = 0, inStr = false
   while (i < s.length) {
@@ -40,8 +40,8 @@ function bareCode(s) {
 export function formatOllin(src) {
   const lines = src.split('\n')
   const out = []
-  // Pile de contextes de BLOC. Chaque entrée : { kind: 'block'|'switch'|'case',
-  // absorb: délimiteurs ouverts sur la ligne d'ouverture du bloc, déjà comptés par elle }
+  // Stack of BLOCK contexts. Each entry is { kind: 'block'|'switch'|'case', absorb: the
+  // delimiters left open on the block's opening line, already counted by it }.
   const st = []
   let delim = 0                 // profondeur des délimiteurs ouverts { [ ( (map/array/appels)
   let absorbed = 0              // somme des `absorb` de la pile
@@ -55,7 +55,7 @@ export function formatOllin(src) {
     const trimmed = raw.replace(/\s+$/, '')   // enlève les espaces de fin
     const body = trimmed.trim()
 
-    // ── commentaire bloc ### … ### : contenu verbatim ──────────────────────
+    // Block comment ### … ###: the content is kept verbatim.
     const hashes = (body.match(/###/g) || []).length
     if (inBlockComment) {
       out.push(trimmed)                        // ne pas reformater l'intérieur
@@ -73,34 +73,34 @@ export function formatOllin(src) {
 
     if (first === 'end') {
       if (top() === 'caseblock') {
-        // `case … do` : cet `end` ferme le bloc do du corps ; le case, lui, court
-        // jusqu'au case suivant ou au `end` du switch.
+        // `case … do`: this `end` closes the body's do block; the case itself runs to the
+        // next case or to the switch's `end`.
         st[st.length - 1].kind = 'case'
         show = level() - 1
       } else {
         if (top() === 'case') popBlock()            // fin du corps de case
         if (st.length === 0) return { ok: false, error: '« end » sans bloc ouvert' }
         const closed = popBlock()                   // ferme le bloc/switch
-        // `end` s'aligne sur la ligne qui a ouvert le bloc : ses délimiteurs absorbés
-        // comptent encore, car ils ne seront refermés qu'ici (`end)`).
+        // `end` aligns with the line that opened the block: its absorbed delimiters still
+        // count, since they are only closed here (`end)`).
         show = level() - closed.absorb
       }
     } else if (first === 'case' || first === 'default' ||
                (first === 'else' && inSwitch)) {
       if (top() === 'case') popBlock()              // fin du case précédent
       show = level()                           // au niveau du switch
-      // `case … do` : le bloc do du corps partage le niveau du case, et son `end` ne
-      // ferme que lui (le case court jusqu'au case suivant ou au `end` du switch).
+      // `case … do`: the body's do block shares the case's level, and its `end` closes only
+      // that block (the case runs to the next case or to the switch's `end`).
       pushBlock(/\bdo\s*$/.test(code) ? 'caseblock' : 'case')
     } else if (first === 'else' || first === 'elseif' || first === 'catch') {
       show = level() - 1                       // ligne dé-indentée, pile inchangée
     } else {
-      // ligne commençant par un fermant de délimiteur → dé-indentée d'un cran
+      // A line starting with a closing delimiter is outdented by one step.
       if (/^[})\]]/.test(code)) show = level() - 1
-      // ouvertures/fermetures nettes de BLOCS sur la ligne (mono-ligne = net 0)
+      // Net BLOCK openings and closings on the line (a one-liner nets zero).
       const sw = count(code, /\bswitch\b/g)
-      // `do` standalone (doStmt) : opener seulement quand c'est le premier mot de la ligne
-      // (dans `while x do` ou `for i=1,10 do`, `first` vaut `while`/`for`, pas `do`)
+      // A standalone `do` (doStmt) is an opener only when it is the line's first word: in
+      // `while x do` or `for i=1,10 do`, `first` is `while` or `for`, not `do`.
       const doBlock = first === 'do' ? 1 : 0
       let net = count(code, OPENERS) - count(code, /\bend\b/g)
       const opened = st.length
@@ -108,8 +108,8 @@ export function formatOllin(src) {
       while (net < 0) { if (top() === 'case') popBlock(); if (st.length) popBlock(); net++ }
       for (let k = 0; k < sw; k++) pushBlock('switch')
       for (let k = 0; k < doBlock; k++) pushBlock('block')
-      // Délimiteurs laissés ouverts par cette ligne : ils sont déjà représentés par le
-      // niveau du bloc qu'elle ouvre → le bloc le plus interne les absorbe.
+      // Delimiters left open by this line are already represented by the level of the block it
+      // opens, so the innermost block absorbs them.
       const openDelims = delimBalance(code)
       if (st.length > opened && openDelims > 0) {
         st[st.length - 1].absorb = openDelims
@@ -121,7 +121,7 @@ export function formatOllin(src) {
 
     delim = Math.max(0, delim + delimBalance(code))   // maj délimiteurs pour la suite
 
-    // ### ouvert sur cette ligne (nombre impair de ### hors chaîne) → bloc commentaire
+    // A ### left open on this line (an odd number of ### outside a string) starts a comment block.
     if (bareCodeHashes(body) % 2 === 1) inBlockComment = true
   }
 
@@ -129,11 +129,11 @@ export function formatOllin(src) {
   return { ok: true, code: out.join('\n') }
 }
 
-// Solde des délimiteurs sur une ligne de code nu : { } (maps), ( ) (appels/groupes)
-// et [ ] (arrays). Les crochets sont ambigus en Ollin — dans un range, « [a;b[ » ferme
-// avec « [ » et « ]a;b] » ouvre avec « ] » —, mais un range contient TOUJOURS un « ; »
-// entre ses bornes : sur une ligne qui en comporte un, on ne compte pas les crochets.
-// Sans quoi un tableau écrit sur plusieurs lignes verrait son contenu dé-indenté.
+// Balance of the delimiters on a line of bare code: { } (maps), ( ) (calls and groups) and
+// [ ] (arrays). Brackets are ambiguous in Ollin — in a range, "[a;b[" closes with "[" and
+// "]a;b]" opens with "]" — but a range ALWAYS holds a ";" between its bounds, so on a line
+// carrying one the brackets are not counted. Without that, an array written over several lines
+// would have its content outdented.
 function delimBalance(code) {
   const brackets = !code.includes(';')
   let n = 0
@@ -146,7 +146,7 @@ function delimBalance(code) {
   return n
 }
 
-// Compte les ### réellement en dehors d'une chaîne (pour l'état bloc-commentaire).
+// Counts the ### that really are outside a string, for the comment-block state.
 function bareCodeHashes(s) {
   let n = 0, i = 0, inStr = false
   while (i < s.length) {

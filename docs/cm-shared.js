@@ -1,9 +1,8 @@
-// Réglages CodeMirror partagés par le tutoriel (views/tutoriel.js) ET le
-// playground (views/playground.js). Source unique : à spreader dans leur
-// EditorView.theme respectif. Chaque vue garde ses spécificités (fond, bordures,
-// taille de police, styles d'autocomplétion).
+// CodeMirror settings shared by the tutorial (views/tutoriel.js) AND the playground
+// (views/playground.js). Single source, spread into their respective EditorView.theme. Each
+// view keeps its own specifics (background, borders, font size, autocomplete styles).
 
-// Géométrie d'affichage (padding, interligne des lignes, gouttières de pliage).
+// Display geometry (padding, line spacing, fold gutters).
 export const CODE_DISPLAY = {
   '.cm-line': { padding: '0 9px 4px', lineHeight: '1.12' },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 4px', minWidth: '1.8em', fontSize: '11.5px', userSelect: 'none' },
@@ -12,9 +11,9 @@ export const CODE_DISPLAY = {
   '.cm-foldPlaceholder': { background: '#242742', border: '1px solid #3a3f63', color: '#a3adc4', borderRadius: '4px', padding: '0 6px', margin: '0 2px' },
 }
 
-// Règles de thème STRICTEMENT identiques entre les deux vues (ligne active,
-// curseur au focus, sélection). Extraites pour ne plus être copiées deux fois
-// (un changement de teinte de sélection/caret ne se fait plus qu'ici).
+// Theme rules STRICTLY identical between the two views (active line, focused cursor,
+// selection). Extracted so they are no longer copied twice: a change of selection or caret
+// tint now happens here only.
 export const CODE_THEME_BASE = {
   '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
   '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.03)', color: '#a3adc4' },
@@ -23,7 +22,7 @@ export const CODE_THEME_BASE = {
   '&.cm-focused .cm-selectionBackground': { background: 'rgba(255,255,255,0.25) !important' },
 }
 
-// Icônes SVG partagées (boutons Exécuter / Copier / validé). Source unique.
+// Shared SVG icons (the Run, Copy and done buttons). Single source.
 export const ICONS = {
   run:  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M3 2l11 6-11 6V2z"/></svg>',
   copy: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/><path d="M10.5 5.5V3a1 1 0 00-1-1H3a1 1 0 00-1 1v7a1 1 0 001 1h2.5"/></svg>',

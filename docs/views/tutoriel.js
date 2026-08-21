@@ -1,9 +1,9 @@
-// Vue TUTORIEL — logique d'initialisation, appelée par app.js après le montage
-// du fragment views/tutoriel.html dans #view.
+// TUTORIAL view — the initialisation logic, called by app.js once the views/tutoriel.html
+// fragment is mounted in #view.
 //   init(ctx) → cleanup()    (ctx = { root, getOllin, hardReload, navigate })
-// `root`      : élément #view où le fragment est monté (portée des querySelector)
-// `getOllin()`: promesse du module WASM PARTAGÉ (une seule instance pour la SPA)
-// `hardReload`: rechargement cache-vidé (bouton « Recharger » / pull-to-refresh)
+// `root`       is the #view element the fragment is mounted in (the scope of querySelector).
+// `getOllin()` is a promise of the SHARED WASM module (a single instance for the whole app).
+// `hardReload` is a cache-cleared reload (the "Reload" button, or pull-to-refresh).
 import {
   EditorState,
   EditorView, lineNumbers,
@@ -12,7 +12,7 @@ import {
 import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../cm-shared.js'
 import { ollinLang, ollinHighlight } from '../cm-lang.js'
 
-// ── Thème éditeur (blocs read-only du tutoriel) ─────────────────────────────
+// Editor theme, for the tutorial's read-only blocks.
 const ollinTheme = EditorView.theme({
   '&': { background: '#1a1d2e', color: '#dde4ef', border: '1px solid #3a3f63', borderRadius: '8px', fontSize: 'var(--code-size)' },
   '.cm-scroller': { fontFamily: "'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace", lineHeight: '1.65', overflow: 'auto', fontSize: 'var(--code-size)' },
@@ -33,7 +33,7 @@ function makeStaticEditor(parent, code) {
   })
 }
 
-// Icônes SVG (run/copy/ok) : partagées via cm-shared.js.
+// SVG icons (run, copy, ok), shared through cm-shared.js.
 
 function makeCopyBtn(getText) {
   const btn = document.createElement('button')
@@ -56,16 +56,16 @@ export async function init(ctx) {
   const disposers = []          // nettoyage au démontage de la vue
   const editors   = []          // éditeurs CM6 statiques créés (à détruire au démontage)
 
-  // Exécution PARTAGÉE (pg-run.js) : mêmes préchargement/gestion d'erreurs que
-  // le playground et le mode autonome (try/catch, erreurs de frame graphique).
+  // SHARED execution (pg-run.js): the same preloading and error handling as the playground and
+  // the standalone mode (try/catch, graphics frame errors).
   const Run = await import('../pg-run.js?v=' + ctx.v)
 
-  // Le runtime WASM est PARTAGÉ (chargé une fois par app.js). On le « réchauffe »
-  // dès l'entrée dans la vue ; les boutons Exécuter l'attendent s'il n'est pas prêt.
+  // The WASM runtime is SHARED, loaded once by app.js. We warm it up as soon as the view is
+  // entered; the Run buttons wait for it if it is not ready.
   let ollin = null
   ctx.getOllin().then(m => { ollin = m }).catch(err => console.error('WASM init:', err))
 
-  // ── Hamburger (mobile) ────────────────────────────────────────────────────
+  // Hamburger menu (mobile).
   const ham      = root.querySelector('#ham')
   const navEl    = root.querySelector('#nav')
   const backdrop = root.querySelector('#backdrop')
@@ -74,11 +74,11 @@ export async function init(ctx) {
     const openNav  = () => { navEl.classList.add('open'); backdrop.classList.add('visible'); ham.classList.add('open') }
     ham.addEventListener('click', () => navEl.classList.contains('open') ? closeNav() : openNav())
     backdrop.addEventListener('click', closeNav)
-    // Un clic sur un lien de section (ou de vue) referme le menu.
+    // A click on a section link (or a view link) closes the menu.
     navEl.querySelectorAll('a').forEach(a => a.addEventListener('click', closeNav))
   }
 
-  // ── Nav active au défilement ──────────────────────────────────────────────
+  // The active nav entry follows the scrolling.
   const navLinks  = root.querySelectorAll('nav a[href^="#"]')
   const scrollObs = new IntersectionObserver(entries => {
     entries.forEach(e => {
@@ -92,9 +92,9 @@ export async function init(ctx) {
   root.querySelectorAll('section[id]').forEach(s => scrollObs.observe(s))
   disposers.push(() => scrollObs.disconnect())
 
-  // ── Mémoriser la position de lecture (restaurée au refresh) ───────────────
-  // Seule une entrée SANS ancre explicite (#/tutoriel nu, ou refresh) restaure
-  // cette position — un lien de section (#intro, #for…) garde la priorité.
+  // Remembering the reading position, restored on refresh. Only an entry WITHOUT an explicit
+  // anchor (a bare #/tutoriel, or a refresh) restores it — a section link (#intro, #for…) keeps
+  // priority.
   const SCROLL_KEY = 'ollin-tutoriel-scrollY'
   let scrollSaveQueued = false
   const onScroll = () => {
@@ -112,14 +112,14 @@ export async function init(ctx) {
     let savedY = 0
     try { savedY = parseInt(localStorage.getItem(SCROLL_KEY) || '0', 10) || 0 } catch (_) {}
     if (savedY > 0) {
-      // Deux rAF : laisse le temps aux éditeurs CM6 (montés plus bas) de fixer
-      // la hauteur finale du contenu avant de calculer le scroll cible.
+      // Two rAFs: they give the CM6 editors (mounted further down) time to settle the final
+      // height of the content before the target scroll is computed.
       requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, savedY)))
     }
   }
 
-  // ── Pull-to-refresh (mobile) ──────────────────────────────────────────────
-  // Tirer la page vers le bas en étant tout en haut → rechargement cache-vidé.
+  // Pull-to-refresh (mobile): dragging the page down while at the very top triggers a
+  // cache-cleared reload.
   const content = root.querySelector('main')
   const ind = document.createElement('div')
   ind.id = 'ptr-indicator'
@@ -188,11 +188,11 @@ export async function init(ctx) {
     removeEventListener('touchcancel', release)
   })
 
-  // ── Bouton « Recharger » (cache-vidé) ─────────────────────────────────────
+  // The "Reload" button (cache cleared).
   const reloadBtn = root.querySelector('#hard-reload-btn')
   if (reloadBtn) reloadBtn.addEventListener('click', ctx.hardReload)
 
-  // ── Remplace les blocs <pre><code> par des éditeurs CM6 read-only ─────────
+  // Replaces the <pre><code> blocks with read-only CM6 editors.
   const canvas = document.getElementById('canvas')   // canvas PARTAGÉ (shell)
   root.querySelectorAll('section pre').forEach(pre => {
     const code = pre.querySelector('code')
@@ -234,8 +234,8 @@ export async function init(ctx) {
           return
         }
         canvas.style.display = 'none'
-        // Exécution partagée : gère try/catch, erreurs de frame graphique et
-        // erreur haut-niveau survenant après ouverture du canvas.
+        // Shared execution: it handles try/catch, graphics frame errors and a top-level error
+        // arising after the canvas is open.
         Run.runProgram(ollin, text, canvas, {
           onRunning: () => {                       // programme graphique : canvas sous le bloc
             outDiv.style.display = 'none'
@@ -268,9 +268,9 @@ export async function init(ctx) {
     if (outDiv) wrap.after(outDiv)
   })
 
-  // Détruire les éditeurs CM6 (retire leurs observers/listeners globaux → pas
-  // de fuite à chaque re-visite), mettre la boucle raylib en pause (un snippet
-  // graphique a pu la lancer) et couper le hook d'erreur de frame.
+  // Destroy the CM6 editors (which removes their global observers and listeners, so there is no
+  // leak on every revisit), pause the raylib loop (a graphics snippet may have started it) and
+  // unhook the frame-error handler.
   disposers.push(() => {
     for (const ed of editors) {
       try { ed.destroy() } catch (_) {}
@@ -279,6 +279,6 @@ export async function init(ctx) {
     window.__ollinFrameError = undefined
   })
 
-  // Nettoyage appelé par le routeur avant de monter une autre vue.
+  // Cleanup, called by the router before another view is mounted.
   return () => { for (const d of disposers) d() }
 }

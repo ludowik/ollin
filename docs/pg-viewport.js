@@ -1,18 +1,17 @@
-// Recale l'app (body en position:fixed) sur le VISUAL VIEWPORT.
+// Realigns the app (a body in position:fixed) on the VISUAL VIEWPORT.
 //
-// Sur mobile — iOS surtout — l'ouverture du clavier retrecit le visual viewport
-// (la zone reellement visible) mais PAS le layout viewport. Une app ancree en
-// position:fixed au layout viewport reste donc calee en haut de la PAGE, pas en
-// haut du VISIBLE : des que le navigateur fait glisser le visual viewport (au
-// focus, ou quand on defile clavier ouvert), la barre d'outils derive vers le
-// haut puis disparait.
+// On mobile — iOS above all — opening the keyboard shrinks the visual viewport (the area
+// actually visible) but NOT the layout viewport. An app anchored in position:fixed to the
+// layout viewport therefore stays aligned with the top of the PAGE rather than the top of what
+// is VISIBLE: as soon as the browser slides the visual viewport (on focus, or when scrolling
+// with the keyboard up), the toolbar drifts upwards and then disappears.
 //
-// Aucune propriete CSS statique ne corrige ca. La seule solution fiable : ecouter
-// visualViewport (resize + scroll) et repositionner activement l'app pour qu'elle
-// couvre exactement le visible — hauteur = vv.height, decalage = vv.offsetTop.
-// Ainsi la barre reste collee au bord haut du visible, clavier ouvert ou non.
+// No static CSS property fixes this. The only reliable answer is to listen to visualViewport
+// (resize and scroll) and actively reposition the app so that it covers exactly what is
+// visible — height = vv.height, offset = vv.offsetTop. The bar then stays against the top edge
+// of the visible area, keyboard up or not.
 //
-// Renvoie un disposer (retire les ecouteurs + remet le body a plat).
+// Returns a disposer, which removes the listeners and lays the body flat again.
 export function pinToVisualViewport() {
     const vv = window.visualViewport;
     if (!vv) {

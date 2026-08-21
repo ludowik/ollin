@@ -1,22 +1,21 @@
-// Capture de crash À L'ÉCRAN (diagnostic device, notamment iOS/WebKit plein écran
-// où la console n'est pas accessible). But : quand le runtime WASM part en faute
-// dure — « memory access out of bounds », « table index is out of bounds »,
-// RuntimeError, abort emscripten — afficher le message EXACT + la stack + le
-// contexte (dernières lignes stderr, userAgent, mémoire) dans un overlay
-// sélectionnable/copiable, au lieu de le perdre (print/printErr étaient muets).
+// ON-SCREEN crash capture, for diagnosing a device — chiefly iOS/WebKit in full screen, where
+// the console cannot be reached. When the WASM runtime takes a hard fault — "memory access out
+// of bounds", "table index is out of bounds", a RuntimeError, an emscripten abort — the EXACT
+// message, the stack and the context (the last stderr lines, the userAgent, the memory) are
+// shown in a selectable, copyable overlay instead of being lost (print and printErr were mute).
 //
-// Une faute dure survenant dans la boucle rAF n'est PAS rattrapable par le
-// try/catch C++ (emscripten_frame) : elle remonte au niveau JS en erreur non
-// capturée / rejet non géré. On écoute donc window 'error' + 'unhandledrejection'
-// + l'abort emscripten (wireModule), et on garde un tampon glissant de stderr.
+// A hard fault occurring in the rAF loop is NOT catchable by the C++ try/catch
+// (emscripten_frame): it surfaces at the JS level as an uncaught error or an unhandled
+// rejection. So we listen to window 'error' and 'unhandledrejection' plus the emscripten abort
+// (wire_module), and keep a sliding stderr buffer.
 
 const STDERR_RING = []          // dernières lignes printErr (contexte)
 const RING_MAX = 60
 let overlayEl = null
 let shown = false
 
-// Une faute dure a une signature reconnaissable ; le reste (avertissements du
-// pilote GL, etc.) ne doit PAS déclencher l'overlay.
+// A hard fault has a recognisable signature; everything else (GL driver warnings and so on)
+// must NOT raise the overlay.
 const FATAL_RE = /memory access out of bounds|table index is out of bounds|out of bounds|RuntimeError|\babort(ed)?\b|Assertion failed|null function or function signature mismatch|unreachable/i
 
 function ensureOverlay() {
@@ -44,8 +43,8 @@ function memInfo() {
   return 'jsHeap=?'
 }
 
-// Affiche l'overlay avec le message + la stack + le contexte. Idempotent : le
-// PREMIER crash gagne (les suivants sont souvent des cascades).
+// Shows the overlay with the message, the stack and the context. Idempotent: the FIRST crash
+// wins, the following ones often being knock-on effects.
 function show(title, message, stack) {
   if (shown) return
   shown = true
@@ -84,7 +83,7 @@ function show(title, message, stack) {
   bar.appendChild(mk('Copier', () => {
     const t = el.textContent
     try { navigator.clipboard.writeText(t) } catch (_) {}
-    // Repli sans clipboard API (WebKit hors HTTPS/gesture) : sélectionner tout.
+    // Fallback without the clipboard API (WebKit outside HTTPS or a gesture): select all.
     try {
       const r = document.createRange()
       r.selectNodeContents(el)
@@ -98,13 +97,12 @@ function show(title, message, stack) {
   el.style.display = 'block'
 }
 
-// Ouvre l'overlay pour une exception JS/WASM SI elle est une faute dure (garde
-// la stack, indispensable : elle nomme la fonction qui a fauté — getWasmTableEntry,
-// index de fonction…). Une erreur de script Ollin ordinaire (« undeclared
-// variable »…) n'est PAS fatale → reste dans la zone de sortie, pas d'overlay.
-// Renvoie true si l'overlay a été ouvert. Appelé notamment par runProgram, car un
-// trap SYNCHRONE pendant m.execute() (relance in-place) est rattrapé par son
-// try/catch et n'atteindrait donc jamais le handler window 'error'.
+// Opens the overlay for a JS or WASM exception IF it is a hard fault. The stack is kept, and is
+// essential: it names the function that faulted (getWasmTableEntry, a function index…). An
+// ordinary Ollin script error ("undeclared variable"…) is NOT fatal and stays in the output
+// area, with no overlay. Returns true if the overlay was opened. It is called in particular by
+// run_program, because a SYNCHRONOUS trap during m.execute() (an in-place restart) is caught by
+// its own try/catch and would therefore never reach the window 'error' handler.
 export function captureError(title, err) {
   const msg = (err && err.message) || String(err)
   const stack = (err && err.stack) || ''
@@ -115,8 +113,8 @@ export function captureError(title, err) {
   return false
 }
 
-// Enregistre une ligne stderr dans le tampon glissant ; déclenche l'overlay si
-// la ligne est une faute dure (l'abort emscripten passe souvent par printErr).
+// Records a stderr line in the sliding buffer, and raises the overlay if the line is a hard
+// fault (the emscripten abort often goes through printErr).
 export function noteStderr(line) {
   if (line == null) return
   const s = String(line)
@@ -125,8 +123,8 @@ export function noteStderr(line) {
   if (FATAL_RE.test(s)) show('stderr fatal', s, '')
 }
 
-// Branche un objet de config emscripten AVANT instanciation : capte printErr
-// (tampon + détection fatale) et l'abort dur. Retourne l'objet (chaînable).
+// Wires an emscripten config object BEFORE instantiation: it captures printErr (buffer plus
+// fatal detection) and the hard abort. Returns the object, so calls chain.
 export function wireModule(cfg) {
   const prevErr = cfg.printErr
   cfg.printErr = (line) => {
@@ -142,22 +140,22 @@ export function wireModule(cfg) {
   return cfg
 }
 
-// Installe les capteurs globaux (une seule fois). À appeler tôt, avant de charger
-// le WASM, pour attraper aussi les fautes d'instanciation.
+// Installs the global sensors, once. To be called early, before loading the WASM, so that
+// instantiation faults are caught too.
 let installed = false
 export function installCrashOverlay() {
   if (installed) return
   installed = true
-  // Exposé global : pg-run.js est chargé sous une URL cache-bustée (?v) distincte
-  // → instance de module séparée. On partage donc l'état de l'overlay (latch
-  // « premier crash gagne », tampon stderr) via window plutôt que par import.
+  // Exposed globally: pg-run.js is loaded under a distinct cache-busted URL (?v), hence as a
+  // separate module instance. The overlay's state (the "first crash wins" latch, the stderr
+  // buffer) is therefore shared through window rather than by import.
   window.__ollinCrash = { captureError, noteStderr }
   window.addEventListener('error', (e) => {
     const err = e.error
     const msg = (err && err.message) || e.message || 'error'
     if (!FATAL_RE.test(msg) && !(err && err.stack && FATAL_RE.test(err.stack))) {
-      // Erreur JS ordinaire (bug de vue, etc.) : on la garde en contexte mais on
-      // n'ouvre l'overlay que pour les fautes dures du runtime.
+      // An ordinary JS error (a view bug, say): we keep it as context but only open the
+      // overlay for the runtime's hard faults.
       noteStderr('window.error: ' + msg)
       return
     }

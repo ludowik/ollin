@@ -1,23 +1,21 @@
-// ── Ollin Playground — coordinateur de sauvegarde distante ──────────────────
+// Ollin playground — remote-save coordinator.
 //
-// Découple la sauvegarde LOCALE (instantanée, faite par l'appelant) de la
-// sauvegarde DISTANTE (push GitHub, coûteuse et faillible). L'appelant fournit
-// la mécanique réelle (`doPush`, `canPush`) ; ce module n'orchestre QUE le
-// « quand » : anti-rafale (debounce), coalescing, single-flight, tolérance
-// hors-ligne. Aucune connaissance de GitHub ni du modèle de projet ici.
+// It decouples the LOCAL save (instant, done by the caller) from the REMOTE one (a GitHub push,
+// costly and fallible). The caller supplies the actual machinery (`doPush`, `canPush`); this
+// module orchestrates ONLY the "when": debounce, coalescing, single-flight, offline tolerance.
+// It knows nothing of GitHub nor of the project model.
 //
-// Garanties :
-//   • debounce      : N frappes en < debounceMs = 1 seul push (le dernier état).
-//   • single-flight : jamais deux pushs en parallèle.
-//   • coalescing    : une modif arrivée pendant un push en vol re-planifie UN
-//                     push après coup (pas d'empilement).
-//   • hors-ligne    : un push qui échoue ne casse rien — l'état reste « sale »
-//                     et sera repoussé plus tard (retryMs).
+// Guarantees:
+//   • debounce      — N keystrokes within debounceMs give one push, of the last state.
+//   • single-flight — never two pushes at once.
+//   • coalescing    — an edit arriving during a push in flight schedules ONE push afterwards,
+//                     with no stacking.
+//   • offline       — a failing push breaks nothing: the state stays dirty and is pushed later
+//                     (retryMs).
 //
-// `doPush(project) → Promise` : push réel (peut throw → l'état est re-planifié).
-// `canPush(project) → bool` : garde-fou évalué à chaque déclenchement (projet
-// éligible, en ligne, dirty…). `onError(err, project)` : notification ; ne doit
-// pas throw.
+// `doPush(project) → Promise` is the real push (it may throw, and the state is rescheduled).
+// `canPush(project) → bool` is a guard evaluated at every trigger (eligible project, online,
+// dirty…). `onError(err, project)` notifies, and must not throw.
 
 export function createRemoteSync({ doPush, canPush, onError, debounceMs = 3000, retryMs = 15000 } = {}) {
   let timer    = null    // debounce en cours
@@ -32,14 +30,14 @@ export function createRemoteSync({ doPush, canPush, onError, debounceMs = 3000, 
     timer = setTimeout(() => { timer = null; run() }, delay)
   }
 
-  // Planifie un push différé du projet (anti-rafale). Idempotent.
+  // Schedules a deferred push of the project (debounced). Idempotent.
   function schedule(project) {
     pending = project
     if (allowed(project)) arm(debounceMs)
   }
 
-  // Déclenche le push. Single-flight : si un push est en vol, on marque `requeue`
-  // (un nouveau push suivra à la fin). Avale l'erreur (retry différé via requeue).
+  // Fires the push. Single-flight: if one is in flight we mark `requeue`, so another follows at
+  // the end. The error is swallowed, the retry being deferred through requeue.
   async function run() {
     if (inFlight) {
       requeue = true
@@ -62,8 +60,8 @@ export function createRemoteSync({ doPush, canPush, onError, debounceMs = 3000, 
     }
   }
 
-  // Annule toute planification en attente (démontage, changement de projet).
-  // N'interrompt pas un push déjà en vol.
+  // Cancels any pending schedule (unmount, project change). It does not interrupt a push
+  // already in flight.
   function cancel() {
     clearTimeout(timer)
     timer = null

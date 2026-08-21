@@ -1,14 +1,13 @@
-// Langage Ollin pour CodeMirror 6 — SOURCE UNIQUE partagée par le tutoriel, le
-// playground et (à terme) la web app monopage. Avant, cette définition était
-// dupliquée dans index.html ET playground.html : toute évolution de la syntaxe
-// devait être reportée deux fois. Ici : un seul endroit.
+// The Ollin language for CodeMirror 6 — the SINGLE SOURCE shared by the tutorial and the
+// playground. This definition used to be duplicated in index.html AND playground.html, so
+// every change to the syntax had to be carried over twice. Here there is one place only.
 //
-// Aligne sur ollin.tmLanguage.json (extension VS Code). Le thème (couleurs de
-// fond, bordures, styles d'autocomplétion) reste propre à chaque vue et n'est
-// donc PAS ici — seuls le tokenizer et le highlight (rôles → couleurs) le sont.
+// It follows ollin.tmLanguage.json (the VS Code extension). The theme (background colours,
+// borders, autocomplete styles) stays private to each view and is therefore NOT here — only
+// the tokenizer and the highlighting (roles to colours) are.
 import { StreamLanguage, HighlightStyle, tags } from './vendor/codemirror.js'
 
-// Union des deux anciens ensembles : `static` (tutoriel) + `default` (playground).
+// The union of the two former sets: `static` (tutorial) and `default` (playground).
 export const KEYWORDS = new Set([
   'var', 'global', 'const', 'while', 'do', 'for', 'in', 'if', 'then', 'elseif', 'end',
   'break', 'true', 'false', 'nil', 'try', 'catch', 'throw', 'else', 'func', 'return',
@@ -25,42 +24,42 @@ export const ollinLang = StreamLanguage.define({
   name: 'ollin',
   startState: () => ({ block: false }),
   token(stream, state) {
-    // Commentaire bloc ### … ###
+    // Block comment ### … ###
     if (state.block) {
       if (stream.match('###')) { state.block = false; return 'comment' }
       stream.next(); return 'comment'
     }
     if (stream.match('###')) { state.block = true; return 'comment' }
     if (stream.eatSpace()) return null
-    // Commentaire ligne ## (pas ###)
+    // Line comment ## (not ###)
     if (stream.match('##')) { stream.skipToEnd(); return 'comment' }
-    // Chaîne "…"
+    // String "…"
     if (stream.peek() === '"') {
       stream.next()
       while (!stream.eol()) { const ch = stream.next(); if (ch === '"') break; if (ch === '\\') stream.next() }
       return 'string'
     }
-    // Nombre : hex 0x.. / octal 0o.. / binaire 0b.. (avant le décimal), puis .5 / 42 / 42.0
+    // Number: hex 0x.., octal 0o.., binary 0b.. (before the decimal form), then .5 / 42 / 42.0
     if (stream.match(/^0[xX][\da-fA-F](?:_?[\da-fA-F])*/)) return 'number'
     if (stream.match(/^0[oO][0-7](?:_?[0-7])*/)) return 'number'
     if (stream.match(/^0[bB][01](?:_?[01])*/)) return 'number'
     if (stream.match(/^\.\d[\d_]*/)) return 'number'
     if (stream.match(/^\d[\d_]*(?:\.[\d_]+)?/)) return 'number'
-    // Identifiant → mot-clé / builtin
+    // Identifier: keyword or builtin
     if (stream.match(/^[a-zA-Z_]\w*/)) {
       const w = stream.current()
       if (KEYWORDS.has(w)) return 'keyword'
       if (BUILTINS.has(w)) return 'atom'
       return null
     }
-    // Opérateurs (multi-caractères d'abord)
+    // Operators (the multi-character ones first)
     if (stream.match(/^(\/\/|\+=|-=|\*=|\/=|%=|==|>=|<=|<>|<<|>>|\.\.\.|\.\.)/) ||
         stream.match(/^[+\-*/%><&|^~?\[\]{}:.]/)) return 'operator'
     stream.next(); return null
   },
 })
 
-// Rôles → couleurs (palette VS Code Dark+). Identique pour toutes les vues.
+// Roles to colours (the VS Code Dark+ palette). The same for every view.
 export const ollinHighlight = HighlightStyle.define([
   { tag: tags.keyword,  color: '#569CD6' },
   { tag: tags.atom,     color: '#DCDCAA' },
