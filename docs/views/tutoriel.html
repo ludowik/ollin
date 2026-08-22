@@ -568,8 +568,8 @@ incr()
 <span class="bi">assert</span>(MAX == <span class="num">100</span>)
 
 <span class="kw">func</span> area(r)
-    <span class="kw">const</span> DEUX_PI = <span class="num">2</span> * PI
-    <span class="kw">return</span> DEUX_PI * r * r
+    <span class="kw">const</span> TWO_PI = <span class="num">2</span> * PI
+    <span class="kw">return</span> TWO_PI * r * r
 <span class="kw">end</span>
 
 <span class="bi">print</span>(area(<span class="num">1</span>))  <span class="cmt">## 6.28318…</span></code></pre>
@@ -651,7 +651,7 @@ multi-lignes
 
 <h3>Précédence</h3>
 <p>De la plus basse à la plus haute :</p>
-<pre data-no-run><code>or  =>  and  =>  |  =>  ~(xor)  =>  &  =>  comparaisons  =>  &lt;&lt; &gt;&gt;  =>  + -  =>  * / %  =>  ~(not) - not  =>  ^</code></pre>
+<pre data-no-run><code>or  =>  and  =>  |  =>  ~(xor)  =>  &  =>  comparisons  =>  &lt;&lt; &gt;&gt;  =>  + -  =>  * / %  =>  ~(not) - not  =>  ^</code></pre>
 
 <h3>Exemples</h3>
 <pre><code><span class="kw">var</span> flags = <span class="num">0</span>
@@ -678,7 +678,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <h2>Chaînes</h2>
 <pre><code><span class="kw">var</span> s = <span class="str">"bonjour"</span>
 <span class="bi">assert</span>(s == <span class="str">"bonjour"</span>)
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## string vide est fausse</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## chaîne vide est fausse</span>
 <span class="bi">assert</span>(<span class="str">"text"</span>)  <span class="cmt">## non vide est vrai</span></code></pre>
 
 <p>La concaténation se fait avec <code>+</code> :</p>
@@ -705,14 +705,14 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <p>Les sauts de ligne sont traités comme de l'espace blanc — une expression peut s'étendre sur autant de lignes que nécessaire, sans syntaxe spéciale.</p>
 
 <pre data-no-run><code><span class="kw">var</span> total =
-    prix_ht
-    * ((<span class="num">1</span> + tva) / <span class="num">100</span>)
-    + frais_port
+    net_price
+    * ((<span class="num">1</span> + vat) / <span class="num">100</span>)
+    + shipping
 
-<span class="kw">if</span> commande_valide
-    <span class="kw">and</span> stock_disponible
-    <span class="kw">and</span> paiement_ok <span class="kw">then</span>
-    expédier()
+<span class="kw">if</span> order_valid
+    <span class="kw">and</span> in_stock
+    <span class="kw">and</span> payment_ok <span class="kw">then</span>
+    ship()
 <span class="kw">end</span></code></pre>
 
 <div class="callout"><code>then</code>, <code>do</code> et <code>end</code> délimitent les blocs — les parenthèses autour des conditions ne sont jamais obligatoires.</div>
@@ -723,7 +723,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <h2>If / Else</h2>
 <pre data-no-run><code><span class="kw">if</span> condition <span class="kw">then</span>
     <span class="cmt">## bloc then</span>
-<span class="kw">elseif</span> autre_condition <span class="kw">then</span>
+<span class="kw">elseif</span> other_condition <span class="kw">then</span>
     <span class="cmt">## elseif (autant que nécessaire)</span>
 <span class="kw">else</span>
     <span class="cmt">## else optionnel</span>
@@ -882,10 +882,10 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <h3>Fonction sur un champ de map</h3>
 <p><code>func obj.field(...)</code> définit une fonction directement sur un champ de map ou de module — sucre pour <code>obj.field = func(...) ... end</code>. Utile pour les hooks moteur (ex. <code>keyboard.keypressed</code>).</p>
 <pre><code><span class="kw">var</span> obj = {}
-<span class="kw">func</span> obj.salut(name)
-    <span class="kw">return</span> <span class="str">"salut "</span> + name
+<span class="kw">func</span> obj.greet(name)
+    <span class="kw">return</span> <span class="str">"greet "</span> + name
 <span class="kw">end</span>
-<span class="bi">assert</span>(obj.salut(<span class="str">"ollin"</span>) == <span class="str">"salut ollin"</span>)</code></pre>
+<span class="bi">assert</span>(obj.greet(<span class="str">"ollin"</span>) == <span class="str">"greet ollin"</span>)</code></pre>
 
 <h3>Retours multiples</h3>
 <pre><code><span class="kw">func</span> minmax(a, b)
@@ -1070,25 +1070,25 @@ inc()
 
 <h3>Clés littérales et clés calculées</h3>
 <p>Une clé écrite en <strong>identifiant</strong>, en <strong>chaîne</strong>, ou entre crochets autour d'une chaîne est la <em>même clé littérale</em> :</p>
-<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}      <span class="cmt">## clé = la string "ref"</span>
+<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}      <span class="cmt">## clé = la chaîne "ref"</span>
 <span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}    <span class="cmt">## identique</span>
 <span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}  <span class="cmt">## identique</span></code></pre>
 <p>Entre crochets, une <strong>expression</strong> est évaluée à l'exécution et sa valeur devient la clé :</p>
 <pre><code><span class="kw">var</span> ref = <span class="str">"color"</span>
-<span class="kw">var</span> m = {[ref]: <span class="str">"rouge"</span>}     <span class="cmt">## key = value de ref => "color"</span>
-<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"rouge"</span>)
-<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## "ref" littéral n'est PAS une key</span>
+<span class="kw">var</span> m = {[ref]: <span class="str">"red"</span>}     <span class="cmt">## clé = valeur de ref => "color"</span>
+<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"red"</span>)
+<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## "ref" littéral n'est PAS une clé</span>
 
-<span class="cmt">## la key calculée peut être de tout type</span>
+<span class="cmt">## la clé calculée peut être de tout type</span>
 <span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"deux"</span>}
 <span class="bi">assert</span>(n[<span class="num">2</span>] == <span class="str">"deux"</span>)</code></pre>
 <p>La même règle vaut pour <strong>l'accès</strong> : entre crochets, un littéral string désigne la clé telle quelle, une variable désigne sa valeur. Lecture, écriture et affectation composée sont identiques :</p>
 <pre><code><span class="kw">var</span> ref = <span class="str">"color"</span>
 <span class="kw">var</span> m = {}
-m[ref]     = <span class="str">"rouge"</span>              <span class="cmt">## écrit le slot "color" (value de ref)</span>
+m[ref]     = <span class="str">"red"</span>              <span class="cmt">## écrit le slot "color" (valeur de ref)</span>
 m[<span class="str">"size"</span>] = <span class="num">10</span>                  <span class="cmt">## écrit le slot "size" (littéral)</span>
-<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"rouge"</span>)   <span class="cmt">## relu via littéral</span>
-<span class="bi">assert</span>(m.color     == <span class="str">"rouge"</span>)  <span class="cmt">## ou via point</span>
+<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"red"</span>)   <span class="cmt">## relu via littéral</span>
+<span class="bi">assert</span>(m.color     == <span class="str">"red"</span>)  <span class="cmt">## ou via point</span>
 m[<span class="str">"size"</span>] += <span class="num">5</span>
 <span class="bi">assert</span>(m[<span class="str">"size"</span>] == <span class="num">15</span>)</code></pre>
 
@@ -1129,7 +1129,7 @@ m[<span class="num">42</span>]    = <span class="str">"int key"</span>
 m[<span class="num">3.14</span>]  = <span class="str">"float key"</span>
 m[<span class="bool">true</span>]  = <span class="str">"bool key"</span>
 
-<span class="cmt">## 1 et 1.0 sont la même key</span>
+<span class="cmt">## 1 et 1.0 sont la même clé</span>
 m[<span class="num">1</span>] = <span class="str">"one"</span>
 <span class="bi">assert</span>(m[<span class="num">1.0</span>] == <span class="str">"one"</span>)</code></pre>
 
@@ -1188,7 +1188,7 @@ b.x = <span class="num">99</span>
 <h3>Numérotation</h3>
 <p>Un élément sans valeur prend le compteur, qui part de <strong>1</strong> et avance de un. Un <strong>littéral entier</strong> fixe la valeur et fait repartir le compteur juste après. Toute <strong>autre expression</strong> est acceptée comme valeur mais laisse le compteur où il est — le compilateur ne peut pas évaluer un appel de fonction.</p>
 
-<pre><code><span class="kw">enum</span> State REPOS = <span class="num">0</span>, MARCHE, SAUT = <span class="num">10</span>, CHUTE <span class="kw">end</span>
+<pre><code><span class="kw">enum</span> State IDLE = <span class="num">0</span>, WALK, JUMP = <span class="num">10</span>, FALL <span class="kw">end</span>
 <span class="cmt">## 0, 1, 10, 11</span>
 
 <span class="kw">enum</span> Mixed A, B = <span class="str">"texte"</span>, C <span class="kw">end</span>
@@ -1215,8 +1215,8 @@ m.RED = <span class="num">5</span>              <span class="cmt">## erreur d'ex
 <p>Un nom simple déclare une <strong>globale</strong>, comme une classe : les références en avant fonctionnent. Un chemin écrit dans une map existante.</p>
 
 <pre><code><span class="kw">global</span> cfg = {}
-<span class="kw">enum</span> cfg.mode PLEIN, FENETRE <span class="kw">end</span>
-<span class="bi">print</span>(cfg.mode.PLEIN)      <span class="cmt">## 1</span></code></pre>
+<span class="kw">enum</span> cfg.mode FULLSCREEN, WINDOWED <span class="kw">end</span>
+<span class="bi">print</span>(cfg.mode.FULLSCREEN)      <span class="cmt">## 1</span></code></pre>
 </section>
 
 <!-- ── ref ────────────────────────────────────────────────────────────────── -->
@@ -1229,7 +1229,7 @@ ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
     <span class="kw">if</span> grid <span class="kw">then</span>          <span class="cmt">## lecture NORMALE : ref ne change rien à l'usage de la variable</span>
-        dessineGrille()
+        drawGrid()
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
 
@@ -1250,8 +1250,8 @@ toggleIt(<span class="kw">ref</span> active)
 <p>Un nom — global ou local — ou un chemin de champs. Le nom doit être <strong>déclaré</strong> : <code>ref inconnue</code> est une erreur de <em>compilation</em>, ce qui est tout l'intérêt par rapport au passage d'un nom sous forme de chaîne.</p>
 
 <pre><code><span class="kw">ref</span> counter           <span class="cmt">## un global ou une locale</span>
-<span class="kw">ref</span> cfg.tuiles         <span class="cmt">## un champ</span>
-<span class="kw">ref</span> cfg.rendu.ombres   <span class="cmt">## un chemin de champs</span>
+<span class="kw">ref</span> cfg.tiles         <span class="cmt">## un champ</span>
+<span class="kw">ref</span> cfg.render.shadows   <span class="cmt">## un chemin de champs</span>
 <span class="kw">ref</span> t[<span class="num">1</span>]              <span class="cmt">## REFUSÉ : le chemin serait réévalué à chaque accès</span></code></pre>
 
 <h3>Deux limites à connaître</h3>
@@ -1521,7 +1521,7 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## bru
 <pre><code><span class="bi">print</span>(string.len(<span class="str">"café"</span>))           <span class="cmt">## 4 (codepoints, pas octets)</span>
 <span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
 <span class="bi">print</span>(string.lower(<span class="str">"HELLO"</span>))         <span class="cmt">## hello</span>
-<span class="bi">print</span>(string.trim(<span class="str">"  salut  "</span>))      <span class="cmt">## salut</span>
+<span class="bi">print</span>(string.trim(<span class="str">"  greet  "</span>))      <span class="cmt">## salut</span>
 <span class="bi">print</span>(string.char(<span class="str">"ollin"</span>, <span class="num">1</span>))       <span class="cmt">## o</span>
 <span class="bi">print</span>(string.substr(<span class="str">"ollin"</span>, <span class="num">2</span>, <span class="num">3</span>))  <span class="cmt">## lli</span></code></pre>
 </section>
@@ -1682,7 +1682,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">var</span> m = {x: <span class="num">1</span>}
 <span class="bi">print</span>(m == m)                      <span class="cmt">## 1 : même référence</span>
 
-<span class="cmt">## instance + __eq => comparaison par value</span>
+<span class="cmt">## instance + __eq => comparaison par valeur</span>
 <span class="kw">class</span> Point
     <span class="kw">func</span> init(x, y)
         self.x = x
@@ -1834,12 +1834,12 @@ print(v3)          ## Vec2(4,6)</code></pre>
 </table>
 <pre><code><span class="kw">var</span> gray  = <span class="bi">Color</span>(<span class="num">0.5</span>)                <span class="cmt">## gris moyen opaque</span>
 <span class="kw">var</span> veil = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0.3</span>)             <span class="cmt">## noir à 30% (gris + alpha)</span>
-<span class="kw">var</span> rouge = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
+<span class="kw">var</span> red = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
 <span class="kw">var</span> blue  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## bleu semi-transparent</span>
-<span class="bi">print</span>(rouge)                           <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
+<span class="bi">print</span>(red)                           <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
 
 <span class="cmt">## accès direct aux composantes</span>
-<span class="bi">print</span>(rouge.r, rouge.g, rouge.b, rouge.a)</code></pre>
+<span class="bi">print</span>(red.r, red.g, red.b, red.a)</code></pre>
 <p><code>graphics.clear</code>, <code>graphics.fill</code> et <code>graphics.stroke</code> acceptent <strong>la même signature</strong> que <code>Color</code> (1 à 4 nombres), ou un objet <code>Color</code>.</p>
 
 <h3>Module <code>colors</code></h3>
@@ -1958,7 +1958,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
 
-<pre><code><span class="cmt">## la caméra est un object : créée une fois, pilotée par ses méthodes</span>
+<pre><code><span class="cmt">## la caméra est un objet : créée une fois, pilotée par ses méthodes</span>
 <span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
 <span class="bi">graphics</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## éclairage : base ambiante…</span>
 <span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …+ un « soleil » directionnel</span>
@@ -2139,7 +2139,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <p>L'état se lit aussi directement, sans rappel&nbsp;: <code>touch.count()</code> donne le nombre de contacts, <code>touch.points()</code> un tableau de <code>{id, x, y}</code>. Les coordonnées sont dans le même repère que celles de <code>mouse</code>.</p>
 
-<pre><code><span class="cmt">## Une note par doigt : l'identifiant sert de key, donc plusieurs sonnent ensemble.</span>
+<pre><code><span class="cmt">## Une note par doigt : l'identifiant sert de clé, donc plusieurs sonnent ensemble.</span>
 <span class="kw">global</span> under = {}
 
 <span class="kw">func</span> touch.began(id, x, y)
@@ -2184,7 +2184,7 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> speed,
 
 <span class="kw">func</span> <span class="fn">draw</span>()
     <span class="kw">if</span> grid <span class="kw">then</span>       <span class="cmt">## lecture NORMALE de la variable liée</span>
-        dessineGrille()
+        drawGrid()
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
 
@@ -2318,7 +2318,7 @@ ui.show(game)        <span class="cmt">## bascule vers un autre menu global</spa
 <span class="bi">tween</span>.to(ball, {r: <span class="num">40</span>}, <span class="num">0.6</span>, <span class="str">"easeInOutQuad"</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>)
 
 <span class="cmt">## Trois clignotements, puis on s'arrête sur la color de départ.</span>
-<span class="bi">tween</span>.to(ball, {teinte: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>).repeat(<span class="num">3</span>)</code></pre>
+<span class="bi">tween</span>.to(ball, {tint: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>).repeat(<span class="num">3</span>)</code></pre>
 
 <h3>Enchaîner : <code>tween.sequence</code></h3>
 <p><code>tween.sequence(object, [steps])</code> joue une <strong>suite</strong> d'animations l'une après l'autre. Chaque étape est une map, et la clé de temps s'appelle <code>delay</code> dans les deux rôles&nbsp;: la <strong>durée</strong> de l'animation quand l'étape porte <code>to</code>, une simple <strong>attente</strong> quand elle ne le porte pas.</p>
@@ -2341,7 +2341,7 @@ ui.show(game)        <span class="cmt">## bascule vers un autre menu global</spa
     {to: {y: <span class="num">300</span>}, delay: <span class="num">0.4</span>, curve: <span class="str">"easeOutQuad"</span>},
     {to: {y: <span class="num">100</span>}, delay: <span class="num">0.6</span>, curve: <span class="str">"easeInQuad"</span>},
     {delay: <span class="num">0.2</span>},                                <span class="cmt">## une pause</span>
-    {target: ombre, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## un autre object</span>
+    {target: shadow, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## un autre objet</span>
 ])</code></pre>
 
 <p>L'exemple «&nbsp;Séquence animée (tween)&nbsp;» fait rebondir une balle en cinq étapes&nbsp;: la chute, l'écrasement à l'impact, la détente, la remontée et une pause. Ce sont les durées inégales — un dixième de seconde pour l'écrasement contre une demie pour la chute — qui donnent son poids à la balle.</p>
@@ -2349,19 +2349,19 @@ ui.show(game)        <span class="cmt">## bascule vers un autre menu global</spa
 <p>Le handle renvoyé est celui d'un tween ordinaire&nbsp;: <code>pause()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>delay()</code> et <code>repeat()</code> s'y appliquent tels quels. Écraser l'un des champs animés par un autre tween annule la séquence, comme pour <code>tween.to</code>.</p>
 
 <pre><code><span class="cmt">## Le dessin lit des champs ; le temps ne l'intéresse pas.</span>
-<span class="kw">global</span> ball = {x: <span class="num">0</span>, r: <span class="num">20</span>, teinte: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
+<span class="kw">global</span> ball = {x: <span class="num">0</span>, r: <span class="num">20</span>, tint: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
 
 <span class="kw">func</span> setup()
     <span class="bi">graphics</span>.canvas(W, H)
     <span class="cmt">## Plusieurs champs d'un coup, dont une COULEUR (interpolée composante par composante).</span>
-    <span class="bi">tween</span>.to(ball, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, teinte: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
+    <span class="bi">tween</span>.to(ball, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, tint: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
     <span class="cmt">## Puis un retour, 0,3 s après la fin du premier.</span>
     <span class="bi">tween</span>.to(ball, {r: <span class="num">20</span>}, <span class="num">0.8</span>, <span class="str">"easeInQuad"</span>).delay(<span class="num">1.5</span>)
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
-    <span class="bi">graphics</span>.fill(ball.teinte)
+    <span class="bi">graphics</span>.fill(ball.tint)
     <span class="bi">graphics</span>.circle(ball.x, CH, ball.r)
 <span class="kw">end</span></code></pre>
 
@@ -2374,7 +2374,7 @@ ui.show(game)        <span class="cmt">## bascule vers un autre menu global</spa
 
 <p><code>tween.curves()</code> se prête directement à une <a href="#ui">liste</a> du module <code>ui</code> : la source est le catalogue du moteur, et la variable liée reçoit le nom choisi. C'est ce que fait l'exemple « Animations (tween) ».</p>
 
-<pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.curve, surCourbe)</code></pre>
+<pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.curve, onCurve)</code></pre>
 
 <h3>Ce qu'il faut savoir</h3>
 <ul>
