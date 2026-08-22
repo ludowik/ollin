@@ -1,7 +1,7 @@
-## Univers voxel infini — chunks générés à la volée par bruit de Perlin, cuits
-## autour du joueur (beginChunk/endChunk) et libérés au loin (freeChunk). Distance
+## An endless voxel world: chunks generated on the fly from Perlin noise, baked around the player
+## (beginChunk/endChunk) and freed far away (freeChunk). The view
 ## de vue auto-adaptative (classe ViewDistance, view_distance.ol). Joystick tactile.
-## Déplacement à inertie : vitesse, virage et hauteur d'œil rejoignent leur consigne
+## Movement with inertia: the speed, the turn and the eye height ease towards their target
 ## au lieu de l'adopter d'un coup (voir approach).
 
 import "joystick.ol"
@@ -14,15 +14,15 @@ global SEA = 9
 global WATER = SEA + 0.45    ## niveau de la surface d'eau — SEUL seuil de « sous l'eau »
 global loaded = {}          ## "cx,cz" → handle endChunk
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
-## Caméra de CONTRÔLE (debug) : vue de haut regardant vers le bas, orientée comme la
-## caméra du joueur, pour VÉRIFIER de l'extérieur que seuls les chunks visibles (frustum
-## de la caméra du joueur) sont dessinés. Bascule avec la touche « C ».
+## The CONTROL camera, for debugging: a view from above looking down, oriented like the player's
+## camera, so as to CHECK from the outside that only the visible chunks — those in the player
+## camera's frustum — are drawn. The "C" key toggles it.
 global ctrlCam = graphics.camera(0, 0, 10,  0, 0, 0)
 global debugCam = false
-global CAMBTN = 46          ## bouton « C » (bascule caméra de contrôle), coin haut-gauche
+global CAMBTN = 46          ## the "C" button, which toggles the control camera, in the top-left corner
 
 global EYE = 2.2
-global STEP = 1.2           ## marche franchissable ; au-delà = mur
+global STEP = 1.2           ## the step one can climb; anything higher is a wall
 global camX = 8.5
 global camY = 10
 global camZ = 8.5
@@ -37,17 +37,17 @@ global pad = Joystick()
 global TURN_MAX = 1.8
 global SPEED_MAX = 8.0
 ## Inertie : la vitesse et le virage ne suivent pas la consigne du joystick d'un
-## coup, ils la rejoignent. L'œil perçoit alors un démarrage et un freinage au lieu
-## d'un mouvement uniforme qui s'allume et s'éteint.
+## once, they ease towards it. The eye then perceives a start and a braking rather than a uniform
+## motion switched on and off.
 global vel = 0.0            ## vitesse d'avance courante
 global turnVel = 0.0        ## vitesse de rotation courante
-global ACCEL = 5.0          ## nervosité de l'avance (plus grand = plus sec)
+global ACCEL = 5.0          ## how eager the forward motion is; higher is sharper
 global TURN_ACCEL = 7.0
 global EYE_RISE = 6.0       ## lissage de la hauteur d'œil (terrain en marches de 1)
 
-## Rapproche `cur` de `target` d'une fraction du chemin restant. La fraction dépend
-## de deltaTime via une exponentielle : le résultat ne change donc pas avec le
-## nombre d'images par seconde, contrairement à un simple `cur + (target-cur) * 0.1`.
+## Brings `cur` towards `target` by a fraction of the distance left. The fraction depends on
+## deltaTime through an exponential, so the result does not change with the frame rate, unlike a
+## plain `cur + (target-cur) * 0.1`.
 func approach(cur, target, rate)
     return cur + (target - cur) * (1 - math.exp(-rate * deltaTime))
 end
@@ -55,21 +55,21 @@ end
 global C_SKY = Color(0.55, 0.80, 0.95)
 global AMB = 0.5              ## ambiant du terrain
 
-## Nuages : couche de cubes blancs semi-transparents, dérivant en +x. Dessinés en
+## The clouds: a layer of semi-transparent white cubes drifting towards +x. They are drawn in
 ## IMMÉDIAT chaque frame (ils bougent → pas de chunk/cuisson). 1 seul draw call
-## (instancing). Cull par SECTEUR : bbox du secteur testée en frustum → on saute le
-## bruit et les cubes d'un pavé de ciel hors-champ.
+## one instanced call. Culling works by SECTOR: the sector's bounding box is tested against the
+## frustum, which skips both the noise and the cubes of a patch of sky that is off screen.
 global CLOUD_Y = SEA + 40     ## altitude (au-dessus des sommets)
-global CLOUD_SIZE = 4         ## côté d'un bloc-nuage
-global CLOUD_TH = 2           ## épaisseur
+global CLOUD_SIZE = 4         ## the side of one cloud block
+global CLOUD_TH = 2           ## the thickness
 global CLOUD_STEP = 4         ## pas de la grille (= CLOUD_SIZE → blocs jointifs)
-global CLOUD_SEC = 32         ## côté d'un secteur (8 cellules) pour le cull frustum
-global CLOUD_MARGIN = 96      ## marge au-delà du terrain chargé (nuages jusqu'à l'horizon)
-global CLOUD_SCALE = 0.05     ## fréquence du bruit de placement
+global CLOUD_SEC = 32         ## the side of a sector, eight cells, for the frustum culling
+global CLOUD_MARGIN = 96      ## the margin beyond the terrain loaded, so clouds reach the horizon
+global CLOUD_SCALE = 0.05     ## the frequency of the placement noise
 global CLOUD_THRESH = 0.67    ## seuil de couverture (plus haut = moins de nuages)
-global CLOUD_SPEED = 1.2      ## dérive (blocs/s)
+global CLOUD_SPEED = 1.2      ## the drift, in blocks per second
 global CLOUD_ALPHA = 0.9
-global CLOUD_TEX = 16         ## côté de la texture mouchetée des nuages
+global CLOUD_TEX = 16         ## the side of the clouds' speckled texture
 global cloudTex = nil
 
 global TILE = 16
@@ -88,13 +88,13 @@ global T_STONE = 8
 global T_SANDD = 9
 
 ## Couleur de base + bruit INDÉPENDANT par canal → variation de teinte, pas seulement
-## de luminosité (les tuiles paraissent moins plates).
+## of brightness, which makes the tiles look less flat.
 ##
-## `trous` (0 = tuile pleine) perce la tuile : le moteur écarte les pixels dont l'alpha est
-## sous 0,5, si bien que le cube laisse voir le ciel à travers. C'est ainsi qu'un feuillage
-## s'aère sans qu'on retire un seul cube — la forme du houppier reste entière, seule la
-## matière devient claire. Les trous suivent un bruit fin : des amas irréguliers, alors
-## qu'un pixel sur deux aurait donné un grillage.
+## `holes`, where 0 means a solid tile, pierces the tile: the engine discards the pixels whose alpha
+## falls below 0.5, so the cube lets the sky show through. That is how foliage is opened up without
+## removing a single cube — the canopy's shape stays whole, only its substance thins. The holes
+## follow a fine noise, giving irregular clusters, where every other pixel would have given a
+## grid.
 func putTile(idx, br, bg, bb, jit, trous = 0)
     var cx = (idx % ACOLS) * TILE
     var cy = math.floor(idx / ACOLS) * TILE
@@ -108,7 +108,7 @@ func putTile(idx, br, bg, bb, jit, trous = 0)
             var a = 1
             if trous > 0 then
                 ## Les BORDS de la tuile restent pleins : un trou au bord ouvrirait une fente
-                ## continue entre deux cubes voisins, bien plus voyante qu'un trou isolé.
+                ## continuous between two neighbouring cubes, far more conspicuous than a lone hole.
                 var edge = math.min(math.min(px, py), math.min(TILE - 1 - px, TILE - 1 - py))
                 var n = math.noise((cx + px) * 0.55 + 200, (cy + py) * 0.55 + 200)
                 if edge >= 2 and n > 1 - trous then
@@ -131,7 +131,7 @@ func buildAtlas()
     putTile(T_SNOW,  0.95, 0.97, 1.00, 0.07)
     putTile(T_WATER, 0.20, 0.45, 0.80, 0.14)
     putTile(T_TRUNK, 0.40, 0.26, 0.13, 0.16)
-    putTile(T_LEAF,  0.18, 0.42, 0.16, 0.22, 0.42)   ## seule tuile ajourée : le feuillage
+    putTile(T_LEAF,  0.18, 0.42, 0.16, 0.22, 0.42)   ## the only pierced tile: the foliage
     putTile(T_STONE, 0.36, 0.36, 0.40, 0.16)
     putTile(T_SANDD, 0.72, 0.63, 0.40, 0.12)
     image.endPixels(atlas)
@@ -139,21 +139,21 @@ func buildAtlas()
     graphics.tileAnim(T_WATER)
 end
 
-## Texture de nuage : blanc légèrement moucheté (bruit de luminosité), alpha plein.
-## Casse le blanc plat des cubes sans créer de trou.
+## The cloud texture: white, faintly speckled by a brightness noise, at full alpha. It breaks the
+## cubes' flat white without opening a hole.
 func buildCloudTex()
     cloudTex = image.create(CLOUD_TEX, CLOUD_TEX)
     image.beginPixels(cloudTex)
     for py = 0, CLOUD_TEX - 1 do
         for px = 0, CLOUD_TEX - 1 do
-            var v = 0.78 + math.noise(px * 0.22 + 3, py * 0.22 + 7) * 0.22   ## ~0.78 → 1.0, basse fréquence → dégradé doux
+            var v = 0.78 + math.noise(px * 0.22 + 3, py * 0.22 + 7) * 0.22   ## about 0.78 to 1.0, at a low frequency, hence a soft gradient
             image.setPixel(cloudTex, px, py, v, v, v, 1)
         end
     end
     image.endPixels(cloudTex)
 end
 
-## Biome de surface : 0 = désert, 1 = plaine, 2 = forêt. Le relief (roche/neige) vient
+## The surface biome: 0 desert, 1 plain, 2 forest. The relief, rock and snow, comes
 ## de l'altitude, pas du biome.
 func biomeAt(x, z)
     var b = math.noise(x * 0.026 + 50, z * 0.026 + 50)
@@ -162,23 +162,23 @@ func biomeAt(x, z)
     return 2
 end
 
-## Élévation lisse : une grande échelle (collines larges) + un léger détail. Source
-## unique → pentes douces, aucune falaise aléatoire.
+## A smooth elevation: one large scale for the broad hills plus a slight detail. A single source
+## gives gentle slopes and no random cliffs.
 func elevation(x, z)
     return math.noise(x * 0.013, z * 0.013) * 0.82
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
 
 ## Amplitude 44 (et non 60) : depuis la normalisation de math.noise sur [0,1], le bruit
-## s'étale ~1,35× plus → 60 rendait le relief trop escarpé. 44 restaure des pentes douces.
+## spreads about 1.35 times further, so 60 made the relief too steep. 44 restores gentle slopes.
 func rawHeight(x, z)
     return math.floor((elevation(x, z) - 0.42) * 44 + SEA)
 end
 
-## Élimine les extrema d'1 colonne : un pic isolé (plus haut que ses 4 voisins) est
-## rabaissé au plus haut voisin, un puits isolé (plus bas que ses 4 voisins) est
-## remonté au plus bas voisin → ni cube ni trou solitaire. Fonction pure de (x, z)
-## → même hauteur pour le culling, la collision et le spawn (pas de jointure incohérente).
+## Removes single-column extrema: a lone peak, higher than its four neighbours, is lowered to the
+## highest of them, and a lone pit, lower than its four neighbours, is raised to the lowest — so
+## neither a solitary cube nor a solitary hole remains. Being a pure function of (x, z), it gives
+## the same height to the culling, the collision and the spawn, with no inconsistent seam.
 func heightAt(x, z)
     var h = rawHeight(x, z)
     var e = rawHeight(x + 1, z)
@@ -187,25 +187,25 @@ func heightAt(x, z)
     var s = rawHeight(x, z - 1)
     var hi = math.max(math.max(e, w), math.max(n, s))
     var lo = math.min(math.min(e, w), math.min(n, s))
-    if h > hi then return hi end   ## cube solitaire → éliminé
+    if h > hi then return hi end   ## a solitary cube, hence removed
     if h < lo then return lo end   ## trou solitaire → rempli
     return h
 end
 
-## Sommet cuit de la colonne : le dessus du cube le plus haut est à colTop + 0.5.
+## The column's baked top: the upper face of the highest cube sits at colTop + 0.5.
 func colTop(x, z)
     return math.max(heightAt(x, z), 0)
 end
 
 ## Hauteur du SOL sous (x, z) : le dessus du cube de sommet, ou la surface de l'eau si la
-## colonne est immergée (on flotte). Le terrain monte donc par marches d'un bloc — c'est
-## l'esprit voxel : tous les cubes ont la même taille.
+## column is submerged, so one floats. The terrain therefore rises in one-block steps — that is the
+## voxel spirit: every cube is the same size.
 func ground(x, z)
     return math.max(colTop(math.floor(x), math.floor(z)) + 0.5, WATER)
 end
 
-## Tuiles (dessus/côté/dessous) selon l'altitude : plage → herbe → roche → neige ;
-## le biome ne distingue que le désert.
+## The tiles, for the top, the sides and the bottom, follow the altitude: beach, then grass, then
+## rock, then snow; the biome only sets the desert apart.
 func setBlockTiles(b, h, y)
     if y >= h then
         if h < SEA + 1 then
@@ -236,8 +236,8 @@ func ckey(cx, cz)
     return cx + "," + cz
 end
 
-## Hash 2D bien mélangé (≠ x*a + z*b linéaire, qui alignait les arbres en diagonales).
-## `salt` donne des flux indépendants (position / hauteur / forme) pour la même colonne.
+## A well-mixed 2D hash, unlike a linear x*a + z*b, which lined the trees up along diagonals.
+## `salt` gives independent streams — position, height, shape — for the same column.
 func treeHash(x, z, salt)
     var h = (x * 374761393) ~ (z * 668265263) ~ (salt * 2246822519)
     h = (h ~ (h >> 15)) * 2654435761
@@ -245,7 +245,7 @@ func treeHash(x, z, salt)
     return h & 2147483647
 end
 
-## Un niveau de houppier : carré de rayon r ; round=true retire les coins (arrondi).
+## One level of canopy: a square of radius r; round=true takes the corners off, rounding it.
 func canopy(x, y, z, r, round)
     for tx = -r, r do
         for tz = -r, r do
@@ -256,8 +256,8 @@ func canopy(x, y, z, r, round)
     end
 end
 
-## Arbre à la colonne (x,z), sol en h. Hauteur de tronc et forme du houppier variées,
-## dérivées du hash (déterministe par colonne) → chaque arbre diffère.
+## A tree at column (x,z), the ground being at h. The trunk's height and the canopy's shape vary,
+## derived from the hash, which is deterministic per column, so every tree differs.
 func putTree(x, z, h)
     var th = 3 + treeHash(x, z, 1) % 4      ## tronc : 3..6 cubes
     var shape = treeHash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
@@ -268,11 +268,11 @@ func putTree(x, z, h)
     graphics.tile(T_LEAF)
     var top = h + th
     if shape == 2 then
-        canopy(x, top - 1, z, 1, true)       ## conique : base arrondie + flèche
+        canopy(x, top - 1, z, 1, true)       ## conical: a rounded base plus a spire
         graphics.cube(x, top, z,  1, 1, 1)
         graphics.cube(x, top + 1, z,  1, 1, 1)
     else
-        var round = shape == 0               ## rond (coins retirés) ou touffu (plein)
+        var round = shape == 0               ## round, with the corners taken off, or bushy, hence solid
         canopy(x, top - 1, z, 1, round)
         canopy(x, top, z, 1, round)
         graphics.cube(x, top + 1, z,  1, 1, 1)
@@ -285,8 +285,8 @@ func bakeChunk(cx, cz)
     var x0 = cx * CS
     var z0 = cz * CS
     ## Hauteurs BRUTES sur la zone + une bordure de 1 (indices -1..CS), pour le culling
-    ## des faces cachées : on ne cuit un cube que si une face touche le vide (sommet de
-    ## colonne, ou voisin plus bas) → seule la surface est instanciée, pas le volume.
+    ## the hidden faces: a cube is baked only when one of its faces touches empty space — the top of
+    ## a column, or a lower neighbour — so only the surface is instanced, not the volume.
     var W2 = CS + 2
     var hg = []
     for lz = -1, CS do
@@ -301,7 +301,7 @@ func bakeChunk(cx, cz)
             var b = biomeAt(x, z)
             var h = hg[(lz + 1) * W2 + (lx + 1) + 1]
             var top = math.max(h, 0)
-            ## hauteurs des 4 voisins, clampées comme les colonnes cuites (>= 0)
+            ## the four neighbours' heights, clamped as the baked columns are, to at least 0
             var he = math.max(hg[(lz + 1) * W2 + (lx + 2) + 1], 0)
             var hw = math.max(hg[(lz + 1) * W2 + lx + 1], 0)
             var hs = math.max(hg[(lz + 2) * W2 + (lx + 1) + 1], 0)
@@ -310,10 +310,10 @@ func bakeChunk(cx, cz)
             for y = 0, top do
                 if y == top or y > mn then   ## face visible : sommet OU un voisin plus bas
                     setBlockTiles(b, h, y)
-                    ## Cube IMMERGÉ : assombri selon sa profondeur (moins de lumière au fond).
+                    ## A SUBMERGED cube, darkened with its depth: there is less light down there.
                     ## C'est le FOND qui s'assombrit avec la profondeur, pas l'eau (uniforme).
                     if y < SEA then
-                        var dk = math.clamp((SEA - y) / 5.0, 0, 0.85)   ## assombrit plus tôt et plus fort
+                        var dk = math.clamp((SEA - y) / 5.0, 0, 0.85)   ## it darkens earlier and harder
                         graphics.fill(Color(1 - dk, 1 - dk, 1 - dk))
                     else
                         graphics.fill(colors.WHITE)
@@ -321,17 +321,17 @@ func bakeChunk(cx, cz)
                     graphics.cube(x, y, z,  1, 1, 1)
                 end
             end
-            ## Nappe posée dès que le dessus de la colonne passe sous la surface : même
-            ## comparaison que ground, donc le contact eau/terrain ne peut pas se désaccorder.
+            ## The sheet is laid as soon as the column's top falls below the surface: the same
+            ## comparison as ground uses, so the water-terrain contact cannot fall out of step.
             if top + 0.5 < WATER then
                 ## eau = UN plan semi-transparent UNIFORME au niveau de la mer (surface
-                ## continue) ; l'atténuation avec la profondeur est portée par les cubes du fond.
+                ## continuous surface; the fading with depth is carried by the cubes on the bottom.
                 graphics.tile(T_WATER)
                 graphics.fill(Color(1, 1, 1, 0.72))
                 graphics.plane(x, WATER, z,  1, 1)
                 graphics.fill(colors.WHITE)
             end
-            var hp = treeHash(x, z, 0) % 100    ## placement dispersé (hash mélangé)
+            var hp = treeHash(x, z, 0) % 100    ## a scattered placement, from the mixed hash
             var grassy = h > SEA and h < SEA + 8 and b <> 0
             var tree = grassy and ((b == 2 and hp < 6) or hp == 0)
             if tree then
@@ -348,7 +348,8 @@ func bakeChunk(cx, cz)
 end
 
 ## Cuit les chunks manquants du rayon, `budget` par frame, en priorisant ce qui est
-## devant la caméra puis le plus proche (buffer trié borné). Renvoie le nombre cuit.
+## in front of the camera, then the nearest, in a bounded sorted buffer. It returns how many were
+## baked.
 func streamLoad(pcx, pcz, budget)
     if budget < 1 then
         return 0
@@ -360,9 +361,9 @@ func streamLoad(pcx, pcz, budget)
     var fdx = math.sin(yaw)
     var fdz = math.cos(yaw)
     ## Balayage en anneaux (Chebyshev) croissants, du plus proche au plus loin. On ne
-    ## parcourt que le PÉRIMÈTRE de chaque anneau (O(r²) total, comme un carré plein) ;
-    ## dès que le tampon est plein et que l'anneau courant ne peut plus battre le pire
-    ## score retenu (d² > bsc[cnt]), on arrête — plus de rebalayage de toute la grille.
+    ## walks only the PERIMETER of each ring, which is O(r squared) in total, like a solid square;
+    ## as soon as the buffer is full and the current ring can no longer beat the worst score kept
+    ## (d squared > bsc[cnt]), it stops — the whole grid is no longer rescanned.
     for d = 0, vd.radius do
         if cnt >= budget and d * d > bsc[cnt] then
             break
@@ -378,7 +379,7 @@ func streamLoad(pcx, pcz, budget)
                 if loaded[ckey(cx, cz)] == nil then
                     var score = dx * dx + dz * dz
                     if dx * fdx + dz * fdz < 0 then
-                        score = score + 100000         ## derrière la caméra → après
+                        score = score + 100000         ## behind the camera, hence later
                     end
                     if cnt < budget or score < bsc[cnt] then
                         var p = budget
@@ -406,8 +407,8 @@ func streamLoad(pcx, pcz, budget)
     return cnt
 end
 
-## Libère les chunks hors rayon. margin = hystérésis : 1 en déplacement (anneau tampon,
-## pas de churn en reculant d'un pas), 0 en réduction (libère aussitôt).
+## Frees the chunks outside the radius. `margin` is the hysteresis: 1 while moving, which gives a
+## buffer ring and avoids churn when stepping back, and 0 when the radius shrinks, freeing at once.
 func streamUnload(pcx, pcz, margin)
     var keep = {}
     for k, c in loaded do
@@ -427,7 +428,7 @@ func setup()
     math.noiseSeed(7)
     buildAtlas()
     buildCloudTex()
-    ## spawn : terre ferme, basse et proche de l'origine (pénalité forte sur l'altitude
+    ## The spawn: dry land, low and near the origin, with a heavy penalty on altitude
     ## → jamais sous l'eau).
     var best = 1000000000.0
     for z = 0, 60 do
@@ -445,7 +446,7 @@ func setup()
             end
         end
     end
-    ## regard vers la direction la plus dégagée (somme d'altitude minimale)
+    ## looking towards the clearest direction, the one of least summed altitude
     var bestSum = 1000000.0
     for a = 0, 15 do
         var ang = a / 16.0 * 6.28319
@@ -458,20 +459,20 @@ func setup()
             yaw = ang
         end
     end
-    ## restaure la position mémorisée (module data) si présente → écrase le spawn par défaut
+    ## restores the remembered position, from the data module, when there is one, overriding the default spawn
     if data.has("camX") then
         camX = data.get("camX", camX)
         camZ = data.get("camZ", camZ)
         yaw = data.get("yaw", yaw)
     end
-    camY = ground(camX, camZ) + EYE   ## sans ça, l'œil descendrait depuis le ciel au 1er frame
+    camY = ground(camX, camZ) + EYE   ## without this the eye would drop from the sky on the first frame
     lastcx = math.floor(camX / CS)
     lastcz = math.floor(camZ / CS)
-    loaded[ckey(lastcx, lastcz)] = bakeChunk(lastcx, lastcz)   ## sol présent dès le spawn
+    loaded[ckey(lastcx, lastcz)] = bakeChunk(lastcx, lastcz)   ## the ground is there from the spawn on
     streaming = true
 end
 
-## Bouton caméra (bascule debug) : carré en haut-gauche, sous le HUD.
+## The camera button, a debug toggle: a square at the top left, below the HUD.
 func camBtnHit(x, y)
     return x >= 12 and x <= 12 + CAMBTN and y >= 36 and y <= 36 + CAMBTN
 end
@@ -480,7 +481,7 @@ func drawCamButton()
     graphics.noStroke()
     graphics.fill(Color(0, 0, 0, 0.38))
     graphics.rect(12, 36, CAMBTN, CAMBTN)
-    if debugCam then                   ## allumé = caméra de contrôle active
+    if debugCam then                   ## lit means the control camera is on
         graphics.fill(Color(0.30, 0.70, 1.00, 0.55))
         graphics.rect(12, 36, CAMBTN, CAMBTN)
     end
@@ -490,15 +491,15 @@ func drawCamButton()
 end
 
 func mouse.pressed(x, y)
-    if camBtnHit(x, y) then          ## bouton caméra → bascule (accessible tactile)
+    if camBtnHit(x, y) then          ## the camera button toggles it, and is reachable by touch
         debugCam = not debugCam
         return
     end
-    var ev = vd.hit(x, y)              ## boutons − / + gérés par ViewDistance
+    var ev = vd.hit(x, y)              ## the - and + buttons, handled by ViewDistance
     if ev == 1 then
         streaming = true               ## rayon agrandi → charger le nouvel anneau
     elseif ev == -1 then
-        streamUnload(lastcx, lastcz, 0)   ## rayon réduit → libérer aussitôt
+        streamUnload(lastcx, lastcz, 0)   ## the radius shrank, so free at once
     elseif ev == 0 then
         pad.press(x, y)                ## hors boutons → joystick (ev == 2 : borne atteinte, rien)
     end
@@ -506,7 +507,7 @@ end
 func mouse.released(x, y)
     pad.release()
 end
-## Touche C : bascule la caméra de contrôle (le déplacement, lui, lit keyboard.isDown).
+## The C key toggles the control camera; the movement itself reads keyboard.isDown.
 func keyboard.keypressed(key)
     if string.upper(key) == "C" then
         debugCam = not debugCam
@@ -516,7 +517,7 @@ func mouse.moved(x, y)
     pad.move(x, y)
 end
 
-## Avance le joueur (virage + vitesse), joystick tactile ET flèches clavier combinés,
+## Advances the player, turning and speed together, combining the touch joystick AND the arrow
 ## avec glissement sur les pentes franchissables et blocage sur les murs.
 func movePlayer()
     var turn = pad.steer()
@@ -525,21 +526,21 @@ func movePlayer()
     turnVel = approach(turnVel, math.clamp(turn, -1, 1) * TURN_MAX, TURN_ACCEL)
     yaw = yaw - turnVel * deltaTime
 
-    var thr = pad.throttle()      ## joystick : [-1;1] (avant / arrière)
+    var thr = pad.throttle()      ## the joystick, in [-1;1], forwards and backwards
     if keyboard.isDown("up") then thr = thr + 1 end
-    if keyboard.isDown("down") then thr = thr - 1 end   ## flèche bas = marche arrière
+    if keyboard.isDown("down") then thr = thr - 1 end   ## the down arrow goes backwards
     vel = approach(vel, math.clamp(thr, -1, 1) * SPEED_MAX, ACCEL)
-    ## Sous le millimètre par seconde, on est à l'arrêt : couper évite de faire
-    ## tourner le test de collision pour un déplacement invisible.
+    ## Below a millimetre a second we are at a standstill: cutting out avoids running the collision
+    ## test for an invisible move.
     if math.abs(vel) < 0.001 then
         vel = 0.0
         return
     end
     var sp = vel * deltaTime
-    ## Déplacement découpé en sous-pas d'un DEMI-BLOC au plus. La garde ci-dessous ne
-    ## compare que le sol de départ et celui d'arrivée : un pas plus large qu'un bloc peut
-    ## enjamber un mur étroit sans jamais l'échantillonner. Cela n'arrive qu'en dessous de
-    ## huit images par seconde — une frame très longue, par exemple pendant une cuisson de
+    ## The move is cut into sub-steps of at most HALF A BLOCK. The guard below compares only the
+    ## starting ground with the arriving one: a step wider than a block can stride over a narrow wall
+    ## without ever sampling it. That only happens below eight frames a second — a very long frame,
+    ## during the baking of
     ## chunks — mais le joueur se retrouve alors DANS le terrain.
     var steps = math.max(math.ceil(math.abs(sp) / 0.5), 1)
     var dx = math.sin(yaw) * sp / steps
@@ -565,15 +566,15 @@ func movePlayer()
             break
         end
     end
-    ## Face à un mur, on retombe à zéro : sinon la vitesse continuerait de monter
-    ## dans le vide et le joueur bondirait en se dégageant.
+    ## Against a wall we fall back to zero: the speed would otherwise keep climbing against nothing,
+    ## and the player would leap on getting free.
     if not moved then
         vel = 0.0
     end
 end
 
-## Mémorise la position (module data) au plus une fois par seconde (throttle) : éviter
-## une écriture localStorage/fichier à chaque frame.
+## Remembers the position, through the data module, at most once a second: it avoids a write to
+## localStorage or to a file on every frame.
 func savePlayer()
     saveAcc = saveAcc + deltaTime
     if saveAcc < 1.0 then
@@ -585,17 +586,17 @@ func savePlayer()
     data.set("yaw", yaw)
 end
 
-## Nuages : pattern de bruit FIGÉ échantillonné aux positions « maison » (cx,cz),
-## rendu décalé de `drift` en x → translation continue et lisse.
+## The clouds: a FROZEN noise pattern sampled at the cells' home positions (cx,cz), rendered offset
+## by `drift` along x, which gives a continuous, smooth translation.
 ##
 ## Cull par SECTEUR fait ICI, comme les chunks : AVANT begin3d(rcam), donc contre le
-## frustum FIGÉ du JOUEUR. Sinon, en caméra de contrôle (rendu depuis ctrlCam),
-## inFrustum lirait le frustum de la caméra de contrôle → aucun secteur rejeté.
+## the PLAYER's FROZEN frustum. Otherwise, with the control camera, rendering from ctrlCam,
+## inFrustum would read the control camera's frustum and reject no sector at all.
 ##
-## On ne scanne pas le carré 2·reach plein (dont ~la moitié est DERRIÈRE le joueur et
-## échoue toujours inFrustum) : chaque rangée est clippée au demi-plan avant (produit
-## scalaire avec la direction de regard f). On ne retire que des secteurs derrière la
-## caméra — que inFrustum rejetait déjà — donc couverture visible inchangée.
+## We do not scan the full square of side 2*reach, about half of which lies BEHIND the player and
+## always fails inFrustum: each row is clipped to the forward half-plane, through a dot product with
+## the viewing direction f. Only sectors behind the camera are dropped — the very ones inFrustum
+## already rejected — so the visible coverage is unchanged.
 ## Renvoie un tableau plat [sx0, sz0, sx1, sz1, …] des secteurs visibles.
 global cloudStats = {"tested": 0, "kept": 0, "full": 0}
 
@@ -607,7 +608,7 @@ func cullCloudSectors()
     var secs = []
     var tested = 0
     var s0z = math.floor((camZ - reach) / CLOUD_SEC) * CLOUD_SEC
-    ## carré plein sans demi-plan : toutes les rangées de s0z à camZ+reach
+    ## the full square, with no half-plane: every row from s0z to camZ+reach
     var fullW = math.floor(2 * reach / CLOUD_SEC) + 1
     var fullRows = math.floor(2 * reach / CLOUD_SEC) + 1
     var fullTotal = fullW * fullRows
@@ -622,7 +623,7 @@ func cullCloudSectors()
         elseif fx < -0.001 then
             whi = math.min(whi, camX + rhs / fx)
         elseif rhs > 0 then
-            wlo = whi + 1                         ## rangée entièrement derrière → vide
+            wlo = whi + 1                         ## the row lies entirely behind, hence empty
         end
         var s0x = math.floor((wlo - drift) / CLOUD_SEC) * CLOUD_SEC
         for sx = s0x, whi - drift, CLOUD_SEC do
@@ -641,9 +642,9 @@ end
 
 func drawClouds(secs)
     var drift = elapsedTime * CLOUD_SPEED
-    graphics.ambient(0.8)                        ## < 1 → la lumière directionnelle donne du volume aux nuages
+    graphics.ambient(0.8)                        ## below 1, so the directional light gives the clouds some volume
     graphics.fill(Color(1, 1, 1, CLOUD_ALPHA))
-    graphics.texture(cloudTex)                    ## moucheté doux (casse le blanc plat)
+    graphics.texture(cloudTex)                    ## a soft speckle, which breaks the flat white
     for i = 1, #secs, 2 do
         var sx = secs[i]
         var sz = secs[i + 1]
@@ -693,12 +694,12 @@ func draw()
                camZ + math.cos(PITCH) * math.cos(yaw))
 
     graphics.noStroke()
-    ## Caméra de rendu : joueur, ou caméra de contrôle en hauteur (regard vers le bas,
-    ## up = direction d'avancée du joueur → même orientation à l'écran). Le culling reste
-    ## TOUJOURS celui du joueur : en mode contrôle on rend d'une AUTRE caméra, alors on
-    ## fige d'abord le frustum du joueur (bloc 3D vide → gèle vue+projection lues par
-    ## inFrustum). En mode joueur, inutile : inFrustum réutilise le frustum figé par le
-    ## rendu de la frame précédente (donc pas de passe 3D vide sur le chemin normal).
+    ## The rendering camera: the player's, or the control camera up high, looking down, with up set
+    ## to the player's heading so the orientation on screen matches. The culling ALWAYS remains the
+    ## player's: in control mode we render from ANOTHER camera, so the player's frustum is frozen
+    ## first, through an empty 3D block that freezes the view and projection inFrustum reads. In
+    ## player mode that is needless: inFrustum reuses the frustum the previous frame's rendering
+    ## froze, so the normal path has no empty 3D pass.
     var rcam = cam
     if debugCam then
         graphics.begin3d(cam)
@@ -718,7 +719,7 @@ func draw()
             vis[#vis + 1] = c
         end
     end
-    var cloudSecs = cullCloudSectors()   ## cull avant begin3d(rcam) → frustum joueur figé
+    var cloudSecs = cullCloudSectors()   ## culled before begin3d(rcam), the player's frustum being frozen
     graphics.begin3d(rcam)
     do
         for i = 1, #vis do
@@ -730,18 +731,18 @@ func draw()
         drawClouds(cloudSecs)
     end
     graphics.end3d()
-    graphics.ambient(AMB)           ## drawClouds a baissé l'ambiant → rétablir pour le terrain
+    graphics.ambient(AMB)           ## drawClouds lowered the ambient, so restore it for the terrain
 
     pad.draw()
     vd.draw()                          ## boutons − / + (ViewDistance)
-    drawCamButton()                  ## bouton « C » (bascule caméra de contrôle)
+    drawCamButton()                  ## the "C" button, which toggles the control camera
     var camlbl = "joueur"
-    if debugCam then camlbl = "contrôle" end
+    if debugCam then camlbl = "control" end
     graphics.stroke(colors.WHITE)
     graphics.fontSize(15)
     graphics.text("vue " + vd.radius + " " + vd.mode() + " " + vd.hz() + "Hz  chunks " + #vis +
                   "  cam " + camlbl, 12, 12)
     graphics.stroke(colors.WHITE)
     graphics.fontSize(13)
-    graphics.text("nuages : " + cloudStats.tested + "/" + cloudStats.full + " testés  " + cloudStats.kept + " rendus", 12, 30)
+    graphics.text("clouds: " + cloudStats.tested + "/" + cloudStats.full + " tested  " + cloudStats.kept + " drawn", 12, 30)
 end
