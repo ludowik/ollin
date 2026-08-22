@@ -147,8 +147,8 @@ const AC_KEYWORDS = [
 
 const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
+  fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(grey | r, g, b [, a])'),
-  fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(gris | r, g, b [, a])'),
   fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (bytes used)'),
 ]
 
@@ -1219,24 +1219,24 @@ function menuGroupLabel(text) {
 }
 
 function renderMenuRoot() {
+  projectMenu.innerHTML = ''
   projectMenu.appendChild(menuHeader('Project: ' + (currentProject ? currentProject.name : '—')))
   projectMenu.appendChild(menuItem('✨ New empty project', false, async () => {
     const name = await askFreeProjectName('Untitled'); if (!name) return
-    const name = await askFreeProjectName('Sans titre'); if (!name) return
     const p = await Store.createProject(name)
     closeMenu()
     await autoPushNewProject(p)   // with a repository set, it is created on GitHub
     await openProject(p.id)
+  }))
   projectMenu.appendChild(menuItem('📂 Open a project', true, renderMenuOpen))
   projectMenu.appendChild(menuItem('📄 Open an example', true, renderMenuExamples))
-  projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions on the CURRENT PROJECT, hidden in sample mode: the project being transient, there is
   // nothing in the database to rename, duplicate or delete.
   if (currentProject && !isExample()) {
+    projectMenu.appendChild(menuSep())
     projectMenu.appendChild(menuItem('✎ Rename', false, async () => {
-    projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
+      const name = await askFreeProjectName(currentProject.name, {
         label: 'New name:',
-        label: 'Nouveau nom :',
         exclude: { id: currentProject.id, slug: (currentProject.remote && currentProject.remote.slug) || currentProject.id },
       })
       if (!name) return
@@ -1255,15 +1255,15 @@ function renderMenuRoot() {
       closeMenu()
       await autoPushNewProject(copy)   // with a repository set, it is created on GitHub
       await switchProject(copy.id)
+    }))
     projectMenu.appendChild(menuItem('🗑 Delete', false, async () => {
-    projectMenu.appendChild(menuItem('🗑 Supprimer', false, async () => {
       if (!confirm(`Delete the project "${currentProject.name}"?`)) return
       const gone = currentProject.id
       await Store.deleteProject(gone)
       const list = await Store.listProjects()
       closeMenu()
+      if (list.length) await loadProject(list[0].id)
       else { const p = await Store.createProject('Untitled'); await loadProject(p.id) }
-      else { const p = await Store.createProject('Sans titre'); await loadProject(p.id) }
     }))
   }
 
@@ -1448,7 +1448,7 @@ function renderMenuConnect() {
     // Tested before being stored, so a rejected token does not replace the one that worked, and
     // no other path can set off with an unvalidated token.
     try { const u = await GH.verifyToken(t); GH.setToken(t); ghLogin = u.login; renderMenuGithub() }
-    catch (e) { err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = label_txt }
+    catch (e) { err.textContent = 'Invalid token: ' + e.message; btn.disabled = false; btn.textContent = label_txt }
   }
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
