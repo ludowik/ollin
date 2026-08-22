@@ -1738,62 +1738,62 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <h3>API</h3>
 <p><strong>The module's rule:</strong> the <em>geometry</em> comes through the arguments, the <em>style</em> from the current state — <code>fill</code>, <code>stroke</code>, <code>strokeSize</code>, <code>fontSize</code>, <code>font</code>, <code>rectMode</code>, <code>ellipseMode</code>, <code>spriteMode</code>. No drawing primitive takes a colour or a size as an argument, and that state is reset to its defaults at the start of every frame.</p>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.canvas(w, h, titre)</code></td><td>Ouvre une fenêtre w×h avec le titre donné (60 fps sur desktop, vsync navigateur sur WASM)</td></tr>
-    <tr><td><code>func setup()</code></td><td>Si elle existe, appelée une fois après le chargement du script, avant la boucle update/draw</td></tr>
-    <tr><td><code>func draw()</code></td><td>Si une fonction globale <code>draw</code> existe, le moteur crée au besoin un canvas W×H puis l'appelle automatiquement à chaque frame (rendu)</td></tr>
-    <tr><td><code>func update(dt)</code></td><td>Si elle existe, appelée chaque frame <strong>avant</strong> <code>draw</code> ; <code>dt</code> = secondes écoulées depuis la frame précédente</td></tr>
-    <tr><td><code>graphics.run(callback)</code></td><td>Lance la boucle principale avec un callback nommé explicitement (alternative à <code>draw</code>)</td></tr>
-    <tr><td><code>graphics.isOpen()</code></td><td>Retourne 1 si la fenêtre est encore ouverte, 0 sinon</td></tr>
-    <tr><td><code>graphics.clear([gris | r,g,b | color …])</code></td><td>Efface le fond. Même signature que <code>Color</code> (1 à 4 nombres, ou un objet <code>Color</code>). Couleur <strong>opaque</strong> → efface net ; <strong>semi-transparente</strong> (alpha&nbsp;&lt;&nbsp;1) → <strong>fondu</strong> progressif (traînées, cf. contexte persistant ci-dessous). Sans argument : noir.</td></tr>
-    <tr><td><code>graphics.blendMode(mode)</code></td><td>Mode de fusion des dessins suivants : chaîne (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) ou constante du module <code>blend</code>. Remis à <code>"alpha"</code> à chaque frame.</td></tr>
-    <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Ouvre / ferme une frame de rendu manuellement (usage avancé ; la boucle <code>draw</code>/<code>run</code> le gère sinon)</td></tr>
-    <tr><td><code>graphics.strokeSize(n)</code></td><td>Épaisseur des tracés <strong>2D</strong> (défaut : 2 ; remise à 2 chaque frame). <strong>Sans effet en 3D</strong> : le fil de fer 3D reste à 1&nbsp;px (limite WebGL).</td></tr>
-    <tr><td><code>graphics.rectMode(mode)</code></td><td>Point d'ancrage de <code>graphics.rect</code> : <code>"corner"</code> (défaut — <code>x, y</code> = coin supérieur gauche) ou <code>"center"</code> (<code>x, y</code> = centre du rectangle). N'affecte que <code>rect</code> ; remis à <code>"corner"</code> à chaque frame et sauvegardé/restauré par <code>push</code>/<code>pop</code>.</td></tr>
-    <tr><td><code>graphics.ellipseMode(mode)</code></td><td>Point d'ancrage de <code>graphics.circle</code>, <code>graphics.ellipse</code> et <code>graphics.arc</code> : <code>"center"</code> (<strong>défaut</strong> — ces primitives sont centrées, à l'inverse de <code>rect</code>) ou <code>"corner"</code>, où <code>x, y</code> est le coin supérieur gauche de la boîte englobante (pour <code>circle</code>, une boîte de côté <code>2 × r</code> ; pour <code>arc</code>, celle de l'ellipse entière, pas du secteur tracé).</td></tr>
-    <tr><td><code>graphics.spriteMode(mode)</code></td><td>Même chose pour les images : <code>"corner"</code> (défaut) ou <code>"center"</code>. S'applique à <code>graphics.sprite</code> <strong>et</strong> à <code>image.draw</code>, comme <code>graphics.tint</code>. Le décalage porte sur la taille <strong>affichée</strong> : centrer une image rendue en 200×200 la décale de 100, quelle que soit la taille de la source.</td></tr>
-    <tr><td><code>graphics.segments(n)</code></td><td>Nombre de segments des primitives courbes — cercle, ellipse, arc <strong>2D</strong> et sphère, cylindre, cône, tore <strong>3D</strong> (défaut : 64). Intégré au système de style : sauvegardé/restauré par <code>push</code>/<code>pop</code>.</td></tr>
-    <tr><td><code>graphics.stroke([gris | r,g,b | color …])</code></td><td>Active le contour. Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code> (+ taille optionnelle en 2e arg) ; sans argument, réactive avec la couleur courante</td></tr>
-    <tr><td><code>graphics.noStroke()</code></td><td>Désactive le contour (aucune bordure) — la couleur courante est conservée</td></tr>
-    <tr><td><code>graphics.fill([gris | r,g,b | color …])</code></td><td>Active le remplissage. Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code> ; sans argument, réactive avec la couleur courante</td></tr>
-    <tr><td><code>graphics.noFill()</code></td><td>Désactive le remplissage (défaut) — la couleur courante est conservée</td></tr>
-    <tr><td><code>graphics.tint([gris | r,g,b | color …])</code></td><td>Teinte des images (<code>graphics.sprite</code> et <code>image.draw</code>). Même signature que <code>Color</code> : 1 à 4 nombres (gris, gris+a, r,g,b, r,g,b,a) ou un objet <code>Color</code></td></tr>
-    <tr><td><code>graphics.noTint()</code></td><td>Désactive la teinte des images (images dessinées telles quelles)</td></tr>
-    <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Trace un segment avec les styles globaux courants</td></tr>
-    <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>Rectangle : remplissage si <code>fill</code> actif, contour si <code>stroke</code> actif. <code>x, y</code> désignent le coin supérieur gauche ou le centre selon <code>rectMode</code>. <code>r</code> = rayon des coins en <strong>pixels</strong>, borné à la moitié du petit côté (au-delà, on obtient une gélule) ; le contour reste à l'intérieur de la géométrie déclarée, comme pour les angles droits. Finesse des coins : <code>segments</code></td></tr>
-    <tr><td><code>graphics.fps()</code></td><td>Retourne le framerate courant (entier)</td></tr>
-    <tr><td><code>graphics.screenshot(file)</code></td><td>Capture le rendu courant dans un PNG (à appeler dans <code>draw</code>) ; sur WASM, déclenche un téléchargement</td></tr>
-    <tr><td><code>graphics.text(text, x, y)</code></td><td>Affiche une chaîne — couleur de <code>stroke</code> (on écrit au stylo), taille de <code>fontSize</code>. <code>noStroke()</code> ne masque PAS le texte : seule la couleur est empruntée au trait. Sans canvas, ne dessine rien</td></tr>
-    <tr><td><code>graphics.fontSize([n])</code></td><td>Fixe la hauteur de police pour <code>text</code> et renvoie <strong>toujours</strong> la hauteur courante — sans argument, c'est donc un accesseur. État remis à 18 chaque frame (valeur la plus courante). Accepte une taille <strong>fractionnaire</strong> (utile pour un dessin mis à l'échelle) et n'impose aucun minimum</td></tr>
-    <tr><td><code>graphics.font([name])</code></td><td>Choisit la police courante et renvoie <strong>toujours</strong> son nom. Trois polices sont embarquées dans le moteur : <code>"sans"</code> (défaut, proportionnelle), <code>"mono"</code> (à espacement fixe) et <code>"pixel"</code> (la police bitmap de raylib, look rétro). Un nom inconnu lève une erreur qui liste les polices disponibles. État de style, donc remis au défaut chaque frame et sauvegardé par <code>pushStyle</code></td></tr>
-    <tr><td><code>graphics.textSize(text)</code></td><td>Largeur <strong>et</strong> hauteur du texte avec la police et la taille courantes, en deux valeurs : <code>var w, h = graphics.textSize("abc")</code>. De quoi centrer ou encadrer un libellé sans réimplémenter la mesure. Sans canvas, renvoie 0, 0</td></tr>
-    <tr><td><code>graphics.point(x, y)</code></td><td>Trace un point aux coordonnées données</td></tr>
-    <tr><td><code>graphics.circle(x, y, r)</code></td><td>Cercle de centre (x,y) et rayon r — fill/stroke selon styles ; ancrage selon <code>ellipseMode</code></td></tr>
-    <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>Ellipse de centre (x,y), largeur w et hauteur h — fill/stroke selon styles ; ancrage selon <code>ellipseMode</code></td></tr>
-    <tr><td><code>graphics.arc(x, y, w, h, start, stop)</code></td><td>Portion d'ellipse de <code>start</code> à <code>stop</code>, angles en <strong>radians</strong> (sens horaire, 0 = droite ; <code>math.rad(deg)</code> pour convertir). <code>fill</code> dessine le secteur plein — la part de tarte, rayons compris — tandis que <code>stroke</code> ne trace que la courbe, sans les rayons. Un intervalle plus large qu'un tour est ramené au tour complet ; <code>stop</code> inférieur à <code>start</code> est rattrapé en ajoutant des tours. Ancrage selon <code>ellipseMode</code>, sur la boîte de l'ellipse entière. Finesse : <code>segments</code>, proportionnellement à l'angle couvert</td></tr>
-    <tr><td><code>graphics.polygon(pts)</code></td><td>Polygone fermé — <code>pts</code> : tableau plat <code>[x1,y1,x2,y2,…]</code> ou tableau de paires <code>[[x1,y1],…]</code></td></tr>
-    <tr><td><code>graphics.polyline(pts)</code></td><td>Polyligne ouverte (stroke uniquement) — mêmes formats que <code>polygon</code></td></tr>
-    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Affiche une texture (handle <code>image</code>) à (x,y) — teintée par <code>graphics.tint</code> courant (blanc si aucun) ; respecte la matrice de transformation. <code>x, y</code> désignent le coin supérieur gauche ou le centre selon <code>spriteMode</code></td></tr>
-    <tr><td><code>graphics.quit()</code></td><td>Arrête la boucle <code>run()</code> sans fermer la fenêtre (safe sur WASM)</td></tr>
-    <tr><td><code>graphics.close()</code></td><td>Ferme la fenêtre et libère les ressources</td></tr>
+    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title (60 fps on the desktop, the browser's vsync in WASM)</td></tr>
+    <tr><td><code>func setup()</code></td><td>When present, called once after the script has loaded, before the update/draw loop</td></tr>
+    <tr><td><code>func draw()</code></td><td>When a global <code>draw</code> function exists, the engine creates a W×H canvas if needed and then calls it on every frame, for the rendering</td></tr>
+    <tr><td><code>func update(dt)</code></td><td>When present, called on every frame <strong>before</strong> <code>draw</code>; <code>dt</code> is the seconds elapsed since the previous frame</td></tr>
+    <tr><td><code>graphics.run(callback)</code></td><td>Starts the main loop with an explicitly named callback, as an alternative to <code>draw</code></td></tr>
+    <tr><td><code>graphics.isOpen()</code></td><td>Returns 1 while the window is still open, 0 otherwise</td></tr>
+    <tr><td><code>graphics.clear([grey | r,g,b | color …])</code></td><td>Clears the background. The same signature as <code>Color</code> (1 to 4 numbers, or a <code>Color</code> object). An <strong>opaque</strong> colour clears outright; a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) applies a gradual <strong>fade</strong>, giving trails (see the persistent context below). With no argument: black.</td></tr>
+    <tr><td><code>graphics.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. Reset to <code>"alpha"</code> on every frame.</td></tr>
+    <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Opens / closes a render frame by hand (an advanced use; the <code>draw</code>/<code>run</code> loop handles it otherwise)</td></tr>
+    <tr><td><code>graphics.strokeSize(n)</code></td><td>The width of <strong>2D</strong> strokes (default 2, reset to 2 on every frame). It has <strong>no effect in 3D</strong>: the 3D wireframe stays 1&nbsp;px wide, a WebGL limit.</td></tr>
+    <tr><td><code>graphics.rectMode(mode)</code></td><td>The anchor point of <code>graphics.rect</code>: <code>"corner"</code> (the default — <code>x, y</code> is the top-left corner) or <code>"center"</code> (<code>x, y</code> is the rectangle's centre). It affects <code>rect</code> only; reset to <code>"corner"</code> on every frame, and saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
+    <tr><td><code>graphics.ellipseMode(mode)</code></td><td>The anchor point of <code>graphics.circle</code>, <code>graphics.ellipse</code> and <code>graphics.arc</code>: <code>"center"</code> (the <strong>default</strong> — these primitives are centred, unlike <code>rect</code>) or <code>"corner"</code>, where <code>x, y</code> is the top-left corner of the bounding box (for <code>circle</code>, a box of side <code>2 × r</code>; for <code>arc</code>, that of the whole ellipse, not of the sector drawn).</td></tr>
+    <tr><td><code>graphics.spriteMode(mode)</code></td><td>The same for images: <code>"corner"</code> (the default) or <code>"center"</code>. It applies to <code>graphics.sprite</code> <strong>and</strong> to <code>image.draw</code>, as <code>graphics.tint</code> does. The offset uses the <strong>displayed</strong> size: centring an image drawn at 200×200 offsets it by 100, whatever the source's size.</td></tr>
+    <tr><td><code>graphics.segments(n)</code></td><td>The number of segments of the curved primitives — circle, ellipse and arc in <strong>2D</strong>, sphere, cylinder, cone and torus in <strong>3D</strong> (default 64). Part of the style system, so saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
+    <tr><td><code>graphics.stroke([grey | r,g,b | color …])</code></td><td>Turns the outline on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object, plus an optional width as a second argument; with no argument, it turns back on with the current colour</td></tr>
+    <tr><td><code>graphics.noStroke()</code></td><td>Turns the outline off, leaving no border — the current colour is kept</td></tr>
+    <tr><td><code>graphics.fill([grey | r,g,b | color …])</code></td><td>Turns the fill on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object; with no argument, it turns back on with the current colour</td></tr>
+    <tr><td><code>graphics.noFill()</code></td><td>Turns the fill off (the default) — the current colour is kept</td></tr>
+    <tr><td><code>graphics.tint([grey | r,g,b | color …])</code></td><td>The tint applied to images (<code>graphics.sprite</code> and <code>image.draw</code>). The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object</td></tr>
+    <tr><td><code>graphics.noTint()</code></td><td>Turns the image tint off, so images are drawn as they are</td></tr>
+    <tr><td><code>graphics.line(x1, y1, x2, y2)</code></td><td>Draws a segment with the current global styles</td></tr>
+    <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>A rectangle: filled when <code>fill</code> is on, outlined when <code>stroke</code> is on. <code>x, y</code> is the top-left corner or the centre, according to <code>rectMode</code>. <code>r</code> is the corner radius in <strong>pixels</strong>, clamped to half the shorter side (beyond that you get a capsule); the outline stays inside the geometry declared, as it does for square corners. The corners' smoothness comes from <code>segments</code></td></tr>
+    <tr><td><code>graphics.fps()</code></td><td>Returns the current frame rate, as an integer</td></tr>
+    <tr><td><code>graphics.screenshot(file)</code></td><td>Captures the current rendering into a PNG (to be called inside <code>draw</code>); in WASM it starts a download</td></tr>
+    <tr><td><code>graphics.text(text, x, y)</code></td><td>Draws a string — in the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
+    <tr><td><code>graphics.fontSize([n])</code></td><td>Sets the font height for <code>text</code> and <strong>always</strong> returns the current height — with no argument it is therefore a getter. The state is reset to 18 on every frame, that being the commonest value. It accepts a <strong>fractional</strong> size, useful for a scaled drawing, and imposes no minimum</td></tr>
+    <tr><td><code>graphics.font([name])</code></td><td>Chooses the current font and <strong>always</strong> returns its name. Three fonts are embedded in the engine: <code>"sans"</code> (the default, proportional), <code>"mono"</code> (fixed pitch) and <code>"pixel"</code> (raylib's bitmap font, for a retro look). An unknown name raises an error listing the fonts available. It is a style state, so it is reset to the default on every frame and saved by <code>pushStyle</code></td></tr>
+    <tr><td><code>graphics.textSize(text)</code></td><td>The width <strong>and</strong> height of the text in the current font and size, as two values: <code>var w, h = graphics.textSize("abc")</code>. Enough to centre or frame a label without reimplementing the measurement. With no canvas it returns 0, 0</td></tr>
+    <tr><td><code>graphics.point(x, y)</code></td><td>Draws a point at the given coordinates</td></tr>
+    <tr><td><code>graphics.circle(x, y, r)</code></td><td>A circle centred on (x,y) with radius r — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
+    <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>An ellipse centred on (x,y), of width w and height h — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
+    <tr><td><code>graphics.arc(x, y, w, h, start, stop)</code></td><td>A portion of an ellipse from <code>start</code> to <code>stop</code>, the angles in <strong>radians</strong> (clockwise, 0 pointing right; <code>math.rad(deg)</code> converts). <code>fill</code> draws the solid sector — the slice of pie, radii included — whereas <code>stroke</code> draws the curve alone, without the radii. An interval wider than a full turn is brought back to one turn; a <code>stop</code> below <code>start</code> is made good by adding turns. Anchored according to <code>ellipseMode</code>, on the whole ellipse's box. Smoothness: <code>segments</code>, in proportion to the angle covered</td></tr>
+    <tr><td><code>graphics.polygon(pts)</code></td><td>A closed polygon — <code>pts</code> is a flat array <code>[x1,y1,x2,y2,…]</code> or an array of pairs <code>[[x1,y1],…]</code></td></tr>
+    <tr><td><code>graphics.polyline(pts)</code></td><td>An open polyline (stroke only) — the same formats as <code>polygon</code></td></tr>
+    <tr><td><code>graphics.sprite(img, x, y [, w, h])</code></td><td>Draws a texture (an <code>image</code> handle) at (x,y) — tinted by the current <code>graphics.tint</code>, white when there is none; it honours the transformation matrix. <code>x, y</code> is the top-left corner or the centre, according to <code>spriteMode</code></td></tr>
+    <tr><td><code>graphics.quit()</code></td><td>Stops the <code>run()</code> loop without closing the window (safe in WASM)</td></tr>
+    <tr><td><code>graphics.close()</code></td><td>Closes the window and releases the resources</td></tr>
   </tbody>
 </table>
 
-<h3>Transformations matricielles</h3>
-<p>Les transformations s'appliquent à toutes les primitives suivantes jusqu'à <code>resetTransform()</code> ou <code>pop()</code>. La matrice est remise à l'identité automatiquement à chaque frame. Elles marchent en <strong>2D et en 3D</strong> (voir la note 3D plus bas).</p>
+<h3>Matrix transformations</h3>
+<p>The transformations apply to every primitive that follows, until <code>resetTransform()</code> or <code>pop()</code>. The matrix is reset to the identity on every frame. They work in <strong>2D and in 3D</strong> (see the 3D note further down).</p>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.push()</code></td><td>Sauvegarde <strong>matrice + style</strong> (trait, remplissage, teinte, mode de fusion…)</td></tr>
-    <tr><td><code>graphics.pop()</code></td><td>Restaure matrice + style de la dernière <code>push()</code></td></tr>
-    <tr><td><code>graphics.pushMatrix()</code> · <code>popMatrix()</code></td><td>Sauvegarde/restaure la <strong>matrice</strong> seule</td></tr>
-    <tr><td><code>graphics.pushStyle()</code> · <code>popStyle()</code></td><td>Sauvegarde/restaure le <strong>style</strong> seul (trait, remplissage, teinte, fusion)</td></tr>
-    <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Déplace l'origine ; <code>z</code> optionnel (3D)</td></tr>
-    <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>Rotation en degrés ; sans axe → autour de Z, sinon autour de l'axe <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>Rotation autour d'un axe principal (raccourcis 3D)</td></tr>
-    <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Échelle : 1 arg = uniforme (x,y,z) ; 2 args = (x,y) ; 3 args = (x,y,z)</td></tr>
-    <tr><td><code>graphics.resetTransform()</code></td><td>Réinitialise la matrice à l'identité</td></tr>
+    <tr><td><code>graphics.push()</code></td><td>Saves the <strong>matrix and the style</strong> (stroke, fill, tint, blend mode…)</td></tr>
+    <tr><td><code>graphics.pop()</code></td><td>Restores the matrix and style of the last <code>push()</code></td></tr>
+    <tr><td><code>graphics.pushMatrix()</code> · <code>popMatrix()</code></td><td>Saves and restores the <strong>matrix</strong> alone</td></tr>
+    <tr><td><code>graphics.pushStyle()</code> · <code>popStyle()</code></td><td>Saves and restores the <strong>style</strong> alone (stroke, fill, tint, blending)</td></tr>
+    <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Moves the origin; <code>z</code> is optional, for 3D</td></tr>
+    <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>A rotation in degrees; with no axis it turns around Z, otherwise around the axis <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis (3D shorthands)</td></tr>
+    <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Scaling: one argument is uniform (x,y,z); two are (x,y); three are (x,y,z)</td></tr>
+    <tr><td><code>graphics.resetTransform()</code></td><td>Resets the matrix to the identity</td></tr>
   </tbody>
 </table>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">220</span>, <span class="num">180</span>, <span class="str">"transform"</span>)
@@ -1801,51 +1801,51 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
     <span class="bi">graphics</span>.push()
     <span class="bi">graphics</span>.translate(<span class="num">110</span>, <span class="num">90</span>)
-    <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">60</span>)  <span class="cmt">## pivote au fil du temps</span>
+    <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">60</span>)  <span class="cmt">## turns as time passes</span>
     <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
-    <span class="bi">graphics</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>)    <span class="cmt">## carré pivoté centré</span>
+    <span class="bi">graphics</span>.rect(<span class="num">-45</span>, <span class="num">-45</span>, <span class="num">90</span>, <span class="num">90</span>)    <span class="cmt">## a rotated, centred square</span>
     <span class="bi">graphics</span>.pop()
 <span class="kw">end</span></code></pre>
 
-<h3>Contexte persistant &amp; modes de fusion</h3>
-<p>Le contexte de dessin n'est <strong>pas effacé automatiquement</strong> entre les frames : c'est à <code>draw()</code> de décider. Sans appel à <code>graphics.clear()</code>, le dessin <strong>s'accumule</strong> d'une frame à l'autre (traînées). Avec une couleur <strong>opaque</strong>, <code>clear</code> repart d'un fond net ; avec une couleur <strong>semi-transparente</strong> (alpha&nbsp;&lt;&nbsp;1), il applique un <strong>fondu</strong> — le contenu précédent s'estompe peu à peu vers cette couleur.</p>
-<p><code>graphics.blendMode(mode)</code> change la façon dont les dessins se combinent au contenu déjà présent. Le mode <strong>additif</strong> (<code>blend.ADD</code>), conjugué au contexte persistant et à un léger fondu, produit des lueurs et des traînées lumineuses.</p>
+<h3>The persistent context and the blend modes</h3>
+<p>The drawing context is <strong>not cleared automatically</strong> between frames: that is for <code>draw()</code> to decide. With no call to <code>graphics.clear()</code>, the drawing <strong>accumulates</strong> from one frame to the next, giving trails. With an <strong>opaque</strong> colour, <code>clear</code> starts from a clean background; with a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) it applies a <strong>fade</strong> — the previous content dims gradually towards that colour.</p>
+<p><code>graphics.blendMode(mode)</code> changes how the drawings combine with the content already there. The <strong>additive</strong> mode (<code>blend.ADD</code>), together with the persistent context and a slight fade, produces glows and luminous trails.</p>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">160</span>)
 <span class="kw">global</span> t = <span class="num">0</span>
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.blendMode(<span class="bi">blend</span>.ADD)         <span class="cmt">## fusion additive (lueur)</span>
-    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.08</span>))  <span class="cmt">## fondu léger → traînées</span>
+    <span class="bi">graphics</span>.blendMode(<span class="bi">blend</span>.ADD)         <span class="cmt">## additive blending (a glow)</span>
+    <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0.08</span>))  <span class="cmt">## a slight fade → trails</span>
     t = t + <span class="num">0.05</span>
     <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">0.2</span>, <span class="num">0.5</span>, <span class="num">1</span>))
     <span class="bi">graphics</span>.circle(<span class="num">120</span> + <span class="bi">math</span>.cos(t) * <span class="num">80</span>, <span class="num">80</span> + <span class="bi">math</span>.sin(t * <span class="num">1.3</span>) * <span class="num">50</span>, <span class="num">14</span>)
 <span class="kw">end</span></code></pre>
 
-<h3>Couleurs — classe <code>Color</code></h3>
-<p>Les couleurs sont des objets <code>Color</code> avec des composantes normalisées dans <code>[0.0, 1.0]</code> (clampées silencieusement). Le constructeur accepte <strong>1 à 4 nombres</strong> selon le nombre d'arguments :</p>
+<h3>Colours — the <code>Color</code> class</h3>
+<p>Colours are <code>Color</code> objects whose components are normalised to <code>[0.0, 1.0]</code>, and silently clamped. The constructor accepts <strong>1 to 4 numbers</strong>, according to how many arguments are given:</p>
 <table>
-  <thead><tr><th>Appel</th><th>Résultat</th></tr></thead>
+  <thead><tr><th>Call</th><th>Result</th></tr></thead>
   <tbody>
-    <tr><td><code>Color(gris)</code></td><td>niveau de gris opaque → <code>(gris, gris, gris, 1)</code></td></tr>
-    <tr><td><code>Color(gris, a)</code></td><td>gris + alpha → <code>(gris, gris, gris, a)</code></td></tr>
-    <tr><td><code>Color(r, g, b)</code></td><td>couleur opaque → <code>(r, g, b, 1)</code></td></tr>
-    <tr><td><code>Color(r, g, b, a)</code></td><td>couleur + alpha</td></tr>
-    <tr><td><code>Color(autre)</code></td><td>copie d'un objet <code>Color</code></td></tr>
+    <tr><td><code>Color(grey)</code></td><td>an opaque grey level → <code>(grey, grey, grey, 1)</code></td></tr>
+    <tr><td><code>Color(grey, a)</code></td><td>grey plus alpha → <code>(grey, grey, grey, a)</code></td></tr>
+    <tr><td><code>Color(r, g, b)</code></td><td>an opaque colour → <code>(r, g, b, 1)</code></td></tr>
+    <tr><td><code>Color(r, g, b, a)</code></td><td>a colour plus alpha</td></tr>
+    <tr><td><code>Color(other)</code></td><td>a copy of a <code>Color</code> object</td></tr>
   </tbody>
 </table>
-<pre><code><span class="kw">var</span> gray  = <span class="bi">Color</span>(<span class="num">0.5</span>)                <span class="cmt">## gris moyen opaque</span>
-<span class="kw">var</span> veil = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0.3</span>)             <span class="cmt">## noir à 30% (gris + alpha)</span>
-<span class="kw">var</span> red = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## rouge opaque</span>
-<span class="kw">var</span> blue  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## bleu semi-transparent</span>
+<pre><code><span class="kw">var</span> gray  = <span class="bi">Color</span>(<span class="num">0.5</span>)                <span class="cmt">## an opaque mid grey</span>
+<span class="kw">var</span> veil = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">0.3</span>)             <span class="cmt">## black at 30% (grey plus alpha)</span>
+<span class="kw">var</span> red = <span class="bi">Color</span>(<span class="num">1.0</span>, <span class="num">0.0</span>, <span class="num">0.0</span>)       <span class="cmt">## opaque red</span>
+<span class="kw">var</span> blue  = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.0</span>, <span class="num">1.0</span>, <span class="num">0.5</span>)  <span class="cmt">## semi-transparent blue</span>
 <span class="bi">print</span>(red)                           <span class="cmt">## Color(1.000000,0.000000,0.000000,1.000000)</span>
 
-<span class="cmt">## accès direct aux composantes</span>
+<span class="cmt">## direct access to the components</span>
 <span class="bi">print</span>(red.r, red.g, red.b, red.a)</code></pre>
-<p><code>graphics.clear</code>, <code>graphics.fill</code> et <code>graphics.stroke</code> acceptent <strong>la même signature</strong> que <code>Color</code> (1 à 4 nombres), ou un objet <code>Color</code>.</p>
+<p><code>graphics.clear</code>, <code>graphics.fill</code> and <code>graphics.stroke</code> accept <strong>the same signature</strong> as <code>Color</code> (1 to 4 numbers), or a <code>Color</code> object.</p>
 
-<h3>Module <code>colors</code></h3>
-<p>Palette de constantes prédéfinies, disponible sans <code>import</code>. Chaque constante est un objet <code>Color</code>.</p>
+<h3>The <code>colors</code> module</h3>
+<p>A palette of predefined constants, available without any <code>import</code>. Each constant is a <code>Color</code> object.</p>
 <table>
-  <thead><tr><th>Constante</th><th>r</th><th>g</th><th>b</th></tr></thead>
+  <thead><tr><th>Constant</th><th>r</th><th>g</th><th>b</th></tr></thead>
   <tbody>
     <tr><td><code>colors.BLACK</code></td><td>0.0</td><td>0.0</td><td>0.0</td></tr>
     <tr><td><code>colors.WHITE</code></td><td>1.0</td><td>1.0</td><td>1.0</td></tr>
@@ -2075,7 +2075,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <h2>Module <code>keyboard</code></h2>
 <p>Le clavier suit le même principe que <code>setup</code>/<code>update</code>/<code>draw</code> : on <strong>déclare des fonctions directement sur le module <code>keyboard</code></strong> et le moteur les appelle si elles existent (aucune activation). Actif pendant la boucle de rendu. Pour un <strong>déplacement continu</strong>, préférer <code>keyboard.isDown(key)</code> (état maintenu, testé chaque frame) aux événements ponctuels.</p>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>keyboard.isDown(key)</code></td><td>Renvoie <code>true</code>/<code>false</code> selon que la touche est <strong>enfoncée maintenant</strong> (à interroger dans <code>draw</code>/<code>update</code>)</td></tr>
     <tr><td><code>func keyboard.keypressed(key)</code></td><td>Appelée à chaque touche <strong>enfoncée</strong> (événement)</td></tr>
@@ -2100,7 +2100,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <h2>Module <code>mouse</code></h2>
 <p>Même principe pour le pointeur (souris ou tap tactile) : on déclare les fonctions directement sur le module <code>mouse</code>. Chaque callback reçoit la position <code>(x, y)</code> dans le repère de la zone graphique.</p>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>func mouse.pressed(x, y)</code></td><td>Appui du bouton gauche / tap</td></tr>
     <tr><td><code>func mouse.released(x, y)</code></td><td>Relâché</td></tr>
@@ -2190,7 +2190,7 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> speed,
 
 <h3>API</h3>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>ui.button(label, fn)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
     <tr><td><code>ui.checkbox(label, ref variable [, onChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>onChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
@@ -2242,7 +2242,7 @@ ui.show(settings)   <span class="cmt">## menu global affiché</span>
 ui.show(game)        <span class="cmt">## bascule vers un autre menu global</span></code></pre>
 
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>ui.menu(label)</code></td><td>Crée un menu à la racine et renvoie son handle. <code>menu.menu(label)</code> crée un sous-menu.</td></tr>
     <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>Mêmes déclarations que leurs équivalents <code>ui.*</code>, rangées dans ce menu.</td></tr>
@@ -2487,7 +2487,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <h2>Module <code>data</code></h2>
 <p>Persiste des <strong>paramètres/variables d'un lancement à l'autre</strong>. Deux portées : <code>data</code> (propre au <strong>projet</strong>, isolée) et <code>data.shared</code> (<strong>partagée</strong> entre tous les projets). Valeurs : nombre, chaîne, booléen. Disponible sans <code>import</code>. Persistance automatique (localStorage sur le web, fichier à côté du script en natif).</p>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>data.set(key, value)</code></td><td>Écrit et persiste (<code>set(key, nil)</code> supprime la clé)</td></tr>
     <tr><td><code>data.get(key [, default])</code></td><td>Lit la valeur, ou <code>défaut</code> (ou <code>nil</code>) si absente</td></tr>
@@ -2539,7 +2539,7 @@ image.endDraw()
 
 <h3>API</h3>
 <table>
-  <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>image.load(name)</code></td><td>Charge une texture (natif : disque ; WASM : image « Images » ou ressource servie même origine) — retourne un handle <code>{id, width, height}</code></td></tr>
     <tr><td><code>image.loadData(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
