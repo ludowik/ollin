@@ -105,7 +105,7 @@ async function healExampleFlags() {
     delete p.example
     if (p.id === TRANSIENT_ID) {
       p._oldId = p.id
-      p.id = await uniqueId(p.name || 'Sans titre')
+      p.id = await uniqueId(p.name || 'Untitled')
     }
     writeManifest(p)
   }
@@ -161,10 +161,10 @@ async function uniqueId(name, exclude) {
 
 export async function createProject(name) {
   const now = Date.now()
-  const id = await uniqueId(name || 'Sans titre')
+  const id = await uniqueId(name || 'Untitled')
   const project = {
     id,
-    name: name || 'Sans titre',
+    name: name || 'Untitled',
     entry: DEFAULT_ENTRY,
     files: { [DEFAULT_ENTRY]: DEFAULT_CODE },
     resources: {},
@@ -241,8 +241,8 @@ async function migrateIfNeeded() {
   const code = (legacy && legacy.trim()) ? legacy : DEFAULT_CODE
   const now = Date.now()
   const project = {
-    id: 'sans-titre',
-    name: 'Sans titre',
+    id: 'untitled',
+    name: 'Untitled',
     entry: DEFAULT_ENTRY,
     files: { [DEFAULT_ENTRY]: code },
     resources: {},

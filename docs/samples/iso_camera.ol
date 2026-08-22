@@ -28,8 +28,10 @@ func mouse.released(x, y)
     dragging = false
 end
 
+## A pinch is not a drag: while two fingers are down, the orbit must not follow the finger the
+## system emulates the mouse with, or the scene would spin as one zooms.
 func mouse.moved(x, y)
-    if not dragging then return end
+    if not dragging or touch.count() > 1 then return end
     var dx = x - lastx
     lastx = x
     lasty = y
@@ -37,9 +39,22 @@ func mouse.moved(x, y)
     cam.orbit(angle, ISO_DIST, ISO_H)
 end
 
-func mouse.scrolled(x, y, dx, dy)
-    ISO_SIZE = math.max(3.0, math.min(40.0, ISO_SIZE * (1.0 - dy * 0.1)))
+## The zoom lives in ONE function, and the two gestures only differ by the factor they hand it:
+## a wheel notch is a step, a pinch is a ratio. Anything else — the bounds, the camera update —
+## would otherwise be written twice and drift.
+func zoomBy(factor)
+    ISO_SIZE = math.max(3.0, math.min(40.0, ISO_SIZE * factor))
     cam.fovy = ISO_SIZE
+end
+
+func mouse.scrolled(x, y, dx, dy)
+    zoomBy(1.0 - dy * 0.1)
+end
+
+## Two fingers spreading (scale > 1) bring the scene CLOSER, so the visible size shrinks: the
+## factor is the inverse of the gesture's, which is what makes the scene follow the fingers.
+func touch.pinch(scale, cx, cy)
+    zoomBy(1.0 / scale)
 end
 
 func mouse.doubleClicked(x, y)
@@ -63,7 +78,7 @@ func draw()
 
     graphics.begin3d(cam)
 
-        ## Sol en damier 9×9
+        ## A 9x9 checkerboard floor
         for x = -4, 4 do
             for z = -4, 4 do
                 graphics.fill(checkerColor(x, z))
@@ -102,7 +117,7 @@ func draw()
     graphics.end3d()
 
     ## HUD
-    var hint = "Glisser : orbiter   Molette : zoom   Double-clic : reset"
+    var hint = "Drag: orbit   Wheel or pinch: zoom   Double-click: reset"
     graphics.stroke(Color(1, 1, 1, 0.55))
     graphics.fontSize(14)
     graphics.text(hint, 12, H - 28)

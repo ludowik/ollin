@@ -2,6 +2,7 @@
 #include "value.h"
 #include "vm.h"
 #include <raylib.h>
+#include <cmath>
 #include <string>
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -152,16 +153,12 @@ void forget_all_lifted() {
 }
 #endif
 
-int index_of(const Point* liste, int n, int id) {
+int index_of(const Point* list, int n, int id) {
     for (int i = 0; i < n; i++) {
-        if (liste[i].id == id)
+        if (list[i].id == id)
             return i;
     }
     return -1;
-}
-
-Value callback(const Value& m, const char* nom) {
-    return m.map_get(Value(std::string(nom)));
 }
 
 // Filtered sample of the current frame, taken ONCE by touch_begin_frame: the state count and points
@@ -199,6 +196,70 @@ void sample_contacts() {
         s_cur[s_cur_count].y = p.y;
         s_cur_count++;
     }
+}
+
+// The PINCH, derived from two contacts. It lives in the engine and not in every script, because a
+// pinch is not simply "two fingers moving": the pair has to be identified, the reference distance
+// re-armed whenever that pair changes, and the degenerate case of two fingers on the same point
+// kept out of a division. Written once here, the gesture behaves the same in every example.
+//
+// The gesture's identity is the SORTED pair of identifiers, not the order raylib reports: the
+// graphics layer may swap its two entries between frames, which would otherwise re-arm the
+// reference on every frame and yield a scale of 1 for ever.
+int s_pinch_a = -1, s_pinch_b = -1;
+float s_pinch_dist = 0.0f;
+
+// Below one pixel the ratio explodes: two fingers pressed at the same point would give a scale of
+// several hundred at the first move. Such a gesture is dropped and re-armed on the next frame.
+constexpr float k_pinch_min_dist = 1.0f;
+
+void pinch_disarm() {
+    s_pinch_a = s_pinch_b = -1;
+    s_pinch_dist = 0.0f;
+}
+
+// Called once per frame, after the per-finger callbacks: a script that follows its fingers has
+// already updated its own state when the zoom arrives.
+void pinch_poll(VM* vm, const Value& cb) {
+    if (s_cur_count != 2) {
+        pinch_disarm();
+        return;
+    }
+    int a = s_cur[0].id, b = s_cur[1].id;
+    if (a > b) {
+        int t = a;
+        a = b;
+        b = t;
+    }
+    float dx = s_cur[1].x - s_cur[0].x;
+    float dy = s_cur[1].y - s_cur[0].y;
+    float dist = std::sqrt(dx * dx + dy * dy);
+    if (dist < k_pinch_min_dist) {
+        pinch_disarm();
+        return;
+    }
+    // A new pair: the reference is armed WITHOUT a callback. Reporting a scale here would compare
+    // the distance of two fingers with that of two others — a jump in the middle of the gesture,
+    // seen as soon as one finger of a pinch is replaced by another.
+    if (a != s_pinch_a || b != s_pinch_b) {
+        s_pinch_a = a;
+        s_pinch_b = b;
+        s_pinch_dist = dist;
+        return;
+    }
+    if (dist == s_pinch_dist)
+        return;   // fingers held still: nothing has changed, so the script is not woken
+    float scale = dist / s_pinch_dist;
+    s_pinch_dist = dist;
+    if (!cb.is_callable())
+        return;
+    Value args[3] = {Value((double)scale), Value((double)((s_cur[0].x + s_cur[1].x) * 0.5f)),
+                     Value((double)((s_cur[0].y + s_cur[1].y) * 0.5f))};
+    vm->call_value(cb, args, 3);
+}
+
+Value callback(const Value& m, const char* nom) {
+    return m.map_get(Value(std::string(nom)));
 }
 
 int touch_count(CallCtx& ctx) {
@@ -242,6 +303,7 @@ void touch_poll() {
     Value began = callback(m, "began");
     Value moved = callback(m, "moved");
     Value ended = callback(m, "ended");
+    Value pinch = callback(m, "pinch");
 
     // Presses and moves: an identifier absent from the previous frame is a new finger. Three
     // arguments go through the generic form of call_value, since the VM has no three-argument
@@ -269,6 +331,8 @@ void touch_poll() {
         }
     }
 
+    pinch_poll(vm, pinch);
+
     // The current list becomes the next frame's reference. It is copied AFTER the calls, so that if
     // a script callback throws, the state stays consistent.
     for (int i = 0; i < s_cur_count; i++)
@@ -279,10 +343,11 @@ void touch_poll() {
 void touch_reset() {
     s_prev_count = 0;
     s_cur_count = 0;
+    pinch_disarm();
 }
 
-// The module is an empty map: the script assigns began, moved and ended to it, and reads count and
-// points. Same pattern as `mouse`.
+// The module is an empty map: the script assigns began, moved, ended and pinch to it, and reads
+// count and points. Same pattern as `mouse`.
 Value make_touch_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("count")), Value::make_builtin(touch_count));

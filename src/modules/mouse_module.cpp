@@ -92,7 +92,7 @@ void mouse_poll(bool click_taken) {
 }
 
 // A new program must not inherit a button left "down" by the previous one, and the
-// statiques survivent au VM (playground).
+// statics outlive the VM (the playground).
 void mouse_reset() {
     s_down = false;
     s_last_click_time = -1.0f;

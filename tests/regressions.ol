@@ -1510,11 +1510,20 @@ assert(typeof(touch.points()) == "array" and #touch.points() == 0)
 
 ## The callbacks are assigned as `mouse`'s are: the engine calls whatever exists, and the absence
 ## of all three is not a fault.
-global tcVus = []
+global tcSeen = []
 func touch.began(id, x, y)
-    tcVus[#tcVus + 1] = id
+    tcSeen[#tcSeen + 1] = id
 end
-assert(#tcVus == 0)
+assert(#tcSeen == 0)
+
+## `pinch` is derived from two contacts, so it is declared like the others and never fires with no
+## touch surface. Only the FORM can be checked here: the gesture itself is measured in a browser,
+## through synthetic touch events.
+global tcZoom = 1.0
+func touch.pinch(scale, cx, cy)
+    tcZoom = tcZoom * scale
+end
+assert(tcZoom == 1.0)
 
 ## ── The audio module (the session) ─────────────────────────────────────────
 ## The module ALWAYS exists, device or no device: generating waves is pure computation, and the

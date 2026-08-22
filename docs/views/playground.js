@@ -301,6 +301,16 @@ const MODULE_MEMBERS = {
     fn('mouse.pressed','pressed(x,y) — to be defined: called on a click'),
     fn('mouse.released','released(x,y) — to be defined: on a release'),
     fn('mouse.moved','moved(x,y) — to be defined: on a move'),
+    fn('mouse.scrolled','scrolled(x,y,dx,dy) — to be defined: the wheel'),
+    fn('mouse.doubleClicked','doubleClicked(x,y) — to be defined: a double click'),
+  ],
+  touch: [
+    fn('touch.began','began(id,x,y) — to be defined: a finger lands'),
+    fn('touch.moved','moved(id,x,y) — to be defined: a finger moves'),
+    fn('touch.ended','ended(id,x,y) — to be defined: a finger lifts'),
+    fn('touch.pinch','pinch(scale,cx,cy) — to be defined: the two-finger zoom'),
+    fn('touch.count','count() → int'),
+    fn('touch.points','points() → array of {id, x, y}'),
   ],
   data: [
     fn('data.get','get(key [, default]) — a persisted value'),

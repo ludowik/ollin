@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-22 12:21</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-22 13:10</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-22 12:21</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-22 13:10</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2134,6 +2134,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>touch.began(id, x, y)</code></td><td>a finger lands</td></tr>
     <tr><td><code>touch.moved(id, x, y)</code></td><td>a finger moves</td></tr>
     <tr><td><code>touch.ended(id, x, y)</code></td><td>a finger lifts, at its last known position</td></tr>
+    <tr><td><code>touch.pinch(scale, cx, cy)</code></td><td>two fingers spread or close — the zoom gesture</td></tr>
   </tbody>
 </table>
 
@@ -2150,6 +2151,27 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">func</span> touch.ended(id, x, y)
     under[id] = <span class="kw">nil</span>
 <span class="kw">end</span></code></pre>
+
+<h3>Zoom with two fingers — <code>pinch</code></h3>
+<p>A pinch is the <strong>only</strong> zoom a phone has: <code>mouse.scrolled</code> reports a wheel, which no touch screen owns. <code>touch.pinch</code> fills that gap, and the engine derives it from two contacts so that no script has to.</p>
+<p><code>scale</code> is a <strong>ratio between two frames</strong>, not a distance: above 1 the fingers are spreading, below 1 they are closing. A ratio composes by multiplication, which is exactly what a zoom needs — and it leaves the script no state to keep. <code>(cx, cy)</code> is the midpoint of the two contacts, for a zoom centred on the gesture rather than on the screen.</p>
+
+<pre data-no-run><code><span class="cmt">## One zoom, two gestures: only the factor differs.</span>
+<span class="kw">func</span> <span class="fn">zoomBy</span>(factor)
+    size = <span class="bi">math</span>.clamp(size * factor, <span class="num">3</span>, <span class="num">40</span>)
+<span class="kw">end</span>
+
+<span class="kw">func</span> mouse.scrolled(x, y, dx, dy)
+    zoomBy(<span class="num">1.0</span> - dy * <span class="num">0.1</span>)      <span class="cmt">## a wheel notch is a step</span>
+<span class="kw">end</span>
+
+<span class="kw">func</span> touch.pinch(scale, cx, cy)
+    zoomBy(<span class="num">1.0</span> / scale)          <span class="cmt">## spreading brings the scene closer</span>
+<span class="kw">end</span></code></pre>
+
+<p>Three things the engine settles, and which a hand-written version gets wrong: the gesture is identified by the <strong>pair</strong> of contacts, so the graphics layer swapping its two entries between frames changes nothing; replacing one finger of the pinch by another <strong>re-arms</strong> the reference distance instead of reporting a jump; and two fingers pressed on the same point are dropped rather than divided by, which would give a scale of several hundred. Fingers held still call nothing at all.</p>
+
+<div class="callout warn">A pinch is not a drag. While two fingers are down the system still emulates the mouse with one of them, so a script that orbits on <code>mouse.moved</code> must guard it with <code>touch.count() > 1</code> — otherwise the scene spins as one zooms. The <em>Isometric camera</em> example does exactly that.</div>
 
 <div class="callout tip">The <code>mouse</code> callbacks are <strong>not</strong> suppressed: under a single finger the system emulates the mouse, so a script declaring both families receives the gesture <strong>twice</strong>. Write each path so that a duplicate has no effect, or listen to one family only.</div>
 

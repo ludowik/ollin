@@ -5,7 +5,8 @@
 
 // Multitouch, build WITHOUT raylib: no touch surface, hence never a contact. The module
 // still exists in full, like the sound one: a script reading touch.count() or iterating
-// touch.points() then runs and sees nothing, instead of failing on a nil module.
+// touch.points() then runs and sees nothing, instead of failing on a nil module. The same
+// holds for the callbacks, `pinch` included: they are assigned and simply never called.
 
 namespace {
 
