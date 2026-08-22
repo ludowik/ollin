@@ -13,10 +13,10 @@ endif()
 set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
 
-# Build natif AVEC raylib (fenêtre/graphique) au lieu du stub. OFF par défaut :
-# le build natif standard reste headless-safe (nécessaire pour les environnements
-# distants sans accès réseau à raylib). Activer localement via -DOLLIN_NATIVE_RAYLIB=ON
-# (cache CMake local à build/, non partagé) ou tools/native-gfx.sh (build-gfx/, tests Xvfb).
+# Native build WITH raylib, hence with a window and graphics, instead of the stub. OFF by
+# default: the standard native build stays headless-safe, which the remote environments need,
+# having no network access to raylib. Turn it on locally with -DOLLIN_NATIVE_RAYLIB=ON (a CMake
+# cache local to build/, not shared) or through tools/native-gfx.sh (build-gfx/, the Xvfb tests).
 option(OLLIN_NATIVE_RAYLIB "Native build with raylib graphics (default: stub)" OFF)
 
 set(OLLIN_SOURCES
@@ -55,10 +55,10 @@ if(EMSCRIPTEN)
         FetchContent_MakeAvailable(raylib)
     endif()
 
-    # raylib désactive le JPG par défaut (config.h : SUPPORT_FILEFORMAT_JPG 0).
+    # raylib disables JPG by default (config.h: SUPPORT_FILEFORMAT_JPG 0).
     # On l'active pour que image.load accepte les .jpg/.jpeg — sans modifier la
     # source raylib : la valeur 1 l'emporte sur le #ifndef de config.h, ce qui
-    # évite le #define STBI_NO_JPEG de rtextures.c.
+    # avoids the #define STBI_NO_JPEG of rtextures.c.
     if(TARGET raylib)
         target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
     endif()
@@ -71,15 +71,15 @@ if(EMSCRIPTEN)
     target_link_options(ollin_wasm PRIVATE
         -sMODULARIZE=1
         -sEXPORT_NAME=OllinModule
-        # Mémoire FIXE (pas de croissance) — IMPÉRATIF pour iOS/WebKit. Depuis emsdk
-        # 6.0.x, avec ALLOW_MEMORY_GROWTH la mémoire WASM est un ArrayBuffer
+        # FIXED memory, with no growth — MANDATORY for iOS and WebKit. Since emsdk
+        # 6.0.x, with ALLOW_MEMORY_GROWTH the WASM memory is a resizable ArrayBuffer
         # *redimensionnable* quand le navigateur le supporte. Or WebKit REFUSE une
-        # vue typée basée sur un ArrayBuffer redimensionnable comme argument de
-        # glTexImage2D → « srcData must be an instance of ArrayBufferView » à CHAQUE
-        # upload de texture (tout script graphique plante sur iOS ; Chrome tolère →
-        # bug iOS-only). Une mémoire fixe garantit un ArrayBuffer classique, dont les
-        # vues sont acceptées. 128 Mo = large pour le playground (interpréteur +
-        # raylib ~40 Mo + données utilisateur).
+        # typed view over a resizable ArrayBuffer as an argument to
+        # glTexImage2D, hence "srcData must be an instance of ArrayBufferView" on EVERY
+        # texture upload: every graphics script crashes on iOS, while Chrome tolerates it, hence
+        # an iOS-only bug. Fixed memory guarantees an ordinary ArrayBuffer, whose views
+        # are accepted. 128 MB is roomy for the playground: the interpreter plus
+        # raylib, about 40 MB, plus the user's data.
         -sALLOW_MEMORY_GROWTH=0
         -sINITIAL_MEMORY=134217728
         -sNO_EXIT_RUNTIME=1
@@ -101,8 +101,8 @@ if(EMSCRIPTEN)
     endif()
 else()
     if(OLLIN_NATIVE_RAYLIB)
-        # raylib via libs/raylib s'il existe, sinon FetchContent (qui réutilise le
-        # cache si -DFETCHCONTENT_SOURCE_DIR_RAYLIB=<src> est passé — cf. native-gfx.sh).
+        # raylib comes from libs/raylib when it exists, otherwise from FetchContent, which reuses
+        # the cache when -DFETCHCONTENT_SOURCE_DIR_RAYLIB=<src> is passed; see native-gfx.sh.
         if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/raylib/CMakeLists.txt")
             add_subdirectory(libs/raylib)
         else()
@@ -114,7 +114,7 @@ else()
             )
             FetchContent_MakeAvailable(raylib)
         endif()
-        # Active le décodage JPG/JPEG dans raylib (désactivé par défaut).
+        # Enables JPG and JPEG decoding in raylib, which is off by default.
         if(TARGET raylib)
             target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
         endif()

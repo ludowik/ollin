@@ -11,14 +11,14 @@
     { "id": "python", "name": "Python 3.11.15" }
   ],
   "benchmarks": [
-    { "id": "fib",        "name": "fib(35) récursif",   "what": "appels et sauts conditionnels",     "lua": 0.5376, "ollin": 2.70, "python": 1.89 },
-    { "id": "loop",       "name": "boucle 10M",         "what": "boucle numérique et arithmétique",  "lua": 0.0429, "ollin": 1.44, "python": 12.96 },
-    { "id": "map",        "name": "map 100K",           "what": "création et accès de table",        "lua": 0.0189, "ollin": 1.99, "python": 1.60 },
-    { "id": "array",      "name": "array 1M",           "what": "accès indexé",                     "lua": 0.0260, "ollin": 1.96, "python": 4.68 },
-    { "id": "calls",      "name": "appels 1M",          "what": "appel de fonction",                "lua": 0.0146, "ollin": 1.96, "python": 5.59 },
-    { "id": "strings",    "name": "chaînes 200K",       "what": "concaténation et interpolation",    "lua": 0.0743, "ollin": 1.84, "python": 1.07 },
-    { "id": "classes",    "name": "classes 200K",       "what": "instanciation, méthode, héritage",  "lua": 0.0794, "ollin": 1.72, "python": 0.95 },
-    { "id": "iter",       "name": "iter 2.4M",          "what": "for … in sur tableau et map",       "lua": 0.0586, "ollin": 0.65, "python": 2.15 },
-    { "id": "mandelbrot", "name": "mandelbrot 200×200", "what": "arithmétique flottante",           "lua": 0.0237, "ollin": 2.34, "python": 6.85 }
+    { "id": "fib",        "name": "fib(35) recursive",   "what": "calls and conditional jumps",     "lua": 0.5376, "ollin": 2.70, "python": 1.89 },
+    { "id": "loop",       "name": "loop 10M",         "what": "a numeric loop and arithmetic",  "lua": 0.0429, "ollin": 1.44, "python": 12.96 },
+    { "id": "map",        "name": "map 100K",           "what": "building a table and reading it",        "lua": 0.0189, "ollin": 1.99, "python": 1.60 },
+    { "id": "array",      "name": "array 1M",           "what": "indexed access",                     "lua": 0.0260, "ollin": 1.96, "python": 4.68 },
+    { "id": "calls",      "name": "calls 1M",          "what": "a function call",                "lua": 0.0146, "ollin": 1.96, "python": 5.59 },
+    { "id": "strings",    "name": "strings 200K",       "what": "concatenation and interpolation",    "lua": 0.0743, "ollin": 1.84, "python": 1.07 },
+    { "id": "classes",    "name": "classes 200K",       "what": "instantiation, methods, inheritance",  "lua": 0.0794, "ollin": 1.72, "python": 0.95 },
+    { "id": "iter",       "name": "iter 2.4M",          "what": "for … in over an array and a map",       "lua": 0.0586, "ollin": 0.65, "python": 2.15 },
+    { "id": "mandelbrot", "name": "mandelbrot 200x200", "what": "floating-point arithmetic",           "lua": 0.0237, "ollin": 2.34, "python": 6.85 }
   ]
 }

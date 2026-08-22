@@ -3,21 +3,19 @@
 # Usage: bash bench/bench_all.sh  (from repo root)
 #        RUNS=5 bash bench/bench_all.sh   (override number of runs)
 #
-# Chaque benchmark est exécuté RUNS fois (défaut 3) et on garde le MEILLEUR
-# temps : un seul run est trop sensible au bruit (contention CPU/cache) et
-# peut afficher un coefficient faussé.
+# Every benchmark runs RUNS times (3 by default) and the BEST time is kept: a single run is too
+# sensitive to noise, through CPU and cache contention, and can show a skewed coefficient.
 
 set -euo pipefail
-# Alignement du tableau : ${#label} doit compter des CARACTÈRES et non des octets,
-# sinon un label accentué (« chaînes ») ressort trop court. Sans locale UTF-8
-# disponible, on retombe simplement sur ce léger décalage.
+# Table alignment: ${#label} must count CHARACTERS and not bytes, or an accented label comes out
+# too short. With no UTF-8 locale available we simply fall back to that slight misalignment.
 export LC_ALL=${LC_ALL:-C.UTF-8}
 RUNS=${RUNS:-3}
 OLLIN=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.exe")
-# Interpréteurs de comparaison, cherchés dans le PATH sur une liste de noms EXPLICITES.
-# Pas de glob sur les noms de binaires : `python3.[0-9]*` attrapait `python3.13-config`,
-# qui n'exécute rien, et le tableau ressortait vide.
-premier_present() {
+# The interpreters compared against, looked up in the PATH over an EXPLICIT list of names. No
+# glob on binary names: `python3.[0-9]*` caught `python3.13-config`, which runs nothing, and the
+# table came out empty.
+first_present() {
     local nom
     for nom in "$@"; do
         if command -v "$nom" >/dev/null 2>&1; then
@@ -27,9 +25,9 @@ premier_present() {
     done
     return 1
 }
-LUA=$(premier_present lua5.4 lua5.3 lua54 lua || echo "")
+LUA=$(first_present lua5.4 lua5.3 lua54 lua || echo "")
 [ -n "$LUA" ] || { [ -x "/c/Tools/lua/lua55.exe" ] && LUA="/c/Tools/lua/lua55.exe"; }
-PY=$(premier_present python3 python || echo "")
+PY=$(first_present python3 python || echo "")
 DIR=$(dirname "$0")
 
 extract_time() {
@@ -52,15 +50,15 @@ best_of() {
 }
 
 benchmarks=(fib loop objects array calls strings classes iter float)
-labels=("fib(35) récursif" "boucle 10M" "map 100K" "array 1M" "appels 1M"
-        "chaînes 200K" "classes 200K" "iter 2.4M" "mandelbrot 200x200")
+labels=("fib(35) recursive" "loop 10M" "map 100K" "array 1M" "calls 1M"
+        "strings 200K" "classes 200K" "iter 2.4M" "mandelbrot 200x200")
 
 echo ""
-echo "  (meilleur de $RUNS runs par benchmark)"
+echo "  (best of $RUNS runs per benchmark)"
 echo "┌──────────────────────┬──────────────┬──────────────┬──────────────┐"
-# Version LUE sur l'interpréteur, jamais écrite en dur : l'en-tête annonçait « Lua 5.5 »
-# quelle que soit la version mesurée, ce qui rendait le tableau faux dès que le conteneur
-# fournissait une autre version.
+# The version is READ from the interpreter, never written by hand: the header announced "Lua 5.5"
+# whatever version was measured, which made the table wrong as soon as the container provided
+# another one.
 lua_label="Lua ?"
 if [ -n "$LUA" ]; then
     lua_label="Lua $("$LUA" -v 2>&1 | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)"

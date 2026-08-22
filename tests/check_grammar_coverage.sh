@@ -3,7 +3,7 @@
 # label in tests/syntax.ol.
 #
 # Why: nothing checked that syntax.ol still covers every form of the language — a file
-# stripped of half its sections passed as "TOUT VERT", the suite doing no more than run it.
+# stripped of half its sections passed as "ALL GREEN", the suite doing no more than run it.
 # Adding a production to the grammar without writing its test is now impossible (which had
 # already happened with `enum`).
 #
@@ -38,14 +38,14 @@ done < <(grep -oE "^## \[grammar: [^]]+\]" "$tests" | sed 's/^## \[grammar: //; 
 
 if [ ${#missing[@]} -eq 0 ] && [ ${#unknown[@]} -eq 0 ]; then
     total=$(grep -cE "^[a-zA-Z_]+ *=" "$grammar")
-    echo "OK   couverture grammaire ($total règles citées par tests/syntax.ol)"
+    echo "OK   grammar coverage ($total rules cited by tests/syntax.ol)"
     exit 0
 fi
 
 for r in ${missing[@]+"${missing[@]}"}; do
-    echo "ECHEC  règle '$r' de grammar.ebnf citée par aucune étiquette de syntax.ol"
+    echo "FAIL  rule '$r' of grammar.ebnf is cited by no label in syntax.ol"
 done
 for r in ${unknown[@]+"${unknown[@]}"}; do
-    echo "ECHEC  étiquette de syntax.ol citant '$r', qui n'est pas une règle de grammar.ebnf"
+    echo "FAIL  a label in syntax.ol cites '$r', which is not a rule of grammar.ebnf"
 done
 exit 1

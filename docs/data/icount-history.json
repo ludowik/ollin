@@ -5,18 +5,18 @@
  "scripts": [
   {
    "id": "fib",
-   "name": "fib(24) récursif",
+   "name": "fib(24) recursive",
    "source": "func fib(n) … return fib(n-1) + fib(n-2)"
   },
   {
    "id": "loop",
-   "name": "boucle 300 000",
+   "name": "loop 300 000",
    "source": "for i = 1, 300000 do s += i end"
   },
   {
    "id": "map",
-   "name": "map 20 000 clés",
-   "source": "20 000 écritures m[\"k\"+i] = i, puis for k, v in m"
+   "name": "map with 20 000 keys",
+   "source": "20 000 writes m[\"k\"+i] = i, then for k, v in m"
   }
  ],
  "milestones": [
@@ -34,7 +34,7 @@
    "fib": 116969297,
    "loop": 109555006,
    "map": 100813220,
-   "subject": "fuite close_upvals()"
+   "subject": "close_upvals() leak"
   },
   {
    "date": "2026-06-22",
@@ -58,7 +58,7 @@
    "fib": null,
    "loop": null,
    "map": null,
-   "subject": "ne compile pas"
+   "subject": "does not compile"
   },
   {
    "date": "2026-06-26",
@@ -66,7 +66,7 @@
    "fib": 117114988,
    "loop": 97625698,
    "map": 63244665,
-   "subject": "clés calculées [expr]"
+   "subject": "computed keys [expr]"
   },
   {
    "date": "2026-06-27",
@@ -74,7 +74,7 @@
    "fib": 119215825,
    "loop": 98826364,
    "map": 63596080,
-   "subject": "registre protégé"
+   "subject": "a protected register"
   },
   {
    "date": "2026-06-28",
@@ -82,7 +82,7 @@
    "fib": 92055658,
    "loop": 32828616,
    "map": 50982385,
-   "subject": "14 commits, dont le chemin rapide FOR_PREP/FOR_LOOP"
+   "subject": "14 commits, including the FOR_PREP/FOR_LOOP fast path"
   },
   {
    "date": "2026-06-29",
@@ -90,7 +90,7 @@
    "fib": 92135813,
    "loop": 32534357,
    "map": 51009570,
-   "subject": "comparaison lexicographique de chaînes"
+   "subject": "lexicographic string comparison"
   },
   {
    "date": "2026-06-30",
@@ -98,7 +98,7 @@
    "fib": 91590639,
    "loop": 32219165,
    "map": 50960250,
-   "subject": "comparaison de chaînes, réappliquée"
+   "subject": "string comparison, reapplied"
   },
   {
    "date": "2026-07-01",
@@ -106,7 +106,7 @@
    "fib": 91517197,
    "loop": 32820950,
    "map": 50983112,
-   "subject": "globales moteur deltaTime"
+   "subject": "the engine global deltaTime"
   },
   {
    "date": "2026-07-02",
@@ -114,7 +114,7 @@
    "fib": 94444726,
    "loop": 34322350,
    "map": 51304398,
-   "subject": "globales moteur W et H"
+   "subject": "the engine globals W and H"
   },
   {
    "date": "2026-07-06",
@@ -122,7 +122,7 @@
    "fib": 93841744,
    "loop": 33422745,
    "map": 52970313,
-   "subject": "corrections de revue"
+   "subject": "review fixes"
   },
   {
    "date": "2026-07-07",
@@ -130,7 +130,7 @@
    "fib": 93991978,
    "loop": 33122562,
    "map": 54148838,
-   "subject": "déduplication dans la VM"
+   "subject": "deduplication inside the VM"
   },
   {
    "date": "2026-07-08",
@@ -138,7 +138,7 @@
    "fib": 94219106,
    "loop": 33124765,
    "map": 52594853,
-   "subject": "codegen piloté par destination"
+   "subject": "destination-driven codegen"
   },
   {
    "date": "2026-07-09",
@@ -146,7 +146,7 @@
    "fib": 93772146,
    "loop": 33727908,
    "map": 52515647,
-   "subject": "indexation des chaînes par codepoint"
+   "subject": "string indexing by codepoint"
   },
   {
    "date": "2026-07-10",
@@ -154,7 +154,7 @@
    "fib": 95423400,
    "loop": 34028645,
    "map": 52576254,
-   "subject": "globales CW et CH"
+   "subject": "the CW and CH globals"
   },
   {
    "date": "2026-07-14",
@@ -162,7 +162,7 @@
    "fib": 95948958,
    "loop": 34328856,
    "map": 52537082,
-   "subject": "overlay mémoire"
+   "subject": "the memory overlay"
   },
   {
    "date": "2026-07-16",
@@ -170,7 +170,7 @@
    "fib": 93998322,
    "loop": 34628852,
    "map": 52497073,
-   "subject": "corruption des pools corrigée"
+   "subject": "pool corruption fixed"
   },
   {
    "date": "2026-07-18",
@@ -178,7 +178,7 @@
    "fib": 93475534,
    "loop": 34031634,
    "map": 52521234,
-   "subject": "préfixe « line N: » sur les erreurs"
+   "subject": "a line N: prefix on the errors"
   },
   {
    "date": "2026-07-19",
@@ -194,7 +194,7 @@
    "fib": 101002219,
    "loop": 32854390,
    "map": 53806284,
-   "subject": "suppression de T_MODULE"
+   "subject": "T_MODULE removed"
   },
   {
    "date": "2026-07-21",
@@ -202,7 +202,7 @@
    "fib": 100264587,
    "loop": 32865100,
    "map": 53804570,
-   "subject": "SourceLoc unifié"
+   "subject": "SourceLoc unified"
   },
   {
    "date": "2026-07-22",
@@ -210,7 +210,7 @@
    "fib": 100264668,
    "loop": 32865291,
    "map": 53804781,
-   "subject": "interpolation de chaînes"
+   "subject": "string interpolation"
   },
   {
    "date": "2026-07-24",
@@ -226,7 +226,7 @@
    "fib": 103424087,
    "loop": 32270233,
    "map": 53849547,
-   "subject": "expansion multi-valeurs de ..."
+   "subject": "multi-value expansion of ..."
   },
   {
    "date": "2026-08-01",
@@ -234,7 +234,7 @@
    "fib": 104030277,
    "loop": 32575101,
    "map": 53895226,
-   "subject": "inline cache monomorphe sur GET_INDEX"
+   "subject": "a monomorphic inline cache on GET_INDEX"
   },
   {
    "date": "2026-08-01",
@@ -242,7 +242,7 @@
    "fib": 98343300,
    "loop": 32589979,
    "map": 53166888,
-   "subject": "clé len comparée par pointeur"
+   "subject": "the len key compared by pointer"
   },
   {
    "date": "2026-08-04",
@@ -266,7 +266,7 @@
    "fib": 99175795,
    "loop": 32299996,
    "map": 53092539,
-   "subject": "une variable par itération de boucle"
+   "subject": "one variable per loop iteration"
   },
   {
    "date": "2026-08-14",
@@ -274,7 +274,7 @@
    "fib": 99178462,
    "loop": 32302639,
    "map": 53094644,
-   "subject": "réaffectation multiple d'un appel multi-retour"
+   "subject": "multiple reassignment from a multi-return call"
   },
   {
    "date": "2026-08-18",
@@ -282,7 +282,7 @@
    "fib": 98878598,
    "loop": 32303057,
    "map": 53017250,
-   "subject": "le booléen devient un type à part entière"
+   "subject": "the boolean becomes a type of its own"
   },
   {
    "date": "2026-08-18",
@@ -290,7 +290,7 @@
    "fib": 97753231,
    "loop": 32603058,
    "map": 52997247,
-   "subject": "is_falsy scindée"
+   "subject": "is_falsy split"
   },
   {
    "date": "2026-08-18",
@@ -298,7 +298,7 @@
    "fib": 97753231,
    "loop": 32603058,
    "map": 52997247,
-   "subject": "data + icount (aucun chemin chaud touché)"
+   "subject": "data and icount, with no hot path touched"
   }
  ]
 }

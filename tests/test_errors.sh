@@ -39,12 +39,12 @@ check_error "param redeclaration via var" \
 end' \
     "local variable 'a' already declared in this scope"
 
-check_error "var utilisée avant sa déclaration (top-level)" \
+check_error "a var used above its declaration (top level)" \
     'print(z)
 var z = 1' \
     "undeclared variable 'z'"
 
-check_error "var utilisée avant sa déclaration (dans fonction)" \
+check_error "a var used above its declaration (inside a function)" \
     'func f()
     print(w)
     var w = 1
@@ -96,7 +96,7 @@ check_error "hex sans chiffre"           'print(0x)'     "invalid hexadecimal li
 check_error "binaire chiffre invalide"   'print(0b2)'    "invalid binary literal"
 check_error "binaire sans chiffre"       'print(0b)'     "invalid binary literal"
 check_error "binaire underscore final"   'print(0b1_)'   "invalid binary literal"
-check_error "** supprimé (puissance = ^)" 'print(2 ** 3)' "use '^' for exponentiation"
+check_error "** removed, exponentiation being ^" 'print(2 ** 3)' "use '^' for exponentiation"
 check_error "decimal alnum colle"        'print(42abc)'  "invalid number literal"
 check_error "decimal underscore final"   'print(1_)'     "invalid number literal"
 check_error "decimal underscore double"  'print(1__0)'   "invalid number literal"
@@ -123,11 +123,11 @@ print(a.x?())' \
     "method call on non-function value"
 
 # The loop variable is local to the loop, and does not leak afterwards.
-check_error "var for numérique non visible après" \
+check_error "a numeric for variable is not visible afterwards" \
     'for i = 1, 3 do end
 print(i)' \
     "undeclared variable 'i'"
-check_error "var for itérateur non visible après" \
+check_error "an iterator for variable is not visible afterwards" \
     'for k, v in {a: 1} do end
 print(k)' \
     "undeclared variable 'k'"

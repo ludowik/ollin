@@ -7,8 +7,8 @@
   { "name": "Primitives 2D",  "file": "primitives.ol" },
   { "name": "Interface (ui)", "file": "ui_demo.ol" },
   { "name": "Animations (tween)", "file": "tween_demo.ol" },
-  { "name": "Séquence animée (tween)", "file": "tween_sequence.ol" },
-  { "name": "Son de synthèse (audio + sound)", "file": "sound_demo.ol" },
+  { "name": "Animated sequence (tween)", "file": "tween_sequence.ol" },
+  { "name": "Synthesised sound (audio + sound)", "file": "sound_demo.ol" },
   { "name": "Image (loadData)", "file": "image_demo.ol" },
   { "name": "Persistance (data)", "file": "data_demo.ol" },
   { "name": "Jeu de la vie",  "file": "game_of_life.ol" },
@@ -16,8 +16,8 @@
   { "name": "Éclipse de Soleil", "file": "eclipse_soleil.ol" },
   { "name": "Primitives 3D",  "file": "primitives_3d.ol" },
   { "name": "Cube 3D",        "file": "cube_3d.ol" },
-  { "name": "Modèles 3D (.obj / .glb)", "file": "model_3d.ol" },
+  { "name": "3D models (.obj / .glb)", "file": "model_3d.ol" },
   { "name": "Univers voxel (Minecraft)", "file": "voxel_world.ol" },
-  { "name": "Caméra isométrique",        "file": "iso_camera.ol" },
+  { "name": "Isometric camera",        "file": "iso_camera.ol" },
   { "name": "Webcam (camera)",           "file": "camera.ol" }
 ]

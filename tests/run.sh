@@ -11,7 +11,7 @@ root=$(cd "$here/.." && pwd)
 cd "$root" || exit 2
 
 if [ ! -x "$OLLIN" ]; then
-    echo "erreur : $OLLIN introuvable — compiler d'abord (cmake --build build --target ollin)"
+    echo "error: $OLLIN not found — compile it first (cmake --build build --target ollin)"
     exit 2
 fi
 
@@ -31,29 +31,29 @@ run_pass() {
     fi
 }
 
-echo "── suites pass (.ol) ─────────────────────────────"
+echo "── pass suites (.ol) ─────────────────────────────"
 run_pass tests/syntax.ol
 run_pass tests/regressions.ol
 
-echo "── suite d'erreurs ───────────────────────────────"
+echo "── error suite ───────────────────────────────────"
 if ! bash tests/test_errors.sh; then
     fails=$((fails + 1))
 fi
 
-echo "── garde-fou nommage API ─────────────────────────"
+echo "── guard: API naming ─────────────────────────────"
 if ! bash tests/check_naming.sh; then
     fails=$((fails + 1))
 fi
 
-echo "── garde-fou couverture grammaire ────────────────"
+echo "── guard: grammar coverage ───────────────────────"
 if ! bash tests/check_grammar_coverage.sh; then
     fails=$((fails + 1))
 fi
 
 echo "──────────────────────────────────────────────────"
 if [ $fails -eq 0 ]; then
-    echo "TOUT VERT"
+    echo "ALL GREEN"
     exit 0
 fi
-echo "$fails suite(s) en échec"
+echo "$fails suite(s) failed"
 exit 1

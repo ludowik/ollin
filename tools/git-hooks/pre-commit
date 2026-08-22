@@ -19,18 +19,18 @@ fi
 
 if command -v cmake >/dev/null 2>&1 && [ -d build ]; then
     if ! cmake --build build -j"$(nproc 2>/dev/null || echo 4)" --target ollin >/tmp/pre-commit-build.log 2>&1; then
-        echo "pre-commit : la compilation a échoué — commit refusé (détail : /tmp/pre-commit-build.log)"
+        echo "pre-commit: the build failed — commit refused (details in /tmp/pre-commit-build.log)"
         tail -15 /tmp/pre-commit-build.log
         exit 1
     fi
 fi
 
 if ! bash tests/run.sh >/tmp/pre-commit-tests.log 2>&1; then
-    echo "pre-commit : tests en échec — commit refusé."
-    grep -E "ECHEC|FAIL|Results:|assert" /tmp/pre-commit-tests.log | tail -15
-    echo "(sortie complète : /tmp/pre-commit-tests.log)"
+    echo "pre-commit: tests failed — commit refused."
+    grep -E "FAIL|Results:|assert" /tmp/pre-commit-tests.log | tail -15
+    echo "(full output in /tmp/pre-commit-tests.log)"
     exit 1
 fi
 
-echo "pre-commit : tests OK"
+echo "pre-commit: tests OK"
 exit 0

@@ -27,7 +27,7 @@ for n in $names; do
         __*) continue ;;   # meta-methods and internal keys
     esac
     if [[ "$n" == *_* ]]; then
-        echo "NAMING: API '$n' contient un '_' — l'API Ollin doit être en camelCase"
+        echo "NAMING: the API name '$n' holds a '_' — the Ollin API must be camelCase"
         bad=$((bad + 1))
     fi
 done
@@ -130,7 +130,7 @@ PY
 )
 if [ -n "$residue" ]; then
     while IFS=$'\t' read -r tok loc; do
-        echo "NAMING: identifiant interne '$tok' en camelCase ($loc) — le C++ interne doit être en snake_case"
+        echo "NAMING: the internal identifier '$tok' is camelCase ($loc) — internal C++ must be snake_case"
         bad=$((bad + 1))
     done <<< "$residue"
 fi

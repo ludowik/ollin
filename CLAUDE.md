@@ -179,7 +179,7 @@ Pas seulement après une évolution du moteur (VM, compilateur, modules natifs) 
 exemple `.ol`, la web app, un commentaire, la documentation. La suite couvre `syntax.ol`,
 `regressions.ol`, `test_errors.sh` et `check_naming.sh`, et dure quelques secondes — juger au
 cas par cas qu'un changement « ne peut rien casser » est un pari qui coûte plus cher qu'elle.
-Un commit ne part que sur un « TOUT VERT ».
+Un commit ne part que sur un « ALL GREEN ».
 
 **Tenu par git, pas par la mémoire** : `tools/git-hooks/pre-commit` (versionné) recompile
 `build/ollin` puis lance la suite, et refuse le commit si l'un des deux échoue. Il est branché

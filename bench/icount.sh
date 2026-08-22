@@ -1,64 +1,63 @@
 #!/usr/bin/env bash
-# Compte les INSTRUCTIONS exécutées, pour départager un coût réel d'un effet de placement.
+# Counts the INSTRUCTIONS executed, so as to tell a real cost from an effect of code placement.
 #
-# Pourquoi cet outil : les temps de bench_all.sh varient de ±7 % selon l'adresse à laquelle
-# le compilateur place les gestionnaires d'opcodes (tous dans la seule fonction run_goto,
-# computed-goto). Une régression de 4 % y est donc indétectable, et « c'est la disposition
-# du code » devient une affirmation qu'on ne peut ni vérifier ni réfuter. Le nombre
-# d'instructions exécutées, lui, ne dépend ni de l'adresse du code ni du cache : il mesure
-# le TRAVAIL. Deux lectures possibles, et une seule demande une correction :
+# Why this tool: bench_all.sh's times vary by about 7 % with the address the compiler gives the
+# opcode handlers, which all live in the single run_goto function, dispatching by computed goto.
+# A 4 % regression is therefore undetectable there, and "it is the code layout" becomes a claim
+# that can be neither checked nor refuted. The number of instructions executed, on the other
+# hand, depends neither on the code's address nor on the cache: it measures the WORK. There are
+# two readings, and only one calls for a fix:
 #
-#   instructions en hausse   → coût réel : le moteur fait davantage de travail.
-#   instructions stables     → placement : rien à optimiser, et figer une disposition
-#                              favorable ne servirait à rien (le prochain commit la défera).
+#   instructions up      a real cost: the engine does more work.
+#   instructions steady  placement: there is nothing to optimise, and freezing a favourable
+#                        layout would be pointless, the next commit undoing it.
 #
-# Usage :
-#   bash bench/icount.sh                          compte pour ./build/ollin
-#   bash bench/icount.sh <réf-git>                compare ./build/ollin à ce commit
-#   bash bench/icount.sh <réf-git> <autre-réf>    compare deux commits entre eux
+# Usage:
+#   bash bench/icount.sh                        counts for ./build/ollin
+#   bash bench/icount.sh <git-ref>              compares ./build/ollin with that commit
+#   bash bench/icount.sh <git-ref> <other-ref>  compares two commits with each other
 #
-# Sensibilité VÉRIFIÉE : quatre comparaisons ajoutées en tête de op_ADD (non éliminables par
-# le compilateur) ressortent à +0,61 % sur fib — un surcoût que les temps de bench_all.sh
-# auraient noyé dans leur bruit. Attention en écrivant une telle sonde : des tests
-# contradictoires (`v.is_range() && v.is_iterator()`) sont supprimés à la compilation et ne
-# mesurent RIEN, ce qui donnerait l'illusion d'un outil aveugle.
+# Sensitivity CHECKED: four comparisons added at the top of op_ADD, which the compiler cannot
+# eliminate, come out at +0.61 % on fib — an overhead bench_all.sh's times would have drowned in
+# their own noise. Beware when writing such a probe: contradictory tests
+# (`v.is_range() && v.is_iterator()`) are removed at compile time and measure NOTHING, which
+# would give the illusion of a blind tool.
 #
-# Un commit passé en argument est construit dans un worktree jetable sous /tmp (retiré à la
-# fin). Les scripts mesurés sont RÉDUITS par rapport à bench/ : callgrind ralentit d'environ
-# 50×, et un compte d'instructions n'a pas besoin de longues séries — il est déterministe,
-# donc une seule exécution suffit et donne le même chiffre à chaque fois.
+# A commit passed as an argument is built in a throwaway worktree under /tmp, removed at the end.
+# The scripts measured are SMALLER than those in bench/: callgrind slows execution about
+# fiftyfold, and an instruction count needs no long series — being deterministic, one run is
+# enough and gives the same figure every time.
 set -uo pipefail
 
-racine=$(cd "$(dirname "$0")/.." && pwd)
-cd "$racine" || exit 1
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root" || exit 1
 
 if ! command -v valgrind >/dev/null 2>&1; then
-    echo "valgrind est absent : sudo apt-get install -y valgrind"
+    echo "valgrind is missing: sudo apt-get install -y valgrind"
     exit 1
 fi
 
-travail=$(mktemp -d)
+work=$(mktemp -d)
 scripts=""
-# Les worktrees de CETTE exécution sont marqués par le PID dans leur nom, et le nettoyage ne
-# retire que ceux-là : un préfixe commun à toutes les exécutions ferait qu'un second icount.sh
-# lancé en parallèle détruirait les binaires du premier en pleine mesure. Le nom ne peut pas
-# venir d'une variable remplie par `construire`, appelée dans une substitution de commande
-# donc dans un sous-shell — une liste accumulée là n'atteindrait jamais ce nettoyage
-# (worktree laissé derrière, constaté).
-prefixe="/tmp/icount-$$-"
-nettoyer() {
+# THIS run's worktrees carry the PID in their name, and the cleanup removes only those: a prefix
+# shared by every run would let a second icount.sh, started in parallel, destroy the first one's
+# binaries in mid-measurement. The name cannot come from a variable filled by build_ref, which is
+# called inside a command substitution, hence in a subshell — a list accumulated there would
+# never reach this cleanup, and a worktree was indeed left behind.
+prefix="/tmp/icount-$$-"
+cleanup() {
     local w
-    for w in $(git worktree list --porcelain | sed -n "s|^worktree $prefixe|$prefixe|p"); do
+    for w in $(git worktree list --porcelain | sed -n "s|^worktree $prefix|$prefix|p"); do
         git worktree remove --force "$w" >/dev/null 2>&1
     done
-    rm -rf "$travail"
+    rm -rf "$work"
 }
-trap nettoyer EXIT
+trap cleanup EXIT
 
-# Les trois chemins chauds qui se distinguent : appels et sauts conditionnels (fib),
-# boucle numérique arithmétique (loop), map et itération (map).
-mkdir -p "$travail/scripts"
-cat > "$travail/scripts/fib.ol" <<'EOF'
+# The three hot paths that stand apart: calls and conditional jumps (fib), a numeric arithmetic
+# loop (loop), and maps with iteration (map).
+mkdir -p "$work/scripts"
+cat > "$work/scripts/fib.ol" <<'EOF'
 func fib(n)
     if n <= 1 then
         return n
@@ -67,14 +66,14 @@ func fib(n)
 end
 print(fib(24))
 EOF
-cat > "$travail/scripts/loop.ol" <<'EOF'
+cat > "$work/scripts/loop.ol" <<'EOF'
 var s = 0
 for i = 1, 300000 do
     s += i
 end
 print(s)
 EOF
-cat > "$travail/scripts/map.ol" <<'EOF'
+cat > "$work/scripts/map.ol" <<'EOF'
 var m = {}
 for i = 1, 20000 do
     m["k" + i] = i
@@ -87,70 +86,70 @@ print(t)
 EOF
 scripts="fib loop map"
 
-# Construit une référence git dans un worktree jetable et renvoie le chemin du binaire.
-construire() {
+# Builds a git ref in a throwaway worktree and returns the path of the binary.
+build_ref() {
     local ref="$1"
     local sha
     sha=$(git rev-parse --short "$ref" 2>/dev/null) || {
-        echo "référence git inconnue : $ref" >&2
+        echo "unknown git ref: $ref" >&2
         return 1
     }
-    local dir="$prefixe$sha"
-    # `rm -rf` seul laisserait l'enregistrement git derrière lui (exécution interrompue avant
-    # le trap) et `git worktree add` refuserait alors un chemin déjà connu, sans que le
-    # message n'explique rien. On dé-enregistre d'abord, puis on efface les restes.
+    local dir="$prefix$sha"
+    # An `rm -rf` alone would leave git's own record behind, should a run be interrupted before
+    # the trap, and `git worktree add` would then refuse a path it already knows, with a message
+    # that explains nothing. So we unregister first, then wipe what is left.
     git worktree remove --force "$dir" >/dev/null 2>&1
     rm -rf "$dir"
     git worktree prune >/dev/null 2>&1
     git worktree add -q "$dir" "$sha" || return 1
     cmake -S "$dir" -B "$dir/build" -DCMAKE_BUILD_TYPE=Release -Wno-dev --log-level=ERROR >/dev/null 2>&1
     cmake --build "$dir/build" -j"$(nproc 2>/dev/null || echo 4)" --target ollin >/dev/null 2>&1 || {
-        echo "compilation impossible pour $ref" >&2
+        echo "cannot build $ref" >&2
         return 1
     }
     echo "$dir/build/ollin"
 }
 
-# Nombre d'instructions exécutées par <binaire> sur <script>. Déterministe.
-compter() {
+# The number of instructions <binary> executes on <script>. Deterministic.
+count_insns() {
     valgrind --tool=callgrind --callgrind-out-file=/dev/null "$1" "$2" 2>&1 \
         | grep -oE "refs: *[0-9,]+" | tr -d ' ,' | sed 's/refs://'
 }
 
-courant=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.exe")
+current=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.exe")
 if [ $# -ge 2 ]; then
-    nom_a="$1"
-    nom_b="$2"
-    bin_a=$(construire "$1") || exit 1
-    bin_b=$(construire "$2") || exit 1
+    name_a="$1"
+    name_b="$2"
+    bin_a=$(build_ref "$1") || exit 1
+    bin_b=$(build_ref "$2") || exit 1
 elif [ $# -eq 1 ]; then
-    nom_a="$1"
-    nom_b="build/ollin"
-    bin_a=$(construire "$1") || exit 1
-    bin_b="$courant"
+    name_a="$1"
+    name_b="build/ollin"
+    bin_a=$(build_ref "$1") || exit 1
+    bin_b="$current"
 else
-    nom_a=""
-    nom_b="build/ollin"
-    bin_b="$courant"
+    name_a=""
+    name_b="build/ollin"
+    bin_b="$current"
 fi
 
 echo ""
-if [ -z "$nom_a" ]; then
-    printf "  instructions exécutées — %s\n\n" "$nom_b"
+if [ -z "$name_a" ]; then
+    printf "  instructions executed — %s\n\n" "$name_b"
     printf "  %-8s %16s\n" "script" "instructions"
     for s in $scripts; do
-        printf "  %-8s %16s\n" "$s" "$(compter "$bin_b" "$travail/scripts/$s.ol")"
+        printf "  %-8s %16s\n" "$s" "$(count_insns "$bin_b" "$work/scripts/$s.ol")"
     done
     echo ""
     exit 0
 fi
 
-printf "  instructions exécutées — %s → %s\n" "$nom_a" "$nom_b"
-printf "  (hausse = coût réel ; stable = placement du code, rien à optimiser)\n\n"
-printf "  %-8s %16s %16s %10s\n" "script" "$nom_a" "$nom_b" "écart"
+printf "  instructions executed — %s to %s\n" "$name_a" "$name_b"
+printf "  (up means a real cost; steady means code placement, and nothing to optimise)\n\n"
+printf "  %-8s %16s %16s %10s\n" "script" "$name_a" "$name_b" "delta"
 for s in $scripts; do
-    a=$(compter "$bin_a" "$travail/scripts/$s.ol")
-    b=$(compter "$bin_b" "$travail/scripts/$s.ol")
+    a=$(count_insns "$bin_a" "$work/scripts/$s.ol")
+    b=$(count_insns "$bin_b" "$work/scripts/$s.ol")
     if [ -z "$a" ] || [ -z "$b" ]; then
         printf "  %-8s %16s %16s %10s\n" "$s" "${a:-N/A}" "${b:-N/A}" "N/A"
         continue
