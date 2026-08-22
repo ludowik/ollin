@@ -1865,179 +1865,179 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 
-<h3>Module <code>blend</code></h3>
-<p>Constantes de mode de fusion à passer à <code>graphics.blendMode(...)</code> (équivalentes aux chaînes correspondantes).</p>
+<h3>The <code>blend</code> module</h3>
+<p>Blend-mode constants to pass to <code>graphics.blendMode(...)</code>, equivalent to the matching strings.</p>
 <table>
-  <thead><tr><th>Constante</th><th>Chaîne</th><th>Effet</th></tr></thead>
+  <thead><tr><th>Constant</th><th>String</th><th>Effect</th></tr></thead>
   <tbody>
-    <tr><td><code>blend.ALPHA</code></td><td><code>"alpha"</code></td><td>Fusion alpha normale (défaut)</td></tr>
-    <tr><td><code>blend.ADD</code></td><td><code>"add"</code></td><td>Additif — éclaircit (lueur / glow)</td></tr>
-    <tr><td><code>blend.MULTIPLY</code></td><td><code>"multiply"</code></td><td>Multiplié — assombrit</td></tr>
-    <tr><td><code>blend.ADD_COLORS</code></td><td><code>"add_colors"</code></td><td>Somme brute des composantes</td></tr>
-    <tr><td><code>blend.SUBTRACT</code></td><td><code>"subtract"</code></td><td>Soustractif</td></tr>
-    <tr><td><code>blend.PREMULTIPLY</code></td><td><code>"premultiply"</code></td><td>Alpha prémultiplié</td></tr>
+    <tr><td><code>blend.ALPHA</code></td><td><code>"alpha"</code></td><td>Ordinary alpha blending (the default)</td></tr>
+    <tr><td><code>blend.ADD</code></td><td><code>"add"</code></td><td>Additive — it lightens, giving a glow</td></tr>
+    <tr><td><code>blend.MULTIPLY</code></td><td><code>"multiply"</code></td><td>Multiplied — it darkens</td></tr>
+    <tr><td><code>blend.ADD_COLORS</code></td><td><code>"add_colors"</code></td><td>The raw sum of the components</td></tr>
+    <tr><td><code>blend.SUBTRACT</code></td><td><code>"subtract"</code></td><td>Subtractive</td></tr>
+    <tr><td><code>blend.PREMULTIPLY</code></td><td><code>"premultiply"</code></td><td>Premultiplied alpha</td></tr>
   </tbody>
 </table>
 
-<h3>Couleur personnalisée et aléatoire</h3>
+<h3>A custom colour, and a random one</h3>
 
-<pre><code><span class="cmt">## color personnalisée (composantes dans [0,1])</span>
+<pre><code><span class="cmt">## a custom colour (components in [0,1])</span>
 <span class="kw">var</span> teal = <span class="bi">Color</span>(<span class="num">0.0</span>, <span class="num">0.6</span>, <span class="num">0.6</span>)
 <span class="bi">print</span>(teal)  <span class="cmt">## Color(0.000000,0.600000,0.600000,1.000000)</span>
 
-<span class="cmt">## color aléatoire : Color.random() (pas besoin de la réimplémenter)</span>
+<span class="cmt">## a random colour: Color.random(), no need to write it yourself</span>
 <span class="kw">var</span> c = <span class="bi">Color</span>.random()
 <span class="bi">print</span>(c.r, c.g, c.b)</code></pre>
 
 <h3>3D</h3>
-<p>Le dessin 3D partage la même boucle et le même état que la 2D. On place une <strong>caméra</strong>, puis on dessine des formes entre <code>graphics.begin3d(cam)</code> et <code>graphics.end3d()</code>. Comme en 2D, <code>fill</code>/<code>stroke</code> pilotent le remplissage et le contour (fil de fer) — mais l'<strong>épaisseur du fil de fer 3D est fixe (1&nbsp;px)</strong> : <code>graphics.strokeSize</code> ne s'applique qu'en 2D. Après <code>end3d()</code>, on peut dessiner un <strong>HUD 2D</strong> par-dessus dans la même frame.</p>
+<p>3D drawing shares the same loop and the same state as 2D. You place a <strong>camera</strong>, then draw shapes between <code>graphics.begin3d(cam)</code> and <code>graphics.end3d()</code>. As in 2D, <code>fill</code> and <code>stroke</code> drive the fill and the outline (the wireframe) — but the <strong>3D wireframe's width is fixed at 1&nbsp;px</strong>: <code>graphics.strokeSize</code> applies in 2D only. After <code>end3d()</code> a <strong>2D HUD</strong> can be drawn on top, in the same frame.</p>
 
-<p>La caméra est un <strong>objet</strong> (classe <code>Camera</code>, comme <code>Color</code>) : on la crée une fois puis on la pilote par ses méthodes. <code>cam.setPos(x,y,z)</code> fixe la position, <code>cam.lookAt(x,y,z)</code> réoriente vers une cible, <code>cam.move(dx,dy,dz)</code> translate la caméra et sa cible (visée conservée), <code>cam.orbit(angle, radius [, height])</code> la place en orbite autour de sa cible (<code>angle</code> en radians).</p>
+<p>The camera is an <strong>object</strong> (the <code>Camera</code> class, like <code>Color</code>): you create it once and then drive it through its methods. <code>cam.setPos(x,y,z)</code> sets the position, <code>cam.lookAt(x,y,z)</code> aims it at a target, <code>cam.move(dx,dy,dz)</code> moves the camera and its target together, keeping the aim, and <code>cam.orbit(angle, radius [, height])</code> puts it in orbit around its target, the <code>angle</code> being in radians.</p>
 
-<div class="callout tip">En 3D, appelle <code>graphics.clear(<em>couleur opaque</em>)</code> au début de chaque frame : un effacement opaque remet à zéro le <strong>tampon de profondeur</strong> (indispensable au test de profondeur), en plus de la couleur.</div>
+<div class="callout tip">In 3D, call <code>graphics.clear(<em>an opaque colour</em>)</code> at the start of every frame: an opaque clear resets the <strong>depth buffer</strong>, which the depth test needs, as well as the colour.</div>
 
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Crée une caméra perspective (objet <code>Camera</code>) regardant <code>(tx,ty,tz)</code> depuis <code>(px,py,pz)</code> ; <code>fovy</code> = champ de vision vertical en degrés (45 par défaut)</td></tr>
-    <tr><td><code>graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>Caméra orthographique — projection sans perspective ; <code>size</code> = nombre d'unités visibles en hauteur (10 par défaut). Mêmes méthodes que <code>camera()</code></td></tr>
-    <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Fixe la position / la cible de la caméra</td></tr>
-    <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, radius [, height])</code></td><td>Translate la caméra (visée conservée) / la met en orbite autour de sa cible (<code>angle</code> en radians)</td></tr>
-    <tr><td><code>cam.zoom(factor)</code></td><td>Multiplie la taille visible (ortho : ajuste <code>size</code> ; perspective : rapproche/éloigne le long de l'axe de visée)</td></tr>
-    <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>Encadrent les dessins 3D dans <code>draw()</code></td></tr>
-    <tr><td><code>graphics.grid(slices, spacing)</code></td><td>Repère quadrillé au sol (plan XZ), centré sur l'origine (couleur grise fixe)</td></tr>
-    <tr><td><code>graphics.cube(x,y,z, w,h,l)</code></td><td>Cube centré en <code>(x,y,z)</code> — plein si <code>fill</code>, arêtes si <code>stroke</code></td></tr>
-    <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>Sphère — pleine si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
-    <tr><td><code>graphics.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> = centre de la base, rayon <code>r</code>, hauteur <code>h</code> — plein si <code>fill</code>, fil de fer si <code>stroke</code></td></tr>
-    <tr><td><code>graphics.cone(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> = centre de la base, rayon <code>r</code>, hauteur <code>h</code> — plein si <code>fill</code></td></tr>
-    <tr><td><code>graphics.torus(x,y,z, r, tube)</code></td><td>Tore centré en <code>(x,y,z)</code>, rayon principal <code>r</code>, rayon du tube <code>tube</code> — plein si <code>fill</code></td></tr>
-    <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>Plan horizontal (XZ) de taille <code>sx</code>×<code>sz</code>, rempli</td></tr>
-    <tr><td><code>graphics.model(name)</code></td><td>Charge un <strong>modèle externe</strong> (<code>.obj</code>, ou <code>.glb</code> avec matériaux/textures embarqués) → renvoie un handle. Dans un projet : ajouté dans <em>Ressources</em> ; dans un exemple/brouillon : chargé automatiquement depuis <code>samples/</code></td></tr>
-    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Dessine le modèle à <code>(x,y,z)</code> (échelle optionnelle), éclairé. Un <code>.glb</code> garde ses <strong>textures/couleurs</strong> ; <code>fill</code> = teinte globale (blanc → couleurs d'origine)</td></tr>
-    <tr><td><code>graphics.modelSize(handle)</code></td><td>Dimensions du modèle → map <code>{ w, h, d, cx, cy, cz, radius }</code> (taille, centre, rayon englobant)</td></tr>
-    <tr><td><code>graphics.fitDistance(radius [, fovy])</code></td><td>Distance de caméra pour qu'une sphère de rayon <code>radius</code> tienne à l'écran (suit le ratio portrait/paysage) — utile pour cadrer un modèle</td></tr>
-    <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>Segment 3D (couleur <code>stroke</code>)</td></tr>
-    <tr><td><code>graphics.point3d(x,y,z)</code></td><td>Point 3D (couleur <code>stroke</code>)</td></tr>
+    <tr><td><code>graphics.camera(px,py,pz, tx,ty,tz [, fovy])</code></td><td>Creates a perspective camera (a <code>Camera</code> object) looking at <code>(tx,ty,tz)</code> from <code>(px,py,pz)</code>; <code>fovy</code> is the vertical field of view in degrees, 45 by default</td></tr>
+    <tr><td><code>graphics.cameraOrtho(px,py,pz, tx,ty,tz [, size])</code></td><td>An orthographic camera — a projection with no perspective; <code>size</code> is the number of units visible vertically, 10 by default. The same methods as <code>camera()</code></td></tr>
+    <tr><td><code>cam.setPos(x,y,z)</code> · <code>cam.lookAt(x,y,z)</code></td><td>Sets the camera's position / target</td></tr>
+    <tr><td><code>cam.move(dx,dy,dz)</code> · <code>cam.orbit(angle, radius [, height])</code></td><td>Moves the camera, keeping its aim / puts it in orbit around its target (<code>angle</code> in radians)</td></tr>
+    <tr><td><code>cam.zoom(factor)</code></td><td>Multiplies the visible size (orthographic: it adjusts <code>size</code>; perspective: it moves nearer or further along the viewing axis)</td></tr>
+    <tr><td><code>graphics.begin3d(cam)</code> / <code>graphics.end3d()</code></td><td>They frame the 3D drawing inside <code>draw()</code></td></tr>
+    <tr><td><code>graphics.grid(slices, spacing)</code></td><td>A grid on the ground (the XZ plane), centred on the origin, in a fixed grey</td></tr>
+    <tr><td><code>graphics.cube(x,y,z, w,h,l)</code></td><td>A cube centred on <code>(x,y,z)</code> — solid with <code>fill</code>, edges with <code>stroke</code></td></tr>
+    <tr><td><code>graphics.sphere(x,y,z, r)</code></td><td>A sphere — solid with <code>fill</code>, a wireframe with <code>stroke</code></td></tr>
+    <tr><td><code>graphics.cylinder(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code>, a wireframe with <code>stroke</code></td></tr>
+    <tr><td><code>graphics.cone(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code></td></tr>
+    <tr><td><code>graphics.torus(x,y,z, r, tube)</code></td><td>A torus centred on <code>(x,y,z)</code>, of main radius <code>r</code> and tube radius <code>tube</code> — solid with <code>fill</code></td></tr>
+    <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>A horizontal plane (XZ) of size <code>sx</code>×<code>sz</code>, filled</td></tr>
+    <tr><td><code>graphics.model(name)</code></td><td>Loads an <strong>external model</strong> (<code>.obj</code>, or <code>.glb</code> with embedded materials and textures) → it returns a handle. In a project, add it under <em>Resources</em>; in an example or a draft it is loaded automatically from <code>samples/</code></td></tr>
+    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Draws the model at <code>(x,y,z)</code>, with an optional scale, lit. A <code>.glb</code> keeps its <strong>textures and colours</strong>; <code>fill</code> is a global tint, white keeping the original colours</td></tr>
+    <tr><td><code>graphics.modelSize(handle)</code></td><td>The model's dimensions → a map <code>{ w, h, d, cx, cy, cz, radius }</code> (size, centre, bounding radius)</td></tr>
+    <tr><td><code>graphics.fitDistance(radius [, fovy])</code></td><td>The camera distance at which a sphere of radius <code>radius</code> fits on screen, following the portrait/landscape ratio — handy for framing a model</td></tr>
+    <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>A 3D segment, in the <code>stroke</code> colour</td></tr>
+    <tr><td><code>graphics.point3d(x,y,z)</code></td><td>A 3D point, in the <code>stroke</code> colour</td></tr>
   </tbody>
 </table>
 
-<h4>Éclairage &amp; texture</h4>
-<p>Les solides pleins (<code>fill</code>) sont dessinés par <strong>instancing</strong> avec un shader Blinn-Phong : toutes les formes d'un même type ne coûtent qu'<strong>un seul appel de dessin</strong>, et chacune garde sa propre couleur. L'éclairage est <strong>opt-in</strong> : tant qu'aucune lumière n'est déclarée, le rendu est plat (couleur unie). Dès qu'une lumière existe, les faces sont ombrées selon leur orientation.</p>
+<h4>Lighting and texture</h4>
+<p>Solid shapes (<code>fill</code>) are drawn by <strong>instancing</strong>, with a Blinn-Phong shader: every shape of one kind costs <strong>a single draw call</strong>, and each keeps a colour of its own. Lighting is <strong>opt-in</strong>: as long as no light is declared, the rendering is flat, in plain colour. As soon as a light exists, the faces are shaded according to their orientation.</p>
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(color)</code></td><td>Lumière ambiante (base uniforme). <code>v</code> ∈ [0,1]</td></tr>
-    <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>Lumière directionnelle (<code>(dx,dy,dz)</code> = direction de propagation) → objet <code>Light</code></td></tr>
-    <tr><td><code>graphics.light("point", x,y,z [, color])</code></td><td>Lumière ponctuelle à la position <code>(x,y,z)</code> → objet <code>Light</code></td></tr>
-    <tr><td><code>lum.setDir(x,y,z)</code> · <code>lum.setPos(x,y,z)</code></td><td>Réoriente / repositionne la lumière</td></tr>
-    <tr><td><code>lum.setColor(color)</code> · <code>lum.enable(bool)</code></td><td>Change la couleur / (dés)active la lumière</td></tr>
-    <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applique une image (handle <code>image</code>) comme texture aux solides suivants ; <code>fill</code> devient une teinte multipliée. Pour un terrain multi-matières, voir l'<a href="#voxel">atlas de tuiles</a> plus bas</td></tr>
+    <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(color)</code></td><td>The ambient light, a uniform base. <code>v</code> ∈ [0,1]</td></tr>
+    <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>A directional light, <code>(dx,dy,dz)</code> being the direction it travels in → a <code>Light</code> object</td></tr>
+    <tr><td><code>graphics.light("point", x,y,z [, color])</code></td><td>A point light at the position <code>(x,y,z)</code> → a <code>Light</code> object</td></tr>
+    <tr><td><code>light.setDir(x,y,z)</code> · <code>light.setPos(x,y,z)</code></td><td>Reaims / moves the light</td></tr>
+    <tr><td><code>light.setColor(color)</code> · <code>light.enable(bool)</code></td><td>Changes the colour / turns the light on or off</td></tr>
+    <tr><td><code>graphics.texture(img)</code> · <code>graphics.noTexture()</code></td><td>Applies an image (an <code>image</code> handle) as a texture to the solids that follow; <code>fill</code> becomes a multiplied tint. For a terrain of several materials, see the <a href="#voxel">tile atlas</a> further down</td></tr>
   </tbody>
 </table>
 
-<div class="callout tip">Phase 1 : une seule lumière active à la fois (directionnelle ou ponctuelle) + l'ambiante. Le fil de fer, la grille et les lignes ne sont pas éclairés.</div>
+<div class="callout tip">Phase 1: one active light at a time (directional or point), plus the ambient. The wireframe, the grid and the lines are not lit.</div>
 
-<h4>Transformer les objets 3D</h4>
-<p>Les <a href="#/tutoriel/graphics">transformations</a> (<code>translate</code>/<code>rotate</code>/<code>scale</code>) agissent aussi sur les solides 3D. <code>translate(x,y,z)</code> place, <code>rotate(deg, ax,ay,az)</code> (ou <code>rotateX/Y/Z</code>) oriente, <code>scale(...)</code> redimensionne. Elles sont <strong>cumulatives</strong> dans le bloc <code>begin3d</code>/<code>end3d</code> ; <code>push()</code>/<code>pop()</code> servent à <strong>isoler</strong> la transformation d'un objet (sauvegarde/restauration).</p>
+<h4>Transforming 3D objects</h4>
+<p>The <a href="#/tutoriel/graphics">transformations</a> (<code>translate</code>/<code>rotate</code>/<code>scale</code>) act on 3D solids as well. <code>translate(x,y,z)</code> places, <code>rotate(deg, ax,ay,az)</code> (or <code>rotateX/Y/Z</code>) orients, <code>scale(...)</code> resizes. They are <strong>cumulative</strong> inside the <code>begin3d</code>/<code>end3d</code> block; <code>push()</code>/<code>pop()</code> serve to <strong>isolate</strong> one object's transformation, by saving and restoring it.</p>
 <pre><code><span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
     <span class="bi">graphics</span>.begin3d(cam)
-        <span class="cmt">## chaque cube dans son propre bloc push/pop</span>
+        <span class="cmt">## each cube in a push/pop block of its own</span>
         <span class="bi">graphics</span>.push()
             <span class="bi">graphics</span>.translate(-<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
-            <span class="bi">graphics</span>.rotateY(elapsedTime * <span class="num">60</span>)   <span class="cmt">## tourne autour de Y</span>
+            <span class="bi">graphics</span>.rotateY(elapsedTime * <span class="num">60</span>)   <span class="cmt">## turns around Y</span>
             <span class="bi">graphics</span>.fill(colors.RED)
             <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
         <span class="bi">graphics</span>.pop()
         <span class="bi">graphics</span>.push()
             <span class="bi">graphics</span>.translate(<span class="num">3</span>, <span class="num">0</span>, <span class="num">0</span>)
-            <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">90</span>, <span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>)  <span class="cmt">## axe quelconque</span>
+            <span class="bi">graphics</span>.rotate(elapsedTime * <span class="num">90</span>, <span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>)  <span class="cmt">## an arbitrary axis</span>
             <span class="bi">graphics</span>.fill(colors.SKYBLUE)
             <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)
         <span class="bi">graphics</span>.pop()
     <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
 
-<pre><code><span class="cmt">## la caméra est un objet : créée une fois, pilotée par ses méthodes</span>
+<pre><code><span class="cmt">## the camera is an object: created once, driven by its methods</span>
 <span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">10</span>, <span class="num">6</span>, <span class="num">0</span>,  <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)
-<span class="bi">graphics</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## éclairage : base ambiante…</span>
-<span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …+ un « soleil » directionnel</span>
+<span class="bi">graphics</span>.ambient(<span class="num">0.2</span>)                         <span class="cmt">## lighting: an ambient base…</span>
+<span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">1</span>, -<span class="num">2</span>, -<span class="num">1</span>)          <span class="cmt">## …plus a directional "sun"</span>
 
 <span class="kw">func</span> draw()
-    <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## efface color + profondeur</span>
-    cam.orbit(elapsedTime * <span class="num">0.5</span>, <span class="num">10</span>, <span class="num">6</span>)   <span class="cmt">## orbite autour de la target (angle en radians)</span>
+    <span class="bi">graphics</span>.clear(colors.BLACK)      <span class="cmt">## clears the colour and the depth</span>
+    cam.orbit(elapsedTime * <span class="num">0.5</span>, <span class="num">10</span>, <span class="num">6</span>)   <span class="cmt">## orbits around the target (the angle in radians)</span>
     <span class="bi">graphics</span>.noStroke()
     <span class="bi">graphics</span>.begin3d(cam)
         <span class="bi">graphics</span>.grid(<span class="num">10</span>, <span class="num">1</span>)
         <span class="bi">graphics</span>.fill(colors.RED)
-        <span class="bi">graphics</span>.cube(-<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)   <span class="cmt">## faces ombrées</span>
+        <span class="bi">graphics</span>.cube(-<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">2</span>, <span class="num">2</span>, <span class="num">2</span>)   <span class="cmt">## shaded faces</span>
         <span class="bi">graphics</span>.fill(colors.SKYBLUE)
         <span class="bi">graphics</span>.sphere(<span class="num">2</span>, <span class="num">1</span>, <span class="num">0</span>,  <span class="num">1.2</span>)
     <span class="bi">graphics</span>.end3d()
     <span class="bi">graphics</span>.fontSize(<span class="num">22</span>)
-    <span class="bi">graphics</span>.text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>)   <span class="cmt">## HUD 2D par-dessus</span>
+    <span class="bi">graphics</span>.text(<span class="str">"Ollin 3D"</span>, <span class="num">12</span>, <span class="num">12</span>)   <span class="cmt">## a 2D HUD on top</span>
 <span class="kw">end</span></code></pre>
 
-<h4>Rotations par quaternion (<code>Quat</code>)</h4>
-<p>Les quaternions composent des orientations sans blocage de cardan et permettent surtout d'<strong>interpoler en douceur</strong> (slerp) entre deux orientations. Un <code>Quat</code> est un objet (angles en degrés).</p>
+<h4>Rotations by quaternion (<code>Quat</code>)</h4>
+<p>Quaternions compose orientations with no gimbal lock, and above all allow <strong>smooth interpolation</strong> (slerp) between two orientations. A <code>Quat</code> is an object, its angles in degrees.</p>
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.quat()</code></td><td>Quaternion identité (aucune rotation)</td></tr>
-    <tr><td><code>graphics.quatAxis(ax,ay,az, deg)</code></td><td>Rotation de <code>deg</code>° autour de l'axe <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.quatEuler(pitch,yaw,roll)</code></td><td>Depuis des angles d'Euler (degrés)</td></tr>
-    <tr><td><code>q.mul(autre)</code></td><td>Composition <code>q · autre</code> → nouveau <code>Quat</code></td></tr>
-    <tr><td><code>q.slerp(autre, t)</code></td><td>Interpolation sphérique, <code>t</code> ∈ [0,1] → nouveau <code>Quat</code></td></tr>
-    <tr><td><code>q.normalize()</code> · <code>q.inverse()</code></td><td>Quaternion normalisé / rotation inverse</td></tr>
-    <tr><td><code>q.rotateVec(x,y,z)</code></td><td>Renvoie le vecteur <code>(x,y,z)</code> tourné, sous forme <code>[x,y,z]</code></td></tr>
-    <tr><td><code>graphics.rotateq(q)</code></td><td>Applique la rotation <code>q</code> (comme <code>rotate</code>, mais depuis un <code>Quat</code>)</td></tr>
+    <tr><td><code>graphics.quat()</code></td><td>The identity quaternion, meaning no rotation</td></tr>
+    <tr><td><code>graphics.quatAxis(ax,ay,az, deg)</code></td><td>A rotation of <code>deg</code>° around the axis <code>(ax,ay,az)</code></td></tr>
+    <tr><td><code>graphics.quatEuler(pitch,yaw,roll)</code></td><td>From Euler angles, in degrees</td></tr>
+    <tr><td><code>q.mul(other)</code></td><td>The composition <code>q · other</code> → a new <code>Quat</code></td></tr>
+    <tr><td><code>q.slerp(other, t)</code></td><td>Spherical interpolation, <code>t</code> ∈ [0,1] → a new <code>Quat</code></td></tr>
+    <tr><td><code>q.normalize()</code> · <code>q.inverse()</code></td><td>The normalised quaternion / the inverse rotation</td></tr>
+    <tr><td><code>q.rotateVec(x,y,z)</code></td><td>Returns the vector <code>(x,y,z)</code> rotated, as <code>[x,y,z]</code></td></tr>
+    <tr><td><code>graphics.rotateq(q)</code></td><td>Applies the rotation <code>q</code>, as <code>rotate</code> does but from a <code>Quat</code></td></tr>
   </tbody>
 </table>
-<pre><code><span class="cmt">## interpole en douceur entre deux orientations</span>
-<span class="kw">global</span> qa = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## départ</span>
-<span class="kw">global</span> qb = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## arrivée</span>
+<pre><code><span class="cmt">## interpolates smoothly between two orientations</span>
+<span class="kw">global</span> qa = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>)     <span class="cmt">## the start</span>
+<span class="kw">global</span> qb = <span class="bi">graphics</span>.quatAxis(<span class="num">1</span>, <span class="num">1</span>, <span class="num">0</span>, <span class="num">180</span>)   <span class="cmt">## the end</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
-    <span class="kw">var</span> t = (<span class="bi">math</span>.sin(elapsedTime) + <span class="num">1</span>) / <span class="num">2</span>   <span class="cmt">## va-et-vient 0↔1</span>
+    <span class="kw">var</span> t = (<span class="bi">math</span>.sin(elapsedTime) + <span class="num">1</span>) / <span class="num">2</span>   <span class="cmt">## back and forth, 0↔1</span>
     <span class="bi">graphics</span>.begin3d(cam)
-        <span class="bi">graphics</span>.rotateq(qa.slerp(qb, t))       <span class="cmt">## rotation interpolée</span>
+        <span class="bi">graphics</span>.rotateq(qa.slerp(qb, t))       <span class="cmt">## the interpolated rotation</span>
         <span class="bi">graphics</span>.fill(colors.ORANGE)
         <span class="bi">graphics</span>.cube(<span class="num">0</span>, <span class="num">0</span>, <span class="num">0</span>,  <span class="num">3</span>, <span class="num">3</span>, <span class="num">3</span>)
     <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
 
-<h4 id="voxel">Terrain voxel : géométrie retenue &amp; culling</h4>
-<p>Pour un monde fait de milliers de cubes (type Minecraft), ré-émettre chaque cube à chaque frame est trop coûteux. Ollin propose une <strong>géométrie retenue</strong> : on <strong>cuit</strong> les cubes d'un « chunk » une seule fois dans des tampons GPU, puis on le redessine en <strong>un seul appel</strong> par frame. On ne dessine que les chunks <strong>visibles</strong> (test de frustum), et on <strong>libère</strong> les lointains → mémoire bornée, monde potentiellement infini.</p>
+<h4 id="voxel">Voxel terrain: retained geometry and culling</h4>
+<p>For a world made of thousands of cubes, of the Minecraft kind, re-emitting every cube on every frame costs too much. Ollin offers <strong>retained geometry</strong>: the cubes of a "chunk" are <strong>baked</strong> once into GPU buffers, then redrawn in <strong>a single call</strong> per frame. Only the <strong>visible</strong> chunks are drawn, through a frustum test, and the distant ones are <strong>freed</strong> — bounded memory, and a potentially endless world.</p>
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.beginChunk()</code></td><td>Ouvre l'enregistrement : les <code>graphics.cube</code>/<code>plane</code> suivants sont <strong>cuits</strong> (enregistrés), pas dessinés</td></tr>
-    <tr><td><code>graphics.endChunk()</code></td><td>Termine et renvoie un <strong>handle</strong> à redessiner chaque frame : map <code>{ id, idw, count, wcount }</code></td></tr>
-    <tr><td><code>graphics.drawChunk(handle)</code></td><td>Redessine la partie <strong>opaque</strong> d'un chunk cuit en un seul appel (dans <code>begin3d</code>)</td></tr>
-    <tr><td><code>graphics.drawChunkAlpha(handle)</code></td><td>Dessine la partie <strong>transparente</strong> (instances à <code>fill</code> alpha &lt; 1, ex. eau). À appeler APRÈS tout l'opaque</td></tr>
-    <tr><td><code>graphics.freeChunk(handle)</code></td><td>Libère les tampons GPU d'un chunk (lointain) → mémoire récupérée</td></tr>
-    <tr><td><code>graphics.inFrustum(x,y,z [, radius])</code></td><td>La sphère (centre, rayon) est-elle (au moins en partie) visible par la caméra ? → <code>1</code>/<code>0</code>. Sert au culling par chunk ; à appeler dans <code>begin3d</code></td></tr>
+    <tr><td><code>graphics.beginChunk()</code></td><td>Opens the recording: the <code>graphics.cube</code>/<code>plane</code> calls that follow are <strong>baked</strong>, that is recorded, rather than drawn</td></tr>
+    <tr><td><code>graphics.endChunk()</code></td><td>Ends it and returns a <strong>handle</strong> to redraw on every frame: a map <code>{ id, idw, count, wcount }</code></td></tr>
+    <tr><td><code>graphics.drawChunk(handle)</code></td><td>Redraws a baked chunk's <strong>opaque</strong> part in a single call, inside <code>begin3d</code></td></tr>
+    <tr><td><code>graphics.drawChunkAlpha(handle)</code></td><td>Draws the <strong>transparent</strong> part (instances whose <code>fill</code> alpha is &lt; 1, water for instance). To be called AFTER all the opaque geometry</td></tr>
+    <tr><td><code>graphics.freeChunk(handle)</code></td><td>Frees a (distant) chunk's GPU buffers, giving the memory back</td></tr>
+    <tr><td><code>graphics.inFrustum(x,y,z [, radius])</code></td><td>Is the sphere (centre, radius) visible to the camera, at least in part? → <code>1</code>/<code>0</code>. Used for culling by chunk; to be called inside <code>begin3d</code></td></tr>
   </tbody>
 </table>
-<p>Un chunk est automatiquement <strong>scindé</strong> en deux groupes selon l'alpha du <code>fill</code> : opaque (<code>drawChunk</code>) et transparent (<code>drawChunkAlpha</code>). <strong>Ordre obligatoire</strong> : dessine TOUT l'opaque, PUIS TOUTE la transparence — sinon le mélange alpha est incorrect.</p>
+<p>A chunk is <strong>split</strong> into two groups according to the <code>fill</code> alpha: opaque (<code>drawChunk</code>) and transparent (<code>drawChunkAlpha</code>). The <strong>order is mandatory</strong>: draw ALL the opaque geometry, THEN all the transparency — the alpha blending is wrong otherwise.</p>
 
-<h4>Atlas de tuiles (texture par face)</h4>
-<p>Pour texturer un terrain sans un appel de dessin par matière, on utilise un <strong>atlas</strong> : une seule image en grille de tuiles. Chaque cube porte un triplet de tuiles (<strong>dessus / côté / dessous</strong>) ; le shader choisit selon la face (herbe dessus, terre sur les côtés…). L'atlas se génère en Ollin avec le module <a href="#/tutoriel/stdlib">image</a> (pixels) ou se charge depuis une image.</p>
+<h4>Tile atlas (a texture per face)</h4>
+<p>To texture a terrain without one draw call per material, use an <strong>atlas</strong>: a single image laid out as a grid of tiles. Each cube carries a triplet of tiles (<strong>top / side / bottom</strong>); the shader picks according to the face — grass on top, earth on the sides. The atlas can be generated in Ollin with the <a href="#/tutoriel/stdlib">image</a> module, pixel by pixel, or loaded from an image.</p>
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.tileset(img, cols, rows)</code></td><td>Déclare l'atlas de tuiles (grille <code>cols</code>×<code>rows</code>, filtrage NEAREST = pixels nets)</td></tr>
-    <tr><td><code>graphics.tile(t)</code></td><td>Même tuile <code>t</code> sur les 6 faces du prochain cube (état, comme <code>fill</code>) ; <code>-1</code> = aucune (couleur pleine)</td></tr>
-    <tr><td><code>graphics.tiles(dessus, côté, dessous)</code></td><td>Tuiles distinctes par face (indices dans l'atlas)</td></tr>
-    <tr><td><code>graphics.tileAnim(t)</code></td><td>Désigne une tuile dont l'UV <strong>défile</strong> dans le temps (eau qui ondule)</td></tr>
-    <tr><td><code>graphics.corners(a, b, c, d)</code></td><td>Hauteurs des 4 coins du <strong>dessus</strong> du prochain cube (état), en fraction de sa hauteur : <code>(-x,-z)</code>, <code>(+x,-z)</code>, <code>(-x,+z)</code>, <code>(+x,+z)</code>. Sans argument = dessus plat</td></tr>
+    <tr><td><code>graphics.tileset(img, cols, rows)</code></td><td>Declares the tile atlas (a <code>cols</code>×<code>rows</code> grid, NEAREST filtering, so the pixels stay crisp)</td></tr>
+    <tr><td><code>graphics.tile(t)</code></td><td>The same tile <code>t</code> on the next cube's six faces (a state, like <code>fill</code>); <code>-1</code> means none, giving plain colour</td></tr>
+    <tr><td><code>graphics.tiles(top, side, bottom)</code></td><td>Distinct tiles per face, as indices into the atlas</td></tr>
+    <tr><td><code>graphics.tileAnim(t)</code></td><td>Names a tile whose UV <strong>scrolls</strong> over time, for rippling water</td></tr>
+    <tr><td><code>graphics.corners(a, b, c, d)</code></td><td>The heights of the four corners of the next cube's <strong>top</strong> (a state), as a fraction of its height: <code>(-x,-z)</code>, <code>(+x,-z)</code>, <code>(-x,+z)</code>, <code>(+x,+z)</code>. With no argument the top is flat</td></tr>
   </tbody>
 </table>
-<p>Un cube à coins déformés reste un cube instancié : le déplacement se fait dans le vertex shader, donc <strong>sans coût de draw call</strong>. Deux cubes voisins qui donnent la même valeur au coin qu'ils partagent forment une surface continue — de quoi faire épouser à un terrain sa hauteur <strong>non arrondie</strong> au lieu d'une marche. À réserver aux rendus qui le cherchent : l'exemple <em>Univers voxel</em>, lui, garde des cubes tous identiques.</p>
-<div class="callout tip">Avec un atlas actif, donne une tuile à <strong>chaque</strong> cube du chunk (<code>tile</code>/<code>tiles</code>) : un cube sans tuile échantillonnerait la tuile 0 au lieu d'une couleur pleine.</div>
+<p>A cube with deformed corners is still an instanced cube: the displacement happens in the vertex shader, so it <strong>costs no draw call</strong>. Two neighbouring cubes giving the same value to the corner they share form a continuous surface — enough to let a terrain follow its <strong>unrounded</strong> height instead of a step. Keep it for renderings that want it: the <em>Voxel world</em> example keeps all its cubes identical.</p>
+<div class="callout tip">With an atlas active, give <strong>every</strong> cube of the chunk a tile (<code>tile</code>/<code>tiles</code>): a cube with no tile would sample tile 0 instead of a plain colour.</div>
 
-<pre><code><span class="cmt">## chunk voxel : cuisson UNIQUE dans setup(), redessin en 1 appel par frame</span>
+<pre><code><span class="cmt">## a voxel chunk: baked ONCE in setup(), redrawn in one call per frame</span>
 <span class="kw">global</span> cam = <span class="bi">graphics</span>.camera(<span class="num">26</span>, <span class="num">20</span>, <span class="num">26</span>,  <span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>)
 <span class="kw">global</span> chunk = <span class="bool">nil</span>
 
@@ -2045,7 +2045,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.canvas(W, H, <span class="str">"voxel"</span>)
     <span class="bi">graphics</span>.ambient(<span class="num">0.5</span>)
     <span class="bi">graphics</span>.light(<span class="str">"dir"</span>, -<span class="num">0.5</span>, -<span class="num">1</span>, -<span class="num">0.35</span>)
-    <span class="bi">graphics</span>.beginChunk()                 <span class="cmt">## début de la cuisson</span>
+    <span class="bi">graphics</span>.beginChunk()                 <span class="cmt">## the baking starts</span>
     <span class="bi">graphics</span>.fill(colors.WHITE)
     <span class="kw">for</span> x = <span class="num">0</span>, <span class="num">15</span> <span class="kw">do</span>
         <span class="kw">for</span> z = <span class="num">0</span>, <span class="num">15</span> <span class="kw">do</span>
@@ -2055,7 +2055,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
             <span class="kw">end</span>
         <span class="kw">end</span>
     <span class="kw">end</span>
-    chunk = <span class="bi">graphics</span>.endChunk()           <span class="cmt">## handle persistant</span>
+    chunk = <span class="bi">graphics</span>.endChunk()           <span class="cmt">## a lasting handle</span>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
