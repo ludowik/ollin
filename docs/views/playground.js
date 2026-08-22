@@ -132,7 +132,7 @@ const fn = (label, detail) => {
 // The complete skeleton (parameters, body, end) is produced on acceptance of a known function
 // NAME, and never doubles the brackets.
 const AC_FUNC = {
-  label: 'func', type: 'keyword', detail: 'définir une fonction',
+  label: 'func', type: 'keyword', detail: 'define a function',
   apply: (view, c, from, to) => {
     view.dispatch({ changes: { from, to, insert: 'func ' }, selection: { anchor: from + 5 } })
   },
@@ -147,20 +147,20 @@ const AC_KEYWORDS = [
 
 const AC_BUILTINS = [
   fn('print',  'print(...)'),    fn('printf', 'printf(fmt, ...)'),
-  fn('assert', 'assert(cond [, msg])'), fn('time', 'time() → float'),
+  fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(grey | r, g, b [, a])'),
   fn('typeof', 'typeof(v) → string'),   fn('Color', 'Color(gris | r, g, b [, a])'),
-  fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (octets utilisés)'),
+  fn('len',    'len(v) → int'),         fn('mem',    'mem() → int (bytes used)'),
 ]
 
 // The globals injected by the engine, available without a declaration (see CLAUDE.md).
 const glob = (label, detail) => ({ label, type: 'variable', detail })
 const AC_GLOBALS = [
-  glob('deltaTime',   'moteur — secondes depuis la frame précédente'),
-  glob('elapsedTime', 'moteur — secondes depuis le démarrage'),
-  glob('W',  'moteur — largeur de la zone de rendu'),
-  glob('H',  'moteur — hauteur de la zone de rendu'),
-  glob('CW', 'moteur — centre X (W / 2)'),
-  glob('CH', 'moteur — centre Y (H / 2)'),
+  glob('deltaTime',   'engine — seconds since the previous frame'),
+  glob('elapsedTime', 'engine — seconds since the start'),
+  glob('W',  'engine — the render area width'),
+  glob('H',  'engine — the render area height'),
+  glob('CW', 'engine — centre X (W / 2)'),
+  glob('CH', 'engine — centre Y (H / 2)'),
 ]
 
 // The lifecycle hooks the engine calls, inserted as a COMPLETE skeleton (func … end), the "func"
@@ -171,7 +171,7 @@ function lifecycle(name, params, detail) {
     label: name, type: 'function', detail,
     apply: (view, c, from, to) => {
       const before = view.state.doc.sliceString(view.state.doc.lineAt(from).from, from)
-      const prefix = /\bfunc\s+\S*$/.test(before) ? '' : 'func '   // ne pas doubler « func »
+      const prefix = /\bfunc\s+\S*$/.test(before) ? '' : 'func '   // do not repeat "func"
       const head = `${prefix}${name}(${params})\n    `
       view.dispatch({
         changes: { from, to, insert: head + '\nend' },
@@ -181,9 +181,9 @@ function lifecycle(name, params, detail) {
   }
 }
 const AC_LIFECYCLE = [
-  lifecycle('setup',  '',   'moteur — une fois au démarrage'),
-  lifecycle('update', 'dt', 'moteur — logique, chaque frame'),
-  lifecycle('draw',   '',   'moteur — rendu, chaque frame'),
+  lifecycle('setup',  '',   'engine — once at startup'),
+  lifecycle('update', 'dt', 'engine — logic, every frame'),
+  lifecycle('draw',   '',   'engine — rendering, every frame'),
 ]
 
 const MODULE_MEMBERS = {
@@ -205,7 +205,7 @@ const MODULE_MEMBERS = {
   ],
   graphics: [
     fn('graphics.canvas','canvas(w,h[,title])'),   fn('graphics.run','run(callback)'),
-    fn('graphics.clear','clear([color]) — alpha<1 = fondu'),
+    fn('graphics.clear','clear([color]) — alpha<1 = fade'),
     fn('graphics.blendMode','blendMode(mode) — "add"/blend.ADD…'),
     fn('graphics.strokeSize','strokeSize(n)'),     fn('graphics.stroke','stroke([color]|r,g,b)'),
     fn('graphics.noStroke','noStroke()'),
@@ -249,7 +249,7 @@ const MODULE_MEMBERS = {
     fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
     fn('graphics.texture','texture(img)'),         fn('graphics.noTexture','noTexture()'),
     // Quaternions.
-    fn('graphics.quat','quat() → Quat (identité)'),
+    fn('graphics.quat','quat() → Quat (identity)'),
     fn('graphics.quatAxis','quatAxis(ax,ay,az, deg) → Quat'),
     fn('graphics.quatEuler','quatEuler(pitch,yaw,roll) → Quat'),
     fn('graphics.rotateq','rotateq(q)'),
@@ -276,12 +276,12 @@ const MODULE_MEMBERS = {
     cst('colors.SKYBLUE',''), cst('colors.LIME',''),   cst('colors.MAGENTA',''),
   ],
   blend: [
-    cst('blend.ALPHA','fusion normale (défaut)'), cst('blend.ADD','additif (glow)'),
-    cst('blend.MULTIPLY','multiplié'),            cst('blend.ADD_COLORS','somme des couleurs'),
-    cst('blend.SUBTRACT','soustractif'),          cst('blend.PREMULTIPLY','alpha prémultiplié'),
+    cst('blend.ALPHA','normal blending (default)'), cst('blend.ADD','additive (glow)'),
+    cst('blend.MULTIPLY','multiplied'),            cst('blend.ADD_COLORS','sum of the colours'),
+    cst('blend.SUBTRACT','subtractive'),           cst('blend.PREMULTIPLY','premultiplied alpha'),
   ],
   Color: [
-    fn('Color.random','random() → couleur aléatoire'),
+    fn('Color.random','random() → a random colour'),
   ],
   string: [
     fn('string.len','len(s) → int'),
@@ -290,26 +290,26 @@ const MODULE_MEMBERS = {
     fn('string.char','char(s,i)'), fn('string.substr','substr(s,start[,len])'),
   ],
   window: [
-    cst('window.width','largeur de la zone de rendu (px)'),
-    cst('window.height','hauteur de la zone de rendu (px)'),
+    cst('window.width','the render area width (px)'),
+    cst('window.height','the render area height (px)'),
   ],
   keyboard: [
-    fn('keyboard.keypressed','keypressed(key) — à définir : appelée à l\'appui'),
-    fn('keyboard.keyrelease','keyrelease(key) — à définir : appelée au relâchement'),
+    fn('keyboard.keypressed','keypressed(key) — to be defined: called on a press'),
+    fn('keyboard.keyrelease','keyrelease(key) — to be defined: called on a release'),
   ],
   mouse: [
-    fn('mouse.pressed','pressed(x,y) — à définir : appelée au clic'),
-    fn('mouse.released','released(x,y) — à définir : au relâchement'),
-    fn('mouse.moved','moved(x,y) — à définir : au déplacement'),
+    fn('mouse.pressed','pressed(x,y) — to be defined: called on a click'),
+    fn('mouse.released','released(x,y) — to be defined: on a release'),
+    fn('mouse.moved','moved(x,y) — to be defined: on a move'),
   ],
   data: [
-    fn('data.get','get(clé [, défaut]) — valeur persistée'),
-    fn('data.set','set(clé, valeur) — nombre/chaîne/booléen'),
-    fn('data.has','has(clé) → bool'),
-    fn('data.delete','delete(clé)'),
+    fn('data.get','get(key [, default]) — a persisted value'),
+    fn('data.set','set(key, value) — number/string/boolean'),
+    fn('data.has','has(key) → bool'),
+    fn('data.delete','delete(key)'),
     fn('data.keys','keys() → array'),
-    fn('data.clear','clear() — efface la portée projet'),
-    cst('data.shared','portée partagée entre projets (data.shared.get/set…)'),
+    fn('data.clear','clear() — clears the project scope'),
+    cst('data.shared','the scope shared between projects (data.shared.get/set…)'),
   ],
 }
 
@@ -376,7 +376,7 @@ function ollinFoldRange(state, lineStart) {
     const body = line.text.replace(/##.*$/, '')
     depth += countMatches(body, FOLD_OPENERS) - countMatches(body, FOLD_ENDS)
     if (depth <= 0) {
-      const from = first.to                              // fin de la ligne d'ouverture
+      const from = first.to                              // the end of the opening line
       const to = state.doc.line(n - 1).to                // the end of the last line before `end`
       return to > from ? { from, to } : null
     }
@@ -388,7 +388,7 @@ function ollinFoldRange(state, lineStart) {
 // editor starts empty, then receives the current file after Store.init.
 let saveTimer   = null
 let autoexecTimer = null  // Auto mode: a deferred restart after the last edit
-let loadingFile = false   // true pendant un chargement programmatique → pas d'autosave
+let loadingFile = false   // true during a programmatic load, so no autosave
 
 // Tab on a PLAIN CURSOR inserts spaces up to the next multiple of four (a tab stop) AT THE
 // CURSOR'S POSITION, and does not indent the line. On a selection it returns false, and
@@ -477,37 +477,37 @@ const editorExtensions = [
 // holding Alt-Enter, F4, Alt-k…, searchKeymap, foldKeymap, historyKeymap) and with the run
 // shortcut handled in onGlobalKeydown.
 const SHORTCUTS = [
-  { cat: 'Exécution', items: [
-    { keys: ['Alt', '↵'],   desc: 'Exécuter / relancer le script' },
-    { keys: ['Alt', 'Maj', '↵'], desc: 'Exécuter + activer le mode Auto (relance à chaque modif)' },
-    { keys: ['Échap'],      desc: 'Arrêter l’exécution en cours' },
-    { keys: ['F4'],         desc: 'Aller à la première erreur' },
+  { cat: 'Running', items: [
+    { keys: ['Alt', '↵'],   desc: 'Run / restart the script' },
+    { keys: ['Alt', 'Shift', '↵'], desc: 'Run and turn Auto on (re-runs on every edit)' },
+    { keys: ['Esc'],        desc: 'Stop the run under way' },
+    { keys: ['F4'],         desc: 'Go to the first error' },
   ]},
-  { cat: 'Édition', items: [
-    { keys: ['Tab'],            desc: 'Indenter au curseur (ou accepter la complétion si la popup est ouverte)' },
-    { keys: ['Maj', 'Tab'],     desc: 'Désindenter' },
-    { keys: ['Alt', 'Espace'], desc: 'Déclencher l’autocomplétion' },
-    { keys: ['Cmd+K', 'C'], sep: ' puis ', desc: 'Commenter les lignes sélectionnées' },
-    { keys: ['Cmd+K', 'U'], sep: ' puis ', desc: 'Décommenter les lignes sélectionnées' },
-    { keys: ['Alt', 'Maj', 'F'],desc: 'Reformater le code (indentation)' },
-    { keys: ['Ctrl', 'Z'],      desc: 'Annuler' },
-    { keys: ['Ctrl', 'Y'],      desc: 'Rétablir (ou Ctrl+Maj+Z)' },
+  { cat: 'Editing', items: [
+    { keys: ['Tab'],            desc: 'Indent at the caret (or accept the completion when the popup is open)' },
+    { keys: ['Shift', 'Tab'],   desc: 'Unindent' },
+    { keys: ['Alt', 'Space'],  desc: 'Trigger autocompletion' },
+    { keys: ['Cmd+K', 'C'], sep: ' then ', desc: 'Comment the selected lines' },
+    { keys: ['Cmd+K', 'U'], sep: ' then ', desc: 'Uncomment the selected lines' },
+    { keys: ['Alt', 'Shift', 'F'],desc: 'Reformat the code (indentation)' },
+    { keys: ['Ctrl', 'Z'],      desc: 'Undo' },
+    { keys: ['Ctrl', 'Y'],      desc: 'Redo (or Ctrl+Shift+Z)' },
   ]},
-  { cat: 'Recherche', items: [
-    { keys: ['Ctrl', 'F'],      desc: 'Rechercher dans le fichier' },
-    { keys: ['Ctrl', 'G'],      desc: 'Occurrence suivante' },
-    { keys: ['Maj', 'Ctrl', 'G'], desc: 'Occurrence précédente' },
+  { cat: 'Search', items: [
+    { keys: ['Ctrl', 'F'],      desc: 'Search in the file' },
+    { keys: ['Ctrl', 'G'],      desc: 'Next match' },
+    { keys: ['Shift', 'Ctrl', 'G'], desc: 'Previous match' },
   ]},
-  { cat: 'Pliage', items: [
-    { keys: ['Ctrl', 'Maj', '['], desc: 'Plier le bloc' },
-    { keys: ['Ctrl', 'Maj', ']'], desc: 'Déplier le bloc' },
+  { cat: 'Folding', items: [
+    { keys: ['Ctrl', 'Shift', '['], desc: 'Fold the block' },
+    { keys: ['Ctrl', 'Shift', ']'], desc: 'Unfold the block' },
   ]},
-  { cat: 'Fichiers', items: [
-    { keys: ['Alt', 'Page↑'], desc: 'Fichier précédent (projet multi-fichiers)' },
-    { keys: ['Alt', 'Page↓'], desc: 'Fichier suivant' },
+  { cat: 'Files', items: [
+    { keys: ['Alt', 'Page↑'], desc: 'Previous file (a multi-file project)' },
+    { keys: ['Alt', 'Page↓'], desc: 'Next file' },
   ]},
-  { cat: 'Aide', items: [
-    { keys: ['F1'], desc: 'Afficher / masquer cette aide' },
+  { cat: 'Help', items: [
+    { keys: ['F1'], desc: 'Show / hide this help' },
   ]},
 ]
 
@@ -530,7 +530,7 @@ function toggleLineComment(v, add) {
     const line = state.doc.line(n)
     const indent = line.text.length - line.text.trimStart().length
     if (add) {
-      if (line.text.trim() === '') continue   // ne pas commenter une ligne vide
+      if (line.text.trim() === '') continue   // do not comment an empty line
       changes.push({ from: line.from + indent, insert: '## ' })
     } else {
       const rest = line.text.slice(indent)
@@ -677,7 +677,7 @@ window.__ollinKbdBlocked = (document.activeElement === view.contentDOM)
 disposers.push(() => {
   view.contentDOM.removeEventListener('focus', onEditorFocus)
   view.contentDOM.removeEventListener('blur', onEditorBlur)
-  window.__ollinKbdBlocked = false   // quitte la vue → ne pas bloquer le run autonome
+  window.__ollinKbdBlocked = false   // leaving the view: do not block the standalone run
 })
 
 // Moving the cursor by a horizontal drag (touch, mobile). The editor wraps lines, so there is no
@@ -685,7 +685,7 @@ disposers.push(() => {
 // glyph width dragged, moving LINEARLY through the document, across line ends. A vertical drag
 // stays the native scroll.
 ;(function () {
-  const H_THRESHOLD = 8      // px avant de trancher la direction du geste
+  const H_THRESHOLD = 8      // px before deciding the gesture's direction
   const dom = view.scrollDOM
   let decided = false, active = false
   let x0 = 0, y0 = 0, head0 = 0
@@ -705,7 +705,7 @@ disposers.push(() => {
     if (!decided) {
       if (Math.abs(dx) < H_THRESHOLD && Math.abs(dy) < H_THRESHOLD) return
       decided = true
-      active = Math.abs(dx) > Math.abs(dy)   // horizontal → on prend la main ; vertical → scroll natif
+      active = Math.abs(dx) > Math.abs(dy)   // horizontal: we take over; vertical: the native scroll
     }
     if (!active) return
     e.preventDefault()   // we handle it: no native scrolling or selection
@@ -814,7 +814,7 @@ let currentFile    = null    // chemin du fichier ouvert
 // the state: renderFiles and openFile read it much higher up in the file, and a `let` declared
 // after them would expose them to "Cannot access before initialization".
 let currentRes     = null
-let examples       = []      // [{name, file}] pour « Nouveau depuis un exemple »
+let examples       = []      // [{name, file}] for "New from an example"
 
 // In sample mode the current project is TRANSIENT, loaded from the repository and never
 // persisted. All of its files can be seen and navigated, but nothing is written to the database
@@ -850,7 +850,7 @@ function flushEditorToFile() {
 }
 
 function scheduleSave() {
-  if (!currentProject || isExample()) return   // un exemple ne se persiste jamais
+  if (!currentProject || isExample()) return   // an example is never persisted
   flushEditorToFile()
   persist(currentProject)
 }
@@ -896,13 +896,13 @@ function renderFiles() {
     if (isEntry) row.classList.add('entry')
     row.appendChild(label)
 
-    if (!isExample()) {   // exemple : lecture/navigation seule, pas de mutation
+    if (!isExample()) {   // an example: reading and navigating only, no mutation
       const acts = document.createElement('span')
       acts.className = 'file-acts'
-      acts.appendChild(iconBtn(isEntry ? '★' : '☆', isEntry ? 'Point d\'entrée' : 'Définir comme point d\'entrée',
+      acts.appendChild(iconBtn(isEntry ? '★' : '☆', isEntry ? 'Entry point' : 'Set as the entry point',
         e => { e.stopPropagation(); setEntry(path) }))
-      acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameFile(path) }))
-      acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteFile(path) }))
+      acts.appendChild(iconBtn('✎', 'Rename', e => { e.stopPropagation(); renameFile(path) }))
+      acts.appendChild(iconBtn('🗑', 'Delete', e => { e.stopPropagation(); deleteFile(path) }))
       row.appendChild(acts)
     }
 
@@ -950,11 +950,11 @@ function cycleFile(dir) {
 
 async function newFile() {
   if (!currentProject || isExample()) return   // no editable project (a 404 sample, say)
-  let name = prompt('Nom du nouveau fichier (.ol) :', 'nouveau.ol')
+  let name = prompt('Name of the new file (.ol):', 'new.ol')
   if (!name) return
   name = name.trim()
   if (!/\.ol$/.test(name)) name += '.ol'
-  if (currentProject.files[name] !== undefined) { alert('Ce fichier existe déjà.'); return }
+  if (currentProject.files[name] !== undefined) { alert('That file already exists.'); return }
   flushEditorToFile()
   currentProject.files[name] = ''
   await persist(currentProject)
@@ -962,11 +962,11 @@ async function newFile() {
 }
 
 async function renameFile(path) {
-  let name = prompt('Renommer le fichier :', path)
+  let name = prompt('Rename the file:', path)
   if (!name || name.trim() === path) return
   name = name.trim()
   if (!/\.ol$/.test(name)) name += '.ol'
-  if (currentProject.files[name] !== undefined) { alert('Ce nom est déjà pris.'); return }
+  if (currentProject.files[name] !== undefined) { alert('That name is already taken.'); return }
   flushEditorToFile()
   currentProject.files[name] = currentProject.files[path]
   delete currentProject.files[path]
@@ -979,8 +979,8 @@ async function renameFile(path) {
 }
 
 async function deleteFile(path) {
-  if (scripts(currentProject).length <= 1) { alert('Un projet doit garder au moins un fichier.'); return }
-  if (!confirm(`Supprimer « ${path} » ?`)) return
+  if (scripts(currentProject).length <= 1) { alert('A project must keep at least one file.'); return }
+  if (!confirm(`Delete "${path}"?`)) return
   delete currentProject.files[path]
   if (currentProject.entry === path) currentProject.entry = scripts(currentProject)[0]
   if (currentFile === path) currentFile = currentProject.entry
@@ -1017,7 +1017,7 @@ function showResource(name) {
   }
   const r = (currentProject.resources || {})[name] || {}
   const ext = (r.ext || name.split('.').pop() || '').toLowerCase()
-  const octets = Math.round((r.b64 || '').length * 3 / 4)
+  const bytes = Math.round((r.b64 || '').length * 3 / 4)
 
   const head = document.createElement('div'); head.className = 'res-head'
   const nm = document.createElement('span'); nm.className = 'res-name'; nm.textContent = name
@@ -1025,7 +1025,7 @@ function showResource(name) {
   const info = document.createElement('span')
   head.append(nm, sp, info)
   const close = document.createElement('button')
-  close.className = 'file-act'; close.textContent = '✕'; close.title = "Revenir à l'éditeur"
+  close.className = 'file-act'; close.textContent = '✕'; close.title = 'Back to the editor'
   close.addEventListener('click', () => showResource(null))
   head.appendChild(close)
   resView.appendChild(head)
@@ -1036,16 +1036,16 @@ function showResource(name) {
     img.src = 'data:' + resMime(ext) + ';base64,' + (r.b64 || '')
     // The dimensions are only known once decoded, and the preview fills them in then.
     img.addEventListener('load', () => {
-      info.textContent = `${img.naturalWidth} × ${img.naturalHeight} · ${fmtSize(octets)}`
+      info.textContent = `${img.naturalWidth} × ${img.naturalHeight} · ${fmtSize(bytes)}`
     })
-    img.addEventListener('error', () => { info.textContent = 'image illisible' })
+    img.addEventListener('error', () => { info.textContent = 'unreadable image' })
     frame.appendChild(img)
     resView.appendChild(frame)
   } else {
-    info.textContent = fmtSize(octets)
+    info.textContent = fmtSize(bytes)
     const note = document.createElement('div'); note.className = 'res-note'
-    note.textContent = ext ? `Ressource « ${ext} » — pas d'aperçu pour ce format.`
-                           : "Ressource binaire — pas d'aperçu."
+    note.textContent = ext ? `"${ext}" resource — no preview for this format.`
+                           : 'Binary resource — no preview.'
     resView.appendChild(note)
   }
 }
@@ -1069,8 +1069,8 @@ function renderResources() {
     row.appendChild(label)
     if (!isExample()) {
       const acts = document.createElement('span'); acts.className = 'file-acts'
-      acts.appendChild(iconBtn('✎', 'Renommer', e => { e.stopPropagation(); renameResource(name) }))
-      acts.appendChild(iconBtn('🗑', 'Supprimer', e => { e.stopPropagation(); deleteResource(name) }))
+      acts.appendChild(iconBtn('✎', 'Rename', e => { e.stopPropagation(); renameResource(name) }))
+      acts.appendChild(iconBtn('🗑', 'Delete', e => { e.stopPropagation(); deleteResource(name) }))
       row.appendChild(acts)
     }
     // Clicking the displayed resource again returns to the editor: it toggles.
@@ -1080,19 +1080,19 @@ function renderResources() {
 }
 
 async function renameResource(name) {
-  let n = prompt('Renommer la ressource :', name)
+  let n = prompt('Rename the resource:', name)
   if (!n || n.trim() === name) return
   n = n.trim()
-  if (currentProject.resources[n] !== undefined) { alert('Ce nom est déjà pris.'); return }
+  if (currentProject.resources[n] !== undefined) { alert('That name is already taken.'); return }
   currentProject.resources[n] = currentProject.resources[name]
   delete currentProject.resources[name]
-  const affichee = currentRes === name
+  const shown = currentRes === name
   await persist(currentProject)
   if (ollin && ollin.preloadImage) {
     const r = currentProject.resources[n]
     ollin.preloadImage(n, r.b64, r.ext)
   }
-  if (affichee) {
+  if (shown) {
     showResource(n)   // the preview carries the name in its header, so rebuild it
     return
   }
@@ -1100,7 +1100,7 @@ async function renameResource(name) {
 }
 
 async function deleteResource(name) {
-  if (!confirm(`Supprimer la ressource « ${name} » ?`)) return
+  if (!confirm(`Delete the resource "${name}"?`)) return
   delete currentProject.resources[name]
   await persist(currentProject)
   if (currentRes === name) {
@@ -1139,7 +1139,7 @@ async function loadProject(id) {
 async function switchProject(id) {
   if (currentProject && !isExample()) {       // a sample, being transient, has nothing to save
     flushEditorToFile()                       // pick up the last keystrokes
-    await Store.saveProject(currentProject)   // puis persister avant de quitter
+    await Store.saveProject(currentProject)   // then persist before leaving
   }
   await loadProject(id)
 }
@@ -1182,7 +1182,7 @@ function menuHeader(text, back) {
     const b = document.createElement('button')
     b.className = 'menu-back'
     b.textContent = '‹'
-    b.title = 'Retour'
+    b.title = 'Back'
     b.addEventListener('click', back)
     h.appendChild(b)
   }
@@ -1219,23 +1219,23 @@ function menuGroupLabel(text) {
 }
 
 function renderMenuRoot() {
-  projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Projet : ' + (currentProject ? currentProject.name : '—')))
-  projectMenu.appendChild(menuItem('✨ Nouveau projet vide', false, async () => {
+  projectMenu.appendChild(menuHeader('Project: ' + (currentProject ? currentProject.name : '—')))
+  projectMenu.appendChild(menuItem('✨ New empty project', false, async () => {
+    const name = await askFreeProjectName('Untitled'); if (!name) return
     const name = await askFreeProjectName('Sans titre'); if (!name) return
     const p = await Store.createProject(name)
     closeMenu()
     await autoPushNewProject(p)   // with a repository set, it is created on GitHub
     await openProject(p.id)
-  }))
-  projectMenu.appendChild(menuItem('📂 Ouvrir un projet', true, renderMenuOpen))
+  projectMenu.appendChild(menuItem('📂 Open a project', true, renderMenuOpen))
+  projectMenu.appendChild(menuItem('📄 Open an example', true, renderMenuExamples))
   projectMenu.appendChild(menuItem('📄 Ouvrir un exemple', true, renderMenuExamples))
   // Actions on the CURRENT PROJECT, hidden in sample mode: the project being transient, there is
   // nothing in the database to rename, duplicate or delete.
   if (currentProject && !isExample()) {
-    projectMenu.appendChild(menuSep())
+    projectMenu.appendChild(menuItem('✎ Rename', false, async () => {
     projectMenu.appendChild(menuItem('✎ Renommer', false, async () => {
-      const name = await askFreeProjectName(currentProject.name, {
+        label: 'New name:',
         label: 'Nouveau nom :',
         exclude: { id: currentProject.id, slug: (currentProject.remote && currentProject.remote.slug) || currentProject.id },
       })
@@ -1244,25 +1244,25 @@ function renderMenuRoot() {
       const p = await Store.renameProject(currentProject.id, name)
       closeMenu(); await loadProject(p.id)
     }))
-    projectMenu.appendChild(menuItem('⧉ Dupliquer', false, async () => {
+    projectMenu.appendChild(menuItem('⧉ Duplicate', false, async () => {
       flushEditorToFile(); await Store.saveProject(currentProject)
-      const dupName = await askFreeProjectName(currentProject.name + ' (copie)'); if (!dupName) return
+      const dupName = await askFreeProjectName(currentProject.name + ' (copy)'); if (!dupName) return
       const copy = await Store.createProject(dupName)
       copy.files = { ...currentProject.files }; copy.entry = currentProject.entry
-      copy.resources = { ...currentProject.resources }   // dupliquer AUSSI les assets
+      copy.resources = { ...currentProject.resources }   // duplicate the assets TOO
       delete copy.files[Store.MANIFEST]
       await Store.saveProject(copy)
       closeMenu()
       await autoPushNewProject(copy)   // with a repository set, it is created on GitHub
       await switchProject(copy.id)
-    }))
+    projectMenu.appendChild(menuItem('🗑 Delete', false, async () => {
     projectMenu.appendChild(menuItem('🗑 Supprimer', false, async () => {
-      if (!confirm(`Supprimer le projet « ${currentProject.name} » ?`)) return
+      if (!confirm(`Delete the project "${currentProject.name}"?`)) return
       const gone = currentProject.id
       await Store.deleteProject(gone)
       const list = await Store.listProjects()
       closeMenu()
-      if (list.length) await loadProject(list[0].id)
+      else { const p = await Store.createProject('Untitled'); await loadProject(p.id) }
       else { const p = await Store.createProject('Sans titre'); await loadProject(p.id) }
     }))
   }
@@ -1271,7 +1271,7 @@ function renderMenuRoot() {
   const ghLabel = GH.isConnected() ? ('🐙 GitHub' + (ghLogin ? ' : @' + ghLogin : '')) : '🐙 GitHub'
   projectMenu.appendChild(menuItem(ghLabel, true, renderMenuGithub))
   projectMenu.appendChild(menuSep())
-  projectMenu.appendChild(menuItem('⌨ Raccourcis clavier (F1)', false, () => { closeMenu(); openHelp() }))
+  projectMenu.appendChild(menuItem('⌨ Keyboard shortcuts (F1)', false, () => { closeMenu(); openHelp() }))
 }
 
 // The GitHub sub-menu gathers every feature (connecting, the repository, pushing and pulling,
@@ -1280,7 +1280,7 @@ function renderMenuGithub() {
   projectMenu.innerHTML = ''
   if (!GH.isConnected()) {
     projectMenu.appendChild(menuHeader('GitHub', renderMenuRoot))
-    projectMenu.appendChild(menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
+    projectMenu.appendChild(menuItem('🔗 Sign in to GitHub', true, renderMenuConnect))
     return
   }
   const hdr = menuHeader('GitHub' + (ghLogin ? ' : @' + ghLogin : ''), renderMenuRoot)
@@ -1296,8 +1296,8 @@ function renderMenuGithub() {
   // token is only good for the repository it grants access to), and a fine-grained token expires,
   // so it must be replaceable without going through a disconnection.
   projectMenu.appendChild(menuItem('GitHub repo', false, renderMenuConnect))
-  projectMenu.appendChild(menuLink('Renouveler le token', TOKEN_URL))
-  projectMenu.appendChild(menuItem('Déconnexion', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
+  projectMenu.appendChild(menuLink('Renew the token', TOKEN_URL))
+  projectMenu.appendChild(menuItem('Sign out', false, () => { GH.clearToken(); ghLogin = null; renderMenuGithub() }))
 }
 
 // A UNIFIED "Open a project" menu: local ones (🖥 unlinked), synchronised ones (🔄 linked) and
@@ -1307,7 +1307,7 @@ function renderMenuGithub() {
 async function renderMenuOpen() {
   const local = await Store.listProjects()
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Ouvrir un projet', renderMenuRoot))
+  projectMenu.appendChild(menuHeader('Open a project', renderMenuRoot))
   const body = document.createElement('div')
   projectMenu.appendChild(body)
 
@@ -1328,13 +1328,13 @@ async function renderMenuOpen() {
       body.appendChild(menuGroupLabel(label))
       for (const it of items) body.appendChild(mk(it))
     }
-    group('🖥 Locaux', local.filter(p => !isLinked(p)), p => menuItem(nameOf(p), false, openLocal(p.id)))
-    group('🔄 Synchronisés', local.filter(isLinked), p => menuItem(nameOf(p), false, openLocal(p.id)))
-    group('☁ Distants', remoteOnly, r => menuItem(r.name, false, () => openRemoteProject(r.slug)))
+    group('🖥 Local', local.filter(p => !isLinked(p)), p => menuItem(nameOf(p), false, openLocal(p.id)))
+    group('🔄 Synchronised', local.filter(isLinked), p => menuItem(nameOf(p), false, openLocal(p.id)))
+    group('☁ Remote', remoteOnly, r => menuItem(r.name, false, () => openRemoteProject(r.slug)))
     if (footer)
       body.appendChild(footer)
     if (!body.childNodes.length) {
-      const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun projet.'
+      const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'No project.'
       body.appendChild(d)
     }
   }
@@ -1342,14 +1342,14 @@ async function renderMenuOpen() {
   // The remote footer, according to the connection and network state.
   const info = txt => { const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = txt; return d }
   if (!GH.isConnected()) {
-    render([], menuItem('🔗 Se connecter à GitHub', true, renderMenuConnect))
+    render([], menuItem('🔗 Sign in to GitHub', true, renderMenuConnect))
     return
   }
   if (!GH.getRepo()) {
-    render([], info('Dépôt GitHub non configuré (menu 🐙 GitHub).'))
+    render([], info('No GitHub repository set (the 🐙 GitHub menu).'))
     return
   }
-  render([], info('Chargement des projets distants…'))
+  render([], info('Loading the remote projects…'))
   try {
     const remote = await GH.listRemoteProjects()
     render(remote.filter(r => !localSlugs.has(r.slug)), null)
@@ -1362,10 +1362,10 @@ async function renderMenuOpen() {
 async function openRemoteProject(slug) {
   closeMenu()
   const existing = await Store.getProject(slug)
-  if (existing && !confirm(`Un projet « ${slug} » existe déjà en local. L'écraser avec la version GitHub ?`)) return
+  if (existing && !confirm(`A project "${slug}" already exists locally. Overwrite it with the GitHub version?`)) return
   flushEditorToFile()
   if (currentProject && currentProject.id !== slug) await Store.saveProject(currentProject)
-  setStatus('Récupération…')
+  setStatus('Fetching…')
   try {
     const p = await GH.pullProject(slug)
     p.dirty = false   // freshly fetched, hence synchronised
@@ -1412,51 +1412,51 @@ function setStatus(msg, transient, isError) {
 // corrected rather than retyped, and an unchanged token is not checked again. Emptying the token
 // field keeps the current token; to erase it, disconnect.
 function renderMenuConnect() {
-  const deja = GH.isConnected()
-  const tokenActuel = GH.getToken() || ''
+  const connected = GH.isConnected()
+  const currentToken = GH.getToken() || ''
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader(deja ? 'Dépôt et token GitHub' : 'Se connecter à GitHub', renderMenuGithub))
+  projectMenu.appendChild(menuHeader(connected ? 'GitHub repository and token' : 'Sign in to GitHub', renderMenuGithub))
   const wrap = document.createElement('div'); wrap.className = 'menu-form'
   const info = document.createElement('div'); info.className = 'menu-info'
-  info.innerHTML = 'Dépôt cible au format <b>owner/repo</b> (il doit exister) et <b>fine-grained token</b> GitHub avec la permission Contents : lecture/écriture. '
-    + `<a href="${TOKEN_URL}" target="_blank" rel="noopener">Créer un token ↗</a>`
+  info.innerHTML = 'The target repository as <b>owner/repo</b> (it must exist) and a GitHub <b>fine-grained token</b> with the Contents permission: read and write. '
+    + `<a href="${TOKEN_URL}" target="_blank" rel="noopener">Create a token ↗</a>`
   const repo = document.createElement('input')
   repo.type = 'text'; repo.className = 'menu-input'; repo.value = GH.getRepo() || ''
-  repo.placeholder = 'owner/repo (ex. moncompte/ollin-projects)'
-  repo.title = 'Dépôt cible au format owner/repo — doit exister sur GitHub.'
+  repo.placeholder = 'owner/repo (e.g. myaccount/ollin-projects)'
+  repo.title = 'The target repository, as owner/repo - it must exist on GitHub.'
   const input = document.createElement('input')
-  input.type = 'password'; input.className = 'menu-input'; input.value = tokenActuel
+  input.type = 'password'; input.className = 'menu-input'; input.value = currentToken
   input.placeholder = 'github_pat_… / ghp_…'
   // The token is masked like a password, so without this toggle the prefilled field would show
   // nothing but a row of dots, and nothing could be checked.
-  const voir = document.createElement('label'); voir.className = 'menu-check'
+  const see = document.createElement('label'); see.className = 'menu-check'
   const box = document.createElement('input'); box.type = 'checkbox'
   box.addEventListener('change', () => { input.type = box.checked ? 'text' : 'password' })
-  voir.append(box, document.createTextNode('Afficher le token'))
-  const libelle = deja ? 'Enregistrer' : 'Connecter'
-  const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = libelle
+  see.append(box, document.createTextNode('Show the token'))
+  const label_txt = connected ? 'Save' : 'Connect'
+  const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = label_txt
   const err = document.createElement('div'); err.className = 'menu-err'
   const connect = async () => {
     const t = input.value.trim()
-    if (!t && !deja) return
+    if (!t && !connected) return
     const r = repo.value.trim()
-    if (!r.includes('/')) { err.textContent = 'Format invalide — utilise owner/repo'; return }
+    if (!r.includes('/')) { err.textContent = 'Invalid format - use owner/repo'; return }
     try { GH.setRepo(r) } catch (e) { err.textContent = e.message; return }
     // Unchanged: it was validated when it was stored, so there is no need to call GitHub again.
-    if (!t || t === tokenActuel) { renderMenuGithub(); return }
-    btn.disabled = true; btn.textContent = 'Vérification…'; err.textContent = ''
+    if (!t || t === currentToken) { renderMenuGithub(); return }
+    btn.disabled = true; btn.textContent = 'Checking…'; err.textContent = ''
     // Tested before being stored, so a rejected token does not replace the one that worked, and
     // no other path can set off with an unvalidated token.
     try { const u = await GH.verifyToken(t); GH.setToken(t); ghLogin = u.login; renderMenuGithub() }
-    catch (e) { err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = libelle }
+    catch (e) { err.textContent = 'Token invalide : ' + e.message; btn.disabled = false; btn.textContent = label_txt }
   }
   btn.addEventListener('click', connect)
   input.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
   repo.addEventListener('keydown', e => { if (e.key === 'Enter') connect() })
-  wrap.append(info, repo, input, voir, btn, err)
+  wrap.append(info, repo, input, see, btn, err)
   projectMenu.appendChild(wrap)
   // When already connected one usually comes to change repository; otherwise, to paste the token.
-  if (deja) repo.focus()
+  if (connected) repo.focus()
   else input.focus()
 }
 
@@ -1465,15 +1465,15 @@ function renderMenuConnect() {
 // and a message says so — "Push to GitHub" remains available for another try.
 async function autoPushNewProject(p) {
   if (!GH.isConnected() || !GH.getRepo()) return
-  setStatus('Création sur GitHub…')
+  setStatus('Creating on GitHub…')
   try {
     await GH.ensureRepo()
     await GH.pushProject(p, null, {})
     p.dirty = false   // freshly pushed, hence synchronised
     await Store.saveProject(p)   // persiste project.remote (slug, folderSha) + dirty
-    setStatus('Projet créé sur GitHub ✓', true)
+    setStatus('Project created on GitHub ✓', true)
   } catch (e) {
-    setStatus('Créé en local — GitHub : ' + (e && e.message ? e.message : e), true, true)
+    setStatus('Created locally — GitHub: ' + (e && e.message ? e.message : e), true, true)
   }
 }
 
@@ -1527,9 +1527,9 @@ function updateSyncBadge() {
 }
 
 const OPEN_CONFLICT_MSG =
-  'Ce projet a des modifications locales non poussées, mais la version sur GitHub a aussi changé.\n\n'
-  + 'OK = récupérer GitHub (tes modifs locales seront perdues)\n'
-  + 'Annuler = garder ta version locale (elle écrasera GitHub au prochain envoi)'
+  'This project has local changes that have not been pushed, but the version on GitHub has changed too.\n\n'
+  + 'OK = fetch GitHub (your local changes will be lost)\n'
+  + 'Cancel = keep your local version (it will overwrite GitHub on the next push)'
 
 // Reconciliation on opening a project (non-blocking; offline it keeps the local version). It
 // compares the remote folder's SHA with the last known one:
@@ -1545,7 +1545,7 @@ async function syncOnOpen(project) {
   try {
     cur = await GH.remoteFolderSha(slug)
   } catch (_) {
-    return   // hors-ligne / token invalide : on garde le local
+    return   // offline or an invalid token: keep the local version
   }
   if (!currentProject || currentProject.id !== project.id) return   // the project changed meanwhile
   const known = (project.remote && project.remote.folderSha) || null
@@ -1554,19 +1554,19 @@ async function syncOnOpen(project) {
     await adoptRemote(project, slug)
     return
   }
-  if (project.dirty) sync.schedule(project)   // garde le local → le pousser
+  if (project.dirty) sync.schedule(project)   // the local version is kept, so push it
 }
 
 // Replaces the current project with the remote version (a pull) and sets `dirty` to false.
 async function adoptRemote(project, slug) {
-  setStatus('Récupération depuis GitHub…')
+  setStatus('Fetching from GitHub…')
   try {
     const p = await GH.pullProject(slug)
     p.id = project.id
     p.dirty = false
     await Store.saveProject(p)
     await loadProject(p.id)   // reloads the editor and rereads remote.folderSha
-    setStatus('Projet à jour ✓', true)
+  setStatus('Project up to date ✓', true)
   } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
 }
 
@@ -1620,9 +1620,9 @@ function showExampleBanner(file) {
   bar.id = 'example-banner'
   bar.style.cssText = 'display:flex;align-items:center;gap:10px;padding:6px 12px;background:#1e2133;border-bottom:1px solid #3a3f63;font-size:12px;color:#a9b2cf'
   const txt = document.createElement('span')
-  txt.innerHTML = '📄 Exemple <b style="color:#dde4ef">' + file + '</b> — non enregistré (un rafraîchissement recharge l\'exemple)'
+  txt.innerHTML = '📄 Example <b style="color:#dde4ef">' + file + '</b> — not saved (a refresh reloads the example)'
   const btn = document.createElement('button')
-  btn.textContent = 'Créer un projet'
+  btn.textContent = 'Create a project'
   btn.style.cssText = 'margin-left:auto;background:var(--accent);color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:12px;cursor:pointer'
   btn.addEventListener('click', () => forkExampleToProject(file))
   bar.appendChild(txt)
@@ -1690,17 +1690,17 @@ async function takenProjectNames(exclude = {}) {
 // a rename.
 async function askFreeProjectName(defName, opts = {}) {
   const label = opts.label || 'Nom du projet :'
-  if (GH.isConnected() && GH.getRepo()) setStatus('Vérification des noms…')
+  if (GH.isConnected() && GH.getRepo()) setStatus('Checking the names…')
   const { names, remoteFailed } = await takenProjectNames(opts.exclude)
-  if (remoteFailed) setStatus('Noms distants non vérifiés (dépôt injoignable)', true, true)
+  if (remoteFailed) setStatus('Remote names not checked (the repository is unreachable)', true, true)
   else if (GH.isConnected() && GH.getRepo()) setStatus('')
   let name = prompt(label, defName)
   while (name !== null) {
     const clean = name.trim()
     if (!clean) {
-      name = prompt('Le nom ne peut pas être vide. ' + label, defName)
+      name = prompt('The name cannot be empty. ' + label, defName)
     } else if (names.has(clean.toLowerCase())) {
-      name = prompt(`Un projet « ${clean} » existe déjà (local ou GitHub). Choisis un autre nom :`, clean)
+      name = prompt(`A project "${clean}" already exists (locally or on GitHub). Choose another name:`, clean)
     } else {
       return clean
     }
@@ -1726,7 +1726,7 @@ async function forkExampleToProject(file) {
   await Store.saveProject(p)
   await autoPushNewProject(p)   // with a repository set, it is created on GitHub
   Store.setActiveId(p.id)
-  ctx.navigate('playground')   // quitte le mode exemple → re-montage en mode projet
+  ctx.navigate('playground')   // leaves example mode, remounting in project mode
 }
 
 // Init.
@@ -1784,13 +1784,13 @@ function setRunning(running) {
   isRunning = running
   if (running) {
     runBtn.classList.add('running')
-    runBtn.innerHTML = ICON_STOP + '<span class="btn-label"> Arrêter</span>'
+    runBtn.innerHTML = ICON_STOP + '<span class="btn-label"> Stop</span>'
     stopBtn.style.display = 'flex'
     stopBtn.disabled = false
     document.getElementById('kbar')?.classList.remove('show')   // no typing aid while the program runs
   } else {
     runBtn.classList.remove('running')
-    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Exécuter</span><kbd>Alt+↵</kbd>'
+    runBtn.innerHTML = ICON_RUN + '<span class="btn-label"> Run</span><kbd>Alt+↵</kbd>'
     stopBtn.style.display = 'none'
     stopBtn.disabled = true
     isPaused = false
@@ -1859,7 +1859,7 @@ function renderErrorWithLink(text) {
   const link = document.createElement('span')
   link.className = 'err-link'
   link.textContent = loc.str
-  link.title = 'Aller à la ligne fautive (F4)'
+  link.title = 'Go to the offending line (F4)'
   link.addEventListener('click', () => gotoError(loc))
   outputEl.appendChild(link)
   outputEl.appendChild(document.createTextNode(text.slice(loc.index + loc.str.length)))
@@ -1897,7 +1897,7 @@ let ollin = null
 function waitViewportRestored(timeout = 500) {
   const vv = window.visualViewport
   if (!vv || window.innerHeight - vv.height < 100)
-    return Promise.resolve()   // pas (plus) de clavier visible
+    return Promise.resolve()   // no visible keyboard (any more)
   return new Promise(resolve => {
     let done = false
     const finish = () => {
@@ -2020,7 +2020,7 @@ stopBtn.addEventListener('click', () => {
 function doFormat() {
   const r = Fmt.formatOllin(view.state.doc.toString())
   if (!r.ok) { setStatus('Formatage impossible : ' + r.error, true, true); return }
-  if (r.code === view.state.doc.toString()) { setStatus('Déjà formaté ✓', true); return }
+  if (r.code === view.state.doc.toString()) { setStatus('Already formatted ✓', true); return }
   const head = view.state.selection.main.head
   const oldLine = view.state.doc.lineAt(head)
   const contentCol = Math.max(0, head - oldLine.from - (oldLine.text.length - oldLine.text.trimStart().length))
@@ -2030,7 +2030,7 @@ function doFormat() {
   const newIndent = nl.text.length - nl.text.trimStart().length
   view.dispatch({ selection: { anchor: Math.min(nl.from + newIndent + contentCol, nl.to) }, scrollIntoView: true })
   view.focus()
-  setStatus('Code formaté ✓', true)
+  setStatus('Code formatted ✓', true)
 }
 document.getElementById('format-btn').addEventListener('click', doFormat)
 
@@ -2040,7 +2040,7 @@ const ICON_COPY = ICONS.copy   // shared (cm-shared.js)
 const ICON_OK   = ICONS.ok
 copyBtn.addEventListener('click', () => {
   navigator.clipboard.writeText(view.state.doc.toString()).then(() => {
-    copyBtn.innerHTML = ICON_OK + '<span class="btn-label"> Copié !</span>'
+    copyBtn.innerHTML = ICON_OK + '<span class="btn-label"> Copied!</span>'
     copyBtn.style.color        = 'var(--green)'
     copyBtn.style.borderColor  = 'var(--green)'
     setTimeout(() => {
@@ -2079,7 +2079,7 @@ const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&
 // On macOS, CodeMirror maps Ctrl to ⌘ (the Mod- spec), so we show the Mac symbols (⌘ ⌥ ⇧) for the
 // help to match the real keys. Elsewhere it is Ctrl, Alt and Shift.
 const IS_MAC = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '')
-const osKey = k => IS_MAC ? k.replace(/Ctrl\+?/g, '⌘').replace(/Alt\+?/g, '⌥').replace(/Maj\+?/g, '⇧') : k
+const osKey = k => IS_MAC ? k.replace(/Ctrl\+?/g, '⌘').replace(/Alt\+?/g, '⌥').replace(/Shift\+?/g, '⇧') : k
 function renderHelp() {
   const body = document.getElementById('help-body')
   if (!body) return
@@ -2157,7 +2157,7 @@ const statusEl = document.getElementById('status')
 getOllin().then(m => {
   ollin              = m
   runBtn.disabled    = false
-  statusEl.textContent = 'Prêt ✓'
+  statusEl.textContent = 'Ready ✓'
   setTimeout(() => { statusEl.textContent = '' }, 2000)
 }).catch(err => {
   statusEl.textContent = 'Erreur WASM : ' + (err?.message ?? err)

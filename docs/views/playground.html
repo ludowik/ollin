@@ -1,7 +1,7 @@
-<!-- Vue PLAYGROUND — fragment monté par app.js dans #view.
-     <style> actif seulement monté (innerHTML remplacé → auto-nettoyé).
-     Le <canvas> est partagé (shell) : app.js le range/rend ; playground.js
-     le reparente dans #output-pane à l'init. -->
+<!-- The PLAYGROUND view — a fragment mounted by app.js into #view.
+     The <style> is active only while mounted (innerHTML is replaced, so it cleans itself up).
+     The <canvas> is shared, owned by the shell: app.js parks and yields it, and playground.js
+     reparents it into #output-pane on init. -->
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -13,11 +13,11 @@
   --text:    #dde4ef;
   --dim:     #a3adc4;
   --accent:  #9ba1ff;
-  /* Encre posée SUR une surface accentuée : l'accent est clair pour ressortir du fond
-     sombre, si bien que du blanc dessus ne donnait que 2,4:1 — illisible. */
+  /* Ink laid ON an accented surface: the accent is light so as to stand out from the dark
+     background, so white on top of it gave only 2.4:1 — unreadable. */
   --accent-ink: #0f1117;
-  /* Contour d'un élément INTERACTIF (bouton, champ, sélecteur), à distinguer de --border
-     qui ne sépare que des zones : 3,6:1 contre la surface, comme l'exige un composant. */
+  /* The outline of an INTERACTIVE element (button, field, selector), to be told apart from
+     --border, which only separates areas: 3.6:1 against the surface, as a component requires. */
   --border-strong: #6b70ab;
   --green:   #4ade80;
   --red:     #f87171;
@@ -26,38 +26,38 @@
   --mono:    'JetBrains Mono','Fira Code','Cascadia Code',Consolas,monospace;
 }
 
-/* min-height:0 neutralise le `min-height:100vh` du shell (index.html) : sur
-   mobile 100vh = viewport LARGE (> zone visible sous la barre dynamique du
-   navigateur), ce qui rendrait le body plus haut que l'écran → la fenêtre
-   défilerait et la barre d'outils s'échapperait vers le haut. overflow:hidden +
-   body en flex colonne : la toolbar reste calée en haut, seul l'intérieur défile. */
+/* min-height:0 cancels the shell's `min-height:100vh` (index.html): on mobile, 100vh is the
+   LARGE viewport, taller than the area visible under the browser's dynamic bar, which would
+   make the body taller than the screen — the window would then scroll and the toolbar would
+   escape upwards. overflow:hidden plus a column flex body keeps the toolbar wedged at the top,
+   and only the inside scrolls. */
 html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-/* position:fixed : sort l'app du flux de defilement. Sans ca, sur mobile,
-   l'ouverture du clavier (focus de l'editeur) fait defiler la page vers le haut
-   pour garder le curseur visible — ce que overflow:hidden n'empeche pas (scroll
-   initie par le navigateur, pas par l'utilisateur). Epingle a la fenetre, la
-   barre d'outils reste calee en haut ; le clavier recouvre simplement le bas. */
+/* position:fixed takes the app out of the scrolling flow. Without it, on mobile, opening the
+   keyboard (focusing the editor) scrolls the page upwards to keep the caret visible — which
+   overflow:hidden does not prevent, the scroll being started by the browser and not by the
+   user. Pinned to the window, the toolbar stays wedged at the top; the keyboard simply covers
+   the bottom. */
 body { display: flex; flex-direction: column; position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
-/* touch-action:none sur les zones NON defilantes (barre d'outils, en-tetes de la
-   colonne de fichiers, gouttiere). Un glissement partant d'une de ces zones n'a
-   pas d'ancetre scrollable → sinon iOS fait rebondir/panoramiquer toute la fenetre.
-   On le pose DIRECTEMENT sur ces elements (touch-action ne s'herite pas) : un geste
-   qui y demarre est bloque, sans affecter les panneaux editeur/sortie qui defilent
-   normalement (ce ne sont pas leurs descendants). */
+/* touch-action:none on the NON-scrolling areas (the toolbar, the file column's headers, the
+   gutter). A drag starting in one of those has no scrollable ancestor, and iOS would otherwise
+   bounce or pan the whole window.
+   It is set DIRECTLY on those elements (touch-action is not inherited): a gesture starting
+   there is blocked, without affecting the editor and output panes, which scroll normally,
+   since they are not their descendants. */
 #toolbar, .rail-head, #divider { touch-action: none; }
 
-/* Saisie mobile (clavier ouvert) : la barre d'outils remonte/disparaît pour agrandir
-   l'éditeur. Réactivée dès la fermeture du clavier (classe posée par playground.js). */
+/* Mobile typing, with the keyboard open: the toolbar slides away to enlarge the editor.
+   Brought back as soon as the keyboard closes (the class is set by playground.js). */
 body.kbd-editing #toolbar { display: none; }
 
 /* ── toolbar ─────────────────────────────────────────────────────────────── */
-/* Apparence : app-bar.css (commun aux trois vues).
-   PAS d'overflow ici : overflow-x:auto forcerait overflow-y:auto et rognerait le menu
-   déroulant (positionné sous la barre). Le mode icônes-seules (@media ≤1080px) suffit
-   à tout faire tenir. */
+/* Appearance: app-bar.css, common to the three views.
+   NO overflow here: overflow-x:auto would force overflow-y:auto and clip the drop-down menu,
+   which is positioned below the bar. The icons-only mode (@media ≤1080px) is enough to fit
+   everything. */
 
-/* Toolbar large mais fenêtre étroite : boutons en icônes seules pour tout garder
-   visible (dont Exécuter/Pause) bien avant le passage en layout mobile. */
+/* A wide toolbar in a narrow window: icons-only buttons keep everything visible (Run and Pause
+   included) well before the switch to the mobile layout. */
 @media (max-width: 1080px) {
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
@@ -83,7 +83,7 @@ body.kbd-editing #toolbar { display: none; }
 
 #status { font-size: 12px; color: var(--dim); }
 
-/* Bascule « Auto » (relance automatique) — révélée par JS (toutes cibles). */
+/* The "Auto" toggle (automatic re-run) — revealed by JS, on every target. */
 #autoexec-wrap { user-select: none; }
 #autoexec-wrap input { margin: 0; width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
 #autoexec-wrap.on { border-color: var(--accent); color: var(--accent); }
@@ -92,7 +92,7 @@ body.kbd-editing #toolbar { display: none; }
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 32px;   /* alignée sur les boutons de barre (app-bar.css) */
+  height: 32px;   /* aligned with the bar buttons (app-bar.css) */
   background: var(--accent);
   color: var(--accent-ink);
   border: 1px solid transparent;
@@ -117,7 +117,7 @@ body.kbd-editing #toolbar { display: none; }
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 32px;   /* alignée sur les boutons de barre (app-bar.css) */
+  height: 32px;   /* aligned with the bar buttons (app-bar.css) */
   background: transparent;
   border: 1px solid var(--red);
   color: var(--red);
@@ -144,8 +144,8 @@ body.kbd-editing #toolbar { display: none; }
 /* ── layout ──────────────────────────────────────────────────────────────── */
 #layout {
   display: flex;
-  flex: 1;            /* remplit l'espace sous la toolbar (body en flex colonne) */
-  min-height: 0;      /* autorise les panneaux internes à défiler, pas la fenêtre */
+  flex: 1;            /* fills the space under the toolbar (a column flex body) */
+  min-height: 0;      /* lets the inner panes scroll, rather than the window */
 }
 
 #editor-pane {
@@ -169,14 +169,14 @@ body.kbd-editing #toolbar { display: none; }
 #editor-wrap .cm-editor { height: 100%; border-radius: 0; border: none; }
 #editor-wrap .cm-scroller { height: 100%; overflow: auto; }
 
-/* Barre de défilement de l'éditeur : fond (piste) transparent, barre blanche. */
+/* The editor's scrollbar: a transparent track and a white bar. */
 #editor-wrap .cm-scroller { scrollbar-width: thin; scrollbar-color: #ffffff transparent; }
 #editor-wrap .cm-scroller::-webkit-scrollbar { width: 10px; height: 10px; background: transparent; }
 #editor-wrap .cm-scroller::-webkit-scrollbar-track { background: transparent; }
 #editor-wrap .cm-scroller::-webkit-scrollbar-corner { background: transparent; }
 #editor-wrap .cm-scroller::-webkit-scrollbar-thumb {
   background: #ffffff; border-radius: 5px;
-  border: 2px solid transparent; background-clip: padding-box;   /* léger retrait → barre fine détachée des bords */
+  border: 2px solid transparent; background-clip: padding-box;   /* a slight inset, so the thin bar stands off the edges */
 }
 
 #output-pane {
@@ -204,7 +204,7 @@ body.kbd-editing #toolbar { display: none; }
 }
 #output.ok  { color: var(--green); font-style: normal; }
 #output.err { color: var(--red);   font-style: normal; }
-/* « fichier:ligne » cliquable dans un message d'erreur → va à la ligne fautive. */
+/* A clickable "file:line" in an error message jumps to the offending line. */
 #output .err-link { text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-weight: 600; }
 #output .err-link:hover { background: rgba(255,255,255,0.08); border-radius: 3px; }
 
@@ -223,27 +223,27 @@ canvas#canvas {
   position: relative;
 }
 #divider:hover, #divider.dragging { background: var(--accent); }
-/* Zone de préhension élargie (invisible) : le trait reste fin (5px) mais la cible
-   tactile déborde de 20px du CÔTÉ ÉDITEUR uniquement → saisissable au doigt (iPad…)
-   sans grignoter la surface d'entrée du canvas (côté sortie laissé à ras). Le divider
-   (sibling postérieur à l'éditeur) peint au-dessus de lui sans z-index. En colonne
-   (mobile), l'éditeur est au-dessus → le débord passe sur le haut. */
+/* A widened (invisible) grip area: the line stays thin, 5px, but the touch target extends
+   20px on the EDITOR SIDE only, so it can be grabbed with a finger (an iPad…) without
+   eating into the canvas's input surface, the output side being left flush. The divider,
+   a later sibling of the editor, paints over it with no z-index. In column layout
+   (mobile) the editor is above, so the overhang goes over its top. */
 #divider::before {
   content: ''; position: absolute; top: 0; bottom: 0; left: -20px; right: 0;
 }
 
-/* ── barre d'aide à la saisie (symboles, tactile) ──────────────────────────── */
+/* ── the typing helper bar (symbols, touch) ────────────────────────────────── */
 #kbar {
-  display: none;               /* affichée par JS (.show) au focus de l'éditeur, tactile only */
+  display: none;               /* shown by JS (.show) when the editor takes focus, touch only */
   flex: none;
   align-items: center;
-  justify-content: flex-end;   /* touches cadrées à droite */
+  justify-content: flex-end;   /* keys aligned to the right */
   gap: 6px;
   padding: 3px 8px;
   background: var(--surface);
   border-top: 1px solid var(--border);
   overflow-x: auto;
-  touch-action: pan-x;         /* défilement horizontal de la barre ; pas de pan de la fenêtre */
+  touch-action: pan-x;         /* the bar scrolls horizontally; the window does not pan */
   -webkit-overflow-scrolling: touch;
 }
 #kbar.show { display: flex; }
@@ -262,11 +262,11 @@ canvas#canvas {
   cursor: pointer;
 }
 .kbar-key:active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-/* Bouton Exécuter : poussé à l'extrême droite (margin auto), accent — la barre
-   d'outils étant masquée en saisie, il permet de lancer sans fermer le clavier. */
+/* The Run button: pushed to the far right (margin auto) and accented — the toolbar being
+   hidden while typing, it allows running without closing the keyboard. */
 .kbar-run { margin-left: auto; background: var(--accent); color: var(--accent-ink); border-color: transparent; padding: 5px 14px; }
 
-/* ── Popup d'aide (raccourcis) ──────────────────────────────────────────────── */
+/* ── the help popup (shortcuts) ─────────────────────────────────────────────── */
 #help-overlay {
   position: fixed;
   inset: 0;
@@ -334,20 +334,20 @@ canvas#canvas {
 }
 .help-keys .plus { color: var(--dim); font-size: 11px; margin: 0 2px; }
 
-/* ── bascule barre latérale ───────────────────────────────────────────────── */
-/* Bouton de barre à icône seule (app-bar.css) ; ne reste ici que l'état « actif ». */
+/* ── the sidebar toggle ────────────────────────────────────────────────────── */
+/* An icon-only bar button (app-bar.css); only the "active" state is left here. */
 #rail-toggle.active { color: var(--bar-accent); border-color: var(--bar-accent); }
 
-/* ── menu Projet (drill-down) ─────────────────────────────────────────────── */
+/* ── the Project menu (drill-down) ─────────────────────────────────────────── */
 #project-wrap { position: relative; }
-/* Bouton de barre (app-bar.css) au FOND PLEIN : il ouvre un menu et porte la pastille
-   de synchro, d'où sa mise en avant ; sa taille reste celle des autres. */
+/* A bar button (app-bar.css) with a SOLID BACKGROUND: it opens a menu and carries the sync
+   badge, hence its prominence; its size stays that of the others. */
 #project-btn { background: var(--surface2); color: var(--text); padding: 0 10px; }
 #project-btn { position: relative; }
 #project-btn:hover:not(:disabled) { border-color: var(--accent); }
 #project-btn:disabled { opacity: 0.5; cursor: default; }
-/* pastille d'état de synchro GitHub (persistante, visible mobile+PC) :
-   bleu = local à pousser (dirty) · vert = synchronisé */
+/* The GitHub sync badge (persistent, shown on mobile and desktop):
+   blue = local changes to push (dirty) · green = in sync */
 #project-btn.sync-local::after,
 #project-btn.sync-syncing::after,
 #project-btn.sync-ok::after {
@@ -380,10 +380,10 @@ canvas#canvas {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
   background: transparent; border: none; color: var(--text); text-align: left;
   padding: 9px 10px; font-size: 13px; border-radius: 6px; cursor: pointer;
-  /* La classe sert aussi à des <a> (liens externes) : sans ça ils seraient soulignés. */
+  /* The class also serves <a> elements (external links): without this they would be underlined. */
   text-decoration: none;
 }
-/* Un nom de dépôt long passait sur deux lignes en écran étroit : une ligne, coupée au besoin. */
+/* A long repository name used to wrap onto two lines on a narrow screen: one line, clipped if need be. */
 .menu-item > span:first-child {
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
@@ -412,11 +412,11 @@ canvas#canvas {
 .menu-btn:disabled { opacity: 0.6; cursor: default; }
 .menu-err { font-size: 11.5px; color: var(--red); }
 
-/* ── liste latérale de fichiers ───────────────────────────────────────────── */
+/* ── the side list of files ────────────────────────────────────────────────── */
 #editor-main { flex: 1; min-height: 0; display: flex; }
 #editor-wrap { flex: 1; min-width: 0; }
 
-/* ── aperçu d'une ressource (à la place de l'éditeur) ─────────────────────── */
+/* ── a resource preview (in the editor's place) ────────────────────────────── */
 #res-view {
   flex: 1; min-width: 0; min-height: 0; overflow: auto;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
@@ -428,7 +428,7 @@ canvas#canvas {
 }
 #res-view .res-name { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
 #res-view .res-sp { flex: 1; }
-/* Damier : sans lui, une image à fond transparent se confondrait avec le panneau. */
+/* The checkerboard: without it, an image with a transparent background would blend into the panel. */
 #res-view .res-frame {
   max-width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px;
   background-color: #1b1b22;
@@ -442,7 +442,7 @@ canvas#canvas {
   width: 172px; flex-shrink: 0; display: flex; flex-direction: column;
   background: var(--surface); border-right: 1px solid var(--border); overflow: hidden;
 }
-#file-rail.rail-hidden { display: none; }   /* fermé dès le 1er rendu (pas de flash) */
+#file-rail.rail-hidden { display: none; }   /* closed from the first render, so there is no flash */
 .rail-head {
   display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
   padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--dim);
@@ -489,14 +489,14 @@ canvas#canvas {
   #divider { width: 100%; height: 6px; cursor: row-resize; }
   #divider::before { top: -20px; bottom: 0; left: 0; right: 0; }
 
-  /* Police réduite — maximum-scale=1.0 dans le viewport empêche le zoom iOS */
+  /* A smaller font — maximum-scale=1.0 in the viewport prevents iOS from zooming */
   #editor-wrap .cm-editor  { font-size: 12px; }
   #editor-wrap .cm-content { font-size: 12px; }
   /* Scroll horizontal fluide sur iOS */
   #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-  /* Barre compacte : le resserrement est commun (app-bar.css) ; ici, ce qui est propre
-     au playground — libellés, raccourci et état effacés, bouton Exécuter resserré. */
+  /* A compact bar: the tightening is common (app-bar.css); what is specific to the
+     playground lives here — labels, shortcut and status hidden, and a tighter Run button. */
   .btn-label { display: none; }
   #run-btn kbd { display: none; }
   #status { display: none; }
@@ -506,46 +506,46 @@ canvas#canvas {
 
 <div id="toolbar" class="app-bar">
   <a href="#/tutoriel" class="bar-logo">Ollin</a>
-  <button id="rail-toggle" class="bar-btn icon-only" title="Afficher / masquer les fichiers">
+  <button id="rail-toggle" class="bar-btn icon-only" title="Show / hide the files">
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg>
   </button>
   <div id="project-wrap">
-    <button id="project-btn" class="bar-btn" title="Projets" disabled aria-haspopup="true" aria-expanded="false">
+    <button id="project-btn" class="bar-btn" title="Projects" disabled aria-haspopup="true" aria-expanded="false">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1.5 4.5A1 1 0 012.5 3.5H6l1.5 1.5H13.5a1 1 0 011 1v6a1 1 0 01-1 1h-11a1 1 0 01-1-1z"/></svg>
-      <span id="project-label" class="btn-label">Projet</span>
+      <span id="project-label" class="btn-label">Project</span>
       <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M3 6l5 5 5-5z"/></svg>
     </button>
     <div id="project-menu" role="menu"></div>
   </div>
   <div class="spacer"></div>
-  <span id="status">Chargement…</span>
-  <button id="reload-btn" class="bar-btn" title="Recharger en vidant le cache (récupère le dernier WASM ; le code est conservé)">
+  <span id="status">Loading…</span>
+  <button id="reload-btn" class="bar-btn" title="Reload with an empty cache (fetches the latest WASM; the code is kept)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
-    <span class="btn-label">Recharger</span>
+    <span class="btn-label">Reload</span>
   </button>
-  <button id="format-btn" class="bar-btn" title="Reformater le code (indentation) — Alt+Maj+F">
+  <button id="format-btn" class="bar-btn" title="Reformat the code (indentation) - Alt+Shift+F">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3.5h12M6 6.5h8M6 9.5h8M2 12.5h12"/></svg>
-    <span class="btn-label">Formater</span>
+    <span class="btn-label">Format</span>
   </button>
-  <button id="copy-btn" class="bar-btn" title="Copier le code">
+  <button id="copy-btn" class="bar-btn" title="Copy the code">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-    <span class="btn-label">Copier</span>
+    <span class="btn-label">Copy</span>
   </button>
-  <label id="autoexec-wrap" class="bar-btn" title="Relance automatique 2 s après la dernière modification" style="display:none">
+  <label id="autoexec-wrap" class="bar-btn" title="Re-run automatically 2 s after the last edit" style="display:none">
     <input type="checkbox" id="autoexec-chk">
     <span class="btn-label">Auto</span>
   </label>
   <button id="run-btn" disabled>
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>
-    <span class="btn-label">Exécuter</span><kbd>Alt+↵</kbd>
+    <span class="btn-label">Run</span><kbd>Alt+↵</kbd>
   </button>
-  <button id="stop-btn" disabled title="Pause / Reprendre" style="display:none">
+  <button id="stop-btn" disabled title="Pause / Resume" style="display:none">
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="4" height="12" rx="1"/><rect x="10" y="2" width="4" height="12" rx="1"/></svg>
     <span class="btn-label">Pause</span>
   </button>
-  <button id="standalone-btn" class="bar-btn" title="Exécuter en plein écran dans une page dédiée">
+  <button id="standalone-btn" class="bar-btn" title="Run full screen, in a page of its own">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
-    <span class="btn-label">Plein écran</span>
+    <span class="btn-label">Full screen</span>
   </button>
 </div>
 
@@ -561,48 +561,48 @@ canvas#canvas {
         </div>
         <div class="rail-head">
           <span>Fichiers</span>
-          <button id="new-file-btn" title="Nouveau fichier">＋</button>
-        </div>
+          <span>Files</span>
+          <button id="new-file-btn" title="New file">＋</button>
         <div id="file-list"></div>
         <div class="rail-head rail-head-res">
           <span>Ressources</span>
-          <button id="new-res-btn" title="Ajouter une image">＋</button>
-        </div>
+          <span>Resources</span>
+          <button id="new-res-btn" title="Add an image">＋</button>
         <div id="res-list"></div>
         <input type="file" id="img-file-input" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,.obj,.glb,.gltf" multiple style="display:none">
       </aside>
       <div id="editor-wrap"></div>
-      <!-- Aperçu d'une ressource : prend la place de l'éditeur (même parent, même flex). -->
+      <!-- A resource preview: it takes the editor's place (same parent, same flex). -->
       <div id="res-view" style="display:none"></div>
     </div>
   </div>
   <div id="divider" style="display:none"></div>
   <div id="output-pane" style="display:none">
-    <div id="output">Prêt.</div>
+    <div id="output">Ready.</div>
   </div>
 </div>
 
-<!-- Barre d'aide à la saisie (symboles) — affichée par JS au focus de l'éditeur
-     sur appareil tactile. Dernier enfant → bas de l'app = juste au-dessus du
-     clavier (grâce au calage visualViewport). data-ins = texte inséré,
-     data-back = recul du curseur (paires : curseur entre les deux). -->
+<!-- The typing helper bar (symbols) — shown by JS when the editor takes focus on a touch
+     device. The last child, so the bottom of the app is just above the keyboard (thanks to
+     the visualViewport alignment). data-ins = the text inserted,
+     data-back = how far the caret steps back (pairs: the caret sits between the two). -->
 <div id="kbar" aria-hidden="true">
   <button class="kbar-key" data-ins="()" data-back="1">(</button>
   <button class="kbar-key" data-ins="[]" data-back="1">[</button>
   <button class="kbar-key" data-ins="{}" data-back="1">{</button>
   <button class="kbar-key" data-ins="=" data-back="0">=</button>
-  <button class="kbar-key" data-move="-1" aria-label="Curseur à gauche">←</button>
-  <button class="kbar-key" data-move="1" aria-label="Curseur à droite">→</button>
-  <button class="kbar-key kbar-run" data-run="1" aria-label="Exécuter">▶</button>
+  <button class="kbar-key" data-move="-1" aria-label="Caret left">←</button>
+  <button class="kbar-key" data-move="1" aria-label="Caret right">→</button>
+  <button class="kbar-key kbar-run" data-run="1" aria-label="Run">▶</button>
 </div>
 
-<!-- Popup d'aide : raccourcis clavier. Ouverte par le bouton « Aide » ou F1.
-     Le contenu (#help-body) est rendu par JS depuis la liste SHORTCUTS. -->
+<!-- The help popup: keyboard shortcuts. Opened by the "Help" button or F1.
+     Its content (#help-body) is rendered by JS from the SHORTCUTS list. -->
 <div id="help-overlay" hidden>
   <div id="help-modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="help-head">
-      <h2 id="help-title">Raccourcis clavier</h2>
-      <button id="help-close" title="Fermer (Échap)" aria-label="Fermer">✕</button>
+      <h2 id="help-title">Keyboard shortcuts</h2>
+      <button id="help-close" title="Close (Esc)" aria-label="Close">✕</button>
     </div>
     <div id="help-body"></div>
   </div>
