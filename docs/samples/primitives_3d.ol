@@ -1,18 +1,18 @@
-## Primitives 3D : cube, sphère, cylindre, plan, ligne, point, cône, tore.
-## Glisse pour faire tourner chaque primitive sur elle-même.
+## The 3D primitives: cube, sphere, cylinder, plane, line, point, cone, torus.
+## Drag to spin each primitive on itself.
 
-## La rotation à la souris vit dans trackball.ol (bibliothèque partagée par les
-## exemples 3D) : l'hôte lui relaie les trois callbacks souris.
+## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
+## relays the three mouse callbacks to it.
 import "trackball.ol"
 global ball = Trackball()
 global cam = graphics.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
 
-## Grille adaptée à l'orientation : paysage = 4×2, portrait = 2×4
+## A grid suited to the orientation: 4x2 in landscape, 2x4 in portrait
 ## cellPos(col, row, cols, rows) → [x, z] dans le plan XZ (vue ortho iso, size=16)
-## Convertit une position de grille (col, row) en coordonnées monde XZ
-## pour la caméra iso à (12,12,12)→(0,0,0) :
+## Converts a grid position (col, row) into world XZ coordinates for the isometric camera
+## looking from (12,12,12) at (0,0,0):
 ##   screen_x = (wx - wz) / √2  ;  screen_y = (-wx - wz) / √6  (avec wy=0)
-## On inverse ce système pour obtenir wx, wz à partir de la cible écran.
+## We invert that system to get wx and wz from the target on screen.
 func cellPos(col, row, cols, rows)
     var size  = 16.0
     var aspect = W / H
@@ -31,7 +31,7 @@ func setup()
     graphics.light("dir", -1, -2, -0.5)
 end
 
-## Souris ET tactile : sur le web, le doigt pilote le pointeur → mêmes callbacks.
+## Mouse AND touch: on the web a finger drives the pointer, hence the same callbacks.
 func mouse.pressed(x, y)
     ball.press(x, y)
 end
@@ -47,8 +47,8 @@ end
 func draw()
     graphics.clear(Color(0.08, 0.08, 0.12))
 
-    ## Paysage 4×2 : cube sphère cylindre plan / lignes cône tore (vide)
-    ## Portrait 2×4 : cube sphère / cylindre plan / lignes cône / tore (vide)
+    ## Landscape 4x2: cube sphere cylinder plane / lines cone torus (empty)
+    ## Portrait 2x4: cube sphere / cylinder plane / lines cone / torus (empty)
     var cols = 4
     var rows = 2
     if H > W then
@@ -75,7 +75,7 @@ func draw()
             graphics.cube(0, 0, 0,  2, 2, 2)
         graphics.pop()
 
-        ## Sphère (idx 1)
+        ## The sphere, index 1
         p = cellPos(gc(1), gr(1), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -129,7 +129,7 @@ func draw()
             graphics.noStroke()
         graphics.pop()
 
-        ## Cône (idx 5)
+        ## The cone, index 5
         p = cellPos(gc(5), gr(5), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -147,7 +147,7 @@ func draw()
             graphics.torus(0, 0, 0,  1.1, 0.4)
         graphics.pop()
 
-        ## segments(8) — même sphère, basse définition (idx 7)
+        ## segments(8): the same sphere at a low resolution, index 7
         p = cellPos(gc(7), gr(7), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -159,7 +159,7 @@ func draw()
 
     graphics.end3d()
 
-    ## Labels 2D — fond blanc, texte noir, centrés sur la cellule
+    ## The 2D labels: a white background, black text, centred on the cell
     var fs = 13
     var pad = 4
     var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(6)"]

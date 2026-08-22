@@ -1,4 +1,4 @@
-## Capture webcam en temps réel — niveau de gris
+## Live webcam capture, in greyscale
 
 graphics.canvas(640, 480)
 

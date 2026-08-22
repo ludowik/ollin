@@ -1,12 +1,12 @@
 ## Joystick analogique tactile RÉUTILISABLE — zone CIRCULAIRE, neutre au centre.
 ##
-## Un doigt posé DANS le disque arme le contrôle et le garde actif même s'il en sort
-## (valeurs clampées). Le neutre est le CENTRE du disque :
-##   steer()    → [-1;1]  décalage horizontal au centre (<0 = gauche, >0 = droite)
-##   throttle() → [-1;1]  décalage vertical au centre   (>0 = avant, <0 = arrière)
+## A finger placed INSIDE the disc arms the control and keeps it active even if it leaves, the
+## values being clamped. The neutral point is the disc's CENTRE:
+##   steer()    in [-1;1], the horizontal offset from the centre (below 0 left, above 0 right)
+##   throttle() in [-1;1], the vertical offset from the centre (above 0 forward, below 0 back)
 ##
-## Câblage côté programme hôte (les callbacks mouse.* sont GLOBAUX au moteur, un
-## module ne peut pas les capter lui-même → 3 relais + un draw) :
+## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
+## module cannot catch them itself, hence three relays plus a draw:
 ##
 ##   import "joystick.ol"
 ##   global pad = Joystick()
@@ -14,15 +14,15 @@
 ##   func mouse.moved(x, y)    pad.move(x, y)   end
 ##   func mouse.released(x, y) pad.release()    end
 ##   ## dans draw() : yaw -= pad.steer() * VITESSE_ROT * deltaTime
-##   ##              avancer de  pad.throttle() * VITESSE * deltaTime  (négatif = arrière)
-##   ## et à la fin : pad.draw()
+##   ##              move by  pad.throttle() * SPEED * deltaTime  (negative goes backwards)
+##   ## and at the end: pad.draw()
 
 class Joystick
     func init()
-        self.active = false       ## armé (doigt posé dans le disque), reste vrai s'il en sort
+        self.active = false       ## armed, a finger being down inside the disc; it stays true if the finger leaves
         self.px = 0               ## position courante du doigt
         self.py = 0
-        self.centerFrac = 0.72   ## centre (neutre) vertical, fraction de H (abaissé)
+        self.centerFrac = 0.72   ## the vertical centre, the neutral point, as a fraction of H, lowered
         self.radiusFrac = 0.22   ## rayon du disque, fraction de H (agrandi)
         self.dead = 0.10          ## zone morte (neutre) autour du centre, fraction du rayon
     end
@@ -42,7 +42,7 @@ class Joystick
         self.py = y
         var dx = x - self.cx()
         var dy = y - self.cy()
-        self.active = (dx * dx + dy * dy) <= self.radius() * self.radius()   ## armé si DANS le disque
+        self.active = (dx * dx + dy * dy) <= self.radius() * self.radius()   ## armed when INSIDE the disc
     end
     func move(x, y)
         self.px = x
@@ -52,7 +52,7 @@ class Joystick
         self.active = false
     end
 
-    ## Zone morte au centre + remise à l'échelle : 0 dans la zone morte, ±1 au bord.
+    ## A dead zone at the centre, then a rescale: 0 inside the dead zone, ±1 at the edge.
     func shape(v)
         if v > 0 - self.dead and v < self.dead then
             return 0.0
@@ -64,7 +64,7 @@ class Joystick
         return sign * math.clamp((math.abs(v) - self.dead) / (1.0 - self.dead), 0.0, 1.0)
     end
 
-    ## Virage ∈ [-1;1] : décalage horizontal du doigt au centre.
+    ## Steering in [-1;1]: the finger's horizontal offset from the centre.
     func steer()
         if not self.active or W <= 0 then
             return 0.0
@@ -72,7 +72,7 @@ class Joystick
         return self.shape((self.px - self.cx()) / self.radius())
     end
 
-    ## Poussée ∈ [-1;1] : décalage vertical au centre (haut = avant, bas = arrière).
+    ## Throttle in [-1;1]: the vertical offset from the centre, up being forward and down back.
     func throttle()
         if not self.active or H <= 0 then
             return 0.0
@@ -86,11 +86,11 @@ class Joystick
         var r = self.radius()
         graphics.noStroke()
         graphics.fill(Color(1, 1, 1, 0.06))
-        graphics.circle(cx, cy, r)                    ## zone circulaire (reflète le fonctionnement réel)
+        graphics.circle(cx, cy, r)                    ## the circular area, which mirrors how it really works
         graphics.fill(Color(1, 1, 1, 0.16))
-        graphics.circle(cx, cy, r * self.dead + 4)    ## repère du neutre au centre
+        graphics.circle(cx, cy, r * self.dead + 4)    ## the marker of the neutral point, at the centre
         if self.active then
-            ## pouce bridé au bord du disque (comme un vrai stick)
+            ## the thumb is held at the disc's edge, as a real stick would be
             var dx = self.px - cx
             var dy = self.py - cy
             var d = math.sqrt(dx * dx + dy * dy)

@@ -1,9 +1,9 @@
-## Caméra isométrique interactive.
+## An interactive isometric camera.
 ## Glisse pour orbiter · Molette / pinch pour zoomer · Double-clic pour recentrer.
 
 global ISO_DIST  = 18.0      ## rayon d'orbite
-global ISO_H     = 14.0      ## hauteur de la caméra
-global ISO_SIZE  = 14.0      ## unités visibles en hauteur
+global ISO_H     = 14.0      ## the camera's height
+global ISO_SIZE  = 14.0      ## the units visible vertically
 global ISO_ANGLE = 0.785     ## angle initial ≈ 45°
 
 global cam    = graphics.cameraOrtho(0, ISO_H, ISO_DIST,  0, 0, 0,  ISO_SIZE)
@@ -13,7 +13,7 @@ global lastx    = 0
 global lasty    = 0
 
 func setup()
-    graphics.canvas(W, H, "Caméra isométrique")
+    graphics.canvas(W, H, "Isometric camera")
     graphics.ambient(0.3)
     graphics.light("dir", -1, -2, -0.5)
 end
@@ -49,7 +49,7 @@ func mouse.doubleClicked(x, y)
     cam.orbit(angle, ISO_DIST, ISO_H)
 end
 
-## Décalages en damier pour rendre la grille plus lisible
+## Checkerboard offsets, which make the grid easier to read
 func checkerColor(x, z)
     if (x + z) % 2 == 0 then
         return Color(0.72, 0.70, 0.65)
@@ -71,7 +71,7 @@ func draw()
             end
         end
 
-        ## Bâtiments de hauteurs variées
+        ## Buildings of varied heights
         var bldgs = [
             [-2,  0, 1.2, 3.0, Color(0.85, 0.38, 0.22)],
             [ 1,  1, 1.0, 2.0, Color(0.30, 0.60, 0.80)],
@@ -87,7 +87,7 @@ func draw()
             graphics.cube(b[1], b[4] / 2, b[2],  b[3], b[4], b[3])
         end
 
-        ## Sphère animée qui orbite au-dessus de la scène
+        ## An animated sphere orbiting above the scene
         var t   = elapsedTime * 0.8
         var sx  = math.cos(t) * 3.2
         var sz  = math.sin(t) * 3.2
@@ -95,7 +95,7 @@ func draw()
         graphics.fill(Color(1.0, 0.95, 0.40))
         graphics.sphere(sx, sy, sz,  0.55)
 
-        ## Ombre projetée (disque au sol, alpha)
+        ## A cast shadow: a disc on the ground, with alpha
         graphics.fill(Color(0.0, 0.0, 0.0, 0.30))
         graphics.cylinder(sx, 0.01, sz,  0.45, 0.02)
 

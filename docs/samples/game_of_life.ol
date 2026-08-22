@@ -3,18 +3,18 @@
 ## double tap = relance.
 
 const CELL = 8           ## px
-const STEP = 0.08        ## secondes entre deux générations
+const STEP = 0.08        ## seconds between two generations
 
-## Grille dérivée de la zone de rendu (W, H) → format libre. Double buffer alloué
-## une fois, échangé à chaque génération. Tableau plat 1-based : index = y*COLS + x + 1.
+## The grid derives from the render area (W, H), so any shape goes. The double buffer is
+## allocated once and swapped every generation. A flat 1-based array: index = y*COLS + x + 1.
 global COLS = 0
 global ROWS = 0
 global cells = []
 global back  = []
 global paused = false
-global acc = 0.0         ## accumulateur pour cadencer les générations
-global lastTap = -1.0   ## dernier appui (détection du double tap)
-global drawing = false   ## true entre appui et relâché → glisser = dessin
+global acc = 0.0         ## the accumulator that paces the generations
+global lastTap = -1.0   ## the last press, for detecting a double tap
+global drawing = false   ## true between press and release, so dragging draws
 
 func idx(x, y)
     return y * COLS + x + 1
@@ -34,8 +34,8 @@ func set(g, x, y)
     end
 end
 
-## Pose (dx, dy) autour de (ox, oy) après rotation o ∈ 1..4 → un motif dans les 4
-## orientations sans dupliquer les coordonnées.
+## Places (dx, dy) around (ox, oy) after a rotation o in 1..4, which gives a pattern in all four
+## orientations without duplicating the coordinates.
 func put(g, ox, oy, dx, dy, o)
     var rx = dx
     var ry = dy
@@ -73,8 +73,9 @@ func block(g, ox, oy, o)
     put(g, ox, oy, 1, 1, o)
 end
 
-## Canon à planeurs de Gosper : émet un planeur toutes les 30 générations.
-## Coordonnées relatives à plat [x0,y0, x1,y1, …], posées via set() (hors-champ ignoré).
+## Gosper's glider gun: it emits a glider every thirty generations.
+## Relative coordinates, laid out flat as [x0,y0, x1,y1, …] and placed through set(), which
+## ignores anything off the grid.
 func gun(g, ox, oy)
     var pts = [
         0, 4,  0, 5,  1, 4,  1, 5,
@@ -91,14 +92,14 @@ func gun(g, ox, oy)
     end
 end
 
-## Un canon + 5 à 10 motifs de base placés aléatoirement (type, position, orientation).
+## One gun plus five to ten basic patterns placed at random, by kind, position and orientation.
 func reset()
     cells = emptyGrid()
     back = emptyGrid()
     gun(cells, 2, 2)
     var count = math.randInt(5, 10)
     for i = 1, count do
-        var ox = math.randInt(2, COLS - 3)   ## marge de 2 : la rotation peut décaler de ±2
+        var ox = math.randInt(2, COLS - 3)   ## a margin of 2: the rotation can shift by up to two
         var oy = math.randInt(2, ROWS - 3)
         var kind = math.randInt(1, 3)
         var o = math.randInt(1, 4)
@@ -127,7 +128,7 @@ func neighbors(x, y)
     return n
 end
 
-## Génération suivante dans `back` (chaque case réécrite → pas de ré-init), puis échange.
+## The next generation goes into `back`, every cell being rewritten so no reset is needed, then the buffers are swapped.
 func step()
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
@@ -173,7 +174,7 @@ func mouse.pressed(x, y)
 end
 
 func mouse.moved(x, y)
-    if drawing then                             ## `drawing` évite de dessiner au simple survol desktop
+    if drawing then                             ## `drawing` keeps a mere desktop hover from drawing
         set(cells, x // CELL, y // CELL)
     end
 end
@@ -182,7 +183,7 @@ func mouse.released(x, y)
     drawing = false
 end
 
-## Cadence fixe : une génération tous les STEP, indépendamment du FPS.
+## A fixed pace: one generation every STEP, whatever the frame rate.
 func update(dt)
     if paused then
         return
@@ -199,7 +200,7 @@ const BLEU = Color(0.62, 0.80, 0.98)
 
 func draw()
     graphics.noStroke()
-    ## clear semi-transparent → légère traînée visuelle (la simulation, elle, reste exacte)
+    ## a semi-transparent clear leaves a slight visual trail; the simulation itself stays exact
     graphics.clear(Color(0.05, 0.06, 0.10, 0.45))
     graphics.fill(BLEU)
     for y = 0, ROWS - 1 do

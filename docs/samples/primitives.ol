@@ -1,5 +1,5 @@
-## Panorama des primitives 2D : une fonction par primitive, appelées depuis draw().
-## px/py/fs mettent tout à l'échelle de la fenêtre (dessin conçu pour 700x520).
+## A tour of the 2D primitives: one function per primitive, all called from draw().
+## px, py and fs scale everything to the window; the drawing was designed for 700x520.
 graphics.canvas(W, H, "Primitives")
 var g = graphics
 var t = 0
@@ -12,15 +12,15 @@ func px(v) return v * sx end
 func py(v) return v * sy end
 func fs(v) return v * ss end
 
-## Le canvas est en pixels PHYSIQUES : sur un mobile à 3 pixels par pixel CSS,
-## une police mise à l'échelle du dessin devient illisible. dpr donne le rapport,
-## et ft() garantit au moins la taille nominale telle qu'on la voit à l'écran.
+## The canvas is in PHYSICAL pixels: on a phone with three pixels per CSS pixel, a font scaled
+## with the drawing becomes unreadable. dpr gives the ratio, and ft() guarantees at least the
+## nominal size as it appears on screen.
 var dpr = W / window.width
 func ft(v) return math.max(v * ss, v * dpr) end
 
 var dim = Color(0.6, 0.65, 0.75)
 
-## Damier 8x8 construit pixel par pixel, pour la démonstration de spriteMode.
+## An 8x8 checkerboard built pixel by pixel, for the spriteMode demonstration.
 var tile = image.create(8, 8)
 image.beginPixels(tile)
 for y = 0, 7 do
@@ -34,7 +34,7 @@ for y = 0, 7 do
 end
 image.endPixels(tile)
 
-## Étiquette d'un bloc : coordonnées en unités du dessin, style commun à toutes.
+## A block's label: coordinates in the drawing's own units, and a style shared by all of them.
 func label(txt, x, y)
     g.stroke(dim)
     g.fontSize(ft(13))
@@ -76,7 +76,7 @@ end
 
 func demoPolyline()
     g.stroke(Color(0.5, 0.9, 1), fs(2))
-    ## Beaucoup de points rapprochés : la ligne brisée passe pour une courbe lisse.
+    ## Many close points: the polyline passes for a smooth curve.
     var wave = []
     for i = 0, 48 do
         wave[#wave+1] = px(30 + i * 3.375)
@@ -86,7 +86,7 @@ func demoPolyline()
     label("polyline", 30, 340)
 end
 
-## 5e argument de rect = rayon des coins, en pixels (borné à la moitié du petit côté)
+## rect's fifth argument is the corner radius, in pixels, clamped to half the shorter side
 func demoRoundRect()
     g.stroke(Color(0.9, 0.7, 1), fs(2))
     g.fill(Color(0.9, 0.7, 1, 0.22))
@@ -94,8 +94,8 @@ func demoRoundRect()
     label("rect arrondi", 120, 378)
 end
 
-## Même point d'ancrage (le point blanc), deux modes : à gauche x,y = coin supérieur
-## gauche, à droite x,y = centre. pushStyle isole le changement de mode.
+## The same anchor point, the white dot, in two modes: on the left x,y is the top-left corner, on
+## the right x,y is the centre. pushStyle keeps the change of mode local.
 func demoRectMode()
     var s = fs(34)
     g.pushStyle()
@@ -113,8 +113,8 @@ func demoRectMode()
     label("rectMode corner / center", 250, 388)
 end
 
-## circle/ellipse sont centrés par défaut, à l'inverse de rect : le mode coin
-## place ici le cercle en bas à droite du point d'ancrage.
+## circle and ellipse are centred by default, unlike rect: the corner mode puts the circle below
+## and to the right of the anchor point here.
 func demoEllipseMode()
     var r = fs(18)
     g.pushStyle()
@@ -185,7 +185,7 @@ func demoStrokeSize()
     label("strokeSize", 470, 48)
 end
 
-## Deux carrés imbriqués : le second hérite de la transformation du premier.
+## Two nested squares: the second inherits the first one's transform.
 func demoTransforms()
     g.push()
     do
@@ -211,8 +211,8 @@ func demoTransforms()
 end
 
 ## La police est un STYLE, comme fill ou fontSize : elle reste en place jusqu'au
-## prochain graphics.font, d'où le pushStyle qui rend la police précédente aux
-## démonstrations suivantes.
+## the next graphics.font, hence the pushStyle that gives the previous font back to the
+## demonstrations that follow.
 func demoText()
     label("text / font", 460, 300)
     g.pushStyle()

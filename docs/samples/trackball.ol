@@ -1,12 +1,12 @@
-## Rotation « trackball » RÉUTILISABLE — glisser à la souris ou au doigt fait tourner
-## une scène ou un objet, sans blocage de cardan (composition de quaternions).
+## A REUSABLE "trackball" rotation: dragging with the mouse or a finger turns a scene or an
+## object, with no gimbal lock, by composing quaternions.
 ##
-##   orient()  → quaternion d'orientation courant, à passer à graphics.rotateq
+##   orient()  gives the current orientation quaternion, to pass to graphics.rotateq
 ##   dragging  → vrai pendant un glissement (pour suspendre une rotation automatique)
-##   idle(degresParSeconde)  → rotation douce au repos, à appeler dans draw()
+##   idle(degreesPerSecond)  a gentle rotation at rest, to be called in draw()
 ##
-## Câblage côté programme hôte (les callbacks mouse.* sont GLOBAUX au moteur, un
-## module ne peut pas les capter lui-même → 3 relais) :
+## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
+## module cannot catch them itself, hence three relays:
 ##
 ##   import "trackball.ol"
 ##   global ball = Trackball()
@@ -21,9 +21,9 @@ class Trackball
         self.dragging = false
         self.lastx = 0
         self.lasty = 0
-        ## Degrés de rotation par pixel glissé. Le défaut ne s'applique qu'en l'ABSENCE
+        ## Degrees of rotation per pixel dragged. The default only applies in the ABSENCE
         ## d'argument : `or` prendrait aussi le dessus sur 0, qui fige volontairement la
-        ## rotation (zéro est faux en Ollin).
+        ## rotation (zero is false in Ollin).
         self.sensitivity = 0.5
         if sensitivity <> nil then
             self.sensitivity = sensitivity
@@ -52,8 +52,8 @@ class Trackball
         var dy = (y - self.lasty) * self.sensitivity
         self.lastx = x
         self.lasty = y
-        ## dx → rotation autour de Y, dy → autour de X ; composée À GAUCHE, donc dans le
-        ## repère de l'ÉCRAN : le glissement suit le doigt quelle que soit l'orientation.
+        ## dx turns around Y, dy around X; composed on the LEFT, hence in the SCREEN's frame,
+        ## so the drag follows the finger whatever the orientation.
         var spin = graphics.quatAxis(0, 1, 0, dx).mul(graphics.quatAxis(1, 0, 0, dy))
         self.q = spin.mul(self.q)
     end

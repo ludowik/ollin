@@ -1,38 +1,38 @@
-## Modèles externes (.obj et .glb) : cadrage automatique (modelSize + fitDistance →
+## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## toujours visible quel que soit le ratio) et rotation interactive par quaternion.
-## Glisse à la souris/au doigt pour tourner, sinon rotation douce automatique.
-## Le menu « Modèle » passe d'un objet à l'autre : un .obj porte sa seule géométrie
+## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
+## The "Model" menu switches from one object to the other: an .obj carries its geometry alone
 ## (le fill le teinte), un .glb embarque aussi sa texture (fill blanc = couleurs
-## d'origine). (Playground : ajoute ton fichier dans « Ressources » et complète la
+## its own colours). In the playground, add your file under "Resources" and extend the
 ## liste ci-dessous.)
 
-## La rotation à la souris vit dans trackball.ol (bibliothèque partagée par les
-## exemples 3D) : l'hôte lui relaie les trois callbacks souris.
+## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
+## relays the three mouse callbacks to it.
 import "trackball.ol"
 global ball = Trackball()
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 
-## Une entrée par modèle : tout ce qui change d'un objet à l'autre est ici, le reste
-## du programme n'en dépend pas.
+## One entry per model: everything that differs from one object to the next lives here, and the
+## rest of the program does not depend on it.
 global models = [
     {name: "Nœud (.obj)", file: "knot.obj", tint: colors.ORANGE, ambient: 0.25, margin: 1.15, height: 0.15},
-    {name: "Cube texturé (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12}
+    {name: "Textured cube (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12}
 ]
-global current = nil   ## entrée affichée
-global sz = nil       ## dimensions du modèle, pour le cadrage
+global current = nil   ## the entry on display
+global sz = nil       ## the model's dimensions, for the framing
 
 func choose(i)
     current = models[i]
-    ## graphics.model met le modèle en cache : le rappeler dans draw() ne recharge rien.
+    ## graphics.model caches the model, so calling it again in draw() reloads nothing.
     sz = graphics.modelSize(graphics.model(current.file))
     graphics.ambient(current.ambient)
 end
 
 func setup()
-    graphics.canvas(W, H, "Modèles 3D")
+    graphics.canvas(W, H, "3D models")
     graphics.light("dir", -1, -1, -0.6)
 
-    var menu = ui.menu("Modèle")
+    var menu = ui.menu("Model")
     menu.button(models[1].name, func() choose(1) end)
     menu.button(models[2].name, func() choose(2) end)
     ui.show(menu)
@@ -40,7 +40,7 @@ func setup()
     choose(1)
 end
 
-## Souris ET tactile : sur le web, le doigt pilote le pointeur → mêmes callbacks.
+## Mouse AND touch: on the web a finger drives the pointer, hence the same callbacks.
 func mouse.pressed(x, y)
     ball.press(x, y)
 end
@@ -56,13 +56,13 @@ end
 func draw()
     graphics.clear(colors.BLACK)
     var dist = graphics.fitDistance(sz.radius) * current.margin
-    cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## caméra FIXE, cadrée
+    cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## a FIXED camera, framed
     cam.lookAt(sz.cx, sz.cy, sz.cz)
     ball.idle(30)   ## rotation douce quand on ne glisse pas
 
     graphics.begin3d(cam)
         graphics.fill(current.tint)
-        graphics.translate(sz.cx, sz.cy, sz.cz)            ## pivoter autour du centre du modèle
+        graphics.translate(sz.cx, sz.cy, sz.cz)            ## pivot around the model's centre
         graphics.rotateq(ball.orient())
         graphics.translate(-sz.cx, -sz.cy, -sz.cz)
         graphics.drawModel(graphics.model(current.file), 0, 0, 0, 1)

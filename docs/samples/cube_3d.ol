@@ -1,11 +1,11 @@
-## 3D éclairée + instancing. Glisse à la souris/au doigt pour tourner la scène :
+## Lit 3D plus instancing. Drag with the mouse or a finger to turn the scene:
 ## chaque glissement compose un quaternion → « trackball » fluide, sans blocage de cardan.
 
-## La rotation à la souris vit dans trackball.ol (bibliothèque partagée par les
-## exemples 3D) : l'hôte lui relaie les trois callbacks souris.
+## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
+## relays the three mouse callbacks to it.
 import "trackball.ol"
 global ball = Trackball()
-global cam = graphics.camera(0, 14, 34,  0, 0, 0)   ## FIXE : c'est la scène qui tourne
+global cam = graphics.camera(0, 14, 34,  0, 0, 0)   ## FIXED: it is the scene that turns
 
 func setup()
     graphics.canvas(W, H, "3D — glisser pour tourner")
@@ -13,7 +13,7 @@ func setup()
     graphics.light("dir", -1, -2, -0.5)
 end
 
-## Souris ET tactile : sur le web, le doigt pilote le pointeur → mêmes callbacks.
+## Mouse AND touch: on the web a finger drives the pointer, hence the same callbacks.
 func mouse.pressed(x, y)
     ball.press(x, y)
 end
@@ -31,9 +31,9 @@ func draw()
 
     graphics.noStroke()
     graphics.begin3d(cam)
-        graphics.grid(16, 2)         ## sol dessiné AVANT la rotation → reste fixe
+        graphics.grid(16, 2)         ## the ground is drawn BEFORE the rotation, so it stays put
         graphics.rotateq(ball.orient())
-        ## grille de cubes colorés = 1 seul draw call (instancing) malgré N couleurs
+        ## a grid of coloured cubes is one draw call, through instancing, whatever the number of colours
         for x = -4, 4 do
             for z = -4, 4 do
                 var t = elapsedTime * 2 + x + z
@@ -54,5 +54,5 @@ func draw()
 
     graphics.stroke(colors.WHITE)
     graphics.fontSize(20)
-    graphics.text("Glisse pour tourner la scène", 12, 12)
+    graphics.text("Drag to turn the scene", 12, 12)
 end

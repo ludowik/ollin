@@ -1,5 +1,5 @@
-## Persistance : le module `data` mémorise des valeurs d'un lancement à l'autre.
-## Ici un compteur de lancements (portée PROJET) + un score incrémenté au clic.
+## Persistence: the `data` module remembers values from one run to the next.
+## Here a run counter, in the PROJECT scope, plus a score raised on every click.
 ## Relance le script (ou recharge la page) : le compteur et le score reviennent.
 
 global runs = 0
@@ -7,14 +7,14 @@ global score = 0
 
 func setup()
     graphics.canvas(W, H, "data — persistance")
-    runs = data.get("runs", 0) + 1     ## lu puis incrémenté à chaque lancement
+    runs = data.get("runs", 0) + 1     ## read, then raised on every run
     data.set("runs", runs)
-    score = data.get("score", 0)       ## repris là où on l'avait laissé
+    score = data.get("score", 0)       ## taken up where it was left
 end
 
 func mouse.pressed(x, y)
     score = score + 1
-    data.set("score", score)           ## persisté immédiatement
+    data.set("score", score)           ## persisted at once
 end
 
 func draw()
@@ -27,8 +27,8 @@ func draw()
     graphics.text("Score (clique) : " + score, 24, 92)
     graphics.stroke(colors.GRAY)
     graphics.fontSize(16)
-    graphics.text("Relance ou recharge : tout est conservé.", 24, 150)
+    graphics.text("Restart or reload: everything is kept.", 24, 150)
     graphics.stroke(colors.GRAY)
     graphics.fontSize(16)
-    graphics.text("data.shared.* pour une portée partagée entre projets.", 24, 176)
+    graphics.text("data.shared.* gives a scope shared between projects.", 24, 176)
 end
