@@ -102,5 +102,5 @@ uint64_t g_map_epoch = 0;
 
 void Map::set(const Value& k, const Value& v) {
     data.insert_or_assign(k, v);
-    version = ++g_map_epoch;   // invalide les inline caches GET_INDEX visant cette map
+    version = ++g_map_epoch;   // invalidates the GET_INDEX inline caches aimed at this map
 }

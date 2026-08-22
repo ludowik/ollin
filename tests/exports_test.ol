@@ -1,6 +1,6 @@
-### Fixture : un module qui déclare TOUTES les sortes de noms exportables.
-    Importé avec un alias par regressions.ol, qui vérifie que chacun est rangé
-    dans la map du module (bug vécu : un enum n'était pas exporté).
+### Fixture: a module declaring EVERY kind of exportable name.
+    Imported under an alias by regressions.ol, which checks that each one is filed
+    into the module's map (a bug once seen: an enum was not exported).
 ###
 var expVar = 1
 global expGlobal = 2
@@ -13,5 +13,5 @@ class ExpClass
     end
 end
 enum ExpEnum A, B end
-var expHote = {}
-enum expHote.dansUneMap X end   ## cible chaînée : n'exporte AUCUN nom propre
+var expHost = {}
+enum expHost.inAMap X end   ## a chained target: it exports NO name of its own

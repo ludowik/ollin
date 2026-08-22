@@ -16,7 +16,7 @@ static double quat_field(const Value& v, const char* k) {
 
 Quaternion quat_from_instance(const Value& v, const char* fn) {
     // Checks this really is a Quat instance and not some other map or other
-    // objet Camera, Light…) — sinon on fabriquerait un quaternion silencieusement
+    // a Camera or Light object…) — otherwise a quaternion would be built silently
     // wrong (a missing w reads as 0), so we check __class__.__name__ == "Quat".
     Value cls = v.is_map() ? v.map_get(Value(std::string("__class__"))) : Value{};
     Value name = cls.is_class() ? cls.map_get(Value(std::string("__name__"))) : Value{};

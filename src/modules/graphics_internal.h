@@ -58,10 +58,10 @@ void end3d_internal();          // flush des buckets + EndMode3D (no-op hors blo
 void reset3d_lighting_state();   // resets the 3D lighting to its default state
 void reset3d_graphics_state();   // frees the 3D GL resources, before the context is destroyed
 void reset3d_frame_state();      // resets the current 3D texture; called every frame by reset_styles
-void register3d_graphics(Value& m);   // enregistre les builtins 3D dans le module graphics
+void register3d_graphics(Value& m);   // registers the 3D builtins in the graphics module
 
 // Current 3D texture: a style state, saved and restored by push and pushStyle.
-unsigned int gfx3d_get_texture();      // id GL de la texture 3D courante (0 = blanche)
+unsigned int gfx3d_get_texture();      // the GL id of the current 3D texture (0 = white)
 void gfx3d_set_texture(unsigned int id);
 
 // External models: the bytes are preloaded, the GPU load deferred.

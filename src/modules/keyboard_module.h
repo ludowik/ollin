@@ -9,7 +9,7 @@ void keyboard_poll();
 
 // True when keyboard_poll saw at least one press during the current frame. Needed
 // because raylib's press queue is CONSUMED by keyboard_poll, so reading it again
-// ailleurs ne rendrait plus rien.
+// so reading it anywhere else would give nothing.
 bool keyboard_pressed_any();
 
 // Resets the held-key state. Called at the start of every gfx_run, since s_down is static and

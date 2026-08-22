@@ -7,7 +7,7 @@
 
 // Functions are assigned to the `mouse` module and the engine calls whichever
 // exist, with no activation needed, passing the position (x, y) in the logical
-// logique de la zone graphique :
+// the graphics area's logical coordinates:
 //   mouse.pressed  = func(x, y) ... end   left button pressed
 //   mouse.released = func(x, y) ... end   released
 //   mouse.moved    = func(x, y) ... end   pointer moved

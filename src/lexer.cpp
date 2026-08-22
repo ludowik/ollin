@@ -97,7 +97,7 @@ Token Lexer::number(bool leading_dot) {
     }
 
     // Decimal: '_' only between digits, a single '.', nothing alphanumeric stuck to the end.
-    bool last_was_digit = !leading_dot; // src[start] est un chiffre si !leading_dot
+    bool last_was_digit = !leading_dot; // src[start] is a digit when !leading_dot
     bool prev_underscore = false;
     while (!at_end()) {
         char c = peek();
@@ -121,7 +121,7 @@ Token Lexer::number(bool leading_dot) {
     }
     // Optional scientific exponent, [eE] [+-]? digits, which makes the number a float.
     if (!at_end() && (peek() == 'e' || peek() == 'E')) {
-        if (prev_underscore) // '_' juste avant l'exposant → invalide (ex. 1_e5)
+        if (prev_underscore) // a '_' right before the exponent is invalid (e.g. 1_e5)
             throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
         digits += 'e';
         advance();

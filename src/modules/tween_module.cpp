@@ -194,7 +194,7 @@ struct Step {
                             // replays the same bounds, otherwise it goes nowhere)
     double dur = 0.0;
     int curve = k_curve_default;
-    Value curve_fn;   // curve fournie par le script (prioritaire sur `curve`)
+    Value curve_fn;   // curve supplied by the script, taking precedence over `curve`
 };
 
 // PLAYBACK plan: one segment per pass over the SEQUENCE, +1 in the declared direction and -1
@@ -210,7 +210,7 @@ struct Tw {
     std::vector<Step> steps;
     size_t pos = 0;      // the current step, counted in the current segment's order
     std::vector<int8_t> plan{1};
-    size_t seg = 0;      // segment en cours dans le plan
+    size_t seg = 0;      // the current segment in the plan
     double cycle = 0.0;  // the duration of one full pass, frozen at construction
     bool endless = false;   // the plan is replayed endlessly
     double elapsed = 0.0;
@@ -372,7 +372,7 @@ void add_chan(std::vector<Chan>& out, const Value& holder, const Value& key, con
         add_struct_chans(out, cur, tgt, field, fn);
         return;
     }
-    throw std::runtime_error(std::string(fn) + ": '" + field + "' n'est pas interpolable (" + cur.type_name() +
+    throw std::runtime_error(std::string(fn) + ": '" + field + "' cannot be interpolated (" + cur.type_name() +
                              " → " + tgt.type_name() + ") — expected a number or a class instance");
 }
 
@@ -413,23 +413,23 @@ void drop_conflicts(const std::vector<Chan>& chans) {
 // Channels from a {field: target} table onto an object: key validation and reading the start values,
 // which used to be written twice. `fn` prefixes the messages — "tween.to" for one caller,
 // "tween.sequence: step N" for the other.
-void add_map_chans(std::vector<Chan>& out, const Value& objet, const Value& vers, const char* fn) {
+void add_map_chans(std::vector<Chan>& out, const Value& obj, const Value& to_map, const char* fn) {
     // The only two ways to pass a tween where numbers are expected. Without these tests the handle
     // would be animated like an ordinary map, and the refusal would complain about a missing
     // '__class__' field.
-    if (is_tween_handle(vers))
+    if (is_tween_handle(to_map))
         throw std::runtime_error(std::string(fn) +
                                  ": a tween cannot be a target — sequences do not nest");
-    if (is_tween_handle(objet))
+    if (is_tween_handle(obj))
         throw std::runtime_error(std::string(fn) + ": a tween cannot be the animated object");
-    for (const auto& kv : vers.as_map()->data) {
+    for (const auto& kv : to_map.as_map()->data) {
         if (!kv.first.is_string())
             throw std::runtime_error(std::string(fn) + ": keys must be field names");
-        Value cur = objet.map_get(kv.first);
+        Value cur = obj.map_get(kv.first);
         if (cur.is_nil())
-            throw std::runtime_error(std::string(fn) + ": le champ '" + kv.first.as_string() +
-                                     "' est absent de l'objet");
-        add_chan(out, objet, kv.first, cur, kv.second, fn);
+            throw std::runtime_error(std::string(fn) + ": field '" + kv.first.as_string() +
+                                     "' is missing from the object");
+        add_chan(out, obj, kv.first, cur, kv.second, fn);
     }
 }
 
@@ -452,11 +452,11 @@ void read_options(const Value* args, int argc, int first, int& curve, Value& cur
             curve = curve_index(args[i].as_string(), fn);
         } else if (args[i].is_callable()) {
             if (curve_fn.is_nil() && on_done.is_nil() && i == first) {
-                curve_fn = args[i];   // 1re fonction = curve, 2e = rappel de fin
+                curve_fn = args[i];   // the first function is the curve, the second the completion callback
             } else if (on_done.is_nil()) {
                 on_done = args[i];
             } else {
-                throw std::runtime_error(std::string(fn) + ": trop de fonctions en argument");
+                throw std::runtime_error(std::string(fn) + ": too many function arguments");
             }
         } else if (!args[i].is_nil()) {
             throw std::runtime_error(std::string(fn) + ": argument " + std::to_string(i + 1) +
@@ -594,58 +594,58 @@ int tween_sequence(CallCtx& ctx) {
             throw std::runtime_error(std::string(FN) + ": argument " + std::to_string(i + 1) +
                                      " expected: completion callback, or nil");
         if (!on_done.is_nil())
-            throw std::runtime_error(std::string(FN) + ": un seul rappel de fin");
+            throw std::runtime_error(std::string(FN) + ": only one completion callback");
         on_done = args[i];
     }
 
     std::vector<Step> steps;
-    std::vector<Chan> tous;   // tous les canaux de la suite, pour une seule passe d'annulation
+    std::vector<Chan> all;   // every channel of the sequence, for a single cancelling pass
     for (int64_t k = 1; k <= nb; k++) {   // Ollin arrays are 1-based
         Value brut = args[1].array_get(k);
-        const std::string ou = std::string(FN) + ": step " + std::to_string(k);
+        const std::string where = std::string(FN) + ": step " + std::to_string(k);
         if (!brut.is_map())
-            throw std::runtime_error(ou + " must be a map {to: …, delay: …}");
-        Value cible = args[0], vers, curve;
-        double delai = -1.0;
+            throw std::runtime_error(where + " must be a map {to: …, delay: …}");
+        Value target_obj = args[0], to_map, curve;
+        double delay_s = -1.0;
         for (const auto& kv : brut.as_map()->data) {
             if (!kv.first.is_string())
-                throw std::runtime_error(ou + ": keys must be names");
+                throw std::runtime_error(where + ": keys must be names");
             const std::string& key = kv.first.as_string();
             if (key == "to") {
-                vers = kv.second;
+                to_map = kv.second;
             } else if (key == "delay") {
                 if (!kv.second.is_number())
-                    throw std::runtime_error(ou + ": `delay` must be a number of seconds");
-                delai = kv.second.as_num();
+                    throw std::runtime_error(where + ": `delay` must be a number of seconds");
+                delay_s = kv.second.as_num();
             } else if (key == "curve") {
                 curve = kv.second;
             } else if (key == "target") {
-                cible = kv.second;
+                target_obj = kv.second;
             } else {
-                throw std::runtime_error(ou + ": unknown key '" + key + "' — allowed: to, delay, curve, target");
+                throw std::runtime_error(where + ": unknown key '" + key + "' — allowed: to, delay, curve, target");
             }
         }
-        if (!(delai > 0.0))
-            throw std::runtime_error(ou + " : `delay` manquant ou <= 0");
+        if (!(delay_s > 0.0))
+            throw std::runtime_error(where + ": `delay` missing or <= 0");
         Step e;
-        e.dur = delai;
+        e.dur = delay_s;
         if (!curve.is_nil())
-            read_curve(curve, e.curve, e.curve_fn, ou.c_str());
-        e.is_wait = vers.is_nil();
-        if (!vers.is_nil()) {
-            if (!is_object(cible))
-                throw std::runtime_error(ou + ": `target` must be an object");
-            if (!vers.is_map() || vers.map_size() == 0)
-                throw std::runtime_error(ou + ": `to` must be a non-empty map {field: target}");
-            add_map_chans(e.chans, cible, vers, ou.c_str());
-            tous.insert(tous.end(), e.chans.begin(), e.chans.end());
+            read_curve(curve, e.curve, e.curve_fn, where.c_str());
+        e.is_wait = to_map.is_nil();
+        if (!to_map.is_nil()) {
+            if (!is_object(target_obj))
+                throw std::runtime_error(where + ": `target` must be an object");
+            if (!to_map.is_map() || to_map.map_size() == 0)
+                throw std::runtime_error(where + ": `to` must be a non-empty map {field: target}");
+            add_map_chans(e.chans, target_obj, to_map, where.c_str());
+            all.insert(all.end(), e.chans.begin(), e.chans.end());
         }
         steps.push_back(std::move(e));
     }
 
     // A single cancellation pass for the WHOLE sequence: called per step, it could free a tween that
     // still had channels targeted by a later step.
-    drop_conflicts(tous);
+    drop_conflicts(all);
     return ctx.ret(make_handle(creer_tween(std::move(steps), on_done)));
 }
 
@@ -927,7 +927,7 @@ void advance(double dt) {
                     t2.seg++;
                     t2.pos = 0;
                 } else {
-                    t2.seg = 0;   // sans fin : on rejoue le plan depuis son premier segment
+                    t2.seg = 0;   // endless: the plan is replayed from its first segment
                     t2.pos = 0;
                 }
             }

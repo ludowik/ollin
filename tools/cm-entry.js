@@ -1,7 +1,7 @@
-// Point d'entrée du bundle CodeMirror servi localement (docs/vendor/codemirror.js).
-// Empaqueté par esbuild (cf. script "build:cm" + workflow build-playground.yml) →
-// le playground n'a plus de dépendance au CDN esm.sh.
-// Ré-exporte uniquement les symboles utilisés par docs/playground.html.
+// The entry point of the CodeMirror bundle served locally (docs/vendor/codemirror.js).
+// Packed by esbuild (see the "build:cm" script and the build-playground.yml workflow), so
+// the playground no longer depends on the esm.sh CDN.
+// It re-exports only the symbols docs/playground.html uses.
 export { EditorState } from '@codemirror/state'
 export {
   EditorView, lineNumbers, keymap, drawSelection,

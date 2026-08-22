@@ -775,7 +775,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     // Target: IDENT { "." IDENT }. Bracket indexing is refused, because the path is
     // re-evaluated on every access and `ref t[i]` would follow later changes to i.
     if (!check(TokenType::IDENTIFIER))
-        throw std::runtime_error(cur_loc(line).str(*source_files_) + ": ref attend un nom de variable, pas '" +
+        throw std::runtime_error(cur_loc(line).str(*source_files_) + ": ref expects a variable name, not '" +
                                  peek().lexeme + "'");
     std::vector<std::string> path;
     path.push_back(advance().lexeme);
@@ -785,7 +785,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     }
     if (check(TokenType::LBRACKET))
         throw std::runtime_error(cur_loc(line).str(*source_files_) +
-                                 ": ref n'accepte qu'un nom ou un chemin de champs (pas d'indexation [])");
+                                 ": ref only accepts a name or a path of fields, with no [] indexing");
 
     auto set_loc = [&](Expr* e) {
         e->line = line;
@@ -1037,7 +1037,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'b' || lex[1] == 'B'))
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 2)));
-            // flottant si '.' OU exposant scientifique ('e'/'E') ; sinon entier.
+            // float on a '.' OR a scientific exponent ('e'/'E'); otherwise an integer.
             if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos &&
                 lex.find('E') == std::string::npos)
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));

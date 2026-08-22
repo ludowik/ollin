@@ -182,12 +182,12 @@ check_error "ref on undeclared variable" \
 
 check_error "ref on a literal" \
     'var r = ref 42' \
-    "ref attend un nom de variable"
+    "ref expects a variable name"
 
 check_error "ref with index" \
     'var t = [1, 2]
 var r = ref t[1]' \
-    "chemin de champs"
+    "path of fields"
 
 
 # ── module ui ────────────────────────────────────────────────────────────────
@@ -238,12 +238,12 @@ tween.to(o, {x: 1}, 1, "rebond")' \
 check_error "tween.to on a missing field" \
     'global o = {x: 0}
 tween.to(o, {y: 1}, 1)' \
-    "absent de"
+    "missing from"
 
 check_error "tween.to on a non-interpolable value" \
     'global o = {x: "a"}
 tween.to(o, {x: 1}, 1)' \
-    "pas interpolable"
+    "cannot be interpolated"
 
 check_error "tween.value without a reference" \
     'global v = 1
@@ -331,12 +331,12 @@ tween.sequence(o, [3])' \
 check_error "tween.sequence with a missing delay" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}}])' \
-    "manquant ou <= 0"
+    "missing or <= 0"
 
 check_error "tween.sequence with a negative delay" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, delay: -1}])' \
-    "manquant ou <= 0"
+    "missing or <= 0"
 
 check_error "tween.sequence with a non-numeric delay" \
     'global o = {x: 0}
@@ -346,7 +346,7 @@ tween.sequence(o, [{to: {x: 1}, delay: "vite"}])' \
 check_error "tween.sequence with an absent field" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {absent: 1}, delay: 1}])' \
-    "est absent de l'objet"
+    "is missing from the object"
 
 check_error "tween.sequence with a list that is not an array" \
     'global o = {x: 0}
@@ -361,7 +361,7 @@ tween.sequence(o, [{to: {x: 1}, delay: 1}], "easeInOutQuad")' \
 check_error "tween.sequence with two end callbacks" \
     'global o = {x: 0}
 tween.sequence(o, [{to: {x: 1}, delay: 1}], func() end, func() end)' \
-    "un seul rappel de fin"
+    "only one completion callback"
 
 check_error "tween.sequence with an unknown curve" \
     'global o = {x: 0}

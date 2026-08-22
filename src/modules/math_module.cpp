@@ -323,7 +323,7 @@ static int math_noise(CallCtx& ctx) {
     return ctx.ret(Value(n));
 }
 
-// Rebat la table de permutation → bruit reproductible / variable.
+// Reshuffles the permutation table, giving reproducible or varying noise.
 static int math_noise_seed(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;

@@ -27,7 +27,7 @@ struct StringTable {
         }
         auto h = (uint32_t)std::hash<std::string>{}(s);
         auto* p = new InternedStr{1, h, std::move(s)};
-        table_.emplace(std::string_view(p->str), p); // view dans p->str, pas de copie
+        table_.emplace(std::string_view(p->str), p); // a view into p->str, with no copy
         return p;
     }
 

@@ -1,7 +1,7 @@
-## Mandelbrot : arithmétique FLOTTANTE pure (multiplications, additions,
-## comparaisons), seul benchmark à solliciter la promotion entier/flottant.
-## Le total d'itérations sert de somme de contrôle : il doit être identique
-## dans les trois langages.
+## Mandelbrot: purely FLOATING-POINT arithmetic (multiplications, additions, comparisons),
+## the only benchmark to exercise the integer/float promotion.
+## The total number of iterations is the checksum: it must be identical in all three
+## languages.
 
 var W = 200
 var H = 200

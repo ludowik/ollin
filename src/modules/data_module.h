@@ -4,7 +4,7 @@
 
 // The `data` module: key-value persistence, PROJECT-scoped (isolated) and GLOBAL (shared).
 // Scalar values only — number, string, boolean. Write-through persistence:
-//   WASM  → localStorage (via window.__ollinData, fourni par la SPA)
+//   WASM  → localStorage (through window.__ollinData, supplied by the SPA)
 //   natif → fichier JSON « sidecar »
 Value make_data_module();
 

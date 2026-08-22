@@ -1,4 +1,4 @@
-## Benchmark : création et usage de N objets avec plusieurs propriétés
+## Benchmark: creating and using N objects with several properties
 
 var N = 100_000
 

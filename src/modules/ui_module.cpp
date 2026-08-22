@@ -46,7 +46,7 @@ struct Node {
     Value action;      // a button: the function called on a click
     Value target;      // a checkbox: the reference (`ref x`) to the bound variable
     Value on_change;   // a checkbox or a slider: an optional function called after a change
-    double vmin = 0.0;     // slider : bornes de la plage
+    double vmin = 0.0;     // slider: the range's bounds
     double vmax = 1.0;
     double vdefault = 0.0; // a slider: the value to use when the bound variable is nil
     bool integral = false; // a slider: integer bounds give an integer value
@@ -185,18 +185,18 @@ struct Style {
     Color bg_hover;
     Color border;     // the discreet outline of the checkboxes and of the track
     Color text;
-    Color text_dim;   // valeur d'un slider, chevron d'un sous-menu
+    Color text_dim;   // a slider's value, a sub-menu's chevron
     Color accent;     // a ticked box, and the filled part of a track
     Color track;      // the background of a slider's track
     float round;      // arrondi des lignes, 0 = angles droits
     float border_thick;
-    float font_frac;  // police, fraction de la hauteur de la zone
-    float font_min;   // en dessous, illisible quelle que soit la zone
-    float pad_frac;   // marge interne, fraction de la police
-    float row_frac;   // hauteur d'une ligne
+    float font_frac;  // the font, as a fraction of the area's height
+    float font_min;   // below this it is unreadable, whatever the area
+    float pad_frac;   // the inner padding, as a fraction of the font
+    float row_frac;   // a row's height
     float slider_row_frac;   // the height of a slider row: the label plus the track
     float gap_frac;   // espace entre deux lignes
-    float margin_frac;// marge au bord de la zone
+    float margin_frac;// the margin at the area's edge
     float box_frac;   // the side of a checkbox's square
     float check_inset;// the fill's inset within the square, as a fraction of it
     float track_frac; // the track's thickness
@@ -436,7 +436,7 @@ static int add_slider(CallCtx& ctx, const Value* args, int argc, int parent) {
 // the list follows changes to its source without recomputing anything per frame.
 static int add_list(CallCtx& ctx, const Value* args, int argc, int parent) {
     ui_check_list_args(args, argc);
-    ui_list_init(args);   // appelle le script (getter/setter) → AVANT d'allouer le nœud
+    ui_list_init(args);   // calls the script (getter/setter), hence BEFORE allocating the node
     int slot = alloc_node(Node::LIST, args[0].as_string(), parent);
     s_nodes[slot].source = args[1];
     s_nodes[slot].target = args[2];

@@ -20,7 +20,7 @@ static std::string s_file[2];                            // native: one sidecar 
 #endif
 
 // Typed encoding of a scalar Value to and from the stored string.
-// 'i'<entier>, 'f'<double>, 's'<brut>, 'b'<0|1>.
+// 'i'<integer>, 'f'<double>, 's'<raw>, 'b'<0|1>.
 // The 'b' prefix came with the boolean becoming a type of its own: `true` no longer being the
 // integer 1, it fell into the throw and data.set("flag", true) failed on a message that promised
 // booleans. A value written EARLIER as 'i1' reads back as an integer — which is what it was, and

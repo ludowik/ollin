@@ -97,7 +97,7 @@ inline double sound_note_hz(const std::string& name, const char* fn) {
 // covers sound.osc, sound.tone and osc.freq at once.
 inline double sound_check_freq(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc || args[i].is_nil())
-        return -1.0;   // absente : l'appelant garde sa valeur courante
+        return -1.0;   // missing: the caller keeps its current value
     if (args[i].is_string())
         return sound_note_hz(args[i].as_string(), fn);
     if (!args[i].is_number())
@@ -160,7 +160,7 @@ inline double sound_check_duration(const Value* args, int argc, int i, const cha
 // 1 right, following raylib and p5.
 inline double sound_check_unit(const Value* args, int argc, int i, const char* fn, const char* quoi, double mini) {
     if (i >= argc || args[i].is_nil())
-        return -2.0;   // absent : l'appelant garde sa valeur courante
+        return -2.0;   // missing: the caller keeps its current value
     if (!args[i].is_number())
         throw std::runtime_error(std::string(fn) + ": " + quoi + " must be a number");
     double v = args[i].as_num();

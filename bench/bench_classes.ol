@@ -1,6 +1,6 @@
-## Classes : instanciation, appel de méthode, héritage et `super`.
-## Mesure CALL_METHOD, la remontée de la chaîne de prototypes et l'inline cache
-## d'accès aux champs. Volontairement sans chaînes, pour isoler le dispatch.
+## Classes: instantiation, method calls, inheritance and `super`.
+## Measures CALL_METHOD, the walk up the prototype chain and the inline cache on field
+## access. Deliberately without strings, so as to isolate the dispatch.
 
 class Point
     func init(x, y)
@@ -18,7 +18,7 @@ class Point3 extends Point
         self.z = z
     end
     func total()
-        return self.sum() + self.z    ## méthode héritée via la chaîne
+        return self.sum() + self.z    ## a method inherited through the chain
     end
 end
 

@@ -345,8 +345,8 @@ Chunk Compiler::compile(const Program& prog) {
     declared_globals_.insert("elapsedTime");
     declared_globals_.insert("W");   // the width of the render area, window.width by default
     declared_globals_.insert("H");   // the height of the render area, window.height by default
-    declared_globals_.insert("CW");  // centre X de la zone de rendu (W / 2)
-    declared_globals_.insert("CH");  // centre Y de la zone de rendu (H / 2)
+    declared_globals_.insert("CW");  // the render area's centre X (W / 2)
+    declared_globals_.insert("CH");  // the render area's centre Y (H / 2)
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
@@ -1433,7 +1433,7 @@ void Compiler::visit(const ExprCallExpr& e) {
         // f?(args) is `if f then f(args) else nil`; JUMP_IF_FALSE skips the arguments
         size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
-        for (int i = 0; i < argc; ++i) { // temps au-dessus de func_reg
+        for (int i = 0; i < argc; ++i) { // temporaries above func_reg
             reg_top_ = func_reg + 1;
             compile_into(*e.args[i], call_base + i);
         }
@@ -1964,7 +1964,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     uint16_t exit_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
-    chunk.patch_jump(prep, exit_addr); // FOR_PREP saute ici si la boucle est vide
+    chunk.patch_jump(prep, exit_addr); // FOR_PREP jumps here when the loop is empty
     for (size_t p : break_patches.back())
         chunk.patch_jump(p, exit_addr);
     break_patches.pop_back();
@@ -2380,7 +2380,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         // always land back on B, an infinite recursion in a hierarchy of three levels or more.
         if (current_class_parent_.empty())
             throw std::runtime_error(sloc().str(chunk.source_files) +
-                                     ": 'super' : la classe courante n'a pas de parent");
+                                     ": 'super': the current class has no parent");
         int self_src = self_it->second;
         reg_top_ = call_base + 1;
         if (reg_top_ > reg_count_)
@@ -2429,7 +2429,7 @@ void Compiler::visit(const MethodCallExpr& e) {
 
     chunk.emit(make_abc((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
     if (e.optional) {
-        size_t end = chunk.emit_jump(Op::JUMP);                                // saute par-dessus le LOAD_NIL
+        size_t end = chunk.emit_jump(Op::JUMP);                                // jumps over the LOAD_NIL
         chunk.patch_jump(skip, (uint16_t)chunk.current_pos());                  // the jump target: a nil method
         chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0)); // a nil result
         chunk.patch_jump(end, (uint16_t)chunk.current_pos());

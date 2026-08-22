@@ -1,10 +1,10 @@
-## Mesure du coût de résolution `module.fonction` (GET_INDEX à chaque appel)
-## vs version hoistée (var f = module.fonction ; f(i)) — ce qu'un inline cache
-## sur GET_INDEX obtiendrait. Le delta ≈ gain maximal du cache.
+## Measures the cost of resolving `module.function` (a GET_INDEX on every call) against a
+## hoisted version (var f = module.function; f(i)) — what an inline cache on GET_INDEX would
+## get. The difference is roughly the cache's greatest possible gain.
 
 var N = 5_000_000
 
-## ---- builtin bon marché : le lookup pèse proportionnellement plus ----
+## ---- a cheap builtin: the lookup weighs proportionally more ----
 var s = 0.0
 var t0 = cpuTime()
 for i = 1, N do
@@ -22,7 +22,7 @@ end
 var t3 = cpuTime()
 var abs_hoisted = t3 - t2
 
-## ---- builtin coûteux (noise) : le lookup pèse peu, réalisme ----
+## ---- an expensive builtin (noise): the lookup weighs little, which is realistic ----
 s = 0.0
 var t4 = cpuTime()
 for i = 1, N do
@@ -41,7 +41,7 @@ var t7 = cpuTime()
 var noise_hoisted = t7 - t6
 
 printf("N = {} appels", N)
-printf("abs   direct  = {}s   hoisté = {}s   delta = {}s  ({} ns/appel)",
+printf("abs   direct  = {}s   hoisted = {}s   delta = {}s  ({} ns/call)",
        abs_direct, abs_hoisted, abs_direct - abs_hoisted, (abs_direct - abs_hoisted) * 1e9 / N)
-printf("noise direct  = {}s   hoisté = {}s   delta = {}s  ({} ns/appel)",
+printf("noise direct  = {}s   hoisted = {}s   delta = {}s  ({} ns/call)",
        noise_direct, noise_hoisted, noise_direct - noise_hoisted, (noise_direct - noise_hoisted) * 1e9 / N)

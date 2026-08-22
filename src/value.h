@@ -54,7 +54,7 @@ struct CallCtx {
 struct Value {
     uint8_t tag;
     uint8_t _pad[3];   // padding explicite (anciennement implicite)
-    uint32_t str_hash; // hash contenu mis en cache, valide uniquement pour T_STRING
+    uint32_t str_hash; // the content hash, cached; valid only for T_STRING
     union {
         int64_t ival;
         double dval;
@@ -73,9 +73,9 @@ struct Value {
     static constexpr uint8_t T_NIL = 0; // ── not ref-counted (POD, by value) ──
     static constexpr uint8_t T_INTEGER = 1;
     static constexpr uint8_t T_FLOAT = 2;
-    static constexpr uint8_t T_FUNCTION = 3; // func_idx dans ival (pas de tas)
-    static constexpr uint8_t T_BUILTIN = 4;  // pointeur de fonction natif dans ival
-    static constexpr uint8_t T_BOOL = 5;     // true/false dans ival (0/1) — type ÉTANCHE, ≠ entier
+    static constexpr uint8_t T_FUNCTION = 3; // func_idx in ival, nothing on the heap
+    static constexpr uint8_t T_BUILTIN = 4;  // a native function pointer in ival
+    static constexpr uint8_t T_BOOL = 5;     // true/false in ival (0/1) — a SEALED type, distinct from an integer
     static constexpr uint8_t T_STRING = 6;   // ── the pivot: ref-counted from here on ──
     static constexpr uint8_t T_MAP = 7;
     static constexpr uint8_t T_ARRAY = 8;

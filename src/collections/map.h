@@ -63,7 +63,7 @@ struct MapPool {
             return;
         }
         m->data.clear();  // this can re-enter the pool through nested releases, so n may change
-        m->version = ++g_map_epoch;  // recyclage : invalide tout inline cache pointant sur ce Map*
+        m->version = ++g_map_epoch;  // recycling: invalidates every inline cache aimed at this Map*
         m->kind = Map::PLAIN;             // otherwise a recycled map would come back frozen, as an enum
         if (n < CAP) {
             buf[n++] = m; // n is READ AGAIN after the clear

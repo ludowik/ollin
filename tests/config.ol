@@ -1,2 +1,2 @@
-### prelude.ol — éléments globaux chargés avant chaque script ###
+### prelude.ol - globals loaded before every script ###
 

@@ -1,20 +1,20 @@
 #!/bin/bash
-# Interdit un commit dont la suite de tests ne passe pas (règle projet : `tests/run.sh`
-# avant CHAQUE commit, sans exception). Versionné dans le dépôt donc présent après un
-# clone frais ; branché par `core.hooksPath`, posé au démarrage de session.
+# Refuses a commit whose test suite does not pass (project rule: `tests/run.sh` before
+# EVERY commit, with no exception). Versioned in the repository, so present after a fresh
+# clone; wired in through `core.hooksPath`, set at session start.
 #
-# Le binaire est reconstruit d'abord : sans ça, une modification C++ non compilée serait
-# validée par l'ANCIEN `build/ollin` — un test vert qui ne dit rien du code commité.
+# The binary is rebuilt first: without that, an uncompiled C++ change would be validated by
+# the OLD `build/ollin` — a green test saying nothing about the code committed.
 #
-# Contournement, à réserver aux cas où la suite ne peut pas tourner (pas de compilateur) :
+# The way round it, to be kept for cases where the suite cannot run (no compiler):
 #   git commit --no-verify
 set -uo pipefail
 
-racine=$(git rev-parse --show-toplevel)
-cd "$racine" || exit 1
+root=$(git rev-parse --show-toplevel)
+cd "$root" || exit 1
 
 if [ ! -f tests/run.sh ]; then
-    exit 0   # dépôt partiel (worktree d'outillage) : rien à vérifier
+    exit 0   # a partial repository (a tooling worktree): nothing to check
 fi
 
 if command -v cmake >/dev/null 2>&1 && [ -d build ]; then

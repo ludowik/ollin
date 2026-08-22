@@ -3,7 +3,7 @@
 Value make_camera_module() {
     Value m = Value::make_map();
     auto stub = [](CallCtx& ctx) -> int {
-        throw std::runtime_error("camera: non disponible en dehors du playground (WASM)");
+        throw std::runtime_error("camera: only available in the playground (WASM)");
         return ctx.ret(Value{});
     };
     m.map_set(Value(std::string("open")),    Value::make_builtin(stub));

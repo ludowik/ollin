@@ -243,7 +243,7 @@ struct Bucket3D {
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
     std::vector<float> tiles;    // 3 floats (top/side/bottom, -1 = aucune) par instance
-    std::vector<float> corners;  // 4 floats (hauteurs de coin du dessus) par instance
+    std::vector<float> corners;  // 4 floats per instance: the top's corner heights
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // the current begin3d block's camera, for viewPos
@@ -251,7 +251,7 @@ static Camera3D s_cam3d{};   // the current begin3d block's camera, for viewPos
 // External models, declared here because reset3d_graphics_state refers to them (definitions further down).
 struct PendingModel {
     std::vector<unsigned char> bytes;
-    std::string ext;   // avec le point, ex. ".obj"
+    std::string ext;   // with the dot, e.g. ".obj"
 };
 static std::map<std::string, PendingModel> s_model_bytes;   // the preloaded bytes, by name
 static std::map<std::string, Model> s_model_cache;          // the models loaded into the GPU, lazily
@@ -449,7 +449,7 @@ static void load_lit_shader() {
         "out vec4 finalColor;\n"
         "void main() {\n"
         "    vec4 texel;\n"
-        "    if (fragTile.x >= 0.0) {\n"                 // cube d'atlas : tuile selon la face (normale)
+        "    if (fragTile.x >= 0.0) {\n"                 // an atlas cube: the tile follows the face, from the normal
         "        float t = fragTile.y;\n"                //   the side face by default
         "        if (fragNormal.y > 0.5) t = fragTile.x;\n"   // dessus
         "        else if (fragNormal.y < -0.5) t = fragTile.z;\n" // dessous
@@ -829,7 +829,7 @@ void end3d_internal() {
         return;
     }
     flush3d_buckets();   // encore en Mode3D → matrices view/proj disponibles
-    rlPopMatrix();      // referme le mode transform ouvert par begin3d (rlPushMatrix)
+    rlPopMatrix();      // closes the transform mode begin3d opened (rlPushMatrix)
     EndMode3D();
     s_in_3d = false;
 }

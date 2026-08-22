@@ -48,7 +48,7 @@ static Color rgba_color(double r, double g, double b, double a) {
 
 static int s_physW = 0, s_physH = 0;
 static int s_logicalW = 0; // the area's logical width, used by the memory and FPS overlay
-static int s_logicalH = 0; // hauteur logique de la zone
+static int s_logicalH = 0; // the area's logical height
 // PERSISTENT drawing context: draw() renders into this RenderTexture, which is NOT cleared between
 // frames — it is up to draw() to call graphics.clear() when it wants a fresh background. It is
 // blitted to the screen every frame with the FPS overlay ON TOP, so the overlay stays crisp and does
@@ -82,7 +82,7 @@ static int gfx_canvas(CallCtx& ctx) {
     int w = argc > 0 ? gfx_to_int(args[0]) : 800;
     int h = argc > 1 ? gfx_to_int(args[1]) : 600;
     const char* title = (argc > 2 && args[2].is_string()) ? args[2].as_string().c_str() : "Ollin";
-    s_shot_pending = false;   // nouveau programme → oublier une capture en attente
+    s_shot_pending = false;   // a new program: forget any pending screenshot
     gfx_reset_capture();      // likewise for the capture the host asked for
     s_blend_mode = BLEND_ALPHA;
     // The 3D lighting is reset HERE, before setup() or the top level set ambient and light — and not
@@ -191,7 +191,7 @@ static int gfx_canvas(CallCtx& ctx) {
         win.map_set(Value(std::string("height")), Value((int64_t)h));
     }
     if (VM* vm = VM::current())
-        vm->mark_gfx_canvas();   // canvas explicite → pas de canvas implicite (runEntryHooks)
+        vm->mark_gfx_canvas();   // an explicit canvas, so no implicit one (run_entry_hooks)
     return ctx.ret(Value{});
 }
 
@@ -234,7 +234,7 @@ static int gfx_clear(CallCtx& ctx) {
         // restored.
         BeginBlendMode(BLEND_ALPHA);
         rlPushMatrix();                 // the fade is independent of the current transform
-        rlLoadIdentity();               // (comme ClearBackground) → couvre tout le canvas
+        rlLoadIdentity();               // (like ClearBackground) covers the whole canvas
         DrawRectangle(0, 0, s_logicalW, s_logicalH, c);
         rlPopMatrix();
         BeginBlendMode(s_blend_mode);
@@ -604,7 +604,7 @@ static int gfx_no_fill(CallCtx& ctx) {
 static int gfx_tint(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
-        return ctx.ret(Value{});   // sans argument : ne change rien
+        return ctx.ret(Value{});   // with no argument: changes nothing
     ColorRGBA k = parse_color(args, argc, "tint");   // the same signature as clear, fill and stroke
     Color c = rgba_color(k.r, k.g, k.b, k.a);
     image_set_tint(true, c.r, c.g, c.b, c.a);
@@ -1142,7 +1142,7 @@ static double s_elapsed_time = 0.0;
 // Updates deltaTime and elapsedTime in the VM and calls update(dt) when it is defined.
 static Value s_update_callback;
 static void call_update_if_any() {
-    double dt = s_frame_dt;   // notre mesure fiable, pas GetFrameTime() (cf. plus haut)
+    double dt = s_frame_dt;   // our own reliable measure, not GetFrameTime() (see above)
     s_elapsed_time += dt;
     VM* vm = VM::current();
     vm->set_global("deltaTime", Value(dt));
@@ -1198,7 +1198,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
     s_frame_dt = (s_last_frame_time < 0.0) ? 0.0 : (now - s_last_frame_time);
     s_last_frame_time = now;
     if (s_target_ready) {
-        BeginTextureMode(s_target);   // lie le FBO ; N'EFFACE PAS
+        BeginTextureMode(s_target);   // binds the FBO; does NOT clear
         *tex = true;
         // The RT is at physical resolution, but BeginTextureMode installed a projection in physical
         // pixels. We replace it with the LOGICAL extents, origin at the top left as raylib does, so
@@ -1284,7 +1284,7 @@ static int gfx_run(CallCtx& ctx) {
     s_run_active = true;
     Value fn = args[0];
     s_elapsed_time = 0.0;
-    s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
+    s_last_frame_time = -1.0;   // first frame: dt = 0, so there is no initial jump
     s_fps_ema = 0.0;
     keyboard_reset();            // a fresh keyboard state: the static s_down survives between WASM runs
     s_update_callback = VM::current()->get_global("update");
@@ -1430,7 +1430,7 @@ static int gfx_scale(CallCtx& ctx) {
         sy = (float)num_arg(args, 1, "graphics.scale");
         sz = 1.0f;
     } else {
-        sy = sx;   // uniforme sur les 3 axes
+        sy = sx;   // uniform on all three axes
         sz = sx;
     }
     rlScalef(sx, sy, sz);

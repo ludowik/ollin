@@ -62,7 +62,7 @@ static std::string key_name(int key) {
     }
 }
 
-// Nom de touche → keycode raylib (inverse de keyName) ; -1 si inconnu.
+// A key name to a raylib keycode, the inverse of key_name; -1 when unknown.
 static int key_code(std::string name) {
     for (char& c : name)
         c = (char)std::tolower((unsigned char)c);

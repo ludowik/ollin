@@ -213,7 +213,7 @@ assert((12 & 10)  == 8)        ## ET
 assert((12 | 10)  == 14)       ## OU
 assert((12 ~ 10)  == 6)        ## XOR: a binary '~', as in Lua
 assert(~0         == -1)       ## NOT : '~' unaire
-assert((5 ~ ~0)   == -6)       ## XOR de 5 et (NOT 0) = 5 ~ -1
+assert((5 ~ ~0)   == -6)       ## XOR of 5 and (NOT 0) = 5 ~ -1
 assert((1 << 3)   == 8)
 assert((16 >> 2)  == 4)
 
@@ -715,7 +715,7 @@ print("hello", 42, true)    ## hello 42 1
 ## printf — POSITIONAL substitution: {} is automatic, {N} is indexed (no escaping).
 ## {N:spec} applies a C format (spec being the conversion without the '%').
 printf("{} + {} = {}", 1, 2, 3)            ## 1 + 2 = 3  (auto : 1-based)
-printf("{1} et {1}", "oui")                ## oui et oui  (index 1 = 1er argument)
+printf("{1} and {1}", "yes")               ## yes and yes  (index 1 = first argument)
 printf("a={1} b={2} a={1}", 10, 20)        ## a=10 b=20 a=10
 printf("pi = {1:.3f}", 3.14159)            ## pi = 3.142
 printf("hex = {1:04x}", 255)               ## hex = 00ff
@@ -736,7 +736,7 @@ assert("{1} litteral" == "{1} litteral")           ## {N} is a positional placeh
 
 ## assert — throws when the value is falsy
 assert(1 + 1 == 2)
-assert(true, "doit être vrai")
+assert(true, "must be true")
 
 ## time — UNIX seconds, as a float
 var t0 = time()
@@ -1096,15 +1096,15 @@ func sw_func(n)
         case 0
             return "zero"
         case 1, 2
-            return "un ou deux"
+            return "one or two"
         else
-            return "autre"
+            return "other"
     end
 end
 assert(sw_func(0) == "zero")
-assert(sw_func(1) == "un ou deux")
-assert(sw_func(2) == "un ou deux")
-assert(sw_func(5) == "autre")
+assert(sw_func(1) == "one or two")
+assert(sw_func(2) == "one or two")
+assert(sw_func(5) == "other")
 
 ## ── 23. The graphics module (raylib) ─────────────────────────────────────────
 ##
@@ -1296,15 +1296,15 @@ global uiVal2 = 7
 ui.slider("Autre", ref uiVal2, 1, 10)
 assert(uiVal2 == 7)
 
-var uiMenu = ui.menu("Réglages")
+var uiMenu = ui.menu("Settings")
 uiMenu.checkbox("Option", ref uiFlag)
-var uiSous = uiMenu.menu("Affichage")
-uiSous.button("Action", uiAction)
-uiSous.slider("Zoom", ref uiVal, 0, 2)
+var uiSub = uiMenu.menu("Display")
+uiSub.button("Action", uiAction)
+uiSub.slider("Zoom", ref uiVal, 0, 2)
 ui.show(uiMenu)
-uiSous.open()
+uiSub.open()
 ui.back()
-uiSous.remove()
+uiSub.remove()
 uiMenu.clear()
 ui.show(nil)
 ui.open()

@@ -682,7 +682,7 @@ assert(expMod.expFunc() == 3)
 assert(ExpClass().v == 4)          ## the class is exported, and can be instantiated through the name
 assert(expMod.ExpClass <> nil)
 assert(expMod.ExpEnum.A == 1 and expMod.ExpEnum.B == 2)
-assert(expMod.dansUneMap == nil)   ## `enum a.b` exports no name of its own
+assert(expMod.inAMap == nil)   ## `enum a.b` exports no name of its own
 
 
 ## Pre-scanning the globals: a `global` declared at the BOTTOM of every kind of construct must be
@@ -1021,26 +1021,26 @@ assert(twR.x == 100 and twR.y == 25)
 ## that is the part tested here, the rendering and the click needing a display. An array returns a
 ## VALUE, a map or an enum a KEY — as `for … in` does.
 enum LiDiff
-    facile,
+    easy,
     normal,
-    difficile
+    hard
 end
-var liTints = ["rouge", "vert", "bleu"]
-var liReglages = {volume: 0.8, brillance: 0.5, alpha: 1}
+var liTints = ["red", "green", "blue"]
+var liSettings = {volume: 0.8, brightness: 0.5, alpha: 1}
 var liC = nil
 var liD = nil
 var liR = nil
-ui.list("Couleur", liTints, ref liC)
-ui.list("Difficulté", LiDiff, ref liD)
-ui.list("Réglage", liReglages, ref liR)
-assert(liC == "rouge")           ## the array's first element, its VALUE
-assert(liD == "facile")          ## an enum sorted by value, hence in declaration order
+ui.list("Colour", liTints, ref liC)
+ui.list("Difficulty", LiDiff, ref liD)
+ui.list("Setting", liSettings, ref liR)
+assert(liC == "red")           ## the array's first element, its VALUE
+assert(liD == "easy")          ## an enum sorted by value, hence in declaration order
 assert(liR == "alpha")           ## a map sorted by label, hence the first in alphabetical order
 
 ## A selection already set is honoured: the initialisation only applies to nil.
-var liGarde = "bleu"
-ui.list("Couleur", liTints, ref liGarde)
-assert(liGarde == "bleu")
+var liKept = "bleu"
+ui.list("Colour", liTints, ref liKept)
+assert(liKept == "bleu")
 
 ## The handle of a finished tween can be queried without error: keeping the handle is normal.
 assert(twT.isDone() and twT.progress() == 1)
@@ -1469,10 +1469,10 @@ assert(math.abs(sound.generate(0.1, func(t) return 5 end).peak() - 1.0) < 0.001)
 ## validates the oscillators' curve — which nothing else can check here.
 var bufE = sound.generate(1.0, func(t) return 1 end)
 bufE.envelope(0.1, 0.2, 0.5, 0.25)
-assert(math.abs(bufE.sample(0.05) - 0.5) < 0.01)    ## mi-attaque
-assert(math.abs(bufE.sample(0.1) - 1.0) < 0.01)     ## sommet de l'attaque
+assert(math.abs(bufE.sample(0.05) - 0.5) < 0.01)    ## halfway through the attack
+assert(math.abs(bufE.sample(0.1) - 1.0) < 0.01)     ## the attack's peak
 assert(math.abs(bufE.sample(0.2) - 0.75) < 0.01)    ## mid-decay, between 1 and the sustain
-assert(math.abs(bufE.sample(0.5) - 0.5) < 0.01)     ## maintien
+assert(math.abs(bufE.sample(0.5) - 0.5) < 0.01)     ## the sustain
 assert(bufE.sample(0.999) < 0.01)                   ## the release has run out along with the sound
 
 ## Playback: play and stop, and the settings chain as an oscillator's do.

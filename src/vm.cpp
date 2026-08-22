@@ -35,7 +35,7 @@ static void validate_numeric_range(double start, double end, double step, const 
     if (step == 0.0)
         throw std::runtime_error(loc + ": runtime: step cannot be 0");
     if (!std::isfinite(start) || !std::isfinite(end) || !std::isfinite(step))
-        throw std::runtime_error(loc + ": runtime: bornes de range non finies (NaN/infini interdit)");
+        throw std::runtime_error(loc + ": runtime: range bounds are not finite (NaN and infinity are refused)");
 }
 
 // Interned meta-key constants, initialized once and reused across all calls.
@@ -124,7 +124,7 @@ int VM::invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc) {
 }
 
 // invoke_str: a mini-loop that calls __str without recursing.
-std::string VM::invoke_str(Value obj) { // by value: regs.resize() ne invalide pas obj
+std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not invalidate obj
     Value cls = obj.map_get(MK().class_);
     if (cls.is_nil())
         return "{map}";
@@ -690,7 +690,7 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 
 // The single entry point for building a call frame: grow_regs to the minimum needed, fill in
 // defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
-//   4. construit et empile le Frame
+//   4. builds and pushes the Frame
 //   5. returns fp.addr (the caller does ip = push_call_frame(...))
 uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                            uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
@@ -821,7 +821,7 @@ dispatch_loop:
 
     op_LOAD_NIL:
         regs[base + A] = Value{};
-        last_results_ = 1; // ex. branche nil d'un appel optionnel f?() (multi-retour)
+        last_results_ = 1; // e.g. the nil branch of an optional call f?() (multi-return)
         NEXT();
 
     op_MOVE:
@@ -1650,11 +1650,11 @@ dispatch_loop:
             Upvalue* uv;
             if (desc.is_local) {
                 uv = nullptr;
-                auto& frame_ouv = call_stack.back().open_upvals;
-                if (frame_ouv) {
-                    for (auto* ou : *frame_ouv) {
-                        if (!ou->closed && ou->frame_base == base && ou->reg_idx == desc.idx) {
-                            uv = ou;
+                auto& frame_open = call_stack.back().open_upvals;
+                if (frame_open) {
+                    for (auto* cand : *frame_open) {
+                        if (!cand->closed && cand->frame_base == base && cand->reg_idx == desc.idx) {
+                            uv = cand;
                             break;
                         }
                     }
@@ -1663,9 +1663,9 @@ dispatch_loop:
                     uv = new Upvalue;
                     uv->frame_base = base;
                     uv->reg_idx = desc.idx;
-                    if (!frame_ouv)
-                        frame_ouv = std::make_unique<std::vector<Upvalue*>>();
-                    frame_ouv->push_back(uv);
+                    if (!frame_open)
+                        frame_open = std::make_unique<std::vector<Upvalue*>>();
+                    frame_open->push_back(uv);
                 }
                 uv->refcount++;
             } else {
@@ -1813,7 +1813,7 @@ dispatch_loop:
             } else {
                 double di = vi.as_num(), dl = vl.as_num(), ds = vs.as_num();
                 validate_numeric_range(di, dl, ds, err_line());
-                regs[base + A] = Value(di); // normalise tout en double
+                regs[base + A] = Value(di); // normalises everything to double
                 regs[base + A + 1] = Value(dl);
                 regs[base + A + 2] = Value(ds);
                 empty = (ds > 0) ? (di > dl) : (di < dl);
@@ -1990,7 +1990,7 @@ void VM::execute(Chunk chunk) {
     grow_regs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     Frame top;
-    top.varargs_base = owned_chunk.top_reg_count; // reg_count du frame top-level → result_cap correct pour les builtins
+    top.varargs_base = owned_chunk.top_reg_count; // the top-level frame's reg_count, so result_cap is right for the builtins
     call_stack.push_back(std::move(top));
 
     run_goto(0);

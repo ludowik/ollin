@@ -91,7 +91,7 @@ enum class Op : uint8_t {
                     // (bit0 = incl_right, bit1 = has_step)
     FOR_PREP, // ABx: a numeric for — R[A]=i, R[A+1]=limit, R[A+2]=step. It validates, normalises int/float, does i-=step, then ip=Bx
               // (towards FOR_LOOP)
-    FOR_LOOP, // ABx: i+=pas ; si dans la limite (incl) → R[A]=i, ip=Bx (corps) ; sinon continue (sortie)
+    FOR_LOOP, // ABx: i+=step; within the limit (inclusive) → R[A]=i, ip=Bx (body); otherwise falls through (exit)
     SPREAD_RESULTS, // AB: multi-return destructuring — sets R[A+last_results..A+B-1] to nil
     CALL_VA,        // ABC: A=arg_base, B=func_val_reg, C=n_fixe ; argc = C + last_results_ (dernier
                     // argument is a multi-value call, already materialized after the fixed ones)
@@ -99,8 +99,8 @@ enum class Op : uint8_t {
                     // Gathers the fixed arguments and the current frame's varargs into a FRESH area
                     // (above the caller's varargs, so nothing is overwritten), calls, and returns
                     // the results at A, the callee frame's result_base.
-    ARRAY_PUSH_SPREAD,  // AB: pousse last_results_ valeurs R[B..] dans le tableau R[A] (spread appel)
-    ARRAY_PUSH_VARARGS, // A: pousse TOUTES les varargs du frame courant dans le tableau R[A] ([..., ...])
+    ARRAY_PUSH_SPREAD,  // AB: pushes last_results_ values R[B..] into the array R[A] (a spread call)
+    ARRAY_PUSH_VARARGS, // A: pushes ALL of the current frame's varargs into the array R[A] ([..., ...])
     MOVE_RESULTS,       // AB: copies last_results_ values from R[B..] to R[A..], recomposing a nested spread
     RETURN_SPREAD,      // AB: returns B explicit values plus last_results_ (the last being a call), contiguous at R[A..]
     SEAL_ENUM,          // A: the map in R[A] becomes an enum, and every indexed write is refused

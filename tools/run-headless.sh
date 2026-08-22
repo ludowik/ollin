@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 
 BIN=build-gfx/ollin
 if [ ! -x "$BIN" ]; then
-    echo "build-gfx/ollin absent — lance d'abord : bash tools/native-gfx.sh"
+    echo "build-gfx/ollin is missing - run bash tools/native-gfx.sh first"
     exit 1
 fi
 if [ $# -lt 1 ]; then

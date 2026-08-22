@@ -56,8 +56,8 @@ if(EMSCRIPTEN)
     endif()
 
     # raylib disables JPG by default (config.h: SUPPORT_FILEFORMAT_JPG 0).
-    # On l'active pour que image.load accepte les .jpg/.jpeg — sans modifier la
-    # source raylib : la valeur 1 l'emporte sur le #ifndef de config.h, ce qui
+    # It is turned on so that image.load accepts .jpg/.jpeg, without touching the raylib
+    # source: the value 1 wins over the #ifndef of config.h, which
     # avoids the #define STBI_NO_JPEG of rtextures.c.
     if(TARGET raylib)
         target_compile_definitions(raylib PRIVATE SUPPORT_FILEFORMAT_JPG=1)
@@ -73,7 +73,7 @@ if(EMSCRIPTEN)
         -sEXPORT_NAME=OllinModule
         # FIXED memory, with no growth — MANDATORY for iOS and WebKit. Since emsdk
         # 6.0.x, with ALLOW_MEMORY_GROWTH the WASM memory is a resizable ArrayBuffer
-        # *redimensionnable* quand le navigateur le supporte. Or WebKit REFUSE une
+        # when the browser supports it. WebKit, however, REFUSES a
         # typed view over a resizable ArrayBuffer as an argument to
         # glTexImage2D, hence "srcData must be an instance of ArrayBufferView" on EVERY
         # texture upload: every graphics script crashes on iOS, while Chrome tolerates it, hence
@@ -92,7 +92,7 @@ if(EMSCRIPTEN)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         target_link_options(ollin_wasm PRIVATE -sASSERTIONS=1)
     endif()
-    # Tampon de date optionnel : ne casse pas le build si le script est absent.
+    # The date stamp is optional: a missing script does not break the build.
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tools/update_build_date.py")
         add_custom_command(TARGET ollin_wasm POST_BUILD
             COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/tools/update_build_date.py

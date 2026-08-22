@@ -34,8 +34,8 @@ extract_time() {
     echo "$1" | grep -oE 'time: [0-9]+\.[0-9]+' | sed 's/time: //'
 }
 
-# best_of <interp> <script> : lance le script RUNS fois, renvoie le meilleur
-# (plus petit) temps extrait, ou "N/A" si aucun run n'a produit de temps.
+# best_of <interp> <script>: runs the script RUNS times and returns the best (smallest)
+# time extracted, or "N/A" when no run produced a time.
 best_of() {
     local interp="$1" script="$2"
     local best="" t

@@ -249,7 +249,7 @@ struct ChainedCompareExpr : Expr {
 struct CallExpr : Expr {
     std::string callee;
     std::vector<std::unique_ptr<Expr>> args;
-    bool optional = false; // f?() : n'appelle que si callable, sinon nil
+    bool optional = false; // f?(): calls only when callable, otherwise nil
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -445,8 +445,8 @@ struct LValue {
     enum Kind { VAR, FIELD, INDEX, FIELD_INDEX };
     Kind kind = VAR;
     std::string name;               // VAR: variable; FIELD/INDEX/FIELD_INDEX: object name
-    std::string field;              // FIELD et FIELD_INDEX: nom du champ
-    std::unique_ptr<Expr> key;      // INDEX et FIELD_INDEX: expression d'index
+    std::string field;              // FIELD and FIELD_INDEX: the field's name
+    std::unique_ptr<Expr> key;      // INDEX and FIELD_INDEX: the index expression
 };
 
 struct MultiAssignStmt : Stmt {
@@ -525,7 +525,7 @@ struct FuncExpr : Expr {
 struct ExprCallExpr : Expr {
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
-    bool optional = false; // expr?() : n'appelle que si callable, sinon nil
+    bool optional = false; // expr?(): calls only when callable, otherwise nil
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -545,7 +545,7 @@ struct MethodCallExpr : Expr {
 
 struct ClassDeclStmt : Stmt {
     std::string name;
-    std::string parent; // vide si pas d'extends
+    std::string parent; // empty when there is no extends
     std::vector<std::unique_ptr<FuncDeclStmt>> methods;
     void exported_names(std::vector<std::string>& out) const override {
         out.push_back(name);
@@ -569,7 +569,7 @@ struct EnumItem {
 
 struct EnumDeclStmt : Stmt {
     std::string name;                   // nom simple (globale) ; sinon nom du champ
-    std::unique_ptr<Expr> obj_expr;     // non nul pour `enum obj.champ` : la map cible
+    std::unique_ptr<Expr> obj_expr;     // non-null for `enum obj.field`: the target map
     std::vector<EnumItem> items;
     void exported_names(std::vector<std::string>& out) const override {
         if (!obj_expr)   // `enum a.b` writes a map field, so there is no name of its own

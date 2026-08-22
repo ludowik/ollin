@@ -17,4 +17,4 @@ for html in targets:
         open(html, 'w', encoding='utf-8').write(new)
         updated += 1
 
-print(f'Build date updated: {ts} ({updated} fichier(s))')
+print(f'Build date updated: {ts} ({updated} file(s))')

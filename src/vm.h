@@ -133,7 +133,7 @@ class VM {
     // and the result is already written); otherwise returns the address of init's body.
     uint32_t instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done);
     uint32_t try_meta_unary(const Value& name, int dest, Value lhs);
-    void close_upvals();                     // tout le frame (retour, throw) — chemin CHAUD
+    void close_upvals();                     // the whole frame (return, throw) — the HOT path
     void close_upvals_above(int threshold);   // a scope that ends, such as an iteration
     // Unwinds to handler `h`, shrinks regs back, writes the caught value into the catch
     // register and points `ip` at the catch body. Shared by op_THROW (a script-level throw) and

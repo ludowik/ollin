@@ -1,4 +1,4 @@
--- Benchmark : création et usage de N objets avec plusieurs propriétés
+-- Benchmark: creating and using N objects with several properties
 
 local N = 100000
 
@@ -14,7 +14,7 @@ for i = 1, N do
     }
     -- lecture
     local s = obj.x + obj.y + obj.z + obj.value
-    -- écriture
+    -- write
     obj.x     = obj.x + 1
     obj.value = obj.value * 2
 end
