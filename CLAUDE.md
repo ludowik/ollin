@@ -630,6 +630,23 @@ survolée a changé, ce qui rend le doublon sans effet.
 
 - Table de taille fixe, 8 contacts (`MAX_TOUCH_POINTS` de raylib) ; un neuvième doigt est
   ignoré, comme raylib l'ignore.
+- **`touch.pinch(scale, cx, cy)` est DÉRIVÉ de deux contacts**, calculé dans le moteur et non
+  par chaque script : c'est le seul zoom d'un téléphone (`mouse.scrolled` rapporte une molette,
+  qu'aucun écran tactile n'a). `scale` est un **rapport entre deux frames**, donc il se compose
+  par multiplication et ne laisse aucun état au script. Trois pièges sont réglés une fois pour
+  toutes : le geste est identifié par la **paire triée** d'identifiants (la couche graphique peut
+  échanger ses deux entrées d'une frame à l'autre, ce qui réarmerait la référence à chaque tour) ;
+  remplacer un doigt de la paire **réarme** la distance de référence au lieu d'annoncer un saut ;
+  et deux doigts au même point sont écartés (`< 1 px`) au lieu d'être divisés, ce qui rendrait un
+  facteur de plusieurs centaines. Des doigts immobiles n'appellent rien. Appelé APRÈS les rappels
+  par doigt (un script qui suit ses doigts a déjà mis son état à jour), désarmé par `touch_reset`.
+  **Mesuré au navigateur** (événements tactiles synthétiques via CDP) : écartement de ±30 à
+  ±120 px → produit des rapports = 4,0000004 (soit exactement 120/30) en 5 appels ; retour à
+  ±40 px → 1,3333 ; doigts immobiles, un seul doigt, et échange d'un doigt de la paire → aucun
+  appel, donc aucun saut.
+- **Un pincement n'est pas un glissement** : sous deux doigts le système émule toujours la souris
+  avec l'un d'eux, donc un script qui oriente la scène sur `mouse.moved` doit se garder par
+  `touch.count() > 1` — sinon la scène tourne pendant qu'on zoome (`iso_camera.ol` le fait).
 - **`touch_begin_frame()` AVANT `mouse_poll`, `touch_poll()` après.** Le relevé des contacts
   est une étape de la frame à part entière, et non le début de `touch_poll` : les rappels de
   `mouse` s'exécutent avant, et beaucoup interrogent `touch.count()` pour savoir si le geste
