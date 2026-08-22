@@ -15,8 +15,8 @@
 export async function init(ctx) {
   const NBSP = " ";
   const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
-  const pct = v => (Math.abs(v) < 0.05 ? "" : v > 0 ? "+" : "−") + Math.abs(v).toFixed(1).replace(".", ",") + " %";
-  const millions = n => (n / 1e6).toFixed(1).replace(".", ",") + " M";
+  const pct = v => (Math.abs(v) < 0.05 ? "" : v > 0 ? "+" : "−") + Math.abs(v).toFixed(1) + " %";
+  const millions = n => (n / 1e6).toFixed(1) + " M";
   const dayMonth = iso => iso.slice(8, 10) + "/" + iso.slice(5, 7);
 
   const SVGNS = "http://www.w3.org/2000/svg";
@@ -36,8 +36,8 @@ export async function init(ctx) {
 
   function report(e) {
     problem.hidden = false;
-    problem.textContent = "Les graphiques n'ont pas pu être dessinés (" + (e && e.message ? e.message : e) +
-                        "). Les valeurs restent lisibles dans le tableau.";
+    problem.textContent = "The charts could not be drawn (" + (e && e.message ? e.message : e) +
+                        "). The values remain readable in the table.";
   }
 
   // Data.
@@ -76,26 +76,26 @@ export async function init(ctx) {
   const first = MILESTONES.find(known);
   const last = [...MILESTONES].reverse().find(known);
   // No complete milestone: the file is unusable for the charts (a renamed series, values all
-  // missing). Say why, rather than failing on premier.date.
+  // missing). Say why, rather than failing on first.date.
   if (!first) {
-    report(new Error("aucun jalon ne porte les " + SERIES.length + " séries attendues : " +
+    report(new Error("no milestone carries the " + SERIES.length + " expected series: " +
                        SERIES.map(s => s.id).join(", ")));
     return () => {};
   }
-  const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin",
-                "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+  const MONTHS = ["January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"];
   const inWords = iso => Number(iso.slice(8, 10)) + " " + MONTHS[Number(iso.slice(5, 7)) - 1];
   const measured = MILESTONES.filter(known).length;
 
   document.getElementById("intro").textContent =
-    "Ce que le moteur d'Ollin coûte à exécuter, mesuré de deux façons : le TRAVAIL qu'il " +
-    "demande, suivi du " + inWords(first.date) + " au " + inWords(last.date) + " " +
-    last.date.slice(0, 4) + (bench ? ", et le TEMPS qu'il prend, relevé face à Lua et à Python." : ".");
+    "What Ollin's engine costs to run, measured two ways: the WORK it asks for, followed from " +
+    inWords(first.date) + " to " + inWords(last.date) + " " +
+    last.date.slice(0, 4) + (bench ? ", and the TIME it takes, read against Lua and Python." : ".");
   document.getElementById("about-work").textContent =
-    "Instructions exécutées par " + SERIES.map(s => s.name).join(", ") + ". " +
-    MILESTONES.length + " jalons, un par journée où le cœur du moteur a été touché" +
-    (measured < MILESTONES.length ? " — dont " + (MILESTONES.length - measured) + " sans valeur, faute de compiler. " : ". ") +
-    "Mesuré avec " + doc.tool + " ; " + doc.machine + ".";
+    "Instructions executed by " + SERIES.map(s => s.name).join(", ") + ". " +
+    MILESTONES.length + " milestones, one per day on which the engine's core was touched" +
+    (measured < MILESTONES.length ? ", " + (MILESTONES.length - measured) + " of them without a value, having failed to build. " : ". ") +
+    "Measured with " + doc.tool + "; " + doc.machine + ".";
 
   // Summaries.
   const summaryBox = document.getElementById("summary");
@@ -114,7 +114,7 @@ export async function init(ctx) {
     val.textContent = pct(v);
     const det = document.createElement("div");
     det.className = "detail";
-    det.textContent = fmt(a) + " → " + fmt(b) + (v < 0 ? " (÷" + (a / b).toFixed(2).replace(".", ",") + ")" : "");
+    det.textContent = fmt(a) + " → " + fmt(b) + (v < 0 ? " (÷" + (a / b).toFixed(2) + ")" : "");
     card.append(what, val, det);
     summaryBox.append(card);
   });
@@ -205,7 +205,7 @@ export async function init(ctx) {
       axis.append(t);
     });
     const leg = el("text", { x: m.l, y: h - m.b + 37, class: "mono dim" });
-    leg.textContent = small ? n + " jalons moteur" : n + " jalons — un par journée de commit moteur";
+    leg.textContent = small ? n + " engine milestones" : n + " milestones - one per day of engine commits";
     axis.append(leg);
     svgCurves.append(axis);
 
@@ -411,8 +411,8 @@ export async function init(ctx) {
   // than compressed: the highest coefficient (Python on the numeric loop) would crush everything
   // else, and a non-linear scale would lie about the ratios. Bars that go past the cap are cut
   // short with a point, and their value is written out at the end.
-  const coef = v => "×" + v.toFixed(2).replace(".", ",");
-  const seconds = v => v.toFixed(4).replace(".", ",") + " s";
+  const coef = v => "×" + v.toFixed(2);
+  const seconds = v => v.toFixed(4) + " s";
   const median = id => {
     const t = bench.benchmarks.map(b => b[id]).sort((a, b) => a - b);
     const m = Math.floor(t.length / 2);
@@ -422,13 +422,13 @@ export async function init(ctx) {
   if (bench) {
     // The reference is not among `concurrents`, so the heading names it first; otherwise the page
     // would announce a single language compared while the chart shows two.
-    document.getElementById("title-times").textContent = "Le temps, face à " +
-      [bench.reference.name].concat(bench.competitors.filter(c => c.id !== "ollin").map(c => c.name)).join(" et à ");
+    document.getElementById("title-times").textContent = "The time, against " +
+      [bench.reference.name].concat(bench.competitors.filter(c => c.id !== "ollin").map(c => c.name)).join(" and ");
     document.getElementById("about-times").textContent =
-      "Relevé du " + inWords(bench.date) + " " + bench.date.slice(0, 4) + " sur le commit " +
-      bench.commit + ", meilleur de " + bench.runs + " exécutions, en temps processeur. " +
-      bench.machine + " ; " + bench.build + ". Référence : " + bench.reference.name +
-      ", dont le temps absolu vaut 1.";
+      "Read on " + inWords(bench.date) + " " + bench.date.slice(0, 4) + " at commit " +
+      bench.commit + ", best of " + bench.runs + " runs, in processor time. " +
+      bench.machine + "; " + bench.build + ". Reference: " + bench.reference.name +
+      ", whose absolute time counts as 1.";
 
     const box = document.getElementById("keys-bench");
     bench.competitors.forEach(c => {
@@ -436,7 +436,7 @@ export async function init(ctx) {
       const i = document.createElement("i");
       i.className = "s-" + c.id;
       const b = document.createElement("b");
-      b.textContent = "médiane " + coef(median(c.id));
+      b.textContent = "median " + coef(median(c.id));
       w.append(i, document.createTextNode(c.name), b);
       box.append(w);
     });
@@ -486,7 +486,7 @@ export async function init(ctx) {
         }));
         // A value beyond the scale is written AGAINST the right edge, right-aligned: placed at
         // the end of the shortened bar it went out of frame and was cut in two on a phone
-        // ("×12,").
+        // ("x12.").
         const t = el("text", {
           x: beyond ? w - 2 : bx + 6, y: y + 7, class: "val",
           fill: "var(--s-" + c.id + ")", "text-anchor": beyond ? "end" : "start",
@@ -550,7 +550,7 @@ export async function init(ctx) {
   if (bench) {
     const table = document.getElementById("times");
     const thead = document.createElement("thead"), tr = document.createElement("tr");
-    ["benchmark", "ce qu'il mesure", bench.reference.name]
+    ["benchmark", "what it measures", bench.reference.name]
       .concat(bench.competitors.map(c => c.name))
       .forEach(c => {
         const th = document.createElement("th");

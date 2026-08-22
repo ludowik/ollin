@@ -149,57 +149,57 @@
 </div>
 
 <div class="perf-wrap">
-  <h1 id="title">Performances du moteur</h1>
+  <h1 id="title">Engine performance</h1>
   <p class="intro" id="intro"></p>
 
   <div class="caution">
-    Deux grandeurs, deux statuts. Le <strong>travail</strong> — le nombre d'instructions exécutées — est <strong>déterministe</strong>&nbsp;: il se compare d'une version du moteur à l'autre, et c'est de lui qu'on parle quand on dit qu'une évolution coûte ou rapporte. Le <strong>temps</strong>, lui, dépend de la machine, du compilateur et jusqu'à l'adresse à laquelle le code est placé&nbsp;: il ne vaut que comme <strong>relevé</strong>, à une date et sur un matériel donnés.
+    Two quantities, two statuses. The <strong>work</strong> — the number of instructions executed — is <strong>deterministic</strong>: it compares from one version of the engine to the next, and it is what we mean when we say a change costs or saves. The <strong>time</strong>, on the other hand, depends on the machine, on the compiler and even on the address the code is placed at: it only counts as a <strong>reading</strong>, on a given date and a given piece of hardware.
   </div>
 
-  <h2 class="section">Le travail, version après version</h2>
+  <h2 class="section">The work, version after version</h2>
   <p class="about" id="about-work"></p>
 
   <div class="summary" id="summary"></div>
 
   <div class="block">
-    <h2>Le travail exécuté, jalon par jalon</h2>
-    <p class="about">Les trois séries partagent la même unité et la même échelle. Une interruption de la courbe signale un jalon dont la valeur est inconnue&nbsp;: elle n'est pas interpolée.</p>
+    <h2>The work executed, milestone by milestone</h2>
+    <p class="about">The three series share one unit and one scale. A break in the curve marks a milestone whose value is unknown: it is not interpolated.</p>
     <div class="keys" id="keys"></div>
-    <svg id="curves" role="img" aria-label="Nombre d'instructions exécutées par chacun des trois scripts, jalon par jalon"></svg>
+    <svg id="curves" role="img" aria-label="The number of instructions executed by each of the three scripts, milestone by milestone"></svg>
   </div>
 
   <div class="block">
-    <h2>Variation d'un jalon au suivant, sur <code id="gaps-series">…</code></h2>
-    <p class="about">Une barre vers le bas est un gain — moins de travail qu'au jalon précédent. Vers le haut, un coût réel. Les plus gros écarts sont annotés&nbsp;; toutes les valeurs sont dans le tableau.</p>
-    <svg id="gaps" role="img" aria-label="Variation en pourcentage du travail de fib, d'un jalon au suivant"></svg>
+    <h2>Change from one milestone to the next, on <code id="gaps-series">…</code></h2>
+    <p class="about">A bar downwards is a gain — less work than at the previous milestone. Upwards, a real cost. The largest changes are annotated; every value is in the table.</p>
+    <svg id="gaps" role="img" aria-label="The percentage change in fib's work from one milestone to the next"></svg>
   </div>
 
-  <h3>Toutes les valeurs</h3>
+  <h3>Every value</h3>
   <div class="scroll"><table id="values"></table></div>
 
-  <h2 class="section" id="title-times">Le temps, face à deux autres langages</h2>
+  <h2 class="section" id="title-times">The time, against two other languages</h2>
   <p class="about" id="about-times"></p>
 
   <div class="block" id="block-bench">
-    <h2>Coefficient par rapport à la référence</h2>
-    <p class="about">Chaque barre est un multiple du temps de référence&nbsp;: à gauche du repère, le langage est plus rapide&nbsp;; à droite, plus lent. Les neuf tests portent chacun sur un chemin différent du moteur, et une somme de contrôle identique dans les trois langages garantit qu'ils font le même travail.</p>
+    <h2>Multiple of the reference time</h2>
+    <p class="about">Every bar is a multiple of the reference time: left of the mark the language is faster, right of it slower. Each of the nine tests exercises a different path through the engine, and a checksum identical in all three languages guarantees they do the same work.</p>
     <div class="keys" id="keys-bench"></div>
-    <svg id="bench" role="img" aria-label="Temps d'exécution d'Ollin et de Python, en multiple du temps de Lua, pour chacun des neuf benchmarks"></svg>
+    <svg id="bench" role="img" aria-label="The run time of Ollin and Python as a multiple of Lua's, for each of the nine benchmarks"></svg>
   </div>
 
-  <h3 id="title-detail">Détail du relevé</h3>
+  <h3 id="title-detail">The reading in detail</h3>
   <div class="scroll" id="scroll-times"><table id="times"></table></div>
 
-  <h2 class="section">Méthode</h2>
+  <h2 class="section">Method</h2>
   <p class="method">
-    <strong>Pourquoi deux instruments.</strong> Tous les gestionnaires d'opcodes de la machine virtuelle vivent dans une seule fonction (dispatch par <em>computed-goto</em>), si bien que modifier n'importe lequel déplace l'adresse de tous les autres et change le comportement du cache d'instructions. L'effet est mesuré à ±7&nbsp;%&nbsp;: ajouter du code mort dans un gestionnaire que le test n'exécute jamais suffit à le rendre 7&nbsp;% plus rapide. Un écart de quelques pour cent sur un temps ne dit donc rien d'un coût réel.
-    Le compte d'instructions, lui, est indifférent à l'adresse du code comme au cache. Instructions en hausse&nbsp;: coût réel, à corriger. Instructions stables et temps qui bouge&nbsp;: placement, rien à optimiser — et figer une disposition favorable ne servirait à rien, le prochain changement la défera.
+    <strong>Why two instruments.</strong> Every opcode handler of the virtual machine lives in a single function (<em>computed-goto</em> dispatch), so changing any one of them moves the address of all the others and alters how the instruction cache behaves. The effect is measured at ±7%: adding dead code to a handler the test never executes is enough to make it 7% faster. A difference of a few per cent in a time therefore says nothing about a real cost.
+    The instruction count, by contrast, is indifferent to the code's address and to the cache. Instructions up: a real cost, to be fixed. Instructions steady while the time moves: placement, and nothing to optimise — freezing a favourable layout would serve no purpose, the next change undoing it.
   </p>
   <p class="method">
-    <strong>Le travail.</strong> Relevé par <code>bash bench/icount.sh &lt;réf&gt; [&lt;réf&gt;]</code>, qui compile chaque version dans un espace de travail jetable et compte les instructions exécutées (callgrind). Un jalon par journée mesure l'état en <em>fin</em> de journée&nbsp;: l'écart affiché cumule tous les commits du jour, et le sujet indiqué — celui du dernier — n'en porte ni le mérite ni le blâme. Attribuer un écart à un commit précis demande de mesurer ce commit. Seules les journées touchant le cœur du moteur sont jalonnées&nbsp;; ailleurs le compte est stable par construction. La borne basse n'est pas l'historique git mais le <strong>langage</strong>&nbsp;: avant le 20 juin 2026, ces trois scripts ne s'exécutent pas.
+    <strong>The work.</strong> Read by <code>bash bench/icount.sh &lt;ref&gt; [&lt;ref&gt;]</code>, which builds each version in a throwaway workspace and counts the instructions executed (callgrind). One milestone per day measures the state at the <em>end</em> of that day: the change shown adds up every commit of the day, and the subject named — the last one's — deserves neither the credit nor the blame. Attributing a change to one commit means measuring that commit. Only the days touching the engine's core are marked; elsewhere the count is steady by construction. The lower bound is not the git history but the <strong>language</strong>: before 20 June 2026, these three scripts do not run.
   </p>
   <p class="method">
-    <strong>Le temps.</strong> Relevé par <code>bash bench/bench_all.sh</code>. Chaque test est lancé plusieurs fois et le <em>meilleur</em> temps est retenu, un run unique étant trop sensible à la contention du processeur. Les trois langages mesurent le temps <strong>processeur</strong>, non le temps écoulé. Aucun environnement n'est normatif&nbsp;: ni les temps ni les coefficients ne se transportent d'une machine ou d'une session à l'autre, et deux chiffres ne se comparent que mesurés dans la même série.
+    <strong>The time.</strong> Read by <code>bash bench/bench_all.sh</code>. Every test is run several times and the <em>best</em> time is kept, a single run being too sensitive to contention for the processor. All three languages measure <strong>processor</strong> time, not elapsed time. No environment is normative: neither the times nor the multiples carry over from one machine or one session to another, and two figures compare only when measured in the same series.
   </p>
   <p id="problem" hidden></p>
 </div>
