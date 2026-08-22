@@ -2072,18 +2072,18 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <!-- ── Clavier ────────────────────────────────────────────────────────────── -->
 <section id="keyboard">
-<h2>Module <code>keyboard</code></h2>
-<p>Le clavier suit le même principe que <code>setup</code>/<code>update</code>/<code>draw</code> : on <strong>déclare des fonctions directement sur le module <code>keyboard</code></strong> et le moteur les appelle si elles existent (aucune activation). Actif pendant la boucle de rendu. Pour un <strong>déplacement continu</strong>, préférer <code>keyboard.isDown(key)</code> (état maintenu, testé chaque frame) aux événements ponctuels.</p>
+<h2>The <code>keyboard</code> module</h2>
+<p>The keyboard follows the same principle as <code>setup</code>/<code>update</code>/<code>draw</code>: you <strong>declare functions straight onto the <code>keyboard</code> module</strong> and the engine calls them when they exist, with nothing to turn on. It is active during the render loop. For <strong>continuous movement</strong>, prefer <code>keyboard.isDown(key)</code> — a held state, tested every frame — over the one-off events.</p>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>keyboard.isDown(key)</code></td><td>Renvoie <code>true</code>/<code>false</code> selon que la touche est <strong>enfoncée maintenant</strong> (à interroger dans <code>draw</code>/<code>update</code>)</td></tr>
-    <tr><td><code>func keyboard.keypressed(key)</code></td><td>Appelée à chaque touche <strong>enfoncée</strong> (événement)</td></tr>
-    <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Appelée à chaque touche <strong>relâchée</strong> (événement)</td></tr>
+    <tr><td><code>keyboard.isDown(key)</code></td><td>Returns <code>true</code>/<code>false</code> according to whether the key is <strong>down right now</strong>; ask inside <code>draw</code>/<code>update</code></td></tr>
+    <tr><td><code>func keyboard.keypressed(key)</code></td><td>Called on every key <strong>press</strong>, as an event</td></tr>
+    <tr><td><code>func keyboard.keyrelease(key)</code></td><td>Called on every key <strong>release</strong>, as an event</td></tr>
   </tbody>
 </table>
-<p><code>key</code> est un <strong>nom de touche</strong> : <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>.</p>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"clavier"</span>)  <span class="cmt">## clique le canvas puis tape</span>
+<p><code>key</code> is a <strong>key name</strong>: <code>"a"</code>…<code>"z"</code>, <code>"0"</code>…<code>"9"</code>, <code>"space"</code>, <code>"return"</code>, <code>"escape"</code>, <code>"backspace"</code>, <code>"tab"</code>, <code>"delete"</code>, <code>"left"</code>/<code>"right"</code>/<code>"up"</code>/<code>"down"</code>, <code>"shift"</code>/<code>"ctrl"</code>/<code>"alt"</code>.</p>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">120</span>, <span class="str">"keyboard"</span>)  <span class="cmt">## click the canvas, then type</span>
 <span class="kw">global</span> last = <span class="str">"…"</span>
 <span class="kw">func</span> keyboard.keypressed(key)
     last = key
@@ -2091,25 +2091,25 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
     <span class="bi">graphics</span>.fontSize(<span class="num">26</span>)
-    <span class="bi">graphics</span>.text(<span class="str">"touche : "</span> + last, <span class="num">16</span>, <span class="num">45</span>)
+    <span class="bi">graphics</span>.text(<span class="str">"key: "</span> + last, <span class="num">16</span>, <span class="num">45</span>)
 <span class="kw">end</span></code></pre>
 </section>
 
-<!-- ── Souris ─────────────────────────────────────────────────────────────── -->
+<!-- ── Mouse ──────────────────────────────────────────────────────────────── -->
 <section id="mouse">
-<h2>Module <code>mouse</code></h2>
-<p>Même principe pour le pointeur (souris ou tap tactile) : on déclare les fonctions directement sur le module <code>mouse</code>. Chaque callback reçoit la position <code>(x, y)</code> dans le repère de la zone graphique.</p>
+<h2>The <code>mouse</code> module</h2>
+<p>The same principle for the pointer, whether a mouse or a tap: the functions are declared straight onto the <code>mouse</code> module. Each callback receives the position <code>(x, y)</code> in the graphics area's frame.</p>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>func mouse.pressed(x, y)</code></td><td>Appui du bouton gauche / tap</td></tr>
-    <tr><td><code>func mouse.released(x, y)</code></td><td>Relâché</td></tr>
-    <tr><td><code>func mouse.moved(x, y)</code></td><td>Déplacement du pointeur</td></tr>
-    <tr><td><code>func mouse.scrolled(x, y, dx, dy)</code></td><td>Molette / pinch — <code>dy</code> positif = vers le haut</td></tr>
-    <tr><td><code>func mouse.doubleClicked(x, y)</code></td><td>Double-clic (deux appuis en moins de 300 ms au même endroit) — le premier appui reste invisible pour <code>mouse.pressed</code></td></tr>
+    <tr><td><code>func mouse.pressed(x, y)</code></td><td>The left button pressed, or a tap</td></tr>
+    <tr><td><code>func mouse.released(x, y)</code></td><td>Released</td></tr>
+    <tr><td><code>func mouse.moved(x, y)</code></td><td>The pointer moved</td></tr>
+    <tr><td><code>func mouse.scrolled(x, y, dx, dy)</code></td><td>The wheel, or a pinch — a positive <code>dy</code> means upwards</td></tr>
+    <tr><td><code>func mouse.doubleClicked(x, y)</code></td><td>A double click: two presses within 300 ms at the same place — the first press stays invisible to <code>mouse.pressed</code></td></tr>
   </tbody>
 </table>
-<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"souris"</span>)  <span class="cmt">## clique dans le canvas</span>
+<pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"mouse"</span>)  <span class="cmt">## click inside the canvas</span>
 <span class="kw">global</span> px = <span class="num">130</span>
 <span class="kw">global</span> py = <span class="num">80</span>
 <span class="kw">func</span> mouse.pressed(x, y)
@@ -2125,21 +2125,21 @@ print(v3)          ## Vec2(4,6)</code></pre>
 
 <!-- ── ui ─────────────────────────────────────────────────────────────────── -->
 <section id="touch">
-<h2>Module <code>touch</code></h2>
-<p>Suit <strong>plusieurs doigts à la fois</strong>, chacun par un identifiant stable. C'est ce qu'il faut pour deux notes tenues ensemble, une manette à deux pouces ou un pincement — là où <code>mouse</code> ne rapporte qu'un seul point.</p>
+<h2>The <code>touch</code> module</h2>
+<p>It follows <strong>several fingers at once</strong>, each by a stable identifier. That is what two notes held together, a two-thumb gamepad or a pinch need — where <code>mouse</code> reports a single point.</p>
 
 <table>
-  <thead><tr><th>Rappel</th><th>Appelé quand</th></tr></thead>
+  <thead><tr><th>Callback</th><th>Called when</th></tr></thead>
   <tbody>
-    <tr><td><code>touch.began(id, x, y)</code></td><td>un doigt se pose</td></tr>
-    <tr><td><code>touch.moved(id, x, y)</code></td><td>un doigt se déplace</td></tr>
-    <tr><td><code>touch.ended(id, x, y)</code></td><td>un doigt se lève, à sa dernière position connue</td></tr>
+    <tr><td><code>touch.began(id, x, y)</code></td><td>a finger lands</td></tr>
+    <tr><td><code>touch.moved(id, x, y)</code></td><td>a finger moves</td></tr>
+    <tr><td><code>touch.ended(id, x, y)</code></td><td>a finger lifts, at its last known position</td></tr>
   </tbody>
 </table>
 
-<p>L'état se lit aussi directement, sans rappel&nbsp;: <code>touch.count()</code> donne le nombre de contacts, <code>touch.points()</code> un tableau de <code>{id, x, y}</code>. Les coordonnées sont dans le même repère que celles de <code>mouse</code>.</p>
+<p>The state can also be read directly, with no callback: <code>touch.count()</code> gives the number of contacts, <code>touch.points()</code> an array of <code>{id, x, y}</code>. The coordinates are in the same frame as <code>mouse</code>'s.</p>
 
-<pre><code><span class="cmt">## Une note par doigt : l'identifiant sert de clé, donc plusieurs sonnent ensemble.</span>
+<pre><code><span class="cmt">## One note per finger: the identifier is the key, so several sound together.</span>
 <span class="kw">global</span> under = {}
 
 <span class="kw">func</span> touch.began(id, x, y)
@@ -2151,39 +2151,39 @@ print(v3)          ## Vec2(4,6)</code></pre>
     under[id] = <span class="kw">nil</span>
 <span class="kw">end</span></code></pre>
 
-<div class="callout tip">Les rappels de <code>mouse</code> ne sont <strong>pas</strong> supprimés&nbsp;: sur un doigt unique, le système émule la souris, si bien qu'un script déclarant les deux familles reçoit le geste <strong>deux fois</strong>. Écrivez donc chaque chemin pour qu'un doublon soit sans effet, ou n'écoutez qu'une famille.</div>
+<div class="callout tip">The <code>mouse</code> callbacks are <strong>not</strong> suppressed: under a single finger the system emulates the mouse, so a script declaring both families receives the gesture <strong>twice</strong>. Write each path so that a duplicate has no effect, or listen to one family only.</div>
 
-<h3>Ce qu'il faut savoir</h3>
+<h3>What to know</h3>
 <ul>
-  <li>Jusqu'à <strong>huit</strong> contacts sont suivis. Un neuvième doigt est ignoré, comme le fait le moteur graphique lui-même.</li>
-  <li>Sur un ordinateur, une souris n'a qu'un pointeur&nbsp;: <code>touch.count()</code> y vaut toujours zéro, et c'est <code>mouse</code> qui rend service.</li>
-  <li>Le suivi est reconstruit par le moteur&nbsp;: la couche graphique ne donne qu'une photographie des contacts à chaque image, sans dire lequel vient d'apparaître. C'est la comparaison d'une image à la suivante qui produit les trois rappels.</li>
-  <li>L'identifiant reste le même du début à la fin d'un geste, mais il est <strong>réutilisé</strong> ensuite&nbsp;: ne le conservez pas au-delà de <code>ended</code>.</li>
-  <li>Une page web doit poser <code>touch-action: none</code> sur son canvas, sans quoi deux doigts déclenchent le zoom du navigateur au lieu d'atteindre le programme. Les vues du site le font déjà.</li>
+  <li>Up to <strong>eight</strong> contacts are followed. A ninth finger is ignored, as the graphics engine itself ignores it.</li>
+  <li>On a computer a mouse has a single pointer: <code>touch.count()</code> is always zero there, and <code>mouse</code> is what serves.</li>
+  <li>The tracking is rebuilt by the engine: the graphics layer gives only a snapshot of the contacts on each frame, without saying which has just appeared. It is the comparison from one frame to the next that produces the three callbacks.</li>
+  <li>The identifier stays the same from the start of a gesture to its end, but it is <strong>reused</strong> afterwards: do not keep it beyond <code>ended</code>.</li>
+  <li>A web page must set <code>touch-action: none</code> on its canvas, otherwise two fingers set off the browser's zoom instead of reaching the program. The site's views already do so.</li>
 </ul>
 </section>
 
 <section id="ui">
-<h2>Module ui</h2>
-<p>Boutons, cases à cocher et sliders dessinés par le <strong>moteur</strong>, en pile dans le coin haut droit de la zone de tracé. Aucune dépendance au navigateur : le même code tourne en natif, sous un affichage virtuel et dans le playground.</p>
+<h2>The ui module</h2>
+<p>Buttons, checkboxes and sliders drawn by the <strong>engine</strong>, stacked in the top-right corner of the drawing area. There is no dependency on the browser: the same code runs natively, under a virtual display, and in the playground.</p>
 
-<p>Un widget se déclare <strong>une fois</strong> — au niveau du fichier ou dans <code>setup()</code>. Le moteur le dessine et le teste à chaque frame : il n'y a rien à appeler dans <code>draw()</code>.</p>
+<p>A widget is declared <strong>once</strong> — at the file level or in <code>setup()</code>. The engine draws it and tests it on every frame: there is nothing to call inside <code>draw()</code>.</p>
 
-<p>L'interface est <strong>fermée au démarrage</strong> : elle se réduit à une poignée à trois barres dans le coin, pour ne pas masquer la scène. Un clic dessus déplie le menu affiché, dont la ligne de tête reprend la poignée et le titre du menu ; un clic sur cette tête referme.</p>
+<p>The interface is <strong>closed at startup</strong>: it shrinks to a three-bar handle in the corner, so as not to hide the scene. A click on it unfolds the menu on display, whose header row carries the handle and the menu's title; a click on that header closes it again.</p>
 
 <pre><code><span class="kw">global</span> grid = <span class="kw">true</span>
-<span class="kw">global</span> speed = <span class="kw">nil</span>   <span class="cmt">## le slider l'initialise à son default</span>
+<span class="kw">global</span> speed = <span class="kw">nil</span>   <span class="cmt">## the slider initialises it to its default</span>
 
 <span class="kw">func</span> <span class="fn">resetAll</span>()
     t = <span class="num">0</span>
 <span class="kw">end</span>
 
-ui.button(<span class="str">"Remettre à zéro"</span>, resetAll)
+ui.button(<span class="str">"Reset"</span>, resetAll)
 ui.checkbox(<span class="str">"Grid"</span>, <span class="kw">ref</span> grid)
-ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> speed, <span class="num">0.25</span>, <span class="num">3</span>, <span class="num">1.0</span>)
+ui.slider(<span class="str">"Speed"</span>, <span class="kw">ref</span> speed, <span class="num">0.25</span>, <span class="num">3</span>, <span class="num">1.0</span>)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
-    <span class="kw">if</span> grid <span class="kw">then</span>       <span class="cmt">## lecture NORMALE de la variable liée</span>
+    <span class="kw">if</span> grid <span class="kw">then</span>       <span class="cmt">## an ORDINARY read of the bound variable</span>
         drawGrid()
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
@@ -2192,111 +2192,111 @@ ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> speed,
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>ui.button(label, fn)</code></td><td>Ajoute un bouton. La fonction est appelée à chaque clic, sans argument.</td></tr>
-    <tr><td><code>ui.checkbox(label, ref variable [, onChange])</code></td><td>Ajoute une case à cocher liée à une variable, passée par <a href="#ref">référence</a>. L'état initial est <strong>lu</strong> dans la variable ; chaque clic y écrit <code>true</code> ou <code>false</code>, puis appelle <code>onChange(nouvelEtat)</code> si la fonction est fournie.</td></tr>
-    <tr><td><code>ui.slider(label, ref variable, min, max [, default] [, onChange])</code></td><td>Ajoute une valeur numérique réglable à la souris, liée à une variable passée par <a href="#ref">référence</a>. Si la variable vaut <code>nil</code>, elle est initialisée au <strong>défaut</strong> (ou à <code>min</code> en son absence). Les deux derniers arguments sont reconnus par leur type : un nombre est le défaut, une fonction le rappel appelé à chaque changement avec la nouvelle valeur.</td></tr>
-    <tr><td><code>ui.list(label, source, <span class="kw">ref</span> variable [, onChange])</code></td><td>Liste en <strong>mono-sélection</strong> : la ligne montre l'élément retenu, un clic déplie les choix. <code>source</code> = tableau, map ou enum</td></tr>
-    <tr><td><code>ui.clear()</code></td><td>Retire tous les widgets — pour reconstruire une interface qui change en cours de route.</td></tr>
+    <tr><td><code>ui.button(label, fn)</code></td><td>Adds a button. The function is called on every click, with no argument.</td></tr>
+    <tr><td><code>ui.checkbox(label, ref variable [, onChange])</code></td><td>Adds a checkbox bound to a variable, passed by <a href="#ref">reference</a>. The initial state is <strong>read</strong> from the variable; every click writes <code>true</code> or <code>false</code> into it, then calls <code>onChange(newState)</code> when that function is given.</td></tr>
+    <tr><td><code>ui.slider(label, ref variable, min, max [, default] [, onChange])</code></td><td>Adds a numeric value adjustable with the mouse, bound to a variable passed by <a href="#ref">reference</a>. When the variable is <code>nil</code> it is initialised to the <strong>default</strong>, or to <code>min</code> when there is none. The last two arguments are recognised by their type: a number is the default, a function the callback called on every change with the new value.</td></tr>
+    <tr><td><code>ui.list(label, source, <span class="kw">ref</span> variable [, onChange])</code></td><td>A <strong>single-selection</strong> list: the row shows the item chosen, and a click unfolds the choices. <code>source</code> is an array, a map or an enum</td></tr>
+    <tr><td><code>ui.clear()</code></td><td>Removes every widget — for rebuilding an interface that changes along the way.</td></tr>
   </tbody>
 </table>
 
-<h3>Listes</h3>
-<p>Une liste choisit <strong>un</strong> élément parmi plusieurs. Sa source est un <strong>tableau</strong>, une <strong>map</strong> ou un <strong>enum</strong>, et la règle d'affichage est celle de <code><span class="kw">for</span> … <span class="kw">in</span></code> : un tableau donne ses <strong>valeurs</strong>, une map ou un enum ses <strong>clés</strong>. La variable liée reçoit exactement ce qui est affiché — la valeur pour un tableau, la clé pour une map ou un enum.</p>
+<h3>Lists</h3>
+<p>A list chooses <strong>one</strong> item among several. Its source is an <strong>array</strong>, a <strong>map</strong> or an <strong>enum</strong>, and the display rule is that of <code><span class="kw">for</span> … <span class="kw">in</span></code>: an array gives its <strong>values</strong>, a map or an enum its <strong>keys</strong>. The bound variable receives exactly what is shown — the value for an array, the key for a map or an enum.</p>
 
-<pre><code><span class="kw">global</span> shapes = [<span class="str">"cercle"</span>, <span class="str">"carré"</span>, <span class="str">"triangle"</span>]
+<pre><code><span class="kw">global</span> shapes = [<span class="str">"circle"</span>, <span class="str">"square"</span>, <span class="str">"triangle"</span>]
 <span class="kw">enum</span> Dir
     clockwise,
     counterClockwise
 <span class="kw">end</span>
-<span class="kw">global</span> shape = <span class="kw">nil</span>      <span class="cmt">## la liste l'initialise au 1er élément</span>
+<span class="kw">global</span> shape = <span class="kw">nil</span>      <span class="cmt">## the list initialises it to the first item</span>
 <span class="kw">global</span> dir = <span class="kw">nil</span>
 
 <span class="kw">func</span> setup()
-    <span class="kw">var</span> menu = ui.menu(<span class="str">"Réglages"</span>)
-    menu.list(<span class="str">"Forme"</span>, shapes, <span class="kw">ref</span> shape)        <span class="cmt">## shape reçoit "cercle", "carré"…</span>
-    menu.list(<span class="str">"Sens"</span>, Dir, <span class="kw">ref</span> dir, onDir)   <span class="cmt">## dir reçoit "clockwise" ou "counterClockwise"</span>
+    <span class="kw">var</span> menu = ui.menu(<span class="str">"Settings"</span>)
+    menu.list(<span class="str">"Shape"</span>, shapes, <span class="kw">ref</span> shape)        <span class="cmt">## shape receives "circle", "square"…</span>
+    menu.list(<span class="str">"Direction"</span>, Dir, <span class="kw">ref</span> dir, onDir)   <span class="cmt">## dir receives "clockwise" or "counterClockwise"</span>
     ui.show(menu)
 <span class="kw">end</span></code></pre>
 
 <ul>
-  <li>La ligne affiche le libellé et l'élément retenu ; un clic <strong>déplie</strong> la liste, où l'élément courant porte une marque ronde. Choisir referme la liste et revient au menu. <code>element.open()</code> la déplie depuis le programme, comme pour un sous-menu.</li>
-  <li>La sélection est <strong>toujours</strong> définie : une variable à <code>nil</code> est initialisée au premier élément. Une valeur déjà posée est conservée.</li>
-  <li>Les éléments sont relus <strong>à chaque ouverture</strong> : modifier la source entre deux ouvertures se voit, sans rien coûter par frame.</li>
-  <li>L'<strong>ordre</strong> est figé, car une map n'en a pas : un enum est trié par valeur — donc dans l'ordre de déclaration —, une map ordinaire par libellé. Un tableau garde l'ordre de ses index.</li>
-  <li><code>surChange</code> reçoit l'élément choisi.</li>
+  <li>The row shows the label and the item chosen; a click <strong>unfolds</strong> the list, where the current item carries a round mark. Choosing closes the list and returns to the menu. <code>element.open()</code> unfolds it from the program, as it does for a sub-menu.</li>
+  <li>The selection is <strong>always</strong> defined: a variable at <code>nil</code> is initialised to the first item. A value already set is kept.</li>
+  <li>The items are read again <strong>on every opening</strong>: changing the source between two openings shows, and costs nothing per frame.</li>
+  <li>The <strong>order</strong> is fixed, since a map has none: an enum is sorted by value — hence in declaration order — and an ordinary map by label. An array keeps the order of its indices.</li>
+  <li><code>onChange</code> receives the item chosen.</li>
 </ul>
 
 <h3>Menus</h3>
-<p>Les widgets peuvent être rangés dans des <strong>menus</strong>. Un seul menu est affiché à la fois : un sous-menu apparaît comme une ligne cliquable marquée d'un chevron, cliquer dessus descend d'un niveau, et une ligne <code>&lt;</code> remonte. Un menu se déclare comme un widget, et porte les mêmes méthodes de déclaration.</p>
+<p>Widgets can be filed into <strong>menus</strong>. One menu is displayed at a time: a sub-menu appears as a clickable row marked with a chevron, clicking it goes one level down, and a <code>&lt;</code> row comes back up. A menu is declared like a widget, and carries the same declaration methods.</p>
 
-<pre><code><span class="kw">var</span> settings = ui.menu(<span class="str">"Réglages"</span>)
-settings.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
+<pre><code><span class="kw">var</span> settings = ui.menu(<span class="str">"Settings"</span>)
+settings.checkbox(<span class="str">"Grid"</span>, <span class="kw">ref</span> grid)
 
-<span class="kw">var</span> display = settings.menu(<span class="str">"Affichage"</span>)   <span class="cmt">## sous-menu de settings</span>
-display.checkbox(<span class="str">"Trait épais"</span>, <span class="kw">ref</span> thick)
+<span class="kw">var</span> display = settings.menu(<span class="str">"Display"</span>)   <span class="cmt">## a sub-menu of settings</span>
+display.checkbox(<span class="str">"Thick stroke"</span>, <span class="kw">ref</span> thick)
 
-<span class="kw">var</span> game = ui.menu(<span class="str">"Jeu"</span>)
-game.button(<span class="str">"Rejouer"</span>, replay)
+<span class="kw">var</span> game = ui.menu(<span class="str">"Game"</span>)
+game.button(<span class="str">"Play again"</span>, replay)
 
-ui.show(settings)   <span class="cmt">## menu global affiché</span>
-ui.show(game)        <span class="cmt">## bascule vers un autre menu global</span></code></pre>
+ui.show(settings)   <span class="cmt">## the global menu on display</span>
+ui.show(game)        <span class="cmt">## switches to another global menu</span></code></pre>
 
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>ui.menu(label)</code></td><td>Crée un menu à la racine et renvoie son handle. <code>menu.menu(label)</code> crée un sous-menu.</td></tr>
-    <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>Mêmes déclarations que leurs équivalents <code>ui.*</code>, rangées dans ce menu.</td></tr>
-    <tr><td><code>ui.show(menu)</code></td><td>Remplace le menu global affiché, et déplie l'interface. La navigation repart de zéro : <code>ui.back()</code> ne remonte pas au menu précédent. <code>ui.show(nil)</code> revient au menu racine.</td></tr>
-    <tr><td><code>ui.back()</code></td><td>Remonte d'un niveau. Sans effet quand le menu global est affiché.</td></tr>
-    <tr><td><code>ui.open([menu])</code> / <code>ui.close()</code> / <code>ui.toggle()</code></td><td>Déplie ou replie l'interface. <code>ui.open(menu)</code> affiche ce menu et le déplie du même geste.</td></tr>
-    <tr><td><code>menu.open()</code></td><td>Descend dans ce menu, comme un clic sur sa ligne — <code>ui.back()</code> y revient.</td></tr>
-    <tr><td><code>ui.current()</code></td><td>Handle du menu actuellement affiché.</td></tr>
-    <tr><td><code>élément.remove()</code></td><td>Retire un widget ou un menu (avec tout son contenu) de son parent.</td></tr>
-    <tr><td><code>menu.clear()</code></td><td>Vide un menu de son contenu, sans le retirer lui-même.</td></tr>
+    <tr><td><code>ui.menu(label)</code></td><td>Creates a menu at the root and returns its handle. <code>menu.menu(label)</code> creates a sub-menu.</td></tr>
+    <tr><td><code>menu.button(…)</code> / <code>menu.checkbox(…)</code> / <code>menu.slider(…)</code></td><td>The same declarations as their <code>ui.*</code> counterparts, filed into this menu.</td></tr>
+    <tr><td><code>ui.show(menu)</code></td><td>Replaces the global menu on display and unfolds the interface. Navigation starts afresh: <code>ui.back()</code> does not return to the previous menu. <code>ui.show(nil)</code> comes back to the root menu.</td></tr>
+    <tr><td><code>ui.back()</code></td><td>Goes one level up. It does nothing while the global menu is on display.</td></tr>
+    <tr><td><code>ui.open([menu])</code> / <code>ui.close()</code> / <code>ui.toggle()</code></td><td>Unfolds or folds the interface. <code>ui.open(menu)</code> displays that menu and unfolds it in one go.</td></tr>
+    <tr><td><code>menu.open()</code></td><td>Goes down into this menu, as a click on its row does — <code>ui.back()</code> comes back.</td></tr>
+    <tr><td><code>ui.current()</code></td><td>The handle of the menu currently on display.</td></tr>
+    <tr><td><code>element.remove()</code></td><td>Removes a widget or a menu, with all its content, from its parent.</td></tr>
+    <tr><td><code>menu.clear()</code></td><td>Empties a menu of its content, without removing the menu itself.</td></tr>
   </tbody>
 </table>
 
-<p>Les widgets déclarés sans menu (<code>ui.button</code>, <code>ui.checkbox</code>) vivent dans un <strong>menu racine implicite</strong>, affiché par défaut : un programme qui n'utilise pas les menus fonctionne exactement comme avant.</p>
+<p>Widgets declared with no menu (<code>ui.button</code>, <code>ui.checkbox</code>) live in an <strong>implicit root menu</strong>, displayed by default: a program that does not use menus works exactly as before.</p>
 
-<div class="callout tip">Un clic sur un widget n'est <strong>pas</strong> transmis à <code>mouse.pressed</code> : cliquer un bouton de l'interface ne déclenche donc pas aussi l'action de la scène. Un clic ailleurs parvient normalement au script.</div>
+<div class="callout tip">A click on a widget is <strong>not</strong> passed on to <code>mouse.pressed</code>: clicking a button of the interface therefore does not also set off the scene's action. A click elsewhere reaches the script as usual.</div>
 
-<h3>Ce qu'il faut savoir</h3>
+<h3>What to know</h3>
 <ul>
-  <li>La taille de l'interface est <strong>proportionnelle</strong> à la hauteur de la zone de tracé, donc lisible aussi bien sur un écran de bureau que sur un téléphone, dont la toile compte plusieurs pixels par pixel d'affichage.</li>
-  <li>L'indicateur de mémoire et d'images par seconde occupe le coin bas droit, à l'opposé de la pile.</li>
-  <li>Les libellés utilisent la police par défaut du moteur (voir <code>graphics.font</code>), et non celle que le script a choisie : l'interface garde son apparence quoi que fasse le programme.</li>
-  <li>Retirer un menu où l'on se trouve fait remonter l'affichage au premier menu parent encore présent. Utiliser un handle retiré lève une erreur explicite.</li>
-  <li>Un slider donne une valeur <strong>entière</strong> si ses bornes et sa valeur de départ le sont, sinon flottante : <code>ui.slider("Facteur", <span class="kw">ref</span> f, 0, 1, 0.5)</code> règle donc un flottant malgré ses bornes entières.</li>
-  <li>La variable liée est la <strong>seule source de vérité</strong> : la glissière lit sa valeur à chaque frame, donc le programme peut l'écrire lui-même et l'affichage suit. Une valeur hors plage est ramenée aux bornes à l'affichage, sans écrire dans la variable.</li>
-  <li><code>ref</code> accepte un <strong>chemin de champs</strong> : <code>ui.checkbox("Grille", <span class="kw">ref</span> config.grille)</code> permet de regrouper tous les réglages dans un seul objet plutôt que d'éparpiller des variables globales (voir l'exemple « Interface (ui) »).</li>
-  <li>La variable d'une case doit être <strong>accessible</strong> : un global ou un champ d'objet. Une variable locale à une fonction n'a pas de sens ici, puisqu'elle disparaît avant le premier clic.</li>
-  <li>Sans zone graphique — exécution en ligne de commande sans fenêtre —, déclarer un widget ne fait rien, mais les arguments sont tout de même vérifiés.</li>
+  <li>The interface's size is <strong>proportional</strong> to the drawing area's height, so it is readable on a desktop screen as much as on a phone, whose canvas counts several pixels per display pixel.</li>
+  <li>The memory and frames-per-second overlay sits in the bottom-right corner, opposite the stack.</li>
+  <li>The labels use the engine's default font (see <code>graphics.font</code>), not the one the script has chosen: the interface keeps its appearance whatever the program does.</li>
+  <li>Removing a menu you are inside moves the display up to the first parent menu still present. Using a removed handle raises an explicit error.</li>
+  <li>A slider gives an <strong>integer</strong> value when its bounds and its starting value are integers, and a float otherwise: <code>ui.slider("Factor", <span class="kw">ref</span> f, 0, 1, 0.5)</code> therefore adjusts a float despite its integer bounds.</li>
+  <li>The bound variable is the <strong>only source of truth</strong>: the slider reads its value on every frame, so the program can write it itself and the display follows. A value out of range is clamped for the display, without writing to the variable.</li>
+  <li><code>ref</code> accepts a <strong>path of fields</strong>: <code>ui.checkbox("Grid", <span class="kw">ref</span> config.grid)</code> allows every setting to be gathered into one object rather than scattered across global variables (see the "Interface (ui)" example).</li>
+  <li>A checkbox's variable must be <strong>reachable</strong>: a global, or an object's field. A variable local to a function makes no sense here, since it is gone before the first click.</li>
+  <li>With no graphics area — a command-line run with no window — declaring a widget does nothing, but the arguments are checked all the same.</li>
 </ul>
 </section>
 
 <section id="tween">
-<h2>Module <code>tween</code></h2>
-<p>Fait évoluer un champ d'objet — ou une variable passée par <code>ref</code> — de sa valeur <strong>courante</strong> vers une valeur cible, sur une durée, selon une courbe. Le moteur avance les animations à chaque frame : on déclare, et il n'y a <strong>rien à appeler dans <code>draw()</code></strong>. Le dessin ne fait que lire les champs animés.</p>
+<h2>The <code>tween</code> module</h2>
+<p>It moves an object's field — or a variable passed by <code>ref</code> — from its <strong>current</strong> value towards a target, over a duration, along a curve. The engine advances the animations on every frame: you declare, and there is <strong>nothing to call inside <code>draw()</code></strong>. The drawing only reads the animated fields.</p>
 
 <table>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>tween.to(object, {field: target, …}, duration [, curve] [, onDone])</code></td><td>Anime un ou plusieurs champs de l'objet. Renvoie un <code>Tween</code></td></tr>
-    <tr><td><code>tween.value(<span class="kw">ref</span> v, target, duration [, curve] [, onDone])</code></td><td>Anime une variable simple</td></tr>
-    <tr><td><code>tween.curves()</code></td><td>Tableau des noms de courbes disponibles</td></tr>
-    <tr><td><code>tween.count()</code></td><td>Nombre d'animations en cours</td></tr>
-    <tr><td><code>tween.cancelAll()</code></td><td>Annule tout (changement d'écran, fin de partie)</td></tr>
-    <tr><td><code>tween.update(dt)</code></td><td>Avance à la main — <strong>seulement</strong> sans zone graphique (ligne de commande, tests) ; sans effet dès que le moteur pilote</td></tr>
+    <tr><td><code>tween.to(object, {field: target, …}, duration [, curve] [, onDone])</code></td><td>Animates one or more of the object's fields. It returns a <code>Tween</code></td></tr>
+    <tr><td><code>tween.value(<span class="kw">ref</span> v, target, duration [, curve] [, onDone])</code></td><td>Animates a plain variable</td></tr>
+    <tr><td><code>tween.curves()</code></td><td>An array of the curve names available</td></tr>
+    <tr><td><code>tween.count()</code></td><td>The number of animations under way</td></tr>
+    <tr><td><code>tween.cancelAll()</code></td><td>Cancels everything (a change of screen, the end of a game)</td></tr>
+    <tr><td><code>tween.update(dt)</code></td><td>Advances by hand — <strong>only</strong> with no graphics area (the command line, the tests); it does nothing as soon as the engine drives</td></tr>
   </tbody>
 </table>
 
-<p>Le handle renvoyé porte <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code>, <code>delay(seconds)</code> et <code>repeat(…)</code>. Les méthodes renvoient le tween, donc elles se chaînent.</p>
+<p>The handle returned carries <code>pause()</code>, <code>resume()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>progress()</code>, <code>delay(seconds)</code> and <code>repeat(…)</code>. The methods return the tween, so they chain.</p>
 
-<h3>Répéter : <code>repeat</code></h3>
-<p>Une animation se lit par <strong>parcours</strong>. <code>repeat([occurrences] [, allerRetour])</code> en règle le nombre : sans compte, la répétition est <strong>sans fin</strong> ; le second paramètre ajoute au programme sa lecture <strong>en arrière</strong>.</p>
+<h3>Repeating: <code>repeat</code></h3>
+<p>An animation is played in <strong>passes</strong>. <code>repeat([count] [, backAndForth])</code> sets how many: with no count the repetition is <strong>endless</strong>; the second parameter adds the <strong>backward</strong> reading to the plan.</p>
 
 <table>
-  <thead><tr><th>Écriture</th><th>Ce qui est joué</th></tr></thead>
+  <thead><tr><th>Written as</th><th>What is played</th></tr></thead>
   <tbody>
     <tr><td><code>tween.to(…)</code></td><td>un aller</td></tr>
     <tr><td><code>.repeat(2)</code></td><td>aller, aller</td></tr>
@@ -2376,7 +2376,7 @@ ui.show(game)        <span class="cmt">## bascule vers un autre menu global</spa
 
 <pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.curve, onCurve)</code></pre>
 
-<h3>Ce qu'il faut savoir</h3>
+<h3>What to know</h3>
 <ul>
   <li>La valeur de départ est lue <strong>au démarrage</strong> de l'animation, pas à la déclaration : avec un <code>delay</code>, le tween part de la valeur qu'aura le champ à l'échéance.</li>
   <li>Déclarer un tween sur un champ <strong>déjà animé annule le précédent</strong> : deux animations ne se battent jamais pour la même valeur. Deux <code>ref</code> distincts sur la même variable ne sont pas reconnus comme telle, en revanche — le langage ne permet pas de les comparer.</li>
@@ -2473,7 +2473,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 
 <div class="callout tip">Un navigateur <strong>refuse de sonner avant une interaction</strong>. Le moteur ouvre donc le périphérique au premier clic ou à la première touche, et il n'y a rien à écrire pour cela. En revanche, un son demandé dans <code>setup()</code> ne s'entendra qu'après ce premier geste.</div>
 
-<h3>Ce qu'il faut savoir</h3>
+<h3>What to know</h3>
 <ul>
   <li>Le calcul des ondes ne dépend pas du graphisme&nbsp;: un tampon se construit et se mesure même sans carte son, ce dont la suite de tests du moteur se sert.</li>
   <li>Seize oscillateurs et trente-deux sons coexistent. Quand la table est pleine, le plus ancien <strong>arrêté</strong> est recyclé — un son qui joue n'est jamais volé —, et son ancien objet devient invalide.</li>
