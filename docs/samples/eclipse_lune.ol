@@ -1,43 +1,43 @@
-## Éclipse de Lune — vue depuis la Terre. La Lune traverse le cône d'ombre projeté par
-## la Terre : elle s'assombrit d'abord dans la PÉNOMBRE, faiblement en entrant puis très
+## A lunar eclipse, seen from the Earth. The Moon crosses the shadow cone the Earth casts: it first
+## darkens in the PENUMBRA, faintly on entering and then very
 ## nettement en approchant du bord de l'ombre — la Terre y masque presque tout le Soleil.
-## Elle mord ensuite l'OMBRE, où elle prend une teinte cuivrée. Ce rouge est celui de la
-## lumière solaire réfractée par l'atmosphère terrestre — le bleu y est diffusé, le rouge passe.
+## It then bites into the UMBRA, where it takes a coppery hue. That red is the sunlight refracted by
+## the Earth's atmosphere: the blue is scattered there, the red goes through.
 ##
-## Deux échelles suffisent à tout décrire, en rayons lunaires : l'ombre en fait ~2,7 et la
-## pénombre ~4,6 à la distance de la Lune. Le reste n'est que géométrie de deux disques.
+## Two scales describe everything, in lunar radii: the umbra is about 2.7 across and the penumbra
+## about 4.6 at the Moon's distance. The rest is nothing but the geometry of two discs.
 ##
-## Le menu choisit le type d'éclipse (l'écart entre la Lune et l'axe de l'ombre), la
-## vitesse, et l'affichage des repères.
+## The menu chooses the kind of eclipse — the offset between the Moon and the shadow's axis — the
+## speed, and whether the markers are shown.
 ##
 ## Le pendant de cet exemple est « Éclipse de Soleil », où c'est la Lune qui masque.
 
-const R_UMBRA = 2.7      ## rayon du cône d'ombre, en rayons lunaires
-const R_PENUMBRA = 4.6   ## rayon de la pénombre
-const DURATION_H = 6.0      ## heures simulées pour la traversée complète
+const R_UMBRA = 2.7      ## the shadow cone's radius, in lunar radii
+const R_PENUMBRA = 4.6   ## the penumbra's radius
+const DURATION_H = 6.0      ## the simulated hours of the whole passage
 
-## Écart de la Lune à l'axe de l'ombre, en rayons lunaires : c'est LUI qui décide du type
-## d'éclipse. La liste du menu affiche et renvoie les CLÉS de cette map (règle de `for … in`),
-## et le programme lit la valeur associée. Clés entre GUILLEMETS : une clé littérale peut
-## être une chaîne, ce qui autorise ici l'accent que refuserait un identifiant.
-global OFFSETS = {"totale": 0.15, "partielle": 2.2, "pénombre": 4.2}
+## The Moon's offset from the shadow's axis, in lunar radii: it is THAT which decides the kind of
+## eclipse. The menu's list shows and returns this map's KEYS, following the `for … in` rule, and
+## the program reads the value attached. The keys are QUOTED: a literal key may be a string, which
+## allows a space here where an identifier would refuse one.
+global OFFSETS = {"total": 0.15, "partial": 2.2, "penumbral": 4.2}
 
-## `type` est posé d'avance : une liste respecte la sélection existante et n'impose son
-## premier élément qu'à une variable nil (l'ordre alphabétique donnerait « partielle »).
-global config = {type: "totale", speed: 1.0, marks: false}
+## `type` is set in advance: a list honours an existing selection and only imposes its first item on
+## a nil variable — alphabetical order would give "partial".
+global config = {type: "total", speed: 1.0, marks: false}
 
 global moon = nil        ## texture du disque lunaire, construite une fois
-global stars = []      ## fond fixe : [x, y, éclat, …]
-global t = 0.0           ## progression de la simulation, en heures simulées
+global stars = []      ## the fixed background: [x, y, brightness, …]
+global t = 0.0           ## the simulation's progress, in simulated hours
 
-## Assez petit pour que le cercle de PÉNOMBRE tienne à l'écran (4,6 rayons lunaires) :
-## c'est cette échelle qui donne la juste idée des tailles en jeu.
+## Small enough for the PENUMBRA's circle to fit on screen, at 4.6 lunar radii: it is that scale
+## which gives a fair idea of the sizes involved.
 func moonRadius()
     return math.min(W, H) * 0.085
 end
 
-## Disque lunaire dessiné UNE fois dans une image : cratères par bruit à deux échelles,
-## limbe assombri (la sphère se dérobe), bord adouci d'un pixel (sinon un escalier visible).
+## The lunar disc is drawn ONCE into an image: craters from noise at two scales, a darkened limb
+## since the sphere turns away, and an edge softened by one pixel, without which stair-steps show.
 func buildMoon(size)
     moon = image.create(size, size)
     var r = size / 2.0
@@ -78,17 +78,17 @@ func setup()
     var menu = ui.menu("Éclipse")
     menu.list("Type", OFFSETS, ref config.type)
     menu.slider("Vitesse", ref config.speed, 0.1, 4)
-    menu.checkbox("Repères", ref config.marks)
+    menu.checkbox("Markers", ref config.marks)
     ui.show(menu)
 end
 
-## Centre de l'ombre : fixe à l'écran. La Lune, elle, défile horizontalement — c'est bien
-## elle qui se déplace sur son orbite, l'ombre suivant l'antisoleil beaucoup plus lentement.
+## The shadow's centre is fixed on screen. The Moon, for its part, drifts horizontally: it really is
+## the Moon that moves along its orbit, the shadow following the antisolar point far more slowly.
 func umbraCentre()
     return CH
 end
 
-## Position de la Lune à l'instant t : trajectoire rectiligne, décalée de l'écart choisi.
+## The Moon's position at time t: a straight path, offset by the chosen amount.
 func moonX()
     var rl = moonRadius()
     var reach = (R_PENUMBRA + 1.6) * rl
@@ -99,11 +99,11 @@ func moonY()
     return umbraCentre() + OFFSETS[config.type] * moonRadius()
 end
 
-## Intersection de DEUX disques, dessinée par lignes horizontales : pour chaque ligne, on
+## The intersection of TWO discs, drawn as horizontal lines: for each line we
 ## garde le segment commun au disque lunaire et au disque d'ombre. C'est ainsi que l'ombre
-## reste exactement dans la Lune, sans masque ni découpe.
+## stays exactly inside the Moon, with no mask and no clipping.
 ##
-## `trou` évide un disque central concentrique à l'ombre : la fonction dessine alors
+## `hole` hollows out a central disc concentric with the shadow: the function then draws
 ## l'intersection d'une COURONNE et du disque lunaire. C'est ce qui permet de peindre chaque
 ## bande une seule fois, avec sa couleur absolue, au lieu d'empiler des disques dont seul le
 ## produit aurait un sens.
@@ -129,7 +129,7 @@ func veilIntersection(mx, my, rl, ox, oy, ro, color, hole = 0)
             var b = math.min(mx + dl, ox + dm)
             var dt = tr2 - dy
             if dt > 0 then
-                ## Le trou coupe la ligne en deux morceaux, l'un ou l'autre pouvant être vide.
+                ## The hole cuts the line in two pieces, either of which may be empty.
                 dt = math.sqrt(dt)
                 drawSegment(a, math.min(b, ox - dt), y)
                 drawSegment(math.max(a, ox + dt), b, y)
@@ -146,7 +146,7 @@ func drawSegment(a, b, y)
     end
 end
 
-## Distance des centres, en rayons lunaires : la seule grandeur dont dépendent la phase et
+## The distance between the centres, in lunar radii: the only quantity the phase and
 ## la magnitude.
 func centreDist()
     var rl = moonRadius()
@@ -156,28 +156,28 @@ func centreDist()
 end
 
 func phase(d)
-    if d <= R_UMBRA - 1 then return "totale" end
-    if d < R_UMBRA + 1 then return "partielle" end
-    if d < R_PENUMBRA + 1 then return "pénombre" end
-    return "hors éclipse"
+    if d <= R_UMBRA - 1 then return "total" end
+    if d < R_UMBRA + 1 then return "partial" end
+    if d < R_PENUMBRA + 1 then return "penumbral" end
+    return "no eclipse"
 end
 
-## Magnitude d'une éclipse de Lune : fraction du DIAMÈTRE lunaire couverte par l'ombre.
-## Elle DÉPASSE 1 en éclipse totale — la Lune est alors enfoncée dans l'ombre, et la
+## A lunar eclipse's magnitude: the fraction of the lunar DIAMETER the umbra covers. It EXCEEDS 1
+## in a total eclipse — the Moon is then deep inside the shadow, and the
 ## grandeur mesure de combien : ne pas la plafonner, ce serait perdre cette information.
 func magnitude(d)
     return math.max((R_UMBRA + 1 - d) / 2, 0)
 end
 
-## Lumière restant dans la pénombre, à la distance `rho` du centre de l'ombre (en rayons
-## lunaires). Vue d'un point de la pénombre, la Terre coupe le disque solaire comme une
-## CORDE : la part masquée est celle du segment circulaire ainsi retranché, d'où la formule
+## The light left in the penumbra, at a distance `rho` from the shadow's centre, in lunar radii.
+## Seen from a point in the penumbra, the Earth cuts the solar disc like a CHORD: the part hidden is
+## the circular segment thus taken away, hence the formula
 ## `(acos c − c√(1−c²))/π`. Elle vaut 0 au bord externe (Soleil entier) et 1 au bord de
-## l'ombre (Soleil entièrement caché) — le profil est donc tout sauf linéaire.
+## the umbra, where the Sun is entirely hidden — so the profile is anything but linear.
 ##
-## PENOMBRE_MIN est ce qu'il reste au bord de l'ombre : l'optique géométrique donnerait zéro,
-## mais l'atmosphère terrestre y réfracte de la lumière. Sa valeur est celle de la luminance
-## de OMBRE_BORD, pour que le dégradé ne saute pas d'un côté à l'autre du bord.
+## PENUMBRA_MIN is what remains at the umbra's edge: geometric optics would give zero, but the
+## Earth's atmosphere refracts light there. Its value is the luminance of UMBRA_EDGE, so that the
+## gradient does not jump from one side of the edge to the other.
 const PENUMBRA_MIN = 0.60
 
 func penumbraLight(rho)
@@ -186,13 +186,13 @@ func penumbraLight(rho)
     return math.max(1 - covered, PENUMBRA_MIN)
 end
 
-## Voile appliqué à la distance `rho` du centre de l'ombre, en facteurs ABSOLUS par canal :
-## une seule fonction pour tout le dégradé, pénombre et ombre comprises. C'est elle qui rend
-## les couleurs lisibles — « le rouge est peu entamé, le bleu beaucoup » se lit directement
-## dans OMBRE_CENTRE, alors qu'un facteur appliqué dix fois de suite ne veut rien dire seul.
-const UMBRA_EDGE = Color(0.86, 0.50, 0.40)     ## brun-orangé du pourtour
+## The veil applied at a distance `rho` from the shadow's centre, as ABSOLUTE factors per channel:
+## one function for the whole gradient, penumbra and umbra alike. It is what makes the colours
+## legible — "the red is barely eaten into, the blue a great deal" reads straight off UMBRA_CENTRE,
+## whereas a factor applied ten times over means nothing on its own.
+const UMBRA_EDGE = Color(0.86, 0.50, 0.40)     ## the orange-brown of the rim
 const UMBRA_CENTRE = Color(0.72, 0.24, 0.15)   ## cuivre du fond de l'ombre
-const OZONE = R_UMBRA * 0.97                   ## bande bleutée juste à l'intérieur du bord
+const OZONE = R_UMBRA * 0.97                   ## the bluish band just inside the edge
 
 func veilA(rho)
     if rho >= R_UMBRA then
@@ -200,24 +200,24 @@ func veilA(rho)
         return Color(f, f, f)
     end
     ## Bord FRANC : la teinte atteint presque le cuivre en un tiers de rayon, le reste de
-    ## l'ombre étant à peu près uniforme. Étaler ce dégradé donnait une ombre molle.
+    ## the umbra being roughly uniform. Spreading that gradient gave a soft, mushy shadow.
     var s = math.clamp((R_UMBRA - rho) / (0.35 * R_UMBRA), 0, 1)
     var r = UMBRA_EDGE.r + (UMBRA_CENTRE.r - UMBRA_EDGE.r) * s
     var v = UMBRA_EDGE.g + (UMBRA_CENTRE.g - UMBRA_EDGE.g) * s
     var b = UMBRA_EDGE.b + (UMBRA_CENTRE.b - UMBRA_EDGE.b) * s
     if rho > OZONE then
-        ## L'ozone de la haute atmosphère absorbe le rouge : les photographes connaissent
+        ## Ozone in the upper atmosphere absorbs red: photographers know
         ## bien cette frange turquoise au bord de l'ombre.
         return Color(r * 0.80, v * 0.98, math.min(b * 1.35, 1))
     end
     return Color(r, v, b)
 end
 
-## Le voile est dessiné en anneaux JOINTIFS, chacun peint une fois avec sa couleur absolue —
-## et non en disques empilés dont seul le produit aurait un sens. Rayons et couleurs ne
-## dépendent que des constantes : la table est donc construite une fois, au démarrage.
-## Bandes serrées près du bord de l'ombre, où tout se joue ; lâches ailleurs.
-global veil = []   ## [{ext, int, couleur}], du bord de la pénombre vers le centre
+## The veil is drawn as ABUTTING rings, each painted once in its absolute colour — not as stacked
+## discs, of which only the product would mean anything. The radii and the colours depend on the
+## constants alone, so the table is built once, at startup. The bands are tight near the umbra's
+## edge, where everything happens, and loose elsewhere.
+global veil = []   ## [{ext, int, color}], from the penumbra's edge towards the centre
 
 func buildVeil()
     var radii = []
@@ -227,9 +227,9 @@ func buildVeil()
     for f in [0.985, 0.94, 0.90, 0.86, 0.82, 0.78, 0.74, 0.70, 0.62, 0.52, 0.40, 0.26, 0.12, 0.0] do
         radii[#radii + 1] = R_UMBRA * f
     end
-    ## Couleur prise au MILIEU de la bande, pas à son bord interne : au bord, chaque bande
-    ## prend la teinte la plus sombre qu'elle contient, et tout le dégradé se trouve décalé
-    ## d'une demi-bande vers l'extérieur — le bord de la pénombre partait alors à 0,96 au
+    ## The colour is taken at the MIDDLE of the band, not at its inner edge: at the edge each band
+    ## takes the darkest hue it holds, and the whole gradient shifts outwards by half a band — the
+    ## penumbra's edge then started at 0.96 instead
     ## lieu de 1,00, sans transition.
     var ext = R_PENUMBRA
     for i = 1, #radii do
@@ -255,13 +255,13 @@ func drawMarks()
     graphics.circle(CW, umbraCentre(), R_UMBRA * rl)
     graphics.stroke(Color(0.5, 0.6, 0.85, 0.8))
     graphics.fontSize(H * 0.022)
-    graphics.text("pénombre", CW + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
+    graphics.text("penumbra", CW + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
     graphics.stroke(Color(0.85, 0.5, 0.4, 0.9))
     graphics.text("ombre", CW + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
 end
 
 func draw()
-    t += deltaTime * config.speed * (DURATION_H / 24)   ## 24 s de simulation par défaut
+    t += deltaTime * config.speed * (DURATION_H / 24)   ## 24 s of simulation by default
     if t > DURATION_H then
         t = 0.0
     end
@@ -279,23 +279,23 @@ func draw()
     var oy = umbraCentre()
     var d = centreDist()
 
-    ## La Lune pleinement éclairée, puis l'ombre PAR-DESSUS : c'est l'ordre de la nature.
+    ## The Moon fully lit, then the shadow ON TOP: that is nature's own order.
     graphics.noStroke()
     graphics.sprite(moon, mx - rl, my - rl, rl * 2, rl * 2)
 
-    ## Le voile MULTIPLIE la lumière lunaire au lieu de la recouvrir : c'est le modèle
-    ## physique — la surface reste la même, seul l'éclairement change. Les cratères
-    ## demeurent donc visibles à travers le cuivre, comme sur une vraie éclipse.
+    ## The veil MULTIPLIES the Moon's light instead of covering it: that is the physical model — the
+    ## surface stays the same, only the illumination changes. The craters therefore remain visible
+    ## through the copper, as in a real eclipse.
     ##
-    ## Une bande par anneau, peinte UNE fois : chaque pixel n'est multiplié qu'une seule
-    ## fois, et sa couleur est celle que `voileA` donne à cette distance. Les bandes sont
+    ## One band per ring, painted ONCE: each pixel is multiplied a single time, and its colour is the
+    ## one `veilA` gives at that distance. The bands are
     ## exactement jointives (le trou de l'une est le rayon externe de la suivante) : les faire
-    ## se chevaucher d'un demi-pixel multipliait deux fois la jointure, d'où des liserés
-    ## SOMBRES périodiques, mesurés.
+    ## overlapping by half a pixel multiplied the joint twice, hence periodic DARK lines, which were
+    ## measured.
     graphics.blendMode(blend.MULTIPLY)
     for i = 1, #veil do
         var b = veil[i]
-        ## La Lune peut tenir tout entière dans le trou de la bande (cas courant en éclipse
+        ## The Moon may fit entirely inside the band's hole, which is common in a
         ## totale) : le balayage ne tracerait alors pas un pixel.
         if d + 1 <= b.int then
             continue
@@ -304,14 +304,14 @@ func draw()
     end
     graphics.blendMode(blend.ALPHA)
 
-    ## Bandeau d'information : phase, magnitude, temps simulé.
+    ## The information strip: the phase, the magnitude, the simulated time.
     graphics.fontSize(H * 0.032)
     graphics.stroke(Color(0.88, 0.9, 0.96))
-    ## L'interpolation formate directement : {expr:.2f} évite un arrondi à la main.
+    ## The interpolation formats directly: {expr:.2f} saves rounding by hand.
     graphics.text("{phase(d)}   magnitude {magnitude(d):.2f}", W * 0.04, H * 0.06)
     graphics.fontSize(H * 0.024)
     graphics.stroke(Color(0.6, 0.65, 0.78))
-    ## Les accents français passent (la police embarquée les couvre), mais pas un point
-    ## médian : un glyphe absent s'afficherait « ? ».
-    graphics.text("T+{t:.1f} h   -   éclipse {config.type}", W * 0.04, H * 0.11)
+    ## Accented letters go through, the embedded font covering them, but not a middle dot: a missing
+    ## glyph would show as a "?".
+    graphics.text("T+{t:.1f} h   -   {config.type} eclipse", W * 0.04, H * 0.11)
 end
