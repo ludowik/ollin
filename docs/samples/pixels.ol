@@ -1,10 +1,10 @@
-## Bruit de Perlin rendu pixel par pixel : un petit buffer (math.noise, 3e dimension
-## the third being time) recomputed every frame, then scaled up to the window: a smooth animated field.
+## Perlin noise drawn pixel by pixel: a small buffer (math.noise, the third dimension being
+## time) recomputed every frame, then scaled up to the window: a smooth animated field.
 const LOW_W = 128
 const LOW_H = 96
-const SCALE = 0.044   ## petit = taches plus larges
+const SCALE = 0.044   ## small = broader blobs
 
-graphics.canvas(W, H, "Perlin par pixel")
+graphics.canvas(W, H, "Perlin per pixel")
 math.noiseSeed(7)
 var canvas = image.create(LOW_W, LOW_H)
 
@@ -24,5 +24,5 @@ func draw()
     graphics.clear(colors.BLACK)
     image.draw(canvas, 0, 0, W, H)
     graphics.stroke(Color(1, 1, 1))
-    graphics.text("Perlin par pixel", 12, 12)
+    graphics.text("Perlin per pixel", 12, 12)
 end

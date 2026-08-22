@@ -1,6 +1,6 @@
 ## A lunar eclipse, seen from the Earth. The Moon crosses the shadow cone the Earth casts: it first
-## darkens in the PENUMBRA, faintly on entering and then very
-## nettement en approchant du bord de l'ombre — la Terre y masque presque tout le Soleil.
+## darkens in the PENUMBRA, faintly on entering and then markedly as it nears the umbra's
+## edge, where the Earth hides almost the whole Sun.
 ## It then bites into the UMBRA, where it takes a coppery hue. That red is the sunlight refracted by
 ## the Earth's atmosphere: the blue is scattered there, the red goes through.
 ##
@@ -10,7 +10,7 @@
 ## The menu chooses the kind of eclipse — the offset between the Moon and the shadow's axis — the
 ## speed, and whether the markers are shown.
 ##
-## Le pendant de cet exemple est « Éclipse de Soleil », où c'est la Lune qui masque.
+## This example's counterpart is "Solar eclipse", where it is the Moon that hides the Sun.
 
 const R_UMBRA = 2.7      ## the shadow cone's radius, in lunar radii
 const R_PENUMBRA = 4.6   ## the penumbra's radius
@@ -26,7 +26,7 @@ global OFFSETS = {"total": 0.15, "partial": 2.2, "penumbral": 4.2}
 ## a nil variable — alphabetical order would give "partial".
 global config = {type: "total", speed: 1.0, marks: false}
 
-global moon = nil        ## texture du disque lunaire, construite une fois
+global moon = nil        ## the lunar disc's texture, built once
 global stars = []      ## the fixed background: [x, y, brightness, …]
 global t = 0.0           ## the simulation's progress, in simulated hours
 
@@ -53,7 +53,7 @@ func buildMoon(size)
                 var n = math.noise(x * 0.05, y * 0.05) * 0.65
                        + math.noise(x * 0.19, y * 0.19) * 0.35
                 var g = math.clamp(0.66 + (n - 0.5) * 0.42, 0, 1)
-                ## Éclairement du limbe : la normale s'incline vers le bord du disque.
+                ## Limb darkening: the normal tilts away towards the disc's edge.
                 var f = math.sqrt(math.max(1 - (d / r) * (d / r), 0))
                 g = g * (0.55 + 0.45 * f)
                 image.setPixel(moon, x, y, g, g * 0.97, g * 0.92, math.clamp(r - d, 0, 1))
@@ -64,7 +64,7 @@ func buildMoon(size)
 end
 
 func setup()
-    graphics.canvas(W, H, "Éclipse de Lune")
+    graphics.canvas(W, H, "Lunar eclipse")
     math.noiseSeed(11)
     buildMoon(256)
     buildVeil()
@@ -75,9 +75,9 @@ func setup()
         stars[#stars + 1] = math.rand(0.15, 1.0)
     end
 
-    var menu = ui.menu("Éclipse")
+    var menu = ui.menu("Eclipse")
     menu.list("Type", OFFSETS, ref config.type)
-    menu.slider("Vitesse", ref config.speed, 0.1, 4)
+    menu.slider("Speed", ref config.speed, 0.1, 4)
     menu.checkbox("Markers", ref config.marks)
     ui.show(menu)
 end
@@ -100,13 +100,13 @@ func moonY()
 end
 
 ## The intersection of TWO discs, drawn as horizontal lines: for each line we
-## garde le segment commun au disque lunaire et au disque d'ombre. C'est ainsi que l'ombre
+## keep the segment common to the lunar disc and the shadow disc. That is how the shadow
 ## stays exactly inside the Moon, with no mask and no clipping.
 ##
 ## `hole` hollows out a central disc concentric with the shadow: the function then draws
-## l'intersection d'une COURONNE et du disque lunaire. C'est ce qui permet de peindre chaque
-## bande une seule fois, avec sa couleur absolue, au lieu d'empiler des disques dont seul le
-## produit aurait un sens.
+## the intersection of a RING and the lunar disc. That is what allows every band to be painted
+## once, with its absolute colour, instead of stacking discs whose product alone would
+## mean anything.
 func veilIntersection(mx, my, rl, ox, oy, ro, color, hole = 0)
     var y0 = math.max(my - rl, oy - ro)
     var y1 = math.min(my + rl, oy + ro)
@@ -116,7 +116,7 @@ func veilIntersection(mx, my, rl, ox, oy, ro, color, hole = 0)
     var rl2 = rl * rl
     var ro2 = ro * ro
     var tr2 = hole * hole
-    ## Pas de 1 px : en fusion multiplicative le bord est net, 2 px feraient un escalier.
+    ## 1 px, deliberately: in multiplicative blending the edge is crisp, and 2 px would make a staircase.
     graphics.stroke(color, 1)
     for y = y0, y1 do
         var dy = (y - oy) * (y - oy)
@@ -146,8 +146,8 @@ func drawSegment(a, b, y)
     end
 end
 
-## The distance between the centres, in lunar radii: the only quantity the phase and
-## la magnitude.
+## The distance between the centres, in lunar radii: the only quantity the phase and the
+## magnitude follow from.
 func centreDist()
     var rl = moonRadius()
     var dx = moonX() - CW
@@ -164,7 +164,7 @@ end
 
 ## A lunar eclipse's magnitude: the fraction of the lunar DIAMETER the umbra covers. It EXCEEDS 1
 ## in a total eclipse — the Moon is then deep inside the shadow, and the
-## grandeur mesure de combien : ne pas la plafonner, ce serait perdre cette information.
+## magnitude measures by how much, so capping it would throw that information away.
 func magnitude(d)
     return math.max((R_UMBRA + 1 - d) / 2, 0)
 end
@@ -172,7 +172,7 @@ end
 ## The light left in the penumbra, at a distance `rho` from the shadow's centre, in lunar radii.
 ## Seen from a point in the penumbra, the Earth cuts the solar disc like a CHORD: the part hidden is
 ## the circular segment thus taken away, hence the formula
-## `(acos c − c√(1−c²))/π`. Elle vaut 0 au bord externe (Soleil entier) et 1 au bord de
+## `(acos c − c√(1−c²))/π`. It is 0 at the outer edge, the Sun whole, and 1 at the edge of
 ## the umbra, where the Sun is entirely hidden — so the profile is anything but linear.
 ##
 ## PENUMBRA_MIN is what remains at the umbra's edge: geometric optics would give zero, but the
@@ -191,7 +191,7 @@ end
 ## legible — "the red is barely eaten into, the blue a great deal" reads straight off UMBRA_CENTRE,
 ## whereas a factor applied ten times over means nothing on its own.
 const UMBRA_EDGE = Color(0.86, 0.50, 0.40)     ## the orange-brown of the rim
-const UMBRA_CENTRE = Color(0.72, 0.24, 0.15)   ## cuivre du fond de l'ombre
+const UMBRA_CENTRE = Color(0.72, 0.24, 0.15)   ## the copper of the shadow's heart
 const OZONE = R_UMBRA * 0.97                   ## the bluish band just inside the edge
 
 func veilA(rho)
@@ -199,7 +199,7 @@ func veilA(rho)
         var f = penumbraLight(rho)
         return Color(f, f, f)
     end
-    ## Bord FRANC : la teinte atteint presque le cuivre en un tiers de rayon, le reste de
+    ## A CRISP edge: the hue nearly reaches the copper within a third of a radius, the rest of
     ## the umbra being roughly uniform. Spreading that gradient gave a soft, mushy shadow.
     var s = math.clamp((R_UMBRA - rho) / (0.35 * R_UMBRA), 0, 1)
     var r = UMBRA_EDGE.r + (UMBRA_CENTRE.r - UMBRA_EDGE.r) * s
@@ -207,7 +207,7 @@ func veilA(rho)
     var b = UMBRA_EDGE.b + (UMBRA_CENTRE.b - UMBRA_EDGE.b) * s
     if rho > OZONE then
         ## Ozone in the upper atmosphere absorbs red: photographers know
-        ## bien cette frange turquoise au bord de l'ombre.
+        ## that turquoise fringe at the shadow's edge well.
         return Color(r * 0.80, v * 0.98, math.min(b * 1.35, 1))
     end
     return Color(r, v, b)
@@ -229,8 +229,7 @@ func buildVeil()
     end
     ## The colour is taken at the MIDDLE of the band, not at its inner edge: at the edge each band
     ## takes the darkest hue it holds, and the whole gradient shifts outwards by half a band — the
-    ## penumbra's edge then started at 0.96 instead
-    ## lieu de 1,00, sans transition.
+    ## penumbra's edge then started at 0.96 instead of 1.00, with no transition.
     var ext = R_PENUMBRA
     for i = 1, #radii do
         veil[i] = {ext: ext, int: radii[i], color: veilA((ext + radii[i]) / 2)}
@@ -289,14 +288,14 @@ func draw()
     ##
     ## One band per ring, painted ONCE: each pixel is multiplied a single time, and its colour is the
     ## one `veilA` gives at that distance. The bands are
-    ## exactement jointives (le trou de l'une est le rayon externe de la suivante) : les faire
+    ## exactly abutting, one band's hole being the next one's outer radius: making them
     ## overlapping by half a pixel multiplied the joint twice, hence periodic DARK lines, which were
     ## measured.
     graphics.blendMode(blend.MULTIPLY)
     for i = 1, #veil do
         var b = veil[i]
-        ## The Moon may fit entirely inside the band's hole, which is common in a
-        ## totale) : le balayage ne tracerait alors pas un pixel.
+        ## The Moon may fit entirely inside the band's hole, which is common in a total
+        ## eclipse: the sweep would then not draw a single pixel.
         if d + 1 <= b.int then
             continue
         end

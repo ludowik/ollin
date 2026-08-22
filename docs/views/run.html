@@ -1,7 +1,7 @@
-<!-- Vue RUN (exécution autonome) — fragment monté par app.js dans #view.
-     Canvas partagé (shell) reparenté dans #output-pane par run.js. -->
+<!-- RUN view (standalone execution) — a fragment mounted by app.js in #view.
+     The shared canvas, from the shell, is reparented into #output-pane by run.js. -->
   <style>
-    /* Mêmes valeurs que le playground et la doc : les trois barres doivent être
+    /* The same values as the playground and the documentation: the three bars must be
        identiques, pas seulement ressemblantes. */
     :root { --bg:#0f1117; --surface:#1a1d2e; --fg:#e6e6ee; --dim:#a3adc4; --accent:#9ba1ff; --border:#3a3f63; }
     * { box-sizing: border-box; }
@@ -19,21 +19,21 @@
     #bar, canvas { touch-action:none; }
 
     /* Apparence de la barre : app-bar.css (commun aux trois vues). Ici, seulement ce
-       qui tient à cette vue : passer sous l'encoche, et ne PAS faire partie de la zone
+       specific to this view: it slips under the notch, and is NOT part of the area
        graphique. */
     #bar { flex:none;
            height: calc(var(--bar-h) + env(safe-area-inset-top));
            padding-top: env(safe-area-inset-top); }
     #status { color:var(--bar-ink); font-size:12px; }
-    /* Écran étroit : icônes seules (les libellés seraient à l'étroit). Le resserrement
-       de la barre lui-même est commun (app-bar.css). */
+    /* A narrow screen: icons only, the labels being too cramped. The bar's own tightening is
+       shared, in app-bar.css. */
     @media (max-width: 600px) { .bar-label { display:none; } }
 
-    /* Marges de sécurité (coins arrondis / barre home) exclues de la zone. */
+    /* The safe-area insets, for rounded corners and the home bar, are excluded from the area. */
     #stage-wrap { flex:1; display:flex; min-height:0;
                   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 
-    /* #output-pane = la ZONE GRAPHIQUE mesurée par window.width/height. */
+    /* #output-pane is the GRAPHICS AREA that window.width and window.height measure. */
     #output-pane { flex:1; position:relative; overflow:hidden; min-width:0; min-height:0; }
     canvas { display:none; position:absolute; top:0; left:0; right:0; bottom:0; margin:auto; background:#000; }
     #out { display:none; position:absolute; inset:0; white-space:pre-wrap; overflow:auto;
@@ -43,20 +43,20 @@
   </style>
 
   <div id="bar" class="app-bar">
-    <!-- « Ollin » à gauche comme dans les autres barres ; le reste cadré à droite :
+    <!-- "Ollin" on the left as in the other bars; the rest is set to the right:
          Recharger · Relancer · Capture · Pause · Éditeur. -->
     <span class="bar-logo">Ollin</span>
     <span class="spacer"></span>
     <span id="status">Chargement…</span>
-    <button id="reload-btn" class="bar-btn" title="Recharger la page (instance WASM neuve, chemin sûr)">
+    <button id="reload-btn" class="bar-btn" title="Reload the page: a fresh WASM instance, the safe path">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
       <span class="bar-label">Recharger</span>
     </button>
-    <button id="relaunch-btn" class="bar-btn" title="Relancer dans la même instance WASM (rapide, sans recharger la page)">
+    <button id="relaunch-btn" class="bar-btn" title="Restart in the same WASM instance: fast, with no page reload">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
       <span class="bar-label">Relancer</span>
     </button>
-    <button id="shot-btn" class="bar-btn" title="Capture d'écran → ressource PNG du projet">
+    <button id="shot-btn" class="bar-btn" title="Screenshot, stored as a PNG resource of the project">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="4" width="13" height="9.5" rx="1.5"/><circle cx="8" cy="8.75" r="2.6"/><path d="M5.5 4l1-1.5h3l1 1.5"/></svg>
       <span class="bar-label">Capture</span>
     </button>
@@ -64,9 +64,9 @@
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>
       <span class="bar-label">Pause</span>
     </button>
-    <!-- Retour à l'éditeur : tout à DROITE, au même coin que le bouton « Plein
-         écran » de l'éditeur (le même coin fait l'aller-retour). -->
-    <a class="bar-btn" href="#/playground" title="Retour à l'éditeur">
+    <!-- Back to the editor: at the far RIGHT, in the same corner as the editor's "Full screen"
+         button, so one corner makes the round trip. -->
+    <a class="bar-btn" href="#/playground" title="Back to the editor">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
       <span class="bar-label">Éditeur</span>
     </a>

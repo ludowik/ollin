@@ -1,6 +1,6 @@
 ## The tween module, with a SEQUENCE of steps: `tween.sequence` plays them one after another, each
-## starting from what the previous one left. The engine advances them at
-## chaque frame ; le dessin ne fait que LIRE des champs, sans jamais parler de temps.
+## starting from what the previous one left. The engine advances them every frame;
+## the drawing only READS fields, and never speaks of time.
 ##
 ## Click anywhere to pause the scene, or to resume it.
 
@@ -80,9 +80,9 @@ func draw()
     graphics.noStroke()
 
     ## The ground is decidedly LIGHT: a black shadow laid on a dark background would not
-    ## verrait pas, et c'est elle qui donne au rebond sa hauteur lisible.
-    ## A BAND, not the whole bottom of the screen: the progress bar and the text stay
-    ## ainsi sur le fond sombre, où ils sont lisibles.
+    ## be seen, and it is the shadow that makes the bounce's height readable.
+    ## A BAND, not the whole bottom of the screen: the progress bar and the text thus stay
+    ## on the dark background, where they are readable.
     var yFloor = floorY() + radius()
     graphics.fill(Color(0.29, 0.33, 0.42))
     graphics.rect(0, yFloor, W, H * 0.055)
@@ -93,8 +93,7 @@ func draw()
     var fall = (ball.y - ceilingY()) / (floorY() - ceilingY())
     var shadowW = radius() * (0.7 + 1.5 * fall)
     var dark = 0.15 + 0.6 * fall
-    ## Two concentric ellipses: the wider, paler one softens the edge, without
-    ## avoir besoin d'un flou.
+    ## Two concentric ellipses: the wider, paler one softens the edge, with no need for a blur.
     graphics.fill(Color(0.04, 0.05, 0.08, dark * 0.45))
     graphics.ellipse(ball.x, yFloor + radius() * 0.28, shadowW * 2.6, radius() * 0.7)
     graphics.fill(Color(0.04, 0.05, 0.08, dark))

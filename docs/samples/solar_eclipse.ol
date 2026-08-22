@@ -106,7 +106,7 @@ func light()
 end
 
 func setup()
-    graphics.canvas(W, H, "Éclipse de Soleil")
+    graphics.canvas(W, H, "Solar eclipse")
     math.noiseSeed(5)
 
     for i = 1, 160 do
@@ -119,15 +119,15 @@ func setup()
         hills[#hills + 1] = H * 0.80 + math.noise(x * 0.004, 3) * H * 0.10
     end
 
-    var menu = ui.menu("Éclipse")
+    var menu = ui.menu("Eclipse")
     menu.list("Type", TYPES, ref config.type)
-    menu.slider("Vitesse", ref config.speed, 0.1, 4)
+    menu.slider("Speed", ref config.speed, 0.1, 4)
     ui.show(menu)
 end
 
 ## The sky: a full-daylight blue that drains of its brightness, never quite black — the corona and
-## the horizon keep a glow, as at dusk. The colour is a FUNCTION, because the
-## Lune s'en sert aussi : hors du Soleil, on ne la voit pas.
+## the horizon keep a glow, as at dusk. The colour is a FUNCTION because the Moon uses it
+## as well: away from the Sun, one does not see the Moon at all.
 func skyColor(l)
     return Color(0.05 + 0.30 * l, 0.09 + 0.42 * l, 0.16 + 0.62 * l)
 end
@@ -185,8 +185,8 @@ end
 func drawCorona()
     var rl = moonRadius()
     graphics.blendMode(blend.ADD)
-    ## The inner halo, dense near the limb and fading outwards: it is what gives the
-    ## nacre de la couronne, les aigrettes ne faisant que la strier.
+    ## The inner halo, dense near the limb and fading outwards: it is what gives the corona
+    ## its pearly look, the streamers doing no more than streaking it.
     graphics.noStroke()
     for k = 1, 18 do
         var f = k / 18
@@ -224,9 +224,9 @@ func draw()
     drawSky(l)
     drawStars(l)
 
-    ## Le disque solaire, puis la couronne, puis la Lune PAR-DESSUS : c'est l'empilement
-    ## real one, and it is enough to carve the crescent out — no intersection need be computed
-    ## pour dessiner, la Lune masque ce qu'elle recouvre.
+    ## The solar disc, then the corona, then the Moon ON TOP: that is the real stacking order,
+    ## and it is enough to carve the crescent out — no intersection need be computed to draw it,
+    ## since the Moon hides whatever it covers.
     graphics.noStroke()
     graphics.fill(Color(1, 0.97, 0.86))
     graphics.circle(sunX(), sunY(), rs)
@@ -240,8 +240,8 @@ func draw()
     end
 
     ## The Moon takes THE SKY'S COLOUR, barely darkened: away from the Sun one does not see it
-    ## pas — un disque noir sur le bleu du jour serait une invention. Devant le Soleil, elle
-    ## le masque tout aussi bien.
+    ## at all — a black disc on the blue of day would be an invention. In front of the Sun it
+    ## hides it just as well.
     var c = skyColor(l)
     graphics.fill(Color(c.r * 0.90, c.g * 0.90, c.b * 0.92))
     graphics.circle(moonX(), moonY(), rl)

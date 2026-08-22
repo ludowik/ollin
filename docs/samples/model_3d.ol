@@ -1,10 +1,10 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
-## toujours visible quel que soit le ratio) et rotation interactive par quaternion.
+## it visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
 ## The "Model" menu switches from one object to the other: an .obj carries its geometry alone
-## (le fill le teinte), un .glb embarque aussi sa texture (fill blanc = couleurs
+## (the fill tints it), whereas a .glb also carries its texture (a white fill keeps
 ## its own colours). In the playground, add your file under "Resources" and extend the
-## liste ci-dessous.)
+## list below.
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.
@@ -15,7 +15,7 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 ## One entry per model: everything that differs from one object to the next lives here, and the
 ## rest of the program does not depend on it.
 global models = [
-    {name: "Nœud (.obj)", file: "knot.obj", tint: colors.ORANGE, ambient: 0.25, margin: 1.15, height: 0.15},
+    {name: "Knot (.obj)", file: "knot.obj", tint: colors.ORANGE, ambient: 0.25, margin: 1.15, height: 0.15},
     {name: "Textured cube (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12}
 ]
 global current = nil   ## the entry on display
@@ -58,7 +58,7 @@ func draw()
     var dist = graphics.fitDistance(sz.radius) * current.margin
     cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## a FIXED camera, framed
     cam.lookAt(sz.cx, sz.cy, sz.cz)
-    ball.idle(30)   ## rotation douce quand on ne glisse pas
+    ball.idle(30)   ## a gentle rotation while nobody is dragging
 
     graphics.begin3d(cam)
         graphics.fill(current.tint)
@@ -69,5 +69,5 @@ func draw()
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.text(current.name + " — glisse pour tourner", 12, 12)
+    graphics.text(current.name + " - drag to turn", 12, 12)
 end

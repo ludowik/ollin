@@ -1,13 +1,13 @@
 ## A REUSABLE self-adapting view distance, for terrain streamed as chunks.
 ##
-## Encapsule le rayon courant, ses bornes, le mode manuel et l'auto-adaptation : en
+## It holds the current radius, its bounds, the manual mode and the self-adaptation. With
 ## With vsync locked, deltaTime only reveals the headroom once frames overrun, so we measure the
 ## SHARE of slow frames over a window, against the display rate as MEASURED — a phone capped at
 ## 30 Hz keeps its computing power. Unreal frames, longer than STALL_DT, from a background tab or a
 ## resume, are ignored. It also carries three buttons at the top right: - and + switch to manual
 ## control, A switches back to self-adaptation.
 ##
-## update() renvoie :  1 = le rayon a GRANDI (relancer le streaming),
+## update() returns:   1 the radius has GROWN, so streaming is to be restarted,
 ##                    -1 the radius has SHRUNK, so the outer ring is to be unloaded,
 ##                     0 unchanged.
 ## hit() returns:      1 and -1 as above, 2 for a button consumed with no change, a bound having
@@ -24,10 +24,10 @@
 ##       elseif ev == -1 then streamUnload(lastcx, lastcz, 0)
 ##       elseif ev == 0 then pad.press(x, y) end   ## ev == 2 means there is nothing to do
 ##   end
-##   ## dans draw() : boucler sur vd.radius, puis
+##   ## in draw(): loop over vd.radius, then
 ##   ##   var ev = vd.update(deltaTime, streaming)
 ##   ##   if ev == 1 then streaming = true elseif ev == -1 then streamUnload(pcx, pcz, 0) end
-##   ##   ... vd.draw()  (boutons)  ...  vd.mode() → "auto"/"manuel"
+##   ##   ... vd.draw()  (the buttons)  ...  vd.mode() → "auto"/"manual"
 
 class ViewDistance
     func init(start, lo, hi, fps = 60)
@@ -63,8 +63,8 @@ class ViewDistance
         ## the share of slow frames becomes too noisy to decide on — a single late frame weighs 7 %
         ## there. So the window lengthens as the rate falls.
         self.MIN_N = 30
-        self.GROW = 0.03      ## ne grandit que si TRÈS peu de frames lentes → garde de la marge
-        self.DROP = 0.25      ## large zone morte [GROW;DROP] = ne chasse pas la limite, n'oscille pas
+        self.GROW = 0.03      ## it only grows on VERY few slow frames, which keeps some headroom
+        self.DROP = 0.25      ## a wide dead zone [GROW;DROP]: it does not chase the limit, nor oscillate
         self.RELAX = 20.0     ## retests the learnt ceiling rarely, which avoids oscillation
         self.MEM_MAX = 110000000
         self.t = 0.0
@@ -81,7 +81,7 @@ class ViewDistance
     end
 
     func mode()
-        return self.manual and "manuel" or "auto"
+        return self.manual and "manual" or "auto"
     end
 
     ## Adjusts the radius from the share of slow frames in the window just past. It measures
@@ -106,7 +106,7 @@ class ViewDistance
         self.slow = self.n - self.voteCadence()
         if first then
             self.t = 0.0                       ## the seed window: it served to elect the
-            self.n = 0                         ## cadence, la juger n'aurait aucun sens
+            self.n = 0                         ## rate, and judging it would mean nothing
             self.slow = 0
             return 0
         end
@@ -157,7 +157,7 @@ class ViewDistance
         end
         if not self.voted then
             self.hzKeep = vote                 ## the first election: adopted as it stands,
-            self.voted = true                  ## sinon l'amorce fausserait le tout premier jugement
+            self.voted = true                  ## the seed would otherwise skew the very first judgement
             self.miss = 0
         elseif vote >= self.hzKeep then
             self.hzKeep = vote
@@ -181,7 +181,7 @@ class ViewDistance
         return atTime
     end
 
-    ## Cadence d'affichage retenue (Hz), affichable pour la mise au point.
+    ## The display rate kept, in Hz, which can be shown while tuning.
     func hz()
         return self.hzKeep
     end

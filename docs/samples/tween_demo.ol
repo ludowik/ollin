@@ -2,7 +2,7 @@
 ## duration, along a curve. The engine advances the tweens every frame: there is nothing to call
 ## in draw(), one declares and forgets.
 ##
-## Clique n'importe où pour relancer les animations. La liste « Courbe » du menu choisit la
+## Click anywhere to restart the animations. The menu's "Curve" list chooses the
 ## curve applied to the star, and the slider sets the duration.
 
 global config = {curve: "easeInOutQuad"}
@@ -51,7 +51,7 @@ func start()
 end
 
 ## The callback receives the item chosen; config.curve is already written when it fires, so
-## il suffit de relancer.
+## restarting is enough.
 func onCurve(name)
     start()
 end
@@ -64,10 +64,10 @@ func setup()
     end
 
     ## ONE list instead of eighteen buttons: it writes config.curve, the name chosen,
-    ## puisqu'un tableau renvoie ses valeurs) puis appelle le rappel. Sa source est
-    ## tween.curves(), donc elle suit le catalogue du moteur sans le recopier ici.
+    ## since an array gives its values, then calls the callback. Its source is
+    ## tween.curves(), so it follows the engine's catalogue instead of copying it here.
     var menu = ui.menu("Animation")
-    menu.list("Courbe", tween.curves(), ref config.curve, onCurve)
+    menu.list("Curve", tween.curves(), ref config.curve, onCurve)
     menu.slider("Duration", ref duration, 0.3, 3)
     ui.show(menu)
 

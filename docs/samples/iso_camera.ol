@@ -1,13 +1,13 @@
 ## An interactive isometric camera.
-## Glisse pour orbiter · Molette / pinch pour zoomer · Double-clic pour recentrer.
+## Drag to orbit - wheel or pinch to zoom - double-click to recentre.
 
-global ISO_DIST  = 18.0      ## rayon d'orbite
+global ISO_DIST  = 18.0      ## orbit radius
 global ISO_H     = 14.0      ## the camera's height
 global ISO_SIZE  = 14.0      ## the units visible vertically
-global ISO_ANGLE = 0.785     ## angle initial ≈ 45°
+global ISO_ANGLE = 0.785     ## initial angle, about 45 degrees
 
 global cam    = graphics.cameraOrtho(0, ISO_H, ISO_DIST,  0, 0, 0,  ISO_SIZE)
-global angle  = ISO_ANGLE    ## angle d'orbite courant (radians)
+global angle  = ISO_ANGLE    ## current orbit angle, in radians
 global dragging = false
 global lastx    = 0
 global lasty    = 0

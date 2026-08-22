@@ -1,4 +1,4 @@
-## Joystick analogique tactile RÉUTILISABLE — zone CIRCULAIRE, neutre au centre.
+## A REUSABLE analogue touch joystick: a CIRCULAR area, neutral at the centre.
 ##
 ## A finger placed INSIDE the disc arms the control and keeps it active even if it leaves, the
 ## values being clamped. The neutral point is the disc's CENTRE:
@@ -13,18 +13,18 @@
 ##   func mouse.pressed(x, y)  pad.press(x, y)  end
 ##   func mouse.moved(x, y)    pad.move(x, y)   end
 ##   func mouse.released(x, y) pad.release()    end
-##   ## dans draw() : yaw -= pad.steer() * VITESSE_ROT * deltaTime
+##   ## in draw(): yaw -= pad.steer() * TURN_SPEED * deltaTime
 ##   ##              move by  pad.throttle() * SPEED * deltaTime  (negative goes backwards)
 ##   ## and at the end: pad.draw()
 
 class Joystick
     func init()
         self.active = false       ## armed, a finger being down inside the disc; it stays true if the finger leaves
-        self.px = 0               ## position courante du doigt
+        self.px = 0               ## the finger's current position
         self.py = 0
         self.centerFrac = 0.72   ## the vertical centre, the neutral point, as a fraction of H, lowered
-        self.radiusFrac = 0.22   ## rayon du disque, fraction de H (agrandi)
-        self.dead = 0.10          ## zone morte (neutre) autour du centre, fraction du rayon
+        self.radiusFrac = 0.22   ## the disc's radius, as a fraction of H (enlarged)
+        self.dead = 0.10          ## the dead zone around the centre, as a fraction of the radius
     end
 
     func cx()

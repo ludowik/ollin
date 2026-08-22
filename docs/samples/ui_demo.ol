@@ -4,12 +4,12 @@
 ## A widget is declared ONCE. The engine draws it and tests it every frame.
 ## Widgets are filed into menus and sub-menus; ui.show changes the menu on display.
 ## A checkbox, a slider and a list each receive a REFERENCE: `ref` accepts a path of fields, so
-## the settings fit in ONE `config` object rather than in as many
-## variables globales. Le programme les lit normalement — voir `config.grille` et
-## `config.vitesse` dans draw().
+## the settings fit in ONE `config` object rather than in as many global
+## variables. The program reads them as usual — see `config.grid` and
+## `config.speed` in draw().
 
-## Every setting the interface exposes, in one place: what the user
-## peut changer se lit ici, sans chercher parmi les globales du programme.
+## Every setting the interface exposes, in one place: what the user can change reads
+## here, with no need to hunt through the program's globals.
 global config = {
     grid: true,
     anim: true,
@@ -40,7 +40,7 @@ end
 
 func onDirection(value)
     ## The callback receives the item chosen: here the enum's key, a string.
-    print("sens : " + value)
+    print("direction: " + value)
 end
 
 func onTint(value)
@@ -55,7 +55,7 @@ func onThick(on)
     if on then
         print("thick stroke")
     else
-        print("trait fin")
+        print("thin stroke")
     end
 end
 
@@ -73,7 +73,7 @@ func setup()
     main.slider("Branches", ref config.branches, 1, 8)
 
     ## A list is single-selection: the row shows the item chosen, and a click unfolds
-    ## les choix. Le tableau renvoie la VALEUR choisie, l'enum sa CLÉ.
+    ## the choices. An array gives back the VALUE chosen, an enum its KEY.
     main.list("Shape", shapes, ref config.shape)
     main.list("Direction", Direction, ref config.direction, onDirection)
 
@@ -83,18 +83,18 @@ func setup()
     appearance.slider("Tint", ref config.tint, 0, 1, onTint)
 
     ## ui.show replaces the menu on display, which is enough to move from one screen to another
-    ## pause, fin de partie) sans reconstruire l'interface. Les menus sont des locales de
-    ## in setup, captured by the buttons' closures.
+    ## (pause, game over) without rebuilding the interface. The menus are locals of
+    ## setup, captured by the buttons' closures.
     var pause = ui.menu("Pause")
     pause.button("Resume", func() ui.show(main) end)
     main.button("Pause", func() ui.show(pause) end)
     ui.show(main)
 
-    onTint(config.tint)   ## le rappel ne part qu'au premier changement : couleur initiale ici
+    onTint(config.tint)   ## the callback only fires on a change, so the initial colour is set here
 end
 
-## La forme du bout de bras vient de la liste : le programme lit config.forme comme une
-## variable ordinaire.
+## The shape at the end of an arm comes from the list: the program reads config.shape like an
+## ordinary variable.
 func drawShape(x, y, radius)
     if config.shape == "square" then
         graphics.rect(x - radius, y - radius, radius * 2, radius * 2)
@@ -125,14 +125,14 @@ func draw()
         t += deltaTime * config.speed
     end
 
-    ## Autant de bras que `config.branches` : chaque widget agit tout de suite sur le dessin.
+    ## As many arms as `config.branches`: every widget acts on the drawing at once.
     var side = math.min(W, H)
     var r = side * 0.28
     var radius = side * 0.06
     var gap = math.TAU / config.branches
     graphics.stroke(armColor, config.thick and 8 or 2)
     graphics.noFill()
-    var direction = config.direction == "horaire" and 1 or -1
+    var direction = config.direction == "clockwise" and 1 or -1
     for i = 1, config.branches do
         var angle = direction * t + gap * i
         var cx = CW + math.cos(angle) * r

@@ -1,6 +1,6 @@
-## Jeu de la vie de Conway (B3/S23), grille torique. Espace = pause, R = relance.
-## Souris/doigt (aussi iPhone) : appui = pause + allume la cellule, glisser = dessine,
-## double tap = relance.
+## Conway's Game of Life (B3/S23) on a toroidal grid. Space pauses, R restarts.
+## Mouse or finger (an iPhone included): a press pauses and lights the cell, dragging draws,
+## a double tap restarts.
 
 const CELL = 8           ## px
 const STEP = 0.08        ## seconds between two generations
@@ -146,7 +146,7 @@ func step()
     back = tmp
 end
 
-graphics.canvas(W, H, "Jeu de la vie")
+graphics.canvas(W, H, "Game of Life")
 COLS = W // CELL
 ROWS = H // CELL
 reset()
@@ -162,9 +162,9 @@ end
 const DOUBLE_TAP = 0.3
 func mouse.pressed(x, y)
     if lastTap >= 0.0 and elapsedTime - lastTap < DOUBLE_TAP then
-        paused = false                          ## double tap → relance
+        paused = false                          ## a double tap restarts
         drawing = false
-        lastTap = -1.0                          ## un 3e appui ne compte pas comme double
+        lastTap = -1.0                          ## a third press does not count as another double
         return
     end
     lastTap = elapsedTime

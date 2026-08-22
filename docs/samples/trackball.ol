@@ -2,7 +2,7 @@
 ## object, with no gimbal lock, by composing quaternions.
 ##
 ##   orient()  gives the current orientation quaternion, to pass to graphics.rotateq
-##   dragging  → vrai pendant un glissement (pour suspendre une rotation automatique)
+##   dragging  → true while dragging, so an automatic rotation can be suspended
 ##   idle(degreesPerSecond)  a gentle rotation at rest, to be called in draw()
 ##
 ## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
@@ -13,7 +13,7 @@
 ##   func mouse.pressed(x, y)  ball.press(x, y) end
 ##   func mouse.moved(x, y)    ball.move(x, y)  end
 ##   func mouse.released(x, y) ball.release()   end
-##   ## dans draw() : graphics.rotateq(ball.orient())
+##   ## in draw(): graphics.rotateq(ball.orient())
 
 class Trackball
     func init(sensitivity)
@@ -22,7 +22,7 @@ class Trackball
         self.lastx = 0
         self.lasty = 0
         ## Degrees of rotation per pixel dragged. The default only applies in the ABSENCE
-        ## d'argument : `or` prendrait aussi le dessus sur 0, qui fige volontairement la
+        ## of an argument: `or` would also override 0, which deliberately freezes the
         ## rotation (zero is false in Ollin).
         self.sensitivity = 0.5
         if sensitivity <> nil then
@@ -58,11 +58,11 @@ class Trackball
         self.q = spin.mul(self.q)
     end
 
-    ## Rotation douce quand l'utilisateur ne glisse pas — sans effet pendant un glissement.
-    func idle(degresParSeconde)
+    ## A gentle rotation while the user is not dragging; it does nothing during a drag.
+    func idle(degreesPerSecond)
         if self.dragging then
             return
         end
-        self.q = graphics.quatAxis(0, 1, 0, deltaTime * degresParSeconde).mul(self.q)
+        self.q = graphics.quatAxis(0, 1, 0, deltaTime * degreesPerSecond).mul(self.q)
     end
 end

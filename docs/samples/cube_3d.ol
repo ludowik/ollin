@@ -1,5 +1,5 @@
 ## Lit 3D plus instancing. Drag with the mouse or a finger to turn the scene:
-## chaque glissement compose un quaternion → « trackball » fluide, sans blocage de cardan.
+## every drag composes a quaternion, giving a smooth trackball with no gimbal lock.
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.
@@ -8,7 +8,7 @@ global ball = Trackball()
 global cam = graphics.camera(0, 14, 34,  0, 0, 0)   ## FIXED: it is the scene that turns
 
 func setup()
-    graphics.canvas(W, H, "3D — glisser pour tourner")
+    graphics.canvas(W, H, "3D - drag to turn")
     graphics.ambient(0.2)
     graphics.light("dir", -1, -2, -0.5)
 end

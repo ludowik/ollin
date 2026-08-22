@@ -132,7 +132,7 @@ func demoEllipseMode()
     label("ellipseMode center / corner", 30, 468)
 end
 
-## Le mode centre des images vaut aussi pour image.draw.
+## The centre mode for sprites holds for image.draw as well.
 func demoSpriteMode()
     var s = fs(40)
     g.pushStyle()
@@ -142,7 +142,7 @@ func demoSpriteMode()
         g.sprite(tile, px(408), py(430), s, s)
     end
     g.popStyle()
-    ## Point plus gros ici : celui du mode centre tombe sur le damier.
+    ## A bigger dot here: the one for the centre mode falls on the checkerboard.
     g.stroke(Color(1, 1, 1), fs(5))
     g.point(px(330), py(430))
     g.point(px(408), py(430))
@@ -210,7 +210,7 @@ func demoTransforms()
     label("rotate/scale", 476, 278)
 end
 
-## La police est un STYLE, comme fill ou fontSize : elle reste en place jusqu'au
+## The font is a STYLE, like fill or fontSize: it stays in place until
 ## the next graphics.font, hence the pushStyle that gives the previous font back to the
 ## demonstrations that follow.
 func demoText()

@@ -18,8 +18,8 @@ global buffers = []          ## one buffer per note, computed once in setup()
 global lastKey = 0       ## the key lit up, for visual feedback
 global glow = 0.0        ## it decays every frame, so the keyboard "breathes"
 
-global bow = nil       ## l'oscillateur vivant
-global bowPos = 0.0      ## 0..1, position du doigt dans la bande
+global bow = nil         ## the living oscillator
+global bowPos = 0.0      ## 0..1, the finger's position across the band
 ## The contact driving the bow: a finger's identifier, "mouse", or nil when it is silent. It is
 ## ALWAYS compared with nil, never by truthiness: a finger's identifier may be 0, which the
 ## language holds to be false — the bow then stayed mute under the browser's first finger. The band
@@ -31,11 +31,11 @@ global mouseDown = false      ## the mouse button is down
 
 ## One HELD oscillator per contact, created when the finger lands and given back on lifting through
 ## `free()`. The engine manages the pool: it only takes a released voice back once it has died away.
-global voiceOf = {}        ## contact (identifiant de doigt, ou "mouse") → oscillateur
+global voiceOf = {}        ## contact (a finger identifier, or "mouse") → oscillator
 
 ## One entry per contact DOWN, a finger or the pointer: its identifier maps to the key it presses.
 ## That is what allows several notes at once. The pointer appears under the name "mouse",
-## comme un contact de plus — tout le reste du programme le traite alors sans cas particulier.
+## as one more contact, so the rest of the program handles it with no special case.
 global underFinger = {}
 ## The keys held, in a map reused from one frame to the next: a fresh map per frame would be an
 ## allocation, whereas emptying this one costs eight writes.
@@ -68,7 +68,7 @@ func keyWidth()
 end
 
 func setup()
-    graphics.canvas(W, H, "son")
+    graphics.canvas(W, H, "sound")
 
     ## One buffer per note: the waveform is sampled ONCE, then the envelope is applied to the
     ## samples. Nothing is recomputed on playback.
@@ -77,9 +77,9 @@ func setup()
         buffers[i].envelope(0.01, 0.12, 0.35, 0.25).volume(0.5)
     end
 
-    ## L'archet reste silencieux jusqu'au premier glissement : son volume est nul et c'est
-    ## `start` qui le met en marche, pas `play`. Triangle et non dent de scie : sur un
-    ## glissando, une forme riche en harmoniques devient criarde dans l'aigu.
+    ## The bow stays silent until the first drag: its volume is zero, and it is `start` that
+    ## sets it running, not `play`. A triangle rather than a sawtooth: over a glissando, a
+    ## shape rich in harmonics turns shrill in the treble.
     bow = sound.triangle(220).volume(0.0)
     bow.start()
 
@@ -143,7 +143,7 @@ func playBuffer(i)
     glow = 1.0
 end
 
-## Touche sous le point (x, y), ou 0 si le point n'est pas sur le clavier.
+## The key under the point (x, y), or 0 when the point is off the keyboard.
 func keyAt(x, y)
     if y < keyboardTop() then
         return 0
@@ -173,7 +173,7 @@ func inBand(y)
     return y >= bandTop() and y <= bandBottom()
 end
 
-## ── Multitouche : plusieurs doigts, chacun suivi par son identifiant ────────────
+## ── Multitouch: several fingers, each followed by its identifier ────────────────
 func touch.began(id, x, y)
     if inBand(y) and bowHolder == nil then
         bowHolder = id
@@ -187,7 +187,7 @@ func touch.moved(id, x, y)
         if inBand(y) then
             moveBow(x, y)
         else
-            bowHolder = nil   ## sorti de la bande : il rend l'bow, et peut playBuffer des notes
+            bowHolder = nil   ## out of the band: it gives the bow back, and can play notes
         end
     end
     underFinger[id] = follow(id, underFinger[id], x, y)
@@ -288,7 +288,7 @@ func draw()
     var bb = bandBottom()
     var hc = keyboardTop()
 
-    ## La bande de l'archet : sa teinte dit s'il sonne.
+    ## The bow's band: its hue says whether it is sounding.
     var warm = (bowHolder <> nil) and 1 or 0
     graphics.fill(Color(0.13 + 0.2 * warm, 0.15, 0.24))
     graphics.rect(0, hb, W, bb - hb)
@@ -297,7 +297,7 @@ func draw()
         graphics.rect(bowPos * W - 2, hb, 4, bb - hb)
     end
     graphics.stroke(Color(0.75, 0.82, 0.95))
-    graphics.text("glisse ici : oscillateur vivant", W * 0.04, hb + H * 0.05)
+    graphics.text("drag here: a living oscillator", W * 0.04, hb + H * 0.05)
     if bowHolder <> nil then
         graphics.text("{bow.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
     end

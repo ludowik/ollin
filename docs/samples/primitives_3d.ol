@@ -8,10 +8,10 @@ global ball = Trackball()
 global cam = graphics.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
 
 ## A grid suited to the orientation: 4x2 in landscape, 2x4 in portrait
-## cellPos(col, row, cols, rows) → [x, z] dans le plan XZ (vue ortho iso, size=16)
+## cellPos(col, row, cols, rows) → [x, z] in the XZ plane (isometric ortho view, size=16)
 ## Converts a grid position (col, row) into world XZ coordinates for the isometric camera
 ## looking from (12,12,12) at (0,0,0):
-##   screen_x = (wx - wz) / √2  ;  screen_y = (-wx - wz) / √6  (avec wy=0)
+##   screen_x = (wx - wz) / √2  ;  screen_y = (-wx - wz) / √6  (with wy=0)
 ## We invert that system to get wx and wz from the target on screen.
 func cellPos(col, row, cols, rows)
     var size  = 16.0

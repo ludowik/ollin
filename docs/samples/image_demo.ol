@@ -1,5 +1,5 @@
-## image.loadData : PNG EMBARQUÉ (base64), sans upload. (Playground : bouton
-## « Images » puis image.load("nom.png") pour charger tes propres fichiers.)
+## image.loadData: an EMBEDDED PNG (base64), with no upload. (In the playground, the
+## "Images" button then image.load("name.png") loads your own files.)
 const SMILEY = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAm0lEQVR42u2XMQ7AIAhFnXsI597/FL2VTYcODlU+8AsmmrB9+c8EFUpZbbWrtlGEmFJhtOZmCKuxCcTbHIJgmYshQgHY5kOIv8w/IWYbznqIk0u0EMCT8A2JuUSrMp8lRrQdhNepUC1UgN41AANQb8IG8Coq9VUMBwh/iNDHyKpT/wVIUH5EqvnuiNI0pSna8hSDSZrRLMVwylw34TmhCGvoaGUAAAAASUVORK5CYII="
 
 graphics.canvas(W, H, "image.loadData")

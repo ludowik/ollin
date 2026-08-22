@@ -1,12 +1,12 @@
 ## Persistence: the `data` module remembers values from one run to the next.
 ## Here a run counter, in the PROJECT scope, plus a score raised on every click.
-## Relance le script (ou recharge la page) : le compteur et le score reviennent.
+## Restart the script (or reload the page): the counter and the score come back.
 
 global runs = 0
 global score = 0
 
 func setup()
-    graphics.canvas(W, H, "data — persistance")
+    graphics.canvas(W, H, "data - persistence")
     runs = data.get("runs", 0) + 1     ## read, then raised on every run
     data.set("runs", runs)
     score = data.get("score", 0)       ## taken up where it was left
@@ -21,7 +21,7 @@ func draw()
     graphics.clear(Color(0.10, 0.12, 0.18))
     graphics.stroke(colors.WHITE)
     graphics.fontSize(30)
-    graphics.text("Lancement n° " + runs, 24, 40)
+    graphics.text("Run no. " + runs, 24, 40)
     graphics.stroke(colors.SKYBLUE)
     graphics.fontSize(26)
     graphics.text("Score (click): " + score, 24, 92)
