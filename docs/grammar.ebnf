@@ -1,16 +1,15 @@
-(* Ollin — grammaire formelle
-   Source de vérité : syntax.ol
-   Maintenu par : Claude — mettre à jour après chaque évolution de syntax.ol
+(* Ollin — formal grammar
+   Source of truth: syntax.ol
+   Maintained by: Claude — update it after every change to syntax.ol
 
-   Ce fichier est LA référence de la syntaxe et de la sémantique du langage.
-   Les commentaires (* ... *) précisent les règles sémantiques attachées à
-   chaque production. CLAUDE.md ne documente que l'implémentation interne.
+   This file is THE reference for the language's syntax and semantics. The (* ... *)
+   comments state the semantic rules attached to each production. CLAUDE.md documents
+   the internal implementation only.
 
-   Terminateurs de statements : chaque statement se termine par un saut de ligne.
-   À l'intérieur des parenthèses, crochets et accolades, les sauts de ligne
-   sont ignorés (continuation implicite).
-   Le caractère ';' est UNIQUEMENT le séparateur d'intervalle dans rangeLit.
-   Un ';' hors d'un contexte entre crochets/parenthèses est une erreur. *)
+   Statement terminators: every statement ends with a newline. Inside brackets, square
+   brackets and braces, newlines are ignored (implicit continuation).
+   The ';' character is ONLY the interval separator in rangeLit. A ';' outside a
+   bracketed context is an error. *)
 
 program        = { stmt } EOF ;
 
@@ -37,99 +36,102 @@ importStmt     = "import" STRING [ "as" IDENT ] NL ;
 enumDecl       = "enum" enumTarget [ enumItem { "," enumItem } [ "," ] ] "end" NL ;
 enumTarget     = IDENT { "." IDENT } ;
 enumItem       = IDENT [ "=" expr ] ;
-                 (* crée une MAP dont les clés sont les éléments ; les sauts de ligne
-                    entre éléments sont libres (les NL ne sont pas des tokens), et la
-                    virgule finale est tolérée — pratique en liste verticale *)
-                 (* cible : IDENT seul = variable GLOBALE (comme une classe, référence
-                    en avant possible) ; chemin a.b = écrit le champ b de la map a *)
-                 (* NUMÉROTATION — un élément sans valeur prend le compteur, qui part de 1
-                    et avance de 1 ; un LITTÉRAL entier (signé permis) fixe la valeur et
-                    fait repartir le compteur à valeur+1 ; toute AUTRE expression est
-                    acceptée comme valeur mais laisse le compteur inchangé (elle n'est
-                    pas évaluable à la compilation). Ex. : A, B = "x", C  →  1, "x", 2 *)
-                 (* une valeur peut être de tout type (nombre, chaîne, objet, tableau,
-                    fonction) ; deux éléments de même valeur = alias, permis ; deux
-                    éléments de même NOM = erreur de compilation *)
-                 (* la map est GELÉE : toute écriture indexée est refusée (erreur de
-                    compilation si la cible est visiblement l'enum, erreur d'exécution
-                    sinon — alias, clé calculée). Le gel est SUPERFICIEL : un objet ou
-                    un tableau CONTENU dans l'enum reste modifiable *)
-                 (* en lecture, un enum est une map ordinaire : accès, len, itération *)
+                 (* builds a MAP whose keys are the items; newlines between items are free
+                    (NL is not a token), and a trailing comma is tolerated, which suits a
+                    vertical list *)
+                 (* the target: a bare IDENT is a GLOBAL variable (like a class, so a forward
+                    reference is possible); a path a.b writes the field b of the map a *)
+                 (* NUMBERING — an item with no value takes the counter, which starts at 1 and
+                    advances by 1; an integer LITERAL (a sign is allowed) sets the value and
+                    restarts the counter at value+1; ANY OTHER expression is accepted as a value
+                    but leaves the counter where it is, not being computable at compile time.
+                    For instance A, B = "x", C gives 1, "x", 2 *)
+                 (* a value may be of any type (a number, a string, an object, an array, a
+                    function); two items of the same value are aliases, and are allowed; two
+                    items of the same NAME are a compile error *)
+                 (* the map is FROZEN: every indexed write is refused — a compile error when the
+                    target is visibly the enum, a runtime error otherwise, through an alias or a
+                    computed key. The freeze is SHALLOW: an object or an array HELD BY the enum
+                    stays mutable *)
+                 (* for reading, an enum is an ordinary map: access, len, iteration *)
 
 classDecl      = "class" IDENT [ "extends" IDENT ] NL { method } "end" NL ;
 method         = [ "static" ] "func" IDENT "(" [ params ] ")" NL { stmt } "end" NL ;
-                 (* sans "static" : méthode d'instance — premier param implicite "self" en R[0] *)
-                 (* avec "static" : méthode de classe — pas de self, appelable via Classe.m() ou instance.m() *)
-                 (* "func init(...)" = constructeur (toujours instance) *)
-                 (* méthodes spéciales : init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
+                 (* without "static": an instance method — the implicit first parameter "self" sits in R[0] *)
+                 (* with "static": a class method — no self, callable as Class.m() or instance.m() *)
+                 (* "func init(...)" is the constructor, always an instance method *)
+                 (* the special methods: init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
 
 methodCall     = expr "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
 superCall      = "super" "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NL ;
-                 (* `var` est OBLIGATOIRE pour créer une variable, et ne crée que des locales *)
-                 (* sans "=" → nil ; moins de valeurs que de noms → les noms en trop valent nil *)
-                 (* portée LEXICALE : la locale n'est visible qu'À PARTIR de sa déclaration.
-                    Avant sa ligne, le nom résout au global/upvalue englobant, ou « undeclared
-                    variable » s'il n'existe pas. Ainsi `var x = x` initialise avec le x
-                    extérieur. (Les fonctions imbriquées, elles, sont visibles en avant dans
-                    leur portée → récursion/référence mutuelle.) *)
+                 (* `var` is MANDATORY to create a variable, and it only ever creates locals *)
+                 (* with no "=" the value is nil; with fewer values than names, the extra names are nil *)
+                 (* LEXICAL scope: a local is only visible FROM its declaration on. Above its
+                    line the name resolves to the enclosing global or upvalue, or to "undeclared
+                    variable" when there is none. Hence `var x = x` initialises from the outer x.
+                    Nested functions, on the other hand, are visible forwards within their scope,
+                    which allows recursion and mutual references. *)
 globalDecl     = "global" IDENT { "," IDENT } [ "=" expr { "," expr } ] NL ;
-                 (* `global` déclare des variables globales, visibles dans tout le programme *)
-                 (* déclarable n'importe où (top-level ou dans une fonction) ; lue/écrite partout *)
-                 (* une locale `var` de même nom masque le global à partir de sa déclaration *)
+                 (* `global` declares global variables, visible throughout the program *)
+                 (* declarable anywhere, at the top level or inside a function; read and written anywhere *)
+                 (* a `var` local of the same name shadows the global from its declaration on *)
 constDecl      = "const" IDENT { "," IDENT } "=" expr { "," expr } NL ;
-                 (* `const` déclare une locale immuable ; initialisation obligatoire *)
-                 (* toute tentative d'assignation ultérieure est une erreur de compilation *)
-                 (* une constante peut être capturée en lecture seule par une closure *)
+                 (* `const` declares an immutable local; the initialisation is mandatory *)
+                 (* any later attempt to assign to it is a compile error *)
+                 (* a constant can be captured read-only by a closure *)
 whileStmt      = "while" expr "do" { stmt } "end" NL ;
 doStmt         = "do" { stmt } "end" NL ;
-                 (* bloc lexical libre : les variables déclarées à l'intérieur sont locales au bloc
-                    et ne sont pas visibles après "end". Les closures capturées restent valides. *)
+                 (* a free lexical block: the variables declared inside are local to the block and
+                    are not visible after "end". The closures captured stay valid. *)
 forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" NL
                | "for" IDENT [ "," IDENT ] "in" expr "do" { stmt } "end" NL ;
-                 (* numérique : "for i=start,end[,step]" ; step optionnel, défaut 1 ; step<0 décompte *)
-                 (* itérateur : "for v in it" → valeur primaire (élément pour array/range, clé pour map) *)
-                 (*             "for k,v in it" → clé/index + valeur *)
-                 (* itérables : array, map (snapshot), range ; "break" valide partout *)
-                 (* la/les variable(s) de boucle sont LOCALES à la boucle : non visibles
-                    après (y référer = erreur) ; une variable externe de même nom est
-                    masquée puis restaurée. Les modifier dans le corps n'affecte pas
-                    l'itération. *)
-                 (* chaque ITÉRATION a ses propres variables : une closure créée dans le
-                    corps capture la variable de boucle et les locales du corps telles
-                    qu'elles étaient à SON tour, pas leur valeur finale *)
+                 (* numeric: "for i=start,end[,step]"; the step is optional, 1 by default, and a
+                    negative step counts down *)
+                 (* iterator: "for v in it" gives the primary value — the element for an array or
+                    a range, the key for a map *)
+                 (*           "for k,v in it" gives the key or index, plus the value *)
+                 (* the iterables: an array, a map (as a snapshot), a range; "break" is valid in all of them *)
+                 (* the loop variable, or variables, are LOCAL to the loop: they are not visible
+                    afterwards, and referring to one is an error; an outer variable of the same
+                    name is shadowed, then restored. Changing them inside the body does not affect
+                    the iteration. *)
+                 (* each ITERATION has variables of its own: a closure created in the body captures
+                    the loop variable and the body's locals as they were on ITS turn, not their
+                    final value *)
 ifStmt         = "if" expr "then" { stmt }
                  { "elseif" expr "then" { stmt } }
                  [ "else" { stmt } ]
                  "end" NL ;
-             (* pas de sucre "else if" : un elseif s'écrit 'elseif'. Un 'else' suivi
-                d'un 'if' est une branche else contenant un bloc if imbriqué (statement
-                normal, avec son propre 'end'). *)
+             (* there is no "else if" sugar: an elseif is written 'elseif'. An 'else' followed
+                by an 'if' is an else branch holding a nested if block — an ordinary statement,
+                with its own 'end'. *)
 tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" NL ;
 switchStmt     = "switch" expr NL { "case" expr { "," expr } NL { stmt } } [ "else" NL { stmt } ] "end" NL ;
 throwStmt      = "throw" expr NL ;
 funcDecl       = "func" IDENT [ "." IDENT ] "(" [ params ] ")" NL { stmt } "end" NL ;
-               (* "func obj.field(...) ... end" est un sucre pour
-                  "obj.field = func(...) ... end" : définit une fonction sur un champ
-                  de map/module (ex. func keyboard.keypressed(key) ... end) *)
+               (* "func obj.field(...) ... end" is sugar for "obj.field = func(...) ... end":
+                  it defines a function on a field of a map or a module, as in
+                  func keyboard.keypressed(key) ... end *)
 params         = param { "," param } [ "," "..." ] | "..." ;
 param          = IDENT [ "=" literal ] ;
-                 (* "..." dans les paramètres = fonction variadique. Dans le CORPS, `...`
-                    désigne les arguments variadiques. Expansion multi-valeurs (modèle Lua) :
-                    en DERNIÈRE position d'une liste — arguments d'appel `f(a, ...)`, éléments
-                    de tableau `[x, ...]`, `return a, ...`, destructuration `var a, b = ...` —
-                    `...` s'étend à TOUTES les varargs. Un APPEL en dernière position s'étend de
-                    même à toutes ses valeurs de retour (`f(g())`, `return g()`, `[x, g()]`).
-                    Ailleurs (position non finale, ou `var x = ...`), l'expression est ajustée à
-                    UNE valeur : `...` → 1ʳᵉ vararg ou nil ; un appel → sa 1ʳᵉ valeur.
-                    Limite connue : `objet.methode(...)` n'étend pas encore (ajusté à 1 valeur). *)
+                 (* "..." among the parameters makes the function variadic. In the BODY, `...`
+                    names the variadic arguments. Multi-value expansion, as in Lua: in LAST
+                    position of a list — call arguments `f(a, ...)`, array elements `[x, ...]`,
+                    `return a, ...`, destructuring `var a, b = ...` — `...` expands to EVERY
+                    vararg. A CALL in last position likewise expands to all of its return values
+                    (`f(g())`, `return g()`, `[x, g()]`). Anywhere else — a non-final position, or
+                    `var x = ...` — the expression is adjusted to ONE value: `...` gives the first
+                    vararg or nil, and a call gives its first value.
+                    A known limit: `object.method(...)` does not expand yet, and is adjusted to
+                    one value. *)
 returnStmt     = "return" [ retvals ] NL ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
-                 (* règle sémantique : IDENT doit avoir été déclaré par "var" ou "global" — sinon erreur *)
-                 (* "var" → locale ; "global" → globale (table VM partagée) *)
+                 (* the semantic rule: IDENT must have been declared by "var" or "global", or it is an error *)
+                 (* "var" gives a local, "global" a global, in the VM's shared table *)
 indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL
                | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
 exprStmt       = expr NL ;
@@ -137,54 +139,56 @@ exprStmt       = expr NL ;
 expr           = logical ;
 logical        = logicalAnd { "or" logicalAnd } ;
 logicalAnd     = bitwiseOr { "and" bitwiseOr } ;
-             (* "and"/"or" COURT-CIRCUITENT et renvoient une VALEUR :
-                "a and b" → a si a est falsy, sinon b (b non évalué si a falsy) ;
-                "a or b"  → a si a est truthy, sinon b (b non évalué si a truthy).
-                Donc `f and f()` ou `obj and obj.x` sont sûrs.
-                Falsy : false, nil, 0, "", [], {} — « le vide est faux ». *)
+             (* "and" and "or" SHORT-CIRCUIT and return a VALUE:
+                "a and b" gives a when a is falsy, otherwise b, which is not evaluated when a is falsy;
+                "a or b" gives a when a is truthy, otherwise b, which is not evaluated when a is truthy.
+                So `f and f()` and `obj and obj.x` are safe.
+                Falsy: false, nil, 0, "", [], {} — "empty is false". *)
 bitwiseOr      = bitwiseXor { "|" bitwiseXor } ;
 bitwiseXor     = bitwiseAnd { "~" bitwiseAnd } ;
-             (* "~" binaire = XOR bit-à-bit ; "~" unaire = NOT, voir unary *)
+             (* a binary "~" is a bitwise XOR; a unary "~" is NOT, see unary *)
 bitwiseAnd     = comparison { "&" comparison } ;
 comparison     = shift { ( ">" | "<" | ">=" | "<=" | "==" | "<>" ) shift } ;
-             (* comparaisons chaînées : 1 < x < 10  ≡  (1 < x) and (x < 10), x évalué une fois *)
-             (* < > <= >= : sur nombres (INT/FLOAT) OU sur deux strings (ordre
-                lexicographique par octets : "abc" < "abd", "abc" < "abcd") *)
-             (* == / <> : valeurs scalaires comparées par valeur (INT==FLOAT si même nombre,
-                strings par contenu) ; map / array / classe comparés par RÉFÉRENCE (même objet).
-                {} == {} → faux. Égalité par valeur : instance de classe avec __eq (cherché sur
-                l'opérande gauche, appelé même si les deux opérandes sont la même instance). *)
+             (* chained comparisons: 1 < x < 10 is (1 < x) and (x < 10), with x evaluated once *)
+             (* < > <= >= work on numbers (INT and FLOAT) OR on two strings, in byte-wise
+                lexicographic order: "abc" < "abd", "abc" < "abcd" *)
+             (* == and <> compare scalars by value (INT equals FLOAT for the same number, strings
+                by content); a map, an array and a class compare by REFERENCE, hence by identity,
+                so {} == {} is false. Equality by value comes from a class instance with __eq,
+                looked up on the left operand and called even when both operands are the same
+                instance. *)
 shift          = additive { ( "<<" | ">>" ) additive } ;
 additive       = multiplicative { ( "+" | "-" ) multiplicative } ;
-             (* "+" : addition numérique ou concaténation de strings *)
-             (* promotion : INT op INT → INT ; INT op FLOAT → FLOAT ; "/" → toujours FLOAT *)
-             (* overflow int64 → wrapping silencieux *)
+             (* "+" is numeric addition, or string concatenation *)
+             (* promotion: INT op INT gives INT; INT op FLOAT gives FLOAT; "/" always gives FLOAT *)
+             (* an int64 overflow wraps silently *)
 multiplicative = unary { ( "*" | "/" | "//" | "%" ) unary } ;
-             (* "//" : division entière plancher (floor) — INT//INT → INT, FLOAT//FLOAT → FLOAT *)
+             (* "//" is floor division: INT//INT gives INT, FLOAT//FLOAT gives FLOAT *)
 refExpr        = "ref" IDENT { "." IDENT } ;
-                 (* PASSAGE PAR RÉFÉRENCE. Donne à une fonction (Ollin ou native) le
-                    moyen de LIRE et d'ÉCRIRE la variable désignée. Usage principal :
-                    lier une variable à un widget — ui.checkbox("Grille", ref grille) *)
-                 (* La cible est un nom ou un chemin de champs. L'indexation `ref t[i]`
-                    est refusée : le chemin étant réévalué à chaque accès, la référence
-                    suivrait les changements de i. *)
-                 (* Le nom doit être DÉCLARÉ : `ref inconnue` est une erreur de
-                    compilation, contrairement à un nom passé sous forme de chaîne. *)
-                 (* Vaut un objet {__ref: true, get: func, set: func} : le script lit
-                    r.get() et écrit r.set(v) ; `__ref` sert à la validation côté natif.
-                    La cible, elle, se lit et s'écrit NORMALEMENT — une référence ne
-                    change rien à l'usage de la variable elle-même. *)
-                 (* Cible LOCALE : la référence reste valide après la sortie du bloc
-                    (upvalue fermée sur une copie) mais l'écriture ne remonte plus. *)
-                 (* Coût : deux fermetures + une map par évaluation → à éviter dans une
-                    boucle serrée. *)
+                 (* PASSING BY REFERENCE. It gives a function, in Ollin or native, the means to
+                    READ and to WRITE the variable named. The main use is binding a variable to a
+                    widget — ui.checkbox("Grid", ref grid) *)
+                 (* The target is a name or a path of fields. Indexing, `ref t[i]`, is refused:
+                    the path being re-evaluated on every access, the reference would follow the
+                    changes of i. *)
+                 (* The name must be DECLARED: `ref unknown` is a compile error, unlike a name
+                    passed as a string. *)
+                 (* It evaluates to an object {__ref: true, get: func, set: func}: the script
+                    reads r.get() and writes r.set(v), and `__ref` serves the validation on the
+                    native side. The target itself is read and written AS USUAL — a reference
+                    changes nothing about the use of the variable. *)
+                 (* A LOCAL target: the reference stays valid after the block ends, its upvalue
+                    having been closed over a copy, but a write no longer reaches anything. *)
+                 (* The cost: two closures and a map per evaluation, so it is to be avoided in a
+                    tight loop. *)
 
 unary          = ( "-" | "not" | "~" | "#" ) unary | refExpr | power ;
-             (* "~" unaire = NOT bit-à-bit ; "#" : sucre syntaxique — "#expr" ≡ "len(expr)" *)
+             (* a unary "~" is a bitwise NOT; "#" is sugar, "#expr" being "len(expr)" *)
 power          = primary ( "^" unary ) ? ;
-             (* "^" : exponentiation, associatif à droite — INT^INT(≥0) → INT ; sinon FLOAT *)
-             (* "^" lie plus fort que le moins unaire : -2^2 == -(2^2) == -4 ; 2^2^3 = 2^(2^3) = 256 ;
-                2 ^ -1 == 0.5. ('**' n'existe plus.) *)
+             (* "^" is exponentiation, right-associative: INT^INT with a non-negative exponent
+                gives INT, and FLOAT otherwise *)
+             (* "^" binds tighter than unary minus: -2^2 is -(2^2), hence -4; 2^2^3 is 2^(2^3),
+                hence 256; and 2 ^ -1 is 0.5. ('**' no longer exists.) *)
 primary        = NUMBER
                | STRING
                | BOOL
@@ -200,38 +204,40 @@ primary        = NUMBER
                | "(" expr ")" ;
 
 lambdaExpr     = "func" "(" [ params ] ")" NL { stmt } "end" ;
-               (* fonction anonyme utilisable comme expression ; capture des upvalues comme toute closure *)
-               (* "expr.method(args)" = appel de méthode avec self implicite *)
+               (* an anonymous function, usable as an expression; it captures upvalues as any closure does *)
+               (* "expr.method(args)" is a method call, with an implicit self *)
 
 mapLit         = "{" [ mapEntry { "," mapEntry } ] "}" ;
-               (* sauts de ligne autorisés entre les entrées — la continuation implicite s'applique à l'intérieur de {} *)
+               (* newlines are allowed between entries: the implicit continuation applies inside {} *)
 mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
-                 (* clé littérale : IDENT, STRING et ["STRING"] sont équivalents → clé = la string *)
-                 (*   { ref: 12 } ≡ { "ref": 12 } ≡ { ["ref"]: 12 }  (clé = "ref") *)
-                 (* clé calculée : [expr] évalue expr à l'exécution et utilise sa valeur comme clé *)
-                 (*   { [ref]: 12 } → clé = valeur de la variable ref (toute Value : string, int, …) *)
-                 (* accès : m["k"] et m.k sont équivalents (lecture, écriture, compound) *)
-                 (* sémantique de copie : référence comptée (pas de clone) ; map vide → falsy (« le vide est faux ») *)
+                 (* a literal key: IDENT, STRING and ["STRING"] are equivalent, the key being the string *)
+                 (*   { ref: 12 } is { "ref": 12 } is { ["ref"]: 12 }, the key being "ref" *)
+                 (* a computed key: [expr] evaluates expr at run time and uses its value as the key *)
+                 (*   { [ref]: 12 } takes the key from the variable ref, of any Value type: a string, an int, … *)
+                 (* access: m["k"] and m.k are equivalent, for reading, writing and compound assignment *)
+                 (* copy semantics: reference counting, with no clone; an empty map is falsy, "empty is false" *)
 arrayLit       = "[" [ expr { "," expr } ] "]" ;
-             (* partagé par référence (comptage de référence) ; array vide → falsy (« le vide est faux ») *)
+             (* shared by reference, through reference counting; an empty array is falsy, "empty is false" *)
 rangeLit       = ( "[" | "]" ) expr ";" expr [ ";" expr ] ( "]" | "[" ) ;
-             (* [a;b] incl-incl, [a;b[ incl-excl, ]a;b] excl-incl, ]a;b[ excl-excl *)
-             (* step optionnel [a;b;step] ; les ranges sont first-class et itérables *)
+             (* [a;b] is inclusive-inclusive, [a;b[ inclusive-exclusive, ]a;b] exclusive-inclusive,
+                ]a;b[ exclusive-exclusive *)
+             (* the step is optional, [a;b;step]; ranges are first-class and iterable *)
 call           = IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
-             (* appel optionnel f?(args) ≡  if f then f(args) else nil .
-                f falsy (false, nil, 0, "", [], {}) → aucun appel, résultat nil, ARGS NON ÉVALUÉS ;
-                f appelable → appel ; f truthy non appelable → erreur (appel standard).
-                Implémenté avec JUMP_IF_FALSE + appel standard (pas d'opcode dédié).
-                S'applique à toutes les formes : f?(), expr?() (ex. m["cb"]?()),
-                obj.m?() (self injecté, méthode absente → nil) et super.m?(). *)
+             (* the optional call f?(args) is `if f then f(args) else nil`.
+                A falsy f (false, nil, 0, "", [], {}) means no call, a nil result, and ARGUMENTS
+                LEFT UNEVALUATED; a callable f is called; a truthy, non-callable f is an error, as
+                in a standard call.
+                It is implemented with JUMP_IF_FALSE plus a standard call, with no opcode of its own.
+                It applies to every form: f?(), expr?() such as m["cb"]?(), obj.m?() — where self
+                is injected and a missing method gives nil — and super.m?(). *)
 
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
 
-(* NL : saut de ligne — termine tout statement.
-   La continuation implicite s'applique à l'intérieur des parenthèses, crochets
-   et accolades : un saut de ligne n'y termine pas le statement.
-   ';' est le séparateur d'intervalle dans rangeLit ; interdit partout ailleurs. *)
+(* NL is a newline, and it terminates every statement.
+   The implicit continuation applies inside brackets, square brackets and braces: a
+   newline does not terminate a statement there.
+   ';' is the interval separator in rangeLit, and is forbidden anywhere else. *)
 
 NUMBER         = ( digit { [ "_" ] digit } [ "." [ digit { [ "_" ] digit } ] ] [ exponent ] )
                | ( "." digit { [ "_" ] digit } [ exponent ] )
@@ -239,12 +245,13 @@ NUMBER         = ( digit { [ "_" ] digit } [ "." [ digit { [ "_" ] digit } ] ] [
                | ( ( "0o" | "0O" ) octDigit { [ "_" ] octDigit } )
                | ( ( "0b" | "0B" ) binDigit { [ "_" ] binDigit } ) ;
 exponent       = ( "e" | "E" ) [ "+" | "-" ] digit { digit } ;
-             (* '_' uniquement entre deux chiffres (1_000 == 1000) ; littéraux entiers → int64, sinon float *)
-             (* notation scientifique : un exposant (e/E) rend le littéral flottant (1e3 == 1000.0,
-                6.022e23, 2e-3 == 0.002) ; l'exposant n'admet pas de '_' et exige au moins un chiffre *)
-             (* 0x.. hexa, 0o.. octal, 0b.. binaire : toujours entiers (0xFF==255, 0o10==8, 0b1010==10) ;
-                pas d'exposant sur ces bases *)
-             (* un littéral suivi immédiatement d'un caractère alphanumérique, '.' ou '_' est une erreur *)
+             (* '_' only between two digits (1_000 == 1000); integer literals become int64,
+                everything else a float *)
+             (* scientific notation: an exponent (e or E) makes the literal a float (1e3 == 1000.0,
+                6.022e23, 2e-3 == 0.002); the exponent admits no '_' and requires at least one digit *)
+             (* 0x.. hex, 0o.. octal, 0b.. binary are always integers (0xFF==255, 0o10==8,
+                0b1010==10), and take no exponent *)
+             (* a literal immediately followed by an alphanumeric character, a '.' or a '_' is an error *)
 hexDigit       = digit | "a" | ... | "f" | "A" | ... | "F" ;
 octDigit       = "0" | ... | "7" ;
 binDigit       = "0" | "1" ;
@@ -254,25 +261,26 @@ placeholder    = "{" [ digit { digit } ] [ ":" fmtSpec ] "}" ;
 fmtSpec        = { "-" | "+" | " " | "#" | "0" | digit | "." } convChar ;
 convChar       = "d" | "i" | "o" | "u" | "x" | "X" | "c"
                | "e" | "E" | "f" | "F" | "g" | "G" | "a" | "A" | "s" ;
-                 (* "{" expr [":"fmtSpec] "}" : INTERPOLATION — évalue expr et insère sa
-                    représentation ; fmtSpec (spec de conversion C sans le '%') applique un
-                    format (ex. {x:.3f}, {n:04x}). Le ':' séparateur est celui de PREMIER
-                    niveau (les ':' d'un map-littéral {a:1} imbriqué sont préservés).
-                    placeholder = "{" vide ou entier ≥ 1 [":"fmtSpec] "}" ({}, {1}, {2:.3f}) — index 1-based :
-                    laissé LITTÉRAL dans la chaîne, destiné à la substitution POSITIONNELLE
-                    de printf (rempli par les arguments). "\{" : accolade littérale.
-                    Une chaîne sans interpolation est un token STRING (elle peut contenir des
-                    placeholders positionnels) ; une chaîne avec "{expr}" produit une séquence
-                    INTERP_START/MID/END. Le formatage {expr:spec} / {N:spec} partage le même
-                    moteur (fonction interne __fmt / printf). *)
+                 (* "{" expr [":"fmtSpec] "}" is INTERPOLATION: it evaluates expr and inserts its
+                    representation; fmtSpec, a C conversion spec without the '%', applies a format,
+                    as in {x:.3f} or {n:04x}. The separating ':' is the one at the TOP level: the
+                    ':' of a nested map literal {a:1} is preserved.
+                    A placeholder is "{" either empty or an integer of at least 1, [":"fmtSpec] "}"
+                    — {}, {1}, {2:.3f} — with a 1-based index: it is left LITERAL in the string, for
+                    printf's POSITIONAL substitution, to be filled by the arguments. "\{" is a
+                    literal brace.
+                    A string with no interpolation is a STRING token, and it may hold positional
+                    placeholders; a string with "{expr}" produces an INTERP_START/MID/END sequence.
+                    The formatting of {expr:spec} and of {N:spec} shares one engine, the internal
+                    __fmt function and printf. *)
 BOOL           = "true" | "false" ;
-             (* TYPE À PART ENTIÈRE, étanche : `true` n'est pas l'entier 1, donc
-                true <> 1 et false <> 0. L'arithmétique et les comparaisons d'ordre sur un
-                booléen sont une erreur d'exécution, comme sur nil.
-                Produit par `not`, par les comparaisons (== <> < > <= >=) et par les
-                littéraux ; affiché "true"/"false".
-                « Le vide est faux » demeure : 0, "", [] et {} sont falsy sans être false.
-                Il n'existe pas de conversion `bool(v)` — `not not v` en tient lieu. *)
+             (* A TYPE OF ITS OWN, sealed: `true` is not the integer 1, so true <> 1 and
+                false <> 0. Arithmetic and the ordering comparisons on a boolean are a runtime
+                error, as they are on nil.
+                It is produced by `not`, by the comparisons (== <> < > <= >=) and by the literals;
+                it displays as "true" and "false".
+                "Empty is false" still holds: 0, "", [] and {} are falsy without being false.
+                There is no `bool(v)` conversion — `not not v` stands in for it. *)
 NIL            = "nil" ;
 IDENT          = ( letter | "_" ) { letter | digit | "_" } ;
 
