@@ -47,7 +47,7 @@ export function setRepo(v) {
 
 // Low-level requests.
 async function gh(path, { method = 'GET', body = null, token = getToken() } = {}) {
-  if (!token) throw new Error('Non connecté à GitHub (token manquant)')
+  if (!token) throw new Error('Not signed in to GitHub (no token)')
   return fetch(API + path, {
     method,
     headers: {
@@ -106,7 +106,7 @@ export async function verifyToken(t) {
 // Resolves the target repository: { owner, repo, base }.
 async function ctx() {
   const val = getRepo()
-  if (!val || !val.includes('/')) throw new Error('Dépôt non configuré — renseigne owner/repo dans les paramètres GitHub')
+  if (!val || !val.includes('/')) throw new Error('No repository configured - set owner/repo in the GitHub settings')
   const [owner, repo] = val.split('/')
   return { owner, repo, base: `/repos/${owner}/${repo}` }
 }
@@ -116,7 +116,7 @@ export async function ensureRepo() {
   const { owner, repo, base } = await ctx()
   const res = await gh(base)
   if (res.ok) return res.json()
-  if (res.status === 404) throw new Error(`Dépôt ${owner}/${repo} introuvable — crée-le d'abord sur GitHub.`)
+  if (res.status === 404) throw new Error(`Repository ${owner}/${repo} not found - create it on GitHub first.`)
   let msg = String(res.status)
   try { const e = await res.json(); if (e && e.message) msg = res.status + ' — ' + e.message } catch (_) {}
   throw new Error('GitHub ' + msg)
@@ -243,7 +243,7 @@ export async function pushProject(project, message, opts = {}) {
     if (refRes.status === 409 || refRes.status === 404) {
       await ghJson(`${base}/contents/README.md`, {
         method: 'PUT',
-        body: { message: 'Initialise ollin-projects', branch, content: encodeUtf8('# ollin-projects\n\nProjets du playground Ollin.\n') },
+        body: { message: 'Initialise ollin-projects', branch, content: encodeUtf8('# ollin-projects\n\nOllin playground projects.\n') },
       })
       refRes = await gh(`${base}/git/ref/heads/${branch}`)
     }

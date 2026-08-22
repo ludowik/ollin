@@ -1,21 +1,21 @@
-/* Barre de menu — DÉFINITION UNIQUE, partagée par les trois vues (documentation,
-   playground, plein écran). Chargée par le shell (index.html), donc valable quelle que
-   soit la vue montée.
+/* The menu bar — a SINGLE DEFINITION, shared by the three views (documentation,
+   playground, full screen). Loaded by the shell (index.html), so it holds whichever view
+   is mounted.
 
-   Elle existe parce que les trois barres avaient dérivé : trois fonds, trois bordures,
-   trois couleurs de bouton, deux espacements, deux hauteurs de bouton et deux familles de
-   police — chaque vue redéfinissant les mêmes règles à sa façon. Une valeur d'apparence de
-   barre ne doit vivre qu'ICI ; une vue ne pose que ce qui lui est propre (safe-area,
-   touch-action, boutons qui n'existent que chez elle). */
+   It exists because the three bars had drifted apart: three backgrounds, three borders,
+   three button colours, two spacings, two button heights and two font families — each view
+   redefining the same rules its own way. A bar's appearance value must live HERE and
+   nowhere else; a view only sets what is its own (safe area, touch-action, buttons that
+   exist nowhere else). */
 
 :root {
   --bar-h: 48px;
   --bar-bg: #1a1d2e;
   --bar-border: #3a3f63;
-  --bar-ink: #a3adc4;         /* texte au repos des boutons : 7,4:1 sur le fond de barre */
-  /* Le CONTOUR d'un bouton l'identifie comme cliquable : il lui faut 3:1, là où le trait
-     de séparation de la barre n'est que décoratif et peut rester discret. Les deux étaient
-     confondus, et le bouton se distinguait à peine de son fond (1,3:1). */
+  --bar-ink: #a3adc4;         /* the buttons' resting text: 7.4:1 on the bar's background */
+  /* A button's OUTLINE is what marks it as clickable: it needs 3:1, whereas the bar's
+     separating line is merely decorative and may stay discreet. The two had been merged,
+     and a button was barely distinguishable from its background (1.3:1). */
   --bar-btn-border: #6b70ab;
   --bar-accent: #9ba1ff;
   --bar-font: system-ui, -apple-system, sans-serif;
@@ -29,17 +29,16 @@
   padding: 0 14px;
   background: var(--bar-bg);
   border-bottom: 1px solid var(--bar-border);
-  /* La police est POSÉE : les vues ont des corps de texte différents (la doc a un
-     interligne de 1,7, le plein écran une police à chasse fixe) et les boutons en
-     héritaient, d'où des tailles et des dessins de lettres différents d'une barre à
-     l'autre. */
+  /* The font is SET here: the views have different body text (the documentation has a
+     line height of 1.7, the full-screen mode a monospaced font) and the buttons inherited
+     it, hence different sizes and letterforms from one bar to the next. */
   font: 500 12px/1 var(--bar-font);
   flex-shrink: 0;
 }
 
-/* Un <button> n'hérite PAS de la police de son parent : sans cette règle, un bouton qui
-   ne la déclare pas repasse à la police par défaut du navigateur (constaté : « Exécuter »
-   en Arial au milieu d'une barre en system-ui). */
+/* A <button> does NOT inherit its parent's font: without this rule, a button that does
+   not declare one falls back to the browser's default (as seen: "Run" in Arial in the
+   middle of a system-ui bar). */
 .app-bar button, .app-bar input, .app-bar select { font: inherit; }
 
 .app-bar .spacer { flex: 1; }
@@ -53,9 +52,9 @@
   flex-shrink: 0;
 }
 
-/* Bouton de barre : le même objet partout — bordure, hauteur et couleur comprises.
-   La hauteur est posée sur le bouton, pas déduite du texte, sinon l'interligne de la vue
-   hôte la ferait varier. */
+/* A bar button: the same object everywhere, border, height and colour included.
+   The height is set on the button rather than derived from the text, which the host view's
+   line height would otherwise make vary. */
 .app-bar .bar-btn {
   display: flex;
   align-items: center;
@@ -73,26 +72,26 @@
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 .app-bar .bar-btn:hover { border-color: var(--bar-accent); color: var(--bar-accent); }
-/* Un bouton désactivé garde une encre LISIBLE : 0,4 d'opacité le rendait fantomatique,
-   au point qu'on ne distinguait plus « indisponible » de « absent ». */
+/* A disabled button keeps READABLE ink: an opacity of 0.4 made it ghostly, to the point
+   that "unavailable" could no longer be told from "absent". */
 .app-bar .bar-btn:disabled { cursor: default; opacity: 0.62; }
 .app-bar .bar-btn:disabled:hover { border-color: var(--bar-btn-border); color: var(--bar-ink); }
 
-/* Indicateur de FOCUS : le contour du navigateur est invisible sur ce fond sombre. Posé
-   sur :focus-visible seulement, donc au clavier et non au clic. */
+/* The FOCUS indicator: the browser's own outline is invisible on this dark background.
+   Set on :focus-visible only, so it shows for the keyboard and not for a click. */
 .app-bar .bar-btn:focus-visible {
   outline: 2px solid var(--bar-accent);
   outline-offset: 2px;
   color: var(--bar-accent);
 }
 
-/* Bouton carré (icône seule) : même hauteur, sans le remplissage horizontal du texte. */
+/* A square button, icon only: the same height, without the text's horizontal padding. */
 .app-bar .bar-btn.icon-only { padding: 0; width: 34px; justify-content: center; }
 
-/* Écran étroit : la barre se resserre — même seuil et mêmes valeurs pour les trois vues.
-   C'était réglé vue par vue (le playground à 8 px de marge, les autres à 14), d'où un logo
-   qui changeait de place selon la vue sur téléphone. Ce que chaque vue garde en propre,
-   c'est le seuil auquel SES libellés s'effacent : il dépend du nombre de boutons. */
+/* A narrow screen: the bar tightens — the same threshold and the same values for all three
+   views. This used to be set view by view (the playground at 8 px of margin, the others at
+   14), so the logo moved about from one view to another on a phone. What each view keeps for
+   itself is the width at which ITS labels disappear: that depends on the number of buttons. */
 @media (max-width: 640px) {
   .app-bar { gap: 6px; padding: 0 8px; flex-wrap: nowrap; }
   .app-bar .bar-btn { padding: 0 8px; }

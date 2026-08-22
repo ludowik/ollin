@@ -94,7 +94,7 @@ const canvasHome = document.getElementById('canvas-home')
 
 let currentView    = null
 let currentCleanup = null
-let currentAnchor  = ''    // sous-chemin de la vue courante (ancre tutoriel, ou ex/<fichier>)
+let currentAnchor  = ''    // the current view's sub-path (a tutorial anchor, or ex/<file>)
 let navSeq         = 0     // re-entrance guard: identifies the current navigation
 
 function parseHash() {
@@ -176,10 +176,10 @@ async function mount(view, anchor) {
     if (stale()) {
       return
     }
-    console.error('Échec de montage de la vue « ' + view + ' » :', e)
+    console.error('Failed to mount the view "' + view + '":', e)
     viewEl.innerHTML = '<div style="padding:40px;text-align:center;font-family:system-ui,sans-serif;color:#dde4ef">' +
-      '<p style="color:#f87171;font-weight:600;margin-bottom:12px">Échec du chargement de la vue.</p>' +
-      '<button onclick="location.reload()" style="background:#9ba1ff;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:14px;cursor:pointer">Recharger</button></div>'
+      '<p style="color:#f87171;font-weight:600;margin-bottom:12px">The view failed to load.</p>' +
+      '<button onclick="location.reload()" style="background:#9ba1ff;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:14px;cursor:pointer">Reload</button></div>'
     currentView = null
   }
 }
@@ -294,16 +294,16 @@ async function checkPagesDeploy() {
         try { sessionStorage.setItem(DEPLOY_CACHE_KEY, JSON.stringify({ t: Date.now(), state })) } catch (_) {}
       }
     }
-  } catch (_) { return /* hors ligne / rate-limit / privé : silencieux */ }
+  } catch (_) { return /* offline, rate-limited or private: stay silent */ }
   // No nagging: once the user has dismissed the banner for THIS state, we say no more for the
   // session (a change of state shows it again).
   let dismissed = null
   try { dismissed = sessionStorage.getItem(DEPLOY_DISMISS_KEY) } catch (_) {}
   if (dismissed === state) return
   if (TRANSIENT.includes(state)) {
-    showDeployBanner('⏳ Une nouvelle version se déploie — recharge dans un instant.', true, state)
+    showDeployBanner('⏳ A new version is deploying - reload in a moment.', true, state)
   } else if (state === 'failure' || state === 'error') {
-    showDeployBanner('⚠ Le dernier déploiement a échoué — tu vois la version précédente.', false, state)
+    showDeployBanner('⚠ The last deployment failed - you are seeing the previous version.', false, state)
   }
 }
 
@@ -316,12 +316,12 @@ function showDeployBanner(msg, offerReload, state) {
   bar.appendChild(txt)
   if (offerReload) {
     const rb = document.createElement('button')
-    rb.className = 'reload'; rb.textContent = 'Recharger'
+    rb.className = 'reload'; rb.textContent = 'Reload'
     rb.addEventListener('click', () => hardReload())
     bar.appendChild(rb)
   }
   const close = document.createElement('button')
-  close.className = 'close'; close.textContent = '✕'; close.title = 'Fermer'
+  close.className = 'close'; close.textContent = '✕'; close.title = 'Close'
   close.addEventListener('click', () => {
     bar.remove()
     try { sessionStorage.setItem(DEPLOY_DISMISS_KEY, state) } catch (_) {}

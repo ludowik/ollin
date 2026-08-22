@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Ollin — exécution plein écran</title>
+<title>Ollin - full-screen run</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <script>
-// Le mode autonome est désormais une VUE de la web app monopage (source unique :
-// docs/views/run.*). Cette page n'est conservée que comme redirection pour les
-// anciens liens/marque-pages. Cache-buster avant le fragment de route.
+// The standalone mode is now a VIEW of the single-page web app (the single source being
+// docs/views/run.*). This page is kept only as a redirect for old links and bookmarks.
+// The cache-buster comes before the route fragment.
 location.replace('index.html?t=' + Date.now() + '#/run')
 </script>
 </head>

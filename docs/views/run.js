@@ -128,7 +128,7 @@ export async function init(ctx) {
     if (!mod || !mod.requestCapture || capturing) return
     if (!project) {
       // A sample read from the repository has no resources to store the image in.
-      statusEl.textContent = 'capture : crée un projet depuis cet exemple'
+      statusEl.textContent = 'capture: create a project from this example'
       return
     }
     capturing = true
@@ -225,7 +225,7 @@ export async function init(ctx) {
     code = (project && project.files) ? (project.files[project.entry] ?? '') : null
     if (project === null || code === null) {
       statusEl.textContent = ''
-      showText("error: aucun projet. Ouvre ce mode depuis l'éditeur (bouton « Plein écran »).")
+      showText('error: no project. Open this mode from the editor, with the "Full screen" button.')
       return stop
     }
   }

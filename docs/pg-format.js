@@ -44,7 +44,7 @@ export function formatOllin(src) {
   // delimiters left open on the block's opening line, already counted by it }.
   const st = []
   let delim = 0                 // depth of the open delimiters { [ ( (maps, arrays, calls)
-  let absorbed = 0              // somme des `absorb` de la pile
+  let absorbed = 0              // the sum of the stack's `absorb` values
   let inBlockComment = false
   const top = () => (st.length ? st[st.length - 1].kind : undefined)
   const pushBlock = (kind, absorb = 0) => { st.push({ kind, absorb }); absorbed += absorb }
@@ -69,7 +69,7 @@ export function formatOllin(src) {
     const first = (code.match(/^([A-Za-z_]\w*)/) || [])[1] || ''
     const inSwitch = top() === 'case' || top() === 'caseblock' || top() === 'switch'
 
-    let show = level()             // niveau d'indentation d'affichage de la ligne
+    let show = level()             // the indentation level the line is shown at
 
     if (first === 'end') {
       if (top() === 'caseblock') {
@@ -78,7 +78,7 @@ export function formatOllin(src) {
         st[st.length - 1].kind = 'case'
         show = level() - 1
       } else {
-        if (top() === 'case') popBlock()            // fin du corps de case
+        if (top() === 'case') popBlock()            // the end of a case body
         if (st.length === 0) return { ok: false, error: '« end » sans bloc ouvert' }
         const closed = popBlock()                   // ferme le bloc/switch
         // `end` aligns with the line that opened the block: its absorbed delimiters still
@@ -88,7 +88,7 @@ export function formatOllin(src) {
     } else if (first === 'case' || first === 'default' ||
                (first === 'else' && inSwitch)) {
       if (top() === 'case') popBlock()              // end of the previous case
-      show = level()                           // au niveau du switch
+      show = level()                           // at the switch's level
       // `case … do`: the body's do block shares the case's level, and its `end` closes only
       // that block (the case runs to the next case or to the switch's `end`).
       pushBlock(/\bdo\s*$/.test(code) ? 'caseblock' : 'case')
@@ -125,7 +125,7 @@ export function formatOllin(src) {
     if (bareCodeHashes(body) % 2 === 1) inBlockComment = true
   }
 
-  if (st.length !== 0) return { ok: false, error: 'bloc non fermé (« end » manquant)' }
+  if (st.length !== 0) return { ok: false, error: 'unclosed block (a missing "end")' }
   return { ok: true, code: out.join('\n') }
 }
 

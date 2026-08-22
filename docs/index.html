@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,24 +7,24 @@
 <link rel="icon" type="image/svg+xml" href="logo.svg">
 <link rel="stylesheet" href="fonts.css">
 <style>
-/* Shell de la web app monopage — CSS volontairement minimal : chaque vue
-   apporte son propre <style> (dans son fragment), actif uniquement tant
-   qu'elle est montée. Ici, seulement le socle commun. */
+/* The single-page web app's shell — the CSS is deliberately minimal: every view brings
+   its own <style>, inside its fragment, active only while it is mounted. Only the
+   common base lives here. */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { min-height: 100vh; }
 body { background: #0f1117; color: #dde4ef; font-family: system-ui, -apple-system, sans-serif; }
 
-/* #view ne génère pas de boîte : les éléments de tête du fragment (nav, main…)
-   participent à la mise en page comme s'ils étaient enfants directs de <body>
-   (le tutoriel attend un body en flex : sidebar + main côte à côte). */
+/* #view generates no box: the fragment's top-level elements (nav, main…) take part in
+   the layout as if they were direct children of <body> (the tutorial expects a flex
+   body: sidebar and main side by side). */
 #view { display: contents; }
 
-/* Le canvas WASM est PARTAGÉ : rangé ici (masqué) hors exécution, déplacé dans
-   la vue active quand elle en a besoin. */
+/* The WASM canvas is SHARED: parked here, hidden, while nothing runs, and moved into
+   the active view when it needs it. */
 #canvas-home { display: none; }
 
-/* Bandeau d'état du déploiement Pages (app.js) — ancré EN BAS pour ne pas
-   recouvrir la barre d'outils. Style ici (pas d'inline verbeux dans app.js). */
+/* The Pages deployment status banner (app.js) — anchored at the BOTTOM so it does not
+   cover the toolbar. Styled here, rather than verbosely inline in app.js. */
 #deploy-banner {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
   display: flex; align-items: center; gap: 12px; padding: 8px 14px;
@@ -45,7 +45,7 @@ body { background: #0f1117; color: #dde4ef; font-family: system-ui, -apple-syste
 <div id="canvas-home"><canvas id="canvas" tabindex="0" style="display:none"></canvas></div>
 
 <script type="module">
-  // Import cache-busté du routeur (comme les autres modules du projet).
+  // A cache-busted import of the router, as for the project's other modules.
   import('./app.js?v=' + Date.now())
 </script>
 </body>

@@ -19,8 +19,8 @@
 
 export function createRemoteSync({ doPush, canPush, onError, debounceMs = 3000, retryMs = 15000 } = {}) {
   let timer    = null    // debounce en cours
-  let pending  = null    // dernier projet en attente de push
-  let inFlight = false    // un push est en cours
+  let pending  = null    // the last project waiting to be pushed
+  let inFlight = false    // a push is under way
   let requeue  = false   // an edit arrived while the push was in flight
 
   const allowed = p => !!p && (!canPush || canPush(p))

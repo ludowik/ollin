@@ -72,7 +72,7 @@ const REMOTE_CONTRACT = [
 function assertContract(mod, contract, label) {
   const missing = contract.filter(k => mod[k] === undefined)
   if (missing.length)
-    throw new Error(`${label} : contrat non respecté, membres manquants : ${missing.join(', ')}`)
+    throw new Error(`${label}: contract not met, missing members: ${missing.join(', ')}`)
   return mod
 }
 

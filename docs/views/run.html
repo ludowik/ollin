@@ -44,23 +44,23 @@
 
   <div id="bar" class="app-bar">
     <!-- "Ollin" on the left as in the other bars; the rest is set to the right:
-         Recharger · Relancer · Capture · Pause · Éditeur. -->
+         Reload, Restart, Capture, Pause, Editor. -->
     <span class="bar-logo">Ollin</span>
     <span class="spacer"></span>
     <span id="status">Chargement…</span>
     <button id="reload-btn" class="bar-btn" title="Reload the page: a fresh WASM instance, the safe path">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
-      <span class="bar-label">Recharger</span>
+      <span class="bar-label">Reload</span>
     </button>
     <button id="relaunch-btn" class="bar-btn" title="Restart in the same WASM instance: fast, with no page reload">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
-      <span class="bar-label">Relancer</span>
+      <span class="bar-label">Restart</span>
     </button>
     <button id="shot-btn" class="bar-btn" title="Screenshot, stored as a PNG resource of the project">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="4" width="13" height="9.5" rx="1.5"/><circle cx="8" cy="8.75" r="2.6"/><path d="M5.5 4l1-1.5h3l1 1.5"/></svg>
       <span class="bar-label">Capture</span>
     </button>
-    <button id="pause-btn" class="bar-btn" title="Pause / Reprendre">
+    <button id="pause-btn" class="bar-btn" title="Pause / Resume">
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>
       <span class="bar-label">Pause</span>
     </button>

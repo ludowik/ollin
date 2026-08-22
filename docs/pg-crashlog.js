@@ -51,23 +51,23 @@ function show(title, message, stack) {
   const el = ensureOverlay()
   const build = (document.querySelector('[data-build-date]') || {}).textContent || '?'
   const parts = [
-    '⚠︎ CRASH — copie ce texte et envoie-le',
+    '⚠︎ CRASH - copy this text and send it',
     '─'.repeat(36),
-    'quand   : ' + title,
-    'message : ' + (message || '(vide)'),
+    'when    : ' + title,
+    'message : ' + (message || '(empty)'),
     '',
     'stack   :',
-    (stack || '(pas de stack)'),
+    (stack || '(no stack)'),
     '',
-    'contexte:',
+    'context :',
     '  build   ' + build,
     '  UA      ' + navigator.userAgent,
-    '  écran   ' + innerWidth + '×' + innerHeight + ' dpr=' + (window.devicePixelRatio || 1),
+    '  screen  ' + innerWidth + '×' + innerHeight + ' dpr=' + (window.devicePixelRatio || 1),
     '  ' + memInfo(),
     '  standalone=' + (window.navigator.standalone === true),
     '',
-    'stderr (dernières lignes) :',
-    ...(STDERR_RING.length ? STDERR_RING.map(l => '  ' + l) : ['  (aucune)']),
+    'stderr (last lines):',
+    ...(STDERR_RING.length ? STDERR_RING.map(l => '  ' + l) : ['  (none)']),
   ]
   el.textContent = parts.join('\n')
 

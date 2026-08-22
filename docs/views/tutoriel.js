@@ -224,7 +224,7 @@ export async function init(ctx) {
 
       const runBtn = document.createElement('button')
       runBtn.className = 'code-btn run'
-      runBtn.title     = 'Exécuter'
+      runBtn.title     = 'Run'
       runBtn.innerHTML = ICONS.run
       runBtn.addEventListener('click', () => {
         if (!ollin) {

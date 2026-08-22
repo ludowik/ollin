@@ -63,7 +63,7 @@ export function loadProjectIntoRuntime(m, project) {
 export function runProgram(m, code, canvasEl, hooks) {
   // An error inside a frame (update/draw): the WASM runtime (emscripten_frame) has already
   // stopped the loop and passes the message up to here.
-  window.__ollinFrameError = (msg) => hooks.onError('error: ' + (msg || "erreur d'exécution"))
+  window.__ollinFrameError = (msg) => hooks.onError('error: ' + (msg || 'runtime error'))
   loadDataInto(m)   // restores the persisted data (the `data` module) before the run
   let out
   try {
