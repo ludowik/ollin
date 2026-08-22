@@ -18,14 +18,14 @@ Le français ne subsiste que dans **nos échanges** — mes réponses à l'utili
 — et dans les fichiers qui PORTENT ces échanges : **CLAUDE.md** et `.claude/` (consignes,
 skills, hooks). Il n'y a plus de frontière « ce qui s'adresse au lecteur francophone » : la
 documentation destinée à l'utilisateur d'Ollin est en anglais comme le reste.
-**Frontière ARRÊTÉE, ne plus la reposer** : `CLAUDE.md` et `.claude/` restent en français,
-tout le reste du dépôt en anglais. La question est tranchée — ne pas proposer de traduire
-ces deux-là, ni redemander confirmation.
+Cette frontière est **ARRÊTÉE** : ne plus proposer de traduire ces deux-là, ni redemander
+confirmation.
 
 **Ce qui reste accentué N'EST PAS du français** (vérifié, ne pas « corriger ») : les données
-de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions.ol` et le tutoriel), les plages
-Latin-1 de `string_module.cpp` (`à..þ`), le jeu de caractères de `tools/gen_ui_font.cpp`, et
-le code généré ou vendorisé (`font_sans.h`, `font_mono.h`, `docs/vendor/`, `docs/wasm/`).
+de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions.ol` ; `"café"` et `"straße"` dans le
+tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de caractères de
+`tools/gen_ui_font.cpp`, et le code généré ou vendorisé (`font_sans.h`, `font_mono.h`,
+`docs/vendor/`, `docs/wasm/`).
 
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans
