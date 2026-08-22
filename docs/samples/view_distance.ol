@@ -1,27 +1,28 @@
-## Distance de vue auto-adaptative RÉUTILISABLE (terrain streamé par chunks).
+## A REUSABLE self-adapting view distance, for terrain streamed as chunks.
 ##
 ## Encapsule le rayon courant, ses bornes, le mode manuel et l'auto-adaptation : en
-## vsync verrouillé, deltaTime ne révèle la marge que quand des frames débordent, donc
-## on mesure la PART de frames lentes sur une fenêtre, par rapport à la cadence
-## d'affichage MESURÉE (un mobile bridé à 30 Hz garde sa puissance de calcul). Les frames irréelles (> STALL_DT,
-## arrière-plan/reprise) sont ignorées. Possède aussi trois boutons (haut-droite) :
-## − / + basculent en réglage manuel, A rebascule en auto-adaptation.
+## With vsync locked, deltaTime only reveals the headroom once frames overrun, so we measure the
+## SHARE of slow frames over a window, against the display rate as MEASURED — a phone capped at
+## 30 Hz keeps its computing power. Unreal frames, longer than STALL_DT, from a background tab or a
+## resume, are ignored. It also carries three buttons at the top right: - and + switch to manual
+## control, A switches back to self-adaptation.
 ##
 ## update() renvoie :  1 = le rayon a GRANDI (relancer le streaming),
-##                    -1 = le rayon a RÉTRÉCI (décharger l'anneau extérieur),
-##                     0 = inchangé.
-## hit() renvoie :     1 / -1 (idem), 2 = bouton consommé sans changement (borne
-##                     atteinte), 0 = hors boutons (à traiter ailleurs, ex. joystick).
+##                    -1 the radius has SHRUNK, so the outer ring is to be unloaded,
+##                     0 unchanged.
+## hit() returns:      1 and -1 as above, 2 for a button consumed with no change, a bound having
+##                     been reached, and 0 for outside the buttons, to be handled elsewhere, by the
+##                     joystick for one.
 ##
-## Câblage côté hôte :
+## Wiring on the host's side:
 ##   import "view_distance.ol"
-##   global vd = ViewDistance(4, 1, 24)       ## 4e arg = cadence d'AMORCE (défaut 60) ;
-##                                            ## la cadence réelle est ensuite mesurée
+##   global vd = ViewDistance(4, 1, 24)       ## the fourth argument is the SEED rate, 60 by default;
+##                                            ## the real rate is measured afterwards
 ##   func mouse.pressed(x, y)
 ##       var ev = vd.hit(x, y)
 ##       if ev == 1 then streaming = true
 ##       elseif ev == -1 then streamUnload(lastcx, lastcz, 0)
-##       elseif ev == 0 then pad.press(x, y) end   ## ev == 2 : rien à faire
+##       elseif ev == 0 then pad.press(x, y) end   ## ev == 2 means there is nothing to do
 ##   end
 ##   ## dans draw() : boucler sur vd.radius, puis
 ##   ##   var ev = vd.update(deltaTime, streaming)
@@ -32,62 +33,61 @@ class ViewDistance
     func init(start, lo, hi, fps = 60)
         self.radius = start
         self.lo = lo
-        self.hi = hi          ## filet de sécurité ; la vraie limite vient du FPS/mémoire
+        self.hi = hi          ## a safety net; the real limit comes from the frame rate and the memory
         self.manual = false
-        ## Cadence d'affichage MESURÉE, pas supposée : un mobile peut brider à 30 Hz sans
-        ## que la puissance de calcul soit divisée pour autant. Avec un seuil calé sur 60,
-        ## chaque frame paraîtrait en retard et le rayon s'effondrerait jusqu'à `lo`.
-        ## `fps` ne sert que d'amorce, remplacé dès la première fenêtre par la cadence VOTÉE.
+        ## The display rate is MEASURED, not assumed: a phone may cap at 30 Hz without its
+        ## computing power being halved. With a threshold fixed at 60, every frame would look late
+        ## and the radius would collapse to `lo`. `fps` is only a seed, replaced from the first
+        ## window on by the rate VOTED for.
         ##
-        ## Le vote plutôt que la plus courte frame : le navigateur livre parfois deux images
-        ## rapprochées (rattrapage), et 2 % de telles frames suffisaient à faire croire à un
-        ## écran 120 Hz, donc à traiter toutes les frames normales comme des retards.
-        ## Ici chaque cadence plausible compte ses frames « à l'heure » (dt <= période ×
-        ## MARGIN) et on retient la PLUS ÉLEVÉE qui en réunit VOTE_PART : quelques frames
-        ## aberrantes ne pèsent alors rien.
-        self.CAD = [120, 90, 60, 50, 40, 30]   ## cadences candidates, décroissantes
-        self.ok = [0, 0, 0, 0, 0, 0]           ## frames à l'heure pour chaque candidate
-        self.MARGIN = 1.25                     ## tolérance sur la période (= seuil de retard)
-        self.VOTE_PART = 0.7                   ## part de frames à l'heure pour élire une cadence
+        ## A vote rather than the shortest frame: the browser sometimes delivers two images close
+        ## together, catching up, and 2 % of such frames were enough to suggest a 120 Hz screen,
+        ## hence to treat every normal frame as late. Here each plausible rate counts its frames
+        ## "on time" (dt <= the period times MARGIN) and we keep the HIGHEST one that gathers
+        ## VOTE_PART of them, so a few outliers weigh nothing.
+        self.CAD = [120, 90, 60, 50, 40, 30]   ## the candidate rates, in decreasing order
+        self.ok = [0, 0, 0, 0, 0, 0]           ## the frames on time for each candidate
+        self.MARGIN = 1.25                     ## the tolerance on the period, hence the lateness threshold
+        self.VOTE_PART = 0.7                   ## the share of frames on time needed to elect a rate
         self.hzKeep = fps                      ## cadence retenue (amorce)
-        self.voted = false                     ## une cadence a-t-elle déjà été élue ?
-        self.miss = 0                          ## fenêtres consécutives ne confirmant pas hzKeep
-        ## La cadence d'un écran ne change quasiment jamais : une baisse du vote est d'abord
-        ## mise sur le compte d'une surcharge passagère (sinon un rendu qui décroche ferait
-        ## croire à un écran plus lent, et le repli du rayon ne se déclencherait plus). Elle
-        ## n'est adoptée qu'après DEMOTE fenêtres — le temps qu'un vrai bridage se confirme.
+        self.voted = false                     ## has a rate been elected yet?
+        self.miss = 0                          ## consecutive windows that do not confirm hzKeep
+        ## A screen's rate hardly ever changes, so a drop in the vote is first put down to a
+        ## passing overload: otherwise a rendering that falls behind would suggest a slower screen,
+        ## and the radius would never pull back. It is adopted only after DEMOTE windows, the time
+        ## a real cap needs to confirm itself.
         self.DEMOTE = 20
-        self.STALL_DT = 0.30              ## frame irréelle (onglet en arrière-plan, reprise)
+        self.STALL_DT = 0.30              ## an unreal frame, from a background tab or a resume
         self.WIN = 0.5
-        ## Une fenêtre doit aussi compter assez de frames : à 30 Hz, 0,5 s n'en donne que
-        ## 15 et la part de frames lentes devient trop bruitée pour décider (une seule
-        ## frame de retard y pèse 7 %). La fenêtre s'allonge donc quand la cadence baisse.
+        ## A window must also hold enough frames: at 30 Hz, half a second gives only fifteen, and
+        ## the share of slow frames becomes too noisy to decide on — a single late frame weighs 7 %
+        ## there. So the window lengthens as the rate falls.
         self.MIN_N = 30
         self.GROW = 0.03      ## ne grandit que si TRÈS peu de frames lentes → garde de la marge
         self.DROP = 0.25      ## large zone morte [GROW;DROP] = ne chasse pas la limite, n'oscille pas
-        self.RELAX = 20.0     ## re-teste le plafond appris rarement (évite le va-et-vient)
+        self.RELAX = 20.0     ## retests the learnt ceiling rarely, which avoids oscillation
         self.MEM_MAX = 110000000
         self.t = 0.0
         self.n = 0
         self.slow = 0
-        self.step = 1         ## montée qui double (1,2,4,8…)
-        self.cap = 999        ## plafond appris au décrochage, relâché après RELAX stable
-        self.good = start     ## dernier rayon confirmé fluide (repli d'un dépassement)
+        self.step = 1         ## a doubling climb: 1, 2, 4, 8…
+        self.cap = 999        ## the ceiling learnt on a stall, released after RELAX seconds of stability
+        self.good = start     ## the last radius confirmed smooth, to fall back to after an overshoot
         self.stable = 0.0
         self.BTN = 54
         self.BTN_Y = 40
         self.BTN_MARGIN = 12  ## marge bord droit
-        self.GAP = 10         ## écart entre boutons
+        self.GAP = 10         ## the gap between buttons
     end
 
     func mode()
         return self.manual and "manuel" or "auto"
     end
 
-    ## Ajuste le rayon selon la part de frames lentes de la fenêtre écoulée. Ne mesure
-    ## ni pendant la cuisson (streaming) ni en manuel. Décrochage (mémoire pleine ou
+    ## Adjusts the radius from the share of slow frames in the window just past. It measures
+    ## neither during the baking of chunks nor in manual mode. A stall, from full memory or
     ## > DROP) → repli dichotomique vers `good` + plafond appris. Fluide (< GROW) →
-    ## montée qui double ; au plafond, relâche après RELAX. Entre les deux → on tient.
+    ## a doubling climb; at the ceiling it releases after RELAX. Between the two, it holds.
     func update(dt, streaming)
         if dt <= 0 or dt >= self.STALL_DT or streaming or self.manual then
             return 0
@@ -100,17 +100,17 @@ class ViewDistance
             end
         end
         if self.t < self.WIN or self.n < self.MIN_N then return 0 end
-        ## La cadence est élue sur la MÊME fenêtre que celle qu'on juge : les frames en
-        ## retard sont exactement celles qui ne sont pas « à l'heure » pour cette cadence.
+        ## The rate is elected over the SAME window as the one being judged: the late frames are
+        ## exactly those not "on time" for that rate.
         var first = not self.voted
         self.slow = self.n - self.voteCadence()
         if first then
-            self.t = 0.0                       ## fenêtre d'amorce : elle a servi à élire la
+            self.t = 0.0                       ## the seed window: it served to elect the
             self.n = 0                         ## cadence, la juger n'aurait aucun sens
             self.slow = 0
             return 0
         end
-        var memFull = mem() > self.MEM_MAX   ## lu une fois par fenêtre, pas à chaque frame
+        var memFull = mem() > self.MEM_MAX   ## read once per window, not every frame
         var ev = 0
         if (memFull or self.slow > self.n * self.DROP) and self.radius > self.lo then
             self.cap = self.radius - 1
@@ -143,8 +143,8 @@ class ViewDistance
         return ev
     end
 
-    ## Élit la cadence de la fenêtre et renvoie le nombre de frames à l'heure pour elle.
-    ## Une cadence plus basse que celle retenue n'est adoptée qu'après DEMOTE fenêtres.
+    ## Elects the window's rate and returns the number of frames on time for it. A rate lower than
+    ## the one kept is adopted only after DEMOTE windows.
     func voteCadence()
         var vote = self.CAD[#self.CAD]
         var kept = self.ok[#self.CAD]
@@ -156,7 +156,7 @@ class ViewDistance
             end
         end
         if not self.voted then
-            self.hzKeep = vote                 ## première élection : adoptée telle quelle,
+            self.hzKeep = vote                 ## the first election: adopted as it stands,
             self.voted = true                  ## sinon l'amorce fausserait le tout premier jugement
             self.miss = 0
         elseif vote >= self.hzKeep then
@@ -169,8 +169,8 @@ class ViewDistance
                 self.miss = 0
             end
         end
-        ## Frames à l'heure pour la cadence RETENUE (pas pour celle votée) : c'est elle qui
-        ## définit ce qu'est un retard.
+        ## The frames on time for the rate KEPT, not for the one voted: it is that rate which
+        ## defines what being late means.
         var atTime = kept
         for j = 1, #self.CAD do
             if self.CAD[j] == self.hzKeep then
@@ -186,12 +186,12 @@ class ViewDistance
         return self.hzKeep
     end
 
-    ## Boutons alignés de droite à gauche : 0 = +, 1 = −, 2 = A.
+    ## The buttons line up from right to left: 0 is +, 1 is -, 2 is A.
     func btnX(i)   return W - self.BTN_MARGIN - self.BTN - i * (self.BTN + self.GAP) end
 
-    ## Traite un appui : + / − → passe en manuel et ajuste le rayon (borné) ; A → rebascule
-    ## en auto-adaptation. Renvoie 1 (grandi) / -1 (rétréci) / 2 (bouton consommé sans
-    ## changement de rayon) / 0 (aucun bouton → à traiter ailleurs).
+    ## Handles a press: + and - switch to manual and adjust the radius, within bounds; A switches
+    ## back to self-adaptation. It returns 1 when the radius grew, -1 when it shrank, 2 for a button
+    ## consumed with no change of radius, and 0 when no button was hit, to be handled elsewhere.
     func hit(x, y)
         if y < self.BTN_Y or y > self.BTN_Y + self.BTN then
             return 0
@@ -223,7 +223,7 @@ class ViewDistance
     end
 
     func draw()
-        ## [index bouton, libellé, nudge X du glyphe] — le "−" est plus étroit
+        ## [the button index, its label, the glyph's X nudge] — the "-" is narrower
         var btns = [[0, "+", -9], [1, "-", -6], [2, "A", -9]]
         var ty = self.BTN_Y + self.BTN / 2 - 16
         graphics.noStroke()
@@ -231,7 +231,7 @@ class ViewDistance
             var x = self.btnX(b[1])
             graphics.fill(Color(0, 0, 0, 0.38))
             if b[2] == "A" and not self.manual then
-                graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## A allumé = auto actif
+                graphics.fill(Color(0.30, 0.70, 1.00, 0.55))   ## a lit A means self-adaptation is on
             end
             graphics.rect(x, self.BTN_Y, self.BTN, self.BTN)
             graphics.stroke(colors.WHITE)
