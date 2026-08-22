@@ -1,30 +1,30 @@
-## Éclipse de Soleil — la Lune passe devant le Soleil. Le hasard veut que les deux disques
-## nous apparaissent presque de la même taille (un demi-degré) : de ce quasi-égalité naissent
-## les trois formes de l'éclipse. Lune un peu plus grosse que le Soleil, elle le cache
-## entièrement — c'est la TOTALE, seul moment où la couronne se montre. Un peu plus petite,
-## il reste un anneau de feu — l'ANNULAIRE. Décalée, elle n'en mord qu'un morceau : PARTIELLE.
+## A solar eclipse: the Moon passes in front of the Sun. As it happens, the two discs look almost
+## the same size to us, half a degree across, and from that near-equality come the eclipse's three
+## forms. With the Moon slightly larger than the Sun it hides it entirely — the TOTAL eclipse, the
+## only moment the corona shows itself. Slightly smaller, a ring of fire remains — the ANNULAR
+## one. Off to one side, it bites out no more than a piece: PARTIAL.
 ##
-## Le pendant de cet exemple est « Éclipse de Lune », où c'est la Terre qui fait l'ombre.
+## This example's counterpart is "Lunar eclipse", where the Earth casts the shadow.
 ##
-## L'obscuration est calculée exactement : aire d'intersection des deux disques, rapportée
-## à celle du Soleil. C'est elle qui commande la lumière du paysage.
+## The obscuration is computed exactly: the area where the two discs intersect, over the Sun's own.
+## It is that figure which governs the landscape's light.
 
-## Par type : rayon de la Lune en rayons SOLAIRES (`ratio`), et écart minimal des centres
-## (`offset`). Le rapport
-## réel va de 0,95 à 1,08 selon les distances du moment ; il est ici un peu exagéré pour que
-## la totalité dure plus qu'un instant (elle ne représente sinon que ~2 % du passage).
+## Per type: the Moon's radius in SOLAR radii (`ratio`), and the least distance between the
+## centres (`offset`). The real ratio runs from 0.95 to 1.08 with the distances of the moment; it
+## is exaggerated a little here so that totality lasts longer than an instant, since it otherwise
+## takes up about 2 % of the passage.
 global TYPES = {
-    "totale":    {ratio: 1.15, offset: 0.0},
-    "annulaire": {ratio: 0.92, offset: 0.0},
-    "partielle": {ratio: 1.05, offset: 0.80}
+    "total":    {ratio: 1.15, offset: 0.0},
+    "annular":  {ratio: 0.92, offset: 0.0},
+    "partial":  {ratio: 1.05, offset: 0.80}
 }
 
-const TRAVEL = 30.0    ## secondes pour la traversée complète, à vitesse 1
+const TRAVEL = 30.0    ## seconds for the whole passage, at speed 1
 
-global config = {type: "totale", speed: 1.0}
-global u = 0.0           ## progression du passage, de 0 à 1
+global config = {type: "total", speed: 1.0}
+global u = 0.0           ## the passage's progress, from 0 to 1
 global stars = []
-global hills = []     ## silhouette de l'horizon, hauteurs échantillonnées
+global hills = []     ## the horizon's outline, as sampled heights
 
 func sunRadius()
     return math.min(W, H) * 0.13
@@ -38,7 +38,7 @@ func sunY()
     return H * 0.42
 end
 
-## La Lune traverse horizontalement, décalée de l'écart du type choisi.
+## The Moon crosses horizontally, offset by the chosen type's own offset.
 func moonX()
     var reach = 2.4 * sunRadius()
     return sunX() - reach + 2 * reach * u
@@ -58,8 +58,8 @@ func centreDist()
     return math.sqrt(dx * dx + dy * dy)
 end
 
-## Aire commune à deux disques — géométrie exacte, sans approximation : deux secteurs
-## circulaires moins le quadrilatère qu'ils partagent (formule de Héron pour ce dernier).
+## The area two discs share — exact geometry, with no approximation: two circular sectors minus
+## the quadrilateral they have in common, the latter through Heron's formula.
 func lensArea(r1, r2, d)
     if d >= r1 + r2 then
         return 0.0
@@ -74,7 +74,7 @@ func lensArea(r1, r2, d)
     return r1 * r1 * a1 + r2 * r2 * a2 - 0.5 * math.sqrt(math.max(h, 0))
 end
 
-## Part du disque solaire cachée : c'est la grandeur qui décide de tout le reste.
+## The fraction of the solar disc hidden: it is the quantity everything else follows from.
 func obscuration()
     var rs = sunRadius()
     return lensArea(rs, moonRadius(), centreDist()) / (math.PI * rs * rs)
@@ -85,20 +85,20 @@ func phase()
     var rs = sunRadius()
     var rl = moonRadius()
     if d >= rs + rl then
-        return "hors éclipse"
+        return "no eclipse"
     end
     if d <= math.abs(rl - rs) then
-        return rl >= rs and "totale" or "annulaire"
+        return rl >= rs and "total" or "annular"
     end
-    return "partielle"
+    return "partial"
 end
 
-## Lumière ambiante, entre 0 et 1. L'œil est logarithmique : perdre la moitié du disque
-## solaire ne divise pas la clarté par deux, et le jour ne s'effondre que dans les tout
-## derniers pour-cent. La totalité, elle, fait chuter la lumière d'un facteur ~10 000 —
-## d'où la marche finale, bien réelle.
+## The ambient light, between 0 and 1. The eye is logarithmic: losing half the solar disc does not
+## halve the brightness, and the day only collapses in the very last few per cent. Totality, for
+## its part, drops the light by a factor of about ten thousand — hence the final step, which is
+## quite real.
 func light()
-    if phase() == "totale" then
+    if phase() == "total" then
         return 0.03
     end
     var o = obscuration()
@@ -114,7 +114,7 @@ func setup()
         stars[#stars + 1] = math.rand(0, H * 0.72)
         stars[#stars + 1] = math.rand(0.2, 1.0)
     end
-    ## Horizon : une hauteur tous les 12 pixels, tirée du bruit → collines douces.
+    ## The horizon: one height every twelve pixels, drawn from the noise, which gives soft hills.
     for x = 0, W + 12, 12 do
         hills[#hills + 1] = H * 0.80 + math.noise(x * 0.004, 3) * H * 0.10
     end
@@ -125,8 +125,8 @@ func setup()
     ui.show(menu)
 end
 
-## Ciel : bleu de plein jour qui se vide de sa clarté, jamais tout à fait noir (la couronne
-## et l'horizon gardent une lueur, comme au crépuscule). La couleur est une FONCTION, car la
+## The sky: a full-daylight blue that drains of its brightness, never quite black — the corona and
+## the horizon keep a glow, as at dusk. The colour is a FUNCTION, because the
 ## Lune s'en sert aussi : hors du Soleil, on ne la voit pas.
 func skyColor(l)
     return Color(0.05 + 0.30 * l, 0.09 + 0.42 * l, 0.16 + 0.62 * l)
@@ -136,8 +136,8 @@ func drawSky(l)
     graphics.clear(skyColor(l))
 end
 
-## Étoiles : elles n'apparaissent qu'avec l'obscurité — invisibles de jour, franches en
-## totalité, comme les planètes brillantes que l'on découvre alors.
+## The stars only appear with the darkness: invisible by day, plain in totality, like the bright
+## planets one discovers then.
 func drawStars(l)
     if l > 0.35 then
         return
@@ -165,10 +165,9 @@ func drawHorizon(l)
     graphics.polygon(pts)
 end
 
-## Halo : disques concentriques en fusion ADDITIVE, du plus large au plus étroit.
-## L'addition imite l'éblouissement — la lumière s'ajoute au ciel au lieu de le remplacer.
-## BEAUCOUP d'étapes à faible opacité : sept étapes bien marquées dessinaient des anneaux
-## concentriques au lieu d'un dégradé.
+## The halo: concentric discs in ADDITIVE blending, from the widest to the narrowest. Adding
+## imitates glare — the light adds to the sky instead of replacing it. MANY steps at a low opacity:
+## seven well-marked steps drew concentric rings instead of a gradient.
 func drawHalo(l)
     var rs = sunRadius()
     graphics.blendMode(blend.ADD)
@@ -181,12 +180,12 @@ func drawHalo(l)
     graphics.blendMode(blend.ALPHA)
 end
 
-## Couronne : visible SEULEMENT quand la photosphère est entièrement masquée. Ses aigrettes
-## sont irrégulières — un bruit angulaire donne cette structure filamenteuse.
+## The corona is visible ONLY when the photosphere is entirely hidden. Its streamers are irregular,
+## and an angular noise gives that filamentary structure.
 func drawCorona()
     var rl = moonRadius()
     graphics.blendMode(blend.ADD)
-    ## Halo interne, dense près du limbe et fondu vers l'extérieur : c'est lui qui donne la
+    ## The inner halo, dense near the limb and fading outwards: it is what gives the
     ## nacre de la couronne, les aigrettes ne faisant que la strier.
     graphics.noStroke()
     for k = 1, 18 do
@@ -194,8 +193,8 @@ func drawCorona()
         graphics.fill(Color(0.48, 0.52, 0.58, 0.05 * (1 - f)))
         graphics.circle(sunX(), sunY(), rl * (1 + 1.5 * f))
     end
-    ## Aigrettes : chacune en QUATRE segments d'opacité décroissante — un trait d'opacité
-    ## constante finissait net, et l'ensemble ressemblait à une brosse.
+    ## The streamers: each in FOUR segments of decreasing opacity — a stroke of constant opacity
+    ## ended abruptly, and the whole looked like a brush.
     for i = 0, 419 do
         var ang = i * math.TAU / 420
         var n = math.noise(math.cos(ang) * 1.3 + 8, math.sin(ang) * 1.3 + 8)
@@ -220,35 +219,35 @@ func draw()
     var l = light()
     var rs = sunRadius()
     var rl = moonRadius()
-    var totale = phase() == "totale"
+    var isTotal = phase() == "total"
 
     drawSky(l)
     drawStars(l)
 
     ## Le disque solaire, puis la couronne, puis la Lune PAR-DESSUS : c'est l'empilement
-    ## réel, et il suffit à découper le croissant — inutile de calculer une intersection
+    ## real one, and it is enough to carve the crescent out — no intersection need be computed
     ## pour dessiner, la Lune masque ce qu'elle recouvre.
     graphics.noStroke()
     graphics.fill(Color(1, 0.97, 0.86))
     graphics.circle(sunX(), sunY(), rs)
 
-    if totale then
+    if isTotal then
         drawCorona()
-        ## Chromosphère : fine bordure rose que la Lune laisse voir juste au-delà de son
-        ## limbe. Dessinée avant la Lune, il n'en reste qu'un liseré.
+        ## The chromosphere: a thin pink border the Moon leaves visible just beyond its limb.
+        ## Drawn before the Moon, only a fine line of it remains.
         graphics.fill(Color(1, 0.35, 0.35, 0.55))
         graphics.circle(moonX(), moonY(), rl * 1.03)
     end
 
-    ## La Lune prend la COULEUR DU CIEL, à peine assombrie : hors du Soleil on ne la voit
+    ## The Moon takes THE SKY'S COLOUR, barely darkened: away from the Sun one does not see it
     ## pas — un disque noir sur le bleu du jour serait une invention. Devant le Soleil, elle
     ## le masque tout aussi bien.
     var c = skyColor(l)
     graphics.fill(Color(c.r * 0.90, c.g * 0.90, c.b * 0.92))
     graphics.circle(moonX(), moonY(), rl)
 
-    ## Halo APRÈS la Lune : la lumière diffusée par l'atmosphère se trouve entre la Lune et
-    ## nous, elle la voile donc elle aussi. En totalité il ne reste presque rien à diffuser.
+    ## The halo comes AFTER the Moon: the light the atmosphere scatters lies between the Moon and
+    ## us, so it veils the Moon as well. In totality there is almost nothing left to scatter.
     drawHalo(l)
 
     drawHorizon(l)
@@ -258,5 +257,5 @@ func draw()
     graphics.text("{phase()}   obscuration {obscuration() * 100:.1f} %", W * 0.04, H * 0.05)
     graphics.fontSize(H * 0.024)
     graphics.stroke(Color(0.68, 0.72, 0.82))
-    graphics.text("éclipse {config.type}   -   lumière {l * 100:.0f} %", W * 0.04, H * 0.10)
+    graphics.text("{config.type} eclipse   -   light {l * 100:.0f} %", W * 0.04, H * 0.10)
 end
