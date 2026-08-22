@@ -1,6 +1,6 @@
-<!-- Vue TUTORIEL — fragment monté par app.js dans #view.
-     Le <style> ci-dessous n'est actif que tant que cette vue est montée
-     (innerHTML remplacé au changement de vue → styles auto-nettoyés). -->
+<!-- The TUTORIAL view — a fragment mounted by app.js into #view.
+     The <style> below is active only while this view is mounted (innerHTML is
+     replaced when the view changes, so the styles clean themselves up). -->
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -12,8 +12,8 @@
   --text: #dde4ef;
   --text-dim: #a3adc4;
   --accent: #9ba1ff;
-  --accent-ink: #0f1117;      /* encre sur une surface accentuée (cf. playground) */
-  --border-strong: #6b70ab;   /* contour d'un élément interactif */
+  --accent-ink: #0f1117;      /* ink on an accented surface (see the playground) */
+  --border-strong: #6b70ab;   /* the outline of an interactive element */
   --accent2: #a78bfa;
   --green: #4ade80;
   --yellow: #fbbf24;
@@ -23,13 +23,13 @@
   --sidebar-w: 240px;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
   --font: system-ui, -apple-system, sans-serif;
-  --code-size: 14.5px;   /* taille unique pour TOUS les blocs de code (pre + CodeMirror) */
+  --code-size: 14.5px;   /* one size for ALL code blocks (pre and CodeMirror alike) */
 }
 
 html {
   scroll-behavior: smooth;
-  /* désactive le font-boosting auto d'iOS Safari (sinon les blocs de code
-     sont gonflés différemment selon leur largeur → tailles incohérentes) */
+  /* Turns off iOS Safari's automatic font boosting (code blocks would otherwise be
+     inflated by different amounts according to their width, giving inconsistent sizes) */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
@@ -44,10 +44,10 @@ body {
   min-height: 100vh;
 }
 
-/* ── barre de menu ───────────────────────────────────────────────────────── */
-/* Apparence : app-bar.css (commun aux trois vues). Ici, seulement ce qui tient à
-   cette vue-ci : la barre est FIXE (la sidebar et le contenu défilent dessous) et
-   doit passer sous l'encoche. */
+/* ── the menu bar ─────────────────────────────────────────────────────────── */
+/* Appearance: app-bar.css, common to the three views. Only what belongs to THIS view
+   lives here: the bar is FIXED (the sidebar and the content scroll under it) and must
+   clear the notch. */
 #tuto-bar {
   position: fixed;
   top: 0; left: 0; right: 0;
@@ -199,7 +199,7 @@ pre {
   line-height: 1.65;
 }
 
-/* CodeMirror statique : même taille que les <pre> bruts (source unique : --code-size) */
+/* Static CodeMirror: the same size as a plain <pre> (one source: --code-size) */
 .cm-static-wrap .cm-editor,
 .cm-static-wrap .cm-scroller,
 .cm-static-wrap .cm-content {
@@ -217,7 +217,7 @@ code {
 
 pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
 
-/* syntax tokens — couleurs VS Code Dark+ */
+/* syntax tokens — the VS Code Dark+ colours */
 .kw   { color: #569CD6; }
 .bi   { color: #DCDCAA; }
 .str  { color: #CE9178; }
@@ -253,10 +253,10 @@ td:first-child { font-family: var(--font-mono); font-size: 13px; color: var(--cy
 .two-col .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
 
 /* ── hamburger (mobile only) ─────────────────────────────────────────────── */
-/* Bouton de barre ordinaire (app-bar.css) : ne reste ici que ce qui fait de lui un
-   hamburger — trois barres empilées, et l'affichage réservé au petit écran.
-   Sélecteur préfixé par #tuto-bar : `.app-bar .bar-btn` (display:flex) l'emporterait
-   sinon sur un simple `.hamburger`, et le bouton apparaîtrait en grand écran. */
+/* An ordinary bar button (app-bar.css): only what makes it a hamburger is left here —
+   three stacked bars, and a display restricted to the small screen.
+   The selector is prefixed by #tuto-bar: `.app-bar .bar-btn` (display:flex) would
+   otherwise beat a plain `.hamburger`, and the button would show on a large screen. */
 #tuto-bar .hamburger {
   display: none;
   flex-direction: column;
@@ -335,11 +335,11 @@ pre:hover .code-actions,
 
   #tuto-bar .hamburger { display: flex; }
 
-  #tuto-bar .bar-label { display: none; }   /* icônes seules : la barre reste sur une ligne */
+  #tuto-bar .bar-label { display: none; }   /* icons only: the bar stays on one line */
 
   nav {
     position: fixed;
-    /* Sous la barre, pas par-dessus : ouvert, le menu laisse la barre visible. */
+    /* Under the bar, not over it: when open, the menu leaves the bar visible. */
     top: calc(var(--bar-h) + env(safe-area-inset-top)); left: 0;
     height: calc(100vh - var(--bar-h) - env(safe-area-inset-top));
     z-index: 100;
@@ -362,7 +362,7 @@ pre:hover .code-actions,
 
   section { margin-bottom: 52px; }
 
-  :root { --code-size: 13.5px; }   /* rétrécit pre ET CodeMirror ensemble */
+  :root { --code-size: 13.5px; }   /* shrinks pre AND CodeMirror together */
   pre { padding: 16px; }
 
   .two-col { grid-template-columns: 1fr; }
@@ -373,23 +373,23 @@ pre:hover .code-actions,
 }
 </style>
 
-<!-- Barre de menu — même position et même style que celles du playground et du mode
-     plein écran. Un seul bouton pour l'instant : l'accès au playground. -->
+<!-- The menu bar — the same position and style as the playground's and the full-screen
+     mode's. One button for now: the way to the playground. -->
 <div id="tuto-bar" class="app-bar">
   <span class="bar-logo">Ollin</span>
   <button class="hamburger bar-btn icon-only" id="ham" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
   <span class="spacer"></span>
-  <button id="hard-reload-btn" class="bar-btn" title="Recharger en vidant le cache (récupère le dernier WASM)">
+  <button id="hard-reload-btn" class="bar-btn" title="Reload with an empty cache (fetches the latest WASM)">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13.6 8a5.6 5.6 0 1 1-1.6-3.9"/><path d="M13.5 2v3h-3"/></svg>
-    <span class="bar-label">Recharger</span>
+    <span class="bar-label">Reload</span>
   </button>
-  <a class="bar-btn" href="#/perf" title="Dérive du travail du moteur, mesurée">
+  <a class="bar-btn" href="#/perf" title="The engine's measured drift in work">
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 13V3"/><path d="M2 13h12"/><path d="M4 10l3-4 3 3 3-5"/></svg>
-    <span class="bar-label">Moteur</span>
+    <span class="bar-label">Engine</span>
   </a>
-  <a class="bar-btn" href="#/playground" title="Ouvrir le playground">
+  <a class="bar-btn" href="#/playground" title="Open the playground">
     <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5l9 5.5-9 5.5z"/></svg>
     <span class="bar-label">Playground</span>
   </a>
@@ -401,67 +401,67 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version : <span data-build-date>2026-08-22 09:43</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-22 09:43</span></p>
   </div>
-  <div class="section-label">Démarrage</div>
+  <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
   <a href="#types">Types</a>
   <a href="#variables">Variables</a>
-  <a href="#constants">Constantes</a>
-  <a href="#comments">Commentaires</a>
+  <a href="#constants">Constants</a>
+  <a href="#comments">Comments</a>
   <div class="section-label">Expressions</div>
-  <a href="#operators">Opérateurs</a>
-  <a href="#bitwise">Opérateurs bits</a>
-  <a href="#strings">Chaînes</a>
-  <a href="#multiline">Multi-lignes</a>
-  <div class="section-label">Contrôle</div>
+  <a href="#operators">Operators</a>
+  <a href="#bitwise">Bitwise operators</a>
+  <a href="#strings">Strings</a>
+  <a href="#multiline">Multi-line</a>
+  <div class="section-label">Control flow</div>
 
   <a href="#if">If / Else</a>
   <a href="#while">While</a>
   <a href="#for">For</a>
   <a href="#switch">Switch</a>
-  <a href="#do">Bloc do…end</a>
-  <div class="section-label">Fonctions</div>
-  <a href="#functions">Fonctions</a>
+  <a href="#do">do…end block</a>
+  <div class="section-label">Functions</div>
+  <a href="#functions">Functions</a>
   <a href="#varargs">Varargs</a>
-  <a href="#defaults">Défauts</a>
+  <a href="#defaults">Defaults</a>
   <a href="#closures">Closures</a>
   <div class="section-label">Maps</div>
   <a href="#maps">Maps</a>
-  <a href="#map-iter">Itération</a>
+  <a href="#map-iter">Iteration</a>
   <a href="#enum">Enum</a>
-  <a href="#ref">Références</a>
+  <a href="#ref">References</a>
   <div class="section-label">Arrays</div>
   <a href="#arrays">Arrays</a>
-  <div class="section-label">Gestion d'erreurs</div>
+  <div class="section-label">Error handling</div>
   <a href="#try">Try / Catch</a>
   <div class="section-label">Builtins</div>
-  <a href="#builtins">Fonctions intégrées</a>
+  <a href="#builtins">Built-in functions</a>
   <a href="#stdlib">Modules built-in</a>
   <a href="#import">Import</a>
   <a href="#classes">Classes</a>
   <a href="#graphics">Graphics + Colors</a>
-  <a href="#keyboard">Clavier</a>
-  <a href="#mouse">Souris</a>
-  <a href="#touch">Multitouche</a>
-  <a href="#ui">Module ui</a>
-  <a href="#tween">Module tween</a>
-  <a href="#sound">Son (audio + sound)</a>
-  <a href="#data">Module data</a>
-  <a href="#image">Module image</a>
-  <a href="#window">Module window</a>
+  <a href="#keyboard">Keyboard</a>
+  <a href="#mouse">Mouse</a>
+  <a href="#touch">Multitouch</a>
+  <a href="#ui">The ui module</a>
+  <a href="#tween">The tween module</a>
+  <a href="#sound">Sound (audio + sound)</a>
+  <a href="#data">The data module</a>
+  <a href="#image">The image module</a>
+  <a href="#window">The window module</a>
 </nav>
 
 <main>
 
 <div class="hero">
   <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-22 09:43</span></h1>
-  <p class="subtitle">Minimaliste · Expressif · Dynamiquement typé · Compilé · Embarquable</p>
+  <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
     <span class="badge badge-blue">C++17</span>
-    <span class="badge badge-green">Dynamiquement typé</span>
-    <span class="badge badge-purple">Embarquable</span>
+    <span class="badge badge-green">Dynamically typed</span>
+    <span class="badge badge-purple">Embeddable</span>
   </div>
 </div>
 
@@ -469,9 +469,9 @@ pre:hover .code-actions,
 <!-- ── Introduction ──────────────────────────────────────────────────────── -->
 <section id="intro">
 <h2>Introduction</h2>
-<p>Ollin est un langage de script <strong>minimaliste</strong> et <strong>expressif</strong> : dynamiquement typé, compilé, et conçu pour être embarqué.</p>
+<p>Ollin is a <strong>minimal</strong>, <strong>expressive</strong> scripting language: dynamically typed, compiled, and designed to be embedded.</p>
 
-<h3>Premier programme</h3>
+<h3>A first program</h3>
 <pre><code><span class="bi">print</span>(<span class="str">"hello world!"</span>)</code></pre>
 </section>
 
@@ -479,77 +479,77 @@ pre:hover .code-actions,
 <section id="types">
 <h2>Types</h2>
 <table>
-<tr><th>Type</th><th>Littéral</th><th>Description</th></tr>
-<tr><td>nil</td><td><code class="nil">nil</code></td><td>Valeur absente. Toute variable non initialisée vaut nil.</td></tr>
-<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>Booléen, <strong>type à part entière</strong> : <code>true</code> n'est pas l'entier 1, donc <code>true &lt;&gt; 1</code>. Produit par <code>not</code> et par les comparaisons. L'arithmétique sur un booléen est une erreur.</td></tr>
-<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code>, <code class="num">0xFF</code>, <code class="num">0o17</code>, <code class="num">0b1010</code></td><td>Entier signé 64-bit (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>). Bases : décimale, <code>0x</code> hexadécimale, <code>0o</code> octale, <code>0b</code> binaire.</td></tr>
-<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code>, <code class="num">6.022e23</code>, <code class="num">2e-3</code></td><td>Nombre à virgule flottante (double précision). Notation scientifique : un exposant <code>e</code>/<code>E</code> (signe optionnel) rend le littéral flottant (<code class="num">1e3</code> == 1000, <code class="num">2e-3</code> == 0.002).</td></tr>
-<tr><td>string</td><td><code class="str">"texte"</code></td><td>Chaîne UTF-8 immuable.</td></tr>
-<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>Dictionnaire clé→valeur. Toute valeur peut être clé (littéral : string ou ident). Ajout d'un item sans guillemets : <code>m.b = 2</code> (équivalent à <code>m["b"] = 2</code>).</td></tr>
-<tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>Tableau dynamique, indexé à 1.</td></tr>
+<tr><th>Type</th><th>Literal</th><th>Description</th></tr>
+<tr><td>nil</td><td><code class="nil">nil</code></td><td>An absent value. Every uninitialised variable is nil.</td></tr>
+<tr><td>bool</td><td><code class="bool">true</code>, <code class="bool">false</code></td><td>A boolean, and <strong>a type in its own right</strong>: <code>true</code> is not the integer 1, so <code>true &lt;&gt; 1</code>. Produced by <code>not</code> and by the comparisons. Arithmetic on a boolean is an error.</td></tr>
+<tr><td>integer</td><td><code class="num">42</code>, <code class="num">1_000</code>, <code class="num">0xFF</code>, <code class="num">0o17</code>, <code class="num">0b1010</code></td><td>A signed 64-bit integer (±2<sup>63</sup> ≈ ±9.2×10<sup>18</sup>). Bases: decimal, <code>0x</code> hexadecimal, <code>0o</code> octal, <code>0b</code> binary.</td></tr>
+<tr><td>float</td><td><code class="num">3.14</code>, <code class="num">.5</code>, <code class="num">6.022e23</code>, <code class="num">2e-3</code></td><td>A floating-point number (double precision). Scientific notation: an <code>e</code>/<code>E</code> exponent, with an optional sign, makes the literal a float (<code class="num">1e3</code> == 1000, <code class="num">2e-3</code> == 0.002).</td></tr>
+<tr><td>string</td><td><code class="str">"text"</code></td><td>An immutable UTF-8 string.</td></tr>
+<tr><td>map</td><td><code>{}</code>, <code>{"a": 1}</code></td><td>A key→value dictionary. Any value can be a key (in a literal: a string or an identifier). Adding an item without quotes: <code>m.b = 2</code>, which is <code>m["b"] = 2</code>.</td></tr>
+<tr><td>array</td><td><code>[]</code>, <code>[1, 2, 3]</code></td><td>A dynamic array, indexed from 1.</td></tr>
 </table>
 
-<h3>Règles de vérité (vrai/faux)</h3>
-<p>Principe unique : <strong>le vide est faux</strong>. Une valeur est <em>fausse</em> si elle représente l'absence ou le vide (<code>nil</code>, <code>false</code>, zéro, chaîne/map/array vide) ; tout le reste est <em>vrai</em>.</p>
+<h3>Truth rules (true/false)</h3>
+<p>One principle: <strong>the empty is false</strong>. A value is <em>false</em> when it stands for absence or emptiness (<code>nil</code>, <code>false</code>, zero, an empty string, map or array); everything else is <em>true</em>.</p>
 <table>
-<tr><th>Valeur</th><th>Fausse si</th></tr>
-<tr><td>nil</td><td>toujours</td></tr>
+<tr><th>Value</th><th>False when</th></tr>
+<tr><td>nil</td><td>always</td></tr>
 <tr><td>bool</td><td><code class="bool">false</code></td></tr>
 <tr><td>integer</td><td>== 0</td></tr>
 <tr><td>float</td><td>== 0.0</td></tr>
-<tr><td>string</td><td>chaîne vide <code>""</code></td></tr>
-<tr><td>map</td><td>vide <code>{}</code></td></tr>
-<tr><td>array</td><td>vide <code>[]</code></td></tr>
+<tr><td>string</td><td>the empty string <code>""</code></td></tr>
+<tr><td>map</td><td>empty <code>{}</code></td></tr>
+<tr><td>array</td><td>empty <code>[]</code></td></tr>
 </table>
 
-<pre><code><span class="bi">assert</span>(<span class="num">1</span> &lt;&gt; <span class="bool">true</span>)   <span class="cmt">## types distincts : le booléen est étanche</span>
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="num">0</span>)        <span class="cmt">## zéro => faux, sans pour autant valoir false</span>
-<span class="bi">assert</span>(<span class="str">"non vide"</span>)  <span class="cmt">## string non vide => vrai</span>
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)      <span class="cmt">## string vide => faux</span></code></pre>
+<pre><code><span class="bi">assert</span>(<span class="num">1</span> &lt;&gt; <span class="bool">true</span>)   <span class="cmt">## distinct types: the boolean is sealed</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="num">0</span>)        <span class="cmt">## zero => false, without being equal to false</span>
+<span class="bi">assert</span>(<span class="str">"not empty"</span>)  <span class="cmt">## a non-empty string => true</span>
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)      <span class="cmt">## an empty string => false</span></code></pre>
 
-<p>Les deux règles sont indépendantes et il faut les tenir ensemble : <strong>zéro est faux</strong> (le vide est faux), et pourtant <strong>zéro n'est pas <code>false</code></strong> (les types ne se mélangent pas). Autrement dit, <code>if x</code> et <code>if not x</code> disent la vérité d'une valeur quel qu'en soit le type — c'est la façon d'écrire un test — alors que <code>x == false</code> ne vaut que pour un vrai booléen. Il n'existe pas de conversion <code>bool(v)</code> : <code>not not v</code> en tient lieu.</p>
+<p>The two rules are independent, and both hold at once: <strong>zero is false</strong> (the empty is false), and yet <strong>zero is not <code>false</code></strong> (the types do not mix). In other words, <code>if x</code> and <code>if not x</code> tell the truth of a value whatever its type — that is how a test is written — whereas <code>x == false</code> only holds for a genuine boolean. There is no <code>bool(v)</code> conversion: <code>not not v</code> does the job.</p>
 
-<h3>Arithmétique des types numériques</h3>
-<div class="callout">Deux entiers combinés donnent un entier — sauf la division <code>/</code>, qui donne toujours un flottant. Dès qu'un flottant intervient dans le calcul, le résultat est un flottant.</div>
+<h3>Arithmetic on the numeric types</h3>
+<div class="callout">Two integers combined give an integer — except for division <code>/</code>, which always gives a float. As soon as a float takes part in the computation, the result is a float.</div>
 
-<pre><code><span class="bi">assert</span>(<span class="num">7</span> / <span class="num">2</span> == <span class="num">3.5</span>)  <span class="cmt">## division => toujours float</span>
-<span class="bi">assert</span>(<span class="num">7</span> % <span class="num">2</span> == <span class="num">1</span>)    <span class="cmt">## modulo => int si les deux sont int</span></code></pre>
+<pre><code><span class="bi">assert</span>(<span class="num">7</span> / <span class="num">2</span> == <span class="num">3.5</span>)  <span class="cmt">## division => always a float</span>
+<span class="bi">assert</span>(<span class="num">7</span> % <span class="num">2</span> == <span class="num">1</span>)    <span class="cmt">## modulo => int when both are ints</span></code></pre>
 </section>
 
 <!-- ── Variables ──────────────────────────────────────────────────────────── -->
 <section id="variables">
 <h2>Variables</h2>
-<p>Toute variable <strong>doit</strong> être déclarée avant utilisation — utiliser ou affecter un nom non déclaré est une erreur de compilation.</p>
-<p><code><span class="kw">var</span></code> crée une variable <strong>locale</strong> à la fonction courante ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible dans tout le programme.</p>
+<p>Every variable <strong>must</strong> be declared before use — using or assigning an undeclared name is a compile error.</p>
+<p><code><span class="kw">var</span></code> creates a variable <strong>local</strong> to the current function; <code><span class="kw">global</span></code> creates a <strong>global</strong> variable visible throughout the program.</p>
 
-<h3>Nommage</h3>
-<p>Un nom commence par une <strong>lettre</strong> ou un <strong>underscore</strong>, suivi de lettres, chiffres ou underscores (<code>_compteur</code>, <code>x1</code>, <code>score_final</code>). Sensible à la casse (<code>score</code> ≠ <code>Score</code>) ; les accents ne sont pas supportés. Les mots-clés du langage (<code><span class="kw">var</span></code>, <code><span class="kw">if</span></code>, <code><span class="kw">end</span></code>…) ne peuvent pas servir de nom.</p>
+<h3>Naming</h3>
+<p>A name starts with a <strong>letter</strong> or an <strong>underscore</strong>, followed by letters, digits or underscores (<code>_counter</code>, <code>x1</code>, <code>final_score</code>). It is case sensitive (<code>score</code> ≠ <code>Score</code>), and accented letters are not supported. The language's keywords (<code><span class="kw">var</span></code>, <code><span class="kw">if</span></code>, <code><span class="kw">end</span></code>…) cannot serve as names.</p>
 
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
 <span class="kw">var</span> b = <span class="num">2.5</span>
-<span class="kw">var</span> s = <span class="str">"bonjour"</span>
-<span class="kw">var</span> undef  <span class="cmt">## pas d'initialisation => nil</span>
+<span class="kw">var</span> s = <span class="str">"hello"</span>
+<span class="kw">var</span> undef  <span class="cmt">## no initialisation => nil</span>
 <span class="bi">assert</span>(undef == <span class="nil">nil</span>)</code></pre>
 
-<h3>Déclaration multiple</h3>
+<h3>Multiple declaration</h3>
 <pre><code><span class="kw">var</span> x, y = <span class="num">1</span>, <span class="num">2</span>
-<span class="kw">var</span> p, q, r = <span class="num">10</span>, <span class="num">20</span>  <span class="cmt">## r => nil (pas assez de valeurs)</span></code></pre>
+<span class="kw">var</span> p, q, r = <span class="num">10</span>, <span class="num">20</span>  <span class="cmt">## r => nil (not enough values)</span></code></pre>
 
-<h3>Affectation</h3>
+<h3>Assignment</h3>
 <pre><code><span class="kw">var</span> a = <span class="num">10</span>
-a = <span class="num">42</span>  <span class="cmt">## simple</span>
-a += <span class="num">1</span>  <span class="cmt">## compound : += -= *= /= %=</span>
+a = <span class="num">42</span>  <span class="cmt">## plain</span>
+a += <span class="num">1</span>  <span class="cmt">## compound: += -= *= /= %=</span>
 a *= <span class="num">2</span>
 <span class="bi">assert</span>(a == <span class="num">86</span>)</code></pre>
 
-<div class="callout tip">Les underscores dans les littéraux numériques sont ignorés : <code>1_000_000</code> == <code>1000000</code>.</div>
+<div class="callout tip">Underscores in numeric literals are ignored: <code>1_000_000</code> == <code>1000000</code>.</div>
 
-<h3>Variables globales — <code><span class="kw">global</span></code></h3>
-<p>Le mot-clé <code><span class="kw">global</span></code> déclare une variable <strong>globale</strong>, visible dans tout le programme. Elle peut être déclarée n'importe où et lue ou modifiée depuis n'importe quelle fonction. Une variable locale (<code><span class="kw">var</span></code>) de même nom masque le global <strong>à partir de sa déclaration</strong> : avant cette ligne, le nom désigne encore le global (ainsi <code><span class="kw">var</span> x = x</code> initialise avec la valeur extérieure).</p>
+<h3>Global variables — <code><span class="kw">global</span></code></h3>
+<p>The <code><span class="kw">global</span></code> keyword declares a <strong>global</strong> variable, visible throughout the program. It can be declared anywhere, and read or changed from any function. A local variable (<code><span class="kw">var</span></code>) of the same name hides the global <strong>from its declaration onwards</strong>: before that line the name still means the global, so <code><span class="kw">var</span> x = x</code> initialises from the outer value.</p>
 <pre><code><span class="kw">global</span> counter = <span class="num">0</span>
 
 <span class="kw">func</span> incr()
-    counter += <span class="num">1</span>  <span class="cmt">## modifie le global depuis une fn</span>
+    counter += <span class="num">1</span>  <span class="cmt">## changes the global from a function</span>
 <span class="kw">end</span>
 
 incr()
@@ -557,10 +557,10 @@ incr()
 <span class="bi">assert</span>(counter == <span class="num">2</span>)
 <span class="bi">print</span>(counter)    <span class="cmt">## 2</span></code></pre>
 
-<div class="callout warn"><code><span class="kw">var</span></code> crée toujours une variable <strong>locale</strong> ; <code><span class="kw">global</span></code> crée une variable <strong>globale</strong> visible partout. Affecter un nom non déclaré reste une erreur de compilation.</div>
+<div class="callout warn"><code><span class="kw">var</span></code> always creates a <strong>local</strong> variable; <code><span class="kw">global</span></code> creates a <strong>global</strong> one, visible everywhere. Assigning an undeclared name remains a compile error.</div>
 
-<h3 id="constants">Constantes — <code><span class="kw">const</span></code></h3>
-<p>Le mot-clé <code><span class="kw">const</span></code> déclare une <strong>locale immuable</strong>. L'initialisation est <strong>obligatoire</strong>. Toute tentative d'assignation ultérieure est une <strong>erreur de compilation</strong>.</p>
+<h3 id="constants">Constants — <code><span class="kw">const</span></code></h3>
+<p>The <code><span class="kw">const</span></code> keyword declares an <strong>immutable local</strong>. Initialisation is <strong>mandatory</strong>. Any later attempt to assign to it is a <strong>compile error</strong>.</p>
 <pre><code><span class="kw">const</span> PI = <span class="num">3.14159</span>
 <span class="kw">const</span> MAX = <span class="num">100</span>
 
@@ -574,95 +574,95 @@ incr()
 
 <span class="bi">print</span>(area(<span class="num">1</span>))  <span class="cmt">## 6.28318…</span></code></pre>
 
-<div class="callout warn">Les erreurs suivantes sont détectées à la <strong>compilation</strong> :
+<div class="callout warn">The following errors are caught at <strong>compile time</strong>:
 <pre style="margin-top:8px"><code><span class="kw">const</span> x  <span class="cmt">## ERROR: must be initialized</span>
 <span class="kw">const</span> x = <span class="num">1</span>
 x = <span class="num">2</span>    <span class="cmt">## ERROR: cannot assign to const 'x'</span></code></pre>
 </div>
 </section>
 
-<!-- ── Commentaires ───────────────────────────────────────────────────────── -->
+<!-- ── Comments ────────────────────────────────────────────────────────────── -->
 <section id="comments">
-<h2>Commentaires</h2>
-<pre><code><span class="cmt">## commentaire de fin de ligne</span>
+<h2>Comments</h2>
+<pre><code><span class="cmt">## an end-of-line comment</span>
 
 <span class="kw">var</span> x = <span class="num">10</span>  <span class="cmt">## inline</span>
 
 <span class="cmt">###
-commentaire
-multi-lignes
+a multi-line
+comment
 ###</span></code></pre>
 </section>
 
-<!-- ── Opérateurs ─────────────────────────────────────────────────────────── -->
+<!-- ── Operators ───────────────────────────────────────────────────────────── -->
 <section id="operators">
-<h2>Opérateurs</h2>
+<h2>Operators</h2>
 
-<h3>Arithmétiques</h3>
+<h3>Arithmetic</h3>
 <table>
-<tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
+<tr><th>Op</th><th>Description</th><th>Example</th></tr>
 <tr><td>+</td><td>Addition</td><td><code>3 + 4 == 7</code></td></tr>
-<tr><td>-</td><td>Soustraction / négation</td><td><code>10 - 3 == 7</code>, <code>-x</code></td></tr>
+<tr><td>-</td><td>Subtraction / negation</td><td><code>10 - 3 == 7</code>, <code>-x</code></td></tr>
 <tr><td>*</td><td>Multiplication</td><td><code>6 * 7 == 42</code></td></tr>
-<tr><td>/</td><td>Division (toujours float)</td><td><code>7 / 2 == 3.5</code></td></tr>
-<tr><td>//</td><td>Division entière (plancher)</td><td><code>7 // 2 == 3</code></td></tr>
+<tr><td>/</td><td>Division (always a float)</td><td><code>7 / 2 == 3.5</code></td></tr>
+<tr><td>//</td><td>Integer division (floor)</td><td><code>7 // 2 == 3</code></td></tr>
 <tr><td>%</td><td>Modulo</td><td><code>10 % 3 == 1</code></td></tr>
-<tr><td>^</td><td>Puissance (associative à droite)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
+<tr><td>^</td><td>Power (right associative)</td><td><code>2 ^ 8 == 256</code>, <code>-2 ^ 2 == -4</code></td></tr>
 </table>
 
-<h3>Comparaisons</h3>
+<h3>Comparisons</h3>
 <table>
 <tr><th>Op</th><th>Description</th></tr>
-<tr><td>==</td><td>Égalité</td></tr>
-<tr><td>&lt;&gt;</td><td>Inégalité</td></tr>
-<tr><td>&gt; &lt; &gt;= &lt;=</td><td>Ordre</td></tr>
+<tr><td>==</td><td>Equality</td></tr>
+<tr><td>&lt;&gt;</td><td>Inequality</td></tr>
+<tr><td>&gt; &lt; &gt;= &lt;=</td><td>Ordering</td></tr>
 </table>
 
-<h3>Logiques</h3>
-<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span>            <span class="cmt">## true (l'opérande, pas un 1)</span>
+<h3>Logical</h3>
+<pre><code><span class="kw">var</span> a = <span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span>            <span class="cmt">## true (the operand, not a 1)</span>
 <span class="kw">var</span> b = <span class="bool">true</span> <span class="kw">and</span> <span class="bool">false</span>           <span class="cmt">## false</span>
 <span class="kw">var</span> c = <span class="kw">not</span> <span class="bool">true</span>                 <span class="cmt">## false</span>
 
-<span class="cmt">## précédence : not > and > or</span>
+<span class="cmt">## precedence: not > and > or</span>
 <span class="bi">assert</span>(<span class="bool">true</span> <span class="kw">or</span> <span class="bool">false</span> <span class="kw">and</span> <span class="bool">false</span>)  <span class="cmt">## true or (false and false)</span></code></pre>
 </section>
 
-<!-- ── Opérateurs bits ───────────────────────────────────────────────────── -->
+<!-- ── Bitwise operators ───────────────────────────────────────────────────── -->
 <section id="bitwise">
-<h2>Opérateurs bits</h2>
-<p>Les opérateurs bit-à-bit opèrent uniquement sur des <strong>entiers</strong>. Le <code>~</code> est <strong>XOR</strong> en binaire et <strong>NOT</strong> en unaire ; <code>^</code> est réservé à la <strong>puissance</strong>.</p>
+<h2>Bitwise operators</h2>
+<p>The bitwise operators work on <strong>integers</strong> only. <code>~</code> is <strong>XOR</strong> as a binary operator and <strong>NOT</strong> as a unary one; <code>^</code> is reserved for the <strong>power</strong>.</p>
 
-<h3>Binaires</h3>
+<h3>Binary</h3>
 <table>
-<tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
-<tr><td>&amp;</td><td>ET bit-à-bit</td><td><code>12 &amp; 10 == 8</code></td></tr>
-<tr><td>|</td><td>OU bit-à-bit</td><td><code>12 | 10 == 14</code></td></tr>
-<tr><td>~</td><td>XOR bit-à-bit</td><td><code>12 ~ 10 == 6</code></td></tr>
-<tr><td>&lt;&lt;</td><td>Décalage gauche</td><td><code>1 &lt;&lt; 3 == 8</code></td></tr>
-<tr><td>&gt;&gt;</td><td>Décalage droit (arithmétique)</td><td><code>16 &gt;&gt; 2 == 4</code></td></tr>
+<tr><th>Op</th><th>Description</th><th>Example</th></tr>
+<tr><td>&amp;</td><td>Bitwise AND</td><td><code>12 &amp; 10 == 8</code></td></tr>
+<tr><td>|</td><td>Bitwise OR</td><td><code>12 | 10 == 14</code></td></tr>
+<tr><td>~</td><td>Bitwise XOR</td><td><code>12 ~ 10 == 6</code></td></tr>
+<tr><td>&lt;&lt;</td><td>Left shift</td><td><code>1 &lt;&lt; 3 == 8</code></td></tr>
+<tr><td>&gt;&gt;</td><td>Right shift (arithmetic)</td><td><code>16 &gt;&gt; 2 == 4</code></td></tr>
 </table>
 
-<h3>Unaire</h3>
+<h3>Unary</h3>
 <table>
-<tr><th>Op</th><th>Description</th><th>Exemple</th></tr>
-<tr><td>~</td><td>NOT (complément à 1)</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
+<tr><th>Op</th><th>Description</th><th>Example</th></tr>
+<tr><td>~</td><td>NOT (one's complement)</td><td><code>~0 == -1</code>, <code>~1 == -2</code></td></tr>
 </table>
-<div class="callout tip">Le <code>~</code> est <strong>XOR</strong> entre deux opérandes (<code>a ~ b</code>) et <strong>NOT</strong> en préfixe (<code>~a</code>). <code>^</code> n'est pas un opérateur bit-à-bit : c'est la puissance (voir <a href="#operators">Opérateurs</a>).</div>
+<div class="callout tip"><code>~</code> is <strong>XOR</strong> between two operands (<code>a ~ b</code>) and <strong>NOT</strong> as a prefix (<code>~a</code>). <code>^</code> is not a bitwise operator: it is the power (see <a href="#operators">Operators</a>).</div>
 
-<h3>Précédence</h3>
-<p>De la plus basse à la plus haute :</p>
+<h3>Precedence</h3>
+<p>From the lowest to the highest:</p>
 <pre data-no-run><code>or  =>  and  =>  |  =>  ~(xor)  =>  &  =>  comparisons  =>  &lt;&lt; &gt;&gt;  =>  + -  =>  * / %  =>  ~(not) - not  =>  ^</code></pre>
 
-<h3>Exemples</h3>
+<h3>Examples</h3>
 <pre><code><span class="kw">var</span> flags = <span class="num">0</span>
-flags = flags <span class="op">|</span> <span class="num">1</span>         <span class="cmt">## activer bit 0</span>
-flags = flags <span class="op">|</span> <span class="num">4</span>         <span class="cmt">## activer bit 2</span>
+flags = flags <span class="op">|</span> <span class="num">1</span>         <span class="cmt">## turn bit 0 on</span>
+flags = flags <span class="op">|</span> <span class="num">4</span>         <span class="cmt">## turn bit 2 on</span>
 <span class="bi">assert</span>(flags == <span class="num">5</span>)        <span class="cmt">## 0101</span>
 
-<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">1</span>) == <span class="num">1</span>)  <span class="cmt">## tester bit 0</span>
-<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">2</span>) == <span class="num">0</span>)  <span class="cmt">## bit 1 absent</span>
+<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">1</span>) == <span class="num">1</span>)  <span class="cmt">## test bit 0</span>
+<span class="bi">assert</span>((flags <span class="op">&amp;</span> <span class="num">2</span>) == <span class="num">0</span>)  <span class="cmt">## bit 1 is not set</span>
 
-flags = flags <span class="op">~</span> <span class="num">1</span>         <span class="cmt">## XOR : basculer bit 0 => 4</span>
+flags = flags <span class="op">~</span> <span class="num">1</span>         <span class="cmt">## XOR: flip bit 0 => 4</span>
 <span class="bi">assert</span>(flags == <span class="num">4</span>)
 
 <span class="bi">assert</span>(<span class="num">1</span> <span class="op">&lt;&lt;</span> <span class="num">8</span> == <span class="num">256</span>)
@@ -670,39 +670,39 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="bi">assert</span>(<span class="op">~</span><span class="num">0</span> == -<span class="num">1</span>)
 <span class="bi">assert</span>(<span class="num">255</span> <span class="op">&amp;</span> <span class="num">15</span> == <span class="num">15</span>)</code></pre>
 
-<div class="callout warn">Les opérateurs bit-à-bit nécessitent des opérandes entiers (<code>integer</code>). Appliquer <code>&amp;</code>, <code>|</code>, <code>~</code>, <code>&lt;&lt;</code> ou <code>&gt;&gt;</code> à un float lèvera une erreur à l'exécution.</div>
+<div class="callout warn">The bitwise operators need integer operands. Applying <code>&amp;</code>, <code>|</code>, <code>~</code>, <code>&lt;&lt;</code> or <code>&gt;&gt;</code> to a float raises an error at run time.</div>
 </section>
 
-<!-- ── Chaînes ─────────────────────────────────────────────────────────────── -->
+<!-- ── Strings ─────────────────────────────────────────────────────────────── -->
 <section id="strings">
-<h2>Chaînes</h2>
-<pre><code><span class="kw">var</span> s = <span class="str">"bonjour"</span>
-<span class="bi">assert</span>(s == <span class="str">"bonjour"</span>)
-<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## chaîne vide est fausse</span>
-<span class="bi">assert</span>(<span class="str">"text"</span>)  <span class="cmt">## non vide est vrai</span></code></pre>
+<h2>Strings</h2>
+<pre><code><span class="kw">var</span> s = <span class="str">"hello"</span>
+<span class="bi">assert</span>(s == <span class="str">"hello"</span>)
+<span class="bi">assert</span>(<span class="kw">not</span> <span class="str">""</span>)   <span class="cmt">## an empty string is false</span>
+<span class="bi">assert</span>(<span class="str">"text"</span>)  <span class="cmt">## a non-empty one is true</span></code></pre>
 
-<p>La concaténation se fait avec <code>+</code> :</p>
+<p>Concatenation uses <code>+</code>:</p>
 <pre><code><span class="kw">var</span> greeting = <span class="str">"Hello, "</span> + <span class="str">"world"</span> + <span class="str">"!"</span>
 <span class="bi">assert</span>(greeting == <span class="str">"Hello, world!"</span>)</code></pre>
-<div class="callout warn">Les chaînes sont immuables. Seul <code>+</code> est surchargé pour les strings — les autres opérateurs (<code>-</code>, <code>*</code>…) restent réservés aux nombres.</div>
+<div class="callout warn">Strings are immutable. Only <code>+</code> is overloaded for strings — the other operators (<code>-</code>, <code>*</code>…) stay reserved for numbers.</div>
 
 <h3>Interpolation</h3>
-<p>Toute expression entre accolades <code>{…}</code> est évaluée et insérée. <code>\{</code> insère une accolade littérale.</p>
+<p>Any expression in braces <code>{…}</code> is evaluated and inserted. <code>\{</code> inserts a literal brace.</p>
 <pre><code><span class="kw">var</span> name = <span class="str">"Ada"</span>
 <span class="kw">var</span> n = <span class="num">42</span>
-<span class="bi">assert</span>(<span class="str">"Bonjour {name}, n={n}"</span> == <span class="str">"Bonjour Ada, n=42"</span>)
-<span class="bi">assert</span>(<span class="str">"calcul : {n * 2 + 1}"</span> == <span class="str">"calcul : 85"</span>)</code></pre>
-<p>Un <strong>format</strong> optionnel suit un <code>:</code> — une spécification de conversion C (sans le <code>%</code>) : <code>.3f</code> (précision), <code>04x</code> (largeur + zéros), <code>-8s</code> (aligné à gauche)… :</p>
+<span class="bi">assert</span>(<span class="str">"Hello {name}, n={n}"</span> == <span class="str">"Hello Ada, n=42"</span>)
+<span class="bi">assert</span>(<span class="str">"result: {n * 2 + 1}"</span> == <span class="str">"result: 85"</span>)</code></pre>
+<p>An optional <strong>format</strong> follows a <code>:</code> — a C conversion specification, without the <code>%</code>: <code>.3f</code> (precision), <code>04x</code> (width plus zeros), <code>-8s</code> (left aligned)…</p>
 <pre><code><span class="bi">assert</span>(<span class="str">"pi = {3.14159:.2f}"</span> == <span class="str">"pi = 3.14"</span>)
 <span class="bi">assert</span>(<span class="str">"hex = {(255):04x}"</span> == <span class="str">"hex = 00ff"</span>)
 <span class="bi">assert</span>(<span class="str">"pad = [{n:5d}]"</span> == <span class="str">"pad = [   42]"</span>)</code></pre>
-<div class="callout">Un <code>{}</code> vide ou un entier (<code>{1}</code>, <code>{2:.2f}</code> — indexation <strong>1-based</strong>) est un <strong>emplacement positionnel</strong> laissé littéral — il est rempli par les arguments de <code>printf</code> (voir Builtins), pas par l'interpolation. Le formatage partage le même moteur des deux côtés.</div>
+<div class="callout">An empty <code>{}</code>, or an integer (<code>{1}</code>, <code>{2:.2f}</code> — indexed from <strong>1</strong>), is a <strong>positional placeholder</strong> left as it is: it is filled by <code>printf</code>'s arguments (see Builtins), not by interpolation. Both sides share the same formatting engine.</div>
 </section>
 
-<!-- ── Multi-lignes ───────────────────────────────────────────────────────── -->
+<!-- ── Multi-line ─────────────────────────────────────────────────────────── -->
 <section id="multiline">
-<h2>Expressions multi-lignes</h2>
-<p>Les sauts de ligne sont traités comme de l'espace blanc — une expression peut s'étendre sur autant de lignes que nécessaire, sans syntaxe spéciale.</p>
+<h2>Multi-line expressions</h2>
+<p>Line breaks are treated as whitespace — an expression may span as many lines as needed, with no special syntax.</p>
 
 <pre data-no-run><code><span class="kw">var</span> total =
     net_price
@@ -715,18 +715,18 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
     ship()
 <span class="kw">end</span></code></pre>
 
-<div class="callout"><code>then</code>, <code>do</code> et <code>end</code> délimitent les blocs — les parenthèses autour des conditions ne sont jamais obligatoires.</div>
+<div class="callout"><code>then</code>, <code>do</code> and <code>end</code> delimit the blocks — brackets around a condition are never required.</div>
 </section>
 
 <!-- ── If ────────────────────────────────────────────────────────────────── -->
 <section id="if">
 <h2>If / Else</h2>
 <pre data-no-run><code><span class="kw">if</span> condition <span class="kw">then</span>
-    <span class="cmt">## bloc then</span>
+    <span class="cmt">## the then block</span>
 <span class="kw">elseif</span> other_condition <span class="kw">then</span>
-    <span class="cmt">## elseif (autant que nécessaire)</span>
+    <span class="cmt">## elseif (as many as needed)</span>
 <span class="kw">else</span>
-    <span class="cmt">## else optionnel</span>
+    <span class="cmt">## an optional else</span>
 <span class="kw">end</span></code></pre>
 
 <pre><code><span class="kw">var</span> score = <span class="num">75</span>
@@ -744,7 +744,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <span class="bi">assert</span>(grade == <span class="str">"C"</span>)
 <span class="bi">print</span>(grade)  <span class="cmt">## C</span></code></pre>
-<div class="callout tip">Pour enchaîner des conditions, utilise <code>elseif</code>. Il n'y a <strong>pas</strong> de sucre « <code>else if</code> » : un <code>else</code> suivi d'un <code>if</code> est une branche <code>else</code> contenant un <strong>bloc <code>if</code> imbriqué</strong> (avec son propre <code>end</code>).</div>
+<div class="callout tip">To chain conditions, use <code>elseif</code>. There is <strong>no</strong> "<code>else if</code>" sugar: an <code>else</code> followed by an <code>if</code> is an <code>else</code> branch containing a <strong>nested <code>if</code> block</strong>, with an <code>end</code> of its own.</div>
 </section>
 
 <!-- ── While ─────────────────────────────────────────────────────────────── -->
@@ -756,7 +756,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="kw">end</span>
 <span class="bi">assert</span>(i == <span class="num">10</span>)
 
-<span class="cmt">## break quitte la boucle immédiatement</span>
+<span class="cmt">## break leaves the loop at once</span>
 <span class="kw">var</span> k = <span class="num">0</span>
 <span class="kw">while</span> <span class="bool">true</span> <span class="kw">do</span>
     k += <span class="num">1</span>
@@ -768,50 +768,50 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <!-- ── For ───────────────────────────────────────────────────────────────── -->
 <section id="for">
 <h2>For</h2>
-<p>Deux variantes pour les boucles numériques : par intervalle (<code>for i in [a;b]</code>) ou par bornes explicites (<code>for i=a,b</code>). Pour l'itération sur les maps et les arrays, voir <a href="#map-iter">Itération sur une map</a> et <a href="#arrays">Arrays</a>.</p>
+<p>Two forms for numeric loops: by interval (<code>for i in [a;b]</code>) or by explicit bounds (<code>for i=a,b</code>). For iterating over maps and arrays, see <a href="#map-iter">Iterating over a map</a> and <a href="#arrays">Arrays</a>.</p>
 
 <h3>Range <code>[a;b]</code></h3>
-<p>Notation d'intervalles mathématiques — bornes inclusives ou exclusives, step optionnel.</p>
+<p>Mathematical interval notation — inclusive or exclusive bounds, with an optional step.</p>
 <pre><code><span class="kw">var</span> sum = <span class="num">0</span>
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">10</span>] <span class="kw">do</span>
     sum += i
 <span class="kw">end</span>
-<span class="bi">assert</span>(sum == <span class="num">55</span>)  <span class="cmt">## 1+2+…+10 (inclusif des deux côtés)</span>
+<span class="bi">assert</span>(sum == <span class="num">55</span>)  <span class="cmt">## 1+2+…+10 (inclusive on both sides)</span>
 
-<span class="cmt">## droit exclusif : 1,2,...,9</span>
+<span class="cmt">## right-exclusive: 1,2,...,9</span>
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">10</span>[ <span class="kw">do</span>
     <span class="bi">print</span>(i)
 <span class="kw">end</span>
 
-<span class="cmt">## avec step : 1,3,5,7,9</span>
+<span class="cmt">## with a step: 1,3,5,7,9</span>
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">10</span>;<span class="num">2</span>] <span class="kw">do</span>
     <span class="bi">print</span>(i)
 <span class="kw">end</span>
 
-<span class="cmt">## first-class : stockable dans une variable</span>
+<span class="cmt">## first class: it can be held in a variable</span>
 <span class="kw">var</span> r = [<span class="num">1</span>;<span class="num">5</span>]
 <span class="kw">for</span> i <span class="kw">in</span> r <span class="kw">do</span>
     <span class="bi">print</span>(i)       <span class="cmt">## 1 2 3 4 5</span>
 <span class="kw">end</span></code></pre>
 
-<h3>Numérique <code>i=start,end[,step]</code></h3>
-<p>Step optionnel — positif ou négatif.</p>
-<pre><code><span class="cmt">## step implicite = 1</span>
+<h3>Numeric <code>i=start,end[,step]</code></h3>
+<p>The step is optional — positive or negative.</p>
+<pre><code><span class="cmt">## the implicit step is 1</span>
 <span class="kw">for</span> i=<span class="num">1</span>,<span class="num">5</span> <span class="kw">do</span>
     <span class="bi">print</span>(i)  <span class="cmt">## 1 2 3 4 5</span>
 <span class="kw">end</span>
 
-<span class="cmt">## step positif (pairs)</span>
+<span class="cmt">## a positive step (even numbers)</span>
 <span class="kw">for</span> i=<span class="num">0</span>,<span class="num">10</span>,<span class="num">2</span> <span class="kw">do</span>
     <span class="bi">print</span>(i)  <span class="cmt">## 0 2 4 6 8 10</span>
 <span class="kw">end</span>
 
-<span class="cmt">## step négatif (compte à rebours)</span>
+<span class="cmt">## a negative step (counting down)</span>
 <span class="kw">for</span> i=<span class="num">5</span>,<span class="num">1</span>,-<span class="num">1</span> <span class="kw">do</span>
     <span class="bi">print</span>(i)  <span class="cmt">## 5 4 3 2 1</span>
 <span class="kw">end</span></code></pre>
 
-<h3>Break dans for</h3>
+<h3>Break inside a for</h3>
 <pre><code><span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">100</span>] <span class="kw">do</span>
     <span class="kw">if</span> i > <span class="num">3</span> <span class="kw">then</span> <span class="kw">break</span> <span class="kw">end</span>
     <span class="bi">print</span>(i)  <span class="cmt">## 1 2 3</span>
@@ -821,44 +821,44 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <!-- ── Switch ──────────────────────────────────────────────────────────────── -->
 <section id="switch">
 <h2>Switch</h2>
-<p><code>switch</code> compare une expression à plusieurs valeurs. Chaque branche commence par <code>case</code> suivi d'une ou plusieurs valeurs séparées par des virgules. Le bloc <code>else</code> s'exécute si aucun <code>case</code> ne correspond. <code>break</code> est valide à l'intérieur.</p>
+<p><code>switch</code> compares an expression against several values. Each branch starts with <code>case</code> followed by one or more comma-separated values. The <code>else</code> block runs when no <code>case</code> matches. <code>break</code> is allowed inside.</p>
 
 <pre><code><span class="kw">var</span> x = <span class="num">2</span>
 <span class="kw">switch</span> x
 <span class="kw">case</span> <span class="num">1</span>
-    <span class="bi">print</span>(<span class="str">"un"</span>)
+    <span class="bi">print</span>(<span class="str">"one"</span>)
 <span class="kw">case</span> <span class="num">2</span>, <span class="num">3</span>
-    <span class="bi">print</span>(<span class="str">"deux ou trois"</span>)
+    <span class="bi">print</span>(<span class="str">"two or three"</span>)
 <span class="kw">else</span>
-    <span class="bi">print</span>(<span class="str">"autre"</span>)
+    <span class="bi">print</span>(<span class="str">"other"</span>)
 <span class="kw">end</span></code></pre>
 
-<h3>Switch sur des chaînes</h3>
+<h3>Switch on strings</h3>
 <pre><code><span class="kw">var</span> cmd = <span class="str">"start"</span>
 <span class="kw">switch</span> cmd
 <span class="kw">case</span> <span class="str">"start"</span>, <span class="str">"go"</span>
-    <span class="bi">print</span>(<span class="str">"démarrage"</span>)
+    <span class="bi">print</span>(<span class="str">"starting"</span>)
 <span class="kw">case</span> <span class="str">"stop"</span>
-    <span class="bi">print</span>(<span class="str">"arrêt"</span>)
+    <span class="bi">print</span>(<span class="str">"stopping"</span>)
 <span class="kw">else</span>
-    <span class="bi">print</span>(<span class="str">"commande inconnue"</span>)
+    <span class="bi">print</span>(<span class="str">"unknown command"</span>)
 <span class="kw">end</span></code></pre>
 </section>
 
 <!-- ── Do ────────────────────────────────────────────────────────────────── -->
 <section id="do">
-<h2>Bloc <code>do … end</code></h2>
-<p>Un bloc <code>do … end</code> crée une portée lexicale locale : les variables déclarées à l'intérieur ne sont pas visibles après <code>end</code>. Utile pour isoler des variables temporaires sans créer une fonction.</p>
+<h2>The <code>do … end</code> block</h2>
+<p>A <code>do … end</code> block creates a local lexical scope: variables declared inside are not visible after <code>end</code>. It is handy for isolating temporaries without writing a function.</p>
 
 <pre><code><span class="kw">var</span> x = <span class="num">0</span>
 <span class="kw">do</span>
     <span class="kw">var</span> tmp = <span class="num">42</span>
     x = tmp + <span class="num">1</span>
 <span class="kw">end</span>
-<span class="cmt">## tmp n'existe plus ici</span>
+<span class="cmt">## tmp no longer exists here</span>
 <span class="bi">assert</span>(x == <span class="num">43</span>)</code></pre>
 
-<p>Les closures créées à l'intérieur capturent les variables du bloc normalement :</p>
+<p>Closures created inside capture the block's variables as usual:</p>
 
 <pre><code><span class="kw">var</span> fns = []
 <span class="kw">do</span>
@@ -867,27 +867,27 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="kw">end</span>
 <span class="bi">assert</span>(fns[<span class="num">1</span>]() == <span class="num">99</span>)</code></pre>
 
-<div class="callout">Les blocs <code>do</code> sont librement imbriquables. La variable d'une portée externe reste accessible dans un bloc interne.</div>
+<div class="callout"><code>do</code> blocks nest freely. A variable of an outer scope stays reachable inside an inner block.</div>
 </section>
 
 <!-- ── Functions ─────────────────────────────────────────────────────────── -->
 <section id="functions">
-<h2>Fonctions</h2>
+<h2>Functions</h2>
 <pre><code><span class="kw">func</span> add(a, b)
     <span class="kw">return</span> a + b
 <span class="kw">end</span>
 
 <span class="bi">assert</span>(add(<span class="num">3</span>, <span class="num">4</span>) == <span class="num">7</span>)</code></pre>
 
-<h3>Fonction sur un champ de map</h3>
-<p><code>func obj.field(...)</code> définit une fonction directement sur un champ de map ou de module — sucre pour <code>obj.field = func(...) ... end</code>. Utile pour les hooks moteur (ex. <code>keyboard.keypressed</code>).</p>
+<h3>A function on a map field</h3>
+<p><code>func obj.field(...)</code> defines a function straight onto a field of a map or a module — sugar for <code>obj.field = func(...) ... end</code>. Handy for the engine hooks (<code>keyboard.keypressed</code>, for instance).</p>
 <pre><code><span class="kw">var</span> obj = {}
 <span class="kw">func</span> obj.greet(name)
     <span class="kw">return</span> <span class="str">"greet "</span> + name
 <span class="kw">end</span>
 <span class="bi">assert</span>(obj.greet(<span class="str">"ollin"</span>) == <span class="str">"greet ollin"</span>)</code></pre>
 
-<h3>Retours multiples</h3>
+<h3>Multiple returns</h3>
 <pre><code><span class="kw">func</span> minmax(a, b)
     <span class="kw">if</span> a < b <span class="kw">then</span>
         <span class="kw">return</span> a, b
@@ -898,7 +898,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="kw">var</span> lo, hi = minmax(<span class="num">7</span>, <span class="num">3</span>)
 <span class="bi">assert</span>(lo == <span class="num">3</span> <span class="kw">and</span> hi == <span class="num">7</span>)</code></pre>
 
-<h3>Récursion</h3>
+<h3>Recursion</h3>
 <pre><code><span class="kw">func</span> fact(n)
     <span class="kw">if</span> n < <span class="num">2</span> <span class="kw">then</span> <span class="kw">return</span> <span class="num">1</span> <span class="kw">end</span>
     <span class="kw">return</span> n * fact(n - <span class="num">1</span>)
@@ -906,65 +906,65 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <span class="bi">assert</span>(fact(<span class="num">10</span>) == <span class="num">3628800</span>)</code></pre>
 
-<h3>Appel optionnel — <code>f?()</code></h3>
-<p>La syntaxe <code>f?(args)</code> est exactement le sucre de <code>if f then f(args) else nil</code> :</p>
+<h3>Optional call — <code>f?()</code></h3>
+<p>The syntax <code>f?(args)</code> is exactly sugar for <code>if f then f(args) else nil</code>:</p>
 <ul>
-  <li><code>f</code> <strong>fausse</strong> (<code>nil</code>, <code>0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>) → <strong>aucun appel</strong>, résultat <code>nil</code>, et les <strong>arguments ne sont pas évalués</strong> (aucun effet de bord) ;</li>
-  <li><code>f</code> <strong>appelable</strong> → <strong>appel normal</strong> ;</li>
-  <li><code>f</code> vraie mais non appelable (entier, chaîne…) → <strong>erreur d'exécution</strong>, comme un appel ordinaire.</li>
+  <li><code>f</code> <strong>false</strong> (<code>nil</code>, <code>0</code>, <code>""</code>, <code>[]</code>, <code>{}</code>) → <strong>no call</strong>, the result is <code>nil</code>, and the <strong>arguments are not evaluated</strong>, so there is no side effect;</li>
+  <li><code>f</code> <strong>callable</strong> → <strong>an ordinary call</strong>;</li>
+  <li><code>f</code> true but not callable (an integer, a string…) → <strong>a run-time error</strong>, as for an ordinary call.</li>
 </ul>
-<p>Cas d'usage typique : callback facultatif (<code>nil</code> → ignoré sans rien exécuter). S'applique à toutes les formes d'appel, y compris les méthodes (<code>obj.m?()</code> injecte <code>self</code> ; méthode absente → <code>nil</code>) et <code>super.m?()</code>. Côté implémentation, c'est un simple <code>JUMP_IF_FALSE</code> suivi de l'appel standard — pas d'opcode dédié.</p>
+<p>The typical use is an optional callback (<code>nil</code> → skipped, with nothing run). It applies to every form of call, methods included (<code>obj.m?()</code> injects <code>self</code>; a missing method gives <code>nil</code>) and <code>super.m?()</code>. In the implementation it is a plain <code>JUMP_IF_FALSE</code> followed by the standard call — there is no dedicated opcode.</p>
 <pre><code><span class="kw">func</span> greet() <span class="kw">return</span> <span class="str">"hello"</span> <span class="kw">end</span>
-<span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)  <span class="cmt">## appelable => appel normal</span>
+<span class="bi">assert</span>(greet?() == <span class="str">"hello"</span>)  <span class="cmt">## callable => an ordinary call</span>
 
 <span class="kw">var</span> cb = <span class="kw">nil</span>
-<span class="bi">assert</span>(cb?() == <span class="kw">nil</span>)         <span class="cmt">## nil => pas d'appel, pas d'erreur</span>
+<span class="bi">assert</span>(cb?() == <span class="kw">nil</span>)         <span class="cmt">## nil => no call, and no error</span>
 
-<span class="cmt">## callback facultatif + appel optionnel de méthode (self injecté)</span>
+<span class="cmt">## an optional callback plus an optional method call (self injected)</span>
 <span class="kw">class</span> Box
     <span class="kw">func</span> init(v) self.v = v <span class="kw">end</span>
     <span class="kw">func</span> get() <span class="kw">return</span> self.v <span class="kw">end</span>
 <span class="kw">end</span>
 <span class="kw">var</span> b = Box(<span class="num">7</span>)
-<span class="bi">assert</span>(b.get?() == <span class="num">7</span>)        <span class="cmt">## self injecté</span>
-<span class="bi">assert</span>(b.missing?() == <span class="kw">nil</span>)  <span class="cmt">## méthode absente => nil</span></code></pre>
-<div class="callout warn">Une valeur <strong>vraie</strong> mais non appelable reste une erreur : <code>(42)?()</code> lève « call on non-function value » (42 est vraie → on tente l'appel). Seules les valeurs fausses sont ignorées. Le <code>?</code> n'agit que sur l'appel immédiatement à sa gauche.</div>
+<span class="bi">assert</span>(b.get?() == <span class="num">7</span>)        <span class="cmt">## self injected</span>
+<span class="bi">assert</span>(b.missing?() == <span class="kw">nil</span>)  <span class="cmt">## a missing method => nil</span></code></pre>
+<div class="callout warn">A <strong>true</strong> value that is not callable is still an error: <code>(42)?()</code> raises "call on non-function value" (42 being true, the call is attempted). Only false values are skipped. The <code>?</code> acts on the call immediately to its left, and on nothing else.</div>
 </section>
 
 <!-- ── Varargs ───────────────────────────────────────────────────────────── -->
 <section id="varargs">
-<h2>Arguments variadiques</h2>
-<p><code>...</code> capture tous les arguments supplémentaires.</p>
+<h2>Variadic arguments</h2>
+<p><code>...</code> captures every extra argument.</p>
 
 <pre><code><span class="kw">func</span> log(level, ...)
     <span class="bi">printf</span>(<span class="str">"[{}] "</span>, level)
     <span class="bi">print</span>(...)
 <span class="kw">end</span>
 
-log(<span class="str">"INFO"</span>, <span class="str">"démarrage"</span>, <span class="str">"ok"</span>)  <span class="cmt">## [INFO] démarrage ok</span></code></pre>
+log(<span class="str">"INFO"</span>, <span class="str">"starting"</span>, <span class="str">"ok"</span>)  <span class="cmt">## [INFO] starting ok</span></code></pre>
 
-<h3>Passer les varargs à une autre fonction</h3>
+<h3>Passing the varargs on to another function</h3>
 <pre><code><span class="kw">func</span> wrapper(a, ...)
-    <span class="kw">return</span> a, ...  <span class="cmt">## propage les varargs</span>
+    <span class="kw">return</span> a, ...  <span class="cmt">## passes the varargs on</span>
 <span class="kw">end</span>
 
 <span class="kw">var</span> x, y, z = wrapper(<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)
 <span class="bi">assert</span>(x == <span class="num">1</span> <span class="kw">and</span> y == <span class="num">2</span> <span class="kw">and</span> z == <span class="num">3</span>)</code></pre>
 
-<p>En <strong>dernière position</strong> d'une liste, <code>...</code> s'étend à toutes les varargs : argument d'appel (<code>f(a, ...)</code>), élément de tableau (<code>[x, ...]</code>), retour (<code>return a, ...</code>) et affectation multiple (<code>var a, b = ...</code>). Un <strong>appel</strong> en dernière position s'étend de même à toutes ses valeurs (<code>f(g())</code>, <code>return g()</code>, <code>[x, g()]</code>). Ailleurs, l'expression est ajustée à une seule valeur (<code>...</code> → 1ᵉʳ argument ou <code>nil</code>).</p>
+<p>In the <strong>last position</strong> of a list, <code>...</code> expands to all the varargs: as a call argument (<code>f(a, ...)</code>), an array element (<code>[x, ...]</code>), a return (<code>return a, ...</code>) or a multiple assignment (<code>var a, b = ...</code>). A <strong>call</strong> in last position likewise expands to all its values (<code>f(g())</code>, <code>return g()</code>, <code>[x, g()]</code>). Anywhere else the expression is trimmed to a single value (<code>...</code> → the first argument, or <code>nil</code>).</p>
 </section>
 
 <!-- ── Défauts ───────────────────────────────────────────────────────────── -->
 <section id="defaults">
-<h2>Paramètres par défaut</h2>
-<p>Les valeurs par défaut doivent être des constantes littérales.</p>
+<h2>Default parameters</h2>
+<p>A default value must be a literal constant.</p>
 
-<pre><code><span class="kw">func</span> greet(name, greeting=<span class="str">"Bonjour"</span>)
-    <span class="bi">printf</span>(<span class="str">"{}, {} !"</span>, greeting, name)
+<pre><code><span class="kw">func</span> greet(name, greeting=<span class="str">"Hello"</span>)
+    <span class="bi">printf</span>(<span class="str">"{}, {}!"</span>, greeting, name)
 <span class="kw">end</span>
 
-greet(<span class="str">"Alice"</span>)         <span class="cmt">## Bonjour, Alice !</span>
-greet(<span class="str">"Bob"</span>, <span class="str">"Salut"</span>)  <span class="cmt">## Salut, Bob !</span></code></pre>
+greet(<span class="str">"Alice"</span>)         <span class="cmt">## Hello, Alice!</span>
+greet(<span class="str">"Bob"</span>, <span class="str">"Hi"</span>)     <span class="cmt">## Hi, Bob!</span></code></pre>
 
 <pre><code><span class="kw">func</span> connect(host=<span class="str">"localhost"</span>, port=<span class="num">8080</span>, debug=<span class="bool">false</span>)
     <span class="bi">printf</span>(<span class="str">"{}:{} debug={}"</span>, host, port, debug)
@@ -978,9 +978,9 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <!-- ── Closures ───────────────────────────────────────────────────────────── -->
 <section id="closures">
 <h2>Closures</h2>
-<p>Une fonction peut capturer les variables de la portée qui l'entoure. La valeur capturée reste vivante même après le retour de la fonction externe.</p>
+<p>A function can capture the variables of the scope around it. The captured value stays alive even after the outer function has returned.</p>
 
-<h3>Compteur encapsulé</h3>
+<h3>An encapsulated counter</h3>
 <pre><code><span class="kw">func</span> make_counter()
     <span class="kw">var</span> n = <span class="num">0</span>
     <span class="kw">func</span> inc()
@@ -991,14 +991,14 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <span class="kw">end</span>
 
 <span class="kw">var</span> c1 = make_counter()
-<span class="kw">var</span> c2 = make_counter()  <span class="cmt">## état indépendant</span>
+<span class="kw">var</span> c2 = make_counter()  <span class="cmt">## independent state</span>
 
 <span class="bi">assert</span>(c1() == <span class="num">1</span>)
 <span class="bi">assert</span>(c1() == <span class="num">2</span>)
-<span class="bi">assert</span>(c2() == <span class="num">1</span>)        <span class="cmt">## c2 repart de 0</span></code></pre>
+<span class="bi">assert</span>(c2() == <span class="num">1</span>)        <span class="cmt">## c2 starts again from 0</span></code></pre>
 
-<h3>Closures créées dans une boucle</h3>
-<p>Chaque <strong>itération</strong> a ses propres variables : une fonction créée dans le corps capture la variable de boucle et les locales du corps telles qu'elles étaient à <em>son</em> tour, et non leur valeur finale.</p>
+<h3>Closures created in a loop</h3>
+<p>Every <strong>iteration</strong> has variables of its own: a function created in the body captures the loop variable and the body's locals as they were on <em>its</em> pass, not their final value.</p>
 <pre><code><span class="kw">var</span> fns = []
 <span class="kw">for</span> i = <span class="num">1</span>, <span class="num">3</span> <span class="kw">do</span>
     <span class="kw">var</span> square = i * i
@@ -1008,9 +1008,9 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <span class="bi">assert</span>(fns[<span class="num">1</span>]() == <span class="num">2</span>)     <span class="cmt">## 1 + 1</span>
 <span class="bi">assert</span>(fns[<span class="num">2</span>]() == <span class="num">6</span>)     <span class="cmt">## 2 + 4</span>
 <span class="bi">assert</span>(fns[<span class="num">3</span>]() == <span class="num">12</span>)    <span class="cmt">## 3 + 9</span></code></pre>
-<p>En revanche, deux fonctions créées au <strong>même</strong> tour partagent bien la même variable — ce qui permet le couple lecture/écriture de la section « État partagé » ci-dessous.</p>
+<p>Two functions created on the <strong>same</strong> pass, on the other hand, do share the variable — which is what makes the reader/writer pair of the "Shared state" section below possible.</p>
 
-<h3>Fabrique de fonctions</h3>
+<h3>A function factory</h3>
 <pre><code><span class="kw">func</span> make_adder(x)
     <span class="kw">func</span> add(y)
         <span class="kw">return</span> x + y
@@ -1024,10 +1024,10 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 <span class="bi">assert</span>(add5(<span class="num">3</span>)  == <span class="num">8</span>)
 <span class="bi">assert</span>(add10(<span class="num">3</span>) == <span class="num">13</span>)</code></pre>
 
-<h3>Fonctions imbriquées</h3>
-<p>Une fonction déclarée à l'intérieur d'une autre reste locale — elle n'est pas ajoutée à l'environnement global.</p>
+<h3>Nested functions</h3>
+<p>A function declared inside another stays local — it is not added to the global environment.</p>
 <pre><code><span class="kw">func</span> process(data)
-    <span class="kw">func</span> helper(x)        <span class="cmt">## visible uniquement dans process</span>
+    <span class="kw">func</span> helper(x)        <span class="cmt">## visible inside process only</span>
         <span class="kw">return</span> x * <span class="num">2</span>
     <span class="kw">end</span>
     <span class="kw">return</span> helper(data) + helper(data + <span class="num">1</span>)
@@ -1035,7 +1035,7 @@ connect(<span class="str">"prod"</span>, <span class="num">443</span>)         <
 
 <span class="bi">assert</span>(process(<span class="num">3</span>) == <span class="num">14</span>)  <span class="cmt">## 3*2 + 4*2</span></code></pre>
 
-<h3>État partagé entre fonctions</h3>
+<h3>State shared between functions</h3>
 <pre><code><span class="kw">func</span> make_shared()
     <span class="kw">var</span> count = <span class="num">0</span>
     <span class="kw">func</span> inc()  count += <span class="num">1</span>  <span class="kw">end</span>
@@ -1054,66 +1054,66 @@ inc()
 <!-- ── Maps ──────────────────────────────────────────────────────────────── -->
 <section id="maps">
 <h2>Maps</h2>
-<p>Dictionnaire clé→valeur. La syntaxe de littéral accepte des chaînes, des identifiants, ou des <strong>clés calculées</strong> <code>[expr]</code> ; à l'exécution, toute valeur peut servir de clé (<code>nil</code>, entier, float, string, bool, array, map, fonction…).</p>
+<p>A key→value dictionary. The literal syntax accepts strings, identifiers, or <strong>computed keys</strong> <code>[expr]</code>; at run time any value can serve as a key (<code>nil</code>, an integer, a float, a string, a bool, an array, a map, a function…).</p>
 
-<h3>Création</h3>
+<h3>Creating one</h3>
 <pre><code><span class="kw">var</span> empty = {}
 
 <span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
 
-<span class="cmt">## clés sans guillemets</span>
+<span class="cmt">## keys without quotes</span>
 <span class="kw">var</span> config = {
     host:  <span class="str">"localhost"</span>,
     port:  <span class="num">8080</span>,
     debug: <span class="bool">false</span>,
 }</code></pre>
 
-<h3>Clés littérales et clés calculées</h3>
-<p>Une clé écrite en <strong>identifiant</strong>, en <strong>chaîne</strong>, ou entre crochets autour d'une chaîne est la <em>même clé littérale</em> :</p>
-<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}      <span class="cmt">## clé = la chaîne "ref"</span>
-<span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}    <span class="cmt">## identique</span>
-<span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}  <span class="cmt">## identique</span></code></pre>
-<p>Entre crochets, une <strong>expression</strong> est évaluée à l'exécution et sa valeur devient la clé :</p>
+<h3>Literal keys and computed keys</h3>
+<p>A key written as an <strong>identifier</strong>, as a <strong>string</strong>, or in brackets around a string is the <em>same literal key</em>:</p>
+<pre data-no-run><code><span class="kw">var</span> a = {ref: <span class="num">12</span>}      <span class="cmt">## the key is the string "ref"</span>
+<span class="kw">var</span> b = {<span class="str">"ref"</span>: <span class="num">12</span>}    <span class="cmt">## the same</span>
+<span class="kw">var</span> c = {[<span class="str">"ref"</span>]: <span class="num">12</span>}  <span class="cmt">## the same</span></code></pre>
+<p>In brackets, an <strong>expression</strong> is evaluated at run time and its value becomes the key:</p>
 <pre><code><span class="kw">var</span> ref = <span class="str">"color"</span>
-<span class="kw">var</span> m = {[ref]: <span class="str">"red"</span>}     <span class="cmt">## clé = valeur de ref => "color"</span>
+<span class="kw">var</span> m = {[ref]: <span class="str">"red"</span>}     <span class="cmt">## the key is ref's value => "color"</span>
 <span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"red"</span>)
-<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## "ref" littéral n'est PAS une clé</span>
+<span class="bi">assert</span>(m[<span class="str">"ref"</span>]     == <span class="nil">nil</span>)  <span class="cmt">## the literal "ref" is NOT a key</span>
 
-<span class="cmt">## la clé calculée peut être de tout type</span>
-<span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"deux"</span>}
-<span class="bi">assert</span>(n[<span class="num">2</span>] == <span class="str">"deux"</span>)</code></pre>
-<p>La même règle vaut pour <strong>l'accès</strong> : entre crochets, un littéral string désigne la clé telle quelle, une variable désigne sa valeur. Lecture, écriture et affectation composée sont identiques :</p>
+<span class="cmt">## a computed key can be of any type</span>
+<span class="kw">var</span> n = {[<span class="num">1</span> + <span class="num">1</span>]: <span class="str">"two"</span>}
+<span class="bi">assert</span>(n[<span class="num">2</span>] == <span class="str">"two"</span>)</code></pre>
+<p>The same rule holds for <strong>access</strong>: in brackets, a string literal names the key as it is, while a variable names its value. Reading, writing and compound assignment all behave the same:</p>
 <pre><code><span class="kw">var</span> ref = <span class="str">"color"</span>
 <span class="kw">var</span> m = {}
-m[ref]     = <span class="str">"red"</span>              <span class="cmt">## écrit le slot "color" (valeur de ref)</span>
-m[<span class="str">"size"</span>] = <span class="num">10</span>                  <span class="cmt">## écrit le slot "size" (littéral)</span>
-<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"red"</span>)   <span class="cmt">## relu via littéral</span>
-<span class="bi">assert</span>(m.color     == <span class="str">"red"</span>)  <span class="cmt">## ou via point</span>
+m[ref]     = <span class="str">"red"</span>              <span class="cmt">## writes the "color" slot (ref's value)</span>
+m[<span class="str">"size"</span>] = <span class="num">10</span>                  <span class="cmt">## writes the "size" slot (a literal)</span>
+<span class="bi">assert</span>(m[<span class="str">"color"</span>] == <span class="str">"red"</span>)   <span class="cmt">## read back through a literal</span>
+<span class="bi">assert</span>(m.color     == <span class="str">"red"</span>)  <span class="cmt">## or through a dot</span>
 m[<span class="str">"size"</span>] += <span class="num">5</span>
 <span class="bi">assert</span>(m[<span class="str">"size"</span>] == <span class="num">15</span>)</code></pre>
 
-<h3>Lecture</h3>
+<h3>Reading</h3>
 <div class="two-col">
-<div><div class="label">Crochets</div>
+<div><div class="label">Brackets</div>
 <pre><code>point[<span class="str">"x"</span>]  <span class="cmt">## 10</span>
 point[<span class="str">"z"</span>]  <span class="cmt">## nil</span></code></pre></div>
-<div><div class="label">Point (équivalent)</div>
+<div><div class="label">Dot (the same)</div>
 <pre><code>point.x  <span class="cmt">## 10</span>
 point.z  <span class="cmt">## nil</span></code></pre></div>
 </div>
 
-<h3>Écriture</h3>
+<h3>Writing</h3>
 <pre><code><span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
-point[<span class="str">"z"</span>] = <span class="num">0</span>   <span class="cmt">## nouvelle key</span>
-point.z = <span class="num">5</span>      <span class="cmt">## équivalent</span>
+point[<span class="str">"z"</span>] = <span class="num">0</span>   <span class="cmt">## a new key</span>
+point.z = <span class="num">5</span>      <span class="cmt">## the same</span>
 
-point[<span class="str">"x"</span>] += <span class="num">1</span>  <span class="cmt">## compound via crochet</span>
-point.y *= <span class="num">2</span>     <span class="cmt">## compound via point</span>
+point[<span class="str">"x"</span>] += <span class="num">1</span>  <span class="cmt">## compound through brackets</span>
+point.y *= <span class="num">2</span>     <span class="cmt">## compound through a dot</span>
 
 <span class="bi">assert</span>(point.x == <span class="num">11</span>)
 <span class="bi">assert</span>(point.y == <span class="num">40</span>)</code></pre>
 
-<h3>Maps imbriquées</h3>
+<h3>Nested maps</h3>
 <pre><code><span class="kw">var</span> scene = {
     camera: {fov: <span class="num">60</span>, near: <span class="num">0.1</span>, far: <span class="num">1000</span>},
     light:  {x: <span class="num">0</span>, y: <span class="num">10</span>, z: <span class="num">0</span>, intensity: <span class="num">1</span>},
@@ -1121,7 +1121,7 @@ point.y *= <span class="num">2</span>     <span class="cmt">## compound via poin
 
 <span class="bi">assert</span>(scene[<span class="str">"camera"</span>][<span class="str">"fov"</span>] == <span class="num">60</span>)</code></pre>
 
-<h3>Clés de tout type (via crochets)</h3>
+<h3>Keys of any type (through brackets)</h3>
 <pre><code><span class="kw">var</span> m = {}
 
 m[<span class="nil">nil</span>]   = <span class="str">"nil key"</span>
@@ -1129,23 +1129,23 @@ m[<span class="num">42</span>]    = <span class="str">"int key"</span>
 m[<span class="num">3.14</span>]  = <span class="str">"float key"</span>
 m[<span class="bool">true</span>]  = <span class="str">"bool key"</span>
 
-<span class="cmt">## 1 et 1.0 sont la même clé</span>
+<span class="cmt">## 1 and 1.0 are the same key</span>
 m[<span class="num">1</span>] = <span class="str">"one"</span>
 <span class="bi">assert</span>(m[<span class="num">1.0</span>] == <span class="str">"one"</span>)</code></pre>
 
-<h3>Sémantique de copie</h3>
-<div class="callout warn">Les maps sont <strong>partagées par référence</strong> (comptage de référence). Affecter une map à une autre variable ne la clone pas.</div>
+<h3>Copy semantics</h3>
+<div class="callout warn">Maps are <strong>shared by reference</strong>, with reference counting. Assigning a map to another variable does not clone it.</div>
 <pre><code><span class="kw">var</span> a = {x: <span class="num">1</span>}
-<span class="kw">var</span> b = a          <span class="cmt">## b pointe vers la même map</span>
+<span class="kw">var</span> b = a          <span class="cmt">## b points at the same map</span>
 b.x = <span class="num">99</span>
-<span class="bi">assert</span>(a.x == <span class="num">99</span>)  <span class="cmt">## a est modifié aussi</span></code></pre>
-<div class="callout">Conséquence : <code>==</code> compare les maps par <strong>référence</strong>, pas par contenu — <code>{} == {}</code> vaut <code>0</code>. Pour une égalité par valeur, voir <a href="#classes">Égalité et comparaison</a>.</div>
+<span class="bi">assert</span>(a.x == <span class="num">99</span>)  <span class="cmt">## a changes too</span></code></pre>
+<div class="callout">A consequence: <code>==</code> compares maps by <strong>reference</strong> and not by content — <code>{} == {}</code> is <code>0</code>. For equality by value, see <a href="#classes">Equality and comparison</a>.</div>
 </section>
 
-<!-- ── Itération ──────────────────────────────────────────────────────────── -->
+<!-- ── Iteration ─────────────────────────────────────────────────────────── -->
 <section id="map-iter">
-<h2>Itération sur une map</h2>
-<p>La syntaxe <code>for k, v in m</code> parcourt toutes les entrées de la map. L'ordre n'est pas garanti.</p>
+<h2>Iterating over a map</h2>
+<p>The form <code>for k, v in m</code> walks every entry of the map. The order is not guaranteed.</p>
 
 <pre><code><span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
 
@@ -1156,15 +1156,15 @@ b.x = <span class="num">99</span>
 ## Bob => 82
 ## Carol => 78</span></code></pre>
 
-<h3>Somme des valeurs</h3>
+<h3>Summing the values</h3>
 <pre><code><span class="kw">var</span> scores = {Alice: <span class="num">95</span>, Bob: <span class="num">82</span>, Carol: <span class="num">78</span>}
 <span class="kw">var</span> total = <span class="num">0</span>
 <span class="kw">for</span> k, v <span class="kw">in</span> scores <span class="kw">do</span>
     total += v
 <span class="kw">end</span>
-<span class="bi">printf</span>(<span class="str">"moyenne : {}"</span>, total / <span class="num">3</span>)</code></pre>
+<span class="bi">printf</span>(<span class="str">"average: {}"</span>, total / <span class="num">3</span>)</code></pre>
 
-<h3>Dans une fonction</h3>
+<h3>Inside a function</h3>
 <pre><code><span class="kw">func</span> sum_values(m)
     <span class="kw">var</span> s = <span class="num">0</span>
     <span class="kw">for</span> k, v <span class="kw">in</span> m <span class="kw">do</span>
@@ -1180,39 +1180,39 @@ b.x = <span class="num">99</span>
 <!-- ── Enum ───────────────────────────────────────────────────────────────── -->
 <section id="enum">
 <h2>Enum</h2>
-<p><code>enum</code> déclare des constantes nommées. Le résultat est une <strong>map gelée</strong> : elle se lit, s'itère et se mesure comme n'importe quelle map, mais toute écriture est refusée.</p>
+<p><code>enum</code> declares named constants. The result is a <strong>frozen map</strong>: it can be read, iterated and measured like any map, but every write is refused.</p>
 
 <pre><code><span class="kw">enum</span> Tint RED, GREEN, BLUE <span class="kw">end</span>
 <span class="bi">print</span>(Tint.RED, Tint.GREEN, Tint.BLUE)   <span class="cmt">## 1 2 3</span></code></pre>
 
-<h3>Numérotation</h3>
-<p>Un élément sans valeur prend le compteur, qui part de <strong>1</strong> et avance de un. Un <strong>littéral entier</strong> fixe la valeur et fait repartir le compteur juste après. Toute <strong>autre expression</strong> est acceptée comme valeur mais laisse le compteur où il est — le compilateur ne peut pas évaluer un appel de fonction.</p>
+<h3>Numbering</h3>
+<p>An element with no value takes the counter, which starts at <strong>1</strong> and advances by one. An <strong>integer literal</strong> sets the value and restarts the counter just after it. Any <strong>other expression</strong> is accepted as a value but leaves the counter where it is — the compiler cannot evaluate a function call.</p>
 
 <pre><code><span class="kw">enum</span> State IDLE = <span class="num">0</span>, WALK, JUMP = <span class="num">10</span>, FALL <span class="kw">end</span>
 <span class="cmt">## 0, 1, 10, 11</span>
 
-<span class="kw">enum</span> Mixed A, B = <span class="str">"texte"</span>, C <span class="kw">end</span>
-<span class="cmt">## 1, "texte", 2 — la chaîne ne déplace pas le compteur</span></code></pre>
+<span class="kw">enum</span> Mixed A, B = <span class="str">"text"</span>, C <span class="kw">end</span>
+<span class="cmt">## 1, "text", 2 — the string does not move the counter</span></code></pre>
 
-<div class="callout">Corollaire : <code>A = 1 + 1</code> est une expression, pas un littéral, donc elle ne déplace pas le compteur même si elle vaut deux.</div>
+<div class="callout">A corollary: <code>A = 1 + 1</code> is an expression and not a literal, so it does not move the counter even though it comes to two.</div>
 
-<h3>Valeurs de tout type</h3>
-<p>Une valeur peut être un nombre, une chaîne, un objet, un tableau ou une fonction. Deux éléments de même valeur sont un alias, ce qui est permis ; deux éléments de même <strong>nom</strong> sont une erreur de compilation.</p>
+<h3>Values of any type</h3>
+<p>A value may be a number, a string, an object, an array or a function. Two elements with the same value are an alias, which is allowed; two elements with the same <strong>name</strong> are a compile error.</p>
 
 <pre><code><span class="kw">enum</span> Palette RED = <span class="bi">Color</span>(<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span>), GREEN = <span class="bi">Color</span>(<span class="num">0</span>, <span class="num">1</span>, <span class="num">0</span>) <span class="kw">end</span></code></pre>
 
-<h3>Immuabilité</h3>
-<p>Écrire dans un enum échoue. Quand la cible est visiblement l'énumération, l'erreur arrive dès la <strong>compilation</strong> et nomme l'élément ; les chemins indirects — alias, clé calculée — sont arrêtés à l'<strong>exécution</strong>.</p>
+<h3>Immutability</h3>
+<p>Writing into an enum fails. When the target is visibly the enumeration, the error comes at <strong>compile time</strong> and names the element; the indirect paths — an alias, a computed key — are stopped at <strong>run time</strong>.</p>
 
-<pre><code>Tint.RED = <span class="num">5</span>        <span class="cmt">## erreur de compilation : cannot modify enum 'Tint' element 'RED'</span>
+<pre><code>Tint.RED = <span class="num">5</span>        <span class="cmt">## a compile error: cannot modify enum 'Tint' element 'RED'</span>
 
 <span class="kw">var</span> m = Tint
-m.RED = <span class="num">5</span>              <span class="cmt">## erreur d'exécution : cannot modify an enum</span></code></pre>
+m.RED = <span class="num">5</span>              <span class="cmt">## a run-time error: cannot modify an enum</span></code></pre>
 
-<div class="callout warn">Le gel est <strong>superficiel</strong> : il protège l'énumération, pas ce qu'elle contient. Si un élément est un tableau ou un objet, ce tableau ou cet objet reste modifiable — <code>E.L[1] = 9</code> passe. Geler en profondeur rendrait immuable un objet qui peut être référencé ailleurs.</div>
+<div class="callout warn">The freeze is <strong>shallow</strong>: it protects the enumeration, not what it holds. If an element is an array or an object, that array or object stays mutable — <code>E.L[1] = 9</code> goes through. Freezing deeply would make immutable an object that may be referenced elsewhere.</div>
 
-<h3>Cible</h3>
-<p>Un nom simple déclare une <strong>globale</strong>, comme une classe : les références en avant fonctionnent. Un chemin écrit dans une map existante.</p>
+<h3>The target</h3>
+<p>A simple name declares a <strong>global</strong>, as a class does: forward references work. A path writes into an existing map.</p>
 
 <pre><code><span class="kw">global</span> cfg = {}
 <span class="kw">enum</span> cfg.mode FULLSCREEN, WINDOWED <span class="kw">end</span>
@@ -1221,22 +1221,22 @@ m.RED = <span class="num">5</span>              <span class="cmt">## erreur d'ex
 
 <!-- ── ref ────────────────────────────────────────────────────────────────── -->
 <section id="ref">
-<h2>Références</h2>
-<p><code>ref x</code> donne à une fonction le moyen de <strong>lire et d'écrire</strong> la variable <code>x</code>, au lieu d'en recevoir une copie. C'est ce qui permet à un module de tenir une variable à jour — le cas typique étant une case à cocher liée à un réglage.</p>
+<h2>References</h2>
+<p><code>ref x</code> gives a function the means to <strong>read and write</strong> the variable <code>x</code>, instead of receiving a copy of it. That is what lets a module keep a variable up to date — the typical case being a checkbox bound to a setting.</p>
 
 <pre><code><span class="kw">global</span> grid = <span class="kw">true</span>
-ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
+ui.checkbox(<span class="str">"Grid"</span>, <span class="kw">ref</span> grid)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
-    <span class="kw">if</span> grid <span class="kw">then</span>          <span class="cmt">## lecture NORMALE : ref ne change rien à l'usage de la variable</span>
+    <span class="kw">if</span> grid <span class="kw">then</span>          <span class="cmt">## an ORDINARY read: ref changes nothing about using the variable</span>
         drawGrid()
     <span class="kw">end</span>
 <span class="kw">end</span></code></pre>
 
-<div class="callout tip">Le point important : la variable reste une variable. <code>ref</code> sert uniquement à <em>transmettre</em> le droit de l'écrire ; le code qui l'utilise ne change pas.</div>
+<div class="callout tip">The point to keep: the variable stays a variable. <code>ref</code> only <em>passes on</em> the right to write it; the code that uses it does not change.</div>
 
-<h3>Manipuler une référence reçue</h3>
-<p>Une fonction qui reçoit une référence la lit avec <code>get()</code> et l'écrit avec <code>set(v)</code>.</p>
+<h3>Handling a reference you receive</h3>
+<p>A function that receives a reference reads it with <code>get()</code> and writes it with <code>set(v)</code>.</p>
 
 <pre><code><span class="kw">func</span> <span class="fn">toggleIt</span>(r)
     r.set(<span class="kw">not</span> r.get())
@@ -1246,49 +1246,49 @@ ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
 toggleIt(<span class="kw">ref</span> active)
 <span class="bi">assert</span>(active)</code></pre>
 
-<h3>Cibles acceptées</h3>
-<p>Un nom — global ou local — ou un chemin de champs. Le nom doit être <strong>déclaré</strong> : <code>ref inconnue</code> est une erreur de <em>compilation</em>, ce qui est tout l'intérêt par rapport au passage d'un nom sous forme de chaîne.</p>
+<h3>Accepted targets</h3>
+<p>A name — global or local — or a path of fields. The name must be <strong>declared</strong>: <code>ref unknown</code> is a <em>compile</em> error, which is the whole point compared with passing a name as a string.</p>
 
-<pre><code><span class="kw">ref</span> counter           <span class="cmt">## un global ou une locale</span>
-<span class="kw">ref</span> cfg.tiles         <span class="cmt">## un champ</span>
-<span class="kw">ref</span> cfg.render.shadows   <span class="cmt">## un chemin de champs</span>
-<span class="kw">ref</span> t[<span class="num">1</span>]              <span class="cmt">## REFUSÉ : le chemin serait réévalué à chaque accès</span></code></pre>
+<pre><code><span class="kw">ref</span> counter           <span class="cmt">## a global or a local</span>
+<span class="kw">ref</span> cfg.tiles         <span class="cmt">## a field</span>
+<span class="kw">ref</span> cfg.render.shadows   <span class="cmt">## a path of fields</span>
+<span class="kw">ref</span> t[<span class="num">1</span>]              <span class="cmt">## REFUSED: the path would be re-evaluated on every access</span></code></pre>
 
-<h3>Deux limites à connaître</h3>
-<p>Une référence prise sur une variable <strong>locale à un bloc</strong> reste lisible après la sortie du bloc, mais l'écriture n'atteint plus rien : la variable n'existe plus, la référence s'est fermée sur une copie.</p>
-<p>Chaque <code>ref x</code> évalué crée deux fermetures et un objet. C'est négligeable à la déclaration d'un widget, à éviter dans une boucle serrée.</p>
+<h3>Two limits worth knowing</h3>
+<p>A reference taken on a variable <strong>local to a block</strong> stays readable after leaving the block, but writing reaches nothing any more: the variable is gone, and the reference has closed over a copy.</p>
+<p>Every <code>ref x</code> evaluated creates two closures and an object. That is negligible when declaring a widget, and to be avoided in a tight loop.</p>
 </section>
 
 <!-- ── Arrays ─────────────────────────────────────────────────────────────── -->
 <section id="arrays">
 <h2>Arrays</h2>
-<p>Tableau dynamique distinct des maps. Les indices commencent à <strong>1</strong>. Comme les maps, les arrays sont partagés par référence.</p>
+<p>A dynamic array, distinct from a map. Indices start at <strong>1</strong>. Like maps, arrays are shared by reference.</p>
 
-<h3>Création</h3>
+<h3>Creating one</h3>
 <pre><code><span class="kw">var</span> empty = []
 
 <span class="kw">var</span> t = [<span class="num">10</span>, <span class="num">20</span>, <span class="num">30</span>]
 
-<span class="kw">var</span> calc = [<span class="num">1</span>+<span class="num">1</span>, <span class="num">2</span>*<span class="num">3</span>, <span class="num">10</span>-<span class="num">1</span>]  <span class="cmt">## expressions autorisées</span></code></pre>
+<span class="kw">var</span> calc = [<span class="num">1</span>+<span class="num">1</span>, <span class="num">2</span>*<span class="num">3</span>, <span class="num">10</span>-<span class="num">1</span>]  <span class="cmt">## expressions are allowed</span></code></pre>
 
-<h3>Lecture / Écriture</h3>
-<pre><code><span class="bi">print</span>(t[<span class="num">1</span>])  <span class="cmt">## 10  (indexé à 1)</span>
-<span class="bi">print</span>(t[<span class="num">4</span>])  <span class="cmt">## nil (hors bounds => nil)</span>
+<h3>Reading / writing</h3>
+<pre><code><span class="bi">print</span>(t[<span class="num">1</span>])  <span class="cmt">## 10  (indexed from 1)</span>
+<span class="bi">print</span>(t[<span class="num">4</span>])  <span class="cmt">## nil (out of bounds => nil)</span>
 
 t[<span class="num">2</span>] = <span class="num">99</span>    <span class="cmt">## set</span>
-t[<span class="num">2</span>] += <span class="num">1</span>    <span class="cmt">## compound : += -= *= /= %=</span>
+t[<span class="num">2</span>] += <span class="num">1</span>    <span class="cmt">## compound: += -= *= /= %=</span>
 
 <span class="kw">var</span> a = []
-a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt">## grossit automatiquement (indices 1..4 => nil)</span></code></pre>
+a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt">## it grows on its own (indices 1..4 => nil)</span></code></pre>
 
-<h3>Itération — valeurs seules</h3>
+<h3>Iteration — values only</h3>
 <pre><code><span class="kw">var</span> sum = <span class="num">0</span>
 <span class="kw">for</span> v <span class="kw">in</span> [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>, <span class="num">4</span>, <span class="num">5</span>] <span class="kw">do</span>
     sum += v
 <span class="kw">end</span>
 <span class="bi">assert</span>(sum == <span class="num">15</span>)</code></pre>
 
-<h3>Itération — index + valeur</h3>
+<h3>Iteration — index and value</h3>
 <pre><code><span class="kw">var</span> t = [<span class="str">"a"</span>, <span class="str">"b"</span>, <span class="str">"c"</span>]
 <span class="kw">for</span> i, v <span class="kw">in</span> t <span class="kw">do</span>
     <span class="bi">printf</span>(<span class="str">"{}: {}"</span>, i, v)
@@ -1297,49 +1297,49 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 ## 2: b
 ## 3: c</span></code></pre>
 
-<h3>Méthodes</h3>
+<h3>Methods</h3>
 <table>
-<tr><th>Méthode</th><th>Description</th></tr>
-<tr><td><code>arr.len()</code></td><td>Nombre d'éléments</td></tr>
-<tr><td><code>arr.push(v)</code></td><td>Ajoute <code>v</code> en fin</td></tr>
-<tr><td><code>arr.pop()</code></td><td>Retire et retourne le dernier élément</td></tr>
-<tr><td><code>arr.insert(i, v)</code></td><td>Insère <code>v</code> à l'indice <code>i</code> (1-based)</td></tr>
-<tr><td><code>arr.delete(i)</code></td><td>Retire et retourne l'élément à l'indice <code>i</code></td></tr>
-<tr><td><code>arr.enqueue(v)</code></td><td>Alias de <code>push</code> — ajoute en fin (file)</td></tr>
-<tr><td><code>arr.dequeue()</code></td><td>Retire et retourne le premier élément (file)</td></tr>
+<tr><th>Method</th><th>Description</th></tr>
+<tr><td><code>arr.len()</code></td><td>The number of elements</td></tr>
+<tr><td><code>arr.push(v)</code></td><td>Appends <code>v</code> at the end</td></tr>
+<tr><td><code>arr.pop()</code></td><td>Removes and returns the last element</td></tr>
+<tr><td><code>arr.insert(i, v)</code></td><td>Inserts <code>v</code> at index <code>i</code> (from 1)</td></tr>
+<tr><td><code>arr.delete(i)</code></td><td>Removes and returns the element at index <code>i</code></td></tr>
+<tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
+<tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
 </table>
 <pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
 a.push(<span class="num">4</span>)           <span class="cmt">## [1, 2, 3, 4]</span>
-a.pop()             <span class="cmt">## retire 4</span>
+a.pop()             <span class="cmt">## removes 4</span>
 a.insert(<span class="num">2</span>, <span class="num">99</span>)    <span class="cmt">## [1, 99, 2, 3]</span>
-a.delete(<span class="num">2</span>)        <span class="cmt">## retire 99 → [1, 2, 3]</span>
+a.delete(<span class="num">2</span>)        <span class="cmt">## removes 99 → [1, 2, 3]</span>
 
-<span class="kw">var</span> q = []          <span class="cmt">## file FIFO</span>
+<span class="kw">var</span> q = []          <span class="cmt">## a FIFO queue</span>
 q.enqueue(<span class="str">"a"</span>)
 q.enqueue(<span class="str">"b"</span>)
 q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 
-<h3>Sémantique de copie</h3>
-<div class="callout warn">Les arrays sont <strong>partagés par référence</strong> (comptage de référence), comme les maps.</div>
+<h3>Copy semantics</h3>
+<div class="callout warn">Arrays are <strong>shared by reference</strong>, with reference counting, just as maps are.</div>
 </section>
 
 <!-- ── Try / Catch ───────────────────────────────────────────────────────── -->
 <section id="try">
-<h2>Gestion d'erreurs</h2>
-<p>Ollin utilise <code>try / catch / else / end</code>. Le bloc <code>else</code> est exécuté si <em>aucune</em> exception n'est levée. Tous les blocs sont optionnels.</p>
+<h2>Error handling</h2>
+<p>Ollin uses <code>try / catch / else / end</code>. The <code>else</code> block runs when <em>no</em> exception is raised. Every block is optional.</p>
 
 <pre><code><span class="kw">try</span>
-    <span class="kw">throw</span> <span class="str">"quelque chose s'est mal passé"</span>
+    <span class="kw">throw</span> <span class="str">"something went wrong"</span>
 <span class="kw">catch</span> err
-    <span class="bi">print</span>(<span class="str">"erreur :"</span>, err)
+    <span class="bi">print</span>(<span class="str">"error:"</span>, err)
 <span class="kw">else</span>
-    <span class="bi">print</span>(<span class="str">"tout s'est bien passé"</span>)
+    <span class="bi">print</span>(<span class="str">"all went well"</span>)
 <span class="kw">end</span></code></pre>
 
-<h3>Throw de n'importe quel type</h3>
+<h3>Throwing any type</h3>
 <pre><code><span class="kw">func</span> divide(a, b)
     <span class="kw">if</span> b == <span class="num">0</span> <span class="kw">then</span>
-        <span class="kw">throw</span> {code: <span class="num">42</span>, msg: <span class="str">"division par zéro"</span>}
+        <span class="kw">throw</span> {code: <span class="num">42</span>, msg: <span class="str">"division by zero"</span>}
     <span class="kw">end</span>
     <span class="kw">return</span> a / b
 <span class="kw">end</span>
@@ -1347,10 +1347,10 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="kw">try</span>
     <span class="kw">var</span> r = divide(<span class="num">10</span>, <span class="num">0</span>)
 <span class="kw">catch</span> e
-    <span class="bi">printf</span>(<span class="str">"erreur {}: {}"</span>, e[<span class="str">"code"</span>], e[<span class="str">"msg"</span>])
+    <span class="bi">printf</span>(<span class="str">"error {}: {}"</span>, e[<span class="str">"code"</span>], e[<span class="str">"msg"</span>])
 <span class="kw">end</span></code></pre>
 
-<h3>Try sans corps</h3>
+<h3>A try with no body</h3>
 <pre><code><span class="kw">try</span>
 <span class="kw">catch</span> err
     <span class="bi">print</span>(err)
@@ -1359,37 +1359,37 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 
 <!-- ── Builtins ───────────────────────────────────────────────────────────── -->
 <section id="builtins">
-<h2>Fonctions intégrées</h2>
+<h2>Built-in functions</h2>
 
 <h3>print</h3>
-<p>Affiche tous les arguments séparés par des espaces, suivi d'un retour à la ligne.</p>
+<p>Prints every argument, separated by spaces, followed by a newline.</p>
 <pre><code><span class="bi">print</span>(<span class="str">"a ="</span>, <span class="num">42</span>, <span class="bool">true</span>)  <span class="cmt">## a = 42 true</span>
-<span class="bi">print</span>()                 <span class="cmt">## ligne vide</span></code></pre>
+<span class="bi">print</span>()                 <span class="cmt">## an empty line</span></code></pre>
 
 <h3>printf</h3>
-<p>Substitution <strong>positionnelle</strong> (indexation <strong>1-based</strong>, comme les arrays) : <code>{}</code> (index auto, à partir de 1) ou <code>{n}</code> (index explicite, <code>{1}</code> = 1<sup>er</sup> argument), avec un format optionnel <code>{n:spec}</code> (même spec que l'interpolation).</p>
+<p><strong>Positional</strong> substitution (indexed from <strong>1</strong>, as arrays are): <code>{}</code> (automatic index, starting at 1) or <code>{n}</code> (an explicit index, <code>{1}</code> being the first argument), with an optional format <code>{n:spec}</code>, the same spec as in interpolation.</p>
 <pre><code><span class="bi">printf</span>(<span class="str">"{} + {} = {}"</span>, <span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>)      <span class="cmt">## 1 + 2 = 3</span>
-<span class="bi">printf</span>(<span class="str">"{1} et {1}"</span>, <span class="str">"oui"</span>)          <span class="cmt">## oui et oui  (1er argument = {1})</span>
-<span class="bi">printf</span>(<span class="str">"x={1} y={2} x={1}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## index explicite (1-based)</span>
+<span class="bi">printf</span>(<span class="str">"{1} and {1}"</span>, <span class="str">"yes"</span>)        <span class="cmt">## yes and yes  (the first argument is {1})</span>
+<span class="bi">printf</span>(<span class="str">"x={1} y={2} x={1}"</span>, <span class="num">10</span>, <span class="num">20</span>)  <span class="cmt">## an explicit index (from 1)</span>
 <span class="bi">printf</span>(<span class="str">"pi = {1:.3f}"</span>, <span class="num">3.14159</span>)     <span class="cmt">## pi = 3.142</span></code></pre>
 
 <h3>assert</h3>
-<p>Lève une exception si la condition est fausse. Message optionnel.</p>
+<p>Raises an exception when the condition is false. The message is optional.</p>
 <pre><code><span class="kw">var</span> x = <span class="num">42</span>
 <span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
-<span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x doit être positif"</span>)</code></pre>
+<span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x must be positive"</span>)</code></pre>
 
 <h3>time</h3>
-<p>Retourne le temps UNIX en secondes (float). Utile pour les benchmarks.</p>
+<p>Returns the UNIX time in seconds, as a float. Handy for benchmarks.</p>
 <pre><code><span class="kw">var</span> t0 = <span class="bi">time</span>()
 
-<span class="cmt">## ... code à mesurer ...</span>
+<span class="cmt">## ... the code being measured ...</span>
 
 <span class="kw">var</span> t1 = <span class="bi">time</span>()
 <span class="bi">printf</span>(<span class="str">"duration : {} s"</span>, t1 - t0)</code></pre>
 
-<h3>Exemple complet</h3>
-<pre><code><span class="cmt">## Benchmark : somme de 1 million d'itérations</span>
+<h3>A complete example</h3>
+<pre><code><span class="cmt">## Benchmark: the sum of a million iterations</span>
 <span class="kw">var</span> N = <span class="num">1_000_000</span>
 <span class="kw">var</span> t0 = <span class="bi">time</span>()
 
@@ -1399,36 +1399,36 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="kw">end</span>
 
 <span class="kw">var</span> t1 = <span class="bi">time</span>()
-<span class="bi">printf</span>(<span class="str">"somme = {}  temps = {} s"</span>, s, t1 - t0)</code></pre>
+<span class="bi">printf</span>(<span class="str">"sum = {}  time = {} s"</span>, s, t1 - t0)</code></pre>
 
 <h3>mem</h3>
-<p>Retourne la mémoire tas actuellement utilisée par le programme, en <strong>octets</strong> (entier). Utile pour surveiller les allocations. La valeur reflète l'ensemble du process (valeurs Ollin + runtime) — regarde surtout sa <em>variation</em>.</p>
+<p>Returns the heap memory the program is currently using, in <strong>bytes</strong>, as an integer. Handy for watching allocations. The value covers the whole process (Ollin values plus the runtime) — what matters is how it <em>changes</em>.</p>
 <pre><code><span class="kw">var</span> before = <span class="bi">mem</span>()
 <span class="kw">var</span> a = []
 <span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">100000</span>] <span class="kw">do</span>
     a[i] = i
 <span class="kw">end</span>
-<span class="bi">printf</span>(<span class="str">"array : {} Ko"</span>, (<span class="bi">mem</span>() - before) / <span class="num">1024</span>)</code></pre>
+<span class="bi">printf</span>(<span class="str">"array: {} kB"</span>, (<span class="bi">mem</span>() - before) / <span class="num">1024</span>)</code></pre>
 
 <h3>len</h3>
-<p>Retourne la longueur d'un array, d'une map, d'une string ou d'un range (nombre d'éléments). Disponible aussi en méthode sur les arrays : <code>arr.len()</code>.</p>
+<p>Returns the length of an array, a map, a string or a range, as a number of elements. Also available as a method on arrays: <code>arr.len()</code>.</p>
 <pre><code><span class="bi">len</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>])  <span class="cmt">## 3</span>
-[<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].len()  <span class="cmt">## 3  (forme méthode)</span>
-<span class="bi">len</span>(<span class="str">"bonjour"</span>)  <span class="cmt">## 7</span>
+[<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].len()  <span class="cmt">## 3  (the method form)</span>
+<span class="bi">len</span>(<span class="str">"hello"</span>)  <span class="cmt">## 7</span>
 <span class="kw">var</span> m = {<span class="str">"a"</span>: <span class="num">1</span>, <span class="str">"b"</span>: <span class="num">2</span>}
 <span class="bi">len</span>(m)          <span class="cmt">## 2</span>
-<span class="bi">len</span>([<span class="num">1</span>;<span class="num">10</span>])     <span class="cmt">## 10 (range inclusif)</span></code></pre>
+<span class="bi">len</span>([<span class="num">1</span>;<span class="num">10</span>])     <span class="cmt">## 10 (an inclusive range)</span></code></pre>
 
 <h3>typeof</h3>
-<p>Retourne le type d'une valeur sous forme de string : <code>"nil"</code>, <code>"int"</code>, <code>"float"</code>, <code>"string"</code>, <code>"array"</code>, <code>"map"</code>, <code>"function"</code>, <code>"class"</code>, <code>"range"</code>.</p>
+<p>Returns a value's type as a string: <code>"nil"</code>, <code>"int"</code>, <code>"float"</code>, <code>"string"</code>, <code>"array"</code>, <code>"map"</code>, <code>"function"</code>, <code>"class"</code>, <code>"range"</code>.</p>
 <pre><code><span class="bi">typeof</span>(<span class="num">42</span>)       <span class="cmt">## "int"</span>
 <span class="bi">typeof</span>(<span class="num">3.14</span>)     <span class="cmt">## "float"</span>
 <span class="bi">typeof</span>(<span class="str">"hello"</span>)  <span class="cmt">## "string"</span>
 <span class="bi">typeof</span>([<span class="num">1</span>, <span class="num">2</span>])   <span class="cmt">## "array"</span>
 <span class="bi">typeof</span>(<span class="bool">nil</span>)      <span class="cmt">## "nil"</span></code></pre>
 
-<h3>Fonctions intégrées comme valeurs</h3>
-<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>mem</code>, <code>len</code> et <code>typeof</code> sont des valeurs de première classe — assignables, passables en argument :</p>
+<h3>Built-in functions as values</h3>
+<p><code>print</code>, <code>printf</code>, <code>assert</code>, <code>time</code>, <code>mem</code>, <code>len</code> and <code>typeof</code> are first-class values — they can be assigned and passed as arguments:</p>
 <pre><code><span class="kw">var</span> f = <span class="bi">print</span>
 f(<span class="str">"hello"</span>)        <span class="cmt">## hello</span>
 
@@ -1440,46 +1440,46 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
 
 <!-- ── Modules built-in ──────────────────────────────────────────────────── -->
 <section id="stdlib">
-<h2>Modules built-in</h2>
-<p>Les modules built-in sont disponibles sans <code>import</code> — ils sont automatiquement injectés au démarrage de la VM sous forme de maps.</p>
+<h2>Built-in modules</h2>
+<p>The built-in modules are available without any <code>import</code> — they are injected as maps when the VM starts.</p>
 
 <h3 id="module-math">math</h3>
-<p>Fonctions et constantes mathématiques.</p>
+<p>Mathematical functions and constants.</p>
 
 <table>
-  <thead><tr><th>Nom</th><th>Type</th><th>Description</th></tr></thead>
+  <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>math.PI</code></td><td>float</td><td>π ≈ 3.14159265358979</td></tr>
     <tr><td><code>math.TAU</code></td><td>float</td><td>τ = 2π ≈ 6.28318530717959</td></tr>
     <tr><td><code>math.E</code></td><td>float</td><td>e ≈ 2.71828182845905</td></tr>
-    <tr><td><code>math.INF</code></td><td>float</td><td>Infini (+∞)</td></tr>
-    <tr><td><code>math.abs(x)</code></td><td>fonction</td><td>Valeur absolue — conserve le type (int→int, float→float)</td></tr>
-    <tr><td><code>math.sign(x)</code></td><td>fonction</td><td>Signe : -1, 0 ou 1 (entier)</td></tr>
-    <tr><td><code>math.floor(x)</code></td><td>fonction</td><td>Arrondi vers le bas → entier</td></tr>
-    <tr><td><code>math.ceil(x)</code></td><td>fonction</td><td>Arrondi vers le haut → entier</td></tr>
-    <tr><td><code>math.round(x)</code></td><td>fonction</td><td>Arrondi au plus proche → entier</td></tr>
-    <tr><td><code>math.trunc(x)</code></td><td>fonction</td><td>Troncature vers zéro → entier</td></tr>
-    <tr><td><code>math.frac(x)</code></td><td>fonction</td><td>Partie fractionnaire</td></tr>
-    <tr><td><code>math.sqrt(x)</code></td><td>fonction</td><td>Racine carrée → float</td></tr>
-    <tr><td><code>math.pow(x, n)</code></td><td>fonction</td><td><code>x</code> à la puissance <code>n</code></td></tr>
-    <tr><td><code>math.exp(x)</code></td><td>fonction</td><td>Exponentielle e<sup>x</sup></td></tr>
-    <tr><td><code>math.log(x)</code></td><td>fonction</td><td>Logarithme naturel (base e)</td></tr>
-    <tr><td><code>math.log2(x)</code></td><td>fonction</td><td>Logarithme base 2</td></tr>
-    <tr><td><code>math.log10(x)</code></td><td>fonction</td><td>Logarithme base 10</td></tr>
-    <tr><td><code>math.logn(x, n)</code></td><td>fonction</td><td>Logarithme de <code>x</code> en base <code>n</code></td></tr>
-    <tr><td><code>math.sin(x)</code> / <code>cos(x)</code> / <code>tan(x)</code></td><td>fonction</td><td>Trigonométrie (radians) → float</td></tr>
-    <tr><td><code>math.asin(x)</code> / <code>acos(x)</code> / <code>atan(x)</code></td><td>fonction</td><td>Trigonométrie inverse (radians)</td></tr>
-    <tr><td><code>math.atan2(y, x)</code></td><td>fonction</td><td>Angle du vecteur (x, y) en radians</td></tr>
-    <tr><td><code>math.deg(rad)</code> / <code>math.rad(deg)</code></td><td>fonction</td><td>Conversion radians ↔ degrés</td></tr>
-    <tr><td><code>math.clamp(x, lo, hi)</code></td><td>fonction</td><td>Borne <code>x</code> dans l'intervalle [lo, hi]</td></tr>
-    <tr><td><code>math.min(...)</code> / <code>math.max(...)</code></td><td>fonction</td><td>Minimum / maximum d'une liste d'arguments</td></tr>
-    <tr><td><code>math.map(x, ilo, ihi, olo, ohi)</code></td><td>fonction</td><td>Ré-échelonne <code>x</code> de [ilo, ihi] vers [olo, ohi]</td></tr>
-    <tr><td><code>math.isNan(x)</code> / <code>math.isInf(x)</code></td><td>fonction</td><td>Teste NaN / infini</td></tr>
-    <tr><td><code>math.rand([lo, hi])</code></td><td>fonction</td><td>Aléatoire float dans [0, 1) ; ou dans [lo, hi] si fourni</td></tr>
-    <tr><td><code>math.randInt([lo,] hi)</code></td><td>fonction</td><td>Entier aléatoire dans [0, hi] ; ou [lo, hi]</td></tr>
-    <tr><td><code>math.seed(n)</code></td><td>fonction</td><td>Fixe la graine du générateur aléatoire (reproductible)</td></tr>
-    <tr><td><code>math.noise(x[, y[, z]])</code></td><td>fonction</td><td>Bruit de Perlin fractal (fBm) en 1, 2 ou 3 dimensions → float dans [0, 1], continu et déterministe</td></tr>
-    <tr><td><code>math.noiseSeed(n)</code></td><td>fonction</td><td>Fixe la graine du bruit : même <code>n</code> → même bruit</td></tr>
+    <tr><td><code>math.INF</code></td><td>float</td><td>Infinity (+∞)</td></tr>
+    <tr><td><code>math.abs(x)</code></td><td>fonction</td><td>Absolute value — it keeps the type (int→int, float→float)</td></tr>
+    <tr><td><code>math.sign(x)</code></td><td>fonction</td><td>The sign: -1, 0 or 1, as an integer</td></tr>
+    <tr><td><code>math.floor(x)</code></td><td>fonction</td><td>Rounds down → an integer</td></tr>
+    <tr><td><code>math.ceil(x)</code></td><td>fonction</td><td>Rounds up → an integer</td></tr>
+    <tr><td><code>math.round(x)</code></td><td>fonction</td><td>Rounds to the nearest → an integer</td></tr>
+    <tr><td><code>math.trunc(x)</code></td><td>fonction</td><td>Truncates towards zero → an integer</td></tr>
+    <tr><td><code>math.frac(x)</code></td><td>fonction</td><td>The fractional part</td></tr>
+    <tr><td><code>math.sqrt(x)</code></td><td>fonction</td><td>Square root → a float</td></tr>
+    <tr><td><code>math.pow(x, n)</code></td><td>fonction</td><td><code>x</code> raised to the power <code>n</code></td></tr>
+    <tr><td><code>math.exp(x)</code></td><td>fonction</td><td>The exponential e<sup>x</sup></td></tr>
+    <tr><td><code>math.log(x)</code></td><td>fonction</td><td>The natural logarithm (base e)</td></tr>
+    <tr><td><code>math.log2(x)</code></td><td>fonction</td><td>The base-2 logarithm</td></tr>
+    <tr><td><code>math.log10(x)</code></td><td>fonction</td><td>The base-10 logarithm</td></tr>
+    <tr><td><code>math.logn(x, n)</code></td><td>fonction</td><td>The logarithm of <code>x</code> in base <code>n</code></td></tr>
+    <tr><td><code>math.sin(x)</code> / <code>cos(x)</code> / <code>tan(x)</code></td><td>fonction</td><td>Trigonometry, in radians → a float</td></tr>
+    <tr><td><code>math.asin(x)</code> / <code>acos(x)</code> / <code>atan(x)</code></td><td>fonction</td><td>Inverse trigonometry, in radians</td></tr>
+    <tr><td><code>math.atan2(y, x)</code></td><td>fonction</td><td>The angle of the vector (x, y), in radians</td></tr>
+    <tr><td><code>math.deg(rad)</code> / <code>math.rad(deg)</code></td><td>fonction</td><td>Converts radians ↔ degrees</td></tr>
+    <tr><td><code>math.clamp(x, lo, hi)</code></td><td>fonction</td><td>Clamps <code>x</code> to the interval [lo, hi]</td></tr>
+    <tr><td><code>math.min(...)</code> / <code>math.max(...)</code></td><td>fonction</td><td>The minimum / maximum of a list of arguments</td></tr>
+    <tr><td><code>math.map(x, ilo, ihi, olo, ohi)</code></td><td>fonction</td><td>Rescales <code>x</code> from [ilo, ihi] to [olo, ohi]</td></tr>
+    <tr><td><code>math.isNan(x)</code> / <code>math.isInf(x)</code></td><td>fonction</td><td>Tests for NaN / infinity</td></tr>
+    <tr><td><code>math.rand([lo, hi])</code></td><td>fonction</td><td>A random float in [0, 1), or in [lo, hi] when given</td></tr>
+    <tr><td><code>math.randInt([lo,] hi)</code></td><td>fonction</td><td>A random integer in [0, hi], or in [lo, hi]</td></tr>
+    <tr><td><code>math.seed(n)</code></td><td>fonction</td><td>Sets the random generator's seed, making it reproducible</td></tr>
+    <tr><td><code>math.noise(x[, y[, z]])</code></td><td>fonction</td><td>Fractal Perlin noise (fBm) in 1, 2 or 3 dimensions → a float in [0, 1], continuous and deterministic</td></tr>
+    <tr><td><code>math.noiseSeed(n)</code></td><td>fonction</td><td>Sets the noise seed: the same <code>n</code> gives the same noise</td></tr>
   </tbody>
 </table>
 
@@ -1493,35 +1493,35 @@ apply(<span class="bi">print</span>, <span class="num">42</span>)  <span class="
 <span class="bi">print</span>(math.sign(-7))            <span class="cmt">## -1</span>
 <span class="bi">print</span>(math.sign(0))             <span class="cmt">## 0</span>
 
-<span class="cmt">## bruit de Perlin : continu, dans [0, 1] — idéal pour animer/texturer</span>
+<span class="cmt">## Perlin noise: continuous, in [0, 1] — ideal for animating and texturing</span>
 <span class="kw">for</span> i = <span class="num">0</span>, <span class="num">3</span> <span class="kw">do</span>
-    <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))  <span class="cmt">## valeurs proches, qui évoluent en douceur</span>
+    <span class="bi">print</span>(math.noise(i * <span class="num">0.2</span>))  <span class="cmt">## nearby values, changing smoothly</span>
 <span class="kw">end</span>
-math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## bruit reproductible</span></code></pre>
+math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## reproducible noise</span></code></pre>
 
 <h3 id="module-string">string</h3>
-<p>Manipulation de chaînes. Les index sont <strong>1-based</strong> (comme les tableaux).</p>
+<p>String handling. Indices start at <strong>1</strong>, as for arrays.</p>
 
 <table>
-  <thead><tr><th>Nom</th><th>Type</th><th>Description</th></tr></thead>
+  <thead><tr><th>Name</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>string.len(s)</code></td><td>fonction</td><td>Nombre de caractères (codepoints UTF-8) de la chaîne — n'accepte qu'une <code>string</code> (contrairement au <code>len</code> global, polymorphe)</td></tr>
-    <tr><td><code>string.upper(s)</code></td><td>fonction</td><td>Chaîne en majuscules</td></tr>
-    <tr><td><code>string.lower(s)</code></td><td>fonction</td><td>Chaîne en minuscules</td></tr>
-    <tr><td><code>string.trim(s [, chars])</code></td><td>fonction</td><td>Retire aux deux extrémités les caractères de <code>chars</code> (espace par défaut)</td></tr>
-    <tr><td><code>string.ltrim(s [, chars])</code></td><td>fonction</td><td>Idem, uniquement à gauche</td></tr>
-    <tr><td><code>string.rtrim(s [, chars])</code></td><td>fonction</td><td>Idem, uniquement à droite</td></tr>
-    <tr><td><code>string.char(s, i)</code></td><td>fonction</td><td>Caractère (codepoint UTF-8) à l'index <code>i</code> (1-based) → chaîne d'1 caractère ; <code>""</code> si hors bornes</td></tr>
-    <tr><td><code>string.substr(s, start [, length])</code></td><td>fonction</td><td>Sous-chaîne de <code>length</code> caractères à partir de <code>start</code> (1-based) ; <code>length</code> optionnel (jusqu'à la fin sinon), bornes ajustées</td></tr>
+    <tr><td><code>string.len(s)</code></td><td>fonction</td><td>The number of characters (UTF-8 codepoints) in the string — it accepts a <code>string</code> only, unlike the polymorphic global <code>len</code></td></tr>
+    <tr><td><code>string.upper(s)</code></td><td>fonction</td><td>The string in upper case</td></tr>
+    <tr><td><code>string.lower(s)</code></td><td>fonction</td><td>The string in lower case</td></tr>
+    <tr><td><code>string.trim(s [, chars])</code></td><td>fonction</td><td>Removes the characters of <code>chars</code> from both ends (spaces by default)</td></tr>
+    <tr><td><code>string.ltrim(s [, chars])</code></td><td>fonction</td><td>The same, on the left only</td></tr>
+    <tr><td><code>string.rtrim(s [, chars])</code></td><td>fonction</td><td>The same, on the right only</td></tr>
+    <tr><td><code>string.char(s, i)</code></td><td>fonction</td><td>The character (UTF-8 codepoint) at index <code>i</code>, counting from 1 → a one-character string; <code>""</code> when out of bounds</td></tr>
+    <tr><td><code>string.substr(s, start [, length])</code></td><td>fonction</td><td>A substring of <code>length</code> characters starting at <code>start</code>, counting from 1; <code>length</code> is optional (to the end otherwise), and the bounds are clamped</td></tr>
   </tbody>
 </table>
 
-<div class="callout tip">Tout est <strong>UTF-8, par caractère (codepoint)</strong>, pas par octet. <code>len</code>/<code>string.char</code>/<code>string.substr</code> comptent les caractères (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>) ; <code>string.trim</code> rogne par codepoint ; <code>string.upper</code>/<code>lower</code> gèrent les lettres accentuées latines (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Au-delà du latin (grec, cyrillique…), la casse laisse le texte inchangé.</div>
+<div class="callout tip">Everything works <strong>in UTF-8, by character (codepoint)</strong>, not by byte. <code>len</code>/<code>string.char</code>/<code>string.substr</code> count characters (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>); <code>string.trim</code> trims by codepoint; <code>string.upper</code>/<code>lower</code> handle the accented Latin letters (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Beyond Latin (Greek, Cyrillic…), case leaves the text unchanged.</div>
 
-<pre><code><span class="bi">print</span>(string.len(<span class="str">"café"</span>))           <span class="cmt">## 4 (codepoints, pas octets)</span>
+<pre><code><span class="bi">print</span>(string.len(<span class="str">"café"</span>))           <span class="cmt">## 4 (codepoints, not bytes)</span>
 <span class="bi">print</span>(string.upper(<span class="str">"ollin"</span>))         <span class="cmt">## OLLIN</span>
 <span class="bi">print</span>(string.lower(<span class="str">"HELLO"</span>))         <span class="cmt">## hello</span>
-<span class="bi">print</span>(string.trim(<span class="str">"  greet  "</span>))      <span class="cmt">## salut</span>
+<span class="bi">print</span>(string.trim(<span class="str">"  greet  "</span>))      <span class="cmt">## greet</span>
 <span class="bi">print</span>(string.char(<span class="str">"ollin"</span>, <span class="num">1</span>))       <span class="cmt">## o</span>
 <span class="bi">print</span>(string.substr(<span class="str">"ollin"</span>, <span class="num">2</span>, <span class="num">3</span>))  <span class="cmt">## lli</span></code></pre>
 </section>
@@ -1529,11 +1529,11 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## bru
 <!-- ── Import ─────────────────────────────────────────────────────────── -->
 <section id="import">
 <h2>Import</h2>
-<p>L'instruction <code>import</code> charge un fichier Ollin et rend son contenu disponible dans le programme courant.</p>
-<p>Les chemins sont relatifs au répertoire du script courant. L'extension <code>.ol</code> est ajoutée automatiquement si absente.</p>
+<p>The <code>import</code> statement loads an Ollin file and makes its content available in the current program.</p>
+<p>Paths are relative to the current script's directory. The <code>.ol</code> extension is added when it is missing.</p>
 
-<h3>Import plat</h3>
-<p>Toutes les définitions du fichier importé deviennent disponibles directement dans le scope courant.</p>
+<h3>A flat import</h3>
+<p>Every definition of the imported file becomes available directly in the current scope.</p>
 <pre data-no-run><code><span class="cmt">## utils.ol</span>
 <span class="kw">func</span> add(a, b)
     <span class="kw">return</span> a + b
@@ -1545,25 +1545,25 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## bru
 <span class="bi">print</span>(add(<span class="num">2</span>, <span class="num">3</span>))  <span class="cmt">## 5</span>
 <span class="bi">print</span>(PI)         <span class="cmt">## 3.14159</span></code></pre>
 
-<h3>Import modulaire</h3>
-<p>Avec <code>as name</code>, toutes les définitions sont regroupées dans une map nommée.</p>
+<h3>A modular import</h3>
+<p>With <code>as name</code>, every definition is gathered into a named map.</p>
 <pre data-no-run><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> math
 <span class="bi">print</span>(math.add(<span class="num">10</span>, <span class="num">20</span>))  <span class="cmt">## 30</span>
 <span class="bi">print</span>(math.PI)           <span class="cmt">## 3.14159</span></code></pre>
 
-<h3>Règles</h3>
+<h3>Rules</h3>
 <ul>
-  <li>Chemins résolus relativement au répertoire du script courant (récursivement pour les imports imbriqués).</li>
-  <li>Les imports circulaires sont détectés et ignorés (cache partagé).</li>
-  <li>Un même fichier importé deux fois n'est exécuté qu'une fois.</li>
+  <li>Paths are resolved relative to the current script's directory, recursively for nested imports.</li>
+  <li>Circular imports are detected and ignored, through a shared cache.</li>
+  <li>A file imported twice is executed only once.</li>
 </ul>
 </section>
 
 <section id="classes">
 <h2>Classes</h2>
-<p>Ollin supporte l'orienté-objet avec héritage simple, constructeur implicite et méta-méthodes.</p>
+<p>Ollin supports object orientation with single inheritance, an implicit constructor and meta-methods.</p>
 
-<h3>Déclaration</h3>
+<h3>Declaration</h3>
 <pre><code>class Animal
     func init(name, sound)
         self.name = name
@@ -1578,15 +1578,15 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## bru
 end
 
 var a = Animal("Rex", "Woof")
-print(a)            ## Animal(Rex)   — affichage de l'instance via __str
+print(a)            ## Animal(Rex)   — the instance is printed through __str
 print(a.speak())    ## Rex says Woof</code></pre>
 <ul>
-  <li><code>func init(...)</code> est le constructeur ; <code>self</code> est passé implicitement en premier paramètre.</li>
-  <li>Toutes les méthodes reçoivent <code>self</code> automatiquement.</li>
-  <li><code>func __str()</code> définit l'affichage de l'instance : <code>print(obj)</code> et la concaténation <code>"…" + obj</code> l'utilisent.</li>
+  <li><code>func init(...)</code> is the constructor; <code>self</code> is passed implicitly as the first parameter.</li>
+  <li>Every method receives <code>self</code> automatically.</li>
+  <li><code>func __str()</code> defines how the instance prints: <code>print(obj)</code> and the concatenation <code>"…" + obj</code> both use it.</li>
 </ul>
 
-<h3>Instanciation</h3>
+<h3>Instantiation</h3>
 <pre><code>class Animal
     func init(name, sound)
         self.name = name
@@ -1600,21 +1600,21 @@ var a = Animal("Dog", "woof")
 print(a.speak())   ## Dog says woof
 print(a.name)      ## Dog</code></pre>
 
-<h3>Méthodes statiques</h3>
-<p>Une méthode préfixée par <code><span class="kw">static</span></code> appartient à la <strong>classe</strong>, pas à une instance : elle ne reçoit <strong>pas</strong> <code>self</code>. On l'appelle via <code>Classe.methode(...)</code> (ou sur une instance, sans injection de self). Utile pour les constructeurs alternatifs ou les utilitaires liés à la classe.</p>
+<h3>Static methods</h3>
+<p>A method prefixed with <code><span class="kw">static</span></code> belongs to the <strong>class</strong> and not to an instance: it does <strong>not</strong> receive <code>self</code>. It is called as <code>Class.method(...)</code>, or on an instance, with no self injected. Handy for alternative constructors, or for utilities tied to the class.</p>
 <pre><code>class Vec
     func init(x, y)
         self.x = x
         self.y = y
     end
-    static func zero()      ## pas de self : fabrique liée à la classe
+    static func zero()      ## no self: a factory tied to the class
         return Vec(0, 0)
     end
 end
-var o = Vec.zero()          ## appel sur la classe
+var o = Vec.zero()          ## called on the class
 assert(o.x == 0 and o.y == 0)</code></pre>
 
-<h3>Héritage</h3>
+<h3>Inheritance</h3>
 <pre><code>class Animal
     func init(name, sound)
         self.name = name
@@ -1626,7 +1626,7 @@ assert(o.x == 0 and o.y == 0)</code></pre>
 end
 class Dog extends Animal
     func init(name)
-        super.init(name, "woof")   ## appel du constructeur parent
+        super.init(name, "woof")   ## calls the parent constructor
     end
     func fetch()
         return self.name + " fetches!"
@@ -1634,16 +1634,16 @@ class Dog extends Animal
 end
 
 var d = Dog("Rex")
-print(d.speak())   ## Rex says woof  (méthode héritée)
+print(d.speak())   ## Rex says woof  (an inherited method)
 print(d.fetch())   ## Rex fetches!</code></pre>
-<p>Si un enfant n'a pas de <code>func init</code>, il hérite automatiquement de celui du parent.</p>
+<p>A child with no <code>func init</code> inherits the parent's.</p>
 
 <h3>super</h3>
-<p><code>super.method(args)</code> appelle la méthode du parent avec le <code>self</code> courant.</p>
+<p><code>super.method(args)</code> calls the parent's method with the current <code>self</code>.</p>
 
-<h3>Méta-méthodes</h3>
+<h3>Meta-methods</h3>
 <table>
-<thead><tr><th>Méthode</th><th>Déclencheur</th></tr></thead>
+<thead><tr><th>Method</th><th>Trigger</th></tr></thead>
 <tbody>
 <tr><td><code>__str</code></td><td><code>print(obj)</code>, <code>printf("{}", obj)</code></td></tr>
 <tr><td><code>__add</code></td><td><code>a + b</code></td></tr>
@@ -1653,8 +1653,8 @@ print(d.fetch())   ## Rex fetches!</code></pre>
 <tr><td><code>__mod</code></td><td><code>a % b</code></td></tr>
 <tr><td><code>__neg</code></td><td><code>-a</code></td></tr>
 <tr><td><code>__eq</code></td><td><code>a == b</code></td></tr>
-<tr><td><code>__lt</code></td><td><code>a &lt; b</code> et <code>a &gt; b</code></td></tr>
-<tr><td><code>__le</code></td><td><code>a &lt;= b</code> et <code>a &gt;= b</code></td></tr>
+<tr><td><code>__lt</code></td><td><code>a &lt; b</code> and <code>a &gt; b</code></td></tr>
+<tr><td><code>__le</code></td><td><code>a &lt;= b</code> and <code>a &gt;= b</code></td></tr>
 </tbody>
 </table>
 <pre><code>class Vec2
@@ -1672,17 +1672,17 @@ end
 
 var v1 = Vec2(1, 2)
 var v2 = Vec2(3, 4)
-var v3 = v1 + v2   ## appelle v1.__add(v2)
+var v3 = v1 + v2   ## calls v1.__add(v2)
 print(v3)          ## Vec2(4,6)</code></pre>
 
-<h3>Égalité et comparaison</h3>
-<p>Les <strong>maps et arrays nus</strong> se comparent par <strong>référence</strong> : <code>a == b</code> n'est vrai que si <code>a</code> et <code>b</code> désignent le même objet en mémoire, jamais d'après leur contenu. Pour une comparaison <strong>par valeur</strong>, il faut en faire une classe et définir <code>__eq</code>.</p>
-<pre><code><span class="cmt">## maps nues => comparaison par référence</span>
-<span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})            <span class="cmt">## 0 : contenu identique mais objets distincts</span>
+<h3>Equality and comparison</h3>
+<p><strong>Bare maps and arrays</strong> compare by <strong>reference</strong>: <code>a == b</code> is true only when <code>a</code> and <code>b</code> name the same object in memory, never from their content. For a comparison <strong>by value</strong>, make it a class and define <code>__eq</code>.</p>
+<pre><code><span class="cmt">## bare maps => compared by reference</span>
+<span class="bi">print</span>({x: <span class="num">1</span>} == {x: <span class="num">1</span>})            <span class="cmt">## 0: the same content, but distinct objects</span>
 <span class="kw">var</span> m = {x: <span class="num">1</span>}
-<span class="bi">print</span>(m == m)                      <span class="cmt">## 1 : même référence</span>
+<span class="bi">print</span>(m == m)                      <span class="cmt">## 1: the same reference</span>
 
-<span class="cmt">## instance + __eq => comparaison par valeur</span>
+<span class="cmt">## an instance plus __eq => compared by value</span>
 <span class="kw">class</span> Point
     <span class="kw">func</span> init(x, y)
         self.x = x
@@ -1692,39 +1692,39 @@ print(v3)          ## Vec2(4,6)</code></pre>
         <span class="kw">return</span> self.x == other.x <span class="kw">and</span> self.y == other.y
     <span class="kw">end</span>
 <span class="kw">end</span>
-<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))  <span class="cmt">## 1 : __eq compare les champs</span>
+<span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">1</span>, <span class="num">2</span>))  <span class="cmt">## 1: __eq compares the fields</span>
 <span class="bi">print</span>(Point(<span class="num">1</span>, <span class="num">2</span>) == Point(<span class="num">3</span>, <span class="num">4</span>))  <span class="cmt">## 0</span></code></pre>
-<div class="callout warn">Deux subtilités sur <code>__eq</code> : il n'est cherché que sur l'opérande de <strong>gauche</strong> (si seule la droite est une instance, la comparaison reste par référence) ; et il est appelé <strong>même quand les deux opérandes sont la même instance</strong> — il n'y a pas de court-circuit d'identité.</div>
+<div class="callout warn">Two subtleties about <code>__eq</code>: it is looked up on the <strong>left</strong> operand only (when only the right one is an instance, the comparison stays by reference); and it is called <strong>even when both operands are the same instance</strong> — there is no identity short-circuit.</div>
 </section>
 
 <!-- ── Graphics ──────────────────────────────────────────────────────────── -->
 <section id="graphics">
 <h2>Graphics</h2>
-<p>Le module <code>graphics</code> expose Raylib pour le rendu 2D en temps réel. Il est disponible automatiquement sans <code>import</code>. Le rendu fonctionne sur desktop et WASM.</p>
+<p>The <code>graphics</code> module exposes raylib for real-time 2D rendering. It is available without any <code>import</code>. Rendering works on the desktop and in WASM.</p>
 
-<h3>Cycle de vie</h3>
-<p>Trois fonctions optionnelles, appelées automatiquement par le moteur : <code>setup()</code> une fois au démarrage, puis <code>update(dt)</code> et <code>draw()</code> à chaque frame.</p>
-<pre data-no-run><code><span class="cmt">## appelée UNE FOIS après le chargement, avant la boucle</span>
+<h3>The lifecycle</h3>
+<p>Three optional functions, called by the engine: <code>setup()</code> once at startup, then <code>update(dt)</code> and <code>draw()</code> on every frame.</p>
+<pre data-no-run><code><span class="cmt">## called ONCE after loading, before the loop</span>
 <span class="kw">func</span> setup()
-    <span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Titre"</span>)
+    <span class="bi">graphics</span>.canvas(<span class="num">800</span>, <span class="num">600</span>, <span class="str">"Title"</span>)
 <span class="kw">end</span>
 
-<span class="cmt">## appelée automatiquement à chaque frame</span>
+<span class="cmt">## called on every frame</span>
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
 
-    <span class="cmt">## dessin ici</span>
+    <span class="cmt">## draw here</span>
 
 <span class="kw">end</span></code></pre>
-<p>Ces trois fonctions sont indépendantes : tu peux n'en définir qu'une. (Tu peux aussi ouvrir la fenêtre au niveau du script plutôt que dans <code>setup</code>.)</p>
-<div class="callout">La seule présence d'un <code>draw()</code> suffit à démarrer une session graphique : si tu n'appelles pas <code>graphics.canvas(...)</code>, le moteur crée automatiquement un canvas aux dimensions <code>W</code>×<code>H</code> par défaut. Appelle <code>graphics.canvas(w, h)</code> uniquement pour choisir une autre taille ou un titre.</div>
-<p>Pour séparer la logique du rendu, définis aussi <code>update(dt)</code> : le moteur l'appelle <strong>avant <code>draw</code></strong> à chaque frame, avec <code>dt</code> = nombre de secondes écoulées depuis la frame précédente. En multipliant les déplacements par <code>dt</code>, l'animation devient <strong>indépendante du framerate</strong>.</p>
+<p>The three functions are independent: you may define just one. (You can also open the window at the script level rather than in <code>setup</code>.)</p>
+<div class="callout">The mere presence of a <code>draw()</code> is enough to start a graphics session: if you do not call <code>graphics.canvas(...)</code>, the engine creates a canvas of the default <code>W</code>×<code>H</code> size. Call <code>graphics.canvas(w, h)</code> only to choose another size or a title.</div>
+<p>To keep the logic apart from the rendering, define <code>update(dt)</code> as well: the engine calls it <strong>before <code>draw</code></strong> on every frame, with <code>dt</code> being the seconds elapsed since the previous frame. Multiplying the movements by <code>dt</code> makes the animation <strong>independent of the frame rate</strong>.</p>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">140</span>, <span class="str">"cycle"</span>)
 <span class="kw">var</span> x = <span class="num">0</span>
 
-<span class="cmt">## logique : appelée AVANT draw, dt = seconds depuis la frame précédente</span>
+<span class="cmt">## the logic: called BEFORE draw, dt = seconds since the previous frame</span>
 <span class="kw">func</span> update(dt)
-    x = x + <span class="num">120</span> * dt  <span class="cmt">## 120 px/seconde, quel que soit le FPS</span>
+    x = x + <span class="num">120</span> * dt  <span class="cmt">## 120 px per second, whatever the frame rate</span>
     <span class="kw">if</span> x > <span class="num">260</span> <span class="kw">then</span> x = <span class="num">0</span> <span class="kw">end</span>
 <span class="kw">end</span>
 
@@ -1733,10 +1733,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.fill(<span class="bi">Color</span>(<span class="num">1</span>, <span class="num">1</span>, <span class="num">1</span>))
     <span class="bi">graphics</span>.circle(x, <span class="num">70</span>, <span class="num">20</span>)
 <span class="kw">end</span></code></pre>
-<p>Tu peux aussi piloter la boucle explicitement avec <code>graphics.run(callback)</code> si tu préfères nommer ta fonction de rendu autrement (<code>update</code> reste appelée avant).</p>
+<p>You can also drive the loop explicitly with <code>graphics.run(callback)</code> if you would rather name your rendering function otherwise (<code>update</code> is still called first).</p>
 
 <h3>API</h3>
-<p><strong>Règle du module :</strong> la <em>géométrie</em> passe par les arguments, le <em>style</em> vient de l'état courant — <code>fill</code>, <code>stroke</code>, <code>strokeSize</code>, <code>fontSize</code>, <code>font</code>, <code>rectMode</code>, <code>ellipseMode</code>, <code>spriteMode</code>. Aucune primitive de dessin ne prend de couleur ni de taille en argument, et cet état est remis à ses valeurs par défaut au début de chaque frame.</p>
+<p><strong>The module's rule:</strong> the <em>geometry</em> comes through the arguments, the <em>style</em> from the current state — <code>fill</code>, <code>stroke</code>, <code>strokeSize</code>, <code>fontSize</code>, <code>font</code>, <code>rectMode</code>, <code>ellipseMode</code>, <code>spriteMode</code>. No drawing primitive takes a colour or a size as an argument, and that state is reset to its defaults at the start of every frame.</p>
 <table>
   <thead><tr><th>Fonction</th><th>Description</th></tr></thead>
   <tbody>
@@ -2179,7 +2179,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <span class="kw">end</span>
 
 ui.button(<span class="str">"Remettre à zéro"</span>, resetAll)
-ui.checkbox(<span class="str">"Grille"</span>, <span class="kw">ref</span> grid)
+ui.checkbox(<span class="str">"Grid"</span>, <span class="kw">ref</span> grid)
 ui.slider(<span class="str">"Vitesse"</span>, <span class="kw">ref</span> speed, <span class="num">0.25</span>, <span class="num">3</span>, <span class="num">1.0</span>)
 
 <span class="kw">func</span> <span class="fn">draw</span>()
@@ -2570,7 +2570,7 @@ image.endDraw()
 </table>
 <div class="callout tip">Le plus souvent tu n'as pas besoin de <code>window</code> : le moteur fournit déjà les globales <code>W</code> et <code>H</code> (largeur/hauteur de la zone de rendu), ainsi que <code>CW</code> et <code>CH</code> (le centre, soit <code>W/2</code> et <code>H/2</code>), initialisées depuis <code>window</code> avant l'exécution.</div>
 <pre data-no-run><code><span class="cmt">## W, H, CW, CH sont fournis par le moteur — pas besoin de window ici</span>
-<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Titre"</span>)  <span class="cmt">## fenêtre pleine zone</span>
+<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## fenêtre pleine zone</span>
 <span class="bi">graphics</span>.circle(CW, CH, <span class="num">50</span>)  <span class="cmt">## cercle au centre</span></code></pre>
 </section>
 
