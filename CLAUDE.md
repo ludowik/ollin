@@ -9,15 +9,15 @@ français**. Les rapports, revues de code, synthèses et résultats sont rendus 
 structure de données comme livrable à l'utilisateur, même si un outil/skill
 produit du JSON en interne (le convertir en rapport lisible avant de le présenter).
 
-**Langue du DÉPÔT : anglais (règle permanente)**. Tout ce qui est écrit dans le dépôt est en
-anglais — identifiants C++ et Ollin, commentaires, messages d'erreur du moteur, noms des
-exemples et de leurs variables. Un identifiant ne mélange JAMAIS les deux langues
-(`voice_sonne`, `leves_masque` étaient des fautes). Trois exceptions, et elles seules :
-mes **réponses** à l'utilisateur (français, cf. ci-dessus), **CLAUDE.md** lui-même, et la
-**documentation destinée à l'utilisateur d'Ollin** (`docs/views/tutoriel.html`, les vues de la
-web app, les commentaires d'en-tête des exemples qui s'affichent comme texte de présentation).
-La frontière est donc : ce qui S'EXÉCUTE ou se lit dans le code est en anglais, ce qui
-S'ADRESSE au lecteur francophone reste en français.
+**Langue du DÉPÔT : anglais, SANS exception de contenu (règle permanente)**. Tout ce qui est
+écrit dans le dépôt est en anglais : identifiants C++ et Ollin, commentaires (en-tête comme
+corps), messages d'erreur du moteur, textes affichés par la web app et par les exemples, prose
+du tutoriel, libellés des données, messages des scripts de test et d'outillage. Un identifiant
+ne mélange JAMAIS les deux langues (`voice_sonne`, `leves_masque` étaient des fautes).
+Le français ne subsiste que dans **nos échanges** — mes réponses à l'utilisateur (cf. ci-dessus)
+— et dans les fichiers qui PORTENT ces échanges : **CLAUDE.md** et `.claude/` (consignes,
+skills, hooks). Il n'y a plus de frontière « ce qui s'adresse au lecteur francophone » : la
+documentation destinée à l'utilisateur d'Ollin est en anglais comme le reste.
 
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans

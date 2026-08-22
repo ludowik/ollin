@@ -36,7 +36,7 @@ static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
 // Heights of the four top corners of the next cube (state, like s_cur_tile), in local
 // units: (-x,-z), (+x,-z), (-x,+z), (+x,+z). All zero = an ordinary cube.
 static float s_cur_corner[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-static float s_anim_tile = -1.0f;   // tuile animée (UV qui défile, ex. eau) ; -1 = aucune
+static float s_anim_tile = -1.0f;   // the animated tile, whose UV scrolls, water for one; -1 means none
 // Ripple parameters of the animated tile: {scroll, wave speed, spatial frequency,
 // amplitude}. Defaults give a water look; tunable through graphics.tileAnim(t, ...).
 static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
@@ -237,8 +237,8 @@ static int gfx_camera_ortho(CallCtx& ctx) {
 enum Shape3D { SH_CUBE = 0, SH_SPHERE = 1, SH_CYLINDER = 2, SH_PLANE = 3, SH_CONE = 4, SH_TORUS = 5, SH_COUNT = 6 };
 
 struct Bucket3D {
-    unsigned int vaoId;          // clé mesh : identifie le mesh GPU (primitive OU modèle externe)
-    Mesh mesh;                   // mesh à dessiner (primitive unitaire ou mesh d'un modèle)
+    unsigned int vaoId;          // the mesh key: it identifies the GPU mesh, a primitive OR an external model
+    Mesh mesh;                   // the mesh to draw: a unit primitive, or one of a model's meshes
     unsigned int texId;
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
@@ -246,31 +246,31 @@ struct Bucket3D {
     std::vector<float> corners;  // 4 floats (hauteurs de coin du dessus) par instance
 };
 static std::vector<Bucket3D> s_buckets;
-static Camera3D s_cam3d{};   // caméra du bloc begin3d courant (pour viewPos)
+static Camera3D s_cam3d{};   // the current begin3d block's camera, for viewPos
 
 // External models, declared here because reset3d_graphics_state refers to them (definitions further down).
 struct PendingModel {
     std::vector<unsigned char> bytes;
     std::string ext;   // avec le point, ex. ".obj"
 };
-static std::map<std::string, PendingModel> s_model_bytes;   // octets préchargés (nom → données)
-static std::map<std::string, Model> s_model_cache;          // modèles chargés en GPU (paresseux)
+static std::map<std::string, PendingModel> s_model_bytes;   // the preloaded bytes, by name
+static std::map<std::string, Model> s_model_cache;          // the models loaded into the GPU, lazily
 
 // BAKED instance groups (retained geometry).
 // beginChunk/endChunk record cubes ONCE into persistent VBOs; drawChunk redraws them
 // every frame in a single call, so Ollin no longer has to re-emit each cube every frame
 // (per-chunk culling on the script side).
 static bool s_recording = false;
-static std::vector<Matrix> s_rec_x;   // transfos locales enregistrées (OPAQUE)
-static std::vector<float> s_rec_c;    // rgba (0..1) enregistrés (OPAQUE)
-static std::vector<float> s_rec_t;    // tuiles (3 floats/instance) enregistrées (OPAQUE)
-static std::vector<float> s_rec_k;    // hauteurs de coin (4 floats/instance) enregistrées (OPAQUE)
+static std::vector<Matrix> s_rec_x;   // the recorded local transforms, OPAQUE group
+static std::vector<float> s_rec_c;    // the recorded rgba values, 0..1, OPAQUE group
+static std::vector<float> s_rec_t;    // the recorded tiles, three floats per instance, OPAQUE group
+static std::vector<float> s_rec_k;    // the recorded corner heights, four floats per instance, OPAQUE group
 static std::vector<Matrix> s_rec_xw;  // idem, instances TRANSPARENTES (alpha < 1, ex. eau)
 static std::vector<float> s_rec_cw;
 static std::vector<float> s_rec_tw;
 static std::vector<float> s_rec_kw;
-static Mesh s_rec_mesh{};             // mesh enregistré, groupe OPAQUE (cube)
-static Mesh s_rec_mesh_w{};           // mesh enregistré, groupe TRANSPARENT (ex. plane pour l'eau)
+static Mesh s_rec_mesh{};             // the recorded mesh, OPAQUE group: a cube
+static Mesh s_rec_mesh_w{};           // the recorded mesh, TRANSPARENT group: a plane, for water
 struct InstGroup {
     Mesh mesh;
     unsigned int vbo_x;   // VBO transfos (persistant)
@@ -280,9 +280,9 @@ struct InstGroup {
     int count;
 };
 static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
-static std::vector<int> s_free_groups;    // slots libérés réutilisables → borne s_groups en streaming
-static Matrix s_view3d = MatrixIdentity();   // vue figée au begin3d (MVP des solides) ; identité par défaut (fail-safe si flush avant begin3d)
-static Matrix s_proj3d = MatrixIdentity();   // projection perspective figée au begin3d — pour inFrustum appelé HORS du bloc 3D (où rlGetMatrixProjection renvoie l'ortho 2D restaurée par end3d)
+static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
+static Matrix s_view3d = MatrixIdentity();   // the view frozen at begin3d, for the solids' MVP; the identity by default, as a fail-safe should a flush precede begin3d
+static Matrix s_proj3d = MatrixIdentity();   // the perspective projection frozen at begin3d, for inFrustum called OUTSIDE the 3D block, where rlGetMatrixProjection returns the 2D ortho restored by end3d
 
 // Mesh cache keyed by (shape, segments): several resolutions coexist, so a
 // push→segments(8)→sphere→pop does not invalidate the 64-segment sphere of the same frame.
@@ -371,7 +371,7 @@ static void upload_instance_vbo(unsigned int& vbo, int& cap, const void* data, i
     if (vbo == 0 || bytes > cap) {
         if (vbo != 0)
             rlUnloadVertexBuffer(vbo);
-        vbo = rlLoadVertexBuffer(data, bytes, true);   // GL_DYNAMIC_DRAW, laisse lié
+        vbo = rlLoadVertexBuffer(data, bytes, true);   // GL_DYNAMIC_DRAW, and it leaves the buffer bound
         cap = bytes;
     } else {
         rlEnableVertexBuffer(vbo);
@@ -450,26 +450,26 @@ static void load_lit_shader() {
         "void main() {\n"
         "    vec4 texel;\n"
         "    if (fragTile.x >= 0.0) {\n"                 // cube d'atlas : tuile selon la face (normale)
-        "        float t = fragTile.y;\n"                //   côté par défaut
+        "        float t = fragTile.y;\n"                //   the side face by default
         "        if (fragNormal.y > 0.5) t = fragTile.x;\n"   // dessus
         "        else if (fragNormal.y < -0.5) t = fragTile.z;\n" // dessous
         "        float cols = atlasGrid.x;\n"
         "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
         "        vec2 uv = fract(fragTexCoord);\n"
-        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) {\n"           // tuile animée (eau) : défilement + ondulation sinusoïdale
-        "            float sc = animParams.x; float ws = animParams.y;\n"        //   sc=défilement, ws=vitesse d'onde
-        "            float wf = animParams.z; float wa = animParams.w;\n"        //   wf=fréquence spatiale, wa=amplitude
+        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) {\n"           // the animated tile, water: scrolling plus a sine ripple
+        "            float sc = animParams.x; float ws = animParams.y;\n"        //   sc is the scroll, ws the wave speed
+        "            float wf = animParams.z; float wa = animParams.w;\n"        //   wf is the spatial frequency, wa the amplitude
         "            uv = fract(uv + vec2(uTime * sc + sin(uTime * ws + fragPosition.z * wf) * wa,\n" // phase en coord. MONDE (fragPosition)
-        "                                 uTime * sc * 0.66 + cos(uTime * ws * 0.8 + fragPosition.x * wf) * wa));\n" // → continue d'une tuile à l'autre
+        "                                 uTime * sc * 0.66 + cos(uTime * ws * 0.8 + fragPosition.x * wf) * wa));\n" // it carries on from one tile to the next
         "        }\n"
-        "        uv = clamp(uv, 0.002, 0.998);\n"        // léger inset : évite le bleeding entre tuiles
+        "        uv = clamp(uv, 0.002, 0.998);\n"        // a slight inset, which avoids bleeding between tiles
         "        vec2 auv = (cell + uv) / atlasGrid;\n"
         "        texel = texture(texture0, auv);\n"
         // Alpha test (pierced foliage): a hole in the TILE pierces the cube. Sharp rather than
         // faded, hence independent of draw order — the cubes stay opaque and need no sorting.
         // Limited to the atlas path: a semi-transparent texture laid on a model keeps its fade.
         "        if (texel.a < 0.5) discard;\n"
-        "    } else {\n"                                 // chemin classique (modèles, texture immédiate)
+        "    } else {\n"                                 // the ordinary path: models, and the immediate texture
         "        texel = texture(texture0, fragTexCoord);\n"
         "    }\n"
         "    vec4 tint = fragColor;\n"
@@ -842,7 +842,7 @@ static int gfx_begin3d(CallCtx& ctx) {
     s_buckets.clear();
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
-    s_proj3d = rlGetMatrixProjection();  // projection perspective figée → inFrustum correct même appelé hors du bloc 3D
+    s_proj3d = rlGetMatrixProjection();  // the perspective projection is frozen, so inFrustum is right even outside the 3D block
     // Enters rlgl's "transform" mode for the WHOLE 3D block, so that translate/rotate/scale
     // — WITH OR WITHOUT push/pop — write into RLGL.State.transform (world space, read by
     // rlGetMatrixTransform) instead of into the modelview. The instanced solids (baked) AND
@@ -1181,7 +1181,7 @@ static int gfx_plane(CallCtx& ctx) {
                 (float)num_arg(args, argc, 2, "graphics.plane")};
     float sx = (float)num_arg(args, argc, 3, "graphics.plane");
     float sz = (float)num_arg(args, argc, 4, "graphics.plane");
-    if (gfx_has_fill() || gfx_has_stroke()) {   // rien à dessiner si ni fill ni stroke (cohérent avec cube/sphere)
+    if (gfx_has_fill() || gfx_has_stroke()) {   // nothing to draw without fill or stroke, consistently with cube and sphere
         Color c = gfx_has_fill() ? gfx_fill_color() : gfx_stroke_color();
         push_instance(get_shape_mesh(SH_PLANE), s_cur_tex3d, pos, Vector3{sx, 1.0f, sz}, c);
     }
@@ -1315,15 +1315,15 @@ static int gfx_draw_model(CallCtx& ctx) {
     Color fill = gfx_has_fill() ? gfx_fill_color() : WHITE;
     for (int i = 0; i < mdl->meshCount; i++) {
         // The mesh's material (GLB/GLTF): diffuse texture plus base colour.
-        unsigned int texId = s_cur_tex3d;   // défaut : texture 3D courante (ou blanche)
+        unsigned int texId = s_cur_tex3d;   // by default the current 3D texture, or white
         Color base = WHITE;
         int mi = mdl->meshMaterial ? mdl->meshMaterial[i] : 0;
         if (mdl->materials && mi >= 0 && mi < mdl->materialCount) {
             const MaterialMap& diff = mdl->materials[mi].maps[MATERIAL_MAP_DIFFUSE];
             if (diff.texture.id != 0) {
-                texId = diff.texture.id;   // texture du matériau (prioritaire)
+                texId = diff.texture.id;   // the material's texture, which wins
             }
-            base = diff.color;             // baseColorFactor (glTF) — blanc par défaut (OBJ)
+            base = diff.color;             // baseColorFactor (glTF); white by default, as for OBJ
         }
         // tint = the material's base colour times fill, component by component.
         Color tint{(unsigned char)(base.r * fill.r / 255), (unsigned char)(base.g * fill.g / 255),
@@ -1419,7 +1419,7 @@ static int gfx_in_frustum(CallCtx& ctx) {
             }
             float dist = (a * x + b * y + c * z + d) / len;
             if (dist < -r) {
-                return ctx.ret(Value::make_bool(false));   // entièrement du mauvais côté d'un plan → hors-champ
+                return ctx.ret(Value::make_bool(false));   // entirely on the wrong side of a plane, hence off screen
             }
         }
     }
@@ -1489,7 +1489,7 @@ static int gfx_end_chunk(CallCtx& ctx) {
     InstGroup g = build_group(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t, s_rec_k);
     InstGroup w = build_group(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw, s_rec_kw);
     int id_o = place_group(g);
-    int id_w = 0;                       // pas de slot si pas d'eau (évite un groupe vide)
+    int id_w = 0;                       // no slot without water, which avoids an empty group
     if (w.count > 0) {
         id_w = place_group(w);
     }

@@ -5,11 +5,11 @@
 uint16_t Chunk::add_constant(Value v) {
     // Strict per-type dedup on (tag, raw union bytes): one pool entry per distinct literal.
     uint64_t bits;
-    std::memcpy(&bits, &v.ival, sizeof(bits)); // motif binaire de l'union (défini)
+    std::memcpy(&bits, &v.ival, sizeof(bits)); // the union's bit pattern, which is well defined
     ConstKey key{v.tag, bits};
     auto it = const_map_.find(key);
     if (it != const_map_.end())
-        return it->second; // v (doublon) est libéré ici → refcount de la chaîne équilibré
+        return it->second; // v, the duplicate, is released here, which balances the string's refcount
     if (constants.size() >= 0xFFFF)
         throw std::runtime_error("compile: too many constants (max 65535)");
     uint16_t idx = static_cast<uint16_t>(constants.size());

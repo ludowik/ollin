@@ -25,7 +25,7 @@ static void append_upper(uint32_t cp, std::string& out) {
         out += (char)((cp >= 'a' && cp <= 'z') ? cp - 32 : cp);
     else if (cp == 0xDF) // ß → SS
         out += "SS";
-    else if (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7) // à..þ (sauf ÷) → À..Þ
+    else if (cp >= 0xE0 && cp <= 0xFE && cp != 0xF7) // à..þ, excluding ÷, maps to À..Þ
         utf8_encode(cp - 0x20, out);
     else if (cp == 0xFF) // ÿ → Ÿ (U+0178)
         utf8_encode(0x178, out);
@@ -36,7 +36,7 @@ static void append_upper(uint32_t cp, std::string& out) {
 static void append_lower(uint32_t cp, std::string& out) {
     if (cp < 0x80)
         out += (char)((cp >= 'A' && cp <= 'Z') ? cp + 32 : cp);
-    else if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7) // À..Þ (sauf ×) → à..þ
+    else if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7) // À..Þ, excluding ×, maps to à..þ
         utf8_encode(cp + 0x20, out);
     else if (cp == 0x178) // Ÿ → ÿ
         utf8_encode(0xFF, out);
@@ -95,7 +95,7 @@ static std::string trim_cp(const std::string& s, const std::string& chars, bool 
             uint32_t cp = utf8_decode(s, j, &nb);
             j += nb;
             if (!set.count(cp))
-                keep = j; // fin (exclusive) après le dernier codepoint conservé
+                keep = j; // the exclusive end, past the last codepoint kept
         }
         e = keep;
     }
@@ -156,7 +156,7 @@ static int str_substr(CallCtx& ctx) {
     if (len <= 0 || (size_t)start > cnt)
         return ctx.ret(Value(std::string("")));
     size_t start_cp = (size_t)start - 1;
-    size_t end_cp = start_cp + (size_t)len; // borné à cnt ci-dessous
+    size_t end_cp = start_cp + (size_t)len; // clamped to cnt below
     if (end_cp > cnt)
         end_cp = cnt;
     size_t b0 = utf8_byte_offset(s, start_cp);

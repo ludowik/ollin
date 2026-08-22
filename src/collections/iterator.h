@@ -18,7 +18,7 @@ struct Iterator {
     virtual bool primary_is_val() const = 0;   // true=val (array/range), false=key (map)
     virtual void release() {
         delete this;
-    } // peut être overridé pour pool
+    } // can be overridden to pool the object
     virtual ~Iterator() = default;
 };
 
@@ -51,7 +51,7 @@ struct MapIterator : Iterator {
 };
 
 struct ArrayIterator : Iterator {
-    std::vector<Value> items; // snapshot au moment du for-in (cohérent avec MapIterator)
+    std::vector<Value> items; // a snapshot taken at the for-in, consistent with MapIterator
     int64_t pos = 0;
     explicit ArrayIterator(Array* a) : Iterator(KIND_ARRAY), items(a->items) {
     }
@@ -73,7 +73,7 @@ struct ArrayIterator : Iterator {
     bool primary_is_val() const override {
         return true;
     }
-    void release() override; // retourne au pool (défini après ArrayIteratorPool)
+    void release() override; // returns to the pool; defined after ArrayIteratorPool
 };
 
 struct ArrayIteratorPool {

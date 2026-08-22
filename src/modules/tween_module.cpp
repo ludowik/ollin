@@ -175,12 +175,12 @@ int curve_index(const std::string& name, const char* fn) {
 // A channel is ONE animated numeric field. A structured target (a Color, a Vec2) produces one per
 // component, so the rest of the module only ever deals with numbers.
 struct Chan {
-    Value holder;   // map/instance dont on écrit la clé ; nil quand la cible est une `ref`
-    Value ref;      // référence (`ref x`) ; nil quand holder est posé
+    Value holder;   // the map or instance whose key is written; nil when the target is a `ref`
+    Value ref;      // the reference (`ref x`); nil when holder is set
     Value key;
     double from = 0.0;
     double to = 0.0;
-    bool integral = false;   // départ ET cible entiers → on arrondit (pas de dérive en float)
+    bool integral = false;   // the start AND the target are integers, so we round, with no float drift
 };
 
 // A STEP of the sequence: the channels it animates, its duration and its curve. A step with no
@@ -189,8 +189,8 @@ struct Chan {
 // case.
 struct Step {
     std::vector<Chan> chans;
-    bool is_wait = false;   // étape déclarée sans `to` : elle ne fait que laisser passer du temps
-    bool started = false;  // bornes déjà lues ? (au PREMIER passage seulement — un retour
+    bool is_wait = false;   // a step declared without `to`: it merely lets time pass
+    bool started = false;  // have the bounds been read? On the FIRST pass only — a return trip
                             // replays the same bounds, otherwise it goes nowhere)
     double dur = 0.0;
     int curve = k_curve_default;
@@ -208,18 +208,18 @@ struct Step {
 // in REVERSE order, each one backwards.
 struct Tw {
     std::vector<Step> steps;
-    size_t pos = 0;      // étape en cours, comptée dans l'ordre du segment courant
+    size_t pos = 0;      // the current step, counted in the current segment's order
     std::vector<int8_t> plan{1};
     size_t seg = 0;      // segment en cours dans le plan
-    double cycle = 0.0;  // durée d'un parcours complet, figée à la construction
-    bool endless = false;   // le plan est rejoué sans fin (loop)
+    double cycle = 0.0;  // the duration of one full pass, frozen at construction
+    bool endless = false;   // the plan is replayed endlessly
     double elapsed = 0.0;
     double delay = 0.0;
     Value on_done;
     bool paused = false;
     bool alive = false;
-    uint64_t born_pass = 0;   // passe d'avancement où le tween est né (cf. advance)
-    uint32_t gen = 1;   // incrémentée à la libération → un handle périmé est détecté
+    uint64_t born_pass = 0;   // the advancing pass the tween was born in (see advance)
+    uint32_t gen = 1;   // incremented on release, which makes a stale handle detectable
 };
 
 std::vector<Tw> s_tweens;
@@ -273,8 +273,8 @@ void free_tween(int slot) {
     Tw& t = s_tweens[slot];
     t.alive = false;
     t.gen++;
-    t.steps.clear();      // relâche les Value kept : sans cela le module garderait
-    t.on_done = Value{};   // l'objet animé vivant longtemps après la fin de l'animation
+    t.steps.clear();      // releases the Values held: without this the module would keep
+    t.on_done = Value{};   // the animated object alive long after the animation ended
     s_free.push_back(slot);
 }
 
@@ -339,7 +339,7 @@ void add_struct_chans(std::vector<Chan>& out, const Value& cur, const Value& tgt
         if (!from.is_number())
             continue;
         Chan c;
-        c.holder = cur;   // on écrit DANS l'instance : le tween modifie l'objet, il ne le remplace pas
+        c.holder = cur;   // we write INTO the instance: the tween mutates the object, it does not replace it
         c.key = kv.first;
         c.from = from.as_num();
         c.to = kv.second.as_num();
@@ -600,7 +600,7 @@ int tween_sequence(CallCtx& ctx) {
 
     std::vector<Step> steps;
     std::vector<Chan> tous;   // tous les canaux de la suite, pour une seule passe d'annulation
-    for (int64_t k = 1; k <= nb; k++) {   // tableaux Ollin : indexés à 1
+    for (int64_t k = 1; k <= nb; k++) {   // Ollin arrays are 1-based
         Value brut = args[1].array_get(k);
         const std::string ou = std::string(FN) + ": step " + std::to_string(k);
         if (!brut.is_map())
@@ -823,7 +823,7 @@ void write_chan(const Chan& c, double v) {
         ref_set(c.ref, out);
         return;
     }
-    Value holder = c.holder;   // map_set mute la map : une copie de la Value suffit (même Map*)
+    Value holder = c.holder;   // map_set mutates the map, so a copy of the Value is enough: the same Map*
     holder.map_set(c.key, out);
 }
 
@@ -868,7 +868,7 @@ void advance(double dt) {
                 t.delay -= step;
                 if (t.delay > 0.0)
                     continue;
-                step = -t.delay;   // le reliquat du pas sert à l'animation
+                step = -t.delay;   // the step's remainder feeds the animation
                 t.delay = 0.0;
             }
             t.elapsed += step;
@@ -881,8 +881,8 @@ void advance(double dt) {
         // slot taken over by another tween" (see alloc_tween, which sets alive = true again).
         uint32_t gen0 = s_tweens[i].gen;
         double p = 1.0;
-        bool ends = true;      // dernier segment terminé → le tween a fini
-        bool seg_ends = true;  // étape courante terminée
+        bool ends = true;      // the last segment is over, so the tween has finished
+        bool seg_ends = true;  // the current step is over
         int8_t sens = 1;
         size_t idx = 0;
         // This loop calls Ollin code: a `ref` getter in start_step, a setter in settle_step_end. That
@@ -918,8 +918,8 @@ void advance(double dt) {
                     break;
                 settle_step_end(s_tweens[i], franchie);
                 if (!tween_alive(i, gen0))
-                    break;   // le code appelé a annulé ce tween
-                Tw& t2 = s_tweens[i];                 // référence RELUE après les appels
+                    break;   // the code called cancelled this tween
+                Tw& t2 = s_tweens[i];                 // the reference is READ AGAIN after the calls
                 t2.elapsed -= t2.steps[franchie].dur;
                 if (t2.pos + 1 < t2.steps.size()) {
                     t2.pos++;
@@ -932,7 +932,7 @@ void advance(double dt) {
                 }
             }
             if (!tween_alive(i, gen0))
-                continue;   // annulé en cours de franchissement : plus rien à écrire
+                continue;   // cancelled while being crossed: there is nothing left to write
             Tw& t = s_tweens[i];
             sens = t.plan[t.seg];
             idx = step_index(t, t.pos);
@@ -943,7 +943,7 @@ void advance(double dt) {
                 ends = false;
             }
         }
-        start_step(s_tweens[i], idx);   // hors de toute référence retenue
+        start_step(s_tweens[i], idx);   // outside of any reference held
         if (!tween_alive(i, gen0))
             continue;
         // The writes and the curve callback run Ollin code — a `ref` setter, a custom curve — so no
@@ -976,7 +976,7 @@ void advance(double dt) {
 } // namespace
 
 void tween_update_all(double dt) {
-    s_engine_driven = true;   // le moteur pilote → tween.update côté script devient no-op
+    s_engine_driven = true;   // the engine drives, so tween.update becomes a no-op on the script side
     advance(dt);
 }
 

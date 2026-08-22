@@ -43,7 +43,7 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
             cur_is_local = false;
         } else if (s.func_proto_idx >= 0) {
             int uv_i = (int)chunk.funcs[s.func_proto_idx].upvals.size();
-            if (uv_i > 255) // l'index d'upvalue est un opérande 8 bits
+            if (uv_i > 255) // the upvalue index is an 8-bit operand
                 throw std::runtime_error("function captures more than 255 upvalues");
             chunk.funcs[s.func_proto_idx].upvals.push_back({cur_is_local, cur_idx});
             s.upval_idx[name] = uv_i;
@@ -61,7 +61,7 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
     if (current_func_idx_ < 0)
         return -1; // in main chunk, no FuncProto
     int uv_i = (int)chunk.funcs[current_func_idx_].upvals.size();
-    if (uv_i > 255) // l'index d'upvalue est un opérande 8 bits
+    if (uv_i > 255) // the upvalue index is an 8-bit operand
         throw std::runtime_error("function captures more than 255 upvalues");
     chunk.funcs[current_func_idx_].upvals.push_back({cur_is_local, cur_idx});
     cur_upval_idx_[name] = uv_i;
@@ -192,7 +192,7 @@ struct CollectLocalsVisitor : StmtQuery {
     std::unordered_set<std::string>& seen;
     bool collect_funcs;
     const std::vector<std::string>& files;
-    std::unordered_set<std::string>* funcs; // noms de fonctions locales (liées d'emblée), si demandé
+    std::unordered_set<std::string>* funcs; // the names of the local functions, bound straight away, when asked for
 
     CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
                          bool collect_funcs, const std::vector<std::string>& files,
@@ -277,7 +277,7 @@ struct CollectGlobalsVisitor : StmtQuery {
         }
     }
     void visit(const ClassDeclStmt& s) override {
-        out.insert(s.name); // classe visible par ses propres méthodes
+        out.insert(s.name); // a class is visible to its own methods
     }
 };
 
@@ -343,15 +343,15 @@ Chunk Compiler::compile(const Program& prog) {
         declared_globals_.insert(n);
     declared_globals_.insert("deltaTime");
     declared_globals_.insert("elapsedTime");
-    declared_globals_.insert("W");   // largeur de la zone de rendu (défaut : window.width)
-    declared_globals_.insert("H");   // hauteur de la zone de rendu (défaut : window.height)
+    declared_globals_.insert("W");   // the width of the render area, window.width by default
+    declared_globals_.insert("H");   // the height of the render area, window.height by default
     declared_globals_.insert("CW");  // centre X de la zone de rendu (W / 2)
     declared_globals_.insert("CH");  // centre Y de la zone de rendu (H / 2)
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
     collect_locals(prog.stmts, top_locals, chunk.source_files, false);
-    bind_scan_locals(top_locals, {}); // collect_funcs=false → aucune fonction ici, tout est différé
+    bind_scan_locals(top_locals, {}); // collect_funcs=false: no function here, everything is deferred
     locals_top_ = reg_top_;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
@@ -484,11 +484,11 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std
                               const std::unordered_set<std::string>& skip) {
     for (auto& name : names) {
         if (skip.count(name))
-            continue; // prologue de la portée courante (param, self, catch var) — déjà lié
+            continue; // the current scope's prologue (a parameter, self, a catch variable): already bound
         if (funcs.count(name))
-            local_regs_[name] = reg_top_++;      // fonction locale : visible d'emblée (récursion / réf. en avant)
+            local_regs_[name] = reg_top_++;      // a local function is visible straight away, for recursion and forward references
         else
-            pending_var_reg_[name] = reg_top_++; // var/const : différée jusqu'à sa déclaration
+            pending_var_reg_[name] = reg_top_++; // var and const are deferred until their declaration
     }
 }
 
@@ -602,7 +602,7 @@ void Compiler::visit(const SwitchStmt& s) {
     int above_subj = reg_top_; // subj_r reste vivant pendant tous les bras
 
     std::vector<size_t> end_patches;
-    break_patches.push_back({}); // break à l'intérieur du switch cible end_addr
+    break_patches.push_back({}); // a break inside the switch targets end_addr
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;
@@ -613,8 +613,8 @@ void Compiler::visit(const SwitchStmt& s) {
             reg_top_ = above_subj;
             arm.values[vi]->accept(*this);
             int val_r = last_reg_;
-            int cond_r = alloc_reg(); // allocReg() met à jour reg_count_
-            reg_top_ = above_subj;   // libère le temporaire après EQ
+            int cond_r = alloc_reg(); // alloc_reg() updates reg_count_
+            reg_top_ = above_subj;   // frees the temporary after EQ
             chunk.emit(make_abc((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
             if (!is_last) {
                 size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
@@ -821,7 +821,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     int outer_locals = locals_top_;
     auto outer_name = current_func_name;
     int outer_fidx = current_func_idx_;
-    bool is_nested = !outer_name.empty(); // déclarée dans une autre fonction
+    bool is_nested = !outer_name.empty(); // declared inside another function
 
     auto outer_consts = const_names_; // copy (not move) — stays in OuterScope too
     const_names_.clear();
@@ -881,7 +881,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
         stmt->accept(*this);
         reg_top_ = saved;
     }
-    emit_implicit_return(chunk); // implicit void return (omis si le corps finit déjà par RETURN)
+    emit_implicit_return(chunk); // an implicit void return, omitted when the body already ends with RETURN
 
     // Update reg_count in FuncProto
     if (reg_count_ > 255)
@@ -1251,7 +1251,7 @@ void Compiler::visit(const ChainedCompareExpr& e) {
         chunk.emit(make_abc((uint8_t)Op::AND, (uint8_t)cmp_base, (uint8_t)cmp_base, (uint8_t)(cmp_base + i)));
 
     last_reg_ = cmp_base;
-    reg_top_ = base_tmp; // libère tous les temporaires après l'expression
+    reg_top_ = base_tmp; // frees every temporary after the expression
 }
 
 void Compiler::visit(const UnaryExpr& e) {
@@ -1283,7 +1283,7 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
     const Expr* last = args.back().get();
     bool is_vararg = dynamic_cast<const VarArgExpr*>(last) != nullptr;
 
-    int func_slot = reg_top_++; // callee SOUS le bloc d'arguments (jamais écrasé par l'expansion)
+    int func_slot = reg_top_++; // the callee sits BELOW the argument block, so an expansion never overwrites it
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
     int call_base = reg_top_;
@@ -1307,7 +1307,7 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
         int want = call_base + n_fixed;
         reg_top_ = want;
         args.back()->accept(*this);
-        if (last_reg_ != want) // appel imbriqué lui-même spread → recompose à `want`
+        if (last_reg_ != want) // the nested call spread as well, so recompose at `want`
             chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
         chunk.emit(make_abc((uint8_t)Op::CALL_VA, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
     }
@@ -1480,7 +1480,7 @@ void Compiler::visit(const MapExpr& e) {
     for (auto& entry : e.entries) {
         int saved = reg_top_;
         int key_reg = alloc_reg();
-        compile_into(*entry.key, key_reg); // StringExpr littéral OU clé calculée
+        compile_into(*entry.key, key_reg); // a literal StringExpr OR a computed key
         int val_reg = alloc_reg();
         compile_into(*entry.value, val_reg);
         chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_reg, (uint8_t)val_reg));
@@ -1524,7 +1524,7 @@ void Compiler::visit(const ArrayExpr& e) {
         } else if (last_pos && is_call_node(elem)) {
             int saved = reg_top_;
             int spread_base = reg_top_;
-            e.elements[i]->accept(*this); // k valeurs à spread_base.., last_results_ = k
+            e.elements[i]->accept(*this); // k values at spread_base.., with last_results_ = k
             chunk.emit(make_abc((uint8_t)Op::ARRAY_PUSH_SPREAD, (uint8_t)dest, (uint8_t)spread_base, 0));
             reg_top_ = saved;
         } else {
@@ -1602,7 +1602,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
 
-    compile_into(src, tmp_src); // src compilé AVANT de scoper les variables de boucle
+    compile_into(src, tmp_src); // src is compiled BEFORE the loop variables are scoped
     chunk.emit(make_abc((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
     reg_top_ = tmp_src;
 
@@ -1940,7 +1940,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     }
     local_regs_[var1] = var_reg;
 
-    size_t prep = chunk.emit_jump(Op::FOR_PREP, (uint8_t)ctl); // Bx → sortie si boucle vide (patché)
+    size_t prep = chunk.emit_jump(Op::FOR_PREP, (uint8_t)ctl); // Bx is the exit for an empty loop, patched later
 
     uint16_t body_addr = (uint16_t)chunk.current_pos(); // FOR_PREP tombe ici si non vide
     if (!can_alias)
@@ -1987,12 +1987,12 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
                                  int file_idx) {
     if (enum_names_.empty())
-        return;   // aucun enum dans le programme : rien à vérifier
+        return;   // no enum in the program, so nothing to check
     const std::string* name = &obj_name;
     if (obj_expr) {
         auto* ve = dynamic_cast<const VarExpr*>(obj_expr);
         if (!ve)
-            return;   // cible chaînée (a.b[k]) : l'objet écrit n'est pas l'enum lui-même
+            return;   // a chained target (a.b[k]): the object written is not the enum itself
         name = &ve->name;
     }
     if (!enum_names_.count(*name) || local_regs_.count(*name))
@@ -2086,7 +2086,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
             reg_count_ = base + n_targets;
         chunk.emit(make_abc((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n_targets, 0));
         reg_top_ = base + n_targets;
-        n = n_targets; // chaque cible a désormais sa valeur en base+i
+        n = n_targets; // each target now has its value at base+i
     } else {
         for (int i = 0; i < n; ++i) {
             int r = alloc_reg();
@@ -2430,8 +2430,8 @@ void Compiler::visit(const MethodCallExpr& e) {
     chunk.emit(make_abc((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
     if (e.optional) {
         size_t end = chunk.emit_jump(Op::JUMP);                                // saute par-dessus le LOAD_NIL
-        chunk.patch_jump(skip, (uint16_t)chunk.current_pos());                  // cible du saut : méthode nil
-        chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0)); // résultat nil
+        chunk.patch_jump(skip, (uint16_t)chunk.current_pos());                  // the jump target: a nil method
+        chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0)); // a nil result
         chunk.patch_jump(end, (uint16_t)chunk.current_pos());
     }
     last_reg_ = call_base;

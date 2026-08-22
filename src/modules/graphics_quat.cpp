@@ -26,7 +26,7 @@ Quaternion quat_from_instance(const Value& v, const char* fn) {
                       (float)quat_field(v, "w")};
 }
 
-static Value quat_class();   // défini plus bas
+static Value quat_class();   // defined below
 
 Value make_quat_instance(Quaternion q) {
     Value inst = Value::make_map();

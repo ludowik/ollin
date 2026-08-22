@@ -26,7 +26,7 @@ class Parser {
     std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names_;
     std::shared_ptr<std::vector<std::string>> source_files_;
     int current_file_idx_ = 0;
-    int depth_ = 0; // profondeur de récursion (garde anti-débordement de pile)
+    int depth_ = 0; // the recursion depth, guarding against a stack overflow
 
     SourceLoc cur_loc(int line) const { return {(uint16_t)current_file_idx_, (uint16_t)line}; }
 

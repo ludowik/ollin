@@ -153,7 +153,7 @@ static int math_map(CallCtx& ctx) {
     double out_lo = num_arg(args, argc, 3, "math.map");
     double out_hi = num_arg(args, argc, 4, "math.map");
     if (in_hi == in_lo)
-        return ctx.ret(num_value(out_lo)); // plage d'entrée dégénérée → borne basse (évite inf/nan)
+        return ctx.ret(num_value(out_lo)); // a degenerate input range gives the low bound, which avoids inf and nan
     return ctx.ret(num_value(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)));
 }
 

@@ -267,8 +267,8 @@ struct CommentStmt : Stmt {
 struct VarDeclStmt : Stmt {
     std::vector<std::string> names;
     std::vector<std::unique_ptr<Expr>> values;
-    bool is_global = false;   // true = déclaré avec 'global' → variables globales
-    bool is_constant = false; // true = déclaré avec 'constant' → locale immuable
+    bool is_global = false;   // true when declared with 'global', hence a global variable
+    bool is_constant = false; // true when declared with 'constant', hence an immutable local
     void exported_names(std::vector<std::string>& out) const override {
         for (auto& n : names)
             out.push_back(n);
@@ -370,9 +370,9 @@ struct TryCatchStmt : Stmt {
 struct FuncDeclStmt : Stmt {
     std::string name;
     std::vector<std::string> params;
-    std::vector<std::unique_ptr<Expr>> defaults; // nullptr = pas de défaut
+    std::vector<std::unique_ptr<Expr>> defaults; // nullptr means no default
     bool variadic = false;
-    bool is_static = false; // méthode de classe (pas de self implicite)
+    bool is_static = false; // a class method, with no implicit self
     std::vector<std::unique_ptr<Stmt>> body;
     void exported_names(std::vector<std::string>& out) const override {
         out.push_back(name);
@@ -428,7 +428,7 @@ struct IndexExpr : Expr {
 };
 
 struct IndexAssignStmt : Stmt {
-    std::string obj; // nom de la variable conteneur (utilisé si obj_expr est nul)
+    std::string obj; // name of the container variable, used when obj_expr is null
     // Container as an EXPRESSION, for CHAINED targets (a.b.c, a[i][j], a.b[k]…). When set it
     // takes precedence over `obj`: the compiler evaluates it to get the map or array to index.
     // Otherwise the plain name `obj` is used.
@@ -461,7 +461,7 @@ struct MultiAssignStmt : Stmt {
 // One variable: var1 receives the primary value (the value for an array or range, the key for
 // a map). Two variables: var1 is the key or index, var2 the value.
 struct ForIterStmt : Stmt {
-    std::string var1; // toujours lié (key si 2 vars, primary si 1 var)
+    std::string var1; // always bound: the key with two variables, the primary one with a single variable
     std::string var2; // vide = forme 1 var
     std::unique_ptr<Expr> iter_expr;
     std::vector<std::unique_ptr<Stmt>> body;
@@ -537,7 +537,7 @@ struct MethodCallExpr : Expr {
     std::string method;
     std::vector<std::unique_ptr<Expr>> args;
     bool is_super = false;
-    bool optional = false; // obj.m?() : appelle si la méthode est callable, nil si absente
+    bool optional = false; // obj.m?(): calls when the method is callable, gives nil when absent
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -552,7 +552,7 @@ struct ClassDeclStmt : Stmt {
     }
     void for_each_body(const BodyFn& f) const override {
         for (auto& m : methods)
-            f(m->body);   // les méthodes sont des FuncDeclStmt : on expose leur corps
+            f(m->body);   // methods are FuncDeclStmt, so their bodies are exposed
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -572,7 +572,7 @@ struct EnumDeclStmt : Stmt {
     std::unique_ptr<Expr> obj_expr;     // non nul pour `enum obj.champ` : la map cible
     std::vector<EnumItem> items;
     void exported_names(std::vector<std::string>& out) const override {
-        if (!obj_expr)   // `enum a.b` écrit un champ d'une map : aucun nom propre
+        if (!obj_expr)   // `enum a.b` writes a map field, so there is no name of its own
             out.push_back(name);
     }
     void accept(StmtVisitor& v) const override {

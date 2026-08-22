@@ -24,7 +24,7 @@ struct Map {
     enum : uint8_t { PLAIN = 0, ENUM = 1 };
     uint8_t kind = PLAIN;
     void* userdata = nullptr;
-    uint64_t version = 0;   // = ++g_map_epoch à chaque mutation ; 0 = jamais mutée
+    uint64_t version = 0;   // = ++g_map_epoch on every mutation; 0 means never mutated
 
     Value get(const Value& k) const;
     // Location of the value, or nullptr when absent. This is what lets the GET_INDEX inline
@@ -44,7 +44,7 @@ struct MapPool {
             Map* m = buf[--n];
             m->refcount = 1;
             m->userdata = nullptr;
-            return m;   // kind/version déjà remis à neuf par release()
+            return m;   // kind and version were already reset by release()
         }
         return new Map();
     }
@@ -59,16 +59,16 @@ struct MapPool {
         // is &n, whenever a nested release filled the pool during the clear. That one-byte
         // overflow used to corrupt n.
         if (m->data.size() > POOL_MAX_SIZE) {
-            delete m; // grosse map : ~Map libère entrées + buckets, jamais poolée
+            delete m; // a big map: ~Map frees the entries and the buckets, and it is never pooled
             return;
         }
-        m->data.clear();  // peut ré-entrer le pool (releases imbriqués) → n peut changer
+        m->data.clear();  // this can re-enter the pool through nested releases, so n may change
         m->version = ++g_map_epoch;  // recyclage : invalide tout inline cache pointant sur ce Map*
-        m->kind = Map::PLAIN;             // sinon une map recyclée ressortirait gelée (enum)
+        m->kind = Map::PLAIN;             // otherwise a recycled map would come back frozen, as an enum
         if (n < CAP) {
-            buf[n++] = m; // n RELU après clear
+            buf[n++] = m; // n is READ AGAIN after the clear
         } else {
-            delete m; // data déjà vidée
+            delete m; // the data is already emptied
         }
     }
 };

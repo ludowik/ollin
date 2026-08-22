@@ -50,7 +50,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
         source_files->push_back(fname);
         s_vm->execute(Compiler().compile(
             Parser(Lexer(source, fname, 0).tokenize(), "", imported, nullptr, source_files).parse()));
-        s_vm->run_entry_hooks(); // setup() puis draw()→graphics.run (logique partagée, garde isMap)
+        s_vm->run_entry_hooks(); // setup(), then draw() through graphics.run: shared logic, with the is_map guard
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);
         return std::string("error: ") + e.what();

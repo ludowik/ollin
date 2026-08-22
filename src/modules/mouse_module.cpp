@@ -52,7 +52,7 @@ void mouse_poll(bool click_taken) {
             && std::abs(my - s_last_click_y) < DBLCLICK_DIST;
         if (dbl) {
             vm->call_value(double_clicked, x, y);
-            s_last_click_time = -1.0f;   // reset pour ne pas déclencher en triple-clic
+            s_last_click_time = -1.0f;   // reset, so a triple click does not fire it
         } else {
             if (pressed.is_callable())
                 vm->call_value(pressed, x, y);

@@ -133,7 +133,7 @@ inline void sound_check_envelope(const Value* args, int argc, const char* fn) {
 
 inline double sound_check_hold(const Value* args, int argc, const char* fn) {
     if (argc < 1 || args[0].is_nil())
-        return -1.0;   // note TENUE : elle sonnera jusqu'à release()
+        return -1.0;   // a HELD note: it sounds until release()
     if (!args[0].is_number())
         throw std::runtime_error(std::string(fn) + ": duration must be a number of seconds");
     if (args[0].as_num() <= 0.0)

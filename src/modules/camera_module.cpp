@@ -34,7 +34,7 @@ static int cam_open(CallCtx& ctx) {
 
     if (!s_cam_id || !image_tex_valid(s_cam_id) || s_cam_w != w || s_cam_h != h) {
         if (s_cam_id)
-            image_free_tex(s_cam_id); // libère l'ancienne texture avant réalloc (sinon fuite GPU)
+            image_free_tex(s_cam_id); // frees the old texture before reallocating, or the GPU leaks
         s_cam_w = w;
         s_cam_h = h;
         s_cam_handle = image_alloc_tex(w, h, &s_cam_id);
@@ -49,7 +49,7 @@ static int cam_open(CallCtx& ctx) {
         // Guard before creating any DOM node: otherwise every retry in an insecure context (the
         // 'error' state) would leave one more orphan <video> behind.
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            cam.state = 'error'; // contexte non sécurisé (HTTP hors localhost) → pas d'API caméra
+            cam.state = 'error'; // an insecure context (HTTP outside localhost) has no camera API
             return;
         }
         cam.w = w; cam.h = h;

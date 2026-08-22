@@ -85,7 +85,7 @@ constexpr int k_max_buffers = 32;
 constexpr double k_max_buffer_seconds = 10.0;
 
 struct Buf {
-    std::vector<float> samples;   // mono ; le panoramique est appliqué à la lecture
+    std::vector<float> samples;   // mono; the pan is applied on playback
     std::atomic<bool> playing{false};
     std::atomic<bool> loop{false};
     std::atomic<double> volume{0.5};
@@ -96,7 +96,7 @@ struct Buf {
     // Private to the main thread.
     uint32_t gen = 1;
     bool used = false;
-    uint64_t retired_epoch = 0;   // bloc de mélange où le slot a été rendu
+    uint64_t retired_epoch = 0;   // the mix block in which the slot was given back
 };
 
 Buf* sound_buffers();

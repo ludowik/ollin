@@ -15,7 +15,7 @@ inline size_t utf8_step(const std::string& s, size_t i) {
     size_t adv = 1;
     for (size_t k = 1; k < len && i + k < s.size(); k++) {
         if (((unsigned char)s[i + k] & 0xC0) != 0x80)
-            break; // pas un octet de continuation → codepoint tronqué
+            break; // not a continuation byte, hence a truncated codepoint
         adv++;
     }
     return adv;
@@ -47,7 +47,7 @@ inline uint32_t utf8_decode(const std::string& s, size_t i, size_t* nbytes) {
     unsigned char c = (unsigned char)s[i];
     size_t lead_len = c >= 0xF0 ? 4 : c >= 0xE0 ? 3 : c >= 0xC0 ? 2 : 1;
     size_t actual = utf8_step(s, i);
-    if (actual != lead_len) { // malformé → octet brut
+    if (actual != lead_len) { // malformed, hence a raw byte
         *nbytes = actual;
         return c;
     }

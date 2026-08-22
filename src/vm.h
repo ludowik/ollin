@@ -18,7 +18,7 @@ class VM {
     void execute(Chunk chunk);
     std::string invoke_str(Value v);
     static VM* current();                   // returns s_current_vm
-    Value call_value(const Value& fn, const Value* args, int argc); // générique
+    Value call_value(const Value& fn, const Value* args, int argc); // the generic form
     Value call_value(const Value& fn);
     Value call_value(const Value& fn, const Value& a);
     Value call_value(const Value& fn, const Value& a, const Value& b);
@@ -54,13 +54,13 @@ class VM {
     struct Frame {
         uint32_t return_ip = 0;
         int reg_base = 0;
-        int result_base = 0;  // où RETURN/RETURN_V écrit les résultats (= reg_base sauf CALL_VARARGS,
+        int result_base = 0;  // where RETURN and RETURN_V write the results (= reg_base except for CALL_VARARGS,
                               // running in a fresh window but returning to the caller's static register)
         int varargs_base = 0; // = reg_base + fp.reg_count (where varargs live in regs)
         int n_varargs = 0;    // count of extra variadic args (0 if none)
         bool is_ctor = false; // true = frame is a constructor; RETURN overrides R[0] with instance
         int return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
-        bool negate_result = false; // true: RETURN nie (logique) le résultat avant return_dest
+        bool negate_result = false; // true: RETURN logically negates the result before return_dest
                                     // (used by <> through __eq, and by >/>=/</<= on the flipped side)
         std::unique_ptr<std::vector<Upvalue*>> upvals;
         std::unique_ptr<std::vector<Upvalue*>> open_upvals;
@@ -134,12 +134,12 @@ class VM {
     uint32_t instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done);
     uint32_t try_meta_unary(const Value& name, int dest, Value lhs);
     void close_upvals();                     // tout le frame (retour, throw) — chemin CHAUD
-    void close_upvals_above(int threshold);   // portée qui se termine (fin d'itération)
+    void close_upvals_above(int threshold);   // a scope that ends, such as an iteration
     // Unwinds to handler `h`, shrinks regs back, writes the caught value into the catch
     // register and points `ip` at the catch body. Shared by op_THROW (a script-level throw) and
     // by the C++ catch(runtime_error).
     void unwind_to_handler(const Handler& h, Value thrown);
-    void grow_regs(size_t needed); // croît par doublement, max 4096, jamais rétrécit
+    void grow_regs(size_t needed); // grows by doubling, up to 4096, and never shrinks
 
     // Calls a builtin: builds the CallCtx, invokes it, updates last_results_ and returns the
     // number of values produced. It is the SINGLE entry point of the six builtin call sites, so

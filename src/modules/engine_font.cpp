@@ -7,7 +7,7 @@ namespace {
 
 struct Entry {
     const char* name;
-    Font (*load)();   // nul = police intégrée de raylib (déjà chargée, sans atlas)
+    Font (*load)();   // null means raylib's built-in font, already loaded and with no atlas
     Font font;
     bool ready;
 };

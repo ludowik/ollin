@@ -54,9 +54,9 @@ static Rectangle sprite_dest(float x, float y, float dw, float dh) {
 struct TexHandle {
     int id = 0;
     bool is_render = false;
-    bool is_streaming = false; // texture alimentée par image_push_pixels (caméra) → ombre CPU maintenue
+    bool is_streaming = false; // a texture fed by image_push_pixels (the camera), so the CPU shadow is kept up to date
     bool pixels_open = false;
-    bool gpu_dirty = false;   // le GPU a été dessiné (beginDraw) → resync CPU au prochain accès pixel
+    bool gpu_dirty = false;   // the GPU was drawn into (beginDraw), so the CPU is resynced on the next pixel access
     Texture2D tex = {};
     RenderTexture2D rtt = {};
     Image cpu = {};
@@ -153,9 +153,9 @@ void image_reset() {
     bool gl = IsWindowReady();
     for (auto& [id, h] : s_images) {
         if (h->cpu.data)
-            UnloadImage(h->cpu);   // mémoire CPU : toujours libérée (indépendante du GL)
+            UnloadImage(h->cpu);   // CPU memory is always freed, being independent of GL
         if (!gl)
-            continue;              // fenêtre partie : sauter les appels GPU, PAS le free CPU
+            continue;              // the window is gone: skip the GPU calls, but NOT the CPU free
         if (h->is_render)
             UnloadRenderTexture(h->rtt);
         else
@@ -377,7 +377,7 @@ static int img_begin(CallCtx& ctx) {
     if (!h.is_render)
         throw std::runtime_error(std::string(FN) + ": not a render texture — use image.create()");
     pixels_close(h);
-    h.gpu_dirty = true;   // le dessin GPU va diverger de l'ombre CPU → resync au prochain accès pixel
+    h.gpu_dirty = true;   // the GPU drawing will diverge from the CPU shadow, so it resyncs on the next pixel access
     BeginTextureMode(h.rtt);
     return ctx.ret(Value{});
 }
@@ -473,7 +473,7 @@ static int img_get_pixel(CallCtx& ctx) {
     pixels_open(h);
     Color c;
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height) {
-        c = BLANK; // hors image → transparent (borne x,y ; sinon accès OOB dans le chemin rapide)
+        c = BLANK; // outside the image is transparent; x and y are clamped, or the fast path would read out of bounds
     } else if (h.cpu.format == PIXELFORMAT_UNCOMPRESSED_R8G8B8A8) {
         const uint8_t* px = (const uint8_t*)h.cpu.data + (y * h.cpu.width + x) * 4;
         c = {px[0], px[1], px[2], px[3]};
@@ -498,7 +498,7 @@ static int img_set_pixel(CallCtx& ctx) {
     int y = (int)num_arg(args, 2, FN);
     pixels_open(h);
     if (x < 0 || y < 0 || x >= h.cpu.width || y >= h.cpu.height)
-        return ctx.ret(Value{}); // hors image → ignore (borne x,y ; sinon écriture OOB dans le chemin rapide)
+        return ctx.ret(Value{}); // outside the image is ignored; x and y are clamped, or the fast path would write out of bounds
     Color c = (argc >= 7) ? Color{
         (uint8_t)(num_arg(args, 3, FN) * 255.0 + 0.5),
         (uint8_t)(num_arg(args, 4, FN) * 255.0 + 0.5),

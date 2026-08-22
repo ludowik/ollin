@@ -19,6 +19,6 @@ int image_get_sprite_mode() {
     return SPRITE_CORNER;
 }
 void image_get_tint(bool* has, unsigned char* r, unsigned char* g, unsigned char* b, unsigned char* a) {
-    *has = false; // paramètres de sortie initialisés : pas de teinte (blanc)
+    *has = false; // the output parameters are initialised: no tint, hence white
     *r = *g = *b = *a = 255;
 }

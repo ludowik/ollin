@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <string>
 
-Value make_color_class(); // défini plus bas — utilisé par color_random (repli)
+Value make_color_class(); // defined below; used by color_random as a fallback
 
 
 static double color_component(const Value& v, const char* name) {
@@ -178,7 +178,7 @@ static Value make_color_instance(const Value& cls, double r, double g, double b,
 
 Value make_colors_module() {
     Value m = Value::make_map();
-    Value cls = make_color_class(); // classe Color partagée par toutes les constantes de la palette
+    Value cls = make_color_class(); // the Color class, shared by every constant of the palette
     m.map_set(Value(std::string("BLACK")), make_color_instance(cls, 0.0, 0.0, 0.0));
     m.map_set(Value(std::string("WHITE")), make_color_instance(cls, 1.0, 1.0, 1.0));
     m.map_set(Value(std::string("RED")), make_color_instance(cls, 230 / 255.0, 41 / 255.0, 55 / 255.0));

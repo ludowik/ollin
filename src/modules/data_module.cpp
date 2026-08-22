@@ -14,9 +14,9 @@
 
 enum Scope { S_PROJECT = 0, S_GLOBAL = 1 };
 
-static std::map<std::string, std::string> s_store[2];   // [portée] : clé → valeur encodée
+static std::map<std::string, std::string> s_store[2];   // [scope]: key to encoded value
 #ifndef __EMSCRIPTEN__
-static std::string s_file[2];                            // natif : fichier sidecar par portée
+static std::string s_file[2];                            // native: one sidecar file per scope
 #endif
 
 // Typed encoding of a scalar Value to and from the stored string.
@@ -49,7 +49,7 @@ static Value decode_value(const std::string& enc) {
         return Value(std::stod(rest));
     if (enc[0] == 'b')
         return Value::make_bool(rest == "1");
-    return Value(rest);   // 's' : chaîne brute
+    return Value(rest);   // 's': a raw string
 }
 
 // Serializing a scope to and from a flat JSON object {key: value}.
@@ -111,7 +111,7 @@ static bool parse_json_string(const std::string& s, size_t& i, std::string& out)
             case 'u': {
                 if (i + 4 > s.size())
                     return false;
-                out += (char)std::stoi(s.substr(i, 4), nullptr, 16);   // on n'émet \u que pour < 0x20 (1 octet)
+                out += (char)std::stoi(s.substr(i, 4), nullptr, 16);   // we only emit \u below 0x20, which is one byte
                 i += 4;
                 break;
             }
@@ -271,6 +271,6 @@ Value make_data_module() {
     fill_scope(m, S_PROJECT);
     Value g = Value::make_map();
     fill_scope(g, S_GLOBAL);
-    m.map_set(Value(std::string("shared")), g);   // « global » est un mot-clé Ollin → « shared »
+    m.map_set(Value(std::string("shared")), g);   // "global" is an Ollin keyword, hence "shared"
     return m;
 }

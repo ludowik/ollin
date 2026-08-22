@@ -124,7 +124,7 @@ int sound_shape_factory(CallCtx& ctx) {
 
 int method_start(CallCtx& ctx) {
     int i = handle_slot(ctx.args[0], "sound.start");
-    audio_wake();   // démarrer un son demande implicitement le périphérique
+    audio_wake();   // starting a sound implicitly asks for the device
     sound_output_ensure();
     voices()[i].active.store(true, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
@@ -290,7 +290,7 @@ int alloc_buffer() {
         if (b[i].playing.load(std::memory_order_relaxed))
             continue;
         if (b[i].retired_epoch >= maintenant)
-            continue;   // rendu trop récemment : un bloc peut encore le lire
+            continue;   // given back too recently: a block may still be reading it
         if (chosen < 0 || b[i].retired_epoch < b[chosen].retired_epoch)
             chosen = i;
     }
@@ -383,7 +383,7 @@ int buf_play(CallCtx& ctx) {
     audio_wake();
     sound_output_ensure();
     Buf& b = bufs()[i];
-    b.pos = 0.0;   // rejouer repart du début, comme PlaySound
+    b.pos = 0.0;   // replaying starts from the beginning, as PlaySound does
     b.playing.store(true, std::memory_order_relaxed);
     return ctx.ret(ctx.args[0]);
 }

@@ -92,7 +92,7 @@ static int key_code(std::string name) {
 static int kbd_is_down(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (s_blocked)
-        return ctx.ret(Value::make_bool(false));   // éditeur focalisé → le jeu ne lit pas le clavier
+        return ctx.ret(Value::make_bool(false));   // the editor has focus, so the game does not read the keyboard
     if (argc < 1 || !args[0].is_string())
         return ctx.ret(Value::make_bool(false));
     std::string name = args[0].as_string();
@@ -135,7 +135,7 @@ bool keyboard_pressed_any() {
 
 void keyboard_poll() {
     s_pressed_any = false;
-    s_blocked = query_blocked();   // rafraîchi 1×/frame ; lu par isDown sans re-interroger le DOM
+    s_blocked = query_blocked();   // refreshed once per frame, and read by is_down without querying the DOM again
     VM* vm = VM::current();
     Value kbd = vm->get_global("keyboard");
     Value pressed, released;

@@ -45,7 +45,7 @@ struct Chunk {
     std::vector<SourceLoc> lines; // parallel to code[] — source file+line per instruction
     std::vector<std::string> source_files;
     std::vector<Value> constants;
-    std::unordered_map<ConstKey, uint16_t, ConstKeyHash> const_map_; // dédup des constantes
+    std::unordered_map<ConstKey, uint16_t, ConstKeyHash> const_map_; // constant dedup
     std::vector<std::string> identifiers;
     std::unordered_map<std::string, uint16_t> identifier_map_;
     std::vector<std::vector<Value>> func_defaults;

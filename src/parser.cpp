@@ -197,7 +197,7 @@ std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> targ
     if (auto* ie = dynamic_cast<IndexExpr*>(target.get())) {
         auto s = std::make_unique<IndexAssignStmt>();
         s->line = line; s->file_idx = current_file_idx_;
-        s->obj_expr = std::move(ie->obj); // conteneur (peut être lui-même chaîné)
+        s->obj_expr = std::move(ie->obj); // the container, which may itself be chained
         s->key = std::move(ie->key);
         s->op = opt;
         s->value = std::move(value);
@@ -656,7 +656,7 @@ std::unique_ptr<Expr> Parser::bitwise_xor() {
     while (true) {
         skip_comments();
         if (!check(TokenType::TILDE))
-            break; // '~' binaire = XOR (modèle Lua)
+            break; // a binary '~' is XOR, as in Lua
         advance();
         skip_comments();
         left = std::make_unique<BinaryExpr>('x', std::move(left), bitwise_and());
@@ -766,7 +766,7 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 // The closures capture the target as an upvalue when it is local, and read or write the global
 // otherwise: the upvalue machinery does all the work. `__ref` exists only so native modules can
 // validate — a map with get/set is not necessarily a reference, the `data` module has some too.
-static const char* REF_PARAM = "__ref_v";   // nom du paramètre du setter : ne doit
+static const char* REF_PARAM = "__ref_v";   // the setter's parameter name, which must not
                                             // must NEVER collide with the target (`ref v`)
 
 std::unique_ptr<Expr> Parser::ref_expr() {
@@ -897,7 +897,7 @@ std::unique_ptr<Expr> Parser::power() {
     auto left = primary();
     skip_comments();
     if (!check(TokenType::CARET))
-        return left; // '^' = puissance (modèle Lua)
+        return left; // '^' is exponentiation, as in Lua
     advance();
     skip_comments();
     // A unary right operand allows 2 ^ -1, and right associativity gives 2^2^3.
@@ -1052,7 +1052,7 @@ std::unique_ptr<Expr> Parser::primary() {
         auto node = std::make_unique<InterpExpr>();
         node->line = peek().line;
         node->file_idx = peek().file_idx;
-        node->literals.push_back(advance().lexeme); // INTERP_START → premier littéral
+        node->literals.push_back(advance().lexeme); // INTERP_START gives the first literal
         while (true) {
             node->exprs.push_back(expr());
             if (check(TokenType::INTERP_MID)) {
@@ -1310,7 +1310,7 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
         s->obj_expr->file_idx = current_file_idx_;
     }
 
-    int64_t counter = 1;   // le premier élément sans valeur vaut 1
+    int64_t counter = 1;   // the first item with no value is 1
     std::unordered_set<std::string> seen;
     while (true) {
         skip_comments();

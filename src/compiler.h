@@ -37,7 +37,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         bool is_closure = false; // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
     };
     std::unordered_map<std::string, FuncInfo> func_table;
-    std::unordered_set<std::string> declared_globals_; // globals déclarés (source + builtins + modules)
+    std::unordered_set<std::string> declared_globals_; // the declared globals: the source's, the builtins and the modules
     std::unordered_set<std::string> const_names_;      // locals declared with 'const'
     // Enums declared under a plain name, so that visible writes are refused at compile time with a
     // message naming the element. The VM still covers every other path.

@@ -75,7 +75,7 @@ Token Lexer::number(bool leading_dot) {
                 char c = peek();
                 if (c == '_') {
                     if (!last_was_digit)
-                        break; // '_' en tête ou doublé → invalide
+                        break; // a leading or doubled '_' is invalid
                     advance();
                     last_was_digit = false;
                     continue;
@@ -109,7 +109,7 @@ Token Lexer::number(bool leading_dot) {
         } else if (c == '_' && last_was_digit) {
             advance();
             last_was_digit = false;
-            prev_underscore = true; // doit être suivi d'un chiffre
+            prev_underscore = true; // it must be followed by a digit
         } else if (c == '.' && !dot_seen && !prev_underscore) {
             advance();
             dot_seen = true;
@@ -360,7 +360,7 @@ std::vector<Token> Lexer::tokenize() {
                     throw std::runtime_error("line " + std::to_string(line) +
                                              ": '..' is not valid syntax (use [a;b] for ranges)");
             } else if (!at_end() && std::isdigit((unsigned char)peek())) {
-                emit(number(true)); // .5 → nombre à virgule
+                emit(number(true)); // .5 is a decimal number
             } else {
                 emit({TokenType::DOT, ".", line});
             }

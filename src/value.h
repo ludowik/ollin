@@ -58,7 +58,7 @@ struct Value {
     union {
         int64_t ival;
         double dval;
-        InternedStr* sptr; // pointe vers l'objet interné (refcount géré inline)
+        InternedStr* sptr; // points at the interned object, its refcount handled inline
         Map* mptr;
         Array* aptr;
         Iterator* iptr;
@@ -70,18 +70,18 @@ struct Value {
     // T_STRING pivot and all ref-counted types contiguously. `tag < T_STRING` therefore tells
     // values needing no memory management from those needing retain/release in a SINGLE test.
     // Any new ref-counted type goes AFTER the pivot, any new plain type BEFORE it.
-    static constexpr uint8_t T_NIL = 0; // ── non ref-comptés (POD / valeur) ──
+    static constexpr uint8_t T_NIL = 0; // ── not ref-counted (POD, by value) ──
     static constexpr uint8_t T_INTEGER = 1;
     static constexpr uint8_t T_FLOAT = 2;
     static constexpr uint8_t T_FUNCTION = 3; // func_idx dans ival (pas de tas)
     static constexpr uint8_t T_BUILTIN = 4;  // pointeur de fonction natif dans ival
     static constexpr uint8_t T_BOOL = 5;     // true/false dans ival (0/1) — type ÉTANCHE, ≠ entier
-    static constexpr uint8_t T_STRING = 6;   // ── pivot : ref-comptés à partir d'ici ──
+    static constexpr uint8_t T_STRING = 6;   // ── the pivot: ref-counted from here on ──
     static constexpr uint8_t T_MAP = 7;
     static constexpr uint8_t T_ARRAY = 8;
     static constexpr uint8_t T_ITERATOR = 9;
     static constexpr uint8_t T_CLOSURE = 10;
-    static constexpr uint8_t T_CLASS = 11;  // prototype de classe (Map* réutilisé)
+    static constexpr uint8_t T_CLASS = 11;  // a class prototype, reusing Map*
     static constexpr uint8_t T_RANGE = 12;  // range [a;b] (Range*, ref-counted)
 
   private:
@@ -102,7 +102,7 @@ struct Value {
     Value(BoolTag, bool b) : tag(T_BOOL), str_hash(0), ival(b ? 1 : 0) {
     }
     void release() noexcept;
-    void release_cold() noexcept; // chemin froid (types ref-comptés) — non inliné
+    void release_cold() noexcept; // the cold path, for the ref-counted types; not inlined
     void retain() const noexcept;
 
   public:
@@ -365,7 +365,7 @@ inline int64_t Value::map_size() const {
 // which is not inlined — this is what lets move-assign inline.
 inline void Value::release() noexcept {
     if (tag < T_STRING)
-        return; // POD : rien à libérer (un seul test, inliné)
+        return; // POD: nothing to release, in a single inlined test
     release_cold();
 }
 
@@ -407,7 +407,7 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
         break;
     }
     default:
-        break; // défensif : seuls les tags >= T_STRING arrivent ici
+        break; // defensive: only tags >= T_STRING reach here
     }
 }
 
@@ -416,7 +416,7 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
 // types (T_FUNCTION and T_BUILTIN included) leave at `tag < T_STRING`.
 inline void Value::retain() const noexcept {
     if (tag < T_STRING)
-        return; // POD / non comptés : rien à retenir (un seul test)
+        return; // POD, not counted: nothing to retain, in a single test
     switch (tag) {
     case T_STRING:
         ++sptr->refcount;
@@ -438,7 +438,7 @@ inline void Value::retain() const noexcept {
         rptr->refcount++;
         break;
     default:
-        break; // défensif : seuls les tags >= T_STRING arrivent ici
+        break; // defensive: only tags >= T_STRING reach here
     }
 }
 
@@ -460,7 +460,7 @@ inline Value::Value(const Value& o) : tag(o.tag), str_hash(o.str_hash), ival(o.i
 inline Value& Value::operator=(const Value& o) {
     if (this == &o)
         return *this;
-    o.retain(); // retain d'abord (protège si this et o partagent la même ressource)
+    o.retain(); // retain first, which protects the case where this and o share the resource
     release();
     // Raw copy of the union (ival/dval/ptr alias the same 8 bytes).
     tag = o.tag;
@@ -499,7 +499,7 @@ inline Value::~Value() {
     if (v.is_array())
         return v.array_size() == 0;
     if (v.is_map())
-        return v.map_size() == 0; // instance : ≥1 clé (__class__) → truthy
+        return v.map_size() == 0; // an instance has at least one key (__class__), hence truthy
     return false;                // T_CLASS, range, closure, function → truthy
 }
 

@@ -78,8 +78,8 @@ enum class Op : uint8_t {
     BRSHIFT,        // bitwise (integers)
     NEW_ARRAY,      // A: R[A] = []
     ARRAY_PUSH,     // AB: R[A].push(R[B])
-    FOR_ITER_NEXT,  // ABx: R[A]=iter; next→R[A+1]=key,R[A+2]=val; épuisé→ip=Bx
-    FOR_ITER_NEXT1, // ABx: R[A]=iter; next→R[A+1]=primary(key ou val); épuisé→ip=Bx
+    FOR_ITER_NEXT,  // ABx: R[A]=iter; next gives R[A+1]=key, R[A+2]=val; exhausted jumps to Bx
+    FOR_ITER_NEXT1, // ABx: R[A]=iter; next gives R[A+1]=primary (key or value); exhausted jumps to Bx
     LOAD_FUNC,      // ABx: R[A] = func_value(Bx)
     CALL_DYN,       // ABC: A=arg_base, B=func_val_reg, C=argc
     MAKE_CLOSURE,   // ABx: A=dest, Bx=func_idx → create closure, capture upvals from current frame
@@ -89,10 +89,10 @@ enum class Op : uint8_t {
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags
                     // (bit0 = incl_right, bit1 = has_step)
-    FOR_PREP, // ABx: for numérique — R[A]=i, R[A+1]=limite, R[A+2]=pas. valide, normalise int/float, i-=pas, ip=Bx
+    FOR_PREP, // ABx: a numeric for — R[A]=i, R[A+1]=limit, R[A+2]=step. It validates, normalises int/float, does i-=step, then ip=Bx
               // (towards FOR_LOOP)
     FOR_LOOP, // ABx: i+=pas ; si dans la limite (incl) → R[A]=i, ip=Bx (corps) ; sinon continue (sortie)
-    SPREAD_RESULTS, // AB: destructuration multi-retour — met R[A+last_results..A+B-1] à nil
+    SPREAD_RESULTS, // AB: multi-return destructuring — sets R[A+last_results..A+B-1] to nil
     CALL_VA,        // ABC: A=arg_base, B=func_val_reg, C=n_fixe ; argc = C + last_results_ (dernier
                     // argument is a multi-value call, already materialized after the fixed ones)
     CALL_VARARGS,   // ABC: A=arg_base(fixes), B=func_val_reg, C=n_fixe ; dernier argument = `...`.
@@ -101,9 +101,9 @@ enum class Op : uint8_t {
                     // the results at A, the callee frame's result_base.
     ARRAY_PUSH_SPREAD,  // AB: pousse last_results_ valeurs R[B..] dans le tableau R[A] (spread appel)
     ARRAY_PUSH_VARARGS, // A: pousse TOUTES les varargs du frame courant dans le tableau R[A] ([..., ...])
-    MOVE_RESULTS,       // AB: copie last_results_ valeurs R[B..] → R[A..] (recompose un spread imbriqué)
-    RETURN_SPREAD,      // AB: return B explicites + last_results_ (dernier = appel), contigus à R[A..]
-    SEAL_ENUM,          // A: la map de R[A] devient un enum — toute écriture indexée est refusée
-    CLOSE_UPVALS,       // A: ferme les upvalues ouvertes dont le registre est >= A (fin de portée)
+    MOVE_RESULTS,       // AB: copies last_results_ values from R[B..] to R[A..], recomposing a nested spread
+    RETURN_SPREAD,      // AB: returns B explicit values plus last_results_ (the last being a call), contiguous at R[A..]
+    SEAL_ENUM,          // A: the map in R[A] becomes an enum, and every indexed write is refused
+    CLOSE_UPVALS,       // A: closes the open upvalues whose register is >= A, at the end of a scope
     HALT,
 };

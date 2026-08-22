@@ -43,18 +43,18 @@ struct Node {
     enum Kind { BUTTON, CHECKBOX, SLIDER, MENU, LIST, LIST_ITEM };
     Kind kind = BUTTON;
     std::string label;
-    Value action;      // bouton : fonction appelée au clic
-    Value target;      // case : référence (`ref x`) vers la variable liée
-    Value on_change;   // case/slider : fonction optionnelle appelée après changement
+    Value action;      // a button: the function called on a click
+    Value target;      // a checkbox: the reference (`ref x`) to the bound variable
+    Value on_change;   // a checkbox or a slider: an optional function called after a change
     double vmin = 0.0;     // slider : bornes de la plage
     double vmax = 1.0;
-    double vdefault = 0.0; // slider : valeur si la variable liée vaut nil
-    bool integral = false; // slider : bornes entières → valeur entière
-    Value source;      // liste : tableau, map ou enum d'où viennent les éléments
-    Value item;        // élément de liste : la valeur (ou la clé) renvoyée par la sélection
-    std::vector<int> children;   // menu : slots de son contenu, dans l'ordre déclaré
+    double vdefault = 0.0; // a slider: the value to use when the bound variable is nil
+    bool integral = false; // a slider: integer bounds give an integer value
+    Value source;      // a list: the array, map or enum the items come from
+    Value item;        // a list item: the value, or the key, the selection returns
+    std::vector<int> children;   // a menu: the slots of its content, in declaration order
     int parent = -1;
-    uint32_t gen = 1;   // incrémentée à la libération → un handle périmé est détecté
+    uint32_t gen = 1;   // incremented on release, which makes a stale handle detectable
     bool alive = false;
     // Geometry of the last frame drawn, reused by the hit test so that the clickable area is EXACTLY
     // what is displayed.
@@ -67,11 +67,11 @@ std::vector<Node> s_nodes;
 std::vector<int> s_free;
 int s_root = -1;
 std::vector<int> s_nav;
-Rectangle s_back_box = {0, 0, 0, 0};   // ligne de retour de la frame dessinée
+Rectangle s_back_box = {0, 0, 0, 0};   // the back row of the frame that was drawn
 // The interface is CLOSED at startup, reduced to a handle in the corner, so it does not hide the scene
 // of a program that only uses it occasionally.
 bool s_open = false;
-Rectangle s_head_box = {0, 0, 0, 0};   // poignée fermée, ou ligne de tête ouverte
+Rectangle s_head_box = {0, 0, 0, 0};   // the closed handle, or the open head row
 // The slider being dragged: tracking spans several frames, so the node is remembered by identity — a
 // slot alone could have been recycled between two frames.
 int s_drag = -1;
@@ -183,27 +183,27 @@ Value make_handle(int slot) {
 struct Style {
     Color bg;
     Color bg_hover;
-    Color border;     // contour discret des cases et de la glissière
+    Color border;     // the discreet outline of the checkboxes and of the track
     Color text;
     Color text_dim;   // valeur d'un slider, chevron d'un sous-menu
-    Color accent;     // case cochée, partie remplie d'une glissière
-    Color track;      // fond de la glissière d'un slider
+    Color accent;     // a ticked box, and the filled part of a track
+    Color track;      // the background of a slider's track
     float round;      // arrondi des lignes, 0 = angles droits
     float border_thick;
     float font_frac;  // police, fraction de la hauteur de la zone
     float font_min;   // en dessous, illisible quelle que soit la zone
     float pad_frac;   // marge interne, fraction de la police
     float row_frac;   // hauteur d'une ligne
-    float slider_row_frac;   // hauteur d'une ligne de slider (libellé + glissière)
+    float slider_row_frac;   // the height of a slider row: the label plus the track
     float gap_frac;   // espace entre deux lignes
     float margin_frac;// marge au bord de la zone
-    float box_frac;   // côté du carré d'une case
-    float check_inset;// retrait du remplissage dans le carré, fraction du carré
-    float track_frac; // épaisseur de la glissière
-    float bar_thick_frac;  // épaisseur d'une barre de la poignée, fraction du carré
-    float bar_gap_frac;    // écart entre deux barres (0.124 × 21,6 ≈ 2 px de séparation
+    float box_frac;   // the side of a checkbox's square
+    float check_inset;// the fill's inset within the square, as a fraction of it
+    float track_frac; // the track's thickness
+    float bar_thick_frac;  // the thickness of one bar of the handle, as a fraction of the square
+    float bar_gap_frac;    // the gap between two bars (0.124 × 21.6 is about 2 px of separation
                            // for a 600 px tall area; see metrics)
-    float bar_width_frac;  // largeur des barres, fraction du carré
+    float bar_width_frac;  // the bars' width, as a fraction of the square
 };
 
 const Style STYLE = {
@@ -355,7 +355,7 @@ float stack_width(const Metrics& m, const std::vector<int>& rows) {
         Node::Kind kind = s_nodes[slot].kind;
         float need = text_width(s_nodes[slot].label, m.font);
         if (kind == Node::CHECKBOX || kind == Node::LIST_ITEM)
-            need += m.box + m.pad;   // case à cocher, ou marque de l'élément retenu
+            need += m.box + m.pad;   // a checkbox, or the mark of the item selected
         if (kind == Node::MENU)
             need += m.pad + text_width(CHEVRON, m.font);
         if (kind == Node::SLIDER) {
@@ -524,7 +524,7 @@ static int ui_show(CallCtx& ctx) {
         slot = menu_slot(ctx.args[0], "ui.show");
     s_nav.clear();
     s_nav.push_back(slot);
-    s_open = true;   // « montrer » implique déplier
+    s_open = true;   // showing implies unfolding
     return ctx.ret(Value{});
 }
 
@@ -896,14 +896,14 @@ bool ui_poll() {
             Value list_target = s_nodes[list_slot].target;
             Value list_change = s_nodes[list_slot].on_change;
             if (!s_nav.empty())
-                s_nav.pop_back();      // choisir referme la liste, comme un menu déroulant
+                s_nav.pop_back();      // choosing closes the list, as a drop-down does
             ref_set(list_target, item);
             if (list_change.is_callable())
                 VM::current()->call_value(list_change, item);
         } else {
             s_nav.push_back(slot);
         }
-        return true;   // clic consommé : ne pas le transmettre à mouse.pressed
+        return true;   // the click is consumed, and must not reach mouse.pressed
     }
     return false;
 }

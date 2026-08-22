@@ -55,9 +55,9 @@ void reset3d_shape_cache();
 
 // Bridges from 2D to 3D, defined in graphics3d.cpp.
 void end3d_internal();          // flush des buckets + EndMode3D (no-op hors bloc 3D)
-void reset3d_lighting_state();   // remet l'éclairage 3D à l'état par défaut
-void reset3d_graphics_state();   // libère les ressources GL 3D (avant destruction du contexte)
-void reset3d_frame_state();      // remet la texture 3D courante (appelé chaque frame par resetStyles)
+void reset3d_lighting_state();   // resets the 3D lighting to its default state
+void reset3d_graphics_state();   // frees the 3D GL resources, before the context is destroyed
+void reset3d_frame_state();      // resets the current 3D texture; called every frame by reset_styles
 void register3d_graphics(Value& m);   // enregistre les builtins 3D dans le module graphics
 
 // Current 3D texture: a style state, saved and restored by push and pushStyle.

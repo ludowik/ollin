@@ -17,7 +17,7 @@ std::string format_one(const Value& v, const std::string& spec) {
     if (spec.empty())
         return value_to_string(v);
     char conv = spec.back();
-    std::string body = spec.substr(0, spec.size() - 1);   // flags + largeur + précision
+    std::string body = spec.substr(0, spec.size() - 1);   // flags, width and precision
     for (char c : body)
         if (!std::strchr("-+ #0123456789.", c))
             throw std::runtime_error("format: invalid character in spec '" + spec + "'");
@@ -61,7 +61,7 @@ std::string format_one(const Value& v, const std::string& spec) {
 // {:spec}, applied through format_one — the same engine as interpolation.
 static std::string apply_format(const std::string& fmt, const std::vector<Value>& args, int offset) {
     std::string out;
-    int auto_idx = 1;   // indexation 1-based (cohérent avec les arrays Ollin) : {1} = 1er argument
+    int auto_idx = 1;   // 1-based indexing, consistent with Ollin arrays: {1} is the first argument
     for (size_t i = 0; i < fmt.size(); ++i) {
         if (fmt[i] == '{') {
             size_t j = fmt.find('}', i + 1);
@@ -85,7 +85,7 @@ static std::string apply_format(const std::string& fmt, const std::vector<Value>
                     if (idx < 1)
                         throw std::runtime_error("printf: index is 1-based, must be >= 1 (got " + idx_part + ")");
                 }
-                long long ai = (long long)idx - 1 + offset;   // {1} → 1er arg réel (args[offset])
+                long long ai = (long long)idx - 1 + offset;   // {1} maps to the first real argument, args[offset]
                 if (ai >= 0 && ai < (long long)args.size())
                     out += format_one(args[(int)ai], spec);
                 i = j;
@@ -104,7 +104,7 @@ static int core_fmt(CallCtx& ctx) {
     int argc = ctx.argc;
     if (argc < 2 || !args[1].is_string())
         throw std::runtime_error("__fmt: expected (value, spec)");
-    std::vector<Value> vargs(args, args + argc);   // copie : formatOne peut réallouer regs (__str)
+    std::vector<Value> vargs(args, args + argc);   // a copy: format_one may reallocate regs, through __str
     return ctx.ret(Value(format_one(vargs[0], vargs[1].as_string())));
 }
 
@@ -146,7 +146,7 @@ Value make_core_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("print")), Value::make_builtin(core_print));
     m.map_set(Value(std::string("printf")), Value::make_builtin(core_printf));
-    m.map_set(Value(std::string("__fmt")), Value::make_builtin(core_fmt));   // interne : désucrage {expr:spec}
+    m.map_set(Value(std::string("__fmt")), Value::make_builtin(core_fmt));   // internal: the desugaring of {expr:spec}
     m.map_set(Value(std::string("typeof")), Value::make_builtin(core_typeof));
     m.map_set(Value(std::string("Color")), make_color_class());
     return m;

@@ -147,7 +147,7 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() ne invalide p
         break;
     }
     case Value::T_BUILTIN: {
-        Value self = obj; // 1 slot dispo (self) ; le builtin y écrit son résultat, relu ensuite
+        Value self = obj; // one slot is available (self); the builtin writes its result there, and it is read back
         int n = invoke_builtin(str_fn.as_builtin(), &self, 1, 1);
         return (n >= 1 && self.is_string()) ? self.as_string() : "{object}";
     }
@@ -255,7 +255,7 @@ static int builtin_cpu_time(CallCtx& ctx) {
 uint64_t ollin_heap_bytes() {
     uint64_t bytes = 0;
 #if defined(__EMSCRIPTEN__)
-    struct mallinfo mi = mallinfo();            // uordblks (arène) + hblkhd (blocs mmap)
+    struct mallinfo mi = mallinfo();            // uordblks (the arena) plus hblkhd (the mmapped blocks)
     bytes = (uint64_t)(unsigned)mi.uordblks + (uint64_t)(unsigned)mi.hblkhd;
 #elif defined(__APPLE__)
     malloc_statistics_t s;
@@ -263,7 +263,7 @@ uint64_t ollin_heap_bytes() {
     bytes = (uint64_t)s.size_in_use;
 #elif defined(__GLIBC__)
     struct mallinfo2 mi = mallinfo2();          // glibc ≥ 2.33 : champs size_t
-    bytes = (uint64_t)mi.uordblks + (uint64_t)mi.hblkhd;   // arène + gros blocs mmap
+    bytes = (uint64_t)mi.uordblks + (uint64_t)mi.hblkhd;   // the arena plus the big mmapped blocks
 #elif defined(_WIN32)
     PROCESS_MEMORY_COUNTERS pmc;
     if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
@@ -301,7 +301,7 @@ static int builtin_len(CallCtx& ctx) {
     if (v.is_map() || v.is_class())
         return ctx.ret(Value(v.map_size()));
     if (v.is_string())
-        return ctx.ret(Value((int64_t)utf8_count(v.as_string()))); // longueur en caractères (codepoints), pas en octets
+        return ctx.ret(Value((int64_t)utf8_count(v.as_string()))); // a length in characters (codepoints), not in bytes
     if (v.is_range())
         return ctx.ret(Value(range_len(v.rptr)));
     return ctx.ret(Value((int64_t)1));
@@ -372,7 +372,7 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
     Value inst = Value::make_map();
     inst.map_set(MK().class_, cls);
     Value init_fn = proto_chain_get(cls, MK().init_);
-    if (!init_fn.is_callable()) { // pas de constructeur → l'instance EST le résultat
+    if (!init_fn.is_callable()) { // no constructor, so the instance IS the result
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
@@ -383,7 +383,7 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         bargs[0] = inst;
         for (int i = 0; i < argc; ++i)
             bargs[1 + i] = regs[base_reg + arg_off + i];
-        invoke_builtin(init_fn.as_builtin(), bargs.data(), argc + 1, argc + 1); // retour ignoré (l'instance prime)
+        invoke_builtin(init_fn.as_builtin(), bargs.data(), argc + 1, argc + 1); // the return value is ignored: the instance wins
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
@@ -965,7 +965,7 @@ dispatch_loop:
 
     op_POW: {
         {
-            const Value& bv = regs[base + B]; // lu avant l'écriture de R[A] → réf sûre
+            const Value& bv = regs[base + B]; // read before R[A] is written, so the reference is safe
             const Value& cv = regs[base + C];
             if (bv.is_integer() && cv.is_integer() && cv.as_int() >= 0) {
                 int64_t b = bv.as_int(), e = cv.as_int(), r = 1;
@@ -1048,13 +1048,13 @@ dispatch_loop:
             regs[base + A] = Value::make_bool(bv.as_int() > cv.as_int());
             NEXT();
         }
-        if (is_instance(cv)) { // instance à droite : a > b == b < a → b.__lt(a)
+        if (is_instance(cv)) { // the instance on the right: a > b is b < a, hence b.__lt(a)
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (is_instance(bv)) { // instance à gauche : a > b == not(a <= b) → not a.__le(b)
+        } else if (is_instance(bv)) { // the instance on the left: a > b is not(a <= b), hence not a.__le(b)
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
@@ -1076,13 +1076,13 @@ dispatch_loop:
             regs[base + A] = Value::make_bool(bv.as_int() < cv.as_int());
             NEXT();
         }
-        if (is_instance(bv)) { // instance à gauche : a < b → a.__lt(b)
+        if (is_instance(bv)) { // the instance on the left: a < b is a.__lt(b)
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (is_instance(cv)) { // instance à droite : a < b == not(b <= a) → not b.__le(a)
+        } else if (is_instance(cv)) { // the instance on the right: a < b is not(b <= a), hence not b.__le(a)
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
@@ -1105,13 +1105,13 @@ dispatch_loop:
             regs[base + A] = Value::make_bool(bv.as_int() >= cv.as_int());
             NEXT();
         }
-        if (is_instance(cv)) { // instance à droite : a >= b == b <= a → b.__le(a)
+        if (is_instance(cv)) { // the instance on the right: a >= b is b <= a, hence b.__le(a)
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, cv, bv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (is_instance(bv)) { // instance à gauche : a >= b == not(a < b) → not a.__lt(b)
+        } else if (is_instance(bv)) { // the instance on the left: a >= b is not(a < b), hence not a.__lt(b)
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, bv, cv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
@@ -1133,13 +1133,13 @@ dispatch_loop:
             regs[base + A] = Value::make_bool(bv.as_int() <= cv.as_int());
             NEXT();
         }
-        if (is_instance(bv)) { // instance à gauche : a <= b → a.__le(b)
+        if (is_instance(bv)) { // the instance on the left: a <= b is a.__le(b)
             if (uint32_t addr = try_meta_binary(MK().le_, base + A, bv, cv)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
                 NEXT();
             }
-        } else if (is_instance(cv)) { // instance à droite : a <= b == not(b < a) → not b.__lt(a)
+        } else if (is_instance(cv)) { // the instance on the right: a <= b is not(b < a), hence not b.__lt(a)
             if (uint32_t addr = try_meta_binary(MK().lt_, base + A, cv, bv, /*negate=*/true)) {
                 ip = addr;
                 base = call_stack.back().reg_base;
@@ -1210,7 +1210,7 @@ dispatch_loop:
             int va_src = fr.varargs_base;
             for (int i = 0; i < n; ++i)
                 regs[base + A + i] = (i < n_va) ? regs[va_src + i] : Value{};
-            last_results_ = n; // compte publié (spread [..., ...] / CALL_VA)
+            last_results_ = n; // the count is published, for a spread [..., ...] and for CALL_VA
         }
         NEXT();
     }
@@ -1322,7 +1322,7 @@ dispatch_loop:
                     c.key = key_sptr;
                     c.val = slot;
                 }
-                Value hit = *slot;   // lire avant d'écrire le registre (cf. hit du cache)
+                Value hit = *slot;   // read before writing the register (see the cache hit)
                 regs[base + A] = std::move(hit);
             } else {
                 // Absent from the own data: walk the prototype chain (__class__ / __parent__).
@@ -1554,7 +1554,7 @@ dispatch_loop:
             if (fn.is_builtin()) {
                 int k = invoke_builtin(fn.as_builtin(), &regs[fresh], total, (int)regs.size() - fresh);
                 for (int i = 0; i < k; ++i)
-                    regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base → recopie descendante sûre
+                    regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base, so copying downwards is safe
             } else if (fn.is_class()) {
                 for (int i = 0; i < total; ++i) // repli rare : instancie au registre statique
                     regs[fixed_base + i] = regs[fresh + i];
@@ -1595,7 +1595,7 @@ dispatch_loop:
     op_MOVE_RESULTS: {
         {
             int n = last_results_;
-            if (A != B) // A < B (recopie descendante) → boucle avant sûre
+            if (A != B) // A < B, copying downwards, so a forward loop is safe
                 for (int i = 0; i < n; ++i)
                     regs[base + A + i] = std::move(regs[base + B + i]);
         }
@@ -1820,7 +1820,7 @@ dispatch_loop:
             }
         }
         if (empty)
-            ip = Bx; // boucle vide → sortie ; sinon on tombe dans le corps (1re itération)
+            ip = Bx; // an empty loop exits; otherwise we fall into the body, for the first iteration
         NEXT();
     }
 
@@ -1830,7 +1830,7 @@ dispatch_loop:
             Value& vi = regs[base + A];
             Value& vl = regs[base + A + 1];
             Value& vs = regs[base + A + 2];
-            if (vi.is_integer()) { // type figé par FOR_PREP
+            if (vi.is_integer()) { // the type was frozen by FOR_PREP
                 // R[A+1] holds the remaining-turn counter set by FOR_PREP. While it is non-zero,
                 // decrement it and step i. No overflow guard is needed: the counter guarantees
                 // that i + st stays within the initial range.

@@ -47,7 +47,7 @@ static Color rgba_color(double r, double g, double b, double a) {
 }
 
 static int s_physW = 0, s_physH = 0;
-static int s_logicalW = 0; // largeur logique de la zone (pour l'overlay mémoire/FPS)
+static int s_logicalW = 0; // the area's logical width, used by the memory and FPS overlay
 static int s_logicalH = 0; // hauteur logique de la zone
 // PERSISTENT drawing context: draw() renders into this RenderTexture, which is NOT cleared between
 // frames — it is up to draw() to call graphics.clear() when it wants a fresh background. It is
@@ -55,7 +55,7 @@ static int s_logicalH = 0; // hauteur logique de la zone
 // not smear.
 static RenderTexture2D s_target{};
 static bool s_target_ready = false;
-static int s_targetW = 0, s_targetH = 0;   // taille réelle de la RT (sur-échantillonnée)
+static int s_targetW = 0, s_targetH = 0;   // the render texture's real size, supersampled
 // Target supersampling RELATIVE to the logical size, for anti-aliasing, bounded below by the physical
 // resolution and above by a ceiling (see gfx_canvas) — and NOT multiplied by the DPR.
 static const int SSAA = 2;
@@ -67,8 +67,8 @@ static int s_blend_mode = BLEND_ALPHA;
 // through the shared WASM instance.
 static std::string s_shot_path;
 static bool s_shot_pending = false;
-static void flush_pending_screenshot();   // défini plus bas (utilisé par gfx_end_draw)
-static void gfx_reset_capture();          // idem (utilisé par gfx_canvas)
+static void flush_pending_screenshot();   // defined below; used by gfx_end_draw
+static void gfx_reset_capture();          // likewise; used by gfx_canvas
 // reset_3d_lighting_state, reset_3d_graphics_state and end_3d_internal are declared in graphics_internal.h and defined in graphics3d.cpp.
 // ONE graphics.run per program. The engine (run_entry_hooks) calls graphics.run(draw) automatically
 // when a draw() exists; if the script ALSO calls it explicitly we would get two loops, hence a double
@@ -83,7 +83,7 @@ static int gfx_canvas(CallCtx& ctx) {
     int h = argc > 1 ? gfx_to_int(args[1]) : 600;
     const char* title = (argc > 2 && args[2].is_string()) ? args[2].as_string().c_str() : "Ollin";
     s_shot_pending = false;   // nouveau programme → oublier une capture en attente
-    gfx_reset_capture();      // idem pour la capture demandée par l'hôte
+    gfx_reset_capture();      // likewise for the capture the host asked for
     s_blend_mode = BLEND_ALPHA;
     // The 3D lighting is reset HERE, before setup() or the top level set ambient and light — and not
     // in gfx_run, which runs AFTER and would wipe the configuration.
@@ -98,11 +98,11 @@ static int gfx_canvas(CallCtx& ctx) {
     // resize it.
     bool reuse = IsWindowReady();
     if (reuse) {
-        if (s_target_ready) {                 // libérer l'ancienne cible (contexte réutilisé → ids valides)
+        if (s_target_ready) {                 // free the old target: the context is reused, so the ids are valid
             UnloadRenderTexture(s_target);
             s_target_ready = false;
         }
-        reset3d_graphics_state();               // libérer shader/meshes/textures/VBO 3D dans CE contexte
+        reset3d_graphics_state();               // free the 3D shader, meshes, textures and VBOs in THIS context
     }
     double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
@@ -114,7 +114,7 @@ static int gfx_canvas(CallCtx& ctx) {
             o.style.display = 'none';
     });
     if (reuse) {
-        SetWindowSize(w, h);                   // même contexte WebGL, nouvelle taille logique
+        SetWindowSize(w, h);                   // the same WebGL context, a new logical size
         SetWindowTitle(title);
     } else {
         SetConfigFlags(FLAG_MSAA_4X_HINT);
@@ -141,7 +141,7 @@ static int gfx_canvas(CallCtx& ctx) {
             UnloadRenderTexture(s_target);
             s_target_ready = false;
         }
-        reset3d_graphics_state();   // libérer les ressources GL 3D avant une éventuelle réinitialisation
+        reset3d_graphics_state();   // free the 3D GL resources before any reinitialisation
     }
     s_physW = w;
     s_physH = h;
@@ -165,7 +165,7 @@ static int gfx_canvas(CallCtx& ctx) {
     // therefore NOT multiplied by the DPR: on mobile, with a DPR of 2 or more, the texture used to
     // blow up — memory, and GL_MAX_TEXTURE_SIZE exceeded, giving a black screen. The size is capped as
     // well.
-    const int MAX_RT = 4096;   // borne sûre (≤ GL_MAX_TEXTURE_SIZE sur la plupart des GPU)
+    const int MAX_RT = 4096;   // a safe bound, at most GL_MAX_TEXTURE_SIZE on most GPUs
     s_targetW = s_physW > s_logicalW * SSAA ? s_physW : s_logicalW * SSAA;
     s_targetH = s_physH > s_logicalH * SSAA ? s_physH : s_logicalH * SSAA;
     if (s_targetW > MAX_RT) {
@@ -180,7 +180,7 @@ static int gfx_canvas(CallCtx& ctx) {
     // texture and show a black screen.
     s_target_ready = (s_target.id != 0 && s_target.texture.id != 0);
     if (s_target_ready) {
-        SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // lissage à la réduction
+        SetTextureFilter(s_target.texture, TEXTURE_FILTER_BILINEAR);   // smoothing when scaled down
         BeginTextureMode(s_target);
         ClearBackground(BLACK);
         EndTextureMode();
@@ -233,7 +233,7 @@ static int gfx_clear(CallCtx& ctx) {
         // rectangle, then the current blend mode — the one graphics.blendMode set in draw() — is
         // restored.
         BeginBlendMode(BLEND_ALPHA);
-        rlPushMatrix();                 // fondu indépendant de la transfo courante
+        rlPushMatrix();                 // the fade is independent of the current transform
         rlLoadIdentity();               // (comme ClearBackground) → couvre tout le canvas
         DrawRectangle(0, 0, s_logicalW, s_logicalH, c);
         rlPopMatrix();
@@ -276,7 +276,7 @@ static int gfx_blend_mode(CallCtx& ctx) {
 }
 
 static float s_stroke_size = 2.0f;
-static float s_font_size = 18.0f;   // taille de police (état), comme s_stroke_size
+static float s_font_size = 18.0f;   // the font size, a piece of state like s_stroke_size
 // Current font, an index into the engine registry (engine_font.h). It is a style STATE like the size,
 // so push and pushStyle save it and every frame resets it to the default.
 static int s_font_idx = engine_font_default();
@@ -440,17 +440,17 @@ static void restore_style(const StyleState& s) {
 
 static void reset_styles() {
     apply_stroke_size(2.0f);
-    apply_font_size(18.0f);   // taille la plus courante → pas besoin de l'écrire
+    apply_font_size(18.0f);   // the most common size, so it need not be written out
     s_font_idx = engine_font_default();
     s_rect_mode = RECT_CORNER;
     s_ellipse_mode = ELLIPSE_CENTER;
     image_set_sprite_mode(SPRITE_CORNER);
     apply_stroke(true, WHITE);
     apply_fill(false);
-    image_set_tint(false, 255, 255, 255, 255);   // pas de teinte par défaut (comme fill/stroke, remis chaque frame)
-    s_blend_mode = BLEND_ALPHA;                   // mode de fusion remis par défaut chaque frame
-    reset3d_frame_state();                          // texture 3D remise à « aucune » (blanche) chaque frame
-    s_style_stack.clear();                        // pile de style repartie à neuf chaque frame (push/pop équilibrés dans draw)
+    image_set_tint(false, 255, 255, 255, 255);   // no tint by default; like fill and stroke, it is reset every frame
+    s_blend_mode = BLEND_ALPHA;                   // the blend mode returns to its default every frame
+    reset3d_frame_state();                          // the 3D texture returns to "none", hence white, every frame
+    s_style_stack.clear();                        // the style stack starts afresh every frame; push and pop are balanced within draw
     BeginBlendMode(BLEND_ALPHA);
     rlLoadIdentity();
 }
@@ -561,7 +561,7 @@ static int gfx_segments(CallCtx& ctx) {
 static int gfx_stroke(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0) {
-        s_has_stroke = true;                   // sans argument → (ré)active avec la couleur courante
+        s_has_stroke = true;                   // with no argument it (re)enables with the current colour
         return ctx.ret(Value{});
     }
     ColorRGBA k = parse_color(args, argc, "stroke");
@@ -577,14 +577,14 @@ static int gfx_no_stroke(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    s_has_stroke = false;                       // ne plus dessiner de contour (couleur conservée)
+    s_has_stroke = false;                       // stop drawing an outline, the colour being kept
     return ctx.ret(Value{});
 }
 
 static int gfx_fill(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0) {
-        s_has_fill = true;                   // sans argument → (ré)active avec la couleur courante
+        s_has_fill = true;                   // with no argument it (re)enables with the current colour
         return ctx.ret(Value{});
     }
     ColorRGBA k = parse_color(args, argc, "fill");
@@ -596,7 +596,7 @@ static int gfx_no_fill(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    s_has_fill = false;                       // ne plus remplir (couleur conservée)
+    s_has_fill = false;                       // stop filling, the colour being kept
     return ctx.ret(Value{});
 }
 
@@ -605,7 +605,7 @@ static int gfx_tint(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0)
         return ctx.ret(Value{});   // sans argument : ne change rien
-    ColorRGBA k = parse_color(args, argc, "tint");   // même signature que clear/fill/stroke
+    ColorRGBA k = parse_color(args, argc, "tint");   // the same signature as clear, fill and stroke
     Color c = rgba_color(k.r, k.g, k.b, k.a);
     image_set_tint(true, c.r, c.g, c.b, c.a);
     return ctx.ret(Value{});
@@ -629,7 +629,7 @@ static int gfx_line(CallCtx& ctx) {
     float y1 = (float)num_arg(args, 1, "graphics.line");
     float x2 = (float)num_arg(args, 2, "graphics.line");
     float y2 = (float)num_arg(args, 3, "graphics.line");
-    StrokeWC s = stroke_params();   // trait fin continu (< 1 → alpha modulé) au lieu de pointillés
+    StrokeWC s = stroke_params();   // a thin continuous line: below 1 the alpha is modulated, instead of dashes
     DrawLineEx({x1, y1}, {x2, y2}, s.w, s.c);
     return ctx.ret(Value{});
 }
@@ -742,7 +742,7 @@ static void gfx_reset_capture() {
 }
 
 std::string gfx_take_capture() {
-    std::string out = s_capture_b64;   // retirée : une capture n'est livrée qu'une fois
+    std::string out = s_capture_b64;   // taken away: a capture is delivered once only
     s_capture_b64.clear();
     return out;
 }
@@ -751,7 +751,7 @@ static void flush_pending_capture() {
     if (!s_capture_pending)
         return;
     s_capture_pending = false;
-    Image img = LoadImageFromScreen();   // batch déjà vidé par l'appelant (cf. ci-dessous)
+    Image img = LoadImageFromScreen();   // the batch was already flushed by the caller, see below
     int size = 0;
     unsigned char* png = ExportImageToMemory(img, ".png", &size);
     if (png != nullptr && size > 0)
@@ -1095,9 +1095,9 @@ static bool s_quit = false; // boucle native seulement (WASM : emscripten_cancel
 // update plus draw, leaves out the rAF wait BETWEEN two frames, so dt comes out too small. The
 // consequences were a deltaTime too small, hence a simulation in slow motion, and an overestimated FPS
 // (76 displayed for a real 60). The wall gap between two frame entries, by contrast, is exact.
-static double s_frame_dt = 0.0;          // durée de la dernière frame (secondes)
-static double s_last_frame_time = -1.0;  // horodatage de la frame précédente
-static double s_fps_ema = 0.0;           // FPS lissé (moyenne exponentielle)
+static double s_frame_dt = 0.0;          // the last frame's duration, in seconds
+static double s_last_frame_time = -1.0;  // the previous frame's timestamp
+static double s_fps_ema = 0.0;           // the smoothed FPS, an exponential average
 
 // Memory and FPS overlay drawn by the engine after each frame, in the BOTTOM right corner — the top is
 // left to the `ui` interface. A bright colour plus a drop shadow keeps it readable whatever the scene's
@@ -1185,8 +1185,8 @@ static void run_user_callbacks(const Value& draw_fn) {
     tween_update_all(s_frame_dt);
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
-    end3d_internal();   // no-op hors 3D ; sinon flush + refermer si draw() a oublié end3d
-    ui_draw();          // par-dessus la scène, dans la même render texture
+    end3d_internal();   // a no-op outside 3D; otherwise it flushes and closes, should draw() have forgotten end3d
+    ui_draw();          // over the scene, in the same render texture
 }
 
 static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
@@ -1232,7 +1232,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
-        flush_pending_screenshot();      // capture l'écran composé (avant l'overlay FPS)
+        flush_pending_screenshot();      // captures the composed screen, before the FPS overlay
         BeginBlendMode(BLEND_ALPHA);   // overlay FPS en fusion normale
         draw_fps_overlay();
         *drawing = false;
@@ -1244,7 +1244,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
         run_user_callbacks(draw_fn);
-        flush_pending_screenshot();      // capture l'écran (avant l'overlay FPS)
+        flush_pending_screenshot();      // captures the screen, before the FPS overlay
         draw_fps_overlay();
         *drawing = false;
         EndDrawing();
@@ -1262,7 +1262,7 @@ static void emscripten_frame() {
     try {
         render_frame(s_run_callback, &tex, &drawing);
     } catch (const std::exception& e) {
-        if (tex)                   // refermer les blocs restés ouverts (pas de 2× End…)
+        if (tex)                   // close the blocks left open, without ending twice
             EndTextureMode();
         if (drawing)
             EndDrawing();
@@ -1279,14 +1279,14 @@ static int gfx_run(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
         throw std::runtime_error("graphics.run: expected callback function");
-    if (s_run_active)   // déjà lancé pour ce programme → ignorer le 2ᵉ appel (voir s_run_active)
+    if (s_run_active)   // already started for this program, so the second call is ignored (see s_run_active)
         return ctx.ret(Value{});
     s_run_active = true;
     Value fn = args[0];
     s_elapsed_time = 0.0;
     s_last_frame_time = -1.0;   // 1re frame → dt = 0 (pas de saut initial)
     s_fps_ema = 0.0;
-    keyboard_reset();            // état clavier neuf (s_down statique persiste entre runs WASM)
+    keyboard_reset();            // a fresh keyboard state: the static s_down survives between WASM runs
     s_update_callback = VM::current()->get_global("update");
 #ifdef __EMSCRIPTEN__
     s_run_callback = fn;
@@ -1389,7 +1389,7 @@ static void rotate_axis(Value* args, int argc, float ax, float ay, float az, con
 static int gfx_rotate(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 1) {
-        rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // axe Z par défaut
+        rotate_axis(args, argc, 0.0f, 0.0f, 1.0f, "graphics.rotate");   // the Z axis by default
     } else if (argc >= 4) {
         rlRotatef((float)num_arg(args, argc, 0, "graphics.rotate"), (float)num_arg(args, argc, 1, "graphics.rotate"),
                   (float)num_arg(args, argc, 2, "graphics.rotate"), (float)num_arg(args, argc, 3, "graphics.rotate"));
@@ -1534,7 +1534,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("arc")), Value::make_builtin(gfx_arc));
     m.map_set(Value(std::string("point")), Value::make_builtin(gfx_point));
     m.map_set(Value(std::string("sprite")), Value::make_builtin(gfx_sprite));
-    register3d_graphics(m);   // 3D (caméra, begin3d/end3d, primitives, éclairage, texture) — graphics3d.cpp
+    register3d_graphics(m);   // 3D: the camera, begin3d/end3d, the primitives, the lighting and the texture — graphics3d.cpp
     // The colour constants are NOT here: use the `colors` module.
     return m;
 }

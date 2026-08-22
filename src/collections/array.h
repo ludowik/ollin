@@ -82,14 +82,14 @@ struct ArrayPool {
         // capacity again with the up-to-date n — otherwise buf[n++] would write buf[CAP], which is
         // &n, whenever a nested release filled the pool during the clear.
         if (a->items.capacity() > POOL_MAX_CAP) {
-            delete a; // gros tableau : jamais poolé
+            delete a; // a big array is never pooled
             return;
         }
-        a->items.clear(); // peut ré-entrer le pool (releases imbriqués) → n peut changer
+        a->items.clear(); // this can re-enter the pool through nested releases, so n may change
         if (n < CAP) {
-            buf[n++] = a; // n RELU après clear
+            buf[n++] = a; // n is READ AGAIN after the clear
         } else {
-            delete a; // items déjà vidés
+            delete a; // the items are already emptied
         }
     }
 };

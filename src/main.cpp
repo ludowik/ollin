@@ -67,9 +67,9 @@ int main(int argc, char* argv[]) {
 
         VM vm;
         vm.execute(Compiler().compile(program));
-        vm.run_entry_hooks(); // setup() puis draw()→graphics.run (logique partagée natif/WASM)
+        vm.run_entry_hooks(); // setup(), then draw() through graphics.run: logic shared by the native and WASM builds
     } catch (const std::exception& e) {
-        std::cerr << e.what() << '\n'; // filename:line déjà dans le message
+        std::cerr << e.what() << '\n'; // filename:line is already part of the message
         return 1;
     }
     return 0;
