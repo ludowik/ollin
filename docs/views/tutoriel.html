@@ -954,7 +954,7 @@ log(<span class="str">"INFO"</span>, <span class="str">"starting"</span>, <span 
 <p>In the <strong>last position</strong> of a list, <code>...</code> expands to all the varargs: as a call argument (<code>f(a, ...)</code>), an array element (<code>[x, ...]</code>), a return (<code>return a, ...</code>) or a multiple assignment (<code>var a, b = ...</code>). A <strong>call</strong> in last position likewise expands to all its values (<code>f(g())</code>, <code>return g()</code>, <code>[x, g()]</code>). Anywhere else the expression is trimmed to a single value (<code>...</code> → the first argument, or <code>nil</code>).</p>
 </section>
 
-<!-- ── Défauts ───────────────────────────────────────────────────────────── -->
+<!-- ── Defaults ────────────────────────────────────────────────────────────── -->
 <section id="defaults">
 <h2>Default parameters</h2>
 <p>A default value must be a literal constant.</p>
@@ -2062,12 +2062,12 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <span class="bi">graphics</span>.clear(Color(<span class="num">0.55</span>, <span class="num">0.8</span>, <span class="num">0.95</span>))
     cam.orbit(elapsedTime * <span class="num">0.3</span>, <span class="num">26</span>, <span class="num">20</span>)
     <span class="bi">graphics</span>.begin3d(cam)
-        <span class="kw">if</span> <span class="bi">graphics</span>.inFrustum(<span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>, <span class="num">20</span>) <span class="kw">then</span>   <span class="cmt">## dessiné seulement si visible</span>
-            <span class="bi">graphics</span>.drawChunk(chunk)                 <span class="cmt">## 1 appel = tout le chunk</span>
+        <span class="kw">if</span> <span class="bi">graphics</span>.inFrustum(<span class="num">8</span>, <span class="num">3</span>, <span class="num">8</span>, <span class="num">20</span>) <span class="kw">then</span>   <span class="cmt">## drawn only when visible</span>
+            <span class="bi">graphics</span>.drawChunk(chunk)                 <span class="cmt">## one call draws the whole chunk</span>
         <span class="kw">end</span>
     <span class="bi">graphics</span>.end3d()
 <span class="kw">end</span></code></pre>
-<div class="callout tip">L'exemple complet <strong>Univers voxel</strong> (streaming infini de chunks, biomes, atlas herbe/roche/neige, eau translucide animée, joystick tactile) est dans le playground → menu <em>Exemples</em>.</div>
+<div class="callout tip">The complete <strong>Voxel world</strong> example — endless chunk streaming, biomes, a grass/rock/snow atlas, animated translucent water and a touch joystick — is in the playground, under the <em>Examples</em> menu.</div>
 </section>
 
 <!-- ── Clavier ────────────────────────────────────────────────────────────── -->
@@ -2298,64 +2298,64 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <table>
   <thead><tr><th>Written as</th><th>What is played</th></tr></thead>
   <tbody>
-    <tr><td><code>tween.to(…)</code></td><td>un aller</td></tr>
-    <tr><td><code>.repeat(2)</code></td><td>aller, aller</td></tr>
-    <tr><td><code>.repeat(2, true)</code></td><td>aller, aller, retour, retour</td></tr>
-    <tr><td><code>.repeat()</code></td><td>aller, aller, … sans fin</td></tr>
-    <tr><td><code>.repeat(nil, true)</code></td><td>aller-retour sans fin</td></tr>
+    <tr><td><code>tween.to(…)</code></td><td>one forward pass</td></tr>
+    <tr><td><code>.repeat(2)</code></td><td>forward, forward</td></tr>
+    <tr><td><code>.repeat(2, true)</code></td><td>forward, forward, back, back</td></tr>
+    <tr><td><code>.repeat()</code></td><td>forward, forward, … endlessly</td></tr>
+    <tr><td><code>.repeat(nil, true)</code></td><td>forward and back, endlessly</td></tr>
   </tbody>
 </table>
 
-<p>Le compte est reconnu par sa <strong>position</strong>, d'où le <code>nil</code> : <code>true</code> vaut 1 en Ollin, donc <code>repeat(true)</code> ne se distinguerait pas de <code>repeat(1)</code>.</p>
+<p>The count is recognised by its <strong>position</strong>, hence the <code>nil</code>: <code>true</code> is 1 in Ollin, so <code>repeat(true)</code> could not be told from <code>repeat(1)</code>.</p>
 
-<p>L'aller-retour porte sur l'<strong>ensemble</strong> des occurrences, non sur chacune : <code>repeat(2, true)</code> joue les deux allers puis les deux retours. Pour alterner à chaque fois, composez deux appels — <code>repeat(nil, true).repeat(2)</code> donne deux allers-retours. C'est la différence avec GSAP ou Phaser, où <code>yoyo</code> inverse chaque répétition.</p>
+<p>The round trip applies to the <strong>whole</strong> set of passes, not to each one: <code>repeat(2, true)</code> plays both forward passes then both backward ones. To alternate every time, compose two calls — <code>repeat(nil, true).repeat(2)</code> gives two round trips. That is the difference from GSAP or Phaser, where <code>yoyo</code> reverses every repetition.</p>
 
-<p>Chaque parcours rejoue l'animation <strong>entière</strong> dans son sens : entre deux allers la valeur revient donc au départ, et entre deux retours elle repart de la cible. Les bornes sont figées au premier démarrage — écrire dans l'objet en pleine animation ne redéfinit pas le départ du parcours suivant. <code>progress()</code> couvre tout le programme (un plan de quatre parcours rend 0,5 à la moitié du deuxième) ; sans fin, il rend l'avancement du tour en cours.</p>
+<p>Every pass replays the <strong>whole</strong> animation in its own direction: between two forward passes the value therefore returns to the start, and between two backward ones it sets off again from the target. The bounds are fixed at the first start — writing into the object mid-animation does not redefine the next pass's start. <code>progress()</code> covers the whole plan (a plan of four passes gives 0.5 halfway through the second); when endless, it gives the current pass's progress.</p>
 
-<p><strong>Attention</strong> : une répétition sans fin ne se termine jamais d'elle-même et retient l'objet animé tant que <code>cancel()</code> — ou <code>tween.cancelAll()</code> — n'a pas été appelé.</p>
+<p><strong>Take care</strong>: an endless repetition never finishes by itself, and holds on to the animated object until <code>cancel()</code> — or <code>tween.cancelAll()</code> — has been called.</p>
 
-<pre><code><span class="cmt">## Une pulsation : le radius grossit puis revient, sans fin.</span>
+<pre><code><span class="cmt">## A pulse: the radius grows then comes back, endlessly.</span>
 <span class="bi">tween</span>.to(ball, {r: <span class="num">40</span>}, <span class="num">0.6</span>, <span class="str">"easeInOutQuad"</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>)
 
-<span class="cmt">## Trois clignotements, puis on s'arrête sur la color de départ.</span>
+<span class="cmt">## Three flashes, ending on the starting colour.</span>
 <span class="bi">tween</span>.to(ball, {tint: Color(<span class="num">1</span>, <span class="num">0.3</span>, <span class="num">0.2</span>)}, <span class="num">0.2</span>).repeat(<span class="kw">nil</span>, <span class="kw">true</span>).repeat(<span class="num">3</span>)</code></pre>
 
-<h3>Enchaîner : <code>tween.sequence</code></h3>
-<p><code>tween.sequence(object, [steps])</code> joue une <strong>suite</strong> d'animations l'une après l'autre. Chaque étape est une map, et la clé de temps s'appelle <code>delay</code> dans les deux rôles&nbsp;: la <strong>durée</strong> de l'animation quand l'étape porte <code>to</code>, une simple <strong>attente</strong> quand elle ne le porte pas.</p>
+<h3>Chaining: <code>tween.sequence</code></h3>
+<p><code>tween.sequence(object, [steps])</code> plays a <strong>series</strong> of animations one after another. Each step is a map, and the time key is called <code>delay</code> in both roles: the animation's <strong>duration</strong> when the step carries <code>to</code>, and a plain <strong>wait</strong> when it does not.</p>
 
 <table>
-  <thead><tr><th>Clé</th><th>Rôle</th></tr></thead>
+  <thead><tr><th>Key</th><th>Role</th></tr></thead>
   <tbody>
-    <tr><td><code>to</code></td><td>les champs visés, comme dans <code>tween.to</code>&nbsp;: <code>{y: 300}</code></td></tr>
-    <tr><td><code>delay</code></td><td>durée de l'étape en secondes — ou attente si l'étape n'a pas de <code>to</code></td></tr>
-    <tr><td><code>curve</code></td><td>nom de courbe ou fonction, propre à cette étape</td></tr>
-    <tr><td><code>target</code></td><td>un autre objet à animer&nbsp;; sans elle, l'objet passé en premier argument</td></tr>
+    <tr><td><code>to</code></td><td>the fields aimed at, as in <code>tween.to</code>: <code>{y: 300}</code></td></tr>
+    <tr><td><code>delay</code></td><td>the step's duration in seconds — or a wait when the step has no <code>to</code></td></tr>
+    <tr><td><code>curve</code></td><td>a curve name or a function, belonging to this step</td></tr>
+    <tr><td><code>target</code></td><td>another object to animate; without it, the object passed as the first argument</td></tr>
   </tbody>
 </table>
 
-<p>Toute autre clé est <strong>refusée</strong>, avec la liste des clés admises&nbsp;: un <code>duration</code> ou un <code>easing</code> mal choisi échoue franchement au lieu d'être ignoré en silence.</p>
+<p>Any other key is <strong>refused</strong>, with the list of those allowed: a misguessed <code>duration</code> or <code>easing</code> fails outright instead of being ignored in silence.</p>
 
-<p>La valeur de départ d'une étape est celle que la précédente a <strong>laissée</strong>, lue à son démarrage — deux étapes qui se suivent s'enchaînent donc sans saut. <code>repeat</code> porte sur la <strong>suite entière</strong> et son aller-retour la rejoue à l'envers, chaque étape inversée. <code>progress()</code> court sur toute la suite, en temps&nbsp;: des étapes de durées inégales donnent une progression régulière.</p>
+<p>A step's starting value is the one the previous step <strong>left</strong>, read when it starts — two consecutive steps therefore join with no jump. <code>repeat</code> applies to the <strong>whole series</strong>, and its round trip replays it backwards, each step reversed. <code>progress()</code> runs over the whole series, in time: steps of unequal duration still give a steady progression.</p>
 
 <pre><code><span class="bi">tween</span>.sequence(ball, [
     {to: {y: <span class="num">300</span>}, delay: <span class="num">0.4</span>, curve: <span class="str">"easeOutQuad"</span>},
     {to: {y: <span class="num">100</span>}, delay: <span class="num">0.6</span>, curve: <span class="str">"easeInQuad"</span>},
-    {delay: <span class="num">0.2</span>},                                <span class="cmt">## une pause</span>
-    {target: shadow, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## un autre objet</span>
+    {delay: <span class="num">0.2</span>},                                <span class="cmt">## a pause</span>
+    {target: shadow, to: {a: <span class="num">0</span>}, delay: <span class="num">0.5</span>},   <span class="cmt">## another object</span>
 ])</code></pre>
 
-<p>L'exemple «&nbsp;Séquence animée (tween)&nbsp;» fait rebondir une balle en cinq étapes&nbsp;: la chute, l'écrasement à l'impact, la détente, la remontée et une pause. Ce sont les durées inégales — un dixième de seconde pour l'écrasement contre une demie pour la chute — qui donnent son poids à la balle.</p>
+<p>The "Animated sequence (tween)" example bounces a ball in five steps: the fall, the squash on impact, the release, the rise and a pause. It is the unequal durations — a tenth of a second for the squash against half a second for the fall — that give the ball its weight.</p>
 
-<p>Le handle renvoyé est celui d'un tween ordinaire&nbsp;: <code>pause()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>delay()</code> et <code>repeat()</code> s'y appliquent tels quels. Écraser l'un des champs animés par un autre tween annule la séquence, comme pour <code>tween.to</code>.</p>
+<p>The handle returned is an ordinary tween's: <code>pause()</code>, <code>cancel()</code>, <code>isDone()</code>, <code>delay()</code> and <code>repeat()</code> all apply as they are. Overwriting one of the animated fields with another tween cancels the sequence, as it does for <code>tween.to</code>.</p>
 
-<pre><code><span class="cmt">## Le dessin lit des champs ; le temps ne l'intéresse pas.</span>
+<pre><code><span class="cmt">## The drawing reads fields; time is none of its business.</span>
 <span class="kw">global</span> ball = {x: <span class="num">0</span>, r: <span class="num">20</span>, tint: Color(<span class="num">0.3</span>, <span class="num">0.7</span>, <span class="num">1</span>)}
 
 <span class="kw">func</span> setup()
     <span class="bi">graphics</span>.canvas(W, H)
-    <span class="cmt">## Plusieurs champs d'un coup, dont une COULEUR (interpolée composante par composante).</span>
+    <span class="cmt">## Several fields at once, a COLOUR among them, interpolated component by component.</span>
     <span class="bi">tween</span>.to(ball, {x: W * <span class="num">0.8</span>, r: <span class="num">60</span>, tint: Color(<span class="num">1</span>, <span class="num">0.45</span>, <span class="num">0.2</span>)}, <span class="num">1.2</span>, <span class="str">"easeOutBack"</span>)
-    <span class="cmt">## Puis un retour, 0,3 s après la fin du premier.</span>
+    <span class="cmt">## Then a return, 0.3 s after the first has finished.</span>
     <span class="bi">tween</span>.to(ball, {r: <span class="num">20</span>}, <span class="num">0.8</span>, <span class="str">"easeInQuad"</span>).delay(<span class="num">1.5</span>)
 <span class="kw">end</span>
 
@@ -2365,39 +2365,39 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
     <span class="bi">graphics</span>.circle(ball.x, CH, ball.r)
 <span class="kw">end</span></code></pre>
 
-<h3>Courbes</h3>
-<p><code>linear</code>, puis les familles <code>easeIn</code> / <code>easeOut</code> / <code>easeInOut</code> déclinées en <code>Quad</code>, <code>Cubic</code>, <code>Sine</code>, <code>Expo</code> et <code>Back</code>, plus <code>easeOutElastic</code> et <code>easeOutBounce</code>. Défaut : <code>easeInOutQuad</code>. Une <strong>fonction</strong> peut aussi tenir ce rôle — elle reçoit la progression sur <code>[0;1]</code> et rend la progression corrigée :</p>
+<h3>Curves</h3>
+<p><code>linear</code>, then the <code>easeIn</code> / <code>easeOut</code> / <code>easeInOut</code> families in their <code>Quad</code>, <code>Cubic</code>, <code>Sine</code>, <code>Expo</code> and <code>Back</code> flavours, plus <code>easeOutElastic</code> and <code>easeOutBounce</code>. The default is <code>easeInOutQuad</code>. A <strong>function</strong> can also fill the role — it receives the progress over <code>[0;1]</code> and returns the corrected progress:</p>
 
 <pre><code><span class="bi">tween</span>.to(obj, {x: <span class="num">100</span>}, <span class="num">1</span>, <span class="kw">func</span>(p) <span class="kw">return</span> p * p * p <span class="kw">end</span>)</code></pre>
 
-<div class="callout tip">Les deux derniers arguments sont reconnus par leur <strong>type</strong> : une chaîne ou une fonction donne la courbe, la fonction suivante est le rappel de fin. Aucun ordre à retenir.</div>
+<div class="callout tip">The last two arguments are recognised by their <strong>type</strong>: a string or a function gives the curve, and the function after that is the completion callback. There is no order to remember.</div>
 
-<p><code>tween.curves()</code> se prête directement à une <a href="#ui">liste</a> du module <code>ui</code> : la source est le catalogue du moteur, et la variable liée reçoit le nom choisi. C'est ce que fait l'exemple « Animations (tween) ».</p>
+<p><code>tween.curves()</code> lends itself directly to a <a href="#ui">list</a> of the <code>ui</code> module: the source is the engine's catalogue, and the bound variable receives the name chosen. That is what the "Animations (tween)" example does.</p>
 
-<pre><code>menu.list(<span class="str">"Courbe"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.curve, onCurve)</code></pre>
+<pre><code>menu.list(<span class="str">"Curve"</span>, <span class="bi">tween</span>.curves(), <span class="kw">ref</span> config.curve, onCurve)</code></pre>
 
 <h3>What to know</h3>
 <ul>
-  <li>La valeur de départ est lue <strong>au démarrage</strong> de l'animation, pas à la déclaration : avec un <code>delay</code>, le tween part de la valeur qu'aura le champ à l'échéance.</li>
-  <li>Déclarer un tween sur un champ <strong>déjà animé annule le précédent</strong> : deux animations ne se battent jamais pour la même valeur. Deux <code>ref</code> distincts sur la même variable ne sont pas reconnus comme telle, en revanche — le langage ne permet pas de les comparer.</li>
-  <li>Si la valeur de départ <strong>et</strong> la cible sont entières, la valeur reste entière tout du long.</li>
-  <li>Une valeur cible peut être une <strong>instance de classe</strong> : les champs numériques communs sont interpolés un à un, ce qui couvre <code>Color</code> comme un <code>Vec2</code> écrit par vos soins. Le tween écrit <strong>dans</strong> l'instance, il ne la remplace pas.</li>
-  <li>La valeur finale posée est la cible <strong>exacte</strong> : une courbe à dépassement ne rend pas tout à fait 1 en fin de course, et un arrondi laisserait 0,999.</li>
-  <li>Le rappel de fin peut déclarer d'autres tweens — de quoi enchaîner des étapes — ou tout annuler.</li>
+  <li>The starting value is read <strong>when the animation starts</strong>, not when it is declared: with a <code>delay</code>, the tween sets off from the value the field has at that moment.</li>
+  <li>Declaring a tween on a field <strong>already animated cancels the previous one</strong>: two animations never fight over the same value. Two distinct <code>ref</code>s on the same variable are not recognised as the same, however — the language does not allow them to be compared.</li>
+  <li>When the starting value <strong>and</strong> the target are integers, the value stays an integer throughout.</li>
+  <li>A target value may be a <strong>class instance</strong>: the numeric fields common to both are interpolated one by one, which covers <code>Color</code> as much as a <code>Vec2</code> of your own. The tween writes <strong>into</strong> the instance; it does not replace it.</li>
+  <li>The final value written is the <strong>exact</strong> target: an overshooting curve does not quite give 1 at the end, and rounding would leave 0.999.</li>
+  <li>The completion callback may declare further tweens — enough to chain steps — or cancel everything.</li>
 </ul>
 </section>
 
 <section id="sound">
-<h2>Modules <code>audio</code> et <code>sound</code></h2>
-<p>Le son se partage en deux : <code>audio</code> est la <strong>session</strong> — le périphérique, le volume général, la pause — et <code>sound</code> est <strong>ce qui sonne</strong>. Aucun fichier n'est nécessaire : tous les sons de cette page sont <strong>calculés</strong>.</p>
+<h2>The <code>audio</code> and <code>sound</code> modules</h2>
+<p>Sound splits in two: <code>audio</code> is the <strong>session</strong> — the device, the master volume, the pause — and <code>sound</code> is <strong>what sounds</strong>. No file is needed: every sound on this page is <strong>computed</strong>.</p>
 
-<p><code>sound</code> offre deux natures d'objet, et la différence n'est pas cosmétique :</p>
+<p><code>sound</code> offers two kinds of object, and the difference is not cosmetic:</p>
 <ul>
-  <li>un <strong>oscillateur</strong> vivant, dont on déplace la fréquence <em>pendant</em> qu'il sonne — une sirène, un vibrato piloté à la souris ;</li>
-  <li>un <strong>tampon</strong> figé, calculé une fois puis déclenché — un bip, une note, une boucle rythmique.</li>
+  <li>a living <strong>oscillator</strong>, whose frequency is moved <em>while</em> it sounds — a siren, a vibrato driven by the mouse;</li>
+  <li>a frozen <strong>buffer</strong>, computed once then triggered — a beep, a note, a rhythmic loop.</li>
 </ul>
 
-<h3>Un oscillateur</h3>
+<h3>An oscillator</h3>
 <pre><code><span class="kw">global</span> siren = <span class="bi">sound</span>.saw(<span class="num">220</span>)
 
 <span class="kw">func</span> setup()
@@ -2406,39 +2406,39 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <span class="kw">end</span>
 
 <span class="kw">func</span> draw()
-    <span class="cmt">## La fréquence suit la souris : c'est tout l'intérêt d'un oscillateur vivant.</span>
+    <span class="cmt">## The frequency follows the mouse: that is the whole point of a living oscillator.</span>
     siren.freq(<span class="num">200</span> + <span class="num">600</span> * <span class="bi">mouse</span>.x / W)
 <span class="kw">end</span></code></pre>
 
 <table>
-  <thead><tr><th>Fabrique</th><th>Rôle</th></tr></thead>
+  <thead><tr><th>Factory</th><th>Role</th></tr></thead>
   <tbody>
-    <tr><td><code>sound.osc(freq [, forme])</code></td><td>oscillateur, forme donnée par son nom</td></tr>
-    <tr><td><code>sound.sine / square / saw / triangle</code></td><td>raccourcis&nbsp;: la forme est dans le nom, donc jamais mal orthographiée</td></tr>
-    <tr><td><code>sound.noise()</code></td><td>bruit blanc (la fréquence ne s'y applique pas)</td></tr>
+    <tr><td><code>sound.osc(freq [, shape])</code></td><td>an oscillator, the shape given by its name</td></tr>
+    <tr><td><code>sound.sine / square / saw / triangle</code></td><td>shorthands: the shape is in the name, so it is never misspelt</td></tr>
+    <tr><td><code>sound.noise()</code></td><td>white noise (a frequency does not apply)</td></tr>
   </tbody>
 </table>
 
-<p>Méthodes d'un oscillateur&nbsp;: <code>start</code>, <code>stop</code>, <code>isPlaying</code>, <code>freq</code>, <code>volume</code>, <code>pan</code>, <code>shape</code>, <code>envelope</code>, <code>trigger</code>, <code>release</code>, <code>free</code>. Comme ailleurs dans le moteur, <strong>sans argument elles lisent</strong>, avec un argument elles écrivent et rendent l'objet&nbsp;: <code>o.freq(440).volume(0.2).pan(-1)</code>.</p>
+<p>An oscillator's methods: <code>start</code>, <code>stop</code>, <code>isPlaying</code>, <code>freq</code>, <code>volume</code>, <code>pan</code>, <code>shape</code>, <code>envelope</code>, <code>trigger</code>, <code>release</code>, <code>free</code>. As elsewhere in the engine, <strong>with no argument they read</strong>, and with one they write and return the object: <code>o.freq(440).volume(0.2).pan(-1)</code>.</p>
 
-<h3>Une enveloppe, pour jouer des notes</h3>
-<p>Un oscillateur qu'on démarre et qu'on arrête produit un son plat. L'enveloppe <strong>ADSR</strong> lui donne une attaque, un déclin, un maintien et un relâchement — c'est ce qui distingue une note d'un signal de test.</p>
+<h3>An envelope, for playing notes</h3>
+<p>An oscillator merely started and stopped gives a flat sound. The <strong>ADSR</strong> envelope gives it an attack, a decay, a sustain and a release — which is what tells a note from a test signal.</p>
 
 <pre><code><span class="kw">global</span> voice = <span class="bi">sound</span>.triangle(<span class="num">440</span>).envelope(<span class="num">0.01</span>, <span class="num">0.08</span>, <span class="num">0.5</span>, <span class="num">0.25</span>)
 
 <span class="kw">func</span> mouse.pressed(x, y)
-    <span class="cmt">## Avec une duration, le relâchement part tout seul à l'échéance.</span>
+    <span class="cmt">## With a duration, the release starts by itself when the time comes.</span>
     voice.freq(<span class="bi">sound</span>.note(<span class="str">"C4"</span>)).trigger(<span class="num">0.2</span>)
 <span class="kw">end</span></code></pre>
 
-<p><code>trigger()</code> sans durée tient la note jusqu'à <code>release()</code>. Une note relâchée <strong>libère sa voix</strong>, si bien qu'un programme peut en déclencher indéfiniment. Quand tu n'as plus besoin d'un oscillateur, <code>free()</code> le rend au moteur&nbsp;: la note finit de s'éteindre, puis la voix redevient disponible — c'est ce qui permet d'en créer un par doigt posé plutôt que de les pré-allouer. Le handle est alors périmé, et le réutiliser lève une erreur explicite. Les hauteurs s'écrivent en clair&nbsp;: <code>sound.note("C#4")</code> rend 277,18&nbsp;Hz, et un <strong>nom de note est accepté partout où une fréquence l'est</strong>.</p>
+<p><code>trigger()</code> with no duration holds the note until <code>release()</code>. A released note <strong>frees its voice</strong>, so a program can trigger them indefinitely. When you no longer need an oscillator, <code>free()</code> gives it back to the engine: the note finishes dying away, then the voice becomes available again — which is what allows one per finger placed, rather than pre-allocating them. The handle is then stale, and reusing it raises an explicit error. Pitches are written in plain text: <code>sound.note("C#4")</code> gives 277.18&nbsp;Hz, and a <strong>note name is accepted anywhere a frequency is</strong>.</p>
 
-<h3>Un tampon calculé</h3>
-<p><code>sound.tone(freq, duration [, forme])</code> échantillonne une forme d'onde&nbsp;; <code>sound.generate(duration, formule)</code> échantillonne <strong>votre</strong> formule, qui reçoit le temps en secondes et rend une amplitude dans <code>[-1;1]</code>.</p>
+<h3>A computed buffer</h3>
+<p><code>sound.tone(freq, duration [, shape])</code> samples a waveform; <code>sound.generate(duration, formula)</code> samples <strong>your</strong> formula, which receives the time in seconds and returns an amplitude in <code>[-1;1]</code>.</p>
 
 <pre><code><span class="kw">global</span> beep = <span class="bi">sound</span>.tone(<span class="num">880</span>, <span class="num">0.12</span>, <span class="str">"square"</span>).envelope(<span class="num">0.005</span>, <span class="num">0.02</span>, <span class="num">0.6</span>, <span class="num">0.05</span>)
 
-<span class="cmt">## Une cloche : un sinus qui s'éteint tout seul.</span>
+<span class="cmt">## A bell: a sine that dies away on its own.</span>
 <span class="kw">global</span> bell = <span class="bi">sound</span>.generate(<span class="num">1.2</span>, <span class="kw">func</span>(t)
     <span class="kw">return</span> <span class="bi">math</span>.sin(t * <span class="num">6.283</span> * <span class="num">660</span>) * <span class="bi">math</span>.exp(-t * <span class="num">3</span>)
 <span class="kw">end</span>)
@@ -2446,93 +2446,93 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 beep.play()
 bell.volume(<span class="num">0.4</span>).play()</code></pre>
 
-<p>La formule est évaluée <strong>une seule fois</strong>, à la construction — jamais pendant la lecture. Méthodes d'un tampon&nbsp;: <code>play</code>, <code>stop</code>, <code>isPlaying</code>, <code>volume</code>, <code>pan</code>, <code>rate</code>, <code>loop</code>, <code>envelope</code>, plus trois <strong>accesseurs</strong> qui lisent le son calculé.</p>
+<p>The formula is evaluated <strong>once only</strong>, at construction — never during playback. A buffer's methods: <code>play</code>, <code>stop</code>, <code>isPlaying</code>, <code>volume</code>, <code>pan</code>, <code>rate</code>, <code>loop</code>, <code>envelope</code>, plus three <strong>getters</strong> that read the computed sound.</p>
 
 <table>
-  <thead><tr><th>Accesseur</th><th>Rend</th></tr></thead>
+  <thead><tr><th>Getter</th><th>Returns</th></tr></thead>
   <tbody>
-    <tr><td><code>duration()</code></td><td>la durée du tampon, en secondes</td></tr>
-    <tr><td><code>peak()</code></td><td>l'amplitude maximale, en valeur absolue</td></tr>
-    <tr><td><code>sample(t)</code></td><td>l'échantillon à l'instant <code>t</code>&nbsp;; zéro hors du tampon</td></tr>
+    <tr><td><code>duration()</code></td><td>the buffer's duration, in seconds</td></tr>
+    <tr><td><code>peak()</code></td><td>the greatest amplitude, in absolute value</td></tr>
+    <tr><td><code>sample(t)</code></td><td>the sample at time <code>t</code>; zero outside the buffer</td></tr>
   </tbody>
 </table>
 
-<p><code>rate</code> change la <strong>vitesse de lecture</strong>, donc la hauteur <em>et</em> la durée, comme un disque qu'on accélère&nbsp;: ce n'est pas une transposition.</p>
+<p><code>rate</code> changes the <strong>playback speed</strong>, hence the pitch <em>and</em> the duration, like a record played faster: it is not a transposition.</p>
 
-<h3>La session</h3>
+<h3>The session</h3>
 <table>
-  <thead><tr><th>Appel</th><th>Rôle</th></tr></thead>
+  <thead><tr><th>Call</th><th>Role</th></tr></thead>
   <tbody>
-    <tr><td><code>audio.volume([v])</code></td><td>volume général, borné à <code>[0;1]</code></td></tr>
-    <tr><td><code>audio.pause() / resume()</code></td><td>suspend l'<strong>avancement</strong> du son, et non son seul volume</td></tr>
-    <tr><td><code>audio.isPaused() / isReady()</code></td><td>état de la pause, et du périphérique</td></tr>
-    <tr><td><code>audio.start()</code></td><td>ouvre le périphérique&nbsp;; rarement utile (voir ci-dessous)</td></tr>
-    <tr><td><code>audio.sampleRate()</code></td><td>44 100, l'unité de tous les calculs de synthèse</td></tr>
+    <tr><td><code>audio.volume([v])</code></td><td>the master volume, clamped to <code>[0;1]</code></td></tr>
+    <tr><td><code>audio.pause() / resume()</code></td><td>suspends the sound's <strong>progress</strong>, and not merely its volume</td></tr>
+    <tr><td><code>audio.isPaused() / isReady()</code></td><td>the state of the pause, and of the device</td></tr>
+    <tr><td><code>audio.start()</code></td><td>opens the device; rarely needed (see below)</td></tr>
+    <tr><td><code>audio.sampleRate()</code></td><td>44,100, the unit of every synthesis computation</td></tr>
   </tbody>
 </table>
 
-<div class="callout tip">Un navigateur <strong>refuse de sonner avant une interaction</strong>. Le moteur ouvre donc le périphérique au premier clic ou à la première touche, et il n'y a rien à écrire pour cela. En revanche, un son demandé dans <code>setup()</code> ne s'entendra qu'après ce premier geste.</div>
+<div class="callout tip">A browser <strong>refuses to make a sound before an interaction</strong>. The engine therefore opens the device on the first click or the first key, and there is nothing to write for that. A sound asked for in <code>setup()</code>, on the other hand, will only be heard after that first gesture.</div>
 
 <h3>What to know</h3>
 <ul>
-  <li>Le calcul des ondes ne dépend pas du graphisme&nbsp;: un tampon se construit et se mesure même sans carte son, ce dont la suite de tests du moteur se sert.</li>
-  <li>Seize oscillateurs et trente-deux sons coexistent. Quand la table est pleine, le plus ancien <strong>arrêté</strong> est recyclé — un son qui joue n'est jamais volé —, et son ancien objet devient invalide.</li>
-  <li>Aucun code Ollin ne tourne dans le circuit audio&nbsp;: la formule d'un <code>generate</code> est échantillonnée d'avance, et la forme d'un oscillateur est calculée par le moteur. C'est ce qui évite les craquements.</li>
-  <li>En natif, le son continue même si un calcul occupe la machine virtuelle&nbsp;; dans le navigateur, le mélange partage le fil de la page, donc une frame très lourde peut s'entendre.</li>
-  <li>Hors périmètre pour l'instant&nbsp;: le chargement de fichiers, les effets, l'enregistrement et la spatialisation.</li>
+  <li>Computing the waves does not depend on graphics: a buffer can be built and measured with no sound card at all, which the engine's test suite makes use of.</li>
+  <li>Sixteen oscillators and thirty-two sounds coexist. When the table is full, the oldest <strong>stopped</strong> one is recycled — a sound that is playing is never stolen — and its old object becomes invalid.</li>
+  <li>No Ollin code runs in the audio path: a <code>generate</code>'s formula is sampled in advance, and an oscillator's shape is computed by the engine. That is what keeps the crackles away.</li>
+  <li>Natively, the sound carries on even while a computation keeps the virtual machine busy; in the browser the mixing shares the page's thread, so a very heavy frame can be heard.</li>
+  <li>Out of scope for now: loading files, effects, recording and spatialisation.</li>
 </ul>
 </section>
 
 <section id="data">
-<h2>Module <code>data</code></h2>
-<p>Persiste des <strong>paramètres/variables d'un lancement à l'autre</strong>. Deux portées : <code>data</code> (propre au <strong>projet</strong>, isolée) et <code>data.shared</code> (<strong>partagée</strong> entre tous les projets). Valeurs : nombre, chaîne, booléen. Disponible sans <code>import</code>. Persistance automatique (localStorage sur le web, fichier à côté du script en natif).</p>
+<h2>The <code>data</code> module</h2>
+<p>It persists <strong>settings and variables from one run to the next</strong>. Two scopes: <code>data</code> (belonging to the <strong>project</strong>, isolated) and <code>data.shared</code> (<strong>shared</strong> between every project). The values are numbers, strings and booleans. Available without any <code>import</code>. Persistence is automatic — localStorage on the web, a file beside the script natively.</p>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>data.set(key, value)</code></td><td>Écrit et persiste (<code>set(key, nil)</code> supprime la clé)</td></tr>
-    <tr><td><code>data.get(key [, default])</code></td><td>Lit la valeur, ou <code>défaut</code> (ou <code>nil</code>) si absente</td></tr>
+    <tr><td><code>data.set(key, value)</code></td><td>Writes and persists (<code>set(key, nil)</code> removes the key)</td></tr>
+    <tr><td><code>data.get(key [, default])</code></td><td>Reads the value, or <code>default</code> (or <code>nil</code>) when it is missing</td></tr>
     <tr><td><code>data.has(key)</code></td><td><code>true</code>/<code>false</code></td></tr>
-    <tr><td><code>data.delete(key)</code></td><td>Supprime la clé</td></tr>
-    <tr><td><code>data.keys()</code></td><td>Tableau des clés</td></tr>
-    <tr><td><code>data.clear()</code></td><td>Efface toute la portée</td></tr>
-    <tr><td><code>data.shared.*</code></td><td>Mêmes fonctions, en portée <strong>partagée</strong> (ex. <code>data.shared.get("theme")</code>)</td></tr>
+    <tr><td><code>data.delete(key)</code></td><td>Removes the key</td></tr>
+    <tr><td><code>data.keys()</code></td><td>An array of the keys</td></tr>
+    <tr><td><code>data.clear()</code></td><td>Clears the whole scope</td></tr>
+    <tr><td><code>data.shared.*</code></td><td>The same functions, in the <strong>shared</strong> scope (<code>data.shared.get("theme")</code>, for instance)</td></tr>
   </tbody>
 </table>
-<pre><code><span class="cmt">## compteur de lancements, persistant par projet</span>
+<pre><code><span class="cmt">## a run counter, persisted per project</span>
 <span class="kw">var</span> n = <span class="bi">data</span>.get(<span class="str">"runs"</span>, <span class="num">0</span>)
-<span class="bi">print</span>(<span class="str">"lancement n° "</span> + (n + <span class="num">1</span>))
+<span class="bi">print</span>(<span class="str">"run no. "</span> + (n + <span class="num">1</span>))
 <span class="bi">data</span>.set(<span class="str">"runs"</span>, n + <span class="num">1</span>)
 
-<span class="bi">data</span>.shared.set(<span class="str">"theme"</span>, <span class="str">"dark"</span>)   <span class="cmt">## partagé entre tous les projets</span></code></pre>
+<span class="bi">data</span>.shared.set(<span class="str">"theme"</span>, <span class="str">"dark"</span>)   <span class="cmt">## shared between every project</span></code></pre>
 </section>
 
 <section id="image">
-<h2>Module <code>image</code></h2>
-<p>Le module <code>image</code> permet de charger des textures depuis le disque (ou des données base64) et de créer des <strong>render textures</strong> pour le rendu hors-écran. Disponible sans <code>import</code>.</p>
-<div class="callout"><code>graphics.canvas()</code> doit être appelé <strong>avant</strong> toute opération image — le contexte GL doit exister.</div>
+<h2>The <code>image</code> module</h2>
+<p>The <code>image</code> module loads textures from disk, or from base64 data, and creates <strong>render textures</strong> for off-screen rendering. Available without any <code>import</code>.</p>
+<div class="callout"><code>graphics.canvas()</code> must be called <strong>before</strong> any image operation — the GL context has to exist.</div>
 
-<h3>Charger une image</h3>
+<h3>Loading an image</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">240</span>, <span class="num">140</span>, <span class="str">"image.load"</span>)
-<span class="kw">var</span> tex = image.load(<span class="str">"assets/smiley.png"</span>)  <span class="cmt">## handle {id, width, height} — ressource servie</span>
+<span class="kw">var</span> tex = image.load(<span class="str">"assets/smiley.png"</span>)  <span class="cmt">## a handle {id, width, height} — a served resource</span>
 
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.12</span>, <span class="num">0.2</span>))
     <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
-    <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## redimensionné</span>
+    <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## resized</span>
 <span class="kw">end</span></code></pre>
-<div class="callout"><code>image.load(name)</code> résout le nom ainsi : en <strong>natif</strong>, un fichier du disque ; en <strong>WASM</strong>, d'abord une image chargée via le bouton <strong>« Images »</strong>, sinon une <strong>ressource servie par le site</strong> (même origine, récupérée automatiquement — ex. <code>image.load("assets/logo.png")</code> relatif à la page). Pour une image <strong>embarquée</strong> dans le script (portable partout, sans réseau), utiliser <code>image.loadData("png", base64)</code> — voir l'exemple « Image (loadData) » du playground.</div>
+<div class="callout"><code>image.load(name)</code> resolves the name like this: <strong>natively</strong>, a file on disk; in <strong>WASM</strong>, first an image added through the <strong>"Images"</strong> button, otherwise a <strong>resource served by the site</strong> (same origin, fetched automatically — <code>image.load("assets/logo.png")</code>, relative to the page). For an image <strong>embedded</strong> in the script, portable anywhere and needing no network, use <code>image.loadData("png", base64)</code> — see the playground's "Image (loadData)" example.</div>
 
-<h3>Render texture (dessin hors-écran)</h3>
+<h3>Render texture (off-screen drawing)</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)
-<span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>)  <span class="cmt">## render texture 120×120</span>
+<span class="kw">var</span> rt = image.create(<span class="num">120</span>, <span class="num">120</span>)  <span class="cmt">## a 120×120 render texture</span>
 
-image.beginDraw(rt)             <span class="cmt">## on dessine DANS la texture (une fois)</span>
+image.beginDraw(rt)             <span class="cmt">## we draw INTO the texture, once</span>
     <span class="bi">graphics</span>.clear(<span class="bi">Color</span>(<span class="num">0.1</span>, <span class="num">0.1</span>, <span class="num">0.15</span>))
     <span class="bi">graphics</span>.fill(<span class="bi">colors</span>.RED)
     <span class="bi">graphics</span>.circle(<span class="num">60</span>, <span class="num">60</span>, <span class="num">50</span>)
 image.endDraw()
 
-<span class="kw">func</span> draw()                      <span class="cmt">## puis on l'affiche comme un sprite</span>
+<span class="kw">func</span> draw()                      <span class="cmt">## then show it like a sprite</span>
     <span class="bi">graphics</span>.clear(<span class="bi">colors</span>.BLACK)
     <span class="bi">graphics</span>.sprite(rt, <span class="num">30</span>, <span class="num">30</span>)
 <span class="kw">end</span></code></pre>
@@ -2541,37 +2541,37 @@ image.endDraw()
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>image.load(name)</code></td><td>Charge une texture (natif : disque ; WASM : image « Images » ou ressource servie même origine) — retourne un handle <code>{id, width, height}</code></td></tr>
-    <tr><td><code>image.loadData(format, base64)</code></td><td>Charge une texture depuis une chaîne base64 (ex. <code>"png"</code>, <code>"jpg"</code>)</td></tr>
-    <tr><td><code>image.create(w, h)</code></td><td>Crée une render texture vide w×h — retourne un handle. Requiert un contexte GL actif.</td></tr>
-    <tr><td><code>image.beginDraw(handle)</code></td><td>Redirige le rendu vers la render texture (équivalent de <code>BeginTextureMode</code>)</td></tr>
-    <tr><td><code>image.endDraw()</code></td><td>Termine le rendu hors-écran et restaure la cible par défaut</td></tr>
-    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Dessine la texture ; <code>tint</code> explicite (objet Color) prioritaire, sinon la teinte globale <code>graphics.tint</code>. L'ancrage suit <code>graphics.spriteMode</code>, comme <code>graphics.sprite</code></td></tr>
-    <tr><td><code>image.unload(handle)</code></td><td>Libère les ressources GPU de la texture</td></tr>
-    <tr><td><code>image.beginPixels(handle)</code></td><td>Ouvre l'accès pixel-par-pixel à la texture (à recalculer chaque frame)</td></tr>
-    <tr><td><code>image.setPixel(handle, x, y, color)</code></td><td>Écrit un pixel — objet <code>Color</code> ou composantes <code>r, g, b [, a]</code> dans [0,1]. Entre <code>beginPixels</code>/<code>endPixels</code>.</td></tr>
-    <tr><td><code>image.getPixel(handle, x, y)</code></td><td>Lit un pixel → 4 valeurs <code>r, g, b, a</code> dans [0,1] : <code>var r, g, b, a = image.getPixel(h, x, y)</code></td></tr>
-    <tr><td><code>image.endPixels(handle)</code></td><td>Valide les écritures pixel et referme l'accès</td></tr>
-    <tr><td><code>image.mapPixel(handle, f)</code></td><td>Applique <code>f(x, y, r, g, b, a)</code> à chaque pixel ; <code>f</code> renvoie les nouveaux <code>r, g, b, a</code> (canaux non renvoyés inchangés). <code>beginPixels</code>/<code>endPixels</code> gérés en interne. Plus rapide que la boucle manuelle.</td></tr>
+    <tr><td><code>image.load(name)</code></td><td>Loads a texture (natively from disk; in WASM an "Images" image, or a same-origin served resource) — it returns a handle <code>{id, width, height}</code></td></tr>
+    <tr><td><code>image.loadData(format, base64)</code></td><td>Loads a texture from a base64 string (<code>"png"</code>, <code>"jpg"</code>…)</td></tr>
+    <tr><td><code>image.create(w, h)</code></td><td>Creates an empty w×h render texture — it returns a handle. It needs an active GL context.</td></tr>
+    <tr><td><code>image.beginDraw(handle)</code></td><td>Redirects the rendering into the render texture, the counterpart of <code>BeginTextureMode</code></td></tr>
+    <tr><td><code>image.endDraw()</code></td><td>Ends the off-screen rendering and restores the default target</td></tr>
+    <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Draws the texture; an explicit <code>tint</code> (a Color object) wins, otherwise the global <code>graphics.tint</code> applies. The anchoring follows <code>graphics.spriteMode</code>, as <code>graphics.sprite</code> does</td></tr>
+    <tr><td><code>image.unload(handle)</code></td><td>Frees the texture's GPU resources</td></tr>
+    <tr><td><code>image.beginPixels(handle)</code></td><td>Opens pixel-by-pixel access to the texture, to be recomputed every frame</td></tr>
+    <tr><td><code>image.setPixel(handle, x, y, color)</code></td><td>Writes a pixel — a <code>Color</code> object, or the components <code>r, g, b [, a]</code> in [0,1]. Between <code>beginPixels</code> and <code>endPixels</code>.</td></tr>
+    <tr><td><code>image.getPixel(handle, x, y)</code></td><td>Reads a pixel → four values <code>r, g, b, a</code> in [0,1]: <code>var r, g, b, a = image.getPixel(h, x, y)</code></td></tr>
+    <tr><td><code>image.endPixels(handle)</code></td><td>Commits the pixel writes and closes the access</td></tr>
+    <tr><td><code>image.mapPixel(handle, f)</code></td><td>Applies <code>f(x, y, r, g, b, a)</code> to every pixel; <code>f</code> returns the new <code>r, g, b, a</code>, the channels it does not return staying unchanged. <code>beginPixels</code>/<code>endPixels</code> are handled internally. Faster than the loop written by hand.</td></tr>
   </tbody>
 </table>
-<div class="callout tip"><code>graphics.sprite()</code> est l'alternative recommandée à <code>image.draw()</code> : elle respecte la matrice de transformation courante et prend <code>graphics.tint</code> comme teinte (blanc si aucune).</div>
+<div class="callout tip"><code>graphics.sprite()</code> is the recommended alternative to <code>image.draw()</code>: it honours the current transformation matrix and takes <code>graphics.tint</code> as its tint, white when there is none.</div>
 </section>
 
 <section id="window">
-<h2>Module <code>window</code></h2>
-<p>Le module <code>window</code> expose les dimensions de la zone de rendu courante. Disponible sans <code>import</code>.</p>
+<h2>The <code>window</code> module</h2>
+<p>The <code>window</code> module exposes the current render area's dimensions. Available without any <code>import</code>.</p>
 <table>
-  <thead><tr><th>Propriété</th><th>Type</th><th>Description</th></tr></thead>
+  <thead><tr><th>Property</th><th>Type</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>window.width</code></td><td>int</td><td>Largeur de la zone de rendu en pixels</td></tr>
-    <tr><td><code>window.height</code></td><td>int</td><td>Hauteur de la zone de rendu en pixels</td></tr>
+    <tr><td><code>window.width</code></td><td>int</td><td>The render area's width, in pixels</td></tr>
+    <tr><td><code>window.height</code></td><td>int</td><td>The render area's height, in pixels</td></tr>
   </tbody>
 </table>
-<div class="callout tip">Le plus souvent tu n'as pas besoin de <code>window</code> : le moteur fournit déjà les globales <code>W</code> et <code>H</code> (largeur/hauteur de la zone de rendu), ainsi que <code>CW</code> et <code>CH</code> (le centre, soit <code>W/2</code> et <code>H/2</code>), initialisées depuis <code>window</code> avant l'exécution.</div>
-<pre data-no-run><code><span class="cmt">## W, H, CW, CH sont fournis par le moteur — pas besoin de window ici</span>
-<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## fenêtre pleine zone</span>
-<span class="bi">graphics</span>.circle(CW, CH, <span class="num">50</span>)  <span class="cmt">## cercle au centre</span></code></pre>
+<div class="callout tip">Most of the time you do not need <code>window</code>: the engine already supplies the globals <code>W</code> and <code>H</code> (the render area's width and height), along with <code>CW</code> and <code>CH</code> (the centre, that is <code>W/2</code> and <code>H/2</code>), initialised from <code>window</code> before the run.</div>
+<pre data-no-run><code><span class="cmt">## W, H, CW and CH come from the engine — no need for window here</span>
+<span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## a window filling the area</span>
+<span class="bi">graphics</span>.circle(CW, CH, <span class="num">50</span>)  <span class="cmt">## a circle at the centre</span></code></pre>
 </section>
 
 
