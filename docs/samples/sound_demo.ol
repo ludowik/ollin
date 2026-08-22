@@ -1,53 +1,52 @@
-## Modules audio et sound — TOUT ce qu'on entend ici est calculé : pas un fichier chargé.
+## The audio and sound modules — EVERYTHING heard here is computed: not one file is loaded.
 ##
-## Pose les doigts sur les touches : chaque note SONNE TANT QUE le doigt reste appuyé, et
-## plusieurs doigts jouent plusieurs notes à la fois — c'est le module `touch` qui les suit,
-## chacun par son identifiant. Fais glisser sans lever : la note suit la touche survolée.
+## Put your fingers on the keys: each note SOUNDS AS LONG AS the finger stays down, and several
+## fingers play several notes at once — the `touch` module follows them, each by its identifier.
+## Drag without lifting and the note follows the key under the finger.
 ##
-## L'exemple montre les DEUX natures d'objet du module `sound`, chacune pour ce qu'elle sait
-## faire :
-##   un OSCILLATEUR tenu pour une touche pressée — sa durée n'est pas connue d'avance, et son
-##     enveloppe la relâche au lever du doigt ;
-##   un TAMPON calculé pour les chiffres 1 à 8 du clavier physique — une note brève, figée,
-##     rejouée telle quelle ;
-##   et un oscillateur de plus dans la bande du haut, dont la fréquence suit le doigt.
+## The example shows the `sound` module's TWO kinds of object, each doing what it is good at:
+##   an OSCILLATOR held for a pressed key — its duration is not known in advance, and its
+##     envelope releases it when the finger lifts;
+##   a computed BUFFER for the digits 1 to 8 of the physical keyboard — a short, frozen note,
+##     replayed as it is;
+##   and one more oscillator in the band at the top, whose frequency follows the finger.
 ##
-## À la souris, un seul pointeur : le module `mouse` prend alors le relais.
+## With a mouse there is a single pointer, and the `mouse` module takes over.
 
 global notes = ["C4", "D4", "E4", "F4", "G4", "A4", "B4", "C5"]
-global buffers = []          ## un tampon par note, calculé une fois dans setup()
-global lastKey = 0       ## touche allumée, pour le retour visuel
-global glow = 0.0        ## décroît à chaque frame — le clavier « respire »
+global buffers = []          ## one buffer per note, computed once in setup()
+global lastKey = 0       ## the key lit up, for visual feedback
+global glow = 0.0        ## it decays every frame, so the keyboard "breathes"
 
 global bow = nil       ## l'oscillateur vivant
 global bowPos = 0.0      ## 0..1, position du doigt dans la bande
-## Contact qui pilote l'archet : identifiant de doigt, "mouse", ou nil s'il ne sonne pas. Se
-## compare TOUJOURS à nil, jamais par véracité : un identifiant de doigt peut valoir 0, que le
-## langage tient pour faux — l'archet restait alors muet sous le premier doigt du navigateur. La
-## bande n'obéit qu'à UN contact, sinon deux positions se disputeraient la même fréquence —
-## et « l'archet sonne » se lit sur cette seule variable, sans drapeau à tenir d'accord.
+## The contact driving the bow: a finger's identifier, "mouse", or nil when it is silent. It is
+## ALWAYS compared with nil, never by truthiness: a finger's identifier may be 0, which the
+## language holds to be false — the bow then stayed mute under the browser's first finger. The band
+## obeys ONE contact only, or two positions would fight over the same frequency; and "the bow is
+## sounding" reads off this single variable, with no flag to keep in step.
 global bowHolder = nil
 
-global mouseDown = false      ## le bouton de la souris est enfoncé
+global mouseDown = false      ## the mouse button is down
 
-## Un oscillateur TENU par contact, créé à la pose et rendu au lever par `free()`. C'est le
-## moteur qui gère la réserve : il ne reprend une voix rendue qu'une fois son extinction finie.
+## One HELD oscillator per contact, created when the finger lands and given back on lifting through
+## `free()`. The engine manages the pool: it only takes a released voice back once it has died away.
 global voiceOf = {}        ## contact (identifiant de doigt, ou "mouse") → oscillateur
 
-## Une entrée par contact POSÉ (doigt ou pointeur) : identifiant → touche qu'il presse. C'est
-## ce qui permet plusieurs notes en même temps. Le pointeur y figure sous le nom "mouse",
+## One entry per contact DOWN, a finger or the pointer: its identifier maps to the key it presses.
+## That is what allows several notes at once. The pointer appears under the name "mouse",
 ## comme un contact de plus — tout le reste du programme le traite alors sans cas particulier.
 global underFinger = {}
-## Les touches tenues, dans une map réutilisée d'une image à l'autre : une map neuve par image
-## serait une allocation, et la vider coûte huit écritures.
+## The keys held, in a map reused from one frame to the next: a fresh map per frame would be an
+## allocation, whereas emptying this one costs eight writes.
 global heldKeys = {}
 
-## Chiffre du clavier → indice de note : comparer la touche à `"" + i` fabriquerait huit
-## chaînes à chaque frappe, y compris pour les touches qui ne sont pas des chiffres.
+## A keyboard digit maps to a note index: comparing the key with `"" + i` would build eight strings
+## on every keystroke, including for keys that are not digits.
 global DIGIT = {}
 
-## Bornée par la LARGEUR autant que par la bowPos : sur un écran de téléphone tenu debout,
-## une taille tirée de la seule bowPos donne des lignes plus larges que l'écran.
+## Bounded by the WIDTH as much as by the height: on a phone screen held upright, a size taken from
+## the height alone gives lines wider than the screen.
 func textSize()
     return math.min(W * 0.055, H * 0.03)
 end
@@ -71,8 +70,8 @@ end
 func setup()
     graphics.canvas(W, H, "son")
 
-    ## Un tampon par note : la forme d'onde est échantillonnée UNE fois, puis l'enveloppe est
-    ## appliquée aux échantillons. Rien n'est recalculé à la lecture.
+    ## One buffer per note: the waveform is sampled ONCE, then the envelope is applied to the
+    ## samples. Nothing is recomputed on playback.
     for i = 1, #notes do
         buffers[i] = sound.tone(sound.note(notes[i]), 0.5, "triangle")
         buffers[i].envelope(0.01, 0.12, 0.35, 0.25).volume(0.5)
@@ -89,10 +88,10 @@ func setup()
     end
 end
 
-## L'oscillateur de ce contact, créé au besoin. L'enveloppe donne l'attaque et le
-## relâchement ; sans durée passée à `trigger`, la note se tient jusqu'au lever du doigt.
-## Le moteur peut refuser si toutes ses voix sonnent encore : mieux vaut alors une note
-## manquante qu'une note volée à un doigt encore posé.
+## This contact's oscillator, created when needed. The envelope gives the attack and the release;
+## with no duration passed to `trigger`, the note holds until the finger lifts. The engine may
+## refuse when all of its voices are still sounding: a missing note is then better than one stolen
+## from a finger still down.
 func voiceFor(contact)
     var o = voiceOf[contact]
     if o then
@@ -107,12 +106,12 @@ func voiceFor(contact)
     return o
 end
 
-## Tenir la note d'une touche, ou relâcher si le contact ne presse plus rien. Rend la touche
-## RÉELLEMENT tenue : zéro si aucune voix n'était libre, sinon la touche s'allumerait sans
-## qu'aucun son ne sorte, et elle resterait muette même une fois une voix libérée.
+## Holds a key's note, or releases when the contact presses nothing any more. It returns the key
+## REALLY held: zero when no voice was free, since the key would otherwise light with no sound
+## coming out, and would stay mute even once a voice was released.
 func holdKey(contact, i)
-    ## Rendre la voix AVANT de la demander : un doigt qui ne fait que glisser dans la bande en
-    ## immobilisait une sinon, et trois suffisaient à faire taire une touche.
+    ## Give the voice back BEFORE asking for one: a finger merely sliding across the band otherwise
+    ## tied one up, and three were enough to silence a key.
     if i == 0 then
         releaseVoice(contact)
         return 0
@@ -132,12 +131,12 @@ func releaseVoice(contact)
     if not o then
         return
     end
-    o.free()             ## lâche l'enveloppe et rend la voix — la note finit de s'éteindre
+    o.free()             ## lets the envelope go and gives the voice back; the note finishes dying away
     voiceOf[contact] = nil
 end
 
-## Note BRÈVE, pour le clavier physique : un tampon figé, rejoué tel quel. Rejouer repart du
-## début, inutile de l'arrêter d'abord.
+## A SHORT note, for the physical keyboard: a frozen buffer, replayed as it is. Replaying starts
+## from the beginning, so there is no need to stop it first.
 func playBuffer(i)
     buffers[i].play()
     lastKey = i
@@ -156,8 +155,8 @@ func keyAt(x, y)
     return i
 end
 
-## Ce que le contact survole décide, à la pose comme au glissement. La note ne change que si
-## l'on CHANGE de touche : sinon un déplacement de trois pixels la redéclencherait par image.
+## What the contact hovers decides, on landing as on dragging. The note only changes when the KEY
+## changes: otherwise a three-pixel move would retrigger it every frame.
 func follow(contact, prev, x, y)
     var t = keyAt(x, y)
     if t == prev then
@@ -198,14 +197,14 @@ func touch.ended(id, x, y)
     if id == bowHolder then
         bowHolder = nil
     end
-    releaseVoice(id)          ## le lever du doigt relâche la note, qui s'éteint sur son enveloppe
+    releaseVoice(id)          ## lifting the finger releases the note, which dies away along its envelope
     underFinger[id] = nil
 end
 
-## ── Souris : un seul pointeur, pour l'ordinateur ────────────────────────────────
-## Sur un écran tactile, le système émule la souris sous un doigt unique : les deux familles
-## de rappels partent alors, et le moteur ne filtre rien — c'est au script de choisir. Sans ce
-## garde-fou, un doigt jouait la note DEUX fois, donc deux fois plus fort.
+## ── The mouse: a single pointer, for a computer ─────────────────────────────────
+## On a touch screen the system emulates the mouse under a single finger: both families of callback
+## then fire, and the engine filters nothing — the script must choose. Without this guard, one
+## finger played the note TWICE, hence twice as loud.
 func mouseIgnored()
     return touch.count() > 0
 end
@@ -236,8 +235,8 @@ func mouse.moved(x, y)
     underFinger["mouse"] = follow("mouse", underFinger["mouse"], x, y)
 end
 
-## Pas de garde-fou ici : une voix prise par le pointeur doit être rendue dans tous les cas,
-## y compris si un doigt s'est posé entre-temps.
+## No guard here: a voice taken by the pointer must be given back in every case, a finger having
+## landed in the meantime included.
 func mouse.released(x, y)
     mouseDown = false
     releaseVoice("mouse")
@@ -248,7 +247,7 @@ func mouse.released(x, y)
 end
 
 func keyboard.keypressed(key)
-    ## Les chiffres 1 à 8 jouent les huit notes : de quoi essayer au clavier physique.
+    ## The digits 1 to 8 play the eight notes, which is enough to try it on a physical keyboard.
     var i = DIGIT[key]
     if i then
         playBuffer(i)
@@ -256,8 +255,8 @@ func keyboard.keypressed(key)
 end
 
 func update()
-    ## L'oscillateur suit le doigt : une fréquence qui bouge pendant que le son sort, ce
-    ## qu'un tampon figé ne saurait pas faire. Le volume s'ouvre et se ferme en douceur.
+    ## The oscillator follows the finger: a frequency that moves while the sound comes out, which a
+    ## frozen buffer could not do. The volume opens and closes gently.
     var target = 0.0
     if bowHolder <> nil then
         target = 0.25
@@ -269,9 +268,8 @@ func update()
     glow = math.max(glow - deltaTime * 2.5, 0)
 end
 
-## Les touches TENUES restent allumées, puisque leur note dure aussi longtemps que l'appui.
-## Relevé en UNE passe, à réutiliser pour les huit touches : interroger chaque touche
-## reparcourait la liste des contacts autant de fois.
+## The keys HELD stay lit, their note lasting as long as the press does. It is read in ONE pass, to
+## be reused for all eight keys: querying each key walked the list of contacts as many times.
 func collectHeldKeys()
     for i = 1, #notes do
         heldKeys[i] = nil
@@ -285,7 +283,7 @@ func draw()
     graphics.clear(Color(0.08, 0.09, 0.13))
     graphics.noStroke()
     graphics.fontSize(textSize())
-    ## Géométrie lue une fois : ces trois fonctions étaient rappelées une trentaine de fois.
+    ## The geometry is read once: those three functions were being called some thirty times.
     var hb = bandTop()
     var bb = bandBottom()
     var hc = keyboardTop()
@@ -304,20 +302,20 @@ func draw()
         graphics.text("{bow.freq():.0f} Hz", W * 0.04, hb + H * 0.11)
     end
 
-    ## Le clavier : huit touches, la dernière jouée reste éclairée le temps de sa lueur. La
-    ## touche SOUS LE DOIGT est cerclée, pour que le balayage se voie autant qu'il s'entende.
+    ## The keyboard: eight keys, the last played staying lit for as long as its glow lasts. The key
+    ## UNDER THE FINGER is ringed, so that a sweep is seen as much as it is heard.
     graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("tiens plusieurs doigts posés", W * 0.04, hc - H * 0.07)
-    graphics.text("chiffres 1 à 8 : notes brèves", W * 0.04, hc - H * 0.03)
+    graphics.text("hold several fingers down", W * 0.04, hc - H * 0.07)
+    graphics.text("digits 1 to 8: short notes", W * 0.04, hc - H * 0.03)
     graphics.noStroke()
     var l = keyWidth()
     collectHeldKeys()
     for i = 1, #notes do
         var held = heldKeys[i]
-        ## Tenue : pleine lumière tant que l'appui dure. Sinon, la lueur d'une note brève.
+        ## Held: full light for as long as the press lasts. Otherwise, the glow of a short note.
         var bright = held and 1 or ((i == lastKey) and glow or 0)
-        ## noStroke AVANT le rectangle, stroke seulement pour le texte : posé dans l'autre
-        ## ordre, le contour du texte cerne aussi les touches suivantes.
+        ## noStroke BEFORE the rectangle, and stroke only for the text: in the other order, the
+        ## text's outline rings the following keys as well.
         graphics.noStroke()
         graphics.fill(Color(0.16 + 0.5 * bright, 0.18 + 0.35 * bright, 0.3 + 0.4 * bright))
         graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
@@ -330,8 +328,8 @@ func draw()
         graphics.text(notes[i], l * (i - 1) + l * 0.28, hc + H * 0.07)
     end
 
-    ## Ce que valent les accesseurs d'un tampon : rien d'autre ne permet de les voir.
+    ## What a buffer's accessors read: nothing else lets one see them.
     graphics.stroke(Color(0.62, 0.7, 0.85))
-    graphics.text("tampon : {buffers[1].duration():.2f} s, crête {buffers[1].peak():.2f}",
+    graphics.text("buffer: {buffers[1].duration():.2f} s, peak {buffers[1].peak():.2f}",
                   W * 0.04, bb - H * 0.04)
 end
