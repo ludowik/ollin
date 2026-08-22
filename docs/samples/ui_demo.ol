@@ -1,34 +1,34 @@
-## Module ui — widgets dessinés par le MOTEUR, en haut à droite de la zone de tracé.
-## Aucune dépendance au navigateur : le même code tourne en natif et dans le playground.
+## The ui module: widgets drawn by the ENGINE, at the top right of the drawing area. There is no
+## dependency on the browser — the same code runs natively and in the playground.
 ##
-## Un widget se déclare UNE fois. Le moteur le dessine et le teste à chaque frame.
-## Les widgets se rangent dans des menus et sous-menus ; ui.show change le menu affiché.
-## Une case à cocher, un slider et une liste reçoivent une RÉFÉRENCE : `ref` accepte un chemin de
-## champs, donc les réglages tiennent dans UN objet `config` plutôt que dans autant de
+## A widget is declared ONCE. The engine draws it and tests it every frame.
+## Widgets are filed into menus and sub-menus; ui.show changes the menu on display.
+## A checkbox, a slider and a list each receive a REFERENCE: `ref` accepts a path of fields, so
+## the settings fit in ONE `config` object rather than in as many
 ## variables globales. Le programme les lit normalement — voir `config.grille` et
 ## `config.vitesse` dans draw().
 
-## Tous les réglages exposés par l'interface, en un seul endroit : ce que l'utilisateur
+## Every setting the interface exposes, in one place: what the user
 ## peut changer se lit ici, sans chercher parmi les globales du programme.
 global config = {
     grid: true,
     anim: true,
     thick: false,
-    speed: nil,    ## le slider l'initialise à son défaut
+    speed: nil,    ## the slider initialises it to its default
     branches: 3,
     tint: 0.55,
-    shape: nil,      ## la liste l'initialise à son premier élément
+    shape: nil,      ## the list initialises it to its first item
     direction: nil
 }
 
-## Sources d'une liste : un TABLEAU donne ses valeurs, un ENUM (ou une map) ses clés.
-global shapes = ["cercle", "carré", "triangle"]
+## What a list draws from: an ARRAY gives its values, an ENUM or a map its keys.
+global shapes = ["circle", "square", "triangle"]
 enum Direction
     clockwise,
     counterClockwise
 end
 
-## État de l'animation (pas des réglages) et couleur dérivée de la teinte.
+## The animation's state, which is not a setting, and the colour derived from the tint.
 global turns = 0
 global t = 0
 global armColor
@@ -39,54 +39,54 @@ func reset()
 end
 
 func onDirection(value)
-    ## Le rappel reçoit l'élément choisi — ici la clé de l'enum, une chaîne.
+    ## The callback receives the item chosen: here the enum's key, a string.
     print("sens : " + value)
 end
 
 func onTint(value)
-    ## Le rappel reçoit la NOUVELLE valeur : la couleur est donc calculée quand elle
-    ## change, et non à chaque frame comme le ferait une lecture dans draw().
+    ## The callback receives the NEW value, so the colour is computed when it changes rather than
+    ## every frame, as a read inside draw() would.
     armColor = Color(value, 0.85, 1 - value * 0.6)
 end
 
 func onThick(on)
-    ## Appelée à chaque changement, avec le nouvel état — pratique pour réagir tout
-    ## de suite plutôt que de comparer la variable à chaque frame.
+    ## Called on every change, with the new state, which is handy for reacting at once instead of
+    ## comparing the variable every frame.
     if on then
-        print("trait épais")
+        print("thick stroke")
     else
         print("trait fin")
     end
 end
 
-## setup() est appelée UNE fois avant la première frame : c'est là que se fait toute
-## l'initialisation — zone de tracé, menus, état de départ.
+## setup() is called ONCE before the first frame: that is where all the initialisation happens —
+## the drawing area, the menus, the starting state.
 func setup()
     graphics.canvas(W, H, "ui")
 
-    var main = ui.menu("Principal")
-    main.button("Remettre à zéro", reset)
+    var main = ui.menu("Main")
+    main.button("Reset", reset)
     main.checkbox("Animation", ref config.anim)
-    ## `config.vitesse` valant nil, le slider l'initialise à son défaut (1.0).
-    main.slider("Vitesse", ref config.speed, 0.25, 3, 1.0)
-    ## Bornes ET départ entiers → slider entier, sans décimale affichée.
+    ## `config.speed` being nil, the slider initialises it to its default, 1.0.
+    main.slider("Speed", ref config.speed, 0.25, 3, 1.0)
+    ## Integer bounds AND an integer start give an integer slider, with no decimals shown.
     main.slider("Branches", ref config.branches, 1, 8)
 
-    ## Une liste est en mono-sélection : la ligne montre l'élément retenu, un clic déplie
+    ## A list is single-selection: the row shows the item chosen, and a click unfolds
     ## les choix. Le tableau renvoie la VALEUR choisie, l'enum sa CLÉ.
-    main.list("Forme", shapes, ref config.shape)
-    main.list("Sens", Direction, ref config.direction, onDirection)
+    main.list("Shape", shapes, ref config.shape)
+    main.list("Direction", Direction, ref config.direction, onDirection)
 
-    var appearance = main.menu("Apparence")
-    appearance.checkbox("Grille", ref config.grid)
-    appearance.checkbox("Trait épais", ref config.thick, onThick)
-    appearance.slider("Teinte", ref config.tint, 0, 1, onTint)
+    var appearance = main.menu("Appearance")
+    appearance.checkbox("Grid", ref config.grid)
+    appearance.checkbox("Thick stroke", ref config.thick, onThick)
+    appearance.slider("Tint", ref config.tint, 0, 1, onTint)
 
-    ## ui.show remplace le menu affiché : de quoi passer d'un écran à l'autre (réglages,
+    ## ui.show replaces the menu on display, which is enough to move from one screen to another
     ## pause, fin de partie) sans reconstruire l'interface. Les menus sont des locales de
-    ## setup, capturées par les closures des boutons.
+    ## in setup, captured by the buttons' closures.
     var pause = ui.menu("Pause")
-    pause.button("Reprendre", func() ui.show(main) end)
+    pause.button("Resume", func() ui.show(main) end)
     main.button("Pause", func() ui.show(pause) end)
     ui.show(main)
 
@@ -96,7 +96,7 @@ end
 ## La forme du bout de bras vient de la liste : le programme lit config.forme comme une
 ## variable ordinaire.
 func drawShape(x, y, radius)
-    if config.shape == "carré" then
+    if config.shape == "square" then
         graphics.rect(x - radius, y - radius, radius * 2, radius * 2)
     elseif config.shape == "triangle" then
         graphics.polygon([x, y - radius, x + radius, y + radius, x - radius, y + radius])
@@ -148,5 +148,5 @@ func draw()
 
     graphics.stroke(Color(0.85, 0.88, 0.95))
     graphics.fontSize(H * 0.035)
-    graphics.text("tours : " + turns, W * 0.05, H * 0.12)
+    graphics.text("turns: " + turns, W * 0.05, H * 0.12)
 end
