@@ -5,22 +5,22 @@
        identiques, pas seulement ressemblantes. */
     :root { --bg:#0f1117; --surface:#1a1d2e; --fg:#e6e6ee; --dim:#a3adc4; --accent:#9ba1ff; --border:#3a3f63; }
     * { box-sizing: border-box; }
-    /* min-height:0 annule le min-height:100vh du shell (sur mobile 100vh = viewport
-       LARGE → fenetre plus haute que l'ecran, defilante). overflow:hidden +
-       position:fixed : l'app remplit exactement la fenetre, rien ne defile. */
+    /* min-height:0 cancels the shell's min-height:100vh (on mobile, 100vh is the LARGE
+       viewport, hence a window taller than the screen, which scrolls). overflow:hidden plus
+       position:fixed make the app fill the window exactly, and nothing scrolls. */
     html, body { margin:0; height:100%; min-height:0; overflow:hidden; overscroll-behavior:none;
                  background:var(--bg); color:var(--fg);
                  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
     body { display:flex; flex-direction:column; position:fixed; top:0; right:0; bottom:0; left:0; }
-    /* touch-action:none sur la barre (zone non defilante) et le canvas (surface
-       graphique interactive) : un glissement qui y demarre n'a pas d'ancetre
-       scrollable → sinon iOS panoramique toute la fenetre. Pose directement sur
-       ces elements (touch-action ne s'herite pas). #out garde le defilement natif. */
+    /* touch-action:none on the bar (a non-scrolling area) and on the canvas (an interactive
+       graphics surface): a drag starting there has no scrollable ancestor, and iOS would
+       otherwise pan the whole window. It is set directly on those elements, since touch-action
+       is not inherited. #out keeps its native scrolling. */
     #bar, canvas { touch-action:none; }
 
-    /* Apparence de la barre : app-bar.css (commun aux trois vues). Ici, seulement ce
-       specific to this view: it slips under the notch, and is NOT part of the area
-       graphique. */
+    /* The bar's appearance: app-bar.css, common to the three views. Only what belongs to
+       this view lives here: it slips under the notch, and is NOT part of the graphics
+       area. */
     #bar { flex:none;
            height: calc(var(--bar-h) + env(safe-area-inset-top));
            padding-top: env(safe-area-inset-top); }
@@ -68,7 +68,7 @@
          button, so one corner makes the round trip. -->
     <a class="bar-btn" href="#/playground" title="Back to the editor">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9.5 3L5 8l4.5 5"/></svg>
-      <span class="bar-label">Éditeur</span>
+      <span class="bar-label">Editor</span>
     </a>
   </div>
   <div id="stage-wrap">

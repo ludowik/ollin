@@ -3,7 +3,7 @@
   "date": "2026-08-19",
   "commit": "fb79e2d",
   "runs": 3,
-  "machine": "Intel Xeon 2,10 GHz, 4 cœurs — conteneur Linux x86-64",
+  "machine": "Intel Xeon 2.10 GHz, 4 cores - Linux x86-64 container",
   "build": "GCC 13.3, CMake Release, computed-goto",
   "reference": { "id": "lua", "name": "Lua 5.4.6" },
   "competitors": [

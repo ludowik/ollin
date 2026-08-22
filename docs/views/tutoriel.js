@@ -193,7 +193,7 @@ export async function init(ctx) {
   if (reloadBtn) reloadBtn.addEventListener('click', ctx.hardReload)
 
   // Replaces the <pre><code> blocks with read-only CM6 editors.
-  const canvas = document.getElementById('canvas')   // canvas PARTAGÉ (shell)
+  const canvas = document.getElementById('canvas')   // the SHARED canvas, owned by the shell
   root.querySelectorAll('section pre').forEach(pre => {
     const code = pre.querySelector('code')
     if (!code) return
