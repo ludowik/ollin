@@ -34,8 +34,8 @@ static Value color_field(const Value& self, const char* name) {
     return v;
 }
 
-// args[0] = self ; args[1..] = forme couleur flexible (voir parseColor) :
-//   Color(gris) · Color(gris, a) · Color(r, g, b) · Color(r, g, b, a) · Color(autreColor)
+// args[0] = self; args[1..] = the flexible colour form (see parse_color):
+//   Color(grey) · Color(grey, a) · Color(r, g, b) · Color(r, g, b, a) · Color(otherColor)
 
 static int color_init(CallCtx& ctx) {
     Value* args = ctx.args;

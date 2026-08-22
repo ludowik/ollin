@@ -1500,7 +1500,7 @@ function canAutoPush(p) {
 async function sharedRemotePush(project) {
   if (project === currentProject) setSyncDot('syncing')
   await GH.ensureRepo()
-  await GH.pushProject(project, null, {})   // pose project.remote (slug, folderSha)
+  await GH.pushProject(project, null, {})   // sets project.remote (slug, folderSha)
   project.dirty = false
   await Store.saveProject(project)
   if (project === currentProject) {

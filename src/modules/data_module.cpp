@@ -68,7 +68,7 @@ static void json_escape(const std::string& s, std::string& out) {
                     snprintf(b, sizeof(b), "\\u%04x", (unsigned char)c);
                     out += b;
                 } else {
-                    out += c;   // UTF-8 multi-octets passe tel quel
+                    out += c;   // a multi-byte UTF-8 sequence passes through as it is
                 }
         }
     }
