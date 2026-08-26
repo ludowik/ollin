@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-22 13:10</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 09:43</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-22 13:10</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 09:43</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1764,10 +1764,10 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>A rectangle: filled when <code>fill</code> is on, outlined when <code>stroke</code> is on. <code>x, y</code> is the top-left corner or the centre, according to <code>rectMode</code>. <code>r</code> is the corner radius in <strong>pixels</strong>, clamped to half the shorter side (beyond that you get a capsule); the outline stays inside the geometry declared, as it does for square corners. The corners' smoothness comes from <code>segments</code></td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Returns the current frame rate, as an integer</td></tr>
     <tr><td><code>graphics.screenshot(file)</code></td><td>Captures the current rendering into a PNG (to be called inside <code>draw</code>); in WASM it starts a download</td></tr>
-    <tr><td><code>graphics.text(text, x, y)</code></td><td>Draws a string — in the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
+    <tr><td><code>graphics.text(value, x, y)</code></td><td>Draws <strong>any value</strong>, converted exactly as <code>print</code> converts it — a class instance goes through its <code>__str</code>. In the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
     <tr><td><code>graphics.fontSize([n])</code></td><td>Sets the font height for <code>text</code> and <strong>always</strong> returns the current height — with no argument it is therefore a getter. The state is reset to 18 on every frame, that being the commonest value. It accepts a <strong>fractional</strong> size, useful for a scaled drawing, and imposes no minimum</td></tr>
     <tr><td><code>graphics.font([name])</code></td><td>Chooses the current font and <strong>always</strong> returns its name. Three fonts are embedded in the engine: <code>"sans"</code> (the default, proportional), <code>"mono"</code> (fixed pitch) and <code>"pixel"</code> (raylib's bitmap font, for a retro look). An unknown name raises an error listing the fonts available. It is a style state, so it is reset to the default on every frame and saved by <code>pushStyle</code></td></tr>
-    <tr><td><code>graphics.textSize(text)</code></td><td>The width <strong>and</strong> height of the text in the current font and size, as two values: <code>var w, h = graphics.textSize("abc")</code>. Enough to centre or frame a label without reimplementing the measurement. With no canvas it returns 0, 0</td></tr>
+    <tr><td><code>graphics.textSize(value)</code></td><td>The width <strong>and</strong> height of the value in the current font and size, as two values: <code>var w, h = graphics.textSize("abc")</code>. It accepts whatever <code>text</code> accepts and converts it the same way, so what is measured is what would be drawn. Enough to centre or frame a label without reimplementing the measurement. With no canvas it returns 0, 0</td></tr>
     <tr><td><code>graphics.point(x, y)</code></td><td>Draws a point at the given coordinates</td></tr>
     <tr><td><code>graphics.circle(x, y, r)</code></td><td>A circle centred on (x,y) with radius r — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>
     <tr><td><code>graphics.ellipse(x, y, w, h)</code></td><td>An ellipse centred on (x,y), of width w and height h — filled and outlined according to the styles; anchored according to <code>ellipseMode</code></td></tr>

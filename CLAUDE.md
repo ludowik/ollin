@@ -933,8 +933,17 @@ toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
   précédent, déjà détruit.
 - Côté langage, la police est un **état de style** comme `fontSize` : `s_font_idx` est
   sauvegardé par `capture_style`/`restore_style` et remis au défaut par `reset_styles`.
-  `graphics.font([nom])` le pilote et renvoie le nom courant ; `graphics.textSize(texte)`
+  `graphics.font([nom])` le pilote et renvoie le nom courant ; `graphics.textSize(valeur)`
   mesure avec la police ET la taille courantes (deux valeurs, via `ctx.set_result`).
+- **`graphics.text` accepte TOUTE valeur**, convertie par `value_to_string` — donc comme
+  `print`, méta-méthode `__str` comprise. Auparavant un non-string devenait la chaîne vide :
+  `graphics.text(score, x, y)` ne dessinait rien, sans erreur ni diagnostic. `textSize` fait la
+  même conversion, sinon on pourrait écrire un nombre sans jamais pouvoir le centrer (vérifié :
+  mêmes largeur et hauteur pour `42` et `"42"`, pour une instance et son `__str`).
+  ⚠ **La géométrie est lue AVANT la conversion** : `__str` est du code Ollin, son appel peut
+  redimensionner le fichier de registres, et `ctx.args` serait alors pendant. La conversion vient
+  aussi APRÈS le test de police, pour qu'un `__str` ne s'exécute pas quand il n'y a rien à dessiner.
+  Non couvert par `tests/run.sh` (graphics y est nil) : mesuré sous Xvfb avec `build-gfx/ollin`.
 - `tests/check_naming.sh` **exclut** `font_sans.h`/`font_mono.h` : les identifiants d'un
   fichier généré sont ceux de l'outil, et une correction serait effacée à la génération
   suivante.

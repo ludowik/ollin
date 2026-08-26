@@ -502,9 +502,8 @@ static int gfx_font(CallCtx& ctx) {
 static int gfx_text_size(CallCtx& ctx) {
     Value* args = ctx.args;
     int argc = ctx.argc;
-    if (argc < 1 || !args[0].is_string())
+    if (argc < 1)
         throw std::runtime_error("graphics.textSize: expected a text");
-    std::string text = args[0].as_string();
     Font font = current_font();
     if (font.texture.id == 0 || font.baseSize == 0) {
         // With no drawing area no font is loaded, so we return 0 rather than divide by the native
@@ -513,6 +512,9 @@ static int gfx_text_size(CallCtx& ctx) {
         ctx.set_result(1, Value(0.0));
         return 2;
     }
+    // Same conversion as graphics.text, and for the same reason: measuring must agree with
+    // drawing, or a number could be written but never centred.
+    std::string text = value_to_string(args[0]);
     Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, s_font_size / (float)font.baseSize);
     ctx.set_result(0, Value((double)size.x));
     ctx.set_result(1, Value((double)size.y));
@@ -781,7 +783,14 @@ static int gfx_text(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 3)
         throw std::runtime_error("graphics.text: expected text, x, y");
-    const char* text = args[0].is_string() ? args[0].as_string().c_str() : "";
+    // ANY value is drawn, converted exactly as `print` converts it — an instance's `__str`
+    // included. A non-string used to become the empty string, so `graphics.text(score, x, y)`
+    // drew nothing at all, in silence: neither a result nor a diagnosis.
+    //
+    // The geometry is read BEFORE the conversion, because `__str` is Ollin code: calling it can
+    // resize the register file, and `args` would then dangle.
+    int tx = gfx_to_int(args[1]);
+    int ty = gfx_to_int(args[2]);
     // The style comes from the current STATE, like every other primitive: the stroke colour — writing
     // is drawing with a pen — and the font size through fontSize(). Only the geometry is passed as an
     // argument.
@@ -798,9 +807,12 @@ static int gfx_text(CallCtx& ctx) {
     // dereference. Draw nothing, as before.
     if (font.texture.id == 0 || font.baseSize == 0)
         return ctx.ret(Value{});
+    // Converted only once the canvas is known to exist: with no drawing area nothing is drawn, so
+    // an `__str` must not run either.
+    std::string text = value_to_string(args[0]);
     float spacing = s_font_size / (float)font.baseSize;
-    Vector2 pos = {(float)gfx_to_int(args[1]), (float)gfx_to_int(args[2])};
-    DrawTextEx(font, text, pos, s_font_size, spacing, s_stroke_color);
+    Vector2 pos = {(float)tx, (float)ty};
+    DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
     return ctx.ret(Value{});
 }
 
