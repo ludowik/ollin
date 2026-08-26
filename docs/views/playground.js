@@ -1069,7 +1069,7 @@ function renderResources() {
   if (!currentProject) return
   const names = Object.keys(currentProject.resources || {}).sort()
   if (!names.length) {
-    const d = document.createElement('div'); d.className = 'rail-empty'; d.textContent = '(aucune)'
+    const d = document.createElement('div'); d.className = 'rail-empty'; d.textContent = '(none)'
     resList.appendChild(d); return
   }
   for (const name of names) {
@@ -1390,7 +1390,7 @@ async function renderMenuExamples() {
   projectMenu.appendChild(menuHeader('Ouvrir un exemple', renderMenuRoot))
   examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => examples)
   if (!examples.length) {
-    const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'Aucun exemple.'
+    const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'No example.'
     projectMenu.appendChild(d); return
   }
   // Opens the sample for DIRECT READING from the repository (the #/playground/sample/<file>
@@ -1831,7 +1831,7 @@ function showOutput(text) {
   if (outputHdr) outputHdr.style.display = 'flex'
   outputPane.style.overflow = ''
   if (!text) {
-    outputEl.textContent = '(aucune sortie)'
+    outputEl.textContent = '(no output)'
     outputEl.className   = ''
     lastErrorLoc = null
   } else if (text.startsWith('error:')) {

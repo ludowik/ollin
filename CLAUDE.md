@@ -175,6 +175,7 @@ prétexte de cette colonne.
 | `tests/regressions.ol` | Claude | **le COMPORTEMENT** : sémantique fine, cas limites, combinaisons et pièges d'implémentation (variable par itération, registres recyclés sous une upvalue ouverte, descente d'arbre manquante, réentrance…) |
 | `tests/test_errors.sh` | Claude | **l'ÉCHEC** : tout ce que le moteur doit REFUSER, et le message qu'il rend |
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
+| `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : rapport de performances du moteur — le TRAVAIL (`docs/data/icount-history.json`, série historique) et le TEMPS (`docs/data/bench-snapshot.json`, relevé unique) |

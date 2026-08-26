@@ -50,6 +50,11 @@ if ! bash tests/check_grammar_coverage.sh; then
     fails=$((fails + 1))
 fi
 
+echo "── guard: markup nesting ─────────────────────────"
+if ! bash tests/check_html.sh; then
+    fails=$((fails + 1))
+fi
+
 echo "──────────────────────────────────────────────────"
 if [ $fails -eq 0 ]; then
     echo "ALL GREEN"
