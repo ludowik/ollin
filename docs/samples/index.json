@@ -1,23 +1,28 @@
 [
-  { "name": "Hello world",    "file": "hello_world.ol" },
-  { "name": "Fibonacci",      "file": "fibonacci.ol" },
-  { "name": "Closure",        "file": "closure.ol" },
-  { "name": "Vec2 class",    "file": "vec2.ol" },
-  { "name": "Perlin noise (per pixel)", "file": "pixels.ol" },
-  { "name": "Primitives 2D",  "file": "primitives.ol" },
-  { "name": "Interface (ui)", "file": "ui_demo.ol" },
-  { "name": "Animations (tween)", "file": "tween_demo.ol" },
-  { "name": "Animated sequence (tween)", "file": "tween_sequence.ol" },
-  { "name": "Synthesised sound (audio + sound)", "file": "sound_demo.ol" },
-  { "name": "Image (loadData)", "file": "image_demo.ol" },
-  { "name": "Persistence (data)", "file": "data_demo.ol" },
-  { "name": "Game of Life",  "file": "game_of_life.ol" },
-  { "name": "Lunar eclipse", "file": "lunar_eclipse.ol" },
-  { "name": "Solar eclipse", "file": "solar_eclipse.ol" },
-  { "name": "Primitives 3D",  "file": "primitives_3d.ol" },
-  { "name": "3D transforms and instancing", "file": "transforms_3d.ol" },
-  { "name": "3D models (.obj / .glb)", "file": "model_3d.ol" },
-  { "name": "Voxel world (Minecraft)", "file": "voxel_world.ol" },
-  { "name": "Isometric camera",        "file": "iso_camera.ol" },
-  { "name": "Webcam (camera)",           "file": "camera.ol" }
+  { "group": "Language",    "name": "Hello world",    "file": "hello_world.ol" },
+  { "group": "Language",    "name": "Fibonacci",      "file": "fibonacci.ol" },
+  { "group": "Language",    "name": "Closure",        "file": "closure.ol" },
+  { "group": "Language",    "name": "Vec2 class",     "file": "vec2.ol" },
+
+  { "group": "2D drawing",  "name": "Primitives 2D",  "file": "primitives.ol" },
+  { "group": "2D drawing",  "name": "Perlin noise (per pixel)", "file": "pixels.ol" },
+  { "group": "2D drawing",  "name": "Image (loadData)", "file": "image_demo.ol" },
+
+  { "group": "3D",          "name": "Primitives 3D",  "file": "primitives_3d.ol" },
+  { "group": "3D",          "name": "3D transforms and instancing", "file": "transforms_3d.ol" },
+  { "group": "3D",          "name": "3D models (.obj / .glb)", "file": "model_3d.ol" },
+  { "group": "3D",          "name": "Isometric camera", "file": "iso_camera.ol" },
+  { "group": "3D",          "name": "Voxel world (Minecraft)", "file": "voxel_world.ol" },
+
+  { "group": "Interface, animation, sound", "name": "Interface (ui)", "file": "ui_demo.ol" },
+  { "group": "Interface, animation, sound", "name": "Animations (tween)", "file": "tween_demo.ol" },
+  { "group": "Interface, animation, sound", "name": "Animated sequence (tween)", "file": "tween_sequence.ol" },
+  { "group": "Interface, animation, sound", "name": "Synthesised sound (audio + sound)", "file": "sound_demo.ol" },
+
+  { "group": "Simulations", "name": "Game of Life",   "file": "game_of_life.ol" },
+  { "group": "Simulations", "name": "Lunar eclipse",  "file": "lunar_eclipse.ol" },
+  { "group": "Simulations", "name": "Solar eclipse",  "file": "solar_eclipse.ol" },
+
+  { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
+  { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }
 ]

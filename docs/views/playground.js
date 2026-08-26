@@ -603,6 +603,15 @@ const onGlobalKeydown = e => {
     toggleHelp()
     return
   }
+  // Escape closes the Project menu first: its sub-menu, then the menu itself. Before the help and
+  // before stopping a run, since the menu is the frontmost thing on screen when it is open.
+  if (e.key === 'Escape' && menuIsOpen()) {
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    if (flyIsOpen()) closeFly()
+    else closeMenu()
+    return
+  }
   // Escape closes the help first when it is open, before stopping a run.
   if (e.key === 'Escape' && helpOpen()) {
     e.preventDefault()
@@ -1168,8 +1177,30 @@ async function openProject(id) {
   }
 }
 
-// The Project menu (a drill-down).
+// The Project menu. Two ways of showing a sub-menu, and ONE function builds the contents for
+// both: CASCADING beside its row, as a desktop menu does, and on a screen too narrow for a second
+// panel, the same list REPLACING the menu's contents, with a back arrow.
+const flyMenu = document.getElementById('menu-fly')
+let flyRow = null          // the row that opened the flyout, lit while it is open
+let flyOpenTimer = null    // the delay before opening on hover, so a mere pass-by does not fire
+let flyCloseTimer = null   // the delay before closing, so the pointer can cross the gap
+
+function menuIsOpen() {
+  return projectMenu.style.display === 'block'
+}
+function flyIsOpen() {
+  return flyMenu.style.display === 'block'
+}
+function closeFly() {
+  clearTimeout(flyOpenTimer)
+  clearTimeout(flyCloseTimer)
+  flyMenu.style.display = 'none'
+  flyMenu.innerHTML = ''
+  if (flyRow) flyRow.classList.remove('menu-open')
+  flyRow = null
+}
 function closeMenu() {
+  closeFly()
   projectMenu.style.display = 'none'
   projectBtn.setAttribute('aria-expanded', 'false')
 }
@@ -1178,6 +1209,83 @@ function openMenu() {
   projectMenu.style.display = 'block'
   projectBtn.setAttribute('aria-expanded', 'true')
 }
+
+// Places the flyout to the right of the menu and says whether it FITS; the caller falls back to
+// the drill-down when it does not — the case of a phone, where the menu is already 82vw.
+//
+// Only the right-hand side is tried, and that is not an oversight: the menu hangs from a button at
+// the LEFT end of the bar, so whenever the right has no room, the left has even less (the menu's
+// own left edge is barely 100 px from the window's). A flip would be a branch that never runs.
+function placeFly(row) {
+  const m = projectMenu.getBoundingClientRect()
+  const r = row.getBoundingClientRect()
+  const w = flyMenu.offsetWidth
+  const h = flyMenu.offsetHeight
+  const edge = 6
+  const left = m.right + 4
+  if (left + w > window.innerWidth - edge) return false
+  // The first item lines up with its row; the panel is then pushed back inside the window, a long
+  // list otherwise running off the bottom.
+  let top = r.top - 5
+  if (top + h > window.innerHeight - edge) top = window.innerHeight - h - edge
+  if (top < edge) top = edge
+  flyMenu.style.left = left + 'px'
+  flyMenu.style.top = top + 'px'
+  return true
+}
+
+// Opens the flyout for `row`, filling it through `build(panel)`. Returns false when there is no
+// room, WITHOUT having shown anything: the caller then drills down instead.
+function openFly(row, title, build) {
+  clearTimeout(flyCloseTimer)
+  if (flyRow === row && flyIsOpen()) return true
+  closeFly()
+  flyMenu.innerHTML = ''
+  flyMenu.appendChild(menuHeader(title))
+  build(flyMenu)
+  // Measured while shown but not yet placed: offsetWidth is 0 on a hidden element.
+  flyMenu.style.left = '-9999px'
+  flyMenu.style.top = '0px'
+  flyMenu.style.display = 'block'
+  if (!placeFly(row)) {
+    flyMenu.style.display = 'none'
+    flyMenu.innerHTML = ''
+    return false
+  }
+  flyRow = row
+  row.classList.add('menu-open')
+  return true
+}
+
+// A row that opens a cascading sub-menu: on hover after a short delay, at once on a click — a
+// touch screen has no hover. `fallback` is the drill-down, used when the flyout does not fit.
+function menuFlyItem(label, title, build, fallback) {
+  const row = menuItem(label, true, () => {
+    if (!openFly(row, title, build)) fallback()
+  })
+  row.addEventListener('mouseenter', () => {
+    clearTimeout(flyCloseTimer)
+    clearTimeout(flyOpenTimer)
+    flyOpenTimer = setTimeout(() => openFly(row, title, build), 120)
+  })
+  row.addEventListener('mouseleave', () => {
+    clearTimeout(flyOpenTimer)
+    flyCloseTimer = setTimeout(closeFly, 260)
+  })
+  return row
+}
+// Entering the flyout cancels the closing the row's mouseleave scheduled; leaving it closes.
+flyMenu.addEventListener('mouseenter', () => clearTimeout(flyCloseTimer))
+flyMenu.addEventListener('mouseleave', () => { flyCloseTimer = setTimeout(closeFly, 260) })
+// Being in `fixed`, the flyout does not follow the menu's own scrolling: it is replaced, and
+// dropped when its row has scrolled out of the menu.
+projectMenu.addEventListener('scroll', () => {
+  if (!flyIsOpen() || !flyRow) return
+  const m = projectMenu.getBoundingClientRect()
+  const r = flyRow.getBoundingClientRect()
+  if (r.bottom < m.top || r.top > m.bottom) closeFly()
+  else placeFly(flyRow)
+})
 function menuItem(label, arrow, on) {
   const b = document.createElement('button')
   b.className = 'menu-item'
@@ -1381,26 +1489,54 @@ async function openRemoteProject(slug) {
     p.dirty = false   // freshly fetched, hence synchronised
     await Store.saveProject(p)
     await loadProject(p.id)
-    setStatus('Projet ouvert ✓', true)
-  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
+    setStatus('Project opened ✓', true)
+  } catch (e) { setStatus('Error: ' + e.message, true, true) }
+}
+
+// The groups, in the order of their first appearance in index.json: that order IS the catalogue's,
+// with no second list to keep in step. An entry with no group falls into "Other".
+function exampleGroups() {
+  const groups = new Map()
+  for (const ex of examples) {
+    const g = ex.group || 'Other'
+    if (!groups.has(g)) groups.set(g, [])
+    groups.get(g).push(ex)
+  }
+  return groups
+}
+
+// Fills a panel with the samples of one group. Opening a sample reads it DIRECTLY from the
+// repository (the #/playground/sample/<file> route): no copy, and a refresh brings the
+// repository's version back. To keep or edit it, the banner offers "Create a project".
+function fillExampleGroup(panel, items) {
+  for (const ex of items) {
+    panel.appendChild(menuItem('📄 ' + ex.name, false, () => {
+      closeMenu()
+      ctx.navigate('playground', 'sample/' + ex.file)
+    }))
+  }
+}
+
+// The drill-down fallback: the same list, replacing the menu's contents, with a back arrow.
+function renderMenuExampleGroup(name, items) {
+  projectMenu.innerHTML = ''
+  projectMenu.appendChild(menuHeader(name, renderMenuExamples))
+  fillExampleGroup(projectMenu, items)
 }
 
 async function renderMenuExamples() {
   projectMenu.innerHTML = ''
-  projectMenu.appendChild(menuHeader('Ouvrir un exemple', renderMenuRoot))
+  projectMenu.appendChild(menuHeader('Open an example', renderMenuRoot))
   examples = await fetch('samples/index.json', { cache: 'no-cache' }).then(r => r.json()).catch(() => examples)
   if (!examples.length) {
     const d = document.createElement('div'); d.className = 'menu-empty'; d.textContent = 'No example.'
     projectMenu.appendChild(d); return
   }
-  // Opens the sample for DIRECT READING from the repository (the #/playground/sample/<file>
-  // route): no copy, and a refresh reloads the repository's version. To keep or edit it, the
-  // banner offers "Create a project".
-  for (const ex of examples) {
-    projectMenu.appendChild(menuItem('📄 ' + ex.name, false, () => {
-      closeMenu()
-      ctx.navigate('playground', 'sample/' + ex.file)
-    }))
+  for (const [name, items] of exampleGroups()) {
+    const build = panel => fillExampleGroup(panel, items)
+    projectMenu.appendChild(menuFlyItem(
+      name + '  (' + items.length + ')', name, build,
+      () => renderMenuExampleGroup(name, items)))
   }
 }
 
@@ -1577,7 +1713,7 @@ async function adoptRemote(project, slug) {
     await Store.saveProject(p)
     await loadProject(p.id)   // reloads the editor and rereads remote.folderSha
   setStatus('Project up to date ✓', true)
-  } catch (e) { setStatus('Erreur : ' + e.message, true, true) }
+  } catch (e) { setStatus('Error: ' + e.message, true, true) }
 }
 
 projectBtn.addEventListener('click', e => {
@@ -1588,8 +1724,9 @@ projectBtn.addEventListener('click', e => {
 // menu (innerHTML=''), its target is detached and the "click outside" test below would close the
 // menu by mistake, breaking the drill-down.
 projectMenu.addEventListener('click', e => e.stopPropagation())
+flyMenu.addEventListener('click', e => e.stopPropagation())
 const onDocClick = e => {
-  if (projectMenu.style.display === 'block' && !projectMenu.contains(e.target) && e.target !== projectBtn)
+  if (menuIsOpen() && !projectMenu.contains(e.target) && !flyMenu.contains(e.target) && e.target !== projectBtn)
     closeMenu()
 }
 document.addEventListener('click', onDocClick)
@@ -1653,7 +1790,7 @@ async function loadExample(file) {
     removeExampleBanner()
     setStructuralUI(true)
     setEditorText('## ' + (e && e.message ? e.message : 'exemple introuvable : ' + file))
-    setStatus('Exemple introuvable : ' + file, true, true)
+    setStatus('Example not found: ' + file, true, true)
     return
   }
   // A TRANSIENT project: the entry file, the imports and the assets, all visible and navigable
@@ -2170,7 +2307,7 @@ getOllin().then(m => {
   statusEl.textContent = 'Ready ✓'
   setTimeout(() => { statusEl.textContent = '' }, 2000)
 }).catch(err => {
-  statusEl.textContent = 'Erreur WASM : ' + (err?.message ?? err)
+  statusEl.textContent = 'WASM error: ' + (err?.message ?? err)
 })
 
 // Divider resize.

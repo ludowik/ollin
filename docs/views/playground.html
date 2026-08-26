@@ -390,6 +390,20 @@ canvas#canvas {
 .menu-item:hover { background: var(--surface2); }
 .menu-arrow { color: var(--dim); font-size: 16px; }
 .menu-sep { height: 1px; background: var(--border); margin: 5px 4px; }
+/* A CASCADING sub-menu, opening beside its row as a desktop menu does. It is a SIBLING of
+   #project-menu and positioned in `fixed`, not a child: #project-menu carries overflow-y, and a
+   box whose one axis is not `visible` clips the other too, so a child would be cut off at the
+   menu's edge. Being fixed, it is placed from the row's rect and follows neither the page nor the
+   menu's own scrolling — whence the reposition on scroll in playground.js. */
+#menu-fly {
+  display: none; position: fixed; z-index: 501;
+  min-width: 220px; max-width: 320px; max-height: 70vh; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.45); padding: 5px;
+}
+/* The row that opened the sub-menu stays lit while it is open: without it, moving the pointer into
+   the child would leave nothing showing where one came from. */
+.menu-item.menu-open { background: var(--surface2); }
 .menu-empty { padding: 10px; font-size: 12px; color: var(--dim); font-style: italic; }
 .menu-group { padding: 8px 10px 3px; font-size: 10.5px; font-weight: 600; color: var(--dim); letter-spacing: 0.3px; }
 .menu-form { padding: 6px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
@@ -483,7 +497,7 @@ canvas#canvas {
   #file-rail { width: 116px; }
   #project-label { max-width: 84px; }
   #project-menu { min-width: 220px; max-width: 82vw; }
-  .file-acts { display: inline-flex; gap: 1px; }   /* tactile : actions toujours visibles */
+  .file-acts { display: inline-flex; gap: 1px; }   /* touch: the actions are always visible */
   #editor-pane { flex: 1 1 55%; border-right: none; border-bottom: 1px solid var(--border); }
   #output-pane { flex: 1 1 45%; min-height: 0; overflow: hidden; }
   #divider { width: 100%; height: 6px; cursor: row-resize; }
@@ -492,7 +506,7 @@ canvas#canvas {
   /* A smaller font — maximum-scale=1.0 in the viewport prevents iOS from zooming */
   #editor-wrap .cm-editor  { font-size: 12px; }
   #editor-wrap .cm-content { font-size: 12px; }
-  /* Scroll horizontal fluide sur iOS */
+  /* smooth horizontal scrolling on iOS */
   #editor-wrap .cm-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
   /* A compact bar: the tightening is common (app-bar.css); what is specific to the
@@ -516,6 +530,7 @@ canvas#canvas {
       <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M3 6l5 5 5-5z"/></svg>
     </button>
     <div id="project-menu" role="menu"></div>
+    <div id="menu-fly" role="menu"></div>
   </div>
   <div class="spacer"></div>
   <span id="status">Loading…</span>

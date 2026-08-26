@@ -131,6 +131,20 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 
 - `docs/index.html` — **shell** minimal : `#view` (point de montage) + `<canvas id="canvas">` partagé (rangé dans `#canvas-home` hors exécution) ; charge `app.js`.
 - `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). `ctx.anchor` = sous-chemin après la vue (ancre tutoriel, ou paramètre de vue). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
+- **Catalogue des exemples, classé par groupes** : `docs/samples/index.json` porte un champ
+  `group` par entrée, et **l'ordre des groupes est celui de leur première apparition** — pas de
+  seconde liste à tenir en accord. Le menu Projet ouvre le groupe en **sous-menu volant** (à côté
+  de la ligne, comme un menu desktop) ; il **retombe** sur le remplacement du panneau, avec flèche
+  de retour, quand la fenêtre est trop étroite pour un second panneau. `fillExampleGroup` construit
+  la liste pour les deux chemins.
+  ⚠ Le panneau volant est un **frère** de `#project-menu`, en `position: fixed` : `#project-menu`
+  porte `overflow-y: auto`, et une boîte dont un axe n'est pas `visible` rogne aussi l'autre, si
+  bien qu'un enfant serait coupé au bord du menu. Étant `fixed`, il ne suit pas le défilement du
+  menu → replacé (ou fermé) sur l'événement `scroll` du parent. Il n'est essayé qu'à DROITE :
+  le menu pendant d'un bouton à l'extrémité gauche de la barre, si la droite manque de place la
+  gauche en manque davantage — un renversement serait une branche jamais exécutée (vérifié).
+  `tests/check_samples.sh` garde le catalogue : fichier listé existant, `.ol` du dossier tous
+  listés hors les trois bibliothèques d'import, groupes contigus.
 - **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
 - `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutoriel`, `playground`, `run`, `perf`.
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
@@ -176,6 +190,7 @@ prétexte de cette colonne.
 | `tests/test_errors.sh` | Claude | **l'ÉCHEC** : tout ce que le moteur doit REFUSER, et le message qu'il rend |
 | `tests/check_grammar_coverage.sh` | Claude | **garde-fou de couverture** : chaque règle de `grammar.ebnf` doit être citée par une étiquette `## [grammar: …]` de `syntax.ol` |
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
+| `tests/check_samples.sh` | Claude | **garde-fou du catalogue** : `docs/samples/index.json` est le seul lien entre le menu du playground et les fichiers — un renommage y laissait une entrée morte que RIEN ne détectait, la panne n'apparaissant qu'à l'ouverture du menu dans le navigateur |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
 | `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : rapport de performances du moteur — le TRAVAIL (`docs/data/icount-history.json`, série historique) et le TEMPS (`docs/data/bench-snapshot.json`, relevé unique) |
