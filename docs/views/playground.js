@@ -1241,7 +1241,10 @@ function openFly(row, title, build) {
   if (flyRow === row && flyIsOpen()) return true
   closeFly()
   flyMenu.innerHTML = ''
-  flyMenu.appendChild(menuHeader(title))
+  // A back arrow even though the parent stays visible beside it: it is the way back on a TOUCH
+  // screen, where there is no pointer to move away, and it is the arrow every other sub-menu of
+  // this menu carries.
+  flyMenu.appendChild(menuHeader(title, closeFly))
   build(flyMenu)
   // Measured while shown but not yet placed: offsetWidth is 0 on a hidden element.
   flyMenu.style.left = '-9999px'
