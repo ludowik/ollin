@@ -749,14 +749,17 @@ void ui_draw() {
             draw_text_at(vtext, rect.x + rect.width - m.pad - vw, rect, m, STYLE.text_dim);
         }
         if (kind == Node::CHECKBOX) {
-            Rectangle box = {rect.x + m.pad, rect.y + (m.row - m.box) * 0.5f, m.box, m.box};
+            // The label on the left, at the same abscissa as a button's, and the square on the
+            // right, where a slider's value, a list's value and a sub-menu's chevron already sit:
+            // one single reading order for the whole stack. Every square being the same size, their
+            // left edges line up on their own, without a column having to be computed.
+            Rectangle box = {rect.x + rect.width - m.pad - m.box, rect.y + (m.row - m.box) * 0.5f, m.box, m.box};
             DrawRectangleRoundedLinesEx(box, STYLE.round, 6, STYLE.border_thick, STYLE.border);
             if (checked) {
                 float inset = m.box * STYLE.check_inset;
                 Rectangle fill = {box.x + inset, box.y + inset, m.box - 2 * inset, m.box - 2 * inset};
                 DrawRectangleRounded(fill, STYLE.round, 6, STYLE.accent);
             }
-            tx = box.x + m.box + m.pad;
         }
         if (kind == Node::SLIDER) {
             double vmin = s_nodes[slot].vmin;

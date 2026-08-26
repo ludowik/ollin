@@ -580,6 +580,10 @@ les dimensions de `STYLE` à chaque frame ; `row_height()` donne sa hauteur prop
 slider (libellé + glissière).
 
 Autres points :
+- **Ordre de lecture d'une ligne : le libellé à GAUCHE, le contrôle à DROITE.** La valeur d'un
+  slider, celle d'une liste et le chevron d'un sous-menu étaient déjà cadrés à droite ; la case
+  d'une checkbox l'est aussi. Toutes les cases ayant la même taille, leurs bords gauches
+  s'alignent d'eux-mêmes — aucune colonne à calculer.
 - La géométrie de chaque ligne est celle **de la dernière frame dessinée**, mémorisée
   dans `Node::box` : la zone cliquable est exactement ce qui est affiché.
 - Mise en page **proportionnelle** à `gfx_logical_height()` (comme `joystick.ol`) : le
