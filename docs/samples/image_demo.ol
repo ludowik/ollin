@@ -10,7 +10,8 @@ global config = {
     minSize: 28,
     maxSize: 72,
     speed:   140,   ## pixels per second, either way
-    pulse:   28     ## how far the big sprite breathes
+    bigSize: 110,   ## the big sprite in the middle
+    pulse:   28     ## how far it breathes, either side of bigSize
 }
 
 global sprites = []
@@ -35,7 +36,7 @@ func draw()
         image.draw(img, sp.x, sp.y, sp.s, sp.s)
     end
 
-    var big = 110 + math.sin(elapsedTime * 2) * config.pulse
+    var big = config.bigSize + math.sin(elapsedTime * 2) * config.pulse
     image.draw(img, W / 2 - big / 2, H / 2 - big / 2, big, big)
 
     graphics.stroke(Color(0.75, 0.8, 0.9))
