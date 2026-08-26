@@ -15,7 +15,7 @@
   { "name": "Lunar eclipse", "file": "lunar_eclipse.ol" },
   { "name": "Solar eclipse", "file": "solar_eclipse.ol" },
   { "name": "Primitives 3D",  "file": "primitives_3d.ol" },
-  { "name": "Cube 3D",        "file": "cube_3d.ol" },
+  { "name": "3D transforms and instancing", "file": "transforms_3d.ol" },
   { "name": "3D models (.obj / .glb)", "file": "model_3d.ol" },
   { "name": "Voxel world (Minecraft)", "file": "voxel_world.ol" },
   { "name": "Isometric camera",        "file": "iso_camera.ol" },
