@@ -843,7 +843,7 @@ let examples       = []      // [{name, file}] for "New from an example"
 // hide renaming and deletion (Store.init self-repairs that).
 const isExample = () => !!(currentProject && currentProject.id === Store.TRANSIENT_ID)
 
-const fileKey = id => 'ollin-pg-file:' + id           // dernier fichier ouvert / projet
+const fileKey = id => 'ollin-pg-file:' + id           // the last file opened, per project
 const scripts = p => Object.keys(p.files).filter(f => f !== Store.MANIFEST).sort()
 
 // Shows or hides the structure-CHANGING buttons (＋ file, ＋ resource): hidden in sample mode,
@@ -1789,7 +1789,7 @@ async function loadExample(file) {
   } catch (e) {
     removeExampleBanner()
     setStructuralUI(true)
-    setEditorText('## ' + (e && e.message ? e.message : 'exemple introuvable : ' + file))
+    setEditorText('## ' + (e && e.message ? e.message : 'example not found: ' + file))
     setStatus('Example not found: ' + file, true, true)
     return
   }
@@ -1836,7 +1836,7 @@ async function takenProjectNames(exclude = {}) {
 // cancelled. `opts` is { label, exclude:{id,slug} }, the exclusion being the project itself during
 // a rename.
 async function askFreeProjectName(defName, opts = {}) {
-  const label = opts.label || 'Nom du projet :'
+  const label = opts.label || 'Project name:'
   if (GH.isConnected() && GH.getRepo()) setStatus('Checking the names…')
   const { names, remoteFailed } = await takenProjectNames(opts.exclude)
   if (remoteFailed) setStatus('Remote names not checked (the repository is unreachable)', true, true)
@@ -2166,7 +2166,7 @@ stopBtn.addEventListener('click', () => {
 // are unbalanced, giving an error message and changing nothing.
 function doFormat() {
   const r = Fmt.formatOllin(view.state.doc.toString())
-  if (!r.ok) { setStatus('Formatage impossible : ' + r.error, true, true); return }
+  if (!r.ok) { setStatus('Cannot format: ' + r.error, true, true); return }
   if (r.code === view.state.doc.toString()) { setStatus('Already formatted ✓', true); return }
   const head = view.state.selection.main.head
   const oldLine = view.state.doc.lineAt(head)

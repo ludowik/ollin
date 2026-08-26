@@ -40,7 +40,7 @@ export function slugify(name) {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  return s || 'projet'
+  return s || 'project'
 }
 
 // Opening the database.

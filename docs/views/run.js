@@ -34,7 +34,7 @@ export async function init(ctx) {
   function showText(text) {
     outEl.style.display    = 'block'
     canvasEl.style.display = 'none'
-    outEl.textContent = (text && String(text).length) ? String(text) : '(aucune sortie)'
+    outEl.textContent = (text && String(text).length) ? String(text) : '(no output)'
     outEl.className   = (text && String(text).startsWith('error:')) ? 'err' : 'ok'
   }
 
@@ -152,7 +152,7 @@ export async function init(ctx) {
       try { mod.pauseMainLoop() } catch (_) {}
     }
     if (!b64) {
-      statusEl.textContent = 'capture indisponible (aucune image rendue)'
+      statusEl.textContent = 'no screenshot available (nothing was rendered)'
       return
     }
     project.resources = project.resources || {}
@@ -213,7 +213,7 @@ export async function init(ctx) {
       code = await fetchSample(exampleFile, ctx.v)   // it rejects on a 404, so an HTML page is never run
     } catch (e) {
       statusEl.textContent = ''
-      showText('error: ' + (e && e.message ? e.message : 'exemple introuvable : ' + exampleFile))
+      showText('error: ' + (e && e.message ? e.message : 'example not found: ' + exampleFile))
       return stop
     }
   } else {

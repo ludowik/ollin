@@ -212,7 +212,7 @@ export async function collectSampleProject(entryFile, v) {
     try {
       const r = await fetch('samples/' + key + '?v=' + v, { cache: 'no-cache' })
       if (!r.ok) {
-        if (key === entryFile) throw new Error('exemple introuvable : ' + key)
+        if (key === entryFile) throw new Error('example not found: ' + key)
         continue
       }
       src = await r.text()
@@ -275,6 +275,6 @@ export function sampleFromAnchor(anchor) {
 // answers 200, which avoids running or displaying the body of a 404 (an HTML page).
 export async function fetchSample(file, v) {
   const r = await fetch('samples/' + file + '?v=' + v, { cache: 'no-cache' })
-  if (!r.ok) throw new Error('exemple introuvable : ' + file)
+  if (!r.ok) throw new Error('example not found: ' + file)
   return r.text()
 }

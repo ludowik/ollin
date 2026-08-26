@@ -51,7 +51,7 @@ function getOllin() {
         printErr: () => {},
       })).then(resolve).catch(reject)
     }
-    s.onerror = () => reject(new Error('WASM introuvable'))
+    s.onerror = () => reject(new Error('WASM not found'))
     document.head.appendChild(s)
   })
   return ollinPromise

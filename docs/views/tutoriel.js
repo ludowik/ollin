@@ -247,7 +247,7 @@ export async function init(ctx) {
           onOutput: (out) => {
             outDiv.style.display = 'block'
             if (!out || out === '') {
-              outDiv.textContent = '(aucune sortie)'
+              outDiv.textContent = '(no output)'
               outDiv.className   = 'inline-output empty'
             } else {
               outDiv.textContent = out

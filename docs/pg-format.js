@@ -79,7 +79,7 @@ export function formatOllin(src) {
         show = level() - 1
       } else {
         if (top() === 'case') popBlock()            // the end of a case body
-        if (st.length === 0) return { ok: false, error: '« end » sans bloc ouvert' }
+        if (st.length === 0) return { ok: false, error: 'an "end" with no block open' }
         const closed = popBlock()                   // ferme le bloc/switch
         // `end` aligns with the line that opened the block: its absorbed delimiters still
         // count, since they are only closed here (`end)`).
