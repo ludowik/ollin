@@ -1554,13 +1554,18 @@ dispatch_loop:
             int fresh = (int)regs.size();
             if (fresh < va_src + n_va)
                 fresh = va_src + n_va;
-            grow_regs((size_t)(fresh + (total > 0 ? total : 1)));
+            // The fresh area holds the arguments AND the results, so it is sized on both: sizing it
+            // on the argument count alone gave a builtin a capacity of `total`, and `var w, h = f(...)`
+            // on a two-value builtin lost the second one. The result capacity is the one the
+            // non-varargs path uses, varargs_base - result_base.
+            int res_cap = va_src - fixed_base;
+            grow_regs((size_t)(fresh + std::max(std::max(total, res_cap), 1)));
             for (int i = 0; i < n_fixed; ++i)
                 regs[fresh + i] = regs[fixed_base + i];
             for (int i = 0; i < n_va; ++i)
                 regs[fresh + n_fixed + i] = regs[va_src + i];
             if (fn.is_builtin()) {
-                int k = invoke_builtin(fn.as_builtin(), &regs[fresh], total, (int)regs.size() - fresh);
+                int k = invoke_builtin(fn.as_builtin(), &regs[fresh], total, res_cap, fresh);
                 for (int i = 0; i < k; ++i)
                     regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base, so copying downwards is safe
             } else if (fn.is_class()) {
