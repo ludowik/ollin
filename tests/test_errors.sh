@@ -479,6 +479,14 @@ check_error "sound.note with a number" \
     'sound.note(440)' \
     "expected a note name"
 
+check_error "assert with a non-string message" \
+    'assert(false, 42)' \
+    "the message must be a string"
+
+check_error "assert with a non-string message, condition true" \
+    'assert(true, 42)' \
+    "the message must be a string"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

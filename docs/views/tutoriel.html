@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 09:50</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 09:56</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 09:50</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 09:56</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1374,7 +1374,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="bi">printf</span>(<span class="str">"pi = {1:.3f}"</span>, <span class="num">3.14159</span>)     <span class="cmt">## pi = 3.142</span></code></pre>
 
 <h3>assert</h3>
-<p>Raises an exception when the condition is false. The message is optional, and may be <strong>any value</strong>: it is converted as <code>print</code> converts it, an instance's <code>__str</code> included.</p>
+<p>Raises an exception when the condition is false. The message is optional, and must be a <strong>string</strong> — a value goes in through an interpolation, <code>assert(ok, "n = {n}")</code>. The type is checked even when the assertion holds, so a mistake there does not wait for the day it breaks.</p>
 <pre><code><span class="kw">var</span> x = <span class="num">42</span>
 <span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
 <span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x must be positive"</span>)</code></pre>
@@ -1740,7 +1740,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which may be any value, converted as <code>print</code> converts it (60 fps on the desktop, the browser's vsync in WASM)</td></tr>
+    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which must be a string (60 fps on the desktop, the browser's vsync in WASM)</td></tr>
     <tr><td><code>func setup()</code></td><td>When present, called once after the script has loaded, before the update/draw loop</td></tr>
     <tr><td><code>func draw()</code></td><td>When a global <code>draw</code> function exists, the engine creates a W×H canvas if needed and then calls it on every frame, for the rendering</td></tr>
     <tr><td><code>func update(dt)</code></td><td>When present, called on every frame <strong>before</strong> <code>draw</code>; <code>dt</code> is the seconds elapsed since the previous frame</td></tr>
@@ -1764,7 +1764,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.rect(x, y, w, h [, r])</code></td><td>A rectangle: filled when <code>fill</code> is on, outlined when <code>stroke</code> is on. <code>x, y</code> is the top-left corner or the centre, according to <code>rectMode</code>. <code>r</code> is the corner radius in <strong>pixels</strong>, clamped to half the shorter side (beyond that you get a capsule); the outline stays inside the geometry declared, as it does for square corners. The corners' smoothness comes from <code>segments</code></td></tr>
     <tr><td><code>graphics.fps()</code></td><td>Returns the current frame rate, as an integer</td></tr>
     <tr><td><code>graphics.screenshot(file)</code></td><td>Captures the current rendering into a PNG (to be called inside <code>draw</code>); in WASM it starts a download</td></tr>
-    <tr><td><code>graphics.text(value, x, y)</code></td><td>Draws <strong>any value</strong>, converted exactly as <code>print</code> converts it — a class instance goes through its <code>__str</code>. In the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
+    <tr><td><code>graphics.text(value, x, y)</code></td><td>Draws <strong>any value</strong>, converted exactly as <code>print</code> converts it — a class instance goes through its <code>__str</code>. Only <code>text</code> and <code>textSize</code> convert like this; a window title or an <code>assert</code> message expects a string. In the <code>stroke</code> colour (one writes with the pen), at the <code>fontSize</code> size. <code>noStroke()</code> does NOT hide the text: only the colour is borrowed from the stroke. With no canvas it draws nothing</td></tr>
     <tr><td><code>graphics.fontSize([n])</code></td><td>Sets the font height for <code>text</code> and <strong>always</strong> returns the current height — with no argument it is therefore a getter. The state is reset to 18 on every frame, that being the commonest value. It accepts a <strong>fractional</strong> size, useful for a scaled drawing, and imposes no minimum</td></tr>
     <tr><td><code>graphics.font([name])</code></td><td>Chooses the current font and <strong>always</strong> returns its name. Three fonts are embedded in the engine: <code>"sans"</code> (the default, proportional), <code>"mono"</code> (fixed pitch) and <code>"pixel"</code> (raylib's bitmap font, for a retro look). An unknown name raises an error listing the fonts available. It is a style state, so it is reset to the default on every frame and saved by <code>pushStyle</code></td></tr>
     <tr><td><code>graphics.textSize(value)</code></td><td>The width <strong>and</strong> height of the value in the current font and size, as two values: <code>var w, h = graphics.textSize("abc")</code>. It accepts whatever <code>text</code> accepts and converts it the same way, so what is measured is what would be drawn. Enough to centre or frame a label without reimplementing the measurement. With no canvas it returns 0, 0</td></tr>

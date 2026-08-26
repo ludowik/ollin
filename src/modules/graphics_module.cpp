@@ -81,9 +81,12 @@ static int gfx_canvas(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     int w = argc > 0 ? gfx_to_int(args[0]) : 800;
     int h = argc > 1 ? gfx_to_int(args[1]) : 600;
-    // The title is displayed text: any value is converted, as print does. A non-string used to
-    // become "Ollin" in silence.
-    std::string title = argc > 2 ? display_arg(args, argc, 2) : std::string("Ollin");
+    // The title is written by the author, so a string is MANDATORY: a number there is a mistake,
+    // and it used to become "Ollin" in silence. A value is inserted the ordinary way, through an
+    // interpolation — graphics.canvas(W, H, "level {n}").
+    if (argc > 2 && !args[2].is_string())
+        throw std::runtime_error("graphics.canvas: the title must be a string");
+    std::string title = argc > 2 ? args[2].as_string() : std::string("Ollin");
     s_shot_pending = false;   // a new program: forget any pending screenshot
     gfx_reset_capture();      // likewise for the capture the host asked for
     s_blend_mode = BLEND_ALPHA;
@@ -503,6 +506,20 @@ static int gfx_font(CallCtx& ctx) {
     return ctx.ret(Value(std::string(engine_font_name(s_font_idx))));
 }
 
+// What the text PRIMITIVES draw is converted, never refused: `graphics.text(score, x, y)` writes
+// the number, and an instance goes through its `__str`, exactly as `print` would. Only these two
+// convert — everywhere else a string argument is mandatory, since a title or a diagnostic message
+// is written by the author and a number there is a mistake, not a shortcut.
+//
+// ⚠ The conversion may run Ollin code (an instance's `__str`), which can resize the register file:
+// read every OTHER argument before calling this, or `args` will dangle.
+static std::string drawn_text(const Value* args, int argc, int i) {
+    if (i >= argc)
+        return std::string();
+    return value_to_string(args[i]);
+}
+
+
 // graphics.textSize(text) gives the width and height of the text WITH the current font and size — two
 // values, so centring or aligning needs no reimplementation of the measurement.
 static int gfx_text_size(CallCtx& ctx) {
@@ -520,7 +537,7 @@ static int gfx_text_size(CallCtx& ctx) {
     }
     // Same conversion as graphics.text, and for the same reason: measuring must agree with
     // drawing, or a number could be written but never centred.
-    std::string text = display_arg(args, argc, 0);
+    std::string text = drawn_text(args, argc, 0);
     Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, s_font_size / (float)font.baseSize);
     ctx.set_result(0, Value((double)size.x));
     ctx.set_result(1, Value((double)size.y));
@@ -815,7 +832,7 @@ static int gfx_text(CallCtx& ctx) {
         return ctx.ret(Value{});
     // Converted only once the canvas is known to exist: with no drawing area nothing is drawn, so
     // an `__str` must not run either.
-    std::string text = display_arg(args, argc, 0);
+    std::string text = drawn_text(args, argc, 0);
     float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)tx, (float)ty};
     DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);

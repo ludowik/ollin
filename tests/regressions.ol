@@ -1501,26 +1501,25 @@ assert(math.abs(sound.osc("A4").freq() - 440.0) < 0.01)
 assert(math.abs(sound.sine(100).freq("E4").freq() - 329.628) < 0.01)
 assert(math.abs(sound.tone("A5", 0.1).duration() - 0.1) < 0.001)
 
-## ── assert: the message is DISPLAYED text, so any value is accepted ────────
-## It used to be replaced by the generic wording unless it was a string, which threw away the
-## diagnosis at the very moment it was needed. Converted as print converts it, `__str` included.
-class AsTag
-    func init(n)
-        self.n = n
-    end
-    func __str()
-        return "AsTag(" + self.n + ")"
-    end
+## ── assert: the message is a string, and nothing else ──────────────────────
+## A non-string used to be replaced by the generic wording, which threw the diagnosis away at the
+## very moment it was needed. The type is checked EVEN WHEN the assertion holds, otherwise the
+## mistake would hide until the day the assertion breaks.
+try
+    assert(true, 42)                     ## the condition is true, yet the message is wrong
+    assert(false, "the wrong message was accepted")
+catch e
+    assert(e == "assert: the message must be a string")
 end
 try
     assert(false, 42)
 catch e
-    assert(e == "42")
+    assert(e == "assert: the message must be a string")
 end
 try
-    assert(false, AsTag(3))
+    assert(false, "a real message")
 catch e
-    assert(e == "AsTag(3)")
+    assert(e == "a real message")       ## a string message comes back untouched
 end
 try
     assert(false)

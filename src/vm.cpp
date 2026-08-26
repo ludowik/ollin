@@ -230,12 +230,14 @@ std::string value_to_string(const Value& v) {
 
 static int builtin_assert(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
+    // The message is a string, and the type is checked EVEN WHEN the assertion holds: a non-string
+    // there is a mistake in the test itself, and validating it only on failure would hide it until
+    // the day the assertion breaks. It used to be replaced by the generic wording, which threw the
+    // diagnosis away at the very moment it was needed.
+    if (argc >= 2 && !args[1].is_string())
+        throw std::runtime_error("assert: the message must be a string");
     if (argc == 0 || is_falsy(args[0])) {
-        // The message is displayed text: converted as print converts it, `__str` included. A
-        // non-string used to be replaced by the generic wording, which threw away the diagnosis at
-        // the very moment it was needed.
-        std::string msg = argc >= 2 ? value_to_string(args[1]) : std::string("assertion failed");
-        throw std::runtime_error(msg);
+        throw std::runtime_error(argc >= 2 ? args[1].as_string() : std::string("assertion failed"));
     }
     return ctx.ret(Value{});
 }
