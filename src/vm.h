@@ -14,6 +14,10 @@ std::string value_to_string(const Value& v);
 uint64_t ollin_heap_bytes();
 
 class VM {
+    // CallCtx writes its return values into regs through the index it carries, the pointer it was
+    // handed being invalidated by any call that grows the register file.
+    friend struct CallCtx;
+
   public:
     void execute(Chunk chunk);
     std::string invoke_str(Value v);
@@ -145,7 +149,7 @@ class VM {
     // number of values produced. It is the SINGLE entry point of the six builtin call sites, so
     // that result_cap is computed in exactly one place and a future site cannot get it wrong.
     // `results` are the result slots (the arguments), `cap` the number of safe slots.
-    int invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap);
+    int invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap, int regs_base = -1);
     // Register variant: results go to regs[result_base..] and `cap` is derived from the current
     // frame (varargs_base - result_base) — the error-prone computation, kept in one place.
     // Used by CALL_DYN and CALL_METHOD.
@@ -170,3 +174,22 @@ class VM {
         throw std::runtime_error("runtime: expected number, got string");
     }
 };
+
+// The result slots are addressed through VM::regs and the index CallCtx carries, never through the
+// `args` pointer: a builtin that calls Ollin code (an `__str`, a callback) may have grown the
+// register file in between, and grow_regs reallocates it.
+inline int CallCtx::ret(const Value& v) {
+    if (result_cap <= 0)
+        return 0;
+    set_result(0, v);
+    return 1;
+}
+
+inline void CallCtx::set_result(int i, const Value& v) {
+    if (i < 0 || i >= result_cap)
+        return;
+    if (regs_base >= 0)
+        vm->regs[(size_t)regs_base + i] = v;
+    else
+        args[i] = v;
+}

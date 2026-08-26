@@ -1,5 +1,6 @@
 #include "data_module.h"
 #include "value.h"
+#include "vm.h"
 #include <cstdio>
 #include <map>
 #include <stdexcept>

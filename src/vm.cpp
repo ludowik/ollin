@@ -112,15 +112,18 @@ void VM::grow_regs(size_t needed) {
     regs.resize(needed);
 }
 
-int VM::invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap) {
-    CallCtx ctx{this, results, argc, cap};
+int VM::invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap, int regs_base) {
+    CallCtx ctx{this, results, argc, cap, regs_base};
     last_results_ = fn(ctx);
     return last_results_;
 }
 
 int VM::invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc) {
     // cap = current frame's reg_count - (result_base - reg_base) = varargs_base - result_base.
-    return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base);
+    // regs_base is passed so that the result slots are re-derived at write time: the builtin may
+    // call Ollin code, which reallocates regs.
+    return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base,
+                          result_base);
 }
 
 // invoke_str: a mini-loop that calls __str without recursing.

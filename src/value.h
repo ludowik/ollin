@@ -45,6 +45,16 @@ struct CallCtx {
     Value* args;
     int    argc;
     int    result_cap = 0;
+    // Index of the first result slot in VM::regs, or -1 when the slots live in a buffer of their
+    // own (the call_value path). The slots are addressed through THIS index and not through
+    // `args`, because a builtin that calls Ollin code — `__str`, a map callback — grows the
+    // register file, and grow_regs doubles its capacity, which REALLOCATES it. `args` then
+    // dangles, and writing the return value landed in freed memory: `graphics.textSize` on an
+    // instance whose `__str` recurses gave back a non-number, and `[1,2,3].map(f)` with a
+    // recursive `f` gave nil, nil, nil.
+    //
+    // Reading is still the caller's business: `args` must be read BEFORE calling Ollin code.
+    int    regs_base = -1;
 
     int ret(const Value& v);
     // Writes the i-th return value, clamped to result_cap. Follow with `return n;`.
@@ -288,17 +298,8 @@ struct Value {
     }
 };
 
-inline int CallCtx::ret(const Value& v) {
-    if (result_cap <= 0)
-        return 0;
-    args[0] = v;
-    return 1;
-}
-
-inline void CallCtx::set_result(int i, const Value& v) {
-    if (i >= 0 && i < result_cap)
-        args[i] = v;
-}
+// ret and set_result are defined in vm.h: they address the slots through VM::regs, which is only
+// a complete type there.
 
 #include "collections/array.h"
 

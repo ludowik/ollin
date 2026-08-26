@@ -1,4 +1,5 @@
 #include "camera_module.h"
+#include "../vm.h"
 
 Value make_camera_module() {
     Value m = Value::make_map();

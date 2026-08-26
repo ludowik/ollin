@@ -1636,4 +1636,26 @@ var autre = sound.sine(660)
 assert(autre.isPlaying() == false)
 autre.free()
 
+## A native member that calls back into Ollin must not keep a REFERENCE into the register file:
+## the call can grow it, which reallocates it. map/filter/reduce/sort held `ctx.args[0]` and
+## `ctx.args[1]` by reference, so a callback recursing deep enough made them read freed memory —
+## map gave back nil for every element instead of the returned values.
+func rq_deep(n)
+    if n <= 0 then
+        return 0
+    end
+    return rq_deep(n - 1)
+end
+var rq_src = [1, 2, 3]
+var rq_map = rq_src.map(func(v) rq_deep(300) return v * 10 end)
+assert(rq_map[1] == 10)
+assert(rq_map[2] == 20)
+assert(rq_map[3] == 30)
+assert(len(rq_src.filter(func(v) rq_deep(300) return v > 1 end)) == 2)
+assert(rq_src.reduce(func(a, v) rq_deep(300) return a + v end, 0) == 6)
+var rq_sorted = [3, 1, 2]
+rq_sorted.sort(func(a, b) rq_deep(300) return a < b end)
+assert(rq_sorted[1] == 1)
+assert(rq_sorted[3] == 3)
+
 print("regressions ok")

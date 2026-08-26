@@ -57,10 +57,14 @@ static int arr_delete(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
+// The higher-order members below COPY the array and the function out of `ctx.args` before running
+// any Ollin code: `call_value` can grow the register file, which reallocates it, and a reference
+// into it would then dangle — `[1, 2, 3].map(f)` with a deeply recursive `f` gave back nil values.
+// Copying the array Value keeps the same Array*, so `sort` still sorts in place.
 static int arr_map(CallCtx& ctx) {
     arr_check(ctx, 2, "map: expected (array, fn)");
-    Value& arr = ctx.args[0];
-    Value& fn = ctx.args[1];
+    Value arr = ctx.args[0];
+    Value fn = ctx.args[1];
     int64_t n = arr.array_size();
     Value result = Value::make_array();
     for (int64_t i = 0; i < n; i++) {
@@ -74,8 +78,8 @@ static int arr_map(CallCtx& ctx) {
 
 static int arr_filter(CallCtx& ctx) {
     arr_check(ctx, 2, "filter: expected (array, fn)");
-    Value& arr = ctx.args[0];
-    Value& fn = ctx.args[1];
+    Value arr = ctx.args[0];
+    Value fn = ctx.args[1];
     int64_t n = arr.array_size();
     Value result = Value::make_array();
     for (int64_t i = 0; i < n; i++) {
@@ -90,8 +94,8 @@ static int arr_filter(CallCtx& ctx) {
 
 static int arr_reduce(CallCtx& ctx) {
     arr_check(ctx, 3, "reduce: expected (array, fn, init)");
-    Value& arr = ctx.args[0];
-    Value& fn = ctx.args[1];
+    Value arr = ctx.args[0];
+    Value fn = ctx.args[1];
     Value acc = ctx.args[2];
     int64_t n = arr.array_size();
     for (int64_t i = 0; i < n; i++) {
@@ -107,7 +111,7 @@ static int arr_reduce(CallCtx& ctx) {
 // < the rest), then by value within a rank.
 static int arr_sort(CallCtx& ctx) {
     arr_check(ctx, 1, "sort: expected (array[, cmp])");
-    Value& arr = ctx.args[0];
+    Value arr = ctx.args[0];
     if (ctx.argc >= 2 && ctx.args[1].is_callable()) {
         Value fn = ctx.args[1];
         VM* vm = ctx.vm;
