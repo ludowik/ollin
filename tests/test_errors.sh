@@ -487,6 +487,31 @@ check_error "assert with a non-string message, condition true" \
     'assert(true, 42)' \
     "the message must be a string"
 
+check_error "break inside a switch" \
+    'for i = 1, 2 do
+switch i
+case 1
+break
+end
+end' \
+    "break inside a switch"
+
+check_error "break inside a lambda declared in a loop" \
+    'for i = 1, 2 do
+var f = func()
+break
+end
+end' \
+    "break outside loop"
+
+check_error "continue inside a lambda declared in a loop" \
+    'for i = 1, 2 do
+var f = func()
+continue
+end
+end' \
+    "continue outside loop"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

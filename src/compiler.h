@@ -13,8 +13,19 @@ class Compiler : public StmtVisitor, public ExprVisitor {
 
   private:
     Chunk chunk;
-    std::vector<std::vector<size_t>> break_patches;
-    std::vector<std::vector<size_t>> continue_patches;
+    // One frame per enclosing construct a `break` or a `continue` could target, innermost last.
+    // Beyond the jumps to patch, a frame records WHERE it was opened, which is what lets the two
+    // statements be refused instead of jumping somewhere absurd: `func_depth` catches a break
+    // written inside a lambda, whose jump would land in the enclosing FUNCTION's code, and
+    // `is_switch` catches a break inside a switch, which is silently not the loop's.
+    struct JumpTargets {
+        std::vector<size_t> patches;
+        size_t func_depth = 0;
+        bool is_switch = false;   // only ever true for break: a switch does not catch continue
+    };
+    std::vector<JumpTargets> break_patches;
+    std::vector<JumpTargets> continue_patches;
+    void check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what);
     int current_line_ = 0;
     int current_file_idx_ = 0;
 

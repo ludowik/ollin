@@ -1658,4 +1658,30 @@ rq_sorted.sort(func(a, b) rq_deep(300) return a < b end)
 assert(rq_sorted[1] == 1)
 assert(rq_sorted[3] == 3)
 
+## A switch does not catch a `continue`: it reaches the enclosing loop. Only `break` is refused
+## inside a switch (test_errors.sh), a case not falling through — so the two statements are
+## deliberately asymmetric, and this pins the half that still works.
+var sw_cont = ""
+for i = 1, 4 do
+    switch i
+        case 2, 3
+            continue
+    end
+    sw_cont = sw_cont + i
+end
+assert(sw_cont == "14")
+
+## A loop nested INSIDE a switch arm keeps its own break: the refusal above must not reach it.
+var sw_inner = ""
+switch 1
+    case 1
+        for i = 1, 5 do
+            if i == 3 then
+                break
+            end
+            sw_inner = sw_inner + i
+        end
+end
+assert(sw_inner == "12")
+
 print("regressions ok")

@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 19:24</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 20:22</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 19:24</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 20:22</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -821,7 +821,19 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <!-- ── Switch ──────────────────────────────────────────────────────────────── -->
 <section id="switch">
 <h2>Switch</h2>
-<p><code>switch</code> compares an expression against several values. Each branch starts with <code>case</code> followed by one or more comma-separated values. The <code>else</code> block runs when no <code>case</code> matches. <code>break</code> is allowed inside.</p>
+<p><code>switch</code> compares an expression against several values. Each branch starts with <code>case</code> followed by one or more comma-separated values. The <code>else</code> block runs when no <code>case</code> matches.</p>
+
+<p>A branch does <strong>not</strong> fall through to the next one: there is nothing to break out of, and
+<code>break</code> is <strong>refused</strong> inside a <code>switch</code>. Written inside a loop it would read
+as leaving that loop, whereas it could only ever leave the <code>switch</code> — so it is a compile error rather
+than a silent misunderstanding. To leave the loop from a branch, use a flag or <code>return</code>.
+<code>continue</code>, on the other hand, goes through and reaches the loop, and a loop written inside a branch
+keeps its own <code>break</code>.</p>
+
+<p>The <code>case</code> values are <strong>expressions</strong>, not constants: <code>case n + 2</code> and
+<code>case f()</code> are valid. They are evaluated in order and only until one matches, so a <code>case</code>
+placed after the branch taken never runs. Matching uses <code>==</code>: <code>1</code> and <code>1.0</code> are
+the same value, <code>"1"</code> and <code>1</code> are not.</p>
 
 <pre><code><span class="kw">var</span> x = <span class="num">2</span>
 <span class="kw">switch</span> x

@@ -109,6 +109,13 @@ ifStmt         = "if" expr "then" { stmt }
                 with its own 'end'. *)
 tryStmt        = "try" { stmt } "catch" IDENT { stmt } [ "else" { stmt } ] "end" NL ;
 switchStmt     = "switch" expr NL { "case" expr { "," expr } NL { stmt } } [ "else" NL { stmt } ] "end" NL ;
+                 (* the subject is evaluated ONCE; a case value is an EXPRESSION, and the values
+                    are evaluated in order, only until one is equal to the subject (the equality of
+                    "==", so 1 matches 1.0 but not "1"). A branch does NOT fall through.
+                    "break" is REFUSED inside a switch: with no fall-through it has nothing to
+                    leave, and inside a loop it would read as leaving that loop while it could only
+                    leave the switch. "continue" passes through and reaches the loop, and a loop
+                    written inside a branch keeps its own "break". *)
 throwStmt      = "throw" expr NL ;
 funcDecl       = "func" IDENT [ "." IDENT ] "(" [ params ] ")" NL { stmt } "end" NL ;
                (* "func obj.field(...) ... end" is sugar for "obj.field = func(...) ... end":

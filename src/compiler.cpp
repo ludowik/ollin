@@ -541,15 +541,15 @@ void Compiler::visit(const WhileStmt& s) {
     size_t exit_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
     reg_top_ = saved;
 
-    break_patches.push_back({});
-    continue_patches.push_back({});
+    break_patches.push_back({{}, outer_scopes_.size(), false});
+    continue_patches.push_back({{}, outer_scopes_.size(), false});
     compile_block(s.body);
-    for (size_t p : continue_patches.back())
+    for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, loop_start);
     continue_patches.pop_back();
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
     chunk.patch_jump(exit_patch, (uint16_t)chunk.current_pos());
-    for (size_t p : break_patches.back())
+    for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, (uint16_t)chunk.current_pos());
     break_patches.pop_back();
 }
@@ -602,7 +602,7 @@ void Compiler::visit(const SwitchStmt& s) {
     int above_subj = reg_top_; // subj_r reste vivant pendant tous les bras
 
     std::vector<size_t> end_patches;
-    break_patches.push_back({}); // a break inside the switch targets end_addr
+    break_patches.push_back({{}, outer_scopes_.size(), true}); // marks the switch; a break inside it is refused
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;
@@ -641,22 +641,36 @@ void Compiler::visit(const SwitchStmt& s) {
     uint16_t end_addr = (uint16_t)chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
-    for (size_t p : break_patches.back())
+    for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, end_addr);
     break_patches.pop_back();
     reg_top_ = saved;
 }
 
+// A break and a continue jump to an address of the CURRENT function, so the innermost frame must
+// have been opened in it: a `break` written inside a lambda declared in a loop used to compile,
+// and jumped into the enclosing function's code — the loop's body was skipped outright, silently.
+void Compiler::check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what) {
+    if (frames.empty() || frames.back().func_depth != outer_scopes_.size())
+        throw std::runtime_error(s.sloc().str(chunk.source_files) + ": " + what + " outside loop");
+}
+
 void Compiler::visit(const BreakStmt& s) {
-    if (break_patches.empty())
-        throw std::runtime_error(s.sloc().str(chunk.source_files) + ": break outside loop");
-    break_patches.back().push_back(chunk.emit_jump(Op::JUMP));
+    check_jump_scope(s, break_patches, "break");
+    // A case does not fall through, so a break at the end of an arm has nothing to leave, and one
+    // meant for the loop would be caught by the switch instead — silently, the loop carrying on.
+    // Refusing it is the only reading that cannot mislead.
+    if (break_patches.back().is_switch)
+        throw std::runtime_error(s.sloc().str(chunk.source_files) +
+                                 ": break inside a switch (a case does not fall through; to leave the "
+                                 "enclosing loop, use a flag or return)");
+    break_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
 }
 
 void Compiler::visit(const ContinueStmt& s) {
-    if (continue_patches.empty())
-        throw std::runtime_error(s.sloc().str(chunk.source_files) + ": continue outside loop");
-    continue_patches.back().push_back(chunk.emit_jump(Op::JUMP));
+    // A continue is NOT caught by a switch: it legitimately reaches the enclosing loop.
+    check_jump_scope(s, continue_patches, "continue");
+    continue_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
 }
 
 void Compiler::visit(const AssignStmt& s) {
@@ -1632,8 +1646,8 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
     size_t exit_patch = chunk.emit_jump(iter_op, (uint8_t)block);
 
-    break_patches.push_back({});
-    continue_patches.push_back({});
+    break_patches.push_back({{}, outer_scopes_.size(), false});
+    continue_patches.push_back({{}, outer_scopes_.size(), false});
     compile_block(body);
     // End of an iteration: the loop variables and the body's locals go out of scope, so their
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
@@ -1642,7 +1656,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     uint16_t iter_end = (uint16_t)chunk.current_pos();
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
-    for (size_t p : continue_patches.back())
+    for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, iter_end);
     continue_patches.pop_back();
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
@@ -1653,7 +1667,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
     chunk.patch_jump(exit_patch, exit);
-    for (size_t p : break_patches.back())
+    for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, exit);
     break_patches.pop_back();
 
@@ -1946,8 +1960,8 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (!can_alias)
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
-    break_patches.push_back({});
-    continue_patches.push_back({});
+    break_patches.push_back({{}, outer_scopes_.size(), false});
+    continue_patches.push_back({{}, outer_scopes_.size(), false});
     compile_block(body);
 
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
@@ -1956,7 +1970,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     uint16_t loop_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
-    for (size_t p : continue_patches.back())
+    for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, loop_addr);
     continue_patches.pop_back();
     chunk.emit(make_abx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
@@ -1965,7 +1979,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
     chunk.patch_jump(prep, exit_addr); // FOR_PREP jumps here when the loop is empty
-    for (size_t p : break_patches.back())
+    for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, exit_addr);
     break_patches.pop_back();
 
