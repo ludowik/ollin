@@ -1,13 +1,22 @@
 ## An interactive isometric camera.
 ## Drag to orbit - wheel or pinch to zoom - double-click to recentre.
 
-global ISO_DIST  = 18.0      ## orbit radius
-global ISO_H     = 14.0      ## the camera's height
-global ISO_SIZE  = 14.0      ## the units visible vertically
-global ISO_ANGLE = 0.785     ## initial angle, about 45 degrees
+## Every tunable of the sample lives in ONE map: what to change to retune the camera is here, and
+## nowhere else. The `size` and `angle` entries are the STARTING values, kept untouched so that a
+## double-click can restore them - the current ones live in `view` below.
+global config = {
+    dist:      18.0,    ## orbit radius
+    height:    14.0,    ## the camera's height
+    size:      14.0,    ## the units visible vertically
+    angle:     0.785,   ## initial orbit angle, about 45 degrees
+    minSize:   3.0,     ## closest zoom
+    maxSize:   40.0,    ## furthest zoom
+    orbitRate: 0.008,   ## radians per pixel dragged
+    wheelStep: 0.1      ## zoom fraction per wheel notch
+}
 
-global cam    = graphics.cameraOrtho(0, ISO_H, ISO_DIST,  0, 0, 0,  ISO_SIZE)
-global angle  = ISO_ANGLE    ## current orbit angle, in radians
+global cam  = graphics.cameraOrtho(0, config.height, config.dist,  0, 0, 0,  config.size)
+global view = { angle: config.angle, size: config.size }
 global dragging = false
 global lastx    = 0
 global lasty    = 0
@@ -35,20 +44,20 @@ func mouse.moved(x, y)
     var dx = x - lastx
     lastx = x
     lasty = y
-    angle = angle + dx * 0.008
-    cam.orbit(angle, ISO_DIST, ISO_H)
+    view.angle = view.angle + dx * config.orbitRate
+    cam.orbit(view.angle, config.dist, config.height)
 end
 
 ## The zoom lives in ONE function, and the two gestures only differ by the factor they hand it:
 ## a wheel notch is a step, a pinch is a ratio. Anything else — the bounds, the camera update —
 ## would otherwise be written twice and drift.
 func zoomBy(factor)
-    ISO_SIZE = math.max(3.0, math.min(40.0, ISO_SIZE * factor))
-    cam.fovy = ISO_SIZE
+    view.size = math.max(config.minSize, math.min(config.maxSize, view.size * factor))
+    cam.fovy = view.size
 end
 
 func mouse.scrolled(x, y, dx, dy)
-    zoomBy(1.0 - dy * 0.1)
+    zoomBy(1.0 - dy * config.wheelStep)
 end
 
 ## Two fingers spreading (scale > 1) bring the scene CLOSER, so the visible size shrinks: the
@@ -58,10 +67,10 @@ func touch.pinch(scale, cx, cy)
 end
 
 func mouse.doubleClicked(x, y)
-    angle    = ISO_ANGLE
-    ISO_SIZE = 14.0
-    cam.fovy = ISO_SIZE
-    cam.orbit(angle, ISO_DIST, ISO_H)
+    view.angle = config.angle
+    view.size  = config.size
+    cam.fovy   = view.size
+    cam.orbit(view.angle, config.dist, config.height)
 end
 
 ## Checkerboard offsets, which make the grid easier to read
