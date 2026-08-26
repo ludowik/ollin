@@ -20,10 +20,10 @@
 class Joystick
     func init()
         self.active = false       ## armed, a finger being down inside the disc; it stays true if the finger leaves
-        self.px = 0               ## the finger's current position
+        self.px = 0
         self.py = 0
-        self.centerFrac = 0.72   ## the vertical centre, the neutral point, as a fraction of H, lowered
-        self.radiusFrac = 0.22   ## the disc's radius, as a fraction of H (enlarged)
+        self.centerFrac = 0.72   ## the neutral point's height, as a fraction of H
+        self.radiusFrac = 0.22   ## the disc's radius, as a fraction of H
         self.dead = 0.10          ## the dead zone around the centre, as a fraction of the radius
     end
 
@@ -42,7 +42,7 @@ class Joystick
         self.py = y
         var dx = x - self.cx()
         var dy = y - self.cy()
-        self.active = (dx * dx + dy * dy) <= self.radius() * self.radius()   ## armed when INSIDE the disc
+        self.active = (dx * dx + dy * dy) <= self.radius() * self.radius()
     end
     func move(x, y)
         self.px = x
@@ -86,9 +86,9 @@ class Joystick
         var r = self.radius()
         graphics.noStroke()
         graphics.fill(Color(1, 1, 1, 0.06))
-        graphics.circle(cx, cy, r)                    ## the circular area, which mirrors how it really works
+        graphics.circle(cx, cy, r)
         graphics.fill(Color(1, 1, 1, 0.16))
-        graphics.circle(cx, cy, r * self.dead + 4)    ## the marker of the neutral point, at the centre
+        graphics.circle(cx, cy, r * self.dead + 4)    ## the neutral point
         if self.active then
             ## the thumb is held at the disc's edge, as a real stick would be
             var dx = self.px - cx

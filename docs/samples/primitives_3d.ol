@@ -7,12 +7,10 @@ import "trackball.ol"
 global ball = Trackball()
 global cam = graphics.cameraOrtho(12, 12, 12,  0, 0, 0,  16)
 
-## A grid suited to the orientation: 4x2 in landscape, 2x4 in portrait
-## cellPos(col, row, cols, rows) → [x, z] in the XZ plane (isometric ortho view, size=16)
-## Converts a grid position (col, row) into world XZ coordinates for the isometric camera
-## looking from (12,12,12) at (0,0,0):
-##   screen_x = (wx - wz) / √2  ;  screen_y = (-wx - wz) / √6  (with wy=0)
-## We invert that system to get wx and wz from the target on screen.
+## A grid cell (col, row) to world XZ coordinates, for the isometric camera looking from
+## (12,12,12) at the origin, where screen_x = (wx - wz) / √2 and screen_y = (-wx - wz) / √6
+## with wy = 0. The system below is that pair INVERTED: it solves for wx and wz from the
+## position wanted on screen.
 func cellPos(col, row, cols, rows)
     var size  = 16.0
     var aspect = W / H
@@ -47,8 +45,7 @@ end
 func draw()
     graphics.clear(Color(0.08, 0.08, 0.12))
 
-    ## Landscape 4x2: cube sphere cylinder plane / lines cone torus (empty)
-    ## Portrait 2x4: cube sphere / cylinder plane / lines cone / torus (empty)
+    ## Four columns in landscape, two in portrait: eight cells either way.
     var cols = 4
     var rows = 2
     if H > W then
@@ -66,7 +63,7 @@ func draw()
     graphics.noStroke()
     graphics.begin3d(cam)
 
-        ## Cube (idx 0)
+        ## cube
         var p = cellPos(gc(0), gr(0), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -75,7 +72,7 @@ func draw()
             graphics.cube(0, 0, 0,  2, 2, 2)
         graphics.pop()
 
-        ## The sphere, index 1
+        ## sphere
         p = cellPos(gc(1), gr(1), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -86,7 +83,7 @@ func draw()
             graphics.noStroke()
         graphics.pop()
 
-        ## Cylindre (idx 2)
+        ## cylinder
         p = cellPos(gc(2), gr(2), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -95,7 +92,7 @@ func draw()
             graphics.cylinder(0, -1.2, 0,  0.9, 2.4)
         graphics.pop()
 
-        ## Plan (idx 3)
+        ## plane
         p = cellPos(gc(3), gr(3), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -105,7 +102,7 @@ func draw()
             graphics.plane(0, 0, 0,  2.5, 2.5)
         graphics.pop()
 
-        ## line3d + point3d (idx 4)
+        ## line3d and point3d
         p = cellPos(gc(4), gr(4), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -129,7 +126,7 @@ func draw()
             graphics.noStroke()
         graphics.pop()
 
-        ## The cone, index 5
+        ## cone
         p = cellPos(gc(5), gr(5), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -138,7 +135,7 @@ func draw()
             graphics.cone(0, -1.2, 0,  1.0, 2.4)
         graphics.pop()
 
-        ## Tore (idx 6)
+        ## torus
         p = cellPos(gc(6), gr(6), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -147,7 +144,7 @@ func draw()
             graphics.torus(0, 0, 0,  1.1, 0.4)
         graphics.pop()
 
-        ## segments(8): the same sphere at a low resolution, index 7
+        ## the same sphere at a low resolution
         p = cellPos(gc(7), gr(7), cols, rows)
         graphics.push()
             graphics.translate(p[1], 0, p[2])
@@ -159,11 +156,10 @@ func draw()
 
     graphics.end3d()
 
-    ## The 2D labels: a white background, black text, centred on the cell
     var fs = 13
     var pad = 4
     var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(6)"]
-    var hw = [14, 20, 26, 18, 42, 14, 16, 34]  ## demi-largeur approx du texte
+    var hw = [14, 20, 26, 18, 42, 14, 16, 34]  ## rough half-width of each label
     for i = 1, 8 do
         var idx = i - 1
         var col = idx % cols
@@ -180,5 +176,5 @@ func draw()
 
     graphics.stroke(Color(1, 1, 1, 0.5))
     graphics.fontSize(16)
-    graphics.text("Glisse pour tourner", 12, 12)
+    graphics.text("Drag to turn", 12, 12)
 end

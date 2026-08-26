@@ -188,7 +188,7 @@ func heightAt(x, z)
     var hi = math.max(math.max(e, w), math.max(n, s))
     var lo = math.min(math.min(e, w), math.min(n, s))
     if h > hi then return hi end   ## a solitary cube, hence removed
-    if h < lo then return lo end   ## trou solitaire → rempli
+    if h < lo then return lo end   ## a solitary pit, hence filled
     return h
 end
 
@@ -259,8 +259,8 @@ end
 ## A tree at column (x,z), the ground being at h. The trunk's height and the canopy's shape vary,
 ## derived from the hash, which is deterministic per column, so every tree differs.
 func putTree(x, z, h)
-    var th = 3 + treeHash(x, z, 1) % 4      ## tronc : 3..6 cubes
-    var shape = treeHash(x, z, 2) % 3       ## 0 rond · 1 touffu · 2 conique
+    var th = 3 + treeHash(x, z, 1) % 4      ## the trunk, 3 to 6 cubes
+    var shape = treeHash(x, z, 2) % 3       ## 0 round, 1 bushy, 2 conical
     graphics.tile(T_TRUNK)
     for k = 1, th do
         graphics.cube(x, h + k, z,  1, 1, 1)
@@ -497,11 +497,11 @@ func mouse.pressed(x, y)
     end
     var ev = vd.hit(x, y)              ## the - and + buttons, handled by ViewDistance
     if ev == 1 then
-        streaming = true               ## rayon agrandi → charger le nouvel anneau
+        streaming = true               ## the radius grew, so the new ring must be loaded
     elseif ev == -1 then
         streamUnload(lastcx, lastcz, 0)   ## the radius shrank, so free at once
     elseif ev == 0 then
-        pad.press(x, y)                ## hors boutons → joystick (ev == 2 : borne atteinte, rien)
+        pad.press(x, y)                ## clear of the buttons, so the joystick takes it (ev == 2: a bound was reached, nothing to do)
     end
 end
 func mouse.released(x, y)
@@ -614,7 +614,7 @@ func cullCloudSectors()
     var fullTotal = fullW * fullRows
     for sz = s0z, camZ + reach, CLOUD_SEC do
         var wz = sz + CLOUD_SEC / 2
-        ## span x du demi-plan avant : (wx-camX)*fx + (wz-camZ)*fz >= -CLOUD_SEC
+        ## the x span of the forward half-plane: (wx-camX)*fx + (wz-camZ)*fz >= -CLOUD_SEC
         var rhs = 0 - CLOUD_SEC - (wz - camZ) * fz
         var wlo = camX - reach
         var whi = camX + reach

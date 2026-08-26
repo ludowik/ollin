@@ -1,7 +1,7 @@
 ## A REUSABLE self-adapting view distance, for terrain streamed as chunks.
 ##
-## It holds the current radius, its bounds, the manual mode and the self-adaptation. With
-## With vsync locked, deltaTime only reveals the headroom once frames overrun, so we measure the
+## It holds the current radius, its bounds, the manual mode and the self-adaptation. With vsync
+## locked, deltaTime only reveals the headroom once frames overrun, so we measure the
 ## SHARE of slow frames over a window, against the display rate as MEASURED — a phone capped at
 ## 30 Hz keeps its computing power. Unreal frames, longer than STALL_DT, from a background tab or a
 ## resume, are ignored. It also carries three buttons at the top right: - and + switch to manual
@@ -49,7 +49,7 @@ class ViewDistance
         self.ok = [0, 0, 0, 0, 0, 0]           ## the frames on time for each candidate
         self.MARGIN = 1.25                     ## the tolerance on the period, hence the lateness threshold
         self.VOTE_PART = 0.7                   ## the share of frames on time needed to elect a rate
-        self.hzKeep = fps                      ## cadence retenue (amorce)
+        self.hzKeep = fps                      ## the rate kept, seeded until the first vote
         self.voted = false                     ## has a rate been elected yet?
         self.miss = 0                          ## consecutive windows that do not confirm hzKeep
         ## A screen's rate hardly ever changes, so a drop in the vote is first put down to a
@@ -76,7 +76,7 @@ class ViewDistance
         self.stable = 0.0
         self.BTN = 54
         self.BTN_Y = 40
-        self.BTN_MARGIN = 12  ## marge bord droit
+        self.BTN_MARGIN = 12  ## the margin from the right edge
         self.GAP = 10         ## the gap between buttons
     end
 
@@ -85,9 +85,10 @@ class ViewDistance
     end
 
     ## Adjusts the radius from the share of slow frames in the window just past. It measures
-    ## neither during the baking of chunks nor in manual mode. A stall, from full memory or
-    ## > DROP) → repli dichotomique vers `good` + plafond appris. Fluide (< GROW) →
-    ## a doubling climb; at the ceiling it releases after RELAX. Between the two, it holds.
+    ## neither during the baking of chunks nor in manual mode. Too many slow frames (> DROP)
+    ## halves the way back to the last radius known good, and learns that ceiling; a fluid
+    ## window (< GROW) climbs by doubling, and at the ceiling it lets go after RELAX. Between
+    ## the two thresholds it holds.
     func update(dt, streaming)
         if dt <= 0 or dt >= self.STALL_DT or streaming or self.manual then
             return 0

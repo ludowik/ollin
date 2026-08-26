@@ -5,7 +5,7 @@
 ## Click anywhere to restart the animations. The menu's "Curve" list chooses the
 ## curve applied to the star, and the slider sets the duration.
 
-global config = {curve: "easeInOutQuad"}
+global config = {curve: "easeInOutQuad", duration: 1.2}
 
 ## One mover per curve compared: each carries its position and its colour, which the tween writes
 ## directly. The drawing merely READS those fields, with no concern for time.
@@ -14,7 +14,6 @@ global labels = ["linear", "easeOutQuad", "easeInOutCubic", "easeOutBack", "ease
 
 ## A single object driven by the menu, to compare a curve chosen on the fly.
 global star = {x: 0, size: 0, tint: Color(0.3, 0.7, 1)}
-global duration = 1.2
 
 func xStart()
     return W * 0.12
@@ -34,7 +33,7 @@ func start()
     for i = 1, #dots do
         var p = dots[i]
         p.x = xStart()
-        tween.to(p, {x: xEnd()}, duration, labels[i])
+        tween.to(p, {x: xEnd()}, config.duration, labels[i])
     end
 
     ## Several fields in one call, a COLOUR among them: a class instance is interpolated field by
@@ -43,11 +42,11 @@ func start()
     star.size = H * 0.02
     star.tint = Color(0.3, 0.7, 1)
     tween.to(star, {x: xEnd(), size: H * 0.055, tint: Color(1, 0.45, 0.2)},
-             duration, config.curve)
+             config.duration, config.curve)
 
     ## The way back starts 0.3 s later, from whatever value the star holds by then: a delay puts
     ## off the READING of the starting value, not only the movement.
-    tween.to(star, {size: H * 0.02}, duration * 0.6, "easeInQuad").delay(duration + 0.3)
+    tween.to(star, {size: H * 0.02}, config.duration * 0.6, "easeInQuad").delay(config.duration + 0.3)
 end
 
 ## The callback receives the item chosen; config.curve is already written when it fires, so
@@ -68,7 +67,7 @@ func setup()
     ## tween.curves(), so it follows the engine's catalogue instead of copying it here.
     var menu = ui.menu("Animation")
     menu.list("Curve", tween.curves(), ref config.curve, onCurve)
-    menu.slider("Duration", ref duration, 0.3, 3)
+    menu.slider("Duration", ref config.duration, 0.3, 3)
     ui.show(menu)
 
     start()
@@ -82,7 +81,6 @@ func draw()
     graphics.clear(Color(0.08, 0.09, 0.13))
     graphics.fontSize(H * 0.028)
 
-    ## One row per curve compared: the dot sits where the tween writes it.
     var y = H * 0.18
     var step = H * 0.1
     for i = 1, #dots do
@@ -96,7 +94,6 @@ func draw()
         y += step
     end
 
-    ## The star: position, size and colour animated together.
     graphics.noStroke()
     graphics.fill(star.tint)
     graphics.circle(star.x, H * 0.86, star.size)

@@ -91,7 +91,7 @@ func demoRoundRect()
     g.stroke(Color(0.9, 0.7, 1), fs(2))
     g.fill(Color(0.9, 0.7, 1, 0.22))
     g.rect(px(30), py(362), px(80), py(45), fs(14))
-    label("rect arrondi", 120, 378)
+    label("rounded rect", 120, 378)
 end
 
 ## The same anchor point, the white dot, in two modes: on the left x,y is the top-left corner, on
@@ -227,7 +227,7 @@ func demoText()
         g.stroke(Color(0.9, 0.9, 1))
         g.font("sans")
         g.fontSize(ft(22))
-        g.text("taille 22", px(460), py(358))
+        g.text("size 22", px(460), py(358))
     end
     g.popStyle()
 end

@@ -8,8 +8,6 @@
 ## variables. The program reads them as usual — see `config.grid` and
 ## `config.speed` in draw().
 
-## Every setting the interface exposes, in one place: what the user can change reads
-## here, with no need to hunt through the program's globals.
 global config = {
     grid: true,
     anim: true,

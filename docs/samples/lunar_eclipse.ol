@@ -303,7 +303,6 @@ func draw()
     end
     graphics.blendMode(blend.ALPHA)
 
-    ## The information strip: the phase, the magnitude, the simulated time.
     graphics.fontSize(H * 0.032)
     graphics.stroke(Color(0.88, 0.9, 0.96))
     ## The interpolation formats directly: {expr:.2f} saves rounding by hand.

@@ -6,8 +6,6 @@
 
 global ball = {x: 0, y: 0, rx: 0, ry: 0, tint: Color(0.45, 0.8, 1)}
 
-## The three waiting dots: the same blink for all of them, shifted in time by a delay
-## proportional to their rank.
 global points = []
 
 ## The sequence's handle: it serves to read its progress and to suspend it.
@@ -99,7 +97,6 @@ func draw()
     graphics.fill(Color(0.04, 0.05, 0.08, dark))
     graphics.ellipse(ball.x, yFloor + radius() * 0.28, shadowW * 1.7, radius() * 0.42)
 
-    ## The ball is an ellipse, the squash animating its two radii separately.
     graphics.fill(ball.tint)
     graphics.ellipse(ball.x, ball.y, ball.rx * 2, ball.ry * 2)
 

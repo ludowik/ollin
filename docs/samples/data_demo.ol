@@ -7,14 +7,14 @@ global score = 0
 
 func setup()
     graphics.canvas(W, H, "data - persistence")
-    runs = data.get("runs", 0) + 1     ## read, then raised on every run
+    runs = data.get("runs", 0) + 1
     data.set("runs", runs)
-    score = data.get("score", 0)       ## taken up where it was left
+    score = data.get("score", 0)
 end
 
 func mouse.pressed(x, y)
     score = score + 1
-    data.set("score", score)           ## persisted at once
+    data.set("score", score)
 end
 
 func draw()

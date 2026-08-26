@@ -173,7 +173,7 @@ func inBand(y)
     return y >= bandTop() and y <= bandBottom()
 end
 
-## ── Multitouch: several fingers, each followed by its identifier ────────────────
+## Multitouch: several fingers, each followed by its identifier.
 func touch.began(id, x, y)
     if inBand(y) and bowHolder == nil then
         bowHolder = id
@@ -201,7 +201,7 @@ func touch.ended(id, x, y)
     underFinger[id] = nil
 end
 
-## ── The mouse: a single pointer, for a computer ─────────────────────────────────
+## The mouse: a single pointer, for a computer.
 ## On a touch screen the system emulates the mouse under a single finger: both families of callback
 ## then fire, and the engine filters nothing — the script must choose. Without this guard, one
 ## finger played the note TWICE, hence twice as loud.

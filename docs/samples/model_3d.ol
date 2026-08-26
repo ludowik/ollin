@@ -1,5 +1,5 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
-## it visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
+## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
 ## The "Model" menu switches from one object to the other: an .obj carries its geometry alone
 ## (the fill tints it), whereas a .glb also carries its texture (a white fill keeps

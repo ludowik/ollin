@@ -2,8 +2,14 @@
 ## Mouse or finger (an iPhone included): a press pauses and lights the cell, dragging draws,
 ## a double tap restarts.
 
-const CELL = 8           ## px
-const STEP = 0.08        ## seconds between two generations
+## The tunables, all of them here. They stay separate constants rather than one config map: the
+## step and draw loops read them once per CELL, so a map lookup would be paid tens of thousands
+## of times a frame.
+const CELL       = 8      ## px
+const GAP        = 2      ## px left between two cells
+const STEP       = 0.08   ## seconds between two generations
+const DOUBLE_TAP = 0.3    ## seconds
+const CELL_COLOR = Color(0.62, 0.80, 0.98)
 
 ## The grid derives from the render area (W, H), so any shape goes. The double buffer is
 ## allocated once and swapped every generation. A flat 1-based array: index = y*COLS + x + 1.
@@ -113,7 +119,7 @@ func reset()
     end
 end
 
-## Voisines vivantes (8-voisinage), bords toriques.
+## Live neighbours over the 8 surrounding cells, the edges wrapping around.
 func neighbors(x, y)
     var n = 0
     for dy = -1, 1 do
@@ -128,7 +134,7 @@ func neighbors(x, y)
     return n
 end
 
-## The next generation goes into `back`, every cell being rewritten so no reset is needed, then the buffers are swapped.
+## Every cell of `back` is rewritten, so it needs no clearing before the swap.
 func step()
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
@@ -159,7 +165,6 @@ func keyboard.keypressed(key)
     end
 end
 
-const DOUBLE_TAP = 0.3
 func mouse.pressed(x, y)
     if lastTap >= 0.0 and elapsedTime - lastTap < DOUBLE_TAP then
         paused = false                          ## a double tap restarts
@@ -195,14 +200,11 @@ func update(dt)
     end
 end
 
-const GAP = 2                                   ## espace entre cellules (px)
-const BLEU = Color(0.62, 0.80, 0.98)
-
 func draw()
     graphics.noStroke()
     ## a semi-transparent clear leaves a slight visual trail; the simulation itself stays exact
     graphics.clear(Color(0.05, 0.06, 0.10, 0.45))
-    graphics.fill(BLEU)
+    graphics.fill(CELL_COLOR)
     for y = 0, ROWS - 1 do
         for x = 0, COLS - 1 do
             if cells[idx(x, y)] == 1 then
