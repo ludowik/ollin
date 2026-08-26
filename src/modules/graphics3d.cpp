@@ -979,7 +979,13 @@ static Value light_class() {
 // For "dir", (x,y,z) is the direction of propagation; for "point", the position.
 static int gfx_light(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    std::string type = (argc > 0 && args[0].is_string()) ? args[0].as_string() : "dir";
+    // The kind is an IDENTIFIER: anything else used to become "dir" in silence, so a mistyped call
+    // lit the scene the wrong way with no word said.
+    if (argc > 0 && !args[0].is_string())
+        throw std::runtime_error("graphics.light: expected \"dir\" or \"point\"");
+    std::string type = argc > 0 ? args[0].as_string() : "dir";
+    if (type != "dir" && type != "point")
+        throw std::runtime_error("graphics.light: unknown kind '" + type + "' — expected \"dir\" or \"point\"");
     float x = (float)num_arg(args, argc, 1, "graphics.light");
     float y = (float)num_arg(args, argc, 2, "graphics.light");
     float z = (float)num_arg(args, argc, 3, "graphics.light");

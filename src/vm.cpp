@@ -231,7 +231,10 @@ std::string value_to_string(const Value& v) {
 static int builtin_assert(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc == 0 || is_falsy(args[0])) {
-        std::string msg = (argc >= 2 && args[1].is_string()) ? args[1].as_string() : "assertion failed";
+        // The message is displayed text: converted as print converts it, `__str` included. A
+        // non-string used to be replaced by the generic wording, which threw away the diagnosis at
+        // the very moment it was needed.
+        std::string msg = argc >= 2 ? value_to_string(args[1]) : std::string("assertion failed");
         throw std::runtime_error(msg);
     }
     return ctx.ret(Value{});

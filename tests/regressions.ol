@@ -1501,6 +1501,33 @@ assert(math.abs(sound.osc("A4").freq() - 440.0) < 0.01)
 assert(math.abs(sound.sine(100).freq("E4").freq() - 329.628) < 0.01)
 assert(math.abs(sound.tone("A5", 0.1).duration() - 0.1) < 0.001)
 
+## ── assert: the message is DISPLAYED text, so any value is accepted ────────
+## It used to be replaced by the generic wording unless it was a string, which threw away the
+## diagnosis at the very moment it was needed. Converted as print converts it, `__str` included.
+class AsTag
+    func init(n)
+        self.n = n
+    end
+    func __str()
+        return "AsTag(" + self.n + ")"
+    end
+end
+try
+    assert(false, 42)
+catch e
+    assert(e == "42")
+end
+try
+    assert(false, AsTag(3))
+catch e
+    assert(e == "AsTag(3)")
+end
+try
+    assert(false)
+catch e
+    assert(e == "assertion failed")
+end
+
 ## ── The touch module (multitouch) ──────────────────────────────────────────
 ## With no touch surface — which is the integration container's case — the module still exists: a
 ## script reading the state runs and sees nothing, instead of failing on a nil.

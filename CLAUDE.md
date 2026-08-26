@@ -935,6 +935,16 @@ toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
   sauvegardé par `capture_style`/`restore_style` et remis au défaut par `reset_styles`.
   `graphics.font([nom])` le pilote et renvoie le nom courant ; `graphics.textSize(valeur)`
   mesure avec la police ET la taille courantes (deux valeurs, via `ctx.set_result`).
+- **Deux familles d'arguments texte, une règle pour chacune** (`display_arg` / `str_arg` dans
+  `module_utils.h`) : un texte AFFICHÉ se **convertit** comme `print` (`graphics.text`,
+  `graphics.textSize`, le titre de `graphics.canvas`, le message d'`assert`) ; un
+  **identifiant** se **refuse** (nom de police, mode de fusion, sorte de lumière, nom de
+  touche, clé de `data`). Le troisième comportement — remplacer en SILENCE par une valeur par
+  défaut — était le pire des trois et a été éliminé partout : `graphics.text(score, x, y)` ne
+  dessinait rien, un titre non-chaîne devenait « Ollin », `blendMode(nil)` retombait sur
+  `alpha`, `light(1, …)` allumait une directionnelle, et `assert(false, 42)` perdait son
+  message. Vérifié : `42` et `Tag(3)` remontent tels quels par `assert` (figé dans
+  `regressions.ol`), et les refus nomment la valeur attendue.
 - **`graphics.text` accepte TOUTE valeur**, convertie par `value_to_string` — donc comme
   `print`, méta-méthode `__str` comprise. Auparavant un non-string devenait la chaîne vide :
   `graphics.text(score, x, y)` ne dessinait rien, sans erreur ni diagnostic. `textSize` fait la

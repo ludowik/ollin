@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 09:43</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-26 09:50</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 09:43</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-26 09:50</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1374,7 +1374,7 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 <span class="bi">printf</span>(<span class="str">"pi = {1:.3f}"</span>, <span class="num">3.14159</span>)     <span class="cmt">## pi = 3.142</span></code></pre>
 
 <h3>assert</h3>
-<p>Raises an exception when the condition is false. The message is optional.</p>
+<p>Raises an exception when the condition is false. The message is optional, and may be <strong>any value</strong>: it is converted as <code>print</code> converts it, an instance's <code>__str</code> included.</p>
 <pre><code><span class="kw">var</span> x = <span class="num">42</span>
 <span class="bi">assert</span>(<span class="num">1</span> + <span class="num">1</span> == <span class="num">2</span>)
 <span class="bi">assert</span>(x > <span class="num">0</span>, <span class="str">"x must be positive"</span>)</code></pre>
@@ -1740,14 +1740,14 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title (60 fps on the desktop, the browser's vsync in WASM)</td></tr>
+    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which may be any value, converted as <code>print</code> converts it (60 fps on the desktop, the browser's vsync in WASM)</td></tr>
     <tr><td><code>func setup()</code></td><td>When present, called once after the script has loaded, before the update/draw loop</td></tr>
     <tr><td><code>func draw()</code></td><td>When a global <code>draw</code> function exists, the engine creates a W×H canvas if needed and then calls it on every frame, for the rendering</td></tr>
     <tr><td><code>func update(dt)</code></td><td>When present, called on every frame <strong>before</strong> <code>draw</code>; <code>dt</code> is the seconds elapsed since the previous frame</td></tr>
     <tr><td><code>graphics.run(callback)</code></td><td>Starts the main loop with an explicitly named callback, as an alternative to <code>draw</code></td></tr>
     <tr><td><code>graphics.isOpen()</code></td><td>Returns 1 while the window is still open, 0 otherwise</td></tr>
     <tr><td><code>graphics.clear([grey | r,g,b | color …])</code></td><td>Clears the background. The same signature as <code>Color</code> (1 to 4 numbers, or a <code>Color</code> object). An <strong>opaque</strong> colour clears outright; a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) applies a gradual <strong>fade</strong>, giving trails (see the persistent context below). With no argument: black.</td></tr>
-    <tr><td><code>graphics.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. Reset to <code>"alpha"</code> on every frame.</td></tr>
+    <tr><td><code>graphics.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. An unknown name, or a value of another type, is an error rather than a silent fallback. Reset to <code>"alpha"</code> on every frame.</td></tr>
     <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Opens / closes a render frame by hand (an advanced use; the <code>draw</code>/<code>run</code> loop handles it otherwise)</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>The width of <strong>2D</strong> strokes (default 2, reset to 2 on every frame). It has <strong>no effect in 3D</strong>: the 3D wireframe stays 1&nbsp;px wide, a WebGL limit.</td></tr>
     <tr><td><code>graphics.rectMode(mode)</code></td><td>The anchor point of <code>graphics.rect</code>: <code>"corner"</code> (the default — <code>x, y</code> is the top-left corner) or <code>"center"</code> (<code>x, y</code> is the rectangle's centre). It affects <code>rect</code> only; reset to <code>"corner"</code> on every frame, and saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
@@ -1927,7 +1927,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
   <thead><tr><th>Nom</th><th>Description</th></tr></thead>
   <tbody>
     <tr><td><code>graphics.ambient(v)</code> ou <code>graphics.ambient(color)</code></td><td>The ambient light, a uniform base. <code>v</code> ∈ [0,1]</td></tr>
-    <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>A directional light, <code>(dx,dy,dz)</code> being the direction it travels in → a <code>Light</code> object</td></tr>
+    <tr><td><code>graphics.light("dir", dx,dy,dz [, color])</code></td><td>A directional light, <code>(dx,dy,dz)</code> being the direction it travels in → a <code>Light</code> object. The kind is an identifier: anything but <code>"dir"</code> or <code>"point"</code> is refused, and named in the error</td></tr>
     <tr><td><code>graphics.light("point", x,y,z [, color])</code></td><td>A point light at the position <code>(x,y,z)</code> → a <code>Light</code> object</td></tr>
     <tr><td><code>light.setDir(x,y,z)</code> · <code>light.setPos(x,y,z)</code></td><td>Reaims / moves the light</td></tr>
     <tr><td><code>light.setColor(color)</code> · <code>light.enable(bool)</code></td><td>Changes the colour / turns the light on or off</td></tr>

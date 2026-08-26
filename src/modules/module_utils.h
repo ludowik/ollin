@@ -42,6 +42,20 @@ static inline double num_arg(const Value* args, int argc, int i, const char* fn)
     return num_arg(args, i, fn);
 }
 
+// TEXT THAT GETS DISPLAYED is converted, never refused: any value is rendered exactly as `print`
+// renders it, `__str` included. That is the opposite of str_arg below, which guards an IDENTIFIER —
+// a font name, a blend mode, a key name — where a number means nothing and silence would hide the
+// mistake. Refusing displayed text would break `graphics.text(score, x, y)`; accepting an identifier
+// blindly would draw with the wrong font without a word.
+//
+// ⚠ The conversion may run Ollin code (an instance's `__str`), which can resize the register file:
+// read every OTHER argument before calling this, or `args` will dangle.
+static inline std::string display_arg(const Value* args, int argc, int i) {
+    if (i >= argc)
+        return std::string();
+    return value_to_string(args[i]);
+}
+
 static inline const std::string& str_arg(const Value* args, int argc, int i, const char* fn) {
     if (i >= argc)
         throw std::runtime_error(std::string(fn) + ": missing argument");

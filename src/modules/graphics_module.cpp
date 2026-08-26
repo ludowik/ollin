@@ -81,7 +81,9 @@ static int gfx_canvas(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     int w = argc > 0 ? gfx_to_int(args[0]) : 800;
     int h = argc > 1 ? gfx_to_int(args[1]) : 600;
-    const char* title = (argc > 2 && args[2].is_string()) ? args[2].as_string().c_str() : "Ollin";
+    // The title is displayed text: any value is converted, as print does. A non-string used to
+    // become "Ollin" in silence.
+    std::string title = argc > 2 ? display_arg(args, argc, 2) : std::string("Ollin");
     s_shot_pending = false;   // a new program: forget any pending screenshot
     gfx_reset_capture();      // likewise for the capture the host asked for
     s_blend_mode = BLEND_ALPHA;
@@ -115,10 +117,10 @@ static int gfx_canvas(CallCtx& ctx) {
     });
     if (reuse) {
         SetWindowSize(w, h);                   // the same WebGL context, a new logical size
-        SetWindowTitle(title);
+        SetWindowTitle(title.c_str());
     } else {
         SetConfigFlags(FLAG_MSAA_4X_HINT);
-        InitWindow(w, h, title);
+        InitWindow(w, h, title.c_str());
         SetTargetFPS(0);
     }
     // Override canvas bitmap to physical resolution, CSS display to logical size
@@ -146,7 +148,7 @@ static int gfx_canvas(CallCtx& ctx) {
     s_physW = w;
     s_physH = h;
     SetConfigFlags(FLAG_MSAA_4X_HINT);
-    InitWindow(w, h, title);
+    InitWindow(w, h, title.c_str());
     SetTargetFPS(60);
 #endif
     s_logicalW = w;
@@ -268,7 +270,11 @@ static int gfx_blend_mode(CallCtx& ctx) {
             throw std::runtime_error("graphics.blendMode: unknown mode '" + s + "'");
         }
     } else if (argc > 0 && args[0].is_number()) {
-        mode = (int)args[0].as_num();   // constante du module `blend`
+        mode = (int)args[0].as_num();   // a constant of the `blend` module
+    } else if (argc > 0) {
+        // A mode is an IDENTIFIER, so a wrong type is refused: it used to fall back to ALPHA in
+        // silence, and the drawing then simply ignored the mode asked for.
+        throw std::runtime_error("graphics.blendMode: expected a mode name or a blend constant");
     }
     s_blend_mode = mode;
     BeginBlendMode(mode);
@@ -514,7 +520,7 @@ static int gfx_text_size(CallCtx& ctx) {
     }
     // Same conversion as graphics.text, and for the same reason: measuring must agree with
     // drawing, or a number could be written but never centred.
-    std::string text = value_to_string(args[0]);
+    std::string text = display_arg(args, argc, 0);
     Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, s_font_size / (float)font.baseSize);
     ctx.set_result(0, Value((double)size.x));
     ctx.set_result(1, Value((double)size.y));
@@ -809,7 +815,7 @@ static int gfx_text(CallCtx& ctx) {
         return ctx.ret(Value{});
     // Converted only once the canvas is known to exist: with no drawing area nothing is drawn, so
     // an `__str` must not run either.
-    std::string text = value_to_string(args[0]);
+    std::string text = display_arg(args, argc, 0);
     float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)tx, (float)ty};
     DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
