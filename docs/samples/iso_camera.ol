@@ -15,11 +15,12 @@ global config = {
     wheelStep: 0.1      ## zoom fraction per wheel notch
 }
 
+## Three globals, one per LIFETIME. `config` never changes once written; `view` is where the
+## camera is right now, derived from the gestures; `drag` is a gesture in progress, meaningless
+## between two presses. Merging them would blur exactly the distinction the double-click needs.
 global cam  = graphics.cameraOrtho(0, config.height, config.dist,  0, 0, 0,  config.size)
 global view = { angle: config.angle, size: config.size }
-global dragging = false
-global lastx    = 0
-global lasty    = 0
+global drag = { active: false, x: 0 }
 
 func setup()
     graphics.canvas(W, H, "Isometric camera")
@@ -28,22 +29,20 @@ func setup()
 end
 
 func mouse.pressed(x, y)
-    dragging = true
-    lastx = x
-    lasty = y
+    drag.active = true
+    drag.x = x
 end
 
 func mouse.released(x, y)
-    dragging = false
+    drag.active = false
 end
 
 ## A pinch is not a drag: while two fingers are down, the orbit must not follow the finger the
 ## system emulates the mouse with, or the scene would spin as one zooms.
 func mouse.moved(x, y)
-    if not dragging or touch.count() > 1 then return end
-    var dx = x - lastx
-    lastx = x
-    lasty = y
+    if not drag.active or touch.count() > 1 then return end
+    var dx = x - drag.x
+    drag.x = x
     view.angle = view.angle + dx * config.orbitRate
     cam.orbit(view.angle, config.dist, config.height)
 end
