@@ -1,23 +1,19 @@
 ## An interactive isometric camera.
 ## Drag to orbit - wheel or pinch to zoom - double-click to recentre.
 
-## Every tunable of the sample lives in ONE map: what to change to retune the camera is here, and
-## nowhere else. The `size` and `angle` entries are the STARTING values, kept untouched so that a
-## double-click can restore them - the current ones live in `view` below.
+## `size` and `angle` are the STARTING values and stay untouched, which is what lets the
+## double-click restore them; where the camera is right now lives in `view`.
 global config = {
-    dist:      18.0,    ## orbit radius
-    height:    14.0,    ## the camera's height
-    size:      14.0,    ## the units visible vertically
-    angle:     0.785,   ## initial orbit angle, about 45 degrees
-    minSize:   3.0,     ## closest zoom
-    maxSize:   40.0,    ## furthest zoom
+    dist:      18.0,
+    height:    14.0,
+    size:      14.0,    ## units visible vertically
+    angle:     0.785,   ## radians, about 45 degrees
+    minSize:   3.0,
+    maxSize:   40.0,
     orbitRate: 0.008,   ## radians per pixel dragged
     wheelStep: 0.1      ## zoom fraction per wheel notch
 }
 
-## Three globals, one per LIFETIME. `config` never changes once written; `view` is where the
-## camera is right now, derived from the gestures; `drag` is a gesture in progress, meaningless
-## between two presses. Merging them would blur exactly the distinction the double-click needs.
 global cam  = graphics.cameraOrtho(0, config.height, config.dist,  0, 0, 0,  config.size)
 global view = { angle: config.angle, size: config.size }
 global drag = { active: false, x: 0 }
@@ -72,7 +68,7 @@ func mouse.doubleClicked(x, y)
     cam.orbit(view.angle, config.dist, config.height)
 end
 
-## Checkerboard offsets, which make the grid easier to read
+## Alternating shades: a single flat colour would hide the grid.
 func checkerColor(x, z)
     if (x + z) % 2 == 0 then
         return Color(0.72, 0.70, 0.65)
@@ -86,7 +82,7 @@ func draw()
 
     graphics.begin3d(cam)
 
-        ## A 9x9 checkerboard floor
+        ## A flat floor, one thin cube per cell
         for x = -4, 4 do
             for z = -4, 4 do
                 graphics.fill(checkerColor(x, z))
@@ -94,7 +90,7 @@ func draw()
             end
         end
 
-        ## Buildings of varied heights
+        ## x, z, footprint, height, colour
         var bldgs = [
             [-2,  0, 1.2, 3.0, Color(0.85, 0.38, 0.22)],
             [ 1,  1, 1.0, 2.0, Color(0.30, 0.60, 0.80)],
@@ -110,7 +106,6 @@ func draw()
             graphics.cube(b[1], b[4] / 2, b[2],  b[3], b[4], b[3])
         end
 
-        ## An animated sphere orbiting above the scene
         var t   = elapsedTime * 0.8
         var sx  = math.cos(t) * 3.2
         var sz  = math.sin(t) * 3.2
@@ -118,13 +113,12 @@ func draw()
         graphics.fill(Color(1.0, 0.95, 0.40))
         graphics.sphere(sx, sy, sz,  0.55)
 
-        ## A cast shadow: a disc on the ground, with alpha
+        ## A cast shadow, faked by a flat translucent disc
         graphics.fill(Color(0.0, 0.0, 0.0, 0.30))
         graphics.cylinder(sx, 0.01, sz,  0.45, 0.02)
 
     graphics.end3d()
 
-    ## HUD
     var hint = "Drag: orbit   Wheel or pinch: zoom   Double-click: reset"
     graphics.stroke(Color(1, 1, 1, 0.55))
     graphics.fontSize(14)
