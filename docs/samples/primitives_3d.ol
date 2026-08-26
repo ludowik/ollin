@@ -156,22 +156,23 @@ func draw()
 
     graphics.end3d()
 
-    var fs = 13
     var pad = 4
     var names = ["cube", "sphere", "cylinder", "plane", "line3d/point3d", "cone", "torus", "segments(6)"]
-    var hw = [14, 20, 26, 18, 42, 14, 16, 34]  ## rough half-width of each label
+    graphics.fontSize(13)
     for i = 1, 8 do
         var idx = i - 1
         var col = idx % cols
         var row = idx // cols
         var cx = W * (col + 0.5) / cols
         var cy = H * (rows - 0.5 - row) / rows
+        ## The label is MEASURED rather than guessed: a hand-written table of half-widths had to be
+        ## revised at every rename, and drifted with the font and the size in any case.
+        var tw, th = graphics.textSize(names[i])
         graphics.noStroke()
         graphics.fill(Color(1, 1, 1, 0.88))
-        graphics.rect(cx - hw[i] - pad, cy - fs/2 - pad, hw[i]*2 + pad*2, fs + pad*2)
+        graphics.rect(cx - tw/2 - pad, cy - th/2 - pad, tw + pad*2, th + pad*2)
         graphics.stroke(Color(0, 0, 0))
-        graphics.fontSize(fs)
-        graphics.text(names[i], cx - hw[i], cy - fs/2)
+        graphics.text(names[i], cx - tw/2, cy - th/2)
     end
 
     graphics.stroke(Color(1, 1, 1, 0.5))

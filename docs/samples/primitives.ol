@@ -240,7 +240,9 @@ func demoArc()
 end
 
 func draw()
-    t += 0.02
+    ## deltaTime, not a fixed increment per frame: the animations kept the same speed only as
+    ## long as the display ran at 60 Hz. The 1.2 restores that speed, in radians per second.
+    t += deltaTime * 1.2
     g.clear(Color(0.08, 0.09, 0.12))
     demoPoint()
     demoLine()
