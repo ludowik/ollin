@@ -1338,6 +1338,31 @@ std::vector<Upvalue*> open_upvals;  // upvals ouvertes créées par ce frame
 - `visit(FuncDeclStmt)` : si `is_nested` (outer_name non vide) → émet `MAKE_CLOSURE` ou `LOAD_FUNC` dans ce registre local, pas de `STORE_GLOBAL`.
 - Appels récursifs à une fonction interne : `resolveUpvalue(callee)` remonte la chaîne de scopes → `GET_UPVAL + CALL_DYN`.
 
+## Sortir d'une construction : `break`, `continue`, `return`
+
+Un saut qui QUITTE une construction doit la démonter, et le compilateur porte cette
+responsabilité — pas la VM. Chaque niveau de `break_patches`/`continue_patches` retient donc
+**où** il a été ouvert : la fonction (`func_depth`), la profondeur de `try` (`try_depth`) et
+s'il s'agit d'un `switch`.
+
+- **`break` dans un `switch` est REFUSÉ.** Un bras ne chute pas sur le suivant, donc il n'a rien
+  à quitter ; et écrit dans une boucle il se lisait comme « sortir de la boucle » alors qu'il
+  était capté par le `switch`, la boucle continuant. Le refuser est la seule lecture qui ne
+  trompe pas. `continue`, lui, traverse et atteint la boucle — asymétrie voulue, testée.
+- **`break`/`continue` dans une lambda déclarée dans une boucle sont REFUSÉS** : le saut visait
+  une adresse du code de la fonction ENGLOBANTE, et le corps de la boucle était purement sauté,
+  sans erreur.
+- **Sortir d'un `try` émet un `POP_TRY` par bloc quitté** (`pop_crossed_tries` pour
+  `break`/`continue`, la même boucle dans `visit(ReturnStmt)` pour `return`). Sans cela le
+  gestionnaire restait empilé : une erreur survenue longtemps après la boucle était interceptée
+  par lui, et le `catch` s'exécutait une fois par tour effectué. Pour `return`, le compte part du
+  **plancher de la fonction** (`try_floors_`, empilé avec `outer_scopes_`), un `return` ne
+  quittant que les `try` de SA fonction.
+- ⚠ **Pourquoi côté compilateur et non côté VM** : dépiler les gestionnaires morts à chaque
+  `RETURN` (le `Handler` porte déjà `call_depth`) coûte **+1,23 % d'instructions sur
+  `bench_fib`**, mesuré — pour un test inutile en l'absence de `try`. La version compilateur
+  mesure **+0,00 %**.
+
 ## Système de classes (implémentation)
 
 > Syntaxe (`class`, `extends`, `super`, méthodes, méta-méthodes) : voir `grammar.ebnf` (`classDecl`, `method`, `superCall`).

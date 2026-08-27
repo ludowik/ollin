@@ -1684,4 +1684,57 @@ switch 1
 end
 assert(sw_inner == "12")
 
+## A jump that LEAVES a try must pop its handler. Jumping over the POP_TRY left it on the VM's
+## stack, and an error raised long after the loop was caught by it — the catch ran once per
+## iteration the loop had made. Same defect for a `return` out of a try, on the VM side: the
+## program then ended in SILENCE, with a status of 0, instead of reporting the error.
+var tb = ""
+for i = 1, 3 do
+    try
+        try
+            if i == 2 then
+                break
+            end
+            tb = tb + i
+        catch e
+            tb = tb + "c1"
+        end
+    catch e
+        tb = tb + "c2"
+    end
+end
+assert(tb == "1")
+
+var tc = ""
+for i = 1, 4 do
+    try
+        if i % 2 == 0 then
+            continue
+        end
+        tc = tc + i
+    catch e
+        tc = tc + "C"
+    end
+end
+assert(tc == "13")
+
+func tr_return()
+    try
+        return "left"
+    catch e
+        return "caught"
+    end
+end
+assert(tr_return() == "left")
+
+## After all of the above, an error must still find the RIGHT handler — the one written here.
+var tr_seen = ""
+try
+    var nothing = nil
+    print(nothing.field)
+catch e
+    tr_seen = "here"
+end
+assert(tr_seen == "here")
+
 print("regressions ok")

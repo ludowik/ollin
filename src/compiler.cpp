@@ -541,8 +541,8 @@ void Compiler::visit(const WhileStmt& s) {
     size_t exit_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
     reg_top_ = saved;
 
-    break_patches.push_back({{}, outer_scopes_.size(), false});
-    continue_patches.push_back({{}, outer_scopes_.size(), false});
+    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
     compile_block(s.body);
     for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, loop_start);
@@ -602,7 +602,7 @@ void Compiler::visit(const SwitchStmt& s) {
     int above_subj = reg_top_; // subj_r reste vivant pendant tous les bras
 
     std::vector<size_t> end_patches;
-    break_patches.push_back({{}, outer_scopes_.size(), true}); // marks the switch; a break inside it is refused
+    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;
@@ -655,6 +655,14 @@ void Compiler::check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& f
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": " + what + " outside loop");
 }
 
+// A jump that leaves try blocks behind must POP their handlers: jumping over the POP_TRY left them
+// on the VM's stack, and an error raised long after the loop was caught by them — the catch block
+// ran once per iteration the loop had made, then the error reached the engine anyway.
+void Compiler::pop_crossed_tries(const JumpTargets& frame) {
+    for (int i = frame.try_depth; i < try_depth_; ++i)
+        chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
+}
+
 void Compiler::visit(const BreakStmt& s) {
     check_jump_scope(s, break_patches, "break");
     // A case does not fall through, so a break at the end of an arm has nothing to leave, and one
@@ -664,12 +672,14 @@ void Compiler::visit(const BreakStmt& s) {
         throw std::runtime_error(s.sloc().str(chunk.source_files) +
                                  ": break inside a switch (a case does not fall through; to leave the "
                                  "enclosing loop, use a flag or return)");
+    pop_crossed_tries(break_patches.back());
     break_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
 }
 
 void Compiler::visit(const ContinueStmt& s) {
     // A continue is NOT caught by a switch: it legitimately reaches the enclosing loop.
     check_jump_scope(s, continue_patches, "continue");
+    pop_crossed_tries(continue_patches.back());
     continue_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
 }
 
@@ -778,7 +788,11 @@ void Compiler::visit(const TryCatchStmt& s) {
     }
 
     size_t try_patch = chunk.emit_jump(Op::TRY, (uint8_t)catch_r);
+    // The handler is live for the BODY only: unwind_to_handler pops it before the catch runs, and
+    // the else body comes after POP_TRY. So only the body raises the depth a jump has to undo.
+    ++try_depth_;
     compile_block(s.try_body);
+    --try_depth_;
     chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
     size_t else_patch = chunk.emit_jump(Op::JUMP);
 
@@ -842,6 +856,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
 
     // Push outer scope for upvalue resolution
     outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
+    try_floors_.push_back(try_depth_);   // this body's returns are relative to HERE
 
     current_func_name = s.name;
     cur_upval_idx_.clear();
@@ -907,6 +922,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
 
     // Pop scope and restore outer context
     outer_scopes_.pop_back();
+    try_floors_.pop_back();
     local_regs_ = std::move(outer_regs);
     pending_var_reg_ = std::move(outer_pending);
     cur_upval_idx_ = std::move(outer_upvals);
@@ -964,6 +980,7 @@ void Compiler::visit(const FuncExpr& s) {
     const_names_.clear();
 
     outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
+    try_floors_.push_back(try_depth_);   // this body's returns are relative to HERE
 
     current_func_name = "<lambda>";
     cur_upval_idx_.clear();
@@ -1009,6 +1026,7 @@ void Compiler::visit(const FuncExpr& s) {
     chunk.patch_jump(jump_patch, (uint16_t)chunk.current_pos());
 
     outer_scopes_.pop_back();
+    try_floors_.pop_back();
     local_regs_ = std::move(outer_regs);
     pending_var_reg_ = std::move(outer_pending);
     cur_upval_idx_ = std::move(outer_upvals);
@@ -1045,6 +1063,11 @@ void Compiler::visit(const ReturnStmt& s) {
     note_line(s.line, s.file_idx);
     if (!in_function())
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": return outside function");
+    // Leaving the try blocks of THIS function pops their handlers, as a break does. Doing it here
+    // and not in the VM is what keeps it free: popping them on every RETURN cost 1.23 % of the
+    // instructions executed by bench_fib, measured, for a check that is useless without a try.
+    for (int i = try_floor(); i < try_depth_; ++i)
+        chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
     // return <explicit values>, <call>: when the last returned expression is a call it expands
     // to ALL its values, as in Lua. `return ...` is still handled by spread_varargs.
     if (!s.spread_varargs && !s.values.empty() && is_call_node(s.values.back().get())) {
@@ -1646,8 +1669,8 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
     size_t exit_patch = chunk.emit_jump(iter_op, (uint8_t)block);
 
-    break_patches.push_back({{}, outer_scopes_.size(), false});
-    continue_patches.push_back({{}, outer_scopes_.size(), false});
+    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
     compile_block(body);
     // End of an iteration: the loop variables and the body's locals go out of scope, so their
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
@@ -1960,8 +1983,8 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (!can_alias)
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
-    break_patches.push_back({{}, outer_scopes_.size(), false});
-    continue_patches.push_back({{}, outer_scopes_.size(), false});
+    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
     compile_block(body);
 
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
@@ -2189,6 +2212,7 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     const_names_.clear();
 
     outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
+    try_floors_.push_back(try_depth_);   // this body's returns are relative to HERE
 
     current_func_name = s.name;
     cur_upval_idx_.clear();
@@ -2255,6 +2279,7 @@ uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
     chunk.patch_jump(jump_patch, (uint16_t)chunk.current_pos());
 
     outer_scopes_.pop_back();
+    try_floors_.pop_back();
     local_regs_ = std::move(outer_regs);
     pending_var_reg_ = std::move(outer_pending);
     cur_upval_idx_ = std::move(outer_upvals);

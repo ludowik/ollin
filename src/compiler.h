@@ -21,11 +21,20 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     struct JumpTargets {
         std::vector<size_t> patches;
         size_t func_depth = 0;
+        int try_depth = 0;        // active try blocks when opened: a jump out of one must pop it
         bool is_switch = false;   // only ever true for break: a switch does not catch continue
     };
+    int try_depth_ = 0;           // try bodies being compiled, the catch bodies excluded
+    // The try depth on entering each nested function body: a `return` only leaves the try blocks
+    // of ITS function, so the count is taken from this floor and not from zero.
+    std::vector<int> try_floors_;
+    int try_floor() const {
+        return try_floors_.empty() ? 0 : try_floors_.back();
+    }
     std::vector<JumpTargets> break_patches;
     std::vector<JumpTargets> continue_patches;
     void check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what);
+    void pop_crossed_tries(const JumpTargets& frame);
     int current_line_ = 0;
     int current_file_idx_ = 0;
 
