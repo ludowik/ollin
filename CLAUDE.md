@@ -150,6 +150,16 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
+- **Toute écriture GitHub passe par `commitOnBranch` (`pg-github.js`), qui se REJOUE sur la
+  nouvelle tête.** Lire la référence puis la faire avancer n'est pas atomique : si la branche a
+  bougé entre les deux, GitHub répond `422 — Update is not a fast forward` (constaté par
+  l'utilisateur). La séquence entière est refaite, lecture de la référence comprise, jusqu'à trois
+  fois — le rappel qui construit l'arbre est rappelé à chaque tentative, sans quoi un envoi rejoué
+  ressusciterait les fichiers qu'un autre commit venait de retirer. Les blobs, eux, sont créés
+  UNE fois en dehors de la boucle : ils ne dépendent pas de la tête (vérifié : deux blobs envoyés
+  malgré trois tentatives). Rejouer est sûr des deux côtés — un envoi écrit l'état local, que le
+  modèle de synchronisation tient pour la vérité, et une suppression met des chemins à `null`,
+  ce qui est idempotent.
 - **Supprimer un projet synchronisé supprime AUSSI son dossier GitHub**, la case étant cochée par
   défaut (`renderMenuDelete`, `GH.deleteRemoteProject`). Laisser la copie distante n'était pas une
   décision mais un oubli, et il avait deux effets : le projet réapparaissait sous « Remote » dans

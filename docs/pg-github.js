@@ -197,6 +197,48 @@ export function folderMoved(current, known) {
   return current !== null && current !== (known || null)
 }
 
+// Read-modify-write on a branch, in ONE commit. `build(remoteTree)` returns the tree entries —
+// blobs to write, and paths with sha:null to remove.
+//
+// GitHub answers 422 "Update is not a fast forward" when the branch has moved between the moment
+// the ref was read and the moment it is patched: another device, another tab, or simply a previous
+// deletion whose commit this one did not see. The whole sequence is therefore REDONE on the new
+// head, ref read included, up to three times. Replaying is safe for both callers: a push writes
+// the local state, which the sync model holds authoritative, and a delete nulls paths, which is
+// idempotent. `build` is called again on each attempt, so it sees the tree as it now is — without
+// which a retried push would resurrect the files another commit had just removed.
+async function commitOnBranch(ghctx, build, message) {
+  const { base, branch } = ghctx
+  for (let attempt = 1; ; attempt++) {
+    const refRes = await gh(`${base}/git/ref/heads/${branch}`)
+    if (!refRes.ok) {
+      let msg = String(refRes.status)
+      try { const e = await refRes.json(); if (e && e.message) msg = refRes.status + ' — ' + e.message } catch (_) {}
+      throw new Error('GitHub ' + msg)
+    }
+    const baseSha = (await refRes.json()).object.sha
+    const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
+    const { tree: remoteTree } = await fullTree(ghctx)
+    const entries = await build(remoteTree)
+    if (!entries || !entries.length)
+      return { newTree: null, entries: [] }
+
+    const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseCommit.tree.sha, tree: entries } })
+    const commit = await ghJson(`${base}/git/commits`, {
+      method: 'POST',
+      body: { message, tree: newTree.sha, parents: [baseSha] },
+    })
+    const patch = await gh(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
+    if (patch.ok)
+      return { newTree, entries }
+    if (patch.status !== 422 || attempt === 3) {
+      let msg = String(patch.status)
+      try { const e = await patch.json(); if (e && e.message) msg = patch.status + ' — ' + e.message } catch (_) {}
+      throw new Error('GitHub ' + msg)
+    }
+  }
+}
+
 // Deletes a project's remote folder, in ONE commit, exactly as a push carries its deletions: the
 // blobs under `<slug>/` are given sha:null in a tree built on the current one. It returns the
 // number of files removed, and 0 when the folder was already absent — deleting twice is therefore
@@ -212,27 +254,18 @@ export async function deleteRemoteProject(slugs, message) {
   const branch = info.default_branch || 'main'
   const refRes = await gh(`${base}/git/ref/heads/${branch}`)
   if (!refRes.ok) return 0   // an empty repository holds nothing to delete
-  const ref = await refRes.json()
-  const baseSha = ref.object.sha
-  const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
-  const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })
 
   const scan = new Set(list)
-  const tree = []
-  for (const e of remoteTree) {
-    if (e.type !== 'blob') continue
-    if (!scan.has(e.path.split('/')[0])) continue
-    tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
-  }
-  if (!tree.length) return 0
-
-  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseCommit.tree.sha, tree } })
-  const commit = await ghJson(`${base}/git/commits`, {
-    method: 'POST',
-    body: { message: message || `ollin: delete ${list[0]}`, tree: newTree.sha, parents: [baseSha] },
-  })
-  await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
-  return tree.length
+  const { entries } = await commitOnBranch({ owner, repo, base, branch }, remoteTree => {
+    const out = []
+    for (const e of remoteTree) {
+      if (e.type !== 'blob') continue
+      if (!scan.has(e.path.split('/')[0])) continue
+      out.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
+    }
+    return out
+  }, message || `ollin: delete ${list[0]}`)
+  return entries.length
 }
 
 // Pulling a project.
@@ -291,53 +324,47 @@ export async function pushProject(project, message, opts = {}) {
       throw new Error('GitHub ' + msg)
     }
   }
-  const ref = await refRes.json()
-  const baseSha = ref.object.sha
-  const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
-  const baseTree = baseCommit.tree.sha
-
-  // The current remote state, used for the deletions; a rename removes the old folder.
   const oldSlug = project.remote && project.remote.slug
   const trackedSlug = oldSlug || slug
-  const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })   // reuses the context already resolved
 
   // No conflict guard here: the sync model (the `dirty` flag, single-person use) makes the LOCAL
   // side authoritative on a push. Reconciling with a divergent remote happens on OPENING
   // (syncOnOpen, on the playground side), not here.
 
-  const tree = []
+  // The blobs are created ONCE, outside commitOnBranch: they do not depend on the branch's head,
+  // and a retry must not re-upload every file.
+  const blobs = []
   for (const rel in (project.files || {})) {
     const blob = await ghJson(`${base}/git/blobs`, { method: 'POST', body: { content: project.files[rel], encoding: 'utf-8' } })
-    tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
+    blobs.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
   for (const rel in (project.resources || {})) {
     const blob = await ghJson(`${base}/git/blobs`, { method: 'POST', body: { content: project.resources[rel].b64, encoding: 'base64' } })
-    tree.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
+    blobs.push({ path: `${slug}/${rel}`, mode: '100644', type: 'blob', sha: blob.sha })
   }
 
-  // Deletions: remote files (under the current slug, plus the old one on a rename) absent
-  // locally get sha:null.
-  const desired = new Set(tree.map(t => t.path))
   const scan = new Set([slug])
   if (oldSlug && oldSlug !== slug) scan.add(oldSlug)
-  for (const e of remoteTree) {
-    if (e.type !== 'blob') continue
-    if (!scan.has(e.path.split('/')[0])) continue
-    if (!desired.has(e.path)) tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
-  }
-
-  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseTree, tree } })
-  const commit = await ghJson(`${base}/git/commits`, {
-    method: 'POST',
-    body: { message: message || `ollin: ${project.name}`, tree: newTree.sha, parents: [baseSha] },
-  })
-  await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
+  // Deletions: remote files (under the current slug, plus the old one on a rename) absent
+  // locally get sha:null. Recomputed on each attempt, the remote tree having moved.
+  const { newTree } = await commitOnBranch({ owner, repo, base, branch }, remoteTree => {
+    const entries = blobs.slice()
+    const desired = new Set(entries.map(t => t.path))
+    for (const e of remoteTree) {
+      if (e.type !== 'blob') continue
+      if (!scan.has(e.path.split('/')[0])) continue
+      if (!desired.has(e.path)) entries.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
+    }
+    return entries
+  }, message || `ollin: ${project.name}`)
 
   // The baseline for the next guards is the folder's tree sha, read from the POST git/trees
   // response (its top-level entries), so there is no further network read and it is strictly the
   // same identifier folderTreeSha will read back. A fallback covers the case where the entry was
   // not there (Git Data being strongly consistent).
-  let folderSha = (newTree.tree || []).find(e => e.path === slug && e.type === 'tree')?.sha || null
+  // newTree is null when there was nothing to write at all — a project with neither a file nor a
+  // resource, which the manifest normally rules out; the fallback below then reads the folder.
+  let folderSha = ((newTree && newTree.tree) || []).find(e => e.path === slug && e.type === 'tree')?.sha || null
   if (!folderSha) {
     try {
       folderSha = await folderTreeSha(base, branch, slug)
