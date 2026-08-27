@@ -132,6 +132,8 @@ ollin/
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
+│                      gen_model_glb.py (engendre docs/samples/armillary.glb — lancé à la MAIN, le
+│                      .glb est commité ; modèle À NOUS, donc aucune licence tierce à honorer),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
