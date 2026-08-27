@@ -8,7 +8,7 @@ at run time.
 
 Why generated rather than downloaded: a third-party sample model carries a licence to honour and
 to attribute, which a repository should not take on lightly. This one is ours, and its complexity
-is chosen rather than inherited — five meshes, five materials, about five thousand triangles.
+is chosen rather than inherited — five meshes, five materials, 6304 triangles.
 
 What it is for: cube_tex.glb already covers a glTF carrying a TEXTURE. This one covers the other
 half of the loader, which nothing exercised — a model whose meshes each have their OWN material
