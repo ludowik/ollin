@@ -17,7 +17,8 @@ GEOMETRY ALONE, with no material, so the script's fill decides the colour — cu
 armillary.glb already cover the textured and the multi-material glTF paths.
 
 Texture coordinates are dropped for the same reason (nothing samples a texture here), and
-positions and normals are written with four decimals, matching knot.obj.
+positions and normals are written with four decimals — enough for a display model, and it halves
+the file against the source's full precision.
 """
 import json
 import os

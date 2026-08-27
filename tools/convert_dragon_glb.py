@@ -17,8 +17,8 @@ above every other sample model, so it measures what the loader and one draw call
 What is kept: the dragon mesh ALONE. The source scene also holds a cloth backdrop and glass
 material extensions (transmission, volume) that Ollin's shader knows nothing about. Texture
 coordinates are dropped (nothing samples a texture) and no material is written, so the model
-carries its geometry only and the script's fill decides the colour — the same lesson as knot.obj
-and suzanne.obj. The node's transform is BAKED into the vertices and the normals, so how raylib
+carries its geometry only and the script's fill decides the colour — the same lesson as
+suzanne.obj. The node's transform is BAKED into the vertices and the normals, so how raylib
 flattens a node hierarchy cannot change the result.
 
 Output is a .glb and not an .obj: the same geometry as OBJ text is roughly 6 MB, against 2.9 MB

@@ -1073,10 +1073,9 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Six fichiers, chacun pour une raison distincte : `knot.obj` (géométrie seule, la teinte vient
-du `fill`), `cube_tex.glb` (glTF portant une TEXTURE), `armillary.glb` (glTF dont chaque maillage
-a SA couleur de matériau), `suzanne.obj` (3 936 triangles de vraie géométrie sculptée, ce que les
-trois autres n'ont pas), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie
+Cinq fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
+`armillary.glb` (glTF dont chaque maillage a SA couleur de matériau), `suzanne.obj` (géométrie
+seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie
 texture peinte SUR de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible).
 
 **Les trois convertisseurs partagent `tools/gltf_util.py`** — lecture d'un conteneur `.glb`,
@@ -1098,8 +1097,8 @@ que cela rencontrera la même limite.
 gardé quand même dans l'en-tête du `.obj`. La licence a été LUE avant de prendre le fichier.
 `tools/convert_suzanne_obj.py` retélécharge la source et refait la conversion glTF → OBJ : c'est
 lui qui rend la provenance contrôlable au lieu d'un binaire mystérieux. Les coordonnées de texture
-sont écartées (rien n'échantillonne de texture ici) et les nombres sont à quatre décimales, comme
-`knot.obj`.
+sont écartées (rien n'échantillonne de texture ici) et les nombres sont à quatre décimales, ce qui
+suffit à un modèle d'affichage.
 
 `dragon.glb` est le dragon scanné par le **Stanford Computer Graphics Laboratory**, repris de la
 décimation de `KhronosGroup/glTF-Sample-Assets` (`DragonAttenuation`) par
