@@ -139,6 +139,9 @@ ollin/
 │                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
 │                      convert_dragon_glb.py (idem pour docs/samples/dragon.glb — dragon de
 │                      Stanford, licence NON commerciale, cf. plus bas),
+│                      convert_helmet_glb.py (idem pour docs/samples/helmet.glb — Damaged Helmet,
+│                      crédit obligatoire et NON commercial, cf. plus bas),
+│                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
@@ -1070,10 +1073,16 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Cinq fichiers, chacun pour une raison distincte : `knot.obj` (géométrie seule, la teinte vient
+Six fichiers, chacun pour une raison distincte : `knot.obj` (géométrie seule, la teinte vient
 du `fill`), `cube_tex.glb` (glTF portant une TEXTURE), `armillary.glb` (glTF dont chaque maillage
 a SA couleur de matériau), `suzanne.obj` (3 936 triangles de vraie géométrie sculptée, ce que les
-trois autres n'ont pas) et `dragon.glb` (la masse : 91 216 triangles).
+trois autres n'ont pas), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie
+texture peinte SUR de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible).
+
+**Les trois convertisseurs partagent `tools/gltf_util.py`** — lecture d'un conteneur `.glb`,
+lecture d'un accesseur, rotation par quaternion, écriture d'un `.glb`. Chacun avait recopié les
+quatre, ce qui est exactement la duplication que le module supprime ; le refactor a été vérifié
+par l'octet (sortie identique avant/après).
 
 **Un maillage raylib ne peut pas dépasser 65 535 sommets** : `Mesh` range ses indices en
 *unsigned short*, et le chargeur CONVERTIT un tampon d'indices 32 bits en 16 bits avec un simple
@@ -1101,6 +1110,15 @@ dans `asset.copyright` du glTF. Seul le maillage du dragon est repris (la scène
 fond de tissu et des extensions de verre que notre shader ignore), la rotation du nœud est cuite
 dans les sommets ET les normales (quart de tour autour de X ; l'échelle étant uniforme, elle ne
 touche pas les normales), et aucun matériau n'est écrit — le `fill` décide de la couleur.
+
+`helmet.glb` est le **Damaged Helmet**, le modèle que tous les moteurs de rendu PBR montrent
+depuis 2016, repris de `KhronosGroup/glTF-Sample-Assets` par `tools/convert_helmet_glb.py`. Sa
+licence est **double** : © 2018 ctxwing pour la reconstruction et la conversion glTF (CC-BY 4.0),
+© 2016 theblueturtle_ pour la version antérieure du modèle (**CC-BY-NC** 4.0) — crédit obligatoire
+et pas d'usage commercial, comme le dragon. Les deux crédits vivent dans `asset.copyright`. Seules
+la géométrie et la texture de couleur de base sont reprises : la source porte aussi des cartes
+métallique-rugosité, émissive, d'occlusion et de normales que notre shader n'échantillonne jamais,
+soit 2,7 Mo que le moteur ne peut pas lire (1,5 Mo livré contre 3,8 Mo à la source).
 
 ## Affichage 3D + éclairage (graphics_module.cpp)
 

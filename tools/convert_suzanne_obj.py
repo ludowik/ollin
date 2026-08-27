@@ -21,14 +21,13 @@ positions and normals are written with four decimals, matching knot.obj.
 """
 import json
 import os
-import struct
+import sys
 import urllib.request
 
-BASE = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Suzanne/glTF/"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gltf_util as gl
 
-COMPONENT = {5120: ("b", 1), 5121: ("B", 1), 5122: ("h", 2), 5123: ("H", 2),
-             5125: ("I", 4), 5126: ("f", 4)}
-COUNT = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+BASE = "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Suzanne/glTF/"
 
 
 def fetch(name):
@@ -36,23 +35,13 @@ def fetch(name):
         return r.read()
 
 
-def accessor(doc, blob, index):
-    acc = doc["accessors"][index]
-    view = doc["bufferViews"][acc["bufferView"]]
-    fmt, size = COMPONENT[acc["componentType"]]
-    n = COUNT[acc["type"]]
-    base = view.get("byteOffset", 0) + acc.get("byteOffset", 0)
-    stride = view.get("byteStride") or size * n
-    return [struct.unpack_from("<" + fmt * n, blob, base + k * stride) for k in range(acc["count"])]
-
-
 def main():
     doc = json.loads(fetch("Suzanne.gltf"))
     blob = fetch("Suzanne.bin")
     prim = doc["meshes"][0]["primitives"][0]
-    pos = accessor(doc, blob, prim["attributes"]["POSITION"])
-    nrm = accessor(doc, blob, prim["attributes"]["NORMAL"])
-    idx = [t[0] for t in accessor(doc, blob, prim["indices"])]
+    pos = gl.accessor(doc, blob, prim["attributes"]["POSITION"])
+    nrm = gl.accessor(doc, blob, prim["attributes"]["NORMAL"])
+    idx = [t[0] for t in gl.accessor(doc, blob, prim["indices"])]
 
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
     path = os.path.join(root, "docs", "samples", "suzanne.obj")

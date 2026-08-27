@@ -7,3 +7,4 @@ package.json
 package-lock.json
 docs/samples/*.data.json
 tests/*.data.json
+__pycache__/

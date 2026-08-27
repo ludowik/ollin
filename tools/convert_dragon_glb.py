@@ -18,64 +18,24 @@ What is kept: the dragon mesh ALONE. The source scene also holds a cloth backdro
 material extensions (transmission, volume) that Ollin's shader knows nothing about. Texture
 coordinates are dropped (nothing samples a texture) and no material is written, so the model
 carries its geometry only and the script's fill decides the colour — the same lesson as knot.obj
-and suzanne.obj. The node's scale and translation are BAKED into the vertices, so how raylib
+and suzanne.obj. The node's transform is BAKED into the vertices and the normals, so how raylib
 flattens a node hierarchy cannot change the result.
 
 Output is a .glb and not an .obj: the same geometry as OBJ text is roughly 6 MB, against 2.9 MB
 of packed floats here.
 """
-import json
 import os
-import struct
+import sys
 import urllib.request
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gltf_util as gl
 
 URL = ("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/"
        "Models/DragonAttenuation/glTF-Binary/DragonAttenuation.glb")
 MESH_NAME = "Dragon"
 
-COMPONENT = {5120: ("b", 1), 5121: ("B", 1), 5122: ("h", 2), 5123: ("H", 2),
-             5125: ("I", 4), 5126: ("f", 4)}
-COUNT = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
-
-
-def rotate(v, quat):
-    """Rotates a vector by a unit quaternion (x, y, z, w)."""
-    x, y, z, w = quat
-    vx, vy, vz = v
-    tx = 2.0 * (y * vz - z * vy)
-    ty = 2.0 * (z * vx - x * vz)
-    tz = 2.0 * (x * vy - y * vx)
-    return (vx + w * tx + (y * tz - z * ty),
-            vy + w * ty + (z * tx - x * tz),
-            vz + w * tz + (x * ty - y * tx))
-
-
-def read_glb(data):
-    """Splits a .glb into its JSON document and its binary chunk."""
-    magic, _, _ = struct.unpack_from("<4sII", data, 0)
-    if magic != b"glTF":
-        raise SystemExit("not a .glb file")
-    doc = blob = None
-    off = 12
-    while off < len(data):
-        length, kind = struct.unpack_from("<II", data, off)
-        chunk = data[off + 8:off + 8 + length]
-        if kind == 0x4E4F534A:
-            doc = json.loads(chunk)
-        elif kind == 0x004E4942:
-            blob = chunk
-        off += 8 + length + (-length % 4)
-    return doc, blob
-
-
-def accessor(doc, blob, index):
-    acc = doc["accessors"][index]
-    view = doc["bufferViews"][acc["bufferView"]]
-    fmt, size = COMPONENT[acc["componentType"]]
-    n = COUNT[acc["type"]]
-    base = view.get("byteOffset", 0) + acc.get("byteOffset", 0)
-    stride = view.get("byteStride") or size * n
-    return [struct.unpack_from("<" + fmt * n, blob, base + k * stride) for k in range(acc["count"])]
+MAX_VERTS = 65535   # raylib stores mesh indices as unsigned short (see the split below)
 
 
 def find_node(doc, name):
@@ -83,9 +43,6 @@ def find_node(doc, name):
         if node.get("name") == name and "mesh" in node:
             return node
     raise SystemExit(f"no node named {name!r} in the source scene")
-
-
-MAX_VERTS = 65535   # raylib stores mesh indices as unsigned short (see the split below)
 
 
 def split(pos, nrm, idx):
@@ -114,23 +71,14 @@ def split(pos, nrm, idx):
     return parts
 
 
-def write_glb(parts):
+def build(parts):
     """Packs the geometry-only parts into a .glb, with the Stanford credit in the asset metadata."""
-    blob = bytearray()
-    views = []
-
-    def view(data, target):
-        while len(blob) % 4:
-            blob.append(0)
-        views.append({"buffer": 0, "byteOffset": len(blob), "byteLength": len(data), "target": target})
-        blob.extend(data)
-        return len(views) - 1
-
+    out = gl.Blob()
     accessors, primitives = [], []
     for pos, nrm, idx in parts:
-        v_pos = view(b"".join(struct.pack("<3f", *p) for p in pos), 34962)
-        v_nrm = view(b"".join(struct.pack("<3f", *n) for n in nrm), 34962)
-        v_idx = view(b"".join(struct.pack("<H", i) for i in idx), 34963)
+        v_pos = out.floats(pos, 3)
+        v_nrm = out.floats(nrm, 3)
+        v_idx = out.ushorts(idx)
         base = len(accessors)
         accessors += [
             {"bufferView": v_pos, "componentType": 5126, "count": len(pos), "type": "VEC3",
@@ -153,27 +101,20 @@ def write_glb(parts):
         "nodes": [{"name": "Dragon", "mesh": 0}],
         "meshes": [{"name": "Dragon", "primitives": primitives}],
         "accessors": accessors,
-        "bufferViews": views,
-        "buffers": [{"byteLength": len(blob)}],
+        "bufferViews": out.views,
     }
-    js = json.dumps(doc, separators=(",", ":")).encode("utf-8")
-    js += b" " * (-len(js) % 4)                    # the JSON chunk is padded with SPACES
-    bn = bytes(blob) + b"\0" * (-len(blob) % 4)    # the BIN chunk with zeros
-    out = struct.pack("<4sII", b"glTF", 2, 12 + 8 + len(js) + 8 + len(bn))
-    out += struct.pack("<II", len(js), 0x4E4F534A) + js
-    out += struct.pack("<II", len(bn), 0x004E4942) + bn
-    return out
+    return gl.write_glb(doc, out.data)
 
 
 def main():
     with urllib.request.urlopen(URL) as r:
-        doc, blob = read_glb(r.read())
+        doc, blob = gl.read_glb(r.read())
 
     node = find_node(doc, MESH_NAME)
     prim = doc["meshes"][node["mesh"]]["primitives"][0]
-    pos = accessor(doc, blob, prim["attributes"]["POSITION"])
-    nrm = accessor(doc, blob, prim["attributes"]["NORMAL"])
-    idx = [t[0] for t in accessor(doc, blob, prim["indices"])]
+    pos = gl.accessor(doc, blob, prim["attributes"]["POSITION"])
+    nrm = gl.accessor(doc, blob, prim["attributes"]["NORMAL"])
+    idx = [t[0] for t in gl.accessor(doc, blob, prim["indices"])]
 
     # Bake the node transform: the source dragon lies on its back under a quarter turn about X.
     # The rotation applies to the normals as well; the UNIFORM scale does not, which is why a
@@ -184,13 +125,13 @@ def main():
     if "matrix" in node or not sx == sy == sz:
         raise SystemExit("the source node now carries a matrix or a non-uniform scale: "
                          "the normals would need the inverse-transpose")
-    pos = [tuple(c * sx + t for c, t in zip(rotate(p, quat), (tx, ty, tz))) for p in pos]
-    nrm = [rotate(n, quat) for n in nrm]
+    pos = [tuple(c * sx + t for c, t in zip(gl.rotate(p, quat), (tx, ty, tz))) for p in pos]
+    nrm = [gl.rotate(n, quat) for n in nrm]
 
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
     path = os.path.join(root, "docs", "samples", "dragon.glb")
     parts = split(pos, nrm, idx)
-    data = write_glb(parts)
+    data = build(parts)
     with open(path, "wb") as f:
         f.write(data)
     verts = sum(len(p[0]) for p in parts)
