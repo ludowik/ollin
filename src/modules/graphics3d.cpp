@@ -411,7 +411,13 @@ static void load_lit_shader() {
         // vertices being at ±0.5. The top vertices of the side faces follow the same value, so
         // there is no crack against the top face. The top normal is rebuilt from the slopes,
         // otherwise the relief would still look flat.
-        "    if (vp.y > 0.0) {\n"
+        //
+        // ⚠ The whole block is guarded by "this instance CARRIES corner heights", and not by the
+        // displacement being zero. Without that guard the normal rebuild ran for EVERY instanced
+        // mesh: on a sphere, every vertex of the upper cap (vn.y > 0.5) had its normal replaced by
+        // the vertical, so the cap was lit as a flat surface and a staircase seam appeared exactly
+        // where vn.y crosses 0.5 along the mesh's rings. Reported on the "Primitives 3D" example.
+        "    if (any(notEqual(instanceCorner, vec4(0.0))) && vp.y > 0.0) {\n"
         "        float u = vp.x + 0.5;\n"
         "        float v = vp.z + 0.5;\n"
         "        vp.y += mix(mix(instanceCorner.x, instanceCorner.y, u),\n"
