@@ -38,13 +38,6 @@ MESH_NAME = "Dragon"
 MAX_VERTS = 65535   # raylib stores mesh indices as unsigned short (see the split below)
 
 
-def find_node(doc, name):
-    for node in doc["nodes"]:
-        if node.get("name") == name and "mesh" in node:
-            return node
-    raise SystemExit(f"no node named {name!r} in the source scene")
-
-
 def split(pos, nrm, idx):
     """Cuts the geometry into parts of at most MAX_VERTS vertices, each with its own indices.
 
@@ -110,8 +103,8 @@ def main():
     with urllib.request.urlopen(URL) as r:
         doc, blob = gl.read_glb(r.read())
 
-    node = find_node(doc, MESH_NAME)
-    prim = doc["meshes"][node["mesh"]]["primitives"][0]
+    node = gl.mesh_node(doc, MESH_NAME)
+    prim = gl.only_primitive(doc, node)
     pos = gl.accessor(doc, blob, prim["attributes"]["POSITION"])
     nrm = gl.accessor(doc, blob, prim["attributes"]["NORMAL"])
     idx = [t[0] for t in gl.accessor(doc, blob, prim["indices"])]

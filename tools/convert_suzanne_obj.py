@@ -39,7 +39,7 @@ def fetch(name):
 def main():
     doc = json.loads(fetch("Suzanne.gltf"))
     blob = fetch("Suzanne.bin")
-    prim = doc["meshes"][0]["primitives"][0]
+    prim = gl.only_primitive(doc, gl.mesh_node(doc))
     pos = gl.accessor(doc, blob, prim["attributes"]["POSITION"])
     nrm = gl.accessor(doc, blob, prim["attributes"]["NORMAL"])
     idx = [t[0] for t in gl.accessor(doc, blob, prim["indices"])]

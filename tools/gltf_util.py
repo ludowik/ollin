@@ -1,8 +1,9 @@
 """Shared glTF plumbing for the model converters in this directory.
 
 Three scripts turn a borrowed asset into a sample model (Suzanne, the dragon, the helmet), and
-they all need the same four things: reading a .glb container, reading an accessor, rotating a
-vector, writing a .glb back. That is what lives here — nothing about any particular model.
+they all need the same plumbing: finding the mesh to convert, reading a .glb container, reading an
+accessor, rotating a vector, writing a .glb back. That is what lives here — nothing about any
+particular model.
 """
 import json
 import struct
@@ -53,6 +54,30 @@ def accessor(doc, blob, index):
     base = view.get("byteOffset", 0) + acc.get("byteOffset", 0)
     stride = view.get("byteStride") or size * n
     return [struct.unpack_from("<" + fmt * n, blob, base + k * stride) for k in range(acc["count"])]
+
+
+def mesh_node(doc, name=None):
+    """The node bearing the mesh to convert — by name, or the only one there is.
+
+    Never index the node list blindly: a source that gains a node would have the converter export
+    the wrong mesh without a word, or trip over a node that carries no mesh at all.
+    """
+    nodes = [n for n in doc["nodes"] if "mesh" in n]
+    if name is not None:
+        nodes = [n for n in nodes if n.get("name") == name]
+        if not nodes:
+            raise SystemExit(f"no node named {name!r} carries a mesh in the source scene")
+    elif len(nodes) != 1:
+        raise SystemExit(f"the source scene has {len(nodes)} mesh nodes, not one: name the wanted one")
+    return nodes[0]
+
+
+def only_primitive(doc, node):
+    """The single primitive of that node's mesh, refusing a mesh that has more than one."""
+    prims = doc["meshes"][node["mesh"]]["primitives"]
+    if len(prims) != 1:
+        raise SystemExit(f"the source mesh now has {len(prims)} primitives, not one")
+    return prims[0]
 
 
 def view_bytes(doc, blob, index):

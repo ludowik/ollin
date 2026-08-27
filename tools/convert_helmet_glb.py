@@ -38,8 +38,8 @@ def main():
     with urllib.request.urlopen(URL) as r:
         doc, blob = gl.read_glb(r.read())
 
-    node = doc["nodes"][0]
-    prim = doc["meshes"][node["mesh"]]["primitives"][0]
+    node = gl.mesh_node(doc)
+    prim = gl.only_primitive(doc, node)
     pos = gl.accessor(doc, blob, prim["attributes"]["POSITION"])
     nrm = gl.accessor(doc, blob, prim["attributes"]["NORMAL"])
     uvs = gl.accessor(doc, blob, prim["attributes"]["TEXCOORD_0"])
