@@ -137,6 +137,8 @@ ollin/
 │                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
 │                      docs/samples/suzanne.obj — lancé à la MAIN, réclame le réseau ; le script
 │                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
+│                      convert_dragon_glb.py (idem pour docs/samples/dragon.glb — dragon de
+│                      Stanford, licence NON commerciale, cf. plus bas),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
@@ -1068,10 +1070,18 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Quatre fichiers, chacun pour une raison distincte : `knot.obj` (géométrie seule, la teinte vient
+Cinq fichiers, chacun pour une raison distincte : `knot.obj` (géométrie seule, la teinte vient
 du `fill`), `cube_tex.glb` (glTF portant une TEXTURE), `armillary.glb` (glTF dont chaque maillage
-a SA couleur de matériau) et `suzanne.obj` (la masse : 3 936 triangles de vraie géométrie
-sculptée, ce que les trois autres n'ont pas).
+a SA couleur de matériau), `suzanne.obj` (3 936 triangles de vraie géométrie sculptée, ce que les
+trois autres n'ont pas) et `dragon.glb` (la masse : 91 216 triangles).
+
+**Un maillage raylib ne peut pas dépasser 65 535 sommets** : `Mesh` range ses indices en
+*unsigned short*, et le chargeur CONVERTIT un tampon d'indices 32 bits en 16 bits avec un simple
+avertissement. Le dragon (76 809 sommets d'un seul tenant) sortait donc en gerbe de triangles
+pointant n'importe où — constaté à l'écran, pas déduit. `tools/convert_dragon_glb.py` le découpe
+en primitives de 65 535 sommets au plus (deux ici, donc deux maillages et un appel de dessin de
+plus), ce qui est la seule correction possible côté données. Toute géométrie importée plus grosse
+que cela rencontrera la même limite.
 
 **Un modèle emprunté ne s'ajoute qu'avec sa provenance vérifiée et un script qui la rejoue.**
 `suzanne.obj` vient de `KhronosGroup/glTF-Sample-Assets`, © 2017 UX3D, par Norbert Nopper, sous
@@ -1081,6 +1091,16 @@ gardé quand même dans l'en-tête du `.obj`. La licence a été LUE avant de pr
 lui qui rend la provenance contrôlable au lieu d'un binaire mystérieux. Les coordonnées de texture
 sont écartées (rien n'échantillonne de texture ici) et les nombres sont à quatre décimales, comme
 `knot.obj`.
+
+`dragon.glb` est le dragon scanné par le **Stanford Computer Graphics Laboratory**, repris de la
+décimation de `KhronosGroup/glTF-Sample-Assets` (`DragonAttenuation`) par
+`tools/convert_dragon_glb.py`. Sa licence **n'est pas CC0** : elle exige le crédit, autorise la
+redistribution gratuite mais **interdit l'usage commercial sans autorisation** — restriction
+portée par ce seul fichier, à connaître avant d'en faire quoi que ce soit d'autre. Le crédit vit
+dans `asset.copyright` du glTF. Seul le maillage du dragon est repris (la scène d'origine a un
+fond de tissu et des extensions de verre que notre shader ignore), la rotation du nœud est cuite
+dans les sommets ET les normales (quart de tour autour de X ; l'échelle étant uniforme, elle ne
+touche pas les normales), et aucun matériau n'est écrit — le `fill` décide de la couleur.
 
 ## Affichage 3D + éclairage (graphics_module.cpp)
 
