@@ -150,6 +150,13 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
+- **Supprimer un projet synchronisé supprime AUSSI son dossier GitHub**, la case étant cochée par
+  défaut (`renderMenuDelete`, `GH.deleteRemoteProject`). Laisser la copie distante n'était pas une
+  décision mais un oubli, et il avait deux effets : le projet réapparaissait sous « Remote » dans
+  le menu d'ouverture, et son nom restait pris, la recherche de nom libre lisant aussi la liste
+  distante. La suppression distante passe AVANT la locale : si elle échoue, le projet reste entier
+  des deux côtés plutôt que de perdre sa copie locale en laissant un dossier orphelin. Décocher
+  garde la copie GitHub (libérer la place locale sans perdre la sauvegarde).
 - Modules partagés : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur).
 
 **Formateur (`pg-format.js`)** : réindentation ligne par ligne, sans AST. Deux règles à

@@ -197,6 +197,44 @@ export function folderMoved(current, known) {
   return current !== null && current !== (known || null)
 }
 
+// Deletes a project's remote folder, in ONE commit, exactly as a push carries its deletions: the
+// blobs under `<slug>/` are given sha:null in a tree built on the current one. It returns the
+// number of files removed, and 0 when the folder was already absent — deleting twice is therefore
+// harmless, and nothing is committed for nothing.
+//
+// A rename is covered too: the caller passes the slugs it knows (the current id and, when they
+// differ, project.remote.slug), the folder having been pushed under either of them.
+export async function deleteRemoteProject(slugs, message) {
+  const list = (Array.isArray(slugs) ? slugs : [slugs]).filter(Boolean)
+  if (!list.length) return 0
+  const { owner, repo, base } = await ctx()
+  const info = await ghJson(base)
+  const branch = info.default_branch || 'main'
+  const refRes = await gh(`${base}/git/ref/heads/${branch}`)
+  if (!refRes.ok) return 0   // an empty repository holds nothing to delete
+  const ref = await refRes.json()
+  const baseSha = ref.object.sha
+  const baseCommit = await ghJson(`${base}/git/commits/${baseSha}`)
+  const { tree: remoteTree } = await fullTree({ owner, repo, base, branch })
+
+  const scan = new Set(list)
+  const tree = []
+  for (const e of remoteTree) {
+    if (e.type !== 'blob') continue
+    if (!scan.has(e.path.split('/')[0])) continue
+    tree.push({ path: e.path, mode: '100644', type: 'blob', sha: null })
+  }
+  if (!tree.length) return 0
+
+  const newTree = await ghJson(`${base}/git/trees`, { method: 'POST', body: { base_tree: baseCommit.tree.sha, tree } })
+  const commit = await ghJson(`${base}/git/commits`, {
+    method: 'POST',
+    body: { message: message || `ollin: delete ${list[0]}`, tree: newTree.sha, parents: [baseSha] },
+  })
+  await ghJson(`${base}/git/refs/heads/${branch}`, { method: 'PATCH', body: { sha: commit.sha } })
+  return tree.length
+}
+
 // Pulling a project.
 export async function pullProject(slug) {
   const { owner, repo, base, branch, tree } = await fullTree()

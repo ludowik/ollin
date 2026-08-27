@@ -1377,14 +1377,14 @@ function renderMenuRoot() {
       await autoPushNewProject(copy)   // with a repository set, it is created on GitHub
       await switchProject(copy.id)
     }))
-    projectMenu.appendChild(menuItem('🗑 Delete', false, async () => {
-      if (!confirm(`Delete the project "${currentProject.name}"?`)) return
-      const gone = currentProject.id
-      await Store.deleteProject(gone)
-      const list = await Store.listProjects()
-      closeMenu()
-      if (list.length) await loadProject(list[0].id)
-      else { const p = await Store.createProject('Untitled'); await loadProject(p.id) }
+    // A project pushed to GitHub is deleted THERE TOO, the checkbox being ticked: leaving the
+    // remote folder behind was not a decision but an omission, and it had consequences — the
+    // project came back under "Remote" in the open menu, and its name stayed taken, the free-name
+    // check reading the remote list as well. Unticking keeps the GitHub copy, which is the way to
+    // free the local space while keeping a backup.
+    projectMenu.appendChild(menuItem('🗑 Delete', hasRemote(currentProject), () => {
+      if (hasRemote(currentProject)) renderMenuDelete()
+      else if (confirm(`Delete the project "${currentProject.name}"?`)) deleteCurrent(false)
     }))
   }
 
@@ -1393,6 +1393,61 @@ function renderMenuRoot() {
   projectMenu.appendChild(menuItem(ghLabel, true, renderMenuGithub))
   projectMenu.appendChild(menuSep())
   projectMenu.appendChild(menuItem('⌨ Keyboard shortcuts (F1)', false, () => { closeMenu(); openHelp() }))
+}
+
+// Is this project pushed to a repository we can still reach? Deleting the remote copy is only
+// offered then: without a token or a repository there is nothing to delete, and the local delete
+// keeps its plain confirmation.
+function hasRemote(p) {
+  return !!(p && p.remote && p.remote.slug && GH.isConnected() && GH.getRepo())
+}
+
+// Deletes the project on display: locally always, and on GitHub when asked. The remote deletion
+// comes FIRST: should it fail, the project stays whole on both sides rather than losing its local
+// copy and keeping an orphan folder.
+async function deleteCurrent(alsoRemote) {
+  const gone = currentProject
+  if (alsoRemote) {
+    setStatus('Deleting on GitHub…')
+    const slugs = [gone.id]
+    if (gone.remote && gone.remote.slug && gone.remote.slug !== gone.id) slugs.push(gone.remote.slug)
+    try {
+      await GH.deleteRemoteProject(slugs, `ollin: delete ${gone.name}`)
+    } catch (e) {
+      setStatus('GitHub: ' + e.message, true, true)
+      return false
+    }
+  }
+  await Store.deleteProject(gone.id)
+  const list = await Store.listProjects()
+  closeMenu()
+  if (list.length) await loadProject(list[0].id)
+  else { const p = await Store.createProject('Untitled'); await loadProject(p.id) }
+  setStatus(alsoRemote ? 'Project deleted, GitHub included ✓' : 'Project deleted locally ✓', true)
+  return true
+}
+
+// The confirmation for a synchronised project: what is about to be deleted is named, and the
+// GitHub copy is included by DEFAULT — which is what one expects of a delete, and what the rest
+// of the sync already does (a rename removes the old folder).
+function renderMenuDelete() {
+  const p = currentProject
+  projectMenu.innerHTML = ''
+  projectMenu.appendChild(menuHeader('Delete “' + p.name + '”', renderMenuRoot))
+  const wrap = document.createElement('div'); wrap.className = 'menu-form'
+  const info = document.createElement('div'); info.className = 'menu-info'
+  info.innerHTML = 'This project is synchronised with <b>' + (p.remote.repo || 'GitHub')
+    + '</b>. Its folder <b>' + p.id + '/</b> will be removed in one commit; the repository\'s history keeps it.'
+  const see = document.createElement('label'); see.className = 'menu-check'
+  const box = document.createElement('input'); box.type = 'checkbox'; box.checked = true
+  see.append(box, document.createTextNode('Delete the GitHub copy too'))
+  const btn = document.createElement('button'); btn.className = 'menu-btn'; btn.textContent = 'Delete'
+  btn.addEventListener('click', async () => {
+    btn.disabled = true
+    if (!await deleteCurrent(box.checked)) btn.disabled = false
+  })
+  wrap.append(info, see, btn)
+  projectMenu.appendChild(wrap)
 }
 
 // The GitHub sub-menu gathers every feature (connecting, the repository, pushing and pulling,
@@ -1475,7 +1530,7 @@ async function renderMenuOpen() {
     const remote = await GH.listRemoteProjects()
     render(remote.filter(r => !localSlugs.has(r.slug)), null)
   } catch (e) {
-    render([], info('Distant indisponible : ' + e.message))
+    render([], info('Remote unavailable: ' + e.message))
   }
 }
 
