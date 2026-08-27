@@ -1,0 +1,17 @@
+// GENERATED at CMake configure time from src/shaders/*.glsl — do not edit; edit the .glsl files.
+//
+// Why generated rather than read at runtime: the shaders are EMBEDDED, like the engine fonts.
+// Nothing has to be found on disk when a program runs, so the rendering is identical on every
+// target, WASM included, and no build option can change it.
+//
+// The "#version" line is deliberately absent from the .glsl files: it depends on the target
+// (300 es under emscripten, 330 elsewhere) and load_lit_shader prepends it.
+#pragma once
+
+inline const char* const k_lit_vertex_src = R"GLSL(
+@OLLIN_LIT_VERT@
+)GLSL";
+
+inline const char* const k_lit_fragment_src = R"GLSL(
+@OLLIN_LIT_FRAG@
+)GLSL";

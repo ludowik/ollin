@@ -120,6 +120,7 @@ ollin/
 │   ├── vm.h/.cpp
 │   ├── source_registry.h/.cpp  registre de sources en mémoire (imports, playground)
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
+│   ├── shaders/       lit.vert / lit.frag — le GLSL de la 3D, EMBARQUÉ (cf. « Shaders »)
 │   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
 │   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
 │   │                  image (+ image_stub), ui (+ ui_stub), tween, + modules.h/.cpp, module_utils.h
@@ -1033,6 +1034,32 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 - **Canvas implicite** : `VM::runEntryHooks()` — si un `draw()` existe et que `graphics` est un module (pas le stub), mais que `graphics.canvas()` n'a **pas** été appelé (drapeau `VM::gfxCanvasCreated()`, posé par `gfx_canvas` via `markGfxCanvas()`), le moteur appelle `graphics.canvas(W, H)` → une session graphique démarre sur la seule présence de `draw()`. **Fait APRÈS `setup()`** : `setup()` est un endroit courant pour appeler `canvas()` soi-même ; le créer avant provoquerait un **double `InitWindow`** (crash « memory access out of bounds » en WASM). Le drapeau vit sur le VM (neuf à chaque run playground) → détection fiable même avec le contexte WebGL réutilisé.
 
 **Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
+
+## Shaders (src/shaders/)
+
+Le GLSL vit dans **`src/shaders/lit.vert` et `lit.frag`**, pas dans du C++. Il est **embarqué** :
+`CMakeLists.txt` lit ces fichiers à la CONFIGURATION (`file(READ)` + `configure_file` sur
+`src/modules/shader_sources.h.in`) et les colle dans un header généré,
+`${CMAKE_BINARY_DIR}/generated/shader_sources.h`, sous forme de chaîne brute. Rien n'est lu sur
+le disque à l'exécution — même principe que les polices : le rendu est identique sur toutes les
+cibles, WASM comprise, et aucune option de build ne peut le changer.
+
+- **La ligne `#version` n'est PAS dans les `.glsl`** : elle dépend de la cible (`300 es` sous
+  emscripten, `330` ailleurs) et `load_lit_shader` la préfixe. C'est le seul morceau de GLSL
+  resté en C++.
+- **Éditer un `.glsl` suffit** : `CMAKE_CONFIGURE_DEPENDS` relance la configuration
+  automatiquement au rebuild, sans appeler `cmake` à la main (vérifié en changeant l'ambiante
+  du fragment et en constatant le changement à l'écran après un simple `cmake --build`).
+- Les identifiants GLSL (`fragTexCoord`, `instanceTransform`…) sont en camelCase et échappent aux
+  conventions C++ : `check_naming.sh` ne parcourt que `src/**/*.cpp` et `src/**/*.h`, donc ni les
+  `.glsl` ni le `.h.in`. Le header généré vit dans `build*/`, ignoré par git.
+- **Un seul couple de shaders** pour toute la 3D. Il porte cinq sujets — éclairage Blinn-Phong,
+  atlas de tuiles, eau animée, hauteurs de coin, test alpha du feuillage. Chaque instance
+  transporte donc 7 flottants (tuile + coins) même quand elle n'en fait rien, et le fragment teste
+  `fragTile.x >= 0` à chaque pixel. C'est une **dette assumée** : séparer en variantes ferait
+  entrer le programme dans la clé de regroupement des instances (aujourd'hui `(maillage, texture)`),
+  donc un tri et des changements d'état en cours de frame. Seuil de bascule : une **sixième**
+  fonctionnalité, ou un attribut d'instance supplémentaire.
 
 ## Affichage 3D + éclairage (graphics_module.cpp)
 

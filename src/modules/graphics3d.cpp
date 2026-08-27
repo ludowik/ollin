@@ -2,6 +2,7 @@
 // transforms live in graphics_module.cpp; the boundary between the two units is
 // graphics_internal.h. Compiled only in the raylib/WASM builds.
 #include "graphics_internal.h"
+#include "shader_sources.h"
 #include "graphics_quat.h"
 #include "image_module.h"
 #include "module_utils.h"
@@ -388,114 +389,11 @@ static void load_lit_shader() {
 #else
     const char* HDR = "#version 330\n";
 #endif
-    std::string vs = std::string(HDR) +
-        "in vec3 vertexPosition;\n"
-        "in vec2 vertexTexCoord;\n"
-        "in vec3 vertexNormal;\n"
-        "in mat4 instanceTransform;\n"
-        "in vec4 instanceColor;\n"
-        "in vec3 instanceTile;\n"
-        "in vec4 instanceCorner;\n"
-        "uniform mat4 mvp;\n"
-        "out vec3 fragPosition;\n"
-        "out vec2 fragTexCoord;\n"
-        "out vec4 fragColor;\n"
-        "out vec3 fragNormal;\n"
-        "flat out vec3 fragTile;\n"
-        "void main() {\n"
-        "    mat4 m = instanceTransform;\n"
-        "    vec3 vp = vertexPosition;\n"
-        "    vec3 vn = vertexNormal;\n"
-            // Corner heights (instanceCorner, in LOCAL units): the TOP vertices rise by the
-        // bilinear interpolation of the four corners — exact at the corners, the unit mesh's
-        // vertices being at ±0.5. The top vertices of the side faces follow the same value, so
-        // there is no crack against the top face. The top normal is rebuilt from the slopes,
-        // otherwise the relief would still look flat.
-        //
-        // ⚠ The whole block is guarded by "this instance CARRIES corner heights", and not by the
-        // displacement being zero. Without that guard the normal rebuild ran for EVERY instanced
-        // mesh: on a sphere, every vertex of the upper cap (vn.y > 0.5) had its normal replaced by
-        // the vertical, so the cap was lit as a flat surface and a staircase seam appeared exactly
-        // where vn.y crosses 0.5 along the mesh's rings. Reported on the "Primitives 3D" example.
-        "    if (any(notEqual(instanceCorner, vec4(0.0))) && vp.y > 0.0) {\n"
-        "        float u = vp.x + 0.5;\n"
-        "        float v = vp.z + 0.5;\n"
-        "        vp.y += mix(mix(instanceCorner.x, instanceCorner.y, u),\n"
-        "                    mix(instanceCorner.z, instanceCorner.w, u), v);\n"
-        "        if (vn.y > 0.5) {\n"
-        "            float dhx = (instanceCorner.y + instanceCorner.w - instanceCorner.x - instanceCorner.z) * 0.5;\n"
-        "            float dhz = (instanceCorner.z + instanceCorner.w - instanceCorner.x - instanceCorner.y) * 0.5;\n"
-        "            vn = normalize(vec3(-dhx, 1.0, -dhz));\n"
-        "        }\n"
-        "    }\n"
-        "    vec4 wp = m * vec4(vp, 1.0);\n"
-        "    fragPosition = wp.xyz;\n"
-        "    fragTexCoord = vertexTexCoord;\n"
-        "    fragColor = instanceColor;\n"
-        "    fragTile = instanceTile;\n"
-        "    mat3 nm = transpose(inverse(mat3(m)));\n"   // the normal matrix: correct under a rotation or a non-uniform scale
-        "    fragNormal = normalize(nm * vn);\n"
-        "    gl_Position = mvp * wp;\n"
-        "}\n";
-    std::string fs = std::string(HDR) +
-        "in vec3 fragPosition;\n"
-        "in vec2 fragTexCoord;\n"
-        "in vec4 fragColor;\n"
-        "in vec3 fragNormal;\n"
-        "flat in vec3 fragTile;\n"
-        "uniform sampler2D texture0;\n"
-        "uniform vec2 atlasGrid;\n"
-        "uniform float uTime;\n"
-        "uniform float animTile;\n"
-        "uniform vec4 animParams;\n"
-        "uniform vec4 ambient;\n"
-        "uniform vec3 viewPos;\n"
-        "struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };\n"
-        "uniform Light light0;\n"
-        "out vec4 finalColor;\n"
-        "void main() {\n"
-        "    vec4 texel;\n"
-        "    if (fragTile.x >= 0.0) {\n"                 // an atlas cube: the tile follows the face, from the normal
-        "        float t = fragTile.y;\n"                //   the side face by default
-        "        if (fragNormal.y > 0.5) t = fragTile.x;\n"   // the top face
-        "        else if (fragNormal.y < -0.5) t = fragTile.z;\n" // the bottom face
-        "        float cols = atlasGrid.x;\n"
-        "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
-        "        vec2 uv = fract(fragTexCoord);\n"
-        "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) {\n"           // the animated tile, water: scrolling plus a sine ripple
-        "            float sc = animParams.x; float ws = animParams.y;\n"        //   sc is the scroll, ws the wave speed
-        "            float wf = animParams.z; float wa = animParams.w;\n"        //   wf is the spatial frequency, wa the amplitude
-        "            uv = fract(uv + vec2(uTime * sc + sin(uTime * ws + fragPosition.z * wf) * wa,\n" // the phase in WORLD coordinates (fragPosition)
-        "                                 uTime * sc * 0.66 + cos(uTime * ws * 0.8 + fragPosition.x * wf) * wa));\n" // it carries on from one tile to the next
-        "        }\n"
-        "        uv = clamp(uv, 0.002, 0.998);\n"        // a slight inset, which avoids bleeding between tiles
-        "        vec2 auv = (cell + uv) / atlasGrid;\n"
-        "        texel = texture(texture0, auv);\n"
-        // Alpha test (pierced foliage): a hole in the TILE pierces the cube. Sharp rather than
-        // faded, hence independent of draw order — the cubes stay opaque and need no sorting.
-        // Limited to the atlas path: a semi-transparent texture laid on a model keeps its fade.
-        "        if (texel.a < 0.5) discard;\n"
-        "    } else {\n"                                 // the ordinary path: models, and the immediate texture
-        "        texel = texture(texture0, fragTexCoord);\n"
-        "    }\n"
-        "    vec4 tint = fragColor;\n"
-        "    vec3 base = (texel * tint).rgb;\n"
-        "    vec3 normal = normalize(fragNormal);\n"
-        "    vec3 result = base * ambient.rgb;\n"
-        "    if (light0.enabled == 1) {\n"
-        "        vec3 l;\n"
-        "        if (light0.type == 0) l = -normalize(light0.target - light0.position);\n"
-        "        else l = normalize(light0.position - fragPosition);\n"
-        "        float ndl = max(dot(normal, l), 0.0);\n"
-        "        result += base * light0.color.rgb * ndl;\n"
-        "        if (ndl > 0.0) {\n"
-        "            vec3 viewD = normalize(viewPos - fragPosition);\n"
-        "            float spec = pow(max(dot(viewD, reflect(-l, normal)), 0.0), 16.0);\n"
-        "            result += light0.color.rgb * spec * 0.3;\n"
-        "        }\n"
-        "    }\n"
-        "    finalColor = vec4(result, texel.a * tint.a);\n"
-        "}\n";
+    // The GLSL lives in src/shaders/lit.vert and lit.frag, pasted into a generated header at
+    // configure time (see CMakeLists). Only the version line, which depends on the target, is
+    // added here.
+    std::string vs = std::string(HDR) + k_lit_vertex_src;
+    std::string fs = std::string(HDR) + k_lit_fragment_src;
     s_lit = LoadShaderFromMemory(vs.c_str(), fs.c_str());
     if (s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] <= 0) {
         s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] = GetShaderLocationAttrib(s_lit, "instanceTransform");
