@@ -1,11 +1,13 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
-## The "Model" menu switches between the three, which cover the three ways a file can carry its
+## The "Model" menu switches between them, covering the three ways a file can carry its
 ## appearance: an .obj holds its geometry ALONE and the fill tints it; a .glb may hold a TEXTURE;
 ## and a .glb may instead give each of its meshes its OWN material colour, which drawModel reads
-## per mesh — a white fill then shows the model's real colours. In the playground, add your file
-## under "Resources" and extend the list below.
+## per mesh — a white fill then shows the model's real colours. Suzanne, the Blender mascot, is
+## there for the size the others do not have: nearly four thousand triangles of real sculpted
+## geometry (public domain, see her .obj header). In the playground, add your file under
+## "Resources" and extend the list below.
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.
@@ -18,7 +20,8 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global models = [
     {name: "Knot (.obj)", file: "knot.obj", tint: colors.ORANGE, ambient: 0.25, margin: 1.15, height: 0.15},
     {name: "Textured cube (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
-    {name: "Armillary sphere (.glb)", file: "armillary.glb", tint: colors.WHITE, ambient: 0.45, margin: 1.25, height: 0.15}
+    {name: "Armillary sphere (.glb)", file: "armillary.glb", tint: colors.WHITE, ambient: 0.45, margin: 1.25, height: 0.15},
+    {name: "Suzanne (.obj)", file: "suzanne.obj", tint: colors.GRAY, ambient: 0.3, margin: 1.1, height: 0.1}
 ]
 global current = nil   ## the entry on display
 global sz = nil       ## the model's dimensions, for the framing

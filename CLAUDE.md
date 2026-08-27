@@ -134,6 +134,9 @@ ollin/
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
 │                      gen_model_glb.py (engendre docs/samples/armillary.glb — lancé à la MAIN, le
 │                      .glb est commité ; modèle À NOUS, donc aucune licence tierce à honorer),
+│                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
+│                      docs/samples/suzanne.obj — lancé à la MAIN, réclame le réseau ; le script
+│                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
@@ -1062,6 +1065,22 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   entrer le programme dans la clé de regroupement des instances (aujourd'hui `(maillage, texture)`),
   donc un tri et des changements d'état en cours de frame. Seuil de bascule : une **sixième**
   fonctionnalité, ou un attribut d'instance supplémentaire.
+
+## Modèles 3D des exemples (docs/samples)
+
+Quatre fichiers, chacun pour une raison distincte : `knot.obj` (géométrie seule, la teinte vient
+du `fill`), `cube_tex.glb` (glTF portant une TEXTURE), `armillary.glb` (glTF dont chaque maillage
+a SA couleur de matériau) et `suzanne.obj` (la masse : 3 936 triangles de vraie géométrie
+sculptée, ce que les trois autres n'ont pas).
+
+**Un modèle emprunté ne s'ajoute qu'avec sa provenance vérifiée et un script qui la rejoue.**
+`suzanne.obj` vient de `KhronosGroup/glTF-Sample-Assets`, © 2017 UX3D, par Norbert Nopper, sous
+**CC0 1.0 Universal** — domaine public, donc aucune obligation d'attribution, et le crédit est
+gardé quand même dans l'en-tête du `.obj`. La licence a été LUE avant de prendre le fichier.
+`tools/convert_suzanne_obj.py` retélécharge la source et refait la conversion glTF → OBJ : c'est
+lui qui rend la provenance contrôlable au lieu d'un binaire mystérieux. Les coordonnées de texture
+sont écartées (rien n'échantillonne de texture ici) et les nombres sont à quatre décimales, comme
+`knot.obj`.
 
 ## Affichage 3D + éclairage (graphics_module.cpp)
 
