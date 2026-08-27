@@ -901,6 +901,12 @@ static void apply_light_from_instance(const Value& self) {
     float x = (float)inst_field(self, "dx", 0.0);
     float y = (float)inst_field(self, "dy", -1.0);
     float z = (float)inst_field(self, "dz", 0.0);
+    // A directional light with a NULL direction is refused: the shader would compute
+    // normalize(vec3(0)), which is undefined — measured as "the light contributes nothing" on one
+    // driver, but nothing guarantees that elsewhere. A meaningless argument is refused, never
+    // silently ignored. A point light has no such case: its position is a place, not a direction.
+    if (type == 0 && x == 0.0f && y == 0.0f && z == 0.0f)
+        throw std::runtime_error("graphics.light: a directional light needs a direction, and (0, 0, 0) is none");
     s_light_type = type;
     if (type == 1) {
         s_light_pos = Vector3{x, y, z};
