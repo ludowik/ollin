@@ -325,7 +325,6 @@ export async function pushProject(project, message, opts = {}) {
     }
   }
   const oldSlug = project.remote && project.remote.slug
-  const trackedSlug = oldSlug || slug
 
   // No conflict guard here: the sync model (the `dirty` flag, single-person use) makes the LOCAL
   // side authoritative on a push. Reconciling with a divergent remote happens on OPENING
