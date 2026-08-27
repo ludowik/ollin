@@ -1672,7 +1672,7 @@ async function autoPushNewProject(p) {
   setStatus('Creating on GitHub…')
   try {
     await GH.ensureRepo()
-    await GH.pushProject(p, null, {})
+    await GH.pushProject(p, null)
     p.dirty = false   // freshly pushed, hence synchronised
     await Store.saveProject(p)   // persiste project.remote (slug, folderSha) + dirty
     setStatus('Project created on GitHub ✓', true)
@@ -1704,7 +1704,7 @@ function canAutoPush(p) {
 async function sharedRemotePush(project) {
   if (project === currentProject) setSyncDot('syncing')
   await GH.ensureRepo()
-  await GH.pushProject(project, null, {})   // sets project.remote (slug, folderSha)
+  await GH.pushProject(project, null)   // sets project.remote (slug, folderSha)
   project.dirty = false
   await Store.saveProject(project)
   if (project === currentProject) {

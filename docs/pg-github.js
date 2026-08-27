@@ -301,7 +301,7 @@ export async function pullProject(slug) {
 // Pushing a project: it makes the `<slug>/` folder identical to the local project, in ONE atomic
 // commit (the Git Data API). Additions, edits AND deletions are carried over; and if the project
 // has been renamed (remote.slug differs from slug), the old folder is deleted too.
-export async function pushProject(project, message, opts = {}) {
+export async function pushProject(project, message) {
   const { owner, repo, base } = await ctx()
   const info = await ghJson(base)
   const branch = info.default_branch || 'main'

@@ -29,7 +29,7 @@
 //   async getUser() ; async ensureRepo()
 //   async listRemoteProjects()                  → [{slug,name}]
 //   async pullProject(slug)                     → a project, in the same model as the local one
-//   async pushProject(project, message, opts)   → project.remote (repo/branch/slug/sha)
+//   async pushProject(project, message)         → project.remote (repo/branch/slug/sha)
 //   async remoteFolderSha(slug) ; folderMoved(current, known)
 //
 // The project MODEL ({id,name,entry,files{},resources{}} plus the real `ollin.project.json`
@@ -86,7 +86,7 @@ function preferred(key, kinds, fallback) {
 export async function getProvider(v, kind) {
   const k = kind || preferred(STORE_PREF_KEY, STORE_KINDS, STORE_DEFAULT)
   const path = STORE_KINDS[k]
-  if (!path) throw new Error('Fournisseur de stockage inconnu : ' + k)
+  if (!path) throw new Error('Unknown storage provider: ' + k)
   return assertContract(await import(`${path}?v=${v}`), STORE_CONTRACT, `store:${k}`)
 }
 
@@ -94,7 +94,7 @@ export async function getProvider(v, kind) {
 export async function getRemote(v, kind) {
   const k = kind || preferred(REMOTE_PREF_KEY, REMOTE_KINDS, REMOTE_DEFAULT)
   const path = REMOTE_KINDS[k]
-  if (!path) throw new Error('Fournisseur distant inconnu : ' + k)
+  if (!path) throw new Error('Unknown remote provider: ' + k)
   return assertContract(await import(`${path}?v=${v}`), REMOTE_CONTRACT, `remote:${k}`)
 }
 
@@ -107,10 +107,10 @@ export function listRemoteKinds() {
 
 // Persistent backend switch: it writes the preference read by getProvider and getRemote.
 export function setStoreKind(kind) {
-  if (!STORE_KINDS[kind]) throw new Error('Fournisseur de stockage inconnu : ' + kind)
+  if (!STORE_KINDS[kind]) throw new Error('Unknown storage provider: ' + kind)
   localStorage.setItem(STORE_PREF_KEY, kind)
 }
 export function setRemoteKind(kind) {
-  if (!REMOTE_KINDS[kind]) throw new Error('Fournisseur distant inconnu : ' + kind)
+  if (!REMOTE_KINDS[kind]) throw new Error('Unknown remote provider: ' + kind)
   localStorage.setItem(REMOTE_PREF_KEY, kind)
 }
