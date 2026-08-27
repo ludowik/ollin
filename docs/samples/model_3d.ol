@@ -1,14 +1,13 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
-## The "Model" menu switches between them, covering the three ways a file can carry its
-## appearance: an .obj holds its geometry ALONE and the fill tints it; a .glb may hold a TEXTURE;
-## and a .glb may instead give each of its meshes its OWN material colour, which drawModel reads
-## per mesh — a white fill then shows the model's real colours. The last three are borrowed
-## classics, each bringing its own weight: Suzanne, the Blender mascot, four thousand triangles of
-## sculpted geometry; the Stanford dragon, ninety thousand; the damaged helmet, a real painted
-## texture over that geometry. Each file's own header carries its source and its credit. In the
-## playground, add your file under "Resources" and extend the list below.
+## The "Model" menu switches between them, covering the two ways a file can carry its appearance:
+## a model may hold its geometry ALONE, and then the fill tints it, or it may hold a TEXTURE, and
+## then a white fill shows it as painted. Three of them are borrowed classics, each bringing its
+## own weight: Suzanne, the Blender mascot, four thousand triangles of sculpted geometry; the
+## Stanford dragon, ninety thousand; the damaged helmet, a real painted texture over that geometry.
+## Each file's own header carries its source and its credit. In the playground, add your file under
+## "Resources" and extend the list below.
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.
@@ -20,7 +19,6 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 ## rest of the program does not depend on it.
 global models = [
     {name: "Textured cube (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
-    {name: "Armillary sphere (.glb)", file: "armillary.glb", tint: colors.WHITE, ambient: 0.45, margin: 1.25, height: 0.15},
     {name: "Suzanne (.obj)", file: "suzanne.obj", tint: colors.GRAY, ambient: 0.3, margin: 1.1, height: 0.1},
     {name: "Stanford dragon (.glb)", file: "dragon.glb", tint: colors.GRAY, ambient: 0.3, margin: 1.15, height: 0.15},
     {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.15, height: 0.1}

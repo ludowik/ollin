@@ -14,7 +14,7 @@ asset checkable instead of a mystery binary.
 
 Why .obj and not the original glTF: the "3D models" example teaches that an .obj carries its
 GEOMETRY ALONE, with no material, so the script's fill decides the colour — cube_tex.glb and
-armillary.glb already cover the textured and the multi-material glTF paths.
+helmet.glb already cover the textured path.
 
 Texture coordinates are dropped for the same reason (nothing samples a texture here), and
 positions and normals are written with four decimals — enough for a display model, and it halves

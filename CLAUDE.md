@@ -132,8 +132,6 @@ ollin/
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
-│                      gen_model_glb.py (engendre docs/samples/armillary.glb — lancé à la MAIN, le
-│                      .glb est commité ; modèle À NOUS, donc aucune licence tierce à honorer),
 │                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
 │                      docs/samples/suzanne.obj — lancé à la MAIN, réclame le réseau ; le script
 │                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
@@ -1073,10 +1071,15 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Cinq fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
-`armillary.glb` (glTF dont chaque maillage a SA couleur de matériau), `suzanne.obj` (géométrie
-seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie
-texture peinte SUR de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible).
+Quatre fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
+`suzanne.obj` (géométrie seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie
+sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie texture peinte SUR
+de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible).
+
+**Plus aucun modèle ne porte une couleur de matériau PAR MAILLAGE** : `armillary.glb` était le
+seul, et il a été retiré à la demande de l'utilisateur. Le chemin existe toujours dans
+`drawModel` (la couleur diffuse est lue par maillage et multipliée par le `fill`), mais il n'est
+plus exercé par aucun exemple — c'est un trou de couverture connu, pas un oubli.
 
 **Les trois convertisseurs partagent `tools/gltf_util.py`** — lecture d'un conteneur `.glb`,
 lecture d'un accesseur, rotation par quaternion, écriture d'un `.glb`. Chacun avait recopié les
