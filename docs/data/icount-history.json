@@ -1,7 +1,7 @@
 {
  "_": "History of the engine WORK, in executed instructions. Produced by bench/icount.sh (callgrind), one milestone per day on which the core was touched. Read by docs/views/perf.js. To extend the series, append entries to milestones.",
  "tool": "bench/icount.sh",
- "machine": "conteneur Linux x86-64, GCC, build Release",
+ "machine": "Linux x86-64 container, GCC, Release build",
  "scripts": [
   {
    "id": "fib",
@@ -186,7 +186,7 @@
    "fib": 93792050,
    "loop": 33748188,
    "map": 52558254,
-   "subject": "BuiltinFn vers CallCtx"
+   "subject": "BuiltinFn to CallCtx"
   },
   {
    "date": "2026-07-20",

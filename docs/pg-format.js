@@ -31,7 +31,7 @@ function bareCode(s) {
       i++; continue
     }
     if (c === '"') { inStr = true; i++; continue }
-    if (c === '#' && s[i + 1] === '#') break   // ## ou ### → reste = commentaire
+    if (c === '#' && s[i + 1] === '#') break   // ## or ###: the rest of the line is a comment
     r += c; i++
   }
   return r
@@ -80,7 +80,7 @@ export function formatOllin(src) {
       } else {
         if (top() === 'case') popBlock()            // the end of a case body
         if (st.length === 0) return { ok: false, error: 'an "end" with no block open' }
-        const closed = popBlock()                   // ferme le bloc/switch
+        const closed = popBlock()                   // closes the block or switch
         // `end` aligns with the line that opened the block: its absorbed delimiters still
         // count, since they are only closed here (`end)`).
         show = level() - closed.absorb

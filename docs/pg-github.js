@@ -41,7 +41,7 @@ export function getRepo() {
 export function setRepo(v) {
   const s = (v || '').trim()
   if (!s) { localStorage.removeItem(REPO_KEY); return }
-  if (!s.includes('/')) throw new Error('Format invalide — utilise owner/repo (ex. moncompte/ollin-projects)')
+  if (!s.includes('/')) throw new Error('Invalid format — use owner/repo (myaccount/ollin-projects, for one)')
   localStorage.setItem(REPO_KEY, s)
 }
 

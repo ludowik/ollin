@@ -195,7 +195,7 @@ void keyboard_poll() {
 }
 
 // The `keyboard` module exposes isDown(); the user additionally assigns
-// keypressed / keyrelease, lues par keyboardPoll().
+// keypressed / keyrelease, read by keyboard_poll().
 Value make_keyboard_module() {
     Value m = Value::make_map();
     m.map_set(Value(std::string("isDown")), Value::make_builtin(kbd_is_down));

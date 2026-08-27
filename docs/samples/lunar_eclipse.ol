@@ -256,7 +256,7 @@ func drawMarks()
     graphics.fontSize(H * 0.022)
     graphics.text("penumbra", CW + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
     graphics.stroke(Color(0.85, 0.5, 0.4, 0.9))
-    graphics.text("ombre", CW + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
+    graphics.text("shadow", CW + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
 end
 
 func draw()

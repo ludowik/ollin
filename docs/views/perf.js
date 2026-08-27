@@ -70,7 +70,7 @@ export async function init(ctx) {
 
   const MILESTONES = doc.milestones;
   const SERIES = doc.scripts.map(s => ({ id: s.id, name: s.name, cssClass: "s-" + s.id, css: "--s-" + s.id }));
-  // ALL the series must be present: testing only one would leave `montrer()` computing y(null)
+  // ALL the series must be present: testing only one would leave `show()` computing y(null)
   // for the others, hence NaN coordinates with no message.
   const known = j => SERIES.every(s => typeof j[s.id] === "number");
   const first = MILESTONES.find(known);
@@ -250,7 +250,7 @@ export async function init(ctx) {
       if (!known(j)) {
         const l = document.createElement("div");
         l.className = "row";
-        l.textContent = "valeur inconnue";
+        l.textContent = "unknown value";
         tip.append(l);
       } else {
         SERIES.forEach(s => {
@@ -368,7 +368,7 @@ export async function init(ctx) {
         const b = document.createElement("b");
         b.textContent = pct(p.v);
         const s = document.createElement("s");
-        s.textContent = "sur " + GAPS_SERIES.id;
+        s.textContent = "on " + GAPS_SERIES.id;
         row.append(b, s);
         const su = document.createElement("div");
         su.className = "subject";
@@ -420,7 +420,7 @@ export async function init(ctx) {
   };
 
   if (bench) {
-    // The reference is not among `concurrents`, so the heading names it first; otherwise the page
+    // The reference is not among `competitors`, so the heading names it first; otherwise the page
     // would announce a single language compared while the chart shows two.
     document.getElementById("title-times").textContent = "The time, against " +
       [bench.reference.name].concat(bench.competitors.filter(c => c.id !== "ollin").map(c => c.name)).join(" and ");
@@ -511,7 +511,7 @@ export async function init(ctx) {
     const thead = document.createElement("thead"), tr = document.createElement("tr");
     const columns = ["date", "commit"];
     SERIES.forEach(s => columns.push(s.id, "Δ " + s.id));
-    columns.push("dernier commit du jour");
+    columns.push("the day's last commit");
     columns.forEach(c => {
       const th = document.createElement("th");
       th.textContent = c;

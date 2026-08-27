@@ -92,7 +92,7 @@ function show(title, message, stack) {
       sel.addRange(r)
     } catch (_) {}
   }))
-  bar.appendChild(mk('Recharger', () => location.reload()))
+  bar.appendChild(mk('Reload', () => location.reload()))
   el.appendChild(bar)
   el.style.display = 'block'
 }

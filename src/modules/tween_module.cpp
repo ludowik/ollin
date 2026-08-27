@@ -383,7 +383,7 @@ void drop_conflicts(const std::vector<Chan>& chans) {
     for (int i = 0; i < (int)s_tweens.size(); i++) {
         if (!s_tweens[i].alive)
             continue;
-        bool reste = false;
+        bool still_running = false;
         for (auto& step : s_tweens[i].steps) {
             auto& mine = step.chans;
             for (int c = (int)mine.size() - 1; c >= 0; c--) {
@@ -403,9 +403,9 @@ void drop_conflicts(const std::vector<Chan>& chans) {
             // A WAIT step legitimately has no channel: it counts as work remaining, otherwise
             // overwriting one field would cancel the whole sequence.
             if (!mine.empty() || step.is_wait)
-                reste = true;
+                still_running = true;
         }
-        if (!reste)
+        if (!still_running)
             free_tween(i);
     }
 }
@@ -546,7 +546,7 @@ int tween_value(CallCtx& ctx) {
     } else if (is_object(cur) && is_object(args[1])) {
         add_struct_chans(chans, cur, args[1], "(ref)", "tween.value");
     } else {
-        throw std::runtime_error(std::string("tween.value: valeur non interpolable (") + cur.type_name() + " → " +
+        throw std::runtime_error(std::string("tween.value: value not interpolable (") + cur.type_name() + " → " +
                                  args[1].type_name() + ")");
     }
     // Two distinct `ref x` are two different maps: we cannot tell that they denote the same
@@ -601,13 +601,13 @@ int tween_sequence(CallCtx& ctx) {
     std::vector<Step> steps;
     std::vector<Chan> all;   // every channel of the sequence, for a single cancelling pass
     for (int64_t k = 1; k <= nb; k++) {   // Ollin arrays are 1-based
-        Value brut = args[1].array_get(k);
+        Value raw = args[1].array_get(k);
         const std::string where = std::string(FN) + ": step " + std::to_string(k);
-        if (!brut.is_map())
+        if (!raw.is_map())
             throw std::runtime_error(where + " must be a map {to: …, delay: …}");
         Value target_obj = args[0], to_map, curve;
         double delay_s = -1.0;
-        for (const auto& kv : brut.as_map()->data) {
+        for (const auto& kv : raw.as_map()->data) {
             if (!kv.first.is_string())
                 throw std::runtime_error(where + ": keys must be names");
             const std::string& key = kv.first.as_string();
@@ -726,10 +726,10 @@ int method_progress(CallCtx& ctx) {
     // remains to be applied, for a delay or a negative time. An endless plan reports the progress of
     // its current pass.
     double cycle = t.cycle;
-    double fait = 0.0;
+    double done = 0.0;
     for (size_t k = 0; k < t.pos && k < t.steps.size(); k++)
-        fait += t.steps[step_index(t, k)].dur;
-    double p = cycle > 0.0 ? std::min((fait + t.elapsed) / cycle, 1.0) : 1.0;
+        done += t.steps[step_index(t, k)].dur;
+    double p = cycle > 0.0 ? std::min((done + t.elapsed) / cycle, 1.0) : 1.0;
     double total = t.endless ? 1.0 : (double)t.plan.size();
     double base = t.endless ? 0.0 : (double)t.seg;
     p = (base + p) / total;
@@ -751,7 +751,7 @@ int method_progress(CallCtx& ctx) {
 // successive calls therefore compose, each acting on the plan built so far.
 int method_repeat(CallCtx& ctx) {
     static constexpr const char* FN = "tween.repeat";
-    double n = 0.0;   // 0 = aucun compte fourni ⇒ sans fin
+    double n = 0.0;   // 0 = no count given, hence endless
     if (ctx.argc > 1 && !ctx.args[1].is_nil()) {
         if (!ctx.args[1].is_number())
             throw std::runtime_error(std::string(FN) + ": repeat count must be a number or nil");
@@ -902,7 +902,7 @@ void advance(double dt) {
                 // instead of the target (observed).
                 if (t.pos + 1 >= t.steps.size() && t.seg + 1 >= t.plan.size() && !t.endless)
                     break;
-                size_t franchie = step_index(t, t.pos);
+                size_t crossed = step_index(t, t.pos);
                 // The crossed step is STARTED and then SETTLED at its exact end before we leave it:
                 // otherwise a step shorter than one time step would be skipped without ever reading
                 // its bounds or writing its target. Each call goes back to s_tweens[i], because the
@@ -913,14 +913,14 @@ void advance(double dt) {
                 // cancel this tween AND THEN declare another, which takes the freed slot and marks it
                 // alive again. The crossed index would then address a stranger's steps, possibly
                 // fewer of them.
-                start_step(s_tweens[i], franchie);
+                start_step(s_tweens[i], crossed);
                 if (!tween_alive(i, gen0))
                     break;
-                settle_step_end(s_tweens[i], franchie);
+                settle_step_end(s_tweens[i], crossed);
                 if (!tween_alive(i, gen0))
                     break;   // the code called cancelled this tween
                 Tw& t2 = s_tweens[i];                 // the reference is READ AGAIN after the calls
-                t2.elapsed -= t2.steps[franchie].dur;
+                t2.elapsed -= t2.steps[crossed].dur;
                 if (t2.pos + 1 < t2.steps.size()) {
                     t2.pos++;
                 } else if (t2.seg + 1 < t2.plan.size()) {

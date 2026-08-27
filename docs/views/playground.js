@@ -245,8 +245,8 @@ const MODULE_MEMBERS = {
     fn('graphics.tiles','tiles(top, side, bottom)'), fn('graphics.tile','tile(t)'),
     fn('graphics.tileAnim','tileAnim(t)'),
     fn('graphics.line3d','line3d(x1,y1,z1, x2,y2,z2)'), fn('graphics.point3d','point3d(x,y,z)'),
-    fn('graphics.ambient','ambient(v | couleur)'),
-    fn('graphics.light','light("dir"|"point", x,y,z [, couleur]) → Light'),
+    fn('graphics.ambient','ambient(v | color)'),
+    fn('graphics.light','light("dir"|"point", x,y,z [, color]) → Light'),
     fn('graphics.texture','texture(img)'),         fn('graphics.noTexture','noTexture()'),
     // Quaternions.
     fn('graphics.quat','quat() → Quat (identity)'),
@@ -377,7 +377,7 @@ const countMatches = (s, re) => (s.match(re) || []).length
 
 function ollinFoldRange(state, lineStart) {
   const first = state.doc.lineAt(lineStart)
-  const head = first.text.replace(/##.*$/, '')          // ignorer les commentaires
+  const head = first.text.replace(/##.*$/, '')          // comments ignored
   let depth = countMatches(head, FOLD_OPENERS) - countMatches(head, FOLD_ENDS)
   if (depth <= 0)
     return null                                          // not a net opener, or closed again on the line
@@ -446,7 +446,7 @@ const editorExtensions = [
         // Alt+Space triggers the autocompletion, a portable alternative to Ctrl+Space, which
         // macOS reserves for the input source.
         { key: 'Alt-Space', run: (v) => (startCompletion ? startCompletion(v) : false) },
-        { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // lance / relance
+        { key: 'Alt-Enter', run: () => { relaunch(); return true } },   // runs, or runs again
         // Switching file in a multi-file project: Ctrl+Tab is reserved by the browser, hence
         // Alt+PageUp and Alt+PageDown, the web-safe equivalent.
         { key: 'Alt-PageUp', run: () => { cycleFile(-1); return true } },
@@ -463,7 +463,7 @@ const editorExtensions = [
         { key: 'Mod-k Mod-c', run: (v) => toggleLineComment(v, true) },
         { key: 'Mod-k Mod-u', run: (v) => toggleLineComment(v, false) },
       ]),
-      keymap.of(searchKeymap),   // Ctrl+F (rechercher), Ctrl+G (suivant), etc.
+      keymap.of(searchKeymap),   // Ctrl+F (find), Ctrl+G (next), and so on
       indentUnit.of('    '),
       // Native auto-pairs: "(" inserts "()", wraps the selection when there is one, and
       // Backspace deletes the empty pair (closeBracketsKeymap).
@@ -827,8 +827,8 @@ const newResBtn    = document.getElementById('new-res-btn')
 const resView      = document.getElementById('res-view')
 const editorBox    = document.getElementById('editor-wrap')
 
-let currentProject = null    // objet projet complet
-let currentFile    = null    // chemin du fichier ouvert
+let currentProject = null    // the complete project object
+let currentFile    = null    // path of the file open in the editor
 // The resource DISPLAYED in place of the editor (null means we are editing). Declared here, with
 // the state: renderFiles and openFile read it much higher up in the file, and a `let` declared
 // after them would expose them to "Cannot access before initialization".
@@ -1135,7 +1135,7 @@ async function loadProject(id) {
   const p = await Store.getProject(id)
   if (!p) return
   if (isRunning) clearAndStop()   // changing PROJECT means another script, so close the preview
-  removeExampleBanner()   // quitte le mode exemple
+  removeExampleBanner()   // leaves example mode
   setStructuralUI(true)   // a real project, so changes are allowed
   flushEditorToFile()
   currentProject = p
@@ -1152,7 +1152,7 @@ async function loadProject(id) {
   renderResources()
   view.focus()
   // Remote reconciliation on opening: an immediate badge, plus the auto-pull and its guard.
-  syncOnOpen(p)   // non bloquant
+  syncOnOpen(p)   // not blocking
 }
 
 async function switchProject(id) {
@@ -1674,7 +1674,7 @@ async function autoPushNewProject(p) {
     await GH.ensureRepo()
     await GH.pushProject(p, null)
     p.dirty = false   // freshly pushed, hence synchronised
-    await Store.saveProject(p)   // persiste project.remote (slug, folderSha) + dirty
+    await Store.saveProject(p)   // persists project.remote (slug, folderSha) and dirty
     setStatus('Project created on GitHub ✓', true)
   } catch (e) {
     setStatus('Created locally — GitHub: ' + (e && e.message ? e.message : e), true, true)
@@ -2215,7 +2215,7 @@ stopBtn.addEventListener('click', () => {
   } else {
     try { ollin.pauseMainLoop() } catch(_) {}
     isPaused = true
-    stopBtn.innerHTML = ICON_RESUME + '<span class="btn-label"> Reprendre</span>'
+    stopBtn.innerHTML = ICON_RESUME + '<span class="btn-label"> Resume</span>'
   }
 })
 

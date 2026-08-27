@@ -93,7 +93,7 @@ static int gfx_canvas(CallCtx& ctx) {
     // The 3D lighting is reset HERE, before setup() or the top level set ambient and light — and not
     // in gfx_run, which runs AFTER and would wipe the configuration.
     reset3d_lighting_state();
-    s_run_active = false;   // nouveau programme → autorise (un seul) graphics.run
+    s_run_active = false;   // a new program, hence ONE graphics.run allowed again
 #ifdef __EMSCRIPTEN__
     // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
     // InitWindow. Every InitWindow (re)creates a WebGL context on the same canvas and recompiles
@@ -219,7 +219,7 @@ static int gfx_end_draw(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
     (void)argc;
-    flush_pending_screenshot();   // chemin manuel beginDraw/endDraw : capture ici
+    flush_pending_screenshot();   // the manual beginDraw/endDraw path: the capture happens here
     EndDrawing();
     return ctx.ret(Value{});
 }
@@ -1121,7 +1121,7 @@ static int gfx_point(CallCtx& ctx) {
 }
 
 #ifndef __EMSCRIPTEN__
-static bool s_quit = false; // boucle native seulement (WASM : emscripten_cancel_main_loop)
+static bool s_quit = false; // the native loop only (WASM: emscripten_cancel_main_loop)
 #endif
 
 // The frame delta is measured BY US: a wall clock (GetTime()) read at a SINGLE point per frame, on
@@ -1155,8 +1155,8 @@ static void draw_fps_overlay() {
     int tw = MeasureText(buf, size);
     int x = s_logicalW - tw - margin;
     int y = s_logicalH - size - margin;
-    DrawText(buf, x + 1, y + 1, size, BLACK);     // ombre (contraste)
-    DrawText(buf, x, y, size, {0, 228, 48, 255}); // vert vif (lime)
+    DrawText(buf, x + 1, y + 1, size, BLACK);     // a drop shadow, for contrast
+    DrawText(buf, x, y, size, {0, 228, 48, 255}); // bright green (lime)
 }
 
 static int gfx_quit(CallCtx& ctx) {
@@ -1268,7 +1268,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
                        Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
                        Vector2{0.0f, 0.0f}, 0.0f, WHITE);
         flush_pending_screenshot();      // captures the composed screen, before the FPS overlay
-        BeginBlendMode(BLEND_ALPHA);   // overlay FPS en fusion normale
+        BeginBlendMode(BLEND_ALPHA);   // the FPS overlay, in normal blending
         draw_fps_overlay();
         *drawing = false;
         EndDrawing();
@@ -1429,7 +1429,7 @@ static int gfx_rotate(CallCtx& ctx) {
         rlRotatef((float)num_arg(args, argc, 0, "graphics.rotate"), (float)num_arg(args, argc, 1, "graphics.rotate"),
                   (float)num_arg(args, argc, 2, "graphics.rotate"), (float)num_arg(args, argc, 3, "graphics.rotate"));
     } else {
-        throw std::runtime_error("graphics.rotate: expected deg [, ax, ay, az] (axe complet ou aucun)");
+        throw std::runtime_error("graphics.rotate: expected deg [, ax, ay, az] (a whole axis, or none)");
     }
     return ctx.ret(Value{});
 }

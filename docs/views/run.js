@@ -76,7 +76,7 @@ export async function init(ctx) {
   let paused = false
   function setPauseUI() {
     if (!pauseBtn) return
-    pauseBtn.innerHTML = paused ? ICON_PLAY + '<span class="bar-label">Reprendre</span>'
+    pauseBtn.innerHTML = paused ? ICON_PLAY + '<span class="bar-label">Resume</span>'
                                 : ICON_PAUSE + '<span class="bar-label">Pause</span>'
   }
   if (pauseBtn) {

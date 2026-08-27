@@ -40,7 +40,7 @@ end
 var t7 = cpuTime()
 var noise_hoisted = t7 - t6
 
-printf("N = {} appels", N)
+printf("N = {} calls", N)
 printf("abs   direct  = {}s   hoisted = {}s   delta = {}s  ({} ns/call)",
        abs_direct, abs_hoisted, abs_direct - abs_hoisted, (abs_direct - abs_hoisted) * 1e9 / N)
 printf("noise direct  = {}s   hoisted = {}s   delta = {}s  ({} ns/call)",

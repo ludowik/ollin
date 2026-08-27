@@ -39,7 +39,7 @@ const Token& peek() const;
 
     TokenType peek_next_type() const;
     TokenType peek_at(int offset) const;
-    void consume_opt_comment(); // absorbe un COMMENT optionnel
+    void consume_opt_comment(); // swallows an optional COMMENT
 
     std::unique_ptr<Stmt> parse_one_stmt();
     std::unique_ptr<Stmt> var_decl();

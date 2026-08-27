@@ -279,7 +279,7 @@ async function checkPagesDeploy() {
     if (cached && (Date.now() - cached.t) < DEPLOY_TTL) {
       state = cached.state
     } else {
-      const token = localStorage.getItem('ollin-gh-token')   // auteur → limite 5000/h
+      const token = localStorage.getItem('ollin-gh-token')   // authenticated, hence a 5000/h limit
       const headers = { Accept: 'application/vnd.github+json' }
       if (token) headers.Authorization = 'Bearer ' + token
       const api = (p) => fetch('https://api.github.com/repos/' + DEPLOY_REPO + p, { headers, cache: 'no-store' })

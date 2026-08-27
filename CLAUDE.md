@@ -21,11 +21,22 @@ documentation destinée à l'utilisateur d'Ollin est en anglais comme le reste.
 Cette frontière est **ARRÊTÉE** : ne plus proposer de traduire ces deux-là, ni redemander
 confirmation.
 
+**Comment on VÉRIFIE (méthode arrêtée)** : pas une liste de mots français écrite de mémoire — j'en
+ai fait trois, chacune ratant ce que les autres trouvaient. Le contrôle est un **dictionnaire** :
+chaque mot de la prose (commentaires et chaînes) est soumis à `aspell --lang en`, et les mots qu'il
+refuse sont soumis à `aspell --lang fr`. Refusé par l'anglais ET accepté par le français ⇒ français,
+sans que j'aie à devenir la source de vérité. Les identifiants passent par le même filtre, découpés
+en mots (`snake_case`, `camelCase`). Il faut écarter à la main une trentaine de jetons de code que le
+français accepte par hasard (`px`, `regs`, `dur`, `env`, `frac`…) et quelques mots anglais que le
+dictionnaire américain refuse (`initialiser`, `recentre`, `DOM`, `CORS`). Cette passe a trouvé
+**une centaine** d'occurrences que mes listes avaient manquées, dont des chaînes affichées à
+l'utilisateur.
+
 **Ce qui reste accentué N'EST PAS du français** (vérifié, ne pas « corriger ») : les données
 de test UTF-8 (`"café"`, `"ÉÀÙÇ"` dans `tests/regressions.ol` ; `"café"` et `"straße"` dans le
 tutoriel), les plages Latin-1 de `string_module.cpp` (`à..þ`), le jeu de caractères de
 `tools/gen_ui_font.cpp`, et le code généré ou vendorisé (`font_sans.h`, `font_mono.h`,
-`docs/vendor/`, `docs/wasm/`).
+`docs/vendor/`, `docs/wasm/`, `libs/robin_hood.h`).
 
 **Style de rédaction (règle permanente)** : écrire des **phrases complètes** en
 français correct. Le style télégraphique est proscrit : pas de fragments sans

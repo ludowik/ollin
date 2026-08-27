@@ -242,7 +242,7 @@ struct Bucket3D {
     unsigned int texId;
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
-    std::vector<float> tiles;    // 3 floats (top/side/bottom, -1 = aucune) par instance
+    std::vector<float> tiles;    // 3 floats per instance (top/side/bottom, -1 = none)
     std::vector<float> corners;  // 4 floats per instance: the top's corner heights
 };
 static std::vector<Bucket3D> s_buckets;
@@ -265,7 +265,7 @@ static std::vector<Matrix> s_rec_x;   // the recorded local transforms, OPAQUE g
 static std::vector<float> s_rec_c;    // the recorded rgba values, 0..1, OPAQUE group
 static std::vector<float> s_rec_t;    // the recorded tiles, three floats per instance, OPAQUE group
 static std::vector<float> s_rec_k;    // the recorded corner heights, four floats per instance, OPAQUE group
-static std::vector<Matrix> s_rec_xw;  // idem, instances TRANSPARENTES (alpha < 1, ex. eau)
+static std::vector<Matrix> s_rec_xw;  // the same, for TRANSPARENT instances (alpha < 1, water for one)
 static std::vector<float> s_rec_cw;
 static std::vector<float> s_rec_tw;
 static std::vector<float> s_rec_kw;
@@ -273,13 +273,13 @@ static Mesh s_rec_mesh{};             // the recorded mesh, OPAQUE group: a cube
 static Mesh s_rec_mesh_w{};           // the recorded mesh, TRANSPARENT group: a plane, for water
 struct InstGroup {
     Mesh mesh;
-    unsigned int vbo_x;   // VBO transfos (persistant)
-    unsigned int vbo_c;   // VBO couleurs (persistant)
-    unsigned int vbo_t;   // VBO tuiles (persistant, 3 floats/instance)
-    unsigned int vbo_k;   // VBO hauteurs de coin (persistant, 4 floats/instance)
+    unsigned int vbo_x;   // the transforms VBO, persistent
+    unsigned int vbo_c;   // the colours VBO, persistent
+    unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
+    unsigned int vbo_k;   // the corner heights VBO, persistent, 4 floats per instance
     int count;
 };
-static std::vector<InstGroup> s_groups;   // groupes cuits (index+1 = id)
+static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
 static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
 static Matrix s_view3d = MatrixIdentity();   // the view frozen at begin3d, for the solids' MVP; the identity by default, as a fail-safe should a flush precede begin3d
 static Matrix s_proj3d = MatrixIdentity();   // the perspective projection frozen at begin3d, for inFrustum called OUTSIDE the 3D block, where rlGetMatrixProjection returns the 2D ortho restored by end3d
@@ -345,7 +345,7 @@ static unsigned int white_tex_id() {
 static bool s_lighting_used = false;
 static float s_amb3d[4] = {0.15f, 0.15f, 0.15f, 1.0f};
 static bool s_light_on = false;
-static int s_light_type = 0;   // 0 = directionnelle, 1 = ponctuelle
+static int s_light_type = 0;   // 0 = directional, 1 = point
 static Vector3 s_light_pos = {0.0f, 0.0f, 0.0f};
 static Vector3 s_light_tgt = {0.0f, -1.0f, 0.0f};
 static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
@@ -427,7 +427,7 @@ static void load_lit_shader() {
         "    fragTexCoord = vertexTexCoord;\n"
         "    fragColor = instanceColor;\n"
         "    fragTile = instanceTile;\n"
-        "    mat3 nm = transpose(inverse(mat3(m)));\n"   // matrice de normale : correcte sous rotation / scale non uniforme
+        "    mat3 nm = transpose(inverse(mat3(m)));\n"   // the normal matrix: correct under a rotation or a non-uniform scale
         "    fragNormal = normalize(nm * vn);\n"
         "    gl_Position = mvp * wp;\n"
         "}\n";
@@ -451,15 +451,15 @@ static void load_lit_shader() {
         "    vec4 texel;\n"
         "    if (fragTile.x >= 0.0) {\n"                 // an atlas cube: the tile follows the face, from the normal
         "        float t = fragTile.y;\n"                //   the side face by default
-        "        if (fragNormal.y > 0.5) t = fragTile.x;\n"   // dessus
-        "        else if (fragNormal.y < -0.5) t = fragTile.z;\n" // dessous
+        "        if (fragNormal.y > 0.5) t = fragTile.x;\n"   // the top face
+        "        else if (fragNormal.y < -0.5) t = fragTile.z;\n" // the bottom face
         "        float cols = atlasGrid.x;\n"
         "        vec2 cell = vec2(mod(t, cols), floor(t / cols));\n"
         "        vec2 uv = fract(fragTexCoord);\n"
         "        if (animTile >= 0.0 && abs(t - animTile) < 0.5) {\n"           // the animated tile, water: scrolling plus a sine ripple
         "            float sc = animParams.x; float ws = animParams.y;\n"        //   sc is the scroll, ws the wave speed
         "            float wf = animParams.z; float wa = animParams.w;\n"        //   wf is the spatial frequency, wa the amplitude
-        "            uv = fract(uv + vec2(uTime * sc + sin(uTime * ws + fragPosition.z * wf) * wa,\n" // phase en coord. MONDE (fragPosition)
+        "            uv = fract(uv + vec2(uTime * sc + sin(uTime * ws + fragPosition.z * wf) * wa,\n" // the phase in WORLD coordinates (fragPosition)
         "                                 uTime * sc * 0.66 + cos(uTime * ws * 0.8 + fragPosition.x * wf) * wa));\n" // it carries on from one tile to the next
         "        }\n"
         "        uv = clamp(uv, 0.002, 0.998);\n"        // a slight inset, which avoids bleeding between tiles
@@ -828,7 +828,7 @@ void end3d_internal() {
     if (!s_in_3d) {
         return;
     }
-    flush3d_buckets();   // encore en Mode3D → matrices view/proj disponibles
+    flush3d_buckets();   // still in Mode3D, so the view and projection matrices are available
     rlPopMatrix();      // closes the transform mode begin3d opened (rlPushMatrix)
     EndMode3D();
     s_in_3d = false;
@@ -841,7 +841,7 @@ static int gfx_begin3d(CallCtx& ctx) {
     s_cam3d = camera_from_map(args[0], "graphics.begin3d");
     s_buckets.clear();
     BeginMode3D(s_cam3d);
-    s_view3d = rlGetMatrixModelview();   // vue « pure » (avant toute transfo utilisateur)
+    s_view3d = rlGetMatrixModelview();   // the view ALONE, before any transform the user applied
     s_proj3d = rlGetMatrixProjection();  // the perspective projection is frozen, so inFrustum is right even outside the 3D block
     // Enters rlgl's "transform" mode for the WHOLE 3D block, so that translate/rotate/scale
     // — WITH OR WITHOUT push/pop — write into RLGL.State.transform (world space, read by
@@ -1621,8 +1621,8 @@ static int gfx_free_chunk(CallCtx& ctx) {
     if (argc < 1 || !args[0].is_map()) {
         return ctx.ret(Value{});
     }
-    free_group_by_id(args[0], "id");    // groupe opaque
-    free_group_by_id(args[0], "idw");   // groupe transparent (eau)
+    free_group_by_id(args[0], "id");    // the opaque group
+    free_group_by_id(args[0], "idw");   // the transparent group (water)
     return ctx.ret(Value{});
 }
 
@@ -1680,5 +1680,5 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("line3d")), Value::make_builtin(gfx_line3d));
     m.map_set(Value(std::string("point3d")), Value::make_builtin(gfx_point3d));
     m.map_set(Value(std::string("rotateq")), Value::make_builtin(gfx_rotateq));
-    register_quat(m);   // quat / quatAxis / quatEuler (classe Quat, graphics_quat.cpp)
+    register_quat(m);   // quat / quatAxis / quatEuler (the Quat class, graphics_quat.cpp)
 }

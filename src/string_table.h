@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>  // uint32_t/uint64_t requis par robin_hood.h
+#include <cstdint>  // uint32_t/uint64_t, required by robin_hood.h
 #include "robin_hood.h"
 #include <string>
 #include <string_view>
@@ -32,7 +32,7 @@ struct StringTable {
     }
 
     void erase(InternedStr* p) {
-        table_.erase(std::string_view(p->str)); // avant delete — view doit rester valide
+        table_.erase(std::string_view(p->str)); // BEFORE the delete: the view must still be valid
         delete p;
     }
 };

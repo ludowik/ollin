@@ -1,6 +1,6 @@
 #pragma once
 // Included by chunk.h after Map and Array; do not include directly.
-#include <cstdint> // uint8_t (underlying type de Iterator::Kind)
+#include <cstdint> // uint8_t (the underlying type of Iterator::Kind)
 #include <utility>
 #include <vector>
 
@@ -14,7 +14,7 @@ struct Iterator {
     explicit Iterator(Kind k) : kind(k) {
     }
     virtual bool next(Value& key, Value& val) = 0;
-    virtual bool next_primary(Value& out) = 0; // FOR_ITER_NEXT1: retourne seulement la valeur primaire
+    virtual bool next_primary(Value& out) = 0; // FOR_ITER_NEXT1: yields the primary value only
     virtual bool primary_is_val() const = 0;   // true=val (array/range), false=key (map)
     virtual void release() {
         delete this;

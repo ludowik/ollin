@@ -2,7 +2,7 @@
 ## FOR_ITER_NEXT path, distinct from the numeric `for`, which has its own fast path.
 ## The collections are built OUTSIDE the measurement.
 
-var NA = 100_000    ## taille du tableau, parcouru PA fois
+var NA = 100_000    ## the array's size, walked PA times
 var PA = 20
 var NM = 10_000     ## the number of keys in the map, walked PM times
 var PM = 40

@@ -272,7 +272,7 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
     void visit(const EnumDeclStmt& s) override {
         if (!s.obj_expr) {
-            out.insert(s.name); // enum sous nom simple = globale, comme une classe
+            out.insert(s.name); // an enum under a bare name is a global, like a class
             enums.insert(s.name);
         }
     }
@@ -599,7 +599,7 @@ void Compiler::visit(const SwitchStmt& s) {
         reg_top_ = subj_r + 1;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
-    int above_subj = reg_top_; // subj_r reste vivant pendant tous les bras
+    int above_subj = reg_top_; // subj_r stays live through every arm
 
     std::vector<size_t> end_patches;
     break_patches.push_back({{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
@@ -1085,7 +1085,7 @@ void Compiler::visit(const ReturnStmt& s) {
         }
         int want = base + n_expl;
         reg_top_ = want;
-        s.values.back()->accept(*this); // appel terminal : k valeurs de retour ; last_results_ = k
+        s.values.back()->accept(*this); // a terminal call: k return values, hence last_results_ = k
         if (last_reg_ != want)
             chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
         chunk.emit(make_abc((uint8_t)Op::RETURN_SPREAD, (uint8_t)base, (uint8_t)n_expl, 0));
@@ -1355,7 +1355,7 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
 }
 
 void Compiler::visit(const CallExpr& e) {
-    // Dernier argument multi-valeurs (… ou appel) → expansion (sauf appel optionnel).
+    // A multi-value last argument (`...` or a call) EXPANDS, an optional call excepted.
     if (!e.optional && !e.args.empty() && is_multi_value_expr(e.args.back().get())) {
         emit_spread_call(e.args, [&](int reg) { emit_callee_value(e.callee, reg); });
         return;
@@ -1451,7 +1451,7 @@ void Compiler::visit(const CallExpr& e) {
 }
 
 void Compiler::visit(const ExprCallExpr& e) {
-    // Dernier argument multi-valeurs (… ou appel) → expansion (sauf appel optionnel).
+    // A multi-value last argument (`...` or a call) EXPANDS, an optional call excepted.
     if (!e.optional && !e.args.empty() && is_multi_value_expr(e.args.back().get())) {
         emit_spread_call(e.args, [&](int reg) { compile_into(*e.callee, reg); });
         return;
@@ -1773,7 +1773,7 @@ static bool expr_has_lambda(const Expr* e) {
     if (dynamic_cast<const VarExpr*>(e) || dynamic_cast<const NumberExpr*>(e) || dynamic_cast<const StringExpr*>(e) ||
         dynamic_cast<const BoolExpr*>(e) || dynamic_cast<const NilExpr*>(e) || dynamic_cast<const VarArgExpr*>(e))
         return false;
-    return true; // type inconnu → conservatif
+    return true; // an unknown type, hence the conservative answer
 }
 
 // True when the body is safe for aliasing the loop variable 'v' onto the control register: no
@@ -1943,7 +1943,7 @@ static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body) {
 
 void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
                                  const std::vector<std::unique_ptr<Stmt>>& body) {
-    int ctl = reg_top_; // ctl, ctl+1, ctl+2 = i, limite, pas
+    int ctl = reg_top_; // ctl, ctl+1, ctl+2 = i, limit, step
     reg_top_ = ctl + 3;
     if (reg_top_ > reg_count_)
         reg_count_ = reg_top_;
@@ -1979,7 +1979,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 
     size_t prep = chunk.emit_jump(Op::FOR_PREP, (uint8_t)ctl); // Bx is the exit for an empty loop, patched later
 
-    uint16_t body_addr = (uint16_t)chunk.current_pos(); // FOR_PREP tombe ici si non vide
+    uint16_t body_addr = (uint16_t)chunk.current_pos(); // FOR_PREP falls through to here when the loop is not empty
     if (!can_alias)
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
@@ -2431,7 +2431,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
 
-        // tmp = <classe parente lexicale>
+        // tmp = <the lexically enclosing parent class>
         chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)tmp, chunk.add_identifier(current_class_parent_)));
         // R[call_base+1] = tmp.<method>
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string(e.method)))));

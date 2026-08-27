@@ -15,14 +15,14 @@ comment
 ## ── 2. Types and literals ────────────────────────────────────────────────────
 ## [grammar: NUMBER, exponent, hexDigit, octDigit, binDigit, digit, STRING, strChar, placeholder, fmtSpec, convChar, BOOL, NIL, IDENT, letter]
 
-var n_int   = 42            ## entier (int64)
-var n_float = 3.14          ## flottant (double)
+var n_int   = 42            ## an integer (int64)
+var n_float = 3.14          ## a float (double)
 var n_lead  = .5            ## a decimal with no leading zero
 var n_sep   = 1_000_000     ## underscores are ignored
 var n_fsep  = 1_000.12
 assert(n_fsep == 1000.12)   ## underscore ignored in a float
 
-var n_sci   = 6.022e23      ## notation scientifique → flottant
+var n_sci   = 6.022e23      ## scientific notation gives a float
 var n_scin  = 2e-3          ## negative exponent
 assert(1e3 == 1000)         ## the exponent gives 1000, an integer after num_value folds it
 assert(1E3 == 1000)         ## an upper-case 'E' is accepted
@@ -31,24 +31,24 @@ assert(n_scin == 0.002)
 assert(n_sci > 1e23)
 
 var n_hex   = 0xFF          ## hexadecimal, hence an integer
-var n_oct   = 0o10          ## octal → entier
-var n_bin   = 0b1010        ## binaire → entier
+var n_oct   = 0o10          ## octal gives an integer
+var n_bin   = 0b1010        ## binary gives an integer
 assert(n_hex == 255)
 assert(n_oct == 8)
 assert(n_bin == 10)
 assert(0xDEAD_BEEF == 3735928559)  ## underscores in hex
 assert(0o7_7 == 63)                ## underscores in octal
 assert(0b1111_1111 == 255)         ## underscores in binary
-assert(0b11111111 == 0xFF)         ## binaire == hexa
+assert(0b11111111 == 0xFF)         ## binary == hex
 assert((0xF0 | 0x0F) == 0xFF)      ## hex literals with the bitwise operators
-assert(0xFFFFFFFFFFFFFFFF == -1)   ## motif de bits complet → wrapping int64
+assert(0xFFFFFFFFFFFFFFFF == -1)   ## the whole bit pattern, wrapping to int64
 
 var s = "hello"             ## a string, immutable
 var s_concat = "hello" + ", " + "world"  ## concatenation with +
 assert(s_concat == "hello, world")
 var yes  = true            ## a boolean: a type of its own, not an integer
 var no  = false
-var rien  = nil             ## valeur absente
+var nothing  = nil          ## no value
 
 ## ── 3. Variables ─────────────────────────────────────────────────────────────
 ## [grammar: varDecl, globalDecl, assignStmt, program, stmt, exprStmt]
@@ -127,7 +127,7 @@ assert(gshadow == 100)
 assert(2 + 3   == 5)
 assert(10 - 4  == 6)
 assert(3 * 7   == 21)
-assert(7 / 2   == 3.5)      ## division → toujours float
+assert(7 / 2   == 3.5)      ## a division is ALWAYS a float
 assert(10 % 3  == 1)
 assert(-5 + 5  == 0)        ## unary negation
 assert(2 + 3 * 4 == 14)     ## precedence: * before +
@@ -199,10 +199,10 @@ assert((2 > 3)   == false)
 assert(not 0)          ## zero is falsy, without being equal to false
 assert(not not 1)
 assert(not not "x")    ## a non-empty string is truthy
-assert(not "")         ## string vide : falsy
+assert(not "")         ## string empty : falsy
 assert(not nil)
-assert(not {})         ## map vide : falsy
-assert(not [])         ## array vide : falsy
+assert(not {})         ## map empty : falsy
+assert(not [])         ## array empty : falsy
 assert(not not {a:1})  ## a non-empty map is truthy
 assert(not not [1])    ## a non-empty array is truthy
 
@@ -378,7 +378,7 @@ assert((func(x) return x * 2 end)(21) == 42)   ## calling a parenthesised lambda
 assert(([10, 20, 30])[2] == 20)                 ## index
 assert(({a: 7}).a == 7)                         ## champ
 ## optional call f?(): nil does nothing (nil), a function is called, anything else is an error
-assert(add?(3, 4) == 7)     ## callable → appel normal
+assert(add?(3, 4) == 7)     ## callable, hence an ordinary call
 var maybe = nil
 assert(maybe?() == nil)     ## nil: no call, and no error
 var cb = func(n) return n * 2 end
@@ -434,11 +434,11 @@ assert(fact(0) == 1)    ## the edge case: n=0 takes the n < 2 branch
 assert(fact(5) == 120)
 
 ## default parameters (literal constants only)
-func greet(name, greeting = "Bonjour")
+func greet(name, greeting = "Hello")
     return greeting
 end
-assert(greet("Alice")          == "Bonjour")
-assert(greet("Bob", "Salut")   == "Salut")
+assert(greet("Alice")          == "Hello")
+assert(greet("Bob", "Hi")   == "Hi")
 
 ## a call with no argument: a parameter with no default gets nil, for want of arguments
 func f_nodefault(a, b)
@@ -466,9 +466,9 @@ assert(double(5) == 10)
 ## definition on a map field: `func obj.field(...)` is `obj.field = func(...)`
 var handlers = {}
 func handlers.greet(name)
-    return "salut " + name
+    return "hi " + name
 end
-assert(handlers.greet("ollin") == "salut ollin")
+assert(handlers.greet("ollin") == "hi ollin")
 func handlers.add(a, b = 5)   ## parameters and defaults work here too
     return a + b
 end
@@ -549,7 +549,7 @@ assert(ok2)
 
 ## throwing a value of any type
 try
-    throw {code: 42, msg: "erreur"}
+    throw {code: 42, msg: "failure"}
 catch e
     assert(e["code"] == 42)
 end
@@ -563,7 +563,7 @@ end
 ## [grammar: mapLit, mapEntry, indexAssign]
 
 ## creation
-var vide = {}
+var empty = {}
 var m = {
     "a": 1,
     b:   2,         ## an identifier key, with no quotes
@@ -591,11 +591,11 @@ var kname = "calculee"
 var ck = {
     kname:   1,      ## the literal key "kname"
     [kname]: 2,      ## the key "calculee", the value of kname
-    [1 + 1]: "deux"  ## the integer key 2
+    [1 + 1]: "two"  ## the integer key 2
 }
 assert(ck["kname"]    == 1)
 assert(ck["calculee"] == 2)
-assert(ck[2]          == "deux")
+assert(ck[2]          == "two")
 assert(ck["kname"] <> ck["calculee"])
 
 ## writing
@@ -626,7 +626,7 @@ var km = {}
 km[nil]   = "nil"
 km[42]    = "int"
 km[3.14]  = "float"
-km[true]  = "vrai"
+km[true]  = "yes"
 km[false] = "faux"
 assert(km[nil]   == "nil")
 assert(km[42]    == "int")
@@ -678,7 +678,7 @@ var vide2 = []
 
 ## reading and writing (1-based)
 assert(arr[1] == 10)
-assert(arr[4] == nil)   ## hors bounds → nil
+assert(arr[4] == nil)   ## out of bounds gives nil
 arr[2] = 99
 arr[3] += 1
 assert(arr[2] == 99)
@@ -721,16 +721,16 @@ printf("pi = {1:.3f}", 3.14159)            ## pi = 3.142
 printf("hex = {1:04x}", 255)               ## hex = 00ff
 
 ## string interpolation: {expr} evaluates the expression, {expr:spec} formats it.
-var iname = "monde"
+var iname = "world"
 var ix = 42
-assert("hello {iname}" == "hello monde")
+assert("hello {iname}" == "hello world")
 assert("x={ix}" == "x=42")
 assert("calc: {ix * 2 + 1}" == "calc: 85")
 assert("{ix}{ix}" == "4242")
 assert("pi~{3.14}" == "pi~3.14")
 assert("pi={3.14159:.2f}" == "pi=3.14")            ## format: two decimals
 assert("hex={(255):04x}" == "hex=00ff")            ## an expression plus a format, in brackets
-assert("pad=[{ix:5d}]" == "pad=[   42]")           ## largeur
+assert("pad=[{ix:5d}]" == "pad=[   42]")           ## the width
 assert(len("ac\{olade") == 8)    ## \{ is a literal brace, one character
 assert("{1} litteral" == "{1} litteral")           ## {N} is a positional placeholder (1-based), and a literal in an interpolation
 
@@ -744,21 +744,21 @@ var t1 = time()
 assert(t1 >= t0)
 
 ## len — the size of a collection or of a string
-var la = [1, 2, 3]
-assert(len(la) == 3)
+var lst = [1, 2, 3]
+assert(len(lst) == 3)
 assert(len("hello") == 5)
 assert(len({a: 1, b: 2}) == 2)
 assert(len([1;5]) == 5)
 
 ## # — syntactic sugar for len()
-assert(#la == 3)
+assert(#lst == 3)
 assert(#"hello" == 5)
 assert(#{a: 1, b: 2} == 2)
 assert(#[1;5] == 5)
-assert(#la == len(la))
+assert(#lst == len(lst))
 
 ## array methods
-assert(la.len() == len(la))
+assert(lst.len() == len(lst))
 assert([10, 20, 30].len() == 3)
 var nested = [[1, 2], [3, 4]]
 assert(nested.len() == 2)
@@ -786,9 +786,9 @@ assert(fifo.dequeue() == 20)
 assert("Ollin".len() == 5)
 assert("Ollin".upper() == "OLLIN")
 assert("OLLIN".lower() == "ollin")
-assert("  bord  ".trim() == "bord")
-assert("  bord  ".ltrim() == "bord  ")
-assert("  bord  ".rtrim() == "  bord")
+assert("  edge  ".trim() == "edge")
+assert("  edge  ".ltrim() == "edge  ")
+assert("  edge  ".rtrim() == "  edge")
 assert("abcdef".substr(2, 3) == "bcd")     ## start at 1, then a length
 assert("abcdef".substr(2) == "bcdef")      ## with no length: through to the end
 assert("abcdef".char(1) == "a")
@@ -813,7 +813,7 @@ assert(u.VERSION == 2)
 
 ## circular import: silently ignored, the file being already imported
 import "utils_test1"
-assert(CONST == 42)   ## toujours disponible
+assert(CONST == 42)   ## still reachable
 
 ## ── 18. Classes ──────────────────────────────────────────────────────────────
 ## [grammar: classDecl, method, methodCall, superCall]
@@ -903,7 +903,7 @@ class Num
     func __eq(o)   return self.v == o.v  end
     func __lt(o)   return self.v < o.v  end
     func __le(o)   return self.v <= o.v  end
-    func __str()   return "Nombre({self.v})"  end
+    func __str()   return "Number({self.v})"  end
 end
 
 var n10 = Num(10)
@@ -917,7 +917,7 @@ assert((-n10).v == -10)
 assert(n10 == Num(10))
 assert(n4 < n10)
 assert(n10 <= Num(10))
-assert("{n10}" == "Nombre(10)")
+assert("{n10}" == "Number(10)")
 
 ## static methods: callable on the class, with no self
 class Factory
@@ -1193,12 +1193,12 @@ enum Tint RED, GREEN, BLUE end
 assert(Tint.RED == 1 and Tint.GREEN == 2 and Tint.BLUE == 3)
 
 ## An integer literal sets the value, and the counter resumes at value+1.
-enum Etat REPOS = 0, MARCHE, SAUT = 10, CHUTE end
-assert(Etat.REPOS == 0 and Etat.MARCHE == 1 and Etat.SAUT == 10 and Etat.CHUTE == 11)
+enum State IDLE = 0, WALK, JUMP = 10, FALL end
+assert(State.IDLE == 0 and State.WALK == 1 and State.JUMP == 10 and State.FALL == 11)
 
 ## Any expression is accepted as a value, but does not move the counter.
-enum Mixte A, B = "texte", C end
-assert(Mixte.A == 1 and Mixte.B == "texte" and Mixte.C == 2)
+enum Mixed A, B = "text", C end
+assert(Mixed.A == 1 and Mixed.B == "text" and Mixed.C == 2)
 
 ## For reading, an enum is a map: len and iteration.
 assert(#Tint == 3)
@@ -1290,10 +1290,10 @@ ui.checkbox("Option", ref uiFlag)
 
 ## A slider initialises the bound variable when it is nil, to the default, otherwise to min.
 global uiVal = nil
-ui.slider("Taille", ref uiVal, 0, 1, 0.25)
+ui.slider("Size", ref uiVal, 0, 1, 0.25)
 assert(uiVal == 0.25)
 global uiVal2 = 7
-ui.slider("Autre", ref uiVal2, 1, 10)
+ui.slider("Other", ref uiVal2, 1, 10)
 assert(uiVal2 == 7)
 
 var uiMenu = ui.menu("Settings")

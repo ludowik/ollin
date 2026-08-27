@@ -14,7 +14,7 @@
 // 2^63 literal is not duplicated.
 inline bool double_fits_int64(double d) {
     constexpr double lo = static_cast<double>(std::numeric_limits<int64_t>::min()); // -2^63 (exact)
-    return d >= lo && d < -lo;                                                      // -lo == 2^63, exclu
+    return d >= lo && d < -lo;                                                      // -lo == 2^63, excluded
 }
 
 // Tagged union, 16 bytes: tag(1) + _pad(3) + str_hash(4) + union(8).
@@ -63,7 +63,7 @@ struct CallCtx {
 
 struct Value {
     uint8_t tag;
-    uint8_t _pad[3];   // padding explicite (anciennement implicite)
+    uint8_t _pad[3];   // explicit padding, implicit before
     uint32_t str_hash; // the content hash, cached; valid only for T_STRING
     union {
         int64_t ival;

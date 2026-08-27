@@ -284,12 +284,12 @@ int alloc_buffer() {
         if (!b[i].used)
             return i;
     }
-    uint64_t maintenant = sound_mix_epoch();
+    uint64_t now = sound_mix_epoch();
     int chosen = -1;
     for (int i = 0; i < k_max_buffers; i++) {
         if (b[i].playing.load(std::memory_order_relaxed))
             continue;
-        if (b[i].retired_epoch >= maintenant)
+        if (b[i].retired_epoch >= now)
             continue;   // given back too recently: a block may still be reading it
         if (chosen < 0 || b[i].retired_epoch < b[chosen].retired_epoch)
             chosen = i;
@@ -345,11 +345,11 @@ int sound_tone(CallCtx& ctx) {
     size_t n = (size_t)(duration * k_audio_sample_rate);
     std::vector<float> samples(n);
     double phase = 0.0;
-    double avance = hz / (double)k_audio_sample_rate;
+    double step = hz / (double)k_audio_sample_rate;
     uint32_t noise_state = 0x9e3779b9u;
     for (size_t i = 0; i < n; i++) {
         samples[i] = (float)wave_at(shape, phase, noise_state);
-        phase += avance;
+        phase += step;
         if (phase >= 1.0)
             phase -= 1.0;
     }

@@ -72,7 +72,7 @@ export function runProgram(m, code, canvasEl, hooks) {
     // A SYNCHRONOUS hard trap (an in-place restart on iOS) is caught here, which raises the
     // diagnostic overlay WITH the stack — the name of the faulting function — that the text
     // message alone would lose. The overlay only opens for a hard fault.
-    try { window.__ollinCrash && window.__ollinCrash.captureError('execute (relance)', e) } catch (_) {}
+    try { window.__ollinCrash && window.__ollinCrash.captureError('execute (rerun)', e) } catch (_) {}
     hooks.onError('error: ' + (e && e.message ? e.message : e))
     return
   }

@@ -188,14 +188,14 @@ struct Style {
     Color text_dim;   // a slider's value, a sub-menu's chevron
     Color accent;     // a ticked box, and the filled part of a track
     Color track;      // the background of a slider's track
-    float round;      // arrondi des lignes, 0 = angles droits
+    float round;      // the rows' corner radius, 0 = square corners
     float border_thick;
     float font_frac;  // the font, as a fraction of the area's height
     float font_min;   // below this it is unreadable, whatever the area
     float pad_frac;   // the inner padding, as a fraction of the font
     float row_frac;   // a row's height
     float slider_row_frac;   // the height of a slider row: the label plus the track
-    float gap_frac;   // espace entre deux lignes
+    float gap_frac;   // the gap between two rows
     float margin_frac;// the margin at the area's edge
     float box_frac;   // the side of a checkbox's square
     float check_inset;// the fill's inset within the square, as a fraction of it

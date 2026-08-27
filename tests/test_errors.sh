@@ -85,36 +85,36 @@ end' \
     "cannot assign to const 'k'"
 
 # Malformed numeric literals.
-check_error "octal digit invalide"      'print(0o18)'   "invalid octal literal"
+check_error "an octal literal with an invalid digit"      'print(0o18)'   "invalid octal literal"
 check_error "octal 9"                    'print(0o9)'    "invalid octal literal"
-check_error "hex lettre invalide"        'print(0xFFg)'  "invalid hexadecimal literal"
-check_error "hex point colle"            'print(0x1.5)'  "invalid hexadecimal literal"
+check_error "a hex literal with an invalid letter"        'print(0xFFg)'  "invalid hexadecimal literal"
+check_error "a hex literal with a dot stuck to it"            'print(0x1.5)'  "invalid hexadecimal literal"
 check_error "hex underscore en tete"     'print(0x_FF)'  "invalid hexadecimal literal"
 check_error "hex underscore final"       'print(0xFF_)'  "invalid hexadecimal literal"
 check_error "hex underscore double"      'print(0xF__F)' "invalid hexadecimal literal"
-check_error "hex sans chiffre"           'print(0x)'     "invalid hexadecimal literal"
-check_error "binaire chiffre invalide"   'print(0b2)'    "invalid binary literal"
-check_error "binaire sans chiffre"       'print(0b)'     "invalid binary literal"
-check_error "binaire underscore final"   'print(0b1_)'   "invalid binary literal"
+check_error "a hex literal with no digit"           'print(0x)'     "invalid hexadecimal literal"
+check_error "binary literal with an invalid digit"   'print(0b2)'    "invalid binary literal"
+check_error "a binary literal with no digit"       'print(0b)'     "invalid binary literal"
+check_error "a binary literal ending in an underscore"   'print(0b1_)'   "invalid binary literal"
 check_error "** removed, exponentiation being ^" 'print(2 ** 3)' "use '^' for exponentiation"
-check_error "decimal alnum colle"        'print(42abc)'  "invalid number literal"
+check_error "a decimal literal with letters stuck to it"        'print(42abc)'  "invalid number literal"
 check_error "decimal underscore final"   'print(1_)'     "invalid number literal"
 check_error "decimal underscore double"  'print(1__0)'   "invalid number literal"
 check_error "decimal double point"       'print(1.2.3)'  "invalid number literal"
-check_error "exposant sans chiffre"      'print(1e)'     "invalid number literal"
-check_error "exposant signe sans chiffre" 'print(1e+)'   "invalid number literal"
-check_error "exposant underscore avant"  'print(1_e5)'   "invalid number literal"
-check_error "double exposant"            'print(1e5e6)'  "invalid number literal"
-check_error "exposant puis point"        'print(1e5.0)'  "invalid number literal"
-check_error "hex hors limites"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
-check_error "decimal hors limites"       'print(99999999999999999999999)' "out of range"
+check_error "an exponent with no digit"      'print(1e)'     "invalid number literal"
+check_error "a signed exponent with no digit" 'print(1e+)'   "invalid number literal"
+check_error "an underscore before the exponent"  'print(1_e5)'   "invalid number literal"
+check_error "a double exponent"            'print(1e5e6)'  "invalid number literal"
+check_error "an exponent followed by a dot"        'print(1e5.0)'  "invalid number literal"
+check_error "a hex literal out of range"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
+check_error "a decimal literal out of range"       'print(99999999999999999999999)' "out of range"
 
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
-check_error "appel optionnel sur entier" \
+check_error "an optional call on an integer" \
     'var x = 42
 print(x?())' \
     "call on non-function value"
-check_error "methode optionnelle sur champ data" \
+check_error "an optional method on a data field" \
     'class A
     func init() self.x = 7 end
 end
@@ -177,8 +177,8 @@ m.A = nil' \
 
 # ── ref ──────────────────────────────────────────────────────────────────────
 check_error "ref on undeclared variable" \
-    'var r = ref inconnue' \
-    "undeclared variable 'inconnue'"
+    'var r = ref unknown_name' \
+    "undeclared variable 'unknown_name'"
 
 check_error "ref on a literal" \
     'var r = ref 42' \
@@ -197,7 +197,7 @@ ui.checkbox("Grille", g)' \
     "must be a reference"
 
 check_error "ui.button without a function" \
-    'ui.button("Rejouer", 42)' \
+    'ui.button("Replay", 42)' \
     "must be a function"
 
 check_error "ui.button label not a string" \
@@ -211,17 +211,17 @@ check_error "ui.menu label not a string" \
 
 check_error "ui.slider without a reference" \
     'global v = 1
-ui.slider("Taille", v, 1, 10)' \
+ui.slider("Size", v, 1, 10)' \
     "must be a reference"
 
 check_error "ui.slider with min >= max" \
     'global v = 1
-ui.slider("Taille", ref v, 10, 1)' \
+ui.slider("Size", ref v, 10, 1)' \
     "min must be smaller than max"
 
 check_error "ui.slider bounds not numbers" \
     'global v = 1
-ui.slider("Taille", ref v, "a", 10)' \
+ui.slider("Size", ref v, "a", 10)' \
     "must be numbers"
 
 
@@ -232,7 +232,7 @@ tween.to(o, {x: 1}, 0)' \
 
 check_error "tween.to with unknown curve" \
     'global o = {x: 0}
-tween.to(o, {x: 1}, 1, "rebond")' \
+tween.to(o, {x: 1}, 1, "bounce_not_a_curve")' \
     "unknown curve"
 
 check_error "tween.to on a missing field" \
@@ -262,22 +262,22 @@ tween.to(o, {x: 1}, 1).repeat(2.5)' \
 
 check_error "tween.repeat with a non-numeric count" \
     'global o = {x: 0}
-tween.to(o, {x: 1}, 1).repeat("deux")' \
+tween.to(o, {x: 1}, 1).repeat("two")' \
     "a number or nil"
 
 check_error "ui.list without a reference" \
     'global v = nil
-ui.list("Couleur", ["a", "b"], v)' \
+ui.list("Colour", ["a", "b"], v)' \
     "must be a reference"
 
 check_error "ui.list with a bad source" \
     'global v = nil
-ui.list("Couleur", 3, ref v)' \
+ui.list("Colour", 3, ref v)' \
     "must be an array, a map or an enum"
 
 check_error "ui.list with an empty source" \
     'global v = nil
-ui.list("Couleur", [], ref v)' \
+ui.list("Colour", [], ref v)' \
     "list is empty"
 
 # Booleans: a sealed type. The sealing rests on a single point of passage (VM::as_double):
@@ -340,7 +340,7 @@ tween.sequence(o, [{to: {x: 1}, delay: -1}])' \
 
 check_error "tween.sequence with a non-numeric delay" \
     'global o = {x: 0}
-tween.sequence(o, [{to: {x: 1}, delay: "vite"}])' \
+tween.sequence(o, [{to: {x: 1}, delay: "fast"}])' \
     "must be a number of seconds"
 
 check_error "tween.sequence with an absent field" \
@@ -365,7 +365,7 @@ tween.sequence(o, [{to: {x: 1}, delay: 1}], func() end, func() end)' \
 
 check_error "tween.sequence with an unknown curve" \
     'global o = {x: 0}
-tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "aucune"}])' \
+tween.sequence(o, [{to: {x: 1}, delay: 1, curve: "no_such_curve"}])' \
     "unknown curve"
 
 check_error "tween.sequence with a tween as target" \

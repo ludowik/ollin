@@ -5,7 +5,7 @@
 
 Value make_window_module() {
     // Available drawing area: the playground's #output-pane container when it
-    // existe, sinon le viewport (page autonome run.html, page externe…).
+    // exists, otherwise the viewport (the standalone run.html, an external page).
     // Without a fallback, getElementById returns null and null.clientWidth throws.
     auto win = emscripten::val::global("window");
     int w = 0, h = 0;
@@ -17,7 +17,7 @@ Value make_window_module() {
         w = ow.as<int>();
         h = oh.as<int>();
     }
-    // 2) Sinon lecture directe de #output-pane (run.html, page externe…).
+    // 2) Otherwise #output-pane is read directly (run.html, an external page).
     if (w <= 0 || h <= 0) {
         auto document = emscripten::val::global("document");
         auto pane = document.call<emscripten::val>("getElementById", std::string("output-pane"));

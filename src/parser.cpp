@@ -867,7 +867,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
 
 // Precedence follows Lua: '^' binds tighter than unary minus.
 //   multiplicative → unary → power → primary
-//   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (droite)
+//   -2 ^ 2 == -(2^2) == -4 ;  2 ^ -1 == 0.5 ;  2 ^ 2 ^ 3 == 2^(2^3) (right-associative)
 std::unique_ptr<Expr> Parser::unary() {
     if (check(TokenType::MINUS)) {
         advance();
@@ -941,7 +941,7 @@ std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
                 ie->key = std::make_unique<StringExpr>(field);
                 base = std::move(ie);
             }
-        } else { // LPAREN ou QUESTION+LPAREN (appel optionnel)
+        } else { // LPAREN, or QUESTION+LPAREN for an optional call
             bool opt = false;
             if (check(TokenType::QUESTION)) {
                 advance();
@@ -1030,7 +1030,7 @@ std::unique_ptr<Expr> Parser::primary() {
         Token tok = advance();
         const std::string& lex = tok.lexeme;
         try {
-            // 0x.. / 0o.. / 0b.. : entiers base 16/8/2 (stoull → bit-pattern complet, wrapping int64)
+            // 0x.. / 0o.. / 0b..: integers in base 16/8/2 (stoull keeps the whole bit pattern, wrapping int64)
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'x' || lex[1] == 'X'))
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 16)));
             if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'o' || lex[1] == 'O'))

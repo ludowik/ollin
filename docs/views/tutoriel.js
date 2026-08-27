@@ -228,7 +228,7 @@ export async function init(ctx) {
       runBtn.innerHTML = ICONS.run
       runBtn.addEventListener('click', () => {
         if (!ollin) {
-          outDiv.textContent   = 'Runtime en cours de chargement…'
+          outDiv.textContent   = 'Loading the runtime…'
           outDiv.className     = 'inline-output wait'
           outDiv.style.display = 'block'
           return
@@ -237,7 +237,7 @@ export async function init(ctx) {
         // Shared execution: it handles try/catch, graphics frame errors and a top-level error
         // arising after the canvas is open.
         Run.runProgram(ollin, text, canvas, {
-          onRunning: () => {                       // programme graphique : canvas sous le bloc
+          onRunning: () => {                       // a graphics program: the canvas goes under the block
             outDiv.style.display = 'none'
             canvas.style.maxWidth = '100%'
             canvas.style.borderRadius = '6px'

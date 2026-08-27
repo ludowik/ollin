@@ -136,8 +136,8 @@ if [ -n "$residue" ]; then
 fi
 
 if [ $bad -eq 0 ]; then
-    echo "OK   nommage (API camelCase ; C++ interne snake_case)"
+    echo "OK   naming (the Ollin API in camelCase; the C++ internals in snake_case)"
     exit 0
 fi
-echo "$bad nom(s) non conforme(s)"
+echo "$bad name(s) not conforming"
 exit 1

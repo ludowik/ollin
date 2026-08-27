@@ -158,11 +158,11 @@ inline double sound_check_duration(const Value* args, int argc, int i, const cha
 
 // Volume and pan are clamped silently, like the master volume. A pan of -1 is left, 0 centre and
 // 1 right, following raylib and p5.
-inline double sound_check_unit(const Value* args, int argc, int i, const char* fn, const char* quoi, double mini) {
+inline double sound_check_unit(const Value* args, int argc, int i, const char* fn, const char* what, double mini) {
     if (i >= argc || args[i].is_nil())
         return -2.0;   // missing: the caller keeps its current value
     if (!args[i].is_number())
-        throw std::runtime_error(std::string(fn) + ": " + quoi + " must be a number");
+        throw std::runtime_error(std::string(fn) + ": " + what + " must be a number");
     double v = args[i].as_num();
     return v < mini ? mini : (v > 1.0 ? 1.0 : v);
 }

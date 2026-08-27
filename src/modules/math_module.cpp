@@ -274,7 +274,7 @@ static int math_rand(CallCtx& ctx) {
 static int64_t int_arg(const Value* args, int argc, int i, const char* fn) {
     double d = num_arg(args, argc, i, fn);
     if (!double_fits_int64(d))
-        throw std::runtime_error(std::string(fn) + ": argument entier hors plage");
+        throw std::runtime_error(std::string(fn) + ": integer argument out of range");
     return (int64_t)d;
 }
 
@@ -336,7 +336,7 @@ Value make_math_module() {
     srand((unsigned)time(nullptr));
     noise_init_default();
     Value m = Value::make_map();
-    // constantes
+    // constants
     m.map_set(Value(std::string("PI")), Value(M_PI));
     m.map_set(Value(std::string("TAU")), Value(2.0 * M_PI));
     m.map_set(Value(std::string("E")), Value(2.718281828459045235360));
@@ -353,7 +353,7 @@ Value make_math_module() {
     m.map_set(Value(std::string("clamp")), Value::make_builtin(math_clamp));
     m.map_set(Value(std::string("min")), Value::make_builtin(math_min));
     m.map_set(Value(std::string("max")), Value::make_builtin(math_max));
-    // logarithmes / exponentielle
+    // logarithms and the exponential
     m.map_set(Value(std::string("exp")), Value::make_builtin(math_exp));
     m.map_set(Value(std::string("log")), Value::make_builtin(math_log));
     m.map_set(Value(std::string("log2")), Value::make_builtin(math_log2));

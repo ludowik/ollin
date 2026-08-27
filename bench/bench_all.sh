@@ -16,10 +16,10 @@ OLLIN=$([ -x "./build/ollin" ] && echo "./build/ollin" || echo "./build/ollin.ex
 # glob on binary names: `python3.[0-9]*` caught `python3.13-config`, which runs nothing, and the
 # table came out empty.
 first_present() {
-    local nom
-    for nom in "$@"; do
-        if command -v "$nom" >/dev/null 2>&1; then
-            echo "$nom"
+    local name
+    for name in "$@"; do
+        if command -v "$name" >/dev/null 2>&1; then
+            echo "$name"
             return 0
         fi
     done

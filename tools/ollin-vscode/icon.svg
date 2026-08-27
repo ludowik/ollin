@@ -19,7 +19,7 @@
 
   <!-- 8 stepped Aztec pyramids pointing outwards -->
   <!-- Base at y=27 (slightly inside the ring, to remove the gap), apex at y=5 -->
-  <!-- Largeurs par palier : 18 (y=21→27)  14 (y=15→21)  10 (y=9→15)  6 (y=5→9) -->
+  <!-- Width per step: 18 (y=21-27)  14 (y=15-21)  10 (y=9-15)  6 (y=5-9) -->
   <g fill="url(#g)">
     <polygon transform="rotate(  0,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>
     <polygon transform="rotate( 45,100,100)" points="91,27 109,27 109,21 107,21 107,15 105,15 105,9 103,9 103,5 97,5 97,9 95,9 95,15 93,15 93,21 91,21"/>

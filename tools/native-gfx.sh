@@ -18,7 +18,7 @@ for d in build-gfx/_deps/raylib-src build_wasm/_deps/raylib-src build/_deps/rayl
 done
 
 if [ -z "$RAYSRC" ]; then
-    echo "Source raylib introuvable en cache."
+    echo "No raylib source found in the cache."
     echo "Run the WASM build first (bash tools/build-wasm.sh): it fetches raylib into"
     echo "  build_wasm/_deps/raylib-src, which is reused here."
     echo "  (github being blocked by the proxy, raylib cannot be cloned on the fly.)"

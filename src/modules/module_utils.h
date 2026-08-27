@@ -79,13 +79,13 @@ static inline ColorRGBA parse_color(const Value* args, int argc, const char* fn)
         throw std::runtime_error(std::string(fn) + ": expected a number or a Color");
     double n0 = color_clamp01(args[0].as_num());
     if (argc == 1)
-        return {n0, n0, n0, 1.0};                                  // gris
+        return {n0, n0, n0, 1.0};                                  // grey
     for (int i = 1; i < argc && i < 4; i++) {
         if (!args[i].is_number())
             throw std::runtime_error(std::string(fn) + ": expected numbers");
     }
     if (argc == 2)
-        return {n0, n0, n0, color_clamp01(args[1].as_num())};        // gris + alpha
+        return {n0, n0, n0, color_clamp01(args[1].as_num())};        // grey + alpha
     double g = color_clamp01(args[1].as_num());
     double b = color_clamp01(args[2].as_num());
     double a = argc >= 4 ? color_clamp01(args[3].as_num()) : 1.0;

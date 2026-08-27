@@ -462,7 +462,7 @@ struct MultiAssignStmt : Stmt {
 // a map). Two variables: var1 is the key or index, var2 the value.
 struct ForIterStmt : Stmt {
     std::string var1; // always bound: the key with two variables, the primary one with a single variable
-    std::string var2; // vide = forme 1 var
+    std::string var2; // empty = the one-variable form
     std::unique_ptr<Expr> iter_expr;
     std::vector<std::unique_ptr<Stmt>> body;
     void for_each_body(const BodyFn& f) const override {
@@ -568,7 +568,7 @@ struct EnumItem {
 };
 
 struct EnumDeclStmt : Stmt {
-    std::string name;                   // nom simple (globale) ; sinon nom du champ
+    std::string name;                   // a bare name (a global); otherwise the field's name
     std::unique_ptr<Expr> obj_expr;     // non-null for `enum obj.field`: the target map
     std::vector<EnumItem> items;
     void exported_names(std::vector<std::string>& out) const override {

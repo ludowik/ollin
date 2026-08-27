@@ -161,7 +161,7 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     }
     int call_base = (int)regs.size();
     grow_regs((size_t)(call_base + std::max((int)ch->funcs[fi].reg_count, 1)));
-    regs[call_base] = obj; // self en R[0] avant pushCallFrame
+    regs[call_base] = obj; // self in R[0], before push_call_frame
     uint32_t saved_ip = ip;
     ip = push_call_frame(call_base, fi, 1, std::move(frame_upvals), 0);
     run_goto(call_stack.size() - 1);
@@ -338,7 +338,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(fn, fuv); // fn est callable (garde ci-dessus)
+    uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
     int nb = (int)regs.size();
     grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb] = std::move(lhs);
@@ -354,7 +354,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(fn, fuv); // fn est callable (garde ci-dessus)
+    uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
     int nb = (int)regs.size();
     grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[nb] = std::move(lhs);
@@ -850,7 +850,7 @@ dispatch_loop:
     op_ADD: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier + entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int + int
             regs[base + A] = Value(bv.as_int() + cv.as_int());
             NEXT();
         }
@@ -880,7 +880,7 @@ dispatch_loop:
     op_SUB: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier - entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int - int
             regs[base + A] = Value(bv.as_int() - cv.as_int());
             NEXT();
         }
@@ -898,7 +898,7 @@ dispatch_loop:
     op_MUL: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier * entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int * int
             regs[base + A] = Value(bv.as_int() * cv.as_int());
             NEXT();
         }
@@ -931,7 +931,7 @@ dispatch_loop:
     op_MOD: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier % entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int % int
             if (cv.as_int() == 0)
                 throw std::runtime_error(err_line() + ": runtime: modulo by zero");
             regs[base + A] = Value(bv.as_int() % cv.as_int());
@@ -1018,7 +1018,7 @@ dispatch_loop:
     op_EQ: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier == entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int == int
             regs[base + A] = Value::make_bool(bv.as_int() == cv.as_int());
             NEXT();
         }
@@ -1052,7 +1052,7 @@ dispatch_loop:
         // GT(a,b) == LT(b,a): check __lt on rhs
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier > entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int > int
             regs[base + A] = Value::make_bool(bv.as_int() > cv.as_int());
             NEXT();
         }
@@ -1069,7 +1069,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+        if (bv.is_string() && cv.is_string()) { // lexicographic order
             regs[base + A] = Value::make_bool(bv.as_string() > cv.as_string());
             NEXT();
         }
@@ -1080,7 +1080,7 @@ dispatch_loop:
     op_LT: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier < entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int < int
             regs[base + A] = Value::make_bool(bv.as_int() < cv.as_int());
             NEXT();
         }
@@ -1097,7 +1097,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+        if (bv.is_string() && cv.is_string()) { // lexicographic order
             regs[base + A] = Value::make_bool(bv.as_string() < cv.as_string());
             NEXT();
         }
@@ -1109,7 +1109,7 @@ dispatch_loop:
         // GE(a,b) == LE(b,a): check __le on rhs
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier >= entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int >= int
             regs[base + A] = Value::make_bool(bv.as_int() >= cv.as_int());
             NEXT();
         }
@@ -1126,7 +1126,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+        if (bv.is_string() && cv.is_string()) { // lexicographic order
             regs[base + A] = Value::make_bool(bv.as_string() >= cv.as_string());
             NEXT();
         }
@@ -1137,7 +1137,7 @@ dispatch_loop:
     op_LE: {
         const Value& bv = regs[base + B];
         const Value& cv = regs[base + C];
-        if (bv.is_integer() && cv.is_integer()) { // chemin chaud : entier <= entier
+        if (bv.is_integer() && cv.is_integer()) { // the hot path: int <= int
             regs[base + A] = Value::make_bool(bv.as_int() <= cv.as_int());
             NEXT();
         }
@@ -1154,7 +1154,7 @@ dispatch_loop:
                 NEXT();
             }
         }
-        if (bv.is_string() && cv.is_string()) { // ordre lexicographique
+        if (bv.is_string() && cv.is_string()) { // lexicographic order
             regs[base + A] = Value::make_bool(bv.as_string() <= cv.as_string());
             NEXT();
         }
@@ -1210,7 +1210,7 @@ dispatch_loop:
         {
             const Frame& fr = call_stack.back();
             int n_va = fr.n_varargs;
-            int count = B;                       // 0 = tous ; sinon nombre fixe (padding nil)
+            int count = B;                       // 0 = all of them; otherwise a fixed count, padded with nil
             int n = (count == 0) ? n_va : count;
             size_t needed = (size_t)(base + A + n);
             if ((int)regs.size() < (int)needed)
@@ -1569,7 +1569,7 @@ dispatch_loop:
                 for (int i = 0; i < k; ++i)
                     regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base, so copying downwards is safe
             } else if (fn.is_class()) {
-                for (int i = 0; i < total; ++i) // repli rare : instancie au registre statique
+                for (int i = 0; i < total; ++i) // a rare fallback: instantiate at the static register
                     regs[fixed_base + i] = regs[fresh + i];
                 bool done;
                 uint32_t addr = instantiate_class(fixed_base, 0, total, fn, done);

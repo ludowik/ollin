@@ -193,7 +193,7 @@ assert(ck_s1 == ck_s2)
 
 ## ── value: num_value no longer casts undefined behaviour on a non-finite or out-of-range value
 ## (math.* can produce inf and nan, and a huge float literal exceeds int64)
-assert(math.exp(1000) > 1000000000000000000)   ## inf → reste flottant, comparable
+assert(math.exp(1000) > 1000000000000000000)   ## inf stays a float, and stays comparable
 assert(math.sqrt(-1) <> math.sqrt(-1))          ## nan is not nan: it stays a float nan
 var big_f = 100000000000000000000.5
 assert(big_f > 1000000000000000000)             ## ~1e20 stays a float, with no undefined cast
@@ -219,7 +219,7 @@ mk2[1] = 10
 assert(mk2[1.0] == 10)
 ## a WHOLE float key beyond the int64 range (before, ValueHash cast to int64, which is undefined
 ## behaviour and traps on WASM). It must work like any other key.
-var mk_huge = math.pow(2.0, 100)     ## 2^100, float entier >> 2^63
+var mk_huge = math.pow(2.0, 100)     ## 2^100: a float, integral, far beyond 2^63
 mk2[mk_huge] = 42
 assert(mk2[mk_huge] == 42)
 mk2[-mk_huge] = 43
@@ -236,7 +236,7 @@ end
 assert(rng_c1 == "x")                          ## it must throw, not loop
 global rng_c2 = "none"
 try
-    var rng_bad = ]0; math.exp(1000)]          ## range ouvert (MAKE_RANGE), borne +inf
+    var rng_bad = ]0; math.exp(1000)]          ## an open range (MAKE_RANGE) with a +inf bound
 catch e
     rng_c2 = "x"
 end
@@ -265,7 +265,7 @@ assert(col_a.r == 0.5 and col_a.b == 0.5)
 var col_c = Color(1, 0, 0)
 var col_b = col_c.gray(0.25)            ## the SAME method, on an instance: the parameter sits in R[0]
 assert(col_b.r == 0.25 and col_b.g == 0.25)
-assert(Color.random().a == 1 and col_c.random().a == 1)  ## random statique, deux modes
+assert(Color.random().a == 1 and col_c.random().a == 1)  ## a static random, in both modes
 
 ## ── core: printing several instances that have __str (a use-after-free before) ──
 ## value_to_string(__str) runs bytecode and may reallocate regs; print read args[i] straight from
@@ -285,7 +285,7 @@ print(PrUAF(1), 42, PrUAF(2), PrUAF(3))
 print(pr_deep(30), PrUAF(4), pr_deep(20))
 
 ## ── math: int consistency (clamp, pow and logn folded as MATH1 and min/max), plus map and 0 ──
-assert(typeof(math.clamp(5, 0, 10)) == "int")   ## avant : float
+assert(typeof(math.clamp(5, 0, 10)) == "int")   ## before: a float
 assert(math.clamp(5, 0, 10) == 5)
 assert(typeof(math.pow(2, 3)) == "int" and math.pow(2, 3) == 8)
 assert(typeof(math.pow(2, 0.5)) == "float")     ## a non-integer stays a float
@@ -299,10 +299,10 @@ assert(string.char("abc", 1e300) == "")         ## an index out of range gives "
 assert(string.char("abc", math.sqrt(-1)) == "") ## NaN
 assert(string.substr("hello", 1e300) == "")
 assert(string.substr("hello", 2, 1e300) == "ello")  ## a huge len is clamped
-assert(string.char("abc", 2) == "b")            ## cas normal
+assert(string.char("abc", 2) == "b")            ## the ordinary case
 global str_c = "none"
 try
-    var r = math.randInt(1e300)                ## arg hors plage int64 → erreur claire
+    var r = math.randInt(1e300)                ## an argument out of int64 range gives a clear error
 catch e
     str_c = "x"
 end
@@ -462,10 +462,10 @@ assert(shadow_x == 1)
 func shadow_outer()
     var z = 3
     do
-        var z = z + 100   ## RHS = z externe (3)
+        var z = z + 100   ## the right-hand side reads the OUTER z (3)
         assert(z == 103)
     end
-    return z              ## externe intacte
+    return z              ## the outer one is untouched
 end
 assert(shadow_outer() == 3)
 
@@ -478,7 +478,7 @@ assert("{(255):x}" == "ff")                     ## hex, on a parenthesised expre
 assert("{(255):#06x}" == "0x00ff")             ## the # flag, zero padding and a width
 assert("{(-7):+d}" == "-7")                     ## a forced sign
 assert("{(42):d}" == "42")
-assert("{(3.9):d}" == "3")                       ## coercition float→int (troncature)
+assert("{(3.9):d}" == "3")                       ## a float coerced to an int, hence truncated
 assert("{"hi":5s}" == "   hi")                 ## width 5, right-aligned, as C defaults to
 assert("{"hi":-5s}" == "hi   ")                ## '-' means left-aligned, the C printf syntax, not '>'
 ## the ':' of a nested map is NOT a spec separator
@@ -540,7 +540,7 @@ class ICB extends ICA
     end
 end
 var ica = ICA(1)
-assert(ica.v == 1)         ## champ propre → cacheable
+assert(ica.v == 1)         ## an own field, hence cacheable
 ica.v = 2
 assert(ica.v == 2)         ## a mutation of the instance bumps the version, so nothing stale
 ICA["tag"] = "c1"
@@ -600,12 +600,12 @@ class NilSh
         self.a = 1
     end
     func m()
-        return "classe"
+        return "klass"
     end
 end
 var nsh = NilSh()
 nsh["m"] = nil
-assert(nsh.m() == "classe")     ## the class method stays reachable
+assert(nsh.m() == "klass")     ## the class method stays reachable
 var nlen = {}
 nlen["len"] = nil
 assert(nlen.len() == 1)         ## the built-in `len` fallback; the map has one key
@@ -613,11 +613,11 @@ assert(nlen.len() == 1)         ## the built-in `len` fallback; the map has one 
 ## ── enum ────────────────────────────────────────────────────────────────────
 ## Numbering: 1 by default, then +1 each time; an integer literal redefines what follows; a
 ## non-literal value — here a string — leaves the counter where it is.
-enum RgEtat REPOS = 0, MARCHE, SAUT = 10, CHUTE end
-assert(RgEtat.REPOS == 0 and RgEtat.MARCHE == 1)
-assert(RgEtat.SAUT == 10 and RgEtat.CHUTE == 11)
-enum RgMix A, B = "texte", C end
-assert(RgMix.A == 1 and RgMix.B == "texte" and RgMix.C == 2)
+enum RgState IDLE = 0, WALK, JUMP = 10, FALL end
+assert(RgState.IDLE == 0 and RgState.WALK == 1)
+assert(RgState.JUMP == 10 and RgState.FALL == 11)
+enum RgMix A, B = "text", C end
+assert(RgMix.A == 1 and RgMix.B == "text" and RgMix.C == 2)
 enum RgNeg X = -3, Y end
 assert(RgNeg.X == -3 and RgNeg.Y == -2)
 enum RgAlias UN = 1, FIRST = 1 end       ## a repeated value is an alias, and is allowed
@@ -900,19 +900,19 @@ assert(rfGlobal == 3)
 ## A reference taken on a BLOCK local: readable after the block ends, the upvalue having been
 ## closed over a copy, and a write no longer reaches anything — behaviour frozen here so that a
 ## change to the upvalue mechanism shows up.
-var rfEchappe = nil
+var rfEscaped = nil
 do
-    var rfInterne = "dedans"
-    rfEchappe = ref rfInterne
+    var rfInner = "inside"
+    rfEscaped = ref rfInner
 end
-assert(rfEchappe.get() == "dedans")
+assert(rfEscaped.get() == "inside")
 
 
 ## ── The tween module ───────────────────────────────────────────────────────
 ## Advancing by EXACT steps (0.25 × 4): a step of 0.1 accumulated ten times does not quite make
 ## one second in binary, and the tween would not be finished.
 tween.cancelAll()
-var twObj = {x: 0, n: 0, teinte: Color(0, 0, 0)}
+var twObj = {x: 0, n: 0, tint: Color(0, 0, 0)}
 var twT = tween.to(twObj, {x: 8}, 1.0, "linear")
 tween.update(0.25)
 tween.update(0.25)
@@ -938,9 +938,9 @@ tween.update(0.5)
 assert(twObj.x == 20 and twFini)
 
 ## Structural interpolation: a class instance animates field by field.
-tween.to(twObj, {teinte: Color(1, 0.5, 0)}, 1.0, "linear")
+tween.to(twObj, {tint: Color(1, 0.5, 0)}, 1.0, "linear")
 tween.update(1.0)
-assert(twObj.teinte.r == 1 and twObj.teinte.g == 0.5 and twObj.teinte.b == 0)
+assert(twObj.tint.r == 1 and twObj.tint.g == 0.5 and twObj.tint.b == 0)
 
 ## A plain variable by reference, and a curve given as a FUNCTION.
 var twVal = 0
@@ -1038,9 +1038,9 @@ assert(liD == "easy")          ## an enum sorted by value, hence in declaration 
 assert(liR == "alpha")           ## a map sorted by label, hence the first in alphabetical order
 
 ## A selection already set is honoured: the initialisation only applies to nil.
-var liKept = "bleu"
+var liKept = "blue"
 ui.list("Colour", liTints, ref liKept)
-assert(liKept == "bleu")
+assert(liKept == "blue")
 
 ## The handle of a finished tween can be queried without error: keeping the handle is normal.
 assert(twT.isDone() and twT.progress() == 1)
@@ -1081,14 +1081,14 @@ maP, maQ = maQ, maP
 assert(maP == 2 and maQ == 1)
 ## A method and varargs take the same path as a named function.
 class MyPair
-    func deux()
+    func two()
         return 8, 9
     end
 end
 var myObj = MyPair()
 var maD1 = 0
 var maD2 = 0
-maD1, maD2 = myObj.deux()
+maD1, maD2 = myObj.two()
 assert(maD1 == 8 and maD2 == 9)
 func maVarargs(...)
     var maV1, maV2 = ...
@@ -1137,12 +1137,12 @@ func plWalk(mods, turns)
     var o = {x: 0}
     var t = tween.to(o, {x: 10}, 1.0, "linear")
     mods(t)
-    var vues = []
+    var seen = []
     for i = 1, turns do
         tween.update(0.5)
-        vues[#vues + 1] = math.round(o.x)
+        seen[#seen + 1] = math.round(o.x)
     end
-    return vues
+    return seen
 end
 
 ## repeat(2): two forward passes. At the end of the first, the position returns to the start.
@@ -1257,7 +1257,7 @@ for i = 1, 3 do
 end
 assert(bcount == 2)
 while false do
-    assert(nil)   ## jamais atteint
+    assert(nil)   ## never reached
 end
 
 ## ── data: a boolean survives persistence ───────────────────────────────────
@@ -1271,14 +1271,14 @@ data.set("bs", "x")
 assert(data.get("bt") == true)
 assert(data.get("bf") == false)
 assert(data.get("bn") == 42 and data.get("bs") == "x")
-assert(data.has("bt") and not data.has("jamais_ecrit"))
+assert(data.has("bt") and not data.has("never_written"))
 
 ## The type survives the encoding: what comes back is a BOOLEAN, not the integer 1.
 assert(data.get("bt") <> 1)
 assert(data.get("bf") <> 0)
 
 ## The default value of a missing key, and deletion through nil.
-assert(data.get("jamais_ecrit", "defaut") == "defaut")
+assert(data.get("never_written", "defaut") == "defaut")
 data.set("bt", nil)
 assert(not data.has("bt"))
 data.set("bf", nil)
@@ -1584,7 +1584,7 @@ var idTab = [1, 2]
 var idTabAlias = idTab
 assert(idTab == idTabAlias)
 assert(not (idTab <> idTabAlias))
-assert(idTab <> [1, 2])          ## contenu identique, objets distincts
+assert(idTab <> [1, 2])          ## same contents, distinct objects
 var idRange = [1;5]
 var idRangeAlias = idRange
 assert(idRange == idRangeAlias)
@@ -1632,9 +1632,9 @@ for i = 1, 20 do
     v.trigger(0.05)
     v.free()
 end
-var autre = sound.sine(660)
-assert(autre.isPlaying() == false)
-autre.free()
+var other = sound.sine(660)
+assert(other.isPlaying() == false)
+other.free()
 
 ## A native member that calls back into Ollin must not keep a REFERENCE into the register file:
 ## the call can grow it, which reallocates it. map/filter/reduce/sort held `ctx.args[0]` and

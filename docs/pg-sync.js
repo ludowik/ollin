@@ -18,7 +18,7 @@
 // dirty…). `onError(err, project)` notifies, and must not throw.
 
 export function createRemoteSync({ doPush, canPush, onError, debounceMs = 3000, retryMs = 15000 } = {}) {
-  let timer    = null    // debounce en cours
+  let timer    = null    // the debounce in flight
   let pending  = null    // the last project waiting to be pushed
   let inFlight = false    // a push is under way
   let requeue  = false   // an edit arrived while the push was in flight

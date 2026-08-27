@@ -85,7 +85,7 @@ enum class Op : uint8_t {
     MAKE_CLOSURE,   // ABx: A=dest, Bx=func_idx → create closure, capture upvals from current frame
     GET_UPVAL,      // AB:  A=dest, B=upval_idx → R[A] = upval[B]
     SET_UPVAL,      // AB:  A=src,  B=upval_idx → upval[B] = R[A]
-    NEW_CLASS,      // A:   R[A] = T_CLASS (nouvelle map prototype vide)
+    NEW_CLASS,      // A:   R[A] = T_CLASS (a fresh, empty prototype map)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags
                     // (bit0 = incl_right, bit1 = has_step)
@@ -93,9 +93,9 @@ enum class Op : uint8_t {
               // (towards FOR_LOOP)
     FOR_LOOP, // ABx: i+=step; within the limit (inclusive) → R[A]=i, ip=Bx (body); otherwise falls through (exit)
     SPREAD_RESULTS, // AB: multi-return destructuring — sets R[A+last_results..A+B-1] to nil
-    CALL_VA,        // ABC: A=arg_base, B=func_val_reg, C=n_fixe ; argc = C + last_results_ (dernier
+    CALL_VA,        // ABC: A=arg_base, B=func_val_reg, C=n_fixed; argc = C + last_results_ (the last
                     // argument is a multi-value call, already materialized after the fixed ones)
-    CALL_VARARGS,   // ABC: A=arg_base(fixes), B=func_val_reg, C=n_fixe ; dernier argument = `...`.
+    CALL_VARARGS,   // ABC: A=arg_base(the fixed ones), B=func_val_reg, C=n_fixed; the last argument is `...`.
                     // Gathers the fixed arguments and the current frame's varargs into a FRESH area
                     // (above the caller's varargs, so nothing is overwritten), calls, and returns
                     // the results at A, the callee frame's result_base.

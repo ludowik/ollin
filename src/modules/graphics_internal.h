@@ -54,7 +54,7 @@ int gfx_segments();
 void reset3d_shape_cache();
 
 // Bridges from 2D to 3D, defined in graphics3d.cpp.
-void end3d_internal();          // flush des buckets + EndMode3D (no-op hors bloc 3D)
+void end3d_internal();          // flushes the buckets, then EndMode3D (a no-op outside a 3D block)
 void reset3d_lighting_state();   // resets the 3D lighting to its default state
 void reset3d_graphics_state();   // frees the 3D GL resources, before the context is destroyed
 void reset3d_frame_state();      // resets the current 3D texture; called every frame by reset_styles

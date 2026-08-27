@@ -169,25 +169,25 @@ int s_cur_count = 0;
 void sample_contacts() {
     // No focus test here: IsWindowFocused() answers false on a real phone as soon as a browser
     // ornament takes over, and it then cut off fingers that were still down.
-    int brut = GetTouchPointCount();
-    if (brut > k_max_points)
-        brut = k_max_points;
+    int raw = GetTouchPointCount();
+    if (raw > k_max_points)
+        raw = k_max_points;
     // No contact reported means no phantom is possible, so there is nothing to filter and the set of
     // lifted identifiers is of no further use. We cross the boundary only at the TRANSITION, since
     // otherwise a frame without a single finger — nearly all of a program — would pay a round trip to
     // receive an empty mask.
-    if (brut == 0) {
+    if (raw == 0) {
         s_cur_count = 0;
         if (s_prev_count > 0)
             forget_all_lifted();
         return;
     }
     int ids[k_max_points];
-    for (int i = 0; i < brut; i++)
+    for (int i = 0; i < raw; i++)
         ids[i] = GetTouchPointId(i);
-    int lifted = lifted_mask(ids, brut);
+    int lifted = lifted_mask(ids, raw);
     s_cur_count = 0;
-    for (int i = 0; i < brut; i++) {
+    for (int i = 0; i < raw; i++) {
         if (lifted & (1 << i))
             continue;
         Vector2 p = GetTouchPosition(i);

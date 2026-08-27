@@ -68,7 +68,7 @@ Token Lexer::number(bool leading_dot) {
                     return (bool)std::isxdigit((unsigned char)c);
                 if (pl == 'o')
                     return c >= '0' && c <= '7';
-                return c == '0' || c == '1'; // binaire
+                return c == '0' || c == '1'; // binary
             };
             bool any = false, last_was_digit = false;
             while (!at_end()) {
@@ -135,7 +135,7 @@ Token Lexer::number(bool leading_dot) {
             advance();
             exp_digit = true;
         }
-        if (!exp_digit) // 'e' sans chiffre (ex. 1e, 1e+)
+        if (!exp_digit) // an 'e' with no digit (1e, 1e+)
             throw std::runtime_error(filename_ + ":" + std::to_string(line) + ": invalid number literal");
         last_was_digit = true;
         prev_underscore = false;

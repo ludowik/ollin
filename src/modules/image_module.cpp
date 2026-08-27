@@ -170,7 +170,7 @@ static Value make_handle(int id, int w, int h, TexHandle* ptr) {
     static const Value K_ID(std::string("id")), K_WIDTH(std::string("width")), K_HEIGHT(std::string("height"));
     Value m = Value::make_map();
     m.mptr->userdata = ptr;
-    m.map_set(K_ID, Value((int64_t)id));   // requis par graphics.sprite
+    m.map_set(K_ID, Value((int64_t)id));   // required by graphics.sprite
     m.map_set(K_WIDTH, Value((int64_t)w));
     m.map_set(K_HEIGHT, Value((int64_t)h));
     return m;
@@ -405,7 +405,7 @@ static int img_draw(CallCtx& ctx) {
     float y = (float)num_arg(args, 2, FN);
     float dw = argc > 3 ? (float)num_arg(args, 3, FN) : (float)tex.width;
     float dh = argc > 4 ? (float)num_arg(args, 4, FN) : (float)tex.height;
-    // teinte : argument explicite prioritaire, sinon teinte globale (graphics.tint)
+    // the tint: an explicit argument wins, otherwise the global one (graphics.tint)
     Color tint = (argc > 5 && args[5].is_map()) ? to_color(args[5]) : (s_has_tint ? s_tint : WHITE);
 
     // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
@@ -429,7 +429,7 @@ static int img_unload(CallCtx& ctx) {
         return ctx.ret(Value{});
     args[0].mptr->userdata = nullptr;
     if (h.cpu.data)
-        UnloadImage(h.cpu);   // ombre CPU persistante
+        UnloadImage(h.cpu);   // the persistent CPU-side copy
     if (h.is_render)
         UnloadRenderTexture(h.rtt);
     else
