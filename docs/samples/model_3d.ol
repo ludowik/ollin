@@ -1,6 +1,7 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
+## Wheel or pinch to zoom.
 ## The "Model" menu switches between them, covering the two ways a file can carry its appearance:
 ## a model may hold its geometry ALONE, and then the fill tints it, or it may hold a TEXTURE, and
 ## then a white fill shows it as painted. Three of them are borrowed classics, each bringing its
@@ -26,8 +27,18 @@ global models = [
 global current = nil   ## the entry on display
 global sz = nil       ## the model's dimensions, for the framing
 
+## The zoom multiplies the framing distance rather than replacing it, so every model keeps being
+## framed by its own size and the gesture only says "closer" or "further".
+global zoom = {
+    factor:    1.0,
+    min:       0.35,
+    max:       4.0,
+    wheelStep: 0.1     ## zoom fraction per wheel notch
+}
+
 func choose(i)
     current = models[i]
+    zoom.factor = 1.0   ## each model has its own framing: the previous zoom means nothing here
     ## graphics.model caches the model, so calling it again in draw() reloads nothing.
     sz = graphics.modelSize(graphics.model(current.file))
     graphics.ambient(current.ambient)
@@ -53,7 +64,10 @@ func mouse.pressed(x, y)
     ball.press(x, y)
 end
 
+## A pinch is not a drag: while two fingers are down, the system still emulates the mouse with one
+## of them, and the model would spin as one zooms.
 func mouse.moved(x, y)
+    if touch.count() > 1 then return end
     ball.move(x, y)
 end
 
@@ -61,9 +75,25 @@ func mouse.released(x, y)
     ball.release()
 end
 
+## The zoom lives in ONE function; the two gestures only differ by the factor they hand it — a
+## wheel notch is a step, a pinch is a ratio.
+func zoomBy(factor)
+    zoom.factor = math.max(zoom.min, math.min(zoom.max, zoom.factor * factor))
+end
+
+func mouse.scrolled(x, y, dx, dy)
+    zoomBy(1.0 + dy * zoom.wheelStep)
+end
+
+## Spreading fingers (scale > 1) bring the model closer, which is a LARGER factor here: the
+## distance is divided by it below.
+func touch.pinch(scale, cx, cy)
+    zoomBy(scale)
+end
+
 func draw()
     graphics.clear(colors.BLACK)
-    var dist = graphics.fitDistance(sz.radius) * current.margin
+    var dist = graphics.fitDistance(sz.radius) * current.margin / zoom.factor
     cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## a FIXED camera, framed
     cam.lookAt(sz.cx, sz.cy, sz.cz)
     ball.idle(30)   ## a gentle rotation while nobody is dragging
@@ -77,5 +107,5 @@ func draw()
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.text(current.name + " - drag to turn", 12, 12)
+    graphics.text(current.name + " - drag to turn, wheel or pinch to zoom", 12, 12)
 end
