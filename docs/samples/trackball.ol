@@ -4,6 +4,7 @@
 ##   orient()  gives the current orientation quaternion, to pass to graphics.rotateq
 ##   dragging  → true while dragging, so an automatic rotation can be suspended
 ##   idle(degreesPerSecond)  a gentle rotation at rest, to be called in draw()
+##   reset()   back to the starting orientation, for a "recentre the view" gesture
 ##
 ## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
 ## module cannot catch them itself, hence three relays:
@@ -32,6 +33,13 @@ class Trackball
 
     func orient()
         return self.q
+    end
+
+    ## Back to the orientation of the first frame. The drag is released as well: a reset triggered
+    ## in the middle of one would otherwise keep turning from the old reference point.
+    func reset()
+        self.q = graphics.quat()
+        self.dragging = false
     end
 
     func press(x, y)

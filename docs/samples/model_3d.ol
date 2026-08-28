@@ -1,7 +1,7 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
-## Wheel or pinch to zoom.
+## Wheel or pinch to zoom, double-click to recentre.
 ## The "Model" menu switches between them, covering the three ways a file can carry its appearance:
 ## a model may hold its geometry ALONE, and then the fill tints it; it may hold a TEXTURE, and then
 ## a white fill shows it as painted; or it may hold a COLOUR PER VERTEX, which paints one mesh in
@@ -95,6 +95,13 @@ func touch.pinch(scale, cx, cy)
     zoomBy(scale)
 end
 
+## Recentre: the orientation AND the zoom go back to their starting values, which is what makes
+## the gesture a way out when the model has been turned or zoomed off.
+func mouse.doubleClicked(x, y)
+    ball.reset()
+    zoom.factor = 1.0
+end
+
 func draw()
     graphics.clear(colors.BLACK)
     var dist = graphics.fitDistance(sz.radius) * current.margin / zoom.factor
@@ -111,5 +118,5 @@ func draw()
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.text(current.name + " - drag to turn, wheel or pinch to zoom", 12, 12)
+    graphics.text(current.name + " - drag: turn   wheel or pinch: zoom   double-click: reset", 12, 12)
 end
