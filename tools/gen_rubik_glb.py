@@ -18,10 +18,16 @@ outer face reads its own sticker from the atlas — the mapping is a function of
 so the painting lines up with the geometry by construction rather than by a table to keep in step.
 The centre cubie is left out: it can never be seen.
 
+The cube is SCRAMBLED: each of the 54 stickers gets its own colour, nine of each. It is a shuffle
+of the stickers with a fixed seed, so the file is reproducible — NOT the result of legal turns, so
+the state is very probably unsolvable. Nothing here claims otherwise; what matters is that the six
+faces no longer show one flat colour each, which is what a texture atlas is for.
+
 The picture is drawn here pixel by pixel and written as a PNG by write_png below, so the file has
 no dependency and the pattern is editable by changing the table of colours.
 """
 import os
+import random
 import struct
 import sys
 import zlib
@@ -32,9 +38,9 @@ import gltf_util as gl
 # The three must satisfy 3 * STICKER + 4 * GAP == CELL, checked below: the first version had
 # 3 * 9 + 4 * 1 = 31 for a cell of 32, so the leftover pixel widened the last border and the
 # stickers sat off-centre on their face.
-CELL = 64          # pixels per face in the atlas
-STICKER = 16       # pixels per sticker
-GAP = 4            # the same width between two stickers and around the grid
+CELL = 68          # pixels per face in the atlas
+STICKER = 20       # pixels per sticker
+GAP = 2            # the same width between two stickers and around the grid
 
 # The six faces of a solved cube, in the order the UVs below use them: right, left, top, bottom,
 # front, back. The classic colour scheme, opposite faces paired.
@@ -51,9 +57,19 @@ PLASTIC = (0x14, 0x14, 0x16)   # the body between the stickers
 ATLAS_COLS = 3
 ATLAS_ROWS = 2
 
+SCRAMBLE_SEED = 20260828       # a fixed seed: the same file comes out of every run
+
+
+def scramble():
+    """The colour of each sticker: [face][row][column], nine of each colour, shuffled."""
+    deck = [colour for _, colour in FACES for _ in range(9)]
+    random.Random(SCRAMBLE_SEED).shuffle(deck)
+    return [[[deck[f * 9 + sy * 3 + sx] for sx in range(3)] for sy in range(3)]
+            for f in range(len(FACES))]
+
 
 def write_png(width, height, rows):
-    """A minimal 8-bit RGB PNG. Writing it here avoids a dependency for a 96x64 image."""
+    """A minimal 8-bit RGB PNG. Writing it here avoids a dependency for a 204x136 image."""
     raw = b"".join(b"\0" + bytes(px for pixel in row for px in pixel) for row in rows)
 
     def chunk(kind, payload):
@@ -69,11 +85,13 @@ def atlas():
     """The six faces side by side: 3 columns, 2 rows, each cell a 3x3 sticker grid."""
     w, h = ATLAS_COLS * CELL, ATLAS_ROWS * CELL
     rows = [[PLASTIC] * w for _ in range(h)]
-    for index, (_, colour) in enumerate(FACES):
+    stickers = scramble()
+    for index in range(len(FACES)):
         ox = (index % ATLAS_COLS) * CELL
         oy = (index // ATLAS_COLS) * CELL
         for sy in range(3):
             for sx in range(3):
+                colour = stickers[index][sy][sx]
                 x0 = ox + GAP + sx * (STICKER + GAP)
                 y0 = oy + GAP + sy * (STICKER + GAP)
                 for y in range(y0, y0 + STICKER):
