@@ -132,6 +132,9 @@ ollin/
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
+│                      gen_teapot_glb.py (engendre docs/samples/teapot.glb — la théière d'Utah,
+│                      pavée depuis ses 32 patchs de Bézier ; le JEU DE DONNÉES est dans le script,
+│                      donc aucun réseau, cf. plus bas),
 │                      gen_terrain_glb.py (engendre docs/samples/terrain.glb — lancé à la MAIN,
 │                      modèle À NOUS ; le seul à porter une couleur par sommet),
 │                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
@@ -1076,11 +1079,12 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Cinq fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
+Six fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
 `suzanne.obj` (géométrie seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie
 sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie texture peinte SUR
-de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible) et `terrain.glb`
-(une couleur PAR SOMMET, cf. plus bas).
+de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible), `terrain.glb`
+(une couleur PAR SOMMET, cf. plus bas) et `teapot.glb` (la théière d'Utah, une SURFACE
+PARAMÉTRIQUE que le script pavage lui-même, cf. plus bas).
 
 **Plus aucun modèle ne porte une couleur de matériau PAR MAILLAGE** : `armillary.glb` était le
 seul, et il a été retiré à la demande de l'utilisateur. Le chemin existe toujours dans
@@ -1102,6 +1106,20 @@ générique — `(0, 0, 0, 1)` par défaut, donc un modèle NOIR. `lit_begin_dra
 blanche une fois par dessin (`rlSetVertexAttributeDefault`), un maillage qui a le tampon
 l'emportant depuis son propre VAO ; c'est ce que fait raylib dans son `DrawMesh`. Vérifié : les
 rendus de Suzanne et du casque sont identiques à l'octet avant et après le changement.
+
+**Surface PARAMÉTRIQUE** : `teapot.glb` n'est pas un maillage emprunté mais la théière de Martin
+Newell (Utah, 1975) — **32 patchs de Bézier bicubiques sur 290 points de contrôle** — pavée par
+`tools/gen_teapot_glb.py`, qui porte le jeu de données en littéral. Trois conséquences : le modèle
+se reconstruit à **n'importe quelle finesse** (constante `STEPS`), il ne dépend d'AUCUN hôte — tous
+les sites qui publient les fichiers `.bpt` sont refusés par le proxy — et les normales viennent des
+**dérivées** de la surface, pas d'une moyenne de faces. Les données de Newell circulent librement
+et sans revendication de droits depuis cinquante ans ; celles-ci ont été **analysées, pas
+retapées**, depuis la tabulation du README de `github.com/LUXOPHIA/UtahTeapot` (celle qui complète
+les patchs symétriques omis par la liste de Steve Baker), et vérifiées à la lecture : 32 patchs,
+290 points, indice maximal 289.
+⚠ Plusieurs patchs **dégénèrent** (une rangée entière repliée sur un seul point : pointe du
+couvercle, extrémités du bec) — une tangente y est nulle, donc le produit vectoriel aussi.
+`patch_normal` échantillonne alors légèrement en retrait au lieu de rendre un vecteur nul.
 
 **Un maillage raylib ne peut pas dépasser 65 535 sommets** : `Mesh` range ses indices en
 *unsigned short*, et le chargeur CONVERTIT un tampon d'indices 32 bits en 16 bits avec un simple
