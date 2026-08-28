@@ -1130,6 +1130,16 @@ static bool s_quit = false; // the native loop only (WASM: emscripten_cancel_mai
 // update plus draw, leaves out the rAF wait BETWEEN two frames, so dt comes out too small. The
 // consequences were a deltaTime too small, hence a simulation in slow motion, and an overestimated FPS
 // (76 displayed for a real 60). The wall gap between two frame entries, by contrast, is exact.
+//
+// A frame the loop did not RUN is not time the program spent, so the gap is CAPPED. When the loop
+// stops — the playground's pause, a hidden tab, a window being dragged — the wall gap covers the
+// whole interruption: measured at 5.126 s for a 5 s pause, which elapsedTime absorbed in one step
+// (4.88 to 12.25 while 1.6 s of real running had gone by) and which would send every tween and
+// every hand-integrated simulation straight to the end. Past this bound the frame was interrupted,
+// not slow; a genuinely slow frame merely runs in slow motion for one pass, which is the lesser
+// evil.
+static const double MAX_FRAME_DT = 0.25;   // seconds; below 4 fps the loop was not running
+
 static double s_frame_dt = 0.0;          // the last frame's duration, in seconds
 static double s_last_frame_time = -1.0;  // the previous frame's timestamp
 static double s_fps_ema = 0.0;           // the smoothed FPS, an exponential average
@@ -1230,7 +1240,8 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
     // Frame delta: the wall gap since the previous frame's entry, which includes the rAF wait, unlike
     // GetFrameTime. On the first frame dt is 0.
     double now = GetTime();
-    s_frame_dt = (s_last_frame_time < 0.0) ? 0.0 : (now - s_last_frame_time);
+    double gap = (s_last_frame_time < 0.0) ? 0.0 : (now - s_last_frame_time);
+    s_frame_dt = (gap > MAX_FRAME_DT) ? MAX_FRAME_DT : gap;
     s_last_frame_time = now;
     if (s_target_ready) {
         BeginTextureMode(s_target);   // binds the FBO; does NOT clear
