@@ -100,8 +100,7 @@ func draw()
             [-3, -2, 0.6, 1.2, Color(0.30, 0.70, 0.65)],
             [ 3,  2, 1.2, 3.6, Color(0.90, 0.50, 0.25)],
         ]
-        for i = 1, bldgs.len() do
-            var b = bldgs[i]
+        for b in bldgs do
             graphics.fill(b[5])
             graphics.cube(b[1], b[4] / 2, b[2],  b[3], b[4], b[3])
         end
