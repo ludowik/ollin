@@ -1132,7 +1132,14 @@ rendus de Suzanne et du casque sont identiques à l'octet avant et après le cha
 **Texture en ATLAS** : `rubik.glb` (engendré par `tools/gen_rubik_glb.py`, modèle à nous) remplace
 un cube enveloppé dans un damier 4×4 répété, qui montrait la MÊME image sur les six faces — le
 minimum qu'une texture puisse prouver. Un cube 3×3 résolu exige un atlas : une seule image, six
-cellules, chaque face lisant la SIENNE par ses UV. Le PNG (192×128) est dessiné pixel par pixel et
+cellules, chaque face lisant la SIENNE par ses UV.
+Les **26 pièces sont de la vraie géométrie** séparée par un jeu (`GAP3D`), et non une grille peinte
+sur une seule boîte : les arêtes de chaque petit cube se voient alors, sur la silhouette comme dans
+les creux, et la lumière les accroche. La pièce centrale est omise, elle ne peut pas être vue. Les
+UV d'une face extérieure sont calculées **depuis la position** du sommet sur la face (`face_uv`),
+donc le motif peint s'aligne sur la géométrie par construction, sans table à tenir en accord ; les
+faces tournées vers l'intérieur prennent un texel du corps noir. 624 sommets, 312 triangles,
+23,7 Ko. Le PNG (192×128) est dessiné pixel par pixel et
 encodé par le script, donc sans dépendance. Trois points appris à la mesure : la grille doit remplir
 sa cellule EXACTEMENT (`3 × sticker + 4 × interstice == cellule`, sinon le pixel qui reste élargit
 la dernière bordure et les stickers ne sont plus centrés — c'était le cas avec 3×9+4×1 = 31 pour une

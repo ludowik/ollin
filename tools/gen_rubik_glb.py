@@ -12,6 +12,12 @@ checker, which showed the same picture on all six faces — the least a texture 
 3x3 cube needs an ATLAS instead: the six faces share one image, each reading its OWN cell, which is
 what a real textured model does and what the loader must get right.
 
+The 26 cubies are REAL geometry, separated by a gap, and not a grid painted on one box: the edges of
+every small cube then show, on the silhouette as well as inside, and the light catches them. Each
+outer face reads its own sticker from the atlas — the mapping is a function of the vertex position,
+so the painting lines up with the geometry by construction rather than by a table to keep in step.
+The centre cubie is left out: it can never be seen.
+
 The picture is drawn here pixel by pixel and written as a PNG by write_png below, so the file has
 no dependency and the pattern is editable by changing the table of colours.
 """
@@ -76,20 +82,6 @@ def atlas():
     return w, h, rows
 
 
-def cell_uv(index):
-    """The four corners of a face's cell, inset by half a pixel.
-
-    The inset is not cosmetic: without it the edge of a cell samples the neighbouring face, and a
-    thin stripe of the wrong colour runs along the cube's edges.
-    """
-    cx = (index % ATLAS_COLS) * CELL
-    cy = (index // ATLAS_COLS) * CELL
-    w, h = ATLAS_COLS * CELL, ATLAS_ROWS * CELL
-    u0, u1 = (cx + 0.5) / w, (cx + CELL - 0.5) / w
-    v0, v1 = (cy + 0.5) / h, (cy + CELL - 0.5) / h
-    return (u0, v0), (u1, v0), (u1, v1), (u0, v1)
-
-
 # One quad per face: the four corners counter-clockwise seen from outside, and the face normal.
 QUADS = [
     ([(1, -1, 1), (1, -1, -1), (1, 1, -1), (1, 1, 1)], (1, 0, 0)),    # right
@@ -101,16 +93,61 @@ QUADS = [
 ]
 
 
+GAP3D = 0.05       # the space between two cubies, in the cube's units (the cube spans -1..1)
+
+
+def face_uv(face, point):
+    """Where a point of a face lands in the atlas, from its POSITION on that face.
+
+    The face's own axes come from its quad: corner0 to corner1 is u, corner0 to corner3 is v. A
+    point is therefore mapped without any per-cubie table, and the painted stickers line up with the
+    geometry on their own. The half-pixel inset keeps the outermost cubies from sampling the
+    neighbouring cell.
+    """
+    corners, _ = QUADS[face]
+    origin = corners[0]
+    du = [b - a for a, b in zip(origin, corners[1])]
+    dv = [b - a for a, b in zip(origin, corners[3])]
+    rel = [p - o for p, o in zip(point, origin)]
+    u = sum(r * d for r, d in zip(rel, du)) / sum(d * d for d in du)
+    v = sum(r * d for r, d in zip(rel, dv)) / sum(d * d for d in dv)
+    cx = (face % ATLAS_COLS) * CELL
+    cy = (face // ATLAS_COLS) * CELL
+    w, h = ATLAS_COLS * CELL, ATLAS_ROWS * CELL
+    inset = 0.5 / CELL
+    u = min(1.0 - inset, max(inset, u))
+    v = min(1.0 - inset, max(inset, v))
+    return (cx + u * CELL) / w, (cy + v * CELL) / h
+
+
+def plastic_uv():
+    """A texel of the black body, for the faces that look inwards: the border of the first cell."""
+    w, h = ATLAS_COLS * CELL, ATLAS_ROWS * CELL
+    return (0.5 / w, 0.5 / h)
+
+
 def build():
     pos, nrm, uvs, idx = [], [], [], []
-    for face, (corners, normal) in enumerate(QUADS):
-        base = len(pos)
-        uv = cell_uv(face)
-        for corner, texel in zip(corners, uv):
-            pos.append(corner)
-            nrm.append(normal)
-            uvs.append(texel)
-        idx += [base, base + 1, base + 2, base, base + 2, base + 3]
+    pitch = 2.0 / 3.0
+    half = (pitch - GAP3D) / 2.0
+    for i in (-1, 0, 1):
+        for j in (-1, 0, 1):
+            for k in (-1, 0, 1):
+                if i == 0 and j == 0 and k == 0:
+                    continue                      # the middle cubie is invisible
+                centre = (i * pitch, j * pitch, k * pitch)
+                for face, (corners, normal) in enumerate(QUADS):
+                    # A face is a STICKER when the cubie sits at the end of the axis it looks along;
+                    # otherwise it faces a neighbour and stays black.
+                    axis = 0 if normal[0] else (1 if normal[1] else 2)
+                    outward = (i, j, k)[axis] == (1 if sum(normal) > 0 else -1)
+                    base = len(pos)
+                    for corner in corners:
+                        point = tuple(c + x * half for c, x in zip(centre, corner))
+                        pos.append(point)
+                        nrm.append(normal)
+                        uvs.append(face_uv(face, point) if outward else plastic_uv())
+                    idx += [base, base + 1, base + 2, base, base + 2, base + 3]
 
     width, height, rows = atlas()
     out = gl.Blob()
@@ -135,7 +172,8 @@ def build():
         "images": [{"mimeType": "image/png", "bufferView": v_img}],
         "accessors": [
             {"bufferView": v_pos, "componentType": 5126, "count": len(pos), "type": "VEC3",
-             "min": [-1, -1, -1], "max": [1, 1, 1]},
+             "min": [min(p[c] for p in pos) for c in range(3)],
+             "max": [max(p[c] for p in pos) for c in range(3)]},
             {"bufferView": v_nrm, "componentType": 5126, "count": len(nrm), "type": "VEC3"},
             {"bufferView": v_uvs, "componentType": 5126, "count": len(uvs), "type": "VEC2"},
             {"bufferView": v_idx, "componentType": 5123, "count": len(idx), "type": "SCALAR"},
