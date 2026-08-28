@@ -55,8 +55,8 @@ func setup()
     ## One button per entry: the list is the only place to edit to add a model. Each closure
     ## captures the index of ITS iteration, the loop variable being per-turn.
     var menu = ui.menu("Model")
-    for i = 1, #models do
-        menu.button(models[i].name, func() choose(i) end)
+    for i, model in models do
+        menu.button(model.name, func() choose(i) end)
     end
     ui.show(menu)
 

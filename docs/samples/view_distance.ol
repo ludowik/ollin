@@ -95,8 +95,8 @@ class ViewDistance
         end
         self.t = self.t + dt
         self.n = self.n + 1
-        for j = 1, #self.CAD do
-            if dt <= self.MARGIN / self.CAD[j] then
+        for j, hz in self.CAD do
+            if dt <= self.MARGIN / hz then
                 self.ok[j] = self.ok[j] + 1
             end
         end
@@ -149,9 +149,9 @@ class ViewDistance
     func voteCadence()
         var vote = self.CAD[#self.CAD]
         var kept = self.ok[#self.CAD]
-        for j = 1, #self.CAD do
+        for j, hz in self.CAD do
             if self.ok[j] >= self.n * self.VOTE_PART then
-                vote = self.CAD[j]
+                vote = hz
                 kept = self.ok[j]
                 break
             end
@@ -173,8 +173,8 @@ class ViewDistance
         ## The frames on time for the rate KEPT, not for the one voted: it is that rate which
         ## defines what being late means.
         var atTime = kept
-        for j = 1, #self.CAD do
-            if self.CAD[j] == self.hzKeep then
+        for j, hz in self.CAD do
+            if hz == self.hzKeep then
                 atTime = self.ok[j]
             end
             self.ok[j] = 0

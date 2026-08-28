@@ -722,11 +722,11 @@ func draw()
     var cloudSecs = cullCloudSectors()   ## culled before begin3d(rcam), the player's frustum being frozen
     graphics.begin3d(rcam)
     do
-        for i = 1, #vis do
-            graphics.drawChunk(vis[i])
+        for chunk in vis do
+            graphics.drawChunk(chunk)
         end
-        for i = 1, #vis do
-            graphics.drawChunkAlpha(vis[i])
+        for chunk in vis do
+            graphics.drawChunkAlpha(chunk)
         end
         drawClouds(cloudSecs)
     end

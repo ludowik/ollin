@@ -72,8 +72,8 @@ func setup()
 
     ## One buffer per note: the waveform is sampled ONCE, then the envelope is applied to the
     ## samples. Nothing is recomputed on playback.
-    for i = 1, #notes do
-        buffers[i] = sound.tone(sound.note(notes[i]), 0.5, "triangle")
+    for i, name in notes do
+        buffers[i] = sound.tone(sound.note(name), 0.5, "triangle")
         buffers[i].envelope(0.01, 0.12, 0.35, 0.25).volume(0.5)
     end
 
@@ -310,7 +310,7 @@ func draw()
     graphics.noStroke()
     var l = keyWidth()
     collectHeldKeys()
-    for i = 1, #notes do
+    for i, name in notes do
         var held = heldKeys[i]
         ## Held: full light for as long as the press lasts. Otherwise, the glow of a short note.
         var bright = held and 1 or ((i == lastKey) and glow or 0)
@@ -325,7 +325,7 @@ func draw()
             graphics.rect(l * (i - 1) + 2, hc, l - 4, H - hc)
         end
         graphics.stroke(Color(0.8, 0.86, 0.96))
-        graphics.text(notes[i], l * (i - 1) + l * 0.28, hc + H * 0.07)
+        graphics.text(name, l * (i - 1) + l * 0.28, hc + H * 0.07)
     end
 
     ## What a buffer's accessors read: nothing else lets one see them.

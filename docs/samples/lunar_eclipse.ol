@@ -231,9 +231,9 @@ func buildVeil()
     ## takes the darkest hue it holds, and the whole gradient shifts outwards by half a band — the
     ## penumbra's edge then started at 0.96 instead of 1.00, with no transition.
     var ext = R_PENUMBRA
-    for i = 1, #radii do
-        veil[i] = {ext: ext, int: radii[i], color: veilA((ext + radii[i]) / 2)}
-        ext = radii[i]
+    for i, r in radii do
+        veil[i] = {ext: ext, int: r, color: veilA((ext + r) / 2)}
+        ext = r
     end
 end
 
@@ -292,8 +292,7 @@ func draw()
     ## overlapping by half a pixel multiplied the joint twice, hence periodic DARK lines, which were
     ## measured.
     graphics.blendMode(blend.MULTIPLY)
-    for i = 1, #veil do
-        var b = veil[i]
+    for b in veil do
         ## The Moon may fit entirely inside the band's hole, which is common in a total
         ## eclipse: the sweep would then not draw a single pixel.
         if d + 1 <= b.int then

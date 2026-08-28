@@ -50,9 +50,9 @@ func startBounce()
 
     ## The same blink for all three dots, offset by a growing delay: an animation's start can be
     ## put off, and its declaration need not wait.
-    for i = 1, #points do
-        points[i].r = H * 0.008
-        tween.to(points[i], {r: H * 0.02}, 0.4, "easeInOutSine").repeat(nil, true).delay(i * 0.13)
+    for i, p in points do
+        p.r = H * 0.008
+        tween.to(p, {r: H * 0.02}, 0.4, "easeInOutSine").repeat(nil, true).delay(i * 0.13)
     end
 end
 
@@ -113,8 +113,8 @@ func draw()
     ## The three dots, to the right of the bar: they blink even while paused, only the sequence
     ## being suspended.
     graphics.fill(Color(0.65, 0.72, 0.85))
-    for i = 1, #points do
-        graphics.circle(left + barW + H * 0.03 * i, yb + H * 0.004, points[i].r)
+    for i, p in points do
+        graphics.circle(left + barW + H * 0.03 * i, yb + H * 0.004, p.r)
     end
 
     graphics.fontSize(H * 0.028)

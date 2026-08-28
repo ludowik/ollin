@@ -154,9 +154,9 @@ func drawHorizon(l)
     graphics.noStroke()
     graphics.fill(Color(0.04 + 0.10 * l, 0.05 + 0.12 * l, 0.07 + 0.13 * l))
     var pts = []
-    for i = 1, #hills do
+    for i, h in hills do
         pts[#pts + 1] = (i - 1) * 12
-        pts[#pts + 1] = hills[i]
+        pts[#pts + 1] = h
     end
     pts[#pts + 1] = W
     pts[#pts + 1] = H

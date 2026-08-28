@@ -30,8 +30,7 @@ func start()
     ## Each dot sets off again from left to right along ITS curve. Declaring a new tween on a
     ## field already animated cancels the previous one, so clicking mid-run does not create two
     ## competing animations.
-    for i = 1, #dots do
-        var p = dots[i]
+    for i, p in dots do
         p.x = xStart()
         tween.to(p, {x: xEnd()}, config.duration, labels[i])
     end
@@ -83,12 +82,12 @@ func draw()
 
     var y = H * 0.18
     var step = H * 0.1
-    for i = 1, #dots do
+    for i, dot in dots do
         graphics.stroke(Color(1, 1, 1, 0.12), 1)
         graphics.line(xStart(), y, xEnd(), y)
         graphics.noStroke()
         graphics.fill(Color(0.45, 0.8, 1))
-        graphics.circle(dots[i].x, y, H * 0.014)
+        graphics.circle(dot.x, y, H * 0.014)
         graphics.stroke(Color(0.65, 0.72, 0.85))
         graphics.text(labels[i], W * 0.02, y - H * 0.014)
         y += step
