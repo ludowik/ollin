@@ -18,10 +18,11 @@ outer face reads its own sticker from the atlas — the mapping is a function of
 so the painting lines up with the geometry by construction rather than by a table to keep in step.
 The centre cubie is left out: it can never be seen.
 
-The cube is SCRAMBLED: each of the 54 stickers gets its own colour, nine of each. It is a shuffle
-of the stickers with a fixed seed, so the file is reproducible — NOT the result of legal turns, so
-the state is very probably unsolvable. Nothing here claims otherwise; what matters is that the six
-faces no longer show one flat colour each, which is what a texture atlas is for.
+The cube is SCRAMBLED BY LEGAL TURNS, from a fixed seed, so the state is a real one — solvable, and
+the file reproducible. No adjacency table was written: a sticker is identified by its cubie's
+POSITION and its own NORMAL, and a quarter turn rotates both vectors, so the geometry keeps the
+bookkeeping. That is the same idea as the UVs below, and it is what makes the turns checkable — four
+identical turns must return the cube to where it started, which check_layout verifies.
 
 The picture is drawn here pixel by pixel and written as a PNG by write_png below, so the file has
 no dependency and the pattern is editable by changing the table of colours.
@@ -58,14 +59,81 @@ ATLAS_COLS = 3
 ATLAS_ROWS = 2
 
 SCRAMBLE_SEED = 20260828       # a fixed seed: the same file comes out of every run
+SCRAMBLE_TURNS = 25            # enough that no face keeps a whole row of one colour
+
+
+def spin(v, axis):
+    """A vector turned a quarter of a turn about one axis, right-hand rule."""
+    x, y, z = v
+    if axis == 0:
+        return (x, -z, y)
+    if axis == 1:
+        return (z, y, -x)
+    return (-y, x, z)
+
+
+def turn(state, axis, layer, times):
+    """One layer of the cube turned: the stickers of that layer have their cubie position AND their
+    normal rotated, everything else stays put. No table of neighbouring faces to get right."""
+    out = {}
+    for (pos, normal), colour in state.items():
+        if pos[axis] == layer:
+            for _ in range(times):
+                pos = spin(pos, axis)
+                normal = spin(normal, axis)
+        out[(pos, normal)] = colour
+    return out
+
+
+def solved():
+    """The 54 stickers of a solved cube, keyed by (cubie position, outward normal)."""
+    state = {}
+    for i in (-1, 0, 1):
+        for j in (-1, 0, 1):
+            for k in (-1, 0, 1):
+                for face, (_, normal) in enumerate(QUADS):
+                    if (i, j, k)[axis_of(normal)] == sum(normal):
+                        state[((i, j, k), normal)] = FACES[face][1]
+    return state
+
+
+def axis_of(normal):
+    return 0 if normal[0] else (1 if normal[1] else 2)
 
 
 def scramble():
-    """The colour of each sticker: [face][row][column], nine of each colour, shuffled."""
-    deck = [colour for _, colour in FACES for _ in range(9)]
-    random.Random(SCRAMBLE_SEED).shuffle(deck)
-    return [[[deck[f * 9 + sy * 3 + sx] for sx in range(3)] for sy in range(3)]
-            for f in range(len(FACES))]
+    """A solved cube taken through SCRAMBLE_TURNS random quarter turns of a face."""
+    rng = random.Random(SCRAMBLE_SEED)
+    state = solved()
+    for _ in range(SCRAMBLE_TURNS):
+        state = turn(state, rng.randrange(3), rng.choice((-1, 1)), rng.randrange(1, 4))
+    return state
+
+
+def sticker_cell(face, pos):
+    """Which of the 3x3 cells of a face's image a cubie's sticker occupies.
+
+    The projection uses the SAME face axes as face_uv, so the painted grid and the geometry cannot
+    drift apart: both answer the question from the position, not from a table.
+    """
+    corners, _ = QUADS[face]
+    origin = corners[0]
+    du = [b - a for a, b in zip(origin, corners[1])]
+    dv = [b - a for a, b in zip(origin, corners[3])]
+    rel = [p - o for p, o in zip((c * 2.0 / 3.0 for c in pos), origin)]
+    u = sum(r * d for r, d in zip(rel, du)) / sum(d * d for d in du)
+    v = sum(r * d for r, d in zip(rel, dv)) / sum(d * d for d in dv)
+    return min(2, max(0, int(u * 3))), min(2, max(0, int(v * 3)))
+
+
+def sticker_grid():
+    """The scrambled colours as [face][row][column], the form the atlas painter wants."""
+    grid = [[[PLASTIC] * 3 for _ in range(3)] for _ in range(len(QUADS))]
+    for (pos, normal), colour in scramble().items():
+        face = next(f for f, (_, n) in enumerate(QUADS) if n == normal)
+        sx, sy = sticker_cell(face, pos)
+        grid[face][sy][sx] = colour
+    return grid
 
 
 def write_png(width, height, rows):
@@ -85,7 +153,7 @@ def atlas():
     """The six faces side by side: 3 columns, 2 rows, each cell a 3x3 sticker grid."""
     w, h = ATLAS_COLS * CELL, ATLAS_ROWS * CELL
     rows = [[PLASTIC] * w for _ in range(h)]
-    stickers = scramble()
+    stickers = sticker_grid()
     for index in range(len(FACES)):
         ox = (index % ATLAS_COLS) * CELL
         oy = (index // ATLAS_COLS) * CELL
@@ -211,6 +279,24 @@ def check_layout():
     """
     if 3 * STICKER + 4 * GAP != CELL:
         raise SystemExit(f"3 * {STICKER} + 4 * {GAP} != {CELL}: the borders would come out uneven")
+    start = solved()
+    if len(start) != 54:
+        raise SystemExit(f"a cube has 54 stickers, not {len(start)}")
+    # Four identical quarter turns are the identity: the cheapest proof that `turn` moves the
+    # stickers as a rigid layer and not into the wrong slots.
+    once = start
+    for _ in range(4):
+        once = turn(once, 1, 1, 1)
+    if once != start:
+        raise SystemExit("four identical turns did not bring the cube back: `turn` is wrong")
+    grid = sticker_grid()
+    counts = {}
+    for face in range(len(QUADS)):
+        for row in grid[face]:
+            for colour in row:
+                counts[colour] = counts.get(colour, 0) + 1
+    if sorted(counts.values()) != [9] * 6:
+        raise SystemExit(f"the scramble lost stickers: {sorted(counts.values())}")
     for corners, normal in QUADS:
         e1 = [b - a for a, b in zip(corners[0], corners[1])]
         e2 = [b - a for a, b in zip(corners[0], corners[2])]
