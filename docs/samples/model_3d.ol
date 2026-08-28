@@ -21,7 +21,7 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 ## One entry per model: everything that differs from one object to the next lives here, and the
 ## rest of the program does not depend on it.
 global models = [
-    {name: "Textured cube (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
+    {name: "Rubik cube (.glb)", file: "rubik.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
     {name: "Suzanne (.obj)", file: "suzanne.obj", tint: colors.GRAY, ambient: 0.3, margin: 1.1, height: 0.1},
     {name: "Stanford dragon (.glb)", file: "dragon.glb", tint: colors.GRAY, ambient: 0.3, margin: 1.15, height: 0.15},
     {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.15, height: 0.1},

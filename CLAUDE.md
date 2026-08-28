@@ -132,6 +132,8 @@ ollin/
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
+│                      gen_rubik_glb.py (engendre docs/samples/rubik.glb — cube 3×3 texturé par un
+│                      ATLAS ; l'image PNG est écrite par le script, cf. plus bas),
 │                      gen_teapot_glb.py (engendre docs/samples/teapot.glb — la théière d'Utah,
 │                      pavée depuis ses 32 patchs de Bézier ; le JEU DE DONNÉES est dans le script,
 │                      donc aucun réseau, cf. plus bas),
@@ -1099,10 +1101,10 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Six fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
+Six fichiers, chacun pour une raison distincte : `rubik.glb` (glTF portant une TEXTURE, en ATLAS),
 `suzanne.obj` (géométrie seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie
 sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie texture peinte SUR
-de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible), `terrain.glb`
+de la géométrie sculptée, ce que `rubik.glb` ne fait que prouver possible), `terrain.glb`
 (une couleur PAR SOMMET, cf. plus bas) et `teapot.glb` (la théière d'Utah, une SURFACE
 PARAMÉTRIQUE que le script pavage lui-même, cf. plus bas).
 
@@ -1126,6 +1128,17 @@ générique — `(0, 0, 0, 1)` par défaut, donc un modèle NOIR. `lit_begin_dra
 blanche une fois par dessin (`rlSetVertexAttributeDefault`), un maillage qui a le tampon
 l'emportant depuis son propre VAO ; c'est ce que fait raylib dans son `DrawMesh`. Vérifié : les
 rendus de Suzanne et du casque sont identiques à l'octet avant et après le changement.
+
+**Texture en ATLAS** : `rubik.glb` (engendré par `tools/gen_rubik_glb.py`, modèle à nous) remplace
+un cube enveloppé dans un damier 4×4 répété, qui montrait la MÊME image sur les six faces — le
+minimum qu'une texture puisse prouver. Un cube 3×3 résolu exige un atlas : une seule image, six
+cellules, chaque face lisant la SIENNE par ses UV. Le PNG (96×64) est dessiné pixel par pixel et
+encodé par le script, donc sans dépendance. Deux points appris à la mesure : les UV sont **rentrés
+d'un demi-pixel** dans leur cellule (sans quoi le bord échantillonne la face voisine et une bande
+de la mauvaise couleur court le long des arêtes), et l'orientation des quads est **vérifiée par le
+calcul** (`check_winding`) — mes deux faces latérales étaient enroulées à l'envers, donc éliminées
+par le back-face culling, et rien ne le signale : le cube sortait simplement ouvert sur deux côtés,
+ce qu'un rendu seul a révélé.
 
 **Surface PARAMÉTRIQUE** : `teapot.glb` n'est pas un maillage emprunté mais la théière de Martin
 Newell (Utah, 1975) — **32 patchs de Bézier bicubiques sur 290 points de contrôle** — pavée par

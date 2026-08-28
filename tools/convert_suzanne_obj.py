@@ -13,7 +13,7 @@ mascot. Keeping the conversion in the repository is what makes the provenance of
 asset checkable instead of a mystery binary.
 
 Why .obj and not the original glTF: the "3D models" example teaches that an .obj carries its
-GEOMETRY ALONE, with no material, so the script's fill decides the colour — cube_tex.glb and
+GEOMETRY ALONE, with no material, so the script's fill decides the colour — rubik.glb and
 helmet.glb already cover the textured path.
 
 Texture coordinates are dropped for the same reason (nothing samples a texture here), and

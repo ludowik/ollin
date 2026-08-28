@@ -11,7 +11,7 @@ of the model, under CC-BY-NC 4.0. Credit is REQUIRED and the non-commercial clau
 the dragon. Both credits are written into the model's own metadata.
 
 Why it is here: it is the model every PBR renderer has shown since 2016, and it is the only sample
-carrying a real painted TEXTURE over sculpted geometry — cube_tex.glb only proves the path exists.
+carrying a real painted TEXTURE over sculpted geometry — rubik.glb only proves the path exists.
 
 What is kept: geometry, the base colour texture, and nothing else. The source also carries
 metallic-roughness, emissive, occlusion and normal maps, which Ollin's shader never samples;
