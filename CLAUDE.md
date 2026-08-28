@@ -1132,11 +1132,13 @@ rendus de Suzanne et du casque sont identiques à l'octet avant et après le cha
 **Texture en ATLAS** : `rubik.glb` (engendré par `tools/gen_rubik_glb.py`, modèle à nous) remplace
 un cube enveloppé dans un damier 4×4 répété, qui montrait la MÊME image sur les six faces — le
 minimum qu'une texture puisse prouver. Un cube 3×3 résolu exige un atlas : une seule image, six
-cellules, chaque face lisant la SIENNE par ses UV. Le PNG (96×64) est dessiné pixel par pixel et
-encodé par le script, donc sans dépendance. Deux points appris à la mesure : les UV sont **rentrés
-d'un demi-pixel** dans leur cellule (sans quoi le bord échantillonne la face voisine et une bande
-de la mauvaise couleur court le long des arêtes), et l'orientation des quads est **vérifiée par le
-calcul** (`check_winding`) — mes deux faces latérales étaient enroulées à l'envers, donc éliminées
+cellules, chaque face lisant la SIENNE par ses UV. Le PNG (192×128) est dessiné pixel par pixel et
+encodé par le script, donc sans dépendance. Trois points appris à la mesure : la grille doit remplir
+sa cellule EXACTEMENT (`3 × sticker + 4 × interstice == cellule`, sinon le pixel qui reste élargit
+la dernière bordure et les stickers ne sont plus centrés — c'était le cas avec 3×9+4×1 = 31 pour une
+cellule de 32) ; les UV sont **rentrés d'un demi-pixel** dans leur cellule (sans quoi le bord
+échantillonne la face voisine et une bande de la mauvaise couleur court le long des arêtes) ; et
+l'orientation des quads est **vérifiée par le calcul** (`check_layout`) — mes deux faces latérales étaient enroulées à l'envers, donc éliminées
 par le back-face culling, et rien ne le signale : le cube sortait simplement ouvert sur deux côtés,
 ce qu'un rendu seul a révélé.
 

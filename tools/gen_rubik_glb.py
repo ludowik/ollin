@@ -23,9 +23,12 @@ import zlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gltf_util as gl
 
-CELL = 32          # pixels per face in the atlas
-STICKER = 9        # pixels per sticker; 3 * 9 + 4 gaps of 1 px leaves a 1 px border
-GAP = 1
+# The three must satisfy 3 * STICKER + 4 * GAP == CELL, checked below: the first version had
+# 3 * 9 + 4 * 1 = 31 for a cell of 32, so the leftover pixel widened the last border and the
+# stickers sat off-centre on their face.
+CELL = 64          # pixels per face in the atlas
+STICKER = 16       # pixels per sticker
+GAP = 4            # the same width between two stickers and around the grid
 
 # The six faces of a solved cube, in the order the UVs below use them: right, left, top, bottom,
 # front, back. The classic colour scheme, opposite faces paired.
@@ -142,13 +145,16 @@ def build():
     return gl.write_glb(doc, out.data), len(pos), len(idx) // 3
 
 
-def check_winding():
-    """Each quad must wind counter-clockwise SEEN FROM OUTSIDE, or the face is back-facing.
+def check_layout():
+    """The sticker grid must fill its cell exactly, and each quad must wind counter-clockwise SEEN
+    FROM OUTSIDE, or the face is back-facing.
 
     Written as a check rather than trusted: the first version had the two side quads reversed, and
     a culled face is not an error anywhere — the cube simply came out open on that side, which was
     only caught by looking at a render.
     """
+    if 3 * STICKER + 4 * GAP != CELL:
+        raise SystemExit(f"3 * {STICKER} + 4 * {GAP} != {CELL}: the borders would come out uneven")
     for corners, normal in QUADS:
         e1 = [b - a for a, b in zip(corners[0], corners[1])]
         e2 = [b - a for a, b in zip(corners[0], corners[2])]
@@ -160,7 +166,7 @@ def check_winding():
 
 
 if __name__ == "__main__":
-    check_winding()
+    check_layout()
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
     path = os.path.join(root, "docs", "samples", "rubik.glb")
     data, verts, tris = build()
