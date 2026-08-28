@@ -1046,15 +1046,25 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 - `s_elapsed_time` (statique dans `graphics_module.cpp`) est remis à 0 à chaque `gfx_run()`.
 - **Canvas implicite** : `VM::runEntryHooks()` — si un `draw()` existe et que `graphics` est un module (pas le stub), mais que `graphics.canvas()` n'a **pas** été appelé (drapeau `VM::gfxCanvasCreated()`, posé par `gfx_canvas` via `markGfxCanvas()`), le moteur appelle `graphics.canvas(W, H)` → une session graphique démarre sur la seule présence de `draw()`. **Fait APRÈS `setup()`** : `setup()` est un endroit courant pour appeler `canvas()` soi-même ; le créer avant provoquerait un **double `InitWindow`** (crash « memory access out of bounds » en WASM). Le drapeau vit sur le VM (neuf à chaque run playground) → détection fiable même avec le contexte WebGL réutilisé.
 
-**Une frame que la boucle n'a PAS exécutée n'est pas du temps passé par le programme** : l'écart
-d'horloge est **plafonné** à `MAX_FRAME_DT` (0,25 s, graphics_module.cpp). Sans ce plafond, tout
-arrêt de la boucle — la pause du playground, un onglet caché, une fenêtre déplacée — était crédité
-en BLOC à la reprise : mesuré, un `deltaTime` de **5,126 s** après 5 s de pause, `elapsedTime`
-sautant de 4,88 à 12,25 alors que 1,6 s de fonctionnement réel s'était écoulée, et tout tween ou
-toute intégration à la main filant droit à sa fin. Au-delà de la borne la frame a été
-INTERROMPUE, pas ralentie ; une frame réellement lente tourne au ralenti le temps d'un tour, ce
-qui est le moindre mal. Après correction : `deltaTime` plafonne à 0,25 et `elapsedTime` ne prend
-plus la pause (7,25 au lieu de 12,25 dans la même mesure).
+**Une frame que la boucle n'a PAS exécutée n'est pas du temps passé par le programme**, et cette
+interruption est **DÉCLARÉE, jamais devinée** : `gfx_clock_break()` (graphics_internal.h) arme le
+moteur, et la première frame de retour compte **zéro** au lieu de l'écart d'horloge. Qui arrête la
+boucle le dit — le bouton Pause du playground et de la vue `run` (`mod.clockBreak()` avant
+`resumeMainLoop`, capture comprise puisqu'elle relance la boucle le temps d'une frame), les
+écouteurs DOM posés une fois par le moteur (`visibilitychange`, `focus`, `blur`, `pageshow`, qui
+lèvent un drapeau relu par la frame), et sur desktop la reprise du focus ou la sortie de
+minimisation. Mesuré au navigateur : sur 5 s de pause, le plus grand `deltaTime` du programme reste
+celui d'avant la pause (0,098 s) — **aucun saut**, contre 5,126 s à l'origine.
+
+⚠ **Plafonner l'écart a été essayé puis RETIRÉ** (`MAX_FRAME_DT = 0,25 s`) : le plafond créditait
+encore sa propre valeur à chaque reprise — un quart de seconde d'animation venu de nulle part — et
+il punissait une frame simplement lente. Un arrêt connu doit rendre zéro, pas « peu ».
+
+**Ce qui reste NON couvert, faute de signal** : une interruption que personne n'annonce — mise en
+veille de la machine, `SIGSTOP`, un débogueur, ou une plateforme dont le déplacement de fenêtre
+bloque notre boucle (constaté par la mesure : un gel de 4 s par `SIGSTOP` sous Xvfb rend un
+`deltaTime` de 4,009 s). Aucune API ne le rapporte, et un seuil qui le devinerait serait justement
+la bidouille écartée ci-dessus.
 
 **Règle d'animation** : utiliser `elapsedTime` (ou `deltaTime` accumulé manuellement) plutôt que `time()`. `time()` utilise `Date.now()` dans le navigateur (précision réduite) ; les globales moteur sont basées sur `GetFrameTime()` / `performance.now()`, plus précis et sans artefact.
 

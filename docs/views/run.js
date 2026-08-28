@@ -83,6 +83,9 @@ export async function init(ctx) {
     pauseBtn.addEventListener('click', () => {
       if (!mod) return
       if (paused) {
+        // The break BEFORE resuming: the frame that follows must not be charged with the time
+        // spent paused, otherwise every animation jumps forward by the length of the pause.
+        try { mod.clockBreak() } catch (_) {}
         try { mod.resumeMainLoop() } catch (_) {}
         paused = false
       } else {
@@ -143,6 +146,7 @@ export async function init(ctx) {
     // While paused no frame goes by, so the loop is resumed for the length of the capture.
     const wasPaused = paused
     if (wasPaused) {
+      try { mod.clockBreak() } catch (_) {}
       try { mod.resumeMainLoop() } catch (_) {}
     }
     statusEl.textContent = 'capture…'

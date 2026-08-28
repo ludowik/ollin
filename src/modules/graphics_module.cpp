@@ -1131,18 +1131,70 @@ static bool s_quit = false; // the native loop only (WASM: emscripten_cancel_mai
 // consequences were a deltaTime too small, hence a simulation in slow motion, and an overestimated FPS
 // (76 displayed for a real 60). The wall gap between two frame entries, by contrast, is exact.
 //
-// A frame the loop did not RUN is not time the program spent, so the gap is CAPPED. When the loop
-// stops — the playground's pause, a hidden tab, a window being dragged — the wall gap covers the
-// whole interruption: measured at 5.126 s for a 5 s pause, which elapsedTime absorbed in one step
-// (4.88 to 12.25 while 1.6 s of real running had gone by) and which would send every tween and
-// every hand-integrated simulation straight to the end. Past this bound the frame was interrupted,
-// not slow; a genuinely slow frame merely runs in slow motion for one pass, which is the lesser
-// evil.
-static const double MAX_FRAME_DT = 0.25;   // seconds; below 4 fps the loop was not running
-
+// A frame the loop did not RUN is not time the program spent, and that interruption is DECLARED,
+// never guessed. Whoever stops the loop — the playground's pause button, a hidden tab, a window
+// losing focus — arms gfx_clock_break(), and the first frame back counts ZERO instead of the wall
+// gap. Capping the gap instead was tried and rejected: it still credited the bound itself (0.25 s
+// of animation appearing out of nowhere on every resume) and it punished a frame that was merely
+// slow. Measured before any of this: a 5 s pause produced a deltaTime of 5.126 s, with elapsedTime
+// jumping from 4.88 to 12.25, sending every tween straight to its end.
 static double s_frame_dt = 0.0;          // the last frame's duration, in seconds
+static bool s_clock_break = false;       // the next gap covers an interruption: it counts zero
 static double s_last_frame_time = -1.0;  // the previous frame's timestamp
 static double s_fps_ema = 0.0;           // the smoothed FPS, an exponential average
+
+// Declares that the loop stopped: the next frame's gap covers the interruption, not running time.
+// Called by the host (the playground's pause and its capture, which resumes the loop for one frame)
+// and by the engine itself when the window comes back.
+void gfx_clock_break() {
+    s_clock_break = true;
+}
+
+#ifndef __EMSCRIPTEN__
+// Desktop: losing focus or being minimised may stop the loop, depending on the platform and the
+// window manager. The transition is what matters — coming BACK is where a gap would otherwise be
+// credited — so one frame is written off at that point. When the loop kept running throughout, that
+// costs one frame's worth of time, which no animation can show.
+static bool s_window_active = true;
+
+static void check_window_activity() {
+    bool active = IsWindowFocused() && !IsWindowMinimized();
+    if (active && !s_window_active)
+        gfx_clock_break();
+    s_window_active = active;
+}
+#else
+// The web signals it properly: the browser stops calling requestAnimationFrame for a hidden tab and
+// fires visibilitychange, blur and focus. The listeners are installed ONCE and only raise a flag,
+// which the frame reads — a call back into C would mean an export to keep in step with this file.
+static void install_clock_watch() {
+    static bool installed = false;
+    if (installed)
+        return;
+    installed = true;
+    EM_ASM({
+        if (window.__ollinClockWatch)
+            return;
+        window.__ollinClockWatch = 1;
+        window.__ollinClockBreak = 0;
+        var mark = function() { window.__ollinClockBreak = 1; };
+        document.addEventListener('visibilitychange', mark);
+        window.addEventListener('focus', mark);
+        window.addEventListener('blur', mark);
+        window.addEventListener('pageshow', mark);
+    });
+}
+
+static void check_window_activity() {
+    install_clock_watch();
+    if (EM_ASM_INT({
+            var b = window.__ollinClockBreak;
+            window.__ollinClockBreak = 0;
+            return b ? 1 : 0;
+        }))
+        gfx_clock_break();
+}
+#endif
 
 // Memory and FPS overlay drawn by the engine after each frame, in the BOTTOM right corner — the top is
 // left to the `ui` interface. A bright colour plus a drop shadow keeps it readable whatever the scene's
@@ -1240,8 +1292,10 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
     // Frame delta: the wall gap since the previous frame's entry, which includes the rAF wait, unlike
     // GetFrameTime. On the first frame dt is 0.
     double now = GetTime();
-    double gap = (s_last_frame_time < 0.0) ? 0.0 : (now - s_last_frame_time);
-    s_frame_dt = (gap > MAX_FRAME_DT) ? MAX_FRAME_DT : gap;
+    check_window_activity();
+    bool interrupted = s_clock_break || s_last_frame_time < 0.0;
+    s_clock_break = false;
+    s_frame_dt = interrupted ? 0.0 : (now - s_last_frame_time);
     s_last_frame_time = now;
     if (s_target_ready) {
         BeginTextureMode(s_target);   // binds the FBO; does NOT clear

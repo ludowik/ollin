@@ -96,6 +96,12 @@ static std::string take_capture_js() {
     return gfx_take_capture();
 }
 
+// The host declares that it stopped the loop (the Pause button, and the capture, which resumes it
+// for a single frame): the interval spent stopped must not be credited to the program.
+static void clock_break_js() {
+    gfx_clock_break();
+}
+
 EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("execute", &ollin_run);  // execute(source, filename)
     emscripten::function("preloadImage", &preload_image_js);
@@ -105,4 +111,5 @@ EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("dataLoad", &data_load_js);
     emscripten::function("requestCapture", &request_capture_js);
     emscripten::function("takeCapture", &take_capture_js);
+    emscripten::function("clockBreak", &clock_break_js);
 }

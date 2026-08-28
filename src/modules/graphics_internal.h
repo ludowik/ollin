@@ -34,6 +34,11 @@ Color gfx_to_color(const Value& v);
 void gfx_request_capture();
 std::string gfx_take_capture();
 
+// Declares that the render loop stopped, so the next frame's wall gap is an interruption and counts
+// as zero elapsed time. The host calls it around the playground's pause; the engine calls it itself
+// when the window comes back.
+void gfx_clock_break();
+
 // Drawing area in LOGICAL units, as set by graphics.canvas.
 // A frame's projection is in logical units, so a module drawing inside it (ui_module) must refer to
 // these rather than to GetScreenWidth(), which is in physical pixels.
