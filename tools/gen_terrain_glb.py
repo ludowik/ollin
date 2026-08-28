@@ -29,16 +29,25 @@ SIDE = 255          # vertices per side; 254 * 254 * 2 triangles
 EXTENT = 2.0        # the terrain spans [-EXTENT, +EXTENT] on X and Z
 HEIGHT = 0.55
 
-# Colour by altitude, in metres of the model: (ceiling, r, g, b). Read in order, first match wins.
-BANDS = [
-    (-0.18, 0.16, 0.29, 0.52),   # deep water
-    (-0.06, 0.24, 0.45, 0.66),   # shallow water
-    (0.00, 0.80, 0.74, 0.50),    # sand
-    (0.16, 0.36, 0.55, 0.28),    # grass
-    (0.34, 0.28, 0.42, 0.24),    # forest
-    (0.50, 0.45, 0.42, 0.38),    # rock
-    (99.0, 0.92, 0.92, 0.94),    # snow
+# Colour by altitude, in the model's units. One entry per zone, and the altitude at which the
+# NEXT one takes over.
+ZONES = [
+    (0.16, 0.29, 0.52, -0.18),   # deep water
+    (0.24, 0.45, 0.66, -0.06),   # shallow water
+    (0.80, 0.74, 0.50, 0.00),    # sand
+    (0.36, 0.55, 0.28, 0.16),    # grass
+    (0.28, 0.42, 0.24, 0.34),    # forest
+    (0.45, 0.42, 0.38, 0.50),    # rock
+    (0.92, 0.92, 0.94, None),    # snow
 ]
+
+# Half-width of the transition between two zones. It is NOT cosmetic: a colour lives on a VERTEX,
+# so a hard boundary can only fall on the grid, and it comes out as a staircase zigzagging along
+# the rows however fine the mesh is (seen when zooming in). Blending over a few vertices puts the
+# boundary back where the relief puts it. A per-vertex colour can never carry an edge SHARPER than
+# one cell — that is the honest limit of the technique, and a texture is the answer when one needs
+# a crisp line.
+BLEND = 0.035
 
 
 def height(x, z):
@@ -47,11 +56,20 @@ def height(x, z):
                      + 0.1 * math.cos(x * 6.3) * math.cos(z * 5.9))
 
 
+def smoothstep(edge0, edge1, x):
+    t = min(1.0, max(0.0, (x - edge0) / (edge1 - edge0)))
+    return t * t * (3.0 - 2.0 * t)
+
+
 def colour(y):
-    for ceiling, r, g, b in BANDS:
-        if y <= ceiling:
-            return (r, g, b, 1.0)
-    return BANDS[-1][1:] + (1.0,)
+    """The zones blended by altitude: each boundary fades over 2 * BLEND instead of cutting."""
+    r, g, b = ZONES[0][:3]
+    for i, zone in enumerate(ZONES[:-1]):
+        edge = zone[3]
+        t = smoothstep(edge - BLEND, edge + BLEND, y)
+        nr, ng, nb = ZONES[i + 1][:3]
+        r, g, b = r + (nr - r) * t, g + (ng - g) * t, b + (nb - b) * t
+    return (r, g, b, 1.0)
 
 
 def build():
