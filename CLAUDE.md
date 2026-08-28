@@ -1138,17 +1138,19 @@ sur une seule boîte : les arêtes de chaque petit cube se voient alors, sur la 
 les creux, et la lumière les accroche. La pièce centrale est omise, elle ne peut pas être vue. Les
 UV d'une face extérieure sont calculées **depuis la position** du sommet sur la face (`face_uv`),
 donc le motif peint s'aligne sur la géométrie par construction, sans table à tenir en accord ; les
-faces tournées vers l'intérieur prennent un texel du corps noir. 624 sommets, 312 triangles, 23,8 Ko. Le **cube est MÉLANGÉ** : les 54 stickers ont chacun leur couleur, neuf par couleur (invariant
+faces tournées vers l'intérieur prennent un texel du corps noir. 624 sommets, 312 triangles,
+23,8 Ko.
+Le **cube est MÉLANGÉ** : les 54 stickers ont chacun leur couleur, neuf par couleur (invariant
 vérifié), par un brassage à graine fixe — donc reproductible, mais ce n'est PAS le résultat de
 rotations légales et l'état est très probablement insoluble ; le script le dit. Un cube résolu
 n'aurait montré qu'une couleur par face, soit ce que l'atlas est censé dépasser.
-Le PNG (204×136) est dessiné pixel par pixel et
-encodé par le script, donc sans dépendance. Trois points appris à la mesure : la grille doit remplir
-sa cellule EXACTEMENT (`3 × sticker + 4 × interstice == cellule`, sinon le pixel qui reste élargit
-la dernière bordure et les stickers ne sont plus centrés — c'était le cas avec 3×9+4×1 = 31 pour une
-cellule de 32) ; les UV sont **rentrés d'un demi-pixel** dans leur cellule (sans quoi le bord
-échantillonne la face voisine et une bande de la mauvaise couleur court le long des arêtes) ; et
-l'orientation des quads est **vérifiée par le calcul** (`check_layout`) — mes deux faces latérales étaient enroulées à l'envers, donc éliminées
+Le PNG (204×136) est dessiné pixel par pixel et encodé par le script, donc sans dépendance. Trois
+points appris à la mesure : la grille doit remplir sa cellule EXACTEMENT (`3 × sticker + 4 ×
+interstice == cellule`, sinon le pixel qui reste élargit la dernière bordure et les stickers ne sont
+plus centrés — c'était le cas avec 3×9+4×1 = 31 pour une cellule de 32) ; les UV sont **rentrés d'un
+demi-pixel** dans leur cellule (sans quoi le bord échantillonne la face voisine et une bande de la
+mauvaise couleur court le long des arêtes) ; et l'orientation des quads est **vérifiée par le
+calcul** (`check_layout`) — mes deux faces latérales étaient enroulées à l'envers, donc éliminées
 par le back-face culling, et rien ne le signale : le cube sortait simplement ouvert sur deux côtés,
 ce qu'un rendu seul a révélé.
 
