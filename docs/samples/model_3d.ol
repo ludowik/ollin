@@ -2,13 +2,14 @@
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
 ## Wheel or pinch to zoom.
-## The "Model" menu switches between them, covering the two ways a file can carry its appearance:
-## a model may hold its geometry ALONE, and then the fill tints it, or it may hold a TEXTURE, and
-## then a white fill shows it as painted. Three of them are borrowed classics, each bringing its
-## own weight: Suzanne, the Blender mascot, four thousand triangles of sculpted geometry; the
-## Stanford dragon, ninety thousand; the damaged helmet, a real painted texture over that geometry.
-## Each file's own header carries its source and its credit. In the playground, add your file under
-## "Resources" and extend the list below.
+## The "Model" menu switches between them, covering the three ways a file can carry its appearance:
+## a model may hold its geometry ALONE, and then the fill tints it; it may hold a TEXTURE, and then
+## a white fill shows it as painted; or it may hold a COLOUR PER VERTEX, which paints one mesh in
+## many colours with no image at all — that is the terrain, coloured by altitude. Three of them are
+## borrowed classics, each bringing its own weight: Suzanne, the Blender mascot, four thousand
+## triangles of sculpted geometry; the Stanford dragon, ninety thousand; the damaged helmet, a real
+## painted texture over that geometry. Each file's own header carries its source and its credit.
+## In the playground, add your file under "Resources" and extend the list below.
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.
@@ -22,7 +23,8 @@ global models = [
     {name: "Textured cube (.glb)", file: "cube_tex.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.2, height: 0.12},
     {name: "Suzanne (.obj)", file: "suzanne.obj", tint: colors.GRAY, ambient: 0.3, margin: 1.1, height: 0.1},
     {name: "Stanford dragon (.glb)", file: "dragon.glb", tint: colors.GRAY, ambient: 0.3, margin: 1.15, height: 0.15},
-    {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.15, height: 0.1}
+    {name: "Damaged helmet (.glb)", file: "helmet.glb", tint: colors.WHITE, ambient: 0.5, margin: 1.15, height: 0.1},
+    {name: "Coloured terrain (.glb)", file: "terrain.glb", tint: colors.WHITE, ambient: 0.4, margin: 1.05, height: 0.45}
 ]
 global current = nil   ## the entry on display
 global sz = nil       ## the model's dimensions, for the framing

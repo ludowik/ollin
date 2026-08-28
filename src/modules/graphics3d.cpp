@@ -354,6 +354,7 @@ static float s_light_col[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 // Instanced Blinn-Phong shader (per-instance transform and colour) plus a texture.
 static Shader s_lit{};
 static bool s_lit_ready = false;
+static int s_loc_vertcolor = -1;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
 static int s_loc_instcorner = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
@@ -398,6 +399,7 @@ static void load_lit_shader() {
     if (s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] <= 0) {
         s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM] = GetShaderLocationAttrib(s_lit, "instanceTransform");
     }
+    s_loc_vertcolor = GetShaderLocationAttrib(s_lit, "vertexColor");
     s_loc_instcolor = GetShaderLocationAttrib(s_lit, "instanceColor");
     s_loc_insttile = GetShaderLocationAttrib(s_lit, "instanceTile");
     s_loc_instcorner = GetShaderLocationAttrib(s_lit, "instanceCorner");
@@ -494,6 +496,13 @@ static bool lit_begin_draw() {
         return false;
     }
     rlEnableShader(s_lit.id);
+    // A mesh WITHOUT per-vertex colours leaves attribute location 3 unfed, and OpenGL then serves
+    // the generic value, (0, 0, 0, 1) by default: every model would come out black. The constant
+    // is posted white once per draw; a mesh that HAS the buffer overrides it from its own VAO.
+    if (s_loc_vertcolor >= 0) {
+        float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        rlSetVertexAttributeDefault(s_loc_vertcolor, white, SHADER_ATTRIB_VEC4, 4);
+    }
     Matrix mvp = MatrixMultiply(s_view3d, rlGetMatrixProjection());
     rlSetUniformMatrix(s_lit.locs[SHADER_LOC_MATRIX_MVP], mvp);
     float vp[3] = {s_cam3d.position.x, s_cam3d.position.y, s_cam3d.position.z};

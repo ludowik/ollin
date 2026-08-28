@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-27 19:39</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-28 06:52</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -455,7 +455,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-27 19:39</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-28 06:52</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1925,7 +1925,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.torus(x,y,z, r, tube)</code></td><td>A torus centred on <code>(x,y,z)</code>, of main radius <code>r</code> and tube radius <code>tube</code> — solid with <code>fill</code></td></tr>
     <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>A horizontal plane (XZ) of size <code>sx</code>×<code>sz</code>, filled</td></tr>
     <tr><td><code>graphics.model(name)</code></td><td>Loads an <strong>external model</strong> (<code>.obj</code>, or <code>.glb</code> with embedded materials and textures) → it returns a handle. In a project, add it under <em>Resources</em>; in an example or a draft it is loaded automatically from <code>samples/</code></td></tr>
-    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Draws the model at <code>(x,y,z)</code>, with an optional scale, lit. A <code>.glb</code> keeps its <strong>textures and colours</strong>; <code>fill</code> is a global tint, white keeping the original colours</td></tr>
+    <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Draws the model at <code>(x,y,z)</code>, with an optional scale, lit. A <code>.glb</code> keeps its <strong>textures and colours</strong>, including a <strong>colour per vertex</strong> when the file carries one — many colours in one mesh, with no image; <code>fill</code> is a global tint, white keeping the original colours</td></tr>
     <tr><td><code>graphics.modelSize(handle)</code></td><td>The model's dimensions → a map <code>{ w, h, d, cx, cy, cz, radius }</code> (size, centre, bounding radius)</td></tr>
     <tr><td><code>graphics.fitDistance(radius [, fovy])</code></td><td>The camera distance at which a sphere of radius <code>radius</code> fits on screen, following the portrait/landscape ratio — handy for framing a model</td></tr>
     <tr><td><code>graphics.line3d(x1,y1,z1, x2,y2,z2)</code></td><td>A 3D segment, in the <code>stroke</code> colour</td></tr>

@@ -4,6 +4,7 @@
 in vec3 vertexPosition;
 in vec2 vertexTexCoord;
 in vec3 vertexNormal;
+in vec4 vertexColor;
 in mat4 instanceTransform;
 in vec4 instanceColor;
 in vec3 instanceTile;
@@ -46,7 +47,7 @@ void main() {
     vec4 wp = m * vec4(vp, 1.0);
     fragPosition = wp.xyz;
     fragTexCoord = vertexTexCoord;
-    fragColor = instanceColor;
+    fragColor = instanceColor * vertexColor;
     fragTile = instanceTile;
     mat3 nm = transpose(inverse(mat3(m)));   // the normal matrix: correct under a rotation or a non-uniform scale
     fragNormal = normalize(nm * vn);

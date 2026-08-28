@@ -132,6 +132,8 @@ ollin/
 │                      native-gfx.sh (build raylib desktop → build-gfx/), run-headless.sh (exécution Xvfb),
 │                      cm-entry.js (point d'entrée du bundle CodeMirror, esbuild via npm/CI),
 │                      build-wasm.sh (build WASM via emscripten, 2ᵉ config CMake → docs/wasm/ ; cf. cible `wasm`),
+│                      gen_terrain_glb.py (engendre docs/samples/terrain.glb — lancé à la MAIN,
+│                      modèle À NOUS ; le seul à porter une couleur par sommet),
 │                      convert_suzanne_obj.py (convertit le Suzanne de Khronos en
 │                      docs/samples/suzanne.obj — lancé à la MAIN, réclame le réseau ; le script
 │                      EST la trace de provenance d'un modèle emprunté, cf. plus bas),
@@ -1068,13 +1070,17 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   entrer le programme dans la clé de regroupement des instances (aujourd'hui `(maillage, texture)`),
   donc un tri et des changements d'état en cours de frame. Seuil de bascule : une **sixième**
   fonctionnalité, ou un attribut d'instance supplémentaire.
+  La couleur par sommet ne compte NI pour l'une NI pour l'autre, et c'est vérifiable : elle
+  n'ajoute aucune branche (une multiplication de plus dans `fragColor`) et rien à l'instance —
+  l'attribut est celui du MAILLAGE, déjà présent dans son VAO. Le seuil est inchangé.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Quatre fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
+Cinq fichiers, chacun pour une raison distincte : `cube_tex.glb` (glTF portant une TEXTURE),
 `suzanne.obj` (géométrie seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie
 sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie texture peinte SUR
-de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible).
+de la géométrie sculptée, ce que `cube_tex.glb` ne fait que prouver possible) et `terrain.glb`
+(une couleur PAR SOMMET, cf. plus bas).
 
 **Plus aucun modèle ne porte une couleur de matériau PAR MAILLAGE** : `armillary.glb` était le
 seul, et il a été retiré à la demande de l'utilisateur. Le chemin existe toujours dans
@@ -1085,6 +1091,17 @@ plus exercé par aucun exemple — c'est un trou de couverture connu, pas un oub
 lecture d'un accesseur, rotation par quaternion, écriture d'un `.glb`. Chacun avait recopié les
 quatre, ce qui est exactement la duplication que le module supprime ; le refactor a été vérifié
 par l'octet (sortie identique avant/après).
+
+**Couleur PAR SOMMET** : `terrain.glb` (engendré par `tools/gen_terrain_glb.py`, modèle à nous,
+aucune licence tierce) porte un `COLOR_0` et se colore par l'altitude — un seul maillage, beaucoup
+de couleurs, aucune image, un seul appel de dessin. Côté moteur, `lit.vert` déclare `in vec4
+vertexColor` : raylib lie ce NOM à l'emplacement d'attribut 3 avant l'édition de liens
+(`glBindAttribLocation`, `rlgl.h`), qui est justement celui du VBO de couleurs d'un maillage.
+⚠ Un maillage SANS `COLOR_0` laisse cet emplacement sans tampon, et OpenGL sert alors la valeur
+générique — `(0, 0, 0, 1)` par défaut, donc un modèle NOIR. `lit_begin_draw` pose donc la constante
+blanche une fois par dessin (`rlSetVertexAttributeDefault`), un maillage qui a le tampon
+l'emportant depuis son propre VAO ; c'est ce que fait raylib dans son `DrawMesh`. Vérifié : les
+rendus de Suzanne et du casque sont identiques à l'octet avant et après le changement.
 
 **Un maillage raylib ne peut pas dépasser 65 535 sommets** : `Mesh` range ses indices en
 *unsigned short*, et le chargeur CONVERTIT un tampon d'indices 32 bits en 16 bits avec un simple
