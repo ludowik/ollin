@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-28 13:24</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-28 16:29</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -448,6 +448,7 @@ pre:hover .code-actions,
   <a href="#tween">The tween module</a>
   <a href="#sound">Sound (audio + sound)</a>
   <a href="#data">The data module</a>
+  <a href="#date">The date module</a>
   <a href="#image">The image module</a>
   <a href="#window">The window module</a>
 </nav>
@@ -455,7 +456,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-28 13:24</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-28 16:29</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2538,6 +2539,40 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <span class="bi">data</span>.set(<span class="str">"runs"</span>, n + <span class="num">1</span>)
 
 <span class="bi">data</span>.shared.set(<span class="str">"theme"</span>, <span class="str">"dark"</span>)   <span class="cmt">## shared between every project</span></code></pre>
+</section>
+
+<section id="date">
+<h2>The <code>date</code> module</h2>
+<p>The calendar, which <code>time()</code> alone cannot give: it returns the seconds since the Unix epoch, and turning those into a day and an hour means leap years, month lengths and above all a <strong>time zone</strong> with its summer time. Available without any <code>import</code>. Both functions return a plain <strong>map</strong>.</p>
+<table>
+  <thead><tr><th>Function</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>date.now([t])</code></td><td>The parts of the <strong>local</strong> time; with no argument, of this instant. <code>t</code> is a number of seconds since the epoch, as <code>time()</code> returns it</td></tr>
+    <tr><td><code>date.utc([t])</code></td><td>The same in <strong>UTC</strong>, the same answer on every machine</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th>Field</th><th>Range</th></tr></thead>
+  <tbody>
+    <tr><td><code>year</code></td><td>the full year, 2026 and not 126</td></tr>
+    <tr><td><code>month</code></td><td>1 to 12, January being 1</td></tr>
+    <tr><td><code>day</code></td><td>1 to 31, the day of the month</td></tr>
+    <tr><td><code>hour</code> <code>minute</code> <code>second</code></td><td>0 to 23, and 0 to 59 (a second may reach 60, a leap second)</td></tr>
+    <tr><td><code>weekday</code></td><td>1 to 7, <strong>Monday being 1</strong> and Sunday 7 (the ISO numbering)</td></tr>
+    <tr><td><code>yearDay</code></td><td>1 to 366, the day of the year</td></tr>
+  </tbody>
+</table>
+<pre><code><span class="kw">var</span> d = <span class="bi">date</span>.now()
+<span class="bi">printf</span>(<span class="str">"{}/{}/{} at {}h{}"</span>, d.day, d.month, d.year, d.hour, d.minute)
+
+<span class="cmt">## the week-end, since Monday is 1</span>
+<span class="kw">if</span> d.weekday &gt;= <span class="num">6</span> <span class="kw">then</span>
+    <span class="bi">print</span>(<span class="str">"day off"</span>)
+<span class="kw">end</span>
+
+<span class="cmt">## an instant of one's own: the parts of a stored date</span>
+<span class="kw">var</span> then_ = <span class="bi">date</span>.utc(<span class="num">1_700_000_000</span>)   <span class="cmt">## 2023-11-14 22:13:20 UTC</span></code></pre>
+<div class="callout">There is no formatting function: interpolation does the job, and it leaves the layout to whoever writes it — <code>"{d.hour}:{d.minute}"</code>. Nor is there any arithmetic on dates: add seconds to the number <code>time()</code> gives you, then decode.</div>
 </section>
 
 <section id="image">

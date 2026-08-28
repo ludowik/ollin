@@ -512,6 +512,14 @@ end
 end' \
     "continue outside loop"
 
+check_error "date.now with a non-number instant" \
+    'var d = date.now("today")' \
+    "date.now: argument 1 expected number"
+
+check_error "date.utc with a non-number instant" \
+    'var d = date.utc([])' \
+    "date.utc: argument 1 expected number"
+
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [ $FAIL -eq 0 ]

@@ -121,7 +121,7 @@ ollin/
 │   ├── source_registry.h/.cpp  registre de sources en mémoire (imports, playground)
 │   ├── collections/   array.h/.cpp, map.h/.cpp (+ ValueHash/ValueEqual), iterator.h, range.h
 │   ├── shaders/       lit.vert / lit.frag — le GLSL de la 3D, EMBARQUÉ (cf. « Shaders »)
-│   ├── modules/       modules natifs : core, math, string, color, window, mouse, keyboard,
+│   ├── modules/       modules natifs : core, math, string, color, date, window, mouse, keyboard,
 │   │                  graphics (graphics_module = 2D/fenêtre/boucle + graphics3d = 3D + graphics_quat = classe Quat, frontière graphics_internal.h ; graphics_stub = nil sans raylib),
 │   │                  image (+ image_stub), ui (+ ui_stub), tween, + modules.h/.cpp, module_utils.h
 │   │                  array_module = pseudo-méthodes des tableaux (interne, PAS un module global)
