@@ -22,10 +22,11 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gltf_util as gl
 
-# 255 is the ceiling: 255 * 255 = 65 025 vertices, just under the 65 535 that raylib's u16 mesh
-# indices allow. Below that the height field shows facets, and the colour bands staircase along
-# the mesh's rows rather than following the relief.
-SIDE = 255          # vertices per side; 254 * 254 * 2 triangles
+# 120 is enough, and it was CHECKED rather than guessed: at 255 (65 025 vertices, the ceiling
+# raylib's u16 mesh indices allow) the close-up render is indistinguishable, for 2.6 MB against
+# 574 kB. What the grid buys is the smoothness of the RELIEF; the colour boundaries owe their
+# cleanness to BLEND below, not to the vertex count.
+SIDE = 120          # vertices per side; 119 * 119 * 2 triangles
 EXTENT = 2.0        # the terrain spans [-EXTENT, +EXTENT] on X and Z
 HEIGHT = 0.55
 
