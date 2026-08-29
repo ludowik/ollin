@@ -1762,8 +1762,20 @@ assert(dt_leap.second == 59)
 assert(dt_leap.weekday == 4)
 assert(dt_leap.yearDay == 60)     ## 31 + 29
 
-## The fraction of a second is dropped, not rounded: the same second comes back.
+## The fraction of a second becomes the MILLISECONDS; the second itself is not rounded up.
 assert(date.utc(1709251199.99).second == 59)
+assert(date.utc(1709251199.99).millisecond == 990)
+assert(date.utc(1709251199).millisecond == 0)
+assert(date.utc(1709251199.25).millisecond == 250)
+
+## Before 1970 the epoch time is NEGATIVE. The split takes the floor, so the milliseconds stay in
+## 0..999 and the second is the one that CONTAINS the instant: -0.25 s is 23:59:59.750 of 1969.
+var dt_before = date.utc(-0.25)
+assert(dt_before.year == 1969)
+assert(dt_before.hour == 23)
+assert(dt_before.minute == 59)
+assert(dt_before.second == 59)
+assert(dt_before.millisecond == 750)
 
 var dt_now = date.now()
 assert(dt_now.year >= 2024)
@@ -1772,6 +1784,7 @@ assert(dt_now.day >= 1 and dt_now.day <= 31)
 assert(dt_now.hour >= 0 and dt_now.hour <= 23)
 assert(dt_now.minute >= 0 and dt_now.minute <= 59)
 assert(dt_now.second >= 0 and dt_now.second <= 60)   ## 60 exists: a leap second
+assert(dt_now.millisecond >= 0 and dt_now.millisecond <= 999)
 assert(dt_now.weekday >= 1 and dt_now.weekday <= 7)
 assert(dt_now.yearDay >= 1 and dt_now.yearDay <= 366)
 

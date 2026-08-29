@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-28 16:29</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-29 07:15</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -456,7 +456,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-28 16:29</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-29 07:15</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2547,7 +2547,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>date.now([t])</code></td><td>The parts of the <strong>local</strong> time; with no argument, of this instant. <code>t</code> is a number of seconds since the epoch, as <code>time()</code> returns it</td></tr>
+    <tr><td><code>date.now([t])</code></td><td>The parts of the <strong>local</strong> time; with no argument, of this instant. <code>t</code> is a number of seconds since the epoch, as <code>time()</code> returns it — its decimals become the milliseconds</td></tr>
     <tr><td><code>date.utc([t])</code></td><td>The same in <strong>UTC</strong>, the same answer on every machine</td></tr>
   </tbody>
 </table>
@@ -2558,6 +2558,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
     <tr><td><code>month</code></td><td>1 to 12, January being 1</td></tr>
     <tr><td><code>day</code></td><td>1 to 31, the day of the month</td></tr>
     <tr><td><code>hour</code> <code>minute</code> <code>second</code></td><td>0 to 23, and 0 to 59 (a second may reach 60, a leap second)</td></tr>
+    <tr><td><code>millisecond</code></td><td>0 to 999 — the fraction of the second, which is what <code>time()</code> carries in its decimals</td></tr>
     <tr><td><code>weekday</code></td><td>1 to 7, <strong>Monday being 1</strong> and Sunday 7 (the ISO numbering)</td></tr>
     <tr><td><code>yearDay</code></td><td>1 to 366, the day of the year</td></tr>
   </tbody>

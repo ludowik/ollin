@@ -2,6 +2,7 @@
 #include "module_utils.h"
 
 #include <chrono>
+#include <cmath>
 #include <ctime>
 
 // The calendar, which time() alone cannot give: it returns seconds since the Unix epoch, and
@@ -14,7 +15,7 @@
 //
 // Both return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
 
-static Value parts_of(const std::tm& tm) {
+static Value parts_of(const std::tm& tm, int millis) {
     Value m = Value::make_map();
     m.map_set(Value(std::string("year")), Value((int64_t)tm.tm_year + 1900));
     m.map_set(Value(std::string("month")), Value((int64_t)tm.tm_mon + 1));      // 1..12
@@ -22,6 +23,7 @@ static Value parts_of(const std::tm& tm) {
     m.map_set(Value(std::string("hour")), Value((int64_t)tm.tm_hour));          // 0..23
     m.map_set(Value(std::string("minute")), Value((int64_t)tm.tm_min));
     m.map_set(Value(std::string("second")), Value((int64_t)tm.tm_sec));
+    m.map_set(Value(std::string("millisecond")), Value((int64_t)millis));   // 0..999
     // ISO numbering, Monday = 1 to Sunday = 7. The C library counts Sunday as 0, which puts the
     // week-end at both ends and trips up every "is it a weekday" test.
     m.map_set(Value(std::string("weekday")), Value((int64_t)(tm.tm_wday == 0 ? 7 : tm.tm_wday)));
@@ -29,35 +31,48 @@ static Value parts_of(const std::tm& tm) {
     return m;
 }
 
-// The instant to decode: the argument if there is one, otherwise now. A date is asked for in
-// SECONDS since the epoch, the unit time() returns, and the fraction is dropped.
-static std::time_t instant(CallCtx& ctx, const char* fn) {
+// The instant to decode, in SECONDS since the epoch — the unit time() returns — as a whole second
+// plus the milliseconds left over. The split uses a FLOOR and not a truncation, so a date before
+// 1970 keeps its milliseconds in 0..999 instead of going negative.
+static void instant(CallCtx& ctx, const char* fn, std::time_t* secs, int* millis) {
+    double t;
     if (ctx.argc >= 1) {
-        return (std::time_t)num_arg(ctx.args, ctx.argc, 0, fn);
+        t = num_arg(ctx.args, ctx.argc, 0, fn);
+    } else {
+        auto now = std::chrono::system_clock::now().time_since_epoch();
+        t = std::chrono::duration<double>(now).count();
     }
-    return std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    double whole = std::floor(t);
+    *secs = (std::time_t)whole;
+    *millis = (int)((t - whole) * 1000.0);
+    if (*millis > 999)      // a fraction of 0.9999 rounds to 1000 in double: keep the field valid
+        *millis = 999;
 }
 
 static int date_now(CallCtx& ctx) {
-    std::time_t t = instant(ctx, "date.now");
+    std::time_t t;
+    int millis;
+    instant(ctx, "date.now", &t, &millis);
     std::tm tm{};
 #ifdef _WIN32
     localtime_s(&tm, &t);
 #else
     localtime_r(&t, &tm);
 #endif
-    return ctx.ret(parts_of(tm));
+    return ctx.ret(parts_of(tm, millis));
 }
 
 static int date_utc(CallCtx& ctx) {
-    std::time_t t = instant(ctx, "date.utc");
+    std::time_t t;
+    int millis;
+    instant(ctx, "date.utc", &t, &millis);
     std::tm tm{};
 #ifdef _WIN32
     gmtime_s(&tm, &t);
 #else
     gmtime_r(&t, &tm);
 #endif
-    return ctx.ret(parts_of(tm));
+    return ctx.ret(parts_of(tm, millis));
 }
 
 Value make_date_module() {
