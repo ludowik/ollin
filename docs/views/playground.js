@@ -159,8 +159,8 @@ const AC_GLOBALS = [
   glob('elapsedTime', 'engine — seconds since the start'),
   glob('W',  'engine — the render area width'),
   glob('H',  'engine — the render area height'),
-  glob('CW', 'engine — centre X (W / 2)'),
-  glob('CH', 'engine — centre Y (H / 2)'),
+  glob('CX', 'engine — centre X (W / 2)'),
+  glob('CY', 'engine — centre Y (H / 2)'),
 ]
 
 // The lifecycle hooks the engine calls, inserted as a COMPLETE skeleton (func … end), the "func"

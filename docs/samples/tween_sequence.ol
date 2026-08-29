@@ -29,7 +29,7 @@ end
 ## is exactly what a sequence of steps can express.
 func startBounce()
     var r = radius()
-    ball.x = CW
+    ball.x = CX
     ball.y = ceilingY()
     ball.rx = r
     ball.ry = r
@@ -103,7 +103,7 @@ func draw()
     ## The progress of the WHOLE sequence, in time: the steps do not share a duration, and yet the
     ## bar advances evenly.
     var barW = W * 0.6
-    var left = CW - barW / 2
+    var left = CX - barW / 2
     var yb = H * 0.9
     graphics.fill(Color(1, 1, 1, 0.1))
     graphics.rect(left, yb, barW, H * 0.008)

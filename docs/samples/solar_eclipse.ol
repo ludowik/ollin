@@ -31,7 +31,7 @@ func sunRadius()
 end
 
 func sunX()
-    return CW
+    return CX
 end
 
 func sunY()

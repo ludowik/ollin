@@ -364,7 +364,7 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
 
   Le travail bouge dans les DEUX sens, et fortement : il faut le mesurer, jamais le
   supposer. Hausses réelles constatées — +9,4 % (`switch`), +7,7 % (suppression de
-  `T_MODULE`), +4,6 % (globales `W`/`H`), +1,8 % (expansion de `...`, `CW`/`CH`), +0,6 %
+  `T_MODULE`), +4,6 % (globales `W`/`H`), +1,8 % (expansion de `...`, `CX`/`CY`), +0,6 %
   (inline cache, variable par itération). Gains — **−67 % sur la boucle** (chemin rapide
   `FOR_PREP`/`FOR_LOOP` + compteur de tours), −35 % sur la map (`StringTable` robin_hood),
   −8 % sur `fib` (clés calculées), −5,5 % (clé `len` par pointeur). Il n'y a donc aucune
@@ -1037,13 +1037,13 @@ Des globales sont injectées par le moteur, sans déclaration `global` dans le s
 | `elapsedTime` | FLOAT | Secondes écoulées depuis le démarrage du programme (somme des deltaTime) |
 | `W` | INTEGER | Largeur de la zone de rendu (défaut : `window.width` selon l'environnement) |
 | `H` | INTEGER | Hauteur de la zone de rendu (défaut : `window.height`) |
-| `CW` | FLOAT | Centre X de la zone de rendu (`W / 2`) |
-| `CH` | FLOAT | Centre Y de la zone de rendu (`H / 2`) |
+| `CX` | FLOAT | Centre X de la zone de rendu (`W / 2`) |
+| `CY` | FLOAT | Centre Y de la zone de rendu (`H / 2`) |
 
 **Implémentation** :
 - `declared_globals_` les contient (pré-ajoutés dans `Compiler::compile()`) → le compilateur accepte ces noms sans `global`.
-- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, `W`/`H` (int) aux dimensions de `window` (lues via `makeBuiltinModule("window")`) et `CW`/`CH` (float) à `W/2`/`H/2` **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
-- `gfx_canvas()` (graphics_module.cpp) **repositionne** `W`/`H`/`CW`/`CH` sur les dimensions logiques réelles à chaque `graphics.canvas(w, h)` (via `setGlobal`) → les globales suivent la taille effective du canvas, même si elle diffère du défaut `window`.
+- `VM::execute()` initialise `deltaTime`/`elapsedTime` à `0.0`, `W`/`H` (int) aux dimensions de `window` (lues via `makeBuiltinModule("window")`) et `CX`/`CY` (float) à `W/2`/`H/2` **avant le top-level** — ainsi `graphics.canvas(W, H)` fonctionne dès le script principal.
+- `gfx_canvas()` (graphics_module.cpp) **repositionne** `W`/`H`/`CX`/`CY` sur les dimensions logiques réelles à chaque `graphics.canvas(w, h)` (via `setGlobal`) → les globales suivent la taille effective du canvas, même si elle diffère du défaut `window`.
 - `VM::setGlobal(name, value)` — méthode publique qui trouve l'identifier par nom et met à jour `globals[i]`. Appelée par `callUpdateIfAny()` dans `graphics_module.cpp` avant chaque frame.
 - `s_elapsed_time` (statique dans `graphics_module.cpp`) est remis à 0 à chaque `gfx_run()`.
 - **Canvas implicite** : `VM::runEntryHooks()` — si un `draw()` existe et que `graphics` est un module (pas le stub), mais que `graphics.canvas()` n'a **pas** été appelé (drapeau `VM::gfxCanvasCreated()`, posé par `gfx_canvas` via `markGfxCanvas()`), le moteur appelle `graphics.canvas(W, H)` → une session graphique démarre sur la seule présence de `draw()`. **Fait APRÈS `setup()`** : `setup()` est un endroit courant pour appeler `canvas()` soi-même ; le créer avant provoquerait un **double `InitWindow`** (crash « memory access out of bounds » en WASM). Le drapeau vit sur le VM (neuf à chaque run playground) → détection fiable même avec le contexte WebGL réutilisé.

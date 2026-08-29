@@ -85,14 +85,14 @@ end
 ## The shadow's centre is fixed on screen. The Moon, for its part, drifts horizontally: it really is
 ## the Moon that moves along its orbit, the shadow following the antisolar point far more slowly.
 func umbraCentre()
-    return CH
+    return CY
 end
 
 ## The Moon's position at time t: a straight path, offset by the chosen amount.
 func moonX()
     var rl = moonRadius()
     var reach = (R_PENUMBRA + 1.6) * rl
-    return CW - reach + 2 * reach * (t / DURATION_H)
+    return CX - reach + 2 * reach * (t / DURATION_H)
 end
 
 func moonY()
@@ -150,7 +150,7 @@ end
 ## magnitude follow from.
 func centreDist()
     var rl = moonRadius()
-    var dx = moonX() - CW
+    var dx = moonX() - CX
     var dy = moonY() - umbraCentre()
     return math.sqrt(dx * dx + dy * dy) / rl
 end
@@ -249,14 +249,14 @@ func drawMarks()
     var rl = moonRadius()
     graphics.noFill()
     graphics.stroke(Color(0.45, 0.55, 0.8, 0.55), 1)
-    graphics.circle(CW, umbraCentre(), R_PENUMBRA * rl)
+    graphics.circle(CX, umbraCentre(), R_PENUMBRA * rl)
     graphics.stroke(Color(0.8, 0.45, 0.35, 0.7), 1)
-    graphics.circle(CW, umbraCentre(), R_UMBRA * rl)
+    graphics.circle(CX, umbraCentre(), R_UMBRA * rl)
     graphics.stroke(Color(0.5, 0.6, 0.85, 0.8))
     graphics.fontSize(H * 0.022)
-    graphics.text("penumbra", CW + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
+    graphics.text("penumbra", CX + R_PENUMBRA * rl + 6, umbraCentre() - H * 0.012)
     graphics.stroke(Color(0.85, 0.5, 0.4, 0.9))
-    graphics.text("shadow", CW + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
+    graphics.text("shadow", CX + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
 end
 
 func draw()
@@ -274,7 +274,7 @@ func draw()
     var rl = moonRadius()
     var mx = moonX()
     var my = moonY()
-    var ox = CW
+    var ox = CX
     var oy = umbraCentre()
     var d = centreDist()
 

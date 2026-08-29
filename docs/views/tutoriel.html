@@ -401,7 +401,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-29 07:15</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-08-29 11:42</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -456,7 +456,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-29 07:15</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-08-29 11:42</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2397,7 +2397,7 @@ ui.show(game)        <span class="cmt">## switches to another global menu</span>
 <span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
     <span class="bi">graphics</span>.fill(ball.tint)
-    <span class="bi">graphics</span>.circle(ball.x, CH, ball.r)
+    <span class="bi">graphics</span>.circle(ball.x, CY, ball.r)
 <span class="kw">end</span></code></pre>
 
 <h3>Curves</h3>
@@ -2638,10 +2638,10 @@ image.endDraw()
     <tr><td><code>window.height</code></td><td>int</td><td>The render area's height, in pixels</td></tr>
   </tbody>
 </table>
-<div class="callout tip">Most of the time you do not need <code>window</code>: the engine already supplies the globals <code>W</code> and <code>H</code> (the render area's width and height), along with <code>CW</code> and <code>CH</code> (the centre, that is <code>W/2</code> and <code>H/2</code>), initialised from <code>window</code> before the run.</div>
-<pre data-no-run><code><span class="cmt">## W, H, CW and CH come from the engine — no need for window here</span>
+<div class="callout tip">Most of the time you do not need <code>window</code>: the engine already supplies the globals <code>W</code> and <code>H</code> (the render area's width and height), along with <code>CX</code> and <code>CY</code> (the centre, that is <code>W/2</code> and <code>H/2</code>), initialised from <code>window</code> before the run.</div>
+<pre data-no-run><code><span class="cmt">## W, H, CX and CY come from the engine — no need for window here</span>
 <span class="bi">graphics</span>.canvas(W, H, <span class="str">"Title"</span>)  <span class="cmt">## a window filling the area</span>
-<span class="bi">graphics</span>.circle(CW, CH, <span class="num">50</span>)  <span class="cmt">## a circle at the centre</span></code></pre>
+<span class="bi">graphics</span>.circle(CX, CY, <span class="num">50</span>)  <span class="cmt">## a circle at the centre</span></code></pre>
 </section>
 
 

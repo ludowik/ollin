@@ -133,10 +133,10 @@ func draw()
     var direction = config.direction == "clockwise" and 1 or -1
     for i = 1, config.branches do
         var angle = direction * t + gap * i
-        var cx = CW + math.cos(angle) * r
-        var cy = CH + math.sin(angle) * r
+        var cx = CX + math.cos(angle) * r
+        var cy = CY + math.sin(angle) * r
         drawShape(cx, cy, radius)
-        graphics.line(CW, CH, cx, cy)
+        graphics.line(CX, CY, cx, cy)
     end
 
     if t > math.TAU then

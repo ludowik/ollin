@@ -1991,10 +1991,10 @@ void VM::execute(Chunk chunk) {
             } else if (owned_chunk.identifiers[gi] == "H") {
                 globals[gi] = Value(win_h);
                 globals_init[gi] = true;
-            } else if (owned_chunk.identifiers[gi] == "CW") {
+            } else if (owned_chunk.identifiers[gi] == "CX") {
                 globals[gi] = Value((double)win_w / 2.0);
                 globals_init[gi] = true;
-            } else if (owned_chunk.identifiers[gi] == "CH") {
+            } else if (owned_chunk.identifiers[gi] == "CY") {
                 globals[gi] = Value((double)win_h / 2.0);
                 globals_init[gi] = true;
             }

@@ -156,14 +156,14 @@ static int gfx_canvas(CallCtx& ctx) {
 #endif
     s_logicalW = w;
     s_logicalH = h;
-    // Repositions the engine globals on the canvas's real size: W and H to the logical dimensions, CW
-    // and CH to the centre as floats. graphics.canvas(w, h) therefore recomputes them even when w and h
+    // Repositions the engine globals on the canvas's real size: W and H to the logical dimensions, CX
+    // and CY to the centre as floats. graphics.canvas(w, h) therefore recomputes them even when w and h
     // differ from the initial window values.
     if (VM* vm = VM::current()) {
         vm->set_global("W", Value((int64_t)w));
         vm->set_global("H", Value((int64_t)h));
-        vm->set_global("CW", Value((double)w / 2.0));
-        vm->set_global("CH", Value((double)h / 2.0));
+        vm->set_global("CX", Value((double)w / 2.0));
+        vm->set_global("CY", Value((double)h / 2.0));
     }
     // Persistent render target. We aim for supersampling RELATIVE to the logical size for
     // anti-aliasing, but never below the physical resolution, to stay sharp on HiDPI. SSAA is

@@ -345,8 +345,8 @@ Chunk Compiler::compile(const Program& prog) {
     declared_globals_.insert("elapsedTime");
     declared_globals_.insert("W");   // the width of the render area, window.width by default
     declared_globals_.insert("H");   // the height of the render area, window.height by default
-    declared_globals_.insert("CW");  // the render area's centre X (W / 2)
-    declared_globals_.insert("CH");  // the render area's centre Y (H / 2)
+    declared_globals_.insert("CX");  // the render area's centre X (W / 2)
+    declared_globals_.insert("CY");  // the render area's centre Y (H / 2)
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;

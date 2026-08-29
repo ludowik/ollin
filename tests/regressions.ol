@@ -1788,4 +1788,10 @@ assert(dt_now.millisecond >= 0 and dt_now.millisecond <= 999)
 assert(dt_now.weekday >= 1 and dt_now.weekday <= 7)
 assert(dt_now.yearDay >= 1 and dt_now.yearDay <= 366)
 
+## The engine globals: CX and CY are the CENTRE of the render area, not its size — the point of
+## the rename from CW/CH, which read as "canvas width" right next to W. The relation holds in every
+## build, including this headless one where the area is 0 by 0.
+assert(CX == W / 2)
+assert(CY == H / 2)
+
 print("regressions ok")
