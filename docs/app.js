@@ -40,9 +40,12 @@ document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-
 const MAC_TITLEBAR_H = 28
 if (/Mac/i.test(navigator.platform || '')) {
   const title_bar_height = () => {
-    // A window can never sit above the menu bar, and full screen is the only way for the page to
-    // start at the top of the screen or to be as tall as it: either says there is no title bar.
-    if (window.screenY <= 20 || screen.height - window.innerHeight < 40)
+    // A window can never cover the menu bar. So a page that starts at the very TOP of the screen,
+    // or that is as TALL as the whole screen, can only be in full screen — where there is no
+    // title bar. Both tests are deliberately tight: a window opened against the menu bar fills
+    // everything below it, which a loose test read as full screen, and the app then launched with
+    // its toolbar under the title bar again (reported on a Mac; moving the window fixed it).
+    if (window.screenY <= 2 || screen.height - window.innerHeight <= 4)
       return 0
     // Its height, when the browser exposes the frame: the whole window less the page inside it.
     // A value outside a plausible range measures something else (a browser's toolbar stack, a
