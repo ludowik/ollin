@@ -171,9 +171,13 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   (bouton vert de macOS) laisse Safari en `standalone` — seule l'API Fullscreen fait basculer le
   mode — et une première version, qui s'y fiait seule, laissait une bande morte en plein écran
   (constaté par l'utilisateur sur son Mac). L'état est donc **mesuré** par `app.js` (macOS
-  seulement, `--mac-titlebar-h`), et remesuré à chaque `resize`, ce que le plein écran déclenche :
-  une fenêtre ne peut jamais passer au-dessus de la barre de menus, donc `screenY <= 20` ou une
-  page aussi haute que l'écran signifient qu'il n'y a pas de barre de titre. Sinon la hauteur vient
+  seulement, `--mac-titlebar-h`), et remesuré à chaque `resize`, ce que le plein écran déclenche.
+  La mesure se fait **contre le système, pas contre des constantes** : `screen.availTop` et
+  `availHeight` bornent la zone où une fenêtre a le droit de vivre (barre de menus et Dock exclus),
+  et une page qui passe au-dessus ou qui est plus haute qu'elle est forcément en plein écran. Des
+  seuils écrits à la main ont été essayés et se sont trompés deux fois — une fenêtre ouverte collée
+  sous la barre de menus remplit toute la zone disponible et passait pour du plein écran (les deux
+  barres se superposaient au lancement, constaté par l'utilisateur). Sinon la hauteur vient
   du cadre (`outerHeight − innerHeight`, retenue entre 8 et 64 px), les 28 px n'étant qu'un repli —
   un cadre non exposé rend zéro, ce qui ne prouve pas l'absence de barre.
   Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc

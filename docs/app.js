@@ -40,12 +40,18 @@ document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-
 const MAC_TITLEBAR_H = 28
 if (/Mac/i.test(navigator.platform || '')) {
   const title_bar_height = () => {
-    // A window can never cover the menu bar. So a page that starts at the very TOP of the screen,
-    // or that is as TALL as the whole screen, can only be in full screen — where there is no
-    // title bar. Both tests are deliberately tight: a window opened against the menu bar fills
-    // everything below it, which a loose test read as full screen, and the app then launched with
-    // its toolbar under the title bar again (reported on a Mac; moving the window fixed it).
-    if (window.screenY <= 2 || screen.height - window.innerHeight <= 4)
+    // No browser tells a page whether a title bar is over it: display-mode says "standalone" in
+    // both states, the Fullscreen API knows nothing of the window's own full screen, and the
+    // Window Controls Overlay, which would give the exact rectangle, is not implemented by
+    // Safari. What CAN be asked is where the system lets a window live — screen.availTop and
+    // availHeight exclude the menu bar and the Dock — and a window can never leave that area.
+    // A page reaching above it, or taller than it, is therefore in full screen, where there is
+    // no title bar. This is measured against the system rather than against numbers of my own:
+    // a window opened flush under the menu bar fills the whole available area, which an earlier
+    // tolerance read as full screen (reported on a Mac: the two bars overlapped at launch).
+    const avail_top = screen.availTop !== undefined ? screen.availTop : 0
+    const avail_height = screen.availHeight || screen.height
+    if (window.screenY < avail_top || window.innerHeight > avail_height)
       return 0
     // Its height, when the browser exposes the frame: the whole window less the page inside it.
     // A value outside a plausible range measures something else (a browser's toolbar stack, a
