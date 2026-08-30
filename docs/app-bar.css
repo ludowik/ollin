@@ -25,11 +25,10 @@
   --bar-font: system-ui, -apple-system, sans-serif;
 }
 
-/* A title bar exists only while the window is in STANDALONE mode. Full screen removes it — the
-   macOS green button as much as a view's own full-screen button — and this query stops matching
-   by itself, so the space is given back without a listener to keep in sync. In a browser tab it
-   never matches at all. app.js only says how TALL the title bar is (--mac-titlebar-h, macOS
-   only): the question of whether one is there is answered here, and answered live. */
+/* A title bar belongs to an INSTALLED app: a browser tab has none, whatever its window does, so
+   this query keeps the whole question away from an ordinary page. It is not enough on its own —
+   Safari stays in "standalone" when the WINDOW goes full screen — which is why app.js measures
+   the window and puts 0 in --mac-titlebar-h in that case. */
 @media (display-mode: standalone) {
   :root {
     --titlebar-h: var(--mac-titlebar-h, 0px);

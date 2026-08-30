@@ -29,21 +29,30 @@ const V = Date.now()
 document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
 
 // Installed as an app on macOS, the window keeps a native TITLE BAR above the page, and our own
-// bar ended up underneath it: its buttons were painted but the clicks went to the window. All
-// that is decided here is the title bar's HEIGHT, and only on macOS — WHETHER one is showing is
-// app-bar.css's `display-mode: standalone` query, which follows the window into full screen and
-// back on its own.
-// The height is MEASURED when the browser exposes the window frame (outerHeight is the whole
-// window, innerHeight the page inside it); the difference is then exactly the title bar. The
-// constant is the fallback for when that difference reads zero — which is what a browser does
-// when the frame is not exposed to a web app, not proof that there is no title bar.
+// bar ended up underneath it: its buttons were painted but the clicks went to the window. This
+// sets how much room to leave for it, on macOS only; app-bar.css leaves none anywhere else.
+//
+// The window's FULL SCREEN (the green button) removes that title bar, and Safari keeps reporting
+// display-mode "standalone" throughout — only the Fullscreen API switches the mode — so the
+// media query alone left a dead band at the top (reported on a Mac, in full screen). The state
+// is therefore MEASURED, and remeasured on every resize, which is what entering and leaving
+// full screen raises.
 const MAC_TITLEBAR_H = 28
 if (/Mac/i.test(navigator.platform || '')) {
-  const frame = Math.round(window.outerHeight - window.innerHeight)
-  // A plausible title bar only: a value out of that range measures something else (a browser's
-  // whole toolbar stack, a zoom artefact) and is worse than the constant.
-  const h = frame >= 8 && frame <= 64 ? frame : MAC_TITLEBAR_H
-  document.documentElement.style.setProperty('--mac-titlebar-h', h + 'px')
+  const title_bar_height = () => {
+    // A window can never sit above the menu bar, and full screen is the only way for the page to
+    // start at the top of the screen or to be as tall as it: either says there is no title bar.
+    if (window.screenY <= 20 || screen.height - window.innerHeight < 40)
+      return 0
+    // Its height, when the browser exposes the frame: the whole window less the page inside it.
+    // A value outside a plausible range measures something else (a browser's toolbar stack, a
+    // zoom artefact), and a zero says the frame is not exposed — NOT that there is no title bar.
+    const frame = Math.round(window.outerHeight - window.innerHeight)
+    return frame >= 8 && frame <= 64 ? frame : MAC_TITLEBAR_H
+  }
+  const apply = () => document.documentElement.style.setProperty('--mac-titlebar-h', title_bar_height() + 'px')
+  apply()
+  addEventListener('resize', apply)
 }
 
 const { hardReload } = await import('./pg-run.js?v=' + V)

@@ -166,15 +166,16 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   l'installation** : une application déjà posée sur le Dock doit être retirée puis rajoutée.
   Une fenêtre d'application macOS garde en outre sa **barre de titre native** au-dessus de la
   page : `--inset-top` (défini dans `app-bar.css`, unique pour les quatre vues) additionne
-  l'encoche iOS (`env(safe-area-inset-top)`) et `--titlebar-h`. Les deux questions sont
-  **séparées**, et c'est ce qui rend le réglage durable : *y a-t-il une barre de titre* est
-  tranché par le média `display-mode: standalone` — le plein écran (bouton vert de macOS comme
-  bouton d'une vue) bascule sur `fullscreen`, la requête cesse de correspondre et la place est
-  rendue **sans écouteur à tenir à jour** ; *quelle hauteur* est posé par `app.js`, sur macOS
-  seulement (`--mac-titlebar-h`). La hauteur est **mesurée** quand le navigateur expose le cadre
-  (`outerHeight − innerHeight`, retenue entre 8 et 64 px) ; les 28 px ne servent que de repli,
-  un cadre non exposé rendant zéro — ce qui ne prouve pas l'absence de barre. Mesuré en fenêtre
-  d'application : 48 en onglet, 76 en application, 48 en plein écran, 76 au retour.
+  l'encoche iOS (`env(safe-area-inset-top)`) et `--titlebar-h`. Le média `display-mode: standalone`
+  écarte le cas d'un onglet ordinaire, mais **il ne suffit pas** : ⚠ le plein écran de la FENÊTRE
+  (bouton vert de macOS) laisse Safari en `standalone` — seule l'API Fullscreen fait basculer le
+  mode — et une première version, qui s'y fiait seule, laissait une bande morte en plein écran
+  (constaté par l'utilisateur sur son Mac). L'état est donc **mesuré** par `app.js` (macOS
+  seulement, `--mac-titlebar-h`), et remesuré à chaque `resize`, ce que le plein écran déclenche :
+  une fenêtre ne peut jamais passer au-dessus de la barre de menus, donc `screenY <= 20` ou une
+  page aussi haute que l'écran signifient qu'il n'y a pas de barre de titre. Sinon la hauteur vient
+  du cadre (`outerHeight − innerHeight`, retenue entre 8 et 64 px), les 28 px n'étant qu'un repli —
+  un cadre non exposé rend zéro, ce qui ne prouve pas l'absence de barre.
   Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc
   zéro, ce qui laisse iOS poser la page dans la zone sûre. Le changer déplacerait la mise en page
   d'iOS et ne se fera pas sans un appareil pour le vérifier.
