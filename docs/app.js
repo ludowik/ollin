@@ -28,6 +28,17 @@ const V = Date.now()
 // imported with a version token, hence always fresh, and the stylesheet follows.
 document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
 
+// Installed as an app on macOS, the window keeps a native TITLE BAR above the page, and our own
+// bar ended up underneath it: its buttons were painted but the clicks went to the window. CSS
+// cannot tell one system from another, so the height is set here, and only there — an iPhone
+// keeps its notch inset alone, a browser tab keeps nothing.
+// The window's frame is not measurable from the page (innerHeight is the content area, and
+// outerHeight is not exposed to a web app), so this is the macOS title-bar height, not a
+// measurement: it is the ONE number to adjust if the bar sits too low or too high.
+const MAC_TITLEBAR_H = '28px'
+if (matchMedia('(display-mode: standalone)').matches && /Mac/i.test(navigator.platform || ''))
+  document.documentElement.style.setProperty('--titlebar-h', MAC_TITLEBAR_H)
+
 const { hardReload } = await import('./pg-run.js?v=' + V)
 
 // On-screen crash capture, for diagnosing a device (iOS in full screen, with no console).

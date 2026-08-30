@@ -52,11 +52,9 @@ body {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 150;
-  height: calc(var(--bar-h) + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
 }
 
-body { padding-top: calc(var(--bar-h) + env(safe-area-inset-top)); }
+body { padding-top: calc(var(--bar-h) + var(--inset-top)); }
 
 /* ── sidebar ─────────────────────────────────────────────────────────────── */
 nav {
@@ -66,8 +64,8 @@ nav {
   border-right: 1px solid var(--border);
   padding: 32px 0;
   position: sticky;
-  top: calc(var(--bar-h) + env(safe-area-inset-top));
-  height: calc(100vh - var(--bar-h) - env(safe-area-inset-top));
+  top: calc(var(--bar-h) + var(--inset-top));
+  height: calc(100vh - var(--bar-h) - var(--inset-top));
   overflow-y: auto;
 }
 
@@ -340,8 +338,8 @@ pre:hover .code-actions,
   nav {
     position: fixed;
     /* Under the bar, not over it: when open, the menu leaves the bar visible. */
-    top: calc(var(--bar-h) + env(safe-area-inset-top)); left: 0;
-    height: calc(100vh - var(--bar-h) - env(safe-area-inset-top));
+    top: calc(var(--bar-h) + var(--inset-top)); left: 0;
+    height: calc(100vh - var(--bar-h) - var(--inset-top));
     z-index: 100;
     transform: translateX(-100%);
     transition: transform 0.25s ease;

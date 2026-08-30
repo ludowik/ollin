@@ -164,6 +164,12 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   icônes PNG (`icon-192`, `icon-512`, `apple-touch-icon`) sont **engendrées depuis `logo.svg`** :
   sans elles, Safari prend une capture de la page comme icône. ⚠ Safari lit le manifeste **à
   l'installation** : une application déjà posée sur le Dock doit être retirée puis rajoutée.
+  Une fenêtre d'application macOS garde en outre sa **barre de titre native** au-dessus de la
+  page : `--inset-top` (défini dans `app-bar.css`, unique pour les quatre vues) additionne
+  l'encoche iOS (`env(safe-area-inset-top)`) et `--titlebar-h`, que `app.js` ne pose que pour
+  macOS en mode `standalone` — CSS ne sait pas distinguer les systèmes. Le cadre d'une fenêtre
+  n'est pas mesurable depuis la page (`innerHeight` est la zone de contenu), donc les 28 px sont
+  la hauteur de barre de titre macOS, **pas une mesure** : c'est le seul nombre à ajuster.
   Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc
   zéro, ce qui laisse iOS poser la page dans la zone sûre. Le changer déplacerait la mise en page
   d'iOS et ne se fera pas sans un appareil pour le vérifier.

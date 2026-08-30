@@ -18,12 +18,9 @@
        is not inherited. #out keeps its native scrolling. */
     #bar, canvas { touch-action:none; }
 
-    /* The bar's appearance: app-bar.css, common to the three views. Only what belongs to
-       this view lives here: it slips under the notch, and is NOT part of the graphics
-       area. */
-    #bar { flex:none;
-           height: calc(var(--bar-h) + env(safe-area-inset-top));
-           padding-top: env(safe-area-inset-top); }
+    /* The bar's appearance, and the platform inset above it, are app-bar.css's: only its
+       place in this view's column layout is set here — it is NOT part of the graphics area. */
+    #bar { flex:none; }
     #status { color:var(--bar-ink); font-size:12px; }
     /* A narrow screen: icons only, the labels being too cramped. The bar's own tightening is
        shared, in app-bar.css. */
