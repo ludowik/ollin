@@ -157,6 +157,16 @@ ollin/
 Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montées à la demande.
 
 - `docs/index.html` — **shell** minimal : `#view` (point de montage) + `<canvas id="canvas">` partagé (rangé dans `#canvas-home` hors exécution) ; charge `app.js`.
+- **Installation en application** (`docs/manifest.webmanifest`, déclaré par le shell) : sans manifeste
+  annonçant `display: "standalone"`, le « Ajouter au Dock » de Safari sous macOS garde ses commandes
+  de navigation dans la fenêtre, et cette bande recouvre notre propre barre d'outils — les boutons
+  s'affichent mais les clics partent au navigateur, pas à la page (signalé par l'utilisateur). Les
+  icônes PNG (`icon-192`, `icon-512`, `apple-touch-icon`) sont **engendrées depuis `logo.svg`** :
+  sans elles, Safari prend une capture de la page comme icône. ⚠ Safari lit le manifeste **à
+  l'installation** : une application déjà posée sur le Dock doit être retirée puis rajoutée.
+  Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc
+  zéro, ce qui laisse iOS poser la page dans la zone sûre. Le changer déplacerait la mise en page
+  d'iOS et ne se fera pas sans un appareil pour le vérifier.
 - `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). `ctx.anchor` = sous-chemin après la vue (ancre tutoriel, ou paramètre de vue). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
 - **Catalogue des exemples, classé par groupes** : `docs/samples/index.json` porte un champ
   `group` par entrée, et **l'ordre des groupes est celui de leur première apparition** — pas de
