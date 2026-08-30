@@ -177,9 +177,11 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   et une page qui passe au-dessus ou qui est plus haute qu'elle est forcément en plein écran. Des
   seuils écrits à la main ont été essayés et se sont trompés deux fois — une fenêtre ouverte collée
   sous la barre de menus remplit toute la zone disponible et passait pour du plein écran (les deux
-  barres se superposaient au lancement, constaté par l'utilisateur). Sinon la hauteur vient
-  du cadre (`outerHeight − innerHeight`, retenue entre 8 et 64 px), les 28 px n'étant qu'un repli —
-  un cadre non exposé rend zéro, ce qui ne prouve pas l'absence de barre.
+  barres se superposaient au lancement, constaté par l'utilisateur). La HAUTEUR, elle, est la
+  constante de 28 px et rien d'autre : la déduire du cadre (`outerHeight − innerHeight`) a été
+  essayé et rendait un écart DOUBLE au retour du plein écran (constaté par l'utilisateur), les
+  valeurs lues pendant l'animation décrivant une fenêtre qui n'est plus celle qu'on met en page.
+  Pour la même raison l'état est relu une seconde fois, 600 ms après le dernier `resize`.
   Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc
   zéro, ce qui laisse iOS poser la page dans la zone sûre. Le changer déplacerait la mise en page
   d'iOS et ne se fera pas sans un appareil pour le vérifier.

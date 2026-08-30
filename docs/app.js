@@ -34,9 +34,15 @@ document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-
 //
 // The window's FULL SCREEN (the green button) removes that title bar, and Safari keeps reporting
 // display-mode "standalone" throughout — only the Fullscreen API switches the mode — so the
-// media query alone left a dead band at the top (reported on a Mac, in full screen). The state
-// is therefore MEASURED, and remeasured on every resize, which is what entering and leaving
-// full screen raises.
+// media query alone left a dead band at the top (reported on a Mac, in full screen). Whether a
+// title bar is there is therefore MEASURED, and remeasured after every resize, which is what
+// entering and leaving full screen raises.
+//
+// Its HEIGHT, on the other hand, is this constant and nothing else. Deriving it from the window
+// frame (outerHeight less innerHeight) was tried and gave DOUBLE the gap on the way back from
+// full screen (reported on a Mac): the numbers read during that animation describe a window that
+// is no longer the one being laid out. The macOS title bar has one height, so measuring it buys
+// nothing and costs a wrong reading. It is the ONE number to adjust here.
 const MAC_TITLEBAR_H = 28
 if (/Mac/i.test(navigator.platform || '')) {
   const title_bar_height = () => {
@@ -53,15 +59,19 @@ if (/Mac/i.test(navigator.platform || '')) {
     const avail_height = screen.availHeight || screen.height
     if (window.screenY < avail_top || window.innerHeight > avail_height)
       return 0
-    // Its height, when the browser exposes the frame: the whole window less the page inside it.
-    // A value outside a plausible range measures something else (a browser's toolbar stack, a
-    // zoom artefact), and a zero says the frame is not exposed — NOT that there is no title bar.
-    const frame = Math.round(window.outerHeight - window.innerHeight)
-    return frame >= 8 && frame <= 64 ? frame : MAC_TITLEBAR_H
+    return MAC_TITLEBAR_H
   }
   const apply = () => document.documentElement.style.setProperty('--mac-titlebar-h', title_bar_height() + 'px')
   apply()
-  addEventListener('resize', apply)
+  // Entering and leaving full screen is ANIMATED, and the resize events raised along the way
+  // carry the intermediate geometry. The state is therefore read again once the window has come
+  // to rest, so a value read mid-flight cannot be the one that stays.
+  let settle = 0
+  addEventListener('resize', () => {
+    apply()
+    clearTimeout(settle)
+    settle = setTimeout(apply, 600)
+  })
 }
 
 const { hardReload } = await import('./pg-run.js?v=' + V)
