@@ -175,14 +175,14 @@ static int str_len(CallCtx& ctx) {
 }
 
 Value make_string_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("len")), Value::make_builtin(str_len));
-    m.map_set(Value(std::string("upper")), Value::make_builtin(str_upper));
-    m.map_set(Value(std::string("lower")), Value::make_builtin(str_lower));
-    m.map_set(Value(std::string("trim")), Value::make_builtin(str_trim));
-    m.map_set(Value(std::string("ltrim")), Value::make_builtin(str_ltrim));
-    m.map_set(Value(std::string("rtrim")), Value::make_builtin(str_rtrim));
-    m.map_set(Value(std::string("char")), Value::make_builtin(str_char));
-    m.map_set(Value(std::string("substr")), Value::make_builtin(str_substr));
-    return m;
+    return MapBuilder()
+        .fn("len", str_len)
+        .fn("upper", str_upper)
+        .fn("lower", str_lower)
+        .fn("trim", str_trim)
+        .fn("ltrim", str_ltrim)
+        .fn("rtrim", str_rtrim)
+        .fn("char", str_char)
+        .fn("substr", str_substr)
+        .done();
 }

@@ -54,7 +54,11 @@ static inline const std::string& str_arg(const Value* args, int argc, int i, con
 // Value::make_builtin(date_now))` becomes `.fn("now", date_now)`. It is a façade over map_set and
 // nothing else — same Value, same order, same result — so it can be adopted one module at a time.
 struct MapBuilder {
-    Value map = Value::make_map();
+    Value map;
+
+    // A class and an instance are built the same way, only their starting value differs.
+    explicit MapBuilder(Value initial = Value::make_map()) : map(std::move(initial)) {
+    }
 
     MapBuilder& set(const char* key, const Value& v) {
         map.map_set(Value(std::string(key)), v);
@@ -62,6 +66,10 @@ struct MapBuilder {
     }
     MapBuilder& fn(const char* key, Value::BuiltinFn f) {
         return set(key, Value::make_builtin(f));
+    }
+    // A static method receives no self, matching `static func` in Ollin.
+    MapBuilder& static_fn(const char* key, Value::BuiltinFn f) {
+        return set(key, Value::make_static_builtin(f));
     }
     MapBuilder& num(const char* key, double v) {
         return set(key, Value(v));
