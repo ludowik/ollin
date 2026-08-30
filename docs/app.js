@@ -29,15 +29,22 @@ const V = Date.now()
 document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
 
 // Installed as an app on macOS, the window keeps a native TITLE BAR above the page, and our own
-// bar ended up underneath it: its buttons were painted but the clicks went to the window. CSS
-// cannot tell one system from another, so the height is set here, and only there — an iPhone
-// keeps its notch inset alone, a browser tab keeps nothing.
-// The window's frame is not measurable from the page (innerHeight is the content area, and
-// outerHeight is not exposed to a web app), so this is the macOS title-bar height, not a
-// measurement: it is the ONE number to adjust if the bar sits too low or too high.
-const MAC_TITLEBAR_H = '28px'
-if (matchMedia('(display-mode: standalone)').matches && /Mac/i.test(navigator.platform || ''))
-  document.documentElement.style.setProperty('--titlebar-h', MAC_TITLEBAR_H)
+// bar ended up underneath it: its buttons were painted but the clicks went to the window. All
+// that is decided here is the title bar's HEIGHT, and only on macOS — WHETHER one is showing is
+// app-bar.css's `display-mode: standalone` query, which follows the window into full screen and
+// back on its own.
+// The height is MEASURED when the browser exposes the window frame (outerHeight is the whole
+// window, innerHeight the page inside it); the difference is then exactly the title bar. The
+// constant is the fallback for when that difference reads zero — which is what a browser does
+// when the frame is not exposed to a web app, not proof that there is no title bar.
+const MAC_TITLEBAR_H = 28
+if (/Mac/i.test(navigator.platform || '')) {
+  const frame = Math.round(window.outerHeight - window.innerHeight)
+  // A plausible title bar only: a value out of that range measures something else (a browser's
+  // whole toolbar stack, a zoom artefact) and is worse than the constant.
+  const h = frame >= 8 && frame <= 64 ? frame : MAC_TITLEBAR_H
+  document.documentElement.style.setProperty('--mac-titlebar-h', h + 'px')
+}
 
 const { hardReload } = await import('./pg-run.js?v=' + V)
 

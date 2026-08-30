@@ -11,8 +11,7 @@
 :root {
   /* What the PLATFORM takes above the bar, in one place because the three views all need it:
      the notch and status bar on iOS, and the window's own title bar once the site is installed
-     as an app on macOS (--titlebar-h, set by app.js — CSS cannot tell the system apart). The
-     bar is pushed down by that much, so it never ends up underneath. */
+     as an app on macOS. The bar is pushed down by that much, so it never ends up underneath. */
   --inset-top: calc(env(safe-area-inset-top) + var(--titlebar-h, 0px));
   --bar-h: 48px;
   --bar-bg: #1a1d2e;
@@ -24,6 +23,17 @@
   --bar-btn-border: #6b70ab;
   --bar-accent: #9ba1ff;
   --bar-font: system-ui, -apple-system, sans-serif;
+}
+
+/* A title bar exists only while the window is in STANDALONE mode. Full screen removes it — the
+   macOS green button as much as a view's own full-screen button — and this query stops matching
+   by itself, so the space is given back without a listener to keep in sync. In a browser tab it
+   never matches at all. app.js only says how TALL the title bar is (--mac-titlebar-h, macOS
+   only): the question of whether one is there is answered here, and answered live. */
+@media (display-mode: standalone) {
+  :root {
+    --titlebar-h: var(--mac-titlebar-h, 0px);
+  }
 }
 
 .app-bar {
