@@ -1,3 +1,4 @@
+#include "module_utils.h"
 #include "vm.h"
 #include <iostream>
 #include <vector>
@@ -143,11 +144,11 @@ static int core_typeof(CallCtx& ctx) {
 }
 
 Value make_core_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("print")), Value::make_builtin(core_print));
-    m.map_set(Value(std::string("printf")), Value::make_builtin(core_printf));
-    m.map_set(Value(std::string("__fmt")), Value::make_builtin(core_fmt));   // internal: the desugaring of {expr:spec}
-    m.map_set(Value(std::string("typeof")), Value::make_builtin(core_typeof));
-    m.map_set(Value(std::string("Color")), make_color_class());
-    return m;
+    return MapBuilder()
+        .fn("print", core_print)
+        .fn("printf", core_printf)
+        .fn("__fmt", core_fmt)   // internal: the desugaring of {expr:spec}
+        .fn("typeof", core_typeof)
+        .set("Color", make_color_class())
+        .done();
 }

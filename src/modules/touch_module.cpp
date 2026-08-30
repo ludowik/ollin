@@ -1,4 +1,5 @@
 #include "touch_module.h"
+#include "module_utils.h"
 #include "value.h"
 #include "vm.h"
 #include <raylib.h>
@@ -349,8 +350,8 @@ void touch_reset() {
 // The module is an empty map: the script assigns began, moved, ended and pinch to it, and reads
 // count and points. Same pattern as `mouse`.
 Value make_touch_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("count")), Value::make_builtin(touch_count));
-    m.map_set(Value(std::string("points")), Value::make_builtin(touch_points));
-    return m;
+    return MapBuilder()
+        .fn("count", touch_count)
+        .fn("points", touch_points)
+        .done();
 }

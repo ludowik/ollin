@@ -7,6 +7,7 @@
 // The array is the FIRST argument: CALL_METHOD injects the receiver as self for an array, so
 // `arr.push(v)` arrives here as (arr, v).
 #include "array_module.h"
+#include "module_utils.h"
 #include "../vm.h"
 #include <algorithm>
 #include <stdexcept>
@@ -156,17 +157,17 @@ static int arr_sort(CallCtx& ctx) {
 }
 
 Value make_array_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("len")), Value::make_builtin(arr_len));
-    m.map_set(Value(std::string("push")), Value::make_builtin(arr_push));
-    m.map_set(Value(std::string("enqueue")), Value::make_builtin(arr_push));
-    m.map_set(Value(std::string("pop")), Value::make_builtin(arr_pop));
-    m.map_set(Value(std::string("dequeue")), Value::make_builtin(arr_dequeue));
-    m.map_set(Value(std::string("insert")), Value::make_builtin(arr_insert));
-    m.map_set(Value(std::string("delete")), Value::make_builtin(arr_delete));
-    m.map_set(Value(std::string("map")), Value::make_builtin(arr_map));
-    m.map_set(Value(std::string("filter")), Value::make_builtin(arr_filter));
-    m.map_set(Value(std::string("reduce")), Value::make_builtin(arr_reduce));
-    m.map_set(Value(std::string("sort")), Value::make_builtin(arr_sort));
-    return m;
+    return MapBuilder()
+        .fn("len", arr_len)
+        .fn("push", arr_push)
+        .fn("enqueue", arr_push)
+        .fn("pop", arr_pop)
+        .fn("dequeue", arr_dequeue)
+        .fn("insert", arr_insert)
+        .fn("delete", arr_delete)
+        .fn("map", arr_map)
+        .fn("filter", arr_filter)
+        .fn("reduce", arr_reduce)
+        .fn("sort", arr_sort)
+        .done();
 }

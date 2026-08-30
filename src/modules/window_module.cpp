@@ -1,3 +1,4 @@
+#include "module_utils.h"
 #include "value.h"
 
 #ifdef __EMSCRIPTEN__
@@ -41,10 +42,10 @@ Value make_window_module() {
 #elif defined(OLLIN_HAS_RAYLIB)
 
 Value make_window_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("width")), Value((int64_t)800));
-    m.map_set(Value(std::string("height")), Value((int64_t)600));
-    return m;
+    return MapBuilder()
+        .int_num("width", 800)
+        .int_num("height", 600)
+        .done();
 }
 
 #else

@@ -600,17 +600,17 @@ static int ui_clear(CallCtx& ctx) {
 namespace {
 
 Value make_element_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("UiElement")));
-    cls.map_set(Value(std::string("button")), Value::make_builtin(menu_button));
-    cls.map_set(Value(std::string("checkbox")), Value::make_builtin(menu_checkbox));
-    cls.map_set(Value(std::string("slider")), Value::make_builtin(menu_slider));
-    cls.map_set(Value(std::string("list")), Value::make_builtin(menu_list));
-    cls.map_set(Value(std::string("menu")), Value::make_builtin(menu_menu));
-    cls.map_set(Value(std::string("open")), Value::make_builtin(menu_open));
-    cls.map_set(Value(std::string("clear")), Value::make_builtin(menu_clear));
-    cls.map_set(Value(std::string("remove")), Value::make_builtin(element_remove));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "UiElement")
+        .fn("button", menu_button)
+        .fn("checkbox", menu_checkbox)
+        .fn("slider", menu_slider)
+        .fn("list", menu_list)
+        .fn("menu", menu_menu)
+        .fn("open", menu_open)
+        .fn("clear", menu_clear)
+        .fn("remove", element_remove)
+        .done();
 }
 
 Value element_class() {
@@ -912,18 +912,18 @@ bool ui_poll() {
 }
 
 Value make_ui_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("button")), Value::make_builtin(ui_button));
-    m.map_set(Value(std::string("checkbox")), Value::make_builtin(ui_checkbox));
-    m.map_set(Value(std::string("slider")), Value::make_builtin(ui_slider));
-    m.map_set(Value(std::string("list")), Value::make_builtin(ui_list));
-    m.map_set(Value(std::string("menu")), Value::make_builtin(ui_menu));
-    m.map_set(Value(std::string("show")), Value::make_builtin(ui_show));
-    m.map_set(Value(std::string("open")), Value::make_builtin(ui_open));
-    m.map_set(Value(std::string("close")), Value::make_builtin(ui_close));
-    m.map_set(Value(std::string("toggle")), Value::make_builtin(ui_toggle));
-    m.map_set(Value(std::string("back")), Value::make_builtin(ui_back));
-    m.map_set(Value(std::string("current")), Value::make_builtin(ui_current));
-    m.map_set(Value(std::string("clear")), Value::make_builtin(ui_clear));
-    return m;
+    return MapBuilder()
+        .fn("button", ui_button)
+        .fn("checkbox", ui_checkbox)
+        .fn("slider", ui_slider)
+        .fn("list", ui_list)
+        .fn("menu", ui_menu)
+        .fn("show", ui_show)
+        .fn("open", ui_open)
+        .fn("close", ui_close)
+        .fn("toggle", ui_toggle)
+        .fn("back", ui_back)
+        .fn("current", ui_current)
+        .fn("clear", ui_clear)
+        .done();
 }

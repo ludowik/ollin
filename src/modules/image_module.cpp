@@ -639,18 +639,18 @@ void image_free_tex(int id) {
 
 
 Value make_image_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("load")), Value::make_builtin(img_load));
-    m.map_set(Value(std::string("loadData")), Value::make_builtin(img_load_data));
-    m.map_set(Value(std::string("create")), Value::make_builtin(img_create));
-    m.map_set(Value(std::string("beginDraw")), Value::make_builtin(img_begin));
-    m.map_set(Value(std::string("endDraw")), Value::make_builtin(img_end));
-    m.map_set(Value(std::string("draw")), Value::make_builtin(img_draw));
-    m.map_set(Value(std::string("unload")), Value::make_builtin(img_unload));
-    m.map_set(Value(std::string("beginPixels")), Value::make_builtin(img_begin_pixels));
-    m.map_set(Value(std::string("endPixels")), Value::make_builtin(img_end_pixels));
-    m.map_set(Value(std::string("getPixel")), Value::make_builtin(img_get_pixel));
-    m.map_set(Value(std::string("setPixel")), Value::make_builtin(img_set_pixel));
-    m.map_set(Value(std::string("mapPixel")), Value::make_builtin(img_map_pixel));
-    return m;
+    return MapBuilder()
+        .fn("load", img_load)
+        .fn("loadData", img_load_data)
+        .fn("create", img_create)
+        .fn("beginDraw", img_begin)
+        .fn("endDraw", img_end)
+        .fn("draw", img_draw)
+        .fn("unload", img_unload)
+        .fn("beginPixels", img_begin_pixels)
+        .fn("endPixels", img_end_pixels)
+        .fn("getPixel", img_get_pixel)
+        .fn("setPixel", img_set_pixel)
+        .fn("mapPixel", img_map_pixel)
+        .done();
 }

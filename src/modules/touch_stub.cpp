@@ -1,4 +1,5 @@
 #include "touch_module.h"
+#include "module_utils.h"
 #include "value.h"
 #include "vm.h"
 #include <string>
@@ -30,8 +31,8 @@ void touch_reset() {
 }
 
 Value make_touch_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("count")), Value::make_builtin(stub_count));
-    m.map_set(Value(std::string("points")), Value::make_builtin(stub_points));
-    return m;
+    return MapBuilder()
+        .fn("count", stub_count)
+        .fn("points", stub_points)
+        .done();
 }

@@ -127,10 +127,10 @@ static int cam_is_open(CallCtx& ctx) {
 }
 
 Value make_camera_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("open")),    Value::make_builtin(cam_open));
-    m.map_set(Value(std::string("capture")), Value::make_builtin(cam_capture));
-    m.map_set(Value(std::string("close")),   Value::make_builtin(cam_close));
-    m.map_set(Value(std::string("isOpen")),  Value::make_builtin(cam_is_open));
-    return m;
+    return MapBuilder()
+        .set("open",    Value::make_builtin(cam_open))
+        .fn("capture", cam_capture)
+        .set("close",   Value::make_builtin(cam_close))
+        .set("isOpen",  Value::make_builtin(cam_is_open))
+        .done();
 }

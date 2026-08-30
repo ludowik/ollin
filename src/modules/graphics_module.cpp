@@ -1574,14 +1574,14 @@ static int gfx_sprite(CallCtx& ctx) {
 // of truth with no literals to maintain or check. It is defined here rather than in modules.cpp,
 // because that file also compiles without raylib.
 Value make_blend_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("ALPHA")), Value((int64_t)BLEND_ALPHA));
-    m.map_set(Value(std::string("ADD")), Value((int64_t)BLEND_ADDITIVE));
-    m.map_set(Value(std::string("MULTIPLY")), Value((int64_t)BLEND_MULTIPLIED));
-    m.map_set(Value(std::string("ADD_COLORS")), Value((int64_t)BLEND_ADD_COLORS));
-    m.map_set(Value(std::string("SUBTRACT")), Value((int64_t)BLEND_SUBTRACT_COLORS));
-    m.map_set(Value(std::string("PREMULTIPLY")), Value((int64_t)BLEND_ALPHA_PREMULTIPLY));
-    return m;
+    return MapBuilder()
+        .int_num("ALPHA", BLEND_ALPHA)
+        .int_num("ADD", BLEND_ADDITIVE)
+        .int_num("MULTIPLY", BLEND_MULTIPLIED)
+        .int_num("ADD_COLORS", BLEND_ADD_COLORS)
+        .int_num("SUBTRACT", BLEND_SUBTRACT_COLORS)
+        .int_num("PREMULTIPLY", BLEND_ALPHA_PREMULTIPLY)
+        .done();
 }
 
 Value make_graphics_module() {

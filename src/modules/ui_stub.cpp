@@ -1,4 +1,5 @@
 #include "ui_module.h"
+#include "module_utils.h"
 #include "vm.h"
 
 // Build without raylib: there is no area to draw in, so declaring a widget produces nothing
@@ -12,9 +13,9 @@ namespace {
 Value inert_class();
 
 Value make_inert() {
-    Value h = Value::make_map();
-    h.map_set(Value(std::string("__class__")), inert_class());
-    return h;
+    return MapBuilder()
+        .set("__class__", inert_class())
+        .done();
 }
 
 int stub_button(CallCtx& ctx) {

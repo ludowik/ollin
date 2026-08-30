@@ -177,15 +177,15 @@ static int cam_get_view_dir(CallCtx& ctx) {
 }
 
 static Value make_camera_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("Camera")));
-    cls.map_set(Value(std::string("setPos")), Value::make_builtin(cam_set_pos));
-    cls.map_set(Value(std::string("lookAt")), Value::make_builtin(cam_look_at));
-    cls.map_set(Value(std::string("move")), Value::make_builtin(cam_move));
-    cls.map_set(Value(std::string("orbit")), Value::make_builtin(cam_orbit));
-    cls.map_set(Value(std::string("zoom")), Value::make_builtin(cam_zoom));
-    cls.map_set(Value(std::string("getViewDir")), Value::make_builtin(cam_get_view_dir));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "Camera")
+        .fn("setPos", cam_set_pos)
+        .fn("lookAt", cam_look_at)
+        .fn("move", cam_move)
+        .fn("orbit", cam_orbit)
+        .fn("zoom", cam_zoom)
+        .fn("getViewDir", cam_get_view_dir)
+        .done();
 }
 
 // Shared Camera class, built once and reused by every instance.
@@ -880,13 +880,13 @@ static int light_enable(CallCtx& ctx) {
 }
 
 static Value make_light_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("Light")));
-    cls.map_set(Value(std::string("setDir")), Value::make_builtin(light_set_dir));
-    cls.map_set(Value(std::string("setPos")), Value::make_builtin(light_set_pos));
-    cls.map_set(Value(std::string("setColor")), Value::make_builtin(light_set_color));
-    cls.map_set(Value(std::string("enable")), Value::make_builtin(light_enable));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "Light")
+        .fn("setDir", light_set_dir)
+        .fn("setPos", light_set_pos)
+        .fn("setColor", light_set_color)
+        .fn("enable", light_enable)
+        .done();
 }
 
 static Value light_class() {

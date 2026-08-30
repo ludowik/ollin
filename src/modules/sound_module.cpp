@@ -506,20 +506,20 @@ int buf_envelope(CallCtx& ctx) {
 }
 
 Value make_buffer_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("Sound")));
-    cls.map_set(Value(std::string("play")), Value::make_builtin(buf_play));
-    cls.map_set(Value(std::string("stop")), Value::make_builtin(buf_stop));
-    cls.map_set(Value(std::string("isPlaying")), Value::make_builtin(buf_is_playing));
-    cls.map_set(Value(std::string("volume")), Value::make_builtin(buf_volume));
-    cls.map_set(Value(std::string("pan")), Value::make_builtin(buf_pan));
-    cls.map_set(Value(std::string("rate")), Value::make_builtin(buf_rate));
-    cls.map_set(Value(std::string("loop")), Value::make_builtin(buf_loop));
-    cls.map_set(Value(std::string("duration")), Value::make_builtin(buf_duration));
-    cls.map_set(Value(std::string("peak")), Value::make_builtin(buf_peak));
-    cls.map_set(Value(std::string("sample")), Value::make_builtin(buf_sample));
-    cls.map_set(Value(std::string("envelope")), Value::make_builtin(buf_envelope));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "Sound")
+        .fn("play", buf_play)
+        .fn("stop", buf_stop)
+        .fn("isPlaying", buf_is_playing)
+        .fn("volume", buf_volume)
+        .fn("pan", buf_pan)
+        .fn("rate", buf_rate)
+        .fn("loop", buf_loop)
+        .fn("duration", buf_duration)
+        .fn("peak", buf_peak)
+        .fn("sample", buf_sample)
+        .fn("envelope", buf_envelope)
+        .done();
 }
 
 Value buffer_class() {
@@ -528,20 +528,20 @@ Value buffer_class() {
 }
 
 Value make_osc_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("Osc")));
-    cls.map_set(Value(std::string("start")), Value::make_builtin(method_start));
-    cls.map_set(Value(std::string("stop")), Value::make_builtin(method_stop));
-    cls.map_set(Value(std::string("isPlaying")), Value::make_builtin(method_is_playing));
-    cls.map_set(Value(std::string("freq")), Value::make_builtin(method_freq));
-    cls.map_set(Value(std::string("volume")), Value::make_builtin(method_volume));
-    cls.map_set(Value(std::string("pan")), Value::make_builtin(method_pan));
-    cls.map_set(Value(std::string("shape")), Value::make_builtin(method_shape));
-    cls.map_set(Value(std::string("envelope")), Value::make_builtin(method_envelope));
-    cls.map_set(Value(std::string("trigger")), Value::make_builtin(method_trigger));
-    cls.map_set(Value(std::string("release")), Value::make_builtin(method_release));
-    cls.map_set(Value(std::string("free")), Value::make_builtin(method_free));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "Osc")
+        .fn("start", method_start)
+        .fn("stop", method_stop)
+        .fn("isPlaying", method_is_playing)
+        .fn("freq", method_freq)
+        .fn("volume", method_volume)
+        .fn("pan", method_pan)
+        .fn("shape", method_shape)
+        .fn("envelope", method_envelope)
+        .fn("trigger", method_trigger)
+        .fn("release", method_release)
+        .fn("free", method_free)
+        .done();
 }
 
 Value osc_class() {
@@ -603,15 +603,15 @@ void sound_update() {
 }
 
 Value make_sound_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("osc")), Value::make_builtin(sound_osc));
-    m.map_set(Value(std::string("sine")), Value::make_builtin(sound_shape_factory<SHAPE_SINE>));
-    m.map_set(Value(std::string("square")), Value::make_builtin(sound_shape_factory<SHAPE_SQUARE>));
-    m.map_set(Value(std::string("saw")), Value::make_builtin(sound_shape_factory<SHAPE_SAW>));
-    m.map_set(Value(std::string("triangle")), Value::make_builtin(sound_shape_factory<SHAPE_TRIANGLE>));
-    m.map_set(Value(std::string("noise")), Value::make_builtin(sound_shape_factory<SHAPE_NOISE>));
-    m.map_set(Value(std::string("note")), Value::make_builtin(sound_note));
-    m.map_set(Value(std::string("tone")), Value::make_builtin(sound_tone));
-    m.map_set(Value(std::string("generate")), Value::make_builtin(sound_generate));
-    return m;
+    return MapBuilder()
+        .fn("osc", sound_osc)
+        .set("sine", Value::make_builtin(sound_shape_factory<SHAPE_SINE>))
+        .set("square", Value::make_builtin(sound_shape_factory<SHAPE_SQUARE>))
+        .set("saw", Value::make_builtin(sound_shape_factory<SHAPE_SAW>))
+        .set("triangle", Value::make_builtin(sound_shape_factory<SHAPE_TRIANGLE>))
+        .set("noise", Value::make_builtin(sound_shape_factory<SHAPE_NOISE>))
+        .fn("note", sound_note)
+        .fn("tone", sound_tone)
+        .fn("generate", sound_generate)
+        .done();
 }

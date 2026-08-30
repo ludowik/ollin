@@ -90,14 +90,14 @@ static int quat_rotate_vec(CallCtx& ctx) {
 }
 
 static Value make_quat_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("Quat")));
-    cls.map_set(Value(std::string("mul")), Value::make_builtin(quat_mul));
-    cls.map_set(Value(std::string("slerp")), Value::make_builtin(quat_slerp));
-    cls.map_set(Value(std::string("normalize")), Value::make_builtin(quat_normalize));
-    cls.map_set(Value(std::string("inverse")), Value::make_builtin(quat_inverse));
-    cls.map_set(Value(std::string("rotateVec")), Value::make_builtin(quat_rotate_vec));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "Quat")
+        .fn("mul", quat_mul)
+        .fn("slerp", quat_slerp)
+        .fn("normalize", quat_normalize)
+        .fn("inverse", quat_inverse)
+        .fn("rotateVec", quat_rotate_vec)
+        .done();
 }
 
 static Value quat_class() {

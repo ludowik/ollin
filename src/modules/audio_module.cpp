@@ -139,13 +139,13 @@ void audio_reset() {
 }
 
 Value make_audio_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("start")), Value::make_builtin(audio_start));
-    m.map_set(Value(std::string("isReady")), Value::make_builtin(audio_is_ready));
-    m.map_set(Value(std::string("volume")), Value::make_builtin(audio_volume));
-    m.map_set(Value(std::string("pause")), Value::make_builtin(audio_pause));
-    m.map_set(Value(std::string("resume")), Value::make_builtin(audio_resume));
-    m.map_set(Value(std::string("isPaused")), Value::make_builtin(audio_is_paused));
-    m.map_set(Value(std::string("sampleRate")), Value::make_builtin(audio_sample_rate));
-    return m;
+    return MapBuilder()
+        .fn("start", audio_start)
+        .fn("isReady", audio_is_ready)
+        .fn("volume", audio_volume)
+        .fn("pause", audio_pause)
+        .fn("resume", audio_resume)
+        .fn("isPaused", audio_is_paused)
+        .fn("sampleRate", audio_sample_rate)
+        .done();
 }

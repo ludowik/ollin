@@ -788,16 +788,16 @@ int method_delay(CallCtx& ctx) {
 }
 
 Value make_tween_class() {
-    Value cls = Value::make_class();
-    cls.map_set(Value(std::string("__name__")), Value(std::string("Tween")));
-    cls.map_set(Value(std::string("pause")), Value::make_builtin(method_pause));
-    cls.map_set(Value(std::string("resume")), Value::make_builtin(method_resume));
-    cls.map_set(Value(std::string("cancel")), Value::make_builtin(method_cancel));
-    cls.map_set(Value(std::string("isDone")), Value::make_builtin(method_is_done));
-    cls.map_set(Value(std::string("progress")), Value::make_builtin(method_progress));
-    cls.map_set(Value(std::string("delay")), Value::make_builtin(method_delay));
-    cls.map_set(Value(std::string("repeat")), Value::make_builtin(method_repeat));
-    return cls;
+    return MapBuilder(Value::make_class())
+        .str("__name__", "Tween")
+        .fn("pause", method_pause)
+        .fn("resume", method_resume)
+        .fn("cancel", method_cancel)
+        .fn("isDone", method_is_done)
+        .fn("progress", method_progress)
+        .fn("delay", method_delay)
+        .fn("repeat", method_repeat)
+        .done();
 }
 
 Value tween_class() {
@@ -988,13 +988,13 @@ void tween_reset() {
 }
 
 Value make_tween_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("to")), Value::make_builtin(tween_to));
-    m.map_set(Value(std::string("sequence")), Value::make_builtin(tween_sequence));
-    m.map_set(Value(std::string("value")), Value::make_builtin(tween_value));
-    m.map_set(Value(std::string("update")), Value::make_builtin(tween_update));
-    m.map_set(Value(std::string("cancelAll")), Value::make_builtin(tween_cancel_all));
-    m.map_set(Value(std::string("count")), Value::make_builtin(tween_count));
-    m.map_set(Value(std::string("curves")), Value::make_builtin(tween_curves));
-    return m;
+    return MapBuilder()
+        .fn("to", tween_to)
+        .fn("sequence", tween_sequence)
+        .fn("value", tween_value)
+        .fn("update", tween_update)
+        .fn("cancelAll", tween_cancel_all)
+        .fn("count", tween_count)
+        .fn("curves", tween_curves)
+        .done();
 }
