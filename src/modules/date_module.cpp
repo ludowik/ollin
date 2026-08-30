@@ -16,19 +16,19 @@
 // Both return a plain map, like graphics.modelSize: no class, no method, nothing to learn.
 
 static Value parts_of(const std::tm& tm, int millis) {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("year")), Value((int64_t)tm.tm_year + 1900));
-    m.map_set(Value(std::string("month")), Value((int64_t)tm.tm_mon + 1));      // 1..12
-    m.map_set(Value(std::string("day")), Value((int64_t)tm.tm_mday));           // 1..31
-    m.map_set(Value(std::string("hour")), Value((int64_t)tm.tm_hour));          // 0..23
-    m.map_set(Value(std::string("minute")), Value((int64_t)tm.tm_min));
-    m.map_set(Value(std::string("second")), Value((int64_t)tm.tm_sec));
-    m.map_set(Value(std::string("millisecond")), Value((int64_t)millis));   // 0..999
-    // ISO numbering, Monday = 1 to Sunday = 7. The C library counts Sunday as 0, which puts the
-    // week-end at both ends and trips up every "is it a weekday" test.
-    m.map_set(Value(std::string("weekday")), Value((int64_t)(tm.tm_wday == 0 ? 7 : tm.tm_wday)));
-    m.map_set(Value(std::string("yearDay")), Value((int64_t)tm.tm_yday + 1));   // 1..366
-    return m;
+    // ISO numbering for the weekday, Monday = 1 to Sunday = 7. The C library counts Sunday as 0,
+    // which puts the week-end at both ends and trips up every "is it a weekday" test.
+    return MapBuilder()
+        .int_num("year", tm.tm_year + 1900)
+        .int_num("month", tm.tm_mon + 1)        // 1..12
+        .int_num("day", tm.tm_mday)             // 1..31
+        .int_num("hour", tm.tm_hour)            // 0..23
+        .int_num("minute", tm.tm_min)
+        .int_num("second", tm.tm_sec)
+        .int_num("millisecond", millis)         // 0..999
+        .int_num("weekday", tm.tm_wday == 0 ? 7 : tm.tm_wday)
+        .int_num("yearDay", tm.tm_yday + 1)     // 1..366
+        .done();
 }
 
 // The instant to decode, in SECONDS since the epoch — the unit time() returns — as a whole second
@@ -76,8 +76,5 @@ static int date_utc(CallCtx& ctx) {
 }
 
 Value make_date_module() {
-    Value m = Value::make_map();
-    m.map_set(Value(std::string("now")), Value::make_builtin(date_now));
-    m.map_set(Value(std::string("utc")), Value::make_builtin(date_utc));
-    return m;
+    return MapBuilder().fn("now", date_now).fn("utc", date_utc).done();
 }

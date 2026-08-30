@@ -50,6 +50,35 @@ static inline const std::string& str_arg(const Value* args, int argc, int i, con
     return args[i].as_string();
 }
 
+// A map being built, with the noise removed: `m.map_set(Value(std::string("now")),
+// Value::make_builtin(date_now))` becomes `.fn("now", date_now)`. It is a façade over map_set and
+// nothing else — same Value, same order, same result — so it can be adopted one module at a time.
+struct MapBuilder {
+    Value map = Value::make_map();
+
+    MapBuilder& set(const char* key, const Value& v) {
+        map.map_set(Value(std::string(key)), v);
+        return *this;
+    }
+    MapBuilder& fn(const char* key, Value::BuiltinFn f) {
+        return set(key, Value::make_builtin(f));
+    }
+    MapBuilder& num(const char* key, double v) {
+        return set(key, Value(v));
+    }
+    MapBuilder& int_num(const char* key, int64_t v) {
+        return set(key, Value(v));
+    }
+    MapBuilder& str(const char* key, const std::string& v) {
+        return set(key, Value(v));
+    }
+    // Named rather than an implicit conversion: the hand-over is where the map leaves the builder,
+    // and an implicit one would let a copy slip in unnoticed.
+    Value done() {
+        return map;
+    }
+};
+
 // Colour components normalized to [0,1].
 struct ColorRGBA {
     double r, g, b, a;

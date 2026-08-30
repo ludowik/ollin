@@ -570,6 +570,8 @@ void VM::run_entry_hooks() {
             // the source of the W/H globals, and on WASM it is the size measured in JS and
             // handed over through __ollinRenderW, so there is no layout race.
             int w = 0, h = 0;
+            // Built afresh, and deliberately: this runs LATER, after the script has had a chance
+            // to resize things, so the DOM must be read again rather than reusing what execute saw.
             Value winm = make_builtin_module("window");
             if (winm.is_map()) {
                 Value vw = winm.map_get(Value(std::string("width")));
@@ -1944,16 +1946,27 @@ void VM::execute(Chunk chunk) {
                 globals[gi] = Value::make_builtin(b.fn);
                 globals_init[gi] = true;
             }
+    // A module is built AT MOST ONCE for this program: `window`, `string` and `core` are read again
+    // below, and each construction is real work — on the web, building `window` queries the DOM for
+    // the layout. The cache lives for this call alone, so two runs in the same WASM instance never
+    // share a module map.
+    std::unordered_map<std::string, Value> built;
+    auto module_of = [&built](const std::string& name) -> const Value& {
+        auto it = built.find(name);
+        if (it == built.end())
+            it = built.emplace(name, make_builtin_module(name)).first;
+        return it->second;
+    };
     for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
         for (auto& name : builtin_module_names())
             if (owned_chunk.identifiers[gi] == name) {
-                globals[gi] = make_builtin_module(name);
+                globals[gi] = module_of(name);
                 globals_init[gi] = true;
             }
-    string_module_ = make_builtin_module("string");
+    string_module_ = module_of("string");
     array_module_ = make_array_module();
     {
-        Value core = make_builtin_module("core");
+        const Value& core = module_of("core");
         for (auto& [k, v] : core.mptr->data) {
             if (!k.is_string())
                 continue;
@@ -1975,7 +1988,7 @@ void VM::execute(Chunk chunk) {
     // graphics.canvas(W, H) works right away.
     {
         int64_t win_w = 0, win_h = 0;
-        Value win = make_builtin_module("window");
+        const Value& win = module_of("window");
         if (win.is_map()) {
             Value vw = win.map_get(Value(std::string("width")));
             Value vh = win.map_get(Value(std::string("height")));

@@ -335,50 +335,50 @@ static int math_noise_seed(CallCtx& ctx) {
 Value make_math_module() {
     srand((unsigned)time(nullptr));
     noise_init_default();
-    Value m = Value::make_map();
-    // constants
-    m.map_set(Value(std::string("PI")), Value(M_PI));
-    m.map_set(Value(std::string("TAU")), Value(2.0 * M_PI));
-    m.map_set(Value(std::string("E")), Value(2.718281828459045235360));
-    m.map_set(Value(std::string("INF")), Value(std::numeric_limits<double>::infinity()));
-    // arithmetic
-    m.map_set(Value(std::string("abs")), Value::make_builtin(math_abs));
-    m.map_set(Value(std::string("sign")), Value::make_builtin(math_sign));
-    m.map_set(Value(std::string("floor")), Value::make_builtin(math_floor));
-    m.map_set(Value(std::string("ceil")), Value::make_builtin(math_ceil));
-    m.map_set(Value(std::string("round")), Value::make_builtin(math_round));
-    m.map_set(Value(std::string("trunc")), Value::make_builtin(math_trunc));
-    m.map_set(Value(std::string("sqrt")), Value::make_builtin(math_sqrt));
-    m.map_set(Value(std::string("pow")), Value::make_builtin(math_pow));
-    m.map_set(Value(std::string("clamp")), Value::make_builtin(math_clamp));
-    m.map_set(Value(std::string("min")), Value::make_builtin(math_min));
-    m.map_set(Value(std::string("max")), Value::make_builtin(math_max));
-    // logarithms and the exponential
-    m.map_set(Value(std::string("exp")), Value::make_builtin(math_exp));
-    m.map_set(Value(std::string("log")), Value::make_builtin(math_log));
-    m.map_set(Value(std::string("log2")), Value::make_builtin(math_log2));
-    m.map_set(Value(std::string("log10")), Value::make_builtin(math_log10));
-    m.map_set(Value(std::string("logn")), Value::make_builtin(math_logn));
-    // trigonometry
-    m.map_set(Value(std::string("sin")), Value::make_builtin(math_sin));
-    m.map_set(Value(std::string("cos")), Value::make_builtin(math_cos));
-    m.map_set(Value(std::string("tan")), Value::make_builtin(math_tan));
-    m.map_set(Value(std::string("asin")), Value::make_builtin(math_asin));
-    m.map_set(Value(std::string("acos")), Value::make_builtin(math_acos));
-    m.map_set(Value(std::string("atan")), Value::make_builtin(math_atan));
-    m.map_set(Value(std::string("atan2")), Value::make_builtin(math_atan2));
-    m.map_set(Value(std::string("deg")), Value::make_builtin(math_deg));
-    m.map_set(Value(std::string("rad")), Value::make_builtin(math_rad));
-    m.map_set(Value(std::string("frac")), Value::make_builtin(math_frac));
-    m.map_set(Value(std::string("isNan")), Value::make_builtin(math_is_nan));
-    m.map_set(Value(std::string("isInf")), Value::make_builtin(math_is_inf));
-    m.map_set(Value(std::string("map")), Value::make_builtin(math_map));
-    // randomness
-    m.map_set(Value(std::string("rand")), Value::make_builtin(math_rand));
-    m.map_set(Value(std::string("randInt")), Value::make_builtin(math_rand_int));
-    m.map_set(Value(std::string("seed")), Value::make_builtin(math_seed));
-    // bruit de Perlin
-    m.map_set(Value(std::string("noise")), Value::make_builtin(math_noise));
-    m.map_set(Value(std::string("noiseSeed")), Value::make_builtin(math_noise_seed));
-    return m;
+    return MapBuilder()
+        // constants
+        .num("PI", M_PI)
+        .num("TAU", 2.0 * M_PI)
+        .num("E", 2.718281828459045235360)
+        .num("INF", std::numeric_limits<double>::infinity())
+        // arithmetic
+        .fn("abs", math_abs)
+        .fn("sign", math_sign)
+        .fn("floor", math_floor)
+        .fn("ceil", math_ceil)
+        .fn("round", math_round)
+        .fn("trunc", math_trunc)
+        .fn("sqrt", math_sqrt)
+        .fn("pow", math_pow)
+        .fn("clamp", math_clamp)
+        .fn("min", math_min)
+        .fn("max", math_max)
+        // logarithms and the exponential
+        .fn("exp", math_exp)
+        .fn("log", math_log)
+        .fn("log2", math_log2)
+        .fn("log10", math_log10)
+        .fn("logn", math_logn)
+        // trigonometry
+        .fn("sin", math_sin)
+        .fn("cos", math_cos)
+        .fn("tan", math_tan)
+        .fn("asin", math_asin)
+        .fn("acos", math_acos)
+        .fn("atan", math_atan)
+        .fn("atan2", math_atan2)
+        .fn("deg", math_deg)
+        .fn("rad", math_rad)
+        .fn("frac", math_frac)
+        .fn("isNan", math_is_nan)
+        .fn("isInf", math_is_inf)
+        .fn("map", math_map)
+        // randomness
+        .fn("rand", math_rand)
+        .fn("randInt", math_rand_int)
+        .fn("seed", math_seed)
+        // Perlin noise
+        .fn("noise", math_noise)
+        .fn("noiseSeed", math_noise_seed)
+        .done();
 }
