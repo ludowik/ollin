@@ -9,13 +9,13 @@
    exist nowhere else). */
 
 :root {
-  /* What the PLATFORM takes above the bar — the notch and status bar on iOS — in one place
-     because the three views all need it.
-     A macOS app window, on the other hand, needs NOTHING: measured on a Mac, its page starts at
-     the top of the window and is 32 px shorter than it, so Safari has already put the page below
-     the title bar. Leaving room for it was a mistake, and it showed as dead space above the bar.
-     What DID overlap our toolbar, before manifest.webmanifest, was Safari's navigation band. */
-  --inset-top: env(safe-area-inset-top);
+  /* What the PLATFORM takes above the bar, in one place because the three views all need it: the
+     notch and status bar on iOS, and — only sometimes — the title bar of a macOS app window.
+     Sometimes, because Safari lays that window out in two DIFFERENT ways: at launch the page fills
+     the window and the title bar sits over it, while after a full-screen round trip the page is
+     put below the bar and the window is 32 px taller than it. app.js measures which of the two is
+     in force (--mac-titlebar-h). */
+  --inset-top: calc(env(safe-area-inset-top) + var(--mac-titlebar-h, 0px));
   --bar-h: 48px;
   --bar-bg: #1a1d2e;
   --bar-border: #3a3f63;
@@ -26,6 +26,14 @@
   --bar-btn-border: #6b70ab;
   --bar-accent: #9ba1ff;
   --bar-font: system-ui, -apple-system, sans-serif;
+}
+
+/* A title bar belongs to an INSTALLED app: whatever a browser tab's window does, its page is
+   never under one, so this query keeps the question away from an ordinary page. */
+@media (display-mode: standalone) {
+  :root {
+    --mac-titlebar-h: var(--mac-titlebar-measured, 0px);
+  }
 }
 
 .app-bar {

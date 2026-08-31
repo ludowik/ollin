@@ -28,6 +28,43 @@ const V = Date.now()
 // imported with a version token, hence always fresh, and the stylesheet follows.
 document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
 
+// Installed as an app on macOS, Safari lays the window out in TWO ways, and the difference is
+// what took four attempts to find. Both were measured on a Mac, through the perf view's readout:
+//   at launch                 window 1536×930, page 1536×930 — the page fills the window, and the
+//                             title bar is drawn OVER it, hence over our toolbar
+//   after full screen, back   window 1536×930, page 1536×898 — Safari has put the page below the
+//                             title bar, and reserving room again only made dead space
+// The window less the page therefore says which one is in force. It is used as a YES/NO and never
+// as the height: reading that difference AS the height gave double the gap coming back from full
+// screen, the numbers read during the animation describing a window that is no longer the one
+// being laid out.
+const MAC_TITLEBAR_H = 32
+if (/Mac/i.test(navigator.platform || '')) {
+  const title_bar_over_page = () => {
+    // Full screen first: there the page covers the whole screen and no title bar exists. A window
+    // may never leave the area the system allows it — availTop and availHeight exclude the menu
+    // bar and the Dock — so a page above that area, or taller than it, can only be full screen.
+    const avail_top = screen.availTop !== undefined ? screen.availTop : 0
+    const avail_height = screen.availHeight || screen.height
+    if (window.screenY < avail_top || window.innerHeight > avail_height)
+      return false
+    return window.outerHeight - window.innerHeight < 8
+  }
+  const apply = () =>
+    document.documentElement.style.setProperty('--mac-titlebar-measured',
+                                               (title_bar_over_page() ? MAC_TITLEBAR_H : 0) + 'px')
+  apply()
+  // Entering and leaving full screen is ANIMATED, and the resize events raised along the way carry
+  // the intermediate geometry. The state is read again once the window has come to rest, so a
+  // value read mid-flight cannot be the one that stays.
+  let settle = 0
+  addEventListener('resize', () => {
+    apply()
+    clearTimeout(settle)
+    settle = setTimeout(apply, 600)
+  })
+}
+
 const { hardReload } = await import('./pg-run.js?v=' + V)
 
 // On-screen crash capture, for diagnosing a device (iOS in full screen, with no console).

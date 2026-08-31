@@ -164,20 +164,24 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   icônes PNG (`icon-192`, `icon-512`, `apple-touch-icon`) sont **engendrées depuis `logo.svg`** :
   sans elles, Safari prend une capture de la page comme icône. ⚠ Safari lit le manifeste **à
   l'installation** : une application déjà posée sur le Dock doit être retirée puis rajoutée.
-  ⚠ **Une fenêtre d'application macOS ne demande AUCUNE place** au-dessus de la page, et le croire
-  a coûté quatre corrections. Mesuré sur le Mac de l'utilisateur (section « This window » de la vue
-  `#/perf`) : `page, top left = 0, 30`, `availTop = 30`, fenêtre `1536 × 930`, page `1536 × 898` —
-  la page commence au bord haut de la FENÊTRE et fait 32 px de moins qu'elle, donc Safari l'a déjà
-  posée sous la barre de titre. Ce qui recouvrait notre barre était la bande de navigation, réglée
-  par le manifeste, et rien d'autre. `--inset-top` (défini dans `app-bar.css`, unique pour les
-  quatre vues, appliqué par `.app-bar`) ne porte donc que l'encoche iOS.
-  Les tentatives, toutes fausses, à ne pas refaire : réserver la hauteur en `display-mode:
-  standalone` (bande morte en plein écran, Safari y restant `standalone` — seule l'API Fullscreen
-  change le mode) ; deviner le plein écran par des seuils (une fenêtre collée sous la barre de
-  menus remplit la zone disponible et passait pour du plein écran) ; déduire la hauteur de
-  `outerHeight − innerHeight` (écart double au retour du plein écran, les valeurs lues pendant
-  l'animation décrivant une autre fenêtre). Leçon de méthode : sur une plateforme hors d'atteinte,
-  faire afficher les chiffres par l'application plutôt que raisonner sur des chiffres supposés.
+  ⚠ **Une fenêtre d'application macOS est disposée de DEUX façons par Safari**, et c'est ce qui a
+  coûté cinq corrections : au lancement la page remplit la fenêtre et la barre de titre est dessinée
+  PAR-DESSUS (donc par-dessus notre barre), tandis qu'après un aller-retour en plein écran Safari
+  pose la page SOUS la barre de titre (réserver de la place y donnait un espace mort). Mesuré sur le
+  Mac de l'utilisateur via la section « This window » de `#/perf` : fenêtre `1536 × 930` dans les
+  deux cas, page `1536 × 930` au lancement contre `1536 × 898` au retour. Le critère est donc
+  `outerHeight − innerHeight` : nul, la barre est au-dessus de la page ; 32, elle est déjà réservée.
+  Cette différence est un OUI/NON et **jamais** une hauteur — la lire comme une hauteur rendait un
+  écart double au retour du plein écran, les valeurs lues pendant l'animation décrivant une autre
+  fenêtre. `app.js` la mesure (`--mac-titlebar-measured`, relu 600 ms après le dernier `resize`),
+  `app-bar.css` ne l'applique qu'en `display-mode: standalone`, et `--inset-top` (unique pour les
+  quatre vues, appliqué par `.app-bar`) l'additionne à l'encoche iOS.
+  Pistes fausses, à ne pas refaire : réserver la place selon l'ÉTAT (mode d'affichage, plein écran
+  deviné par des seuils) — chaque version corrigeait un cas en cassant l'autre, parce que l'état ne
+  dit rien de la disposition choisie par Safari ; et ne rien réserver du tout, ce qui laissait les
+  barres se superposer au lancement. Leçon de méthode : sur une plateforme hors d'atteinte, faire
+  AFFICHER les chiffres par l'application (d'où le relevé de `#/perf`) au lieu de raisonner sur des
+  chiffres supposés.
   Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc
   zéro, ce qui laisse iOS poser la page dans la zone sûre. Le changer déplacerait la mise en page
   d'iOS et ne se fera pas sans un appareil pour le vérifier.

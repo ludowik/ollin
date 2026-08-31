@@ -53,6 +53,9 @@ export async function init(ctx) {
       ["screen", screen.width + " × " + screen.height],
       ["screen, available area", (screen.availLeft ?? "?") + ", " + (screen.availTop ?? "?") +
         " — " + screen.availWidth + " × " + screen.availHeight],
+      // The telling figure on macOS: zero means the page fills the window, so the system title bar
+      // is drawn over it; 32 means Safari has already put the page below that bar.
+      ["window less page, in height", (window.outerHeight - window.innerHeight) + " px"],
       ["pixel ratio", String(window.devicePixelRatio)],
       // The bar's own padding, not --inset-top: a custom property reads back as the expression
       // written for it, never as the pixels it resolves to.
