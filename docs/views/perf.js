@@ -34,6 +34,42 @@ export async function init(ctx) {
   const svgCurves = document.getElementById("curves");
   const svgGaps = document.getElementById("gaps");
 
+  // Everything the page can learn about its window, side by side. An installed app has a title bar
+  // the page cannot see, and the room left for it is deduced from these numbers alone — so when
+  // the layout comes out wrong on a machine one cannot reach, this table is the evidence.
+  function showWindowFacts() {
+    const table = document.getElementById("window-facts");
+    if (!table)
+      return;
+    const modes = ["standalone", "fullscreen", "minimal-ui", "browser"].filter(m => matchMedia("(display-mode: " + m + ")").matches);
+    const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "—";
+    const bar = document.querySelector(".app-bar");
+    const rows = [
+      ["display-mode", modes.join(", ") || "—"],
+      ["platform", navigator.platform || "—"],
+      ["page, top left on screen", window.screenX + ", " + window.screenY],
+      ["page size", window.innerWidth + " × " + window.innerHeight],
+      ["window size", window.outerWidth + " × " + window.outerHeight],
+      ["screen", screen.width + " × " + screen.height],
+      ["screen, available area", (screen.availLeft ?? "?") + ", " + (screen.availTop ?? "?") +
+        " — " + screen.availWidth + " × " + screen.availHeight],
+      ["pixel ratio", String(window.devicePixelRatio)],
+      ["title bar left for", css("--mac-titlebar-h")],
+      ["bar height on screen", bar ? Math.round(bar.getBoundingClientRect().height) + " px" : "—"],
+    ];
+    emptyNode(table);
+    for (const [label, value] of rows) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("td");
+      th.className = "subject";
+      th.textContent = label;
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(th, td);
+      table.append(tr);
+    }
+  }
+
   function report(e) {
     problem.hidden = false;
     problem.textContent = "The charts could not be drawn (" + (e && e.message ? e.message : e) +
@@ -605,7 +641,9 @@ export async function init(ctx) {
     svgCurves.addEventListener("pointercancel", onCancelCurves);
     closeOnOutside(svgCurves, onCancelCurves);
     closeOnOutside(svgGaps, () => { if (hoverGaps) hoverGaps.clearHover(); });
+    showWindowFacts();
     addEventListener("resize", redraw);
+    addEventListener("resize", showWindowFacts);
     addEventListener("orientationchange", onRotation);
     if (window.ResizeObserver) {
       observer = new ResizeObserver(redraw);
@@ -618,6 +656,7 @@ export async function init(ctx) {
   // Cleanup: every GLOBAL listener installed here must be removed, otherwise it survives the
   // change of view (app.js replaces #view, but not window or document).
   return () => {
+    removeEventListener("resize", showWindowFacts);
     removeEventListener("resize", redraw);
     removeEventListener("orientationchange", onRotation);
     outsideHandlers.forEach(h => document.removeEventListener("pointerdown", h, true));
