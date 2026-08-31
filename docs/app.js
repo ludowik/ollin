@@ -28,52 +28,6 @@ const V = Date.now()
 // imported with a version token, hence always fresh, and the stylesheet follows.
 document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
 
-// Installed as an app on macOS, the window keeps a native TITLE BAR above the page, and our own
-// bar ended up underneath it: its buttons were painted but the clicks went to the window. This
-// sets how much room to leave for it, on macOS only; app-bar.css leaves none anywhere else.
-//
-// The window's FULL SCREEN (the green button) removes that title bar, and Safari keeps reporting
-// display-mode "standalone" throughout — only the Fullscreen API switches the mode — so the
-// media query alone left a dead band at the top (reported on a Mac, in full screen). Whether a
-// title bar is there is therefore MEASURED, and remeasured after every resize, which is what
-// entering and leaving full screen raises.
-//
-// Its HEIGHT, on the other hand, is this constant and nothing else. Deriving it from the window
-// frame (outerHeight less innerHeight) was tried and gave DOUBLE the gap on the way back from
-// full screen (reported on a Mac): the numbers read during that animation describe a window that
-// is no longer the one being laid out. The macOS title bar has one height, so measuring it buys
-// nothing and costs a wrong reading. It is the ONE number to adjust here.
-const MAC_TITLEBAR_H = 28
-if (/Mac/i.test(navigator.platform || '')) {
-  const title_bar_height = () => {
-    // No browser tells a page whether a title bar is over it: display-mode says "standalone" in
-    // both states, the Fullscreen API knows nothing of the window's own full screen, and the
-    // Window Controls Overlay, which would give the exact rectangle, is not implemented by
-    // Safari. What CAN be asked is where the system lets a window live — screen.availTop and
-    // availHeight exclude the menu bar and the Dock — and a window can never leave that area.
-    // A page reaching above it, or taller than it, is therefore in full screen, where there is
-    // no title bar. This is measured against the system rather than against numbers of my own:
-    // a window opened flush under the menu bar fills the whole available area, which an earlier
-    // tolerance read as full screen (reported on a Mac: the two bars overlapped at launch).
-    const avail_top = screen.availTop !== undefined ? screen.availTop : 0
-    const avail_height = screen.availHeight || screen.height
-    if (window.screenY < avail_top || window.innerHeight > avail_height)
-      return 0
-    return MAC_TITLEBAR_H
-  }
-  const apply = () => document.documentElement.style.setProperty('--mac-titlebar-h', title_bar_height() + 'px')
-  apply()
-  // Entering and leaving full screen is ANIMATED, and the resize events raised along the way
-  // carry the intermediate geometry. The state is therefore read again once the window has come
-  // to rest, so a value read mid-flight cannot be the one that stays.
-  let settle = 0
-  addEventListener('resize', () => {
-    apply()
-    clearTimeout(settle)
-    settle = setTimeout(apply, 600)
-  })
-}
-
 const { hardReload } = await import('./pg-run.js?v=' + V)
 
 // On-screen crash capture, for diagnosing a device (iOS in full screen, with no console).

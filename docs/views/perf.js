@@ -34,15 +34,15 @@ export async function init(ctx) {
   const svgCurves = document.getElementById("curves");
   const svgGaps = document.getElementById("gaps");
 
-  // Everything the page can learn about its window, side by side. An installed app has a title bar
-  // the page cannot see, and the room left for it is deduced from these numbers alone — so when
-  // the layout comes out wrong on a machine one cannot reach, this table is the evidence.
+  // Everything the page can learn about its window, side by side. When the layout comes out wrong
+  // on a machine one cannot reach, this table is the evidence: it is what settled the macOS app
+  // window, whose page turned out to start BELOW the system title bar, so that leaving room for
+  // that bar only produced dead space.
   function showWindowFacts() {
     const table = document.getElementById("window-facts");
     if (!table)
       return;
     const modes = ["standalone", "fullscreen", "minimal-ui", "browser"].filter(m => matchMedia("(display-mode: " + m + ")").matches);
-    const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "—";
     const bar = document.querySelector(".app-bar");
     const rows = [
       ["display-mode", modes.join(", ") || "—"],
@@ -54,7 +54,9 @@ export async function init(ctx) {
       ["screen, available area", (screen.availLeft ?? "?") + ", " + (screen.availTop ?? "?") +
         " — " + screen.availWidth + " × " + screen.availHeight],
       ["pixel ratio", String(window.devicePixelRatio)],
-      ["title bar left for", css("--mac-titlebar-h")],
+      // The bar's own padding, not --inset-top: a custom property reads back as the expression
+      // written for it, never as the pixels it resolves to.
+      ["space left above the bar", bar ? getComputedStyle(bar).paddingTop : "—"],
       ["bar height on screen", bar ? Math.round(bar.getBoundingClientRect().height) + " px" : "—"],
     ];
     emptyNode(table);
