@@ -36,8 +36,8 @@ export async function init(ctx) {
 
   // Everything the page can learn about its window, side by side. When the layout comes out wrong
   // on a machine one cannot reach, this table is the evidence: it is what settled the macOS app
-  // window, whose page turned out to start BELOW the system title bar, so that leaving room for
-  // that bar only produced dead space.
+  // window, whose page turned out to fill the window at launch — the system title bar drawn over
+  // it — but to sit below that bar after a full-screen round trip.
   function showWindowFacts() {
     const table = document.getElementById("window-facts");
     if (!table)

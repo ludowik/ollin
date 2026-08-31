@@ -14,7 +14,8 @@
      Sometimes, because Safari lays that window out in two DIFFERENT ways: at launch the page fills
      the window and the title bar sits over it, while after a full-screen round trip the page is
      put below the bar and the window is 32 px taller than it. app.js measures which of the two is
-     in force (--mac-titlebar-h). */
+     in force and writes --mac-titlebar-measured, which the display-mode rule below turns into
+     --mac-titlebar-h so that a browser tab can never inherit it. */
   --inset-top: calc(env(safe-area-inset-top) + var(--mac-titlebar-h, 0px));
   --bar-h: 48px;
   --bar-bg: #1a1d2e;
