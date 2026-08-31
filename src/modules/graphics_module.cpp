@@ -294,6 +294,13 @@ static int s_font_idx = engine_font_default();
 static const int RECT_CORNER = 0;
 static const int RECT_CENTER = 1;
 static int s_rect_mode = RECT_CORNER;
+// Anchoring for text, HORIZONTAL only: x is the left edge, the middle, or the right edge, while y
+// stays the top of the line. "corner" is accepted as a synonym of "left", so the word used by rect
+// and sprite keeps its meaning here.
+static const int TEXT_LEFT = 0;
+static const int TEXT_CENTER = 1;
+static const int TEXT_RIGHT = 2;
+static int s_text_mode = TEXT_LEFT;
 // Anchoring for circle and ellipse. Those primitives have always been centred, so the default stays
 // "center", unlike rect.
 static const int ELLIPSE_CORNER = 0;
@@ -398,6 +405,7 @@ struct StyleState {
     int rect_mode;
     int ellipse_mode;
     int sprite_mode;
+    int   text_mode;
     bool  has_stroke;
     Color stroke_color;
     bool  has_fill;
@@ -418,6 +426,7 @@ static StyleState capture_style() {
     s.rect_mode = s_rect_mode;
     s.ellipse_mode = s_ellipse_mode;
     s.sprite_mode = image_get_sprite_mode();
+    s.text_mode = s_text_mode;
     s.has_stroke = s_has_stroke;
     s.stroke_color = s_stroke_color;
     s.has_fill = s_has_fill;
@@ -436,6 +445,7 @@ static void restore_style(const StyleState& s) {
     s_rect_mode = s.rect_mode;
     s_ellipse_mode = s.ellipse_mode;
     image_set_sprite_mode(s.sprite_mode);
+    s_text_mode = s.text_mode;
     s_has_stroke = s.has_stroke;
     s_stroke_color = s.stroke_color;
     s_has_fill = s.has_fill;
@@ -454,6 +464,7 @@ static void reset_styles() {
     s_rect_mode = RECT_CORNER;
     s_ellipse_mode = ELLIPSE_CENTER;
     image_set_sprite_mode(SPRITE_CORNER);
+    s_text_mode = TEXT_LEFT;
     apply_stroke(true, WHITE);
     apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // no tint by default; like fill and stroke, it is reset every frame
@@ -573,6 +584,27 @@ static int gfx_ellipse_mode(CallCtx& ctx) {
 static int gfx_sprite_mode(CallCtx& ctx) {
     image_set_sprite_mode(anchor_mode_arg(ctx, "graphics.spriteMode", SPRITE_CORNER) == 0 ? SPRITE_CORNER
                                                                                         : SPRITE_CENTER);
+    return ctx.ret(Value{});
+}
+
+// Text has THREE anchors and two names for one of them, so it does not go through
+// anchor_mode_arg: that helper answers 0 or 1 and its message names only two words.
+static int gfx_text_mode(CallCtx& ctx) {
+    if (ctx.argc == 0) {
+        s_text_mode = TEXT_LEFT;
+        return ctx.ret(Value{});
+    }
+    if (!ctx.args[0].is_string())
+        throw std::runtime_error("graphics.textMode: expected \"corner\", \"left\", \"center\" or \"right\"");
+    const std::string& mode = ctx.args[0].as_string();
+    if (mode == "corner" || mode == "left")
+        s_text_mode = TEXT_LEFT;
+    else if (mode == "center")
+        s_text_mode = TEXT_CENTER;
+    else if (mode == "right")
+        s_text_mode = TEXT_RIGHT;
+    else
+        throw std::runtime_error("graphics.textMode: unknown mode '" + mode + "'");
     return ctx.ret(Value{});
 }
 
@@ -835,6 +867,11 @@ static int gfx_text(CallCtx& ctx) {
     std::string text = drawn_text(args, argc, 0);
     float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)tx, (float)ty};
+    // The horizontal anchor costs a measurement, so it is only paid for when it is asked for.
+    if (s_text_mode != TEXT_LEFT) {
+        float width = MeasureTextEx(font, text.c_str(), s_font_size, spacing).x;
+        pos.x -= s_text_mode == TEXT_CENTER ? width / 2.0f : width;
+    }
     DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
     return ctx.ret(Value{});
 }
@@ -1611,6 +1648,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("rectMode")), Value::make_builtin(gfx_rect_mode));
     m.map_set(Value(std::string("ellipseMode")), Value::make_builtin(gfx_ellipse_mode));
     m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));
+    m.map_set(Value(std::string("textMode")), Value::make_builtin(gfx_text_mode));
     m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
     m.map_set(Value(std::string("run")), Value::make_builtin(gfx_run));
