@@ -6,8 +6,8 @@
 ## of the rule, never a setting. The wave only drops and reverses at the END of a pass, which is what
 ## keeps the formation square.
 ##
-## The shapes below are ours: geometric on purpose, so that nothing of the arcade original's
-## artwork is reproduced. Only the MECHANICS are faithful.
+## The three creatures are drawn below, and they are ours. Only the MECHANICS are faithful to the
+## arcade original, whose sprites are its author's work.
 ##
 ## Desktop: left and right arrows, space to fire. Mobile: drag in the lower band to aim, tap the
 ## field to fire.
@@ -35,15 +35,16 @@ const GUN_INK = Color(0.35, 0.95, 0.45)
 const TOP_INK = Color(1.00, 0.45, 0.45)
 const DIM     = Color(0.55, 0.60, 0.72)
 
-## Two frames per shape, alternating on every pass: that alternation IS the march. The shapes are
-## deliberately GEOMETRIC — a ring, a chevron, a diamond — rather than creatures: a hand-drawn bug
-## lands too close to the silhouettes of the arcade original, which are its author's work.
-const RING_A  = ["..####..", ".#....#.", "#..##..#", "#.####.#", "#..##..#", ".#....#.", "..####.."]
-const RING_B  = ["..####..", ".#....#.", "#.#..#.#", "#..##..#", "#.#..#.#", ".#....#.", "..####.."]
-const CHEV_A  = ["#......#", "##....##", ".######.", "..####..", ".#.##.#.", "#..##..#"]
-const CHEV_B  = ["#......#", ".##..##.", ".######.", "..####..", ".##..##.", "#......#"]
-const DIAM_A  = ["...##...", "..####..", ".######.", "########", ".######.", "..####..", "...##..."]
-const DIAM_B  = ["...##...", "..####..", ".######.", "##....##", ".######.", "..####..", "...##..."]
+## Two frames per creature, alternating on every pass: that alternation IS the march. Three
+## silhouettes of our own — a jellyfish, a spider, a moth — drawn in the idiom of an 8x8 monochrome
+## sprite. The arcade original's own creatures are its author's work and are not reproduced here;
+## only the MECHANICS are faithful.
+const JELLY_A = ["..####..", ".######.", "########", "#.####.#", ".#.##.#.", "#..##..#", ".#....#."]
+const JELLY_B = ["..####..", ".######.", "########", "#.####.#", ".#.##.#.", "..#..#..", ".#.##.#."]
+const SPIDR_A = ["#......#", ".#....#.", "..####..", ".######.", "..####..", ".#.##.#.", "#.#..#.#"]
+const SPIDR_B = [".#....#.", "..#..#..", "..####..", ".######.", "..####..", ".#.##.#.", "#......#"]
+const MOTH_A  = ["##....##", "##.##.##", ".######.", "..####..", "..#..#..", ".#....#."]
+const MOTH_B  = ["#......#", "##.##.##", "########", ".######.", "..#..#..", "#......#"]
 const CANNON  = ["......#......", ".....###.....", ".....###.....", "#############", "#############"]
 
 ## One entry per kind: its two frames, what killing it is worth, its colour. The kind comes from the
@@ -70,9 +71,9 @@ global acc = 0.0
 
 func buildSprites()
     kinds = [
-        {frames: [image.fromPattern(RING_A), image.fromPattern(RING_B)], points: 30, ink: TOP_INK},
-        {frames: [image.fromPattern(CHEV_A), image.fromPattern(CHEV_B)], points: 20, ink: INK},
-        {frames: [image.fromPattern(DIAM_A), image.fromPattern(DIAM_B)], points: 10, ink: INK}
+        {frames: [image.fromPattern(JELLY_A), image.fromPattern(JELLY_B)], points: 30, ink: TOP_INK},
+        {frames: [image.fromPattern(SPIDR_A), image.fromPattern(SPIDR_B)], points: 20, ink: INK},
+        {frames: [image.fromPattern(MOTH_A), image.fromPattern(MOTH_B)], points: 10, ink: INK}
     ]
     gunImg = image.fromPattern(CANNON)
 end
