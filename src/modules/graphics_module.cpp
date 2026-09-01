@@ -573,20 +573,27 @@ static int gfx_text_size(CallCtx& ctx) {
 // separately. `i` is the argument's position, so a primitive anchored on two axes reads one list
 // per axis. With no argument the caller's default is returned: a mode call describes the mode in
 // full rather than half-remembering the last one.
-static int mode_arg(CallCtx& ctx, int i, const char* fn, const char* const* names, int count, int dflt) {
-    std::string expected;
-    for (int k = 0; k < count; k++)
-        expected += (k == 0 ? "\"" : (k + 1 == count ? " or \"" : ", \"")) + std::string(names[k]) + "\"";
+// The size comes from the array's TYPE: passing it as a number would have to be kept in step with
+// the list, and one too many would read past its end with nothing to signal it.
+template <int N>
+static int mode_arg(CallCtx& ctx, int i, const char* fn, const char* const (&names)[N], int dflt) {
     if (i >= ctx.argc)
         return dflt;
+    // Built only on the way out, an accepted call having no message to write.
+    auto expected = [&names]() {
+        std::string out;
+        for (int k = 0; k < N; k++)
+            out += (k == 0 ? "\"" : (k + 1 == N ? " or \"" : ", \"")) + std::string(names[k]) + "\"";
+        return out;
+    };
     if (!ctx.args[i].is_string())
-        throw std::runtime_error(std::string(fn) + ": expected " + expected);
+        throw std::runtime_error(std::string(fn) + ": expected " + expected());
     const std::string& given = ctx.args[i].as_string();
-    for (int k = 0; k < count; k++) {
+    for (int k = 0; k < N; k++) {
         if (given == names[k])
             return k;
     }
-    throw std::runtime_error(std::string(fn) + ": unknown mode '" + given + "' (expected " + expected + ")");
+    throw std::runtime_error(std::string(fn) + ": unknown mode '" + given + "' (expected " + expected() + ")");
 }
 
 // The CORNER value is 0 in each of these families, and CENTER is 1, so a mode reads straight out of
@@ -594,17 +601,17 @@ static int mode_arg(CallCtx& ctx, int i, const char* fn, const char* const* name
 static const char* const CORNER_CENTER[] = {"corner", "center"};
 
 static int gfx_rect_mode(CallCtx& ctx) {
-    s_rect_mode = mode_arg(ctx, 0, "graphics.rectMode", CORNER_CENTER, 2, RECT_CORNER);
+    s_rect_mode = mode_arg(ctx, 0, "graphics.rectMode", CORNER_CENTER, RECT_CORNER);
     return ctx.ret(Value{});
 }
 
 static int gfx_ellipse_mode(CallCtx& ctx) {
-    s_ellipse_mode = mode_arg(ctx, 0, "graphics.ellipseMode", CORNER_CENTER, 2, ELLIPSE_CENTER);
+    s_ellipse_mode = mode_arg(ctx, 0, "graphics.ellipseMode", CORNER_CENTER, ELLIPSE_CENTER);
     return ctx.ret(Value{});
 }
 
 static int gfx_sprite_mode(CallCtx& ctx) {
-    image_set_sprite_mode(mode_arg(ctx, 0, "graphics.spriteMode", CORNER_CENTER, 2, SPRITE_CORNER));
+    image_set_sprite_mode(mode_arg(ctx, 0, "graphics.spriteMode", CORNER_CENTER, SPRITE_CORNER));
     return ctx.ret(Value{});
 }
 
@@ -621,8 +628,8 @@ static int gfx_text_mode(CallCtx& ctx) {
     // Both axes are read BEFORE either is written: writing as the arguments were parsed left an
     // invalid call having already wiped the mode in force, so a script catching the error found
     // itself back at left/top without asking. A refused call must change nothing.
-    int horizontal = TEXT_H_VALUES[mode_arg(ctx, 0, "graphics.textMode", TEXT_H_NAMES, 4, 0)];
-    int vertical = TEXT_V_VALUES[mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 4, 0)];
+    int horizontal = TEXT_H_VALUES[mode_arg(ctx, 0, "graphics.textMode", TEXT_H_NAMES, 0)];
+    int vertical = TEXT_V_VALUES[mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 0)];
     s_text_mode = horizontal;
     s_text_valign = vertical;
     return ctx.ret(Value{});
