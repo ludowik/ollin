@@ -254,7 +254,7 @@ func demoTextMode()
 
     ## TWO sizes per mark, and that is the whole point: "top" lines up the tops of the boxes,
     ## "bottom" their bottoms, and only "baseline" puts both writings on the same line.
-    label("top / bottom / baseline", 425, 512)
+    label("top / center / bottom / baseline", 425, 512)
     g.pushStyle()
     do
         var big = ft(16)
@@ -262,13 +262,13 @@ func demoTextMode()
         g.stroke(Color(1, 0.4, 0.4), fs(1))
         g.line(px(425), py(548), px(690), py(548))
         g.stroke(Color(0.9, 0.9, 1))
-        for entry in [[px(432), "top"], [px(521), "bottom"], [px(610), "baseline"]] do
+        for entry in [[px(427), "top"], [px(493), "center"], [px(559), "bottom"], [px(625), "baseline"]] do
             var x = entry[1]
             g.textMode("left", entry[2])
             g.fontSize(big)
             g.text("Hxg", x, py(548))
             g.fontSize(small)
-            g.text("Hxg", x + px(42), py(548))
+            g.text("Hxg", x + px(37), py(548))
         end
     end
     g.popStyle()

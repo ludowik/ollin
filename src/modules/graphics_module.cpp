@@ -294,10 +294,12 @@ static int s_font_idx = engine_font_default();
 static const int RECT_CORNER = 0;
 static const int RECT_CENTER = 1;
 static int s_rect_mode = RECT_CORNER;
-// Anchoring for text, on the two axes separately: x is the left edge, the middle or the right edge,
-// y is the top of the line, its bottom, or the BASELINE — the line the letters sit on, which is
-// what one aligns text to when mixing sizes. "corner" is accepted as a synonym of "left", so the
-// word used by rect and sprite keeps its meaning here.
+// Anchoring for text, on the two axes separately: x is the left edge, the middle or the right edge;
+// y is the top of the line, its middle, its bottom, or the BASELINE — the line the letters sit on,
+// which is what one aligns text to when mixing sizes. "corner" is accepted as a synonym of "left",
+// so the word used by rect and sprite keeps its meaning here. The vertical middle is named
+// TEXT_MIDDLE and not TEXT_V_CENTER: the two axes both expose it as "center", and one internal name
+// per anchor keeps the offsets below unambiguous.
 static const int TEXT_LEFT = 0;
 static const int TEXT_CENTER = 1;
 static const int TEXT_RIGHT = 2;
@@ -305,6 +307,7 @@ static int s_text_mode = TEXT_LEFT;
 static const int TEXT_TOP = 0;
 static const int TEXT_BOTTOM = 1;
 static const int TEXT_BASELINE = 2;
+static const int TEXT_MIDDLE = 3;
 static int s_text_valign = TEXT_TOP;
 // Anchoring for circle and ellipse. Those primitives have always been centred, so the default stays
 // "center", unlike rect.
@@ -610,14 +613,16 @@ static int gfx_sprite_mode(CallCtx& ctx) {
 // family.
 static const char* const TEXT_H_NAMES[] = {"left", "corner", "center", "right"};
 static const int TEXT_H_VALUES[] = {TEXT_LEFT, TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT};
-static const char* const TEXT_V_NAMES[] = {"top", "bottom", "baseline"};
+// Named in the reading order a user expects, hence a table of values as on the other axis.
+static const char* const TEXT_V_NAMES[] = {"top", "center", "bottom", "baseline"};
+static const int TEXT_V_VALUES[] = {TEXT_TOP, TEXT_MIDDLE, TEXT_BOTTOM, TEXT_BASELINE};
 
 static int gfx_text_mode(CallCtx& ctx) {
     // Both axes are read BEFORE either is written: writing as the arguments were parsed left an
     // invalid call having already wiped the mode in force, so a script catching the error found
     // itself back at left/top without asking. A refused call must change nothing.
     int horizontal = TEXT_H_VALUES[mode_arg(ctx, 0, "graphics.textMode", TEXT_H_NAMES, 4, 0)];
-    int vertical = mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 3, TEXT_TOP);
+    int vertical = TEXT_V_VALUES[mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 4, 0)];
     s_text_mode = horizontal;
     s_text_valign = vertical;
     return ctx.ret(Value{});
@@ -885,7 +890,7 @@ static int gfx_text(CallCtx& ctx) {
     // Only the anchors that need the text MEASURED pay for it: measuring walks the whole string,
     // and a baseline needs the font's ascent alone. Guarding both axes at once made "left" plus
     // "baseline" — what the Primitives sample uses — measure for nothing.
-    if (s_text_mode != TEXT_LEFT || s_text_valign == TEXT_BOTTOM) {
+    if (s_text_mode != TEXT_LEFT || s_text_valign == TEXT_BOTTOM || s_text_valign == TEXT_MIDDLE) {
         Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, spacing);
         if (s_text_mode == TEXT_CENTER)
             pos.x -= size.x / 2.0f;
@@ -893,6 +898,8 @@ static int gfx_text(CallCtx& ctx) {
             pos.x -= size.x;
         if (s_text_valign == TEXT_BOTTOM)
             pos.y -= size.y;
+        else if (s_text_valign == TEXT_MIDDLE)
+            pos.y -= size.y / 2.0f;
     }
     if (s_text_valign == TEXT_BASELINE)
         pos.y -= engine_font_ascent(font, s_font_size);
