@@ -23,6 +23,8 @@
   { "group": "Simulations", "name": "Lunar eclipse",  "file": "lunar_eclipse.ol" },
   { "group": "Simulations", "name": "Solar eclipse",  "file": "solar_eclipse.ol" },
 
+  { "group": "Games", "name": "Ollin Invaders", "file": "invaders.ol" },
+
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }
 ]
