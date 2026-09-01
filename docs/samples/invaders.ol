@@ -1,4 +1,5 @@
-## Ollin Invaders — the fleet, the cannon, one shot, the shields, and the fleet shooting back.
+## Ollin Invaders — the fleet, the cannon, one shot, the shields, the fleet shooting back, and the
+## mystery ship crossing above it.
 ##
 ## The RULE that makes this genre work, and the one most often missed: the fleet does not move as a
 ## block. ONE alien advances per tick. Fifty-five aliens therefore take fifty-five ticks to complete
@@ -11,6 +12,10 @@
 ##
 ## The fleet answers: only the LOWEST living alien of a column may drop a bomb, three bombs at most
 ## in the air. Being shot costs a life, and so does letting the fleet reach the cannon's line.
+##
+## The mystery ship is worth a value taken from a TABLE indexed by the number of shots the player
+## has fired — that is how the original priced it, and it is why 300 can be hunted rather than hoped
+## for. It stays away while the wave is nearly cleared, so the last aliens are not shot at through it.
 ##
 ## Desktop: left and right arrows, space to fire. Mobile: ONE finger anywhere DRAGS the cannon —
 ## the movement is relative, so touching the screen never teleports it — and firing is
@@ -45,6 +50,16 @@ const BOMB_SPEED = 90           ## slower than the cannon's shot: a bomb can be 
 const BOMB_MAX   = 3            ## how many bombs the fleet keeps in the air
 const BOMB_ODDS  = 90           ## one tick in this many drops a bomb, while there is room for one
 const LIVES      = 3
+const UFO_Y        = 24         ## the mystery ship's lane, above the fleet
+const UFO_W        = 16
+const UFO_H        = 7
+const UFO_SPEED    = 30         ## field pixels per second
+const UFO_PERIOD   = 22.0       ## seconds between two crossings
+const UFO_MIN_ALIVE = 8         ## it stays away below this many aliens, as the original does
+## The price of the mystery ship, indexed by the number of shots fired. A table, not a random draw:
+## a player who counts their shots can aim for the 300.
+const UFO_VALUES = [100, 50, 50, 100, 150, 100, 100, 50, 300, 100, 100, 100, 50, 150, 100]
+const POPUP_TIME = 0.9          ## how long the value stays written where the ship died
 const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
 const INK     = Color(0.90, 0.95, 1.00)
@@ -85,6 +100,17 @@ const SHIELD = [
 ]
 const CANNON  = ["......#......", ".....###.....", ".....###.....", "#############", "#############"]
 ## The bomb turns as it falls, which is how a falling thing reads at three pixels wide.
+## Our own saucer: wide, flat, and lit underneath — nothing of the fleet's silhouette, since it is
+## not one of them.
+const UFO = [
+    "....########....",
+    "..############..",
+    ".##############.",
+    "################",
+    "..##.##.##.##...",
+    "...#..#..#..#...",
+    "....##....##...."
+]
 const BOMB_A  = ["#..", ".#.", "..#", ".#."]
 const BOMB_B  = ["..#", ".#.", "#..", ".#."]
 
@@ -93,6 +119,7 @@ const BOMB_B  = ["..#", ".#.", "#..", ".#."]
 global kinds = []
 global gunImg = nil
 global bombImgs = []
+global ufoImg = nil
 global shields = []      ## four {img, x}: each one its own texture, so each erodes on its own
 
 global fleet = []        ## 55 entries {x, y, kind, alive}
@@ -115,6 +142,13 @@ global respawn = 0.0     ## > 0: the cannon was hit, and the field holds still
 global over = false      ## the last life is gone, or the fleet landed: a press starts a new game
 global ticks = 0         ## logical ticks, which is what makes the bomb sprite turn
 
+global ufo = nil         ## {x, dir} while it crosses, nil between crossings
+global ufoWait = UFO_PERIOD
+global ufoDir = 1        ## it comes from the other side each time
+global shots = 0         ## shots fired, which is what prices the mystery ship
+global popup = nil       ## {text, x, y, left}: what a kill was worth, written where it happened
+global best = 0          ## the best score of the session
+
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
 global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game
 global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
@@ -129,6 +163,7 @@ func buildSprites()
     ]
     gunImg = image.fromPattern(CANNON)
     bombImgs = [image.fromPattern(BOMB_A), image.fromPattern(BOMB_B)]
+    ufoImg = image.fromPattern(UFO)
 end
 
 ## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
@@ -207,7 +242,64 @@ func startGame()
     gunX = FIELD_W / 2 - GUN_W / 2
     shotLive = false
     bombs = []
+    shots = 0
+    ufo = nil
+    ufoWait = UFO_PERIOD
+    ufoDir = 1
+    popup = nil
     newWave()
+end
+
+## The value of the mystery ship for the shot that just hit it, read from the table as the original
+## read it — the count wraps, so the 300 comes back within reach.
+func ufoValue()
+    return UFO_VALUES[1 + shots % #UFO_VALUES]
+end
+
+func addScore(points)
+    score += points
+    if score > best then
+        best = score
+    end
+end
+
+func showPopup(text, x, y)
+    popup = {text: text, x: x, y: y, left: POPUP_TIME}
+end
+
+## One crossing at a time, from alternating sides, and never while the wave is nearly cleared.
+func ufoUpdate(dt)
+    if ufo == nil then
+        ufoWait -= dt
+        if ufoWait <= 0.0 and alive >= UFO_MIN_ALIVE then
+            var x = -UFO_W
+            if ufoDir < 0 then
+                x = FIELD_W
+            end
+            ufo = {x: x, dir: ufoDir}
+            ufoDir = -ufoDir
+            ufoWait = UFO_PERIOD
+        end
+        return
+    end
+    ufo.x = ufo.x + UFO_SPEED * ufo.dir * dt
+    if ufo.x < -UFO_W or ufo.x > FIELD_W then    ## it left the field: it was worth nothing
+        ufo = nil
+    end
+end
+
+func ufoHit()
+    if ufo == nil or not shotLive then
+        return false
+    end
+    if shotX < ufo.x or shotX >= ufo.x + UFO_W or shotY > UFO_Y + UFO_H or shotY < UFO_Y then
+        return false
+    end
+    var points = ufoValue()
+    addScore(points)
+    showPopup("{points}", ufo.x + UFO_W / 2, UFO_Y + 3)
+    ufo = nil
+    return true
 end
 
 ## The fleet is stored bottom row first, so the FIRST living alien of a column is its lowest one —
@@ -315,6 +407,7 @@ func fire()
     if shotLive or alive == 0 then
         return
     end
+    shots += 1
     shotLive = true
     shotX = gunX + GUN_W / 2
     shotY = GUN_Y - 4
@@ -326,7 +419,7 @@ func shotHits()
         if a.alive and shotX >= a.x and shotX < a.x + 8 and shotY >= a.y and shotY < a.y + 8 then
             a.alive = false
             alive -= 1
-            score += kinds[a.kind].points
+            addScore(kinds[a.kind].points)
             return true
         end
     end
@@ -443,8 +536,16 @@ func update(dt)
         if hit <> nil then
             erode(hit, shotX - hit.x, shotY - SHIELD_Y, BLAST)
             shotLive = false
-        elseif shotY < MARGIN or shotHits() then
+        elseif shotY < MARGIN or ufoHit() or shotHits() then
             shotLive = false
+        end
+    end
+
+    ufoUpdate(dt)
+    if popup <> nil then
+        popup.left -= dt
+        if popup.left <= 0.0 then
+            popup = nil
         end
     end
 
@@ -492,6 +593,11 @@ func draw()
         end
     end
 
+    if ufo <> nil then
+        graphics.tint(TOP_INK)
+        graphics.sprite(ufoImg, ufo.x, UFO_Y, UFO_W, UFO_H)
+    end
+
     graphics.tint(SHIELD_INK)
     for sh in shields do
         graphics.sprite(sh.img, sh.x, SHIELD_Y, SHIELD_W, SHIELD_H)
@@ -518,10 +624,19 @@ func draw()
     graphics.fill(GUN_INK)
     graphics.rect(MARGIN, GUN_Y + 8, FIELD_W - 2 * MARGIN, 1)   ## the floor the cannon stands on
 
+    if popup <> nil then
+        graphics.fontSize(8)
+        graphics.stroke(TOP_INK)
+        graphics.textMode("center", "center")
+        graphics.text(popup.text, popup.x, popup.y)
+    end
+
     graphics.fontSize(9)
     graphics.stroke(INK)
     graphics.textMode("left", "top")
     graphics.text("SCORE {score}", MARGIN, 8)
+    graphics.textMode("center", "top")
+    graphics.text("BEST {best}", FIELD_W / 2, 8)
     graphics.textMode("right", "top")
     graphics.text("WAVE {wave}", FIELD_W - MARGIN, 8)
     ## The lives left, as cannons: a count of the thing itself reads faster than a number.
