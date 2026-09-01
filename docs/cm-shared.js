@@ -1,4 +1,4 @@
-// CodeMirror settings shared by the tutorial (views/tutoriel.js) AND the playground
+// CodeMirror settings shared by the tutorial (views/tutorial.js) AND the playground
 // (views/playground.js). Single source, spread into their respective EditorView.theme. Each
 // view keeps its own specifics (background, borders, font size, autocomplete styles).
 

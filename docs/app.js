@@ -5,7 +5,7 @@
 // init(ctx) → cleanup()).
 //
 // Hash routing:
-//   #/<view>[/<anchor>]  changes view (#/tutoriel, #/tutoriel/for)
+//   #/<view>[/<anchor>]  changes view (#/tutorial, #/tutorial/for)
 //   #<anchor> (with no /) is an internal anchor of the current view (native scrolling)
 //   (empty)              is the last visited view, otherwise the default one (the tutorial)
 // The "#/" prefix is what tells a route from a plain anchor: the tutorial's section links
@@ -98,12 +98,12 @@ function getOllin() {
 // remount. Otherwise the anchor is a view parameter (sample/<file>, say), and the view is
 // remounted when it changes.
 const ROUTES = {
-  tutoriel:   { html: 'views/tutoriel.html',   js: './views/tutoriel.js', anchorIsSection: true },
+  tutorial:   { html: 'views/tutorial.html',   js: './views/tutorial.js', anchorIsSection: true },
   playground: { html: 'views/playground.html', js: './views/playground.js' },
   run:        { html: 'views/run.html',        js: './views/run.js' },
   perf:       { html: 'views/perf.html',       js: './views/perf.js' },
 }
-const DEFAULT_VIEW = 'tutoriel'
+const DEFAULT_VIEW = 'tutorial'
 // The last complete ROUTE visited (the view plus its sub-path: a tutorial anchor, a sample…),
 // remembered so as to reopen it on the next launch. The whole route is stored, not just the
 // view, so the exact sample or anchor comes back. `run` is EXCLUDED, being transient and
@@ -116,7 +116,7 @@ const LAST_HASH_KEY = 'ollin-last-route'
 // behaviour of the former standalone page, lost when moving to a single page with one shared
 // viewport. The tutorial stays zoomable, for comfortable reading.
 const VIEWPORT = {
-  tutoriel:   'width=device-width, initial-scale=1.0',
+  tutorial:   'width=device-width, initial-scale=1.0',
   playground: 'width=device-width, initial-scale=1.0, maximum-scale=1.0',
   run:        'width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover',
   perf:       'width=device-width, initial-scale=1.0',
@@ -235,6 +235,13 @@ function navigate(view, anchor) {
 
 async function route() {
   const { view, anchor } = parseHash()
+  // An unknown view falls back to the default one, and the hash is REWRITTEN to say so: left as
+  // it was, the address would name a view that does not exist and, being remembered on mount,
+  // would come back at every launch. That is what a bookmark on the former "#/tutoriel" does.
+  if (view && !ROUTES[view]) {
+    location.replace('#/' + DEFAULT_VIEW)
+    return
+  }
   if (view === currentView && ROUTES[view]) {
     // The anchor is a section (the tutorial): scroll, with no remount.
     if (ROUTES[view].anchorIsSection) {

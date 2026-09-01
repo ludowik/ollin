@@ -1950,7 +1950,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <div class="callout tip">Phase 1: one active light at a time (directional or point), plus the ambient. The wireframe, the grid and the lines are not lit.</div>
 
 <h4>Transforming 3D objects</h4>
-<p>The <a href="#/tutoriel/graphics">transformations</a> (<code>translate</code>/<code>rotate</code>/<code>scale</code>) act on 3D solids as well. <code>translate(x,y,z)</code> places, <code>rotate(deg, ax,ay,az)</code> (or <code>rotateX/Y/Z</code>) orients, <code>scale(...)</code> resizes. They are <strong>cumulative</strong> inside the <code>begin3d</code>/<code>end3d</code> block; <code>push()</code>/<code>pop()</code> serve to <strong>isolate</strong> one object's transformation, by saving and restoring it.</p>
+<p>The <a href="#/tutorial/graphics">transformations</a> (<code>translate</code>/<code>rotate</code>/<code>scale</code>) act on 3D solids as well. <code>translate(x,y,z)</code> places, <code>rotate(deg, ax,ay,az)</code> (or <code>rotateX/Y/Z</code>) orients, <code>scale(...)</code> resizes. They are <strong>cumulative</strong> inside the <code>begin3d</code>/<code>end3d</code> block; <code>push()</code>/<code>pop()</code> serve to <strong>isolate</strong> one object's transformation, by saving and restoring it.</p>
 <pre><code><span class="kw">func</span> draw()
     <span class="bi">graphics</span>.clear(colors.BLACK)
     <span class="bi">graphics</span>.begin3d(cam)
@@ -2035,7 +2035,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <p>A chunk is <strong>split</strong> into two groups according to the <code>fill</code> alpha: opaque (<code>drawChunk</code>) and transparent (<code>drawChunkAlpha</code>). The <strong>order is mandatory</strong>: draw ALL the opaque geometry, THEN all the transparency — the alpha blending is wrong otherwise.</p>
 
 <h4>Tile atlas (a texture per face)</h4>
-<p>To texture a terrain without one draw call per material, use an <strong>atlas</strong>: a single image laid out as a grid of tiles. Each cube carries a triplet of tiles (<strong>top / side / bottom</strong>); the shader picks according to the face — grass on top, earth on the sides. The atlas can be generated in Ollin with the <a href="#/tutoriel/stdlib">image</a> module, pixel by pixel, or loaded from an image.</p>
+<p>To texture a terrain without one draw call per material, use an <strong>atlas</strong>: a single image laid out as a grid of tiles. Each cube carries a triplet of tiles (<strong>top / side / bottom</strong>); the shader picks according to the face — grass on top, earth on the sides. The atlas can be generated in Ollin with the <a href="#/tutorial/stdlib">image</a> module, pixel by pixel, or loaded from an image.</p>
 <table>
   <thead><tr><th>Name</th><th>Description</th></tr></thead>
   <tbody>

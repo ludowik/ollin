@@ -185,7 +185,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   Le `viewport` n'a **pas** `viewport-fit=cover` : les `env(safe-area-inset-*)` des vues valent donc
   zéro, ce qui laisse iOS poser la page dans la zone sûre. Le changer déplacerait la mise en page
   d'iOS et ne se fera pas sans un appareil pour le vérifier.
-- `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). `ctx.anchor` = sous-chemin après la vue (ancre tutoriel, ou paramètre de vue). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
+- `docs/app.js` — **routeur** par hash. `#/<vue>[/<ancre>]` change de vue ; `#<ancre>` (sans `/`) = ancre interne de la vue courante (défilement, pas de re-montage). `ctx.anchor` = sous-chemin après la vue (ancre du tutoriel, ou paramètre de vue). Charge le runtime **WASM une seule fois** (`getOllin`, instance partagée) et déplace le canvas partagé dans la vue active.
 - **Catalogue des exemples, classé par groupes** : `docs/samples/index.json` porte un champ
   `group` par entrée, et **l'ordre des groupes est celui de leur première apparition** — pas de
   seconde liste à tenir en accord. Le menu Projet ouvre le groupe en **sous-menu volant** (à côté
@@ -201,7 +201,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   `tests/check_samples.sh` garde le catalogue : fichier listé existant, `.ol` du dossier tous
   listés hors les trois bibliothèques d'import, groupes contigus.
 - **Exemples en lecture directe** : `#/playground/sample/<fichier>` (et `#/run/sample/<fichier>`) ouvre un exemple `docs/samples/<fichier>` **depuis le dépôt, sans copie ni persistance** (re-`fetch` frais à chaque chargement → un refresh reprend la version du dépôt). Édition libre non enregistrée ; bouton « Créer un projet » pour forker dans IndexedDB. Les projets utilisateur (IndexedDB) restent le mode par défaut.
-- `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutoriel`, `playground`, `run`, `perf`.
+- `docs/views/<vue>.html` + `docs/views/<vue>.js` — chaque vue = un fragment (CSS + markup, `<style>` actif seulement monté) + un module `export function init(ctx) → cleanup()`. `ctx = { root, getOllin, hardReload, navigate }`. Vues : `tutorial`, `playground`, `run`, `perf`.
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
@@ -264,11 +264,11 @@ prétexte de cette colonne.
 | `tests/check_html.sh` | Claude | **garde-fou de balisage** : les fragments de `docs/views/` et le shell doivent être correctement imbriqués — une balise non fermée ne cassait aucun test, le navigateur réparant l'arbre en silence (constaté : les deux `</div>` du rail écrasés par une passe d'édition, la liste des fichiers et tout « Resources » se retrouvant DANS l'en-tête « Files ») |
 | `tests/check_samples.sh` | Claude | **garde-fou du catalogue** : `docs/samples/index.json` est le seul lien entre le menu du playground et les fichiers — un renommage y laissait une entrée morte que RIEN ne détectait, la panne n'apparaissant qu'à l'ouverture du menu dans le navigateur |
 | `docs/grammar.ebnf` | Claude | **grammaire formelle = référence de la syntaxe du langage** (dérivée de `syntax.ol`) |
-| `docs/views/tutoriel.html` | Claude | tutoriel HTML (vue de la web app monopage) |
+| `docs/views/tutorial.html` | Claude | tutoriel HTML (vue de la web app monopage) |
 | `docs/views/perf.html` + `perf.js` | Claude | vue `#/perf` : rapport de performances du moteur — le TRAVAIL (`docs/data/icount-history.json`, série historique) et le TEMPS (`docs/data/bench-snapshot.json`, relevé unique), plus la section « This window » : tout ce que la page sait de sa fenêtre, seule preuve exploitable quand la mise en page est fausse sur une machine hors d'atteinte |
 | `tools/ollin-vscode/` | Claude | extension VS Code (colorisation) |
 
-**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutoriel.html` et `tools/ollin-vscode/`. **Répartition des tests, sans recouvrement** : la FORME dans `tests/syntax.ol` (une construction du langage y figure toujours — une forme couverte seulement ailleurs est un manque), le COMPORTEMENT dans `tests/regressions.ol` (sémantique fine, cas limites, ce qui a déjà été cassé), l'ÉCHEC dans `tests/test_errors.sh` (ce qui doit être refusé, et avec quel message) — un échec RATTRAPÉ par `try`/`catch` reste du comportement, `test_errors.sh` ne sait vérifier qu'un message rendu sur la sortie d'erreur. Un test de sémantique qui n'exhibe aucune forme nouvelle n'a rien à faire dans `syntax.ol`. **La couverture est vérifiée par `tests/check_grammar_coverage.sh`** (dans `run.sh`) : chaque section de `syntax.ol` porte une étiquette `## [grammar: forStmt, rangeLit]` citant les règles qu'elle exerce, et le script échoue si une règle de `grammar.ebnf` n'est citée nulle part — ou si une étiquette cite un nom qui n'existe pas. Il compare des NOMS, il ne lit pas le code : l'étiquette engage celui qui la pose. Ajouter une règle à la grammaire oblige donc à écrire son test. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
+**Règle** : toute évolution de la syntaxe doit mettre à jour simultanément `grammar.ebnf` (référence), `tests/syntax.ol` (qui doit EXERCER la forme nouvelle, pas seulement la mentionner), `docs/views/tutorial.html` et `tools/ollin-vscode/`. **Répartition des tests, sans recouvrement** : la FORME dans `tests/syntax.ol` (une construction du langage y figure toujours — une forme couverte seulement ailleurs est un manque), le COMPORTEMENT dans `tests/regressions.ol` (sémantique fine, cas limites, ce qui a déjà été cassé), l'ÉCHEC dans `tests/test_errors.sh` (ce qui doit être refusé, et avec quel message) — un échec RATTRAPÉ par `try`/`catch` reste du comportement, `test_errors.sh` ne sait vérifier qu'un message rendu sur la sortie d'erreur. Un test de sémantique qui n'exhibe aucune forme nouvelle n'a rien à faire dans `syntax.ol`. **La couverture est vérifiée par `tests/check_grammar_coverage.sh`** (dans `run.sh`) : chaque section de `syntax.ol` porte une étiquette `## [grammar: forStmt, rangeLit]` citant les règles qu'elle exerce, et le script échoue si une règle de `grammar.ebnf` n'est citée nulle part — ou si une étiquette cite un nom qui n'existe pas. Il compare des NOMS, il ne lit pas le code : l'étiquette engage celui qui la pose. Ajouter une règle à la grammaire oblige donc à écrire son test. CLAUDE.md n'est mis à jour que si l'implémentation (opcodes, stratégie de compilation, structures) change.
 
 **Règle (permanente) : exécuter `bash tests/run.sh` avant CHAQUE commit, sans exception.**
 Pas seulement après une évolution du moteur (VM, compilateur, modules natifs) : aussi pour un
@@ -590,7 +590,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 ## Module `ui` (implémentation)
 
-> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module ui »).
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Module ui »).
 
 Widgets dessinés par le moteur, en pile dans le coin haut droit. Le moteur appelle le
 module en trois endroits de sa boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`) :
@@ -688,7 +688,7 @@ Autres points :
 
 ## Module `touch` (multitouche, implémentation)
 
-> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module touch »).
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Module touch »).
 
 raylib ne donne qu'une PHOTOGRAPHIE des contacts à chaque image (`GetTouchPointCount`,
 `GetTouchPointId`, `GetTouchPosition`) : aucun événement ne dit lequel vient d'apparaître.
@@ -801,7 +801,7 @@ survolée a changé, ce qui rend le doublon sans effet.
 
 ## Modules `audio` et `sound` (implémentation)
 
-> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Modules audio et sound »).
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Modules audio et sound »).
 
 Le son se partage en deux modules : `audio` est la SESSION (périphérique, volume général,
 pause), `sound` est ce qui SONNE — un oscillateur vivant ou un tampon calculé. Deux modules
@@ -935,7 +935,7 @@ enregistrement, spatialisation, synthèse en temps réel pilotée par une formul
 
 ## Module `tween` (implémentation)
 
-> API : voir le tutoriel (`docs/views/tutoriel.html`, section « Module tween »).
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Module tween »).
 
 Anime un champ d'objet (ou une variable passée par `ref`) de sa valeur courante vers une
 cible, sur une durée, selon une courbe. **Aucune dépendance raylib** → un seul fichier, pas

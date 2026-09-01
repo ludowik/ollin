@@ -1,4 +1,4 @@
-// TUTORIAL view — the initialisation logic, called by app.js once the views/tutoriel.html
+// TUTORIAL view — the initialisation logic, called by app.js once the views/tutorial.html
 // fragment is mounted in #view.
 //   init(ctx) → cleanup()    (ctx = { root, getOllin, hardReload, navigate })
 // `root`       is the #view element the fragment is mounted in (the scope of querySelector).
@@ -93,9 +93,9 @@ export async function init(ctx) {
   disposers.push(() => scrollObs.disconnect())
 
   // Remembering the reading position, restored on refresh. Only an entry WITHOUT an explicit
-  // anchor (a bare #/tutoriel, or a refresh) restores it — a section link (#intro, #for…) keeps
+  // anchor (a bare #/tutorial, or a refresh) restores it — a section link (#intro, #for…) keeps
   // priority.
-  const SCROLL_KEY = 'ollin-tutoriel-scrollY'
+  const SCROLL_KEY = 'ollin-tutorial-scrollY'
   let scrollSaveQueued = false
   const onScroll = () => {
     if (scrollSaveQueued) return

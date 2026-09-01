@@ -32,9 +32,6 @@ const DEFAULT_CODE    = 'print("hello world!")\n'
 // persisted. It is the only criterion for "is this a sample?" on the UI side: a persistable flag
 // could leak into the database and block renaming and deletion.
 export const TRANSIENT_ID = '__example__'
-// The id this constant had before the repository was put into English. A row stored under it
-// must still be cleaned up, hence a second value to test and not a plain rename.
-const LEGACY_TRANSIENT_ID = '__exemple__'
 
 // Slug: "My game !" becomes "my-game". ASCII, lower case, hyphens as separators.
 export function slugify(name) {
@@ -102,12 +99,12 @@ export async function init() {
 async function healExampleFlags() {
   const ro = await tx('readonly')
   const all = await reqAsync(ro.getAll())
-  const legacy = p => p.id === TRANSIENT_ID || p.id === LEGACY_TRANSIENT_ID
-  const bad = all.filter(p => p.example || legacy(p))
+  const sentinel = p => p.id === TRANSIENT_ID
+  const bad = all.filter(p => p.example || sentinel(p))
   if (!bad.length) return
   for (const p of bad) {
     delete p.example
-    if (legacy(p)) {
+    if (sentinel(p)) {
       p._oldId = p.id
       p.id = await uniqueId(p.name || 'Untitled')
     }
