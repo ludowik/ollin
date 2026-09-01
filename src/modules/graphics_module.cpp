@@ -400,12 +400,13 @@ static bool view_geometry(float* scale, float* off_x, float* off_y) {
     return true;
 }
 
-void gfx_view_map(float* x, float* y) {
+bool gfx_view_map(float* x, float* y) {
     float scale = 1.0f, off_x = 0.0f, off_y = 0.0f;
     if (!view_geometry(&scale, &off_x, &off_y))
-        return;
+        return false;
     *x = (*x - off_x) / scale;
     *y = (*y - off_y) / scale;
+    return true;
 }
 
 // W, H, CX and CY name the space the script DRAWS in, so they follow the viewport — that is the
@@ -606,34 +607,7 @@ static int gfx_text_size(CallCtx& ctx) {
     return 2;
 }
 
-// A MODE argument: a name from a list, answered as its position in that list. The list also writes
-// the error messages, so the words accepted are spelled once — they were written by hand in each
-// caller, and the renaming of a single mode meant editing the comparison and two messages
-// separately. `i` is the argument's position, so a primitive anchored on two axes reads one list
-// per axis. With no argument the caller's default is returned: a mode call describes the mode in
-// full rather than half-remembering the last one.
-// The size comes from the array's TYPE: passing it as a number would have to be kept in step with
-// the list, and one too many would read past its end with nothing to signal it.
-template <int N>
-static int mode_arg(CallCtx& ctx, int i, const char* fn, const char* const (&names)[N], int dflt) {
-    if (i >= ctx.argc)
-        return dflt;
-    // Built only on the way out, an accepted call having no message to write.
-    auto expected = [&names]() {
-        std::string out;
-        for (int k = 0; k < N; k++)
-            out += (k == 0 ? "\"" : (k + 1 == N ? " or \"" : ", \"")) + std::string(names[k]) + "\"";
-        return out;
-    };
-    if (!ctx.args[i].is_string())
-        throw std::runtime_error(std::string(fn) + ": expected " + expected());
-    const std::string& given = ctx.args[i].as_string();
-    for (int k = 0; k < N; k++) {
-        if (given == names[k])
-            return k;
-    }
-    throw std::runtime_error(std::string(fn) + ": unknown mode '" + given + "' (expected " + expected() + ")");
-}
+// mode_arg lives in module_utils.h: the mouse reads its button names through the same list.
 
 // The CORNER value is 0 in each of these families, and CENTER is 1, so a mode reads straight out of
 // its position in the list.
@@ -1487,12 +1461,11 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // and in the area's own coordinates, so widgets keep their size whatever virtual resolution
         // the game chose — and they stay outside the letterbox. Still before the screenshot flush,
         // which is what captures them.
+        // Normal blending from here to the end of the frame: the interface, then the FPS overlay.
+        // The screenshot in between only READS pixels, so no blend state is restored for it.
         BeginBlendMode(BLEND_ALPHA);
         ui_draw();
-        rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
-        BeginBlendMode(BLEND_CUSTOM);
         flush_pending_screenshot();      // captures the composed screen, before the FPS overlay
-        BeginBlendMode(BLEND_ALPHA);   // the FPS overlay, in normal blending
         draw_fps_overlay();
         *drawing = false;
         EndDrawing();

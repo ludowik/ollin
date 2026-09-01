@@ -1065,8 +1065,9 @@ toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
 
 Une texture n'est retournée que si son contenu a été écrit **par RENDU** dans le framebuffer
 (OpenGL range alors ses lignes de bas en haut). `TexHandle::gpu_flipped` porte ce fait : vrai
-depuis `image.beginDraw`, faux dès qu'un `UpdateTexture` recopie l'ombre CPU (`image.create` +
-`setPixel`, `image.fromPattern`). C'est ce drapeau, et non `is_render`, que lisent `image.draw` et
+depuis `image.beginDraw`, faux dès qu'un `UpdateTexture` recopie l'ombre CPU. Le drapeau ne se
+remet à zéro qu'en **un seul point**, `upload_cpu` — l'unique endroit où l'ombre CPU atteint la
+texture —, si bien qu'un futur chemin d'écriture qui passe par lui est correct sans qu'on y pense. C'est ce drapeau, et non `is_render`, que lisent `image.draw` et
 `image_draw_sprite`. Auparavant TOUTE texture de rendu était retournée au dessin, si bien qu'un
 motif rempli côté processeur s'affichait à l'envers — constaté sur les boucliers d'`invaders.ol`,
 et vérifié dans les deux sens : une image peinte par rendu garde son sens, un aller-retour
@@ -1075,6 +1076,10 @@ quand `gpu_flipped`, pour que l'ombre CPU reste de haut en bas).
 
 Le chemin 3D n'est pas concerné : `graphics.texture` passe par `image_gl_texid`, qui ne décide
 d'aucun sens (l'atlas de tuiles est échantillonné sans retournement, cf. « Affichage 3D »).
+⚠ **Trou connu, antérieur et non corrigé** : `image_gl_texid` rend l'identifiant GL nu, donc une
+image peinte par `beginDraw` puis posée en texture 3D est renversée en silence. Le corriger demande
+de faire traverser le sens à cette frontière (`image_gl_texid(id, bool*)`) et de le lire dans
+`graphics3d.cpp` ; aucun exemple ne l'exerce, tous les atlas étant remplis côté processeur.
 
 ## Viewport (résolution virtuelle, `graphics.viewport`)
 
@@ -1089,8 +1094,14 @@ Il se glisse en **trois** points, et nulle part ailleurs :
    `ClearBackground` pour peindre les bandes (sans lui, la frame précédente reste visible à côté) ;
 3. `gfx_view_map` convertit les coordonnées d'entrée — `mouse_poll`, `mouse.position()` et
    `touch_begin_frame` — pour que le script reçoive des positions dans le repère où il dessine.
-   ⚠ Le test de double-clic garde les coordonnées BRUTES : son seuil est en pixels réels, et huit
-   pixels virtuels ne sont pas la même distance à l'écran.
+   ⚠ **Tout seuil exprimé en pixels d'ÉCRAN garde les coordonnées brutes** : le test de double-clic
+   (`mouse_poll`) et la distance minimale du pincement (`Point::raw_x/raw_y`, lu par `pinch_poll`),
+   sinon un champ virtuel étroit les divise par le facteur d'échelle — un pixel de garde-fou devenait
+   un huitième de pixel réel.
+   ⚠ `gfx_view_map` rend un **booléen** « un viewport est actif » : sans viewport les positions
+   restent des ENTIERS, comme tous les scripts existants les reçoivent depuis toujours. Une
+   conversion neutre doit l'être jusqu'au type — un `Value(double)` inconditionnel changeait
+   l'affichage, les clés de map et les égalités entières de tout le dépôt.
 
 `W`/`H`/`CX`/`CY` valent la taille **virtuelle** (décision de l'utilisateur) : le script n'a qu'un
 seul repère à connaître. `window.width`/`height` continuent de rapporter la zone RÉELLE.

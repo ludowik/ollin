@@ -2,6 +2,7 @@
 #include "../vm.h"
 #include "modules/module_utils.h"
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <raylib.h>
 #include <stdexcept>
@@ -232,14 +233,17 @@ static void pixels_open(TexHandle& h) {
     h.pixels_open = true;
 }
 
+// The ONLY place the CPU shadow reaches the texture, which is why the orientation flag is cleared
+// here: any future write path that goes through this one is correct without having to think about it.
+static void upload_cpu(TexHandle& h) {
+    UpdateTexture(h.is_render ? h.rtt.texture : h.tex, h.cpu.data);
+    h.gpu_flipped = false;   // uploaded from the top-down CPU shadow
+}
+
 static void pixels_close(TexHandle& h) {
     if (!h.pixels_open)
         return;
-    if (h.is_render)
-        UpdateTexture(h.rtt.texture, h.cpu.data);
-    else
-        UpdateTexture(h.tex, h.cpu.data);
-    h.gpu_flipped = false;   // uploaded from the top-down CPU shadow
+    upload_cpu(h);
     h.pixels_open = false;
 }
 
@@ -354,25 +358,33 @@ static int img_load_data(CallCtx& ctx) {
 }
 
 
+// A render-texture handle, registered and ready: image.create and image.fromPattern both go through
+// here. Written twice, the pair drifted — the orientation flag was added to one of them only.
+static TexHandle& new_render_handle(int w, int h, int* id_out) {
+    auto uptr = std::make_unique<TexHandle>();
+    TexHandle& hnd = *uptr;
+    hnd.rtt = LoadRenderTexture(w, h);
+    hnd.is_render = true;
+    // A PERSISTENT CPU shadow (RGBA8), the source of truth for the pixels. It avoids any mid-frame
+    // glReadPixels through LoadImageFromTexture — which breaks WebGL/WASM rendering by losing the
+    // current FBO — and speeds up begin/setPixel/endPixels.
+    hnd.cpu = GenImageColor(w, h, BLANK);
+    int id = s_next_id++;
+    hnd.id = id;
+    *id_out = id;
+    s_images[id] = std::move(uptr);
+    return hnd;
+}
+
 static int img_create(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.create";
     int w = (int)num_arg(args, argc, 0, FN);
     int h = (int)num_arg(args, argc, 1, FN);
-    TexHandle hnd;
-    hnd.rtt = LoadRenderTexture(w, h);
-    hnd.is_render = true;
-    // A PERSISTENT CPU shadow (RGBA8), the source of truth for the pixels. It avoids any
-    // mid-frame glReadPixels through LoadImageFromTexture — which breaks WebGL/WASM rendering by
-    // losing the current FBO — and speeds up begin/setPixel/endPixels.
-    hnd.cpu = GenImageColor(w, h, BLANK);
-    UpdateTexture(hnd.rtt.texture, hnd.cpu.data);   // the initial texture is transparent
-    int id = s_next_id++;
-    hnd.id = id;
-    auto uptr = std::make_unique<TexHandle>(std::move(hnd));
-    TexHandle* ptr = uptr.get();
-    s_images[id] = std::move(uptr);
-    return ctx.ret(make_handle(id, w, h, ptr));
+    int id = 0;
+    TexHandle& hnd = new_render_handle(w, h, &id);
+    upload_cpu(hnd);   // the initial texture is transparent
+    return ctx.ret(make_handle(id, w, h, &hnd));
 }
 
 
@@ -433,21 +445,13 @@ static int img_from_pattern(CallCtx& ctx) {
             pixels[(size_t)y * (size_t)w + (size_t)x] = c;
         }
     }
-    TexHandle hnd;
-    hnd.rtt = LoadRenderTexture(w, h);
-    hnd.is_render = true;
-    hnd.cpu = GenImageColor(w, h, BLANK);
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++)
-            ImageDrawPixel(&hnd.cpu, x, y, pixels[(size_t)y * (size_t)w + (size_t)x]);
-    }
-    UpdateTexture(hnd.rtt.texture, hnd.cpu.data);
-    int id = s_next_id++;
-    hnd.id = id;
-    auto uptr = std::make_unique<TexHandle>(std::move(hnd));
-    TexHandle* ptr = uptr.get();
-    s_images[id] = std::move(uptr);
-    return ctx.ret(make_handle(id, w, h, ptr));
+    int id = 0;
+    TexHandle& hnd = new_render_handle(w, h, &id);
+    // The CPU shadow is RGBA8 and contiguous, exactly the layout `pixels` was built in: one copy,
+    // rather than a second pass of per-pixel calls that would blend what is already final.
+    std::memcpy(hnd.cpu.data, pixels.data(), (size_t)w * (size_t)h * 4);
+    upload_cpu(hnd);
+    return ctx.ret(make_handle(id, w, h, &hnd));
 }
 
 static int img_begin(CallCtx& ctx) {

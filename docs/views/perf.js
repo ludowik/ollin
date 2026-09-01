@@ -38,6 +38,31 @@ export async function init(ctx) {
   // on a machine one cannot reach, this table is the evidence: it is what settled the macOS app
   // window, whose page turned out to fill the window at launch — the system title bar drawn over
   // it — but to sit below that bar after a full-screen round trip.
+  // A table of label/value rows, for both fact sections — same view, same stylesheet, so the row is
+  // described once. The rows are REWRITTEN in place when the shape is unchanged: the audio table is
+  // refreshed every second, and throwing a dozen nodes away for four values that rarely move is
+  // work for nothing.
+  function fillFacts(table, rows) {
+    if (table.rows.length !== rows.length) {
+      emptyNode(table);
+      for (const _ of rows) {
+        const tr = document.createElement("tr");
+        const th = document.createElement("td");
+        th.className = "subject";
+        const td = document.createElement("td");
+        tr.append(th, td);
+        table.append(tr);
+      }
+    }
+    rows.forEach(([label, value], i) => {
+      const cells = table.rows[i].cells;
+      if (cells[0].textContent !== label)
+        cells[0].textContent = label;
+      if (cells[1].textContent !== value)
+        cells[1].textContent = value;
+    });
+  }
+
   function showWindowFacts() {
     const table = document.getElementById("window-facts");
     if (!table)
@@ -62,17 +87,7 @@ export async function init(ctx) {
       ["space left above the bar", bar ? getComputedStyle(bar).paddingTop : "—"],
       ["bar height on screen", bar ? Math.round(bar.getBoundingClientRect().height) + " px" : "—"],
     ];
-    emptyNode(table);
-    for (const [label, value] of rows) {
-      const tr = document.createElement("tr");
-      const th = document.createElement("td");
-      th.className = "subject";
-      th.textContent = label;
-      const td = document.createElement("td");
-      td.textContent = value;
-      tr.append(th, td);
-      table.append(tr);
-    }
+    fillFacts(table, rows);
   }
 
   // The engine's audio output, as the page can see it: miniaudio publishes its devices on window,
@@ -83,23 +98,12 @@ export async function init(ctx) {
       return;
     const dev = window.miniaudio && window.miniaudio.devices ? window.miniaudio.devices[0] : null;
     const ctxa = dev ? dev.webaudio : null;
-    const rows = [
+    fillFacts(table, [
       ["engine output", dev ? (dev.scriptNode ? "open" : "device, no output node") : "not opened yet"],
       ["context state", ctxa ? ctxa.state : "—"],
       ["sample rate", ctxa ? ctxa.sampleRate + " Hz" : "—"],
       ["page's own tone", probe ? probe.state : "not played yet"],
-    ];
-    emptyNode(table);
-    for (const [label, value] of rows) {
-      const tr = document.createElement("tr");
-      const th = document.createElement("td");
-      th.className = "subject";
-      th.textContent = label;
-      const td = document.createElement("td");
-      td.textContent = value;
-      tr.append(th, td);
-      table.append(tr);
-    }
+    ]);
   }
 
   // The tone is built by the page, so hearing it proves the device and the browser will sound at all.

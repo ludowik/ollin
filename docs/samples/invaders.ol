@@ -154,6 +154,7 @@ global fleet = []        ## 55 entries {x, y, kind, alive}
 global cursor = 1        ## the alien the next tick advances
 global heading = 1       ## +1 rightwards, -1 leftwards
 global turning = false   ## an alien touched a wall: drop and reverse at the end of the pass
+global landed = false    ## an alien crossed the cannon's line: the game ends this frame
 global frame = 1         ## which of the two frames the fleet shows
 global alive = 0
 global wave = 1
@@ -301,6 +302,7 @@ func newWave()
     cursor = 1
     heading = 1
     turning = false
+    landed = false
     frame = 1
 end
 
@@ -499,13 +501,21 @@ func fleetTick()
             if a.x <= MARGIN or a.x + 8 >= FIELD_W - MARGIN then
                 turning = true
             end
-            ## Descended onto a shield, it eats its way through: the arch is no shelter once the
-            ## fleet is level with it.
-            for sh in shields do
-                if a.x + 8 > sh.x and a.x < sh.x + SHIELD_W
-                   and a.y + 8 > SHIELD_Y and a.y < SHIELD_Y + SHIELD_H then
-                    erode(sh, a.x + 4 - sh.x, a.y + 4 - SHIELD_Y, 5)
+            ## Level with the shields, it eats its way through: the arch is no shelter once the fleet
+            ## reaches it. Tested only when the fleet is low enough — for most of a game the aliens
+            ## are a hundred pixels above, and the four rectangles would be compared for nothing.
+            if a.y + 8 > SHIELD_Y then
+                for sh in shields do
+                    if a.x + 8 > sh.x and a.x < sh.x + SHIELD_W and a.y < SHIELD_Y + SHIELD_H then
+                        erode(sh, a.x + 4 - sh.x, a.y + 4 - SHIELD_Y, 5)
+                    end
                 end
+            end
+            ## The fleet landing is as fatal as a bomb, and the alien that just moved is the only one
+            ## that can have crossed the line: asking the whole fleet once per frame was 55 tests for
+            ## at most one transition in a game.
+            if a.y + 8 >= GUN_Y then
+                landed = true
             end
             return
         end
@@ -642,17 +652,12 @@ func mouse.moved(x, y)
 end
 
 ## The bursts fade on their own clock: they are shown after the thing that made them is gone, so
-## they belong to no other state.
+## they belong to no other state. A filter says it in one line — the countdown is the only change.
 func burstsFade(dt)
-    var i = 1
-    while i <= #bursts do
-        bursts[i].left -= dt
-        if bursts[i].left <= 0.0 then
-            bursts.delete(i)
-        else
-            i += 1
-        end
-    end
+    bursts = bursts.filter(func(b)
+        b.left -= dt
+        return b.left > 0.0
+    end)
 end
 
 func update(dt)
@@ -708,7 +713,7 @@ func update(dt)
     end
 
     bombsFall(dt)
-    if respawn > 0.0 or state == "over" then     ## the cannon was just hit: this frame is over
+    if respawn > 0.0 then     ## the cannon was just hit: this frame is over
         return
     end
 
@@ -723,15 +728,12 @@ func update(dt)
         end
     end
 
-    ## The fleet landing is as fatal as a bomb, and it ends the game outright: a cannon replaced
-    ## under a landed fleet would be shot at once.
-    for a in fleet do
-        if a.alive and a.y + 8 >= GUN_Y then
-            lives = 0
-            hitCannon()
-            state = "over"
-            return
-        end
+    ## A landed fleet ends the game outright: a cannon replaced under it would be shot at once, so
+    ## the last life goes with the landing.
+    if landed then
+        lives = 1
+        hitCannon()
+        return
     end
 
     if alive == 0 then
@@ -760,23 +762,26 @@ func drawTitle()
     graphics.stroke(DIM)
     graphics.text("*SCORE ADVANCE TABLE*", FIELD_W / 2, 78)
 
+    ## The four rows are one list, the mystery ship included: written apart, its line could drift
+    ## from the three above it without anything saying so.
+    var table = []
     for i = 1, #kinds do
-        var y = 96 + (i - 1) * 20
-        graphics.tint(kinds[i].ink)
-        graphics.sprite(kinds[i].frames[f], FIELD_W / 2 - 34, y - 4, 8, 8)
-        graphics.noTint()
-        graphics.fontSize(9)
-        graphics.stroke(INK)
-        graphics.textMode("left", "center")
-        graphics.text("= {kinds[i].points} POINTS", FIELD_W / 2 - 20, y)
+        table.push({img: kinds[i].frames[f], w: 8, h: 8, ink: kinds[i].ink,
+                    text: "= {kinds[i].points} POINTS"})
     end
-    graphics.tint(TOP_INK)
-    graphics.sprite(ufoImg, FIELD_W / 2 - 38, 152, UFO_W, UFO_H)
-    graphics.noTint()
+    table.push({img: ufoImg, w: UFO_W, h: UFO_H, ink: TOP_INK, text: "= MYSTERY"})
+
     graphics.fontSize(9)
-    graphics.stroke(INK)
     graphics.textMode("left", "center")
-    graphics.text("= MYSTERY", FIELD_W / 2 - 20, 156)
+    for i = 1, #table do
+        var row = table[i]
+        var y = 96 + (i - 1) * 20
+        graphics.tint(row.ink)
+        graphics.sprite(row.img, FIELD_W / 2 - 34 - (row.w - 8) / 2, y - row.h / 2, row.w, row.h)
+        graphics.noTint()
+        graphics.stroke(INK)
+        graphics.text(row.text, FIELD_W / 2 - 20, y)
+    end
 
     graphics.fontSize(9)
     graphics.stroke(GUN_INK)
@@ -790,7 +795,7 @@ func drawTitle()
     if best > 0 then
         graphics.fontSize(8)
         graphics.stroke(INK)
-        graphics.text("BEST {best}", FIELD_W / 2, 236)
+        graphics.text("BEST {best}", FIELD_W / 2, 242)
     end
 end
 
@@ -802,10 +807,16 @@ func draw()
 
     graphics.clear(Color(0.02, 0.03, 0.05))
 
+    ## The fleet is stored by rows, hence by kind, so three tint changes cover all 55 aliens — one
+    ## per alien was fifty-five native state changes a frame for the same picture.
+    var tinted = 0
     for a in fleet do
         if a.alive then
             var k = kinds[a.kind]
-            graphics.tint(k.ink)
+            if a.kind <> tinted then
+                graphics.tint(k.ink)
+                tinted = a.kind
+            end
             graphics.sprite(k.frames[frame], a.x, a.y, 8, 8)
         end
     end

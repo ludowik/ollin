@@ -34,6 +34,22 @@ static const int   DBLCLICK_DIST  = 8;
 // The script received a `pressed` with no `released` yet: an invariant to hold, whatever happens.
 static bool s_down = false;
 
+// The pointer, in the space the script DRAWS in. One place converts it, so a change of frame of
+// reference cannot reach the callbacks and miss the accessor, or the other way round.
+// A viewport makes the coordinates fractional; without one they stay INTEGERS, as every existing
+// script has always received them — a neutral conversion must be neutral down to the type.
+static void mouse_view_pos(Value* x, Value* y) {
+    float fx = (float)GetMouseX();
+    float fy = (float)GetMouseY();
+    if (gfx_view_map(&fx, &fy)) {
+        *x = Value((double)fx);
+        *y = Value((double)fy);
+        return;
+    }
+    *x = Value((int64_t)fx);
+    *y = Value((int64_t)fy);
+}
+
 void mouse_poll(bool click_taken) {
     VM* vm = VM::current();
     Value m = vm->get_global("mouse");
@@ -50,11 +66,8 @@ void mouse_poll(bool click_taken) {
     // script receives, on the other hand, is mapped into the space it draws in.
     int mx = GetMouseX();
     int my = GetMouseY();
-    float vx = (float)mx;
-    float vy = (float)my;
-    gfx_view_map(&vx, &vy);
-    Value x = Value((double)vx);
-    Value y = Value((double)vy);
+    Value x, y;
+    mouse_view_pos(&x, &y);
 
     // The click was taken by a UI widget, so the script must not see the release either —
     // otherwise an interface button would also fire mouse.released.
@@ -107,34 +120,21 @@ void mouse_poll(bool click_taken) {
     }
 }
 
-// The pointer's position, in the graphics area's logical coordinates — the same the callbacks
-// receive, so a script can mix the two without converting anything.
 static int mouse_position(CallCtx& ctx) {
-    float x = (float)GetMouseX();
-    float y = (float)GetMouseY();
-    gfx_view_map(&x, &y);
-    ctx.set_result(0, Value((double)x));
-    ctx.set_result(1, Value((double)y));
+    Value x, y;
+    mouse_view_pos(&x, &y);
+    ctx.set_result(0, x);
+    ctx.set_result(1, y);
     return 2;
 }
 
+// The names are spelled ONCE, here, and mode_arg writes both refusals from this very list.
+static const char* const BUTTON_NAMES[] = {"left", "right", "middle"};
+static const int BUTTONS[] = {MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE};
+
 static int mouse_is_down(CallCtx& ctx) {
-    int button = MOUSE_BUTTON_LEFT;
-    if (ctx.argc >= 1) {
-        if (!ctx.args[0].is_string())
-            throw std::runtime_error("mouse.isDown: expected \"left\", \"right\" or \"middle\"");
-        const std::string& name = ctx.args[0].as_string();
-        if (name == "left")
-            button = MOUSE_BUTTON_LEFT;
-        else if (name == "right")
-            button = MOUSE_BUTTON_RIGHT;
-        else if (name == "middle")
-            button = MOUSE_BUTTON_MIDDLE;
-        else
-            throw std::runtime_error("mouse.isDown: unknown button '" + name +
-                                     "' (expected \"left\", \"right\" or \"middle\")");
-    }
-    return ctx.ret(Value::make_bool(IsMouseButtonDown(button)));
+    int idx = mode_arg(ctx, 0, "mouse.isDown", BUTTON_NAMES, 0);
+    return ctx.ret(Value::make_bool(IsMouseButtonDown(BUTTONS[idx])));
 }
 
 // A new program must not inherit a button left "down" by the previous one, and the

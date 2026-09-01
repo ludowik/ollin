@@ -50,6 +50,32 @@ static inline const std::string& str_arg(const Value* args, int argc, int i, con
     return args[i].as_string();
 }
 
+// A NAME chosen from a list, rendered as its position: the words accepted are spelled once, and so
+// are the error messages. `i` is the argument's position, so a primitive anchored on two axes reads
+// one list per axis. With no argument the caller's default is returned.
+// The size comes from the array's TYPE: passing it as a number would have to be kept in step with
+// the list, and one too many would read past its end with nothing to signal it.
+template <int N>
+static int mode_arg(CallCtx& ctx, int i, const char* fn, const char* const (&names)[N], int dflt) {
+    if (i >= ctx.argc)
+        return dflt;
+    // Built only on the way out, an accepted call having no message to write.
+    auto expected = [&names]() {
+        std::string out;
+        for (int k = 0; k < N; k++)
+            out += (k == 0 ? "\"" : (k + 1 == N ? " or \"" : ", \"")) + std::string(names[k]) + "\"";
+        return out;
+    };
+    if (!ctx.args[i].is_string())
+        throw std::runtime_error(std::string(fn) + ": expected " + expected());
+    const std::string& given = ctx.args[i].as_string();
+    for (int k = 0; k < N; k++) {
+        if (given == names[k])
+            return k;
+    }
+    throw std::runtime_error(std::string(fn) + ": unknown mode '" + given + "' (expected " + expected() + ")");
+}
+
 // A map being built, with the noise removed: `m.map_set(Value(std::string("now")),
 // Value::make_builtin(date_now))` becomes `.fn("now", date_now)`. It is a façade over map_set and
 // nothing else — same Value, same order, same result — so it can be adopted one module at a time.

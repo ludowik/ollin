@@ -47,8 +47,13 @@ constexpr int k_max_points = 8;
 
 struct Point {
     int id = -1;
-    float x = 0.0f;
+    float x = 0.0f;      // in the space the script draws in, viewport included
     float y = 0.0f;
+    // The SCREEN position, kept beside it: a threshold expressed in real pixels — the pinch's
+    // minimum distance — must not become a fraction of a pixel because a game chose a small
+    // virtual field. Same rule as the mouse's double-click test.
+    float raw_x = 0.0f;
+    float raw_y = 0.0f;
 };
 
 Point s_prev[k_max_points];
@@ -193,6 +198,8 @@ void sample_contacts() {
         if (lifted & (1 << i))
             continue;
         Vector2 p = GetTouchPosition(i);
+        s_cur[s_cur_count].raw_x = p.x;
+        s_cur[s_cur_count].raw_y = p.y;
         gfx_view_map(&p.x, &p.y);   // a contact arrives in the space the script draws in
         s_cur[s_cur_count].id = ids[i];
         s_cur[s_cur_count].x = p.x;
@@ -234,8 +241,10 @@ void pinch_poll(VM* vm, const Value& cb) {
         a = b;
         b = t;
     }
-    float dx = s_cur[1].x - s_cur[0].x;
-    float dy = s_cur[1].y - s_cur[0].y;
+    // Measured on SCREEN: the reference distance and the minimum below which the ratio explodes are
+    // both in real pixels, and a ratio of two screen distances is what the script wants anyway.
+    float dx = s_cur[1].raw_x - s_cur[0].raw_x;
+    float dy = s_cur[1].raw_y - s_cur[0].raw_y;
     float dist = std::sqrt(dx * dx + dy * dy);
     if (dist < k_pinch_min_dist) {
         pinch_disarm();
