@@ -25,7 +25,9 @@
 ## The game has THREE states, and one variable says which: the title screen, the play, and the end.
 ## Every input asks that variable first, so no callback has to guess whether the game is running.
 ##
-## Desktop: left and right arrows, space to fire, P pauses. Mobile: ONE finger anywhere DRAGS the cannon —
+## Desktop: left and right arrows, space to fire, P pauses. On a touch screen the pause is a tap in
+## the TOP BAND, where the score is written: the rest of the screen aims, so the pause needs a place
+## of its own — and that band is the one spot no thumb visits while playing. Mobile: ONE finger anywhere DRAGS the cannon —
 ## the movement is relative, so touching the screen never teleports it — and firing is
 ## automatic — a finger that aims everywhere cannot also mean "fire" by tapping, and the one-shot
 ## rule already paces the cannon: the next shot waits for the previous one to leave the field, which
@@ -75,6 +77,7 @@ const UFO_WARBLE  = 70          ## how far the warble swings, in hertz
 const UFO_RATE    = 14.0        ## and how fast, in swings per second
 const EXTRA_LIFE  = 1500        ## a life is given each time the score passes another of these
 const BLAST_TIME  = 0.18        ## how long a kill is shown coming apart
+const PAUSE_BAND  = 20          ## the top band, in field pixels: a tap there pauses on a touch screen
 const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
 const INK     = Color(0.90, 0.95, 1.00)
@@ -573,6 +576,16 @@ func begin()
     return true
 end
 
+## A tap in the top band pauses instead of aiming. It answers the same on both input paths — a single
+## finger also emulates the mouse — so the band is read in ONE place.
+func bandTap(y)
+    if state <> "play" or y >= PAUSE_BAND then
+        return false
+    end
+    paused = not paused
+    return true
+end
+
 func keyboard.keypressed(key)
     if key == "space" then
         if not begin() then
@@ -588,9 +601,11 @@ end
 ## one being allowed in the air.
 func touch.began(id, x, y)
     touchPlay = true
+    if begin() or bandTap(y) then    ## the band pauses, and neither takes hold of the cannon
+        return
+    end
     aimId = id
     grab(x)
-    begin()
 end
 
 func touch.moved(id, x, y)
@@ -606,14 +621,20 @@ func touch.ended(id, x, y)
 end
 
 func mouse.pressed(x, y)
-    grab(x)
-    if not begin() and not touchPlay then    ## a real click, on a desktop: it fires as space does
-        fire()
+    if begin() then
+        return
     end
+    ## A finger has already been answered by touch.began, band included: the emulated click must not
+    ## pause a second time, which would undo it.
+    if touchPlay then
+        return
+    end
+    grab(x)
+    fire()                                   ## a real click, on a desktop: it fires as space does
 end
 
 func mouse.moved(x, y)
-    if mouse.isDown() then
+    if mouse.isDown() and not touchPlay then
         dragTo(x)
     end
 end
@@ -763,6 +784,7 @@ func drawTitle()
     graphics.stroke(DIM)
     graphics.text("arrows to move, space to fire, P pauses", FIELD_W / 2, 206)
     graphics.text("one finger drags the cannon, firing is automatic", FIELD_W / 2, 218)
+    graphics.text("tap the score band to pause", FIELD_W / 2, 228)
     if best > 0 then
         graphics.fontSize(8)
         graphics.stroke(INK)
@@ -848,9 +870,9 @@ func draw()
     graphics.fontSize(7)
     graphics.stroke(DIM)
     graphics.textMode("center", "bottom")
-    var hint = "arrows + space — or drag with one finger, firing is automatic"
+    var hint = "arrows + space — P pauses — or play with one finger"
     if touchPlay then
-        hint = "drag to move — firing is automatic"
+        hint = "drag to move — tap the score band to pause"
     end
     graphics.text(hint, FIELD_W / 2, FIELD_H - 3)
 
