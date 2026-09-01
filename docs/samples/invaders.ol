@@ -9,8 +9,10 @@
 ## The three creatures are drawn below, and they are ours. Only the MECHANICS are faithful to the
 ## arcade original, whose sprites are its author's work.
 ##
-## Desktop: left and right arrows, space to fire. Mobile: drag in the lower band to aim, tap the
-## field to fire.
+## Desktop: left and right arrows, space to fire. Mobile: ONE finger anywhere aims, and firing is
+## automatic — a finger that aims everywhere cannot also mean "fire" by tapping, and the one-shot
+## rule already paces the cannon: the next shot waits for the previous one to leave the field, which
+## is what a good player's thumb does anyway.
 
 const FIELD_W    = 224          ## the field, in its own pixels — graphics.viewport does the rest
 const FIELD_H    = 256
@@ -28,7 +30,6 @@ const GUN_W      = 13
 const GUN_Y      = 232
 const GUN_SPEED  = 60           ## field pixels per second
 const SHOT_SPEED = 240
-const BAND_Y     = 200          ## below this line a finger AIMS, above it a tap FIRES
 
 const INK     = Color(0.90, 0.95, 1.00)
 const GUN_INK = Color(0.35, 0.95, 0.45)
@@ -67,6 +68,7 @@ global shotY = 0
 global shotLive = false
 
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
+global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game
 global acc = 0.0
 
 func buildSprites()
@@ -183,12 +185,9 @@ end
 ## to be IDEMPOTENT: aiming twice at the same place is one aim, and firing twice is one shot, only
 ## one being allowed in the air.
 func touch.began(id, x, y)
-    if y >= BAND_Y then
-        aimId = id
-        aimAt(x)
-    else
-        fire()
-    end
+    touchPlay = true
+    aimId = id
+    aimAt(x)
 end
 
 func touch.moved(id, x, y)
@@ -204,15 +203,14 @@ func touch.ended(id, x, y)
 end
 
 func mouse.pressed(x, y)
-    if y >= BAND_Y then
-        aimAt(x)
-    else
+    aimAt(x)
+    if not touchPlay then    ## a real click, on a desktop: it fires as space does
         fire()
     end
 end
 
 func mouse.moved(x, y)
-    if mouse.isDown() and y >= BAND_Y then
+    if mouse.isDown() then
         aimAt(x)
     end
 end
@@ -223,6 +221,12 @@ func update(dt)
     end
     if keyboard.isDown("right") then
         gunX = math.min(FIELD_W - MARGIN - GUN_W, gunX + GUN_SPEED * dt)
+    end
+
+    ## Automatic once a finger has played: fire() is a no-op while a shot is in the air, so the
+    ## cadence is the shot's travel time and nothing has to time it.
+    if touchPlay then
+        fire()
     end
 
     if shotLive then
@@ -281,5 +285,9 @@ func draw()
     graphics.fontSize(7)
     graphics.stroke(DIM)
     graphics.textMode("center", "bottom")
-    graphics.text("arrows + space — or drag low to aim, tap high to fire", FIELD_W / 2, FIELD_H - 3)
+    var hint = "arrows + space — or one finger to aim, firing is automatic"
+    if touchPlay then
+        hint = "one finger aims — firing is automatic"
+    end
+    graphics.text(hint, FIELD_W / 2, FIELD_H - 3)
 end
