@@ -57,6 +57,11 @@ struct TexHandle {
     bool is_streaming = false; // a texture fed by image_push_pixels (the camera), so the CPU shadow is kept up to date
     bool pixels_open = false;
     bool gpu_dirty = false;   // the GPU was drawn into (beginDraw), so the CPU is resynced on the next pixel access
+    // The texture's rows are in OpenGL bottom-up order, which is the case only for content written
+    // by RENDERING into the framebuffer. A texture filled by UpdateTexture from the CPU shadow —
+    // image.create + setPixel, image.fromPattern — is already top-down, and flipping it on draw
+    // turned every pattern upside down.
+    bool gpu_flipped = false;
     Texture2D tex = {};
     RenderTexture2D rtt = {};
     Image cpu = {};
@@ -200,6 +205,8 @@ static void pixels_open(TexHandle& h) {
         if (h.gpu_dirty) {
             Image fresh = LoadImageFromTexture(h.rtt.texture);
             if (fresh.data) {
+                if (h.gpu_flipped)
+                    ImageFlipVertical(&fresh);   // read back in GL order, stored top-down
                 if (h.cpu.data) UnloadImage(h.cpu);
                 h.cpu = fresh;
             }
@@ -232,6 +239,7 @@ static void pixels_close(TexHandle& h) {
         UpdateTexture(h.rtt.texture, h.cpu.data);
     else
         UpdateTexture(h.tex, h.cpu.data);
+    h.gpu_flipped = false;   // uploaded from the top-down CPU shadow
     h.pixels_open = false;
 }
 
@@ -452,6 +460,7 @@ static int img_begin(CallCtx& ctx) {
         throw std::runtime_error(std::string(FN) + ": not a render texture — use image.create()");
     pixels_close(h);
     h.gpu_dirty = true;   // the GPU drawing will diverge from the CPU shadow, so it resyncs on the next pixel access
+    h.gpu_flipped = true;
     BeginTextureMode(h.rtt);
     return ctx.ret(Value{});
 }
@@ -482,8 +491,9 @@ static int img_draw(CallCtx& ctx) {
     // the tint: an explicit argument wins, otherwise the global one (graphics.tint)
     Color tint = (argc > 5 && args[5].is_map()) ? to_color(args[5]) : (s_has_tint ? s_tint : WHITE);
 
-    // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
-    float sh = h.is_render ? -(float)tex.height : (float)tex.height;
+    // A texture written by RENDERING holds its rows bottom-up (OpenGL) — negate src.height to
+    // correct. One filled from the CPU shadow is already top-down and must NOT be flipped.
+    float sh = h.gpu_flipped ? -(float)tex.height : (float)tex.height;
     Rectangle src = {0, 0, (float)tex.width, sh};
     Rectangle dst = sprite_dest(x, y, dw, dh);
     DrawTexturePro(tex, src, dst, {0, 0}, 0.0f, tint);
@@ -656,8 +666,9 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
     if (dh == 0.0f)
         dh = (float)tex.height;
 
-    // RenderTexture2D has Y-axis flipped in OpenGL — negate src.height to correct
-    float sh = h.is_render ? -(float)tex.height : (float)tex.height;
+    // A texture written by RENDERING holds its rows bottom-up (OpenGL) — negate src.height to
+    // correct. One filled from the CPU shadow is already top-down and must NOT be flipped.
+    float sh = h.gpu_flipped ? -(float)tex.height : (float)tex.height;
     Rectangle src = {0, 0, (float)tex.width, sh};
     Rectangle dst = sprite_dest(x, y, dw, dh);
     Color tint = {cr, cg, cb, ca};

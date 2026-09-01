@@ -1061,6 +1061,21 @@ toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
   fichier généré sont ceux de l'outil, et une correction serait effacée à la génération
   suivante.
 
+## Orientation verticale d'une image (`image_module.cpp`)
+
+Une texture n'est retournée que si son contenu a été écrit **par RENDU** dans le framebuffer
+(OpenGL range alors ses lignes de bas en haut). `TexHandle::gpu_flipped` porte ce fait : vrai
+depuis `image.beginDraw`, faux dès qu'un `UpdateTexture` recopie l'ombre CPU (`image.create` +
+`setPixel`, `image.fromPattern`). C'est ce drapeau, et non `is_render`, que lisent `image.draw` et
+`image_draw_sprite`. Auparavant TOUTE texture de rendu était retournée au dessin, si bien qu'un
+motif rempli côté processeur s'affichait à l'envers — constaté sur les boucliers d'`invaders.ol`,
+et vérifié dans les deux sens : une image peinte par rendu garde son sens, un aller-retour
+`beginPixels`/`endPixels` après un rendu aussi (la relecture `LoadImageFromTexture` est retournée
+quand `gpu_flipped`, pour que l'ombre CPU reste de haut en bas).
+
+Le chemin 3D n'est pas concerné : `graphics.texture` passe par `image_gl_texid`, qui ne décide
+d'aucun sens (l'atlas de tuiles est échantillonné sans retournement, cf. « Affichage 3D »).
+
 ## Viewport (résolution virtuelle, `graphics.viewport`)
 
 `graphics.viewport(w, h)` fait dessiner le script dans un champ de `w × h`, que le moteur met à
