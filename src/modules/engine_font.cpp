@@ -67,3 +67,15 @@ void engine_font_reset() {
     for (int i = 0; i < FONT_COUNT; ++i)
         s_fonts[i].ready = false;
 }
+
+// Read off a capital: 'H' has neither descender nor overshoot, so the bottom of its box IS the
+// baseline, and offsetY + height is the ascent at the atlas's own size. The fraction is the
+// fallback for a font whose 'H' cannot be found — the registry decides its fallback metric as it
+// decides its fallback font.
+float engine_font_ascent(const Font& font, float size) {
+    int i = GetGlyphIndex(font, 'H');
+    if (i < 0 || i >= font.glyphCount)
+        return size * 0.8f;
+    float ascent = (float)font.glyphs[i].offsetY + font.recs[i].height;
+    return ascent * size / (float)font.baseSize;
+}

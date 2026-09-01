@@ -21,3 +21,9 @@ void engine_font_reset();
 
 // Index of the default font, the registry entry named "sans".
 int engine_font_default();
+
+// Distance from the top of a line down to its BASELINE, at the size asked for. raylib's Font does
+// not carry it, so it is a metric of the REGISTRY rather than of any one caller: `graphics` aligns
+// text on it, and `ui` will the day a widget label has to.
+// Precondition: a loaded font (baseSize != 0), which engine_font guarantees once a context exists.
+float engine_font_ascent(const Font& font, float size);

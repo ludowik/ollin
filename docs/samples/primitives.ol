@@ -233,45 +233,42 @@ func demoText()
 end
 
 ## textMode anchors text on the two axes, and the red marks show the point given to graphics.text:
-## a vertical tick for the horizontal modes, a single line for the vertical ones. Under "baseline"
-## the letters sit ON the line and the g's tail crosses it — that is what puts two different sizes
-## on one line, which neither "top" nor "bottom" does.
+## a vertical tick for the horizontal modes, a single line for the vertical ones. Each mode is
+## paired with its position in one table, so the two can never fall out of step; the positions are
+## written out rather than strided from the index, which is how a word once landed off the canvas.
 func demoTextMode()
     label("textMode: left / center / right", 30, 512)
     g.pushStyle()
     do
         g.fontSize(ft(16))
-        ## Explicit positions rather than a stride from the index: the last one must stay inside
-        ## the drawing, and a stride is exactly how the third word ended up off the canvas.
-        var ticks = [px(205), px(295), px(385)]
-        var modes = ["left", "center", "right"]
-        for i, mode in modes do
-            var x = ticks[i]
+        for entry in [[px(205), "left"], [px(295), "center"], [px(385), "right"]] do
+            var x = entry[1]
             g.stroke(Color(1, 0.4, 0.4), fs(1))
             g.line(x, py(524), x, py(556))
             g.stroke(Color(0.9, 0.9, 1))
-            g.textMode(mode)
+            g.textMode(entry[2])
             g.text("Hxg", x, py(528))
         end
     end
     g.popStyle()
 
+    ## TWO sizes per mark, and that is the whole point: "top" lines up the tops of the boxes,
+    ## "bottom" their bottoms, and only "baseline" puts both writings on the same line.
     label("top / bottom / baseline", 425, 512)
     g.pushStyle()
     do
+        var big = ft(16)
+        var small = ft(10)
         g.stroke(Color(1, 0.4, 0.4), fs(1))
         g.line(px(425), py(548), px(690), py(548))
-        ## TWO sizes per mark, and that is the whole point: "top" lines up the tops of the boxes,
-        ## "bottom" their bottoms, and only "baseline" puts both writings on the same line.
-        var marks = [px(432), px(521), px(610)]
-        var verticals = ["top", "bottom", "baseline"]
-        for i, vertical in verticals do
-            g.stroke(Color(0.9, 0.9, 1))
-            g.textMode("left", vertical)
-            g.fontSize(ft(16))
-            g.text("Hxg", marks[i], py(548))
-            g.fontSize(ft(10))
-            g.text("Hxg", marks[i] + px(42), py(548))
+        g.stroke(Color(0.9, 0.9, 1))
+        for entry in [[px(432), "top"], [px(521), "bottom"], [px(610), "baseline"]] do
+            var x = entry[1]
+            g.textMode("left", entry[2])
+            g.fontSize(big)
+            g.text("Hxg", x, py(548))
+            g.fontSize(small)
+            g.text("Hxg", x + px(42), py(548))
         end
     end
     g.popStyle()

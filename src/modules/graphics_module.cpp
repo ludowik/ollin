@@ -339,19 +339,6 @@ static Font current_font() {
     return engine_font(s_font_idx);
 }
 
-// Distance from the top of a line down to its BASELINE, which raylib's Font does not carry. It is
-// read off a capital: 'H' has neither descender nor overshoot, so the bottom of its box IS the
-// baseline, and offsetY + height is the ascent at the atlas's own size. Scaled to the size asked
-// for. The fraction is the fallback for a font whose glyph cannot be found, where a wrong baseline
-// is better than a division by a missing box.
-static float font_ascent(const Font& font, float size) {
-    int i = GetGlyphIndex(font, 'H');
-    if (i < 0 || i >= font.glyphCount || font.baseSize == 0)
-        return size * 0.8f;
-    float ascent = (float)font.glyphs[i].offsetY + font.recs[i].height;
-    return ascent * size / (float)font.baseSize;
-}
-
 // Sub-pixel strokes: the RenderTexture has no MSAA, so a thickness below 1 renders as dots — partial
 // coverage without smoothing. We approximate anti-aliasing by keeping a CONTINUOUS 1 px stroke and
 // modulating the alpha by the coverage, that is by the thickness, giving a thin continuous line that
@@ -577,77 +564,60 @@ static int gfx_text_size(CallCtx& ctx) {
     return 2;
 }
 
-// An anchoring-mode argument: "corner" (0) or "center" (1), the values shared by the RECT_*, ELLIPSE_*
-// and SPRITE_* constants. With no argument we return to the primitive's default, which is not the same
-// for rect as for ellipse.
-static int anchor_mode_arg(CallCtx& ctx, const char* fn, int dflt) {
-    if (ctx.argc == 0)
+// A MODE argument: a name from a list, answered as its position in that list. The list also writes
+// the error messages, so the words accepted are spelled once — they were written by hand in each
+// caller, and the renaming of a single mode meant editing the comparison and two messages
+// separately. `i` is the argument's position, so a primitive anchored on two axes reads one list
+// per axis. With no argument the caller's default is returned: a mode call describes the mode in
+// full rather than half-remembering the last one.
+static int mode_arg(CallCtx& ctx, int i, const char* fn, const char* const* names, int count, int dflt) {
+    std::string expected;
+    for (int k = 0; k < count; k++)
+        expected += (k == 0 ? "\"" : (k + 1 == count ? " or \"" : ", \"")) + std::string(names[k]) + "\"";
+    if (i >= ctx.argc)
         return dflt;
-    if (!ctx.args[0].is_string())
-        throw std::runtime_error(std::string(fn) + ": expected \"corner\" or \"center\"");
-    const std::string& s = ctx.args[0].as_string();
-    if (s == "corner")
-        return 0;
-    if (s == "center")
-        return 1;
-    throw std::runtime_error(std::string(fn) + ": unknown mode '" + s + "'");
+    if (!ctx.args[i].is_string())
+        throw std::runtime_error(std::string(fn) + ": expected " + expected);
+    const std::string& given = ctx.args[i].as_string();
+    for (int k = 0; k < count; k++) {
+        if (given == names[k])
+            return k;
+    }
+    throw std::runtime_error(std::string(fn) + ": unknown mode '" + given + "' (expected " + expected + ")");
 }
 
+// The CORNER value is 0 in each of these families, and CENTER is 1, so a mode reads straight out of
+// its position in the list.
+static const char* const CORNER_CENTER[] = {"corner", "center"};
+
 static int gfx_rect_mode(CallCtx& ctx) {
-    s_rect_mode = anchor_mode_arg(ctx, "graphics.rectMode", RECT_CORNER) == 0 ? RECT_CORNER : RECT_CENTER;
+    s_rect_mode = mode_arg(ctx, 0, "graphics.rectMode", CORNER_CENTER, 2, RECT_CORNER);
     return ctx.ret(Value{});
 }
 
 static int gfx_ellipse_mode(CallCtx& ctx) {
-    s_ellipse_mode = anchor_mode_arg(ctx, "graphics.ellipseMode", ELLIPSE_CENTER) == 0 ? ELLIPSE_CORNER : ELLIPSE_CENTER;
+    s_ellipse_mode = mode_arg(ctx, 0, "graphics.ellipseMode", CORNER_CENTER, 2, ELLIPSE_CENTER);
     return ctx.ret(Value{});
 }
 
 static int gfx_sprite_mode(CallCtx& ctx) {
-    image_set_sprite_mode(anchor_mode_arg(ctx, "graphics.spriteMode", SPRITE_CORNER) == 0 ? SPRITE_CORNER
-                                                                                        : SPRITE_CENTER);
+    image_set_sprite_mode(mode_arg(ctx, 0, "graphics.spriteMode", CORNER_CENTER, 2, SPRITE_CORNER));
     return ctx.ret(Value{});
 }
 
-// Text has two axes and four names on the first, so it does not go through anchor_mode_arg: that
-// helper answers 0 or 1 and its message names only two words.
-// A call DESCRIBES the mode in full: naming only the horizontal one puts the vertical back to its
-// default, exactly as calling with no argument puts both back. Half-remembering the previous call
-// would make the same line of code mean two different things.
+// Two lists rather than one, because "corner" and "left" are the SAME anchor: the word rect and
+// sprite use keeps its meaning here. The default is therefore the first name, as for every other
+// family.
+static const char* const TEXT_H_NAMES[] = {"left", "corner", "center", "right"};
+static const int TEXT_H_VALUES[] = {TEXT_LEFT, TEXT_LEFT, TEXT_CENTER, TEXT_RIGHT};
+static const char* const TEXT_V_NAMES[] = {"top", "bottom", "baseline"};
+
 static int gfx_text_mode(CallCtx& ctx) {
-    // Read into locals FIRST: writing the state as the arguments are parsed left an invalid call
-    // having already wiped the mode in force, so a script catching the error found itself back at
-    // left/top without asking. A refused call must change nothing.
-    int horizontal = TEXT_LEFT;
-    int vertical = TEXT_TOP;
-    if (ctx.argc >= 1) {
-        if (!ctx.args[0].is_string())
-            throw std::runtime_error("graphics.textMode: expected \"corner\", \"left\", \"center\" or \"right\"");
-        const std::string& mode = ctx.args[0].as_string();
-        if (mode == "corner" || mode == "left")
-            horizontal = TEXT_LEFT;
-        else if (mode == "center")
-            horizontal = TEXT_CENTER;
-        else if (mode == "right")
-            horizontal = TEXT_RIGHT;
-        else
-            throw std::runtime_error("graphics.textMode: unknown horizontal mode '" + mode +
-                                     "' (expected \"corner\", \"left\", \"center\" or \"right\")");
-    }
-    if (ctx.argc >= 2) {
-        if (!ctx.args[1].is_string())
-            throw std::runtime_error("graphics.textMode: expected \"top\", \"bottom\" or \"baseline\"");
-        const std::string& valign = ctx.args[1].as_string();
-        if (valign == "top")
-            vertical = TEXT_TOP;
-        else if (valign == "bottom")
-            vertical = TEXT_BOTTOM;
-        else if (valign == "baseline")
-            vertical = TEXT_BASELINE;
-        else
-            throw std::runtime_error("graphics.textMode: unknown vertical mode '" + valign +
-                                     "' (expected \"top\", \"bottom\" or \"baseline\")");
-    }
+    // Both axes are read BEFORE either is written: writing as the arguments were parsed left an
+    // invalid call having already wiped the mode in force, so a script catching the error found
+    // itself back at left/top without asking. A refused call must change nothing.
+    int horizontal = TEXT_H_VALUES[mode_arg(ctx, 0, "graphics.textMode", TEXT_H_NAMES, 4, 0)];
+    int vertical = mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 3, TEXT_TOP);
     s_text_mode = horizontal;
     s_text_valign = vertical;
     return ctx.ret(Value{});
@@ -912,8 +882,10 @@ static int gfx_text(CallCtx& ctx) {
     std::string text = drawn_text(args, argc, 0);
     float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)tx, (float)ty};
-    // The anchors cost a measurement, so it is only paid for when one of them is asked for.
-    if (s_text_mode != TEXT_LEFT || s_text_valign != TEXT_TOP) {
+    // Only the anchors that need the text MEASURED pay for it: measuring walks the whole string,
+    // and a baseline needs the font's ascent alone. Guarding both axes at once made "left" plus
+    // "baseline" — what the Primitives sample uses — measure for nothing.
+    if (s_text_mode != TEXT_LEFT || s_text_valign == TEXT_BOTTOM) {
         Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, spacing);
         if (s_text_mode == TEXT_CENTER)
             pos.x -= size.x / 2.0f;
@@ -921,9 +893,9 @@ static int gfx_text(CallCtx& ctx) {
             pos.x -= size.x;
         if (s_text_valign == TEXT_BOTTOM)
             pos.y -= size.y;
-        else if (s_text_valign == TEXT_BASELINE)
-            pos.y -= font_ascent(font, s_font_size);
     }
+    if (s_text_valign == TEXT_BASELINE)
+        pos.y -= engine_font_ascent(font, s_font_size);
     DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
     return ctx.ret(Value{});
 }
