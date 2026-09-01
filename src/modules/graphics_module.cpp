@@ -294,13 +294,18 @@ static int s_font_idx = engine_font_default();
 static const int RECT_CORNER = 0;
 static const int RECT_CENTER = 1;
 static int s_rect_mode = RECT_CORNER;
-// Anchoring for text, HORIZONTAL only: x is the left edge, the middle, or the right edge, while y
-// stays the top of the line. "corner" is accepted as a synonym of "left", so the word used by rect
-// and sprite keeps its meaning here.
+// Anchoring for text, on the two axes separately: x is the left edge, the middle or the right edge,
+// y is the top of the line, its bottom, or the BASELINE — the line the letters sit on, which is
+// what one aligns text to when mixing sizes. "corner" is accepted as a synonym of "left", so the
+// word used by rect and sprite keeps its meaning here.
 static const int TEXT_LEFT = 0;
 static const int TEXT_CENTER = 1;
 static const int TEXT_RIGHT = 2;
 static int s_text_mode = TEXT_LEFT;
+static const int TEXT_TOP = 0;
+static const int TEXT_BOTTOM = 1;
+static const int TEXT_BASELINE = 2;
+static int s_text_valign = TEXT_TOP;
 // Anchoring for circle and ellipse. Those primitives have always been centred, so the default stays
 // "center", unlike rect.
 static const int ELLIPSE_CORNER = 0;
@@ -332,6 +337,19 @@ static void apply_font_size(float sz) {
 // Font used for text drawing, as chosen by the script.
 static Font current_font() {
     return engine_font(s_font_idx);
+}
+
+// Distance from the top of a line down to its BASELINE, which raylib's Font does not carry. It is
+// read off a capital: 'H' has neither descender nor overshoot, so the bottom of its box IS the
+// baseline, and offsetY + height is the ascent at the atlas's own size. Scaled to the size asked
+// for. The fraction is the fallback for a font whose glyph cannot be found, where a wrong baseline
+// is better than a division by a missing box.
+static float font_ascent(const Font& font, float size) {
+    int i = GetGlyphIndex(font, 'H');
+    if (i < 0 || i >= font.glyphCount || font.baseSize == 0)
+        return size * 0.8f;
+    float ascent = (float)font.glyphs[i].offsetY + font.recs[i].height;
+    return ascent * size / (float)font.baseSize;
 }
 
 // Sub-pixel strokes: the RenderTexture has no MSAA, so a thickness below 1 renders as dots — partial
@@ -406,6 +424,7 @@ struct StyleState {
     int ellipse_mode;
     int sprite_mode;
     int   text_mode;
+    int   text_valign;
     bool  has_stroke;
     Color stroke_color;
     bool  has_fill;
@@ -427,6 +446,7 @@ static StyleState capture_style() {
     s.ellipse_mode = s_ellipse_mode;
     s.sprite_mode = image_get_sprite_mode();
     s.text_mode = s_text_mode;
+    s.text_valign = s_text_valign;
     s.has_stroke = s_has_stroke;
     s.stroke_color = s_stroke_color;
     s.has_fill = s_has_fill;
@@ -446,6 +466,7 @@ static void restore_style(const StyleState& s) {
     s_ellipse_mode = s.ellipse_mode;
     image_set_sprite_mode(s.sprite_mode);
     s_text_mode = s.text_mode;
+    s_text_valign = s.text_valign;
     s_has_stroke = s.has_stroke;
     s_stroke_color = s.stroke_color;
     s_has_fill = s.has_fill;
@@ -465,6 +486,7 @@ static void reset_styles() {
     s_ellipse_mode = ELLIPSE_CENTER;
     image_set_sprite_mode(SPRITE_CORNER);
     s_text_mode = TEXT_LEFT;
+    s_text_valign = TEXT_TOP;
     apply_stroke(true, WHITE);
     apply_fill(false);
     image_set_tint(false, 255, 255, 255, 255);   // no tint by default; like fill and stroke, it is reset every frame
@@ -587,13 +609,16 @@ static int gfx_sprite_mode(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// Text has THREE anchors and two names for one of them, so it does not go through
-// anchor_mode_arg: that helper answers 0 or 1 and its message names only two words.
+// Text has two axes and four names on the first, so it does not go through anchor_mode_arg: that
+// helper answers 0 or 1 and its message names only two words.
+// A call DESCRIBES the mode in full: naming only the horizontal one puts the vertical back to its
+// default, exactly as calling with no argument puts both back. Half-remembering the previous call
+// would make the same line of code mean two different things.
 static int gfx_text_mode(CallCtx& ctx) {
-    if (ctx.argc == 0) {
-        s_text_mode = TEXT_LEFT;
+    s_text_mode = TEXT_LEFT;
+    s_text_valign = TEXT_TOP;
+    if (ctx.argc == 0)
         return ctx.ret(Value{});
-    }
     if (!ctx.args[0].is_string())
         throw std::runtime_error("graphics.textMode: expected \"corner\", \"left\", \"center\" or \"right\"");
     const std::string& mode = ctx.args[0].as_string();
@@ -604,7 +629,22 @@ static int gfx_text_mode(CallCtx& ctx) {
     else if (mode == "right")
         s_text_mode = TEXT_RIGHT;
     else
-        throw std::runtime_error("graphics.textMode: unknown mode '" + mode + "'");
+        throw std::runtime_error("graphics.textMode: unknown horizontal mode '" + mode +
+                                 "' (expected \"corner\", \"left\", \"center\" or \"right\")");
+    if (ctx.argc < 2)
+        return ctx.ret(Value{});
+    if (!ctx.args[1].is_string())
+        throw std::runtime_error("graphics.textMode: expected \"top\", \"bottom\" or \"line\"");
+    const std::string& valign = ctx.args[1].as_string();
+    if (valign == "top")
+        s_text_valign = TEXT_TOP;
+    else if (valign == "bottom")
+        s_text_valign = TEXT_BOTTOM;
+    else if (valign == "line")
+        s_text_valign = TEXT_BASELINE;
+    else
+        throw std::runtime_error("graphics.textMode: unknown vertical mode '" + valign +
+                                 "' (expected \"top\", \"bottom\" or \"line\")");
     return ctx.ret(Value{});
 }
 
@@ -867,10 +907,17 @@ static int gfx_text(CallCtx& ctx) {
     std::string text = drawn_text(args, argc, 0);
     float spacing = s_font_size / (float)font.baseSize;
     Vector2 pos = {(float)tx, (float)ty};
-    // The horizontal anchor costs a measurement, so it is only paid for when it is asked for.
-    if (s_text_mode != TEXT_LEFT) {
-        float width = MeasureTextEx(font, text.c_str(), s_font_size, spacing).x;
-        pos.x -= s_text_mode == TEXT_CENTER ? width / 2.0f : width;
+    // The anchors cost a measurement, so it is only paid for when one of them is asked for.
+    if (s_text_mode != TEXT_LEFT || s_text_valign != TEXT_TOP) {
+        Vector2 size = MeasureTextEx(font, text.c_str(), s_font_size, spacing);
+        if (s_text_mode == TEXT_CENTER)
+            pos.x -= size.x / 2.0f;
+        else if (s_text_mode == TEXT_RIGHT)
+            pos.x -= size.x;
+        if (s_text_valign == TEXT_BOTTOM)
+            pos.y -= size.y;
+        else if (s_text_valign == TEXT_BASELINE)
+            pos.y -= font_ascent(font, s_font_size);
     }
     DrawTextEx(font, text.c_str(), pos, s_font_size, spacing, s_stroke_color);
     return ctx.ret(Value{});
