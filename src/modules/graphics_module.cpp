@@ -615,36 +615,41 @@ static int gfx_sprite_mode(CallCtx& ctx) {
 // default, exactly as calling with no argument puts both back. Half-remembering the previous call
 // would make the same line of code mean two different things.
 static int gfx_text_mode(CallCtx& ctx) {
-    s_text_mode = TEXT_LEFT;
-    s_text_valign = TEXT_TOP;
-    if (ctx.argc == 0)
-        return ctx.ret(Value{});
-    if (!ctx.args[0].is_string())
-        throw std::runtime_error("graphics.textMode: expected \"corner\", \"left\", \"center\" or \"right\"");
-    const std::string& mode = ctx.args[0].as_string();
-    if (mode == "corner" || mode == "left")
-        s_text_mode = TEXT_LEFT;
-    else if (mode == "center")
-        s_text_mode = TEXT_CENTER;
-    else if (mode == "right")
-        s_text_mode = TEXT_RIGHT;
-    else
-        throw std::runtime_error("graphics.textMode: unknown horizontal mode '" + mode +
-                                 "' (expected \"corner\", \"left\", \"center\" or \"right\")");
-    if (ctx.argc < 2)
-        return ctx.ret(Value{});
-    if (!ctx.args[1].is_string())
-        throw std::runtime_error("graphics.textMode: expected \"top\", \"bottom\" or \"baseline\"");
-    const std::string& valign = ctx.args[1].as_string();
-    if (valign == "top")
-        s_text_valign = TEXT_TOP;
-    else if (valign == "bottom")
-        s_text_valign = TEXT_BOTTOM;
-    else if (valign == "baseline")
-        s_text_valign = TEXT_BASELINE;
-    else
-        throw std::runtime_error("graphics.textMode: unknown vertical mode '" + valign +
-                                 "' (expected \"top\", \"bottom\" or \"baseline\")");
+    // Read into locals FIRST: writing the state as the arguments are parsed left an invalid call
+    // having already wiped the mode in force, so a script catching the error found itself back at
+    // left/top without asking. A refused call must change nothing.
+    int horizontal = TEXT_LEFT;
+    int vertical = TEXT_TOP;
+    if (ctx.argc >= 1) {
+        if (!ctx.args[0].is_string())
+            throw std::runtime_error("graphics.textMode: expected \"corner\", \"left\", \"center\" or \"right\"");
+        const std::string& mode = ctx.args[0].as_string();
+        if (mode == "corner" || mode == "left")
+            horizontal = TEXT_LEFT;
+        else if (mode == "center")
+            horizontal = TEXT_CENTER;
+        else if (mode == "right")
+            horizontal = TEXT_RIGHT;
+        else
+            throw std::runtime_error("graphics.textMode: unknown horizontal mode '" + mode +
+                                     "' (expected \"corner\", \"left\", \"center\" or \"right\")");
+    }
+    if (ctx.argc >= 2) {
+        if (!ctx.args[1].is_string())
+            throw std::runtime_error("graphics.textMode: expected \"top\", \"bottom\" or \"baseline\"");
+        const std::string& valign = ctx.args[1].as_string();
+        if (valign == "top")
+            vertical = TEXT_TOP;
+        else if (valign == "bottom")
+            vertical = TEXT_BOTTOM;
+        else if (valign == "baseline")
+            vertical = TEXT_BASELINE;
+        else
+            throw std::runtime_error("graphics.textMode: unknown vertical mode '" + valign +
+                                     "' (expected \"top\", \"bottom\" or \"baseline\")");
+    }
+    s_text_mode = horizontal;
+    s_text_valign = vertical;
     return ctx.ret(Value{});
 }
 
