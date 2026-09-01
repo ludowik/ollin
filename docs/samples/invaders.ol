@@ -324,6 +324,7 @@ func startGame()
     hushUfo()
     popup = nil
     marchStep = 0
+    acc = 0.0        ## the previous game's leftover would be spent on this one's first frame
     newWave()
 end
 
@@ -460,8 +461,9 @@ func bombsFall(dt)
             return
         end
         ## A bomb and the cannon's shot cancel each other: two things crossing in the same lane
-        ## cannot pass through one another.
-        if shotLive and math.abs(b.x - shotX) <= 2 and math.abs(b.y - shotY) <= 4 then
+        ## cannot pass through one another. A bomb already stopped by a shield is spent, and must not
+        ## take a shot down with it.
+        if not gone and shotLive and math.abs(b.x - shotX) <= 2 and math.abs(b.y - shotY) <= 4 then
             shotLive = false
             gone = true
         end
@@ -827,9 +829,6 @@ func draw()
     for b in bombs do
         graphics.sprite(bombImgs[1 + (ticks // 6) % 2], b.x - 1, b.y, 3, 4)
     end
-    graphics.noTint()
-
-    graphics.tint(INK)
     for b in bursts do
         graphics.sprite(burstImg, b.x, b.y, 10, 7)
     end
