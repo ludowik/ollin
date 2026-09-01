@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 15:01</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 19:42</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 15:01</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 19:42</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2119,6 +2119,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>func mouse.moved(x, y)</code></td><td>The pointer moved</td></tr>
     <tr><td><code>func mouse.scrolled(x, y, dx, dy)</code></td><td>The wheel, or a pinch — a positive <code>dy</code> means upwards</td></tr>
     <tr><td><code>func mouse.doubleClicked(x, y)</code></td><td>A double click: two presses within 300 ms at the same place — the first press stays invisible to <code>mouse.pressed</code></td></tr>
+    <tr><td><code>mouse.position()</code></td><td>Two values, <code>x, y</code>: where the pointer is <strong>now</strong>, in the same frame the callbacks use. Asked, not waited for.</td></tr>
+    <tr><td><code>mouse.isDown([button])</code></td><td><code>true</code> while the button is held — <code>"left"</code> (the default), <code>"right"</code> or <code>"middle"</code>. It answers what a script used to mirror by hand, raising a flag on <code>pressed</code> and lowering it on <code>released</code>; <code>keyboard.isDown</code> never had that gap.</td></tr>
   </tbody>
 </table>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">260</span>, <span class="num">160</span>, <span class="str">"mouse"</span>)  <span class="cmt">## click inside the canvas</span>

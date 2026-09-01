@@ -1,7 +1,9 @@
 #include "mouse_module.h"
+#include "module_utils.h"
 #include "value.h"
 #include "vm.h"
 #include <raylib.h>
+#include <stdexcept>
 #include <string>
 #include <cmath>
 
@@ -15,6 +17,13 @@
 // Detection happens in mouse_poll(), called once per frame by the render loop
 // loop (graphics_module.cpp), so the pointer only works during a
 // graphics.run(...) — or through the automatically called draw function.
+//
+// Two things can also be ASKED, rather than waited for:
+//   mouse.position()      → x, y
+//   mouse.isDown([button]) → true while the button is held
+// Without them a script had to mirror the engine's own state — set a flag on `pressed`, clear it
+// on `released` — to answer "is the pointer dragging", which is a question the engine already
+// knows the answer to. `keyboard.isDown` had no such gap.
 
 static float s_last_click_time = -1.0f;
 static int   s_last_click_x    = -9999;
@@ -91,6 +100,33 @@ void mouse_poll(bool click_taken) {
     }
 }
 
+// The pointer's position, in the graphics area's logical coordinates — the same the callbacks
+// receive, so a script can mix the two without converting anything.
+static int mouse_position(CallCtx& ctx) {
+    ctx.set_result(0, Value((int64_t)GetMouseX()));
+    ctx.set_result(1, Value((int64_t)GetMouseY()));
+    return 2;
+}
+
+static int mouse_is_down(CallCtx& ctx) {
+    int button = MOUSE_BUTTON_LEFT;
+    if (ctx.argc >= 1) {
+        if (!ctx.args[0].is_string())
+            throw std::runtime_error("mouse.isDown: expected \"left\", \"right\" or \"middle\"");
+        const std::string& name = ctx.args[0].as_string();
+        if (name == "left")
+            button = MOUSE_BUTTON_LEFT;
+        else if (name == "right")
+            button = MOUSE_BUTTON_RIGHT;
+        else if (name == "middle")
+            button = MOUSE_BUTTON_MIDDLE;
+        else
+            throw std::runtime_error("mouse.isDown: unknown button '" + name +
+                                     "' (expected \"left\", \"right\" or \"middle\")");
+    }
+    return ctx.ret(Value::make_bool(IsMouseButtonDown(button)));
+}
+
 // A new program must not inherit a button left "down" by the previous one, and the
 // statics outlive the VM (the playground).
 void mouse_reset() {
@@ -98,8 +134,11 @@ void mouse_reset() {
     s_last_click_time = -1.0f;
 }
 
-// The `mouse` module is an empty map: the user assigns pressed, released and moved to it, and
-// mouse_poll reads them.
+// The user assigns pressed, released and moved to this map, and mouse_poll reads them back; the
+// two accessors are what the module offers on its own.
 Value make_mouse_module() {
-    return Value::make_map();
+    return MapBuilder()
+        .fn("position", mouse_position)
+        .fn("isDown", mouse_is_down)
+        .done();
 }
