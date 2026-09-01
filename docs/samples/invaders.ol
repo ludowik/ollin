@@ -27,6 +27,12 @@ const FLEET_Y    = 40
 const WAVE_DROP  = 8            ## how much lower each wave starts, and each descent falls
 const STEP_X     = 2            ## how far one alien advances
 const MARGIN     = 8            ## the walls the fleet turns at
+const SHIELD_Y     = 192        ## the four shields, between the fleet and the cannon
+const SHIELD_X0    = 26
+const SHIELD_PITCH = 56
+const SHIELD_W     = 22
+const SHIELD_H     = 16
+const BLAST        = 3          ## the radius a hit eats out of a shield
 const GUN_W      = 13
 const GUN_Y      = 232
 const GUN_SPEED  = 60           ## field pixels per second
@@ -34,6 +40,7 @@ const SHOT_SPEED = 240
 
 const INK     = Color(0.90, 0.95, 1.00)
 const GUN_INK = Color(0.35, 0.95, 0.45)
+const SHIELD_INK = Color(0.30, 0.85, 0.40)
 const TOP_INK = Color(1.00, 0.45, 0.45)
 const DIM     = Color(0.55, 0.60, 0.72)
 
@@ -47,12 +54,33 @@ const SPIDR_A = ["#......#", ".#....#.", "..####..", ".######.", "..####..", ".#
 const SPIDR_B = [".#....#.", "..#..#..", "..####..", ".######.", "..####..", ".#.##.#.", "#......#"]
 const MOTH_A  = ["##....##", "##.##.##", ".######.", "..####..", "..#..#..", ".#....#."]
 const MOTH_B  = ["#......#", "##.##.##", "########", ".######.", "..#..#..", "#......#"]
+## Our own arch: what matters is that it is a TEXTURE, eaten pixel by pixel, and not a rectangle
+## that would vanish whole.
+const SHIELD = [
+    "......##########......",
+    "....##############....",
+    "...################...",
+    "..##################..",
+    ".####################.",
+    "######################",
+    "######################",
+    "######################",
+    "######################",
+    "######################",
+    "######################",
+    "#########....#########",
+    "########......########",
+    "#######........#######",
+    "######..........######",
+    "#####............#####"
+]
 const CANNON  = ["......#......", ".....###.....", ".....###.....", "#############", "#############"]
 
 ## One entry per kind: its two frames, what killing it is worth, its colour. The kind comes from the
 ## ROW, so the fleet's shape decides the score.
 global kinds = []
 global gunImg = nil
+global shields = []      ## four {img, x}: each one its own texture, so each erodes on its own
 
 global fleet = []        ## 55 entries {x, y, kind, alive}
 global cursor = 1        ## the alien the next tick advances
@@ -83,6 +111,43 @@ func buildSprites()
     gunImg = image.fromPattern(CANNON)
 end
 
+## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
+## arches — and the erosion of the previous one is genuinely gone, the textures being new.
+func buildShields()
+    shields = []
+    for i = 1, 4 do
+        shields.push({img: image.fromPattern(SHIELD), x: SHIELD_X0 + (i - 1) * SHIELD_PITCH})
+    end
+end
+
+## Eats a disc out of a shield, in the texture's own coordinates. The jitter keeps two hits at the
+## same spot from cutting the same clean circle twice.
+func erode(sh, cx, cy, radius)
+    image.beginPixels(sh.img)
+    for dy = -radius, radius do
+        for dx = -radius, radius do
+            if dx * dx + dy * dy <= radius * radius + math.randInt(0, radius) then
+                image.setPixel(sh.img, cx + dx, cy + dy, 0, 0, 0, 0)
+            end
+        end
+    end
+    image.endPixels(sh.img)
+end
+
+## The first shield whose SOLID pixel is under (x, y) — a hole is passed through, which is the whole
+## point of eroding a texture rather than shrinking a box.
+func shieldAt(x, y)
+    for sh in shields do
+        if x >= sh.x and x < sh.x + SHIELD_W and y >= SHIELD_Y and y < SHIELD_Y + SHIELD_H then
+            var r, g, b, a = image.getPixel(sh.img, x - sh.x, y - SHIELD_Y)
+            if a > 0.5 then
+                return sh
+            end
+        end
+    end
+    return nil
+end
+
 ## The fleet is stored bottom row first, left to right — the order the ticks advance it in, so the
 ## wave ripples upwards as it did on the original hardware.
 func newWave()
@@ -103,6 +168,7 @@ func newWave()
             })
         end
     end
+    buildShields()
     alive = #fleet
     cursor = 1
     heading = 1
@@ -139,6 +205,14 @@ func fleetTick()
             a.x = a.x + STEP_X * heading
             if a.x <= MARGIN or a.x + 8 >= FIELD_W - MARGIN then
                 turning = true
+            end
+            ## Descended onto a shield, it eats its way through: the arch is no shelter once the
+            ## fleet is level with it.
+            for sh in shields do
+                if a.x + 8 > sh.x and a.x < sh.x + SHIELD_W
+                   and a.y + 8 > SHIELD_Y and a.y < SHIELD_Y + SHIELD_H then
+                    erode(sh, a.x + 4 - sh.x, a.y + 4 - SHIELD_Y, 5)
+                end
             end
             return
         end
@@ -250,7 +324,11 @@ func update(dt)
 
     if shotLive then
         shotY -= SHOT_SPEED * dt
-        if shotY < MARGIN or shotHits() then
+        var hit = shieldAt(shotX, shotY)
+        if hit <> nil then
+            erode(hit, shotX - hit.x, shotY - SHIELD_Y, BLAST)
+            shotLive = false
+        elseif shotY < MARGIN or shotHits() then
             shotLive = false
         end
     end
@@ -279,6 +357,11 @@ func draw()
             graphics.tint(k.ink)
             graphics.sprite(k.frames[frame], a.x, a.y, 8, 8)
         end
+    end
+
+    graphics.tint(SHIELD_INK)
+    for sh in shields do
+        graphics.sprite(sh.img, sh.x, SHIELD_Y, SHIELD_W, SHIELD_H)
     end
 
     graphics.tint(GUN_INK)
