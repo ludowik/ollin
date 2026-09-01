@@ -1,5 +1,5 @@
 ## Ollin Invaders — the fleet, the cannon, one shot, the shields, the fleet shooting back, the
-## mystery ship crossing above it, and the sound.
+## mystery ship crossing above it, the sound, and a title screen to start from.
 ##
 ## The RULE that makes this genre work, and the one most often missed: the fleet does not move as a
 ## block. ONE alien advances per tick. Fifty-five aliens therefore take fifty-five ticks to complete
@@ -22,7 +22,10 @@
 ## on its own as the wave empties — the same rule that drives the movement drives the music, and
 ## nothing times it.
 ##
-## Desktop: left and right arrows, space to fire. Mobile: ONE finger anywhere DRAGS the cannon —
+## The game has THREE states, and one variable says which: the title screen, the play, and the end.
+## Every input asks that variable first, so no callback has to guess whether the game is running.
+##
+## Desktop: left and right arrows, space to fire, P pauses. Mobile: ONE finger anywhere DRAGS the cannon —
 ## the movement is relative, so touching the screen never teleports it — and firing is
 ## automatic — a finger that aims everywhere cannot also mean "fire" by tapping, and the one-shot
 ## rule already paces the cannon: the next shot waits for the previous one to leave the field, which
@@ -70,6 +73,8 @@ const MARCH_NOTES = [110, 98, 87, 78]
 const UFO_HUM     = 220         ## the mystery ship's tone, warbled while it crosses
 const UFO_WARBLE  = 70          ## how far the warble swings, in hertz
 const UFO_RATE    = 14.0        ## and how fast, in swings per second
+const EXTRA_LIFE  = 1500        ## a life is given each time the score passes another of these
+const BLAST_TIME  = 0.18        ## how long a kill is shown coming apart
 const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
 const INK     = Color(0.90, 0.95, 1.00)
@@ -109,6 +114,16 @@ const SHIELD = [
     "#####............#####"
 ]
 const CANNON  = ["......#......", ".....###.....", ".....###.....", "#############", "#############"]
+## What is left of an alien for a fraction of a second: pieces flying apart, not a cloud.
+const BURST = [
+    "#..#..#..#",
+    ".#.#..#.#.",
+    "..#.##.#..",
+    "#..####..#",
+    "..#.##.#..",
+    ".#.#..#.#.",
+    "#..#..#..#"
+]
 ## The bomb turns as it falls, which is how a falling thing reads at three pixels wide.
 ## Our own saucer: wide, flat, and lit underneath — nothing of the fleet's silhouette, since it is
 ## not one of them.
@@ -149,7 +164,6 @@ global shotLive = false
 global bombs = []        ## up to BOMB_MAX {x, y}
 global lives = LIVES
 global respawn = 0.0     ## > 0: the cannon was hit, and the field holds still
-global over = false      ## the last life is gone, or the fleet landed: a press starts a new game
 global ticks = 0         ## logical ticks, which is what makes the bomb sprite turn
 
 global ufo = nil         ## {x, dir} while it crosses, nil between crossings
@@ -170,6 +184,13 @@ global sndUfo   = nil
 global ufoVoice = nil
 global marchStep = 0     ## which of the four notes the next pass plays
 
+global state = "title"   ## "title", "play" or "over": every input asks this first
+global paused = false
+global bursts = []       ## {x, y, left}: the kills still coming apart
+global nextLife = EXTRA_LIFE
+global burstImg = nil
+global demo = 0.0        ## the title screen's own clock, which animates the three creatures
+
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
 global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game
 global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
@@ -185,6 +206,7 @@ func buildSprites()
     gunImg = image.fromPattern(CANNON)
     bombImgs = [image.fromPattern(BOMB_A), image.fromPattern(BOMB_B)]
     ufoImg = image.fromPattern(UFO)
+    burstImg = image.fromPattern(BURST)
 end
 
 ## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
@@ -283,12 +305,15 @@ func startGame()
     wave = 1
     score = 0
     lives = LIVES
-    over = false
     respawn = 0.0
     ticks = 0
     gunX = FIELD_W / 2 - GUN_W / 2
+    state = "play"
+    paused = false
     shotLive = false
     bombs = []
+    bursts = []
+    nextLife = EXTRA_LIFE
     shots = 0
     ufo = nil
     ufoWait = UFO_PERIOD
@@ -313,11 +338,22 @@ func ufoValue()
     return UFO_VALUES[1 + shots % #UFO_VALUES]
 end
 
+## A life every EXTRA_LIFE points, and the threshold moves up: crossing it twice in one hit still
+## gives one life, which is what the original did.
 func addScore(points)
     score += points
     if score > best then
         best = score
     end
+    if score >= nextLife then
+        lives += 1
+        nextLife += EXTRA_LIFE
+        showPopup("EXTRA LIFE", FIELD_W / 2, GUN_Y - 24)
+    end
+end
+
+func showBurst(x, y)
+    bursts.push({x: x, y: y, left: BLAST_TIME})
 end
 
 func showPopup(text, x, y)
@@ -357,6 +393,7 @@ func ufoHit()
     end
     var points = ufoValue()
     sndUfo.play()
+    showBurst(ufo.x + 3, UFO_Y)
     hushUfo()
     addScore(points)
     showPopup("{points}", ufo.x + UFO_W / 2, UFO_Y + 3)
@@ -394,13 +431,14 @@ end
 ## and a fresh one must not walk into them.
 func hitCannon()
     sndGun.play()
+    showBurst(gunX + 1, GUN_Y - 1)
     hushUfo()
     bombs = []
     shotLive = false
     lives -= 1
     respawn = RESPAWN
     if lives <= 0 then
-        over = true
+        state = "over"
     end
 end
 
@@ -487,6 +525,7 @@ func shotHits()
             a.alive = false
             alive -= 1
             sndAlien.play()
+            showBurst(a.x - 1, a.y)
             addScore(kinds[a.kind].points)
             return true
         end
@@ -520,15 +559,27 @@ graphics.canvas(W, H, "Ollin Invaders")
 graphics.viewport(FIELD_W, FIELD_H)
 buildSprites()
 buildSounds()
-startGame()
+## The field is laid out but not started: the title screen holds it, and its fleet is the one the
+## first wave will march — nothing is built twice.
+newWave()
+
+## Any press means "go" on the title screen and on the end screen, and only fires while playing.
+## One place decides that, so the four input paths below say the same thing.
+func begin()
+    if state == "play" then
+        return false
+    end
+    startGame()
+    return true
+end
 
 func keyboard.keypressed(key)
     if key == "space" then
-        if over then
-            startGame()
-        else
+        if not begin() then
             fire()
         end
+    elseif key == "p" and state == "play" then
+        paused = not paused
     end
 end
 
@@ -539,9 +590,7 @@ func touch.began(id, x, y)
     touchPlay = true
     aimId = id
     grab(x)
-    if over then
-        startGame()
-    end
+    begin()
 end
 
 func touch.moved(id, x, y)
@@ -558,9 +607,7 @@ end
 
 func mouse.pressed(x, y)
     grab(x)
-    if over then
-        startGame()
-    elseif not touchPlay then    ## a real click, on a desktop: it fires as space does
+    if not begin() and not touchPlay then    ## a real click, on a desktop: it fires as space does
         fire()
     end
 end
@@ -571,8 +618,27 @@ func mouse.moved(x, y)
     end
 end
 
+## The bursts fade on their own clock: they are shown after the thing that made them is gone, so
+## they belong to no other state.
+func burstsFade(dt)
+    var i = 1
+    while i <= #bursts do
+        bursts[i].left -= dt
+        if bursts[i].left <= 0.0 then
+            bursts.delete(i)
+        else
+            i += 1
+        end
+    end
+end
+
 func update(dt)
-    if over then
+    burstsFade(dt)
+    if state == "title" then
+        demo += dt
+        return
+    end
+    if state == "over" or paused then
         return
     end
 
@@ -619,7 +685,7 @@ func update(dt)
     end
 
     bombsFall(dt)
-    if respawn > 0.0 or over then     ## the cannon was just hit: this frame is over
+    if respawn > 0.0 or state == "over" then     ## the cannon was just hit: this frame is over
         return
     end
 
@@ -640,7 +706,7 @@ func update(dt)
         if a.alive and a.y + 8 >= GUN_Y then
             lives = 0
             hitCannon()
-            over = true
+            state = "over"
             return
         end
     end
@@ -651,7 +717,65 @@ func update(dt)
     end
 end
 
+## The title screen shows what the three creatures are worth — the score table the cabinet carried,
+## and the only place the player is ever told. The frames alternate on the screen's own clock, so the
+## fleet is seen marching before a shot is fired.
+func drawTitle()
+    graphics.clear(Color(0.02, 0.03, 0.05))
+    ## The two frames alternate every four tenths of a second — an integer index, since a fractional
+    ## one cannot address an array.
+    var f = 1
+    if math.frac(demo * 1.25) >= 0.5 then
+        f = 2
+    end
+
+    graphics.fontSize(20)
+    graphics.stroke(GUN_INK)
+    graphics.textMode("center", "center")
+    graphics.text("OLLIN INVADERS", FIELD_W / 2, 52)
+    graphics.fontSize(8)
+    graphics.stroke(DIM)
+    graphics.text("*SCORE ADVANCE TABLE*", FIELD_W / 2, 78)
+
+    for i = 1, #kinds do
+        var y = 96 + (i - 1) * 20
+        graphics.tint(kinds[i].ink)
+        graphics.sprite(kinds[i].frames[f], FIELD_W / 2 - 34, y - 4, 8, 8)
+        graphics.noTint()
+        graphics.fontSize(9)
+        graphics.stroke(INK)
+        graphics.textMode("left", "center")
+        graphics.text("= {kinds[i].points} POINTS", FIELD_W / 2 - 20, y)
+    end
+    graphics.tint(TOP_INK)
+    graphics.sprite(ufoImg, FIELD_W / 2 - 38, 152, UFO_W, UFO_H)
+    graphics.noTint()
+    graphics.fontSize(9)
+    graphics.stroke(INK)
+    graphics.textMode("left", "center")
+    graphics.text("= MYSTERY", FIELD_W / 2 - 20, 156)
+
+    graphics.fontSize(9)
+    graphics.stroke(GUN_INK)
+    graphics.textMode("center", "center")
+    graphics.text("PRESS SPACE OR TAP TO PLAY", FIELD_W / 2, 190)
+    graphics.fontSize(7)
+    graphics.stroke(DIM)
+    graphics.text("arrows to move, space to fire, P pauses", FIELD_W / 2, 206)
+    graphics.text("one finger drags the cannon, firing is automatic", FIELD_W / 2, 218)
+    if best > 0 then
+        graphics.fontSize(8)
+        graphics.stroke(INK)
+        graphics.text("BEST {best}", FIELD_W / 2, 236)
+    end
+end
+
 func draw()
+    if state == "title" then
+        drawTitle()
+        return
+    end
+
     graphics.clear(Color(0.02, 0.03, 0.05))
 
     for a in fleet do
@@ -680,6 +804,12 @@ func draw()
     graphics.tint(INK)
     for b in bombs do
         graphics.sprite(bombImgs[1 + (ticks // 6) % 2], b.x - 1, b.y, 3, 4)
+    end
+    graphics.noTint()
+
+    graphics.tint(INK)
+    for b in bursts do
+        graphics.sprite(burstImg, b.x, b.y, 10, 7)
     end
     graphics.noTint()
 
@@ -724,7 +854,14 @@ func draw()
     end
     graphics.text(hint, FIELD_W / 2, FIELD_H - 3)
 
-    if over then
+    if paused then
+        graphics.fontSize(12)
+        graphics.stroke(GUN_INK)
+        graphics.textMode("center", "center")
+        graphics.text("PAUSED", FIELD_W / 2, 150)
+    end
+
+    if state == "over" then
         graphics.fontSize(14)
         graphics.stroke(TOP_INK)
         graphics.textMode("center", "center")
