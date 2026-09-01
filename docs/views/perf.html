@@ -131,6 +131,18 @@
     .method { color: var(--text-dim); font-size: 12.5px; margin-top: 24px; }
     .method code { font-family: var(--mono); }
     #problem { color: var(--rise); font-size: 13px; margin-top: 18px; }
+    /* The outline is what identifies a button here, hence --border-strong and not --border. */
+    #audio-test {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 7px 13px;
+      font: 500 13px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      cursor: pointer;
+    }
+    #audio-test:hover { border-color: var(--accent); }
+    #audio-said { color: var(--text-dim); font-size: 12.5px; margin-left: 8px; }
   </style>
 
 <div id="perf-bar" class="app-bar">
@@ -205,6 +217,15 @@
   these numbers alone — no browser reports the title bar itself. The values update as the window moves,
   resizes, or goes full screen.</p>
   <div class="scroll"><table id="window-facts"></table></div>
+
+  <h2 class="section">Audio on this device</h2>
+  <p class="about">Why a page stays silent is decided outside the engine as often as inside it: a browser
+  refuses to sound before a gesture, a system can mute a whole category of sound, and a phone has a
+  switch for it. The button below plays a tone the page builds ITSELF, with the engine out of the
+  picture — heard, the fault is in the program; unheard, it is the device or the browser. The table
+  reads back what the engine's own output is doing.</p>
+  <p><button id="audio-test" type="button">Play a test tone</button> <span id="audio-said"></span></p>
+  <div class="scroll"><table id="audio-facts"></table></div>
 
   <p id="problem" hidden></p>
 </div>

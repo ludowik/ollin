@@ -75,6 +75,59 @@ export async function init(ctx) {
     }
   }
 
+  // The engine's audio output, as the page can see it: miniaudio publishes its devices on window,
+  // and a suspended context or a missing output node is exactly what a silent game looks like.
+  function showAudioFacts() {
+    const table = document.getElementById("audio-facts");
+    if (!table)
+      return;
+    const dev = window.miniaudio && window.miniaudio.devices ? window.miniaudio.devices[0] : null;
+    const ctxa = dev ? dev.webaudio : null;
+    const rows = [
+      ["engine output", dev ? (dev.scriptNode ? "open" : "device, no output node") : "not opened yet"],
+      ["context state", ctxa ? ctxa.state : "—"],
+      ["sample rate", ctxa ? ctxa.sampleRate + " Hz" : "—"],
+      ["page's own tone", probe ? probe.state : "not played yet"],
+    ];
+    emptyNode(table);
+    for (const [label, value] of rows) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("td");
+      th.className = "subject";
+      th.textContent = label;
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(th, td);
+      table.append(tr);
+    }
+  }
+
+  // The tone is built by the page, so hearing it proves the device and the browser will sound at all.
+  // Its context is kept: a second press must not stack another one.
+  let probe = null;
+  function playTestTone() {
+    const said = document.getElementById("audio-said");
+    try {
+      if (!probe)
+        probe = new (window.AudioContext || window.webkitAudioContext)();
+      probe.resume();
+      const osc = probe.createOscillator();
+      const gain = probe.createGain();
+      osc.frequency.value = 440;
+      gain.gain.value = 0.2;
+      osc.connect(gain).connect(probe.destination);
+      osc.start();
+      osc.stop(probe.currentTime + 0.6);
+      if (said)
+        said.textContent = "440 Hz for six tenths of a second — if you hear nothing, the sound is " +
+                           "stopped before the page (system volume, or a phone's silent switch).";
+    } catch (e) {
+      if (said)
+        said.textContent = "the page cannot build a tone at all (" + (e && e.message ? e.message : e) + ")";
+    }
+    showAudioFacts();
+  }
+
   function report(e) {
     problem.hidden = false;
     problem.textContent = "The charts could not be drawn (" + (e && e.message ? e.message : e) +
@@ -82,6 +135,7 @@ export async function init(ctx) {
   }
 
   // Data.
+  let audioTick = 0;
   let doc;
   try {
     const resp = await fetch("data/icount-history.json?v=" + ctx.v);
@@ -647,6 +701,11 @@ export async function init(ctx) {
     closeOnOutside(svgCurves, onCancelCurves);
     closeOnOutside(svgGaps, () => { if (hoverGaps) hoverGaps.clearHover(); });
     showWindowFacts();
+    showAudioFacts();
+    const testBtn = document.getElementById("audio-test");
+    if (testBtn)
+      testBtn.addEventListener("click", playTestTone);
+    audioTick = setInterval(showAudioFacts, 1000);
     addEventListener("resize", redraw);
     addEventListener("resize", showWindowFacts);
     addEventListener("orientationchange", onRotation);
@@ -661,6 +720,10 @@ export async function init(ctx) {
   // Cleanup: every GLOBAL listener installed here must be removed, otherwise it survives the
   // change of view (app.js replaces #view, but not window or document).
   return () => {
+    if (audioTick)
+      clearInterval(audioTick);
+    if (probe)
+      probe.close();
     removeEventListener("resize", showWindowFacts);
     removeEventListener("resize", redraw);
     removeEventListener("orientationchange", onRotation);
