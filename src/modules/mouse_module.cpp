@@ -1,4 +1,5 @@
 #include "mouse_module.h"
+#include "graphics_internal.h"
 #include "module_utils.h"
 #include "value.h"
 #include "vm.h"
@@ -44,10 +45,16 @@ void mouse_poll(bool click_taken) {
     Value scrolled      = m.map_get(Value(std::string("scrolled")));
     Value double_clicked = m.map_get(Value(std::string("doubleClicked")));
 
+    // The raw position serves the double-click test, whose threshold is in REAL pixels: under a
+    // viewport the same eight virtual pixels would be a different distance on screen. What the
+    // script receives, on the other hand, is mapped into the space it draws in.
     int mx = GetMouseX();
     int my = GetMouseY();
-    Value x = Value((int64_t)mx);
-    Value y = Value((int64_t)my);
+    float vx = (float)mx;
+    float vy = (float)my;
+    gfx_view_map(&vx, &vy);
+    Value x = Value((double)vx);
+    Value y = Value((double)vy);
 
     // The click was taken by a UI widget, so the script must not see the release either —
     // otherwise an interface button would also fire mouse.released.
@@ -103,8 +110,11 @@ void mouse_poll(bool click_taken) {
 // The pointer's position, in the graphics area's logical coordinates — the same the callbacks
 // receive, so a script can mix the two without converting anything.
 static int mouse_position(CallCtx& ctx) {
-    ctx.set_result(0, Value((int64_t)GetMouseX()));
-    ctx.set_result(1, Value((int64_t)GetMouseY()));
+    float x = (float)GetMouseX();
+    float y = (float)GetMouseY();
+    gfx_view_map(&x, &y);
+    ctx.set_result(0, Value((double)x));
+    ctx.set_result(1, Value((double)y));
     return 2;
 }
 

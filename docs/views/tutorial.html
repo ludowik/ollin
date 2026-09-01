@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 19:53</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 20:02</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 19:53</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 20:02</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1758,6 +1758,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.run(callback)</code></td><td>Starts the main loop with an explicitly named callback, as an alternative to <code>draw</code></td></tr>
     <tr><td><code>graphics.isOpen()</code></td><td>Returns 1 while the window is still open, 0 otherwise</td></tr>
     <tr><td><code>graphics.clear([grey | r,g,b | color …])</code></td><td>Clears the background. The same signature as <code>Color</code> (1 to 4 numbers, or a <code>Color</code> object). An <strong>opaque</strong> colour clears outright; a <strong>semi-transparent</strong> one (alpha&nbsp;&lt;&nbsp;1) applies a gradual <strong>fade</strong>, giving trails (see the persistent context below). With no argument: black.</td></tr>
+    <tr><td><code>graphics.viewport(w, h)</code></td><td>Draw in a fixed <code>w × h</code> field, whatever the area's real size: the engine scales it up, centres it, and letterboxes what is left in black. <code>W</code>, <code>H</code>, <code>CX</code> and <code>CY</code> become the <strong>virtual</strong> size, and <code>mouse</code> and <code>touch</code> deliver their positions in that same frame — so a script never inverts the transform itself. With no argument the viewport is dropped; <code>graphics.canvas</code> drops it too. The <code>ui</code> widgets stay <strong>independent</strong>, at their own size in the area's corner. It is a <strong>2D</strong> feature: 3D takes its aspect ratio from the window, not from the viewport. Outside the field the coordinates are negative or past the edges, which is the honest answer for a finger on a black band.</td></tr>
     <tr><td><code>graphics.blendMode(mode)</code></td><td>The blend mode for the drawings that follow: a string (<code>"alpha"</code>, <code>"add"</code>, <code>"multiply"</code>, <code>"subtract"</code>, <code>"add_colors"</code>, <code>"premultiply"</code>) or a constant of the <code>blend</code> module. An unknown name, or a value of another type, is an error rather than a silent fallback. Reset to <code>"alpha"</code> on every frame.</td></tr>
     <tr><td><code>graphics.beginDraw()</code> / <code>graphics.endDraw()</code></td><td>Opens / closes a render frame by hand (an advanced use; the <code>draw</code>/<code>run</code> loop handles it otherwise)</td></tr>
     <tr><td><code>graphics.strokeSize(n)</code></td><td>The width of <strong>2D</strong> strokes (default 2, reset to 2 on every frame). It has <strong>no effect in 3D</strong>: the 3D wireframe stays 1&nbsp;px wide, a WebGL limit.</td></tr>

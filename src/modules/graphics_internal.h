@@ -44,6 +44,11 @@ void gfx_clock_break();
 // these rather than to GetScreenWidth(), which is in physical pixels.
 int gfx_logical_width();
 int gfx_logical_height();
+// A VIEWPORT (graphics.viewport(w, h)): the script draws in a fixed w×h space, scaled and centred
+// in the drawing area. Input must arrive in that same space, so the pointer and the contacts are
+// mapped through here — the engine holds the transform, and no script should be asked to invert it.
+// With no viewport the coordinates pass through unchanged.
+void gfx_view_map(float* x, float* y);
 // Strip taken at the top by the FPS overlay, composed ON TOP OF the render texture: a module
 // drawing at the top of the area must leave it free.
 

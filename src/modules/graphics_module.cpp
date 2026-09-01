@@ -54,6 +54,12 @@ static int s_logicalH = 0; // the area's logical height
 // blitted to the screen every frame with the FPS overlay ON TOP, so the overlay stays crisp and does
 // not smear.
 static RenderTexture2D s_target{};
+// The viewport: a fixed drawing space, scaled and centred in the area. 0 means none, and then every
+// coordinate is the area's own.
+static int s_view_w = 0;
+static int s_view_h = 0;
+// Defined further down, next to the logical-size accessors it reads; used by gfx_canvas above them.
+static void publish_draw_size();
 static bool s_target_ready = false;
 static int s_targetW = 0, s_targetH = 0;   // the render texture's real size, supersampled
 // Target supersampling RELATIVE to the logical size, for anti-aliasing, bounded below by the physical
@@ -159,12 +165,10 @@ static int gfx_canvas(CallCtx& ctx) {
     // Repositions the engine globals on the canvas's real size: W and H to the logical dimensions, CX
     // and CY to the centre as floats. graphics.canvas(w, h) therefore recomputes them even when w and h
     // differ from the initial window values.
-    if (VM* vm = VM::current()) {
-        vm->set_global("W", Value((int64_t)w));
-        vm->set_global("H", Value((int64_t)h));
-        vm->set_global("CX", Value((double)w / 2.0));
-        vm->set_global("CY", Value((double)h / 2.0));
-    }
+    // A new canvas drops any viewport: it belongs to the program that asked for it.
+    s_view_w = 0;
+    s_view_h = 0;
+    publish_draw_size();
     // Persistent render target. We aim for supersampling RELATIVE to the logical size for
     // anti-aliasing, but never below the physical resolution, to stay sharp on HiDPI. SSAA is
     // therefore NOT multiplied by the DPR: on mobile, with a DPR of 2 or more, the texture used to
@@ -381,6 +385,41 @@ int gfx_logical_width() {
 
 int gfx_logical_height() {
     return s_logicalH;
+}
+
+// The viewport's placement in the area: the largest scale that fits, and the letterbox that centres
+// it. Recomputed on demand rather than stored, so it follows a canvas that changes size.
+static bool view_geometry(float* scale, float* off_x, float* off_y) {
+    if (s_view_w <= 0 || s_view_h <= 0 || s_logicalW <= 0 || s_logicalH <= 0)
+        return false;
+    float sx = (float)s_logicalW / (float)s_view_w;
+    float sy = (float)s_logicalH / (float)s_view_h;
+    *scale = sx < sy ? sx : sy;
+    *off_x = ((float)s_logicalW - (float)s_view_w * *scale) / 2.0f;
+    *off_y = ((float)s_logicalH - (float)s_view_h * *scale) / 2.0f;
+    return true;
+}
+
+void gfx_view_map(float* x, float* y) {
+    float scale = 1.0f, off_x = 0.0f, off_y = 0.0f;
+    if (!view_geometry(&scale, &off_x, &off_y))
+        return;
+    *x = (*x - off_x) / scale;
+    *y = (*y - off_y) / scale;
+}
+
+// W, H, CX and CY name the space the script DRAWS in, so they follow the viewport — that is the
+// whole point of one: a single frame of reference for the drawing and for the input.
+static void publish_draw_size() {
+    VM* vm = VM::current();
+    if (!vm)
+        return;
+    int w = s_view_w > 0 ? s_view_w : s_logicalW;
+    int h = s_view_h > 0 ? s_view_h : s_logicalH;
+    vm->set_global("W", Value((int64_t)w));
+    vm->set_global("H", Value((int64_t)h));
+    vm->set_global("CX", Value((double)w / 2.0));
+    vm->set_global("CY", Value((double)h / 2.0));
 }
 
 bool gfx_has_fill() {
@@ -632,6 +671,31 @@ static int gfx_text_mode(CallCtx& ctx) {
     int vertical = TEXT_V_VALUES[mode_arg(ctx, 1, "graphics.textMode", TEXT_V_NAMES, 0)];
     s_text_mode = horizontal;
     s_text_valign = vertical;
+    return ctx.ret(Value{});
+}
+
+// graphics.viewport(w, h): draw in a fixed w×h space, whatever the area's real size — the engine
+// scales it up, centres it, and letterboxes what is left. With no argument the viewport is dropped
+// and the area's own coordinates come back.
+// It exists because a game with a fixed field otherwise has to compute its own scale, push its own
+// transform, AND invert that transform for every pointer position — the last part being work only
+// the engine can do right, since it is the one holding the transform.
+static int gfx_viewport(CallCtx& ctx) {
+    if (ctx.argc == 0) {
+        s_view_w = 0;
+        s_view_h = 0;
+        publish_draw_size();
+        return ctx.ret(Value{});
+    }
+    if (ctx.argc < 2)
+        throw std::runtime_error("graphics.viewport: expected a width and a height");
+    int w = gfx_to_int(ctx.args[0]);
+    int h = gfx_to_int(ctx.args[1]);
+    if (w <= 0 || h <= 0)
+        throw std::runtime_error("graphics.viewport: the width and the height must be positive");
+    s_view_w = w;
+    s_view_h = h;
+    publish_draw_size();
     return ctx.ret(Value{});
 }
 
@@ -1358,7 +1422,6 @@ static void run_user_callbacks(const Value& draw_fn) {
     call_update_if_any();
     VM::current()->call_value(const_cast<Value&>(draw_fn));
     end3d_internal();   // a no-op outside 3D; otherwise it flushes and closes, should draw() have forgotten end3d
-    ui_draw();          // over the scene, in the same render texture
 }
 
 static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
@@ -1382,7 +1445,13 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // graphics.resetTransform.
         rlMatrixMode(RL_PROJECTION);
         rlLoadIdentity();
-        rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
+        // Under a viewport the extents are the VIRTUAL ones, so draw() works in that space while the
+        // texture keeps the device's resolution: a scaled-up sprite stays crisp (its texture is
+        // sampled NEAREST) and text stays smooth.
+        if (s_view_w > 0)
+            rlOrtho(0, s_view_w, s_view_h, 0, 0.0, 1.0);
+        else
+            rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
         run_user_callbacks(draw_fn);
@@ -1403,10 +1472,25 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // size with a negative height to display it upright, and the destination is in logical
         // coordinates, filling the screen through the physical viewport. The SSAA-to-physical reduction
         // by the bilinear filter is what smooths the image.
+        float vscale = 1.0f, voff_x = 0.0f, voff_y = 0.0f;
+        Rectangle dest{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH};
+        if (view_geometry(&vscale, &voff_x, &voff_y)) {
+            // The area is wider or taller than the viewport, so the bands must be painted: without
+            // this the previous frame would stay visible either side of the field.
+            ClearBackground(BLACK);
+            dest = Rectangle{voff_x, voff_y, (float)s_view_w * vscale, (float)s_view_h * vscale};
+        }
         DrawTexturePro(s_target.texture,
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
-                       Rectangle{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH},
-                       Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+                       dest, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        // The interface is INDEPENDENT of the viewport: it is drawn here, over the composed field
+        // and in the area's own coordinates, so widgets keep their size whatever virtual resolution
+        // the game chose — and they stay outside the letterbox. Still before the screenshot flush,
+        // which is what captures them.
+        BeginBlendMode(BLEND_ALPHA);
+        ui_draw();
+        rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
+        BeginBlendMode(BLEND_CUSTOM);
         flush_pending_screenshot();      // captures the composed screen, before the FPS overlay
         BeginBlendMode(BLEND_ALPHA);   // the FPS overlay, in normal blending
         draw_fps_overlay();
@@ -1419,6 +1503,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         if (s_physW != GetScreenWidth() || s_physH != GetScreenHeight())
             rlViewport(0, 0, s_physW, s_physH);
         run_user_callbacks(draw_fn);
+        ui_draw();                       // no composition here, so the interface follows the scene
         flush_pending_screenshot();      // captures the screen, before the FPS overlay
         draw_fps_overlay();
         *drawing = false;
@@ -1687,6 +1772,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("ellipseMode")), Value::make_builtin(gfx_ellipse_mode));
     m.map_set(Value(std::string("spriteMode")), Value::make_builtin(gfx_sprite_mode));
     m.map_set(Value(std::string("textMode")), Value::make_builtin(gfx_text_mode));
+    m.map_set(Value(std::string("viewport")), Value::make_builtin(gfx_viewport));
     m.map_set(Value(std::string("close")), Value::make_builtin(gfx_close));
     m.map_set(Value(std::string("quit")), Value::make_builtin(gfx_quit));
     m.map_set(Value(std::string("run")), Value::make_builtin(gfx_run));

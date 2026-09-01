@@ -1,4 +1,5 @@
 #include "touch_module.h"
+#include "graphics_internal.h"
 #include "module_utils.h"
 #include "value.h"
 #include "vm.h"
@@ -192,6 +193,7 @@ void sample_contacts() {
         if (lifted & (1 << i))
             continue;
         Vector2 p = GetTouchPosition(i);
+        gfx_view_map(&p.x, &p.y);   // a contact arrives in the space the script draws in
         s_cur[s_cur_count].id = ids[i];
         s_cur[s_cur_count].x = p.x;
         s_cur[s_cur_count].y = p.y;

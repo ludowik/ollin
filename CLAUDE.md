@@ -600,8 +600,14 @@ module en trois endroits de sa boucle de rendu (`graphics_module.cpp`, `run_user
   LA raison d'être d'un module natif plutôt qu'une classe Ollin : une classe ne peut pas
   s'interposer, elle devrait voler les callbacks du script (cf. l'avertissement en tête
   de `joystick.ol` et de `trackball.ol`, qui réclament trois relais chacun).
-- **`ui_draw()` APRÈS `draw()`** et après `end3d_internal()` : dans la même render
-  texture, donc capturé par `graphics.screenshot` et posé par-dessus la 3D.
+- **`ui_draw()` APRÈS la COMPOSITION**, dans `render_frame` et non plus dans
+  `run_user_callbacks` : l'interface est **indépendante du viewport** (décision de
+  l'utilisateur), donc elle se dessine dans les coordonnées de la ZONE, par-dessus le champ
+  déjà composé et jusque sur les bandes du letterbox — un widget garde ainsi sa taille quelle
+  que soit la résolution virtuelle choisie par le jeu. Elle reste **avant**
+  `flush_pending_screenshot`, ce qui la fait capturer par `graphics.screenshot`, et toujours
+  après `end3d_internal()`, donc par-dessus la 3D. Le chemin de repli (sans render texture)
+  l'appelle juste après `run_user_callbacks`, faute de composition à attendre.
 - **`ui_reset()` dans `ollin_run` (wasm_main.cpp), PAS dans `gfx_run`** : les widgets
   sont déclarés au niveau du fichier, donc AVANT `graphics.run` — réinitialiser dans
   `gfx_run` les effaçait tous (constaté). Le reset appartient au démarrage d'un
@@ -1054,6 +1060,30 @@ toutes les cibles, WASM compris (+70 Ko sur le `.wasm` pour les deux atlas).
 - `tests/check_naming.sh` **exclut** `font_sans.h`/`font_mono.h` : les identifiants d'un
   fichier généré sont ceux de l'outil, et une correction serait effacée à la génération
   suivante.
+
+## Viewport (résolution virtuelle, `graphics.viewport`)
+
+`graphics.viewport(w, h)` fait dessiner le script dans un champ de `w × h`, que le moteur met à
+l'échelle et centre dans la zone, bandes noires à côté. Sans argument, le viewport est abandonné.
+
+Il se glisse en **trois** points, et nulle part ailleurs :
+1. le `rlOrtho` de `render_frame` prend les dimensions virtuelles au lieu des logiques — la render
+   texture garde la résolution de l'appareil, si bien qu'un sprite agrandi reste net (texture en
+   NEAREST) et que le texte reste lisse ;
+2. la **composition** vise le rectangle du letterbox au lieu de l'écran entier, avec un
+   `ClearBackground` pour peindre les bandes (sans lui, la frame précédente reste visible à côté) ;
+3. `gfx_view_map` convertit les coordonnées d'entrée — `mouse_poll`, `mouse.position()` et
+   `touch_begin_frame` — pour que le script reçoive des positions dans le repère où il dessine.
+   ⚠ Le test de double-clic garde les coordonnées BRUTES : son seuil est en pixels réels, et huit
+   pixels virtuels ne sont pas la même distance à l'écran.
+
+`W`/`H`/`CX`/`CY` valent la taille **virtuelle** (décision de l'utilisateur) : le script n'a qu'un
+seul repère à connaître. `window.width`/`height` continuent de rapporter la zone RÉELLE.
+`graphics.canvas` abandonne le viewport — il appartient au programme qui l'a demandé — et la
+publication des quatre globales passe par un seul endroit, `publish_draw_size`.
+
+**Ce qu'il ne fait pas** : l'interface `ui` est indépendante (cf. plus haut), et la 3D tire son
+rapport d'aspect de la fenêtre et non du viewport — c'est une fonctionnalité 2D.
 
 ## Globales moteur (engine-injected globals)
 
