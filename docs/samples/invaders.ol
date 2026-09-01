@@ -9,7 +9,8 @@
 ## The three creatures are drawn below, and they are ours. Only the MECHANICS are faithful to the
 ## arcade original, whose sprites are its author's work.
 ##
-## Desktop: left and right arrows, space to fire. Mobile: ONE finger anywhere aims, and firing is
+## Desktop: left and right arrows, space to fire. Mobile: ONE finger anywhere DRAGS the cannon —
+## the movement is relative, so touching the screen never teleports it — and firing is
 ## automatic — a finger that aims everywhere cannot also mean "fire" by tapping, and the one-shot
 ## rule already paces the cannon: the next shot waits for the previous one to leave the field, which
 ## is what a good player's thumb does anyway.
@@ -69,6 +70,8 @@ global shotLive = false
 
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
 global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game
+global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
+global grabGun = 0.0     ## RELATIVE, so touching the screen never teleports the cannon
 global acc = 0.0
 
 func buildSprites()
@@ -164,8 +167,24 @@ func shotHits()
     return false
 end
 
-func aimAt(x)
-    gunX = math.clamp(x - GUN_W / 2, MARGIN, FIELD_W - MARGIN - GUN_W)
+## Taking hold: the cannon stays where it is, and the offset between the finger and it is what the
+## drag preserves.
+func grab(x)
+    grabX = x
+    grabGun = gunX
+end
+
+## The cannon follows the finger's DISPLACEMENT. When the wall stops it, the hold is re-anchored on
+## the spot: without that, a finger carried on past the wall would owe the same distance back before
+## the cannon moved again — a dead zone that feels like a stuck control.
+func dragTo(x)
+    var wanted = grabGun + (x - grabX)
+    var stopped = math.clamp(wanted, MARGIN, FIELD_W - MARGIN - GUN_W)
+    if stopped <> wanted then
+        grabX = x
+        grabGun = stopped
+    end
+    gunX = stopped
 end
 
 graphics.canvas(W, H, "Ollin Invaders")
@@ -187,12 +206,12 @@ end
 func touch.began(id, x, y)
     touchPlay = true
     aimId = id
-    aimAt(x)
+    grab(x)
 end
 
 func touch.moved(id, x, y)
     if aimId == id then
-        aimAt(x)
+        dragTo(x)
     end
 end
 
@@ -203,7 +222,7 @@ func touch.ended(id, x, y)
 end
 
 func mouse.pressed(x, y)
-    aimAt(x)
+    grab(x)
     if not touchPlay then    ## a real click, on a desktop: it fires as space does
         fire()
     end
@@ -211,7 +230,7 @@ end
 
 func mouse.moved(x, y)
     if mouse.isDown() then
-        aimAt(x)
+        dragTo(x)
     end
 end
 
@@ -285,9 +304,9 @@ func draw()
     graphics.fontSize(7)
     graphics.stroke(DIM)
     graphics.textMode("center", "bottom")
-    var hint = "arrows + space — or one finger to aim, firing is automatic"
+    var hint = "arrows + space — or drag with one finger, firing is automatic"
     if touchPlay then
-        hint = "one finger aims — firing is automatic"
+        hint = "drag to move — firing is automatic"
     end
     graphics.text(hint, FIELD_W / 2, FIELD_H - 3)
 end
