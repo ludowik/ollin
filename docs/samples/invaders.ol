@@ -1,4 +1,4 @@
-## Ollin Invaders — phase 1: the fleet, the cannon, one shot.
+## Ollin Invaders — the fleet, the cannon, one shot, the shields, and the fleet shooting back.
 ##
 ## The RULE that makes this genre work, and the one most often missed: the fleet does not move as a
 ## block. ONE alien advances per tick. Fifty-five aliens therefore take fifty-five ticks to complete
@@ -8,6 +8,9 @@
 ##
 ## The three creatures are drawn below, and they are ours. Only the MECHANICS are faithful to the
 ## arcade original, whose sprites are its author's work.
+##
+## The fleet answers: only the LOWEST living alien of a column may drop a bomb, three bombs at most
+## in the air. Being shot costs a life, and so does letting the fleet reach the cannon's line.
 ##
 ## Desktop: left and right arrows, space to fire. Mobile: ONE finger anywhere DRAGS the cannon —
 ## the movement is relative, so touching the screen never teleports it — and firing is
@@ -34,9 +37,15 @@ const SHIELD_W     = 22
 const SHIELD_H     = 16
 const BLAST        = 3          ## the radius a hit eats out of a shield
 const GUN_W      = 13
+const GUN_H      = 5
 const GUN_Y      = 232
 const GUN_SPEED  = 60           ## field pixels per second
 const SHOT_SPEED = 240
+const BOMB_SPEED = 90           ## slower than the cannon's shot: a bomb can be outrun
+const BOMB_MAX   = 3            ## how many bombs the fleet keeps in the air
+const BOMB_ODDS  = 90           ## one tick in this many drops a bomb, while there is room for one
+const LIVES      = 3
+const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
 const INK     = Color(0.90, 0.95, 1.00)
 const GUN_INK = Color(0.35, 0.95, 0.45)
@@ -75,11 +84,15 @@ const SHIELD = [
     "#####............#####"
 ]
 const CANNON  = ["......#......", ".....###.....", ".....###.....", "#############", "#############"]
+## The bomb turns as it falls, which is how a falling thing reads at three pixels wide.
+const BOMB_A  = ["#..", ".#.", "..#", ".#."]
+const BOMB_B  = ["..#", ".#.", "#..", ".#."]
 
 ## One entry per kind: its two frames, what killing it is worth, its colour. The kind comes from the
 ## ROW, so the fleet's shape decides the score.
 global kinds = []
 global gunImg = nil
+global bombImgs = []
 global shields = []      ## four {img, x}: each one its own texture, so each erodes on its own
 
 global fleet = []        ## 55 entries {x, y, kind, alive}
@@ -96,6 +109,12 @@ global shotX = 0
 global shotY = 0
 global shotLive = false
 
+global bombs = []        ## up to BOMB_MAX {x, y}
+global lives = LIVES
+global respawn = 0.0     ## > 0: the cannon was hit, and the field holds still
+global over = false      ## the last life is gone, or the fleet landed: a press starts a new game
+global ticks = 0         ## logical ticks, which is what makes the bomb sprite turn
+
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
 global touchPlay = false ## a finger has been seen: aiming is by hand, firing by the game
 global grabX = 0.0       ## where the finger landed, and where the cannon was then: a drag is
@@ -109,6 +128,7 @@ func buildSprites()
         {frames: [image.fromPattern(MOTH_A), image.fromPattern(MOTH_B)], points: 10, ink: INK}
     ]
     gunImg = image.fromPattern(CANNON)
+    bombImgs = [image.fromPattern(BOMB_A), image.fromPattern(BOMB_B)]
 end
 
 ## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
@@ -163,6 +183,7 @@ func newWave()
             fleet.push({
                 x: FLEET_X + (col - 1) * CELL_W,
                 y: FLEET_Y + (row - 1) * CELL_H + (wave - 1) * WAVE_DROP,
+                col: col,
                 kind: kind,
                 alive: true
             })
@@ -179,9 +200,80 @@ end
 func startGame()
     wave = 1
     score = 0
+    lives = LIVES
+    over = false
+    respawn = 0.0
+    ticks = 0
     gunX = FIELD_W / 2 - GUN_W / 2
     shotLive = false
+    bombs = []
     newWave()
+end
+
+## The fleet is stored bottom row first, so the FIRST living alien of a column is its lowest one —
+## the only one with a clear line to the cannon. No column bookkeeping is needed: the storage order
+## already answers the question.
+func lowestOf(col)
+    for a in fleet do
+        if a.alive and a.col == col then
+            return a
+        end
+    end
+    return nil
+end
+
+func dropBomb()
+    if #bombs >= BOMB_MAX or alive == 0 then
+        return
+    end
+    if math.randInt(1, BOMB_ODDS) <> 1 then
+        return
+    end
+    var a = lowestOf(math.randInt(1, COLS))
+    if a == nil then
+        return
+    end
+    bombs.push({x: a.x + 4, y: a.y + 8})
+end
+
+## Losing a life clears the air: the bombs already falling belonged to the cannon that just died,
+## and a fresh one must not walk into them.
+func hitCannon()
+    bombs = []
+    shotLive = false
+    lives -= 1
+    respawn = RESPAWN
+    if lives <= 0 then
+        over = true
+    end
+end
+
+func bombsFall(dt)
+    var i = 1
+    while i <= #bombs do
+        var b = bombs[i]
+        b.y = b.y + BOMB_SPEED * dt
+        var gone = b.y > FIELD_H
+        var sh = shieldAt(b.x, b.y)
+        if sh <> nil then
+            erode(sh, b.x - sh.x, b.y - SHIELD_Y, BLAST)
+            gone = true
+        elseif b.y + 4 > GUN_Y and b.y < GUN_Y + GUN_H and b.x >= gunX and b.x < gunX + GUN_W then
+            hitCannon()
+            return
+        end
+        ## A bomb and the cannon's shot cancel each other: two things crossing in the same lane
+        ## cannot pass through one another.
+        if shotLive and math.abs(b.x - shotX) <= 2 and math.abs(b.y - shotY) <= 4 then
+            shotLive = false
+            gone = true
+        end
+        if gone then
+            bombs.delete(i)
+        else
+            i += 1
+        end
+    end
 end
 
 ## One tick: the next LIVING alien advances. A dead one costs nothing, and that is the whole
@@ -270,7 +362,11 @@ startGame()
 
 func keyboard.keypressed(key)
     if key == "space" then
-        fire()
+        if over then
+            startGame()
+        else
+            fire()
+        end
     end
 end
 
@@ -281,6 +377,9 @@ func touch.began(id, x, y)
     touchPlay = true
     aimId = id
     grab(x)
+    if over then
+        startGame()
+    end
 end
 
 func touch.moved(id, x, y)
@@ -297,7 +396,9 @@ end
 
 func mouse.pressed(x, y)
     grab(x)
-    if not touchPlay then    ## a real click, on a desktop: it fires as space does
+    if over then
+        startGame()
+    elseif not touchPlay then    ## a real click, on a desktop: it fires as space does
         fire()
     end
 end
@@ -309,6 +410,20 @@ func mouse.moved(x, y)
 end
 
 func update(dt)
+    if over then
+        return
+    end
+
+    ## The field holds still while the cannon is being replaced — the pause is what tells the player
+    ## they were hit, so nothing marches, falls or fires during it.
+    if respawn > 0.0 then
+        respawn -= dt
+        if respawn <= 0.0 then
+            gunX = FIELD_W / 2 - GUN_W / 2
+        end
+        return
+    end
+
     if keyboard.isDown("left") then
         gunX = math.max(MARGIN, gunX - GUN_SPEED * dt)
     end
@@ -333,12 +448,30 @@ func update(dt)
         end
     end
 
+    bombsFall(dt)
+    if respawn > 0.0 or over then     ## the cannon was just hit: this frame is over
+        return
+    end
+
     ## A FIXED tick, so the march keeps its pace whatever the frame rate.
     acc += dt
     while acc >= TICK do
         acc -= TICK
+        ticks += 1
         if alive > 0 then
             fleetTick()
+            dropBomb()
+        end
+    end
+
+    ## The fleet landing is as fatal as a bomb, and it ends the game outright: a cannon replaced
+    ## under a landed fleet would be shot at once.
+    for a in fleet do
+        if a.alive and a.y + 8 >= GUN_Y then
+            lives = 0
+            hitCannon()
+            over = true
+            return
         end
     end
 
@@ -364,8 +497,15 @@ func draw()
         graphics.sprite(sh.img, sh.x, SHIELD_Y, SHIELD_W, SHIELD_H)
     end
 
-    graphics.tint(GUN_INK)
-    graphics.sprite(gunImg, gunX, GUN_Y, GUN_W, 5)
+    ## During the pause the cannon blinks, so the eye finds where it died before it comes back.
+    if respawn <= 0.0 or math.frac(respawn * 6.0) < 0.5 then
+        graphics.tint(GUN_INK)
+        graphics.sprite(gunImg, gunX, GUN_Y, GUN_W, GUN_H)
+    end
+    graphics.tint(INK)
+    for b in bombs do
+        graphics.sprite(bombImgs[1 + (ticks // 6) % 2], b.x - 1, b.y, 3, 4)
+    end
     graphics.noTint()
 
     if shotLive then
@@ -384,6 +524,13 @@ func draw()
     graphics.text("SCORE {score}", MARGIN, 8)
     graphics.textMode("right", "top")
     graphics.text("WAVE {wave}", FIELD_W - MARGIN, 8)
+    ## The lives left, as cannons: a count of the thing itself reads faster than a number.
+    graphics.tint(GUN_INK)
+    for i = 1, lives - 1 do
+        graphics.sprite(gunImg, MARGIN + (i - 1) * (GUN_W + 4), FIELD_H - 13, GUN_W, GUN_H)
+    end
+    graphics.noTint()
+
     graphics.fontSize(7)
     graphics.stroke(DIM)
     graphics.textMode("center", "bottom")
@@ -392,4 +539,14 @@ func draw()
         hint = "drag to move — firing is automatic"
     end
     graphics.text(hint, FIELD_W / 2, FIELD_H - 3)
+
+    if over then
+        graphics.fontSize(14)
+        graphics.stroke(TOP_INK)
+        graphics.textMode("center", "center")
+        graphics.text("GAME OVER", FIELD_W / 2, 150)
+        graphics.fontSize(8)
+        graphics.stroke(INK)
+        graphics.text("SCORE {score} — press or tap to play again", FIELD_W / 2, 168)
+    end
 end
