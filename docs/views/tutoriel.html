@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 06:20</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 06:35</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 06:20</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 06:35</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1764,7 +1764,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.rectMode(mode)</code></td><td>The anchor point of <code>graphics.rect</code>: <code>"corner"</code> (the default — <code>x, y</code> is the top-left corner) or <code>"center"</code> (<code>x, y</code> is the rectangle's centre). It affects <code>rect</code> only; reset to <code>"corner"</code> on every frame, and saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
     <tr><td><code>graphics.ellipseMode(mode)</code></td><td>The anchor point of <code>graphics.circle</code>, <code>graphics.ellipse</code> and <code>graphics.arc</code>: <code>"center"</code> (the <strong>default</strong> — these primitives are centred, unlike <code>rect</code>) or <code>"corner"</code>, where <code>x, y</code> is the top-left corner of the bounding box (for <code>circle</code>, a box of side <code>2 × r</code>; for <code>arc</code>, that of the whole ellipse, not of the sector drawn).</td></tr>
     <tr><td><code>graphics.spriteMode(mode)</code></td><td>The same for images: <code>"corner"</code> (the default) or <code>"center"</code>. It applies to <code>graphics.sprite</code> <strong>and</strong> to <code>image.draw</code>, as <code>graphics.tint</code> does. The offset uses the <strong>displayed</strong> size: centring an image drawn at 200×200 offsets it by 100, whatever the source's size.</td></tr>
-    <tr><td><code>graphics.textMode(h [, v])</code></td><td>The anchor of <code>graphics.text</code>, one axis per argument. Horizontally: <code>"left"</code> (the default — <code>x</code> is the left edge) or its synonym <code>"corner"</code>, <code>"center"</code> (the middle of the line) and <code>"right"</code> (the right edge). Vertically: <code>"top"</code> (the default — <code>y</code> is the top of the line), <code>"bottom"</code> (its bottom) and <code>"line"</code>, where <code>y</code> is the <strong>baseline</strong>, the line the letters sit on and which descenders cross — that is what aligns two different sizes on one line. A call describes the mode in full, so naming only <code>h</code> puts the vertical back to <code>"top"</code>, and calling with no argument puts both back. Reset on every frame, and saved and restored by <code>push</code>/<code>pop</code>. An anchor costs a measurement of the text, paid only when one is asked for.</td></tr>
+    <tr><td><code>graphics.textMode(h [, v])</code></td><td>The anchor of <code>graphics.text</code>, one axis per argument. Horizontally: <code>"left"</code> (the default — <code>x</code> is the left edge) or its synonym <code>"corner"</code>, <code>"center"</code> (the middle of the line) and <code>"right"</code> (the right edge). Vertically: <code>"top"</code> (the default — <code>y</code> is the top of the line), <code>"bottom"</code> (its bottom) and <code>"baseline"</code>, where <code>y</code> is the line the letters sit on and which descenders cross — that is what aligns two different sizes on one line. A call describes the mode in full, so naming only <code>h</code> puts the vertical back to <code>"top"</code>, and calling with no argument puts both back. Reset on every frame, and saved and restored by <code>push</code>/<code>pop</code>. An anchor costs a measurement of the text, paid only when one is asked for.</td></tr>
     <tr><td><code>graphics.segments(n)</code></td><td>The number of segments of the curved primitives — circle, ellipse and arc in <strong>2D</strong>, sphere, cylinder, cone and torus in <strong>3D</strong> (default 64). Part of the style system, so saved and restored by <code>push</code>/<code>pop</code>.</td></tr>
     <tr><td><code>graphics.stroke([grey | r,g,b | color …])</code></td><td>Turns the outline on. The same signature as <code>Color</code>: 1 to 4 numbers (grey, grey+a, r,g,b, r,g,b,a) or a <code>Color</code> object, plus an optional width as a second argument; with no argument, it turns back on with the current colour</td></tr>
     <tr><td><code>graphics.noStroke()</code></td><td>Turns the outline off, leaving no border — the current colour is kept</td></tr>

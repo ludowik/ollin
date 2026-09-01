@@ -634,17 +634,17 @@ static int gfx_text_mode(CallCtx& ctx) {
     if (ctx.argc < 2)
         return ctx.ret(Value{});
     if (!ctx.args[1].is_string())
-        throw std::runtime_error("graphics.textMode: expected \"top\", \"bottom\" or \"line\"");
+        throw std::runtime_error("graphics.textMode: expected \"top\", \"bottom\" or \"baseline\"");
     const std::string& valign = ctx.args[1].as_string();
     if (valign == "top")
         s_text_valign = TEXT_TOP;
     else if (valign == "bottom")
         s_text_valign = TEXT_BOTTOM;
-    else if (valign == "line")
+    else if (valign == "baseline")
         s_text_valign = TEXT_BASELINE;
     else
         throw std::runtime_error("graphics.textMode: unknown vertical mode '" + valign +
-                                 "' (expected \"top\", \"bottom\" or \"line\")");
+                                 "' (expected \"top\", \"bottom\" or \"baseline\")");
     return ctx.ret(Value{});
 }
 
