@@ -368,6 +368,80 @@ static int img_create(CallCtx& ctx) {
 }
 
 
+// A sprite from a text PATTERN: one string per row, '.' and a space transparent, every other
+// character taken from the palette — {"#": colors.WHITE, "o": Color(1, 0.4, 0.4)} — or opaque white
+// when no palette is given. It stands in for create + beginPixels + a double loop + endPixels, and
+// with it the only place where a script had to count pixels from ZERO while the rest of the language
+// counts from one.
+// Ragged rows are REFUSED rather than padded: a '#' missing at the end of a line would shift the
+// whole sprite in silence. A character that is neither transparent nor in the palette is refused the
+// same way, and named with its position — in ASCII art, a stray letter among the hashes is invisible.
+static int img_from_pattern(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    static constexpr const char* FN = "image.fromPattern";
+    if (argc < 1 || !args[0].is_array())
+        throw std::runtime_error(std::string(FN) + ": expected an array of strings, one per row");
+    int64_t rows = args[0].array_size();
+    if (rows == 0)
+        throw std::runtime_error(std::string(FN) + ": the pattern has no row");
+    std::vector<std::string> lines;
+    lines.reserve((size_t)rows);
+    for (int64_t r = 1; r <= rows; r++) {
+        Value line = args[0].array_get(r);
+        if (!line.is_string())
+            throw std::runtime_error(std::string(FN) + ": row " + std::to_string(r) + " is not a string");
+        lines.push_back(line.as_string());
+        if (lines.back().size() != lines.front().size())
+            throw std::runtime_error(std::string(FN) + ": row " + std::to_string(r) + " is " +
+                                     std::to_string(lines.back().size()) + " characters wide, row 1 is " +
+                                     std::to_string(lines.front().size()));
+    }
+    if (argc >= 2 && !args[1].is_nil() && !args[1].is_map())
+        throw std::runtime_error(std::string(FN) + ": the palette must be a map of character to Color");
+    int w = (int)lines.front().size();
+    int h = (int)rows;
+    if (w == 0)
+        throw std::runtime_error(std::string(FN) + ": the rows are empty");
+    // EVERY character is resolved before anything is allocated. Creating the render texture first
+    // and validating afterwards leaked it on the error path — and, called from inside draw(), the
+    // creation unbinds the frame's target, so the rest of the drawing went nowhere (observed: a
+    // wholly black frame). Validation before allocation is what keeps a refusal free of effect.
+    std::vector<Color> pixels((size_t)w * (size_t)h, BLANK);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            char ch = lines[(size_t)y][(size_t)x];
+            if (ch == '.' || ch == ' ')
+                continue;
+            Color c = WHITE;
+            if (argc >= 2 && args[1].is_map()) {
+                Value entry = args[1].map_get(Value(std::string(1, ch)));
+                if (entry.is_nil())
+                    throw std::runtime_error(std::string(FN) + ": '" + std::string(1, ch) +
+                                             "' at row " + std::to_string(y + 1) + ", column " +
+                                             std::to_string(x + 1) + " is not in the palette");
+                c = to_color(entry);
+            }
+            pixels[(size_t)y * (size_t)w + (size_t)x] = c;
+        }
+    }
+    TexHandle hnd;
+    hnd.rtt = LoadRenderTexture(w, h);
+    hnd.is_render = true;
+    hnd.cpu = GenImageColor(w, h, BLANK);
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++)
+            ImageDrawPixel(&hnd.cpu, x, y, pixels[(size_t)y * (size_t)w + (size_t)x]);
+    }
+    UpdateTexture(hnd.rtt.texture, hnd.cpu.data);
+    int id = s_next_id++;
+    hnd.id = id;
+    auto uptr = std::make_unique<TexHandle>(std::move(hnd));
+    TexHandle* ptr = uptr.get();
+    s_images[id] = std::move(uptr);
+    return ctx.ret(make_handle(id, w, h, ptr));
+}
+
 static int img_begin(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     static constexpr const char* FN = "image.beginDraw";
@@ -643,6 +717,7 @@ Value make_image_module() {
         .fn("load", img_load)
         .fn("loadData", img_load_data)
         .fn("create", img_create)
+        .fn("fromPattern", img_from_pattern)
         .fn("beginDraw", img_begin)
         .fn("endDraw", img_end)
         .fn("draw", img_draw)

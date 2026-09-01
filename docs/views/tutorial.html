@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 19:42</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-01 19:53</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 19:42</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-01 19:53</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2615,6 +2615,7 @@ image.endDraw()
     <tr><td><code>image.load(name)</code></td><td>Loads a texture (natively from disk; in WASM an "Images" image, or a same-origin served resource) — it returns a handle <code>{id, width, height}</code></td></tr>
     <tr><td><code>image.loadData(format, base64)</code></td><td>Loads a texture from a base64 string (<code>"png"</code>, <code>"jpg"</code>…)</td></tr>
     <tr><td><code>image.create(w, h)</code></td><td>Creates an empty w×h render texture — it returns a handle. It needs an active GL context.</td></tr>
+    <tr><td><code>image.fromPattern(rows [, palette])</code></td><td>A sprite from a text pattern: one string per row, <code>.</code> and a space transparent, every other character opaque white — or taken from <code>palette</code>, a map of one character to a <code>Color</code>: <code>{"#": colors.WHITE, "o": Color(1, 0.4, 0.4)}</code>. It returns a handle like <code>image.create</code>. Rows of unequal length are <strong>refused</strong>, as is a character absent from the palette, which is named with its row and column — a stray letter in ASCII art is invisible to the eye. Textures are sampled NEAREST, so a sprite scaled up stays crisp.</td></tr>
     <tr><td><code>image.beginDraw(handle)</code></td><td>Redirects the rendering into the render texture, the counterpart of <code>BeginTextureMode</code></td></tr>
     <tr><td><code>image.endDraw()</code></td><td>Ends the off-screen rendering and restores the default target</td></tr>
     <tr><td><code>image.draw(handle, x, y [, w, h [, tint]])</code></td><td>Draws the texture; an explicit <code>tint</code> (a Color object) wins, otherwise the global <code>graphics.tint</code> applies. The anchoring follows <code>graphics.spriteMode</code>, as <code>graphics.sprite</code> does</td></tr>
