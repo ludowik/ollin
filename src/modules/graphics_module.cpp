@@ -832,8 +832,9 @@ static int gfx_fps(CallCtx& ctx) {
 // Captures the DISPLAYED framebuffer into a PNG. Since draw() renders into the persistent
 // RenderTexture, which is bound during draw, the composed screen cannot be captured here: the capture
 // is DEFERRED to the end of the frame, after composition, in render_frame — or in gfx_end_draw on the
-// manual path. On WASM, TakeScreenshot triggers a download. See s_shot_path and s_shot_pending
-// above.
+// manual path. ⚠ On WASM raylib's TakeScreenshot writes into the page's in-memory filesystem and
+// starts NO download (verified in the browser: no download event, and the file is unreachable) —
+// there, the host capture below is the only way out. See s_shot_path and s_shot_pending above.
 static int gfx_screenshot(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1 || !args[0].is_string())
