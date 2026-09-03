@@ -1392,6 +1392,11 @@ q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 
 <h3>time</h3>
 <p>Returns the UNIX time in seconds, as a float. Handy for benchmarks.</p>
+<div class="callout warn"><strong>Never animate with <code>time()</code>.</strong> It reads a wall clock the
+system may adjust while the program runs, and the browser deliberately coarsens it. Use <code>dt</code>
+in <code>update(dt)</code>, or the <code>elapsedTime</code> global: both come from the frame's own clock, and
+a paused or backgrounded program does not silently accumulate seconds in them. For measuring the
+processor rather than the wall, benchmarks use <code>cpuTime()</code>.</div>
 <pre><code><span class="kw">var</span> t0 = <span class="bi">time</span>()
 
 <span class="cmt">## ... the code being measured ...</span>
