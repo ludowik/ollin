@@ -19,3 +19,13 @@ bool source_get(const std::string& path, std::string& out) {
     out = it->second;
     return true;
 }
+
+static std::string s_program_dir;
+
+void program_dir_set(const std::string& dir) {
+    s_program_dir = dir;
+}
+
+const std::string& program_dir() {
+    return s_program_dir;
+}

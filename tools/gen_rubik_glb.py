@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates docs/samples/rubik.glb — the TEXTURED model of the "3D models" example.
+"""Generates docs/samples/model_3d/rubik.glb — the TEXTURED model of the "3D models" example.
 
     python3 tools/gen_rubik_glb.py
 
@@ -310,7 +310,7 @@ def check_layout():
 if __name__ == "__main__":
     check_layout()
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "rubik.glb")
+    path = os.path.join(root, "docs", "samples", "model_3d", "rubik.glb")
     data, verts, tris = build()
     with open(path, "wb") as f:
         f.write(data)

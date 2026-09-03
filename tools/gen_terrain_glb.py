@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates docs/samples/terrain.glb — the PER-VERTEX COLOUR model of the "3D models" example.
+"""Generates docs/samples/model_3d/terrain.glb — the PER-VERTEX COLOUR model of the "3D models" example.
 
     python3 tools/gen_terrain_glb.py
 
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     if SIDE * SIDE > 65535:
         raise SystemExit("above 65535 vertices raylib narrows the indices to u16: lower SIDE")
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "terrain.glb")
+    path = os.path.join(root, "docs", "samples", "model_3d", "terrain.glb")
     data, verts, tris = build()
     with open(path, "wb") as f:
         f.write(data)

@@ -47,6 +47,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     // for its siblings at the root instead — it ran natively and not on the web. path_dir is the
     // single place that rule lives now.
     const std::string base_dir = path_dir(fname);
+    program_dir_set(base_dir);   // the resources a script names are looked for beside it
     std::ostringstream out;
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
     try {

@@ -152,10 +152,9 @@ ollin/
 └── docs/              tutoriel, playground, samples, wasm
                        docs/samples/ : un exemple d'UN fichier est posé à plat ; un exemple de
                        PLUSIEURS fichiers a son propre dossier (voxel_world/, model_3d/,
-                       primitives_3d/, transforms_3d/), et une bibliothèque partagée par plusieurs
-                       d'entre eux vit dans docs/samples/lib/ (trackball.ol). Les modèles 3D
-                       restent à la racine : ce sont des DONNÉES désignées par leur nom, et le
-                       préchargeur web préfixe `samples/`.
+                       primitives_3d/, transforms_3d/), avec SES données (les six modèles 3D sont
+                       dans model_3d/), et une bibliothèque partagée par plusieurs d'entre eux vit
+                       dans docs/samples/lib/ (trackball.ol).
 ```
 
 ## Web app monopage (docs/)
@@ -1355,6 +1354,22 @@ fichier dont le chemin remonte l'arborescence.
 - `tests/check_samples.sh` parcourt `docs/samples/**` et identifie un fichier par son **chemin
   relatif** ; les bibliothèques exemptées du catalogue y sont listées par chemin
   (`lib/trackball.ol`, `voxel_world/joystick.ol`, `voxel_world/view_distance.ol`).
+
+## Ressources : `program_dir()` (une ressource se cherche À CÔTÉ du programme)
+
+`graphics.model("rubik.glb")` et `image.load("logo.png")` désignent un fichier par un nom NU, sans
+répéter le dossier du script. Ce nom est résolu **à côté du programme d'abord**, puis tel quel :
+`program_dir()` (source_registry.h) porte le dossier du fichier d'entrée, posé une fois au
+démarrage par `main.cpp` et `wasm_main.cpp` depuis `path_dir`, comme pour `base_dir`.
+
+- **Ce que cela règle** : un exemple rangé dans son propre dossier y garde ses données, et il ne
+  dépend plus du répertoire COURANT du processus — `LoadModel`/`LoadTexture` résolvent depuis le
+  CWD, si bien que `model_3d` ne tournait en natif que lancé depuis `docs/samples/`.
+- **Le nom écrit dans le code reste la clé** : le préchargeur web (`fetchAsset`, pg-run.js) cherche
+  `<dossier de l'entrée>/<nom>` puis `<nom>`, mais déclare toujours l'octet sous le **nom nu**, que
+  `graphics.model` et `image.load` interrogent. Un projet forké range donc ses ressources sous ce
+  même nom.
+- Les six générateurs et convertisseurs de `tools/` écrivent dans `docs/samples/model_3d/`.
 
 ## Noms exportés par un module (`Stmt::exported_names`)
 

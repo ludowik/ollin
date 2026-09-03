@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates docs/samples/teapot.glb — the Utah teapot, tessellated from its Bezier patches.
+"""Generates docs/samples/model_3d/teapot.glb — the Utah teapot, tessellated from its Bezier patches.
 
     python3 tools/gen_teapot_glb.py
 
@@ -244,7 +244,7 @@ if __name__ == "__main__":
     if 32 * STEPS * STEPS > 65535:
         raise SystemExit("above 65535 vertices raylib narrows the indices to u16: lower STEPS")
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "teapot.glb")
+    path = os.path.join(root, "docs", "samples", "model_3d", "teapot.glb")
     data, verts, tris = build()
     with open(path, "wb") as f:
         f.write(data)

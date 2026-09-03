@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Converts the Damaged Helmet into docs/samples/helmet.glb.
+"""Converts the Damaged Helmet into docs/samples/model_3d/helmet.glb.
 
     python3 tools/convert_helmet_glb.py
 
@@ -88,7 +88,7 @@ def main():
     }
 
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "helmet.glb")
+    path = os.path.join(root, "docs", "samples", "model_3d", "helmet.glb")
     data = gl.write_glb(built, out.data)
     with open(path, "wb") as f:
         f.write(data)

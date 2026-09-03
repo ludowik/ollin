@@ -2,6 +2,7 @@
 #include "lexer.h"
 #include "modules/data_module.h"
 #include "parser.h"
+#include "source_registry.h"
 #include "vm.h"
 #include <cstdlib>
 #include <fstream>
@@ -21,6 +22,7 @@ static void append_program(Program& dst, Program src) {
 int main(int argc, char* argv[]) {
     std::string script_path = (argc < 2) ? "main.ol" : argv[1];
     std::string dir = path_dir(script_path);
+    program_dir_set(dir);   // where the script's resources live, whatever the current directory
 
     // `data` persistence: a "<script>.data.json" sidecar for the project, plus a home file
     // for the global store.

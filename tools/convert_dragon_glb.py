@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Converts the Stanford dragon into docs/samples/dragon.glb.
+"""Converts the Stanford dragon into docs/samples/model_3d/dragon.glb.
 
     python3 tools/convert_dragon_glb.py
 
@@ -122,7 +122,7 @@ def main():
     nrm = [gl.rotate(n, quat) for n in nrm]
 
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "dragon.glb")
+    path = os.path.join(root, "docs", "samples", "model_3d", "dragon.glb")
     parts = split(pos, nrm, idx)
     data = build(parts)
     with open(path, "wb") as f:

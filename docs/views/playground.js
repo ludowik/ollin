@@ -2155,7 +2155,7 @@ async function launch() {
   // samples/; user projects go through their own resources.
   if (!currentProject) {
     const imported = await Run.preloadSampleImports(ollin, code, ctx.v, entryName)
-    await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // the imports' models too
+    await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v, entryName)   // the imports' models too
   }
   // The `data` module's project scope: the project's id, or 'sample:<file>' for a sample.
   window.__ollinDataProject = isExample() ? ('sample:' + exampleFile) : (currentProject ? currentProject.id : '_')

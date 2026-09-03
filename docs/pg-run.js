@@ -105,21 +105,33 @@ function bytesToB64(bytes) {
   return btoa(bin)
 }
 
-// SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj"), fetching them from
-// samples/ (user projects go through their own resources instead). Best-effort: a model that
-// cannot be found is simply ignored.
-export async function preloadSampleModels(m, code, v) {
+// A resource a script NAMES is looked for beside the program first, then at the root of samples/ —
+// the same rule the engine follows for a native run (program_dir), so an example kept in its own
+// directory carries its data beside it while a shared asset stays reachable. Returns the bytes, or
+// null: the preloading is best-effort, and the engine reports a genuinely missing resource.
+async function fetchAsset(name, v, entry) {
+  const dir = dirOf(entry || '')
+  for (const url of dir ? [dir + name, name] : [name]) {
+    try {
+      const r = await fetch('samples/' + url + '?v=' + v, { cache: 'no-cache' })
+      if (r.ok) return new Uint8Array(await r.arrayBuffer())
+    } catch (_) { /* try the next place */ }
+  }
+  return null
+}
+
+// SAMPLE mode: preloads the 3D models referenced by graphics.model("x.obj") (user projects go
+// through their own resources instead). The key is the name AS WRITTEN in the code, which is what
+// the engine looks up — never the URL it was found at.
+export async function preloadSampleModels(m, code, v, entry = '') {
   if (!m || !m.preloadModel || typeof code !== 'string') return
   const seen = new Set()
   for (const file of findModels(code)) {
     if (seen.has(file)) continue
     seen.add(file)
-    try {
-      const r = await fetch('samples/' + file + '?v=' + v, { cache: 'no-cache' })
-      if (!r.ok) continue
-      const bytes = new Uint8Array(await r.arrayBuffer())
+    const bytes = await fetchAsset(file, v, entry)
+    if (bytes)
       m.preloadModel(file, bytesToB64(bytes), file.split('.').pop().toLowerCase())
-    } catch (_) { /* best-effort */ }
   }
 }
 
@@ -244,12 +256,9 @@ export async function collectSampleProject(entryFile, v) {
   for (const name of [...findModels(allCode), ...findImages(allCode)]) {
     if (seenAsset.has(name)) continue
     seenAsset.add(name)
-    try {
-      const r = await fetch('samples/' + name + '?v=' + v, { cache: 'no-cache' })
-      if (!r.ok) continue
-      const bytes = new Uint8Array(await r.arrayBuffer())
+    const bytes = await fetchAsset(name, v, entryFile)
+    if (bytes)
       resources[name] = { b64: bytesToB64(bytes), ext: name.split('.').pop().toLowerCase() }
-    } catch (_) { /* a missing asset is ignored */ }
   }
   return { files, resources, entry: entryFile }
 }

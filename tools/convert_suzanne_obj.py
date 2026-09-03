@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Converts the Khronos Suzanne sample model into docs/samples/suzanne.obj.
+"""Converts the Khronos Suzanne sample model into docs/samples/model_3d/suzanne.obj.
 
     python3 tools/convert_suzanne_obj.py
 
@@ -45,7 +45,7 @@ def main():
     idx = [t[0] for t in gl.accessor(doc, blob, prim["indices"])]
 
     root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "suzanne.obj")
+    path = os.path.join(root, "docs", "samples", "model_3d", "suzanne.obj")
     with open(path, "w") as f:
         f.write("# Suzanne, the Blender mascot - external model (OBJ) for Ollin\n")
         f.write("# From KhronosGroup/glTF-Sample-Assets, (c) 2017 UX3D, by Norbert Nopper.\n")

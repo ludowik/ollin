@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-03 21:00</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-03 21:12</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-03 21:00</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-03 21:12</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1930,7 +1930,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.cone(x,y,z, r, h)</code></td><td><code>(x,y,z)</code> is the base's centre, with radius <code>r</code> and height <code>h</code> — solid with <code>fill</code></td></tr>
     <tr><td><code>graphics.torus(x,y,z, r, tube)</code></td><td>A torus centred on <code>(x,y,z)</code>, of main radius <code>r</code> and tube radius <code>tube</code> — solid with <code>fill</code></td></tr>
     <tr><td><code>graphics.plane(x,y,z, sx,sz)</code></td><td>A horizontal plane (XZ) of size <code>sx</code>×<code>sz</code>, filled</td></tr>
-    <tr><td><code>graphics.model(name)</code></td><td>Loads an <strong>external model</strong> (<code>.obj</code>, or <code>.glb</code> with embedded materials and textures) → it returns a handle. In a project, add it under <em>Resources</em>; in an example or a draft it is loaded automatically from <code>samples/</code></td></tr>
+    <tr><td><code>graphics.model(name)</code></td><td>Loads an <strong>external model</strong> (<code>.obj</code>, or <code>.glb</code> with embedded materials and textures) → it returns a handle. In a project, add it under <em>Resources</em>; in an example or a draft it is loaded automatically from <code>samples/</code>. Like <code>image.load</code>, the name is looked for <strong>beside the program</strong> first — an example kept in its own directory carries its models there</td></tr>
     <tr><td><code>graphics.drawModel(handle, x,y,z [, scale])</code></td><td>Draws the model at <code>(x,y,z)</code>, with an optional scale, lit. A <code>.glb</code> keeps its <strong>textures and colours</strong>, including a <strong>colour per vertex</strong> when the file carries one — many colours in one mesh, with no image; <code>fill</code> is a global tint, white keeping the original colours</td></tr>
     <tr><td><code>graphics.modelSize(handle)</code></td><td>The model's dimensions → a map <code>{ w, h, d, cx, cy, cz, radius }</code> (size, centre, bounding radius)</td></tr>
     <tr><td><code>graphics.fitDistance(radius [, fovy])</code></td><td>The camera distance at which a sphere of radius <code>radius</code> fits on screen, following the portrait/landscape ratio — handy for framing a model</td></tr>
@@ -2597,7 +2597,7 @@ bell.volume(<span class="num">0.4</span>).play()</code></pre>
     <span class="bi">graphics</span>.sprite(tex, <span class="num">20</span>, <span class="num">40</span>, <span class="num">64</span>, <span class="num">64</span>)   <span class="cmt">## 64×64</span>
     <span class="bi">graphics</span>.sprite(tex, <span class="num">120</span>, <span class="num">25</span>, <span class="num">96</span>, <span class="num">96</span>)  <span class="cmt">## resized</span>
 <span class="kw">end</span></code></pre>
-<div class="callout"><code>image.load(name)</code> resolves the name like this: <strong>natively</strong>, a file on disk; in <strong>WASM</strong>, first an image added through the <strong>"Images"</strong> button, otherwise a <strong>resource served by the site</strong> (same origin, fetched automatically — <code>image.load("assets/logo.png")</code>, relative to the page). For an image <strong>embedded</strong> in the script, portable anywhere and needing no network, use <code>image.loadData("png", base64)</code> — see the playground's "Image (loadData)" example.</div>
+<div class="callout"><code>image.load(name)</code> resolves the name like this: <strong>natively</strong>, a file on disk; in <strong>WASM</strong>, first an image added through the <strong>"Images"</strong> button, otherwise a <strong>resource served by the site</strong> (same origin, fetched automatically — <code>image.load("assets/logo.png")</code>, relative to the page). In both cases the file is looked for <strong>beside the program</strong> first, then under the name as written: a script kept in its own directory names its data without repeating that directory, and it no longer matters which directory the program was started from. For an image <strong>embedded</strong> in the script, portable anywhere and needing no network, use <code>image.loadData("png", base64)</code> — see the playground's "Image (loadData)" example.</div>
 
 <h3>Render texture (off-screen drawing)</h3>
 <pre><code><span class="bi">graphics</span>.canvas(<span class="num">180</span>, <span class="num">180</span>, <span class="str">"render texture"</span>)

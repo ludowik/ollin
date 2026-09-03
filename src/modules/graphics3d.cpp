@@ -2,6 +2,7 @@
 // transforms live in graphics_module.cpp; the boundary between the two units is
 // graphics_internal.h. Compiled only in the raylib/WASM builds.
 #include "graphics_internal.h"
+#include "../source_registry.h"
 #include "shader_sources.h"
 #include "graphics_quat.h"
 #include "image_module.h"
@@ -1186,8 +1187,16 @@ static Model* model_get(const std::string& name) {
         m = LoadModel(path.c_str());
         remove(path.c_str());
     } else {
-        // Fallback: load straight from a path (native, or an asset in MEMFS).
-        m = LoadModel(name.c_str());
+        // Fallback: load straight from a path (native, or an asset in MEMFS). BESIDE THE PROGRAM
+        // first — a script names its data without repeating its own directory, and an example kept
+        // in its own directory must not depend on which directory the process was started from —
+        // then the path as written, which keeps an absolute or already-qualified name working.
+        if (!program_dir().empty())
+            m = LoadModel((program_dir() + name).c_str());
+        if (m.meshCount <= 0) {
+            UnloadModel(m);
+            m = LoadModel(name.c_str());
+        }
     }
     if (m.meshCount <= 0) {
         UnloadModel(m);
