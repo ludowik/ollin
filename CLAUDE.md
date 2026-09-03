@@ -151,10 +151,10 @@ ollin/
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
                        docs/samples/ : un exemple d'UN fichier est posé à plat ; un exemple de
-                       PLUSIEURS fichiers a son propre dossier (voxel_world/, model_3d/,
+                       PLUSIEURS fichiers a son propre dossier (invaders/, voxel_world/, model_3d/,
                        primitives_3d/, transforms_3d/), avec SES données (les six modèles 3D sont
                        dans model_3d/), et une bibliothèque partagée par plusieurs d'entre eux vit
-                       dans docs/samples/lib/ (trackball.ol).
+                       dans docs/samples/lib/ (trackball.ol, starfield.ol).
 ```
 
 ## Web app monopage (docs/)
@@ -1352,8 +1352,14 @@ fichier dont le chemin remonte l'arborescence.
   (`preloadSampleImports`, qui part du dossier du fichier d'entrée) et le ramassage d'un fork
   (`collectSampleProject`). Les deux fonctions JS partagent `resolveImport`/`pathNormalise`.
 - `tests/check_samples.sh` parcourt `docs/samples/**` et identifie un fichier par son **chemin
-  relatif** ; les bibliothèques exemptées du catalogue y sont listées par chemin
-  (`lib/trackball.ol`, `voxel_world/joystick.ol`, `voxel_world/view_distance.ol`).
+  relatif** ; il DÉDUIT les bibliothèques au lieu de les lister — un `.ol` importé par un autre en
+  est une — et signale aussi un `import` visant un fichier disparu.
+- **Ce qui doit rester dans le fichier d'ENTRÉE** : `setup`, `update`, `draw` et les rappels
+  `mouse.*` / `touch.*` / `keyboard.*`. Un module ne peut pas les capter (cf. l'avertissement en
+  tête de `joystick.ol` et de `trackball.ol`). En revanche un `global` déclaré dans un module est
+  partagé, et une fonction de l'hôte peut lire un `const` du module (et l'inverse) : c'est ce qui
+  permet de sortir les données et leurs constructeurs. ⚠ Un `const` de l'HÔTE, lui, est une locale
+  du corps principal : un module ne le voit pas (`UFO_HUM` a dû suivre les sons dans `sounds.ol`).
 
 ## Ressources : `program_dir()` (une ressource se cherche À CÔTÉ du programme)
 

@@ -33,6 +33,11 @@
 ## rule already paces the cannon: the next shot waits for the previous one to leave the field, which
 ## is what a good player's thumb does anyway.
 
+## The look and the sound live apart: patterns, inks and their builder in sprites.ol, the notes and
+## the noises in sounds.ol. What stays here is the GAME — its rules, its state and its frame.
+import "sprites.ol"
+import "sounds.ol"
+
 const FIELD_W    = 224          ## the field, in its own pixels — graphics.viewport does the rest
 const FIELD_H    = 256
 const TICK       = 1.0 / 60.0   ## the logical tick: one alien advances per tick
@@ -54,23 +59,6 @@ const SHIELD_H     = 16
 ## the eye catches at once, and one that no rewriting of two numbers can be trusted to keep. Whole
 ## pixels, a shield being read pixel by pixel through its own coordinates.
 const SHIELD_GAP   = (FIELD_W - SHIELDS * SHIELD_W) // (SHIELDS + 1)
-## What a hit eats out of a shield. The original carved a fixed PATTERN into the shield's bitmap —
-## no circle and no randomness — and the two weapons carved different ones: the cannon's shot takes a
-## small bite out of the UNDERSIDE it struck, while a bomb, arriving from above, opens a wider and
-## shallower crater. That is why a shield lasts a whole wave there and dissolved here: a jittered
-## disc of radius three removed some thirty pixels per shot, against a dozen for these.
-const SHOT_BITE = [
-    "##.#",
-    "####",
-    ".###",
-    "#.##"
-]
-const BOMB_BITE = [
-    ".####.",
-    "######",
-    "##.###",
-    ".####."
-]
 const GUN_W      = 13
 const GUN_H      = 5
 const GUN_Y      = 224          ## the cannon stands close under the shields, not far below them
@@ -90,77 +78,11 @@ const UFO_MIN_ALIVE = 8         ## it stays away below this many aliens, as the 
 ## a player who counts their shots can aim for the 300.
 const UFO_VALUES = [100, 50, 50, 100, 150, 100, 100, 50, 300, 100, 100, 100, 50, 150, 100]
 const POPUP_TIME = 0.9          ## how long the value stays written where the ship died
-## The march's four notes, descending — the loop the fleet walks to.
-const MARCH_NOTES = [110, 98, 87, 78]
-const UFO_HUM     = 220         ## the mystery ship's tone, warbled while it crosses
-const UFO_WARBLE  = 70          ## how far the warble swings, in hertz
-const UFO_RATE    = 14.0        ## and how fast, in swings per second
 const EXTRA_LIFE  = 1500        ## a life is given each time the score passes another of these
 const BLAST_TIME  = 0.18        ## how long a kill is shown coming apart
 const PAUSE_BAND  = 20          ## the top band, in field pixels: a tap there pauses on a touch screen
 const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
-const INK     = Color(0.90, 0.95, 1.00)
-const GUN_INK = Color(0.35, 0.95, 0.45)
-const SHIELD_INK = Color(0.30, 0.85, 0.40)
-const TOP_INK = Color(1.00, 0.45, 0.45)
-const DIM     = Color(0.55, 0.60, 0.72)
-
-## Two frames per creature, alternating on every pass: that alternation IS the march. Three
-## silhouettes of our own — a jellyfish, a spider, a moth — drawn in the idiom of an 8x8 monochrome
-## sprite. The arcade original's own creatures are its author's work and are not reproduced here;
-## only the MECHANICS are faithful.
-const JELLY_A = ["..####..", ".######.", "########", "#.####.#", ".#.##.#.", "#..##..#", ".#....#."]
-const JELLY_B = ["..####..", ".######.", "########", "#.####.#", ".#.##.#.", "..#..#..", ".#.##.#."]
-const SPIDR_A = ["#......#", ".#....#.", "..####..", ".######.", "..####..", ".#.##.#.", "#.#..#.#"]
-const SPIDR_B = [".#....#.", "..#..#..", "..####..", ".######.", "..####..", ".#.##.#.", "#......#"]
-const MOTH_A  = ["##....##", "##.##.##", ".######.", "..####..", "..#..#..", ".#....#."]
-const MOTH_B  = ["#......#", "##.##.##", "########", ".######.", "..#..#..", "#......#"]
-## Our own arch: what matters is that it is a TEXTURE, eaten pixel by pixel, and not a rectangle
-## that would vanish whole.
-const SHIELD = [
-    "......##########......",
-    "....##############....",
-    "...################...",
-    "..##################..",
-    ".####################.",
-    "######################",
-    "######################",
-    "######################",
-    "######################",
-    "######################",
-    "######################",
-    "#########....#########",
-    "########......########",
-    "#######........#######",
-    "######..........######",
-    "#####............#####"
-]
-const CANNON  = ["......#......", ".....###.....", ".....###.....", "#############", "#############"]
-## What is left of an alien for a fraction of a second: pieces flying apart, not a cloud.
-const BURST = [
-    "#..#..#..#",
-    ".#.#..#.#.",
-    "..#.##.#..",
-    "#..####..#",
-    "..#.##.#..",
-    ".#.#..#.#.",
-    "#..#..#..#"
-]
-## The bomb turns as it falls, which is how a falling thing reads at three pixels wide.
-## Our own saucer: wide, flat, and lit underneath — nothing of the fleet's silhouette, since it is
-## not one of them.
-const UFO = [
-    "....########....",
-    "..############..",
-    ".##############.",
-    "################",
-    "..##.##.##.##...",
-    "...#..#..#..#...",
-    "....##....##...."
-]
-const BOMB_A  = ["#..", ".#.", "..#", ".#."]
-const BOMB_B  = ["..#", ".#.", "#..", ".#."]
 
 ## One entry per kind: its two frames, what killing it is worth, its colour. The kind comes from the
 ## ROW, so the fleet's shape decides the score.
@@ -221,46 +143,8 @@ global grabX = 0.0       ## where the finger landed, and where the cannon was th
 global grabGun = 0.0     ## RELATIVE, so touching the screen never teleports the cannon
 global acc = 0.0
 
-func buildSprites()
-    kinds = [
-        {frames: [image.fromPattern(JELLY_A), image.fromPattern(JELLY_B)], points: 30, ink: TOP_INK},
-        {frames: [image.fromPattern(SPIDR_A), image.fromPattern(SPIDR_B)], points: 20, ink: INK},
-        {frames: [image.fromPattern(MOTH_A), image.fromPattern(MOTH_B)], points: 10, ink: INK}
-    ]
-    gunImg = image.fromPattern(CANNON)
-    bombImgs = [image.fromPattern(BOMB_A), image.fromPattern(BOMB_B)]
-    ufoImg = image.fromPattern(UFO)
-    burstImg = image.fromPattern(BURST)
-end
-
 ## A fresh set of shields: they are rebuilt for every wave, so a cleared wave hands back four whole
 ## arches — and the erosion of the previous one is genuinely gone, the textures being new.
-func buildSounds()
-    sndMarch = []
-    for f in MARCH_NOTES do
-        sndMarch.push(sound.tone(f, 0.11, "square").envelope(0.005, 0.03, 0.7, 0.04).volume(0.25))
-    end
-    ## The cannon's shot: a tone falling as it leaves, which is what makes it read as departing.
-    sndShoot = sound.generate(0.16, func(t)
-        return math.sin(t * 6.28318 * (900 - 3600 * t)) * math.exp(-t * 14)
-    end).volume(0.18)
-    ## An alien coming apart: noise, with a low ring under it so it is not just a hiss.
-    sndAlien = sound.generate(0.22, func(t)
-        var n = math.rand() * 2 - 1
-        return (n * 0.7 + math.sin(t * 6.28318 * 180) * 0.3) * math.exp(-t * 12)
-    end).volume(0.22)
-    ## The cannon itself: the same idea, heavier and slower to die.
-    sndGun = sound.generate(0.7, func(t)
-        var n = math.rand() * 2 - 1
-        return (n * 0.8 + math.sin(t * 6.28318 * (90 - 60 * t)) * 0.4) * math.exp(-t * 4)
-    end).volume(0.30)
-    ## The mystery ship coming apart: a sweep downwards, so it is heard as a fall.
-    sndUfo = sound.generate(0.45, func(t)
-        return math.sin(t * 6.28318 * (700 - 1200 * t)) * math.exp(-t * 5)
-    end).volume(0.22)
-    ufoVoice = sound.square(UFO_HUM).volume(0.10)
-end
-
 func buildShields()
     shields = []
     for i = 1, SHIELDS do

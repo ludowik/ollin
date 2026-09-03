@@ -19,11 +19,14 @@ global TYPES = {
     "partial":  {ratio: 1.05, offset: 0.80}
 }
 
+## The stars are a shared library: the lunar eclipse seeds the same field.
+import "lib/starfield.ol"
+
 const TRAVEL = 30.0    ## seconds for the whole passage, at speed 1
 
 global config = {type: "total", speed: 1.0}
 global u = 0.0           ## the passage's progress, from 0 to 1
-global stars = []
+global sky = nil       ## the fixed background of stars, from the shared library
 global hills = []     ## the horizon's outline, as sampled heights
 
 func sunRadius()
@@ -109,11 +112,8 @@ func setup()
     graphics.canvas(W, H, "Solar eclipse")
     math.noiseSeed(5)
 
-    for i = 1, 160 do
-        stars[#stars + 1] = math.rand(0, W)
-        stars[#stars + 1] = math.rand(0, H * 0.72)
-        stars[#stars + 1] = math.rand(0.2, 1.0)
-    end
+    ## Only the sky's height: a star below the horizon would be buried under the hills.
+    sky = Starfield(160, W, H * 0.72, 0.2).color(Color(0.9, 0.94, 1)).seed()
     ## The horizon: one height every twelve pixels, drawn from the noise, which gives soft hills.
     for x = 0, W + 12, 12 do
         hills[#hills + 1] = H * 0.80 + math.noise(x * 0.004, 3) * H * 0.10
@@ -137,17 +137,12 @@ func drawSky(l)
 end
 
 ## The stars only appear with the darkness: invisible by day, plain in totality, like the bright
-## planets one discovers then.
+## planets one discovers then. The field itself is the shared library's; only the fading is ours.
 func drawStars(l)
     if l > 0.35 then
         return
     end
-    var a = (0.35 - l) / 0.32
-    for i = 1, #stars, 3 do
-        var e = stars[i + 2]
-        graphics.stroke(Color(0.9, 0.94, 1, math.clamp(a * e, 0, 1)), e * 2)
-        graphics.point(stars[i], stars[i + 1])
-    end
+    sky.draw((0.35 - l) / 0.32)
 end
 
 func drawHorizon(l)

@@ -12,6 +12,9 @@
 ##
 ## This example's counterpart is "Solar eclipse", where it is the Moon that hides the Sun.
 
+## The stars are a shared library: the solar eclipse seeds the same field.
+import "lib/starfield.ol"
+
 const R_UMBRA = 2.7      ## the shadow cone's radius, in lunar radii
 const R_PENUMBRA = 4.6   ## the penumbra's radius
 const DURATION_H = 6.0      ## the simulated hours of the whole passage
@@ -27,7 +30,7 @@ global OFFSETS = {"total": 0.15, "partial": 2.2, "penumbral": 4.2}
 global config = {type: "total", speed: 1.0, marks: false}
 
 global moon = nil        ## the lunar disc's texture, built once
-global stars = []      ## the fixed background: [x, y, brightness, …]
+global sky = nil       ## the fixed background of stars, from the shared library
 global t = 0.0           ## the simulation's progress, in simulated hours
 
 ## Small enough for the PENUMBRA's circle to fit on screen, at 4.6 lunar radii: it is that scale
@@ -69,11 +72,7 @@ func setup()
     buildMoon(256)
     buildVeil()
 
-    for i = 1, 220 do
-        stars[#stars + 1] = math.rand(0, W)
-        stars[#stars + 1] = math.rand(0, H)
-        stars[#stars + 1] = math.rand(0.15, 1.0)
-    end
+    sky = Starfield(220, W, H, 0.15).color(Color(0.85, 0.9, 1)).seed()
 
     var menu = ui.menu("Eclipse")
     menu.list("Type", OFFSETS, ref config.type)
@@ -237,14 +236,6 @@ func buildVeil()
     end
 end
 
-func drawStars()
-    for i = 1, #stars, 3 do
-        var e = stars[i + 2]
-        graphics.stroke(Color(0.85, 0.9, 1, e), e * 2)
-        graphics.point(stars[i], stars[i + 1])
-    end
-end
-
 func drawMarks()
     var rl = moonRadius()
     graphics.noFill()
@@ -269,7 +260,7 @@ end
 
 func draw()
     graphics.clear(Color(0.02, 0.02, 0.05))
-    drawStars()
+    sky.draw()
     if config.marks then
         drawMarks()
     end
