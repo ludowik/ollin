@@ -533,8 +533,14 @@ func fleetTick()
             if turning then
                 turning = false
                 heading = -heading
+                ## The descent moves the WHOLE fleet, so the landing is judged here as well: testing
+                ## only the alien that advances would leave the fleet standing on the cannon for up
+                ## to a full pass before the game noticed.
                 for b in fleet do
                     b.y = b.y + WAVE_DROP
+                    if b.alive and b.y + 8 >= GUN_Y then
+                        landed = true
+                    end
                 end
             end
         end
