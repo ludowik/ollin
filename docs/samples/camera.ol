@@ -1,11 +1,10 @@
 ## Live webcam capture, in greyscale
 
-graphics.canvas(640, 480)
-
 global scale = 2
 global frame = nil
 
 func setup()
+    graphics.canvas(640, 480)
     camera.open(W / scale, H / scale)
 end
 

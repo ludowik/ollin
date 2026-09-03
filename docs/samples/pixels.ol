@@ -4,9 +4,14 @@ const LOW_W = 128
 const LOW_H = 96
 const SCALE = 0.044   ## small = broader blobs
 
-graphics.canvas(W, H, "Perlin per pixel")
-math.noiseSeed(7)
-var canvas = image.create(LOW_W, LOW_H)
+global canvas = nil
+
+func setup()
+    graphics.canvas(W, H, "Perlin per pixel")
+    math.noiseSeed(7)
+    ## The buffer is a texture, so it is built once the window exists.
+    canvas = image.create(LOW_W, LOW_H)
+end
 
 func draw()
     var t = elapsedTime * 0.3

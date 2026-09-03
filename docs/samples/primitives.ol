@@ -1,12 +1,17 @@
 ## A tour of the 2D primitives: one function per primitive, all called from draw().
 ## px, py and fs scale everything to the window; the drawing was designed for 700x600.
-graphics.canvas(W, H, "Primitives")
-var g = graphics
-var t = 0
+global g = graphics
+global t = 0
 
-var sx = W / 700
-var sy = H / 600
-var ss = math.min(sx, sy)
+## The drawing was designed for 700x600, so everything is scaled to the window — which means these
+## are only known once the canvas exists.
+global sx = 1
+global sy = 1
+global ss = 1
+global dpr = 1
+global tile = nil
+
+const DIM = Color(0.6, 0.65, 0.75)
 
 func px(v) return v * sx end
 func py(v) return v * sy end
@@ -15,28 +20,35 @@ func fs(v) return v * ss end
 ## The canvas is in PHYSICAL pixels: on a phone with three pixels per CSS pixel, a font scaled
 ## with the drawing becomes unreadable. dpr gives the ratio, and ft() guarantees at least the
 ## nominal size as it appears on screen.
-var dpr = W / window.width
 func ft(v) return math.max(v * ss, v * dpr) end
 
-var dim = Color(0.6, 0.65, 0.75)
-
 ## An 8x8 checkerboard built pixel by pixel, for the spriteMode demonstration.
-var tile = image.create(8, 8)
-image.beginPixels(tile)
-for y = 0, 7 do
-    for x = 0, 7 do
-        if (x + y) % 2 == 0 then
-            image.setPixel(tile, x, y, 1, 0.6, 0.25, 1)
-        else
-            image.setPixel(tile, x, y, 0.25, 0.3, 0.5, 1)
+func buildTile()
+    tile = image.create(8, 8)
+    image.beginPixels(tile)
+    for y = 0, 7 do
+        for x = 0, 7 do
+            if (x + y) % 2 == 0 then
+                image.setPixel(tile, x, y, 1, 0.6, 0.25, 1)
+            else
+                image.setPixel(tile, x, y, 0.25, 0.3, 0.5, 1)
+            end
         end
     end
+    image.endPixels(tile)
 end
-image.endPixels(tile)
 
-## A block's label: coordinates in the drawing's own units, and a style shared by all of them.
+func setup()
+    graphics.canvas(W, H, "Primitives")
+    sx = W / 700
+    sy = H / 600
+    ss = math.min(sx, sy)
+    dpr = W / window.width
+    buildTile()
+end
+
 func label(txt, x, y)
-    g.stroke(dim)
+    g.stroke(DIM)
     g.fontSize(ft(13))
     g.text(txt, px(x), py(y))
 end

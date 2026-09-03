@@ -2,8 +2,7 @@
 ## "Images" button then image.load("name.png") loads your own files.)
 const SMILEY = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAm0lEQVR42u2XMQ7AIAhFnXsI597/FL2VTYcODlU+8AsmmrB9+c8EFUpZbbWrtlGEmFJhtOZmCKuxCcTbHIJgmYshQgHY5kOIv8w/IWYbznqIk0u0EMCT8A2JuUSrMp8lRrQdhNepUC1UgN41AANQb8IG8Coq9VUMBwh/iNDHyKpT/wVIUH5EqvnuiNI0pSna8hSDSZrRLMVwylw34TmhCGvoaGUAAAAASUVORK5CYII="
 
-graphics.canvas(W, H, "image.loadData")
-var img = image.loadData("png", SMILEY)
+global img = nil
 
 global config = {
     count:   10,
@@ -15,14 +14,21 @@ global config = {
 }
 
 global sprites = []
-for i = 1, config.count do
-    sprites[i] = {
-        x:  math.randInt(0, W - config.maxSize),
-        y:  math.randInt(0, H - config.maxSize),
-        vx: math.rand(-config.speed, config.speed),
-        vy: math.rand(-config.speed, config.speed),
-        s:  math.randInt(config.minSize, config.maxSize)
-    }
+
+## The sprite is a texture and the swarm is placed inside the render area, so both wait for the
+## window to exist.
+func setup()
+    graphics.canvas(W, H, "image.loadData")
+    img = image.loadData("png", SMILEY)
+    for i = 1, config.count do
+        sprites[i] = {
+            x:  math.randInt(0, W - config.maxSize),
+            y:  math.randInt(0, H - config.maxSize),
+            vx: math.rand(-config.speed, config.speed),
+            vy: math.rand(-config.speed, config.speed),
+            s:  math.randInt(config.minSize, config.maxSize)
+        }
+    end
 end
 
 func draw()

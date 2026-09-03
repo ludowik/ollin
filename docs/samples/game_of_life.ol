@@ -152,10 +152,13 @@ func step()
     back = tmp
 end
 
-graphics.canvas(W, H, "Game of Life")
-COLS = W // CELL
-ROWS = H // CELL
-reset()
+func setup()
+    graphics.canvas(W, H, "Game of Life")
+    ## The grid derives from the render area, so it is sized once the canvas exists.
+    COLS = W // CELL
+    ROWS = H // CELL
+    reset()
+end
 
 func keyboard.keypressed(key)
     if key == "space" then
