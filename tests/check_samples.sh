@@ -42,7 +42,12 @@ for f in listed:
         errs.append(f"{f}: listed more than once")
         break
 
-on_disk = {os.path.basename(p) for p in glob.glob("docs/samples/*.ol")}
+# RECURSIVE, and by relative path: a sample kept in a sub-directory (an example split over several
+# files) is a legitimate layout, and globbing the top level only would let it escape the catalogue
+# entirely — exactly the oversight this guard exists to catch. The path is the identity, so two
+# files of the same name in different directories no longer collide either.
+on_disk = {os.path.relpath(p, "docs/samples").replace(os.sep, "/")
+           for p in glob.glob("docs/samples/**/*.ol", recursive=True)}
 for f in sorted(on_disk - set(listed) - LIBS):
     errs.append(f"{f}: present in docs/samples/ but absent from index.json")
 
