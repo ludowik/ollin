@@ -31,14 +31,20 @@ func setup()
     end
 end
 
+## The swarm MOVES here and is only drawn below: what advances the state belongs to update.
+func update(dt)
+    for sp in sprites do
+        sp.x = sp.x + sp.vx * dt
+        sp.y = sp.y + sp.vy * dt
+        if sp.x < 0 or sp.x > W - sp.s then sp.vx = -sp.vx end
+        if sp.y < 0 or sp.y > H - sp.s then sp.vy = -sp.vy end
+    end
+end
+
 func draw()
     graphics.clear(Color(0.08, 0.09, 0.14))
 
     for sp in sprites do
-        sp.x = sp.x + sp.vx * deltaTime
-        sp.y = sp.y + sp.vy * deltaTime
-        if sp.x < 0 or sp.x > W - sp.s then sp.vx = -sp.vx end
-        if sp.y < 0 or sp.y > H - sp.s then sp.vy = -sp.vy end
         image.draw(img, sp.x, sp.y, sp.s, sp.s)
     end
 

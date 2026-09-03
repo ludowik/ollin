@@ -259,12 +259,15 @@ func drawMarks()
     graphics.text("shadow", CX + R_UMBRA * rl + 6, umbraCentre() + H * 0.02)
 end
 
-func draw()
-    t += deltaTime * config.speed * (DURATION_H / 24)   ## 24 s of simulation by default
+## The simulation's own clock, which draw() then reads.
+func update(dt)
+    t += dt * config.speed * (DURATION_H / 24)   ## 24 s of simulation by default
     if t > DURATION_H then
         t = 0.0
     end
+end
 
+func draw()
     graphics.clear(Color(0.02, 0.02, 0.05))
     drawStars()
     if config.marks then

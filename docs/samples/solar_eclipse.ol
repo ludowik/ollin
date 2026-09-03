@@ -210,12 +210,15 @@ func drawCorona()
     graphics.blendMode(blend.ALPHA)
 end
 
-func draw()
-    u += deltaTime * config.speed / TRAVEL
+## The moon's progress along its path, which draw() then reads.
+func update(dt)
+    u += dt * config.speed / TRAVEL
     if u > 1 then
         u = 0.0
     end
+end
 
+func draw()
     var l = light()
     var rs = sunRadius()
     var rl = moonRadius()

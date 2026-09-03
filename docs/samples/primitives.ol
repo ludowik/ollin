@@ -293,10 +293,14 @@ func demoArc()
     label("arc", 630, 305)
 end
 
+## The clock the demonstrations read. A time in SECONDS and not a fixed increment per frame: the
+## animations kept their speed only as long as the display ran at 60 Hz. The 1.2 is that speed, in
+## radians per second.
+func update(dt)
+    t += dt * 1.2
+end
+
 func draw()
-    ## deltaTime, not a fixed increment per frame: the animations kept the same speed only as
-    ## long as the display ran at 60 Hz. The 1.2 restores that speed, in radians per second.
-    t += deltaTime * 1.2
     g.clear(Color(0.08, 0.09, 0.12))
     demoPoint()
     demoLine()

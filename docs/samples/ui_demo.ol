@@ -114,15 +114,23 @@ func drawGrid()
     end
 end
 
+## The angle and the turns counted: what the widgets steer advances here, and draw() only reads it.
+func update(dt)
+    if not config.anim then
+        return
+    end
+    t += dt * config.speed
+    if t > math.TAU then
+        t -= math.TAU
+        turns += 1
+    end
+end
+
 func draw()
     graphics.clear(Color(0.09, 0.10, 0.14))
     if config.grid then
         drawGrid()
     end
-    if config.anim then
-        t += deltaTime * config.speed
-    end
-
     ## As many arms as `config.branches`: every widget acts on the drawing at once.
     var side = math.min(W, H)
     var r = side * 0.28
@@ -137,11 +145,6 @@ func draw()
         var cy = CY + math.sin(angle) * r
         drawShape(cx, cy, radius)
         graphics.line(CX, CY, cx, cy)
-    end
-
-    if t > math.TAU then
-        t -= math.TAU
-        turns += 1
     end
 
     graphics.stroke(Color(0.85, 0.88, 0.95))

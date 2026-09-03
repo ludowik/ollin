@@ -660,8 +660,9 @@ func drawClouds(secs)
     graphics.fill(colors.WHITE)
 end
 
-func draw()
-    graphics.clear(C_SKY)
+## The walk, the streaming of the chunks and the eye's placement: everything that advances the
+## world. draw() below only renders what this left behind.
+func update(dt)
     movePlayer()
     savePlayer()
 
@@ -678,7 +679,7 @@ func draw()
     if streaming and streamLoad(pcx, pcz, budget) == 0 then
         streaming = false
     end
-    var ev = vd.update(deltaTime, streaming)
+    var ev = vd.update(dt, streaming)
     if ev == 1 then
         streaming = true
     elseif ev == -1 then
@@ -692,7 +693,10 @@ func draw()
     cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),
                camY + math.sin(PITCH),
                camZ + math.cos(PITCH) * math.cos(yaw))
+end
 
+func draw()
+    graphics.clear(C_SKY)
     graphics.noStroke()
     ## The rendering camera: the player's, or the control camera up high, looking down, with up set
     ## to the player's heading so the orientation on screen matches. The culling ALWAYS remains the
