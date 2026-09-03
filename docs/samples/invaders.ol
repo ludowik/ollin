@@ -628,15 +628,19 @@ func dragTo(x)
     gunX = stopped
 end
 
-graphics.canvas(W, H, "Ollin Invaders")
-## From here on the script knows ONE frame of reference: the engine scales the field to the area and
-## hands over the pointer and the contacts already converted.
-graphics.viewport(FIELD_W, FIELD_H)
-buildSprites()
-buildSounds()
-## The field is laid out but not started: the title screen holds it, and its fleet is the one the
-## first wave will march — nothing is built twice.
-newWave()
+## Everything the program owns is built here, in the order it depends on: the window first, since a
+## sprite is a texture and a texture needs a graphics context.
+func setup()
+    graphics.canvas(W, H, "Ollin Invaders")
+    ## From here on the script knows ONE frame of reference: the engine scales the field to the area
+    ## and hands over the pointer and the contacts already converted.
+    graphics.viewport(FIELD_W, FIELD_H)
+    buildSprites()
+    buildSounds()
+    ## The field is laid out but not started: the title screen holds it, and its fleet is the one the
+    ## first wave will march — nothing is built twice.
+    newWave()
+end
 
 ## Any press means "go" on the title screen and on the end screen, and only fires while playing.
 ## One place decides that, so the four input paths below say the same thing.
