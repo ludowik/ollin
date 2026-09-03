@@ -45,15 +45,19 @@ const FLEET_Y    = 40
 const WAVE_DROP  = 8            ## how much lower each wave starts, and each descent falls
 const STEP_X     = 2            ## how far one alien advances
 const MARGIN     = 8            ## the walls the fleet turns at
-const SHIELD_Y     = 192        ## the four shields, between the fleet and the cannon
-const SHIELD_X0    = 26
-const SHIELD_PITCH = 56
+const SHIELD_Y     = 200        ## the four shields, just above the cannon as in the arcade
+const SHIELDS      = 4
 const SHIELD_W     = 22
 const SHIELD_H     = 16
+## The row is CENTRED by calculation: five equal gaps between the walls and the four arches. Written
+## as a first position and a pitch, it sat 26 px from the left wall and 8 from the right — a shift
+## the eye catches at once, and one that no rewriting of two numbers can be trusted to keep. Whole
+## pixels, a shield being read pixel by pixel through its own coordinates.
+const SHIELD_GAP   = (FIELD_W - SHIELDS * SHIELD_W) // (SHIELDS + 1)
 const BLAST        = 3          ## the radius a hit eats out of a shield
 const GUN_W      = 13
 const GUN_H      = 5
-const GUN_Y      = 232
+const GUN_Y      = 224          ## the cannon stands close under the shields, not far below them
 const GUN_SPEED  = 60           ## field pixels per second
 const SHOT_SPEED = 240
 const BOMB_SPEED = 90           ## slower than the cannon's shot: a bomb can be outrun
@@ -243,8 +247,8 @@ end
 
 func buildShields()
     shields = []
-    for i = 1, 4 do
-        shields.push({img: image.fromPattern(SHIELD), x: SHIELD_X0 + (i - 1) * SHIELD_PITCH})
+    for i = 1, SHIELDS do
+        shields.push({img: image.fromPattern(SHIELD), x: SHIELD_GAP * i + SHIELD_W * (i - 1)})
     end
 end
 
@@ -354,7 +358,7 @@ func addScore(points)
     if score >= nextLife then
         lives += 1
         nextLife += EXTRA_LIFE
-        showPopup("EXTRA LIFE", FIELD_W / 2, GUN_Y - 24)
+        showPopup("EXTRA LIFE", FIELD_W / 2, SHIELD_Y - 14)
     end
 end
 
