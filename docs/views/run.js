@@ -43,7 +43,7 @@ export async function init(ctx) {
     statusEl.textContent = ''
     // The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a
     // project whose models are already among its resources).
-    const imported = await preloadSampleImports(mod, code, ctx.v)
+    const imported = await preloadSampleImports(mod, code, ctx.v, exampleFile || (project && project.entry) || '')
     await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // the imports' models too
     // The `data` module's project scope, consistent with the playground: the same key.
     window.__ollinDataProject = exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_')

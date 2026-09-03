@@ -14,7 +14,7 @@
 
 ## The mouse rotation lives in trackball.ol, a library shared by the 3D examples: the host
 ## relays the three mouse callbacks to it.
-import "trackball.ol"
+import "../lib/trackball.ol"
 global ball = Trackball()
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 

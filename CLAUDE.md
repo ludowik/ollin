@@ -150,6 +150,12 @@ ollin/
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
 └── docs/              tutoriel, playground, samples, wasm
+                       docs/samples/ : un exemple d'UN fichier est posé à plat ; un exemple de
+                       PLUSIEURS fichiers a son propre dossier (voxel_world/, model_3d/,
+                       primitives_3d/, transforms_3d/), et une bibliothèque partagée par plusieurs
+                       d'entre eux vit dans docs/samples/lib/ (trackball.ol). Les modèles 3D
+                       restent à la racine : ce sont des DONNÉES désignées par leur nom, et le
+                       préchargeur web préfixe `samples/`.
 ```
 
 ## Web app monopage (docs/)
@@ -1327,6 +1333,28 @@ La 3D s'appuie sur raylib (`Camera3D`, `BeginMode3D`/`EndMode3D`, `GenMesh*`) ma
 - **Quaternions** (`graphics_quat.cpp`, math raymath pure, fichier séparé) : classe native `Quat` ; fabriques `graphics.quat()`/`quat_axis(ax,ay,az,deg)`/`quat_euler(pitch,yaw,roll)` (**degrés**) ; méthodes `mul`/`slerp`/`normalize`/`inverse`/`rotate_vec` (renvoient de NOUVELLES instances, valeurs immuables). `graphics.rotateq(q)` (dans graphics3d.cpp) applique `QuaternionToMatrix(q)` via `rlMultMatrixf` (gauche-multiplie comme `rlRotatef` → compose comme `rotate`). `quatFromInstance()`/`makeQuatInstance()` = pont graphics3d↔graphics_quat.
 - **Perf/limites** : 1 draw call par `(shape, texture)` — le nombre de **couleurs** n'ajoute pas de draw call (couleur par instance). `cylinder` est **mono-rayon** (`x,y,z,r,h`) : contrainte du mesh unitaire figé. Models externes = extension additive (bucket déjà keyé `(mesh, texture)`).
 
+
+## Résolution d'un `import` (le chemin résolu = IDENTITÉ du module)
+
+Un chemin d'`import` est résolu **relativement au dossier du fichier importateur** (`base_dir_ +
+path`, sauf chemin absolu), puis **normalisé** — `.` et `..` réduits (`path_normalise`, parser.cpp).
+Le chemin résolu est l'**identité** du module : clé du registre de sources, clé de déduplication des
+imports, et nom sous lequel un projet web forké range le fichier. Sans normalisation,
+`model_3d/../lib/trackball.ol` et `lib/trackball.ol` étaient deux modules distincts — la bibliothèque
+partagée par trois exemples aurait été analysée sous trois noms, et un projet forké aurait porté un
+fichier dont le chemin remonte l'arborescence.
+
+- **Le fichier d'entrée n'est PAS une exception** : `wasm_main.cpp` dérive `base_dir` du nom du
+  fichier exécuté, comme `main.cpp` l'a toujours fait. Il passait `""` en dur, si bien qu'un exemple
+  rangé dans un sous-dossier cherchait ses voisins à la racine — il tournait en natif et pas sur le
+  web, et le 404 du préchargement était silencieux (constaté au navigateur).
+- **La même règle vit en TROIS endroits** qui doivent rendre la même chaîne : `parser.cpp` (le
+  moteur), et dans `docs/pg-run.js` le préchargement des imports d'un exemple
+  (`preloadSampleImports`, qui part du dossier du fichier d'entrée) et le ramassage d'un fork
+  (`collectSampleProject`). Les deux fonctions JS partagent `resolveImport`/`pathNormalise`.
+- `tests/check_samples.sh` parcourt `docs/samples/**` et identifie un fichier par son **chemin
+  relatif** ; les bibliothèques exemptées du catalogue y sont listées par chemin
+  (`lib/trackball.ol`, `voxel_world/joystick.ol`, `voxel_world/view_distance.ol`).
 
 ## Noms exportés par un module (`Stmt::exported_names`)
 

@@ -8,11 +8,11 @@
   { "group": "2D drawing",  "name": "Perlin noise (per pixel)", "file": "pixels.ol" },
   { "group": "2D drawing",  "name": "Image (loadData)", "file": "image_demo.ol" },
 
-  { "group": "3D",          "name": "Primitives 3D",  "file": "primitives_3d.ol" },
-  { "group": "3D",          "name": "3D transforms and instancing", "file": "transforms_3d.ol" },
-  { "group": "3D",          "name": "3D models (.obj / .glb)", "file": "model_3d.ol" },
+  { "group": "3D",          "name": "Primitives 3D",  "file": "primitives_3d/primitives_3d.ol" },
+  { "group": "3D",          "name": "3D transforms and instancing", "file": "transforms_3d/transforms_3d.ol" },
+  { "group": "3D",          "name": "3D models (.obj / .glb)", "file": "model_3d/model_3d.ol" },
   { "group": "3D",          "name": "Isometric camera", "file": "iso_camera.ol" },
-  { "group": "3D",          "name": "Voxel world (Minecraft)", "file": "voxel_world.ol" },
+  { "group": "3D",          "name": "Voxel world (Minecraft)", "file": "voxel_world/voxel_world.ol" },
 
   { "group": "Interface, animation, sound", "name": "Interface (ui)", "file": "ui_demo.ol" },
   { "group": "Interface, animation, sound", "name": "Animations (tween)", "file": "tween_demo.ol" },

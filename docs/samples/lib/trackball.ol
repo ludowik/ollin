@@ -9,7 +9,7 @@
 ## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
 ## module cannot catch them itself, hence three relays:
 ##
-##   import "trackball.ol"
+##   import "../lib/trackball.ol"   ## from a sample kept in its own directory
 ##   global ball = Trackball()
 ##   func mouse.pressed(x, y)  ball.press(x, y) end
 ##   func mouse.moved(x, y)    ball.move(x, y)  end

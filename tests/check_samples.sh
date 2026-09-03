@@ -15,7 +15,9 @@ import glob, json, os, sys
 
 # The LIBRARIES are imported by other samples (import "trackball.ol"), not opened on their own:
 # they have no setup() and no draw(), so the menu must not offer them.
-LIBS = {"trackball.ol", "joystick.ol", "view_distance.ol"}
+# A multi-file example lives in its OWN directory, and a library shared by several of them in
+# lib/ — hence relative paths here, the identity of a file being its path.
+LIBS = {"lib/trackball.ol", "voxel_world/joystick.ol", "voxel_world/view_distance.ol"}
 
 errs = []
 try:

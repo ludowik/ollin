@@ -134,11 +134,15 @@ const _importSrcCache = new Map()
 // registry keys consistent, sub-directories included. It returns the CONCATENATION of the
 // imported sources, so that the caller can preload the models and assets they reference too.
 // Best-effort.
-export async function preloadSampleImports(m, code, v) {
+export async function preloadSampleImports(m, code, v, entry) {
   if (!m || !m.preloadSource || typeof code !== 'string') return ''
   const seen = new Set()
   const collected = []
-  let queue = findImports(code).map((imp) => resolveImport('', imp))   // the entry file: an empty base_dir
+  // The entry file's own directory is the base of ITS imports — the engine resolves them exactly so.
+  // Assuming the root here sent an entry kept in a sub-directory looking for its siblings at the
+  // top of samples/, and the 404 was silent (this preloading is best-effort).
+  const base = dirOf(entry || '')
+  let queue = findImports(code).map((imp) => resolveImport(base, imp))
   while (queue.length) {
     const key = queue.shift()
     if (seen.has(key)) continue
@@ -174,8 +178,24 @@ function findImports(src) {
   return out
 }
 const dirOf = (p) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/') + 1) : '')
-// Resolution identical to the parser's: base_dir plus the path (a naive concatenation), unless the path is absolute.
-const resolveImport = (parentDir, imp) => (imp[0] === '/' ? imp : parentDir + imp)
+// Resolution identical to the parser's: base_dir plus the path, unless the path is absolute, then
+// "." and ".." collapsed. The result is the module's IDENTITY — the registry key the engine looks
+// up, and the file name a forked project stores it under — so a shared library reached from two
+// sample directories must come out as ONE string, without a path that walks upwards.
+const resolveImport = (parentDir, imp) => pathNormalise(imp[0] === '/' ? imp : parentDir + imp)
+function pathNormalise(p) {
+  const absolute = p.startsWith('/')
+  const parts = []
+  for (const seg of p.split('/')) {
+    if (seg === '..') {
+      if (parts.length && parts[parts.length - 1] !== '..') parts.pop()
+      else if (!absolute) parts.push(seg)
+    } else if (seg && seg !== '.') {
+      parts.push(seg)
+    }
+  }
+  return (absolute ? '/' : '') + parts.join('/')
+}
 
 // The resources referenced by Ollin code: file names carrying one of the given extensions. We
 // collect EVERY string literal that looks like a file, without requiring it to be the direct

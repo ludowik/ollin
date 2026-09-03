@@ -5,6 +5,42 @@
 #include <sstream>
 #include <stdexcept>
 
+// Collapses "." and ".." in a resolved import path. The resolved path is the IDENTITY of a module —
+// the registry key, the deduplication key, and the file name a forked web project stores it under —
+// so "a/../lib/x.ol" and "lib/x.ol" must be the same string. Two samples reaching a shared library
+// from their own directories would otherwise load it twice, under two names, and a project forked
+// from one of them would carry a file whose path walks upwards.
+static std::string path_normalise(const std::string& p) {
+    bool absolute = !p.empty() && p[0] == '/';
+    std::vector<std::string> parts;
+    size_t i = 0;
+    while (i <= p.size()) {
+        size_t j = p.find('/', i);
+        if (j == std::string::npos)
+            j = p.size();
+        std::string seg = p.substr(i, j - i);
+        if (seg == "..") {
+            // A ".." that cannot be collapsed is kept: it may still be meaningful on the filesystem.
+            if (!parts.empty() && parts.back() != "..")
+                parts.pop_back();
+            else if (!absolute)
+                parts.push_back(seg);
+        } else if (!seg.empty() && seg != ".") {
+            parts.push_back(seg);
+        }
+        if (j == p.size())
+            break;
+        i = j + 1;
+    }
+    std::string out = absolute ? "/" : "";
+    for (size_t k = 0; k < parts.size(); k++) {
+        if (k)
+            out += "/";
+        out += parts[k];
+    }
+    return out;
+}
+
 Parser::Parser(std::vector<Token> tokens, std::string base_dir,
                std::shared_ptr<std::unordered_set<std::string>> imported,
                std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names,
@@ -1374,6 +1410,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     // Resolve the path relative to the current script's directory.
     std::string resolved =
         (!path.empty() && (path[0] == '/' || (path.size() > 1 && path[1] == ':'))) ? path : base_dir_ + path;
+    resolved = path_normalise(resolved);
 
     auto block = std::make_unique<BlockStmt>();
 

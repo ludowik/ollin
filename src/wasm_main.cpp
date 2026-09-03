@@ -42,6 +42,12 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     s_vm = std::make_unique<VM>();
 
     const std::string fname = filename.empty() ? "<playground>" : filename;
+    // An import resolves relative to the DIRECTORY of the importing file, and the entry file is no
+    // exception: hard-coding an empty base directory meant an entry kept in a sub-directory looked
+    // for its siblings at the root instead (a sample split over several files could not run on the
+    // web, while it ran natively — main.cpp has always derived this).
+    auto sep = fname.find_last_of("/\\");
+    const std::string base_dir = (sep != std::string::npos) ? fname.substr(0, sep + 1) : "";
     std::ostringstream out;
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
     try {
@@ -49,7 +55,7 @@ static std::string ollin_run(const std::string& source, const std::string& filen
         auto source_files = std::make_shared<std::vector<std::string>>();
         source_files->push_back(fname);
         s_vm->execute(Compiler().compile(
-            Parser(Lexer(source, fname, 0).tokenize(), "", imported, nullptr, source_files).parse()));
+            Parser(Lexer(source, fname, 0).tokenize(), base_dir, imported, nullptr, source_files).parse()));
         s_vm->run_entry_hooks(); // setup(), then draw() through graphics.run: shared logic, with the is_map guard
     } catch (const std::exception& e) {
         std::cout.rdbuf(saved);

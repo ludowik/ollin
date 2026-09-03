@@ -17,7 +17,7 @@
 ## The rotation itself lives in trackball.ol, a library shared by the 3D examples: dragging
 ## composes quaternions, hence a smooth trackball with no gimbal lock. The mouse.* callbacks are
 ## global to the engine, so the host relays the three of them.
-import "trackball.ol"
+import "../lib/trackball.ol"
 global ball = Trackball()
 global cam = graphics.camera(0, 14, 34,  0, 0, 0)   ## FIXED: it is the scene that turns
 
