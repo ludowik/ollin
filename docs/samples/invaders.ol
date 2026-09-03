@@ -570,6 +570,18 @@ func fleetTick()
     end
 end
 
+## Is a shield straight above the muzzle? Its own pixels answer, so a hole shot earlier is a clear
+## line again — the shelter is asked, not a rectangle around it.
+func sheltered()
+    var x = gunX + GUN_W / 2
+    for y = SHIELD_Y, SHIELD_Y + SHIELD_H - 1 do
+        if shieldAt(x, y) <> nil then
+            return true
+        end
+    end
+    return false
+end
+
 func fire()
     if shotLive or alive == 0 then
         return
@@ -736,8 +748,11 @@ func update(dt)
     end
 
     ## Automatic once a finger has played: fire() is a no-op while a shot is in the air, so the
-    ## cadence is the shot's travel time and nothing has to time it.
-    if touchPlay then
+    ## cadence is the shot's travel time and nothing has to time it. It holds fire under a shield —
+    ## the finger only aims, and a thumb parked in the shelter would otherwise dig through it at
+    ## sixty shots a second. Space still fires wherever the cannon stands: destroying one's own
+    ## shelter is the player's right, not an accident of the automatic cadence.
+    if touchPlay and not sheltered() then
         fire()
     end
 
