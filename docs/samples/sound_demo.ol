@@ -254,7 +254,7 @@ func keyboard.keypressed(key)
     end
 end
 
-func update()
+func update(dt)
     ## The oscillator follows the finger: a frequency that moves while the sound comes out, which a
     ## frozen buffer could not do. The volume opens and closes gently.
     var target = 0.0
@@ -263,9 +263,9 @@ func update()
         bow.freq(110 + bowPos * 660)
     end
     var v = bow.volume()
-    bow.volume(v + (target - v) * math.min(1, deltaTime * 8))
+    bow.volume(v + (target - v) * math.min(1, dt * 8))
 
-    glow = math.max(glow - deltaTime * 2.5, 0)
+    glow = math.max(glow - dt * 2.5, 0)
 end
 
 ## The keys HELD stay lit, their note lasting as long as the press does. It is read in ONE pass, to

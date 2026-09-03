@@ -3,7 +3,7 @@
 ##
 ##   orient()  gives the current orientation quaternion, to pass to graphics.rotateq
 ##   dragging  → true while dragging, so an automatic rotation can be suspended
-##   idle(degreesPerSecond)  a gentle rotation at rest, to be called in draw()
+##   idle(dt, degreesPerSecond)  a gentle rotation at rest, to be called from update(dt)
 ##   reset()   back to the starting orientation, for a "recentre the view" gesture
 ##
 ## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
@@ -67,10 +67,12 @@ class Trackball
     end
 
     ## A gentle rotation while the user is not dragging; it does nothing during a drag.
-    func idle(degreesPerSecond)
+    ## The time step is an ARGUMENT: what advances state belongs to update(dt), and a library that
+    ## read the deltaTime global would teach the opposite of what the examples show.
+    func idle(dt, degreesPerSecond)
         if self.dragging then
             return
         end
-        self.q = graphics.quatAxis(0, 1, 0, deltaTime * degreesPerSecond).mul(self.q)
+        self.q = graphics.quatAxis(0, 1, 0, dt * degreesPerSecond).mul(self.q)
     end
 end

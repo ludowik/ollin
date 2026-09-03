@@ -5,6 +5,11 @@
 #include <sstream>
 #include <stdexcept>
 
+std::string path_dir(const std::string& file) {
+    auto sep = file.find_last_of("/\\");
+    return (sep != std::string::npos) ? file.substr(0, sep + 1) : "";
+}
+
 // Collapses "." and ".." in a resolved import path. The resolved path is the IDENTITY of a module —
 // the registry key, the deduplication key, and the file name a forked web project stores it under —
 // so "a/../lib/x.ol" and "lib/x.ol" must be the same string. Two samples reaching a shared library
@@ -13,12 +18,9 @@
 static std::string path_normalise(const std::string& p) {
     bool absolute = !p.empty() && p[0] == '/';
     std::vector<std::string> parts;
-    size_t i = 0;
-    while (i <= p.size()) {
-        size_t j = p.find('/', i);
-        if (j == std::string::npos)
-            j = p.size();
-        std::string seg = p.substr(i, j - i);
+    std::istringstream segments(p);
+    std::string seg;
+    while (std::getline(segments, seg, '/')) {
         if (seg == "..") {
             // A ".." that cannot be collapsed is kept: it may still be meaningful on the filesystem.
             if (!parts.empty() && parts.back() != "..")
@@ -28,9 +30,6 @@ static std::string path_normalise(const std::string& p) {
         } else if (!seg.empty() && seg != ".") {
             parts.push_back(seg);
         }
-        if (j == p.size())
-            break;
-        i = j + 1;
     }
     std::string out = absolute ? "/" : "";
     for (size_t k = 0; k < parts.size(); k++) {
@@ -1455,8 +1454,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
         src_text = ss.str();
     }
 
-    auto sep2 = resolved.find_last_of("/\\");
-    std::string sub_dir = (sep2 != std::string::npos) ? resolved.substr(0, sep2 + 1) : base_dir_;
+    std::string sub_dir = path_dir(resolved);
 
     // Register the imported file in the shared source table, then lex and parse with that
     // file_idx so tokens and AST nodes carry the right origin. The table is shared by every

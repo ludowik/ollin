@@ -102,12 +102,16 @@ func mouse.doubleClicked(x, y)
     zoom.factor = 1.0
 end
 
+## The trackball's gentle drift is the only state this example advances.
+func update(dt)
+    ball.idle(dt, 30)
+end
+
 func draw()
     graphics.clear(colors.BLACK)
     var dist = graphics.fitDistance(sz.radius) * current.margin / zoom.factor
     cam.setPos(sz.cx, sz.cy + dist * current.height, sz.cz + dist)   ## a FIXED camera, framed
     cam.lookAt(sz.cx, sz.cy, sz.cz)
-    ball.idle(30)   ## a gentle rotation while nobody is dragging
 
     graphics.begin3d(cam)
         graphics.fill(current.tint)

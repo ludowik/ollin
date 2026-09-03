@@ -1,26 +1,22 @@
 ## A tour of the 2D primitives: one function per primitive, all called from draw().
 ## px, py and fs scale everything to the window; the drawing was designed for 700x600.
-global g = graphics
-global t = 0
-
-## The drawing was designed for 700x600, so everything is scaled to the window — which means these
-## are only known once the canvas exists.
-global sx = 1
-global sy = 1
-global ss = 1
-global dpr = 1
-global tile = nil
-
+const g = graphics
 const DIM = Color(0.6, 0.65, 0.75)
 
-func px(v) return v * sx end
-func py(v) return v * sy end
-func fs(v) return v * ss end
+global t = 0
+global tile = nil
+
+## The drawing was designed for 700x600 and is scaled to the window. Nothing is cached: these are
+## pure functions of W, H and window.width, so the drawing follows a canvas that changes size
+## instead of staying frozen on the values read at startup.
+func px(v) return v * W / 700 end
+func py(v) return v * H / 600 end
+func fs(v) return v * math.min(W / 700, H / 600) end
 
 ## The canvas is in PHYSICAL pixels: on a phone with three pixels per CSS pixel, a font scaled
-## with the drawing becomes unreadable. dpr gives the ratio, and ft() guarantees at least the
-## nominal size as it appears on screen.
-func ft(v) return math.max(v * ss, v * dpr) end
+## with the drawing becomes unreadable. W / window.width gives that ratio, and ft() guarantees at
+## least the nominal size as it appears on screen.
+func ft(v) return math.max(fs(v), v * W / window.width) end
 
 ## An 8x8 checkerboard built pixel by pixel, for the spriteMode demonstration.
 func buildTile()
@@ -40,10 +36,6 @@ end
 
 func setup()
     graphics.canvas(W, H, "Primitives")
-    sx = W / 700
-    sy = H / 600
-    ss = math.min(sx, sy)
-    dpr = W / window.width
     buildTile()
 end
 

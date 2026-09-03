@@ -44,10 +44,9 @@ static std::string ollin_run(const std::string& source, const std::string& filen
     const std::string fname = filename.empty() ? "<playground>" : filename;
     // An import resolves relative to the DIRECTORY of the importing file, and the entry file is no
     // exception: hard-coding an empty base directory meant an entry kept in a sub-directory looked
-    // for its siblings at the root instead (a sample split over several files could not run on the
-    // web, while it ran natively — main.cpp has always derived this).
-    auto sep = fname.find_last_of("/\\");
-    const std::string base_dir = (sep != std::string::npos) ? fname.substr(0, sep + 1) : "";
+    // for its siblings at the root instead — it ran natively and not on the web. path_dir is the
+    // single place that rule lives now.
+    const std::string base_dir = path_dir(fname);
     std::ostringstream out;
     std::streambuf* saved = std::cout.rdbuf(out.rdbuf());
     try {

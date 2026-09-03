@@ -571,12 +571,20 @@ func fleetTick()
 end
 
 ## Is a shield straight above the muzzle? Its own pixels answer, so a hole shot earlier is a clear
-## line again — the shelter is asked, not a rectangle around it.
+## line again — the shelter is asked, not a rectangle around it. The cannon's column can only meet
+## ONE shield, so it is found first and its rows are then read directly: going through shieldAt per
+## row re-tested the four shields sixteen times for the same answer.
 func sheltered()
     var x = gunX + GUN_W / 2
-    for y = SHIELD_Y, SHIELD_Y + SHIELD_H - 1 do
-        if shieldAt(x, y) <> nil then
-            return true
+    for sh in shields do
+        if x >= sh.x and x < sh.x + SHIELD_W then
+            for y = 0, SHIELD_H - 1 do
+                var r, g, b, a = image.getPixel(sh.img, x - sh.x, y)
+                if a > 0.5 then
+                    return true
+                end
+            end
+            return false
         end
     end
     return false
@@ -756,7 +764,10 @@ func update(dt)
     ## the finger only aims, and a thumb parked in the shelter would otherwise dig through it at
     ## sixty shots a second. Space still fires wherever the cannon stands: destroying one's own
     ## shelter is the player's right, not an accident of the automatic cadence.
-    if touchPlay and not sheltered() then
+    ## The cheapest test first: with a shot in the air fire() would do nothing anyway, and a shot is
+    ## in the air most of the time — reading the shelter's pixels before knowing that was the cost of
+    ## a whole frame for no decision.
+    if touchPlay and not shotLive and not sheltered() then
         fire()
     end
 

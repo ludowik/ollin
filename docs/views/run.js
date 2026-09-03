@@ -41,9 +41,13 @@ export async function init(ctx) {
   // (Re)starts the current program. Used both at startup and by "Reload".
   async function launch() {
     statusEl.textContent = ''
+    // ONE name for the file being run: it is the base the imports resolve against, on the
+    // preloading side and inside the engine, which derives its base directory from this very
+    // string. Two formulas would let the two disagree.
+    const entryName = project ? (project.entry || '') : (exampleFile || '')
     // The 3D models referenced are preloaded from samples/ (best-effort, and of no effect for a
     // project whose models are already among its resources).
-    const imported = await preloadSampleImports(mod, code, ctx.v, exampleFile || (project && project.entry) || '')
+    const imported = await preloadSampleImports(mod, code, ctx.v, entryName)
     await preloadSampleModels(mod, code + '\n' + imported, ctx.v)   // the imports' models too
     // The `data` module's project scope, consistent with the playground: the same key.
     window.__ollinDataProject = exampleFile ? ('sample:' + exampleFile) : (project && project.id ? project.id : '_')
@@ -54,7 +58,7 @@ export async function init(ctx) {
     window.__ollinRenderW = Math.round(rr.width)
     window.__ollinRenderH = Math.round(rr.height)
     runProgram(mod, code, canvasEl, {
-      filename:  project ? (project.entry || '') : (exampleFile || ''),
+      filename:  entryName,
       onError:   (msg) => { statusEl.textContent = ''; showText(msg) },
       // A graphics program: keyboard focus goes to the canvas, for interactive programs.
       // preventScroll, otherwise mobile scrolls to bring the canvas into the viewport.

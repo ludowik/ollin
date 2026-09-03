@@ -8,7 +8,7 @@ func setup()
     camera.open(W / scale, H / scale)
 end
 
-func update()
+func update(dt)
     if camera.isOpen() then
         frame = camera.capture()
         if frame then

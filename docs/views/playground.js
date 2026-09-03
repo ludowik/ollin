@@ -2148,16 +2148,19 @@ async function launch() {
   Run.loadProjectIntoRuntime(ollin, currentProject)
   const code = currentProject ? (currentProject.files[currentProject.entry] ?? '')
                               : view.state.doc.toString()
+  // ONE name for the file being run: the base its imports resolve against, both while preloading
+  // and inside the engine, which derives its base directory from this very string.
+  const entryName = currentProject ? (currentProject.entry || '') : (exampleFile || '')
   // In sample or draft mode the 3D models referenced (graphics.model("x.obj")) are preloaded from
   // samples/; user projects go through their own resources.
   if (!currentProject) {
-    const imported = await Run.preloadSampleImports(ollin, code, ctx.v, exampleFile || '')
+    const imported = await Run.preloadSampleImports(ollin, code, ctx.v, entryName)
     await Run.preloadSampleModels(ollin, code + '\n' + imported, ctx.v)   // the imports' models too
   }
   // The `data` module's project scope: the project's id, or 'sample:<file>' for a sample.
   window.__ollinDataProject = isExample() ? ('sample:' + exampleFile) : (currentProject ? currentProject.id : '_')
   Run.runProgram(ollin, code, canvasEl, {
-    filename:  currentProject ? (currentProject.entry || '') : (exampleFile || ''),
+    filename:  entryName,
     onError:   (msg) => { setRunning(false); showOutput(msg) },
     onRunning: () => {
       outputPane.style.overflow = 'hidden'

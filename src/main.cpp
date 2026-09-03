@@ -20,8 +20,7 @@ static void append_program(Program& dst, Program src) {
 
 int main(int argc, char* argv[]) {
     std::string script_path = (argc < 2) ? "main.ol" : argv[1];
-    auto sep = script_path.find_last_of("/\\");
-    std::string dir = (sep != std::string::npos) ? script_path.substr(0, sep + 1) : "";
+    std::string dir = path_dir(script_path);
 
     // `data` persistence: a "<script>.data.json" sidecar for the project, plus a home file
     // for the global store.

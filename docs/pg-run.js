@@ -127,22 +127,16 @@ export async function preloadSampleModels(m, code, v) {
 // again on every restart (a page reload means a fresh module, hence an empty cache).
 const _importSrcCache = new Map()
 
-// SAMPLE mode: preloads the IMPORTED .ol files (import "x.ol") from samples/ into the runtime's
-// source registry, so that `import` resolves when a sample is run directly (user projects
-// already preload all of their files). It follows chained imports breadth-first, RESOLVING each
-// path as the parser does — relative to the importing file's directory — which keeps the
-// registry keys consistent, sub-directories included. It returns the CONCATENATION of the
-// imported sources, so that the caller can preload the models and assets they reference too.
-// Best-effort.
-export async function preloadSampleImports(m, code, v, entry) {
-  if (!m || !m.preloadSource || typeof code !== 'string') return ''
+// The transitive .ol imports of a file from samples/, walked breadth-first, each path RESOLVED as
+// the parser resolves it — relative to the importing file's directory, "." and ".." collapsed —
+// which keeps the keys identical to the ones the engine will look up, sub-directories included.
+// `onFile(key, src)` is called once per file reached; a fetch that fails calls `onMissing(key)`,
+// which decides whether that is fatal. The walk is written ONCE: preloading a sample into the
+// runtime and forking one into a project are the same traversal, and a resolution fix applied to
+// one of two copies would leave the other wrong.
+async function walkImports(entry, code, v, onFile, onMissing) {
   const seen = new Set()
-  const collected = []
-  // The entry file's own directory is the base of ITS imports — the engine resolves them exactly so.
-  // Assuming the root here sent an entry kept in a sub-directory looking for its siblings at the
-  // top of samples/, and the 404 was silent (this preloading is best-effort).
-  const base = dirOf(entry || '')
-  let queue = findImports(code).map((imp) => resolveImport(base, imp))
+  let queue = findImports(code).map((imp) => resolveImport(dirOf(entry), imp))
   while (queue.length) {
     const key = queue.shift()
     if (seen.has(key)) continue
@@ -151,16 +145,31 @@ export async function preloadSampleImports(m, code, v, entry) {
     if (src === undefined) {
       try {
         const r = await fetch('samples/' + key + '?v=' + v, { cache: 'no-cache' })
-        if (!r.ok) continue
+        if (!r.ok) throw new Error('HTTP ' + r.status)
         src = await r.text()
         _importSrcCache.set(key, src)
-      } catch (_) { continue }
+      } catch (e) {
+        onMissing(key, e)
+        continue
+      }
     }
-    m.preloadSource(key, src)          // the key is the resolved path, what source_get() looks for
-    collected.push(src)
-    const pdir = dirOf(key)
-    for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
+    onFile(key, src)
+    for (const imp of findImports(src)) queue.push(resolveImport(dirOf(key), imp))
   }
+}
+
+// SAMPLE mode: preloads the imported .ol files into the runtime's source registry, so that
+// `import` resolves when a sample is run straight from the repository (a user project already
+// preloads all of its files). It returns the CONCATENATION of the sources reached, so the caller
+// can preload the models and images THEY reference too. Best-effort: a missing import is ignored
+// here, and the engine reports it as the error it is.
+export async function preloadSampleImports(m, code, v, entry = '') {
+  if (!m || !m.preloadSource || typeof code !== 'string') return ''
+  const collected = []
+  await walkImports(entry, code, v, (key, src) => {
+    m.preloadSource(key, src)        // the key is the resolved path, what source_get() looks for
+    collected.push(src)
+  }, () => {})
   return collected.join('\n')
 }
 
@@ -222,28 +231,12 @@ const findImages = (code) => findAssets(code, 'png|jpg|jpeg|gif|webp|bmp')
 export async function collectSampleProject(entryFile, v) {
   const files = {}
   const resources = {}
-  const seen = new Set()
-  let queue = [entryFile]
-  while (queue.length) {
-    const key = queue.shift()
-    if (seen.has(key)) continue
-    seen.add(key)
-    let src
-    try {
-      const r = await fetch('samples/' + key + '?v=' + v, { cache: 'no-cache' })
-      if (!r.ok) {
-        if (key === entryFile) throw new Error('example not found: ' + key)
-        continue
-      }
-      src = await r.text()
-    } catch (e) {
-      if (key === entryFile) throw e
-      continue
-    }
-    files[key] = src
-    const pdir = dirOf(key)
-    for (const imp of findImports(src)) queue.push(resolveImport(pdir, imp))
-  }
+  // The ENTRY file is the one failure that must not be silent, so it is fetched here and its
+  // rejection propagates; its imports go through the shared walk, where a miss is ignored.
+  const entrySrc = await fetchSample(entryFile, v)
+  files[entryFile] = entrySrc
+  await walkImports(entryFile, entrySrc, v, (key, src) => { files[key] = src }, () => {})
+
   // The binary assets referenced — 3D models (model("x.obj")) AND external images
   // (image.load("x.png")) — become base64 resources of the project.
   const allCode = Object.values(files).join('\n')

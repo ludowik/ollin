@@ -11,15 +11,46 @@ root=$(cd "$here/.." && pwd)
 cd "$root" || exit 2
 
 python3 - <<'PYEOF'
-import glob, json, os, sys
+import glob, json, os, re, sys
 
-# The LIBRARIES are imported by other samples (import "trackball.ol"), not opened on their own:
-# they have no setup() and no draw(), so the menu must not offer them.
-# A multi-file example lives in its OWN directory, and a library shared by several of them in
-# lib/ — hence relative paths here, the identity of a file being its path.
-LIBS = {"lib/trackball.ol", "voxel_world/joystick.ol", "voxel_world/view_distance.ol"}
+# A LIBRARY is a file IMPORTED by another one: it is not opened on its own, so the menu must not
+# offer it and the catalogue must not list it. That is read from the code rather than kept in a
+# list — the list had to be rewritten the day the files moved, and an omission turns this guard
+# into a false alarm. The resolution is the parser's: relative to the importing file's directory,
+# with "." and ".." collapsed.
+def path_normalise(p):
+    absolute = p.startswith("/")
+    parts = []
+    for seg in p.split("/"):
+        if seg == "..":
+            if parts and parts[-1] != "..":
+                parts.pop()
+            elif not absolute:
+                parts.append(seg)
+        elif seg and seg != ".":
+            parts.append(seg)
+    return ("/" if absolute else "") + "/".join(parts)
+
+def imported_by(paths):
+    libs = set()
+    for rel in paths:
+        base = rel.rsplit("/", 1)[0] + "/" if "/" in rel else ""
+        src = open(os.path.join("docs/samples", rel), encoding="utf-8").read()
+        for imp in re.findall(r'(?m)^\s*import\s+["\']([^"\']+)', src):
+            if not imp.endswith(".ol"):
+                imp += ".ol"
+            libs.add(path_normalise(imp if imp.startswith("/") else base + imp))
+    return libs
 
 errs = []
+
+# RECURSIVE, and by relative path: a sample kept in a sub-directory (an example split over several
+# files) is a legitimate layout, and globbing the top level only would let it escape the catalogue
+# entirely — exactly the oversight this guard exists to catch. The path is the identity, so two
+# files of the same name in different directories no longer collide either.
+on_disk = {os.path.relpath(p, "docs/samples").replace(os.sep, "/")
+           for p in glob.glob("docs/samples/**/*.ol", recursive=True)}
+LIBS = imported_by(on_disk)
 try:
     entries = json.load(open("docs/samples/index.json", encoding="utf-8"))
 except Exception as e:
@@ -44,14 +75,11 @@ for f in listed:
         errs.append(f"{f}: listed more than once")
         break
 
-# RECURSIVE, and by relative path: a sample kept in a sub-directory (an example split over several
-# files) is a legitimate layout, and globbing the top level only would let it escape the catalogue
-# entirely — exactly the oversight this guard exists to catch. The path is the identity, so two
-# files of the same name in different directories no longer collide either.
-on_disk = {os.path.relpath(p, "docs/samples").replace(os.sep, "/")
-           for p in glob.glob("docs/samples/**/*.ol", recursive=True)}
 for f in sorted(on_disk - set(listed) - LIBS):
     errs.append(f"{f}: present in docs/samples/ but absent from index.json")
+for f in sorted(LIBS - on_disk):
+    errs.append(f"{f}: imported by a sample but the file does not exist")
+
 
 # A group split in two by a stray entry in between would show TWICE in the menu, the order of the
 # groups being that of their first appearance.
