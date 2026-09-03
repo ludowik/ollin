@@ -54,7 +54,23 @@ const SHIELD_H     = 16
 ## the eye catches at once, and one that no rewriting of two numbers can be trusted to keep. Whole
 ## pixels, a shield being read pixel by pixel through its own coordinates.
 const SHIELD_GAP   = (FIELD_W - SHIELDS * SHIELD_W) // (SHIELDS + 1)
-const BLAST        = 3          ## the radius a hit eats out of a shield
+## What a hit eats out of a shield. The original carved a fixed PATTERN into the shield's bitmap —
+## no circle and no randomness — and the two weapons carved different ones: the cannon's shot takes a
+## small bite out of the UNDERSIDE it struck, while a bomb, arriving from above, opens a wider and
+## shallower crater. That is why a shield lasts a whole wave there and dissolved here: a jittered
+## disc of radius three removed some thirty pixels per shot, against a dozen for these.
+const SHOT_BITE = [
+    "##.#",
+    "####",
+    ".###",
+    "#.##"
+]
+const BOMB_BITE = [
+    ".####.",
+    "######",
+    "##.###",
+    ".####."
+]
 const GUN_W      = 13
 const GUN_H      = 5
 const GUN_Y      = 224          ## the cannon stands close under the shields, not far below them
@@ -254,13 +270,35 @@ end
 
 ## Eats a disc out of a shield, in the texture's own coordinates. The jitter keeps two hits at the
 ## same spot from cutting the same clean circle twice.
-func erode(sh, cx, cy, radius)
+## Carves a pattern out of a shield, in the texture's own coordinates. `dir` is where the projectile
+## was going: -1 for the cannon's shot, which eats UPWARDS from the pixel it struck, +1 for a bomb,
+## which eats downwards. The pattern is centred horizontally and anchored on the impact, so the
+## crater opens on the side the hit came from — a bite taken symmetrically would hollow the shield
+## from the middle and let a second shot straight through.
+func bite(sh, cx, cy, rows, dir)
+    var w = len(rows[1])
+    var top = cy
+    if dir < 0 then
+        top = cy - #rows + 1
+    end
     image.beginPixels(sh.img)
-    for dy = -radius, radius do
-        for dx = -radius, radius do
-            if dx * dx + dy * dy <= radius * radius + math.randInt(0, radius) then
-                image.setPixel(sh.img, cx + dx, cy + dy, 0, 0, 0, 0)
+    for r = 1, #rows do
+        for c = 1, w do
+            if string.char(rows[r], c) == "#" then
+                image.setPixel(sh.img, cx - w // 2 + c - 1, top + r - 1, 0, 0, 0, 0)
             end
+        end
+    end
+    image.endPixels(sh.img)
+end
+
+## An alien that has descended into a shield does not nibble it: it erases its whole footprint, which
+## is what makes the fleet's arrival final.
+func eraseBox(sh, cx, cy, w, h)
+    image.beginPixels(sh.img)
+    for y = 0, h - 1 do
+        for x = 0, w - 1 do
+            image.setPixel(sh.img, cx + x, cy + y, 0, 0, 0, 0)
         end
     end
     image.endPixels(sh.img)
@@ -460,7 +498,7 @@ func bombsFall(dt)
         var gone = b.y > FIELD_H
         var sh = shieldAt(b.x, b.y)
         if sh <> nil then
-            erode(sh, b.x - sh.x, b.y - SHIELD_Y, BLAST)
+            bite(sh, b.x - sh.x, b.y - SHIELD_Y, BOMB_BITE, 1)
             gone = true
         elseif b.y + 4 > GUN_Y and b.y < GUN_Y + GUN_H and b.x >= gunX and b.x < gunX + GUN_W then
             hitCannon()
@@ -511,7 +549,7 @@ func fleetTick()
             if a.y + 8 > SHIELD_Y then
                 for sh in shields do
                     if a.x + 8 > sh.x and a.x < sh.x + SHIELD_W and a.y < SHIELD_Y + SHIELD_H then
-                        erode(sh, a.x + 4 - sh.x, a.y + 4 - SHIELD_Y, 5)
+                        eraseBox(sh, a.x - sh.x, a.y - SHIELD_Y, 8, 8)
                     end
                 end
             end
@@ -701,7 +739,7 @@ func update(dt)
         shotY -= SHOT_SPEED * dt
         var hit = shieldAt(shotX, shotY)
         if hit <> nil then
-            erode(hit, shotX - hit.x, shotY - SHIELD_Y, BLAST)
+            bite(hit, shotX - hit.x, shotY - SHIELD_Y, SHOT_BITE, -1)
             shotLive = false
         elseif shotY < MARGIN or ufoHit() or shotHits() then
             shotLive = false
