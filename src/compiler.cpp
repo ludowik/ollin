@@ -1889,8 +1889,7 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
             if (expr_has_lambda(ia->key.get()) || expr_has_lambda(ia->value.get()) ||
                 (ia->obj_expr && expr_has_lambda(ia->obj_expr.get())))
                 return false;
-        } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s) ||
-                   dynamic_cast<const CommentStmt*>(s)) {
+        } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s)) {
             // safe
         } else {
             return false; // if/while/for/block/try/switch/funcdecl/…: stay conservative
@@ -1989,7 +1988,7 @@ struct HasFuncQuery : StmtQuery {
             }
     }
     // TryCatchStmt, BlockStmt and DoStmt have no expressions of their own, so descending is
-    // enough; BreakStmt, ContinueStmt and CommentStmt have nothing either.
+    // enough; BreakStmt and ContinueStmt have nothing either.
 };
 static bool stmt_has_func(const Stmt* s) {
     HasFuncQuery q;

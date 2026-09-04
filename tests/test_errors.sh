@@ -103,6 +103,16 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# A return ENDS its block, as in Lua: code written after one is dead, and its author meant it to
+# run. Refused rather than silently dropped.
+check_error "a statement after a return" \
+    'func f()
+    return 1
+    var x = 2
+end
+print(f())' \
+    "after 'return': a return ends its block"
+
 # A line opening with a token that can only CONTINUE an expression is LINKED to the expression
 # above and never begins a statement. The only case that contradicts the rule — nothing to
 # continue — is refused, whichever token it is.

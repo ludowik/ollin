@@ -314,15 +314,16 @@ Token Lexer::identifier() {
     return {it != s_keywords.end() ? it->second : TokenType::IDENTIFIER, lex, line};
 }
 
-Token Lexer::comment() {
-    int start = pos;
+// A comment is DROPPED, like whitespace: nothing downstream ever reads one, and every stage
+// that saw a comment token had to step over it — 59 sites in the parser, plus an AST node whose
+// only job was to be ignored. A forgotten step did not fail to build, it failed to parse a
+// program that put a comment in an unusual place.
+void Lexer::comment() {
     while (!at_end() && peek() != '\n')
         advance();
-    return {TokenType::COMMENT, src.substr(start, pos - start), line};
 }
 
-Token Lexer::block_comment() {
-    int start = pos;
+void Lexer::block_comment() {
     int hashes = 0;
     while (!at_end()) {
         char c = advance();
@@ -330,11 +331,9 @@ Token Lexer::block_comment() {
             line++;
         hashes = (c == '#') ? hashes + 1 : 0;
         if (hashes == 3)
-            break;
+            return;
     }
-    if (hashes < 3)
-        fail("unterminated block comment", line);
-    return {TokenType::COMMENT, src.substr(start, pos - start - 3), line};
+    fail("unterminated block comment", line);
 }
 
 std::vector<Token> Lexer::tokenize() {
@@ -455,8 +454,10 @@ std::vector<Token> Lexer::tokenize() {
         case '#':
             if (!match('#'))
                 emit(tokens, {TokenType::HASH, "#", line});
+            else if (match('#'))
+                block_comment();
             else
-                emit(tokens, match('#') ? block_comment() : comment());
+                comment();
             break;
         default:
             if (is_dec(c)) {

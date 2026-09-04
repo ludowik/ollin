@@ -234,8 +234,6 @@ class Compiler : public StmtVisitor, public ExprVisitor {
                             const std::function<void(int)>& emit_callee);
 
     // StmtVisitor
-    void visit(const CommentStmt&) override {
-    }
     void visit(const VarDeclStmt&) override;
     void visit(const WhileStmt&) override;
     void visit(const IfStmt&) override;

@@ -81,11 +81,6 @@ bool Parser::at_optional_call() const {
     return check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
 }
 
-void Parser::skip_comments() {
-    while (check(TokenType::COMMENT))
-        advance();
-}
-
 // A token that ENDS a block, whichever block it is. The set lives here and nowhere else: written
 // out a second time in return_stmt, it was missing CASE, so a bare 'return' as the last statement
 // of a switch arm was refused.
@@ -105,7 +100,6 @@ bool Parser::at_block_terminator() const {
 
 void Parser::parse_body_until(std::vector<std::unique_ptr<Stmt>>& out, std::initializer_list<TokenType> stops) {
     while (true) {
-        skip_comments();
         if (check(TokenType::EOF_T))
             return;
         for (TokenType t : stops)
@@ -159,12 +153,6 @@ void Parser::parse_field_path(std::vector<std::string>& path) {
         path.push_back(expect_name("a field name"));
 }
 
-// Absorbs an optional COMMENT at the end of a statement. Statements are separated by
-// newlines, which are not tokenized; there is no automatic semicolon insertion.
-void Parser::consume_opt_comment() {
-    match(TokenType::COMMENT);
-}
-
 // Stack-overflow guard: recursive descent (parentheses, calls, nested blocks) could crash the
 // process on deeply nested input. Depth is bounded and a clean error is raised instead.
 namespace {
@@ -185,7 +173,6 @@ struct DepthGuard {
 Program Parser::parse() {
     Program prog;
     while (true) {
-        skip_comments();
         if (check(TokenType::EOF_T))
             break;
         prog.stmts.push_back(parse_one_stmt());
@@ -245,11 +232,6 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         fail(std::string("a statement cannot begin with '") + peek().lexeme +
              "' — such a line continues the expression above; give the value a name instead");
     switch (peek().type) {
-    case TokenType::COMMENT: {
-        std::string text = advance().lexeme;
-        consume_opt_comment();
-        return std::make_unique<CommentStmt>(std::move(text));
-    }
     case TokenType::SEMICOLON:
         // ';' is only valid inside a range [a;b], where range_expr consumes it. At statement
         // level it is an error, reported explicitly.
@@ -300,7 +282,6 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
             return finish_assign_from_expr(std::move(e), line);
         if (check(TokenType::COMMA))
             return multi_assign_stmt(std::move(e), line);
-        consume_opt_comment();
         auto st = std::make_unique<ExprStmt>(std::move(e));
         st->line = line;
         st->file_idx = current_file_idx_;
@@ -318,7 +299,6 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
 std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> target, int line) {
     TokenType opt = advance().type; // assignment operator
     auto value = expr();
-    consume_opt_comment();
     if (auto* ve = dynamic_cast<VarExpr*>(target.get())) {
         auto s = std::make_unique<AssignStmt>();
         s->line = line;
@@ -377,7 +357,6 @@ std::unique_ptr<Stmt> Parser::decl_stmt(bool is_global, bool is_constant) {
         fail_at(line, "const '" + s->names[0] + "' must be initialized");
     if (match(TokenType::EQUALS))
         parse_expr_list(s->values);
-    consume_opt_comment();
     return s;
 }
 
@@ -388,11 +367,9 @@ std::unique_ptr<Stmt> Parser::while_stmt() {
     s->line = line;
     s->file_idx = current_file_idx_;
     s->cond = expr();
-    skip_comments();
     expect(TokenType::DO);
     parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
@@ -404,7 +381,6 @@ std::unique_ptr<Stmt> Parser::do_stmt() {
     s->file_idx = current_file_idx_;
     parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
@@ -415,7 +391,6 @@ std::unique_ptr<Stmt> Parser::if_stmt() {
     s->line = line;
     s->file_idx = current_file_idx_;
     s->cond = expr();
-    skip_comments();
     expect(TokenType::THEN);
     parse_body_until(s->then_body, {TokenType::ELSE, TokenType::ELSEIF, TokenType::END});
     // There is no "else if" sugar: an elseif is spelled 'elseif'. An 'else' followed by an 'if'
@@ -423,24 +398,20 @@ std::unique_ptr<Stmt> Parser::if_stmt() {
     while (match(TokenType::ELSEIF)) {
         ElseIfClause ei;
         ei.cond = expr();
-        skip_comments();
         expect(TokenType::THEN);
         parse_body_until(ei.body, {TokenType::ELSE, TokenType::ELSEIF, TokenType::END});
         s->else_ifs.push_back(std::move(ei));
     }
     if (match(TokenType::ELSE)) {
-        consume_opt_comment();
         parse_body_until(s->else_body, {TokenType::END});
     }
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::break_stmt() {
     int line = peek().line;
     advance();
-    consume_opt_comment();
     auto s = std::make_unique<BreakStmt>();
     s->line = line;
     s->file_idx = current_file_idx_;
@@ -450,7 +421,6 @@ std::unique_ptr<Stmt> Parser::break_stmt() {
 std::unique_ptr<Stmt> Parser::continue_stmt() {
     int line = peek().line;
     advance();
-    consume_opt_comment();
     auto s = std::make_unique<ContinueStmt>();
     s->line = line;
     s->file_idx = current_file_idx_;
@@ -463,7 +433,6 @@ std::unique_ptr<Stmt> Parser::throw_stmt() {
     auto s = std::make_unique<ThrowStmt>(expr());
     s->line = line;
     s->file_idx = current_file_idx_;
-    consume_opt_comment();
     return s;
 }
 
@@ -473,18 +442,14 @@ std::unique_ptr<Stmt> Parser::try_catch_stmt() {
     auto s = std::make_unique<TryCatchStmt>();
     s->line = line;
     s->file_idx = current_file_idx_;
-    consume_opt_comment();
     parse_body_until(s->try_body, {TokenType::CATCH});
     expect(TokenType::CATCH);
     s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
-    consume_opt_comment();
     parse_body_until(s->catch_body, {TokenType::ELSE, TokenType::END});
     if (match(TokenType::ELSE)) {
-        consume_opt_comment();
         parse_body_until(s->else_body, {TokenType::END});
     }
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
@@ -498,10 +463,8 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
         std::string field = expect_name("a field name");
         auto fe = std::make_unique<FuncExpr>();
         parse_params(fe->params, fe->defaults, fe->variadic);
-        consume_opt_comment();
         parse_body_until(fe->body, {TokenType::END});
         expect(TokenType::END);
-        consume_opt_comment();
         auto ia = std::make_unique<IndexAssignStmt>();
         ia->line = line;
         ia->file_idx = current_file_idx_;
@@ -531,10 +494,8 @@ std::unique_ptr<FuncDeclStmt> Parser::finish_func_decl(int line, std::string nam
     s->file_idx = current_file_idx_;
     s->name = std::move(name);
     parse_params(s->params, s->defaults, s->variadic);
-    consume_opt_comment();
     parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
@@ -544,9 +505,8 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
     auto s = std::make_unique<ReturnStmt>();
     s->line = line;
     s->file_idx = current_file_idx_;
-    // Return values are optional: none when we are on a block terminator, a separator or a
-    // comment. A comment stands for the end of the line, newlines not being tokenized.
-    if (!at_block_terminator() && !check(TokenType::SEMICOLON) && !check(TokenType::COMMENT)) {
+    // Return values are optional: none when we are on a block terminator or a separator.
+    if (!at_block_terminator() && !check(TokenType::SEMICOLON)) {
         if (check(TokenType::DOT_DOT_DOT)) {
             advance();
             s->spread_varargs = true;
@@ -561,7 +521,13 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
             }
         }
     }
-    consume_opt_comment();
+    // A `return` ENDS its block, as in Lua: nothing may follow it. Code written after one is
+    // dead, and its author meant it to run. Without this refusal the mistake was silent, and
+    // worse, ambiguous — `return` alone followed by an expression on the next line took that
+    // expression as the value, newlines being whitespace (checked: Lua reads it the same way,
+    // and refuses the two statements outright).
+    if (!at_block_terminator())
+        fail("'" + peek().lexeme + "' after 'return': a return ends its block, so nothing can follow it");
     return s;
 }
 
@@ -585,7 +551,6 @@ std::unique_ptr<Stmt> Parser::multi_assign_stmt(std::unique_ptr<Expr> first, int
 
     expect(TokenType::EQUALS);
     parse_expr_list(s->values);
-    consume_opt_comment();
     return s;
 }
 
@@ -616,7 +581,6 @@ std::unique_ptr<Stmt> Parser::for_stmt() {
         iter_e = expr();
     }
 
-    skip_comments();
     expect(TokenType::DO);
     auto s = std::make_unique<ForIterStmt>();
     s->line = line;
@@ -626,14 +590,12 @@ std::unique_ptr<Stmt> Parser::for_stmt() {
     s->iter_expr = std::move(iter_e);
     parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
 std::unique_ptr<Stmt> Parser::expr_stmt() {
     int line = peek().line;
     auto e = expr();
-    consume_opt_comment();
     auto s = std::make_unique<ExprStmt>(std::move(e));
     s->line = line;
     s->file_idx = current_file_idx_;
@@ -687,7 +649,6 @@ std::unique_ptr<Expr> Parser::binary_level(int level) {
     const BinLevel& lv = LEVELS[level];
     auto left = binary_level(level + 1);
     while (true) {
-        skip_comments();
         const BinOp* found = nullptr;
         for (int i = 0; i < lv.n && !found; i++)
             if (check(lv.ops[i].tok))
@@ -695,7 +656,6 @@ std::unique_ptr<Expr> Parser::binary_level(int level) {
         if (!found)
             return left;
         advance();
-        skip_comments();
         left = std::make_unique<BinaryExpr>(found->op, std::move(left), binary_level(level + 1));
     }
 }
@@ -720,16 +680,13 @@ static char cmp_char(TokenType t) {
 
 std::unique_ptr<Expr> Parser::comparison() {
     auto first = binary_level(CMP_LEVEL + 1);
-    skip_comments();
     if (!is_cmp_token(peek().type))
         return first;
 
     // A single comparison is a plain BinaryExpr; the chained node is only built from the SECOND
     // operator on, so the common case allocates nothing extra.
     char op1 = cmp_char(advance().type);
-    skip_comments();
     auto second = binary_level(CMP_LEVEL + 1);
-    skip_comments();
     if (!is_cmp_token(peek().type))
         return std::make_unique<BinaryExpr>(op1, std::move(first), std::move(second));
 
@@ -739,9 +696,7 @@ std::unique_ptr<Expr> Parser::comparison() {
     chain->operands.push_back(std::move(second));
     while (is_cmp_token(peek().type)) {
         chain->ops.push_back(cmp_char(advance().type));
-        skip_comments();
         chain->operands.push_back(binary_level(CMP_LEVEL + 1));
-        skip_comments();
     }
     return chain;
 }
@@ -882,11 +837,9 @@ std::unique_ptr<Expr> Parser::unary() {
 
 std::unique_ptr<Expr> Parser::power() {
     auto left = primary();
-    skip_comments();
     if (!check(TokenType::CARET))
         return left; // '^' is exponentiation, as in Lua
     advance();
-    skip_comments();
     // A unary right operand allows 2 ^ -1, and right associativity gives 2^2^3.
     return std::make_unique<BinaryExpr>('p', std::move(left), unary());
 }
@@ -1093,14 +1046,12 @@ std::unique_ptr<Expr> Parser::primary() {
         advance(); // FUNC
         auto fe = std::make_unique<FuncExpr>();
         parse_params(fe->params, fe->defaults, fe->variadic);
-        consume_opt_comment();
         parse_body_until(fe->body, {TokenType::END});
         expect(TokenType::END);
         return parse_postfix(std::move(fe));
     }
     if (check(TokenType::LBRACE)) {
         advance(); // consume {
-        skip_comments();
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
             std::unique_ptr<Expr> key;
@@ -1117,7 +1068,6 @@ std::unique_ptr<Expr> Parser::primary() {
             auto val = expr();
             map->entries.push_back({std::move(key), std::move(val)});
             expect_separator(TokenType::RBRACE, "map entries");
-            skip_comments();
         }
         expect(TokenType::RBRACE);
         return parse_postfix(std::move(map));
@@ -1127,12 +1077,10 @@ std::unique_ptr<Expr> Parser::primary() {
         if (looks_like_range()) {
             return range_expr(true); // incl_left=true
         }
-        skip_comments();
         auto arr = std::make_unique<ArrayExpr>();
         while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
             arr->elements.push_back(expr());
             expect_separator(TokenType::RBRACKET, "array elements");
-            skip_comments();
         }
         expect(TokenType::RBRACKET);
         return parse_postfix(std::move(arr));
@@ -1143,9 +1091,7 @@ std::unique_ptr<Expr> Parser::primary() {
         return range_expr(false); // incl_left=false
     }
     if (match(TokenType::LPAREN)) {
-        skip_comments();
         auto e = expr();
-        skip_comments();
         expect(TokenType::RPAREN);
         // Postfix on a parenthesized expression: (expr)(args), (expr)[i], (expr).field
         return parse_postfix(std::move(e));
@@ -1164,9 +1110,7 @@ std::unique_ptr<Stmt> Parser::class_decl() {
         advance();
         s->parent = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consume_opt_comment();
     while (true) {
-        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
         bool is_static = false;
@@ -1181,7 +1125,6 @@ std::unique_ptr<Stmt> Parser::class_decl() {
         s->methods.push_back(std::move(method));
     }
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
@@ -1224,7 +1167,6 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
     int64_t counter = 1; // the first item with no value is 1
     std::unordered_set<std::string> seen;
     while (true) {
-        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
         EnumItem it;
@@ -1244,12 +1186,10 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
             it.value->file_idx = current_file_idx_;
         }
         s->items.push_back(std::move(it));
-        skip_comments();
         if (!match(TokenType::COMMA))
             break;
     }
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }
 
@@ -1276,7 +1216,6 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
         advance();
         alias = expect(TokenType::IDENTIFIER).lexeme;
     }
-    consume_opt_comment();
 
     // Resolved against the importing file's directory, and normalised: this string IS the module's
     // identity (see paths.h).
@@ -1367,15 +1306,12 @@ std::unique_ptr<Stmt> Parser::switch_stmt() {
     s->line = line;
     s->file_idx = current_file_idx_;
     s->subject = expr();
-    consume_opt_comment();
 
     while (true) {
-        skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
 
         if (match(TokenType::ELSE)) {
-            consume_opt_comment();
             parse_body_until(s->else_body, {TokenType::END});
             break;
         }
@@ -1383,12 +1319,10 @@ std::unique_ptr<Stmt> Parser::switch_stmt() {
         expect(TokenType::CASE);
         CaseClause arm;
         parse_expr_list(arm.values);
-        consume_opt_comment();
         parse_body_until(arm.body, {TokenType::CASE, TokenType::ELSE, TokenType::END});
         s->cases.push_back(std::move(arm));
     }
 
     expect(TokenType::END);
-    consume_opt_comment();
     return s;
 }

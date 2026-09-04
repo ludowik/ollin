@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-04 15:41</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-04 16:13</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-04 15:41</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-04 16:13</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -591,6 +591,8 @@ x = <span class="num">2</span>    <span class="cmt">## ERROR: cannot assign to c
 a multi-line
 comment
 ###</span></code></pre>
+
+<div class="callout">A comment is <strong>whitespace</strong>: it ends nothing. A line whose last thing is a comment continues into the next one exactly as a bare line break does, so an expression may be commented line by line.</div>
 </section>
 
 <!-- ── Operators ───────────────────────────────────────────────────────────── -->
@@ -899,6 +901,8 @@ the same value, <code>"1"</code> and <code>1</code> are not.</p>
     <span class="kw">return</span> <span class="str">"greet "</span> + name
 <span class="kw">end</span>
 <span class="bi">assert</span>(obj.greet(<span class="str">"ollin"</span>) == <span class="str">"greet ollin"</span>)</code></pre>
+
+<div class="callout">A <code>return</code> <strong>ends its block</strong>: nothing may be written after it, and a statement that tries is refused. Code placed after a return would never run, and its author meant it to.</div>
 
 <h3>Multiple returns</h3>
 <pre><code><span class="kw">func</span> minmax(a, b)

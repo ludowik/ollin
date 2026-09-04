@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-struct CommentStmt;
 struct VarDeclStmt;
 struct WhileStmt;
 struct IfStmt;
@@ -48,7 +47,6 @@ struct ChainedCompareExpr;
 struct InterpExpr;
 
 struct StmtVisitor {
-    virtual void visit(const CommentStmt&) = 0;
     virtual void visit(const VarDeclStmt&) = 0;
     virtual void visit(const WhileStmt&) = 0;
     virtual void visit(const IfStmt&) = 0;
@@ -130,8 +128,6 @@ struct StmtQuery : StmtVisitor {
     void run(const std::vector<std::unique_ptr<Stmt>>& stmts) {
         for (auto& s : stmts)
             s->accept(*this);
-    }
-    void visit(const CommentStmt&) override {
     }
     void visit(const VarDeclStmt&) override {
     }
@@ -287,15 +283,6 @@ struct CallExpr : Expr {
             f(*a);
     }
     void accept(ExprVisitor& v) const override {
-        v.visit(*this);
-    }
-};
-
-struct CommentStmt : Stmt {
-    std::string text;
-    explicit CommentStmt(std::string t) : text(std::move(t)) {
-    }
-    void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
 };

@@ -33,6 +33,6 @@ class Lexer {
     Token number(bool leading_dot = false);
     void interp_string(std::vector<Token>& out);
     Token identifier();
-    Token comment();
-    Token block_comment();
+    void comment();       // dropped, like whitespace
+    void block_comment(); // idem
 };

@@ -41,14 +41,12 @@ class Parser {
     std::string expect_name(const char* what);
     // An optional method call, 'f?()': a '?' is only that when a '(' follows it.
     bool at_optional_call() const;
-    void skip_comments();
 
     // Every refusal goes through one of these, so a message always carries its location.
     [[noreturn]] void fail(const std::string& msg) const;
     [[noreturn]] void fail_at(int line, const std::string& msg) const;
 
     TokenType peek_next_type() const;
-    void consume_opt_comment(); // swallows an optional COMMENT
 
     // A token that ends a block, whichever block it is.
     bool at_block_terminator() const;

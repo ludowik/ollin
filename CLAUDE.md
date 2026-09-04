@@ -612,6 +612,28 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | HALT          | —      |                            | arrêt                                            |
 
+## Commentaires : un BLANC, jeté au découpage
+
+Le lexer ne produit **aucun jeton** pour un commentaire, ni pour un bloc `###`. Rien en aval
+n'en lit jamais un, et chaque étage qui en voyait passer devait l'enjamber : **59 appels** dans
+le parser (`skip_comments`, `consume_opt_comment`), plus un nœud d'AST, `CommentStmt`, dont la
+seule fonction était d'être ignoré. Un enjambement oublié ne cassait pas la compilation du
+moteur, il cassait l'analyse d'un programme qui plaçait un commentaire à un endroit inhabituel.
+
+Conséquence de langage, **vérifiée sur `lua5.4` avant d'être adoptée** : un commentaire ne
+termine plus rien. Une ligne qui finit par un commentaire se prolonge dans la suivante comme un
+simple retour à la ligne. C'était le seul endroit du langage où un commentaire changeait le sens
+du code — un `return` nu dont la ligne portait un commentaire n'avait pas de valeur de retour,
+alors que sans commentaire la ligne suivante devenait sa valeur.
+
+**Et `return` termine son bloc** (`return_stmt`, parser.cpp), comme en Lua : rien ne peut le
+suivre, et une instruction écrite après est refusée en nommant le jeton. C'est ce refus qui
+supprime l'ambiguïté à la racine plutôt que de l'arbitrer. Lua rend exactement les deux mêmes
+réponses (`'end' expected near 'print'`), mesuré.
+
+Gain : **−6,8 %** d'instructions sur un fichier de 3 000 commentaires, −0,5 % sur
+`tests/syntax.ol`. Le vrai motif n'est pas là : ce sont les 59 pièges et le nœud inutile.
+
 ## Décodage d'une instruction (macro `NEXT`, vm.cpp)
 
 `NEXT()` ne transporte que **le mot de l'instruction** (`_i`) et le champ **A** ; `B`, `C` et

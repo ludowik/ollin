@@ -175,6 +175,11 @@ param          = IDENT [ "=" literal ] ;
                     A known limit: `object.method(...)` does not expand yet, and is adjusted to
                     one value. *)
 returnStmt     = "return" [ retvals ] NL ;
+(* A return ENDS its block: nothing may follow it, and a statement written after one is refused.
+   Code after a return is dead, and its author meant it to run. Note the consequence of NL being
+   whitespace: `return` alone followed by an expression on the NEXT line takes that expression as
+   its value, since the expression can still be extended. Lua behaves identically on both counts
+   (checked with lua5.4). *)
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
 assignStmt     = lvalue ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
@@ -298,6 +303,9 @@ call           = IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
 
 line_comment   = "##" { any \ newline } ;
 block_comment  = "###" { any } "###" ;
+(* A comment is WHITESPACE: the lexer drops it, and no later stage ever sees one. It therefore
+   terminates nothing — a line ending with a comment continues into the next one exactly as a
+   bare line break does. Lua reads it the same way (checked). *)
 
 (* NL is a newline, and it terminates every statement.
    The implicit continuation applies inside brackets, square brackets and braces: a

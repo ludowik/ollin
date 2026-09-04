@@ -2201,4 +2201,19 @@ for i = 1, 6 do
 end
 assert(swAcc == 14)
 
+## A comment is WHITESPACE: the lexer drops it, so it terminates nothing. A line ending with a
+## comment continues into the next one exactly as a bare line break does.
+func cmJoined()
+    var a = 1        ## the first term
+    var b = 2        ## the second
+    return a
+           + b       ## joined ACROSS a comment: one expression
+end
+assert(cmJoined() == 3)
+
+func cmBare()
+    return           ## a bare return, its line ending with a comment
+end
+assert(cmBare() == nil)
+
 print("regressions ok")
