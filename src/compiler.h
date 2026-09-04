@@ -166,7 +166,10 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         return where(s.line, s.file_idx);
     }
 
-    void compile_into(const Expr& e, int dest);
+    // Compiles e so its value ends up in `dest`. `dest_at_top` says dest is the TOP of the
+    // scratch area — the argument slots of a call, the values of a return — which lets a node
+    // that allocates its own register land on dest itself instead of being copied there.
+    void compile_into(const Expr& e, int dest, bool dest_at_top = false);
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the
     // fixed ones through here.
     void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count = -1);
@@ -180,6 +183,15 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // A sequence of statements, each one's temporaries freed after it — EXCEPT when it carries a
     // function, whose captured registers must stay reserved.
     void compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body);
+    // "does this body carry a function?", MEMOIZED by the address of the body. The walk is
+    // recursive, and the same body is asked three to four times per enclosing construct
+    // (compile_block, the closing of a scope, keep_captured_regs, the alias test), so the cost
+    // was proportional to the nesting depth. The key is only valid for one compilation, hence a
+    // member and not a static.
+    bool body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body);
+    int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
+                           int reg_top_after_body);
+    std::unordered_map<const void*, bool> has_func_cache_;
 
     // Reserves a register for every pre-scanned local. Functions are bound in local_regs_ straight
     // away, for recursion and forward references, while var and const are deferred in

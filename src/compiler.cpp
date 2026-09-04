@@ -278,7 +278,22 @@ static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std
     v.walk(stmts);
 }
 
-void Compiler::compile_into(const Expr& e, int dest) {
+// The negation of a numeric LITERAL is a constant: `-1` used to cost a LOAD_K plus a NEGATE at
+// every execution. Integer wrap-around is the same as the VM's, so -(INT64_MIN) is unchanged.
+static bool negated_literal(const UnaryExpr& e, Value& out) {
+    if (e.op != '-')
+        return false;
+    auto* n = dynamic_cast<const NumberExpr*>(e.operand.get());
+    if (!n)
+        return false;
+    out = n->is_integer ? Value((int64_t)(0 - (uint64_t)n->ival)) : num_value(-n->value);
+    return true;
+}
+
+void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
+    // The direct paths below need dest < reg_top_, so that operand temporaries never overlap it.
+    if (dest_at_top)
+        reserve_regs_to(dest + 1);
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest,
                             chunk.add_constant(n->is_integer ? Value(n->ival) : num_value(n->value))));
@@ -305,6 +320,12 @@ void Compiler::compile_into(const Expr& e, int dest) {
         reg_top_ = saved;
         last_reg_ = dest;
     } else if (auto* un = dynamic_cast<const UnaryExpr*>(&e)) {
+        Value folded;
+        if (negated_literal(*un, folded)) {
+            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(folded)));
+            last_reg_ = dest;
+            return;
+        }
         // Unary: emit into dest directly, safe for the same reason with a single operand.
         int saved = reg_top_;
         un->operand->accept(*this);
@@ -314,6 +335,8 @@ void Compiler::compile_into(const Expr& e, int dest) {
         last_reg_ = dest;
     } else {
         int saved = reg_top_;
+        if (dest_at_top)
+            reg_top_ = dest; // a call, a map, an array MAY land on dest, and then needs no MOVE
         e.accept(*this);
         if (last_reg_ != dest)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)last_reg_, 0));
@@ -495,9 +518,18 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std
 // frame returns, so handing those registers back to temporaries would overwrite the captured
 // values. compile_block has already reserved the body's locals (the current reg_top_), and we
 // keep the higher of the two.
-static int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
-                              int reg_top_after_body) {
-    if (!body_has_func(body))
+bool Compiler::body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body) {
+    auto it = has_func_cache_.find(&body);
+    if (it != has_func_cache_.end())
+        return it->second;
+    bool r = body_has_func(body);
+    has_func_cache_.emplace(&body, r);
+    return r;
+}
+
+int Compiler::keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
+                                 int reg_top_after_body) {
+    if (!body_carries_func(body))
         return recycled_top;
     return loop_vars_top > reg_top_after_body ? loop_vars_top : reg_top_after_body;
 }
@@ -528,7 +560,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
 
     compile_stmt_seq(body);
 
-    bool has_func = body_has_func(body);
+    bool has_func = body_carries_func(body);
     // A block's locals DIE at its end, so the upvalues opened on them are closed there — the
     // value is copied into the Upvalue and the register stops being watched. Without this, a
     // closure declared in a nested block kept an open upvalue on a register that went back to
@@ -576,10 +608,15 @@ void Compiler::visit(const IfStmt& s) {
     reg_top_ = saved;
     size_t next_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
 
+    // The jump to the end is only needed when a branch FOLLOWS: without one it lands on the
+    // next instruction, and that dead jump was executed every time the branch was taken.
+    bool has_more = !s.else_ifs.empty() || !s.else_body.empty();
     compile_block(s.then_body);
-    end_patches.push_back(chunk.emit_jump(Op::JUMP));
+    if (has_more)
+        end_patches.push_back(chunk.emit_jump(Op::JUMP));
 
-    for (auto& ei : s.else_ifs) {
+    for (size_t k = 0; k < s.else_ifs.size(); ++k) {
+        auto& ei = s.else_ifs[k];
         chunk.patch_jump(next_patch, (uint16_t)chunk.current_pos());
         int s2 = reg_top_;
         ei.cond->accept(*this);
@@ -587,7 +624,8 @@ void Compiler::visit(const IfStmt& s) {
         reg_top_ = s2;
         next_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)er);
         compile_block(ei.body);
-        end_patches.push_back(chunk.emit_jump(Op::JUMP));
+        if (k + 1 < s.else_ifs.size() || !s.else_body.empty())
+            end_patches.push_back(chunk.emit_jump(Op::JUMP));
     }
 
     chunk.patch_jump(next_patch, (uint16_t)chunk.current_pos());
@@ -807,7 +845,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     // executes: it is emitted again here, where control lands. The body's locals are dead at
     // this point, and one declared BEFORE the try keeps its open upvalue (its register is below
     // try_base).
-    if (body_has_func(s.try_body))
+    if (body_carries_func(s.try_body))
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)try_base, 0, 0));
 
     // Catch block: catch_var keeps catch_r, other locals are scoped as usual.
@@ -818,7 +856,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     compile_block(s.else_body);
     chunk.patch_jump(end_patch, (uint16_t)chunk.current_pos());
 
-    if (!body_has_func(s.try_body) && !body_has_func(s.catch_body) && !body_has_func(s.else_body))
+    if (!body_carries_func(s.try_body) && !body_carries_func(s.catch_body) && !body_carries_func(s.else_body))
         reg_top_ = saved_top;
 }
 
@@ -955,17 +993,14 @@ void Compiler::visit(const FuncExpr& s) {
     last_reg_ = dest;
 }
 
-// Compiles each expression into base+i.
+// Compiles each expression into base+i. These are the argument slots of a call and the values
+// of a return: the TOP of the scratch area, so compile_into can write the final operation
+// straight into the slot — `f(n - 1)` costs SUB alone instead of SUB into a temporary plus a
+// MOVE, and a call still lands on its slot without one.
 void Compiler::compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count) {
     int n = count < 0 ? (int)exprs.size() : count;
-    for (int i = 0; i < n; ++i) {
-        int target = base + i;
-        reg_top_ = target;
-        exprs[i]->accept(*this);
-        if (last_reg_ != target)
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reserve_regs_to(target + 1);
-    }
+    for (int i = 0; i < n; ++i)
+        compile_into(*exprs[i], base + i, true);
 }
 
 void Compiler::visit(const ReturnStmt& s) {
@@ -999,6 +1034,11 @@ void Compiler::visit(const ReturnStmt& s) {
         int n = (int)s.values.size();
         if (n == 0) {
             chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 0, 0));
+        } else if (n == 1) {
+            // RETURN A,1 copies R[A] into R[0], so ANY register will do: the value is compiled
+            // where it falls, instead of being moved to the top of the scratch area first.
+            s.values[0]->accept(*this);
+            chunk.emit(make_abc((uint8_t)Op::RETURN, (uint8_t)last_reg_, 1, 0));
         } else {
             int base = reg_top_;
             compile_consecutive(base, s.values);
@@ -1022,24 +1062,26 @@ void Compiler::visit(const InterpExpr& e) {
     note_line(e.line, e.file_idx);
     // Result is literals[0] + str(exprs[0]) + literals[1] + ... + literals[n]; an ADD with a
     // string on the left converts the right-hand side through value_to_string.
-    int result = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)result, (uint16_t)chunk.add_constant(Value(e.literals[0]))));
+    // Accumulated IN PLACE: `ADD acc, acc, x` reads before it writes, as a compound assignment
+    // does. Allocating a fresh register per piece burned three of them per placeholder, and a
+    // string of some 85 pieces failed to compile on the 255-register limit.
+    int acc = alloc_reg();
+    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)acc, (uint16_t)chunk.add_constant(Value(e.literals[0]))));
+    int scratch = reg_top_; // the piece being appended, reused at every step
     for (int i = 0; i < (int)e.exprs.size(); ++i) {
+        reg_top_ = scratch;
         e.exprs[i]->accept(*this);
-        int expr_reg = last_reg_;
-        int acc = alloc_reg();
-        chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc, (uint8_t)result, (uint8_t)expr_reg));
-        result = acc;
+        chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc, (uint8_t)acc, (uint8_t)last_reg_));
         if (!e.literals[i + 1].empty()) {
+            reg_top_ = scratch;
             int lit = alloc_reg();
             chunk.emit(
                 make_abx((uint8_t)Op::LOAD_K, (uint8_t)lit, (uint16_t)chunk.add_constant(Value(e.literals[i + 1]))));
-            int acc2 = alloc_reg();
-            chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc2, (uint8_t)result, (uint8_t)lit));
-            result = acc2;
+            chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc, (uint8_t)acc, (uint8_t)lit));
         }
     }
-    last_reg_ = result;
+    reg_top_ = scratch;
+    last_reg_ = acc;
 }
 
 void Compiler::visit(const BoolExpr& e) {
@@ -1092,12 +1134,11 @@ void Compiler::visit(const BinaryExpr& e) {
     // when a is truthy, b otherwise. The AND/OR opcodes remain in use for chained comparisons,
     // where both sides are already computed.
     if (e.op == '&' || e.op == '|') {
-        e.left->accept(*this);
-        int r_l = last_reg_;
-        if (reg_top_ <= r_l)
-            reg_top_ = r_l + 1;
+        // The left operand is compiled INTO dst: the value of the whole expression is the left
+        // one whenever the short circuit fires, so copying it there afterwards was a MOVE per
+        // evaluation.
         int dst = alloc_reg();
-        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)r_l, 0));
+        compile_into(*e.left, dst);
         if (e.op == '&') {
             // a falsy: keep a, already in dst, and skip evaluating b
             size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
@@ -1163,6 +1204,12 @@ void Compiler::visit(const ChainedCompareExpr& e) {
 }
 
 void Compiler::visit(const UnaryExpr& e) {
+    Value folded;
+    if (negated_literal(e, folded)) {
+        last_reg_ = alloc_reg();
+        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.add_constant(folded)));
+        return;
+    }
     e.operand->accept(*this);
     int r_in = last_reg_;
     last_reg_ = alloc_reg();
@@ -1493,7 +1540,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // End of an iteration: the loop variables and the body's locals go out of scope, so their
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
     // `continue` jumps HERE, so it goes through the same closing.
-    bool close_scope = body_has_func(body);
+    bool close_scope = body_carries_func(body);
     uint16_t iter_end = (uint16_t)chunk.current_pos();
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
@@ -1804,7 +1851,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
     // Closing does not modify the registers, so FOR_LOOP finds its counter intact.
-    bool close_scope = body_has_func(body);
+    bool close_scope = body_carries_func(body);
     uint16_t loop_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
         chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
