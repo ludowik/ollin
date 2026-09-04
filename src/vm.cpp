@@ -19,8 +19,8 @@
 #elif defined(__GLIBC__)
 #include <malloc.h>
 #elif defined(_WIN32)
-#include <windows.h>
 #include <psapi.h>
+#include <windows.h>
 #endif
 
 static VM* s_current_vm = nullptr;
@@ -45,10 +45,9 @@ struct MetaKeys {
     MetaKeys()
         : class_(std::string("__class__")), parent_(std::string("__parent__")), str_(std::string("__str")),
           name_(std::string("__name__")), init_(std::string("init")), len_(std::string("len")),
-          add_(std::string("__add")),
-          sub_(std::string("__sub")), mul_(std::string("__mul")), div_(std::string("__div")),
-          mod_(std::string("__mod")), neg_(std::string("__neg")), eq_(std::string("__eq")), lt_(std::string("__lt")),
-          le_(std::string("__le")) {
+          add_(std::string("__add")), sub_(std::string("__sub")), mul_(std::string("__mul")),
+          div_(std::string("__div")), mod_(std::string("__mod")), neg_(std::string("__neg")), eq_(std::string("__eq")),
+          lt_(std::string("__lt")), le_(std::string("__le")) {
     }
 };
 static MetaKeys& MK() {
@@ -122,8 +121,7 @@ int VM::invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc) {
     // cap = current frame's reg_count - (result_base - reg_base) = varargs_base - result_base.
     // regs_base is passed so that the result slots are re-derived at write time: the builtin may
     // call Ollin code, which reallocates regs.
-    return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base,
-                          result_base);
+    return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base, result_base);
 }
 
 // invoke_str: a mini-loop that calls __str without recursing.
@@ -230,9 +228,9 @@ std::string value_to_string(const Value& v) {
     return os.str();
 }
 
-
 static int builtin_assert(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
+    Value* args = ctx.args;
+    int argc = ctx.argc;
     // The message is a string, and the type is checked EVEN WHEN the assertion holds: a non-string
     // there is a mistake in the test itself, and validating it only on failure would hide it until
     // the day the assertion breaks. It used to be replaced by the generic wording, which threw the
@@ -263,15 +261,15 @@ static int builtin_cpu_time(CallCtx& ctx) {
 uint64_t ollin_heap_bytes() {
     uint64_t bytes = 0;
 #if defined(__EMSCRIPTEN__)
-    struct mallinfo mi = mallinfo();            // uordblks (the arena) plus hblkhd (the mmapped blocks)
+    struct mallinfo mi = mallinfo(); // uordblks (the arena) plus hblkhd (the mmapped blocks)
     bytes = (uint64_t)(unsigned)mi.uordblks + (uint64_t)(unsigned)mi.hblkhd;
 #elif defined(__APPLE__)
     malloc_statistics_t s;
     malloc_zone_statistics(malloc_default_zone(), &s);
     bytes = (uint64_t)s.size_in_use;
 #elif defined(__GLIBC__)
-    struct mallinfo2 mi = mallinfo2();          // glibc ≥ 2.33 : champs size_t
-    bytes = (uint64_t)mi.uordblks + (uint64_t)mi.hblkhd;   // the arena plus the big mmapped blocks
+    struct mallinfo2 mi = mallinfo2();                   // glibc ≥ 2.33 : champs size_t
+    bytes = (uint64_t)mi.uordblks + (uint64_t)mi.hblkhd; // the arena plus the big mmapped blocks
 #elif defined(_WIN32)
     PROCESS_MEMORY_COUNTERS pmc;
     if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
@@ -297,33 +295,36 @@ static int64_t range_len(const Range* r) {
     return n <= 0.0 ? 0 : (int64_t)n;
 }
 
-static int builtin_len(CallCtx& ctx) {
-    Value* args = ctx.args; int argc = ctx.argc;
-    if (argc == 0)
-        throw std::runtime_error("len() requires 1 argument");
-    const Value& v = args[0];
+// The length of a value, shared by the `len` builtin and by the LEN opcode that '#' compiles to,
+// so the two can never disagree. NOT inlined: it would be pulled into run_goto, whose register
+// allocation is shared by every opcode handler, and the numeric loop measured +2 instructions
+// per turn for it (bench/icount.sh) — a cost paid by code that never uses '#'.
+static __attribute__((noinline)) Value value_len(const Value& v) {
     if (v.is_nil())
-        return ctx.ret(Value((int64_t)0));
+        return Value((int64_t)0);
     if (v.is_array())
-        return ctx.ret(Value((int64_t)v.array_size()));
+        return Value((int64_t)v.array_size());
     if (v.is_map() || v.is_class())
-        return ctx.ret(Value(v.map_size()));
+        return Value(v.map_size());
     if (v.is_string())
-        return ctx.ret(Value((int64_t)utf8_count(v.as_string()))); // a length in characters (codepoints), not in bytes
+        return Value((int64_t)utf8_count(v.as_string())); // in characters (codepoints), not in bytes
     if (v.is_range())
-        return ctx.ret(Value(range_len(v.rptr)));
-    return ctx.ret(Value((int64_t)1));
+        return Value(range_len(v.rptr));
+    return Value((int64_t)1);
+}
+
+static int builtin_len(CallCtx& ctx) {
+    if (ctx.argc == 0)
+        throw std::runtime_error("len() requires 1 argument");
+    return ctx.ret(value_len(ctx.args[0]));
 }
 
 static const struct {
     const char* name;
     Value::BuiltinFn fn;
 } k_builtins[] = {
-    {"assert", builtin_assert},
-    {"time", builtin_time},
-    {"cpuTime", builtin_cpu_time},
-    {"mem", builtin_mem},
-    {"len", builtin_len},
+    {"assert", builtin_assert}, {"time", builtin_time}, {"cpuTime", builtin_cpu_time},
+    {"mem", builtin_mem},       {"len", builtin_len},
 };
 
 // resolve_func_val: function value to func_idx (plus upvals); defined below.
@@ -391,7 +392,8 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         bargs[0] = inst;
         for (int i = 0; i < argc; ++i)
             bargs[1 + i] = regs[base_reg + arg_off + i];
-        invoke_builtin(init_fn.as_builtin(), bargs.data(), argc + 1, argc + 1); // the return value is ignored: the instance wins
+        invoke_builtin(init_fn.as_builtin(), bargs.data(), argc + 1,
+                       argc + 1); // the return value is ignored: the instance wins
         regs[base_reg] = std::move(inst);
         last_results_ = 1;
         done = true;
@@ -511,7 +513,6 @@ static bool values_equal(const Value& av, const Value& bv) {
     }
 }
 
-
 std::string VM::err_line() const {
     uint32_t idx = ip > 0 ? ip - 1 : 0;
     if (idx >= ch->lines.size())
@@ -576,14 +577,16 @@ void VM::run_entry_hooks() {
             if (winm.is_map()) {
                 Value vw = winm.map_get(Value(std::string("width")));
                 Value vh = winm.map_get(Value(std::string("height")));
-                if (vw.is_number()) w = (int)vw.as_num();
-                if (vh.is_number()) h = (int)vh.as_num();
+                if (vw.is_number())
+                    w = (int)vw.as_num();
+                if (vh.is_number())
+                    h = (int)vh.as_num();
             }
             // If the size is still unusable, call canvas() with no argument and let gfx_canvas
             // apply its defaults (800×600), rather than a 0×0 canvas with no GL context, which
             // would crash.
             if (w > 0 && h > 0) {
-                Value wh[2] = { Value((int64_t)w), Value((int64_t)h) };
+                Value wh[2] = {Value((int64_t)w), Value((int64_t)h)};
                 invoke_builtin(canvas_fn.as_builtin(), wh, 2, 2);
             } else {
                 Value none[1] = {};
@@ -703,7 +706,7 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 //   4. builds and pushes the Frame
 //   5. returns fp.addr (the caller does ip = push_call_frame(...))
 uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                           uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
+                             uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
     grow_regs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
     if (argc < fp.n_fixed) {
@@ -738,11 +741,11 @@ void VM::run_goto(size_t stop_depth) {
 #define NEXT()                                                                                                         \
     do {                                                                                                               \
         Instr _ni = ch->code[ip++];                                                                                    \
-        A = i_a(_ni);                                                                                                   \
-        B = i_b(_ni);                                                                                                   \
-        C = i_c(_ni);                                                                                                   \
-        Bx = i_bx(_ni);                                                                                                 \
-        goto* dt[i_op(_ni)];                                                                                            \
+        A = i_a(_ni);                                                                                                  \
+        B = i_b(_ni);                                                                                                  \
+        C = i_c(_ni);                                                                                                  \
+        Bx = i_bx(_ni);                                                                                                \
+        goto* dt[i_op(_ni)];                                                                                           \
     } while (0)
 
     static const void* const dt[] = {
@@ -810,6 +813,7 @@ void VM::run_goto(size_t stop_depth) {
         &&op_RETURN_SPREAD,
         &&op_SEAL_ENUM,
         &&op_CLOSE_UPVALS,
+        &&op_LEN,
         &&op_HALT,
     };
 
@@ -1212,7 +1216,7 @@ dispatch_loop:
         {
             const Frame& fr = call_stack.back();
             int n_va = fr.n_varargs;
-            int count = B;                       // 0 = all of them; otherwise a fixed count, padded with nil
+            int count = B; // 0 = all of them; otherwise a fixed count, padded with nil
             int n = (count == 0) ? n_va : count;
             size_t needed = (size_t)(base + A + n);
             if ((int)regs.size() < (int)needed)
@@ -1332,7 +1336,7 @@ dispatch_loop:
                     c.key = key_sptr;
                     c.val = slot;
                 }
-                Value hit = *slot;   // read before writing the register (see the cache hit)
+                Value hit = *slot; // read before writing the register (see the cache hit)
                 regs[base + A] = std::move(hit);
             } else {
                 // Absent from the own data: walk the prototype chain (__class__ / __parent__).
@@ -1368,8 +1372,7 @@ dispatch_loop:
                 regs[base + A] = obj.array_get(key.as_int());
             }
         } else {
-            throw std::runtime_error(err_line() + ": cannot index " +
-                                     std::string(obj.type_name()) +
+            throw std::runtime_error(err_line() + ": cannot index " + std::string(obj.type_name()) +
                                      (key.is_string() ? " with field '" + key.as_string() + "'" : ""));
         }
         NEXT();
@@ -1388,8 +1391,7 @@ dispatch_loop:
                 throw std::runtime_error(err_line() + ": runtime: array index must be integer");
             obj.array_set(key.as_int(), regs[base + C]);
         } else {
-            throw std::runtime_error(err_line() + ": cannot assign index on " +
-                                     std::string(obj.type_name()) +
+            throw std::runtime_error(err_line() + ": cannot assign index on " + std::string(obj.type_name()) +
                                      (key.is_string() ? " with field '" + key.as_string() + "'" : ""));
         }
         NEXT();
@@ -1431,6 +1433,11 @@ dispatch_loop:
         if (!bv.is_integer())
             throw std::runtime_error(err_line() + ": runtime: ~ requires integer operand");
         regs[base + A] = Value(~bv.as_int());
+        NEXT();
+    }
+
+    op_LEN: {
+        regs[base + A] = value_len(regs[base + B]);
         NEXT();
     }
 
@@ -1657,41 +1664,41 @@ dispatch_loop:
         // Inner block: the unique_ptr has a non-trivial destructor and must leave scope BEFORE
         // NEXT(), per the computed-goto rule.
         {
-        uint8_t fi = (uint8_t)Bx;
-        // A unique_ptr so that if capturing throws (inconsistent bytecode) the Closure is freed
-        // instead of leaking.
-        auto cl = std::make_unique<Closure>(fi);
-        for (auto& desc : ch->funcs[fi].upvals) {
-            Upvalue* uv;
-            if (desc.is_local) {
-                uv = nullptr;
-                auto& frame_open = call_stack.back().open_upvals;
-                if (frame_open) {
-                    for (auto* cand : *frame_open) {
-                        if (!cand->closed && cand->frame_base == base && cand->reg_idx == desc.idx) {
-                            uv = cand;
-                            break;
+            uint8_t fi = (uint8_t)Bx;
+            // A unique_ptr so that if capturing throws (inconsistent bytecode) the Closure is freed
+            // instead of leaking.
+            auto cl = std::make_unique<Closure>(fi);
+            for (auto& desc : ch->funcs[fi].upvals) {
+                Upvalue* uv;
+                if (desc.is_local) {
+                    uv = nullptr;
+                    auto& frame_open = call_stack.back().open_upvals;
+                    if (frame_open) {
+                        for (auto* cand : *frame_open) {
+                            if (!cand->closed && cand->frame_base == base && cand->reg_idx == desc.idx) {
+                                uv = cand;
+                                break;
+                            }
                         }
                     }
+                    if (!uv) {
+                        uv = new Upvalue;
+                        uv->frame_base = base;
+                        uv->reg_idx = desc.idx;
+                        if (!frame_open)
+                            frame_open = std::make_unique<std::vector<Upvalue*>>();
+                        frame_open->push_back(uv);
+                    }
+                    uv->refcount++;
+                } else {
+                    if (!call_stack.back().upvals)
+                        throw std::runtime_error("runtime: closure captures upvalue from non-closure frame");
+                    uv = (*call_stack.back().upvals)[desc.idx];
+                    uv->refcount++;
                 }
-                if (!uv) {
-                    uv = new Upvalue;
-                    uv->frame_base = base;
-                    uv->reg_idx = desc.idx;
-                    if (!frame_open)
-                        frame_open = std::make_unique<std::vector<Upvalue*>>();
-                    frame_open->push_back(uv);
-                }
-                uv->refcount++;
-            } else {
-                if (!call_stack.back().upvals)
-                    throw std::runtime_error("runtime: closure captures upvalue from non-closure frame");
-                uv = (*call_stack.back().upvals)[desc.idx];
-                uv->refcount++;
+                cl->upvals.push_back(uv);
             }
-            cl->upvals.push_back(uv);
-        }
-        regs[base + A] = Value::make_closure(cl.release());
+            regs[base + A] = Value::make_closure(cl.release());
         }
         NEXT();
     }
@@ -1865,7 +1872,7 @@ dispatch_loop:
             }
         }
         if (cont)
-            ip = Bx;   // into the body; otherwise we fall through to the exit
+            ip = Bx; // into the body; otherwise we fall through to the exit
         NEXT();
     }
 
@@ -2016,7 +2023,8 @@ void VM::execute(Chunk chunk) {
     grow_regs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
     Frame top;
-    top.varargs_base = owned_chunk.top_reg_count; // the top-level frame's reg_count, so result_cap is right for the builtins
+    top.varargs_base =
+        owned_chunk.top_reg_count; // the top-level frame's reg_count, so result_cap is right for the builtins
     call_stack.push_back(std::move(top));
 
     run_goto(0);

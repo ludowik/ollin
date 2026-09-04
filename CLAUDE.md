@@ -381,6 +381,13 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
   figer une disposition favorable (le prochain changement la défera). Pour attribuer un
   écart à un commit, mesurer en **tourniquet** (tous les binaires une fois par tour, puis
   minimum par binaire) : une mesure au meilleur de trois est trop bruitée.
+- ⚠ **La disposition peut aussi déplacer le COMPTE d'instructions, pas seulement le temps.**
+  Mesuré en ajoutant l'opcode `LEN` : le même gestionnaire, placé avant `op_HALT`, coûtait
+  **+600 000 instructions (+1,9 %) au benchmark `loop`**, qui n'exécute jamais `LEN` ; placé au
+  milieu des opérations binaires, le surcoût disparaît (−61). La cause n'est pas le travail mais
+  l'allocation de registres de `run_goto`, partagée par tous les gestionnaires. Corollaire : une
+  hausse constatée sur un chemin qui ne touche pas le code modifié se vérifie en DÉPLAÇANT le
+  nouveau code avant d'être prise pour un coût réel.
 - **« C'est la disposition du code » ne s'AFFIRME pas, ça se MESURE : `bash bench/icount.sh
   [<réf>] [<réf>]`.** Le script compte les instructions exécutées (callgrind), chiffre
   déterministe et indifférent à l'adresse du code comme au cache : il mesure le TRAVAIL.
@@ -599,6 +606,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
 
 **Destructuration multi-retour : UN seul chemin, deux appelants.** `var a, b = f()` (`visit(VarDeclStmt)`) et `a, b = f()` (`visit(MultiAssignStmt)`) émettent la même séquence — appel compilé à une base connue, `MOVE_RESULTS` si l'appel a produit ses valeurs ailleurs, puis `SPREAD_RESULTS`. La réaffectation ne l'avait pas : elle ne comptait qu'une valeur et les cibles suivantes lisaient les temporaires voisins, donc des valeurs décalées (`a, b, c = f()` donnait `1, 1, 2` pour un retour `1, 2, 3`). Toute nouvelle forme de cible doit passer par ce chemin, pas le réinventer.
+| LEN           | AB     | A=dst, B=src               | `R[A] = longueur de R[B]` — l'opérateur `#`, un opcode et non un appel à `len` par nom (un `var len` du script l'interceptait) |
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | HALT          | —      |                            | arrêt                                            |

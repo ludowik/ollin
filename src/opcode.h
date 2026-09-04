@@ -105,5 +105,6 @@ enum class Op : uint8_t {
     RETURN_SPREAD,      // AB: returns B explicit values plus last_results_ (the last being a call), contiguous at R[A..]
     SEAL_ENUM,          // A: the map in R[A] becomes an enum, and every indexed write is refused
     CLOSE_UPVALS,       // A: closes the open upvalues whose register is >= A, at the end of a scope
+    LEN,                // AB: R[A] = length of R[B] — the '#' operator
     HALT,
 };

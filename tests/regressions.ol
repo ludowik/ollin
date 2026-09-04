@@ -1986,4 +1986,16 @@ end
 sameTurnSet(8)
 assert(sameTurnGet() == 8)
 
+## '#' is a real unary OPERATOR (the LEN opcode), not a call by name to `len`. It was desugared
+## into len(x), resolved in the user's scope, so a variable called len intercepted it and the
+## program died on "call on non-function value" — the very trap ref's __ref_v parameter avoids.
+var len = 7
+assert(#[1, 2, 3] == 3)
+assert(len == 7)
+assert(#"café" == 4)          ## in codepoints, as the builtin counts
+assert(#{a: 1, b: 2} == 2)
+assert(#nil == 0)
+assert(#42 == 1)
+assert(#[1;5] == 5)           ## a range knows its length
+
 print("regressions ok")

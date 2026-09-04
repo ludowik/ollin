@@ -151,6 +151,8 @@ static Op unary_opcode(char op) {
         return Op::NOT;
     case '~':
         return Op::BNOT;
+    case '#':
+        return Op::LEN;
     default:
         throw std::runtime_error(std::string("unknown unary op: ") + op);
     }

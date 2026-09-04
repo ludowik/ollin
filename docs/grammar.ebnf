@@ -207,7 +207,7 @@ refExpr        = "ref" IDENT { "." IDENT } ;
                     tight loop. *)
 
 unary          = ( "-" | "not" | "~" | "#" ) unary | refExpr | power ;
-             (* a unary "~" is a bitwise NOT; "#" is sugar, "#expr" being "len(expr)" *)
+             (* a unary "~" is a bitwise NOT; "#expr" is the LENGTH of expr, as len(expr) gives *)
 power          = primary ( "^" unary ) ? ;
              (* "^" is exponentiation, right-associative: INT^INT with a non-negative exponent
                 gives INT, and FLOAT otherwise *)

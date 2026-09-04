@@ -837,12 +837,11 @@ std::unique_ptr<Expr> Parser::unary() {
         advance();
         return std::make_unique<UnaryExpr>('~', unary());
     }
-    if (check(TokenType::HASH)) {
-        advance();
-        auto e = std::make_unique<CallExpr>();
-        e->callee = "len";
-        e->args.push_back(unary());
-        return e;
+    if (match(TokenType::HASH)) {
+        // A real unary operator, NOT a call to `len` by name: resolved in the user's scope, a
+        // `var len = 5` used to intercept '#' and the program failed with "call on non-function
+        // value". The same hygiene as REF_PARAM below.
+        return std::make_unique<UnaryExpr>('#', unary());
     }
     if (check(TokenType::REF))
         return ref_expr();
