@@ -242,6 +242,7 @@ struct Bucket3D {
     unsigned int vaoId;          // the mesh key: it identifies the GPU mesh, a primitive OR an external model
     Mesh mesh;                   // the mesh to draw: a unit primitive, or one of a model's meshes
     unsigned int texId;
+    bool flip_v;                // the texture's rows are bottom-up (painted by image.beginDraw)
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
     std::vector<float> tiles;    // 3 floats per instance (top/side/bottom, -1 = none)
@@ -359,7 +360,7 @@ static int s_loc_vertcolor = -1;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
 static int s_loc_instcorner = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
-static int s_loc_animparams = -1;
+static int s_loc_animparams = -1, s_loc_flipv = -1;
 static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -1, s_loc_l_col = -1;
 
 // PERSISTENT instance VBOs (transform + colour): reused from one frame to the next
@@ -408,6 +409,7 @@ static void load_lit_shader() {
     s_loc_utime = GetShaderLocation(s_lit, "uTime");
     s_loc_animtile = GetShaderLocation(s_lit, "animTile");
     s_loc_animparams = GetShaderLocation(s_lit, "animParams");
+    s_loc_flipv = GetShaderLocation(s_lit, "uFlipV");
     s_loc_viewpos = GetShaderLocation(s_lit, "viewPos");
     s_loc_ambient = GetShaderLocation(s_lit, "ambient");
     s_loc_l_en = GetShaderLocation(s_lit, "light0.enabled");
@@ -427,7 +429,7 @@ static Bucket3D& bucket_for(const Mesh& mesh, unsigned int texId) {
             return b;
         }
     }
-    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, {}, {}, {}, {}});
+    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, image_gl_flipped(texId), {}, {}, {}, {}});
     return s_buckets.back();
 }
 
@@ -582,11 +584,18 @@ static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned 
 }
 
 // Instanced draw (shader and attributes already in place). Binds the texture, then draws.
-static void lit_draw_instanced(const Mesh& mesh, unsigned int texId, int n) {
+static void lit_draw_instanced(const Mesh& mesh, unsigned int texId, int n, bool flip_v) {
     rlActiveTextureSlot(0);
     rlEnableTexture(texId ? texId : white_tex_id());
     int slot = 0;
     rlSetUniform(s_lit.locs[SHADER_LOC_MAP_DIFFUSE], &slot, RL_SHADER_UNIFORM_INT, 1);
+    // An image painted by RENDERING has its rows bottom-up (OpenGL's framebuffer origin), and
+    // the 3D path samples the texture directly: without this the picture came out upside down.
+    // Set per DRAW, the texture being part of a bucket's key.
+    if (s_loc_flipv >= 0) {
+        float fv = flip_v ? 1.0f : 0.0f;
+        rlSetUniform(s_loc_flipv, &fv, RL_SHADER_UNIFORM_FLOAT, 1);
+    }
     rlEnableVertexArray(mesh.vaoId);
     if (mesh.indices != nullptr) {
         rlDrawVertexArrayElementsInstanced(0, mesh.triangleCount * 3, 0, n);
@@ -623,7 +632,7 @@ static void flush_bucket(const Bucket3D& b) {
     bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile, s_inst_vbo_corner);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
-    lit_draw_instanced(mesh, b.texId, n);
+    lit_draw_instanced(mesh, b.texId, n, b.flip_v);
     rlDisableShader();
 }
 
@@ -1471,7 +1480,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     // The atlas is bound if declared (tiles >= 0 sample it), otherwise white (plain colour).
     // CONTRACT: with a tileset active, give a tile to EVERY cube of the chunk — a cube with
     // tile -1 would sample the atlas at fragTexCoord (tile 0) instead of a plain colour.
-    lit_draw_instanced(g.mesh, s_atlas_texid, g.count);
+    lit_draw_instanced(g.mesh, s_atlas_texid, g.count, image_gl_flipped(s_atlas_texid));
     rlDisableShader();
     return ctx.ret(Value{});
 }
@@ -1502,7 +1511,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
     }
     BeginBlendMode(BLEND_ALPHA);
     lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
-    lit_draw_instanced(g.mesh, s_atlas_texid, g.count);
+    lit_draw_instanced(g.mesh, s_atlas_texid, g.count, image_gl_flipped(s_atlas_texid));
     rlDisableShader();
     EndBlendMode();
     return ctx.ret(Value{});

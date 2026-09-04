@@ -1097,12 +1097,18 @@ et vérifié dans les deux sens : une image peinte par rendu garde son sens, un 
 `beginPixels`/`endPixels` après un rendu aussi (la relecture `LoadImageFromTexture` est retournée
 quand `gpu_flipped`, pour que l'ombre CPU reste de haut en bas).
 
-Le chemin 3D n'est pas concerné : `graphics.texture` passe par `image_gl_texid`, qui ne décide
-d'aucun sens (l'atlas de tuiles est échantillonné sans retournement, cf. « Affichage 3D »).
-⚠ **Trou connu, antérieur et non corrigé** : `image_gl_texid` rend l'identifiant GL nu, donc une
-image peinte par `beginDraw` puis posée en texture 3D est renversée en silence. Le corriger demande
-de faire traverser le sens à cette frontière (`image_gl_texid(id, bool*)`) et de le lire dans
-`graphics3d.cpp` ; aucun exemple ne l'exerce, tous les atlas étant remplis côté processeur.
+**Le chemin 3D le sait aussi, et depuis la TEXTURE et non depuis le handle** : `image_gl_flipped(id_GL)`
+répond « ces lignes sont de bas en haut » pour une texture qui est l'une des nôtres. Le sens voyage
+ainsi avec la texture, si bien que la texture propre à un modèle (chargée d'un fichier) répond non
+d'elle-même, sans que `push_instance` ait un paramètre de plus. Un bucket retient la réponse (sa clé
+étant déjà `(maillage, texture)`), `lit_draw_instanced` pose l'uniforme `uFlipV` par DESSIN, et le
+fragment retourne la coordonnée V — sur le `auv` FINAL du chemin d'atlas, pas sur la tuile, sinon la
+cellule ne suivrait pas. `abs(uFlipV - v)` évite une branche.
+Avant, une image peinte par `beginDraw` posée en texture 3D était renversée en silence. **Mesuré
+sous Xvfb** : deux plans côte à côte, la même image construite côté processeur d'un côté et peinte
+par rendu de l'autre — les deux moitiés de couleur étaient inversées entre les deux plans, elles
+sont maintenant identiques. Et le rendu du Rubik (texture de fichier) comme celui d'un atlas de
+tuiles sont **inchangés à l'octet**, `uFlipV` valant 0 : `abs(0 - v)` est exactement `v`.
 
 ## Viewport (résolution virtuelle, `graphics.viewport`)
 
@@ -1196,7 +1202,10 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   conventions C++ : `check_naming.sh` ne parcourt que `src/**/*.cpp` et `src/**/*.h`, donc ni les
   `.glsl` ni le `.h.in`. Le header généré vit dans `build*/`, ignoré par git.
 - **Un seul couple de shaders** pour toute la 3D. Il porte cinq sujets — éclairage Blinn-Phong,
-  atlas de tuiles, eau animée, hauteurs de coin, test alpha du feuillage. Chaque instance
+  atlas de tuiles, eau animée, hauteurs de coin, test alpha du feuillage. Le retournement vertical
+  (`uFlipV`, cf. « Orientation verticale d'une image ») n'en est pas un sixième : c'est un uniforme
+  et non un attribut d'instance, il ne coûte qu'une soustraction par pixel, et le sens étant une
+  propriété de la TEXTURE il n'ajoute rien à la clé de regroupement. Chaque instance
   transporte donc 7 flottants (tuile + coins) même quand elle n'en fait rien, et le fragment teste
   `fragTile.x >= 0` à chaque pixel. C'est une **dette assumée** : séparer en variantes ferait
   entrer le programme dans la clé de regroupement des instances (aujourd'hui `(maillage, texture)`),

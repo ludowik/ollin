@@ -80,6 +80,18 @@ unsigned int image_gl_texid(int id) {
     return h.is_render ? h.rtt.texture.id : h.tex.id;
 }
 
+bool image_gl_flipped(unsigned int gl_texid) {
+    if (gl_texid == 0)
+        return false;
+    for (auto& kv : s_images) {
+        const TexHandle& h = *kv.second;
+        unsigned int id = h.is_render ? h.rtt.texture.id : h.tex.id;
+        if (id == gl_texid)
+            return h.gpu_flipped;
+    }
+    return false; // not one of ours: a model's texture, or the white 1x1
+}
+
 // preloaded bytes: name → (bytes, ext with dot e.g. ".png")
 static std::unordered_map<std::string, std::pair<std::vector<uint8_t>, std::string>> s_preloaded;
 

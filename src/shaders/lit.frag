@@ -11,6 +11,10 @@ uniform vec2 atlasGrid;
 uniform float uTime;
 uniform float animTile;
 uniform vec4 animParams;
+// 1.0 when the bound texture's rows are bottom-up — an image painted by image.beginDraw, OpenGL's
+// framebuffer origin being at the bottom. abs(uFlipV - v) is the flip without a branch: v when
+// uFlipV is 0, 1 - v when it is 1.
+uniform float uFlipV;
 uniform vec4 ambient;
 uniform vec3 viewPos;
 struct Light { int enabled; int type; vec3 position; vec3 target; vec4 color; };
@@ -37,13 +41,14 @@ void main() {
         }
         uv = clamp(uv, 0.002, 0.998);   // a slight inset, which avoids bleeding between tiles
         vec2 auv = (cell + uv) / atlasGrid;
+        auv.y = abs(uFlipV - auv.y);    // the WHOLE atlas is flipped, so the cell moves with it
         texel = texture(texture0, auv);
         // Alpha test (pierced foliage): a hole in the TILE pierces the cube. Sharp rather than
         // faded, hence independent of draw order — the cubes stay opaque and need no sorting.
         // Limited to the atlas path: a semi-transparent texture laid on a model keeps its fade.
         if (texel.a < 0.5) discard;
     } else {                            // the ordinary path: models, and the immediate texture
-        texel = texture(texture0, fragTexCoord);
+        texel = texture(texture0, vec2(fragTexCoord.x, abs(uFlipV - fragTexCoord.y)));
     }
 
     vec4 tint = fragColor;

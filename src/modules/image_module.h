@@ -25,6 +25,11 @@ void image_reset();
 // GL texture id of an image handle, or 0 when not found. Used by the 3D side
 // (graphics.texture) to texture meshes with an image from this module.
 unsigned int image_gl_texid(int id);
+// True when that GL texture is one of ours AND its rows are bottom-up, which is the case only
+// when its content was written by RENDERING (image.beginDraw). The 3D path needs to know: it
+// samples the texture directly, and without this the image came out upside down. Asked by
+// texture id and not by image handle, so a model's own texture answers false by itself.
+bool image_gl_flipped(unsigned int gl_texid);
 
 // Called by graphics.sprite() — draws image id at (x,y) scaled to (dw,dh).
 // Pass dw=0/dh=0 to use the image's natural size.
