@@ -103,8 +103,19 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
-# A line opening with a delimiter is LINKED to the expression above and never begins a statement.
-# The only case that contradicted the rule — nothing to continue — is refused.
+# A line opening with a token that can only CONTINUE an expression is LINKED to the expression
+# above and never begins a statement. The only case that contradicts the rule — nothing to
+# continue — is refused, whichever token it is.
+check_error "a statement beginning with a binary operator" \
+    '* 2' \
+    "a statement cannot begin with '*'"
+check_error "a statement beginning with a field access" \
+    'var a = 1
+.field' \
+    "a statement cannot begin with '.'"
+check_error "a statement beginning with an assignment operator" \
+    '/= 2' \
+    "a statement cannot begin with '/='"
 check_error "a statement beginning with a parenthesis" \
     'var f = func(n)
     return n

@@ -14,12 +14,13 @@
        var n = f(x) * 0.8
              + g(x) * 0.2          (one expression, and the samples rely on this)
 
-   That reading is the only SENSIBLE one, and it needs no rule of its own: no statement can begin
-   with a binary operator or with a ".", so `+ b` and `.field` can only be continuations.
-   The same holds for an opening "(" or "[": a line that starts with one is LINKED to the
-   expression above, and never begins a statement. A statement beginning with a delimiter is
-   therefore refused, which is the only case that contradicted the rule — there was nothing to
-   continue. Write `f(7)` rather than `(f)(7)`, or give the value a name.
+   That reading is the only SENSIBLE one, and one rule covers it: a line opening with a token
+   that can only CONTINUE an expression — a binary operator, a ".", a "?", an assignment
+   operator, an opening "(" or "[" — is LINKED to the expression above, and never begins a
+   statement. Such a line therefore never reaches the statement level; reaching it means there
+   was nothing to continue, and that is refused. Write `f(7)` rather than `(f)(7)`, or give the
+   value a name. The unary operators ("-", "not", "~", "#") are outside the rule, beginning an
+   expression as well, and a closing delimiter or a "," is a different fault.
    (Lua 5.4 joins these lines the same way, checked; its explicit "ambiguous syntax" refusal
    belonged to 5.1. Ollin states the rule instead of reporting an ambiguity.)
    The ';' character is ONLY the interval separator in rangeLit. A ';' outside a

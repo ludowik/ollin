@@ -199,10 +199,51 @@ static bool is_assign_op(TokenType t) {
            t == TokenType::STAR_EQUAL || t == TokenType::SLASH_EQUAL || t == TokenType::PERCENT_EQUAL;
 }
 
+// A token that can only CONTINUE an expression: a binary operator, a field access, a call or an
+// index. '-', 'not', '~' and '#' are absent, being unary as well. Closing delimiters and ',' are
+// absent too: they end something that was never opened, which is a different fault.
+static bool only_continues_expr(TokenType t) {
+    switch (t) {
+    case TokenType::PLUS:
+    case TokenType::STAR:
+    case TokenType::SLASH:
+    case TokenType::PERCENT:
+    case TokenType::SLASH_SLASH:
+    case TokenType::CARET:
+    case TokenType::AMP:
+    case TokenType::PIPE:
+    case TokenType::LSHIFT:
+    case TokenType::RSHIFT:
+    case TokenType::EQUAL_EQUAL:
+    case TokenType::NOT_EQUAL:
+    case TokenType::GREATER:
+    case TokenType::GREATER_EQUAL:
+    case TokenType::LESS:
+    case TokenType::LESS_EQUAL:
+    case TokenType::AND:
+    case TokenType::OR:
+    case TokenType::DOT:
+    case TokenType::QUESTION:
+    case TokenType::LPAREN:
+    case TokenType::LBRACKET:
+        return true;
+    default:
+        return is_assign_op(t);
+    }
+}
+
 std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     if (depth_ >= 256)
         fail("nesting too deep");
     DepthGuard guard(depth_);
+    // A line that opens with such a token CONTINUES the expression above — that is what one
+    // reads, and a continuation never reaches this point, being consumed by the previous
+    // expression. Getting here therefore means there was nothing to continue, so the line is a
+    // statement beginning with an operator, a field access, a call or an index: refused, since
+    // no statement does.
+    if (only_continues_expr(peek().type))
+        fail(std::string("a statement cannot begin with '") + peek().lexeme +
+             "' — such a line continues the expression above; give the value a name instead");
     switch (peek().type) {
     case TokenType::COMMENT: {
         std::string text = advance().lexeme;
@@ -213,14 +254,6 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         // ';' is only valid inside a range [a;b], where range_expr consumes it. At statement
         // level it is an error, reported explicitly.
         fail("';' is not valid syntax — statements are terminated by newlines");
-    case TokenType::LPAREN:
-    case TokenType::LBRACKET:
-        // A line that opens with a delimiter CONTINUES the expression above — that is what one
-        // reads, and a continuation never reaches this point, being consumed by the previous
-        // expression. Getting here therefore means there was nothing to continue, so the line
-        // is a statement beginning with a delimiter: refused, since no statement does.
-        fail(std::string("a statement cannot begin with '") + peek().lexeme +
-             "' — such a line continues the expression above; give the value a name instead");
     case TokenType::WHILE:
         return while_stmt();
     case TokenType::DO:
