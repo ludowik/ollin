@@ -63,6 +63,8 @@ class Parser {
     void parse_call_args(std::vector<std::unique_ptr<Expr>>& out);
     // A name, then the fields of a path: IDENT { "." NAME }.
     void parse_field_path(std::vector<std::string>& path);
+    // The comma between two items of a literal: mandatory, except right before `closing`.
+    void expect_separator(TokenType closing, const char* what);
 
     std::unique_ptr<Stmt> parse_one_stmt();
     // var / global / const: one rule, the keyword only choosing the flags.

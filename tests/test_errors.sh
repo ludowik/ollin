@@ -84,6 +84,11 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# The comma between two items of a literal is mandatory (grammar.ebnf): newlines are not tokens,
+# so without it "[1 2 3]" quietly read as three elements. One before the closing bracket is fine.
+check_error "an array without a comma"    'var a = [1 2 3]'      "expected ',' between array elements"
+check_error "a map without a comma"       'var m = {a: 1 b: 2}'  "expected ',' between map entries"
+
 # A const stays a const through a multi-return destructuring: the early return of that path
 # skipped the registration, and the write below went through in silence.
 check_error "const through a multi-return destructuring" \

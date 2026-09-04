@@ -675,6 +675,11 @@ assert(sum_map_vals({x: 1, y: 2, z: 3}) == 6)
 ## creation
 var arr = [10, 20, 30]
 var vide2 = []
+## a comma before the closing bracket is allowed, on one line as on several; between two items
+## it is REQUIRED (see test_errors.sh)
+var trailing = [1, 2,]
+var trailingMap = {a: 1,}
+assert(#trailing == 2 and #trailingMap == 1)
 
 ## reading and writing (1-based)
 assert(arr[1] == 10)

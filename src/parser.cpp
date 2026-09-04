@@ -143,6 +143,16 @@ void Parser::parse_call_args(std::vector<std::unique_ptr<Expr>>& out) {
     expect(TokenType::RPAREN);
 }
 
+// The comma between two items of a literal is MANDATORY, as grammar.ebnf says: newlines are not
+// tokenized, so without it `[1 2 3]` quietly read as three elements and a forgotten comma changed
+// the meaning of the program with no diagnostic. A comma before the closing bracket is allowed
+// though — it is a real convenience of multi-line literals, and the samples use it.
+void Parser::expect_separator(TokenType closing, const char* what) {
+    if (match(TokenType::COMMA) || check(closing) || check(TokenType::EOF_T))
+        return;
+    fail(std::string("expected ',' between ") + what + ", got '" + peek().lexeme + "'");
+}
+
 void Parser::parse_field_path(std::vector<std::string>& path) {
     path.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::DOT))
@@ -1084,8 +1094,7 @@ std::unique_ptr<Expr> Parser::primary() {
             expect(TokenType::COLON);
             auto val = expr();
             map->entries.push_back({std::move(key), std::move(val)});
-            if (check(TokenType::COMMA))
-                advance();
+            expect_separator(TokenType::RBRACE, "map entries");
             skip_comments();
         }
         expect(TokenType::RBRACE);
@@ -1100,8 +1109,7 @@ std::unique_ptr<Expr> Parser::primary() {
         auto arr = std::make_unique<ArrayExpr>();
         while (!check(TokenType::RBRACKET) && !check(TokenType::EOF_T)) {
             arr->elements.push_back(expr());
-            if (check(TokenType::COMMA))
-                advance();
+            expect_separator(TokenType::RBRACKET, "array elements");
             skip_comments();
         }
         expect(TokenType::RBRACKET);
