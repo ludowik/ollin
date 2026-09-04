@@ -83,7 +83,9 @@ class Parser {
     // The signature and body, the name being already read.
     std::unique_ptr<FuncDeclStmt> finish_func_decl(int line, std::string name);
     std::unique_ptr<Stmt> return_stmt();
-    std::unique_ptr<Stmt> multi_assign_stmt();
+    // The first target is already parsed: the statement is recognised from the comma that
+    // follows it, so nothing needs re-parsing.
+    std::unique_ptr<Stmt> multi_assign_stmt(std::unique_ptr<Expr> first, int line);
     std::unique_ptr<Stmt> expr_stmt();
     // Builds the assignment statement from an already parsed target: a VarExpr becomes an
     // AssignStmt, an IndexExpr a chained IndexAssignStmt. Any other form is rejected with

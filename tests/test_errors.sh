@@ -84,6 +84,20 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# Every target of a multiple assignment must be an lvalue, the same rule as a single assignment.
+check_error "a call as a multiple-assignment target" \
+    'var x = 0
+func f()
+    return 1
+end
+f(), x = 1, 2' \
+    "invalid assignment target"
+check_error "an expression as a multiple-assignment target" \
+    'var x = 0
+var y = 0
+x + 1, y = 1, 2' \
+    "invalid assignment target"
+
 # The comma between two items of a literal is mandatory (grammar.ebnf): newlines are not tokens,
 # so without it "[1 2 3]" quietly read as three elements. One before the closing bracket is fine.
 check_error "an array without a comma"    'var a = [1 2 3]'      "expected ',' between array elements"

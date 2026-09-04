@@ -1673,9 +1673,10 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
                 return false;
         } else if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) {
             for (auto& t : m->targets) {
-                if (t.kind == LValue::VAR && t.name == v)
+                auto* ve = dynamic_cast<const VarExpr*>(t.get());
+                if (ve && ve->name == v)
                     return false;
-                if (t.key && expr_has_lambda(t.key.get()))
+                if (expr_has_lambda(t.get()))
                     return false;
             }
             for (auto& val : m->values)
@@ -1766,7 +1767,7 @@ struct HasFuncQuery : StmtQuery {
                 return;
             }
         for (auto& t : s.targets)
-            if (t.key && expr_has_lambda(t.key.get())) {
+            if (expr_has_lambda(t.get())) {
                 result = true;
                 return;
             }
@@ -1976,6 +1977,48 @@ void Compiler::visit(const IndexAssignStmt& s) {
     reg_top_ = saved;
 }
 
+// Writes R[src] into the variable `name`: a local register, an upvalue, or a global.
+void Compiler::store_name(const std::string& name, int src, const Stmt& at) {
+    auto it = local_regs_.find(name);
+    if (it != local_regs_.end()) {
+        if (src != it->second)
+            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)src, 0));
+        return;
+    }
+    int uv = resolve_upvalue(name);
+    if (uv >= 0) {
+        chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)src, (uint8_t)uv, 0));
+        return;
+    }
+    if (!declared_globals_.count(name))
+        throw std::runtime_error(where(at) + ": undeclared variable '" + name + "' (use 'var' or 'global')");
+    chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)src, chunk.add_identifier(name)));
+}
+
+// The container of an indexed write, in a register: a named variable keeps its own register, any
+// other expression is compiled into a temporary. Maps and arrays being ref-counted, the SET_INDEX
+// that follows does mutate the original object.
+int Compiler::emit_container(const Expr& obj, const Stmt& at) {
+    if (auto* ve = dynamic_cast<const VarExpr*>(&obj)) {
+        auto it = local_regs_.find(ve->name);
+        if (it != local_regs_.end())
+            return it->second;
+        int uv = resolve_upvalue(ve->name);
+        int r = alloc_reg();
+        if (uv >= 0) {
+            chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)r, (uint8_t)uv, 0));
+            return r;
+        }
+        if (!declared_globals_.count(ve->name))
+            throw std::runtime_error(where(at) + ": undeclared variable '" + ve->name + "'");
+        chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)r, chunk.add_identifier(ve->name)));
+        return r;
+    }
+    int r = alloc_reg();
+    compile_into(obj, r);
+    return r;
+}
+
 void Compiler::visit(const MultiAssignStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
@@ -2009,58 +2052,26 @@ void Compiler::visit(const MultiAssignStmt& s) {
     }
 
     // Assign each target from its temporary, or nil when there are fewer values than targets.
+    // A target is a VarExpr or an IndexExpr of any depth — the same lvalue the single assignment
+    // recognises, so `a.b.c, x = 1, 2` works exactly as `a.b.c = 1` does.
     for (int i = 0; i < n_targets; ++i) {
         int val_r = (i < n) ? base + i : alloc_reg(); // nil when there is no value
-        const LValue& lv = s.targets[i];
-        // FIELD_INDEX (a.b[k]) writes into a.b, not into a, so the refusal does not apply.
-        if (lv.kind == LValue::FIELD || lv.kind == LValue::INDEX)
-            reject_enum_write(lv.name, nullptr, lv.kind == LValue::FIELD ? lv.field : std::string(), s.line,
-                              s.file_idx);
+        const Expr* target = s.targets[i].get();
 
-        if (lv.kind == LValue::VAR) {
-            auto it = local_regs_.find(lv.name);
-            if (it != local_regs_.end()) {
-                if (val_r != it->second)
-                    chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)it->second, (uint8_t)val_r, 0));
-            } else {
-                int uv = resolve_upvalue(lv.name);
-                if (uv >= 0) {
-                    chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)val_r, (uint8_t)uv, 0));
-                } else {
-                    chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)val_r, chunk.add_identifier(lv.name)));
-                }
-            }
-        } else {
-            // FIELD or INDEX: load the object.
-            int obj_r = alloc_reg();
-            auto it = local_regs_.find(lv.name);
-            if (it != local_regs_.end()) {
-                obj_r = it->second;
-                reg_top_--;
-            } else {
-                int uv = resolve_upvalue(lv.name);
-                if (uv >= 0)
-                    chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
-                else
-                    chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.add_identifier(lv.name)));
-            }
-            if (lv.kind == LValue::FIELD_INDEX) {
-                int field_r = alloc_reg();
-                compile_into(StringExpr(lv.field), field_r);
-                int inner_r = alloc_reg();
-                chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)inner_r, (uint8_t)obj_r, (uint8_t)field_r));
-                int key_r = alloc_reg();
-                compile_into(*lv.key, key_r);
-                chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)inner_r, (uint8_t)key_r, (uint8_t)val_r));
-            } else {
-                int key_r = alloc_reg();
-                if (lv.kind == LValue::FIELD)
-                    compile_into(StringExpr(lv.field), key_r);
-                else
-                    compile_into(*lv.key, key_r);
-                chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
-            }
+        if (auto* ve = dynamic_cast<const VarExpr*>(target)) {
+            store_name(ve->name, val_r, s);
+            continue;
         }
+        auto* ie = dynamic_cast<const IndexExpr*>(target);
+        // The container of the LAST indexing is what gets written, so an enum is judged on it.
+        auto* base_var = dynamic_cast<const VarExpr*>(ie->obj.get());
+        auto* key_lit = dynamic_cast<const StringExpr*>(ie->key.get());
+        reject_enum_write(base_var ? base_var->name : std::string(), base_var ? nullptr : ie->obj.get(),
+                          key_lit ? key_lit->value : std::string(), s.line, s.file_idx);
+        int obj_r = emit_container(*ie->obj, s);
+        int key_r = alloc_reg();
+        compile_into(*ie->key, key_r);
+        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
     }
 
     reg_top_ = saved;

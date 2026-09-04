@@ -153,11 +153,18 @@ param          = IDENT [ "=" literal ] ;
 returnStmt     = "return" [ retvals ] NL ;
 retvals        = "..."
                | expr { "," expr } [ "," "..." ] ;
-assignStmt     = IDENT ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
-                 (* the semantic rule: IDENT must have been declared by "var" or "global", or it is an error *)
+assignStmt     = lvalue ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
+                 (* the semantic rule: the name must have been declared by "var" or "global", or it is an error *)
                  (* "var" gives a local, "global" a global, in the VM's shared table *)
-indexAssign    = IDENT "[" expr "]" ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL
-               | IDENT "." IDENT   ( "=" | "+=" | "-=" | "*=" | "/=" | "%=" ) expr NL ;
+lvalue         = IDENT { "[" expr "]" | "." NAME } ;
+                 (* the ONE notion of assignment target: a name, then any depth of indexing —
+                    a, a.b, a[i], a.b.c, a[i][j], a.b[k]. The same rule holds for every target of
+                    a multiple assignment: the two used to differ, the second being limited to one
+                    level, so `a.b.c = 1` compiled while `a.b.c, x = 1, 2` did not *)
+multiAssign    = lvalue { "," lvalue } "=" expr { "," expr } NL ;
+                 (* the right-hand side is fully evaluated BEFORE any write, hence `a, b = b, a` *)
+                 (* fewer values than targets leaves the rest nil; a single call spreads its
+                    return values over the targets, as in a declaration *)
 exprStmt       = expr NL ;
 
 expr           = logical ;

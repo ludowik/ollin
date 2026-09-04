@@ -239,6 +239,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
 
     // Refuses a write to an enum, detected at compile time so the message can name the enumeration
     // and the element. An empty `field` means the key is not a literal.
+    // Writes R[src] into the variable `name`: local register, upvalue or global.
+    void store_name(const std::string& name, int src, const Stmt& at);
+    // The container of an indexed write, in a register.
+    int emit_container(const Expr& obj, const Stmt& at);
+
     void reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
                            int file_idx);
 

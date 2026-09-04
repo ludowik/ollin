@@ -51,7 +51,7 @@ var no  = false
 var nothing  = nil          ## no value
 
 ## ── 3. Variables ─────────────────────────────────────────────────────────────
-## [grammar: varDecl, globalDecl, assignStmt, program, stmt, exprStmt]
+## [grammar: varDecl, globalDecl, assignStmt, lvalue, multiAssign, program, stmt, exprStmt]
 ## Every variable MUST be declared with `var` before use.
 ## Reading or assigning an undeclared name is a compile error.
 ## `var` only ever creates locals.
@@ -73,6 +73,13 @@ a, b = 1, 2
 assert(a == 1 and b == 2)
 a, b = b, a                 ## a swap: the right-hand side is evaluated before writing
 assert(a == 2 and b == 1)
+
+## a target is an lvalue of ANY depth, exactly as in a single assignment
+var deep = {inner: {leaf: 0}, rows: [[0, 0]]}
+deep.inner.leaf, a = 7, 8
+assert(deep.inner.leaf == 7 and a == 8)
+deep.rows[1][2], a = 9, 10
+assert(deep.rows[1][2] == 9 and a == 10)
 
 ## compound assignments
 var c = 10
@@ -560,7 +567,7 @@ catch err
 end
 
 ## ── 14. Maps ─────────────────────────────────────────────────────────────────
-## [grammar: mapLit, mapEntry, indexAssign]
+## [grammar: mapLit, mapEntry, lvalue]
 
 ## creation
 var empty = {}

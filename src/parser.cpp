@@ -254,14 +254,11 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         // target must be an lvalue (VarExpr or IndexExpr), which uniformly covers a=, a.b=,
         // a[i]=, a.b.c=, a[i][j]= and a.b[k]= (see the grammar).
         int line = peek().line;
-        int saved = pos;
         auto e = expr();
         if (is_assign_op(peek().type))
             return finish_assign_from_expr(std::move(e), line);
-        if (check(TokenType::COMMA)) {
-            pos = saved; // a multiple assignment: re-parsed by multi_assign_stmt (LValue)
-            return multi_assign_stmt();
-        }
+        if (check(TokenType::COMMA))
+            return multi_assign_stmt(std::move(e), line);
         consume_opt_comment();
         auto st = std::make_unique<ExprStmt>(std::move(e));
         st->line = line;
@@ -527,39 +524,23 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
     return s;
 }
 
-std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
-    int line = peek().line;
+// A target must be an lvalue: a name, or an indexing of any depth. Same rule as the single
+// assignment, which reads it off the expression it has just parsed.
+static bool is_lvalue(const Expr* e) {
+    return dynamic_cast<const VarExpr*>(e) != nullptr || dynamic_cast<const IndexExpr*>(e) != nullptr;
+}
+
+std::unique_ptr<Stmt> Parser::multi_assign_stmt(std::unique_ptr<Expr> first, int line) {
     auto s = std::make_unique<MultiAssignStmt>();
     s->line = line;
     s->file_idx = current_file_idx_;
 
-    auto parse_l_value = [&]() {
-        LValue lv;
-        lv.name = expect(TokenType::IDENTIFIER).lexeme;
-        if (match(TokenType::DOT)) {
-            lv.field = expect_name("a field name");
-            if (check(TokenType::LBRACKET)) {
-                advance();
-                lv.kind = LValue::FIELD_INDEX;
-                lv.key = expr();
-                expect(TokenType::RBRACKET);
-            } else {
-                lv.kind = LValue::FIELD;
-            }
-        } else if (check(TokenType::LBRACKET)) {
-            advance();
-            lv.kind = LValue::INDEX;
-            lv.key = expr();
-            expect(TokenType::RBRACKET);
-        } else {
-            lv.kind = LValue::VAR;
-        }
-        return lv;
-    };
-
-    s->targets.push_back(parse_l_value());
+    s->targets.push_back(std::move(first));
     while (match(TokenType::COMMA))
-        s->targets.push_back(parse_l_value());
+        s->targets.push_back(expr());
+    for (auto& t : s->targets)
+        if (!is_lvalue(t.get()))
+            fail_at(line, "invalid assignment target");
 
     expect(TokenType::EQUALS);
     parse_expr_list(s->values);

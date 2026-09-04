@@ -101,7 +101,9 @@ using BodyFn = std::function<void(const std::vector<std::unique_ptr<Stmt>>&)>;
 struct Stmt {
     int line = 0;
     int file_idx = 0;
-    SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
+    SourceLoc sloc() const {
+        return {(uint16_t)file_idx, (uint16_t)line};
+    }
     virtual void accept(StmtVisitor&) const = 0;
     // Names this statement declares at module level, hence stored in the map built by
     // `import "m" as m` (none by default). The answer lives HERE, next to the node: a new kind
@@ -170,7 +172,9 @@ struct StmtQuery : StmtVisitor {
 struct Expr {
     int line = 0;
     int file_idx = 0;
-    SourceLoc sloc() const { return {(uint16_t)file_idx, (uint16_t)line}; }
+    SourceLoc sloc() const {
+        return {(uint16_t)file_idx, (uint16_t)line};
+    }
     virtual void accept(ExprVisitor&) const = 0;
     virtual ~Expr() = default;
 };
@@ -441,16 +445,11 @@ struct IndexAssignStmt : Stmt {
     }
 };
 
-struct LValue {
-    enum Kind { VAR, FIELD, INDEX, FIELD_INDEX };
-    Kind kind = VAR;
-    std::string name;               // VAR: variable; FIELD/INDEX/FIELD_INDEX: object name
-    std::string field;              // FIELD and FIELD_INDEX: the field's name
-    std::unique_ptr<Expr> key;      // INDEX and FIELD_INDEX: the index expression
-};
-
 struct MultiAssignStmt : Stmt {
-    std::vector<LValue> targets;
+    // The targets are EXPRESSIONS, each a VarExpr or an IndexExpr — the same notion of lvalue the
+    // single assignment uses (see Parser::finish_assign_from_expr). A second, poorer grammar used
+    // to live here, limited to one level, so `a.b.c = 1` compiled while `a.b.c, x = 1, 2` did not.
+    std::vector<std::unique_ptr<Expr>> targets;
     std::vector<std::unique_ptr<Expr>> values;
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -552,7 +551,7 @@ struct ClassDeclStmt : Stmt {
     }
     void for_each_body(const BodyFn& f) const override {
         for (auto& m : methods)
-            f(m->body);   // methods are FuncDeclStmt, so their bodies are exposed
+            f(m->body); // methods are FuncDeclStmt, so their bodies are exposed
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -568,11 +567,11 @@ struct EnumItem {
 };
 
 struct EnumDeclStmt : Stmt {
-    std::string name;                   // a bare name (a global); otherwise the field's name
-    std::unique_ptr<Expr> obj_expr;     // non-null for `enum obj.field`: the target map
+    std::string name;               // a bare name (a global); otherwise the field's name
+    std::unique_ptr<Expr> obj_expr; // non-null for `enum obj.field`: the target map
     std::vector<EnumItem> items;
     void exported_names(std::vector<std::string>& out) const override {
-        if (!obj_expr)   // `enum a.b` writes a map field, so there is no name of its own
+        if (!obj_expr) // `enum a.b` writes a map field, so there is no name of its own
             out.push_back(name);
     }
     void accept(StmtVisitor& v) const override {
@@ -607,7 +606,9 @@ struct SwitchStmt : Stmt {
 struct InterpExpr : Expr {
     std::vector<std::string> literals;
     std::vector<std::unique_ptr<Expr>> exprs;
-    void accept(ExprVisitor& v) const override { v.visit(*this); }
+    void accept(ExprVisitor& v) const override {
+        v.visit(*this);
+    }
 };
 
 struct Program {
