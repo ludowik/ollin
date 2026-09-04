@@ -12,4 +12,6 @@ tests/*.data.json
 ## five of them reached a commit through a `git add -A` before this line existed.
 /*.png
 _probe*.ol
+## A compiler probe's leftover: a build writes it into the working directory.
+/a.out
 __pycache__/
