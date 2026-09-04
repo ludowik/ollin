@@ -1505,8 +1505,13 @@ donc les upvalues ouvertes sur elles doivent y être fermées — sans quoi une 
 dans un `do`/`if`/`while`/`try`/`switch` imbriqué gardait une upvalue ouverte sur un registre
 rendu aux temporaires, et l'instruction suivante écrasait la valeur capturée (mesuré : un `do`
 rendant `nil` au lieu de `42`). Les deux formes de `for` le faisaient déjà par itération, pour la
-même raison. ⚠ Le chemin du `throw` **quitte le corps sans exécuter sa fin** : `visit(TryCatchStmt)`
-réémet donc le `CLOSE_UPVALS` là où le contrôle atterrit. **Réserver les registres au lieu de
+même raison. ⚠ **Tout chemin qui QUITTE le corps sans exécuter sa fin** doit refermer là où il
+atterrit : `visit(TryCatchStmt)` réémet le `CLOSE_UPVALS` à l'entrée du `catch` (le `throw`), et
+`visit(WhileStmt)` en pose deux — sur le chemin du `continue`, placé APRÈS le saut de retour pour
+que le tour ordinaire ne paie rien, et à la sortie de la boucle (le `break`). Sans eux, deux tours
+d'un `while` partageaient la même case (`10 30 30 40` au lieu de `10 20 30 40` avec un `continue`,
+et la closure du dernier tour rendait `{function}` après un `break`). Les deux formes de `for`
+avaient ces deux points depuis toujours ; le `while` n'en avait aucun. **Réserver les registres au lieu de
 fermer a été essayé et retiré** : la réserve s'accumulait sur tout un fichier et faisait dépasser
 les 255 registres. Fermer ne dé-partage rien : deux closures d'un même registre continuent de
 voir les écritures l'une de l'autre (figé dans `regressions.ol`).

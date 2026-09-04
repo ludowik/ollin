@@ -1937,4 +1937,53 @@ var scopedConst = 2
 scopedConst = 3
 assert(scopedConst == 3)
 
+## One variable PER TURN in a while loop, as in a for. The body of a while is a block, so it
+## closes its upvalues at its end — but a `continue` leaves the body without running that end,
+## and the closures of that turn went on sharing their register with the next turn's (10 30 30 40
+## instead of 10 20 30 40). The continue path closes them on its own way back.
+func perTurn(withContinue)
+    var fs = []
+    var i = 0
+    while i < 4 do
+        i += 1
+        var x = i * 10
+        fs.push(func() return x end)
+        if withContinue and i == 2 then
+            continue
+        end
+    end
+    return fs[1]() + fs[2]() * 100 + fs[3]() * 10000
+end
+assert(perTurn(false) == 10 + 2000 + 300000)
+assert(perTurn(true) == 10 + 2000 + 300000)
+
+## A break leaves the body early too, and the closures of the last turn keep their value.
+func breakTurn()
+    var gs = []
+    var j = 0
+    while true do
+        j += 1
+        var y = j * 100
+        gs.push(func() return y end)
+        if j == 2 then
+            break
+        end
+    end
+    return gs[1]() + gs[2]()
+end
+assert(breakTurn() == 300)
+
+## Two closures of the SAME turn still share their variable, closing or not.
+global sameTurnGet = nil
+global sameTurnSet = nil
+var once = 0
+while once < 1 do
+    var v = 1
+    sameTurnGet = func() return v end
+    sameTurnSet = func(n) v = n end
+    once += 1
+end
+sameTurnSet(8)
+assert(sameTurnGet() == 8)
+
 print("regressions ok")

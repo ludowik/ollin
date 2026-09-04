@@ -587,14 +587,31 @@ void Compiler::visit(const WhileStmt& s) {
 
     break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
     continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    int body_base = reg_top_;
     compile_block(s.body);
+    // A continue LEAVES the body without running its end, so the CLOSE_UPVALS that compile_block
+    // put there is skipped: the closures of that turn would go on sharing their register with the
+    // next turn's. The continue path therefore closes them itself, on its own way back — placed
+    // AFTER the normal jump, so the ordinary path pays nothing.
+    uint16_t cont_target = loop_start;
+    if (!continue_patches.back().patches.empty() && body_carries_func(s.body)) {
+        chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
+        cont_target = (uint16_t)chunk.current_pos();
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)body_base, 0, 0));
+    }
     for (size_t p : continue_patches.back().patches)
-        chunk.patch_jump(p, loop_start);
+        chunk.patch_jump(p, cont_target);
     continue_patches.pop_back();
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
-    chunk.patch_jump(exit_patch, (uint16_t)chunk.current_pos());
+
+    uint16_t exit_addr = (uint16_t)chunk.current_pos();
+    // A break leaves the body the same way, so the exit closes too — once, on the way out. The
+    // two `for` forms have always done this; the while had neither of the two points.
+    if (body_carries_func(s.body))
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)body_base, 0, 0));
+    chunk.patch_jump(exit_patch, exit_addr);
     for (size_t p : break_patches.back().patches)
-        chunk.patch_jump(p, (uint16_t)chunk.current_pos());
+        chunk.patch_jump(p, exit_addr);
     break_patches.pop_back();
 }
 
