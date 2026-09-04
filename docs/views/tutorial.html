@@ -1620,6 +1620,7 @@ print(a.name)      ## Dog</code></pre>
 
 <h3>Static methods</h3>
 <p>A method prefixed with <code><span class="kw">static</span></code> belongs to the <strong>class</strong> and not to an instance: it does <strong>not</strong> receive <code>self</code>. It is called as <code>Class.method(...)</code>, or on an instance, with no self injected. Handy for alternative constructors, or for utilities tied to the class.</p>
+<p><code><span class="kw">static</span></code> is <strong>refused</strong> on <code>init</code> and on every meta-method (<code>__add</code>, <code>__str</code>…): a constructor and an operator always receive the object, so a class-level one would have nothing to work on. Both refusals name the method.</p>
 <pre><code>class Vec
     func init(x, y)
         self.x = x

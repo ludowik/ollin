@@ -82,6 +82,9 @@ method         = [ "static" ] "func" IDENT "(" [ params ] ")" NL { stmt } "end" 
                  (* with "static": a class method — no self, callable as Class.m() or instance.m() *)
                  (* "func init(...)" is the constructor, always an instance method *)
                  (* the special methods: init, __str, __add, __sub, __mul, __div, __mod, __neg, __eq, __lt, __le *)
+                 (* "static" is REFUSED on init and on every __ method: a constructor and an
+                    operator always receive the object, so a class-level one would have nothing
+                    to work on. Both refusals name the method *)
 
 methodCall     = expr "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
 superCall      = "super" "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;

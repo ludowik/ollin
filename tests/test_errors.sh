@@ -103,6 +103,22 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# static is refused on init and on the meta-methods: a constructor and an operator always
+# receive the object (documented under `method` in grammar.ebnf).
+check_error "static init" \
+    'class C
+    static func init()
+    end
+end' \
+    "'init' cannot be static"
+check_error "a static meta-method" \
+    'class D
+    static func __add(a, b)
+        return 1
+    end
+end' \
+    "cannot be static"
+
 # Two DIFFERENT modules under one alias in one scope is a genuine contradiction, and the message
 # names both files instead of talking about a local variable.
 check_error_file "two modules under one alias" tests/alias_clash_test.ol \
