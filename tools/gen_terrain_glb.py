@@ -137,8 +137,7 @@ def build():
 if __name__ == "__main__":
     if SIDE * SIDE > 65535:
         raise SystemExit("above 65535 vertices raylib narrows the indices to u16: lower SIDE")
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "model_3d", "terrain.glb")
+    path = gl.sample_path("terrain.glb")
     data, verts, tris = build()
     with open(path, "wb") as f:
         f.write(data)

@@ -6,6 +6,7 @@ accessor, rotating a vector, writing a .glb back. That is what lives here — no
 particular model.
 """
 import json
+import os
 import struct
 
 COMPONENT = {5120: ("b", 1), 5121: ("B", 1), 5122: ("h", 2), 5123: ("H", 2),
@@ -14,6 +15,14 @@ COUNT = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
 
 JSON_CHUNK = 0x4E4F534A
 BIN_CHUNK = 0x004E4942
+
+
+# Where the "3D models" example keeps its data. The six generators wrote these two lines each, and
+# moving the models into model_3d/ therefore took six identical edits — the next move would take six
+# more, with one generator liable to stay behind and write beside the catalogue.
+def sample_path(name):
+    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
+    return os.path.join(root, "docs", "samples", "model_3d", name)
 
 
 def rotate(v, quat):

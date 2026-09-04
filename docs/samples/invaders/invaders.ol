@@ -7,8 +7,8 @@
 ## of the rule, never a setting. The wave only drops and reverses at the END of a pass, which is what
 ## keeps the formation square.
 ##
-## The three creatures are drawn below, and they are ours. Only the MECHANICS are faithful to the
-## arcade original, whose sprites are its author's work.
+## The three creatures are ours, drawn in sprites.ol. Only the MECHANICS are faithful to the arcade
+## original, whose sprites are its author's work.
 ##
 ## The fleet answers: only the LOWEST living alien of a column may drop a bomb, three bombs at most
 ## in the air. Being shot costs a life, and so does letting the fleet reach the cannon's line.
@@ -83,13 +83,6 @@ const BLAST_TIME  = 0.18        ## how long a kill is shown coming apart
 const PAUSE_BAND  = 20          ## the top band, in field pixels: a tap there pauses on a touch screen
 const RESPAWN    = 1.2          ## seconds the field holds still after the cannon is hit
 
-
-## One entry per kind: its two frames, what killing it is worth, its colour. The kind comes from the
-## ROW, so the fleet's shape decides the score.
-global kinds = []
-global gunImg = nil
-global bombImgs = []
-global ufoImg = nil
 global shields = []      ## four {img, x}: each one its own texture, so each erodes on its own
 
 global fleet = []        ## 55 entries {x, y, kind, alive}
@@ -119,22 +112,10 @@ global shots = 0         ## shots fired, which is what prices the mystery ship
 global popup = nil       ## {text, x, y, left}: what a kill was worth, written where it happened
 global best = 0          ## the best score of the session
 
-## Every sound is a buffer computed ONCE, at startup: the formulas below are sampled by the engine
-## before the game runs, so nothing is calculated while a note plays. Only the mystery ship needs a
-## living oscillator, its tone being moved while it sounds.
-global sndMarch = []
-global sndShoot = nil
-global sndAlien = nil
-global sndGun   = nil
-global sndUfo   = nil
-global ufoVoice = nil
-global marchStep = 0     ## which of the four notes the next pass plays
-
 global state = "title"   ## "title", "play" or "over": every input asks this first
 global paused = false
 global bursts = []       ## {x, y, left}: the kills still coming apart
 global nextLife = EXTRA_LIFE
-global burstImg = nil
 global demo = 0.0        ## the title screen's own clock, which animates the three creatures
 
 global aimId = nil       ## the finger aiming, by id — an id can be 0, so only nil means "none"
@@ -152,8 +133,6 @@ func buildShields()
     end
 end
 
-## Eats a disc out of a shield, in the texture's own coordinates. The jitter keeps two hits at the
-## same spot from cutting the same clean circle twice.
 ## Carves a pattern out of a shield, in the texture's own coordinates. `dir` is where the projectile
 ## was going: -1 for the cannon's shot, which eats UPWARDS from the pixel it struck, +1 for a bomb,
 ## which eats downwards. The pattern is centred horizontally and anchored on the impact, so the

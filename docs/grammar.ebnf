@@ -32,6 +32,23 @@ stmt           = varDecl
                | exprStmt ;
 
 importStmt     = "import" STRING [ "as" IDENT ] NL ;
+                 (* the path is resolved against the DIRECTORY of the importing file (an absolute
+                    path is taken as it is), then normalised — "." and ".." collapsed. That resolved
+                    path is the module's identity: importing the same file twice does nothing the
+                    second time, whichever way it was written *)
+                 (* the extension may be left out: "utils" reads utils.ol *)
+                 (* WITHOUT `as`, the module's top-level names are injected into the importing
+                    scope; WITH `as`, they are gathered as the fields of a map of that name. The
+                    names injected are those DECLARED at the module's top level: var, const, func,
+                    class and enum *)
+                 (* what crosses the boundary, and what does not:
+                      a `global` of either file is shared, so a module can fill the host's state;
+                      a function of the host reads a `const` of the module, and the other way round
+                        is NOT true — a `const` of the host is a local of its main body, invisible
+                        to a module (a constant a module needs must live in the module);
+                      the engine's entry points — setup, update, draw — and the input callbacks
+                        (mouse.*, touch.*, keyboard.*) are read from the ENTRY file only: declaring
+                        them in a module has no effect *)
 
 enumDecl       = "enum" enumTarget [ enumItem { "," enumItem } [ "," ] ] "end" NL ;
 enumTarget     = IDENT { "." IDENT } ;

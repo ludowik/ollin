@@ -1,44 +1,10 @@
 #include "parser.h"
+#include "paths.h"
 #include "lexer.h"
 #include "source_registry.h"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
-
-std::string path_dir(const std::string& file) {
-    auto sep = file.find_last_of("/\\");
-    return (sep != std::string::npos) ? file.substr(0, sep + 1) : "";
-}
-
-// Collapses "." and ".." in a resolved import path. The resolved path is the IDENTITY of a module —
-// the registry key, the deduplication key, and the file name a forked web project stores it under —
-// so "a/../lib/x.ol" and "lib/x.ol" must be the same string. Two samples reaching a shared library
-// from their own directories would otherwise load it twice, under two names, and a project forked
-// from one of them would carry a file whose path walks upwards.
-static std::string path_normalise(const std::string& p) {
-    bool absolute = !p.empty() && p[0] == '/';
-    std::vector<std::string> parts;
-    std::istringstream segments(p);
-    std::string seg;
-    while (std::getline(segments, seg, '/')) {
-        if (seg == "..") {
-            // A ".." that cannot be collapsed is kept: it may still be meaningful on the filesystem.
-            if (!parts.empty() && parts.back() != "..")
-                parts.pop_back();
-            else if (!absolute)
-                parts.push_back(seg);
-        } else if (!seg.empty() && seg != ".") {
-            parts.push_back(seg);
-        }
-    }
-    std::string out = absolute ? "/" : "";
-    for (size_t k = 0; k < parts.size(); k++) {
-        if (k)
-            out += "/";
-        out += parts[k];
-    }
-    return out;
-}
 
 Parser::Parser(std::vector<Token> tokens, std::string base_dir,
                std::shared_ptr<std::unordered_set<std::string>> imported,
@@ -1406,10 +1372,9 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     }
     consume_opt_comment();
 
-    // Resolve the path relative to the current script's directory.
-    std::string resolved =
-        (!path.empty() && (path[0] == '/' || (path.size() > 1 && path[1] == ':'))) ? path : base_dir_ + path;
-    resolved = path_normalise(resolved);
+    // Resolved against the importing file's directory, and normalised: this string IS the module's
+    // identity (see paths.h).
+    std::string resolved = path_resolve(base_dir_, path);
 
     auto block = std::make_unique<BlockStmt>();
 

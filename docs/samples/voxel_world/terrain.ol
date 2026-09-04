@@ -88,9 +88,6 @@ func setBlockTiles(b, h, y)
     graphics.tile(T_STONE)
 end
 
-func ckey(cx, cz)
-    return cx + "," + cz
-end
 
 ## A well-mixed 2D hash, unlike a linear x*a + z*b, which lined the trees up along diagonals.
 ## `salt` gives independent streams — position, height, shape — for the same column.

@@ -13,6 +13,7 @@
 #include "modules/image_module.h"
 #include "modules/modules.h"
 #include "parser.h"
+#include "paths.h"
 #include "source_registry.h"
 #include "vm.h"
 #include <emscripten.h>

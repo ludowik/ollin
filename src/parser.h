@@ -7,12 +7,6 @@
 #include <unordered_set>
 #include <vector>
 
-// The DIRECTORY a file's imports resolve against: everything up to the last separator, empty when
-// there is none. Both entry points (main.cpp, wasm_main.cpp) and the import statement itself derive
-// it, and each having written the line meant one of them could forget to — which is exactly what
-// happened on the web, where an entry kept in a sub-directory looked for its siblings at the root.
-std::string path_dir(const std::string& file);
-
 class Parser {
   public:
     explicit Parser(std::vector<Token> tokens, std::string base_dir = "",

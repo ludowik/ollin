@@ -2,7 +2,7 @@
 // transforms live in graphics_module.cpp; the boundary between the two units is
 // graphics_internal.h. Compiled only in the raylib/WASM builds.
 #include "graphics_internal.h"
-#include "../source_registry.h"
+#include "../paths.h"
 #include "shader_sources.h"
 #include "graphics_quat.h"
 #include "image_module.h"
@@ -1187,17 +1187,18 @@ static Model* model_get(const std::string& name) {
         m = LoadModel(path.c_str());
         remove(path.c_str());
     } else {
-        // Fallback: load straight from a path (native, or an asset in MEMFS). BESIDE THE PROGRAM
-        // first — a script names its data without repeating its own directory, and an example kept
-        // in its own directory must not depend on which directory the process was started from —
-        // then the path as written, which keeps an absolute or already-qualified name working.
-        if (!program_dir().empty()) {
-            m = LoadModel((program_dir() + name).c_str());
-            if (m.meshCount <= 0)
-                UnloadModel(m);   // a failed load still allocated a default material
+        // Straight from a path (native, or an asset in MEMFS), searched where asset_candidates
+        // says. The file is PROBED before being loaded: a failed LoadModel still allocates a
+        // default material to undo, and writes a warning of its own.
+        for (const std::string& path : asset_candidates(name)) {
+            if (!FileExists(path.c_str()))
+                continue;
+            m = LoadModel(path.c_str());
+            if (m.meshCount > 0)
+                break;
+            UnloadModel(m);   // the file exists but does not load: try the next place
+            m = Model{};
         }
-        if (m.meshCount <= 0)
-            m = LoadModel(name.c_str());
     }
     if (m.meshCount <= 0) {
         UnloadModel(m);

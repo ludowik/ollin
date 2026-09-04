@@ -44,8 +44,7 @@ def main():
     nrm = gl.accessor(doc, blob, prim["attributes"]["NORMAL"])
     idx = [t[0] for t in gl.accessor(doc, blob, prim["indices"])]
 
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "model_3d", "suzanne.obj")
+    path = gl.sample_path("suzanne.obj")
     with open(path, "w") as f:
         f.write("# Suzanne, the Blender mascot - external model (OBJ) for Ollin\n")
         f.write("# From KhronosGroup/glTF-Sample-Assets, (c) 2017 UX3D, by Norbert Nopper.\n")

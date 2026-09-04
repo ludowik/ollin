@@ -2,7 +2,7 @@
 #include "lexer.h"
 #include "modules/data_module.h"
 #include "parser.h"
-#include "source_registry.h"
+#include "paths.h"
 #include "vm.h"
 #include <cstdlib>
 #include <fstream>

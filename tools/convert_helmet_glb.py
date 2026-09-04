@@ -87,8 +87,7 @@ def main():
         "bufferViews": out.views,
     }
 
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "model_3d", "helmet.glb")
+    path = gl.sample_path("helmet.glb")
     data = gl.write_glb(built, out.data)
     with open(path, "wb") as f:
         f.write(data)

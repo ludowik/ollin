@@ -16,6 +16,11 @@ global vd = ViewDistance(4, 1, 24)   ## the radius in chunks: self-adapting, plu
 global SEA = 9
 global WATER = SEA + 0.45    ## the water surface level, the ONLY threshold for "under water"
 global loaded = {}          ## "cx,cz" → the endChunk handle
+
+## The key of that table: the streaming's business, so it lives here and not with the terrain.
+func ckey(cx, cz)
+    return cx + "," + cz
+end
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 ## The CONTROL camera, for debugging: a view from above looking down, oriented like the player's
 ## camera, so as to CHECK from the outside that only the visible chunks — those in the player

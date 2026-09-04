@@ -18,6 +18,11 @@ import glob, json, os, re, sys
 # list — the list had to be rewritten the day the files moved, and an omission turns this guard
 # into a false alarm. The resolution is the parser's: relative to the importing file's directory,
 # with "." and ".." collapsed.
+def path_is_absolute(p):
+    # The parser's rule (paths.h): a leading "/" or a Windows drive letter.
+    return p.startswith("/") or (len(p) > 1 and p[1] == ":")
+
+
 def path_normalise(p):
     absolute = p.startswith("/")
     parts = []
@@ -39,7 +44,7 @@ def imported_by(paths):
         for imp in re.findall(r'(?m)^\s*import\s+["\']([^"\']+)', src):
             if not imp.endswith(".ol"):
                 imp += ".ol"
-            libs.add(path_normalise(imp if imp.startswith("/") else base + imp))
+            libs.add(path_normalise(imp if path_is_absolute(imp) else base + imp))
     return libs
 
 errs = []

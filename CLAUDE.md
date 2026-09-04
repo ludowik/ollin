@@ -1357,7 +1357,7 @@ fichier dont le chemin remonte l'arborescence.
   fichier exécuté, comme `main.cpp` l'a toujours fait. Il passait `""` en dur, si bien qu'un exemple
   rangé dans un sous-dossier cherchait ses voisins à la racine — il tournait en natif et pas sur le
   web, et le 404 du préchargement était silencieux (constaté au navigateur).
-- **La même règle vit en TROIS endroits** qui doivent rendre la même chaîne : `parser.cpp` (le
+- **La même règle vit en DEUX endroits** qui doivent rendre la même chaîne : `src/paths.h` (le
   moteur), et dans `docs/lib/pg-run.js` le préchargement des imports d'un exemple
   (`preloadSampleImports`, qui part du dossier du fichier d'entrée) et le ramassage d'un fork
   (`collectSampleProject`). Les deux fonctions JS partagent `resolveImport`/`pathNormalise`.
@@ -1371,12 +1371,24 @@ fichier dont le chemin remonte l'arborescence.
   permet de sortir les données et leurs constructeurs. ⚠ Un `const` de l'HÔTE, lui, est une locale
   du corps principal : un module ne le voit pas (`UFO_HUM` a dû suivre les sons dans `sounds.ol`).
 
-## Ressources : `program_dir()` (une ressource se cherche À CÔTÉ du programme)
+## Chemins : `src/paths.h`, le seul endroit qui décide de ce qu'un chemin veut dire
 
-`graphics.model("rubik.glb")` et `image.load("logo.png")` désignent un fichier par un nom NU, sans
-répéter le dossier du script. Ce nom est résolu **à côté du programme d'abord**, puis tel quel :
-`program_dir()` (source_registry.h) porte le dossier du fichier d'entrée, posé une fois au
-démarrage par `main.cpp` et `wasm_main.cpp` depuis `path_dir`, comme pour `base_dir`.
+`path_dir`, `path_normalise`, `path_is_absolute`, `path_resolve`, `program_dir` et
+`asset_candidates` vivent **dans une seule unité**. Les mêmes règles servent à trois familles
+d'appelants — l'instruction `import` (l'identité d'un module), les deux points d'entrée (le dossier
+du programme) et les chargeurs de ressources —, et chacune ayant écrit sa version, elles ont
+divergé : une entrée en sous-dossier cherchait ses voisins à la racine, et un chemin de ressource
+n'était jamais normalisé alors qu'un import l'était toujours.
+
+**Une ressource se cherche À CÔTÉ du programme.** `graphics.model("rubik.glb")` et
+`image.load("logo.png")` désignent un fichier par un nom NU ; `asset_candidates(nom)` rend la liste
+ordonnée des endroits où regarder — le dossier du programme, puis le nom tel quel —, si bien qu'un
+chargeur n'a plus qu'une question à trancher : « est-ce que ça a chargé ? ». Un nom **ancré**
+(`/…` ou `C:…`) ne rend qu'un candidat, lui-même. `program_dir()` est posé une fois au démarrage par
+`main.cpp` et `wasm_main.cpp`, depuis `path_dir`, comme `base_dir`.
+
+⚠ Côté natif, l'existence est **sondée** (`FileExists`) avant de charger : un `LoadModel` qui échoue
+alloue quand même un matériau par défaut à défaire, et écrit un avertissement.
 
 - **Ce que cela règle** : un exemple rangé dans son propre dossier y garde ses données, et il ne
   dépend plus du répertoire COURANT du processus — `LoadModel`/`LoadTexture` résolvent depuis le
@@ -1385,7 +1397,9 @@ démarrage par `main.cpp` et `wasm_main.cpp` depuis `path_dir`, comme pour `base
   `<dossier de l'entrée>/<nom>` puis `<nom>`, mais déclare toujours l'octet sous le **nom nu**, que
   `graphics.model` et `image.load` interrogent. Un projet forké range donc ses ressources sous ce
   même nom.
-- Les six générateurs et convertisseurs de `tools/` écrivent dans `docs/samples/model_3d/`.
+- Les six générateurs et convertisseurs de `tools/` écrivent dans `docs/samples/model_3d/`, par
+  `gl.sample_path(nom)` (gltf_util.py) : le chemin de sortie était recopié six fois, et le
+  déplacement des modèles a coûté six retouches identiques.
 
 ## Noms exportés par un module (`Stmt::exported_names`)
 

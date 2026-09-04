@@ -1,5 +1,5 @@
 #include "image_module.h"
-#include "../source_registry.h"
+#include "../paths.h"
 #include "../vm.h"
 #include "modules/module_utils.h"
 #include <cstdint>
@@ -312,24 +312,22 @@ static int img_load(CallCtx& ctx) {
     if (it != s_preloaded.end()) {
         h.tex = load_from_memory(it->second.first, it->second.second);
     } else {
-        // Nothing was uploaded: the file is looked for BESIDE THE PROGRAM first — a script names
-        // its images without repeating its own directory — then under the path as written.
+        // Nothing was uploaded: the file is searched where asset_candidates says — beside the
+        // program first, then the name as written.
+        for (const std::string& cand : asset_candidates(path)) {
 #ifdef __EMSCRIPTEN__
-        // Served, same-origin resource relative to the page: image.load("logo.png") reads
-        // <base>/logo.png.
-        std::vector<uint8_t> bytes;
-        if (!program_dir().empty())
-            bytes = fetch_bytes_sync(program_dir() + path);
-        if (bytes.empty())
-            bytes = fetch_bytes_sync(path);
-        if (!bytes.empty())
-            h.tex = load_from_memory(bytes, ext_of(path));
+            // Served, same-origin resource relative to the page: image.load("logo.png") reads
+            // <base>/logo.png.
+            std::vector<uint8_t> bytes = fetch_bytes_sync(cand);
+            if (!bytes.empty())
+                h.tex = load_from_memory(bytes, ext_of(path));
 #else
-        if (!program_dir().empty())
-            h.tex = LoadTexture((program_dir() + path).c_str());
-        if (h.tex.id == 0)
-            h.tex = LoadTexture(path.c_str());
+            if (FileExists(cand.c_str()))
+                h.tex = LoadTexture(cand.c_str());
 #endif
+            if (h.tex.id != 0)
+                break;
+        }
         if (h.tex.id == 0)
             throw std::runtime_error("image.load: cannot open '" + path + "'");
     }

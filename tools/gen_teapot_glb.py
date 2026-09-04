@@ -243,8 +243,7 @@ if __name__ == "__main__":
                          f"{len(POINTS)} points")
     if 32 * STEPS * STEPS > 65535:
         raise SystemExit("above 65535 vertices raylib narrows the indices to u16: lower STEPS")
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "model_3d", "teapot.glb")
+    path = gl.sample_path("teapot.glb")
     data, verts, tris = build()
     with open(path, "wb") as f:
         f.write(data)

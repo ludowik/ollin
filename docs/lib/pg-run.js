@@ -105,16 +105,26 @@ function bytesToB64(bytes) {
   return btoa(bin)
 }
 
+// Session cache of the binary assets already fetched, keyed by the name AS WRITTEN in the code —
+// the same key the engine looks up. A relaunch would otherwise re-download them: the six models of
+// the 3D example weigh 5.7 MB, and `cache: no-cache` forbids even the HTTP cache from serving them.
+const _assetCache = new Map()
+
 // A resource a script NAMES is looked for beside the program first, then at the root of samples/ —
-// the same rule the engine follows for a native run (program_dir), so an example kept in its own
-// directory carries its data beside it while a shared asset stays reachable. Returns the bytes, or
-// null: the preloading is best-effort, and the engine reports a genuinely missing resource.
+// the same rule the engine follows for a native run (asset_candidates, paths.h), so an example kept
+// in its own directory carries its data beside it while a shared asset stays reachable. Returns the
+// bytes, or null: the preloading is best-effort, and the engine reports a genuinely missing one.
 async function fetchAsset(name, v, entry) {
+  if (_assetCache.has(name)) return _assetCache.get(name)
   const dir = dirOf(entry || '')
   for (const url of dir ? [dir + name, name] : [name]) {
     try {
-      const r = await fetch('samples/' + url + '?v=' + v, { cache: 'no-cache' })
-      if (r.ok) return new Uint8Array(await r.arrayBuffer())
+      const r = await fetch(sampleUrl(url, v), { cache: 'no-cache' })
+      if (r.ok) {
+        const bytes = new Uint8Array(await r.arrayBuffer())
+        _assetCache.set(name, bytes)
+        return bytes
+      }
     } catch (_) { /* try the next place */ }
   }
   return null
@@ -125,14 +135,14 @@ async function fetchAsset(name, v, entry) {
 // the engine looks up — never the URL it was found at.
 export async function preloadSampleModels(m, code, v, entry = '') {
   if (!m || !m.preloadModel || typeof code !== 'string') return
-  const seen = new Set()
-  for (const file of findModels(code)) {
-    if (seen.has(file)) continue
-    seen.add(file)
-    const bytes = await fetchAsset(file, v, entry)
-    if (bytes)
-      m.preloadModel(file, bytesToB64(bytes), file.split('.').pop().toLowerCase())
-  }
+  // Fetched CONCURRENTLY: the models are independent of one another, and six in single file cost
+  // six round trips before the first frame.
+  const names = [...new Set(findModels(code))]
+  const fetched = await Promise.all(names.map((file) => fetchAsset(file, v, entry)))
+  names.forEach((file, i) => {
+    if (fetched[i])
+      m.preloadModel(file, bytesToB64(fetched[i]), file.split('.').pop().toLowerCase())
+  })
 }
 
 // Session cache of imported .ol sources (resolved path to text), which avoids downloading them
@@ -149,24 +159,32 @@ const _importSrcCache = new Map()
 // copies would leave the other wrong.
 async function walkImports(entry, code, v, onFile) {
   const seen = new Set()
-  let queue = findImports(code).map((imp) => resolveImport(dirOf(entry), imp))
-  while (queue.length) {
-    const key = queue.shift()
-    if (seen.has(key)) continue
-    seen.add(key)
-    let src = _importSrcCache.get(key)
-    if (src === undefined) {
-      try {
-        const r = await fetch('samples/' + key + '?v=' + v, { cache: 'no-cache' })
-        if (!r.ok) throw new Error('HTTP ' + r.status)
-        src = await r.text()
-        _importSrcCache.set(key, src)
-      } catch (_) {
-        continue
+  let level = [...new Set(findImports(code).map((imp) => resolveImport(dirOf(entry), imp)))]
+  // One LEVEL at a time, its files fetched concurrently: the siblings of a level are known from the
+  // start and are independent, so a file per round trip made three of them where one was enough.
+  while (level.length) {
+    const wanted = level.filter((key) => !seen.has(key))
+    wanted.forEach((key) => seen.add(key))
+    const sources = await Promise.all(wanted.map(async (key) => {
+      let src = _importSrcCache.get(key)
+      if (src === undefined) {
+        try {
+          src = await fetchSample(key, v)
+          _importSrcCache.set(key, src)
+        } catch (_) {
+          return null
+        }
       }
-    }
-    onFile(key, src)
-    for (const imp of findImports(src)) queue.push(resolveImport(dirOf(key), imp))
+      return src
+    }))
+    const next = []
+    wanted.forEach((key, i) => {
+      const src = sources[i]
+      if (src === null) return         // missing: skipped, the engine reports it as the error it is
+      onFile(key, src)
+      for (const imp of findImports(src)) next.push(resolveImport(dirOf(key), imp))
+    })
+    level = next
   }
 }
 
@@ -252,14 +270,12 @@ export async function collectSampleProject(entryFile, v) {
   // The binary assets referenced — 3D models (model("x.obj")) AND external images
   // (image.load("x.png")) — become base64 resources of the project.
   const allCode = Object.values(files).join('\n')
-  const seenAsset = new Set()
-  for (const name of [...findModels(allCode), ...findImages(allCode)]) {
-    if (seenAsset.has(name)) continue
-    seenAsset.add(name)
-    const bytes = await fetchAsset(name, v, entryFile)
-    if (bytes)
-      resources[name] = { b64: bytesToB64(bytes), ext: name.split('.').pop().toLowerCase() }
-  }
+  const names = [...new Set([...findModels(allCode), ...findImages(allCode)])]
+  const fetched = await Promise.all(names.map((name) => fetchAsset(name, v, entryFile)))
+  names.forEach((name, i) => {
+    if (fetched[i])
+      resources[name] = { b64: bytesToB64(fetched[i]), ext: name.split('.').pop().toLowerCase() }
+  })
   return { files, resources, entry: entryFile }
 }
 
@@ -293,10 +309,14 @@ export function sampleFromAnchor(anchor) {
   return (anchor || '').startsWith('sample/') ? anchor.slice('sample/'.length) : null
 }
 
-// Fetches a sample's code, fresh (cache-buster plus no-cache). It rejects unless the server
-// answers 200, which avoids running or displaying the body of a 404 (an HTML page).
+// The URL of a file of samples/, in ONE place: the prefix, the cache-busting token and the cache
+// policy are a single decision, and three copies of it would drift apart.
+const sampleUrl = (file, v) => 'samples/' + file + '?v=' + v
+
+// Fetches a sample's code, fresh. It rejects unless the server answers 200, which avoids running or
+// displaying the body of a 404 (an HTML page).
 export async function fetchSample(file, v) {
-  const r = await fetch('samples/' + file + '?v=' + v, { cache: 'no-cache' })
+  const r = await fetch(sampleUrl(file, v), { cache: 'no-cache' })
   if (!r.ok) throw new Error('example not found: ' + file)
   return r.text()
 }

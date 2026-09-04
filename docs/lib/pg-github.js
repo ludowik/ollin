@@ -78,8 +78,14 @@ function decodeUtf8(b64) {
 }
 function encodeUtf8(str) {
   const bytes = new TextEncoder().encode(str)
+  // In CHUNKS: String.fromCharCode.apply overflows the argument stack on a large file, and one
+  // character at a time is quadratic on a big string. Same shape as bytesToB64 in pg-run.js, which
+  // is not imported here — that module is the RUNTIME's, and the GitHub layer does not depend on it.
   let bin = ''
-  for (const b of bytes) bin += String.fromCharCode(b)
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK))
+  }
   return btoa(bin)
 }
 

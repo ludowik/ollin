@@ -309,8 +309,7 @@ def check_layout():
 
 if __name__ == "__main__":
     check_layout()
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "model_3d", "rubik.glb")
+    path = gl.sample_path("rubik.glb")
     data, verts, tris = build()
     with open(path, "wb") as f:
         f.write(data)

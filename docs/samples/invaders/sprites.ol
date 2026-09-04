@@ -7,7 +7,16 @@
 ## the MECHANICS of the game are faithful to it.
 ##
 ## Wired in from the entry file with a plain `import "sprites.ol"`: a flat import injects these
-## names, so the game reads INK or calls buildSprites() as if they were written beside it.
+## names — the constants, the globals below AND the builder — so the game reads INK or draws
+## kinds[k].frames[f] as if they were written beside it.
+
+## One entry per kind: its two frames, what killing it is worth, its colour. The kind comes from the
+## ROW of the fleet, so its shape decides the score.
+global kinds = []
+global gunImg = nil
+global bombImgs = []
+global ufoImg = nil
+global burstImg = nil
 
 const INK     = Color(0.90, 0.95, 1.00)
 const GUN_INK = Color(0.35, 0.95, 0.45)
@@ -15,10 +24,7 @@ const SHIELD_INK = Color(0.30, 0.85, 0.40)
 const TOP_INK = Color(1.00, 0.45, 0.45)
 const DIM     = Color(0.55, 0.60, 0.72)
 
-## Two frames per creature, alternating on every pass: that alternation IS the march. Three
-## silhouettes of our own — a jellyfish, a spider, a moth — drawn in the idiom of an 8x8 monochrome
-## sprite. The arcade original's own creatures are its author's work and are not reproduced here;
-## only the MECHANICS are faithful.
+## Two frames per creature, alternating on every pass: that alternation IS the march.
 const JELLY_A = ["..####..", ".######.", "########", "#.####.#", ".#.##.#.", "#..##..#", ".#....#."]
 const JELLY_B = ["..####..", ".######.", "########", "#.####.#", ".#.##.#.", "..#..#..", ".#.##.#."]
 const SPIDR_A = ["#......#", ".#....#.", "..####..", ".######.", "..####..", ".#.##.#.", "#.#..#.#"]
@@ -56,7 +62,6 @@ const BURST = [
     ".#.#..#.#.",
     "#..#..#..#"
 ]
-## The bomb turns as it falls, which is how a falling thing reads at three pixels wide.
 ## Our own saucer: wide, flat, and lit underneath — nothing of the fleet's silhouette, since it is
 ## not one of them.
 const UFO = [
@@ -68,6 +73,7 @@ const UFO = [
     "...#..#..#..#...",
     "....##....##...."
 ]
+## The bomb turns as it falls, which is how a falling thing reads at three pixels wide.
 const BOMB_A  = ["#..", ".#.", "..#", ".#."]
 const BOMB_B  = ["..#", ".#.", "#..", ".#."]
 

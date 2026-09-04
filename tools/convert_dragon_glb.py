@@ -121,8 +121,7 @@ def main():
     pos = [tuple(c * sx + t for c, t in zip(gl.rotate(p, quat), (tx, ty, tz))) for p in pos]
     nrm = [gl.rotate(n, quat) for n in nrm]
 
-    root = os.path.normpath(os.path.join(os.path.dirname(__file__), ".."))
-    path = os.path.join(root, "docs", "samples", "model_3d", "dragon.glb")
+    path = gl.sample_path("dragon.glb")
     parts = split(pos, nrm, idx)
     data = build(parts)
     with open(path, "wb") as f:

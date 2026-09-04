@@ -41,6 +41,7 @@ set(OLLIN_SOURCES
     src/parser.cpp
     src/compiler.cpp
     src/vm.cpp
+    src/paths.cpp
     src/source_registry.cpp
     src/modules/modules.cpp
     src/modules/core_module.cpp
