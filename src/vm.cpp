@@ -757,15 +757,18 @@ uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr
 void VM::run_goto(size_t stop_depth) {
 // Table in the exact order of enum Op (chunk.h).
 // Each handler ends with NEXT() → direct jump to the next handler.
+// Only the instruction WORD is carried across the jump; each handler extracts the fields it
+// actually uses. Decoding the four fields eagerly kept four values live at every dispatch point,
+// which saturated the register allocation of this single function — measured.
 #define NEXT()                                                                                                         \
     do {                                                                                                               \
-        Instr _ni = ch->code[ip++];                                                                                    \
-        A = i_a(_ni);                                                                                                  \
-        B = i_b(_ni);                                                                                                  \
-        C = i_c(_ni);                                                                                                  \
-        Bx = i_bx(_ni);                                                                                                \
-        goto* dt[i_op(_ni)];                                                                                           \
+        _i = ch->code[ip++];                                                                                           \
+        A = i_a(_i);                                                                                                   \
+        goto* dt[i_op(_i)];                                                                                            \
     } while (0)
+#define B i_b(_i)
+#define C i_c(_i)
+#define Bx i_bx(_i)
 
     static const void* const dt[] = {
         &&op_LOAD_K,
@@ -837,8 +840,8 @@ void VM::run_goto(size_t stop_depth) {
         &&op_HALT,
     };
 
-    uint8_t A, B, C;
-    uint16_t Bx;
+    Instr _i = 0;
+    uint8_t A = 0;
     int base = call_stack.back().reg_base;
     // The GET_INDEX inline cache is sized on the current code, one slot per instruction. Under
     // reentrancy (a run_goto nested through call_value) the chunk is the same, so the size
@@ -1976,6 +1979,9 @@ dispatch_loop:
     }
 
 #undef NEXT
+#undef B
+#undef C
+#undef Bx
 }
 
 void VM::execute(Chunk chunk) {

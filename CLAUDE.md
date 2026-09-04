@@ -612,6 +612,29 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | HALT          | —      |                            | arrêt                                            |
 
+## Décodage d'une instruction (macro `NEXT`, vm.cpp)
+
+`NEXT()` ne transporte que **le mot de l'instruction** (`_i`) et le champ **A** ; `B`, `C` et
+`Bx` sont des macros qui extraient à la demande, dans les seuls gestionnaires qui les emploient.
+Les quatre champs étaient décodés d'avance, donc **quatre valeurs vivantes à chaque point de
+saut** — et tous les gestionnaires vivant dans une seule fonction (computed-goto), cette
+pression saturait l'allocation de registres, au point qu'ajouter un opcode faisait perdre une
+case à la boucle (cf. « Table de sauts du `switch` »).
+
+Mesuré, par rapport à l'état d'avant le `switch` : `fib` **−3,7 %**, boucle **−2,8 %**, map
+−0,8 % en instructions ; en temps, `fib` −2,9 %, boucle **−7,8 %**, itération −17 %. Le surcoût
+de l'opcode `SWITCH` a donc disparu, et les trois repères sont plus rapides qu'avant son ajout.
+
+**Ce réglage a été CHOISI par la mesure, pas deviné.** Quatre variantes essayées : tout à la
+demande (`fib` 79,6 M), **A seul d'avance (77,9 M — retenu)**, A et B d'avance (boucle 32,3 M
+contre 31,1 M), A et Bx d'avance (32,3 M). Décoder A d'avance gagne parce que c'est le champ
+présent dans presque tous les gestionnaires (147 usages, contre 68, 40 et 19) ; en décoder un
+deuxième reperd ce que la pression coûte.
+
+⚠ `B`, `C` et `Bx` sont des **macros aux noms très courts**, donc `#undef` à la fin de
+`run_goto` — sans quoi une variable nommée `C` écrite plus loin dans le fichier casserait de
+façon incompréhensible.
+
 ## Table de sauts du `switch`
 
 Un `switch` était une **chaîne de comparaisons** : atteindre la n-ième branche coûtait n
@@ -644,7 +667,9 @@ chaîne le donnait.
 de types, ou un intervalle de plus de 1024 entrées — `case 1` à côté de `case 1000000` demanderait
 un million de cases pour deux branches. Le repli est silencieux et correct.
 
-⚠ **Le coût d'un opcode de plus est STRUCTUREL, et il ne vient pas du gestionnaire.** La boucle
+⚠ **Le coût d'un opcode de plus était STRUCTUREL** (il a été SUPPRIMÉ depuis, cf. « Décodage
+d'une instruction » — le relevé ci-dessous est celui du jour de l'ajout, et il reste le
+protocole à suivre pour attribuer un écart).** La boucle
 gagne 600 000 instructions (+1,9 %) alors qu'elle n'exécute jamais un `switch`. Ce n'est pas le
 placement du code : les cinq positions essayées donnent le même chiffre à l'instruction près, et
 sortir le calcul dans une fonction séparée coûte davantage (+900 000). La preuve est un
