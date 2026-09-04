@@ -1,7 +1,8 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
 ## Drag with the mouse or a finger to turn it, or steer it with the ARROW KEYS; otherwise it rotates
-## gently on its own. Wheel or pinch to zoom, double-click to recentre.
+## gently on its own — space stops that drift and starts it again. Wheel or pinch to zoom,
+## double-click or Return to put it back as it was found.
 ## The "Model" menu switches between them, covering the three ways a file can carry its appearance:
 ## a model may hold its geometry ALONE, and then the fill tints it; it may hold a TEXTURE, and then
 ## a white fill shows it as painted; or it may hold a COLOUR PER VERTEX, which paints one mesh in
@@ -97,9 +98,25 @@ end
 
 ## Recentre: the orientation AND the zoom go back to their starting values, which is what makes
 ## the gesture a way out when the model has been turned or zoomed off.
-func mouse.doubleClicked(x, y)
+## Back to the start: the orientation and the zoom, which is what "the transform" means here. The
+## double click and the Return key say the same thing, so they go through the same function.
+func resetView()
     ball.reset()
     zoom.factor = 1.0
+end
+
+func mouse.doubleClicked(x, y)
+    resetView()
+end
+
+## Space stops the gentle drift and starts it again; Return puts the model back as it was found.
+## Both are key EVENTS and not held states: they say "do this once", unlike the arrows.
+func keyboard.keypressed(key)
+    if key == "space" then
+        drifting = not drifting
+    elseif key == "return" then
+        resetView()
+    end
 end
 
 ## The ARROW KEYS turn the model: left and right around the vertical axis, up and down around the
@@ -108,6 +125,9 @@ end
 ## time step, so it keeps its speed whatever the frame rate. Two arrows at once turn diagonally,
 ## the two amounts composing in the trackball's own frame.
 const KEY_SPIN = 90
+const DRIFT    = 30    ## the gentle rotation at rest, in degrees per second
+
+global drifting = true   ## space toggles it; the arrows and a drag work either way
 
 func arrowSpin(dt)
     var dx = 0
@@ -132,10 +152,10 @@ func arrowSpin(dt)
 end
 
 func update(dt)
-    ## The gentle drift only resumes when nobody is steering: it would otherwise pull against the
-    ## arrows, exactly as it stands aside during a drag.
-    if not arrowSpin(dt) then
-        ball.idle(dt, 30)
+    ## The gentle drift only runs when it is switched on AND nobody is steering: it would otherwise
+    ## pull against the arrows, exactly as it stands aside during a drag.
+    if not arrowSpin(dt) and drifting then
+        ball.idle(dt, DRIFT)
     end
 end
 
@@ -153,6 +173,10 @@ func draw()
         graphics.drawModel(graphics.model(current.file), 0, 0, 0, 1)
     graphics.end3d()
 
+    ## Two lines: the model's name, then the controls. On one line they ran under the menu, which
+    ## sits in the top right corner.
     graphics.stroke(colors.WHITE)
-    graphics.text(current.name + " - drag or arrows: turn   wheel or pinch: zoom   double-click: reset", 12, 12)
+    graphics.text(current.name, 12, 12)
+    graphics.text("drag or arrows: turn   space: drift on/off   wheel or pinch: zoom   return: reset",
+                  12, 12 + graphics.fontSize() * 1.4)
 end
