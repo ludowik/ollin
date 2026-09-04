@@ -14,18 +14,13 @@
        var n = f(x) * 0.8
              + g(x) * 0.2          (one expression, and the samples rely on this)
 
-   That reading is the only SENSIBLE one, because no statement can begin with a binary operator
-   or with a ".": `+ b` and `.field` are not statements. So a leading operator is unambiguous,
-   and needs no rule of its own.
-   The one genuine ambiguity is a leading "(", where both readings are meaningful:
-
-       g()
-       (f)(1)                      read as g()(f)(1), NOT as two statements
-
-   Lua refuses that form outright; here it is joined, and the mistake shows up at run time. To
-   be sure a statement stops before a "(", end the previous line with a ";"-free statement that
-   cannot extend — in practice, write the call as `local r = (f)(1)` or put the parenthesis on
-   the same line.
+   That reading is the only SENSIBLE one, and it needs no rule of its own: no statement can begin
+   with a binary operator or with a ".", so `+ b` and `.field` can only be continuations.
+   A leading "(" or "[" is the one shape where both readings would parse, and it is theoretical
+   rather than a trap: no idiom of the language starts a statement with one, and the whole
+   repository contains no such line. Lua 5.4 joins them the same way (checked), its explicit
+   "ambiguous syntax" refusal having belonged to 5.1. If the need ever arises, give the value a
+   name — `var r = (f)(1)` — which reads better anyway.
    The ';' character is ONLY the interval separator in rangeLit. A ';' outside a
    bracketed context is an error. *)
 

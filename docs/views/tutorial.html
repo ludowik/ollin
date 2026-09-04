@@ -716,10 +716,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <div class="callout"><code>then</code>, <code>do</code> and <code>end</code> delimit the blocks — brackets around a condition are never required.</div>
 
-<div class="callout warn">The other side of that freedom: a line that <strong>could</strong> continue the previous one <strong>does</strong>, since a statement ends when the expression can no longer be extended and not at the end of its line. For an operator or a <code>.</code> that is the only sensible reading — <code>+ b</code> and <code>.field</code> are not statements — so nothing to watch there. The one form to watch is a line starting with <code>(</code>, where both readings would make sense:
-<pre data-no-run><code>g()
-(f)(<span class="num">1</span>)            <span class="cmt">## read as g()(f)(1), not as two statements</span></code></pre>
-Give the call a name (<code><span class="kw">var</span> r = (f)(<span class="num">1</span>)</code>) or drop the parentheses around <code>f</code>, and the ambiguity is gone.</div>
+<div class="callout">The other side of that freedom: a line that <strong>could</strong> continue the previous one <strong>does</strong>, since a statement ends when the expression can no longer be extended and not at the end of its line. There is nothing to watch out for, though: no statement can begin with an operator or with a <code>.</code>, so such a line can only be a continuation — which is exactly what one reads.</div>
 </section>
 
 <!-- ── If ────────────────────────────────────────────────────────────────── -->
