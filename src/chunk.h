@@ -73,6 +73,13 @@ struct Chunk {
             current_file_idx_ = fi;
     }
 
+    // The index of an identifier, or -1. The name-to-index table is already built by
+    // add_identifier, so nothing needs to scan `identifiers` comparing strings.
+    int identifier_index(const std::string& name) const {
+        auto it = identifier_map_.find(name);
+        return it == identifier_map_.end() ? -1 : (int)it->second;
+    }
+
     uint16_t add_constant(Value v);
     uint16_t add_identifier(const std::string& name);
     uint16_t add_func_defaults(std::vector<Value> defs);

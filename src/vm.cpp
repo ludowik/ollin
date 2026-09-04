@@ -55,8 +55,11 @@ static MetaKeys& MK() {
     return mk;
 }
 
+// find_ptr and not map_get: the latter RETURNS the class by value, so a retain and a release on
+// every test — and this is asked for each method call and for each arithmetic operand that is not
+// a plain number.
 bool VM::is_instance(const Value& v) {
-    return (v.is_map() || v.is_class()) && !v.map_get(MK().class_).is_nil();
+    return (v.is_map() || v.is_class()) && v.mptr->find_ptr(MK().class_) != nullptr;
 }
 
 // Built-in `len` pseudo-method of maps, synthesized by GET_INDEX when the map does not define
@@ -124,6 +127,21 @@ int VM::invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc) {
     return invoke_builtin(fn, &regs[result_base], argc, call_stack.back().varargs_base - result_base, result_base);
 }
 
+// A number's text. Shared by value_to_string and by invoke_str, which cannot simply call the
+// former: value_to_string routes an INSTANCE back to invoke_str, so a `__str` returning an
+// instance would recurse — the very thing invoke_str's own loop exists to avoid.
+static std::string number_text(const Value& v) {
+    if (v.is_integer())
+        return std::to_string(v.as_int());
+    std::ostringstream os;
+    double d = v.as_float();
+    if (d == (long long)d && d >= -1e15 && d <= 1e15)
+        os << (long long)d;
+    else
+        os << d;
+    return os.str();
+}
+
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not invalidate obj
     Value cls = obj.map_get(MK().class_);
@@ -166,23 +184,12 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     std::string result;
     if ((int)regs.size() > call_base) {
         const Value& rv = regs[call_base];
-        if (rv.is_string()) {
+        if (rv.is_string())
             result = rv.as_string();
-        } else {
-            std::ostringstream os;
-            if (rv.is_nil())
-                os << "nil";
-            else if (rv.is_integer())
-                os << rv.as_int();
-            else if (rv.is_float()) {
-                double d = rv.as_float();
-                if (d == (long long)d && d >= -1e15 && d <= 1e15)
-                    os << (long long)d;
-                else
-                    os << d;
-            }
-            result = os.str();
-        }
+        else if (rv.is_nil())
+            result = "nil";
+        else if (rv.is_number())
+            result = number_text(rv);
     }
     regs.resize(call_base);
     ip = saved_ip;
@@ -217,15 +224,7 @@ std::string value_to_string(const Value& v) {
         return "{range}";
     if (v.is_func_val() || v.is_closure() || v.is_builtin())
         return "{function}";
-    if (v.is_integer())
-        return std::to_string(v.as_int());
-    std::ostringstream os;
-    double d = v.as_float();
-    if (d == (long long)d && d >= -1e15 && d <= 1e15)
-        os << (long long)d;
-    else
-        os << d;
-    return os.str();
+    return number_text(v);
 }
 
 static int builtin_assert(CallCtx& ctx) {
@@ -244,7 +243,6 @@ static int builtin_assert(CallCtx& ctx) {
 }
 
 static int builtin_time(CallCtx& ctx) {
-    (void)ctx;
     auto now = std::chrono::system_clock::now();
     return ctx.ret(Value(std::chrono::duration<double>(now.time_since_epoch()).count()));
 }
@@ -252,7 +250,6 @@ static int builtin_time(CallCtx& ctx) {
 // CPU time consumed since startup, in seconds. Prefer it to time() for measuring a duration:
 // time() reads a wall clock the system may adjust mid-run (NTP), which yields wild values.
 static int builtin_cpu_time(CallCtx& ctx) {
-    (void)ctx;
     return ctx.ret(Value((double)std::clock() / (double)CLOCKS_PER_SEC));
 }
 
@@ -550,22 +547,18 @@ VM* VM::current() {
 }
 
 void VM::set_global(const std::string& name, const Value& value) {
-    for (int i = 0; i < (int)owned_chunk.identifiers.size(); ++i) {
-        if (owned_chunk.identifiers[i] == name) {
-            globals[i] = value;
-            globals_init[i] = true;
-            return;
-        }
-    }
+    int i = owned_chunk.identifier_index(name);
+    if (i < 0)
+        return;
+    globals[i] = value;
+    globals_init[i] = true;
 }
 
 Value VM::get_global(const std::string& name) const {
     if (!ch)
         return Value{};
-    for (int i = 0; i < (int)ch->identifiers.size(); ++i)
-        if (ch->identifiers[i] == name && globals_init[i])
-            return globals[i];
-    return Value{};
+    int i = ch->identifier_index(name);
+    return (i >= 0 && globals_init[i]) ? globals[i] : Value{};
 }
 
 void VM::run_entry_hooks() {
@@ -626,41 +619,15 @@ void VM::run_entry_hooks() {
     }
 }
 
+// ONE bridge from native code back into Ollin: call_value is the single-result case of
+// call_value_multi. The two carried the same forty lines — buffer for a builtin, function
+// resolution, frame, run_goto, read-back, resize, ip restored — so the call protocol had two
+// places to drift. A callee that returns NOTHING gives nil either way, the result slot having
+// been set to nil by the return itself.
 Value VM::call_value(const Value& fn, const Value* args, int argc) {
-    if (fn.is_builtin()) {
-        // A writable local buffer: the builtin writes its result there, since the caller's
-        // arguments may be read-only. At least one slot, to receive the value.
-        std::vector<Value> buf(std::max(argc, 1));
-        for (int i = 0; i < argc; ++i)
-            buf[i] = args[i];
-        int n = invoke_builtin(fn.as_builtin(), buf.data(), argc, (int)buf.size());
-        return n >= 1 ? buf[0] : Value{};
-    }
-    uint8_t fi;
-    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.is_func_val()) {
-        fi = (uint8_t)fn.as_int();
-    } else if (fn.is_closure()) {
-        fi = fn.as_closure()->func_idx;
-        const auto& uvs = fn.as_closure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else {
-        throw std::runtime_error("callValue: not callable");
-    }
-    int call_base = (int)regs.size();
-    if (argc > 0) {
-        grow_regs((size_t)(call_base + argc));
-        for (int i = 0; i < argc; i++)
-            regs[call_base + i] = args[i];
-    }
-    uint32_t saved_ip = ip;
-    ip = push_call_frame(call_base, fi, argc, std::move(frame_upvals), saved_ip);
-    run_goto(call_stack.size() - 1);
-    Value result = (int)regs.size() > call_base ? regs[call_base] : Value{};
-    regs.resize(call_base);
-    ip = saved_ip;
-    return result;
+    Value out;
+    int n = call_value_multi(fn, args, argc, &out, 1);
+    return n >= 1 ? out : Value{};
 }
 
 int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* out, int out_cap) {
@@ -676,18 +643,8 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
             out[i] = buf[i];
         return m;
     }
-    uint8_t fi;
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    if (fn.is_func_val()) {
-        fi = (uint8_t)fn.as_int();
-    } else if (fn.is_closure()) {
-        fi = fn.as_closure()->func_idx;
-        const auto& uvs = fn.as_closure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-    } else {
-        throw std::runtime_error("callValue: not callable");
-    }
+    uint8_t fi = resolve_func_val(fn, frame_upvals); // the ONE place that reads a function value
     int call_base = (int)regs.size();
     if (argc > 0) {
         grow_regs((size_t)(call_base + argc));
@@ -745,7 +702,10 @@ uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr
         for (int i = n_varargs - 1; i >= 0; --i)
             regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
     }
-    Frame fr;
+    // Built IN PLACE: a local Frame filled then pushed was a full move of the struct plus its
+    // vector of upvalues on EVERY call — thirty million times in bench_fib.
+    call_stack.emplace_back();
+    Frame& fr = call_stack.back();
     fr.return_ip = return_ip;
     fr.reg_base = new_base;
     fr.result_base = (result_base >= 0) ? result_base : new_base;
@@ -754,8 +714,39 @@ uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr
     fr.is_ctor = is_ctor;
     fr.return_dest = return_dest;
     fr.upvals = std::move(fuv);
-    call_stack.push_back(std::move(fr));
     return fp.addr;
+}
+
+// The tail of a return, shared by RETURN_V and RETURN_SPREAD: the two carried these twenty lines
+// twice over, differing only in HOW they gather the values. Kept out of run_goto (like
+// nil_result_slot, for the same reason) and given the gathered values, it pops the frame, lays
+// the results at result_base, applies the constructor's instance and the meta-method's
+// destination, and returns the ip to resume at. op_RETURN keeps its own shorter version: it is
+// the hot path, measured, and needs no vector.
+__attribute__((noinline)) uint32_t VM::finish_return(std::vector<Value>& rvs, int frame_base) {
+    const Frame& fr = call_stack.back();
+    bool is_ctor_ = fr.is_ctor;
+    bool neg_ = fr.negate_result;
+    int ret_dest = fr.return_dest;
+    uint32_t rip = fr.return_ip;
+    int rbase = fr.result_base;
+    Value ctor_val;
+    if (is_ctor_)
+        ctor_val = regs[frame_base + 0];
+    int total = (int)rvs.size();
+    call_stack.pop_back(); // fr is dangling from here on, hence the copies above
+    if ((int)regs.size() < rbase + total)
+        regs.resize(rbase + total);
+    for (int i = 0; i < total; ++i)
+        regs[rbase + i] = std::move(rvs[i]);
+    if (total == 0)
+        nil_result_slot(rbase);
+    if (is_ctor_)
+        regs[rbase + 0] = std::move(ctor_val);
+    if (ret_dest >= 0)
+        regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
+    last_results_ = is_ctor_ ? 1 : total; // for SPREAD_RESULTS (a multiple return)
+    return rip;
 }
 
 void VM::run_goto(size_t stop_depth) {
@@ -846,6 +837,7 @@ void VM::run_goto(size_t stop_depth) {
 
     Instr _i = 0;
     uint8_t A = 0;
+    int argc_dyn = 0; // CALL_DYN and CALL_VA differ only by it, and share one body
     int base = call_stack.back().reg_base;
     // The GET_INDEX inline cache is sized on the current code, one slot per instruction. Under
     // reentrancy (a run_goto nested through call_value) the chunk is the same, so the size
@@ -1213,27 +1205,31 @@ dispatch_loop:
     op_RETURN: {
         {
             close_upvals();
-            bool is_ctor_ = call_stack.back().is_ctor;
-            bool neg_ = call_stack.back().negate_result;
+            // Read ONCE from the frame: five call_stack.back() interleaved with writes to regs
+            // made the compiler reload the vector's data pointer and size each time, the two
+            // vectors being indistinguishable to it. LOAD_VARARGS just below already did this.
+            const Frame& fr = call_stack.back();
+            bool is_ctor_ = fr.is_ctor;
+            bool neg_ = fr.negate_result;
+            int ret_dest = fr.return_dest;
+            int wb = fr.result_base;
+            uint32_t rip = fr.return_ip;
             Value ctor_val;
             if (is_ctor_)
                 ctor_val = regs[base + 0]; // save self before potential overwrite
-            int ret_dest = call_stack.back().return_dest;
-            int wb = call_stack.back().result_base;
             int n = B;
             if (n > 0 && (wb != base || A != 0))
                 for (int i = 0; i < n; ++i)
                     regs[wb + i] = std::move(regs[base + A + i]);
             else if (n == 0)
                 nil_result_slot(wb); // a valueless return still leaves nil where the caller reads
-            uint32_t rip = call_stack.back().return_ip;
-            call_stack.pop_back();
+            call_stack.pop_back(); // fr is dangling from here on
             if (is_ctor_)
                 regs[wb + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
                 regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[wb + 0])) : regs[wb + 0];
             ip = rip;
-            last_results_ = is_ctor_ ? 1 : n; // pour SPREAD_RESULTS (multi-retour)
+            last_results_ = is_ctor_ ? 1 : n; // for SPREAD_RESULTS (a multiple return)
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1261,36 +1257,15 @@ dispatch_loop:
     op_RETURN_V: {
         {
             close_upvals();
-            bool is_ctor_ = call_stack.back().is_ctor;
-            bool neg_ = call_stack.back().negate_result;
-            Value ctor_val;
-            if (is_ctor_)
-                ctor_val = regs[base + 0];
-            int ret_dest = call_stack.back().return_dest;
+            int n_expl = B;
             int n_va = call_stack.back().n_varargs;
             int va_src = call_stack.back().varargs_base;
-            int n_expl = B;
-            int total = n_expl + n_va;
-            std::vector<Value> rvs(total);
+            std::vector<Value> rvs(n_expl + n_va);
             for (int i = 0; i < n_expl; ++i)
                 rvs[i] = std::move(regs[base + A + i]);
             for (int i = 0; i < n_va; ++i)
                 rvs[n_expl + i] = std::move(regs[va_src + i]);
-            uint32_t rip = call_stack.back().return_ip;
-            int rbase = call_stack.back().result_base;
-            call_stack.pop_back();
-            if ((int)regs.size() < rbase + total)
-                regs.resize(rbase + total);
-            for (int i = 0; i < total; ++i)
-                regs[rbase + i] = std::move(rvs[i]);
-            if (total == 0)
-                nil_result_slot(rbase);
-            if (is_ctor_)
-                regs[rbase + 0] = std::move(ctor_val);
-            if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
-            ip = rip;
-            last_results_ = is_ctor_ ? 1 : total; // for SPREAD_RESULTS (a multiple return)
+            ip = finish_return(rvs, base);
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1539,52 +1514,35 @@ dispatch_loop:
 
     op_CALL_DYN: {
         // A=arg_base, B=func_val_reg, C=argc
+        argc_dyn = C;
+        goto call_dyn_common;
+
+        // Like CALL_DYN but with a dynamic argc: C fixed arguments plus last_results_ values from
+        // the last expanded argument (`...` or a multi-value call), already materialized after
+        // the fixed ones. The callee (B) sits BELOW the argument block, so the varying number of
+        // values never overwrites it. That ONE line was the whole difference, and the builtin /
+        // class / function tree below was carried twice.
+    op_CALL_VA:
+        argc_dyn = C + last_results_;
+
+    call_dyn_common:
         if (regs[base + B].is_builtin()) {
-            invoke_builtin_regs(regs[base + B].as_builtin(), base + A, C);
+            invoke_builtin_regs(regs[base + B].as_builtin(), base + A, argc_dyn);
             NEXT();
         }
         if (regs[base + B].is_class()) {
-            // Instanciation (args en ctor_base+0.. → arg_off = 0).
-            bool done;
-            uint32_t addr = instantiate_class(base + A, 0, C, regs[base + B], done);
+            bool done; // instantiation: the arguments sit at ctor_base+0.., hence arg_off = 0
+            uint32_t addr = instantiate_class(base + A, 0, argc_dyn, regs[base + B], done);
             if (!done)
                 ip = addr;
             goto call_dyn_done;
         }
         {
-            // Regular function/closure call
             std::unique_ptr<std::vector<Upvalue*>> fuv;
             uint8_t fi = resolve_func_val(regs[base + B], fuv);
-            ip = push_call_frame(base + A, fi, C, std::move(fuv), ip);
+            ip = push_call_frame(base + A, fi, argc_dyn, std::move(fuv), ip);
         }
     call_dyn_done:
-        base = call_stack.back().reg_base;
-        NEXT();
-    }
-
-    op_CALL_VA: {
-        // Like CALL_DYN but with a dynamic argc: C fixed arguments plus last_results_ values
-        // from the last expanded argument (`...` or a multi-value call), already materialized
-        // after the fixed ones. The callee (B) sits BELOW the argument block, so the varying
-        // number of values never overwrites it.
-        int argc_va = C + last_results_;
-        if (regs[base + B].is_builtin()) {
-            invoke_builtin_regs(regs[base + B].as_builtin(), base + A, argc_va);
-            NEXT();
-        }
-        if (regs[base + B].is_class()) {
-            bool done;
-            uint32_t addr = instantiate_class(base + A, 0, argc_va, regs[base + B], done);
-            if (!done)
-                ip = addr;
-            goto call_va_done;
-        }
-        {
-            std::unique_ptr<std::vector<Upvalue*>> fuv;
-            uint8_t fi = resolve_func_val(regs[base + B], fuv);
-            ip = push_call_frame(base + A, fi, argc_va, std::move(fuv), ip);
-        }
-    call_va_done:
         base = call_stack.back().reg_base;
         NEXT();
     }
@@ -1672,32 +1630,12 @@ dispatch_loop:
         // all contiguous at base+A. Like RETURN_V, but with a contiguous source and no varargs.
         {
             close_upvals();
-            bool is_ctor_ = call_stack.back().is_ctor;
-            bool neg_ = call_stack.back().negate_result;
-            Value ctor_val;
-            if (is_ctor_)
-                ctor_val = regs[base + 0];
-            int ret_dest = call_stack.back().return_dest;
             int total = B + last_results_;
             int src = base + A;
             std::vector<Value> rvs(total);
             for (int i = 0; i < total; ++i)
                 rvs[i] = std::move(regs[src + i]);
-            uint32_t rip = call_stack.back().return_ip;
-            int rbase = call_stack.back().result_base;
-            call_stack.pop_back();
-            if ((int)regs.size() < rbase + total)
-                regs.resize(rbase + total);
-            for (int i = 0; i < total; ++i)
-                regs[rbase + i] = std::move(rvs[i]);
-            if (total == 0)
-                nil_result_slot(rbase);
-            if (is_ctor_)
-                regs[rbase + 0] = std::move(ctor_val);
-            if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
-            ip = rip;
-            last_results_ = is_ctor_ ? 1 : total;
+            ip = finish_return(rvs, base);
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1995,12 +1933,17 @@ void VM::execute(Chunk chunk) {
     s_current_vm = this;
     globals.assign(owned_chunk.identifiers.size(), Value{});
     globals_init.assign(owned_chunk.identifiers.size(), false);
-    for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
-        for (auto& b : k_builtins)
-            if (owned_chunk.identifiers[gi] == b.name) {
-                globals[gi] = Value::make_builtin(b.fn);
-                globals_init[gi] = true;
-            }
+    // One lookup per name through the chunk's table, and not a scan of every identifier per
+    // name: the builtins, the modules and core's members were three NESTED loops.
+    auto init_global = [this](const std::string& name, const Value& v) {
+        int gi = owned_chunk.identifier_index(name);
+        if (gi < 0)
+            return; // the program never mentions this name
+        globals[gi] = v;
+        globals_init[gi] = true;
+    };
+    for (auto& b : k_builtins)
+        init_global(b.name, Value::make_builtin(b.fn));
     // A module is built AT MOST ONCE for this program: `window`, `string` and `core` are read again
     // below, and each construction is real work — on the web, building `window` queries the DOM for
     // the layout. The cache lives for this call alone, so two runs in the same WASM instance never
@@ -2012,12 +1955,9 @@ void VM::execute(Chunk chunk) {
             it = built.emplace(name, make_builtin_module(name)).first;
         return it->second;
     };
-    for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
-        for (auto& name : builtin_module_names())
-            if (owned_chunk.identifiers[gi] == name) {
-                globals[gi] = module_of(name);
-                globals_init[gi] = true;
-            }
+    for (auto& name : builtin_module_names())
+        if (owned_chunk.identifier_index(name) >= 0) // do not BUILD a module the program never names
+            init_global(name, module_of(name));
     string_module_ = module_of("string");
     array_module_ = make_array_module();
     {
@@ -2025,19 +1965,11 @@ void VM::execute(Chunk chunk) {
         for (auto& [k, v] : core.mptr->data) {
             if (!k.is_string())
                 continue;
-            const std::string& fname = k.as_string();
-            for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
-                if (owned_chunk.identifiers[gi] == fname) {
-                    globals[gi] = v;
-                    globals_init[gi] = true;
-                }
+            init_global(k.as_string(), v);
         }
     }
-    for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi)
-        if (owned_chunk.identifiers[gi] == "deltaTime" || owned_chunk.identifiers[gi] == "elapsedTime") {
-            globals[gi] = Value(0.0);
-            globals_init[gi] = true;
-        }
+    init_global("deltaTime", Value(0.0));
+    init_global("elapsedTime", Value(0.0));
     // W and H are the render-area dimensions injected by the engine, defaulting to
     // window.width/height for the environment. They are read before the top level so that
     // graphics.canvas(W, H) works right away.
@@ -2052,21 +1984,10 @@ void VM::execute(Chunk chunk) {
             if (vh.is_integer())
                 win_h = vh.as_int();
         }
-        for (int gi = 0; gi < (int)owned_chunk.identifiers.size(); ++gi) {
-            if (owned_chunk.identifiers[gi] == "W") {
-                globals[gi] = Value(win_w);
-                globals_init[gi] = true;
-            } else if (owned_chunk.identifiers[gi] == "H") {
-                globals[gi] = Value(win_h);
-                globals_init[gi] = true;
-            } else if (owned_chunk.identifiers[gi] == "CX") {
-                globals[gi] = Value((double)win_w / 2.0);
-                globals_init[gi] = true;
-            } else if (owned_chunk.identifiers[gi] == "CY") {
-                globals[gi] = Value((double)win_h / 2.0);
-                globals_init[gi] = true;
-            }
-        }
+        init_global("W", Value(win_w));
+        init_global("H", Value(win_h));
+        init_global("CX", Value((double)win_w / 2.0));
+        init_global("CY", Value((double)win_h / 2.0));
     }
     grow_regs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);

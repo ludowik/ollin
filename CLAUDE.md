@@ -2022,6 +2022,36 @@ méta-méthode est nié avant d'être écrit dans `return_dest`.
 consommé par `SPREAD_RESULTS` pour mettre à `nil` les cibles d'une
 destructuration multi-retour au-delà de ce que l'appel a réellement renvoyé.
 
+## Points de passage uniques de la VM
+
+Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a déjà coûté :
+
+- **Un nom de global → son index** : `Chunk::identifier_index` (chunk.h), qui interroge la table
+  déjà construite par `add_identifier`. `set_global`, `get_global` et l'initialisation d'`execute`
+  parcouraient `identifiers` en comparant des chaînes — trois de ces boucles étaient IMBRIQUÉES
+  (builtins, modules, membres de `core`), donc quadratiques, et `set_global` est appelé à chaque
+  frame pour `deltaTime`. Un module n'est même plus CONSTRUIT si le programme ne le nomme pas.
+- **Une valeur de fonction → `func_idx` + upvalues** : `resolve_func_val`. Quatre sites la
+  réécrivaient à la main ; le message d'erreur est désormais le même partout, celui que le
+  tutoriel documente (« call on non-function value »).
+- **Le retour d'un appel natif → Ollin** : `call_value_multi`, dont `call_value` n'est que le cas
+  à un résultat. Les deux portaient les mêmes quarante lignes, donc deux endroits où le protocole
+  d'appel pouvait dériver.
+
+Et **la queue d'un retour** vit dans `finish_return` (`noinline`, comme `nil_result_slot`),
+partagée par `RETURN_V` et `RETURN_SPREAD` qui en portaient chacun leur copie. `op_RETURN` garde
+sa version courte : c'est le chemin chaud, mesuré, et il n'a pas besoin du vecteur intermédiaire.
+
+**`CALL_DYN` et `CALL_VA` partagent un seul corps** (`call_dyn_common`), leur seule différence
+étant `argc` — l'un des deux recopiait tout l'arbre builtin / classe / fonction.
+
+⚠ **Un `Frame` se construit EN PLACE** (`call_stack.emplace_back()` puis remplissage de
+`back()`) : le remplir en local puis le pousser était un déplacement complet de la structure et de
+son vecteur d'upvalues à **chaque appel** — trente millions de fois dans `bench_fib`. Et les
+champs du frame se lisent **une fois** dans une référence (`const Frame& fr`) : cinq
+`call_stack.back()` entrelacés avec des écritures dans `regs` font recharger le pointeur du
+vecteur, les deux vecteurs étant indiscernables pour le compilateur.
+
 ## Builtins : convention de retour (modèle Lua)
 
 Signature : `using BuiltinFn = int (*)(CallCtx&)`. Comme une `lua_CFunction`, un

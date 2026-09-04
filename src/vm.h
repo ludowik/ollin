@@ -167,6 +167,9 @@ class VM {
             regs.resize(slot + 1);
         regs[slot] = Value();
     }
+    // The tail of a return, shared by RETURN_V and RETURN_SPREAD (see vm.cpp). Kept out of
+    // run_goto for the same reason as nil_result_slot.
+    uint32_t finish_return(std::vector<Value>& rvs, int frame_base);
 
     // Register variant: results go to regs[result_base..] and `cap` is derived from the current
     // frame (varargs_base - result_base) — the error-prone computation, kept in one place.
