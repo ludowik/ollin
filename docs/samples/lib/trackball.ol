@@ -3,6 +3,7 @@
 ##
 ##   orient()  gives the current orientation quaternion, to pass to graphics.rotateq
 ##   dragging  → true while dragging, so an automatic rotation can be suspended
+##   spin(dxDeg, dyDeg)          turns it directly, for the keyboard or any other source
 ##   idle(dt, degreesPerSecond)  a gentle rotation at rest, to be called from update(dt)
 ##   reset()   back to the starting orientation, for a "recentre the view" gesture
 ##
@@ -60,10 +61,16 @@ class Trackball
         var dy = (y - self.lasty) * self.sensitivity
         self.lastx = x
         self.lasty = y
-        ## dx turns around Y, dy around X; composed on the LEFT, hence in the SCREEN's frame,
-        ## so the drag follows the finger whatever the orientation.
-        var spin = graphics.quatAxis(0, 1, 0, dx).mul(graphics.quatAxis(1, 0, 0, dy))
-        self.q = spin.mul(self.q)
+        self.spin(dx, dy)
+    end
+
+    ## Turns it by an amount given in DEGREES, whatever the source: a drag converts pixels into
+    ## degrees and calls this, the arrow keys give a speed times the time step. dx turns around Y
+    ## and dy around X, composed on the LEFT — hence in the SCREEN's frame, so the rotation follows
+    ## the gesture whatever the orientation already reached.
+    func spin(dx, dy)
+        var turn = graphics.quatAxis(0, 1, 0, dx).mul(graphics.quatAxis(1, 0, 0, dy))
+        self.q = turn.mul(self.q)
     end
 
     ## A gentle rotation while the user is not dragging; it does nothing during a drag.

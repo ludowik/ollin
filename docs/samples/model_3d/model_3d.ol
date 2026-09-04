@@ -1,7 +1,7 @@
 ## External models (.obj and .glb), framed automatically: modelSize plus fitDistance keep them
 ## visible whatever the aspect ratio, and the rotation is interactive, by quaternion.
-## Drag with the mouse or a finger to turn it; otherwise it rotates gently on its own.
-## Wheel or pinch to zoom, double-click to recentre.
+## Drag with the mouse or a finger to turn it, or steer it with the ARROW KEYS; otherwise it rotates
+## gently on its own. Wheel or pinch to zoom, double-click to recentre.
 ## The "Model" menu switches between them, covering the three ways a file can carry its appearance:
 ## a model may hold its geometry ALONE, and then the fill tints it; it may hold a TEXTURE, and then
 ## a white fill shows it as painted; or it may hold a COLOUR PER VERTEX, which paints one mesh in
@@ -102,9 +102,41 @@ func mouse.doubleClicked(x, y)
     zoom.factor = 1.0
 end
 
-## The trackball's gentle drift is the only state this example advances.
+## The ARROW KEYS turn the model: left and right around the vertical axis, up and down around the
+## horizontal one, at KEY_SPIN degrees per second. A held state (keyboard.isDown) and not a key
+## event, so the rotation is continuous and independent of the repeat rate — and multiplied by the
+## time step, so it keeps its speed whatever the frame rate. Two arrows at once turn diagonally,
+## the two amounts composing in the trackball's own frame.
+const KEY_SPIN = 90
+
+func arrowSpin(dt)
+    var dx = 0
+    var dy = 0
+    if keyboard.isDown("left") then
+        dx -= 1
+    end
+    if keyboard.isDown("right") then
+        dx += 1
+    end
+    if keyboard.isDown("up") then
+        dy -= 1
+    end
+    if keyboard.isDown("down") then
+        dy += 1
+    end
+    if dx == 0 and dy == 0 then
+        return false
+    end
+    ball.spin(dx * KEY_SPIN * dt, dy * KEY_SPIN * dt)
+    return true
+end
+
 func update(dt)
-    ball.idle(dt, 30)
+    ## The gentle drift only resumes when nobody is steering: it would otherwise pull against the
+    ## arrows, exactly as it stands aside during a drag.
+    if not arrowSpin(dt) then
+        ball.idle(dt, 30)
+    end
 end
 
 func draw()
@@ -122,5 +154,5 @@ func draw()
     graphics.end3d()
 
     graphics.stroke(colors.WHITE)
-    graphics.text(current.name + " - drag: turn   wheel or pinch: zoom   double-click: reset", 12, 12)
+    graphics.text(current.name + " - drag or arrows: turn   wheel or pinch: zoom   double-click: reset", 12, 12)
 end
