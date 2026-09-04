@@ -2069,18 +2069,21 @@ end
 checkEnumNameIsOrdinary()
 
 ## A line break is WHITESPACE: a statement ends when the expression can no longer be extended,
-## not at the end of its line. The useful side of the rule (a multi-line expression) and its trap
-## (a line starting with an operator, joined to the previous one) are the same mechanism, and both
-## are pinned here so neither changes by accident. grammar.ebnf and the tutorial say the rule.
+## not at the end of its line. Both assertions below are the SAME mechanism, and joining is the
+## only sensible reading of either — no statement can begin with a binary operator, so `+ b` and
+## `- b` are not statements. Pinned so the rule does not change by accident.
 func checkLineContinuation()
     var a = 1
     var b = 2
     var joined = a
                  + b               ## one expression: 3
     assert(joined == 3)
-    var trap = 1
-    -b                             ## joined to the line above: 1 - b, so -1 and not 1
-    assert(trap == -1)
+    var minus = 1
+    -b                             ## joined to the line above: 1 - b, so -1
+    assert(minus == -1)
+    var times = 3
+    *b                             ## every binary operator continues the same way: 3 * b
+    assert(times == 6)
 end
 checkLineContinuation()
 

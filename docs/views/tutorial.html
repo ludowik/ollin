@@ -716,16 +716,10 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <div class="callout"><code>then</code>, <code>do</code> and <code>end</code> delimit the blocks — brackets around a condition are never required.</div>
 
-<div class="callout warn">The other side of that freedom: a line that <strong>could</strong> continue the previous one <strong>does</strong>. A statement ends when the expression can no longer be extended, not at the end of its line, so these three read as one statement each:
-<pre data-no-run><code>a = <span class="num">1</span>            <span class="cmt">## a is -1: the next line continues the expression</span>
--b
-
-f()               <span class="cmt">## reads as f()(x)</span>
-(x)
-
-<span class="bi">print</span>(t[i])       <span class="cmt">## indexes what print returned</span>
-[<span class="num">9</span>]</code></pre>
-The rule to remember: never leave an <strong>operator or an opening delimiter at the start</strong> of a line. Put the operator at the <strong>end</strong> of the previous line instead — <code>a +</code> then <code>b</code> — which reads the same and cannot be misread.</div>
+<div class="callout warn">The other side of that freedom: a line that <strong>could</strong> continue the previous one <strong>does</strong>, since a statement ends when the expression can no longer be extended and not at the end of its line. For an operator or a <code>.</code> that is the only sensible reading — <code>+ b</code> and <code>.field</code> are not statements — so nothing to watch there. The one form to watch is a line starting with <code>(</code>, where both readings would make sense:
+<pre data-no-run><code>g()
+(f)(<span class="num">1</span>)            <span class="cmt">## read as g()(f)(1), not as two statements</span></code></pre>
+Give the call a name (<code><span class="kw">var</span> r = (f)(<span class="num">1</span>)</code>) or drop the parentheses around <code>f</code>, and the ambiguity is gone.</div>
 </section>
 
 <!-- ── If ────────────────────────────────────────────────────────────────── -->

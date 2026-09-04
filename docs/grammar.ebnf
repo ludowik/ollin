@@ -11,14 +11,21 @@
    the end of its line. A statement ends when the expression can no longer be extended, so a
    line that CONTINUES the previous one is joined to it, inside brackets and outside them alike:
 
-       var n = f(x) * 0.8          a = 1              print(t[i])
-             + g(x) * 0.2          -b                 [9]
-       (one expression: useful)    (a is -1, silent)  (indexes print's result)
+       var n = f(x) * 0.8
+             + g(x) * 0.2          (one expression, and the samples rely on this)
 
-   The first form is the useful side of the rule and the samples rely on it; the other two are
-   its traps. To be sure a statement stops, leave no operator or opening delimiter at the START
-   of the next line: put the operator at the END of the line instead, which reads the same and
-   is unambiguous.
+   That reading is the only SENSIBLE one, because no statement can begin with a binary operator
+   or with a ".": `+ b` and `.field` are not statements. So a leading operator is unambiguous,
+   and needs no rule of its own.
+   The one genuine ambiguity is a leading "(", where both readings are meaningful:
+
+       g()
+       (f)(1)                      read as g()(f)(1), NOT as two statements
+
+   Lua refuses that form outright; here it is joined, and the mistake shows up at run time. To
+   be sure a statement stops before a "(", end the previous line with a ";"-free statement that
+   cannot extend — in practice, write the call as `local r = (f)(1)` or put the parenthesis on
+   the same line.
    The ';' character is ONLY the interval separator in rangeLit. A ';' outside a
    bracketed context is an error. *)
 
