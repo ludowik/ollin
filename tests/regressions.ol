@@ -2326,4 +2326,44 @@ func cbStrRaises()
 end
 assert(cbStrRaises() == "cannot index nil with field 'x'")
 
+## Every place the ENGINE calls back into Ollin goes through one bridge, so an error raised in a
+## callback must behave the same everywhere: caught once by the enclosing try, with the message as
+## thrown, and the program carries on. The paths that need a screen (mouse, keyboard, touch, ui,
+## image.mapPixel, draw) were probed by hand — under Xvfb and in the browser, where a raising
+## mouse.pressed reports ONE error and stops instead of repeating it every click.
+func cbRaises(f)
+    try
+        f()
+        return "NOT RAISED"
+    catch e
+        return e
+    end
+end
+func cbEveryBridge()
+    var t = [3, 1, 2]
+    assert(cbRaises(func() return t.map(func(x) return x.a end) end) == "cannot index int with field 'a'")
+    assert(cbRaises(func() return t.filter(func(x) return x.a end) end) == "cannot index int with field 'a'")
+    assert(cbRaises(func() return t.reduce(func(a, b) return a.x end, 0) end) == "cannot index int with field 'x'")
+    ## the comparator's exception cannot cross stable_sort, so array_module captures and rethrows it
+    assert(cbRaises(func() return t.sort(func(a, b) return a.x end) end) == "cannot index int with field 'x'")
+    ## the sound generator samples an Ollin formula, off the audio thread
+    assert(cbRaises(func() return sound.generate(0.01, func(s) return s.x end) end) ==
+           "cannot index float with field 'x'")
+    ## a `throw` crosses the same bridges, carrying its VALUE
+    assert(cbThrows(func() return t.map(func(x) throw {code: 7} end) end) == 7)
+    assert(cbThrows(func() return t.sort(func(a, b) throw {code: 8} end) end) == 8)
+    ## and the array is still usable afterwards, the engine having left no half-state behind
+    assert(t.reduce(func(a, b) return a + b end, 0) == 6)
+end
+
+func cbThrows(f)
+    try
+        f()
+        return -1
+    catch e
+        return e["code"]
+    end
+end
+cbEveryBridge()
+
 print("regressions ok")

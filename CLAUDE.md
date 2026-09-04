@@ -2048,6 +2048,15 @@ dans `regressions.ol`.
 ⚠ Le type, et non le texte, est ce qui empêche une **double** position : `run_goto` est réentrant
 (un rappel natif rappelle du code Ollin), donc une erreur peut traverser deux fois la boucle.
 
+**Sondé une fois pour toutes, sur les DIX endroits où le moteur rappelle du code Ollin** :
+`array.map`/`filter`/`reduce`/`sort`, `sound.generate` et les rappels de `tween` sans graphisme
+(figés dans `regressions.ol`) ; `image.mapPixel`, `ui.list` — dont les libellés appellent `__str`
+dès la DÉCLARATION, et non à l'ouverture — et un `draw()` qui lève, sous Xvfb ; un
+`func mouse.pressed` qui lève, au navigateur. Partout le même comportement : l'erreur est
+attrapée UNE fois par le `try` englobant avec le message tel qu'il a été levé, ou signalée une
+fois avec sa ligne et le programme s'arrête — au navigateur, trois clics ne produisent qu'une
+erreur, la boucle s'arrêtant à la première au lieu de la répéter à chaque image.
+
 **Un gestionnaire n'est déroulé que par la boucle qui le possède** (`handler_can_run`, vm.h) :
 `run_goto` est réentrant, et un `try` ouvert SOUS le plancher de l'invocation courante
 (`call_depth <= stop_depth`) appartient à une boucle englobante. La boucle imbriquée laisse alors
