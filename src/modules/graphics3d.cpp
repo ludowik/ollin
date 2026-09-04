@@ -33,6 +33,10 @@ static unsigned int s_cur_tex3d = 0;
 // the atlas. s_cur_tile = tiles of the next cube (state, like fill); -1 = no tile
 // (plain colour / ordinary texture0).
 static unsigned int s_atlas_texid = 0;
+// Whether the atlas's rows are bottom-up, answered ONCE when the atlas is declared: the two chunk
+// draws asked per call, and image_gl_flipped scans every image — a hundred scans a frame for a
+// texture that cannot change until the next tileset().
+static bool s_atlas_flipped = false;
 static float s_atlas_grid[2] = {1.0f, 1.0f};
 static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
 // Heights of the four top corners of the next cube (state, like s_cur_tile), in local
@@ -722,6 +726,7 @@ void reset3d_graphics_state() {
     s_in_3d = false;
     s_cur_tex3d = 0;
     s_atlas_texid = 0;
+    s_atlas_flipped = false;
     s_atlas_grid[0] = 1.0f;
     s_atlas_grid[1] = 1.0f;
     s_cur_tile[0] = -1.0f;
@@ -969,6 +974,7 @@ static int gfx_tileset(CallCtx& ctx) {
     if (argc > 0 && args[0].is_map()) {
         Value idv = args[0].map_get(Value(std::string("id")));
         s_atlas_texid = idv.is_integer() ? image_gl_texid((int)idv.as_int()) : 0;
+        s_atlas_flipped = image_gl_flipped(s_atlas_texid);
     }
     s_atlas_grid[0] = argc > 1 ? (float)num_arg(args, argc, 1, "graphics.tileset") : 1.0f;
     s_atlas_grid[1] = argc > 2 ? (float)num_arg(args, argc, 2, "graphics.tileset") : 1.0f;
@@ -1480,7 +1486,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     // The atlas is bound if declared (tiles >= 0 sample it), otherwise white (plain colour).
     // CONTRACT: with a tileset active, give a tile to EVERY cube of the chunk — a cube with
     // tile -1 would sample the atlas at fragTexCoord (tile 0) instead of a plain colour.
-    lit_draw_instanced(g.mesh, s_atlas_texid, g.count, image_gl_flipped(s_atlas_texid));
+    lit_draw_instanced(g.mesh, s_atlas_texid, g.count, s_atlas_flipped);
     rlDisableShader();
     return ctx.ret(Value{});
 }
@@ -1511,7 +1517,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
     }
     BeginBlendMode(BLEND_ALPHA);
     lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
-    lit_draw_instanced(g.mesh, s_atlas_texid, g.count, image_gl_flipped(s_atlas_texid));
+    lit_draw_instanced(g.mesh, s_atlas_texid, g.count, s_atlas_flipped);
     rlDisableShader();
     EndBlendMode();
     return ctx.ret(Value{});
@@ -1567,6 +1573,12 @@ static int gfx_free_chunk(CallCtx& ctx) {
 
 // Resets the current 3D texture (called every frame by reset_styles, on the 2D side).
 void reset3d_frame_state() {
+    // Once per FRAME, not per chunk drawn: the two chunk draws asked per call and
+    // image_gl_flipped scans every image, which is a hundred scans a frame for one texture. Asked
+    // here and not only at tileset() time, because a script may paint the atlas by RENDERING into
+    // it after declaring it, which changes the answer.
+    if (s_atlas_texid != 0)
+        s_atlas_flipped = image_gl_flipped(s_atlas_texid);
     s_cur_tex3d = 0;
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;

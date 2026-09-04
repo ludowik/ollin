@@ -75,6 +75,8 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::unordered_map<std::string, std::unordered_map<std::string, Value>> enum_consts_;
     // `Name.MEMBER` of a foldable enum, when the name is not shadowed here: gives its value.
     bool fold_enum_member(const Expr& e, Value& out);
+    // A value known at compile time: a literal, or such an enum member.
+    bool const_value(const Expr& e, Value& out);
     std::string current_func_name; // "" = global scope
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's
@@ -125,8 +127,6 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // A switch compiles to an indexed jump when every case value is an integer known at compile
     // time; otherwise to the comparison chain, which stays the general path.
     bool switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out, int64_t& lo, int64_t& hi);
-    void compile_switch_table(const SwitchStmt& s, int subj_r, int above_subj,
-                              const std::vector<std::vector<int64_t>>& values, int64_t lo, int64_t hi);
     void compile_iterator_loop(const Expr& src, const std::string& var1, const std::string& var2,
                                const std::vector<std::unique_ptr<Stmt>>& body);
     // Fast path for the numeric for: a range literal inclusive on both bounds, one variable.
@@ -206,6 +206,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // (compile_block, the closing of a scope, keep_captured_regs, the alias test), so the cost
     // was proportional to the nesting depth. The key is only valid for one compilation, hence a
     // member and not a static.
+    void close_upvals_from(int base);
     bool body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body);
     int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, int loop_vars_top, int recycled_top,
                            int reg_top_after_body);

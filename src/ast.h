@@ -121,6 +121,12 @@ struct Stmt {
     virtual void for_each_body(const BodyFn& f) const {
         (void)f;
     }
+    // The expressions this statement carries ITSELF, its sub-bodies excluded. Symmetric to
+    // Expr::for_each_child, and PURELY virtual for the same reason: a statement that forgot to
+    // answer would report "no expressions", and a walk looking for a lambda would miss it — which
+    // recycles a register still held by an open upvalue. A statement with none answers with an
+    // empty body, which is one line and states the fact.
+    virtual void for_each_expr(const ChildFn& f) const = 0;
     virtual ~Stmt() = default;
 };
 // Base for read-only visitors: any method left un-overridden is a no-op.
@@ -301,6 +307,11 @@ struct VarDeclStmt : Stmt {
         for (auto& n : names)
             out.push_back(n);
     }
+    void for_each_expr(const ChildFn& f) const override {
+        for (auto& v : values)
+            if (v)
+                f(*v);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -309,6 +320,9 @@ struct VarDeclStmt : Stmt {
 struct ExprStmt : Stmt {
     std::unique_ptr<Expr> expr;
     explicit ExprStmt(std::unique_ptr<Expr> e) : expr(std::move(e)) {
+    }
+    void for_each_expr(const ChildFn& f) const override {
+        f(*expr);
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -319,18 +333,25 @@ struct AssignStmt : Stmt {
     std::string name;
     char op = '\0'; // '\0' = a plain assignment; '+','-','*','/','%' = compound
     std::unique_ptr<Expr> value;
+    void for_each_expr(const ChildFn& f) const override {
+        f(*value);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
 };
 
 struct BreakStmt : Stmt {
+    void for_each_expr(const ChildFn&) const override { // carries no expression of its own
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
 };
 
 struct ContinueStmt : Stmt {
+    void for_each_expr(const ChildFn&) const override { // carries no expression of its own
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -355,6 +376,11 @@ struct IfStmt : Stmt {
             f(ei.body);
         f(else_body);
     }
+    void for_each_expr(const ChildFn& f) const override {
+        f(*cond);
+        for (auto& ei : else_ifs)
+            f(*ei.cond);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -366,6 +392,9 @@ struct WhileStmt : Stmt {
     void for_each_body(const BodyFn& f) const override {
         f(body);
     }
+    void for_each_expr(const ChildFn& f) const override {
+        f(*cond);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -374,6 +403,9 @@ struct WhileStmt : Stmt {
 struct ThrowStmt : Stmt {
     std::unique_ptr<Expr> value;
     explicit ThrowStmt(std::unique_ptr<Expr> v) : value(std::move(v)) {
+    }
+    void for_each_expr(const ChildFn& f) const override {
+        f(*value);
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -389,6 +421,8 @@ struct TryCatchStmt : Stmt {
         f(try_body);
         f(catch_body);
         f(else_body);
+    }
+    void for_each_expr(const ChildFn&) const override { // carries no expression of its own
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -408,6 +442,11 @@ struct FuncDeclStmt : Stmt {
     void for_each_body(const BodyFn& f) const override {
         f(body);
     }
+    void for_each_expr(const ChildFn& f) const override {
+        for (auto& d : defaults)
+            if (d)
+                f(*d);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -416,6 +455,10 @@ struct FuncDeclStmt : Stmt {
 struct ReturnStmt : Stmt {
     std::vector<std::unique_ptr<Expr>> values;
     bool spread_varargs = false;
+    void for_each_expr(const ChildFn& f) const override {
+        for (auto& v : values)
+            f(*v);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -478,6 +521,12 @@ struct IndexAssignStmt : Stmt {
     std::unique_ptr<Expr> key;
     TokenType op = TokenType::EQUALS; // EQUALS, PLUS_EQUAL, MINUS_EQUAL, etc.
     std::unique_ptr<Expr> value;
+    void for_each_expr(const ChildFn& f) const override {
+        if (obj_expr)
+            f(*obj_expr);
+        f(*key);
+        f(*value);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -489,6 +538,12 @@ struct MultiAssignStmt : Stmt {
     // to live here, limited to one level, so `a.b.c = 1` compiled while `a.b.c, x = 1, 2` did not.
     std::vector<std::unique_ptr<Expr>> targets;
     std::vector<std::unique_ptr<Expr>> values;
+    void for_each_expr(const ChildFn& f) const override {
+        for (auto& t : targets)
+            f(*t);
+        for (auto& v : values)
+            f(*v);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -505,6 +560,9 @@ struct ForIterStmt : Stmt {
     void for_each_body(const BodyFn& f) const override {
         f(body);
     }
+    void for_each_expr(const ChildFn& f) const override {
+        f(*iter_expr);
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -515,6 +573,8 @@ struct BlockStmt : Stmt {
     void for_each_body(const BodyFn& f) const override {
         f(stmts);
     }
+    void for_each_expr(const ChildFn&) const override { // carries no expression of its own
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -524,6 +584,8 @@ struct DoStmt : Stmt {
     std::vector<std::unique_ptr<Stmt>> body;
     void for_each_body(const BodyFn& f) const override {
         f(body);
+    }
+    void for_each_expr(const ChildFn&) const override { // carries no expression of its own
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -619,6 +681,10 @@ struct ClassDeclStmt : Stmt {
         for (auto& m : methods)
             f(m->body); // methods are FuncDeclStmt, so their bodies are exposed
     }
+    void for_each_expr(const ChildFn& f) const override {
+        for (auto& m : methods)
+            m->for_each_expr(f); // a method's own expressions are its default values
+    }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
     }
@@ -639,6 +705,12 @@ struct EnumDeclStmt : Stmt {
     void exported_names(std::vector<std::string>& out) const override {
         if (!obj_expr) // `enum a.b` writes a map field, so there is no name of its own
             out.push_back(name);
+    }
+    void for_each_expr(const ChildFn& f) const override {
+        if (obj_expr)
+            f(*obj_expr);
+        for (auto& it : items)
+            f(*it.value);
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -661,6 +733,12 @@ struct SwitchStmt : Stmt {
         for (auto& arm : cases)
             f(arm.body);
         f(else_body);
+    }
+    void for_each_expr(const ChildFn& f) const override {
+        f(*subject);
+        for (auto& c : cases)
+            for (auto& v : c.values)
+                f(*v);
     }
     void accept(StmtVisitor& v) const override {
         v.visit(*this);

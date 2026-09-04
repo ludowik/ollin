@@ -67,6 +67,14 @@ struct TexHandle {
     Texture2D tex = {};
     RenderTexture2D rtt = {};
     Image cpu = {};
+    // The texture this handle draws with: the render target's when there is one. Written out by
+    // hand at five sites, which is exactly one place too many for a choice this easy to get wrong.
+    const Texture2D& gpu_tex() const {
+        return is_render ? rtt.texture : tex;
+    }
+    unsigned int gl_id() const {
+        return gpu_tex().id;
+    }
 };
 
 static std::unordered_map<int, std::unique_ptr<TexHandle>> s_images;
@@ -76,8 +84,7 @@ unsigned int image_gl_texid(int id) {
     auto it = s_images.find(id);
     if (it == s_images.end())
         return 0;
-    const TexHandle& h = *it->second;
-    return h.is_render ? h.rtt.texture.id : h.tex.id;
+    return it->second->gl_id();
 }
 
 bool image_gl_flipped(unsigned int gl_texid) {
@@ -85,8 +92,7 @@ bool image_gl_flipped(unsigned int gl_texid) {
         return false;
     for (auto& kv : s_images) {
         const TexHandle& h = *kv.second;
-        unsigned int id = h.is_render ? h.rtt.texture.id : h.tex.id;
-        if (id == gl_texid)
+        if (h.gl_id() == gl_texid)
             return h.gpu_flipped;
     }
     return false; // not one of ours: a model's texture, or the white 1x1
@@ -249,7 +255,7 @@ static void pixels_open(TexHandle& h) {
 // The ONLY place the CPU shadow reaches the texture, which is why the orientation flag is cleared
 // here: any future write path that goes through this one is correct without having to think about it.
 static void upload_cpu(TexHandle& h) {
-    UpdateTexture(h.is_render ? h.rtt.texture : h.tex, h.cpu.data);
+    UpdateTexture(h.gpu_tex(), h.cpu.data);
     h.gpu_flipped = false;   // uploaded from the top-down CPU shadow
 }
 
@@ -507,7 +513,7 @@ static int img_draw(CallCtx& ctx) {
     TexHandle& h = handle_ptr(args[0], FN);
     pixels_close(h);
 
-    Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
+    Texture2D tex = h.gpu_tex();
     float x = (float)num_arg(args, 1, FN);
     float y = (float)num_arg(args, 2, FN);
     float dw = argc > 3 ? (float)num_arg(args, 3, FN) : (float)tex.width;
@@ -684,7 +690,7 @@ void image_draw_sprite(int id, float x, float y, float dw, float dh, unsigned ch
         return;
     const TexHandle& h = *it->second;
 
-    Texture2D tex = h.is_render ? h.rtt.texture : h.tex;
+    Texture2D tex = h.gpu_tex();
     if (dw == 0.0f)
         dw = (float)tex.width;
     if (dh == 0.0f)

@@ -671,15 +671,26 @@ dépend plus de la branche touchée (81,0 M dans les deux cas, et **3,5× plus r
 étant figées (cf. « Type enum ») — c'est ce qui fait que la table atteint le `switch` qu'on écrit
 vraiment, sur un état ou une sorte de tuile, et non seulement sur des nombres nus.
 
-**La chaîne est TOUJOURS émise, après les branches, et sert de chemin lent.** Elle n'est pas un
-reste : un sujet peut être une instance dont `__eq` décide de la correspondance, et seule la
-chaîne peut appeler cette méta-méthode. Vérifié dans les deux sens en comparant les deux binaires
-— une instance `Num(2)` atteignait `case 2` avant, et l'atteint toujours ; sans le chemin lent
-elle tombait dans le `else`. Un nombre n'y passe jamais, donc le cas rapide ne paie rien.
+**UNE seule disposition, et donc un seul émetteur** (`visit(SwitchStmt)`) : la chaîne de
+comparaisons, puis les branches, puis le `else`. Ce que la table ajoute est un **préambule** — un
+`SWITCH` qui indexe les branches ; sans elle l'exécution tombe simplement dans la chaîne, comme le
+`switch` a toujours fait. Il y avait deux compilateurs de `switch` à tenir d'accord sur trois
+invariants non locaux (l'ordre des branches, « une valeur répétée appartient à la PREMIÈRE », le
+refus du `break`), et la chaîne du chemin rapide comparait à la constante figée au lieu de
+l'expression écrite. Mesuré : la table gagne encore **5,4 %** (81,0 M → 76,7 M) parce que les
+branches sont désormais contiguës, et la chaîne paie **un saut de plus par exécution** (+0,8 % sur
+un `switch` de huit chaînes de caractères) — le prix d'un émetteur au lieu de deux.
+
+**La chaîne est TOUJOURS émise et sert de chemin lent.** Elle n'est pas un reste : un sujet peut
+être une instance dont `__eq` décide de la correspondance, et seule la chaîne peut appeler cette
+méta-méthode. Vérifié dans les deux sens en comparant les deux binaires — une instance `Num(2)`
+atteignait `case 2` avant, et l'atteint toujours ; sans le chemin lent elle tombait dans le
+`else`. Un nombre n'y passe jamais, donc le cas rapide ne paie rien.
 
 Trois destinations, et pas une seule : `targets[v - base]` pour un entier de l'intervalle,
 `else_addr` pour un nombre hors intervalle ou dans un TROU de l'intervalle (une valeur sans
-branche), `other_addr` — la chaîne — pour tout ce qui n'est pas un nombre. Deux points appris à
+branche), `other_addr` — la chaîne, qui suit immédiatement le `SWITCH` — pour tout ce qui n'est
+pas un nombre. Deux points appris à
 la mesure : un sujet FLOTTANT entier doit trouver sa branche (`4 / 2` est un flottant, la division
 en produisant toujours un, et l'égalité confond INTEGER et FLOAT — la première version le
 renvoyait au `else`), et une valeur répétée dans deux branches appartient à la PREMIÈRE, comme la
@@ -1450,6 +1461,28 @@ La 3D s'appuie sur raylib (`Camera3D`, `BeginMode3D`/`EndMode3D`, `GenMesh*`) ma
 - **Quaternions** (`graphics_quat.cpp`, math raymath pure, fichier séparé) : classe native `Quat` ; fabriques `graphics.quat()`/`quat_axis(ax,ay,az,deg)`/`quat_euler(pitch,yaw,roll)` (**degrés**) ; méthodes `mul`/`slerp`/`normalize`/`inverse`/`rotate_vec` (renvoient de NOUVELLES instances, valeurs immuables). `graphics.rotateq(q)` (dans graphics3d.cpp) applique `QuaternionToMatrix(q)` via `rlMultMatrixf` (gauche-multiplie comme `rlRotatef` → compose comme `rotate`). `quatFromInstance()`/`makeQuatInstance()` = pont graphics3d↔graphics_quat.
 - **Perf/limites** : 1 draw call par `(shape, texture)` — le nombre de **couleurs** n'ajoute pas de draw call (couleur par instance). `cylinder` est **mono-rayon** (`x,y,z,r,h`) : contrainte du mesh unitaire figé. Models externes = extension additive (bucket déjà keyé `(mesh, texture)`).
 
+
+## Ce qu'un nœud d'AST répond pour lui-même
+
+Trois questions vivent **sur le nœud**, dans `ast.h`, au lieu d'une cascade de `dynamic_cast`
+tenue à la main ailleurs — les deux premières sont documentées plus haut, la troisième les
+complète :
+
+| Question | Méthode | Défaut |
+|---|---|---|
+| quels noms je déclare au niveau module | `Stmt::exported_names` | vide |
+| quels sous-corps je porte | `Stmt::for_each_body` | aucun |
+| quelles expressions je porte moi-même | `Stmt::for_each_expr` | **purement virtuelle** |
+| quelles sous-expressions je porte | `Expr::for_each_child` | **purement virtuelle** |
+
+`for_each_expr` remplace **onze** méthodes `visit` de `HasFuncQuery` et la cascade de
+`loop_body_alias_safe`, qui énuméraient à la main `s.value`, `s.values`, `s.key`, `s.targets`…
+Comme `for_each_child`, elle est **purement virtuelle** : un nœud qui oublierait de répondre
+rendrait « aucune expression », donc « aucune fonction ici », et le compilateur recyclerait un
+registre encore tenu par une upvalue ouverte — exactement la classe de bug corrigée quatre fois
+dans ce dépôt. `HasFuncQuery` ne garde que quatre `visit`, dont le conservatisme mesuré de
+`switch` et `enum` ; `loop_body_alias_safe` garde sa liste des sortes AUTORISÉES, qui est un
+garde-fou voulu et non une énumération de champs.
 
 ## Résolution d'un `import` (le chemin résolu = IDENTITÉ du module)
 

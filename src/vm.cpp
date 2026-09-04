@@ -295,10 +295,6 @@ static int64_t range_len(const Range* r) {
     return n <= 0.0 ? 0 : (int64_t)n;
 }
 
-// The length of a value, shared by the `len` builtin and by the LEN opcode that '#' compiles to,
-// so the two can never disagree. NOT inlined: it would be pulled into run_goto, whose register
-// allocation is shared by every opcode handler, and the numeric loop measured +2 instructions
-// per turn for it (bench/icount.sh) — a cost paid by code that never uses '#'.
 // One indexed jump instead of one comparison per arm: the compiler builds the table when every
 // case value is an integer known at compile time (see Compiler::switch_table_values). Kept out of
 // run_goto — its locals raised the register pressure of the single function all the handlers live
@@ -318,6 +314,14 @@ static __attribute__((noinline)) uint16_t switch_target_slow(const SwitchTable& 
     return t.else_addr;
 }
 
+// The length of a value, shared by the `len` builtin and by the LEN opcode that '#' compiles to,
+// so the two can never disagree. NOT inlined: it would be pulled into run_goto, whose register
+// allocation is shared by every opcode handler, and the numeric loop measured +2 instructions
+// per turn for it (bench/icount.sh) — a cost paid by code that never uses '#'.
+// ⚠ builtin_map_len, arr_len and str_len keep their own one-line computation on purpose: making
+// the map one call this function costs the SAME 600 000 instructions on the loop benchmark
+// (measured), the extra call site changing what the compiler inlines in this file. Sharing one
+// expression is not worth 1.9 % of every numeric loop.
 static __attribute__((noinline)) Value value_len(const Value& v) {
     if (v.is_nil())
         return Value((int64_t)0);

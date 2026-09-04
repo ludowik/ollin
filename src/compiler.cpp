@@ -67,15 +67,46 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
     return uv_i;
 }
 
+// The negation of a numeric LITERAL is a constant: `-1` used to cost a LOAD_K plus a NEGATE at
+// every execution. Integer wrap-around is the same as the VM's, so -(INT64_MIN) is unchanged.
+static bool negated_literal(const UnaryExpr& e, Value& out) {
+    if (e.op != '-')
+        return false;
+    auto* n = dynamic_cast<const NumberExpr*>(e.operand.get());
+    if (!n)
+        return false;
+    out = n->is_integer ? Value((int64_t)(0 - (uint64_t)n->ival)) : num_value(-n->value);
+    return true;
+}
+
+// The value of an expression that IS a literal, hence known at compile time. The single place
+// where a literal becomes a Value: written out again elsewhere, the two copies drifted.
+static bool literal_value(const Expr& e, Value& out) {
+    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
+        out = n->is_integer ? Value(n->ival) : num_value(n->value);
+        return true;
+    }
+    if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
+        out = Value(s->value);
+        return true;
+    }
+    if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
+        out = Value::make_bool(b->value);
+        return true;
+    }
+    if (dynamic_cast<const NilExpr*>(&e)) {
+        out = Value{};
+        return true;
+    }
+    if (auto* u = dynamic_cast<const UnaryExpr*>(&e))
+        return negated_literal(*u, out);
+    return false;
+}
+
 static Value eval_constant(const Expr& e, const std::vector<std::string>& files, SourceLoc fallback = {}) {
-    if (auto* n = dynamic_cast<const NumberExpr*>(&e))
-        return n->is_integer ? Value(n->ival) : num_value(n->value);
-    if (auto* s = dynamic_cast<const StringExpr*>(&e))
-        return Value(s->value);
-    if (auto* b = dynamic_cast<const BoolExpr*>(&e))
-        return Value::make_bool(b->value);
-    if (dynamic_cast<const NilExpr*>(&e))
-        return Value{};
+    Value v;
+    if (literal_value(e, v))
+        return v;
     SourceLoc loc = (e.line > 0) ? e.sloc() : fallback;
     throw std::runtime_error(loc.str(files) + ": default values must be literal constants (not a runtime expression)");
 }
@@ -255,17 +286,22 @@ struct CollectGlobalsVisitor : StmtQuery {
     std::unordered_set<std::string>& out;
     std::unordered_set<std::string>& enums;
     const std::vector<std::string>& files;
-    // How many times each bare-name enum is DECLARED, and which names are ASSIGNED anywhere.
-    // Both decide whether an enum's members may be folded into constants: an enum declared
-    // twice, or a name later reassigned, has no single compile-time value (`RgCol = 5` is legal,
-    // the freeze holding the CONTENT and not the name).
+    // What decides whether an enum's members may be folded into constants: how many times each
+    // bare-name enum is DECLARED (twice means no single value), which names are ASSIGNED anywhere
+    // (`RgCol = 5` is legal, the freeze holding the CONTENT and not the name), and which
+    // declarations are CERTAIN to run — the program's top level, an import's flattened BlockStmt
+    // included. All three are collected by this one walk: the third had its own recursive
+    // function, a fourth traversal of the tree for one question about a node this visitor
+    // already sees.
     std::unordered_map<std::string, int>& enum_decls;
     std::unordered_set<std::string>& assigned;
+    std::unordered_set<std::string>& certain;
+    bool cur_certain = true; // set by walk() for the statement being visited
 
     CollectGlobalsVisitor(std::unordered_set<std::string>& out, std::unordered_set<std::string>& enums,
                           const std::vector<std::string>& files, std::unordered_map<std::string, int>& enum_decls,
-                          std::unordered_set<std::string>& assigned)
-        : out(out), enums(enums), files(files), enum_decls(enum_decls), assigned(assigned) {
+                          std::unordered_set<std::string>& assigned, std::unordered_set<std::string>& certain)
+        : out(out), enums(enums), files(files), enum_decls(enum_decls), assigned(assigned), certain(certain) {
     }
 
     void visit(const AssignStmt& s) override {
@@ -284,10 +320,16 @@ struct CollectGlobalsVisitor : StmtQuery {
     // The tree's topology is declared by the nodes themselves (Stmt::for_each_body, ast.h)
     // rather than re-enumerated here, so a new statement with a body is walked without touching
     // this visitor. The `visit` methods below only COLLECT.
-    void walk(const std::vector<std::unique_ptr<Stmt>>& stmts) {
+    // `certain` says the statements are reached unconditionally. Only a BlockStmt — the container
+    // an import is flattened into — keeps that property for its own body; a function body or an
+    // `if` branch may never run.
+    void walk(const std::vector<std::unique_ptr<Stmt>>& stmts, bool certain_here = true) {
         for (auto& s : stmts) {
+            cur_certain = certain_here;
             s->accept(*this);
-            s->for_each_body([this](const std::vector<std::unique_ptr<Stmt>>& sub) { walk(sub); });
+            bool sub_certain = certain_here && dynamic_cast<const BlockStmt*>(s.get()) != nullptr;
+            s->for_each_body(
+                [this, sub_certain](const std::vector<std::unique_ptr<Stmt>>& sub) { walk(sub, sub_certain); });
         }
     }
 
@@ -305,6 +347,8 @@ struct CollectGlobalsVisitor : StmtQuery {
             out.insert(s.name); // an enum under a bare name is a global, like a class
             enums.insert(s.name);
             ++enum_decls[s.name];
+            if (cur_certain)
+                certain.insert(s.name);
         }
     }
     void visit(const ClassDeclStmt& s) override {
@@ -315,46 +359,17 @@ struct CollectGlobalsVisitor : StmtQuery {
 static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::unordered_set<std::string>& out,
                             std::unordered_set<std::string>& enums, const std::vector<std::string>& files,
                             std::unordered_map<std::string, int>& enum_decls,
-                            std::unordered_set<std::string>& assigned) {
-    CollectGlobalsVisitor v(out, enums, files, enum_decls, assigned);
+                            std::unordered_set<std::string>& assigned, std::unordered_set<std::string>& certain) {
+    CollectGlobalsVisitor v(out, enums, files, enum_decls, assigned, certain);
     v.walk(stmts);
-}
-
-// The negation of a numeric LITERAL is a constant: `-1` used to cost a LOAD_K plus a NEGATE at
-// every execution. Integer wrap-around is the same as the VM's, so -(INT64_MIN) is unchanged.
-static bool negated_literal(const UnaryExpr& e, Value& out) {
-    if (e.op != '-')
-        return false;
-    auto* n = dynamic_cast<const NumberExpr*>(e.operand.get());
-    if (!n)
-        return false;
-    out = n->is_integer ? Value((int64_t)(0 - (uint64_t)n->ival)) : num_value(-n->value);
-    return true;
-}
-
-// The value of an expression that IS a literal, hence known at compile time.
-static bool literal_value(const Expr& e, Value& out) {
-    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
-        out = n->is_integer ? Value(n->ival) : num_value(n->value);
-        return true;
-    }
-    if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
-        out = Value(s->value);
-        return true;
-    }
-    if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
-        out = Value::make_bool(b->value);
-        return true;
-    }
-    if (auto* u = dynamic_cast<const UnaryExpr*>(&e))
-        return negated_literal(*u, out);
-    return false;
 }
 
 // `Name.MEMBER` where Name is a foldable enum already compiled and MEMBER has a literal value:
 // the access becomes a constant load. The name must not be shadowed HERE — a local or an
 // upvalue of the same name is a different variable, and reading its field is a real lookup.
 bool Compiler::fold_enum_member(const Expr& e, Value& out) {
+    if (enum_consts_.empty()) // no foldable enum in this program: nothing to look for
+        return false;
     auto* ix = dynamic_cast<const IndexExpr*>(&e);
     if (!ix)
         return false;
@@ -372,6 +387,13 @@ bool Compiler::fold_enum_member(const Expr& e, Value& out) {
         return false;
     out = member->second;
     return true;
+}
+
+// A value known at COMPILE TIME: a literal, or a member of a frozen enum. The two are always
+// asked together — by the switch table and by a member read — so the pair is the notion, and
+// naming it leaves the door open to `const` without a second call site to find.
+bool Compiler::const_value(const Expr& e, Value& out) {
+    return literal_value(e, out) || fold_enum_member(e, out);
 }
 
 void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
@@ -434,26 +456,15 @@ Chunk Compiler::compile(const Program& prog) {
     reg_count_ = 8;
     std::unordered_map<std::string, int> enum_decls;
     std::unordered_set<std::string> assigned_names;
-    collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files, enum_decls, assigned_names);
+    std::unordered_set<std::string> certain_enums;
+    collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files, enum_decls, assigned_names,
+                    certain_enums);
     // An enum whose name is declared once, never reassigned, and declared where the statement is
     // CERTAIN to run has one value per member for the whole program, so `Colour.RED` can become a
-    // constant load (see fold_enum_member). "Certain to run" is the top level of the program: a
-    // declaration inside a function or under an `if` may never execute, and folding would then
-    // hand a value to code that used to fail on a nil enum. An import is flattened into a
-    // BlockStmt container, which does run, so a module's enums are folded too.
-    std::unordered_set<std::string> certain;
-    std::function<void(const std::vector<std::unique_ptr<Stmt>>&)> scan_certain =
-        [&](const std::vector<std::unique_ptr<Stmt>>& stmts) {
-            for (auto& st : stmts) {
-                if (auto* en = dynamic_cast<const EnumDeclStmt*>(st.get()); en && !en->obj_expr)
-                    certain.insert(en->name);
-                else if (auto* blk = dynamic_cast<const BlockStmt*>(st.get()))
-                    scan_certain(blk->stmts);
-            }
-        };
-    scan_certain(prog.stmts);
+    // constant load (see fold_enum_member). A declaration inside a function or under an `if` may
+    // never execute, and folding would then hand a value to code that used to fail on a nil enum.
     for (auto& kv : enum_decls)
-        if (kv.second == 1 && certain.count(kv.first) != 0 && assigned_names.count(kv.first) == 0)
+        if (kv.second == 1 && certain_enums.count(kv.first) != 0 && assigned_names.count(kv.first) == 0)
             foldable_enums_.insert(kv.first);
     for (auto& n : builtin_module_names())
         declared_globals_.insert(n);
@@ -632,6 +643,13 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std
 // frame returns, so handing those registers back to temporaries would overwrite the captured
 // values. compile_block has already reserved the body's locals (the current reg_top_), and we
 // keep the higher of the two.
+// Closes every upvalue opened at or above `base`. Emitted at the end of a scope AND at every
+// path that leaves one early — a throw, a continue, a break, the end of a loop iteration — which
+// is why the same two lines appeared eight times.
+void Compiler::close_upvals_from(int base) {
+    chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)base, 0, 0));
+}
+
 bool Compiler::body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body) {
     auto it = has_func_cache_.find(&body);
     if (it != has_func_cache_.end())
@@ -683,7 +701,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     // returning nil instead of 42, measured). The two loop forms already close per iteration,
     // for the same reason; reserving the registers instead would grow without bound over a file.
     if (has_func && reg_top_ > saved_top)
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)saved_top, 0, 0));
+        close_upvals_from(saved_top);
     local_regs_ = std::move(saved_regs);
     pending_var_reg_ = std::move(saved_pending);
     const_names_ = std::move(saved_consts);
@@ -713,7 +731,7 @@ void Compiler::visit(const WhileStmt& s) {
     if (!continue_patches.back().patches.empty() && body_carries_func(s.body)) {
         chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
         cont_target = (uint16_t)chunk.current_pos();
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)body_base, 0, 0));
+        close_upvals_from(body_base);
     }
     for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, cont_target);
@@ -724,7 +742,7 @@ void Compiler::visit(const WhileStmt& s) {
     // A break leaves the body the same way, so the exit closes too — once, on the way out. The
     // two `for` forms have always done this; the while had neither of the two points.
     if (body_carries_func(s.body))
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)body_base, 0, 0));
+        close_upvals_from(body_base);
     chunk.patch_jump(exit_patch, exit_addr);
     for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, exit_addr);
@@ -786,7 +804,7 @@ bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<
     for (size_t ai = 0; ai < s.cases.size(); ++ai) {
         for (auto& ve : s.cases[ai].values) {
             Value v;
-            if (!literal_value(*ve, v) && !fold_enum_member(*ve, v))
+            if (!const_value(*ve, v))
                 return false;
             if (!v.is_integer())
                 return false;
@@ -805,61 +823,15 @@ bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<
     return (uint64_t)hi - (uint64_t)lo < MAX_SPAN;
 }
 
-// The table path: the subject is evaluated once, then a single indexed jump reaches the arm.
-// The comparison chain is still emitted, AFTER the arms, and serves a subject that is not a
-// number — an instance whose `__eq` decides the match reached its arm before, and only the chain
-// can call that method. It is never executed for a number, so the fast case pays nothing.
-void Compiler::compile_switch_table(const SwitchStmt& s, int subj_r, int above_subj,
-                                    const std::vector<std::vector<int64_t>>& values, int64_t lo, int64_t hi) {
-    if (chunk.switch_tables.size() >= 0xFFFF)
-        throw std::runtime_error("compile: too many switch tables (max 65535)");
-    uint16_t table_idx = (uint16_t)chunk.switch_tables.size();
-    chunk.switch_tables.push_back({lo, std::vector<uint16_t>((size_t)(hi - lo) + 1, 0), 0, 0});
-    chunk.emit(make_abx((uint8_t)Op::SWITCH, (uint8_t)subj_r, table_idx));
-
-    std::vector<size_t> end_patches;
-    std::vector<uint16_t> arm_addr(values.size());
-    for (size_t ai = 0; ai < s.cases.size(); ++ai) {
-        arm_addr[ai] = (uint16_t)chunk.current_pos();
-        reg_top_ = above_subj;
-        compile_block(s.cases[ai].body);
-        end_patches.push_back(chunk.emit_jump(Op::JUMP));
-    }
-
-    uint16_t other_addr = (uint16_t)chunk.current_pos();
-    for (size_t ai = 0; ai < values.size(); ++ai)
-        for (int64_t v : values[ai]) {
-            reg_top_ = above_subj;
-            int val_r = alloc_reg();
-            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.add_constant(Value(v))));
-            int cond_r = alloc_reg();
-            chunk.emit(make_abc((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
-            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
-            chunk.patch_jump(chunk.emit_jump(Op::JUMP), arm_addr[ai]);
-            chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
-        }
-
-    uint16_t else_addr = (uint16_t)chunk.current_pos();
-    reg_top_ = above_subj;
-    compile_block(s.else_body);
-
-    uint16_t end_addr = (uint16_t)chunk.current_pos();
-    for (size_t p : end_patches)
-        chunk.patch_jump(p, end_addr);
-
-    SwitchTable& t = chunk.switch_tables[table_idx];
-    t.else_addr = else_addr;
-    t.other_addr = other_addr;
-    for (auto& e : t.targets)
-        e = else_addr; // a hole in the span is a number matching no case, so the else body
-    for (size_t ai = 0; ai < values.size(); ++ai)
-        for (int64_t v : values[ai]) {
-            uint16_t& slot = t.targets[(size_t)(v - lo)];
-            if (slot == else_addr)
-                slot = arm_addr[ai]; // a value repeated across arms belongs to the FIRST, as the chain gave it
-        }
-}
-
+// ONE layout for both paths, so nothing has to be kept in agreement: the comparison chain, then
+// the arms in order, then the else body. What the table adds is a PREFIX — a single SWITCH that
+// indexes the arms — and without it execution simply falls into the chain, which is what the
+// switch has always done.
+//
+// The chain is therefore ALWAYS emitted, and it is not a leftover: a subject can be an instance
+// whose `__eq` decides the match, and only the chain can call that method (verified against the
+// previous binary in both directions). A number never reaches it, so the indexed path pays
+// nothing. It compares against the case EXPRESSIONS, as it always has.
 void Compiler::visit(const SwitchStmt& s) {
     note_line(s.line, s.file_idx);
 
@@ -873,53 +845,52 @@ void Compiler::visit(const SwitchStmt& s) {
         reserve_regs_to(subj_r + 1);
     int above_subj = reg_top_; // subj_r stays live through every arm
 
-    std::vector<size_t> end_patches;
     break_patches.push_back(
         {{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
 
     std::vector<std::vector<int64_t>> table_values;
     int64_t lo = 0;
     int64_t hi = 0;
-    if (switch_table_values(s, table_values, lo, hi)) {
-        compile_switch_table(s, subj_r, above_subj, table_values, lo, hi);
-        for (size_t p : break_patches.back().patches)
-            chunk.patch_jump(p, (uint16_t)chunk.current_pos());
-        break_patches.pop_back();
-        reg_top_ = saved;
-        return;
+    bool use_table = switch_table_values(s, table_values, lo, hi);
+    uint16_t table_idx = 0;
+    if (use_table) {
+        if (chunk.switch_tables.size() >= 0xFFFF)
+            throw std::runtime_error("compile: too many switch tables (max 65535)");
+        table_idx = (uint16_t)chunk.switch_tables.size();
+        chunk.switch_tables.push_back({lo, std::vector<uint16_t>((size_t)(hi - lo) + 1, 0), 0, 0});
+        chunk.emit(make_abx((uint8_t)Op::SWITCH, (uint8_t)subj_r, table_idx));
     }
 
-    for (auto& arm : s.cases) {
-        std::vector<size_t> body_patches;
-        size_t next_arm_patch = 0;
-
-        for (size_t vi = 0; vi < arm.values.size(); ++vi) {
-            bool is_last = (vi == arm.values.size() - 1);
+    // The chain, whose jumps to the arms are patched once their addresses are known.
+    uint16_t chain_addr = (uint16_t)chunk.current_pos();
+    std::vector<std::vector<size_t>> arm_patches(s.cases.size());
+    for (size_t ai = 0; ai < s.cases.size(); ++ai)
+        for (auto& ve : s.cases[ai].values) {
             reg_top_ = above_subj;
-            arm.values[vi]->accept(*this);
+            ve->accept(*this);
             int val_r = last_reg_;
-            int cond_r = alloc_reg(); // alloc_reg() updates reg_count_
-            reg_top_ = above_subj;    // frees the temporary after EQ
+            int cond_r = alloc_reg();
+            reg_top_ = above_subj; // frees the temporary after EQ
             chunk.emit(make_abc((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
-            if (!is_last) {
-                size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
-                body_patches.push_back(chunk.emit_jump(Op::JUMP));
-                chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
-            } else {
-                next_arm_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
-            }
+            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+            arm_patches[ai].push_back(chunk.emit_jump(Op::JUMP));
+            chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
         }
+    size_t no_match_patch = chunk.emit_jump(Op::JUMP); // nothing matched: the else body
 
-        uint16_t body_addr = (uint16_t)chunk.current_pos();
-        for (size_t p : body_patches)
-            chunk.patch_jump(p, body_addr);
-
+    std::vector<size_t> end_patches;
+    std::vector<uint16_t> arm_addr(s.cases.size());
+    for (size_t ai = 0; ai < s.cases.size(); ++ai) {
+        arm_addr[ai] = (uint16_t)chunk.current_pos();
+        for (size_t p : arm_patches[ai])
+            chunk.patch_jump(p, arm_addr[ai]);
         reg_top_ = above_subj;
-        compile_block(arm.body);
+        compile_block(s.cases[ai].body);
         end_patches.push_back(chunk.emit_jump(Op::JUMP));
-        chunk.patch_jump(next_arm_patch, (uint16_t)chunk.current_pos());
     }
 
+    uint16_t else_addr = (uint16_t)chunk.current_pos();
+    chunk.patch_jump(no_match_patch, else_addr);
     reg_top_ = above_subj;
     compile_block(s.else_body);
 
@@ -930,6 +901,20 @@ void Compiler::visit(const SwitchStmt& s) {
         chunk.patch_jump(p, end_addr);
     break_patches.pop_back();
     reg_top_ = saved;
+
+    if (!use_table)
+        return;
+    SwitchTable& t = chunk.switch_tables[table_idx];
+    t.else_addr = else_addr;
+    t.other_addr = chain_addr;
+    for (auto& e : t.targets)
+        e = else_addr; // a hole in the span is a number matching no case, so the else body
+    for (size_t ai = 0; ai < table_values.size(); ++ai)
+        for (int64_t v : table_values[ai]) {
+            uint16_t& slot = t.targets[(size_t)(v - lo)];
+            if (slot == else_addr)
+                slot = arm_addr[ai]; // a value repeated across arms belongs to the FIRST, as the chain gives it
+        }
 }
 
 // A break and a continue jump to an address of the CURRENT function, so the innermost frame must
@@ -1082,7 +1067,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     // this point, and one declared BEFORE the try keeps its open upvalue (its register is below
     // try_base).
     if (body_carries_func(s.try_body))
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)try_base, 0, 0));
+        close_upvals_from(try_base);
 
     // Catch block: catch_var keeps catch_r, other locals are scoped as usual.
     compile_block(s.catch_body, s.catch_var, catch_r);
@@ -1789,7 +1774,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     bool close_scope = body_carries_func(body);
     uint16_t iter_end = (uint16_t)chunk.current_pos();
     if (close_scope)
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
+        close_upvals_from(block + 1);
     for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, iter_end);
     continue_patches.pop_back();
@@ -1799,7 +1784,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // Exit (normal end, exhausted iterator, or `break`): the same closing, so that the last
     // iteration behaves like the others.
     if (close_scope)
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)(block + 1), 0, 0));
+        close_upvals_from(block + 1);
     chunk.patch_jump(exit_patch, exit);
     for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, exit);
@@ -1851,50 +1836,35 @@ static bool expr_has_lambda(const Expr* e) {
 static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& v) {
     for (auto& sp : body) {
         const Stmt* s = sp.get();
-        if (auto* a = dynamic_cast<const AssignStmt*>(s)) {
-            if (a->name == v)
-                return false;
-            if (expr_has_lambda(a->value.get()))
-                return false;
-        } else if (auto* m = dynamic_cast<const MultiAssignStmt*>(s)) {
-            for (auto& t : m->targets) {
-                auto* ve = dynamic_cast<const VarExpr*>(t.get());
-                if (ve && ve->name == v)
+        // The KINDS allowed are a deliberate guard-rail, not a shortcut: anything else — if,
+        // while, for, block, try, switch, a declaration — is refused outright, which is what also
+        // keeps nested loops from aliasing. What the statement WRITES is asked of the node.
+        bool simple = dynamic_cast<const AssignStmt*>(s) || dynamic_cast<const MultiAssignStmt*>(s) ||
+                      dynamic_cast<const VarDeclStmt*>(s) || dynamic_cast<const ExprStmt*>(s) ||
+                      dynamic_cast<const ReturnStmt*>(s) || dynamic_cast<const ThrowStmt*>(s) ||
+                      dynamic_cast<const IndexAssignStmt*>(s) || dynamic_cast<const BreakStmt*>(s) ||
+                      dynamic_cast<const ContinueStmt*>(s);
+        if (!simple)
+            return false;
+        // A write to v itself, whichever shape it takes. An IndexAssignStmt whose container is v
+        // does NOT write v, it writes into the object v holds, so it is not listed here.
+        if (auto* a = dynamic_cast<const AssignStmt*>(s); a && a->name == v)
+            return false;
+        if (auto* m = dynamic_cast<const MultiAssignStmt*>(s))
+            for (auto& t : m->targets)
+                if (auto* ve = dynamic_cast<const VarExpr*>(t.get()); ve && ve->name == v)
                     return false;
-                if (expr_has_lambda(t.get()))
-                    return false;
-            }
-            for (auto& val : m->values)
-                if (expr_has_lambda(val.get()))
-                    return false;
-        } else if (auto* d = dynamic_cast<const VarDeclStmt*>(s)) {
+        if (auto* d = dynamic_cast<const VarDeclStmt*>(s))
             for (auto& n : d->names)
                 if (n == v)
                     return false; // shadow
-            for (auto& val : d->values)
-                if (expr_has_lambda(val.get()))
-                    return false;
-        } else if (auto* e = dynamic_cast<const ExprStmt*>(s)) {
-            if (expr_has_lambda(e->expr.get()))
-                return false;
-        } else if (auto* r = dynamic_cast<const ReturnStmt*>(s)) {
-            for (auto& x : r->values)
-                if (expr_has_lambda(x.get()))
-                    return false;
-        } else if (auto* th = dynamic_cast<const ThrowStmt*>(s)) {
-            if (expr_has_lambda(th->value.get()))
-                return false;
-        } else if (auto* ia = dynamic_cast<const IndexAssignStmt*>(s)) {
-            // obj == v does not write v, it writes into its container; check the key, the value
-            // and the chained container (obj_expr) if there is one.
-            if (expr_has_lambda(ia->key.get()) || expr_has_lambda(ia->value.get()) ||
-                (ia->obj_expr && expr_has_lambda(ia->obj_expr.get())))
-                return false;
-        } else if (dynamic_cast<const BreakStmt*>(s) || dynamic_cast<const ContinueStmt*>(s)) {
-            // safe
-        } else {
-            return false; // if/while/for/block/try/switch/funcdecl/…: stay conservative
-        }
+        bool lambda = false;
+        s->for_each_expr([&lambda](const Expr& e) {
+            if (!lambda)
+                lambda = expr_has_lambda(&e);
+        });
+        if (lambda)
+            return false;
     }
     return true;
 }
@@ -1931,65 +1901,6 @@ struct HasFuncQuery : StmtQuery {
     void visit(const EnumDeclStmt&) override {
         result = true;
     }
-    void visit(const AssignStmt& s) override {
-        result = expr_has_lambda(s.value.get());
-    }
-    void visit(const ExprStmt& s) override {
-        result = expr_has_lambda(s.expr.get());
-    }
-    void visit(const ThrowStmt& s) override {
-        result = expr_has_lambda(s.value.get());
-    }
-    void visit(const IndexAssignStmt& s) override {
-        result = expr_has_lambda(s.key.get()) || expr_has_lambda(s.value.get()) ||
-                 (s.obj_expr && expr_has_lambda(s.obj_expr.get()));
-    }
-    void visit(const MultiAssignStmt& s) override {
-        for (auto& v : s.values)
-            if (expr_has_lambda(v.get())) {
-                result = true;
-                return;
-            }
-        for (auto& t : s.targets)
-            if (expr_has_lambda(t.get())) {
-                result = true;
-                return;
-            }
-    }
-    void visit(const VarDeclStmt& s) override {
-        for (auto& v : s.values)
-            if (expr_has_lambda(v.get())) {
-                result = true;
-                return;
-            }
-    }
-    void visit(const ReturnStmt& s) override {
-        for (auto& v : s.values)
-            if (expr_has_lambda(v.get())) {
-                result = true;
-                return;
-            }
-    }
-    // Nodes with bodies: only their OWN expressions are examined here.
-    void visit(const WhileStmt& s) override {
-        result = expr_has_lambda(s.cond.get());
-    }
-    void visit(const ForIterStmt& s) override {
-        result = expr_has_lambda(s.iter_expr.get());
-    }
-    void visit(const IfStmt& s) override {
-        if (expr_has_lambda(s.cond.get())) {
-            result = true;
-            return;
-        }
-        for (auto& ei : s.else_ifs)
-            if (expr_has_lambda(ei.cond.get())) {
-                result = true;
-                return;
-            }
-    }
-    // TryCatchStmt, BlockStmt and DoStmt have no expressions of their own, so descending is
-    // enough; BreakStmt and ContinueStmt have nothing either.
 };
 static bool stmt_has_func(const Stmt* s) {
     HasFuncQuery q;
@@ -1997,6 +1908,17 @@ static bool stmt_has_func(const Stmt* s) {
     if (q.result)
         return true;
     bool found = false;
+    // Its OWN expressions: a lambda written in any of them captures like a declaration. Asked of
+    // the node (Stmt::for_each_expr) instead of the eleven visit methods that used to enumerate
+    // s.value, s.values, s.key, s.targets… by hand — a list where a new node, or a new expression
+    // field on an existing one, was missed in SILENCE, and a false "no function here" recycles a
+    // register still held by an open upvalue.
+    s->for_each_expr([&found](const Expr& e) {
+        if (!found)
+            found = expr_has_lambda(&e);
+    });
+    if (found)
+        return true;
     s->for_each_body([&found](const std::vector<std::unique_ptr<Stmt>>& sub) {
         if (!found)
             found = body_has_func(sub);
@@ -2058,7 +1980,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     bool close_scope = body_carries_func(body);
     uint16_t loop_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
+        close_upvals_from(var_reg);
     for (size_t p : continue_patches.back().patches)
         chunk.patch_jump(p, loop_addr);
     continue_patches.pop_back();
@@ -2066,7 +1988,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 
     uint16_t exit_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
-        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)var_reg, 0, 0));
+        close_upvals_from(var_reg);
     chunk.patch_jump(prep, exit_addr); // FOR_PREP jumps here when the loop is empty
     for (size_t p : break_patches.back().patches)
         chunk.patch_jump(p, exit_addr);
