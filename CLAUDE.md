@@ -149,12 +149,22 @@ ollin/
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
 │                      ollin-vscode/ (extension VS Code, colorisation)
 ├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
-└── docs/              tutoriel, playground, samples, wasm
-                       docs/samples/ : un exemple d'UN fichier est posé à plat ; un exemple de
-                       PLUSIEURS fichiers a son propre dossier (invaders/, voxel_world/, model_3d/,
-                       primitives_3d/, transforms_3d/), avec SES données (les six modèles 3D sont
-                       dans model_3d/), et une bibliothèque partagée par plusieurs d'entre eux vit
-                       dans docs/samples/lib/ (trackball.ol, starfield.ol).
+└── docs/              la web app servie par GitHub Pages, rangée par RÔLE
+    ├── index.html     le shell de la SPA ; app.js est le routeur. playground.html et run.html
+    │                  ne sont que des redirections vers les routes par hash
+    ├── views/         une vue = un fragment .html (CSS + markup) + un module .js
+    ├── lib/           les modules partagés : cm-* (CodeMirror) et pg-* (projets, exécution,
+    │                  GitHub, formateur…), importés par les vues et par app.js
+    ├── css/           app-bar.css (la barre des trois vues) et fonts.css
+    ├── icons/         logo.svg et les trois PNG de l'installation en application
+    ├── fonts/ vendor/ assets/ data/   polices, CodeMirror bundlé, images, relevés de perf
+    ├── grammar.ebnf   la référence de la syntaxe (lue aussi par check_grammar_coverage.sh)
+    ├── wasm/          ollin.js + ollin.wasm, l'artefact servi
+    └── samples/       un exemple d'UN fichier est posé à plat ; un exemple de PLUSIEURS fichiers
+                       a son propre dossier (invaders/, voxel_world/, model_3d/, primitives_3d/,
+                       transforms_3d/) avec SES données (les six modèles 3D sont dans model_3d/),
+                       et une bibliothèque partagée vit dans samples/lib/ (trackball.ol,
+                       starfield.ol)
 ```
 
 ## Web app monopage (docs/)
@@ -210,7 +220,7 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
 - **Aperçu d'une ressource (vue `playground`)** : cliquer une ressource du rail l'affiche **à la place de l'éditeur** — `#res-view`, frère de `#editor-wrap` dans `#editor-main`, l'un masquant l'autre. Une image est rendue sur un damier (sinon un fond transparent se confondrait avec le panneau) avec ses dimensions et son poids ; tout autre format n'a qu'une fiche d'information. `currentRes` (nom, ou `null` = on édite) sert aussi aux deux rails pour la ligne active, si bien qu'un seul élément paraît sélectionné. Ouvrir un script, re-cliquer la ressource affichée ou la supprimer ramène à l'éditeur.
 - **Capture d'écran (mode plein écran, vue `run`)** : le bouton « Capture » range un PNG dans les **ressources du projet actif** (`project.resources[nom] = {b64, ext}`), puis le déclare au moteur (`preloadImage`) → utilisable aussitôt par `image.load(nom)`. L'image vient du MOTEUR, en deux temps (`requestCapture` / `takeCapture`, bindings de `wasm_main.cpp`) : elle ne peut être lue qu'en **fin de frame**, et `canvas.toDataURL` rendrait une image vide (le contexte WebGL n'a pas `preserveDrawingBuffer`). En pause, la vue reprend la boucle le temps d'une frame. Un exemple lu depuis le dépôt n'a pas de projet où ranger l'image → message explicite.
 - `docs/playground.html` / `docs/run.html` — **redirections** vers `index.html#/playground` / `#/run` (anciens liens). La source unique est `docs/views/`.
-- **Toute écriture GitHub passe par `commitOnBranch` (`pg-github.js`), qui se REJOUE sur la
+- **Toute écriture GitHub passe par `commitOnBranch` (`lib/pg-github.js`), qui se REJOUE sur la
   nouvelle tête.** Lire la référence puis la faire avancer n'est pas atomique : si la branche a
   bougé entre les deux, GitHub répond `422 — Update is not a fast forward` (constaté par
   l'utilisateur). La séquence entière est refaite, lecture de la référence comprise, jusqu'à trois
@@ -227,9 +237,9 @@ Le site (`docs/`) est une **SPA** : une seule page hôte, plusieurs vues montée
   distante. La suppression distante passe AVANT la locale : si elle échoue, le projet reste entier
   des deux côtés plutôt que de perdre sa copie locale en laissant un dossier orphelin. Décocher
   garde la copie GitHub (libérer la place locale sans perdre la sauvegarde).
-- Modules partagés : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur).
+- Modules partagés, dans **`docs/lib/`** : `cm-lang.js` (langage CM6 Ollin), `cm-shared.js` (affichage CM), `pg-store.js` (projets IndexedDB), `pg-github.js`, `pg-run.js` (exécution/nav), `pg-format.js` (formateur). Les feuilles de style communes sont dans `docs/css/`, les icônes dans `docs/icons/` — la racine de `docs/` ne porte plus que le shell, le routeur, les deux redirections, le manifeste et la grammaire.
 
-**Formateur (`pg-format.js`)** : réindentation ligne par ligne, sans AST. Deux règles à
+**Formateur (`lib/pg-format.js`)** : réindentation ligne par ligne, sans AST. Deux règles à
 retenir avant d'y toucher — une ligne qui ouvre à la fois un bloc et un délimiteur
 (`f(x, func()`) ne vaut qu'**un** niveau (le bloc « absorbe » les délimiteurs de sa ligne
 d'ouverture), et les crochets ne sont comptés que sur les lignes **sans `;`**, un range
@@ -1348,7 +1358,7 @@ fichier dont le chemin remonte l'arborescence.
   rangé dans un sous-dossier cherchait ses voisins à la racine — il tournait en natif et pas sur le
   web, et le 404 du préchargement était silencieux (constaté au navigateur).
 - **La même règle vit en TROIS endroits** qui doivent rendre la même chaîne : `parser.cpp` (le
-  moteur), et dans `docs/pg-run.js` le préchargement des imports d'un exemple
+  moteur), et dans `docs/lib/pg-run.js` le préchargement des imports d'un exemple
   (`preloadSampleImports`, qui part du dossier du fichier d'entrée) et le ramassage d'un fork
   (`collectSampleProject`). Les deux fonctions JS partagent `resolveImport`/`pathNormalise`.
 - `tests/check_samples.sh` parcourt `docs/samples/**` et identifie un fichier par son **chemin
@@ -1371,7 +1381,7 @@ démarrage par `main.cpp` et `wasm_main.cpp` depuis `path_dir`, comme pour `base
 - **Ce que cela règle** : un exemple rangé dans son propre dossier y garde ses données, et il ne
   dépend plus du répertoire COURANT du processus — `LoadModel`/`LoadTexture` résolvent depuis le
   CWD, si bien que `model_3d` ne tournait en natif que lancé depuis `docs/samples/`.
-- **Le nom écrit dans le code reste la clé** : le préchargeur web (`fetchAsset`, pg-run.js) cherche
+- **Le nom écrit dans le code reste la clé** : le préchargeur web (`fetchAsset`, lib/pg-run.js) cherche
   `<dossier de l'entrée>/<nom>` puis `<nom>`, mais déclare toujours l'octet sous le **nom nu**, que
   `graphics.model` et `image.load` interrogent. Un projet forké range donc ses ressources sous ce
   même nom.

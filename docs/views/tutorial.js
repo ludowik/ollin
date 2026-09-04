@@ -9,8 +9,8 @@ import {
   EditorView, lineNumbers,
   syntaxHighlighting,
 } from '../vendor/codemirror.js'
-import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../cm-shared.js'
-import { ollinLang, ollinHighlight } from '../cm-lang.js'
+import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../lib/cm-shared.js'
+import { ollinLang, ollinHighlight } from '../lib/cm-lang.js'
 
 // Editor theme, for the tutorial's read-only blocks.
 const ollinTheme = EditorView.theme({
@@ -58,7 +58,7 @@ export async function init(ctx) {
 
   // SHARED execution (pg-run.js): the same preloading and error handling as the playground and
   // the standalone mode (try/catch, graphics frame errors).
-  const Run = await import('../pg-run.js?v=' + ctx.v)
+  const Run = await import('../lib/pg-run.js?v=' + ctx.v)
 
   // The WASM runtime is SHARED, loaded once by app.js. We warm it up as soon as the view is
   // entered; the Run buttons wait for it if it is not ready.

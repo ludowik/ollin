@@ -5,7 +5,7 @@
 // It follows ollin.tmLanguage.json (the VS Code extension). The theme (background colours,
 // borders, autocomplete styles) stays private to each view and is therefore NOT here — only
 // the tokenizer and the highlighting (roles to colours) are.
-import { StreamLanguage, HighlightStyle, tags } from './vendor/codemirror.js'
+import { StreamLanguage, HighlightStyle, tags } from '../vendor/codemirror.js'
 
 // The union of the two former sets: `static` (tutorial) and `default` (playground).
 export const KEYWORDS = new Set([

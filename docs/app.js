@@ -26,7 +26,7 @@ const V = Date.now()
 // reference it — whereas the views are always loaded fresh and no longer carry bar styles of
 // their own. The bars would then have no style at all (observed). app.js, on the other hand, is
 // imported with a version token, hence always fresh, and the stylesheet follows.
-document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="app-bar.css?v=' + V + '">')
+document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="css/app-bar.css?v=' + V + '">')
 
 // Installed as an app on macOS, Safari lays the window out in TWO ways, and the difference is
 // what took four attempts to find. Both were measured on a Mac, through the perf view's readout:
@@ -65,11 +65,11 @@ if (/Mac/i.test(navigator.platform || '')) {
   })
 }
 
-const { hardReload } = await import('./pg-run.js?v=' + V)
+const { hardReload } = await import('./lib/pg-run.js?v=' + V)
 
 // On-screen crash capture, for diagnosing a device (iOS in full screen, with no console).
 // Installed BEFORE any WASM load, so that hard faults are caught too.
-const { installCrashOverlay, wireModule } = await import('./pg-crashlog.js?v=' + V)
+const { installCrashOverlay, wireModule } = await import('./lib/pg-crashlog.js?v=' + V)
 installCrashOverlay()
 
 // The shared WASM runtime: one instance for the whole app.

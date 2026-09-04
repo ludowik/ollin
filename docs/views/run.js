@@ -11,9 +11,9 @@ export async function init(ctx) {
 
   // Shared modules, cache-busted with the app's version token: one session reuses the same URL,
   // so the module registry does not grow.
-  const Store = await (await import('../pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
-  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../pg-run.js?v=' + ctx.v)
-  const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
+  const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
+  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
   // only, not tablets or iPads, which get the desktop interface: a coarse pointer AND a small

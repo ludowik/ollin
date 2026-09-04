@@ -12,8 +12,8 @@ import {
   closeBrackets, closeBracketsKeymap,
   search, searchKeymap, highlightSelectionMatches,
 } from '../vendor/codemirror.js'
-import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../cm-shared.js'
-import { ollinLang, ollinHighlight } from '../cm-lang.js'
+import { CODE_DISPLAY, CODE_THEME_BASE, ICONS } from '../lib/cm-shared.js'
+import { ollinLang, ollinHighlight } from '../lib/cm-lang.js'
 
 export async function init(ctx) {
 const { getOllin, hardReload } = ctx
@@ -22,13 +22,13 @@ const disposers = []   // the global listeners to remove on unmount
 // Storage through the abstraction layer (pg-provider): `Store` is the working store (local by
 // default), `GH` the remote provider (GitHub by default). Plugging in another backend happens in
 // pg-provider.js, with no change to the call sites.
-const Prov  = await import('../pg-provider.js?v=' + ctx.v)
+const Prov  = await import('../lib/pg-provider.js?v=' + ctx.v)
 const Store = await Prov.getProvider(ctx.v)
 const GH    = await Prov.getRemote(ctx.v)
-const Run   = await import('../pg-run.js?v=' + ctx.v)   // execution shared with run.html
-const Fmt   = await import('../pg-format.js?v=' + ctx.v)   // the on-demand formatter
-const { pinToVisualViewport } = await import('../pg-viewport.js?v=' + ctx.v)
-const { createRemoteSync } = await import('../pg-sync.js?v=' + ctx.v)
+const Run   = await import('../lib/pg-run.js?v=' + ctx.v)   // execution shared with run.html
+const Fmt   = await import('../lib/pg-format.js?v=' + ctx.v)   // the on-demand formatter
+const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
+const { createRemoteSync } = await import('../lib/pg-sync.js?v=' + ctx.v)
 
 // The remote-save coordinator: every local save of a linked project schedules a deferred GitHub
 // push (debounced, single-flight, offline-tolerant). The actual machinery is supplied further
