@@ -1191,12 +1191,13 @@ static Model* model_get(const std::string& name) {
         // first — a script names its data without repeating its own directory, and an example kept
         // in its own directory must not depend on which directory the process was started from —
         // then the path as written, which keeps an absolute or already-qualified name working.
-        if (!program_dir().empty())
+        if (!program_dir().empty()) {
             m = LoadModel((program_dir() + name).c_str());
-        if (m.meshCount <= 0) {
-            UnloadModel(m);
-            m = LoadModel(name.c_str());
+            if (m.meshCount <= 0)
+                UnloadModel(m);   // a failed load still allocated a default material
         }
+        if (m.meshCount <= 0)
+            m = LoadModel(name.c_str());
     }
     if (m.meshCount <= 0) {
         UnloadModel(m);

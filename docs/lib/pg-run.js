@@ -142,11 +142,12 @@ const _importSrcCache = new Map()
 // The transitive .ol imports of a file from samples/, walked breadth-first, each path RESOLVED as
 // the parser resolves it — relative to the importing file's directory, "." and ".." collapsed —
 // which keeps the keys identical to the ones the engine will look up, sub-directories included.
-// `onFile(key, src)` is called once per file reached; a fetch that fails calls `onMissing(key)`,
-// which decides whether that is fatal. The walk is written ONCE: preloading a sample into the
-// runtime and forking one into a project are the same traversal, and a resolution fix applied to
-// one of two copies would leave the other wrong.
-async function walkImports(entry, code, v, onFile, onMissing) {
+// `onFile(key, src)` is called once per file reached, and a file that cannot be fetched is simply
+// skipped: an import is best-effort here in BOTH uses, the engine being the one that reports a
+// genuinely missing module. The walk is written ONCE — preloading a sample into the runtime and
+// forking one into a project are the same traversal, and a resolution fix applied to one of two
+// copies would leave the other wrong.
+async function walkImports(entry, code, v, onFile) {
   const seen = new Set()
   let queue = findImports(code).map((imp) => resolveImport(dirOf(entry), imp))
   while (queue.length) {
@@ -160,8 +161,7 @@ async function walkImports(entry, code, v, onFile, onMissing) {
         if (!r.ok) throw new Error('HTTP ' + r.status)
         src = await r.text()
         _importSrcCache.set(key, src)
-      } catch (e) {
-        onMissing(key, e)
+      } catch (_) {
         continue
       }
     }
@@ -181,7 +181,7 @@ export async function preloadSampleImports(m, code, v, entry = '') {
   await walkImports(entry, code, v, (key, src) => {
     m.preloadSource(key, src)        // the key is the resolved path, what source_get() looks for
     collected.push(src)
-  }, () => {})
+  })
   return collected.join('\n')
 }
 
@@ -247,7 +247,7 @@ export async function collectSampleProject(entryFile, v) {
   // rejection propagates; its imports go through the shared walk, where a miss is ignored.
   const entrySrc = await fetchSample(entryFile, v)
   files[entryFile] = entrySrc
-  await walkImports(entryFile, entrySrc, v, (key, src) => { files[key] = src }, () => {})
+  await walkImports(entryFile, entrySrc, v, (key, src) => { files[key] = src })
 
   // The binary assets referenced — 3D models (model("x.obj")) AND external images
   // (image.load("x.png")) — become base64 resources of the project.
