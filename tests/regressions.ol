@@ -2056,4 +2056,16 @@ import "alias_import2_test.ol"
 assert(aliasOne() == 7)
 assert(aliasTwo() == 14)
 
+## An enum's freeze holds its CONTENT, not its NAME: the name is an ordinary global, as a class's
+## is, so it can be reassigned. Writing an ELEMENT stays refused (test_errors.sh).
+func checkEnumNameIsOrdinary()
+    assert(RgCol.A == 1)
+    RgCol = 5
+    assert(RgCol == 5)
+end
+enum RgCol
+    A, B
+end
+checkEnumNameIsOrdinary()
+
 print("regressions ok")

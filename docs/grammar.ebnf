@@ -74,6 +74,8 @@ enumItem       = IDENT [ "=" expr ] ;
                     target is visibly the enum, a runtime error otherwise, through an alias or a
                     computed key. The freeze is SHALLOW: an object or an array HELD BY the enum
                     stays mutable *)
+                 (* the freeze holds the CONTENT, not the NAME: `Col = 5` is accepted and replaces
+                    the enum, the name being an ordinary global — exactly like the name of a class *)
                  (* for reading, an enum is an ordinary map: access, len, iteration *)
 
 classDecl      = "class" IDENT [ "extends" IDENT ] NL { method } "end" NL ;

@@ -1222,7 +1222,7 @@ b.x = <span class="num">99</span>
 <span class="kw">var</span> m = Tint
 m.RED = <span class="num">5</span>              <span class="cmt">## a run-time error: cannot modify an enum</span></code></pre>
 
-<div class="callout warn">The freeze is <strong>shallow</strong>: it protects the enumeration, not what it holds. If an element is an array or an object, that array or object stays mutable — <code>E.L[1] = 9</code> goes through. Freezing deeply would make immutable an object that may be referenced elsewhere.</div>
+<div class="callout warn">The freeze is <strong>shallow</strong>: it protects the enumeration, not what it holds. If an element is an array or an object, that array or object stays mutable — <code>E.L[1] = 9</code> goes through. Freezing deeply would make immutable an object that may be referenced elsewhere. It protects the CONTENT and not the NAME: <code>E = 5</code> replaces the enumeration, the name being an ordinary global — exactly like the name of a class.</div>
 
 <h3>The target</h3>
 <p>A simple name declares a <strong>global</strong>, as a class does: forward references work. A path writes into an existing map.</p>
