@@ -2087,4 +2087,26 @@ func checkLineContinuation()
 end
 checkLineContinuation()
 
+## A lambda hidden INSIDE an interpolation captures the loop variable like any other, so the
+## walk that looks for one must descend into the interpolated expressions. The old walk listed
+## the kinds of expression by hand and left the interpolation out, answering "there is one" by
+## precaution; the answer now comes from the node itself, so it must stay exact both ways.
+func checkLambdaInInterpolation()
+    var out = []
+    for i = 1, 3 do
+        out.push("v={(func() return i * 10 end)()}")
+    end
+    assert(out[1] == "v=10")
+    assert(out[3] == "v=30")
+
+    var fns = []
+    for i = 1, 3 do
+        var label = "n={i}"        ## carries NO function: the registers may be recycled
+        fns.push(func() return label end)
+    end
+    assert(fns[1]() == "n=1")      ## one variable per turn, unaffected by the recycling
+    assert(fns[3]() == "n=3")
+end
+checkLambdaInInterpolation()
+
 print("regressions ok")

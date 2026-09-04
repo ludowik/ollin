@@ -1630,64 +1630,22 @@ void Compiler::visit(const ForIterStmt& s) {
     compile_iterator_loop(*s.iter_expr, s.var1, s.var2, s.body);
 }
 
-// True when the expression contains a lambda, which could capture the loop variable.
+// True when the expression contains a lambda, which could capture the loop variable. The
+// descent goes through Expr::for_each_child, so no list of expression kinds is maintained here:
+// the previous cascade of dynamic_cast answered "yes, conservatively" for anything it did not
+// list, and an interpolated string was in that case — one in a loop body was enough to forbid
+// recycling the loop registers, though it carries no function at all.
 static bool expr_has_lambda(const Expr* e) {
     if (!e)
         return false;
     if (dynamic_cast<const FuncExpr*>(e))
         return true;
-    if (auto* b = dynamic_cast<const BinaryExpr*>(e))
-        return expr_has_lambda(b->left.get()) || expr_has_lambda(b->right.get());
-    if (auto* u = dynamic_cast<const UnaryExpr*>(e))
-        return expr_has_lambda(u->operand.get());
-    if (auto* c = dynamic_cast<const CallExpr*>(e)) {
-        for (auto& a : c->args)
-            if (expr_has_lambda(a.get()))
-                return true;
-        return false;
-    }
-    if (auto* c = dynamic_cast<const ExprCallExpr*>(e)) {
-        if (expr_has_lambda(c->callee.get()))
-            return true;
-        for (auto& a : c->args)
-            if (expr_has_lambda(a.get()))
-                return true;
-        return false;
-    }
-    if (auto* m = dynamic_cast<const MethodCallExpr*>(e)) {
-        if (expr_has_lambda(m->receiver.get()))
-            return true;
-        for (auto& a : m->args)
-            if (expr_has_lambda(a.get()))
-                return true;
-        return false;
-    }
-    if (auto* i = dynamic_cast<const IndexExpr*>(e))
-        return expr_has_lambda(i->obj.get()) || expr_has_lambda(i->key.get());
-    if (auto* mp = dynamic_cast<const MapExpr*>(e)) {
-        for (auto& en : mp->entries)
-            if (expr_has_lambda(en.key.get()) || expr_has_lambda(en.value.get()))
-                return true;
-        return false;
-    }
-    if (auto* ar = dynamic_cast<const ArrayExpr*>(e)) {
-        for (auto& x : ar->elements)
-            if (expr_has_lambda(x.get()))
-                return true;
-        return false;
-    }
-    if (auto* rg = dynamic_cast<const RangeExpr*>(e))
-        return expr_has_lambda(rg->start.get()) || expr_has_lambda(rg->end.get()) || expr_has_lambda(rg->step.get());
-    if (auto* cc = dynamic_cast<const ChainedCompareExpr*>(e)) {
-        for (auto& o : cc->operands)
-            if (expr_has_lambda(o.get()))
-                return true;
-        return false;
-    }
-    if (dynamic_cast<const VarExpr*>(e) || dynamic_cast<const NumberExpr*>(e) || dynamic_cast<const StringExpr*>(e) ||
-        dynamic_cast<const BoolExpr*>(e) || dynamic_cast<const NilExpr*>(e) || dynamic_cast<const VarArgExpr*>(e))
-        return false;
-    return true; // an unknown type, hence the conservative answer
+    bool found = false;
+    e->for_each_child([&found](const Expr& c) {
+        if (!found)
+            found = expr_has_lambda(&c);
+    });
+    return found;
 }
 
 // True when the body is safe for aliasing the loop variable 'v' onto the control register: no

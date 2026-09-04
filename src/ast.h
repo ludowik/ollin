@@ -95,8 +95,11 @@ struct ExprVisitor {
 };
 
 struct Stmt;
+struct Expr;
 // Callback handed to Stmt::for_each_body, once per sub-body.
 using BodyFn = std::function<void(const std::vector<std::unique_ptr<Stmt>>&)>;
+// Callback handed to Expr::for_each_child, once per sub-expression.
+using ChildFn = std::function<void(const Expr&)>;
 
 struct Stmt {
     int line = 0;
@@ -176,12 +179,20 @@ struct Expr {
         return {(uint16_t)file_idx, (uint16_t)line};
     }
     virtual void accept(ExprVisitor&) const = 0;
+    // Sub-expressions of this expression. Same division of labour as for statements:
+    // `accept`/`visit` acts ACCORDING TO the kind, `for_each_child` DESCENDS. It is PURELY
+    // virtual, unlike Stmt::for_each_body, because forgetting it here would answer "no children"
+    // — a walk would silently stop, and a walk that looks for a lambda would miss it. A leaf
+    // answers with an empty body, which is one line and states the fact.
+    virtual void for_each_child(const ChildFn& f) const = 0;
     virtual ~Expr() = default;
 };
 
 struct BoolExpr : Expr {
     bool value;
     explicit BoolExpr(bool v) : value(v) {
+    }
+    void for_each_child(const ChildFn&) const override { // a leaf
     }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
@@ -196,6 +207,8 @@ struct NumberExpr : Expr {
     }
     explicit NumberExpr(int64_t v) : value(0.0), ival(v), is_integer(true) {
     }
+    void for_each_child(const ChildFn&) const override { // a leaf
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -205,6 +218,8 @@ struct StringExpr : Expr {
     std::string value;
     explicit StringExpr(std::string v) : value(std::move(v)) {
     }
+    void for_each_child(const ChildFn&) const override { // a leaf
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -213,6 +228,8 @@ struct StringExpr : Expr {
 struct VarExpr : Expr {
     std::string name;
     explicit VarExpr(std::string n) : name(std::move(n)) {
+    }
+    void for_each_child(const ChildFn&) const override { // a leaf
     }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
@@ -225,6 +242,10 @@ struct BinaryExpr : Expr {
     BinaryExpr(char o, std::unique_ptr<Expr> l, std::unique_ptr<Expr> r)
         : op(o), left(std::move(l)), right(std::move(r)) {
     }
+    void for_each_child(const ChildFn& f) const override {
+        f(*left);
+        f(*right);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -234,6 +255,9 @@ struct UnaryExpr : Expr {
     char op;
     std::unique_ptr<Expr> operand;
     UnaryExpr(char o, std::unique_ptr<Expr> e) : op(o), operand(std::move(e)) {
+    }
+    void for_each_child(const ChildFn& f) const override {
+        f(*operand);
     }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
@@ -245,6 +269,10 @@ struct UnaryExpr : Expr {
 struct ChainedCompareExpr : Expr {
     std::vector<std::unique_ptr<Expr>> operands;
     std::vector<char> ops;
+    void for_each_child(const ChildFn& f) const override {
+        for (auto& o : operands)
+            f(*o);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -254,6 +282,10 @@ struct CallExpr : Expr {
     std::string callee;
     std::vector<std::unique_ptr<Expr>> args;
     bool optional = false; // f?(): calls only when callable, otherwise nil
+    void for_each_child(const ChildFn& f) const override {
+        for (auto& a : args)
+            f(*a);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -403,12 +435,16 @@ struct ReturnStmt : Stmt {
 };
 
 struct VarArgExpr : Expr {
+    void for_each_child(const ChildFn&) const override { // a leaf
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
 };
 
 struct NilExpr : Expr {
+    void for_each_child(const ChildFn&) const override { // a leaf
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -423,6 +459,12 @@ struct MapEntry {
 
 struct MapExpr : Expr {
     std::vector<MapEntry> entries;
+    void for_each_child(const ChildFn& f) const override {
+        for (auto& en : entries) {
+            f(*en.key);
+            f(*en.value);
+        }
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -431,6 +473,10 @@ struct MapExpr : Expr {
 struct IndexExpr : Expr {
     std::unique_ptr<Expr> obj;
     std::unique_ptr<Expr> key;
+    void for_each_child(const ChildFn& f) const override {
+        f(*obj);
+        f(*key);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -499,6 +545,10 @@ struct DoStmt : Stmt {
 
 struct ArrayExpr : Expr {
     std::vector<std::unique_ptr<Expr>> elements;
+    void for_each_child(const ChildFn& f) const override {
+        for (auto& x : elements)
+            f(*x);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -510,6 +560,12 @@ struct RangeExpr : Expr {
     std::unique_ptr<Expr> start;
     std::unique_ptr<Expr> end;
     std::unique_ptr<Expr> step; // nullptr if absent
+    void for_each_child(const ChildFn& f) const override {
+        f(*start);
+        f(*end);
+        if (step)
+            f(*step);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -520,6 +576,13 @@ struct FuncExpr : Expr {
     std::vector<std::unique_ptr<Expr>> defaults;
     bool variadic = false;
     std::vector<std::unique_ptr<Stmt>> body;
+    // The default values only: the BODY is statements, which a walk over expressions does not
+    // reach. A walk that needs it descends through the statements itself.
+    void for_each_child(const ChildFn& f) const override {
+        for (auto& d : defaults)
+            if (d)
+                f(*d);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -530,6 +593,11 @@ struct ExprCallExpr : Expr {
     std::unique_ptr<Expr> callee;
     std::vector<std::unique_ptr<Expr>> args;
     bool optional = false; // expr?(): calls only when callable, otherwise nil
+    void for_each_child(const ChildFn& f) const override {
+        f(*callee);
+        for (auto& a : args)
+            f(*a);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -542,6 +610,12 @@ struct MethodCallExpr : Expr {
     std::vector<std::unique_ptr<Expr>> args;
     bool is_super = false;
     bool optional = false; // obj.m?(): calls when the method is callable, gives nil when absent
+    void for_each_child(const ChildFn& f) const override {
+        if (receiver) // null on a super call
+            f(*receiver);
+        for (auto& a : args)
+            f(*a);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }
@@ -611,6 +685,10 @@ struct SwitchStmt : Stmt {
 struct InterpExpr : Expr {
     std::vector<std::string> literals;
     std::vector<std::unique_ptr<Expr>> exprs;
+    void for_each_child(const ChildFn& f) const override {
+        for (auto& x : exprs)
+            f(*x);
+    }
     void accept(ExprVisitor& v) const override {
         v.visit(*this);
     }

@@ -1443,6 +1443,19 @@ Même principe pour la DESCENTE : chaque nœud composite déclare ses sous-corps
 Un parcours combine les deux mécanismes : `accept`/`visit` pour agir SELON la sorte
 d'instruction, `for_each_body` pour DESCENDRE.
 
+**Les EXPRESSIONS ont le même mécanisme** (`Expr::for_each_child`, ast.h) : chaque nœud
+déclare ses sous-expressions, et `expr_has_lambda` (compiler.cpp) ne pose plus qu'une
+question — « suis-je une `FuncExpr` ? sinon je descends ». C'était une cascade de 58 lignes
+de `dynamic_cast` énumérant les sortes d'expressions à la main, dont le cas final répondait
+« oui » par prudence : `InterpExpr` y manquait, si bien qu'un `"tour {i}"` dans un corps de
+boucle interdisait l'aliasage de la variable et le recyclage des registres, sans rien
+contenir. ⚠ Contrairement à `for_each_body`, elle est **purement virtuelle** : un défaut
+« aucun enfant » ferait taire un parcours au lieu de le rendre prudent — la recherche d'une
+lambda ne la trouverait plus. Une feuille répond donc par un corps vide, ce qui est une
+ligne et énonce le fait. Le corps d'une `FuncExpr` n'est pas un enfant (ce sont des
+instructions) : seules ses valeurs par défaut le sont. Mesuré : `fib`, boucle et map
+inchangés à l'instruction près.
+
 Deux visiteurs l'utilisent :
 - `CollectGlobalsVisitor` : sa méthode `walk` remplace les 8 `visit` qui ne faisaient
   que réénumérer les nœuds composites ; ses `visit` restants ne font plus que collecter.
