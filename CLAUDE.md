@@ -334,7 +334,10 @@ op_EXEMPLE: {
 
 ## Commande `perf`
 
-Quand l'utilisateur dit **"perf"**, lancer : `bash bench/bench_all.sh`
+Quand l'utilisateur dit **"perf"**, lancer la commande `/perf` (`.claude/skills/perf/`), qui
+enchaîne le TEMPS (`bash bench/bench_all.sh`), le TRAVAIL (`bash bench/icount.sh`), la publication
+dans les deux fichiers de `docs/data/` et le commit. Cette section reste la référence de ce que la
+commande doit faire ; le skill ne fait que l'exécuter dans l'ordre.
 
 **Publication des résultats (vue `#/perf`)** : les temps vont dans `docs/data/bench-snapshot.json`,
 qui est **remplacé** à chaque relevé, jamais complété — un temps ne valant que pour une machine
