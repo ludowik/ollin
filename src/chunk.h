@@ -40,6 +40,18 @@ struct ConstKeyHash {
     }
 };
 
+// A switch whose case values are all integers known at compile time: the arm is reached by
+// INDEXING instead of by comparing the subject against each value in turn. `targets` holds one
+// address per value from `base` on.
+struct SwitchTable {
+    int64_t base = 0;
+    std::vector<uint16_t> targets; // one address per value from `base` on; a hole holds else_addr
+    uint16_t else_addr = 0;        // a number that matches no case
+    // Anything that is NOT a number: the comparison chain, kept as a slow path. A subject can be
+    // an instance whose `__eq` decides the match, and only the chain can call it.
+    uint16_t other_addr = 0;
+};
+
 struct Chunk {
     std::vector<Instr> code;
     std::vector<SourceLoc> lines; // parallel to code[] — source file+line per instruction
@@ -53,6 +65,7 @@ struct Chunk {
     uint8_t top_reg_count = 8;
     int current_line_ = 0;
     int current_file_idx_ = 0;
+    std::vector<SwitchTable> switch_tables;
 
     void set_line(int l, int fi = -1) {
         current_line_ = l;

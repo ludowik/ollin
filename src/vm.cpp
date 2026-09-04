@@ -299,6 +299,25 @@ static int64_t range_len(const Range* r) {
 // so the two can never disagree. NOT inlined: it would be pulled into run_goto, whose register
 // allocation is shared by every opcode handler, and the numeric loop measured +2 instructions
 // per turn for it (bench/icount.sh) — a cost paid by code that never uses '#'.
+// One indexed jump instead of one comparison per arm: the compiler builds the table when every
+// case value is an integer known at compile time (see Compiler::switch_table_values). Kept out of
+// run_goto — its locals raised the register pressure of the single function all the handlers live
+// in, which cost 600 000 instructions to the loop benchmark, a script that never runs a switch.
+static __attribute__((noinline)) uint16_t switch_target_slow(const SwitchTable& t, const Value& subj) {
+    if (subj.tag != Value::T_FLOAT)
+        return t.other_addr; // not a number: the comparison chain, which can call an __eq
+    // Equality merges INTEGER and FLOAT, so `4 / 2` — a FLOAT, division always being one — must
+    // reach `case 2` exactly as the chain let it. The span is tested in doubles FIRST, which
+    // makes the cast below well defined.
+    double d = subj.dval;
+    if (d >= (double)t.base && d <= (double)(t.base + (int64_t)t.targets.size() - 1)) {
+        int64_t i = (int64_t)d;
+        if ((double)i == d)
+            return t.targets[(size_t)(i - t.base)];
+    }
+    return t.else_addr;
+}
+
 static __attribute__((noinline)) Value value_len(const Value& v) {
     if (v.is_nil())
         return Value((int64_t)0);
@@ -814,6 +833,7 @@ void VM::run_goto(size_t stop_depth) {
         &&op_SEAL_ENUM,
         &&op_CLOSE_UPVALS,
         &&op_LEN,
+        &&op_SWITCH,
         &&op_HALT,
     };
 
@@ -1437,6 +1457,18 @@ dispatch_loop:
         if (!bv.is_integer())
             throw std::runtime_error(err_line() + ": runtime: ~ requires integer operand");
         regs[base + A] = Value(~bv.as_int());
+        NEXT();
+    }
+
+    op_SWITCH: {
+        const SwitchTable& t = ch->switch_tables[Bx];
+        const Value& subj = regs[base + A];
+        if (subj.is_integer()) {
+            uint64_t idx = (uint64_t)(subj.ival - t.base);
+            ip = idx < t.targets.size() ? t.targets[idx] : t.else_addr;
+        } else {
+            ip = switch_target_slow(t, subj); // a float, or the chain for anything else
+        }
         NEXT();
     }
 

@@ -769,6 +769,98 @@ void Compiler::visit(const IfStmt& s) {
         chunk.patch_jump(p, end_addr);
 }
 
+// The integer values of every case, when they are ALL known at compile time and their span is
+// small enough for a table. An enum member counts, its value having been folded (see
+// fold_enum_member) — which is what makes the table reach the switch one actually writes, on a
+// state or a tile kind rather than on bare numbers. An empty answer means "use the comparison
+// chain": a string, a computed value, a mixture of types, or `case 1` next to `case 1000000`,
+// whose table would hold a million entries for two arms.
+bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out) {
+    static const int64_t MAX_SPAN = 1024;
+    int64_t lo = INT64_MAX;
+    int64_t hi = INT64_MIN;
+    size_t count = 0;
+    out.clear();
+    out.resize(s.cases.size());
+    for (size_t ai = 0; ai < s.cases.size(); ++ai) {
+        for (auto& ve : s.cases[ai].values) {
+            Value v;
+            if (!literal_value(*ve, v) && !fold_enum_member(*ve, v))
+                return false;
+            if (!v.is_integer())
+                return false;
+            out[ai].push_back(v.ival);
+            lo = v.ival < lo ? v.ival : lo;
+            hi = v.ival > hi ? v.ival : hi;
+            ++count;
+        }
+    }
+    if (count == 0)
+        return false;
+    return hi - lo < MAX_SPAN; // the subtraction is safe: both bounds come from the same table
+}
+
+// The table path: the subject is evaluated once, then a single indexed jump reaches the arm.
+// The comparison chain is still emitted, AFTER the arms, and serves a subject that is not a
+// number — an instance whose `__eq` decides the match reached its arm before, and only the chain
+// can call that method. It is never executed for a number, so the fast case pays nothing.
+void Compiler::compile_switch_table(const SwitchStmt& s, int subj_r, int above_subj,
+                                    const std::vector<std::vector<int64_t>>& values) {
+    int64_t lo = INT64_MAX;
+    int64_t hi = INT64_MIN;
+    for (auto& arm : values)
+        for (int64_t v : arm) {
+            lo = v < lo ? v : lo;
+            hi = v > hi ? v : hi;
+        }
+
+    uint16_t table_idx = (uint16_t)chunk.switch_tables.size();
+    chunk.switch_tables.push_back({lo, std::vector<uint16_t>((size_t)(hi - lo) + 1, 0), 0, 0});
+    chunk.emit(make_abx((uint8_t)Op::SWITCH, (uint8_t)subj_r, table_idx));
+
+    std::vector<size_t> end_patches;
+    std::vector<uint16_t> arm_addr(values.size());
+    for (size_t ai = 0; ai < s.cases.size(); ++ai) {
+        arm_addr[ai] = (uint16_t)chunk.current_pos();
+        reg_top_ = above_subj;
+        compile_block(s.cases[ai].body);
+        end_patches.push_back(chunk.emit_jump(Op::JUMP));
+    }
+
+    uint16_t other_addr = (uint16_t)chunk.current_pos();
+    for (size_t ai = 0; ai < values.size(); ++ai)
+        for (int64_t v : values[ai]) {
+            reg_top_ = above_subj;
+            int val_r = alloc_reg();
+            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.add_constant(Value(v))));
+            int cond_r = alloc_reg();
+            chunk.emit(make_abc((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
+            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+            chunk.patch_jump(chunk.emit_jump(Op::JUMP), arm_addr[ai]);
+            chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
+        }
+
+    uint16_t else_addr = (uint16_t)chunk.current_pos();
+    reg_top_ = above_subj;
+    compile_block(s.else_body);
+
+    uint16_t end_addr = (uint16_t)chunk.current_pos();
+    for (size_t p : end_patches)
+        chunk.patch_jump(p, end_addr);
+
+    SwitchTable& t = chunk.switch_tables[table_idx];
+    t.else_addr = else_addr;
+    t.other_addr = other_addr;
+    for (auto& e : t.targets)
+        e = else_addr; // a hole in the span is a number matching no case, so the else body
+    for (size_t ai = 0; ai < values.size(); ++ai)
+        for (int64_t v : values[ai]) {
+            uint16_t& slot = t.targets[(size_t)(v - lo)];
+            if (slot == else_addr)
+                slot = arm_addr[ai]; // a value repeated across arms belongs to the FIRST, as the chain gave it
+        }
+}
+
 void Compiler::visit(const SwitchStmt& s) {
     note_line(s.line, s.file_idx);
 
@@ -785,6 +877,16 @@ void Compiler::visit(const SwitchStmt& s) {
     std::vector<size_t> end_patches;
     break_patches.push_back(
         {{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
+
+    std::vector<std::vector<int64_t>> table_values;
+    if (switch_table_values(s, table_values)) {
+        compile_switch_table(s, subj_r, above_subj, table_values);
+        for (size_t p : break_patches.back().patches)
+            chunk.patch_jump(p, (uint16_t)chunk.current_pos());
+        break_patches.pop_back();
+        reg_top_ = saved;
+        return;
+    }
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;

@@ -607,9 +607,51 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 
 **Destructuration multi-retour : UN seul chemin, deux appelants.** `var a, b = f()` (`visit(VarDeclStmt)`) et `a, b = f()` (`visit(MultiAssignStmt)`) émettent la même séquence — appel compilé à une base connue, `MOVE_RESULTS` si l'appel a produit ses valeurs ailleurs, puis `SPREAD_RESULTS`. La réaffectation ne l'avait pas : elle ne comptait qu'une valeur et les cibles suivantes lisaient les temporaires voisins, donc des valeurs décalées (`a, b, c = f()` donnait `1, 1, 2` pour un retour `1, 2, 3`). Toute nouvelle forme de cible doit passer par ce chemin, pas le réinventer.
 | LEN           | AB     | A=dst, B=src               | `R[A] = longueur de R[B]` — l'opérateur `#`, un opcode et non un appel à `len` par nom (un `var len` du script l'interceptait) |
+| SWITCH        | ABx    | A=sujet, Bx=table          | saut indexé par l'entier de `R[A]` dans `chunk.switch_tables[Bx]` (cf. « Table de sauts du `switch` ») |
 | SEAL_ENUM     | A      | A=map                      | `R[A].kind = ENUM` — la map devient constante (cf. « Type enum ») |
 | CLOSE_UPVALS  | A      | A=premier registre          | ferme les upvalues ouvertes dont `reg_idx >= A` (fin d'itération de boucle) |
 | HALT          | —      |                            | arrêt                                            |
+
+## Table de sauts du `switch`
+
+Un `switch` était une **chaîne de comparaisons** : atteindre la n-ième branche coûtait n
+comparaisons. Mesuré sur 200 000 tours et huit branches — 99,8 M d'instructions quand la
+PREMIÈRE branche correspond, **284,6 M quand c'est la dernière**, soit **132 instructions par
+branche écartée**.
+
+Quand toutes les valeurs des `case` sont des **entiers connus à la compilation**, le compilateur
+range les adresses des branches dans `chunk.switch_tables` et émet un seul `SWITCH` : le coût ne
+dépend plus de la branche touchée (81,0 M dans les deux cas, et **3,5× plus rapide en temps** sur
+2 M de tours : 0,289 s → 0,083 s). Un membre d'enum compte comme un entier connu, ses valeurs
+étant figées (cf. « Type enum ») — c'est ce qui fait que la table atteint le `switch` qu'on écrit
+vraiment, sur un état ou une sorte de tuile, et non seulement sur des nombres nus.
+
+**La chaîne est TOUJOURS émise, après les branches, et sert de chemin lent.** Elle n'est pas un
+reste : un sujet peut être une instance dont `__eq` décide de la correspondance, et seule la
+chaîne peut appeler cette méta-méthode. Vérifié dans les deux sens en comparant les deux binaires
+— une instance `Num(2)` atteignait `case 2` avant, et l'atteint toujours ; sans le chemin lent
+elle tombait dans le `else`. Un nombre n'y passe jamais, donc le cas rapide ne paie rien.
+
+Trois destinations, et pas une seule : `targets[v - base]` pour un entier de l'intervalle,
+`else_addr` pour un nombre hors intervalle ou dans un TROU de l'intervalle (une valeur sans
+branche), `other_addr` — la chaîne — pour tout ce qui n'est pas un nombre. Deux points appris à
+la mesure : un sujet FLOTTANT entier doit trouver sa branche (`4 / 2` est un flottant, la division
+en produisant toujours un, et l'égalité confond INTEGER et FLOAT — la première version le
+renvoyait au `else`), et une valeur répétée dans deux branches appartient à la PREMIÈRE, comme la
+chaîne le donnait.
+
+**Repli** (la chaîne seule, sans table) : une valeur non entière, une valeur calculée, un mélange
+de types, ou un intervalle de plus de 1024 entrées — `case 1` à côté de `case 1000000` demanderait
+un million de cases pour deux branches. Le repli est silencieux et correct.
+
+⚠ **Le coût d'un opcode de plus est STRUCTUREL, et il ne vient pas du gestionnaire.** La boucle
+gagne 600 000 instructions (+1,9 %) alors qu'elle n'exécute jamais un `switch`. Ce n'est pas le
+placement du code : les cinq positions essayées donnent le même chiffre à l'instruction près, et
+sortir le calcul dans une fonction séparée coûte davantage (+900 000). La preuve est un
+**gestionnaire VIDE ajouté à la version d'avant : +900 000 sur la même boucle**, soit plus que le
+vrai. La cause est l'allocation de registres de `run_goto`, partagée par tous les gestionnaires
+(même mécanisme que pour `LEN`, où déplacer suffisait). En temps : boucle +2,5 %, `fib` +1,6 %,
+contre 3,5× sur le `switch`.
 
 ## Module `ui` (implémentation)
 
