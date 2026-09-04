@@ -4,7 +4,6 @@
 #include <stdexcept>
 #include <unordered_set>
 
-
 int Compiler::resolve_upvalue(const std::string& name) {
     auto it = cur_upval_idx_.find(name);
     if (it != cur_upval_idx_.end())
@@ -81,22 +80,6 @@ static Value eval_constant(const Expr& e, const std::vector<std::string>& files,
     throw std::runtime_error(loc.str(files) + ": default values must be literal constants (not a runtime expression)");
 }
 
-static Op char_to_op(char op) {
-    switch (op) {
-    case '+':
-        return Op::ADD;
-    case '-':
-        return Op::SUB;
-    case '*':
-        return Op::MUL;
-    case '/':
-        return Op::DIV;
-    case '%':
-        return Op::MOD;
-    default:
-        throw std::runtime_error(std::string("unknown assign op: ") + op);
-    }
-}
 static Op token_to_op(TokenType op) {
     switch (op) {
     case TokenType::PLUS_EQUAL:
@@ -194,17 +177,18 @@ struct CollectLocalsVisitor : StmtQuery {
     const std::vector<std::string>& files;
     std::unordered_set<std::string>* funcs; // the names of the local functions, bound straight away, when asked for
 
-    CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen,
-                         bool collect_funcs, const std::vector<std::string>& files,
-                         std::unordered_set<std::string>* funcs)
-        : out(out), seen(seen), collect_funcs(collect_funcs), files(files), funcs(funcs) {}
+    CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen, bool collect_funcs,
+                         const std::vector<std::string>& files, std::unordered_set<std::string>* funcs)
+        : out(out), seen(seen), collect_funcs(collect_funcs), files(files), funcs(funcs) {
+    }
 
     void visit(const VarDeclStmt& s) override {
         if (!s.is_global) { // 'global' goes to the globals table, with no register;
                             // 'constant' is an ordinary local, immutable at compile time
             for (auto& n : s.names) {
                 if (!seen.insert(n).second) {
-                    throw std::runtime_error(s.sloc().str(files) + ": local variable '" + n + "' already declared in this scope");
+                    throw std::runtime_error(s.sloc().str(files) + ": local variable '" + n +
+                                             "' already declared in this scope");
                 }
                 out.push_back(n);
             }
@@ -220,19 +204,27 @@ struct CollectLocalsVisitor : StmtQuery {
     }
     // User blocks have strict lexical scope, so we do not descend: each block's locals are
     // collected separately in compile_block.
-    void visit(const ForIterStmt&) override {}
-    void visit(const WhileStmt&) override {}
-    void visit(const IfStmt&) override {}
-    void visit(const TryCatchStmt&) override {}
-    void visit(const DoStmt&) override {}
-    void visit(const SwitchStmt&) override {}
+    void visit(const ForIterStmt&) override {
+    }
+    void visit(const WhileStmt&) override {
+    }
+    void visit(const IfStmt&) override {
+    }
+    void visit(const TryCatchStmt&) override {
+    }
+    void visit(const DoStmt&) override {
+    }
+    void visit(const SwitchStmt&) override {
+    }
     // A BlockStmt is an internal container (import) with no scope of its own, so descend.
-    void visit(const BlockStmt& s) override { run(s.stmts); }
+    void visit(const BlockStmt& s) override {
+        run(s.stmts);
+    }
 };
 
 static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
-                          const std::vector<std::string>& files, bool collect_funcs = true,
-                          std::unordered_set<std::string>* funcs = nullptr) {
+                           const std::vector<std::string>& files, bool collect_funcs = true,
+                           std::unordered_set<std::string>* funcs = nullptr) {
     std::unordered_set<std::string> seen(out.begin(), out.end());
     CollectLocalsVisitor v(out, seen, collect_funcs, files, funcs);
     v.run(stmts);
@@ -247,7 +239,8 @@ struct CollectGlobalsVisitor : StmtQuery {
 
     CollectGlobalsVisitor(std::unordered_set<std::string>& out, std::unordered_set<std::string>& enums,
                           const std::vector<std::string>& files)
-        : out(out), enums(enums), files(files) {}
+        : out(out), enums(enums), files(files) {
+    }
 
     // The tree's topology is declared by the nodes themselves (Stmt::for_each_body, ast.h)
     // rather than re-enumerated here, so a new statement with a body is walked without touching
@@ -255,9 +248,7 @@ struct CollectGlobalsVisitor : StmtQuery {
     void walk(const std::vector<std::unique_ptr<Stmt>>& stmts) {
         for (auto& s : stmts) {
             s->accept(*this);
-            s->for_each_body([this](const std::vector<std::unique_ptr<Stmt>>& sub) {
-                walk(sub);
-            });
+            s->for_each_body([this](const std::vector<std::unique_ptr<Stmt>>& sub) { walk(sub); });
         }
     }
 
@@ -282,7 +273,7 @@ struct CollectGlobalsVisitor : StmtQuery {
 };
 
 static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::unordered_set<std::string>& out,
-                           std::unordered_set<std::string>& enums, const std::vector<std::string>& files) {
+                            std::unordered_set<std::string>& enums, const std::vector<std::string>& files) {
     CollectGlobalsVisitor v(out, enums, files);
     v.walk(stmts);
 }
@@ -290,7 +281,7 @@ static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std
 void Compiler::compile_into(const Expr& e, int dest) {
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                           chunk.add_constant(n->is_integer ? Value(n->ival) : num_value(n->value))));
+                            chunk.add_constant(n->is_integer ? Value(n->ival) : num_value(n->value))));
     } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(Value(s->value))));
     } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
@@ -306,10 +297,8 @@ void Compiler::compile_into(const Expr& e, int dest) {
         int saved = reg_top_;
         bin->left->accept(*this);
         int r_l = last_reg_;
-        if (reg_top_ <= r_l)   // protects r_l from a 0-argument call (see visit(BinaryExpr))
-            reg_top_ = r_l + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        if (reg_top_ <= r_l) // protects r_l from a 0-argument call (see visit(BinaryExpr))
+            reserve_regs_to(r_l + 1);
         bin->right->accept(*this);
         int r_r = last_reg_;
         chunk.emit(make_abc((uint8_t)binary_arith_opcode(bin->op), (uint8_t)dest, (uint8_t)r_l, (uint8_t)r_r));
@@ -343,18 +332,17 @@ Chunk Compiler::compile(const Program& prog) {
         declared_globals_.insert(n);
     declared_globals_.insert("deltaTime");
     declared_globals_.insert("elapsedTime");
-    declared_globals_.insert("W");   // the width of the render area, window.width by default
-    declared_globals_.insert("H");   // the height of the render area, window.height by default
-    declared_globals_.insert("CX");  // the render area's centre X (W / 2)
-    declared_globals_.insert("CY");  // the render area's centre Y (H / 2)
+    declared_globals_.insert("W");  // the width of the render area, window.width by default
+    declared_globals_.insert("H");  // the height of the render area, window.height by default
+    declared_globals_.insert("CX"); // the render area's centre X (W / 2)
+    declared_globals_.insert("CY"); // the render area's centre Y (H / 2)
     // Pre-scan all top-level var/for declarations → registers (like Lua's local in main chunk)
     // collect_funcs=false: top-level functions are in func_table, not in local registers
     std::vector<std::string> top_locals;
     collect_locals(prog.stmts, top_locals, chunk.source_files, false);
     bind_scan_locals(top_locals, {}); // collect_funcs=false: no function here, everything is deferred
     locals_top_ = reg_top_;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    bump_reg_count();
 
     for (auto& s : prog.stmts)
         s->accept(*this);
@@ -362,13 +350,12 @@ Chunk Compiler::compile(const Program& prog) {
     // script needing more than 255 of them was silently truncated.
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": top-level code uses more than 255 registers");
-    chunk.top_reg_count = (uint8_t)std::max(reg_count_, 8);
+    chunk.top_reg_count = (uint8_t)reg_count_; // reg_count_ starts at 8 and only ever grows
     chunk.emit(make_bx((uint8_t)Op::HALT, 0));
     if (chunk.code.size() > 65535)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": program too large (> 65535 instructions)");
     return std::move(chunk);
 }
-
 
 // True when the expression is a call, in any form. Used by multi-return destructuring, which
 // must read several values from the call base.
@@ -394,7 +381,7 @@ void Compiler::visit(const VarDeclStmt& s) {
     auto activate_local = [&](const std::string& name) -> int {
         auto it = pending_var_reg_.find(name);
         if (it == pending_var_reg_.end())
-            return local_regs_.at(name);   // already active
+            return local_regs_.at(name); // already active
         int reg = it->second;
         pending_var_reg_.erase(it);
         local_regs_[name] = reg;
@@ -419,12 +406,12 @@ void Compiler::visit(const VarDeclStmt& s) {
             // var a, b = ... gives n varargs at base, nil-padded, with last_results_ = n
             chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n, 0));
         } else {
-            s.values[0]->accept(*this);   // a call: k return values, last_results_ = k
-            if (last_reg_ != base)   // the call itself spread, so recompose at base
+            s.values[0]->accept(*this); // a call: k return values, last_results_ = k
+            if (last_reg_ != base)      // the call itself spread, so recompose at base
                 chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)base, (uint8_t)last_reg_, 0));
         }
         if (base + n > reg_count_)
-            reg_count_ = base + n;   // these registers are live, read just below
+            reg_count_ = base + n; // these registers are live, read just below
         // Nil out the targets beyond what the call returned (k < n): otherwise they would read
         // stale registers, and `var a, b = len(x)` must leave b nil.
         chunk.emit(make_abc((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n, 0));
@@ -432,7 +419,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             if (s.is_global) {
                 chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.add_identifier(s.names[i])));
             } else {
-                int dest = activate_local(s.names[i]);   // the call is compiled, so this is safe
+                int dest = activate_local(s.names[i]); // the call is compiled, so this is safe
                 if (base + i != dest)
                     chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(base + i), 0));
             }
@@ -478,15 +465,16 @@ void Compiler::visit(const VarDeclStmt& s) {
             const_names_.insert(n);
 }
 
-static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body);   // defined below
+static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body); // defined below
 
 void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
-                              const std::unordered_set<std::string>& skip) {
+                                const std::unordered_set<std::string>& skip) {
     for (auto& name : names) {
         if (skip.count(name))
             continue; // the current scope's prologue (a parameter, self, a catch variable): already bound
         if (funcs.count(name))
-            local_regs_[name] = reg_top_++;      // a local function is visible straight away, for recursion and forward references
+            local_regs_[name] =
+                reg_top_++; // a local function is visible straight away, for recursion and forward references
         else
             pending_var_reg_[name] = reg_top_++; // var and const are deferred until their declaration
     }
@@ -504,20 +492,26 @@ static int keep_captured_regs(const std::vector<std::unique_ptr<Stmt>>& body, in
     return loop_vars_top > reg_top_after_body ? loop_vars_top : reg_top_after_body;
 }
 
-void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body) {
+void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& pre_bound,
+                             int pre_bound_reg) {
     auto saved_regs = local_regs_;
     auto saved_pending = pending_var_reg_;
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
+    static const std::unordered_set<std::string> no_skip;
+    std::unordered_set<std::string> skip;
+    if (!pre_bound.empty()) {
+        local_regs_[pre_bound] = pre_bound_reg;
+        skip.insert(pre_bound);
+    }
     std::vector<std::string> block_locals;
     std::unordered_set<std::string> block_funcs;
     collect_locals(body, block_locals, chunk.source_files, true, &block_funcs);
-    bind_scan_locals(block_locals, block_funcs);
+    bind_scan_locals(block_locals, block_funcs, pre_bound.empty() ? no_skip : skip);
     int block_locals_top = reg_top_;
     locals_top_ = block_locals_top;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    bump_reg_count();
 
     for (auto& stmt : body) {
         int s = reg_top_;
@@ -596,13 +590,12 @@ void Compiler::visit(const SwitchStmt& s) {
     // so without this guard evaluating the 'case' values would reallocate over the subject and
     // the wrong branch would be taken. `switch f()` is the case in point.
     if (reg_top_ <= subj_r)
-        reg_top_ = subj_r + 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+        reserve_regs_to(subj_r + 1);
     int above_subj = reg_top_; // subj_r stays live through every arm
 
     std::vector<size_t> end_patches;
-    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
+    break_patches.push_back(
+        {{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
 
     for (auto& arm : s.cases) {
         std::vector<size_t> body_patches;
@@ -614,7 +607,7 @@ void Compiler::visit(const SwitchStmt& s) {
             arm.values[vi]->accept(*this);
             int val_r = last_reg_;
             int cond_r = alloc_reg(); // alloc_reg() updates reg_count_
-            reg_top_ = above_subj;   // frees the temporary after EQ
+            reg_top_ = above_subj;    // frees the temporary after EQ
             chunk.emit(make_abc((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
             if (!is_last) {
                 size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
@@ -686,13 +679,11 @@ void Compiler::visit(const ContinueStmt& s) {
 void Compiler::visit(const AssignStmt& s) {
     note_line(s.line, s.file_idx);
     if (const_names_.count(s.name))
-        throw std::runtime_error(SourceLoc{(uint16_t)s.file_idx, (uint16_t)(s.line > 0 ? s.line : current_line_)}.str(chunk.source_files) +
-                                 ": cannot assign to const '" + s.name + "'");
+        throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     // Also block assignment when name is a constant captured from an outer scope
     for (auto& scope : outer_scopes_)
         if (scope.consts.count(s.name))
-            throw std::runtime_error(SourceLoc{(uint16_t)s.file_idx, (uint16_t)(s.line > 0 ? s.line : current_line_)}.str(chunk.source_files) +
-                                     ": cannot assign to const '" + s.name + "'");
+            throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     {
         auto it = local_regs_.find(s.name);
         if (it != local_regs_.end()) {
@@ -705,7 +696,7 @@ void Compiler::visit(const AssignStmt& s) {
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 // Emit op directly into dest — safe: rhs is already in a register
-                chunk.emit(make_abc((uint8_t)char_to_op(s.op), (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs));
+                chunk.emit(make_abc((uint8_t)binary_arith_opcode(s.op), (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs));
                 reg_top_ = saved;
             }
             return;
@@ -725,9 +716,8 @@ void Compiler::visit(const AssignStmt& s) {
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 int res = alloc_reg();
-                if (reg_top_ > reg_count_)
-                    reg_count_ = reg_top_;
-                chunk.emit(make_abc((uint8_t)char_to_op(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
+                bump_reg_count();
+                chunk.emit(make_abc((uint8_t)binary_arith_opcode(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
                 chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)res, (uint8_t)uv, 0));
             }
             reg_top_ = saved;
@@ -746,17 +736,15 @@ void Compiler::visit(const AssignStmt& s) {
             s.value->accept(*this);
             int rhs = last_reg_;
             int res = alloc_reg();
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
-            chunk.emit(make_abc((uint8_t)char_to_op(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
+            bump_reg_count();
+            chunk.emit(make_abc((uint8_t)binary_arith_opcode(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
             chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res, chunk.add_identifier(s.name)));
         }
         reg_top_ = saved;
         return;
     }
     // Global scope — assignment without var/global is not allowed
-    throw std::runtime_error(SourceLoc{(uint16_t)s.file_idx, (uint16_t)(s.line > 0 ? s.line : current_line_)}.str(chunk.source_files) + ": undeclared variable '" +
-                             s.name + "' (use 'var' or 'global')");
+    throw std::runtime_error(where(s) + ": undeclared variable '" + s.name + "' (use 'var' or 'global')");
 }
 
 void Compiler::visit(const ExprStmt& s) {
@@ -783,8 +771,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     int catch_r = 0;
     if (!s.catch_var.empty()) {
         catch_r = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        bump_reg_count();
     }
 
     size_t try_patch = chunk.emit_jump(Op::TRY, (uint8_t)catch_r);
@@ -798,36 +785,8 @@ void Compiler::visit(const TryCatchStmt& s) {
 
     chunk.patch_jump(try_patch, (uint16_t)chunk.current_pos());
 
-    // Catch block: catch_var is bound to catch_r, other locals are scoped as usual.
-    {
-        auto saved_regs = local_regs_;
-        auto saved_pending = pending_var_reg_;
-        int saved_top2 = reg_top_;
-        int saved_locals = locals_top_;
-        if (!s.catch_var.empty())
-            local_regs_[s.catch_var] = catch_r;
-        std::vector<std::string> catch_ls;
-        std::unordered_set<std::string> catch_funcs;
-        collect_locals(s.catch_body, catch_ls, chunk.source_files, true, &catch_funcs);
-        std::unordered_set<std::string> catch_skip;
-        if (!s.catch_var.empty())
-            catch_skip.insert(s.catch_var);
-        bind_scan_locals(catch_ls, catch_funcs, catch_skip);
-        int catch_top = reg_top_;
-        locals_top_ = catch_top;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        for (auto& stmt : s.catch_body) {
-            int sv = reg_top_;
-            stmt->accept(*this);
-            reg_top_ = sv;
-        }
-        bool catch_has_func = body_has_func(s.catch_body);
-        local_regs_ = std::move(saved_regs);
-        pending_var_reg_ = std::move(saved_pending);
-        reg_top_ = catch_has_func ? catch_top : saved_top2;
-        locals_top_ = saved_locals;
-    }
+    // Catch block: catch_var keeps catch_r, other locals are scoped as usual.
+    compile_block(s.catch_body, s.catch_var, catch_r);
 
     size_t end_patch = chunk.emit_jump(Op::JUMP);
     chunk.patch_jump(else_patch, (uint16_t)chunk.current_pos());
@@ -838,100 +797,111 @@ void Compiler::visit(const TryCatchStmt& s) {
         reg_top_ = saved_top;
 }
 
-void Compiler::visit(const FuncDeclStmt& s) {
-    note_line(s.line, s.file_idx);
-    // Save outer context
-    auto outer_regs = std::move(local_regs_);
-    auto outer_pending = std::move(pending_var_reg_);
-    auto outer_upvals = std::move(cur_upval_idx_);
-    int outer_top = reg_top_;
-    int outer_count = reg_count_;
-    int outer_locals = locals_top_;
-    auto outer_name = current_func_name;
-    int outer_fidx = current_func_idx_;
-    bool is_nested = !outer_name.empty(); // declared inside another function
+Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
+    : c(comp), regs(std::move(comp.local_regs_)), pending(std::move(comp.pending_var_reg_)),
+      upvals(std::move(comp.cur_upval_idx_)), consts(comp.const_names_), top(comp.reg_top_), count(comp.reg_count_),
+      locals(comp.locals_top_), fidx(comp.current_func_idx_), name(comp.current_func_name) {
+    c.outer_scopes_.push_back({regs, upvals, consts, fidx}); // for upvalue resolution
+    c.try_floors_.push_back(c.try_depth_);                   // this body's returns are relative to HERE
+    c.const_names_.clear();
+    c.current_func_name = fname;
+    c.cur_upval_idx_.clear();
+    c.local_regs_.clear();
+    c.pending_var_reg_.clear();
+    c.reg_top_ = 0;
+    c.reg_count_ = 0;
+    c.locals_top_ = 0;
+}
 
-    auto outer_consts = const_names_; // copy (not move) — stays in OuterScope too
-    const_names_.clear();
+Compiler::FuncScope::~FuncScope() {
+    c.outer_scopes_.pop_back();
+    c.try_floors_.pop_back();
+    c.local_regs_ = std::move(regs);
+    c.pending_var_reg_ = std::move(pending);
+    c.cur_upval_idx_ = std::move(upvals);
+    c.const_names_ = std::move(consts);
+    c.reg_top_ = top;
+    c.reg_count_ = count;
+    c.locals_top_ = locals;
+    c.current_func_name = name;
+    c.current_func_idx_ = fidx;
+}
 
-    // Push outer scope for upvalue resolution
-    outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
-    try_floors_.push_back(try_depth_);   // this body's returns are relative to HERE
+uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<std::string>& params,
+                                    const std::vector<std::unique_ptr<Expr>>& defaults,
+                                    const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
+                                    bool with_self, SourceLoc defaults_loc,
+                                    const std::function<void(uint8_t)>& on_registered) {
+    FuncScope scope(*this, name);
 
-    current_func_name = s.name;
-    cur_upval_idx_.clear();
-    local_regs_.clear();
-    pending_var_reg_.clear();
-    reg_top_ = 0;
-    reg_count_ = 0;
-    locals_top_ = 0;
-
-    // Assign parameter registers
-    int n_fixed = (int)s.params.size();
-    for (int i = 0; i < n_fixed; ++i)
-        local_regs_[s.params[i]] = i;
+    // Instance method: self in R[0], parameters from R[1]. Otherwise parameters from R[0].
+    int n_params = (int)params.size();
+    int first = with_self ? 1 : 0;
+    int n_fixed = n_params + first;
+    if (with_self)
+        local_regs_["self"] = 0;
+    for (int i = 0; i < n_params; ++i)
+        local_regs_[params[i]] = i + first;
     reg_top_ = n_fixed;
 
-    // Pre-scan body for all var declarations and for-loop variables
-    // Seed with param names so redeclaring a param with 'var' is caught
-    std::vector<std::string> body_locals(s.params.begin(), s.params.end());
+    // The prologue names seed the pre-scan, so redeclaring a parameter with 'var' is caught, and
+    // they go in `skip` because they already have their register.
+    std::vector<std::string> body_locals;
+    std::unordered_set<std::string> skip(params.begin(), params.end());
+    if (with_self) {
+        body_locals.push_back("self");
+        skip.insert("self");
+    }
+    body_locals.insert(body_locals.end(), params.begin(), params.end());
     std::unordered_set<std::string> body_funcs;
-    collect_locals(s.body, body_locals, chunk.source_files, true, &body_funcs);
-    bind_scan_locals(body_locals, body_funcs, {s.params.begin(), s.params.end()});
+    collect_locals(body, body_locals, chunk.source_files, true, &body_funcs);
+    bind_scan_locals(body_locals, body_funcs, skip);
     locals_top_ = reg_top_;
     reg_count_ = reg_top_;
 
-    // Emit jump over function body
-    size_t jump_patch = chunk.emit_jump(Op::JUMP);
+    size_t jump_patch = chunk.emit_jump(Op::JUMP); // over the body, which is inlined here
     uint32_t func_addr = (uint32_t)chunk.current_pos();
 
-    // Build default values
+    // Defaults: for an instance method index 0 is self, which has none.
     std::vector<Value> defs(n_fixed);
-    for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? eval_constant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
+    for (int i = 0; i < n_params; ++i)
+        defs[i + first] = (i < (int)defaults.size() && defaults[i])
+                              ? eval_constant(*defaults[i], chunk.source_files, defaults_loc)
+                              : Value{};
     uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
 
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
+    FuncProto fp{func_addr, (uint8_t)n_fixed, variadic, is_static, defaults_idx, 0, {}};
     uint8_t func_idx = chunk.add_func(fp);
     current_func_idx_ = func_idx;
+    if (on_registered)
+        on_registered(func_idx);
 
-    bool outer_has_vars = !outer_scopes_.back().regs.empty();
-
-    if (!is_nested) {
-        // Top-level function: pre-registered in func_table so recursive calls are optimized
-        // (CALL_DYN instead of CALL_FUNC when the function may be a closure)
-        func_table[s.name] = FuncInfo{func_idx, n_fixed, s.variadic, outer_has_vars};
-    }
-    // Nested functions get no func_table entry: they live in a local register.
-
-    // Compile body
-    for (auto& stmt : s.body) {
+    for (auto& stmt : body) {
         int saved = reg_top_;
         stmt->accept(*this);
         reg_top_ = saved;
     }
     emit_implicit_return(chunk); // an implicit void return, omitted when the body already ends with RETURN
 
-    // Update reg_count in FuncProto
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
     chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
-
-    // Patch jump over body
     chunk.patch_jump(jump_patch, (uint16_t)chunk.current_pos());
+    return func_idx;
+}
 
-    // Pop scope and restore outer context
-    outer_scopes_.pop_back();
-    try_floors_.pop_back();
-    local_regs_ = std::move(outer_regs);
-    pending_var_reg_ = std::move(outer_pending);
-    cur_upval_idx_ = std::move(outer_upvals);
-    const_names_ = std::move(outer_consts);
-    reg_top_ = outer_top;
-    reg_count_ = outer_count;
-    locals_top_ = outer_locals;
-    current_func_name = outer_name;
-    current_func_idx_ = outer_fidx;
+void Compiler::visit(const FuncDeclStmt& s) {
+    note_line(s.line, s.file_idx);
+    bool is_nested = in_function(); // declared inside another function
+    uint8_t func_idx =
+        compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, false, false, s.sloc(), [&](uint8_t idx) {
+            // Top-level function: pre-registered in func_table so recursive calls are optimized
+            // (CALL_DYN instead of CALL_FUNC when the function may be a closure). A nested one
+            // gets no entry: it lives in a local register.
+            if (!is_nested)
+                func_table[s.name] =
+                    FuncInfo{idx, (int)s.params.size(), s.variadic, !outer_scopes_.back().regs.empty()};
+        });
 
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
@@ -939,123 +909,37 @@ void Compiler::visit(const FuncDeclStmt& s) {
         // Nested function: stored in the local register pre-allocated by collect_locals, with no
         // func_table entry and no access to globals.
         int dest = local_regs_.at(s.name);
-        if (has_upvals) {
-            chunk.emit(make_abx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)dest, func_idx));
-        } else {
-            chunk.emit(make_abx((uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
-        }
-    } else if (has_upvals) {
-        // Top-level closure: MAKE_CLOSURE then STORE_GLOBAL
-        func_table[s.name].is_closure = true;
-        int tmp = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        chunk.emit(make_abx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)tmp, func_idx));
-        chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.add_identifier(s.name)));
-        reg_top_--;
-    } else {
-        // Top-level non-closure: LOAD_FUNC then STORE_GLOBAL. Needed even without outer
-        // variables, so that get_global("draw") works (the WASM auto-detection) and so the
-        // function is reachable as a value.
-        func_table[s.name].is_closure = false;
-        int tmp = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        chunk.emit(make_abx((uint8_t)Op::LOAD_FUNC, (uint8_t)tmp, func_idx));
-        chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.add_identifier(s.name)));
-        reg_top_--;
+        chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
+        return;
     }
+    // Top level: LOAD_FUNC (or MAKE_CLOSURE) then STORE_GLOBAL. Needed even without outer
+    // variables, so that get_global("draw") works (the WASM auto-detection) and so the function
+    // is reachable as a value.
+    func_table[s.name].is_closure = has_upvals;
+    int tmp = alloc_reg();
+    chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)tmp, func_idx));
+    chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.add_identifier(s.name)));
+    reg_top_--;
 }
 
 void Compiler::visit(const FuncExpr& s) {
-    auto outer_regs = std::move(local_regs_);
-    auto outer_pending = std::move(pending_var_reg_);
-    auto outer_upvals = std::move(cur_upval_idx_);
-    int outer_top = reg_top_;
-    int outer_count = reg_count_;
-    int outer_locals = locals_top_;
-    auto outer_name = current_func_name;
-    int outer_fidx = current_func_idx_;
-    auto outer_consts = const_names_;
-    const_names_.clear();
-
-    outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
-    try_floors_.push_back(try_depth_);   // this body's returns are relative to HERE
-
-    current_func_name = "<lambda>";
-    cur_upval_idx_.clear();
-    local_regs_.clear();
-    pending_var_reg_.clear();
-    reg_top_ = 0;
-    reg_count_ = 0;
-    locals_top_ = 0;
-
-    int n_fixed = (int)s.params.size();
-    for (int i = 0; i < n_fixed; ++i)
-        local_regs_[s.params[i]] = i;
-    reg_top_ = n_fixed;
-
-    std::vector<std::string> body_locals(s.params.begin(), s.params.end());
-    std::unordered_set<std::string> body_funcs;
-    collect_locals(s.body, body_locals, chunk.source_files, true, &body_funcs);
-    bind_scan_locals(body_locals, body_funcs, {s.params.begin(), s.params.end()});
-    locals_top_ = reg_top_;
-    reg_count_ = reg_top_;
-
-    size_t jump_patch = chunk.emit_jump(Op::JUMP);
-    uint32_t func_addr = (uint32_t)chunk.current_pos();
-
-    std::vector<Value> defs(n_fixed);
-    for (int i = 0; i < n_fixed; ++i)
-        defs[i] = (i < (int)s.defaults.size() && s.defaults[i]) ? eval_constant(*s.defaults[i], chunk.source_files, SourceLoc{(uint16_t)current_file_idx_, (uint16_t)s.line}) : Value{};
-    uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
-
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, false, defaults_idx, 0, {}};
-    uint8_t func_idx = chunk.add_func(fp);
-    current_func_idx_ = func_idx;
-
-    for (auto& stmt : s.body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
-    emit_implicit_return(chunk);
-    if (reg_count_ > 255)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
-    chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
-    chunk.patch_jump(jump_patch, (uint16_t)chunk.current_pos());
-
-    outer_scopes_.pop_back();
-    try_floors_.pop_back();
-    local_regs_ = std::move(outer_regs);
-    pending_var_reg_ = std::move(outer_pending);
-    cur_upval_idx_ = std::move(outer_upvals);
-    const_names_ = std::move(outer_consts);
-    reg_top_ = outer_top;
-    reg_count_ = outer_count;
-    locals_top_ = outer_locals;
-    current_func_name = outer_name;
-    current_func_idx_ = outer_fidx;
-
+    uint8_t func_idx = compile_func_body("<lambda>", s.params, s.defaults, s.body, s.variadic, false, false, s.sloc());
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
-    int dest = reg_top_++;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    int dest = alloc_reg();
     chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
     last_reg_ = dest;
 }
 
 // Compiles each expression into base+i.
-void Compiler::compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs) {
-    for (int i = 0; i < (int)exprs.size(); ++i) {
+void Compiler::compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count) {
+    int n = count < 0 ? (int)exprs.size() : count;
+    for (int i = 0; i < n; ++i) {
         int target = base + i;
         reg_top_ = target;
         exprs[i]->accept(*this);
         if (last_reg_ != target)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reg_top_ = target + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(target + 1);
     }
 }
 
@@ -1073,16 +957,7 @@ void Compiler::visit(const ReturnStmt& s) {
     if (!s.spread_varargs && !s.values.empty() && is_call_node(s.values.back().get())) {
         int base = reg_top_;
         int n_expl = (int)s.values.size() - 1;
-        for (int i = 0; i < n_expl; ++i) {
-            int target = base + i;
-            reg_top_ = target;
-            s.values[i]->accept(*this);
-            if (last_reg_ != target)
-                chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-            reg_top_ = target + 1;
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
-        }
+        compile_consecutive(base, s.values, n_expl);
         int want = base + n_expl;
         reg_top_ = want;
         s.values.back()->accept(*this); // a terminal call: k return values, hence last_results_ = k
@@ -1107,11 +982,10 @@ void Compiler::visit(const ReturnStmt& s) {
     }
 }
 
-
 void Compiler::visit(const NumberExpr& e) {
     last_reg_ = alloc_reg();
     chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                       chunk.add_constant(e.is_integer ? Value(e.ival) : num_value(e.value))));
+                        chunk.add_constant(e.is_integer ? Value(e.ival) : num_value(e.value))));
 }
 
 void Compiler::visit(const StringExpr& e) {
@@ -1124,8 +998,7 @@ void Compiler::visit(const InterpExpr& e) {
     // Result is literals[0] + str(exprs[0]) + literals[1] + ... + literals[n]; an ADD with a
     // string on the left converts the right-hand side through value_to_string.
     int result = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)result,
-                       (uint16_t)chunk.add_constant(Value(e.literals[0]))));
+    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)result, (uint16_t)chunk.add_constant(Value(e.literals[0]))));
     for (int i = 0; i < (int)e.exprs.size(); ++i) {
         e.exprs[i]->accept(*this);
         int expr_reg = last_reg_;
@@ -1134,8 +1007,8 @@ void Compiler::visit(const InterpExpr& e) {
         result = acc;
         if (!e.literals[i + 1].empty()) {
             int lit = alloc_reg();
-            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)lit,
-                               (uint16_t)chunk.add_constant(Value(e.literals[i + 1]))));
+            chunk.emit(
+                make_abx((uint8_t)Op::LOAD_K, (uint8_t)lit, (uint16_t)chunk.add_constant(Value(e.literals[i + 1]))));
             int acc2 = alloc_reg();
             chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc2, (uint8_t)result, (uint8_t)lit));
             result = acc2;
@@ -1198,9 +1071,7 @@ void Compiler::visit(const BinaryExpr& e) {
         int r_l = last_reg_;
         if (reg_top_ <= r_l)
             reg_top_ = r_l + 1;
-        int dst = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int dst = alloc_reg();
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)r_l, 0));
         if (e.op == '&') {
             // a falsy: keep a, already in dst, and skip evaluating b
@@ -1226,21 +1097,18 @@ void Compiler::visit(const BinaryExpr& e) {
     // Protect the left result's register: a 0-argument call — or any expression leaving
     // reg_top_ <= r_l — would otherwise see the right operand overwrite it.
     if (reg_top_ <= r_l)
-        reg_top_ = r_l + 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+        reserve_regs_to(r_l + 1);
     e.right->accept(*this);
     int r_r = last_reg_;
     last_reg_ = reg_top_++;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    bump_reg_count();
 
     chunk.emit(make_abc((uint8_t)binary_arith_opcode(e.op), (uint8_t)last_reg_, (uint8_t)r_l, (uint8_t)r_r));
 }
 
 // a < b < c: each operand in its own register, comparisons taken pairwise, AND at the end.
 void Compiler::visit(const ChainedCompareExpr& e) {
-    int n = (int)e.operands.size();   // n operands, n-1 operators
+    int n = (int)e.operands.size(); // n operands, n-1 operators
 
     // Evaluate every operand into contiguous temporaries.
     int base_tmp = reg_top_;
@@ -1249,39 +1117,17 @@ void Compiler::visit(const ChainedCompareExpr& e) {
         e.operands[i]->accept(*this);
         regs.push_back(last_reg_);
         if (last_reg_ >= reg_top_) {
-            reg_top_ = last_reg_ + 1;
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
+            reserve_regs_to(last_reg_ + 1);
         }
     }
 
     // Allocate n-1 registers for the comparison results.
     int cmp_base = reg_top_;
-    reg_top_ += n - 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
-
-    static auto cmp_op = [](char op) -> uint8_t {
-        switch (op) {
-        case '=':
-            return (uint8_t)Op::EQ;
-        case 'N':
-            return (uint8_t)Op::NEQ;
-        case '>':
-            return (uint8_t)Op::GT;
-        case '<':
-            return (uint8_t)Op::LT;
-        case 'G':
-            return (uint8_t)Op::GE;
-        case 'L':
-            return (uint8_t)Op::LE;
-        default:
-            throw std::runtime_error("unknown cmp op in chain");
-        }
-    };
+    reserve_regs_to(reg_top_ + n - 1);
 
     for (int i = 0; i < n - 1; i++)
-        chunk.emit(make_abc(cmp_op(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i], (uint8_t)regs[i + 1]));
+        chunk.emit(make_abc((uint8_t)binary_arith_opcode(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i],
+                            (uint8_t)regs[i + 1]));
 
     // Fold the partial results together with AND, into cmp_base.
     for (int i = 1; i < n - 1; i++)
@@ -1315,14 +1161,13 @@ void Compiler::emit_callee_value(const std::string& name, int reg) {
 }
 
 void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
-                              const std::function<void(int)>& emit_callee) {
+                                const std::function<void(int)>& emit_callee) {
     int n_fixed = (int)args.size() - 1;
     const Expr* last = args.back().get();
     bool is_vararg = dynamic_cast<const VarArgExpr*>(last) != nullptr;
 
     int func_slot = reg_top_++; // the callee sits BELOW the argument block, so an expansion never overwrites it
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    bump_reg_count();
     int call_base = reg_top_;
     for (int i = 0; i < n_fixed; ++i) {
         int target = call_base + i;
@@ -1330,9 +1175,7 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
         args[i]->accept(*this);
         if (last_reg_ != target)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reg_top_ = target + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(target + 1);
     }
     emit_callee(func_slot);
     if (is_vararg) {
@@ -1349,9 +1192,33 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
         chunk.emit(make_abc((uint8_t)Op::CALL_VA, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
     }
     last_reg_ = call_base;
+    reserve_regs_to(call_base + 1);
+}
+
+void Compiler::emit_optional_call(const std::vector<std::unique_ptr<Expr>>& args,
+                                  const std::function<void(int)>& emit_callee) {
+    int call_base = reg_top_;
+    int argc = (int)args.size();
+    int func_reg = call_base + argc;
     reg_top_ = call_base + 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    emit_callee(call_base); // call_base holds the callee: both the test and the result slot
+    reserve_regs_to(func_reg + 1);
+    // f?(args) is `if f then f(args) else nil`: JUMP_IF_FALSE (nil being falsy) jumps over the
+    // arguments, which are therefore NOT evaluated when f is falsy.
+    size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
+    chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
+    for (int i = 0; i < argc; ++i) { // temporaries above func_reg
+        reg_top_ = func_reg + 1;
+        compile_into(*args[i], call_base + i);
+    }
+    reserve_regs_to(func_reg + 1);
+    chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+    size_t to_end = chunk.emit_jump(Op::JUMP);
+    chunk.patch_jump(to_nil, (uint16_t)chunk.current_pos());
+    chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0));
+    chunk.patch_jump(to_end, (uint16_t)chunk.current_pos());
+    reg_top_ = call_base + 1;
+    last_reg_ = call_base;
 }
 
 void Compiler::visit(const CallExpr& e) {
@@ -1361,44 +1228,7 @@ void Compiler::visit(const CallExpr& e) {
         return;
     }
     if (e.optional) {
-        // Optional named call: resolve the callee BEFORE the arguments, guard, then arguments.
-        int call_base = reg_top_;
-        int argc = (int)e.args.size();
-        int func_reg = call_base + argc;
-        reg_top_ = call_base + 1;
-        {
-            auto rit = local_regs_.find(e.callee);
-            if (rit != local_regs_.end()) {
-                chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)rit->second, 0));
-            } else {
-                int uv = resolve_upvalue(e.callee);
-                if (uv >= 0)
-                    chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)call_base, (uint8_t)uv, 0));
-                else
-                    chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)call_base, chunk.add_identifier(e.callee)));
-            }
-        }
-        reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        // f?(args) is `if f then f(args) else nil`: JUMP_IF_FALSE (nil being falsy) jumps over
-        // the arguments, which are therefore NOT evaluated when f is falsy.
-        size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
-        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
-        for (int i = 0; i < argc; ++i) {
-            reg_top_ = func_reg + 1;
-            compile_into(*e.args[i], call_base + i);
-        }
-        reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
-        size_t to_end = chunk.emit_jump(Op::JUMP);
-        chunk.patch_jump(to_nil, (uint16_t)chunk.current_pos());
-        chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0));
-        chunk.patch_jump(to_end, (uint16_t)chunk.current_pos());
-        reg_top_ = call_base + 1;
-        last_reg_ = call_base;
+        emit_optional_call(e.args, [&](int reg) { emit_callee_value(e.callee, reg); });
         return;
     }
 
@@ -1409,9 +1239,7 @@ void Compiler::visit(const CallExpr& e) {
         int argc = (int)e.args.size();
         compile_consecutive(call_base, e.args);
         if (it->second.is_closure) {
-            int func_reg = reg_top_++;
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
+            int func_reg = alloc_reg();
             chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg, chunk.add_identifier(e.callee)));
             chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         } else {
@@ -1428,9 +1256,7 @@ void Compiler::visit(const CallExpr& e) {
 
     // Every call goes through CALL_DYN; builtins are T_BUILTIN globals.
     {
-        int func_reg = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int func_reg = alloc_reg();
         {
             auto rit = local_regs_.find(e.callee);
             if (rit != local_regs_.end()) {
@@ -1460,30 +1286,7 @@ void Compiler::visit(const ExprCallExpr& e) {
     int argc = (int)e.args.size();
 
     if (e.optional) {
-        // Optional call: evaluate the callee BEFORE the arguments, guard, then arguments.
-        int func_reg = call_base + argc;
-        reg_top_ = call_base + 1;
-        compile_into(*e.callee, call_base);   // callee in call_base: both the check and the result
-        reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        // f?(args) is `if f then f(args) else nil`; JUMP_IF_FALSE skips the arguments
-        size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
-        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
-        for (int i = 0; i < argc; ++i) { // temporaries above func_reg
-            reg_top_ = func_reg + 1;
-            compile_into(*e.args[i], call_base + i);
-        }
-        reg_top_ = func_reg + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
-        chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
-        size_t to_end = chunk.emit_jump(Op::JUMP);
-        chunk.patch_jump(to_nil, (uint16_t)chunk.current_pos());
-        chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0));
-        chunk.patch_jump(to_end, (uint16_t)chunk.current_pos());
-        reg_top_ = call_base + 1;
-        last_reg_ = call_base;
+        emit_optional_call(e.args, [&](int reg) { compile_into(*e.callee, reg); });
         return;
     }
 
@@ -1491,9 +1294,7 @@ void Compiler::visit(const ExprCallExpr& e) {
     compile_consecutive(call_base, e.args);
 
     // Compile callee into a temp register after args
-    int func_reg = reg_top_++;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    int func_reg = alloc_reg();
     compile_into(*e.callee, func_reg);
 
     chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
@@ -1527,16 +1328,13 @@ void Compiler::visit(const MapExpr& e) {
 }
 
 void Compiler::visit(const IndexExpr& e) {
-    int saved = reg_top_;
     e.obj->accept(*this);
     int obj_r = last_reg_;
     // Reserve the object's register before evaluating the key: a 0-argument call leaves
     // reg_top_ at its own result register, so without this guard evaluating the key would
     // reallocate over the object (same as in BinaryExpr). See f().x and f()[i].
     if (reg_top_ <= obj_r)
-        reg_top_ = obj_r + 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+        reserve_regs_to(obj_r + 1);
     int saved2 = reg_top_;
     e.key->accept(*this);
     int key_r = last_reg_;
@@ -1544,7 +1342,6 @@ void Compiler::visit(const IndexExpr& e) {
     int dest = alloc_reg();
     chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)dest, (uint8_t)obj_r, (uint8_t)key_r));
     last_reg_ = dest;
-    (void)saved;
 }
 
 void Compiler::visit(const ArrayExpr& e) {
@@ -1584,25 +1381,19 @@ void Compiler::visit(const RangeExpr& e) {
 
     // Compile start
     int start_r = base;
-    reg_top_ = base + 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    reserve_regs_to(base + 1);
     compile_into(*e.start, start_r);
 
     // Compile end
     int end_r = base + 1;
-    reg_top_ = base + 2;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    reserve_regs_to(base + 2);
     compile_into(*e.end, end_r);
 
     // Compile step if present
     bool has_step = (e.step != nullptr);
     if (has_step) {
         int step_r = base + 2;
-        reg_top_ = base + 3;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(base + 3);
         compile_into(*e.step, step_r);
     }
 
@@ -1612,9 +1403,7 @@ void Compiler::visit(const RangeExpr& e) {
             chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)start_r, (uint8_t)start_r, (uint8_t)(base + 2)));
         } else {
             int one_r = base + 2;
-            reg_top_ = base + 3;
-            if (reg_top_ > reg_count_)
-                reg_count_ = reg_top_;
+            reserve_regs_to(base + 3);
             chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)one_r, chunk.add_constant(Value((int64_t)1))));
             chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)start_r, (uint8_t)start_r, (uint8_t)one_r));
         }
@@ -1631,13 +1420,11 @@ void Compiler::visit(const RangeExpr& e) {
 }
 
 void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, const std::string& var2,
-                                   const std::vector<std::unique_ptr<Stmt>>& body) {
+                                     const std::vector<std::unique_ptr<Stmt>>& body) {
     bool two_vars = !var2.empty();
     int block = reg_top_;
     int tmp_src = block + (two_vars ? 3 : 2);
-    reg_top_ = tmp_src + 1;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    reserve_regs_to(tmp_src + 1);
 
     compile_into(src, tmp_src); // src is compiled BEFORE the loop variables are scoped
     chunk.emit(make_abc((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
@@ -1824,7 +1611,7 @@ static bool loop_body_alias_safe(const std::vector<std::unique_ptr<Stmt>>& body,
                    dynamic_cast<const CommentStmt*>(s)) {
             // safe
         } else {
-            return false;   // if/while/for/block/try/switch/funcdecl/…: stay conservative
+            return false; // if/while/for/block/try/switch/funcdecl/…: stay conservative
         }
     }
     return true;
@@ -1942,11 +1729,9 @@ static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body) {
 }
 
 void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
-                                 const std::vector<std::unique_ptr<Stmt>>& body) {
+                                   const std::vector<std::unique_ptr<Stmt>>& body) {
     int ctl = reg_top_; // ctl, ctl+1, ctl+2 = i, limit, step
-    reg_top_ = ctl + 3;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    reserve_regs_to(ctl + 3);
 
     // Bounds are compiled BEFORE i is scoped, so that `for i = i, …` reads the outer i.
     compile_into(*r.start, ctl);
@@ -1965,8 +1750,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     int var_reg = ctl;
     if (!can_alias) {
         var_reg = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        bump_reg_count();
     }
     bool had_old;
     int old_reg;
@@ -2009,7 +1793,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (had_old)
         local_regs_[var1] = old_reg;
     else
-        local_regs_.erase(var1);   // restore the scope
+        local_regs_.erase(var1); // restore the scope
     // Register recycling: when a closure in the body captures i we keep its register reserved,
     // otherwise it would be overwritten after the loop and the upvalue would be corrupted.
     // Do NOT drop below what compile_block reserved for the body's LOCALS, which a closure can
@@ -2024,19 +1808,17 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_expr, const std::string& field, int line,
                                  int file_idx) {
     if (enum_names_.empty())
-        return;   // no enum in the program, so nothing to check
+        return; // no enum in the program, so nothing to check
     const std::string* name = &obj_name;
     if (obj_expr) {
         auto* ve = dynamic_cast<const VarExpr*>(obj_expr);
         if (!ve)
-            return;   // a chained target (a.b[k]): the object written is not the enum itself
+            return; // a chained target (a.b[k]): the object written is not the enum itself
         name = &ve->name;
     }
     if (!enum_names_.count(*name) || local_regs_.count(*name))
         return;
-    throw std::runtime_error(SourceLoc{(uint16_t)file_idx, (uint16_t)(line > 0 ? line : current_line_)}.str(
-                                 chunk.source_files) +
-                             ": cannot modify enum '" + *name + "'" +
+    throw std::runtime_error(where(line, file_idx) + ": cannot modify enum '" + *name + "'" +
                              (field.empty() ? "" : " element '" + field + "'"));
 }
 
@@ -2068,8 +1850,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
                 chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
             } else {
                 if (!declared_globals_.count(s.obj))
-                    throw std::runtime_error(SourceLoc{(uint16_t)s.file_idx, (uint16_t)(s.line > 0 ? s.line : current_line_)}.str(chunk.source_files) +
-                                             ": undeclared variable '" + s.obj + "'");
+                    throw std::runtime_error(where(s) + ": undeclared variable '" + s.obj + "'");
                 chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.add_identifier(s.obj)));
             }
         }
@@ -2091,8 +1872,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         int rhs_r = alloc_reg();
         compile_into(*s.value, rhs_r);
         int result_r = alloc_reg();
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        bump_reg_count();
         chunk.emit(make_abc((uint8_t)token_to_op(s.op), (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
         chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
     }
@@ -2132,8 +1912,8 @@ void Compiler::visit(const MultiAssignStmt& s) {
     }
 
     // Assign each target from its temporary, or nil when there are fewer values than targets.
-    for (int i = 0; i < (int)s.targets.size(); ++i) {
-        int val_r = (i < n) ? base + i : alloc_reg();   // nil when there is no value
+    for (int i = 0; i < n_targets; ++i) {
+        int val_r = (i < n) ? base + i : alloc_reg(); // nil when there is no value
         const LValue& lv = s.targets[i];
         // FIELD_INDEX (a.b[k]) writes into a.b, not into a, so the refusal does not apply.
         if (lv.kind == LValue::FIELD || lv.kind == LValue::INDEX)
@@ -2200,97 +1980,7 @@ void Compiler::visit(const DoStmt& s) {
 
 // Compiles a method, with an implicit 'self' in R[0].
 uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
-    auto outer_regs = std::move(local_regs_);
-    auto outer_pending = std::move(pending_var_reg_);
-    auto outer_upvals = std::move(cur_upval_idx_);
-    auto outer_consts = const_names_; // copy — stays in OuterScope too
-    int outer_top = reg_top_;
-    int outer_count = reg_count_;
-    int outer_locals = locals_top_;
-    auto outer_name = current_func_name;
-    int outer_fidx = current_func_idx_;
-    const_names_.clear();
-
-    outer_scopes_.push_back({outer_regs, outer_upvals, outer_consts, outer_fidx});
-    try_floors_.push_back(try_depth_);   // this body's returns are relative to HERE
-
-    current_func_name = s.name;
-    cur_upval_idx_.clear();
-    local_regs_.clear();
-    pending_var_reg_.clear();
-    reg_top_ = 0;
-    reg_count_ = 0;
-    locals_top_ = 0;
-
-    int n_params = (int)s.params.size();
-    int n_fixed;
-
-    if (s.is_static) {
-        // Static method: no self, parameters in R[0..n-1].
-        for (int i = 0; i < n_params; ++i)
-            local_regs_[s.params[i]] = i;
-        n_fixed = n_params;
-    } else {
-        // Instance method: self in R[0], parameters in R[1..n].
-        local_regs_["self"] = 0;
-        for (int i = 0; i < n_params; ++i)
-            local_regs_[s.params[i]] = i + 1;
-        n_fixed = 1 + n_params;
-    }
-    reg_top_ = n_fixed;
-
-    std::vector<std::string> body_locals;
-    if (!s.is_static)
-        body_locals.push_back("self");
-    body_locals.insert(body_locals.end(), s.params.begin(), s.params.end());
-    std::unordered_set<std::string> body_funcs;
-    collect_locals(s.body, body_locals, chunk.source_files, true, &body_funcs);
-    std::unordered_set<std::string> method_skip(s.params.begin(), s.params.end());
-    if (!s.is_static)
-        method_skip.insert("self");
-    bind_scan_locals(body_locals, body_funcs, method_skip);
-    locals_top_ = reg_top_;
-    reg_count_ = reg_top_;
-
-    size_t jump_patch = chunk.emit_jump(Op::JUMP);
-    uint32_t func_addr = (uint32_t)chunk.current_pos();
-
-    // Defaults: for an instance method index 0 is self, which has none.
-    std::vector<Value> defs(n_fixed);
-    int defs_offset = s.is_static ? 0 : 1;
-    for (int i = 0; i < n_params; ++i)
-        defs[i + defs_offset] = (i < (int)s.defaults.size() && s.defaults[i]) ? eval_constant(*s.defaults[i], chunk.source_files, s.sloc()) : Value{};
-    uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
-
-    FuncProto fp{func_addr, (uint8_t)n_fixed, s.variadic, s.is_static, defaults_idx, 0, {}};
-    uint8_t func_idx = chunk.add_func(fp);
-    current_func_idx_ = func_idx;
-
-    for (auto& stmt : s.body) {
-        int sv = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = sv;
-    }
-    emit_implicit_return(chunk);
-
-    if (reg_count_ > 255)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
-    chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
-    chunk.patch_jump(jump_patch, (uint16_t)chunk.current_pos());
-
-    outer_scopes_.pop_back();
-    try_floors_.pop_back();
-    local_regs_ = std::move(outer_regs);
-    pending_var_reg_ = std::move(outer_pending);
-    cur_upval_idx_ = std::move(outer_upvals);
-    const_names_ = std::move(outer_consts);
-    reg_top_ = outer_top;
-    reg_count_ = outer_count;
-    locals_top_ = outer_locals;
-    current_func_name = outer_name;
-    current_func_idx_ = outer_fidx;
-
-    return func_idx;
+    return compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, s.is_static, !s.is_static, s.sloc());
 }
 
 void Compiler::visit(const ClassDeclStmt& s) {
@@ -2298,16 +1988,12 @@ void Compiler::visit(const ClassDeclStmt& s) {
     int saved = reg_top_;
 
     // Create the class value (T_CLASS, an empty map).
-    int dest = reg_top_++;
-    if (reg_top_ > reg_count_)
-        reg_count_ = reg_top_;
+    int dest = alloc_reg();
     chunk.emit(make_abc((uint8_t)Op::NEW_CLASS, (uint8_t)dest, 0, 0));
 
     // Store the class name as __name__, which print and debugging use.
     {
-        int key_r = reg_top_++, val_r = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int key_r = alloc_reg(), val_r = alloc_reg();
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string("__name__")))));
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.add_constant(Value(s.name))));
         chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
@@ -2316,9 +2002,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
 
     // Inheritance: store the parent class as __parent__.
     if (!s.parent.empty()) {
-        int par_r = reg_top_++, key_r = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int par_r = alloc_reg(), key_r = alloc_reg();
         chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)par_r, chunk.add_identifier(s.parent)));
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string("__parent__")))));
         chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)par_r));
@@ -2345,9 +2029,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
         uint8_t func_idx = compile_method_func(*method);
         bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
-        int func_r = reg_top_++, key_r = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int func_r = alloc_reg(), key_r = alloc_reg();
         if (has_upvals)
             chunk.emit(make_abx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)func_r, func_idx));
         else
@@ -2412,49 +2094,35 @@ void Compiler::visit(const MethodCallExpr& e) {
         // does not exist, hence a clean diagnostic instead of a map::at crash.
         auto self_it = local_regs_.find("self");
         if (self_it == local_regs_.end())
-            throw std::runtime_error(sloc().str(chunk.source_files) +
-                                     ": 'super' can only be used inside a method");
+            throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super' can only be used inside a method");
         // The parent class is fixed LEXICALLY — the class where the method is defined — rather
         // than through self.__class__.__parent__: otherwise B.m() running on a C instance would
         // always land back on B, an infinite recursion in a hierarchy of three levels or more.
         if (current_class_parent_.empty())
-            throw std::runtime_error(sloc().str(chunk.source_files) +
-                                     ": 'super': the current class has no parent");
+            throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super': the current class has no parent");
         int self_src = self_it->second;
-        reg_top_ = call_base + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(call_base + 1);
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)self_src, 0));
 
         // Temporaries: tmp holds the parent class (a global), key_r the key.
-        int tmp = reg_top_++, key_r = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int tmp = alloc_reg(), key_r = alloc_reg();
 
         // tmp = <the lexically enclosing parent class>
         chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)tmp, chunk.add_identifier(current_class_parent_)));
         // R[call_base+1] = tmp.<method>
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string(e.method)))));
         chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)tmp, (uint8_t)key_r));
-        reg_top_ = call_base + 2;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(call_base + 2);
     } else {
         // R[call_base] = receiver (self)
         compile_into(*e.receiver, call_base);
-        reg_top_ = call_base + 1;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(call_base + 1);
 
         // R[call_base+1] = GET_INDEX(receiver, method_name)
-        int key_r = reg_top_++;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        int key_r = alloc_reg();
         chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string(e.method)))));
         chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)call_base, (uint8_t)key_r));
-        reg_top_ = call_base + 2;
-        if (reg_top_ > reg_count_)
-            reg_count_ = reg_top_;
+        reserve_regs_to(call_base + 2);
     }
 
     // obj.m?() is `if m then m(args) else nil`: JUMP_IF_FALSE jumps BEFORE the arguments,
@@ -2469,7 +2137,7 @@ void Compiler::visit(const MethodCallExpr& e) {
     chunk.emit(make_abc((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
     if (e.optional) {
         size_t end = chunk.emit_jump(Op::JUMP);                                // jumps over the LOAD_NIL
-        chunk.patch_jump(skip, (uint16_t)chunk.current_pos());                  // the jump target: a nil method
+        chunk.patch_jump(skip, (uint16_t)chunk.current_pos());                 // the jump target: a nil method
         chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0)); // a nil result
         chunk.patch_jump(end, (uint16_t)chunk.current_pos());
     }

@@ -21,10 +21,10 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     struct JumpTargets {
         std::vector<size_t> patches;
         size_t func_depth = 0;
-        int try_depth = 0;        // active try blocks when opened: a jump out of one must pop it
-        bool is_switch = false;   // only ever true for break: a switch does not catch continue
+        int try_depth = 0;      // active try blocks when opened: a jump out of one must pop it
+        bool is_switch = false; // only ever true for break: a switch does not catch continue
     };
-    int try_depth_ = 0;           // try bodies being compiled, the catch bodies excluded
+    int try_depth_ = 0; // try bodies being compiled, the catch bodies excluded
     // The try depth on entering each nested function body: a `return` only leaves the try blocks
     // of ITS function, so the count is taken from this floor and not from zero.
     std::vector<int> try_floors_;
@@ -57,17 +57,18 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         bool is_closure = false; // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
     };
     std::unordered_map<std::string, FuncInfo> func_table;
-    std::unordered_set<std::string> declared_globals_; // the declared globals: the source's, the builtins and the modules
-    std::unordered_set<std::string> const_names_;      // locals declared with 'const'
+    std::unordered_set<std::string>
+        declared_globals_;                        // the declared globals: the source's, the builtins and the modules
+    std::unordered_set<std::string> const_names_; // locals declared with 'const'
     // Enums declared under a plain name, so that visible writes are refused at compile time with a
     // message naming the element. The VM still covers every other path.
     std::unordered_set<std::string> enum_names_;
-    std::string current_func_name;                     // "" = global scope
+    std::string current_func_name; // "" = global scope
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's
     // dynamic class, which would recurse forever in a hierarchy of three levels or more.
     std::string current_class_parent_;
-    int current_func_idx_ = -1;                        // index in chunk.funcs (-1 = main chunk)
+    int current_func_idx_ = -1; // index in chunk.funcs (-1 = main chunk)
 
     bool in_function() const {
         return !current_func_name.empty();
@@ -82,20 +83,62 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::vector<OuterScope> outer_scopes_;
     std::unordered_map<std::string, int> cur_upval_idx_;
 
+    // Everything the ENCLOSING scope owns while a function body is compiled. Saved and reset by
+    // the constructor, restored by the destructor: the nine fields were saved and restored by
+    // hand in three places, in the same order, and one forgotten restore would not fail to
+    // compile — it would silently corrupt the scope of everything that follows.
+    struct FuncScope {
+        Compiler& c;
+        std::unordered_map<std::string, int> regs, pending, upvals;
+        std::unordered_set<std::string> consts;
+        int top, count, locals, fidx;
+        std::string name;
+        FuncScope(Compiler& comp, const std::string& fname);
+        ~FuncScope();
+    };
+    // Compiles a function body into a fresh FuncProto and returns its index. `with_self` puts
+    // self in R[0] (an instance method), and on_registered runs once the proto exists but
+    // BEFORE the body — which is what lets a top-level function be recursive.
+    uint8_t compile_func_body(const std::string& name, const std::vector<std::string>& params,
+                              const std::vector<std::unique_ptr<Expr>>& defaults,
+                              const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
+                              bool with_self, SourceLoc defaults_loc,
+                              const std::function<void(uint8_t)>& on_registered = {});
+
     int resolve_upvalue(const std::string& name);
     int resolve_upval_from(int scope_idx, const std::string& name);
     int capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
     uint8_t compile_method_func(const FuncDeclStmt& s);
     void compile_iterator_loop(const Expr& src, const std::string& var1, const std::string& var2,
-                             const std::vector<std::unique_ptr<Stmt>>& body);
+                               const std::vector<std::unique_ptr<Stmt>>& body);
     // Fast path for the numeric for: a range literal inclusive on both bounds, one variable.
-    void compile_numeric_for(const RangeExpr& r, const std::string& var1, const std::vector<std::unique_ptr<Stmt>>& body);
+    void compile_numeric_for(const RangeExpr& r, const std::string& var1,
+                             const std::vector<std::unique_ptr<Stmt>>& body);
 
-    int alloc_reg() {
-        int r = reg_top_++;
+    // reg_count_ is the HIGH-WATER MARK of reg_top_: it is what FuncProto.reg_count commits to,
+    // and what bounds a builtin's result slots (see "Invariant registre" in CLAUDE.md). Every
+    // site that moves reg_top_ must raise it, so the rule lives here instead of in the fifty
+    // copies of `if (reg_top_ > reg_count_)` it used to be written as — one forgotten copy
+    // under-reports reg_count and lets a builtin write outside its frame.
+    void bump_reg_count() {
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
+    }
+    void reserve_regs_to(int top) {
+        reg_top_ = top;
+        bump_reg_count();
+    }
+    int alloc_reg() {
+        int r = reg_top_++;
+        bump_reg_count();
         return r;
+    }
+    // n consecutive registers, the base returned.
+    int alloc_regs(int n) {
+        int base = reg_top_;
+        reg_top_ += n;
+        bump_reg_count();
+        return base;
     }
 
     // Records the current source line for runtime diagnostics, replacing the
@@ -110,14 +153,30 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         }
     }
 
-    SourceLoc sloc() const { return {(uint16_t)current_file_idx_, (uint16_t)current_line_}; }
+    SourceLoc sloc() const {
+        return {(uint16_t)current_file_idx_, (uint16_t)current_line_};
+    }
+
+    // "file:line" for a diagnostic, falling back on the last line seen when the node carries
+    // none — a node the PARSER generated (an import's alias map, say) has no line of its own.
+    std::string where(int line, int file_idx) const {
+        return SourceLoc{(uint16_t)file_idx, (uint16_t)(line > 0 ? line : current_line_)}.str(chunk.source_files);
+    }
+    std::string where(const Stmt& s) const {
+        return where(s.line, s.file_idx);
+    }
 
     void compile_into(const Expr& e, int dest);
-    void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs);
+    // `count` < 0 means the whole list: a call with a spread last argument compiles only the
+    // fixed ones through here.
+    void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count = -1);
     // Strict lexical scope: saves local_regs_, reg_top_ and locals_top_, allocates the locals
     // declared in body without descending into sub-blocks, compiles, then restores. The registers
     // stay reserved when the body contains closures.
-    void compile_block(const std::vector<std::unique_ptr<Stmt>>& body);
+    // `pre_bound` names a variable already living in `pre_bound_reg` — the catch variable, the
+    // only case — so it keeps that register instead of being given a fresh one.
+    void compile_block(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& pre_bound = "",
+                       int pre_bound_reg = 0);
 
     // Reserves a register for every pre-scanned local. Functions are bound in local_regs_ straight
     // away, for recursion and forward references, while var and const are deferred in
@@ -125,7 +184,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // (parameters, self, the catch variable), left as they are. A name inherited from an enclosing
     // scope is NOT in skip, so it gets a fresh register and shadows the outer one.
     void bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
-                        const std::unordered_set<std::string>& skip = {});
+                          const std::unordered_set<std::string>& skip = {});
 
     // Loads the callable named `name` into register `reg`: a local, an upvalue, a top-level function
     // through LOAD_FUNC, or a global through LOAD_GLOBAL.
@@ -134,8 +193,12 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // below the argument block, then the fixed arguments, then the expansion — emitting CALL_VARARGS
     // for `...` and CALL_VA for a call. emit_callee(reg) places the callable, and the result comes
     // back through last_reg_ = call_base.
-    void emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
-                        const std::function<void(int)>& emit_callee);
+    void emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args, const std::function<void(int)>& emit_callee);
+    // `f?(args)`: the callee is placed FIRST so it can be tested, then the arguments — which a
+    // falsy callee therefore never evaluates. Shared by the named and the expression forms,
+    // which differed only in how emit_callee(reg) puts the callable there.
+    void emit_optional_call(const std::vector<std::unique_ptr<Expr>>& args,
+                            const std::function<void(int)>& emit_callee);
 
     // StmtVisitor
     void visit(const CommentStmt&) override {
