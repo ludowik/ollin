@@ -52,13 +52,6 @@ TokenType Parser::peek_next_type() const {
     return TokenType::EOF_T;
 }
 
-TokenType Parser::peek_at(int offset) const {
-    int idx = pos + offset;
-    if (idx < static_cast<int>(tokens.size()))
-        return tokens[idx].type;
-    return TokenType::EOF_T;
-}
-
 void Parser::skip_comments() {
     while (check(TokenType::COMMENT))
         advance();
@@ -147,7 +140,7 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         if (is_assign_op(peek().type))
             return finish_assign_from_expr(std::move(e), line);
         if (check(TokenType::COMMA)) {
-            pos = saved; // multi-affectation : re-parse via multiAssignStmt (LValue)
+            pos = saved; // a multiple assignment: re-parsed by multi_assign_stmt (LValue)
             return multi_assign_stmt();
         }
         consume_opt_comment();
@@ -284,7 +277,7 @@ std::unique_ptr<Stmt> Parser::while_stmt() {
 
 std::unique_ptr<Stmt> Parser::do_stmt() {
     int line = peek().line;
-    advance(); // consomme DO
+    advance();
     auto s = std::make_unique<DoStmt>();
     s->line = line; s->file_idx = current_file_idx_;
     while (true) {
@@ -444,7 +437,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     };
 
     // Definition on a map field: func obj.field(params) ... end
-    // → desugar en  obj.field = func(params) ... end
+    // → desugared into  obj.field = func(params) ... end
     if (check(TokenType::DOT)) {
         advance(); // DOT
         std::string field = expect(TokenType::IDENTIFIER).lexeme;
@@ -1031,16 +1024,17 @@ std::unique_ptr<Expr> Parser::primary() {
         Token tok = advance();
         const std::string& lex = tok.lexeme;
         try {
+            // The lexeme is NORMALISED by the lexer: no '_', and the base prefix and the
+            // exponent letter are lower case, so 'X'/'O'/'B'/'E' cannot appear here.
             // 0x.. / 0o.. / 0b..: integers in base 16/8/2 (stoull keeps the whole bit pattern, wrapping int64)
-            if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'x' || lex[1] == 'X'))
+            if (lex.size() > 2 && lex[0] == '0' && lex[1] == 'x')
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 16)));
-            if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'o' || lex[1] == 'O'))
+            if (lex.size() > 2 && lex[0] == '0' && lex[1] == 'o')
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
-            if (lex.size() > 2 && lex[0] == '0' && (lex[1] == 'b' || lex[1] == 'B'))
+            if (lex.size() > 2 && lex[0] == '0' && lex[1] == 'b')
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 2)));
-            // float on a '.' OR a scientific exponent ('e'/'E'); otherwise an integer.
-            if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos &&
-                lex.find('E') == std::string::npos)
+            // float on a '.' OR a scientific exponent; otherwise an integer.
+            if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos)
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
             return std::make_unique<NumberExpr>(std::stod(lex));
         } catch (const std::out_of_range&) {
@@ -1236,7 +1230,7 @@ std::unique_ptr<Stmt> Parser::class_decl() {
             break;
         bool is_static = false;
         if (check(TokenType::STATIC)) {
-            advance(); // consomme 'static'
+            advance();
             is_static = true;
         }
         if (!check(TokenType::FUNC))
@@ -1359,7 +1353,7 @@ static std::vector<std::string> collect_top_level_names(const std::vector<std::u
 }
 
 std::unique_ptr<Stmt> Parser::import_stmt() {
-    advance(); // consomme 'import'
+    advance();
     Token path_tok = expect(TokenType::STRING);
     std::string path = path_tok.lexeme;
     if (path.size() < 3 || path.substr(path.size() - 3) != ".ol")
@@ -1426,14 +1420,10 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     // parser in the chain.
     int sub_file_idx = (int)source_files_->size();
     source_files_->push_back(resolved);
-    Program sub_prog;
-    try {
-        Parser sub_parser(Lexer(src_text, resolved, sub_file_idx).tokenize(), sub_dir,
-                          imported_paths_, module_names_, source_files_);
-        sub_prog = sub_parser.parse();
-    } catch (const std::exception& e) {
-        throw; // message already contains "file:line:" prefix
-    }
+    // Any error thrown from here already carries its own "file:line:" prefix, hence no catch.
+    Parser sub_parser(Lexer(src_text, resolved, sub_file_idx).tokenize(), sub_dir, imported_paths_,
+                      module_names_, source_files_);
+    Program sub_prog = sub_parser.parse();
 
     // Remember the exported names even for a flat import, so a later aliased import of the same
     // module can rebuild its map.
