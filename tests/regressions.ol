@@ -2068,4 +2068,20 @@ enum RgCol
 end
 checkEnumNameIsOrdinary()
 
+## A line break is WHITESPACE: a statement ends when the expression can no longer be extended,
+## not at the end of its line. The useful side of the rule (a multi-line expression) and its trap
+## (a line starting with an operator, joined to the previous one) are the same mechanism, and both
+## are pinned here so neither changes by accident. grammar.ebnf and the tutorial say the rule.
+func checkLineContinuation()
+    var a = 1
+    var b = 2
+    var joined = a
+                 + b               ## one expression: 3
+    assert(joined == 3)
+    var trap = 1
+    -b                             ## joined to the line above: 1 - b, so -1 and not 1
+    assert(trap == -1)
+end
+checkLineContinuation()
+
 print("regressions ok")

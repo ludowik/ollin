@@ -6,8 +6,19 @@
    comments state the semantic rules attached to each production. CLAUDE.md documents
    the internal implementation only.
 
-   Statement terminators: every statement ends with a newline. Inside brackets, square
-   brackets and braces, newlines are ignored (implicit continuation).
+   Statement terminators: the NL of the rules below is where a statement ENDS in practice, but
+   it is not a token — the lexer does not emit one, and nothing forces a statement to stop at
+   the end of its line. A statement ends when the expression can no longer be extended, so a
+   line that CONTINUES the previous one is joined to it, inside brackets and outside them alike:
+
+       var n = f(x) * 0.8          a = 1              print(t[i])
+             + g(x) * 0.2          -b                 [9]
+       (one expression: useful)    (a is -1, silent)  (indexes print's result)
+
+   The first form is the useful side of the rule and the samples rely on it; the other two are
+   its traps. To be sure a statement stops, leave no operator or opening delimiter at the START
+   of the next line: put the operator at the END of the line instead, which reads the same and
+   is unambiguous.
    The ';' character is ONLY the interval separator in rangeLit. A ';' outside a
    bracketed context is an error. *)
 

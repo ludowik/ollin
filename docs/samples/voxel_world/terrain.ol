@@ -21,6 +21,8 @@ end
 ## A smooth elevation: one large scale for the broad hills plus a slight detail. A single source
 ## gives gentle slopes and no random cliffs.
 func elevation(x, z)
+    ## One expression over two lines: a line break is whitespace, and the leading + continues the
+    ## line above (see "Multi-line expressions" in the tutorial).
     return math.noise(x * 0.013, z * 0.013) * 0.82
          + math.noise(x * 0.075, z * 0.075) * 0.18
 end
