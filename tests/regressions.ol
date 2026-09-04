@@ -129,6 +129,18 @@ catch e
 end
 assert(caught == "kaboom")
 
+## A CAUGHT error reaches the script as it was thrown, with NO source line — the message is data
+## for the program, the location is for the developer reading a crash. It used to depend on the
+## site of the throw: the engine's own errors carried a location, a builtin's did not.
+global caughtEngine = "none"
+try
+    var nilThing = nil
+    print(nilThing.field)
+catch e
+    caughtEngine = e
+end
+assert(caughtEngine == "cannot index nil with field 'field'")
+
 ## ── VM: destructuring a SINGLE-VALUE call gives nil ─────────────────────────
 ## (the regression: a builtin, a constructor or an optional call left stale registers instead
 ## of nil)

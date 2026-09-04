@@ -2022,6 +2022,31 @@ méta-méthode est nié avant d'être écrit dans `return_dest`.
 consommé par `SPREAD_RESULTS` pour mettre à `nil` les cibles d'une
 destructuration multi-retour au-delà de ce que l'appel a réellement renvoyé.
 
+## Où une erreur reçoit sa LIGNE
+
+**Un seul endroit l'attache** : le `catch` de `run_goto`, et le **type** de l'exception dit que
+c'est fait (`OllinError`, vm.h). Tout le moteur et tous les modules lèvent un message **NU**.
+
+Avant, vingt-deux sites de `vm.cpp` collaient `err_line()` au message eux-mêmes tandis que les
+builtins levaient nu, si bien que le `catch` devait DEVINER — il cherchait un motif `:<chiffre>:`
+dans le texte. `assert(false, "rendez-vous a 12:30:45")` correspondait au motif : l'erreur
+**perdait sa ligne**, au moment précis où elle sert (figé dans `test_errors.sh`, avec un second
+cas en `3:4:5`).
+
+**Une erreur ATTRAPÉE arrive au script telle qu'elle a été levée, sans position** : le message
+est une donnée pour le programme — `assert(false, "kaboom")` s'attrape en `"kaboom"` — alors que
+la position s'adresse au développeur qui lit un plantage. C'était auparavant asymétrique : les
+erreurs du moteur portaient une position, celles d'un builtin non. Les deux formes sont figées
+dans `regressions.ol`.
+
+⚠ Le type, et non le texte, est ce qui empêche une **double** position : `run_goto` est réentrant
+(un rappel natif rappelle du code Ollin), donc une erreur peut traverser deux fois la boucle.
+
+**Défaut CONNU et distinct, non corrigé** : une erreur levée dans un rappel passé à une fonction
+native d'ordre supérieur (`array.map`) est délivrée au `catch` du script ET s'échappe ensuite en
+fin de programme — le rappel est exécuté par un `run_goto` imbriqué, qui déroule vers un
+gestionnaire appartenant à la boucle englobante. Vérifié présent avant comme après ce changement.
+
 ## Points de passage uniques de la VM
 
 Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a déjà coûté :

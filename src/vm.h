@@ -13,6 +13,13 @@ std::string value_to_string(const Value& v);
 // memory overlay.
 uint64_t ollin_heap_bytes();
 
+// A runtime error that has ALREADY been given its source line. The type is the mark: nothing has
+// to guess from the text, and a nested run_goto cannot prefix a second location.
+struct OllinError : std::runtime_error {
+    explicit OllinError(const std::string& msg) : std::runtime_error(msg) {
+    }
+};
+
 class VM {
     // CallCtx writes its return values into regs through the index it carries, the pointer it was
     // handed being invalidated by any call that grows the register file.

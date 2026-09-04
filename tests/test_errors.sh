@@ -103,6 +103,16 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# The source line is attached in ONE place, and the mark is the exception TYPE. It used to be
+# recognised by sniffing the message for ":<digits>:", which a time with seconds matches — the
+# error then lost its line, at the moment it was needed most.
+check_error "a message that looks like a location keeps its line" \
+    'assert(false, "meeting at 12:30:45")' \
+    "/dev/stdin:1: meeting at 12:30:45"
+check_error "a message with a ratio keeps its line" \
+    'assert(false, "ratio 3:4:5 refused")' \
+    "/dev/stdin:1: ratio 3:4:5 refused"
+
 # A return ENDS its block, as in Lua: code written after one is dead, and its author meant it to
 # run. Refused rather than silently dropped.
 check_error "a statement after a return" \
