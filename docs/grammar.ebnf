@@ -230,18 +230,23 @@ power          = primary ( "^" unary ) ? ;
              (* "^" binds tighter than unary minus: -2^2 is -(2^2), hence -4; 2^2^3 is 2^(2^3),
                 hence 256; and 2 ^ -1 is 0.5. ('**' no longer exists.) *)
 primary        = NUMBER
-               | STRING
                | BOOL
                | NIL
-               | "super" "." IDENT "(" [ expr { "," expr } ] ")"
-               | IDENT { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
-               | call  { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
-               | mapLit { ( "[" expr "]" | "." IDENT [ "(" [ expr { "," expr } ] ")" ] ) }
-               | arrayLit { ( "[" expr "]" ) }
+               | "super" "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")"
+               | ( STRING | IDENT | call | mapLit | arrayLit | "(" expr ")" ) { postfix }
                | rangeLit
                | lambdaExpr
-               | "..."
-               | "(" expr ")" ;
+               | "..." ;
+postfix        = "[" expr "]" | "." NAME [ "?" ] [ "(" [ expr { "," expr } ] ")" ] ;
+                 (* ONE suffix rule for every base that can carry it: the four bases used to be
+                    written out one by one, and a STRING and an arrayLit were left without it
+                    although "abc".len() and [1,2,3].len() have always worked *)
+                 (* "." NAME alone reads a field; followed by "(" it is a method call, with an
+                    implicit self; the "?" makes the call conditional (nil when not callable) *)
+
+NAME           = IDENT ;
+                 (* plus any KEYWORD, which in this position is simply that name: { end: 1 },
+                    m.in, ref cfg.class. true, false and nil are excluded, carrying a value *)
 
 lambdaExpr     = "func" "(" [ params ] ")" NL { stmt } "end" ;
                (* an anonymous function, usable as an expression; it captures upvalues as any closure does *)

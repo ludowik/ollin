@@ -129,10 +129,17 @@ assert(shadow_test() == 7)
 assert(gshadow == 100)
 
 ## ── 4. Arithmetic ────────────────────────────────────────────────────────────
-## [grammar: additive, multiplicative, power, unary, primary, expr]
+## [grammar: additive, multiplicative, power, unary, primary, postfix, expr]
 
 assert(2 + 3   == 5)
 assert(10 - 4  == 6)
+
+## the postfix suffix applies to every base that can carry it, a literal included
+assert("abc".len() == 3)
+assert([1, 2, 3].len() == 3)
+assert({a: 7}.a == 7)
+assert([10, 20][2] == 20)
+assert(("x" + "y").len() == 2)
 assert(3 * 7   == 21)
 assert(7 / 2   == 3.5)      ## a division is ALWAYS a float
 assert(10 % 3  == 1)
@@ -567,10 +574,12 @@ catch err
 end
 
 ## ── 14. Maps ─────────────────────────────────────────────────────────────────
-## [grammar: mapLit, mapEntry, lvalue]
+## [grammar: mapLit, mapEntry, lvalue, NAME]
 
 ## creation
 var empty = {}
+var kwKey = {end: 1, in: 2}     ## a KEYWORD is a plain name here (the NAME rule)
+assert(kwKey.end == 1 and kwKey.in == 2)
 var m = {
     "a": 1,
     b:   2,         ## an identifier key, with no quotes
