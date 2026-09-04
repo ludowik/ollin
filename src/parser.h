@@ -35,6 +35,9 @@ const Token& peek() const;
     bool check(TokenType t) const;
     bool match(TokenType t);
     Token expect(TokenType t);
+    // A plain NAME: an identifier, or a keyword used where no keyword can be meant.
+    bool at_name() const;
+    std::string expect_name(const char* what);
     void skip_comments();
 
     TokenType peek_next_type() const;

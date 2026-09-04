@@ -52,6 +52,25 @@ TokenType Parser::peek_next_type() const {
     return TokenType::EOF_T;
 }
 
+// grammar.ebnf wants a plain NAME for a map-literal key and for a field after '.' — a word
+// that happens to be a keyword ({end: 1}, m.in, ref cfg.class) is just that name. The lexer
+// classifies by spelling alone and cannot know the position, so the decision belongs here.
+// true/false/nil stay out on purpose: they carry a value, and turning them into strings
+// silently would be a trap.
+bool Parser::at_name() const {
+    TokenType t = peek().type;
+    if (t == TokenType::IDENTIFIER)
+        return true;
+    return is_keyword_type(t) && t != TokenType::TRUE && t != TokenType::FALSE && t != TokenType::NIL;
+}
+
+std::string Parser::expect_name(const char* what) {
+    if (!at_name())
+        throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected " + what + ", got '" +
+                                 peek().lexeme + "'");
+    return advance().lexeme;
+}
+
 void Parser::skip_comments() {
     while (check(TokenType::COMMENT))
         advance();
@@ -440,7 +459,7 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     // → desugared into  obj.field = func(params) ... end
     if (check(TokenType::DOT)) {
         advance(); // DOT
-        std::string field = expect(TokenType::IDENTIFIER).lexeme;
+        std::string field = expect_name("a field name");
         auto fe = std::make_unique<FuncExpr>();
         parse_params_body(fe->params, fe->defaults, fe->variadic, fe->body);
         auto ia = std::make_unique<IndexAssignStmt>();
@@ -498,7 +517,7 @@ std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
         LValue lv;
         lv.name = expect(TokenType::IDENTIFIER).lexeme;
         if (match(TokenType::DOT)) {
-            lv.field = expect(TokenType::IDENTIFIER).lexeme;
+            lv.field = expect_name("a field name");
             if (check(TokenType::LBRACKET)) {
                 advance();
                 lv.kind = LValue::FIELD_INDEX;
@@ -775,7 +794,7 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     path.push_back(advance().lexeme);
     while (check(TokenType::DOT)) {
         advance();
-        path.push_back(expect(TokenType::IDENTIFIER).lexeme);
+        path.push_back(expect_name("a field name"));
     }
     if (check(TokenType::LBRACKET))
         throw std::runtime_error(cur_loc(line).str(*source_files_) +
@@ -911,7 +930,7 @@ std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
             base = std::move(ie);
         } else if (check(TokenType::DOT)) {
             advance();
-            std::string field = expect(TokenType::IDENTIFIER).lexeme;
+            std::string field = expect_name("a field name");
             bool opt_m = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
             if (check(TokenType::LPAREN) || opt_m) {
                 if (opt_m)
@@ -1073,7 +1092,7 @@ std::unique_ptr<Expr> Parser::primary() {
         // super.method(args): calls the parent method with the current self
         if (name == "super") {
             expect(TokenType::DOT);
-            std::string method_name = expect(TokenType::IDENTIFIER).lexeme;
+            std::string method_name = expect_name("a method name");
             bool opt_super = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
             if (opt_super)
                 advance(); // consume '?'
@@ -1156,17 +1175,13 @@ std::unique_ptr<Expr> Parser::primary() {
         auto map = std::make_unique<MapExpr>();
         while (!check(TokenType::RBRACE) && !check(TokenType::EOF_T)) {
             std::unique_ptr<Expr> key;
-            switch (peek().type) {
-            case TokenType::STRING:
-            case TokenType::IDENTIFIER:
+            if (check(TokenType::STRING) || at_name()) {
                 key = std::make_unique<StringExpr>(advance().lexeme);
-                break;
-            case TokenType::LBRACKET:
+            } else if (check(TokenType::LBRACKET)) {
                 advance();
                 key = expr();
                 expect(TokenType::RBRACKET);
-                break;
-            default:
+            } else {
                 throw std::runtime_error(peek().sloc().str(*source_files_) +
                                          ": expected string, identifier, or [expr] key in map literal");
             }

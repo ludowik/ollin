@@ -1794,4 +1794,39 @@ assert(dt_now.yearDay >= 1 and dt_now.yearDay <= 366)
 assert(CX == W / 2)
 assert(CY == H / 2)
 
+## A KEYWORD is a plain NAME where no keyword can be meant — a map-literal key and a field
+## after a '.'. grammar.ebnf says so ({ ref: 12 } is { "ref": 12 }) but the lexer classifies a
+## word by its spelling alone, so the parser has to decide it by position. Every way of naming
+## a field is covered, since each had its own call site.
+var kw = {end: 1, in: 2, class: "c", do: 4, case: 5, static: 6, ref: 7, for: 8, while: 9}
+assert(kw.end == 1 and kw.in == 2 and kw.class == "c")
+assert(kw["end"] == kw.end)               ## the same key, written two ways
+kw.end = 99                               ## a field assignment
+assert(kw.end == 99)
+kw.in, kw.as = 7, 8                        ## a multiple assignment on fields
+assert(kw.in == 7 and kw.as == 8)
+func kw.for(x)                             ## a function defined on a field
+    return x * 2
+end
+assert(kw.for(21) == 42)
+func bumpRef(r)
+    r.set(r.get() + 1)
+end
+bumpRef(ref kw.while)                      ## a field path behind a 'ref'
+assert(kw.while == 10)
+
+class KwHolder
+    func init()
+        self.end = 5
+    end
+    func get()
+        return self.end                    ## a field on self, inside a method
+    end
+end
+assert(KwHolder().get() == 5)
+
+## true, false and nil are LEFT OUT on purpose: they carry a value, so turning them into
+## strings silently would be a trap (the refusal itself is pinned in test_errors.sh).
+assert(kw[true] == nil)                    ## a boolean key is a key of its own, not "true"
+
 print("regressions ok")

@@ -84,6 +84,14 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# A keyword spells a NAME as a map key or a field, but true/false/nil are left out: they carry
+# a value, so ["true"] must be written out rather than turned into a string in silence.
+check_error "true as a map-literal key"   'var m = {true: 1}'   "expected string, identifier, or [expr] key in map literal"
+check_error "nil as a map-literal key"    'var m = {nil: 1}'    "expected string, identifier, or [expr] key in map literal"
+check_error "a keyword as a variable name" 'var end = 1'        "unexpected token 'end'"
+check_error "a field with no name"        'var m = {}
+print(m.)'                                                      "expected a field name"
+
 # Malformed numeric literals.
 check_error "an octal literal with an invalid digit"      'print(0o18)'   "invalid octal literal"
 check_error "octal 9"                    'print(0o9)'    "invalid octal literal"

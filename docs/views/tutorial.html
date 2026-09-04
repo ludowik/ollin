@@ -1066,6 +1066,7 @@ inc()
 <section id="maps">
 <h2>Maps</h2>
 <p>A key→value dictionary. The literal syntax accepts strings, identifiers, or <strong>computed keys</strong> <code>[expr]</code>; at run time any value can serve as a key (<code>nil</code>, an integer, a float, a string, a bool, an array, a map, a function…).</p>
+<p>A <strong>keyword</strong> is a plain name in the two places where no keyword can be meant — a key in a literal and a field after a dot — so data whose keys read like keywords needs no detour: <code>{end: 1, in: 2, class: "c"}</code>, then <code>m.end</code>. The exceptions are <code>true</code>, <code>false</code> and <code>nil</code>, which carry a value: write <code>{["true"]: 1}</code> for the string, or <code>{[true]: 1}</code> for the boolean key itself.</p>
 
 <h3>Creating one</h3>
 <pre><code><span class="kw">var</span> empty = {}

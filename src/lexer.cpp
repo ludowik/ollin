@@ -40,6 +40,16 @@ static const robin_hood::unordered_map<std::string, TokenType> s_keywords = {
     {"enum", TokenType::ENUM},       {"ref", TokenType::REF},
 };
 
+bool is_keyword_type(TokenType t) {
+    static const robin_hood::unordered_set<int> types = [] {
+        robin_hood::unordered_set<int> set;
+        for (const auto& kv : s_keywords)
+            set.insert((int)kv.second);
+        return set;
+    }();
+    return types.count((int)t) != 0;
+}
+
 Lexer::Lexer(std::string source, std::string filename, int file_idx)
     : src(std::move(source)), filename_(std::move(filename)), file_idx_(file_idx), len_(static_cast<int>(src.size())) {
 }

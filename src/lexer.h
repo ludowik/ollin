@@ -3,6 +3,11 @@
 #include <string>
 #include <vector>
 
+// True for the token types the lexer produces from a KEYWORD spelling ('end', 'in', 'ref'…).
+// The parser needs it where the grammar wants a plain name, a position in which no keyword
+// can be meant. Lives here because the keyword table does.
+bool is_keyword_type(TokenType t);
+
 class Lexer {
   public:
     explicit Lexer(std::string source, std::string filename = "", int file_idx = 0);

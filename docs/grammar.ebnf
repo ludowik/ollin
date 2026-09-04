@@ -236,6 +236,8 @@ mapLit         = "{" [ mapEntry { "," mapEntry } ] "}" ;
 mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* a literal key: IDENT, STRING and ["STRING"] are equivalent, the key being the string *)
                  (*   { ref: 12 } is { "ref": 12 } is { ["ref"]: 12 }, the key being "ref" *)
+                 (* a KEYWORD spells a name here, and after a "." as well: { end: 1 }, m.in, ref c.class *)
+                 (*   the exceptions are true, false and nil, which carry a value: use ["true"] for those *)
                  (* a computed key: [expr] evaluates expr at run time and uses its value as the key *)
                  (*   { [ref]: 12 } takes the key from the variable ref, of any Value type: a string, an int, … *)
                  (* access: m["k"] and m.k are equivalent, for reading, writing and compound assignment *)
