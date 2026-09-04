@@ -103,6 +103,20 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# A line opening with a delimiter is LINKED to the expression above and never begins a statement.
+# The only case that contradicted the rule — nothing to continue — is refused.
+check_error "a statement beginning with a parenthesis" \
+    'var f = func(n)
+    return n
+end
+var a = 1
+(f)(7)' \
+    "a statement cannot begin with '('"
+check_error "a statement beginning with a bracket" \
+    'var a = 1
+[9]' \
+    "a statement cannot begin with '['"
+
 # static is refused on init and on the meta-methods: a constructor and an operator always
 # receive the object (documented under `method` in grammar.ebnf).
 check_error "static init" \

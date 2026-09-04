@@ -213,6 +213,14 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         // ';' is only valid inside a range [a;b], where range_expr consumes it. At statement
         // level it is an error, reported explicitly.
         fail("';' is not valid syntax — statements are terminated by newlines");
+    case TokenType::LPAREN:
+    case TokenType::LBRACKET:
+        // A line that opens with a delimiter CONTINUES the expression above — that is what one
+        // reads, and a continuation never reaches this point, being consumed by the previous
+        // expression. Getting here therefore means there was nothing to continue, so the line
+        // is a statement beginning with a delimiter: refused, since no statement does.
+        fail(std::string("a statement cannot begin with '") + peek().lexeme +
+             "' — such a line continues the expression above; give the value a name instead");
     case TokenType::WHILE:
         return while_stmt();
     case TokenType::DO:

@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-04 13:28</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-04 14:02</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-04 13:28</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-04 14:02</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -716,7 +716,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 
 <div class="callout"><code>then</code>, <code>do</code> and <code>end</code> delimit the blocks — brackets around a condition are never required.</div>
 
-<div class="callout">The other side of that freedom: a line that <strong>could</strong> continue the previous one <strong>does</strong>, since a statement ends when the expression can no longer be extended and not at the end of its line. There is nothing to watch out for, though: no statement can begin with an operator or with a <code>.</code>, so such a line can only be a continuation — which is exactly what one reads.</div>
+<div class="callout">The other side of that freedom: a line that <strong>could</strong> continue the previous one <strong>does</strong>, since a statement ends when the expression can no longer be extended and not at the end of its line. There is nothing to watch out for, though — a line beginning with an operator, a <code>.</code>, a <code>(</code> or a <code>[</code> is <strong>linked to the expression above</strong>, which is exactly what one reads. No statement begins with any of those, and one that tried is refused: write <code>f(<span class="num">7</span>)</code>, not <code>(f)(<span class="num">7</span>)</code> on a line of its own.</div>
 </section>
 
 <!-- ── If ────────────────────────────────────────────────────────────────── -->
