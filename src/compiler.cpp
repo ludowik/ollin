@@ -178,6 +178,7 @@ struct CollectLocalsVisitor : StmtQuery {
     bool collect_funcs;
     const std::vector<std::string>& files;
     std::unordered_set<std::string>* funcs; // the names of the local functions, bound straight away, when asked for
+    std::unordered_map<std::string, std::string> alias_of; // an import alias → the module it names
 
     CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen, bool collect_funcs,
                          const std::vector<std::string>& files, std::unordered_set<std::string>* funcs)
@@ -189,9 +190,25 @@ struct CollectLocalsVisitor : StmtQuery {
                             // 'constant' is an ordinary local, immutable at compile time
             for (auto& n : s.names) {
                 if (!seen.insert(n).second) {
+                    // A second alias for the SAME module is not a redeclaration: a flat import
+                    // copies a module's statements into the importer's scope, so two modules
+                    // sharing one library under one alias both declare it here. The declaration
+                    // is dropped (the compiler makes it a no-op too, keeping the map filled).
+                    if (!s.import_alias_of.empty()) {
+                        auto it = alias_of.find(n);
+                        if (it != alias_of.end() && it->second == s.import_alias_of)
+                            continue;
+                        throw std::runtime_error(s.sloc().str(files) + ": cannot import '" + s.import_alias_of +
+                                                 "' as '" + n + "' here: " +
+                                                 (it != alias_of.end() ? "'" + it->second + "' is already imported"
+                                                                       : "a variable is already declared") +
+                                                 " under that name in this scope");
+                    }
                     throw std::runtime_error(s.sloc().str(files) + ": local variable '" + n +
                                              "' already declared in this scope");
                 }
+                if (!s.import_alias_of.empty())
+                    alias_of.emplace(n, s.import_alias_of);
                 out.push_back(n);
             }
         }
@@ -412,6 +429,14 @@ void Compiler::visit(const VarDeclStmt& s) {
         local_regs_[name] = reg;
         return reg;
     };
+    // A second alias of the SAME module in this scope emits nothing: the map is already there,
+    // filled, and re-running `var name = {}` would empty it.
+    if (!s.import_alias_of.empty()) {
+        auto it = alias_module_.find(s.names[0]);
+        if (it != alias_module_.end() && it->second == s.import_alias_of)
+            return;
+        alias_module_.emplace(s.names[0], s.import_alias_of);
+    }
     // A const is registered HERE and not at the end of the function: the multi-return path
     // returns early, and `const a, b = f()` silently lost its constness.
     if (s.is_constant)
@@ -543,6 +568,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     // The constants belong to the scope too: without this, `do const x = 1 end` then `var x = 2`
     // refused to assign x, a name with nothing to do with the block's.
     auto saved_consts = const_names_;
+    auto saved_aliases = alias_module_;
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
@@ -574,6 +600,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     local_regs_ = std::move(saved_regs);
     pending_var_reg_ = std::move(saved_pending);
     const_names_ = std::move(saved_consts);
+    alias_module_ = std::move(saved_aliases);
     reg_top_ = has_func ? block_locals_top : saved_top;
     locals_top_ = saved_locals;
 }
@@ -881,11 +908,13 @@ void Compiler::visit(const TryCatchStmt& s) {
 
 Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
     : c(comp), regs(std::move(comp.local_regs_)), pending(std::move(comp.pending_var_reg_)),
-      upvals(std::move(comp.cur_upval_idx_)), consts(comp.const_names_), top(comp.reg_top_), count(comp.reg_count_),
-      locals(comp.locals_top_), fidx(comp.current_func_idx_), name(comp.current_func_name) {
+      upvals(std::move(comp.cur_upval_idx_)), consts(comp.const_names_), aliases(std::move(comp.alias_module_)),
+      top(comp.reg_top_), count(comp.reg_count_), locals(comp.locals_top_), fidx(comp.current_func_idx_),
+      name(comp.current_func_name) {
     c.outer_scopes_.push_back({regs, upvals, consts, fidx}); // for upvalue resolution
     c.try_floors_.push_back(c.try_depth_);                   // this body's returns are relative to HERE
     c.const_names_.clear();
+    c.alias_module_.clear();
     c.current_func_name = fname;
     c.cur_upval_idx_.clear();
     c.local_regs_.clear();
@@ -902,6 +931,7 @@ Compiler::FuncScope::~FuncScope() {
     c.pending_var_reg_ = std::move(pending);
     c.cur_upval_idx_ = std::move(upvals);
     c.const_names_ = std::move(consts);
+    c.alias_module_ = std::move(aliases);
     c.reg_top_ = top;
     c.reg_count_ = count;
     c.locals_top_ = locals;

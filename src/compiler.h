@@ -60,6 +60,10 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::unordered_set<std::string>
         declared_globals_;                        // the declared globals: the source's, the builtins and the modules
     std::unordered_set<std::string> const_names_; // locals declared with 'const'
+    // Import aliases bound in the CURRENT scope, each with the module it names: a second `import
+    // "m" as name` for the same module in the same scope must emit nothing, or it would clear the
+    // map the first one filled. Saved and restored exactly where const_names_ is.
+    std::unordered_map<std::string, std::string> alias_module_;
     // Enums declared under a plain name, so that visible writes are refused at compile time with a
     // message naming the element. The VM still covers every other path.
     std::unordered_set<std::string> enum_names_;
@@ -91,6 +95,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         Compiler& c;
         std::unordered_map<std::string, int> regs, pending, upvals;
         std::unordered_set<std::string> consts;
+        std::unordered_map<std::string, std::string> aliases;
         int top, count, locals, fidx;
         std::string name;
         FuncScope(Compiler& comp, const std::string& fname);

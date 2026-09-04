@@ -1798,36 +1798,41 @@ assert(CY == H / 2)
 ## after a '.'. grammar.ebnf says so ({ ref: 12 } is { "ref": 12 }) but the lexer classifies a
 ## word by its spelling alone, so the parser has to decide it by position. Every way of naming
 ## a field is covered, since each had its own call site.
-var kw = {end: 1, in: 2, class: "c", do: 4, case: 5, static: 6, ref: 7, for: 8, while: 9}
-assert(kw.end == 1 and kw.in == 2 and kw.class == "c")
-assert(kw["end"] == kw.end)               ## the same key, written two ways
-kw.end = 99                               ## a field assignment
-assert(kw.end == 99)
-kw.in, kw.as = 7, 8                        ## a multiple assignment on fields
-assert(kw.in == 7 and kw.as == 8)
-func kw.for(x)                             ## a function defined on a field
-    return x * 2
-end
-assert(kw.for(21) == 42)
-func bumpRef(r)
-    r.set(r.get() + 1)
-end
-bumpRef(ref kw.while)                      ## a field path behind a 'ref'
-assert(kw.while == 10)
-
-class KwHolder
-    func init()
-        self.end = 5
+## Held in a function: its locals then live in its own frame, the top level of this file being
+## close to the 255-register limit.
+func checkKeywordNames()
+    var kw = {end: 1, in: 2, class: "c", do: 4, case: 5, static: 6, ref: 7, for: 8, while: 9}
+    assert(kw.end == 1 and kw.in == 2 and kw.class == "c")
+    assert(kw["end"] == kw.end)               ## the same key, written two ways
+    kw.end = 99                               ## a field assignment
+    assert(kw.end == 99)
+    kw.in, kw.as = 7, 8                        ## a multiple assignment on fields
+    assert(kw.in == 7 and kw.as == 8)
+    func kw.for(x)                             ## a function defined on a field
+        return x * 2
     end
-    func get()
-        return self.end                    ## a field on self, inside a method
+    assert(kw.for(21) == 42)
+    func bumpRef(r)
+        r.set(r.get() + 1)
     end
-end
-assert(KwHolder().get() == 5)
+    bumpRef(ref kw.while)                      ## a field path behind a 'ref'
+    assert(kw.while == 10)
 
-## true, false and nil are LEFT OUT on purpose: they carry a value, so turning them into
-## strings silently would be a trap (the refusal itself is pinned in test_errors.sh).
-assert(kw[true] == nil)                    ## a boolean key is a key of its own, not "true"
+    class KwHolder
+        func init()
+            self.end = 5
+        end
+        func get()
+            return self.end                    ## a field on self, inside a method
+        end
+    end
+    assert(KwHolder().get() == 5)
+
+    ## true, false and nil are LEFT OUT on purpose: they carry a value, so turning them into
+    ## strings silently would be a trap (the refusal itself is pinned in test_errors.sh).
+    assert(kw[true] == nil)                    ## a boolean key is a key of its own, not "true"
+end
+checkKeywordNames()
 
 ## A bare 'return' as the last statement of a switch arm. The set of tokens meaning "no return
 ## value" was written out a second time in return_stmt, and 'case' was missing from it: the form
@@ -1989,14 +1994,17 @@ assert(sameTurnGet() == 8)
 ## '#' is a real unary OPERATOR (the LEN opcode), not a call by name to `len`. It was desugared
 ## into len(x), resolved in the user's scope, so a variable called len intercepted it and the
 ## program died on "call on non-function value" — the very trap ref's __ref_v parameter avoids.
-var len = 7
-assert(#[1, 2, 3] == 3)
-assert(len == 7)
-assert(#"café" == 4)          ## in codepoints, as the builtin counts
-assert(#{a: 1, b: 2} == 2)
-assert(#nil == 0)
-assert(#42 == 1)
-assert(#[1;5] == 5)           ## a range knows its length
+func checkLengthOperator()
+    var len = 7               ## shadows the builtin: '#' must not go through the name
+    assert(#[1, 2, 3] == 3)
+    assert(len == 7)
+    assert(#"café" == 4)      ## in codepoints, as the builtin counts
+    assert(#{a: 1, b: 2} == 2)
+    assert(#nil == 0)
+    assert(#42 == 1)
+    assert(#[1;5] == 5)       ## a range knows its length
+end
+checkLengthOperator()
 
 ## A return that yields NO value still leaves nil where the caller reads its result. The slot
 ## kept whatever was there, so `var a = g()` on a bare `return` came back with a neighbouring
@@ -2036,5 +2044,16 @@ func checkValuelessReturn()
     assert(twoArgs(retNone(), "tail") == "nil|tail")
 end
 checkValuelessReturn()
+
+## A library shared by TWO modules, each aliasing it under the same name. A flat import copies a
+## module's statements into the importer's scope, so both `var shd = {}` landed here and the
+## program was refused with "local variable 'shd' already declared in this scope" — impossible to
+## alias a shared library from two modules. The second declaration names the SAME module, so it
+## is a no-op and the two importers share the map. Two DIFFERENT modules under one alias stay
+## refused, with a message naming both files (test_errors.sh).
+import "alias_import1_test.ol"
+import "alias_import2_test.ol"
+assert(aliasOne() == 7)
+assert(aliasTwo() == 14)
 
 print("regressions ok")

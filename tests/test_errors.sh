@@ -4,6 +4,25 @@ OLLIN=./build/ollin
 PASS=0
 FAIL=0
 
+# Same as check_error, but the code lives in a FILE: an import resolves against the importing
+# file's directory, which /dev/stdin does not have.
+check_error_file() {
+    local desc="$1"
+    local file="$2"
+    local expected="$3"
+    local actual
+    actual=$($OLLIN "$file" 2>&1)
+    if echo "$actual" | grep -qF "$expected"; then
+        echo "OK  $desc"
+        PASS=$((PASS+1))
+    else
+        echo "FAIL $desc"
+        echo "     expected: $expected"
+        echo "     got:      $actual"
+        FAIL=$((FAIL+1))
+    fi
+}
+
 check_error() {
     local desc="$1"
     local code="$2"
@@ -83,6 +102,11 @@ func f()
     k = 0
 end' \
     "cannot assign to const 'k'"
+
+# Two DIFFERENT modules under one alias in one scope is a genuine contradiction, and the message
+# names both files instead of talking about a local variable.
+check_error_file "two modules under one alias" tests/alias_clash_test.ol \
+    "is already imported under that name in this scope"
 
 # Every target of a multiple assignment must be an lvalue, the same rule as a single assignment.
 check_error "a call as a multiple-assignment target" \

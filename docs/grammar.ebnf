@@ -41,6 +41,10 @@ importStmt     = "import" STRING [ "as" IDENT ] NL ;
                     scope; WITH `as`, they are gathered as the fields of a map of that name. The
                     names injected are those DECLARED at the module's top level: var, const, func,
                     class and enum *)
+                 (* an alias is desugared into a `var` of the importing scope, so TWO modules
+                    importing one shared library under the same alias both declare it there. The
+                    second declaration names the same module, so it does nothing and the two share
+                    the map; two DIFFERENT modules under one alias is a contradiction, and refused *)
                  (* what crosses the boundary, and what does not:
                       a `global` of either file is shared, so a module can fill the host's state;
                       a function of the host reads a `const` of the module, and the other way round

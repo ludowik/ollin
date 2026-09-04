@@ -273,6 +273,11 @@ struct VarDeclStmt : Stmt {
     std::vector<std::unique_ptr<Expr>> values;
     bool is_global = false;   // true when declared with 'global', hence a global variable
     bool is_constant = false; // true when declared with 'constant', hence an immutable local
+    // The module this declaration is the ALIAS of, when `import "m" as name` generated it (empty
+    // otherwise). A flat import copies a module's statements into the importer's scope, so two
+    // modules sharing one library under one alias both produce `var name = {}` in the SAME scope:
+    // the second is a no-op rather than a redeclaration, since it names the same module.
+    std::string import_alias_of;
     void exported_names(std::vector<std::string>& out) const override {
         for (auto& n : names)
             out.push_back(n);

@@ -1250,6 +1250,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
         auto vd = std::make_unique<VarDeclStmt>();
         vd->line = path_line;
         vd->file_idx = current_file_idx_;
+        vd->import_alias_of = resolved; // two importers of the same module may both declare it
         vd->names.push_back(al);
         vd->values.push_back(std::make_unique<MapExpr>());
         block->stmts.push_back(std::move(vd));
