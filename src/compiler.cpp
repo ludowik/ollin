@@ -255,10 +255,30 @@ struct CollectGlobalsVisitor : StmtQuery {
     std::unordered_set<std::string>& out;
     std::unordered_set<std::string>& enums;
     const std::vector<std::string>& files;
+    // How many times each bare-name enum is DECLARED, and which names are ASSIGNED anywhere.
+    // Both decide whether an enum's members may be folded into constants: an enum declared
+    // twice, or a name later reassigned, has no single compile-time value (`RgCol = 5` is legal,
+    // the freeze holding the CONTENT and not the name).
+    std::unordered_map<std::string, int>& enum_decls;
+    std::unordered_set<std::string>& assigned;
 
     CollectGlobalsVisitor(std::unordered_set<std::string>& out, std::unordered_set<std::string>& enums,
-                          const std::vector<std::string>& files)
-        : out(out), enums(enums), files(files) {
+                          const std::vector<std::string>& files, std::unordered_map<std::string, int>& enum_decls,
+                          std::unordered_set<std::string>& assigned)
+        : out(out), enums(enums), files(files), enum_decls(enum_decls), assigned(assigned) {
+    }
+
+    void visit(const AssignStmt& s) override {
+        assigned.insert(s.name);
+    }
+    void visit(const MultiAssignStmt& s) override {
+        for (auto& t : s.targets)
+            if (auto* ve = dynamic_cast<const VarExpr*>(t.get()))
+                assigned.insert(ve->name);
+    }
+    void visit(const VarDeclStmt& s) override {
+        assigned.insert(s.names.begin(), s.names.end()); // a local of the same name shadows the enum
+        collect_declared(s);
     }
 
     // The tree's topology is declared by the nodes themselves (Stmt::for_each_body, ast.h)
@@ -271,7 +291,7 @@ struct CollectGlobalsVisitor : StmtQuery {
         }
     }
 
-    void visit(const VarDeclStmt& s) override {
+    void collect_declared(const VarDeclStmt& s) {
         if (s.is_global) {
             for (auto& n : s.names) {
                 if (!out.insert(n).second) {
@@ -284,6 +304,7 @@ struct CollectGlobalsVisitor : StmtQuery {
         if (!s.obj_expr) {
             out.insert(s.name); // an enum under a bare name is a global, like a class
             enums.insert(s.name);
+            ++enum_decls[s.name];
         }
     }
     void visit(const ClassDeclStmt& s) override {
@@ -292,8 +313,10 @@ struct CollectGlobalsVisitor : StmtQuery {
 };
 
 static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::unordered_set<std::string>& out,
-                            std::unordered_set<std::string>& enums, const std::vector<std::string>& files) {
-    CollectGlobalsVisitor v(out, enums, files);
+                            std::unordered_set<std::string>& enums, const std::vector<std::string>& files,
+                            std::unordered_map<std::string, int>& enum_decls,
+                            std::unordered_set<std::string>& assigned) {
+    CollectGlobalsVisitor v(out, enums, files, enum_decls, assigned);
     v.walk(stmts);
 }
 
@@ -306,6 +329,48 @@ static bool negated_literal(const UnaryExpr& e, Value& out) {
     if (!n)
         return false;
     out = n->is_integer ? Value((int64_t)(0 - (uint64_t)n->ival)) : num_value(-n->value);
+    return true;
+}
+
+// The value of an expression that IS a literal, hence known at compile time.
+static bool literal_value(const Expr& e, Value& out) {
+    if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
+        out = n->is_integer ? Value(n->ival) : num_value(n->value);
+        return true;
+    }
+    if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
+        out = Value(s->value);
+        return true;
+    }
+    if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
+        out = Value::make_bool(b->value);
+        return true;
+    }
+    if (auto* u = dynamic_cast<const UnaryExpr*>(&e))
+        return negated_literal(*u, out);
+    return false;
+}
+
+// `Name.MEMBER` where Name is a foldable enum already compiled and MEMBER has a literal value:
+// the access becomes a constant load. The name must not be shadowed HERE — a local or an
+// upvalue of the same name is a different variable, and reading its field is a real lookup.
+bool Compiler::fold_enum_member(const Expr& e, Value& out) {
+    auto* ix = dynamic_cast<const IndexExpr*>(&e);
+    if (!ix)
+        return false;
+    auto* obj = dynamic_cast<const VarExpr*>(ix->obj.get());
+    auto* key = dynamic_cast<const StringExpr*>(ix->key.get());
+    if (!obj || !key)
+        return false;
+    auto en = enum_consts_.find(obj->name);
+    if (en == enum_consts_.end())
+        return false;
+    auto member = en->second.find(key->value);
+    if (member == en->second.end())
+        return false;
+    if (local_regs_.count(obj->name) != 0 || resolve_upvalue(obj->name) >= 0)
+        return false;
+    out = member->second;
     return true;
 }
 
@@ -367,7 +432,29 @@ Chunk Compiler::compile(const Program& prog) {
     chunk.source_files = prog.source_files;
     reg_top_ = 0;
     reg_count_ = 8;
-    collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files);
+    std::unordered_map<std::string, int> enum_decls;
+    std::unordered_set<std::string> assigned_names;
+    collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files, enum_decls, assigned_names);
+    // An enum whose name is declared once, never reassigned, and declared where the statement is
+    // CERTAIN to run has one value per member for the whole program, so `Colour.RED` can become a
+    // constant load (see fold_enum_member). "Certain to run" is the top level of the program: a
+    // declaration inside a function or under an `if` may never execute, and folding would then
+    // hand a value to code that used to fail on a nil enum. An import is flattened into a
+    // BlockStmt container, which does run, so a module's enums are folded too.
+    std::unordered_set<std::string> certain;
+    std::function<void(const std::vector<std::unique_ptr<Stmt>>&)> scan_certain =
+        [&](const std::vector<std::unique_ptr<Stmt>>& stmts) {
+            for (auto& st : stmts) {
+                if (auto* en = dynamic_cast<const EnumDeclStmt*>(st.get()); en && !en->obj_expr)
+                    certain.insert(en->name);
+                else if (auto* blk = dynamic_cast<const BlockStmt*>(st.get()))
+                    scan_certain(blk->stmts);
+            }
+        };
+    scan_certain(prog.stmts);
+    for (auto& kv : enum_decls)
+        if (kv.second == 1 && certain.count(kv.first) != 0 && assigned_names.count(kv.first) == 0)
+            foldable_enums_.insert(kv.first);
     for (auto& n : builtin_module_names())
         declared_globals_.insert(n);
     for (auto& n : builtin_func_names())
@@ -1455,6 +1542,13 @@ void Compiler::visit(const MapExpr& e) {
 }
 
 void Compiler::visit(const IndexExpr& e) {
+    Value folded;
+    if (fold_enum_member(e, folded)) {
+        int dest = alloc_reg();
+        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(folded)));
+        last_reg_ = dest;
+        return;
+    }
     e.obj->accept(*this);
     int obj_r = last_reg_;
     // Reserve the object's register before evaluating the key: a 0-argument call leaves
@@ -2164,6 +2258,18 @@ void Compiler::visit(const EnumDeclStmt& s) {
     }
 
     chunk.emit(make_abc((uint8_t)Op::SEAL_ENUM, (uint8_t)dest, 0, 0));
+
+    // Record the members whose value is a literal, so later code reads them as constants. Per
+    // MEMBER and not per enum: an enum holding an array or a function keeps a real lookup for
+    // those, and folds the rest.
+    if (!s.obj_expr && foldable_enums_.count(s.name) != 0) {
+        auto& members = enum_consts_[s.name];
+        for (auto& it : s.items) {
+            Value v;
+            if (literal_value(*it.value, v))
+                members[it.name] = v;
+        }
+    }
 
     if (!s.obj_expr) {
         // The name is already in declared_globals_ AND enum_names_ from the collect_globals pass.

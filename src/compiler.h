@@ -67,6 +67,14 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // Enums declared under a plain name, so that visible writes are refused at compile time with a
     // message naming the element. The VM still covers every other path.
     std::unordered_set<std::string> enum_names_;
+    // Enums whose name is declared once and never reassigned: their members have one value for
+    // the whole program. The second map holds those values, filled when the declaration is
+    // COMPILED, so only code compiled after it folds — a member read before the declaration has
+    // run keeps failing as it did.
+    std::unordered_set<std::string> foldable_enums_;
+    std::unordered_map<std::string, std::unordered_map<std::string, Value>> enum_consts_;
+    // `Name.MEMBER` of a foldable enum, when the name is not shadowed here: gives its value.
+    bool fold_enum_member(const Expr& e, Value& out);
     std::string current_func_name; // "" = global scope
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's

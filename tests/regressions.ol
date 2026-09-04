@@ -2109,4 +2109,37 @@ func checkLambdaInInterpolation()
 end
 checkLambdaInInterpolation()
 
+## An enum member with a literal value is read as a CONSTANT, the compiler knowing the value.
+## The fold is invisible, so what is pinned here is everything that must NOT fold: a name
+## shadowed by a local, a member holding an object or a function, an enum declared where the
+## statement may never run, and a name that is reassigned (checked above by
+## checkEnumNameIsOrdinary, whose RgCol is both declared twice and reassigned).
+enum FoState IDLE = 0, WALK, JUMP = 10 end
+assert(FoState.IDLE == 0 and FoState.WALK == 1 and FoState.JUMP == 10)
+
+func foShadowed()
+    var FoState = [nil, 99]    ## a local of the same name is a DIFFERENT variable
+    return FoState[2]
+end
+assert(foShadowed() == 99)
+
+func foSquare(x) return x * x end
+enum FoMixed N = 4, F = foSquare, L = [7, 8] end
+assert(FoMixed.N == 4)         ## literal: folded
+assert(FoMixed.F(6) == 36)     ## a function stays a real lookup
+assert(FoMixed.L[2] == 8)      ## so does an array
+
+func foDeferred()
+    enum FoLate A = 1 end      ## declared inside a function: it may never run, so no fold
+end
+var foReached = 0
+try
+    foReached = FoLate.A       ## still fails, exactly as before
+catch err
+    foReached = -1
+end
+assert(foReached == -1)
+foDeferred()
+assert(FoLate.A == 1)          ## and once it HAS run, the ordinary lookup finds it
+
 print("regressions ok")

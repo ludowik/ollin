@@ -1625,6 +1625,28 @@ sont les upvalues qui font tout le travail, y compris la capture d'une locale.
 
 > Syntaxe, numérotation et sémantique : voir `grammar.ebnf` (`enumDecl`).
 
+**`Enum.MEMBRE` est un CHARGEMENT DE CONSTANTE** quand le compilateur connaît la valeur
+(`fold_enum_member`, compiler.cpp) : une lecture coûtait un `GET_INDEX` avec sa recherche
+dans la map, soit **118 instructions de plus par lecture** (mesuré : une boucle de 300 000
+tours lisant deux membres passe de 147,3 M à 76,4 M, −48 %). Le figeage n'est appliqué
+qu'aux enums qui n'ont qu'une valeur possible pour tout le programme, et **quatre
+conditions** sont exigées, chacune pour un cas réel :
+- **déclaré une seule fois** — deux `enum E` sous le même nom n'ont pas de valeur unique ;
+- **jamais réaffecté** — le gel porte sur le CONTENU, pas sur le nom, donc `E = 5` est légal
+  (figé dans `regressions.ol`) ;
+- **déclaré là où l'instruction s'exécute à COUP SÛR**, c'est-à-dire au premier niveau du
+  programme. Un `enum` dans une fonction ou sous un `if` peut ne jamais s'exécuter, et le
+  figeage rendrait alors une valeur à du code qui échouait sur un enum `nil`. Un `import`
+  étant aplati dans un `BlockStmt`, qui lui s'exécute, les enums d'un module sont figés ;
+- **non masqué au point de lecture** — une locale ou une upvalue du même nom est une autre
+  variable, et lire son champ reste une vraie recherche.
+
+Le figeage est **par MEMBRE** : un enum portant un tableau ou une fonction garde une vraie
+recherche pour ceux-là et fige les autres. Les valeurs sont relevées quand la déclaration
+est COMPILÉE, donc seul le code compilé ensuite en profite — une lecture placée avant
+échoue comme avant. Le repli est silencieux et correct : rien ne casse quand une condition
+manque, seule l'économie disparaît.
+
 Un enum **est une map** (`T_MAP`), distinguée par `Map::kind == Map::ENUM`. Pas de tag
 dédié : en LECTURE (`GET_INDEX`, `MAKE_ITER`, `isFalsy`, `len`, affichage) un enum se
 comporte exactement comme une map et **aucun de ces chemins ne connaît les enums**.
