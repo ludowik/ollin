@@ -1998,4 +1998,43 @@ assert(#nil == 0)
 assert(#42 == 1)
 assert(#[1;5] == 5)           ## a range knows its length
 
+## A return that yields NO value still leaves nil where the caller reads its result. The slot
+## kept whatever was there, so `var a = g()` on a bare `return` came back with a neighbouring
+## register — a function value. The three return paths (RETURN, RETURN_V, RETURN_SPREAD) go
+## through the same point, and last_results_ stays 0: the multi-value model is untouched, which
+## the last two assertions check.
+## Held in a FUNCTION rather than at the top level: its locals then live in its own frame, and
+## the top level of this file is close to the 255-register limit.
+class RetK
+    func m()
+        return
+    end
+end
+func checkValuelessReturn()
+    func retNone()
+        return
+    end
+    func retImplicit()
+        var unused = 1
+    end
+    func retSpread()
+        return retNone()
+    end
+    func twoArgs(a, b)
+        return "" + a + "|" + b
+    end
+    var rn = retNone()
+    var ri = retImplicit()
+    var rs = retSpread()
+    assert(rn == nil and ri == nil and rs == nil)
+    var rd, re = retNone()
+    assert(rd == nil and re == nil)
+    assert(RetK().m() == nil)
+    ## Zero values REMAIN zero values where the count matters: an array literal ending on such a
+    ## call is empty, and a non-final argument is adjusted to exactly one nil (the Lua model).
+    assert(#[retNone()] == 0)
+    assert(twoArgs(retNone(), "tail") == "nil|tail")
+end
+checkValuelessReturn()
+
 print("regressions ok")

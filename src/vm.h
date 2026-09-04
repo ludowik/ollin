@@ -21,7 +21,7 @@ class VM {
   public:
     void execute(Chunk chunk);
     std::string invoke_str(Value v);
-    static VM* current();                   // returns s_current_vm
+    static VM* current();                                           // returns s_current_vm
     Value call_value(const Value& fn, const Value* args, int argc); // the generic form
     Value call_value(const Value& fn);
     Value call_value(const Value& fn, const Value& a);
@@ -40,12 +40,16 @@ class VM {
     // Set by gfx_canvas to record that graphics.canvas() ran for this program (the VM is new
     // on every run). It lets run_entry_hooks create an IMPLICIT canvas at W×H when a draw()
     // exists but no canvas was created explicitly.
-    void mark_gfx_canvas() { gfx_canvas_created_ = true; }
-    bool gfx_canvas_created() const { return gfx_canvas_created_; }
+    void mark_gfx_canvas() {
+        gfx_canvas_created_ = true;
+    }
+    bool gfx_canvas_created() const {
+        return gfx_canvas_created_;
+    }
 
   private:
     bool gfx_canvas_created_ = false;
-    std::string err_line() const;      // "file:line" from current ip
+    std::string err_line() const;     // "file:line" from current ip
     void run_goto(size_t stop_depth); // unified computed-goto dispatch loop
     struct Handler {
         uint32_t catch_addr;
@@ -58,12 +62,12 @@ class VM {
     struct Frame {
         uint32_t return_ip = 0;
         int reg_base = 0;
-        int result_base = 0;  // where RETURN and RETURN_V write the results (= reg_base except for CALL_VARARGS,
-                              // running in a fresh window but returning to the caller's static register)
-        int varargs_base = 0; // = reg_base + fp.reg_count (where varargs live in regs)
-        int n_varargs = 0;    // count of extra variadic args (0 if none)
-        bool is_ctor = false; // true = frame is a constructor; RETURN overrides R[0] with instance
-        int return_dest = -1; // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
+        int result_base = 0;        // where RETURN and RETURN_V write the results (= reg_base except for CALL_VARARGS,
+                                    // running in a fresh window but returning to the caller's static register)
+        int varargs_base = 0;       // = reg_base + fp.reg_count (where varargs live in regs)
+        int n_varargs = 0;          // count of extra variadic args (0 if none)
+        bool is_ctor = false;       // true = frame is a constructor; RETURN overrides R[0] with instance
+        int return_dest = -1;       // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
         bool negate_result = false; // true: RETURN logically negates the result before return_dest
                                     // (used by <> through __eq, and by >/>=/</<= on the flipped side)
         std::unique_ptr<std::vector<Upvalue*>> upvals;
@@ -137,8 +141,8 @@ class VM {
     // and the result is already written); otherwise returns the address of init's body.
     uint32_t instantiate_class(int base_reg, int arg_off, int argc, Value cls, bool& done);
     uint32_t try_meta_unary(const Value& name, int dest, Value lhs);
-    void close_upvals();                     // the whole frame (return, throw) — the HOT path
-    void close_upvals_above(int threshold);   // a scope that ends, such as an iteration
+    void close_upvals();                    // the whole frame (return, throw) — the HOT path
+    void close_upvals_above(int threshold); // a scope that ends, such as an iteration
     // Unwinds to handler `h`, shrinks regs back, writes the caught value into the catch
     // register and points `ip` at the catch body. Shared by op_THROW (a script-level throw) and
     // by the C++ catch(runtime_error).
@@ -150,6 +154,20 @@ class VM {
     // that result_cap is computed in exactly one place and a future site cannot get it wrong.
     // `results` are the result slots (the arguments), `cap` the number of safe slots.
     int invoke_builtin(Value::BuiltinFn fn, Value* results, int argc, int cap, int regs_base = -1);
+    // A return that yields NO value still leaves nil where the caller reads its result. The slot
+    // kept whatever was there, so `var a = g()` on a bare `return` came back with a neighbouring
+    // register — a function value, measured. last_results_ stays 0, so print(g()) keeps its empty
+    // line and f(g()) passes no argument: the multi-value model (Lua's) is untouched.
+    // NOT inlined, and that is measured, not a guess: inlined into the three return handlers it
+    // cost the `loop` benchmark +600k instructions (+1.9 %) for code that never calls it — the
+    // register allocation of run_goto, shared by every handler, shifting. noinline brings loop
+    // and map back to their reference counts and leaves fib 0.55 % below it.
+    __attribute__((noinline)) void nil_result_slot(int slot) {
+        if ((int)regs.size() <= slot)
+            regs.resize(slot + 1);
+        regs[slot] = Value();
+    }
+
     // Register variant: results go to regs[result_base..] and `cap` is derived from the current
     // frame (varargs_base - result_base) — the error-prone computation, kept in one place.
     // Used by CALL_DYN and CALL_METHOD.
@@ -157,7 +175,7 @@ class VM {
 
     // Pushes a call frame, fills in defaults and varargs, returns fp.addr.
     uint32_t push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                           uint32_t return_ip, bool is_ctor = false, int return_dest = -1, int result_base = -1);
+                             uint32_t return_ip, bool is_ctor = false, int return_dest = -1, int result_base = -1);
 
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())

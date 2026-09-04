@@ -1197,6 +1197,8 @@ dispatch_loop:
             if (n > 0 && (wb != base || A != 0))
                 for (int i = 0; i < n; ++i)
                     regs[wb + i] = std::move(regs[base + A + i]);
+            else if (n == 0)
+                nil_result_slot(wb); // a valueless return still leaves nil where the caller reads
             uint32_t rip = call_stack.back().return_ip;
             call_stack.pop_back();
             if (is_ctor_)
@@ -1254,12 +1256,14 @@ dispatch_loop:
                 regs.resize(rbase + total);
             for (int i = 0; i < total; ++i)
                 regs[rbase + i] = std::move(rvs[i]);
+            if (total == 0)
+                nil_result_slot(rbase);
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
                 regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
             ip = rip;
-            last_results_ = is_ctor_ ? 1 : total; // pour SPREAD_RESULTS (multi-retour)
+            last_results_ = is_ctor_ ? 1 : total; // for SPREAD_RESULTS (a multiple return)
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1647,6 +1651,8 @@ dispatch_loop:
                 regs.resize(rbase + total);
             for (int i = 0; i < total; ++i)
                 regs[rbase + i] = std::move(rvs[i]);
+            if (total == 0)
+                nil_result_slot(rbase);
             if (is_ctor_)
                 regs[rbase + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
