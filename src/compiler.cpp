@@ -775,10 +775,11 @@ void Compiler::visit(const IfStmt& s) {
 // state or a tile kind rather than on bare numbers. An empty answer means "use the comparison
 // chain": a string, a computed value, a mixture of types, or `case 1` next to `case 1000000`,
 // whose table would hold a million entries for two arms.
-bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out) {
-    static const int64_t MAX_SPAN = 1024;
-    int64_t lo = INT64_MAX;
-    int64_t hi = INT64_MIN;
+bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out, int64_t& lo,
+                                   int64_t& hi) {
+    static const uint64_t MAX_SPAN = 1024;
+    lo = INT64_MAX;
+    hi = INT64_MIN;
     size_t count = 0;
     out.clear();
     out.resize(s.cases.size());
@@ -797,7 +798,11 @@ bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<
     }
     if (count == 0)
         return false;
-    return hi - lo < MAX_SPAN; // the subtraction is safe: both bounds come from the same table
+    // The span is measured UNSIGNED: `case` values reach the bounds of the 64-bit integer, and
+    // `hi - lo` then overflows — the wrapped value passed this test, and the table below tried to
+    // allocate a vector of that size (checked: "cannot create std::vector larger than max_size()").
+    // hi >= lo holds, so the unsigned difference is the exact span.
+    return (uint64_t)hi - (uint64_t)lo < MAX_SPAN;
 }
 
 // The table path: the subject is evaluated once, then a single indexed jump reaches the arm.
@@ -805,15 +810,9 @@ bool Compiler::switch_table_values(const SwitchStmt& s, std::vector<std::vector<
 // number — an instance whose `__eq` decides the match reached its arm before, and only the chain
 // can call that method. It is never executed for a number, so the fast case pays nothing.
 void Compiler::compile_switch_table(const SwitchStmt& s, int subj_r, int above_subj,
-                                    const std::vector<std::vector<int64_t>>& values) {
-    int64_t lo = INT64_MAX;
-    int64_t hi = INT64_MIN;
-    for (auto& arm : values)
-        for (int64_t v : arm) {
-            lo = v < lo ? v : lo;
-            hi = v > hi ? v : hi;
-        }
-
+                                    const std::vector<std::vector<int64_t>>& values, int64_t lo, int64_t hi) {
+    if (chunk.switch_tables.size() >= 0xFFFF)
+        throw std::runtime_error("compile: too many switch tables (max 65535)");
     uint16_t table_idx = (uint16_t)chunk.switch_tables.size();
     chunk.switch_tables.push_back({lo, std::vector<uint16_t>((size_t)(hi - lo) + 1, 0), 0, 0});
     chunk.emit(make_abx((uint8_t)Op::SWITCH, (uint8_t)subj_r, table_idx));
@@ -879,8 +878,10 @@ void Compiler::visit(const SwitchStmt& s) {
         {{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
 
     std::vector<std::vector<int64_t>> table_values;
-    if (switch_table_values(s, table_values)) {
-        compile_switch_table(s, subj_r, above_subj, table_values);
+    int64_t lo = 0;
+    int64_t hi = 0;
+    if (switch_table_values(s, table_values, lo, hi)) {
+        compile_switch_table(s, subj_r, above_subj, table_values, lo, hi);
         for (size_t p : break_patches.back().patches)
             chunk.patch_jump(p, (uint16_t)chunk.current_pos());
         break_patches.pop_back();

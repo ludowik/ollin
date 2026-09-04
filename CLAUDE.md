@@ -687,7 +687,9 @@ chaîne le donnait.
 
 **Repli** (la chaîne seule, sans table) : une valeur non entière, une valeur calculée, un mélange
 de types, ou un intervalle de plus de 1024 entrées — `case 1` à côté de `case 1000000` demanderait
-un million de cases pour deux branches. Le repli est silencieux et correct.
+un million de cases pour deux branches. L'intervalle se mesure en NON SIGNÉ : deux `case` aux
+bornes de l'entier 64 bits font déborder `hi - lo`, et la valeur enroulée passait le test (vérifié :
+« cannot create std::vector larger than max_size() »). Le repli est silencieux et correct.
 
 ⚠ **Le coût d'un opcode de plus était STRUCTUREL** (il a été SUPPRIMÉ depuis, cf. « Décodage
 d'une instruction » — le relevé ci-dessous est celui du jour de l'ajout, et il reste le

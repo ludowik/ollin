@@ -124,9 +124,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     uint8_t compile_method_func(const FuncDeclStmt& s);
     // A switch compiles to an indexed jump when every case value is an integer known at compile
     // time; otherwise to the comparison chain, which stays the general path.
-    bool switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out);
+    bool switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out, int64_t& lo, int64_t& hi);
     void compile_switch_table(const SwitchStmt& s, int subj_r, int above_subj,
-                              const std::vector<std::vector<int64_t>>& values);
+                              const std::vector<std::vector<int64_t>>& values, int64_t lo, int64_t hi);
     void compile_iterator_loop(const Expr& src, const std::string& var1, const std::string& var2,
                                const std::vector<std::unique_ptr<Stmt>>& body);
     // Fast path for the numeric for: a range literal inclusive on both bounds, one variable.

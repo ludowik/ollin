@@ -2216,4 +2216,20 @@ func cmBare()
 end
 assert(cmBare() == nil)
 
+## A switch whose case values reach the bounds of the 64-bit integer: the span between them
+## overflows a signed subtraction, and the wrapped value used to pass the table's size test —
+## the compiler then tried to allocate a vector of that size. It falls back to the chain.
+func swWide(k)
+    switch k
+    case -9223372036854775807
+        return "min"
+    case 9223372036854775807
+        return "max"
+    end
+    return "autre"
+end
+assert(swWide(-9223372036854775807) == "min")
+assert(swWide(9223372036854775807) == "max")
+assert(swWide(1) == "autre")
+
 print("regressions ok")
