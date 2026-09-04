@@ -1,304 +1,312 @@
 {
- "_": "History of the engine WORK, in executed instructions. Produced by bench/icount.sh (callgrind), one milestone per day on which the core was touched. Read by docs/views/perf.js. To extend the series, append entries to milestones.",
- "tool": "bench/icount.sh",
- "machine": "Linux x86-64 container, GCC, Release build",
- "scripts": [
-  {
-   "id": "fib",
-   "name": "fib(24) recursive",
-   "source": "func fib(n) … return fib(n-1) + fib(n-2)"
-  },
-  {
-   "id": "loop",
-   "name": "loop 300 000",
-   "source": "for i = 1, 300000 do s += i end"
-  },
-  {
-   "id": "map",
-   "name": "map with 20 000 keys",
-   "source": "20 000 writes m[\"k\"+i] = i, then for k, v in m"
-  }
- ],
- "milestones": [
-  {
-   "date": "2026-06-20",
-   "commit": "fe99827",
-   "fib": 121470752,
-   "loop": 112555011,
-   "map": 101653234,
-   "subject": "varargs + Frame POD"
-  },
-  {
-   "date": "2026-06-21",
-   "commit": "08c87d0",
-   "fib": 116969297,
-   "loop": 109555006,
-   "map": 100813220,
-   "subject": "close_upvals() leak"
-  },
-  {
-   "date": "2026-06-22",
-   "commit": "04cf60c",
-   "fib": 127988198,
-   "loop": 114719860,
-   "map": 65479409,
-   "subject": "switch + StringTable robin_hood"
-  },
-  {
-   "date": "2026-06-24",
-   "commit": "155b941",
-   "fib": 127614898,
-   "loop": 114422086,
-   "map": 65462229,
-   "subject": "builtin len()"
-  },
-  {
-   "date": "2026-06-25",
-   "commit": "a8eb6f4",
-   "fib": null,
-   "loop": null,
-   "map": null,
-   "subject": "does not compile"
-  },
-  {
-   "date": "2026-06-26",
-   "commit": "e28e017",
-   "fib": 117114988,
-   "loop": 97625698,
-   "map": 63244665,
-   "subject": "computed keys [expr]"
-  },
-  {
-   "date": "2026-06-27",
-   "commit": "03e00e0",
-   "fib": 119215825,
-   "loop": 98826364,
-   "map": 63596080,
-   "subject": "a protected register"
-  },
-  {
-   "date": "2026-06-28",
-   "commit": "2b426c7",
-   "fib": 92055658,
-   "loop": 32828616,
-   "map": 50982385,
-   "subject": "14 commits, including the FOR_PREP/FOR_LOOP fast path"
-  },
-  {
-   "date": "2026-06-29",
-   "commit": "bc4c42d",
-   "fib": 92135813,
-   "loop": 32534357,
-   "map": 51009570,
-   "subject": "lexicographic string comparison"
-  },
-  {
-   "date": "2026-06-30",
-   "commit": "0bdb391",
-   "fib": 91590639,
-   "loop": 32219165,
-   "map": 50960250,
-   "subject": "string comparison, reapplied"
-  },
-  {
-   "date": "2026-07-01",
-   "commit": "9e9013f",
-   "fib": 91517197,
-   "loop": 32820950,
-   "map": 50983112,
-   "subject": "the engine global deltaTime"
-  },
-  {
-   "date": "2026-07-02",
-   "commit": "92ef981",
-   "fib": 94444726,
-   "loop": 34322350,
-   "map": 51304398,
-   "subject": "the engine globals W and H"
-  },
-  {
-   "date": "2026-07-06",
-   "commit": "712bb5f",
-   "fib": 93841744,
-   "loop": 33422745,
-   "map": 52970313,
-   "subject": "review fixes"
-  },
-  {
-   "date": "2026-07-07",
-   "commit": "11f2cb2",
-   "fib": 93991978,
-   "loop": 33122562,
-   "map": 54148838,
-   "subject": "deduplication inside the VM"
-  },
-  {
-   "date": "2026-07-08",
-   "commit": "53d3161",
-   "fib": 94219106,
-   "loop": 33124765,
-   "map": 52594853,
-   "subject": "destination-driven codegen"
-  },
-  {
-   "date": "2026-07-09",
-   "commit": "2c552b5",
-   "fib": 93772146,
-   "loop": 33727908,
-   "map": 52515647,
-   "subject": "string indexing by codepoint"
-  },
-  {
-   "date": "2026-07-10",
-   "commit": "fa4b43d",
-   "fib": 95423400,
-   "loop": 34028645,
-   "map": 52576254,
-   "subject": "the CW and CH globals"
-  },
-  {
-   "date": "2026-07-14",
-   "commit": "03da9f6",
-   "fib": 95948958,
-   "loop": 34328856,
-   "map": 52537082,
-   "subject": "the memory overlay"
-  },
-  {
-   "date": "2026-07-16",
-   "commit": "a6962e9",
-   "fib": 93998322,
-   "loop": 34628852,
-   "map": 52497073,
-   "subject": "pool corruption fixed"
-  },
-  {
-   "date": "2026-07-18",
-   "commit": "559297e",
-   "fib": 93475534,
-   "loop": 34031634,
-   "map": 52521234,
-   "subject": "a line N: prefix on the errors"
-  },
-  {
-   "date": "2026-07-19",
-   "commit": "f57f7d0",
-   "fib": 93792050,
-   "loop": 33748188,
-   "map": 52558254,
-   "subject": "BuiltinFn to CallCtx"
-  },
-  {
-   "date": "2026-07-20",
-   "commit": "38ba6a3",
-   "fib": 101002219,
-   "loop": 32854390,
-   "map": 53806284,
-   "subject": "T_MODULE removed"
-  },
-  {
-   "date": "2026-07-21",
-   "commit": "932a184",
-   "fib": 100264587,
-   "loop": 32865100,
-   "map": 53804570,
-   "subject": "SourceLoc unified"
-  },
-  {
-   "date": "2026-07-22",
-   "commit": "cfaf679",
-   "fib": 100264668,
-   "loop": 32865291,
-   "map": 53804781,
-   "subject": "string interpolation"
-  },
-  {
-   "date": "2026-07-24",
-   "commit": "015d69a",
-   "fib": 101616180,
-   "loop": 33466264,
-   "map": 54424440,
-   "subject": "image.mapPixel"
-  },
-  {
-   "date": "2026-07-24",
-   "commit": "4b4dae5",
-   "fib": 103424087,
-   "loop": 32270233,
-   "map": 53849547,
-   "subject": "multi-value expansion of ..."
-  },
-  {
-   "date": "2026-08-01",
-   "commit": "41c24d6",
-   "fib": 104030277,
-   "loop": 32575101,
-   "map": 53895226,
-   "subject": "a monomorphic inline cache on GET_INDEX"
-  },
-  {
-   "date": "2026-08-01",
-   "commit": "42ebaf9",
-   "fib": 98343300,
-   "loop": 32589979,
-   "map": 53166888,
-   "subject": "the len key compared by pointer"
-  },
-  {
-   "date": "2026-08-04",
-   "commit": "20b457d",
-   "fib": 98197762,
-   "loop": 32594366,
-   "map": 53211117,
-   "subject": "enum"
-  },
-  {
-   "date": "2026-08-04",
-   "commit": "2f98a0a",
-   "fib": 98573738,
-   "loop": 32295119,
-   "map": 53112175,
-   "subject": "for_each_body"
-  },
-  {
-   "date": "2026-08-07",
-   "commit": "005bcef",
-   "fib": 99175795,
-   "loop": 32299996,
-   "map": 53092539,
-   "subject": "one variable per loop iteration"
-  },
-  {
-   "date": "2026-08-14",
-   "commit": "046fd62",
-   "fib": 99178462,
-   "loop": 32302639,
-   "map": 53094644,
-   "subject": "multiple reassignment from a multi-return call"
-  },
-  {
-   "date": "2026-08-18",
-   "commit": "1590046",
-   "fib": 98878598,
-   "loop": 32303057,
-   "map": 53017250,
-   "subject": "the boolean becomes a type of its own"
-  },
-  {
-   "date": "2026-08-18",
-   "commit": "f0de161",
-   "fib": 97753231,
-   "loop": 32603058,
-   "map": 52997247,
-   "subject": "is_falsy split"
-  },
-  {
-   "date": "2026-08-18",
-   "commit": "2c900b6",
-   "fib": 97753231,
-   "loop": 32603058,
-   "map": 52997247,
-   "subject": "data and icount, with no hot path touched"
-  }
- ]
+  "_": "History of the engine WORK, in executed instructions. Produced by bench/icount.sh (callgrind), one milestone per day on which the core was touched. Read by docs/views/perf.js. To extend the series, append entries to milestones.",
+  "tool": "bench/icount.sh",
+  "machine": "Linux x86-64 container, GCC, Release build",
+  "scripts": [
+    {
+      "id": "fib",
+      "name": "fib(24) recursive",
+      "source": "func fib(n) … return fib(n-1) + fib(n-2)"
+    },
+    {
+      "id": "loop",
+      "name": "loop 300 000",
+      "source": "for i = 1, 300000 do s += i end"
+    },
+    {
+      "id": "map",
+      "name": "map with 20 000 keys",
+      "source": "20 000 writes m[\"k\"+i] = i, then for k, v in m"
+    }
+  ],
+  "milestones": [
+    {
+      "date": "2026-06-20",
+      "commit": "fe99827",
+      "fib": 121470752,
+      "loop": 112555011,
+      "map": 101653234,
+      "subject": "varargs + Frame POD"
+    },
+    {
+      "date": "2026-06-21",
+      "commit": "08c87d0",
+      "fib": 116969297,
+      "loop": 109555006,
+      "map": 100813220,
+      "subject": "close_upvals() leak"
+    },
+    {
+      "date": "2026-06-22",
+      "commit": "04cf60c",
+      "fib": 127988198,
+      "loop": 114719860,
+      "map": 65479409,
+      "subject": "switch + StringTable robin_hood"
+    },
+    {
+      "date": "2026-06-24",
+      "commit": "155b941",
+      "fib": 127614898,
+      "loop": 114422086,
+      "map": 65462229,
+      "subject": "builtin len()"
+    },
+    {
+      "date": "2026-06-25",
+      "commit": "a8eb6f4",
+      "fib": null,
+      "loop": null,
+      "map": null,
+      "subject": "does not compile"
+    },
+    {
+      "date": "2026-06-26",
+      "commit": "e28e017",
+      "fib": 117114988,
+      "loop": 97625698,
+      "map": 63244665,
+      "subject": "computed keys [expr]"
+    },
+    {
+      "date": "2026-06-27",
+      "commit": "03e00e0",
+      "fib": 119215825,
+      "loop": 98826364,
+      "map": 63596080,
+      "subject": "a protected register"
+    },
+    {
+      "date": "2026-06-28",
+      "commit": "2b426c7",
+      "fib": 92055658,
+      "loop": 32828616,
+      "map": 50982385,
+      "subject": "14 commits, including the FOR_PREP/FOR_LOOP fast path"
+    },
+    {
+      "date": "2026-06-29",
+      "commit": "bc4c42d",
+      "fib": 92135813,
+      "loop": 32534357,
+      "map": 51009570,
+      "subject": "lexicographic string comparison"
+    },
+    {
+      "date": "2026-06-30",
+      "commit": "0bdb391",
+      "fib": 91590639,
+      "loop": 32219165,
+      "map": 50960250,
+      "subject": "string comparison, reapplied"
+    },
+    {
+      "date": "2026-07-01",
+      "commit": "9e9013f",
+      "fib": 91517197,
+      "loop": 32820950,
+      "map": 50983112,
+      "subject": "the engine global deltaTime"
+    },
+    {
+      "date": "2026-07-02",
+      "commit": "92ef981",
+      "fib": 94444726,
+      "loop": 34322350,
+      "map": 51304398,
+      "subject": "the engine globals W and H"
+    },
+    {
+      "date": "2026-07-06",
+      "commit": "712bb5f",
+      "fib": 93841744,
+      "loop": 33422745,
+      "map": 52970313,
+      "subject": "review fixes"
+    },
+    {
+      "date": "2026-07-07",
+      "commit": "11f2cb2",
+      "fib": 93991978,
+      "loop": 33122562,
+      "map": 54148838,
+      "subject": "deduplication inside the VM"
+    },
+    {
+      "date": "2026-07-08",
+      "commit": "53d3161",
+      "fib": 94219106,
+      "loop": 33124765,
+      "map": 52594853,
+      "subject": "destination-driven codegen"
+    },
+    {
+      "date": "2026-07-09",
+      "commit": "2c552b5",
+      "fib": 93772146,
+      "loop": 33727908,
+      "map": 52515647,
+      "subject": "string indexing by codepoint"
+    },
+    {
+      "date": "2026-07-10",
+      "commit": "fa4b43d",
+      "fib": 95423400,
+      "loop": 34028645,
+      "map": 52576254,
+      "subject": "the CW and CH globals"
+    },
+    {
+      "date": "2026-07-14",
+      "commit": "03da9f6",
+      "fib": 95948958,
+      "loop": 34328856,
+      "map": 52537082,
+      "subject": "the memory overlay"
+    },
+    {
+      "date": "2026-07-16",
+      "commit": "a6962e9",
+      "fib": 93998322,
+      "loop": 34628852,
+      "map": 52497073,
+      "subject": "pool corruption fixed"
+    },
+    {
+      "date": "2026-07-18",
+      "commit": "559297e",
+      "fib": 93475534,
+      "loop": 34031634,
+      "map": 52521234,
+      "subject": "a line N: prefix on the errors"
+    },
+    {
+      "date": "2026-07-19",
+      "commit": "f57f7d0",
+      "fib": 93792050,
+      "loop": 33748188,
+      "map": 52558254,
+      "subject": "BuiltinFn to CallCtx"
+    },
+    {
+      "date": "2026-07-20",
+      "commit": "38ba6a3",
+      "fib": 101002219,
+      "loop": 32854390,
+      "map": 53806284,
+      "subject": "T_MODULE removed"
+    },
+    {
+      "date": "2026-07-21",
+      "commit": "932a184",
+      "fib": 100264587,
+      "loop": 32865100,
+      "map": 53804570,
+      "subject": "SourceLoc unified"
+    },
+    {
+      "date": "2026-07-22",
+      "commit": "cfaf679",
+      "fib": 100264668,
+      "loop": 32865291,
+      "map": 53804781,
+      "subject": "string interpolation"
+    },
+    {
+      "date": "2026-07-24",
+      "commit": "015d69a",
+      "fib": 101616180,
+      "loop": 33466264,
+      "map": 54424440,
+      "subject": "image.mapPixel"
+    },
+    {
+      "date": "2026-07-24",
+      "commit": "4b4dae5",
+      "fib": 103424087,
+      "loop": 32270233,
+      "map": 53849547,
+      "subject": "multi-value expansion of ..."
+    },
+    {
+      "date": "2026-08-01",
+      "commit": "41c24d6",
+      "fib": 104030277,
+      "loop": 32575101,
+      "map": 53895226,
+      "subject": "a monomorphic inline cache on GET_INDEX"
+    },
+    {
+      "date": "2026-08-01",
+      "commit": "42ebaf9",
+      "fib": 98343300,
+      "loop": 32589979,
+      "map": 53166888,
+      "subject": "the len key compared by pointer"
+    },
+    {
+      "date": "2026-08-04",
+      "commit": "20b457d",
+      "fib": 98197762,
+      "loop": 32594366,
+      "map": 53211117,
+      "subject": "enum"
+    },
+    {
+      "date": "2026-08-04",
+      "commit": "2f98a0a",
+      "fib": 98573738,
+      "loop": 32295119,
+      "map": 53112175,
+      "subject": "for_each_body"
+    },
+    {
+      "date": "2026-08-07",
+      "commit": "005bcef",
+      "fib": 99175795,
+      "loop": 32299996,
+      "map": 53092539,
+      "subject": "one variable per loop iteration"
+    },
+    {
+      "date": "2026-08-14",
+      "commit": "046fd62",
+      "fib": 99178462,
+      "loop": 32302639,
+      "map": 53094644,
+      "subject": "multiple reassignment from a multi-return call"
+    },
+    {
+      "date": "2026-08-18",
+      "commit": "1590046",
+      "fib": 98878598,
+      "loop": 32303057,
+      "map": 53017250,
+      "subject": "the boolean becomes a type of its own"
+    },
+    {
+      "date": "2026-08-18",
+      "commit": "f0de161",
+      "fib": 97753231,
+      "loop": 32603058,
+      "map": 52997247,
+      "subject": "is_falsy split"
+    },
+    {
+      "date": "2026-08-18",
+      "commit": "2c900b6",
+      "fib": 97753231,
+      "loop": 32603058,
+      "map": 52997247,
+      "subject": "data and icount, with no hot path touched"
+    },
+    {
+      "date": "2026-09-04",
+      "commit": "2c4b54c",
+      "subject": "one switch emitter, and each statement declares its expressions",
+      "fib": 77954860,
+      "loop": 31104978,
+      "map": 52933344
+    }
+  ]
 }
