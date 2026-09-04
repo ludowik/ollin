@@ -1483,6 +1483,47 @@ imbriqué : une descente manquante y produirait une valeur corrompue.
 - `reg_count_` = max registres utilisés → stocké dans `FuncProto.reg_count`
 - À l'appel de fonction, la VM resize regs[] pour loger le nouveau frame
 
+**`reg_count_` est le point haut de `reg_top_`, et il ne se maintient QU'EN un endroit** :
+`bump_reg_count`, `reserve_regs_to`, `alloc_reg`, `alloc_regs` (compiler.h). C'est ce compte
+que `FuncProto.reg_count` publie, et donc ce qui borne les slots de résultat d'un builtin
+(cf. « Invariant registre ») : il était réaffirmé par une cinquantaine de copies du même `if`,
+et un seul oubli sous-évalue le compte et laisse un builtin écrire hors de son frame.
+
+**`compile_into(e, dest, dest_at_top)` — écrire DANS la case plutôt que copier ensuite.**
+`dest_at_top` dit que `dest` est le sommet de la zone de travail : les emplacements d'arguments
+d'un appel et les valeurs d'un `return`. Le drapeau autorise deux choses qui s'excluaient :
+réserver `dest + 1` pour que l'opération finale s'écrive directement dans `dest`
+(`f(n - 1)` coûte un `SUB` au lieu d'un `SUB` plus un `MOVE`), et laisser un nœud qui alloue son
+propre registre — un appel, une map — **tomber** sur `dest` sans `MOVE`. C'est le seul chemin de
+`compile_consecutive`, donc de tous les arguments et de tous les retours : **−11,8 % sur `fib`**,
+mesuré. `RETURN A, 1` recopiant `R[A]` dans `R[0]`, une valeur de retour unique n'a besoin
+d'aucun registre particulier : le `MOVE` qui l'amenait au sommet a disparu (**−8,4 %**).
+
+**Un bloc FERME ses upvalues à sa fin** (`CLOSE_UPVALS <premier registre du bloc>`, émis par
+`compile_block` quand le corps porte une fonction). Les locales d'un bloc meurent à son `end`,
+donc les upvalues ouvertes sur elles doivent y être fermées — sans quoi une closure déclarée
+dans un `do`/`if`/`while`/`try`/`switch` imbriqué gardait une upvalue ouverte sur un registre
+rendu aux temporaires, et l'instruction suivante écrasait la valeur capturée (mesuré : un `do`
+rendant `nil` au lieu de `42`). Les deux formes de `for` le faisaient déjà par itération, pour la
+même raison. ⚠ Le chemin du `throw` **quitte le corps sans exécuter sa fin** : `visit(TryCatchStmt)`
+réémet donc le `CLOSE_UPVALS` là où le contrôle atterrit. **Réserver les registres au lieu de
+fermer a été essayé et retiré** : la réserve s'accumulait sur tout un fichier et faisait dépasser
+les 255 registres. Fermer ne dé-partage rien : deux closures d'un même registre continuent de
+voir les écritures l'une de l'autre (figé dans `regressions.ol`).
+
+**« Ce corps porte-t-il une fonction ? » est MÉMOÏSÉ** par l'adresse du corps
+(`body_carries_func`). Le parcours est récursif et la même question est posée trois à quatre
+fois par construction englobante (`compile_block`, la fermeture de portée, `keep_captured_regs`,
+le test d'aliasage), si bien que le coût croissait avec la profondeur d'imbrication. Un script
+très imbriqué compile en 14,3 M instructions au lieu de 26,3 M (**−45,6 %**, mesuré). La clé
+n'est valide que pour UNE compilation → membre du compilateur, jamais un cache statique.
+
+**Une fonction déclarée dans un BLOC vit dans un registre local**, au niveau supérieur comme
+dans une fonction : le critère est `local_regs_.count(nom)` (« ce nom a-t-il un registre ici »)
+et non « suis-je dans une fonction » — `collect_locals` réserve un registre pour un `func` d'un
+bloc, y compris au niveau supérieur. L'autre critère compilait un `func` d'un `do` de premier
+niveau comme un global tout en le liant comme une locale, et son registre restait vide.
+
 ## Boucle `for` (implémentation)
 
 > Syntaxe et sémantique (formes numérique/itérateur, valeur primaire, step) : voir `grammar.ebnf` (`forStmt`).
