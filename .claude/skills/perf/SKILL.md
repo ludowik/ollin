@@ -37,6 +37,18 @@ Deux fichiers, deux natures opposées, ne pas les confondre :
   `g++ --version`. Garder le champ `_` d'en-tête, qui explique le fichier à qui l'ouvre.
 - **`docs/data/icount-history.json` s'ALLONGE** : ajouter un jalon à `milestones`. Garder le
   champ `_`, `tool`, `machine` et `scripts` tels quels.
+  ⚠ **Vérifier d'abord qu'il ne MANQUE pas de jalon** : la série veut une entrée par journée où le
+  moteur a été touché, et elle s'était laissée distancer de huit journées. Les journées attendues
+  sortent de `git log --format="%ad %h %s" --date=short -- src/vm.cpp src/value.h src/compiler.cpp
+  src/opcode.h src/vm.h src/collections/` (le conteneur part d'un clone superficiel :
+  `git fetch --unshallow origin` d'abord). Rattraper avec `bash bench/icount.sh <réf> <réf>`, qui
+  construit chaque commit dans une copie jetable — le jalon d'une journée est son DERNIER commit
+  moteur.
+  ⚠ Et **calibrer avant de mêler des mesures de sessions différentes** : remesurer le dernier
+  jalon déjà enregistré et comparer à sa valeur stockée. Mesuré le 04/09 sur `f0de161` : écart de
+  **0,02 %** (fib +8 799 sur 97,8 M), donc la série est comparable d'une session à l'autre. Sans
+  cette calibration, un écart de bibliothèque C ou de version de compilateur passerait pour un
+  changement du moteur.
 
 La vue `#/perf` lit les deux et reste valide si l'un manque (sa section disparaît).
 

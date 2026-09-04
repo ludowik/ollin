@@ -301,6 +301,70 @@
       "subject": "data and icount, with no hot path touched"
     },
     {
+      "date": "2026-08-19",
+      "commit": "9d28f7f",
+      "subject": "typeof answers \"bool\" for a boolean",
+      "fib": 97761605,
+      "loop": 32610820,
+      "map": 53002941
+    },
+    {
+      "date": "2026-08-20",
+      "commit": "d9512b0",
+      "subject": "vm: equality by identity for arrays, ranges, closures and functions",
+      "fib": 97915543,
+      "loop": 32014285,
+      "map": 53006817
+    },
+    {
+      "date": "2026-08-21",
+      "commit": "4e41819",
+      "subject": "comments: english in the sound, audio and input modules",
+      "fib": 97915653,
+      "loop": 32014549,
+      "map": 53008247
+    },
+    {
+      "date": "2026-08-22",
+      "commit": "885713c",
+      "subject": "engine, tests and tooling: english everywhere",
+      "fib": 97915653,
+      "loop": 32014549,
+      "map": 53008247
+    },
+    {
+      "date": "2026-08-26",
+      "commit": "ec10d90",
+      "subject": "refuse a break that cannot mean what it reads",
+      "fib": 97390901,
+      "loop": 32315035,
+      "map": 53410564
+    },
+    {
+      "date": "2026-08-27",
+      "commit": "8f22c9a",
+      "subject": "sweep the French out of the repository",
+      "fib": 97391282,
+      "loop": 32315032,
+      "map": 53410189
+    },
+    {
+      "date": "2026-08-29",
+      "commit": "0bb3f2a",
+      "subject": "engine globals: CW and CH become CX and CY",
+      "fib": 97393885,
+      "loop": 32317629,
+      "map": 53413028
+    },
+    {
+      "date": "2026-08-30",
+      "commit": "780bd9d",
+      "subject": "modules: a builder for the map, and one construction per program run",
+      "fib": 101071298,
+      "loop": 32019428,
+      "map": 53400474
+    },
+    {
       "date": "2026-09-04",
       "commit": "2c4b54c",
       "subject": "one switch emitter, and each statement declares its expressions",
