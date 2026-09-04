@@ -289,7 +289,7 @@ struct ExprStmt : Stmt {
 
 struct AssignStmt : Stmt {
     std::string name;
-    char op = '\0'; // '\0' = affectation simple ; '+','-','*','/','%' = compound
+    char op = '\0'; // '\0' = a plain assignment; '+','-','*','/','%' = compound
     std::unique_ptr<Expr> value;
     void accept(StmtVisitor& v) const override {
         v.visit(*this);
@@ -533,7 +533,7 @@ struct ExprCallExpr : Expr {
 
 // Method call receiver.method(args), with self passed automatically.
 struct MethodCallExpr : Expr {
-    std::unique_ptr<Expr> receiver; // nullptr si is_super
+    std::unique_ptr<Expr> receiver; // nullptr when is_super
     std::string method;
     std::vector<std::unique_ptr<Expr>> args;
     bool is_super = false;

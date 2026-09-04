@@ -1,6 +1,6 @@
 #include "parser.h"
-#include "paths.h"
 #include "lexer.h"
+#include "paths.h"
 #include "source_registry.h"
 #include <fstream>
 #include <sstream>
@@ -9,7 +9,7 @@
 Parser::Parser(std::vector<Token> tokens, std::string base_dir,
                std::shared_ptr<std::unordered_set<std::string>> imported,
                std::shared_ptr<std::unordered_map<std::string, std::vector<std::string>>> module_names,
-               std::shared_ptr<std::vector<std::string>> source_files, std::string /*filename*/)
+               std::shared_ptr<std::vector<std::string>> source_files)
     : tokens(std::move(tokens)), base_dir_(std::move(base_dir)),
       imported_paths_(imported ? std::move(imported) : std::make_shared<std::unordered_set<std::string>>()),
       module_names_(module_names ? std::move(module_names)
@@ -39,11 +39,18 @@ bool Parser::match(TokenType t) {
     return true;
 }
 
-Token Parser::expect(TokenType t) {
+const Token& Parser::expect(TokenType t) {
     if (!check(t))
-        throw std::runtime_error(cur_loc(tokens[pos].line).str(*source_files_) + ": unexpected token '" +
-                                 tokens[pos].lexeme + "'");
+        fail("unexpected token '" + peek().lexeme + "'");
     return advance();
+}
+
+void Parser::fail(const std::string& msg) const {
+    fail_at(peek().line, msg);
+}
+
+void Parser::fail_at(int line, const std::string& msg) const {
+    throw std::runtime_error(cur_loc(line).str(*source_files_) + ": " + msg);
 }
 
 TokenType Parser::peek_next_type() const {
@@ -66,14 +73,80 @@ bool Parser::at_name() const {
 
 std::string Parser::expect_name(const char* what) {
     if (!at_name())
-        throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected " + what + ", got '" +
-                                 peek().lexeme + "'");
+        fail(std::string("expected ") + what + ", got '" + peek().lexeme + "'");
     return advance().lexeme;
+}
+
+bool Parser::at_optional_call() const {
+    return check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
 }
 
 void Parser::skip_comments() {
     while (check(TokenType::COMMENT))
         advance();
+}
+
+// A token that ENDS a block, whichever block it is. The set lives here and nowhere else: written
+// out a second time in return_stmt, it was missing CASE, so a bare 'return' as the last statement
+// of a switch arm was refused.
+bool Parser::at_block_terminator() const {
+    switch (peek().type) {
+    case TokenType::END:
+    case TokenType::ELSE:
+    case TokenType::ELSEIF:
+    case TokenType::CATCH:
+    case TokenType::CASE:
+    case TokenType::EOF_T:
+        return true;
+    default:
+        return false;
+    }
+}
+
+void Parser::parse_body_until(std::vector<std::unique_ptr<Stmt>>& out, std::initializer_list<TokenType> stops) {
+    while (true) {
+        skip_comments();
+        if (check(TokenType::EOF_T))
+            return;
+        for (TokenType t : stops)
+            if (check(t))
+                return;
+        out.push_back(parse_one_stmt());
+    }
+}
+
+void Parser::parse_params(std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,
+                          bool& variadic) {
+    expect(TokenType::LPAREN);
+    while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
+        if (match(TokenType::DOT_DOT_DOT)) {
+            variadic = true;
+            break;
+        }
+        params.push_back(expect(TokenType::IDENTIFIER).lexeme);
+        defaults.push_back(match(TokenType::EQUALS) ? expr() : nullptr);
+        if (!check(TokenType::RPAREN))
+            expect(TokenType::COMMA);
+    }
+    expect(TokenType::RPAREN);
+}
+
+void Parser::parse_expr_list(std::vector<std::unique_ptr<Expr>>& out) {
+    out.push_back(expr());
+    while (match(TokenType::COMMA))
+        out.push_back(expr());
+}
+
+void Parser::parse_call_args(std::vector<std::unique_ptr<Expr>>& out) {
+    if (!check(TokenType::RPAREN))
+        parse_expr_list(out);
+    expect(TokenType::RPAREN);
+}
+
+void Parser::parse_field_path(std::vector<std::string>& path) {
+    path.push_back(expect(TokenType::IDENTIFIER).lexeme);
+    while (match(TokenType::DOT))
+        path.push_back(expect_name("a field name"));
 }
 
 // Absorbs an optional COMMENT at the end of a statement. Statements are separated by
@@ -85,19 +158,19 @@ void Parser::consume_opt_comment() {
 // Stack-overflow guard: recursive descent (parentheses, calls, nested blocks) could crash the
 // process on deeply nested input. Depth is bounded and a clean error is raised instead.
 namespace {
+// The counter is decremented on the way out; the depth is TESTED by the caller, which owns the
+// location — formatting a "file:line" prefix for every statement and every expression, to serve
+// a message that almost never fires, was paid on the hot path.
 struct DepthGuard {
     int& d;
-    std::string prefix;
-    DepthGuard(int& depth, std::string loc) : d(depth), prefix(std::move(loc)) {
-        if (++d > 256)
-            throw std::runtime_error(prefix + ": nesting too deep");
+    explicit DepthGuard(int& depth) : d(depth) {
+        ++d;
     }
     ~DepthGuard() {
         --d;
     }
 };
 } // namespace
-
 
 Program Parser::parse() {
     Program prog;
@@ -107,10 +180,9 @@ Program Parser::parse() {
             break;
         prog.stmts.push_back(parse_one_stmt());
     }
-    prog.source_files = *source_files_;
+    prog.source_files = *source_files_; // the table grows with each import, hence the copy
     return prog;
 }
-
 
 static bool is_assign_op(TokenType t) {
     return t == TokenType::EQUALS || t == TokenType::PLUS_EQUAL || t == TokenType::MINUS_EQUAL ||
@@ -118,7 +190,9 @@ static bool is_assign_op(TokenType t) {
 }
 
 std::unique_ptr<Stmt> Parser::parse_one_stmt() {
-    DepthGuard guard(depth_, peek().sloc().str(*source_files_));
+    if (depth_ >= 256)
+        fail("nesting too deep");
+    DepthGuard guard(depth_);
     switch (peek().type) {
     case TokenType::COMMENT: {
         std::string text = advance().lexeme;
@@ -128,25 +202,41 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     case TokenType::SEMICOLON:
         // ';' is only valid inside a range [a;b], where range_expr consumes it. At statement
         // level it is an error, reported explicitly.
-        throw std::runtime_error(peek().sloc().str(*source_files_) +
-                                 ": ';' is not valid syntax — statements are terminated by newlines");
-    case TokenType::WHILE:    return while_stmt();
-    case TokenType::DO:       return do_stmt();
-    case TokenType::IF:       return if_stmt();
-    case TokenType::BREAK:    return break_stmt();
-    case TokenType::CONTINUE: return continue_stmt();
-    case TokenType::TRY:      return try_catch_stmt();
-    case TokenType::THROW:    return throw_stmt();
-    case TokenType::FOR:      return for_stmt();
-    case TokenType::IMPORT:   return import_stmt();
-    case TokenType::CLASS:    return class_decl();
-    case TokenType::ENUM:     return enum_decl();
-    case TokenType::SWITCH:   return switch_stmt();
-    case TokenType::FUNC:     return func_decl_stmt();
-    case TokenType::RETURN:   return return_stmt();
-    case TokenType::VAR:      return var_decl();
-    case TokenType::GLOBAL:   return global_decl();
-    case TokenType::CONSTANT: return constant_decl();
+        fail("';' is not valid syntax — statements are terminated by newlines");
+    case TokenType::WHILE:
+        return while_stmt();
+    case TokenType::DO:
+        return do_stmt();
+    case TokenType::IF:
+        return if_stmt();
+    case TokenType::BREAK:
+        return break_stmt();
+    case TokenType::CONTINUE:
+        return continue_stmt();
+    case TokenType::TRY:
+        return try_catch_stmt();
+    case TokenType::THROW:
+        return throw_stmt();
+    case TokenType::FOR:
+        return for_stmt();
+    case TokenType::IMPORT:
+        return import_stmt();
+    case TokenType::CLASS:
+        return class_decl();
+    case TokenType::ENUM:
+        return enum_decl();
+    case TokenType::SWITCH:
+        return switch_stmt();
+    case TokenType::FUNC:
+        return func_decl_stmt();
+    case TokenType::RETURN:
+        return return_stmt();
+    case TokenType::VAR:
+        return decl_stmt(false, false);
+    case TokenType::GLOBAL:
+        return decl_stmt(true, false);
+    case TokenType::CONSTANT:
+        return decl_stmt(false, true);
     case TokenType::IDENTIFIER: {
         // A statement starting with an identifier is an assignment (plain, indexed or
         // chained), a multi-assignment, or an expression statement. We parse an expression and
@@ -164,7 +254,8 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
         }
         consume_opt_comment();
         auto st = std::make_unique<ExprStmt>(std::move(e));
-        st->line = line; st->file_idx = current_file_idx_;
+        st->line = line;
+        st->file_idx = current_file_idx_;
         return st;
     }
     default:
@@ -177,12 +268,13 @@ std::unique_ptr<Stmt> Parser::parse_one_stmt() {
 // VarExpr becomes an AssignStmt, IndexExpr (a.b, a[i] and chains) an IndexAssignStmt carrying
 // the container in obj_expr.
 std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> target, int line) {
-    TokenType opt = advance().type;   // assignment operator
+    TokenType opt = advance().type; // assignment operator
     auto value = expr();
     consume_opt_comment();
     if (auto* ve = dynamic_cast<VarExpr*>(target.get())) {
         auto s = std::make_unique<AssignStmt>();
-        s->line = line; s->file_idx = current_file_idx_;
+        s->line = line;
+        s->file_idx = current_file_idx_;
         s->name = ve->name;
         switch (opt) {
         case TokenType::PLUS_EQUAL:
@@ -209,68 +301,34 @@ std::unique_ptr<Stmt> Parser::finish_assign_from_expr(std::unique_ptr<Expr> targ
     }
     if (auto* ie = dynamic_cast<IndexExpr*>(target.get())) {
         auto s = std::make_unique<IndexAssignStmt>();
-        s->line = line; s->file_idx = current_file_idx_;
+        s->line = line;
+        s->file_idx = current_file_idx_;
         s->obj_expr = std::move(ie->obj); // the container, which may itself be chained
         s->key = std::move(ie->key);
         s->op = opt;
         s->value = std::move(value);
         return s;
     }
-    throw std::runtime_error(cur_loc(line).str(*source_files_) + ": invalid assignment target");
+    fail_at(line, "invalid assignment target");
 }
 
-
-std::unique_ptr<Stmt> Parser::var_decl() {
+std::unique_ptr<Stmt> Parser::decl_stmt(bool is_global, bool is_constant) {
     int line = peek().line;
-    advance();
+    advance(); // var / global / const
     auto s = std::make_unique<VarDeclStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->is_global = is_global;
+    s->is_constant = is_constant;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
     while (match(TokenType::COMMA))
         s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    if (match(TokenType::EQUALS)) {
-        s->values.push_back(expr());
-        while (match(TokenType::COMMA))
-            s->values.push_back(expr());
-    }
-    // Without '=' the values are absent and become nil in the compiler.
-    consume_opt_comment();
-    return s;
-}
-
-std::unique_ptr<Stmt> Parser::global_decl() {
-    int line = peek().line;
-    advance(); // consume 'global'
-    auto s = std::make_unique<VarDeclStmt>();
-    s->is_global = true;
-    s->line = line; s->file_idx = current_file_idx_;
-    s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    while (match(TokenType::COMMA))
-        s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    if (match(TokenType::EQUALS)) {
-        s->values.push_back(expr());
-        while (match(TokenType::COMMA))
-            s->values.push_back(expr());
-    }
-    consume_opt_comment();
-    return s;
-}
-
-std::unique_ptr<Stmt> Parser::constant_decl() {
-    int line = peek().line;
-    advance(); // consume 'const'
-    auto s = std::make_unique<VarDeclStmt>();
-    s->is_constant = true;
-    s->line = line; s->file_idx = current_file_idx_;
-    s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    while (match(TokenType::COMMA))
-        s->names.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    if (!check(TokenType::EQUALS))
-        throw std::runtime_error(cur_loc(line).str(*source_files_) + ": const '" + s->names[0] + "' must be initialized");
-    advance(); // consume '='
-    s->values.push_back(expr());
-    while (match(TokenType::COMMA))
-        s->values.push_back(expr());
+    // A const MUST be initialized; without '=' a var or a global has no value, and the compiler
+    // makes it nil.
+    if (is_constant && !check(TokenType::EQUALS))
+        fail_at(line, "const '" + s->names[0] + "' must be initialized");
+    if (match(TokenType::EQUALS))
+        parse_expr_list(s->values);
     consume_opt_comment();
     return s;
 }
@@ -279,16 +337,12 @@ std::unique_ptr<Stmt> Parser::while_stmt() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<WhileStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     s->cond = expr();
     skip_comments();
     expect(TokenType::DO);
-    while (true) {
-        skip_comments();
-        if (check(TokenType::END) || check(TokenType::EOF_T))
-            break;
-        s->body.push_back(parse_one_stmt());
-    }
+    parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
     consume_opt_comment();
     return s;
@@ -298,13 +352,9 @@ std::unique_ptr<Stmt> Parser::do_stmt() {
     int line = peek().line;
     advance();
     auto s = std::make_unique<DoStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
-    while (true) {
-        skip_comments();
-        if (check(TokenType::END) || check(TokenType::EOF_T))
-            break;
-        s->body.push_back(parse_one_stmt());
-    }
+    s->line = line;
+    s->file_idx = current_file_idx_;
+    parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
     consume_opt_comment();
     return s;
@@ -314,44 +364,25 @@ std::unique_ptr<Stmt> Parser::if_stmt() {
     int line = peek().line;
     advance(); // IF
     auto s = std::make_unique<IfStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     s->cond = expr();
     skip_comments();
     expect(TokenType::THEN);
-    while (true) {
+    parse_body_until(s->then_body, {TokenType::ELSE, TokenType::ELSEIF, TokenType::END});
+    // There is no "else if" sugar: an elseif is spelled 'elseif'. An 'else' followed by an 'if'
+    // is an else branch containing a nested if block, like any other statement.
+    while (match(TokenType::ELSEIF)) {
+        ElseIfClause ei;
+        ei.cond = expr();
         skip_comments();
-        if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) || check(TokenType::EOF_T))
-            break;
-        s->then_body.push_back(parse_one_stmt());
+        expect(TokenType::THEN);
+        parse_body_until(ei.body, {TokenType::ELSE, TokenType::ELSEIF, TokenType::END});
+        s->else_ifs.push_back(std::move(ei));
     }
-    while (check(TokenType::ELSE) || check(TokenType::ELSEIF)) {
-        bool is_elif = check(TokenType::ELSEIF);
-        advance(); // ELSE or ELSEIF
-        // There is no "else if" sugar: an elseif is spelled 'elseif'. An 'else' followed by an
-        // 'if' is an else branch containing a nested if block, like any other statement.
-        if (is_elif) {
-            ElseIfClause ei;
-            ei.cond = expr();
-            skip_comments();
-            expect(TokenType::THEN);
-            while (true) {
-                skip_comments();
-                if (check(TokenType::ELSE) || check(TokenType::ELSEIF) || check(TokenType::END) ||
-                    check(TokenType::EOF_T))
-                    break;
-                ei.body.push_back(parse_one_stmt());
-            }
-            s->else_ifs.push_back(std::move(ei));
-        } else {
-            consume_opt_comment();
-            while (true) {
-                skip_comments();
-                if (check(TokenType::END) || check(TokenType::EOF_T))
-                    break;
-                s->else_body.push_back(parse_one_stmt());
-            }
-            break;
-        }
+    if (match(TokenType::ELSE)) {
+        consume_opt_comment();
+        parse_body_until(s->else_body, {TokenType::END});
     }
     expect(TokenType::END);
     consume_opt_comment();
@@ -363,7 +394,8 @@ std::unique_ptr<Stmt> Parser::break_stmt() {
     advance();
     consume_opt_comment();
     auto s = std::make_unique<BreakStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     return s;
 }
 
@@ -372,7 +404,8 @@ std::unique_ptr<Stmt> Parser::continue_stmt() {
     advance();
     consume_opt_comment();
     auto s = std::make_unique<ContinueStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     return s;
 }
 
@@ -380,7 +413,8 @@ std::unique_ptr<Stmt> Parser::throw_stmt() {
     int line = peek().line;
     advance(); // throw
     auto s = std::make_unique<ThrowStmt>(expr());
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     consume_opt_comment();
     return s;
 }
@@ -389,31 +423,17 @@ std::unique_ptr<Stmt> Parser::try_catch_stmt() {
     int line = peek().line;
     advance(); // try
     auto s = std::make_unique<TryCatchStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     consume_opt_comment();
-    while (true) {
-        skip_comments();
-        if (check(TokenType::CATCH) || check(TokenType::EOF_T))
-            break;
-        s->try_body.push_back(parse_one_stmt());
-    }
+    parse_body_until(s->try_body, {TokenType::CATCH});
     expect(TokenType::CATCH);
     s->catch_var = expect(TokenType::IDENTIFIER).lexeme;
     consume_opt_comment();
-    while (true) {
-        skip_comments();
-        if (check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T))
-            break;
-        s->catch_body.push_back(parse_one_stmt());
-    }
+    parse_body_until(s->catch_body, {TokenType::ELSE, TokenType::END});
     if (match(TokenType::ELSE)) {
         consume_opt_comment();
-        while (true) {
-            skip_comments();
-            if (check(TokenType::END) || check(TokenType::EOF_T))
-                break;
-            s->else_body.push_back(parse_one_stmt());
-        }
+        parse_body_until(s->else_body, {TokenType::END});
     }
     expect(TokenType::END);
     consume_opt_comment();
@@ -424,57 +444,49 @@ std::unique_ptr<Stmt> Parser::func_decl_stmt() {
     int line = peek().line;
     advance(); // FUNC
     std::string name = expect(TokenType::IDENTIFIER).lexeme;
-
-    // Parses "(" params ")" NL body "end" into the fields provided.
-    auto parse_params_body = [&](std::vector<std::string>& params, std::vector<std::unique_ptr<Expr>>& defaults,
-                               bool& variadic, std::vector<std::unique_ptr<Stmt>>& body) {
-        expect(TokenType::LPAREN);
-        while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
-            if (check(TokenType::DOT_DOT_DOT)) {
-                advance();
-                variadic = true;
-                break;
-            }
-            params.push_back(expect(TokenType::IDENTIFIER).lexeme);
-            if (match(TokenType::EQUALS))
-                defaults.push_back(expr());
-            else
-                defaults.push_back(nullptr);
-            if (!check(TokenType::RPAREN))
-                expect(TokenType::COMMA);
-        }
-        expect(TokenType::RPAREN);
-        consume_opt_comment();
-        while (true) {
-            skip_comments();
-            if (check(TokenType::END) || check(TokenType::EOF_T))
-                break;
-            body.push_back(parse_one_stmt());
-        }
-        expect(TokenType::END);
-        consume_opt_comment();
-    };
-
     // Definition on a map field: func obj.field(params) ... end
     // → desugared into  obj.field = func(params) ... end
-    if (check(TokenType::DOT)) {
-        advance(); // DOT
+    if (match(TokenType::DOT)) {
         std::string field = expect_name("a field name");
         auto fe = std::make_unique<FuncExpr>();
-        parse_params_body(fe->params, fe->defaults, fe->variadic, fe->body);
+        parse_params(fe->params, fe->defaults, fe->variadic);
+        consume_opt_comment();
+        parse_body_until(fe->body, {TokenType::END});
+        expect(TokenType::END);
+        consume_opt_comment();
         auto ia = std::make_unique<IndexAssignStmt>();
-        ia->line = line; ia->file_idx = current_file_idx_;
-        ia->obj = name;
-        ia->key = std::make_unique<StringExpr>(field);
+        ia->line = line;
+        ia->file_idx = current_file_idx_;
+        ia->obj = std::move(name);
+        ia->key = std::make_unique<StringExpr>(std::move(field));
         ia->op = TokenType::EQUALS;
         ia->value = std::move(fe);
         return ia;
     }
+    return finish_func_decl(line, std::move(name));
+}
 
+std::unique_ptr<FuncDeclStmt> Parser::func_decl_named() {
+    int line = peek().line;
+    advance(); // FUNC
+    std::string name = expect(TokenType::IDENTIFIER).lexeme;
+    // The 'func obj.field()' form is a statement-level desugaring, so refusing it HERE keeps the
+    // caller from having to recognise a foreign node type after the fact.
+    if (check(TokenType::DOT))
+        fail_at(line, "a class method must be 'func name(...)' (not 'func obj.field(...)')");
+    return finish_func_decl(line, std::move(name));
+}
+
+std::unique_ptr<FuncDeclStmt> Parser::finish_func_decl(int line, std::string name) {
     auto s = std::make_unique<FuncDeclStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
-    s->name = name;
-    parse_params_body(s->params, s->defaults, s->variadic, s->body);
+    s->line = line;
+    s->file_idx = current_file_idx_;
+    s->name = std::move(name);
+    parse_params(s->params, s->defaults, s->variadic);
+    consume_opt_comment();
+    parse_body_until(s->body, {TokenType::END});
+    expect(TokenType::END);
+    consume_opt_comment();
     return s;
 }
 
@@ -482,20 +494,18 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
     int line = peek().line;
     advance(); // RETURN
     auto s = std::make_unique<ReturnStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
-    // Return values are optional: none when we are on a block terminator.
-    // (end/else/elseif/catch), a separator, a comment, or EOF.
-    if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMENT) && !check(TokenType::EOF_T)
-        && !check(TokenType::END) && !check(TokenType::ELSE)
-        && !check(TokenType::ELSEIF) && !check(TokenType::CATCH)) {
+    s->line = line;
+    s->file_idx = current_file_idx_;
+    // Return values are optional: none when we are on a block terminator, a separator or a
+    // comment. A comment stands for the end of the line, newlines not being tokenized.
+    if (!at_block_terminator() && !check(TokenType::SEMICOLON) && !check(TokenType::COMMENT)) {
         if (check(TokenType::DOT_DOT_DOT)) {
             advance();
             s->spread_varargs = true;
         } else {
             s->values.push_back(expr());
             while (match(TokenType::COMMA)) {
-                if (check(TokenType::DOT_DOT_DOT)) {
-                    advance();
+                if (match(TokenType::DOT_DOT_DOT)) {
                     s->spread_varargs = true;
                     break;
                 }
@@ -510,9 +520,9 @@ std::unique_ptr<Stmt> Parser::return_stmt() {
 std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
     int line = peek().line;
     auto s = std::make_unique<MultiAssignStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
 
-    // Parse LValue list
     auto parse_l_value = [&]() {
         LValue lv;
         lv.name = expect(TokenType::IDENTIFIER).lexeme;
@@ -542,11 +552,7 @@ std::unique_ptr<Stmt> Parser::multi_assign_stmt() {
         s->targets.push_back(parse_l_value());
 
     expect(TokenType::EQUALS);
-
-    s->values.push_back(expr());
-    while (match(TokenType::COMMA))
-        s->values.push_back(expr());
-
+    parse_expr_list(s->values);
     consume_opt_comment();
     return s;
 }
@@ -556,6 +562,8 @@ std::unique_ptr<Stmt> Parser::for_stmt() {
     advance(); // FOR
     std::string first_var = expect(TokenType::IDENTIFIER).lexeme;
 
+    std::string var2;
+    std::unique_ptr<Expr> iter_e;
     if (match(TokenType::EQUALS)) {
         // for i=start,end[,step] is desugared into for i in [start;end[;step]]
         auto range = std::make_unique<RangeExpr>();
@@ -567,44 +575,24 @@ std::unique_ptr<Stmt> Parser::for_stmt() {
         range->end = expr();
         if (match(TokenType::COMMA))
             range->step = expr();
-        skip_comments();
-        expect(TokenType::DO);
-        auto s = std::make_unique<ForIterStmt>();
-        s->line = line; s->file_idx = current_file_idx_;
-        s->var1 = first_var;
-        s->iter_expr = std::move(range);
-        while (true) {
-            skip_comments();
-            if (check(TokenType::END) || check(TokenType::EOF_T))
-                break;
-            s->body.push_back(parse_one_stmt());
-        }
-        expect(TokenType::END);
-        consume_opt_comment();
-        return s;
+        iter_e = std::move(range);
+    } else {
+        // for var1[, var2] in expr
+        if (match(TokenType::COMMA))
+            var2 = expect(TokenType::IDENTIFIER).lexeme;
+        expect(TokenType::IN);
+        iter_e = expr();
     }
 
-    // for var1[, var2] in expr
-    std::string var2;
-    if (check(TokenType::COMMA)) {
-        advance();
-        var2 = expect(TokenType::IDENTIFIER).lexeme;
-    }
-    expect(TokenType::IN);
-    auto iter_e = expr();
     skip_comments();
     expect(TokenType::DO);
     auto s = std::make_unique<ForIterStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
-    s->var1 = first_var;
-    s->var2 = var2;
+    s->line = line;
+    s->file_idx = current_file_idx_;
+    s->var1 = std::move(first_var);
+    s->var2 = std::move(var2);
     s->iter_expr = std::move(iter_e);
-    while (true) {
-        skip_comments();
-        if (check(TokenType::END) || check(TokenType::EOF_T))
-            break;
-        s->body.push_back(parse_one_stmt());
-    }
+    parse_body_until(s->body, {TokenType::END});
     expect(TokenType::END);
     consume_opt_comment();
     return s;
@@ -615,79 +603,69 @@ std::unique_ptr<Stmt> Parser::expr_stmt() {
     auto e = expr();
     consume_opt_comment();
     auto s = std::make_unique<ExprStmt>(std::move(e));
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     return s;
 }
 
-
 std::unique_ptr<Expr> Parser::expr() {
-    DepthGuard guard(depth_, peek().sloc().str(*source_files_));
-    return logical();
+    if (depth_ >= 256)
+        fail("nesting too deep");
+    DepthGuard guard(depth_);
+    return binary_level(0);
 }
 
-std::unique_ptr<Expr> Parser::logical() {
-    auto left = logical_and();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::OR))
-            break;
-        advance();
-        skip_comments();
-        left = std::make_unique<BinaryExpr>('|', std::move(left), logical_and());
-    }
-    return left;
-}
+namespace {
+struct BinOp {
+    TokenType tok;
+    char op; // the code BinaryExpr uses (see compiler.cpp, token_to_op)
+};
+// One entry per PRECEDENCE level, loosest first. Levels 0..4 sit above the comparison, levels
+// 5..7 below it — the comparison being chainable (a < b < c), it is a shape of its own and keeps
+// its own function. Adding an operator is one line here instead of a new near-identical method.
+struct BinLevel {
+    const BinOp* ops;
+    int n;
+};
+const BinOp OPS_OR[] = {{TokenType::OR, '|'}};
+const BinOp OPS_AND[] = {{TokenType::AND, '&'}};
+const BinOp OPS_BOR[] = {{TokenType::PIPE, 'o'}};
+const BinOp OPS_BXOR[] = {{TokenType::TILDE, 'x'}}; // a binary '~' is XOR, as in Lua
+const BinOp OPS_BAND[] = {{TokenType::AMP, 'b'}};
+const BinOp OPS_SHIFT[] = {{TokenType::LSHIFT, 'l'}, {TokenType::RSHIFT, 'r'}};
+const BinOp OPS_ADD[] = {{TokenType::PLUS, '+'}, {TokenType::MINUS, '-'}};
+const BinOp OPS_MUL[] = {
+    {TokenType::STAR, '*'}, {TokenType::SLASH, '/'}, {TokenType::SLASH_SLASH, 'q'}, {TokenType::PERCENT, '%'}};
+#define LEVEL(a)                                                                                                       \
+    { a, (int)(sizeof(a) / sizeof(*a)) }
+// The comparison HOLDS ITS RANK in the table, as an empty entry: leaving it out made the level
+// numbers of the two halves disagree, and the shift level was then skipped entirely.
+const BinLevel LEVELS[] = {LEVEL(OPS_OR), LEVEL(OPS_AND),   LEVEL(OPS_BOR), LEVEL(OPS_BXOR), LEVEL(OPS_BAND),
+                           {nullptr, 0},  LEVEL(OPS_SHIFT), LEVEL(OPS_ADD), LEVEL(OPS_MUL)};
+#undef LEVEL
+const int CMP_LEVEL = 5;
+const int N_LEVELS = (int)(sizeof(LEVELS) / sizeof(*LEVELS));
+} // namespace
 
-std::unique_ptr<Expr> Parser::logical_and() {
-    auto left = bitwise_or();
+std::unique_ptr<Expr> Parser::binary_level(int level) {
+    if (level == CMP_LEVEL)
+        return comparison();
+    if (level == N_LEVELS)
+        return unary();
+    const BinLevel& lv = LEVELS[level];
+    auto left = binary_level(level + 1);
     while (true) {
         skip_comments();
-        if (!check(TokenType::AND))
-            break;
+        const BinOp* found = nullptr;
+        for (int i = 0; i < lv.n && !found; i++)
+            if (check(lv.ops[i].tok))
+                found = &lv.ops[i];
+        if (!found)
+            return left;
         advance();
         skip_comments();
-        left = std::make_unique<BinaryExpr>('&', std::move(left), bitwise_or());
+        left = std::make_unique<BinaryExpr>(found->op, std::move(left), binary_level(level + 1));
     }
-    return left;
-}
-
-std::unique_ptr<Expr> Parser::bitwise_or() {
-    auto left = bitwise_xor();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::PIPE))
-            break;
-        advance();
-        skip_comments();
-        left = std::make_unique<BinaryExpr>('o', std::move(left), bitwise_xor());
-    }
-    return left;
-}
-
-std::unique_ptr<Expr> Parser::bitwise_xor() {
-    auto left = bitwise_and();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::TILDE))
-            break; // a binary '~' is XOR, as in Lua
-        advance();
-        skip_comments();
-        left = std::make_unique<BinaryExpr>('x', std::move(left), bitwise_and());
-    }
-    return left;
-}
-
-std::unique_ptr<Expr> Parser::bitwise_and() {
-    auto left = comparison();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::AMP))
-            break;
-        advance();
-        skip_comments();
-        left = std::make_unique<BinaryExpr>('b', std::move(left), comparison());
-    }
-    return left;
 }
 
 static bool is_cmp_token(TokenType t) {
@@ -709,66 +687,52 @@ static char cmp_char(TokenType t) {
 }
 
 std::unique_ptr<Expr> Parser::comparison() {
-    auto first = shift();
+    auto first = binary_level(CMP_LEVEL + 1);
     skip_comments();
     if (!is_cmp_token(peek().type))
         return first;
 
-    // collect all operands and operators
+    // A single comparison is a plain BinaryExpr; the chained node is only built from the SECOND
+    // operator on, so the common case allocates nothing extra.
+    char op1 = cmp_char(advance().type);
+    skip_comments();
+    auto second = binary_level(CMP_LEVEL + 1);
+    skip_comments();
+    if (!is_cmp_token(peek().type))
+        return std::make_unique<BinaryExpr>(op1, std::move(first), std::move(second));
+
     auto chain = std::make_unique<ChainedCompareExpr>();
+    chain->ops.push_back(op1);
     chain->operands.push_back(std::move(first));
+    chain->operands.push_back(std::move(second));
     while (is_cmp_token(peek().type)) {
         chain->ops.push_back(cmp_char(advance().type));
         skip_comments();
-        chain->operands.push_back(shift());
+        chain->operands.push_back(binary_level(CMP_LEVEL + 1));
         skip_comments();
     }
-    // single comparison: return a plain BinaryExpr for simplicity
-    if (chain->ops.size() == 1)
-        return std::make_unique<BinaryExpr>(chain->ops[0], std::move(chain->operands[0]),
-                                            std::move(chain->operands[1]));
     return chain;
 }
 
-std::unique_ptr<Expr> Parser::shift() {
-    auto left = additive();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::LSHIFT) && !check(TokenType::RSHIFT))
-            break;
-        char op = check(TokenType::LSHIFT) ? 'l' : 'r';
-        advance();
-        skip_comments();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), additive());
+// Folds the first `n` segments of a path into a VarExpr followed by a chain of IndexExpr —
+// what `a.b.c` means. Called several times per `ref` (a unique_ptr cannot be copied) and once
+// per enum target, which is why it is not a lambda of either.
+static std::unique_ptr<Expr> fold_path(const std::vector<std::string>& path, size_t n, SourceLoc loc) {
+    std::unique_ptr<Expr> e = std::make_unique<VarExpr>(path[0]);
+    e->line = loc.line;
+    e->file_idx = loc.file_idx;
+    for (size_t i = 1; i < n; ++i) {
+        auto ix = std::make_unique<IndexExpr>();
+        ix->obj = std::move(e);
+        auto k = std::make_unique<StringExpr>(path[i]);
+        k->line = loc.line;
+        k->file_idx = loc.file_idx;
+        ix->key = std::move(k);
+        ix->line = loc.line;
+        ix->file_idx = loc.file_idx;
+        e = std::move(ix);
     }
-    return left;
-}
-
-std::unique_ptr<Expr> Parser::additive() {
-    auto left = multiplicative();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::PLUS) && !check(TokenType::MINUS))
-            break;
-        char op = advance().lexeme[0];
-        skip_comments();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), multiplicative());
-    }
-    return left;
-}
-
-std::unique_ptr<Expr> Parser::multiplicative() {
-    auto left = unary();
-    while (true) {
-        skip_comments();
-        if (!check(TokenType::STAR) && !check(TokenType::SLASH) && !check(TokenType::SLASH_SLASH) &&
-            !check(TokenType::PERCENT))
-            break;
-        char op = check(TokenType::SLASH_SLASH) ? (advance(), 'q') : advance().lexeme[0];
-        skip_comments();
-        left = std::make_unique<BinaryExpr>(op, std::move(left), unary());
-    }
-    return left;
+    return e;
 }
 
 // `ref x` and `ref a.b.c`: pass by REFERENCE, desugared right here — no new type, no new
@@ -779,8 +743,8 @@ std::unique_ptr<Expr> Parser::multiplicative() {
 // The closures capture the target as an upvalue when it is local, and read or write the global
 // otherwise: the upvalue machinery does all the work. `__ref` exists only so native modules can
 // validate — a map with get/set is not necessarily a reference, the `data` module has some too.
-static const char* REF_PARAM = "__ref_v";   // the setter's parameter name, which must not
-                                            // must NEVER collide with the target (`ref v`)
+static const char* REF_PARAM = "__ref_v"; // the setter's parameter name, which must not
+                                          // must NEVER collide with the target (`ref v`)
 
 std::unique_ptr<Expr> Parser::ref_expr() {
     int line = peek().line;
@@ -788,38 +752,17 @@ std::unique_ptr<Expr> Parser::ref_expr() {
     // Target: IDENT { "." IDENT }. Bracket indexing is refused, because the path is
     // re-evaluated on every access and `ref t[i]` would follow later changes to i.
     if (!check(TokenType::IDENTIFIER))
-        throw std::runtime_error(cur_loc(line).str(*source_files_) + ": ref expects a variable name, not '" +
-                                 peek().lexeme + "'");
+        fail_at(line, "ref expects a variable name, not '" + peek().lexeme + "'");
     std::vector<std::string> path;
-    path.push_back(advance().lexeme);
-    while (check(TokenType::DOT)) {
-        advance();
-        path.push_back(expect_name("a field name"));
-    }
+    parse_field_path(path);
     if (check(TokenType::LBRACKET))
-        throw std::runtime_error(cur_loc(line).str(*source_files_) +
-                                 ": ref only accepts a name or a path of fields, with no [] indexing");
+        fail_at(line, "ref only accepts a name or a path of fields, with no [] indexing");
 
     auto set_loc = [&](Expr* e) {
         e->line = line;
         e->file_idx = current_file_idx_;
     };
-    // Builds the access to the first `n` segments (a VarExpr, or a chain of IndexExpr). Called
-    // several times: each generated tree needs its own, since a unique_ptr cannot be copied.
-    auto make_access = [&](size_t n) {
-        std::unique_ptr<Expr> e = std::make_unique<VarExpr>(path[0]);
-        set_loc(e.get());
-        for (size_t i = 1; i < n; ++i) {
-            auto ix = std::make_unique<IndexExpr>();
-            ix->obj = std::move(e);
-            auto k = std::make_unique<StringExpr>(path[i]);
-            set_loc(k.get());
-            ix->key = std::move(k);
-            set_loc(ix.get());
-            e = std::move(ix);
-        }
-        return e;
-    };
+    auto make_access = [&](size_t n) { return fold_path(path, n, cur_loc(line)); };
 
     auto getter = std::make_unique<FuncExpr>();
     set_loc(getter.get());
@@ -918,8 +861,7 @@ std::unique_ptr<Expr> Parser::power() {
 }
 
 std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
-    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) ||
-           (check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN)) {
+    while (check(TokenType::LBRACKET) || check(TokenType::DOT) || check(TokenType::LPAREN) || at_optional_call()) {
         if (check(TokenType::LBRACKET)) {
             advance();
             auto key = expr();
@@ -931,27 +873,22 @@ std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
         } else if (check(TokenType::DOT)) {
             advance();
             std::string field = expect_name("a field name");
-            bool opt_m = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
+            bool opt_m = at_optional_call();
             if (check(TokenType::LPAREN) || opt_m) {
                 if (opt_m)
                     advance(); // consume '?'
                 advance();     // consume LPAREN
                 auto mc = std::make_unique<MethodCallExpr>();
                 mc->receiver = std::move(base);
-                mc->method = field;
+                mc->method = std::move(field);
                 mc->is_super = false;
                 mc->optional = opt_m;
-                if (!check(TokenType::RPAREN)) {
-                    mc->args.push_back(expr());
-                    while (match(TokenType::COMMA))
-                        mc->args.push_back(expr());
-                }
-                expect(TokenType::RPAREN);
+                parse_call_args(mc->args);
                 base = std::move(mc);
             } else {
                 auto ie = std::make_unique<IndexExpr>();
                 ie->obj = std::move(base);
-                ie->key = std::make_unique<StringExpr>(field);
+                ie->key = std::make_unique<StringExpr>(std::move(field));
                 base = std::move(ie);
             }
         } else { // LPAREN, or QUESTION+LPAREN for an optional call
@@ -964,18 +901,12 @@ std::unique_ptr<Expr> Parser::parse_postfix(std::unique_ptr<Expr> base) {
             auto call = std::make_unique<ExprCallExpr>();
             call->callee = std::move(base);
             call->optional = opt;
-            if (!check(TokenType::RPAREN)) {
-                call->args.push_back(expr());
-                while (match(TokenType::COMMA))
-                    call->args.push_back(expr());
-            }
-            expect(TokenType::RPAREN);
+            parse_call_args(call->args);
             base = std::move(call);
         }
     }
     return base;
 }
-
 
 // Scan forward from current position looking for SEMICOLON at depth 0 before
 // COMMA or RBRACKET at depth 0. Returns true if this looks like a range.
@@ -1008,16 +939,12 @@ std::unique_ptr<Expr> Parser::range_expr(bool incl_left) {
     auto node = std::make_unique<RangeExpr>();
     node->incl_left = incl_left;
 
-    // Parse start expression
     node->start = expr();
 
-    // Expect SEMICOLON separator
     expect(TokenType::SEMICOLON);
 
-    // Parse end expression
     node->end = expr();
 
-    // Optional step: if next is SEMICOLON
     if (match(TokenType::SEMICOLON)) {
         node->step = expr();
     }
@@ -1030,7 +957,7 @@ std::unique_ptr<Expr> Parser::range_expr(bool incl_left) {
         advance();
         node->incl_right = false;
     } else {
-        throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected ']' or '[' to close range");
+        fail("expected ']' or '[' to close range");
     }
 
     // The open-left adjustment (incl_left = false, so start += step) is emitted by the
@@ -1045,19 +972,21 @@ std::unique_ptr<Expr> Parser::primary() {
         try {
             // The lexeme is NORMALISED by the lexer: no '_', and the base prefix and the
             // exponent letter are lower case, so 'X'/'O'/'B'/'E' cannot appear here.
-            // 0x.. / 0o.. / 0b..: integers in base 16/8/2 (stoull keeps the whole bit pattern, wrapping int64)
-            if (lex.size() > 2 && lex[0] == '0' && lex[1] == 'x')
-                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 16)));
-            if (lex.size() > 2 && lex[0] == '0' && lex[1] == 'o')
-                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 8)));
-            if (lex.size() > 2 && lex[0] == '0' && lex[1] == 'b')
-                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.substr(2), nullptr, 2)));
+            // 0x / 0o / 0b: an integer in base 16/8/2 (stoull keeps the whole bit pattern,
+            // wrapping int64). One conversion for the three bases, read from the prefix.
+            int base = lex.size() > 2 && lex[0] == '0' ? (lex[1] == 'x'   ? 16
+                                                          : lex[1] == 'o' ? 8
+                                                          : lex[1] == 'b' ? 2
+                                                                          : 0)
+                                                       : 0;
+            if (base)
+                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.c_str() + 2, nullptr, base)));
             // float on a '.' OR a scientific exponent; otherwise an integer.
             if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos)
                 return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
             return std::make_unique<NumberExpr>(std::stod(lex));
         } catch (const std::out_of_range&) {
-            throw std::runtime_error(tok.sloc().str(*source_files_) + ": numeric literal out of range: " + lex);
+            fail_at(tok.line, "numeric literal out of range: " + lex);
         }
     }
     if (check(TokenType::STRING))
@@ -1093,40 +1022,29 @@ std::unique_ptr<Expr> Parser::primary() {
         if (name == "super") {
             expect(TokenType::DOT);
             std::string method_name = expect_name("a method name");
-            bool opt_super = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
+            bool opt_super = at_optional_call();
             if (opt_super)
                 advance(); // consume '?'
             if (!check(TokenType::LPAREN))
-                throw std::runtime_error(peek().sloc().str(*source_files_) +
-                                         ": super: only method calls are supported");
+                fail("super: only method calls are supported");
             advance(); // LPAREN
             auto mc = std::make_unique<MethodCallExpr>();
             mc->receiver = nullptr;
-            mc->method = method_name;
+            mc->method = std::move(method_name);
             mc->is_super = true;
             mc->optional = opt_super;
-            if (!check(TokenType::RPAREN)) {
-                mc->args.push_back(expr());
-                while (match(TokenType::COMMA))
-                    mc->args.push_back(expr());
-            }
-            expect(TokenType::RPAREN);
+            parse_call_args(mc->args);
             return parse_postfix(std::move(mc));
         }
         // Optional call F?(): calls only when F is callable, and yields nil otherwise.
-        bool opt_call = check(TokenType::QUESTION) && peek_next_type() == TokenType::LPAREN;
+        bool opt_call = at_optional_call();
         if (opt_call)
             advance(); // consume '?'
         if (match(TokenType::LPAREN)) {
             auto call = std::make_unique<CallExpr>();
             call->callee = name;
             call->optional = opt_call;
-            if (!check(TokenType::RPAREN)) {
-                call->args.push_back(expr());
-                while (match(TokenType::COMMA))
-                    call->args.push_back(expr());
-            }
-            expect(TokenType::RPAREN);
+            parse_call_args(call->args);
             return parse_postfix(std::move(call));
         }
         // Plain variable — may be followed by postfix chaining
@@ -1143,29 +1061,9 @@ std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::FUNC)) {
         advance(); // FUNC
         auto fe = std::make_unique<FuncExpr>();
-        expect(TokenType::LPAREN);
-        while (!check(TokenType::RPAREN) && !check(TokenType::EOF_T)) {
-            if (check(TokenType::DOT_DOT_DOT)) {
-                advance();
-                fe->variadic = true;
-                break;
-            }
-            fe->params.push_back(expect(TokenType::IDENTIFIER).lexeme);
-            if (match(TokenType::EQUALS))
-                fe->defaults.push_back(expr());
-            else
-                fe->defaults.push_back(nullptr);
-            if (!check(TokenType::RPAREN))
-                expect(TokenType::COMMA);
-        }
-        expect(TokenType::RPAREN);
+        parse_params(fe->params, fe->defaults, fe->variadic);
         consume_opt_comment();
-        while (true) {
-            skip_comments();
-            if (check(TokenType::END) || check(TokenType::EOF_T))
-                break;
-            fe->body.push_back(parse_one_stmt());
-        }
+        parse_body_until(fe->body, {TokenType::END});
         expect(TokenType::END);
         return parse_postfix(std::move(fe));
     }
@@ -1182,8 +1080,7 @@ std::unique_ptr<Expr> Parser::primary() {
                 key = expr();
                 expect(TokenType::RBRACKET);
             } else {
-                throw std::runtime_error(peek().sloc().str(*source_files_) +
-                                         ": expected string, identifier, or [expr] key in map literal");
+                fail("expected string, identifier, or [expr] key in map literal");
             }
             expect(TokenType::COLON);
             auto val = expr();
@@ -1196,8 +1093,7 @@ std::unique_ptr<Expr> Parser::primary() {
         return parse_postfix(std::move(map));
     }
     if (check(TokenType::LBRACKET)) {
-        advance(); // consume [
-        // Check if this is a range [a;b] or array [a,b,c]
+        advance();
         if (looks_like_range()) {
             return range_expr(true); // incl_left=true
         }
@@ -1214,7 +1110,7 @@ std::unique_ptr<Expr> Parser::primary() {
     }
     if (check(TokenType::RBRACKET)) {
         // Open-left range: ]a;b]  or  ]a;b[
-        advance();               // consume ]
+        advance();                // consume ]
         return range_expr(false); // incl_left=false
     }
     if (match(TokenType::LPAREN)) {
@@ -1225,14 +1121,15 @@ std::unique_ptr<Expr> Parser::primary() {
         // Postfix on a parenthesized expression: (expr)(args), (expr)[i], (expr).field
         return parse_postfix(std::move(e));
     }
-    throw std::runtime_error(peek().sloc().str(*source_files_) + ": unexpected token '" + peek().lexeme + "'");
+    fail("unexpected token '" + peek().lexeme + "'");
 }
 
 std::unique_ptr<Stmt> Parser::class_decl() {
     int line = peek().line;
     advance(); // CLASS
     auto s = std::make_unique<ClassDeclStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     s->name = expect(TokenType::IDENTIFIER).lexeme;
     if (check(TokenType::EXTENDS)) {
         advance();
@@ -1249,18 +1146,8 @@ std::unique_ptr<Stmt> Parser::class_decl() {
             is_static = true;
         }
         if (!check(TokenType::FUNC))
-            throw std::runtime_error(peek().sloc().str(*source_files_) + ": expected 'func' inside class body");
-        int method_line = peek().line;
-        // func_decl_stmt() returns an IndexAssignStmt for the `func obj.field()` form
-        // which is invalid in a class. Check the type rather than static_cast'ing
-        // blindly, which used to segfault.
-        auto raw = func_decl_stmt();
-        auto* fd = dynamic_cast<FuncDeclStmt*>(raw.get());
-        if (!fd)
-            throw std::runtime_error(cur_loc(method_line).str(*source_files_) +
-                                     ": a class method must be 'func name(...)' (not 'func obj.field(...)')");
-        raw.release();
-        auto method = std::unique_ptr<FuncDeclStmt>(fd);
+            fail("expected 'func' inside class body");
+        auto method = func_decl_named();
         method->is_static = is_static;
         s->methods.push_back(std::move(method));
     }
@@ -1300,27 +1187,12 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
     // not call parse_postfix, which would also accept `a[0]` and `a.f()` — forms the grammar
     // does not allow as an enum target.
     std::vector<std::string> path;
-    path.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    while (check(TokenType::DOT)) {
-        advance();
-        path.push_back(expect(TokenType::IDENTIFIER).lexeme);
-    }
+    parse_field_path(path);
     s->name = path.back();
-    path.pop_back();
-    for (auto& seg : path) {
-        if (!s->obj_expr) {
-            s->obj_expr = std::make_unique<VarExpr>(seg);
-        } else {
-            auto ix = std::make_unique<IndexExpr>();
-            ix->obj = std::move(s->obj_expr);
-            ix->key = std::make_unique<StringExpr>(seg);
-            s->obj_expr = std::move(ix);
-        }
-        s->obj_expr->line = line;
-        s->obj_expr->file_idx = current_file_idx_;
-    }
+    if (path.size() > 1)
+        s->obj_expr = fold_path(path, path.size() - 1, cur_loc(line));
 
-    int64_t counter = 1;   // the first item with no value is 1
+    int64_t counter = 1; // the first item with no value is 1
     std::unordered_set<std::string> seen;
     while (true) {
         skip_comments();
@@ -1330,8 +1202,7 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
         int item_line = peek().line;
         it.name = expect(TokenType::IDENTIFIER).lexeme;
         if (!seen.insert(it.name).second)
-            throw std::runtime_error(cur_loc(item_line).str(*source_files_) + ": enum '" + s->name +
-                                     "' : element '" + it.name + "' declared twice");
+            fail_at(item_line, "enum '" + s->name + "' : element '" + it.name + "' declared twice");
         if (check(TokenType::EQUALS)) {
             advance();
             it.value = expr();
@@ -1345,13 +1216,9 @@ std::unique_ptr<Stmt> Parser::enum_decl() {
         }
         s->items.push_back(std::move(it));
         skip_comments();
-        if (check(TokenType::COMMA)) {
-            advance();
-            continue;
-        }
-        break;
+        if (!match(TokenType::COMMA))
+            break;
     }
-    skip_comments();
     expect(TokenType::END);
     consume_opt_comment();
     return s;
@@ -1369,7 +1236,8 @@ static std::vector<std::string> collect_top_level_names(const std::vector<std::u
 
 std::unique_ptr<Stmt> Parser::import_stmt() {
     advance();
-    Token path_tok = expect(TokenType::STRING);
+    const Token& path_tok = expect(TokenType::STRING);
+    int path_line = path_tok.line;
     std::string path = path_tok.lexeme;
     if (path.size() < 3 || path.substr(path.size() - 3) != ".ol")
         path += ".ol";
@@ -1387,15 +1255,22 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
 
     auto block = std::make_unique<BlockStmt>();
 
-    // Builds `var al = {}` then `al[n] = n` for every exported name, referencing the globals
-    // already injected. Shared by the already-imported case and the fresh one.
-    auto emit_alias_map = [&](const std::string& al, const std::vector<std::string>& names) {
+    // `var al = {}` and `al[n] = n` for every exported name, referencing the globals already
+    // injected. TWO halves and not one: a fresh import must slip the module's statements
+    // BETWEEN them, and the second copy written for that case is what made this lambda a lie.
+    auto emit_alias_decl = [&](const std::string& al) {
         auto vd = std::make_unique<VarDeclStmt>();
+        vd->line = path_line;
+        vd->file_idx = current_file_idx_;
         vd->names.push_back(al);
         vd->values.push_back(std::make_unique<MapExpr>());
         block->stmts.push_back(std::move(vd));
+    };
+    auto emit_alias_fields = [&](const std::string& al, const std::vector<std::string>& names) {
         for (auto& tname : names) {
             auto ia = std::make_unique<IndexAssignStmt>();
+            ia->line = path_line;
+            ia->file_idx = current_file_idx_;
             ia->obj = al;
             ia->key = std::make_unique<StringExpr>(tname);
             ia->op = TokenType::EQUALS;
@@ -1407,14 +1282,15 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     // Already imported (dedup, and cycle breaking): do NOT inject the statements again. When an
     // alias is asked for, rebuild its map from the names cached on the first import, otherwise a
     // second `import "m" as b` would yield an empty map.
-    if (imported_paths_->count(resolved)) {
+    if (!imported_paths_->insert(resolved).second) {
         if (!alias.empty()) {
+            static const std::vector<std::string> none;
             auto it = module_names_->find(resolved);
-            emit_alias_map(alias, it != module_names_->end() ? it->second : std::vector<std::string>{});
+            emit_alias_decl(alias);
+            emit_alias_fields(alias, it != module_names_->end() ? it->second : none);
         }
         return block;
     }
-    imported_paths_->insert(resolved);
 
     // Read the imported file from the in-memory registry first (provided by the host, the WASM
     // playground for instance), then from disk.
@@ -1422,7 +1298,7 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     if (!source_get(resolved, src_text) && !(resolved != path && source_get(path, src_text))) {
         std::ifstream f(resolved);
         if (!f)
-            throw std::runtime_error(path_tok.sloc().str(*source_files_) + ": import: cannot open '" + resolved + "'");
+            fail_at(path_line, "import: cannot open '" + resolved + "'");
         std::ostringstream ss;
         ss << f.rdbuf();
         src_text = ss.str();
@@ -1436,38 +1312,21 @@ std::unique_ptr<Stmt> Parser::import_stmt() {
     int sub_file_idx = (int)source_files_->size();
     source_files_->push_back(resolved);
     // Any error thrown from here already carries its own "file:line:" prefix, hence no catch.
-    Parser sub_parser(Lexer(src_text, resolved, sub_file_idx).tokenize(), sub_dir, imported_paths_,
-                      module_names_, source_files_);
+    Parser sub_parser(Lexer(src_text, resolved, sub_file_idx).tokenize(), sub_dir, imported_paths_, module_names_,
+                      source_files_);
     Program sub_prog = sub_parser.parse();
 
     // Remember the exported names even for a flat import, so a later aliased import of the same
     // module can rebuild its map.
-    auto top_names = collect_top_level_names(sub_prog.stmts);
-    (*module_names_)[resolved] = top_names;
+    const std::vector<std::string>& top_names = (*module_names_)[resolved] = collect_top_level_names(sub_prog.stmts);
 
-    if (alias.empty()) {
-        // Flat import: inject every statement directly.
-        for (auto& s : sub_prog.stmts)
-            block->stmts.push_back(std::move(s));
-    } else {
-        // Aliased import: var name = {}; <stmts>; name[k] = k for every top-level name.
-        auto vd = std::make_unique<VarDeclStmt>();
-        vd->names.push_back(alias);
-        vd->values.push_back(std::make_unique<MapExpr>());
-        block->stmts.push_back(std::move(vd));
-
-        for (auto& s : sub_prog.stmts)
-            block->stmts.push_back(std::move(s));
-
-        for (auto& tname : top_names) {
-            auto ia = std::make_unique<IndexAssignStmt>();
-            ia->obj = alias;
-            ia->key = std::make_unique<StringExpr>(tname);
-            ia->op = TokenType::EQUALS;
-            ia->value = std::make_unique<VarExpr>(tname);
-            block->stmts.push_back(std::move(ia));
-        }
-    }
+    // Aliased import: var name = {}; <stmts>; name[k] = k for every top-level name.
+    if (!alias.empty())
+        emit_alias_decl(alias);
+    for (auto& st : sub_prog.stmts)
+        block->stmts.push_back(std::move(st));
+    if (!alias.empty())
+        emit_alias_fields(alias, top_names);
     return block;
 }
 
@@ -1475,45 +1334,27 @@ std::unique_ptr<Stmt> Parser::switch_stmt() {
     int line = peek().line;
     advance(); // SWITCH
     auto s = std::make_unique<SwitchStmt>();
-    s->line = line; s->file_idx = current_file_idx_;
+    s->line = line;
+    s->file_idx = current_file_idx_;
     s->subject = expr();
     consume_opt_comment();
-
-    auto is_arm_start = [&]() {
-        return check(TokenType::CASE) || check(TokenType::ELSE) || check(TokenType::END) || check(TokenType::EOF_T);
-    };
 
     while (true) {
         skip_comments();
         if (check(TokenType::END) || check(TokenType::EOF_T))
             break;
 
-        if (check(TokenType::ELSE)) {
-            advance(); // ELSE
+        if (match(TokenType::ELSE)) {
             consume_opt_comment();
-            while (!check(TokenType::END) && !check(TokenType::EOF_T)) {
-                skip_comments();
-                if (check(TokenType::END) || check(TokenType::EOF_T))
-                    break;
-                s->else_body.push_back(parse_one_stmt());
-            }
+            parse_body_until(s->else_body, {TokenType::END});
             break;
         }
 
         expect(TokenType::CASE);
         CaseClause arm;
-        arm.values.push_back(expr());
-        while (check(TokenType::COMMA)) {
-            advance(); // COMMA
-            arm.values.push_back(expr());
-        }
+        parse_expr_list(arm.values);
         consume_opt_comment();
-        while (!is_arm_start()) {
-            skip_comments();
-            if (is_arm_start())
-                break;
-            arm.body.push_back(parse_one_stmt());
-        }
+        parse_body_until(arm.body, {TokenType::CASE, TokenType::ELSE, TokenType::END});
         s->cases.push_back(std::move(arm));
     }
 

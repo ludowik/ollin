@@ -1829,4 +1829,27 @@ assert(KwHolder().get() == 5)
 ## strings silently would be a trap (the refusal itself is pinned in test_errors.sh).
 assert(kw[true] == nil)                    ## a boolean key is a key of its own, not "true"
 
+## A bare 'return' as the last statement of a switch arm. The set of tokens meaning "no return
+## value" was written out a second time in return_stmt, and 'case' was missing from it: the form
+## was refused outright ("unexpected token 'case'"). One predicate now answers for every block.
+func armReturn(x)
+    switch x
+    case 1
+        return
+    case 2
+        return 9
+    end
+    return 7
+end
+assert(armReturn(2) == 9)
+assert(armReturn(3) == 7)
+
+## An enum whose TARGET is a path through a keyword. Every other position after a '.' accepted a
+## keyword; the enum target was the one site still demanding an identifier.
+global kwCfg = {}
+enum kwCfg.class
+    A, B
+end
+assert(kwCfg.class.A == 1 and kwCfg.class.B == 2)
+
 print("regressions ok")
