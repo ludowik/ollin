@@ -184,7 +184,9 @@ async function walkImports(entry, code, v, onFile) {
       onFile(key, src)
       for (const imp of findImports(src)) next.push(resolveImport(dirOf(key), imp))
     })
-    level = next
+    // Deduplicated: `seen` is only filled AFTER the filter, so two files of one level importing
+    // the same library would both survive it — fetched twice, and handed to onFile twice.
+    level = [...new Set(next)]
   }
 }
 
