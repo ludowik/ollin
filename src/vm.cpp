@@ -1286,6 +1286,12 @@ dispatch_loop:
             Value thrown = regs[base + A];
             if (handler_stack.empty())
                 throw std::runtime_error("unhandled exception: " + value_to_string(thrown));
+            // A handler opened BELOW this invocation's floor belongs to an enclosing run_goto —
+            // this loop is running a callback called from native code. Unwinding to it from here
+            // would continue the enclosing program INSIDE the nested loop, and the native frame
+            // in between would resume afterwards with a truncated stack.
+            if (handler_stack.back().call_depth <= stop_depth)
+                throw OllinThrow{std::move(thrown)};
             Handler h = handler_stack.back();
             handler_stack.pop_back();
             unwind_to_handler(h, std::move(thrown));
@@ -1888,14 +1894,25 @@ dispatch_loop:
         call_stack.pop_back();
         return;
 
+    } catch (OllinThrow& t) {
+        // A script value thrown under a nested loop, arriving here through the native frame.
+        if (!handler_can_run(stop_depth))
+            throw;
+        Handler h = handler_stack.back();
+        handler_stack.pop_back();
+        unwind_to_handler(h, std::move(t.value));
+        base = call_stack.back().reg_base;
+        goto dispatch_loop;
     } catch (const std::runtime_error& e) {
         // A CAUGHT error reaches the script as it was thrown, with no location: the message is
         // data for the program — `assert(false, "kaboom")` catches as "kaboom" — whereas the
         // location is for the developer reading a crash.
-        if (!handler_stack.empty()) {
+        const OllinError* prior = dynamic_cast<const OllinError*>(&e);
+        std::string bare = prior ? prior->bare : e.what();
+        if (handler_can_run(stop_depth)) {
             Handler h = handler_stack.back();
             handler_stack.pop_back();
-            unwind_to_handler(h, Value(std::string(e.what())));
+            unwind_to_handler(h, Value(bare));
             // `base` (a local) is restored here, as in op_THROW; unwind_to_handler already set ip.
             base = call_stack.back().reg_base;
             goto dispatch_loop;
@@ -1906,9 +1923,11 @@ dispatch_loop:
         // engine and in the modules throws a BARE message; a location written at the throw site
         // had to be recognised here, and recognising it meant sniffing the text for ":<digits>:"
         // — which `assert(false, "meeting at 12:30:45")` matched, and the error lost its line.
-        if (dynamic_cast<const OllinError*>(&e))
+        // The location is the INNERMOST one: computed here, where ip still points at the failing
+        // instruction, and carried along so an enclosing loop does not replace it with its own.
+        if (prior)
             throw;
-        throw OllinError(err_line() + ": " + e.what());
+        throw OllinError(err_line() + ": " + bare, bare);
     }
 
 #undef NEXT

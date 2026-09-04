@@ -14,10 +14,20 @@ std::string value_to_string(const Value& v);
 uint64_t ollin_heap_bytes();
 
 // A runtime error that has ALREADY been given its source line. The type is the mark: nothing has
-// to guess from the text, and a nested run_goto cannot prefix a second location.
+// to guess from the text, and a nested run_goto cannot prefix a second location. `bare` keeps the
+// message as it was thrown, which is what a script's catch receives.
 struct OllinError : std::runtime_error {
-    explicit OllinError(const std::string& msg) : std::runtime_error(msg) {
+    std::string bare;
+    OllinError(const std::string& located, std::string bare_msg)
+        : std::runtime_error(located), bare(std::move(bare_msg)) {
     }
+};
+
+// A script-level `throw` whose handler belongs to an ENCLOSING run_goto: the value has to cross a
+// native frame (a callback handed to array.map, to a mouse handler…) as a C++ exception, since
+// only the enclosing loop may unwind to that handler.
+struct OllinThrow {
+    Value value;
 };
 
 class VM {
@@ -58,6 +68,12 @@ class VM {
     bool gfx_canvas_created_ = false;
     std::string err_line() const;     // "file:line" from current ip
     void run_goto(size_t stop_depth); // unified computed-goto dispatch loop
+    // Whether the innermost handler may be unwound to BY THIS invocation. A handler opened below
+    // the floor belongs to an enclosing run_goto: only that loop may resume the program, so the
+    // error has to propagate out through the native frame in between.
+    bool handler_can_run(size_t stop_depth) const {
+        return !handler_stack.empty() && handler_stack.back().call_depth > stop_depth;
+    }
     struct Handler {
         uint32_t catch_addr;
         uint8_t catch_reg;

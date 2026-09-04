@@ -1234,8 +1234,13 @@ void Compiler::visit(const ReturnStmt& s) {
     // Leaving the try blocks of THIS function pops their handlers, as a break does. Doing it here
     // and not in the VM is what keeps it free: popping them on every RETURN cost 1.23 % of the
     // instructions executed by bench_fib, measured, for a check that is useless without a try.
-    for (int i = try_floor(); i < try_depth_; ++i)
-        chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
+    // ⚠ Popped AFTER the returned values are evaluated, not before: `return x.field` inside a try
+    // failed with the handler already gone, so the error escaped its own try — while the same
+    // code split over `var v = x.field` then `return v` was caught.
+    auto pop_tries = [this]() {
+        for (int i = try_floor(); i < try_depth_; ++i)
+            chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
+    };
     // return <explicit values>, <call>: when the last returned expression is a call it expands
     // to ALL its values, as in Lua. `return ...` is still handled by spread_varargs.
     if (!s.spread_varargs && !s.values.empty() && is_call_node(s.values.back().get())) {
@@ -1247,25 +1252,30 @@ void Compiler::visit(const ReturnStmt& s) {
         s.values.back()->accept(*this); // a terminal call: k return values, hence last_results_ = k
         if (last_reg_ != want)
             chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
+        pop_tries();
         chunk.emit(make_abc((uint8_t)Op::RETURN_SPREAD, (uint8_t)base, (uint8_t)n_expl, 0));
         return;
     }
     if (s.spread_varargs) {
         int base = reg_top_;
         compile_consecutive(base, s.values);
+        pop_tries();
         chunk.emit(make_abc((uint8_t)Op::RETURN_V, (uint8_t)base, (uint8_t)s.values.size(), 0));
     } else {
         int n = (int)s.values.size();
         if (n == 0) {
+            pop_tries();
             chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 0, 0));
         } else if (n == 1) {
             // RETURN A,1 copies R[A] into R[0], so ANY register will do: the value is compiled
             // where it falls, instead of being moved to the top of the scratch area first.
             s.values[0]->accept(*this);
+            pop_tries();
             chunk.emit(make_abc((uint8_t)Op::RETURN, (uint8_t)last_reg_, 1, 0));
         } else {
             int base = reg_top_;
             compile_consecutive(base, s.values);
+            pop_tries();
             chunk.emit(make_abc((uint8_t)Op::RETURN, (uint8_t)base, (uint8_t)n, 0));
         }
     }

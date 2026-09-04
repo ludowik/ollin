@@ -2244,4 +2244,86 @@ assert(swWide(-9223372036854775807) == "min")
 assert(swWide(9223372036854775807) == "max")
 assert(swWide(1) == "autre")
 
+## ── try/catch: the handler must live exactly as long as the block ──────────
+## A `return` whose EXPRESSION fails inside a try: the handlers of the blocks being left were
+## popped BEFORE the value was evaluated, so the error escaped its own try — while the same code
+## written as `var v = ...` then `return v` was caught. They are popped after the evaluation now.
+func trReturnRaises(x)
+    try
+        return x.champ
+    catch e
+        return "caught"
+    end
+end
+assert(trReturnRaises(1) == "caught")
+
+func trReturnTwoValues(x)
+    try
+        return 1, x.champ
+    catch e
+        return "caught"
+    end
+end
+assert(trReturnTwoValues(1) == "caught")
+
+## A callback run by a NATIVE higher-order function (array.map) lives in a nested dispatch loop.
+## An error raised there was delivered to the enclosing catch AND then escaped at the end of the
+## program: the nested loop resumed the enclosing program inside itself, and the native frame in
+## between woke up with a truncated stack. Only the loop that owns the handler may unwind to it.
+func cbErrorOutside()
+    var t = [1, 2, 3]
+    var seen = "none"
+    try
+        t.map(func(x) return x.champ end)
+    catch e
+        seen = e
+    end
+    return seen + "|" + t.reduce(func(a, b) return a + b end, 0)
+end
+assert(cbErrorOutside() == "cannot index int with field 'champ'|6")
+
+## Same crossing for a script-level `throw`: the VALUE travels through the native frame.
+func cbThrowOutside()
+    var got = 0
+    var pair = [1, 2]
+    try
+        pair.map(func(x) throw {code: 42} end)
+    catch e
+        got = e["code"]
+    end
+    return got
+end
+assert(cbThrowOutside() == 42)
+
+## And a try INSIDE the callback is served on the spot, not by the enclosing one.
+func cbTryInside()
+    var r = [1, 2].map(func(x)
+        try
+            return x.champ
+        catch e
+            return -1
+        end
+    end)
+    return r[1] + r[2]
+end
+assert(cbTryInside() == -2)
+
+## __str also runs in a nested loop, through print.
+class TrBoom
+    func __str()
+        var z = nil
+        return z.x
+    end
+end
+func cbStrRaises()
+    var seen = "none"
+    try
+        print(TrBoom())
+    catch e
+        seen = e
+    end
+    return seen
+end
+assert(cbStrRaises() == "cannot index nil with field 'x'")
+
 print("regressions ok")

@@ -1950,7 +1950,13 @@ s'il s'agit d'un `switch`.
 - **`break`/`continue` dans une lambda déclarée dans une boucle sont REFUSÉS** : le saut visait
   une adresse du code de la fonction ENGLOBANTE, et le corps de la boucle était purement sauté,
   sans erreur.
-- **Sortir d'un `try` émet un `POP_TRY` par bloc quitté** (`pop_crossed_tries` pour
+- ⚠ **Les `POP_TRY` d'un `return` sont émis APRÈS l'évaluation des valeurs**, jamais avant : le
+gestionnaire doit vivre pendant le calcul de ce qu'on renvoie. Émis avant, `return x.champ` écrit
+dans un `try` échouait **hors de son propre `try`** — alors que le même code coupé en `var v =
+x.champ` puis `return v` était attrapé. Figé dans `regressions.ol`, dans les trois formes de
+retour.
+
+**Sortir d'un `try` émet un `POP_TRY` par bloc quitté** (`pop_crossed_tries` pour
   `break`/`continue`, la même boucle dans `visit(ReturnStmt)` pour `return`). Sans cela le
   gestionnaire restait empilé : une erreur survenue longtemps après la boucle était interceptée
   par lui, et le `catch` s'exécutait une fois par tour effectué. Pour `return`, le compte part du
@@ -2042,10 +2048,14 @@ dans `regressions.ol`.
 ⚠ Le type, et non le texte, est ce qui empêche une **double** position : `run_goto` est réentrant
 (un rappel natif rappelle du code Ollin), donc une erreur peut traverser deux fois la boucle.
 
-**Défaut CONNU et distinct, non corrigé** : une erreur levée dans un rappel passé à une fonction
-native d'ordre supérieur (`array.map`) est délivrée au `catch` du script ET s'échappe ensuite en
-fin de programme — le rappel est exécuté par un `run_goto` imbriqué, qui déroule vers un
-gestionnaire appartenant à la boucle englobante. Vérifié présent avant comme après ce changement.
+**Un gestionnaire n'est déroulé que par la boucle qui le possède** (`handler_can_run`, vm.h) :
+`run_goto` est réentrant, et un `try` ouvert SOUS le plancher de l'invocation courante
+(`call_depth <= stop_depth`) appartient à une boucle englobante. La boucle imbriquée laisse alors
+l'erreur traverser le cadre natif — un `throw` du script voyage dans `OllinThrow`, qui porte la
+valeur. Sans cela, une erreur levée dans un rappel de `array.map` était délivrée au `catch` du
+script ET s'échappait ensuite en fin de programme : la boucle imbriquée reprenait le programme
+englobant à l'intérieur d'elle-même, et le cadre natif intermédiaire se réveillait avec une pile
+tronquée. Même chemin pour `__str`, appelé par `print` dans une boucle imbriquée.
 
 ## Points de passage uniques de la VM
 
