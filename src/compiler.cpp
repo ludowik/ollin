@@ -387,6 +387,11 @@ void Compiler::visit(const VarDeclStmt& s) {
         local_regs_[name] = reg;
         return reg;
     };
+    // A const is registered HERE and not at the end of the function: the multi-return path
+    // returns early, and `const a, b = f()` silently lost its constness.
+    if (s.is_constant)
+        for (auto& n : s.names)
+            const_names_.insert(n);
     // Register reserved for a still-deferred local, without activating it.
     auto reserved_reg = [&](const std::string& name) -> int {
         auto it = pending_var_reg_.find(name);
@@ -459,13 +464,18 @@ void Compiler::visit(const VarDeclStmt& s) {
     // With the initializers compiled, the locals become visible from here on.
     for (auto& n : s.names)
         activate_local(n);
-    // Register constants so any later assignment is caught at compile time
-    if (s.is_constant)
-        for (auto& n : s.names)
-            const_names_.insert(n);
 }
 
 static bool body_has_func(const std::vector<std::unique_ptr<Stmt>>& body); // defined below
+
+// The temporaries of a statement are freed once it is compiled, so the next one reuses them.
+void Compiler::compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body) {
+    for (auto& stmt : body) {
+        int saved = reg_top_;
+        stmt->accept(*this);
+        reg_top_ = saved;
+    }
+}
 
 void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
                                 const std::unordered_set<std::string>& skip) {
@@ -496,6 +506,9 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
                              int pre_bound_reg) {
     auto saved_regs = local_regs_;
     auto saved_pending = pending_var_reg_;
+    // The constants belong to the scope too: without this, `do const x = 1 end` then `var x = 2`
+    // refused to assign x, a name with nothing to do with the block's.
+    auto saved_consts = const_names_;
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
@@ -513,15 +526,20 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     locals_top_ = block_locals_top;
     bump_reg_count();
 
-    for (auto& stmt : body) {
-        int s = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = s;
-    }
+    compile_stmt_seq(body);
 
     bool has_func = body_has_func(body);
+    // A block's locals DIE at its end, so the upvalues opened on them are closed there — the
+    // value is copied into the Upvalue and the register stops being watched. Without this, a
+    // closure declared in a nested block kept an open upvalue on a register that went back to
+    // the temporaries, and the next statement overwrote the captured value (a `do` block
+    // returning nil instead of 42, measured). The two loop forms already close per iteration,
+    // for the same reason; reserving the registers instead would grow without bound over a file.
+    if (has_func && reg_top_ > saved_top)
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)saved_top, 0, 0));
     local_regs_ = std::move(saved_regs);
     pending_var_reg_ = std::move(saved_pending);
+    const_names_ = std::move(saved_consts);
     reg_top_ = has_func ? block_locals_top : saved_top;
     locals_top_ = saved_locals;
 }
@@ -777,6 +795,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     size_t try_patch = chunk.emit_jump(Op::TRY, (uint8_t)catch_r);
     // The handler is live for the BODY only: unwind_to_handler pops it before the catch runs, and
     // the else body comes after POP_TRY. So only the body raises the depth a jump has to undo.
+    int try_base = reg_top_;
     ++try_depth_;
     compile_block(s.try_body);
     --try_depth_;
@@ -784,6 +803,12 @@ void Compiler::visit(const TryCatchStmt& s) {
     size_t else_patch = chunk.emit_jump(Op::JUMP);
 
     chunk.patch_jump(try_patch, (uint16_t)chunk.current_pos());
+    // A throw LEAVES the body without running its end, so the block's own CLOSE_UPVALS never
+    // executes: it is emitted again here, where control lands. The body's locals are dead at
+    // this point, and one declared BEFORE the try keeps its open upvalue (its register is below
+    // try_base).
+    if (body_has_func(s.try_body))
+        chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)try_base, 0, 0));
 
     // Catch block: catch_var keeps catch_r, other locals are scoped as usual.
     compile_block(s.catch_body, s.catch_var, catch_r);
@@ -793,7 +818,7 @@ void Compiler::visit(const TryCatchStmt& s) {
     compile_block(s.else_body);
     chunk.patch_jump(end_patch, (uint16_t)chunk.current_pos());
 
-    if (!body_has_func(s.try_body) && !body_has_func(s.catch_body))
+    if (!body_has_func(s.try_body) && !body_has_func(s.catch_body) && !body_has_func(s.else_body))
         reg_top_ = saved_top;
 }
 
@@ -876,11 +901,7 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
     if (on_registered)
         on_registered(func_idx);
 
-    for (auto& stmt : body) {
-        int saved = reg_top_;
-        stmt->accept(*this);
-        reg_top_ = saved;
-    }
+    compile_stmt_seq(body);
     emit_implicit_return(chunk); // an implicit void return, omitted when the body already ends with RETURN
 
     if (reg_count_ > 255)
@@ -892,22 +913,26 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
 
 void Compiler::visit(const FuncDeclStmt& s) {
     note_line(s.line, s.file_idx);
-    bool is_nested = in_function(); // declared inside another function
+    // The question is not "am I inside a function" but "does this name have a local register
+    // here" — collect_locals reserves one for a func declared in a BLOCK, top level included.
+    // Deciding by in_function() compiled a `func` inside a top-level `do` as a global while
+    // binding it as a local, so its register stayed empty: `var g = h` gave nil.
+    bool is_local = local_regs_.count(s.name) != 0;
     uint8_t func_idx =
         compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, false, false, s.sloc(), [&](uint8_t idx) {
-            // Top-level function: pre-registered in func_table so recursive calls are optimized
-            // (CALL_DYN instead of CALL_FUNC when the function may be a closure). A nested one
-            // gets no entry: it lives in a local register.
-            if (!is_nested)
+            // A global function is pre-registered in func_table so recursive calls are optimized
+            // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
+            // a local register gets no entry.
+            if (!is_local)
                 func_table[s.name] =
                     FuncInfo{idx, (int)s.params.size(), s.variadic, !outer_scopes_.back().regs.empty()};
         });
 
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
-    if (is_nested) {
-        // Nested function: stored in the local register pre-allocated by collect_locals, with no
-        // func_table entry and no access to globals.
+    if (is_local) {
+        // Stored in the local register pre-allocated by collect_locals, with no func_table entry
+        // and no access to globals.
         int dest = local_regs_.at(s.name);
         chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
         return;
@@ -1232,8 +1257,14 @@ void Compiler::visit(const CallExpr& e) {
         return;
     }
 
-    // Check if it's a user-defined function
-    auto it = func_table.find(e.callee);
+    // A local, a parameter or an upvalue SHADOWS a top-level function of the same name — exactly
+    // as it does when the name is read as a VALUE (visit(VarExpr)). Consulting func_table first
+    // made `func run(handler) return handler() end` call the global `handler` instead of its own
+    // parameter, so `print(f)` and `f()` named two different things in one scope.
+    // resolve_upvalue only creates the upvalue when it finds one, and it caches, so testing here
+    // costs nothing and adds nothing to the proto.
+    bool shadowed = local_regs_.count(e.callee) != 0 || resolve_upvalue(e.callee) >= 0;
+    auto it = shadowed ? func_table.end() : func_table.find(e.callee);
     if (it != func_table.end()) {
         int call_base = reg_top_;
         int argc = (int)e.args.size();

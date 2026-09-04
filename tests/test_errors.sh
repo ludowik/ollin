@@ -84,6 +84,14 @@ func f()
 end' \
     "cannot assign to const 'k'"
 
+# A const stays a const through a multi-return destructuring: the early return of that path
+# skipped the registration, and the write below went through in silence.
+check_error "const through a multi-return destructuring" \
+    'func f() return 1, 2 end
+const a, b = f()
+a = 99' \
+    "cannot assign to const 'a'"
+
 # A keyword spells a NAME as a map key or a field, but true/false/nil are left out: they carry
 # a value, so ["true"] must be written out rather than turned into a string in silence.
 check_error "true as a map-literal key"   'var m = {true: 1}'   "expected string, identifier, or [expr] key in map literal"

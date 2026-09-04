@@ -1852,4 +1852,89 @@ enum kwCfg.class
 end
 assert(kwCfg.class.A == 1 and kwCfg.class.B == 2)
 
+## A local, a parameter or an upvalue SHADOWS a top-level function of the same name AT THE CALL
+## SITE too. func_table was consulted first, so a callback parameter named like an existing
+## function called that function instead — while reading the same name as a value resolved right.
+func shadowed() return "the global one" end
+func callWith(shadowed)
+    return shadowed()
+end
+assert(callWith(func() return "the parameter" end) == "the parameter")
+
+## A closure declared in a NESTED block keeps the value it captured. The block's locals die at
+## its end, so the upvalues opened on them are closed there — without that, the register went
+## back to the temporaries and the next statement overwrote the captured value. One case per
+## kind of block, plus the throw path, which leaves the body without running its end.
+func capturedIn(kind)
+    var f = nil
+    if kind == 1 then
+        var a = 42
+        f = func() return a end
+    end
+    var i = 0
+    while i < 1 do
+        var b = 43
+        if kind == 2 then
+            f = func() return b end
+        end
+        i += 1
+    end
+    try
+        var c = 44
+        if kind == 3 then
+            f = func() return c end
+        end
+        throw "leave the body early"
+    catch e
+        var d = 45
+        if kind == 4 then
+            f = func() return d end
+        end
+    end
+    switch kind
+    case 5
+        var g = 46
+        f = func() return g end
+    end
+    var pad1, pad2, pad3, pad4, pad5 = 1, 2, 3, 4, 5   ## reuses the freed registers
+    return f() + pad1 - pad1
+end
+assert(capturedIn(1) == 42)
+assert(capturedIn(2) == 43)
+assert(capturedIn(3) == 44)
+assert(capturedIn(4) == 45)
+assert(capturedIn(5) == 46)
+
+## Closing an upvalue does not un-share it: two closures over the same block local still see
+## each other's writes afterwards.
+global blockSet = nil
+global blockGet = nil
+do
+    var shared = 1
+    blockSet = func(v) shared = v end
+    blockGet = func() return shared end
+end
+blockSet(9)
+assert(blockGet() == 9)
+
+## A func declared in a BLOCK lives in a local register, at the top level as well as inside a
+## function: deciding by "am I in a function" stored it as a global while binding it as a local,
+## so the register stayed empty and taking the function as a value gave nil.
+do
+    func blockFunc() return 5 end
+    var alias = blockFunc
+    assert(alias() == 5)
+    assert(blockFunc() == 5)
+end
+
+## A const belongs to its block. const_names_ was not restored, so a constant declared in a
+## block forbade assigning an unrelated variable of the same name afterwards.
+do
+    const scopedConst = 1
+    assert(scopedConst == 1)
+end
+var scopedConst = 2
+scopedConst = 3
+assert(scopedConst == 3)
+
 print("regressions ok")

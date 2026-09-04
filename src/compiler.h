@@ -177,6 +177,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // only case — so it keeps that register instead of being given a fresh one.
     void compile_block(const std::vector<std::unique_ptr<Stmt>>& body, const std::string& pre_bound = "",
                        int pre_bound_reg = 0);
+    // A sequence of statements, each one's temporaries freed after it — EXCEPT when it carries a
+    // function, whose captured registers must stay reserved.
+    void compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body);
 
     // Reserves a register for every pre-scanned local. Functions are bound in local_regs_ straight
     // away, for recursion and forward references, while var and const are deferred in
