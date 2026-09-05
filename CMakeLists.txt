@@ -19,6 +19,16 @@ set(BUILD_GAMES    OFF CACHE BOOL "" FORCE)
 # cache local to build/, not shared) or through tools/native-gfx.sh (build-gfx/, the Xvfb tests).
 option(OLLIN_NATIVE_RAYLIB "Native build with raylib graphics (default: stub)" OFF)
 
+# How the compiler holds its scoped name tables (see src/scope_tables.h). ON = one small map per
+# scope, chained; OFF = a single map copied whole on entering a scope. The two produce the same
+# bytecode; only the cost of compiling differs, and the switch exists so the two can be compared.
+option(OLLIN_SCOPED_TABLES "Compiler scopes: chained tables (OFF = flat, copied per scope)" ON)
+if(OLLIN_SCOPED_TABLES)
+    add_compile_definitions(OLLIN_SCOPED_TABLES=1)
+else()
+    add_compile_definitions(OLLIN_SCOPED_TABLES=0)
+endif()
+
 # The 3D shaders live in src/shaders/*.glsl and are EMBEDDED in the binary: the file is read HERE,
 # at configure time, and pasted into a generated header as a raw string. Nothing is read from disk
 # when a program runs, exactly as for the engine fonts, so every target renders the same.

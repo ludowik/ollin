@@ -1636,6 +1636,41 @@ imbriqué : une descente manquante y produirait une valeur corrompue.
 - Résolution d'un nom : local (`local_regs_`) → fonction (`func_table`) → upvalue (`resolveUpvalue`) → global (`declared_globals_` → `LOAD_GLOBAL`/`STORE_GLOBAL`) → sinon erreur. Une locale masque donc un global de même nom.
 - Garde-fous + branche global dans le compilateur : `visit(AssignStmt)`, `visit(VarExpr)`, `visit(IndexAssignStmt)`.
 
+## Tables de portée du compilateur (`src/scope_tables.h`)
+
+Les quatre tables de noms du compilateur — locales, locales différées, constantes, alias
+d'import — vivent derrière **une seule interface, avec DEUX implémentations** que rien au-dessus
+ne distingue. Le langage se comporte à l'identique dans les deux cas (vérifié : sorties
+identiques sur tous les fichiers de test et d'exemple), seul le coût de la compilation change.
+On bascule par `cmake -DOLLIN_SCOPED_TABLES=OFF`.
+
+- **Chaînée (défaut)** : une petite table par portée, consultée de la plus interne vers
+  l'extérieur. Entrer coûte une table vide, sortir sa libération ; un nom déclaré n portées plus
+  haut coûte n consultations.
+- **Plate** : une table unique où toutes les portées écrivent, **recopiée en entier** à chaque
+  entrée de bloc et remise en place à la sortie. La consultation est unique quelle que soit la
+  profondeur, mais l'entrée coûte la portée englobante tout entière.
+
+**Mesuré avant de choisir** (compilation seule, callgrind) : les copies de la forme plate
+pesaient **20,0 %** du travail sur `tests/syntax.ol` — un fichier dont la portée de tête est
+énorme — et **6,4 %** sur `voxel_world.ol`, quand les consultations supplémentaires de la chaîne
+se comptaient en 85 et 1 203, soit du bruit. Le profil dépend entièrement de la FORME du
+fichier : `syntax.ol` recopiait 125 entrées par bloc, `invaders.ol` seulement 2.
+
+Sur les binaires finis (les deux en `Release`, exécution comprise) : `syntax.ol` 21,0 M → 13,6 M
+(**−35 %**), `regressions.ol` 113,7 M → 99,2 M, `voxel_world.ol` 14,8 M → 14,4 M. Le gain dépasse
+la mesure d'origine parce que la chaîne a supprimé une seconde famille de copies : `OuterScope`
+recopiait les locales et les constantes de la fonction englobante à chaque fonction compilée, et
+il **pointe** désormais sur l'état mis de côté par `FuncScope`, qui lui survit exactement.
+
+⚠ **Une comparaison de deux builds n'a de sens qu'à `CMAKE_BUILD_TYPE` égal** : mon premier
+relevé donnait la forme plate 3 à 5 fois plus chère, parce que ce build-là n'était pas en
+`Release`. Le chiffre était absurde et c'est ce qui l'a trahi.
+
+⚠ Une variable de boucle est liée dans la portée COURANTE, la boucle n'ayant pas de portée à
+elle : `innermost()` est là pour ça, et la remise en place doit viser cette table-là — chercher
+dans toute la chaîne trouverait un homonyme hérité et le recopierait dans la portée interne.
+
 ## Allocateur de registres (Compiler)
 
 - Les paramètres de fonction occupent R[0..n_fixed-1]
