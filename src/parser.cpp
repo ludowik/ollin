@@ -187,37 +187,9 @@ static bool is_assign_op(TokenType t) {
 }
 
 // A token that can only CONTINUE an expression: a binary operator, a field access, a call or an
-// index. '-', 'not', '~' and '#' are absent, being unary as well. Closing delimiters and ',' are
-// absent too: they end something that was never opened, which is a different fault.
-static bool only_continues_expr(TokenType t) {
-    switch (t) {
-    case TokenType::PLUS:
-    case TokenType::STAR:
-    case TokenType::SLASH:
-    case TokenType::PERCENT:
-    case TokenType::SLASH_SLASH:
-    case TokenType::CARET:
-    case TokenType::AMP:
-    case TokenType::PIPE:
-    case TokenType::LSHIFT:
-    case TokenType::RSHIFT:
-    case TokenType::EQUAL_EQUAL:
-    case TokenType::NOT_EQUAL:
-    case TokenType::GREATER:
-    case TokenType::GREATER_EQUAL:
-    case TokenType::LESS:
-    case TokenType::LESS_EQUAL:
-    case TokenType::AND:
-    case TokenType::OR:
-    case TokenType::DOT:
-    case TokenType::QUESTION:
-    case TokenType::LPAREN:
-    case TokenType::LBRACKET:
-        return true;
-    default:
-        return is_assign_op(t);
-    }
-}
+// index. Defined below, once the precedence table it is DERIVED from is in scope — a hand-written
+// list would have to be kept in step with that table by memory alone.
+static bool only_continues_expr(TokenType t);
 
 std::unique_ptr<Stmt> Parser::parse_one_stmt() {
     if (depth_ >= 256)
@@ -664,6 +636,36 @@ static bool is_cmp_token(TokenType t) {
     return t == TokenType::GREATER || t == TokenType::LESS || t == TokenType::GREATER_EQUAL ||
            t == TokenType::LESS_EQUAL || t == TokenType::EQUAL_EQUAL || t == TokenType::NOT_EQUAL;
 }
+// Every token the precedence table treats as binary, plus the comparisons (a level of their own)
+// and the power, which the unary chain parses. Adding an operator to LEVELS therefore extends the
+// refusal below on its own.
+static bool is_binary_op(TokenType t) {
+    for (const BinLevel& lv : LEVELS)
+        for (int i = 0; i < lv.n; i++)
+            if (lv.ops[i].tok == t)
+                return true;
+    return is_cmp_token(t) || t == TokenType::CARET;
+}
+
+// '-', 'not', '~' and '#' are excluded, being unary as well. Closing delimiters and ',' are
+// excluded too: they end something that was never opened, which is a different fault.
+static bool only_continues_expr(TokenType t) {
+    switch (t) {
+    case TokenType::MINUS:
+    case TokenType::NOT:
+    case TokenType::TILDE:
+    case TokenType::HASH:
+        return false;
+    case TokenType::DOT:
+    case TokenType::QUESTION:
+    case TokenType::LPAREN:
+    case TokenType::LBRACKET:
+        return true;
+    default:
+        return is_binary_op(t) || is_assign_op(t);
+    }
+}
+
 static char cmp_char(TokenType t) {
     if (t == TokenType::EQUAL_EQUAL)
         return '=';
