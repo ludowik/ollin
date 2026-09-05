@@ -1990,6 +1990,23 @@ retour.
 | NEW_CLASS | A | R[A] = nouvelle classe vide (T_CLASS) |
 | CALL_METHOD | ABC | A=receiver_base, B=0, C=argc — R[A]=receiver, R[A+1]=method_fn, R[A+2..]=args |
 
+### Le constructeur rend l'OBJET, et c'est le COMPILATEUR qui le décide
+
+Chaque `return` d'un `init` **évalue ses valeurs** — elles peuvent avoir des effets — puis rend
+`self`, qui occupe R[0] d'une méthode d'instance : le compilateur émet `RETURN 0, 1`, y compris
+pour le retour implicite de fin de corps (`in_ctor_`, remis à zéro par `FuncScope`, donc une
+lambda écrite DANS un constructeur garde sa propre valeur de retour).
+
+La VM n'en sait plus rien. Le drapeau `is_ctor` du frame, la copie de `self` mise de côté et la
+réécriture du résultat ont disparu des **trois** chemins de retour et de `push_call_frame`.
+
+⚠ **Retirer un paramètre `bool` d'une fonction est un piège silencieux** : deux sites passaient
+encore `false` pour l'ancien `is_ctor`, et ce `false` est allé dans `return_dest` — le résultat
+d'une méta-méthode partait donc dans le registre 0. Le compilateur C++ ne peut rien y voir, un
+booléen se convertissant en entier. Symptôme observé : `E(1) <> E(1)` rendait `true` quand
+l'expression servait d'ARGUMENT d'appel, et `false` quand elle était rangée dans une variable
+(figé dans `regressions.ol` par les tests de `__eq`).
+
 ### CALL_DYN sur T_CLASS (instanciation)
 
 1. Crée une instance T_MAP, pose `__class__` = la classe.

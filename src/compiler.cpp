@@ -192,13 +192,15 @@ static Op unary_opcode(char op) {
 // Implicit void epilogue of a function or method. Omitted when the body already ends with a
 // RETURN or RETURN_V: that last instruction returns unconditionally, so one more would be
 // unreachable. This does NOT cover an explicit valueless `return`, which is always emitted.
-static void emit_implicit_return(Chunk& chunk) {
+static void emit_implicit_return(Chunk& chunk, bool is_ctor = false) {
     if (!chunk.code.empty()) {
         Op last = (Op)i_op(chunk.code.back());
         if (last == Op::RETURN || last == Op::RETURN_V)
             return;
     }
-    chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 0, 0));
+    // A constructor falling off its end gives the object, exactly as an explicit `return` in it
+    // does: self sits in R[0].
+    chunk.emit(make_abc((uint8_t)Op::RETURN, 0, is_ctor ? 1 : 0, 0));
 }
 
 // collect_funcs=true inside function bodies (nested FuncDecls need a local register)
@@ -1085,11 +1087,12 @@ Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
     : c(comp), regs(std::move(comp.local_regs_)), pending(std::move(comp.pending_var_reg_)),
       upvals(std::move(comp.cur_upval_idx_)), consts(comp.const_names_), aliases(std::move(comp.alias_module_)),
       top(comp.reg_top_), count(comp.reg_count_), locals(comp.locals_top_), fidx(comp.current_func_idx_),
-      name(comp.current_func_name) {
+      ctor(comp.in_ctor_), name(comp.current_func_name) {
     c.outer_scopes_.push_back({regs, upvals, consts, fidx}); // for upvalue resolution
     c.try_floors_.push_back(c.try_depth_);                   // this body's returns are relative to HERE
     c.const_names_.clear();
     c.alias_module_.clear();
+    c.in_ctor_ = false; // a nested function is not the constructor, whatever encloses it
     c.current_func_name = fname;
     c.cur_upval_idx_.clear();
     c.local_regs_.clear();
@@ -1110,6 +1113,7 @@ Compiler::FuncScope::~FuncScope() {
     c.reg_top_ = top;
     c.reg_count_ = count;
     c.locals_top_ = locals;
+    c.in_ctor_ = ctor;
     c.current_func_name = name;
     c.current_func_idx_ = fidx;
 }
@@ -1118,8 +1122,9 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
                                     const std::vector<std::unique_ptr<Expr>>& defaults,
                                     const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                                     bool with_self, SourceLoc defaults_loc,
-                                    const std::function<void(uint8_t)>& on_registered) {
+                                    const std::function<void(uint8_t)>& on_registered, bool is_ctor) {
     FuncScope scope(*this, name);
+    in_ctor_ = is_ctor;
 
     // Instance method: self in R[0], parameters from R[1]. Otherwise parameters from R[0].
     int n_params = (int)params.size();
@@ -1164,7 +1169,7 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
         on_registered(func_idx);
 
     compile_stmt_seq(body);
-    emit_implicit_return(chunk); // an implicit void return, omitted when the body already ends with RETURN
+    emit_implicit_return(chunk, in_ctor_); // omitted when the body already ends with a RETURN
 
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
@@ -1241,6 +1246,19 @@ void Compiler::visit(const ReturnStmt& s) {
         for (int i = try_floor(); i < try_depth_; ++i)
             chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
     };
+    // A constructor gives the OBJECT whatever it is written to return. The values are still
+    // COMPILED — they may have side effects, and they used to run before the VM overwrote the
+    // result — but the return hands back self, which an instance method keeps in R[0]. Settling it
+    // here removed the frame flag, the saved copy and the rewrite from the VM's three return paths.
+    if (in_ctor_) {
+        int saved_top = reg_top_;
+        for (auto& v : s.values)
+            v->accept(*this);
+        reg_top_ = saved_top;
+        pop_tries();
+        chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 1, 0));
+        return;
+    }
     // return <explicit values>, <call>: when the last returned expression is a call it expands
     // to ALL its values, as in Lua. `return ...` is still handled by spread_varargs.
     if (!s.spread_varargs && !s.values.empty() && is_call_node(s.values.back().get())) {
@@ -2204,7 +2222,10 @@ void Compiler::visit(const DoStmt& s) {
 
 // Compiles a method, with an implicit 'self' in R[0].
 uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
-    return compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, s.is_static, !s.is_static, s.sloc());
+    // `init` is the constructor, and `static init` is refused elsewhere, so an instance method by
+    // that name is one.
+    return compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, s.is_static, !s.is_static, s.sloc(), {},
+                             !s.is_static && s.name == "init");
 }
 
 void Compiler::visit(const ClassDeclStmt& s) {

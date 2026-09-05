@@ -77,6 +77,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     bool fold_enum_member(const Expr& e, Value& out);
     // A value known at compile time: a literal, or such an enum member.
     bool const_value(const Expr& e, Value& out);
+    // Compiling the body of an `init`: every `return` of a constructor gives the OBJECT, whatever
+    // it is written to return, and the compiler is where that is settled — the values are still
+    // evaluated for their side effects, then RETURN 0,1 hands back self. Saved and reset by
+    // FuncScope, so a lambda written INSIDE a constructor returns its own value.
+    bool in_ctor_ = false;
     std::string current_func_name; // "" = global scope
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's
@@ -107,6 +112,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         std::unordered_set<std::string> consts;
         std::unordered_map<std::string, std::string> aliases;
         int top, count, locals, fidx;
+        bool ctor;
         std::string name;
         FuncScope(Compiler& comp, const std::string& fname);
         ~FuncScope();
@@ -118,7 +124,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
                               const std::vector<std::unique_ptr<Expr>>& defaults,
                               const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                               bool with_self, SourceLoc defaults_loc,
-                              const std::function<void(uint8_t)>& on_registered = {});
+                              const std::function<void(uint8_t)>& on_registered = {}, bool is_ctor = false);
 
     int resolve_upvalue(const std::string& name);
     int resolve_upval_from(int scope_idx, const std::string& name);

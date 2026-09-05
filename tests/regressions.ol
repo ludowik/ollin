@@ -2366,4 +2366,54 @@ func cbThrows(f)
 end
 cbEveryBridge()
 
+## ── A constructor gives the OBJECT, and the COMPILER is what settles it ────
+## `init` used to be a flag on the call frame: the VM saved self, popped, then rewrote the result
+## in its three return paths. The compiler knows it is compiling an init, so every `return` there
+## evaluates its values — they may have side effects — and hands back self, which sits in R[0].
+class CtA
+    func init(x)
+        self.x = x
+        if x > 10 then
+            return "too big"     ## an explicit return in the middle: the object still wins
+        end
+        self.tag = "small"
+        return 42
+    end
+end
+class CtB
+    func init()
+        var f = func() return 7 end
+        self.v = f()
+    end
+end
+
+## a `return` inside a try inside a constructor: the handler must still be live for the value
+class CtC
+    func init(v)
+        try
+            self.v = v.field
+            return
+        catch e
+            self.v = "caught"
+        end
+    end
+end
+
+## a multiple return from an init still yields the object, and nothing more
+class CtD
+    func init() return 1, 2, 3 end
+end
+func ctorChecks()
+    var a1 = CtA(3)
+    var a2 = CtA(99)
+    assert(a1.x == 3 and a1.tag == "small")
+    assert(a2.x == 99 and a2.tag == nil) ## the early return did leave the rest unrun
+    assert(a1 <> 42 and a2 <> "too big")
+    assert(CtC(1).v == "caught")
+    assert(CtB().v == 7)                 ## a lambda inside a constructor keeps its own return value
+    var g1, g2 = CtD()                   ## a multiple return still yields the object, and nothing more
+    assert(g1 <> nil and g2 == nil)
+end
+ctorChecks()
+
 print("regressions ok")

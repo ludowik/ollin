@@ -364,7 +364,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
     grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
     regs[nb] = std::move(lhs);
     regs[nb + 1] = std::move(rhs);
-    uint32_t addr = push_call_frame(nb, fi, 2, std::move(fuv), ip, false, dest);
+    uint32_t addr = push_call_frame(nb, fi, 2, std::move(fuv), ip, dest);
     if (negate)
         call_stack.back().negate_result = true;
     return addr;
@@ -379,7 +379,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
     int nb = (int)regs.size();
     grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
     regs[nb] = std::move(lhs);
-    return push_call_frame(nb, fi, 1, std::move(fuv), ip, false, dest);
+    return push_call_frame(nb, fi, 1, std::move(fuv), ip, dest);
 }
 
 // unwind_to_handler: the unwinding shared by a script throw and a C++ runtime error.
@@ -433,7 +433,8 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         for (int i = argc - 1; i >= 0; --i)
             regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
     regs[base_reg + 0] = std::move(inst);
-    return push_call_frame(base_reg, fi, total, std::move(fuv), ip, /*is_ctor=*/true);
+    // No flag on the frame: the compiler has already made every `return` of an init hand back self.
+    return push_call_frame(base_reg, fi, total, std::move(fuv), ip);
 }
 
 // Closes and releases ALL the frame's open upvalues. HOT path: called on every function
@@ -686,7 +687,7 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 //   4. builds and pushes the Frame
 //   5. returns fp.addr (the caller does ip = push_call_frame(...))
 uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                             uint32_t return_ip, bool is_ctor, int return_dest, int result_base) {
+                             uint32_t return_ip, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
     grow_regs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
     if (argc < fp.n_fixed) {
@@ -711,7 +712,6 @@ uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr
     fr.result_base = (result_base >= 0) ? result_base : new_base;
     fr.varargs_base = va_base;
     fr.n_varargs = n_varargs;
-    fr.is_ctor = is_ctor;
     fr.return_dest = return_dest;
     fr.upvals = std::move(fuv);
     return fp.addr;
@@ -725,14 +725,11 @@ uint32_t VM::push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr
 // the hot path, measured, and needs no vector.
 __attribute__((noinline)) uint32_t VM::finish_return(std::vector<Value>& rvs, int frame_base) {
     const Frame& fr = call_stack.back();
-    bool is_ctor_ = fr.is_ctor;
     bool neg_ = fr.negate_result;
     int ret_dest = fr.return_dest;
     uint32_t rip = fr.return_ip;
     int rbase = fr.result_base;
-    Value ctor_val;
-    if (is_ctor_)
-        ctor_val = regs[frame_base + 0];
+    (void)frame_base;
     int total = (int)rvs.size();
     call_stack.pop_back(); // fr is dangling from here on, hence the copies above
     if ((int)regs.size() < rbase + total)
@@ -741,11 +738,9 @@ __attribute__((noinline)) uint32_t VM::finish_return(std::vector<Value>& rvs, in
         regs[rbase + i] = std::move(rvs[i]);
     if (total == 0)
         nil_result_slot(rbase);
-    if (is_ctor_)
-        regs[rbase + 0] = std::move(ctor_val);
     if (ret_dest >= 0)
         regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
-    last_results_ = is_ctor_ ? 1 : total; // for SPREAD_RESULTS (a multiple return)
+    last_results_ = total; // for SPREAD_RESULTS (a multiple return)
     return rip;
 }
 
@@ -1209,14 +1204,10 @@ dispatch_loop:
             // made the compiler reload the vector's data pointer and size each time, the two
             // vectors being indistinguishable to it. LOAD_VARARGS just below already did this.
             const Frame& fr = call_stack.back();
-            bool is_ctor_ = fr.is_ctor;
             bool neg_ = fr.negate_result;
             int ret_dest = fr.return_dest;
             int wb = fr.result_base;
             uint32_t rip = fr.return_ip;
-            Value ctor_val;
-            if (is_ctor_)
-                ctor_val = regs[base + 0]; // save self before potential overwrite
             int n = B;
             if (n > 0 && (wb != base || A != 0))
                 for (int i = 0; i < n; ++i)
@@ -1224,12 +1215,10 @@ dispatch_loop:
             else if (n == 0)
                 nil_result_slot(wb); // a valueless return still leaves nil where the caller reads
             call_stack.pop_back(); // fr is dangling from here on
-            if (is_ctor_)
-                regs[wb + 0] = std::move(ctor_val);
             if (ret_dest >= 0)
                 regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[wb + 0])) : regs[wb + 0];
             ip = rip;
-            last_results_ = is_ctor_ ? 1 : n; // for SPREAD_RESULTS (a multiple return)
+            last_results_ = n; // for SPREAD_RESULTS (a multiple return)
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1594,7 +1583,7 @@ dispatch_loop:
             } else {
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
                 uint8_t fi = resolve_func_val(fn, fuv);
-                ip = push_call_frame(fresh, fi, total, std::move(fuv), ip, false, -1, fixed_base);
+                ip = push_call_frame(fresh, fi, total, std::move(fuv), ip, -1, fixed_base);
             }
         }
         base = call_stack.back().reg_base;
