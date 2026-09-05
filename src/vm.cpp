@@ -726,13 +726,12 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
 // nil_result_slot, for the same reason) and given the gathered values, it pops the frame, lays
 // the results at result_base, applies the meta-method's destination, and returns the ip to resume
 // at. op_RETURN keeps its own shorter version: it is the hot path, measured, and needs no vector.
-__attribute__((noinline)) uint32_t VM::finish_return(std::vector<Value>& rvs) {
+__attribute__((noinline)) uint32_t VM::finish_return(Value* rvs, int total) {
     const Frame& fr = call_stack.back();
     bool neg_ = fr.negate_result;
     int ret_dest = fr.return_dest;
     uint32_t rip = fr.return_ip;
     int rbase = fr.result_base;
-    int total = (int)rvs.size();
     call_stack.pop_back(); // fr is dangling from here on, hence the copies above
     if ((int)regs.size() < rbase + total)
         regs.resize(rbase + total);
@@ -1251,12 +1250,13 @@ dispatch_loop:
             int n_expl = B;
             int n_va = call_stack.back().n_varargs;
             int va_src = call_stack.back().varargs_base;
-            std::vector<Value> rvs(n_expl + n_va);
+            int total = n_expl + n_va;
+            RetBuf rvs(total);
             for (int i = 0; i < n_expl; ++i)
-                rvs[i] = std::move(regs[base + A + i]);
+                rvs.p[i] = std::move(regs[base + A + i]);
             for (int i = 0; i < n_va; ++i)
-                rvs[n_expl + i] = std::move(regs[va_src + i]);
-            ip = finish_return(rvs);
+                rvs.p[n_expl + i] = std::move(regs[va_src + i]);
+            ip = finish_return(rvs.p, total);
         }
         if (call_stack.size() <= stop_depth)
             return;
@@ -1320,9 +1320,9 @@ dispatch_loop:
                 NEXT();
             }
         }
-        if (obj.is_map() || obj.is_class()) {
+        if (obj_map) { // the same two tag tests as above, already answered
             // Own data first (T_MAP and T_CLASS share the Map layout).
-            const Map* own = obj.mptr;
+            const Map* own = obj_map;
             // Throughout the engine `nil` means ABSENT (see proto_chain_get): an own key holding
             // nil must still defer to the prototype chain and to the `len` fallback, not shadow
             // the class method.
@@ -1629,10 +1629,10 @@ dispatch_loop:
             close_upvals();
             int total = B + last_results_;
             int src = base + A;
-            std::vector<Value> rvs(total);
+            RetBuf rvs(total);
             for (int i = 0; i < total; ++i)
-                rvs[i] = std::move(regs[src + i]);
-            ip = finish_return(rvs);
+                rvs.p[i] = std::move(regs[src + i]);
+            ip = finish_return(rvs.p, total);
         }
         if (call_stack.size() <= stop_depth)
             return;

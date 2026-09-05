@@ -2113,6 +2113,12 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   à un résultat. Les deux portaient les mêmes quarante lignes, donc deux endroits où le protocole
   d'appel pouvait dériver.
 
+**Les valeurs d'un retour multiple sont rassemblées sur la PILE** (`RetBuf`, vm.h) jusqu'à huit,
+avec repli sur un vecteur au-delà : un `std::vector` par retour, c'était une allocation et une
+libération pour ce qui est presque toujours une ou deux valeurs. Mesuré sur 300 000 tours faisant
+un retour à deux valeurs et un retour variadique : **−10,3 %** (453,9 M → 407,1 M d'instructions).
+`op_RETURN`, le chemin chaud, n'a jamais eu de vecteur.
+
 Et **la queue d'un retour** vit dans `finish_return` (`noinline`, comme `nil_result_slot`),
 partagée par `RETURN_V` et `RETURN_SPREAD` qui en portaient chacun leur copie. `op_RETURN` garde
 sa version courte : c'est le chemin chaud, mesuré, et il n'a pas besoin du vecteur intermédiaire.

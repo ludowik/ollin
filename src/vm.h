@@ -189,9 +189,24 @@ class VM {
             regs.resize(slot + 1);
         regs[slot] = Value();
     }
+    // The values a multi-value return gathers, on the STACK up to eight: a heap vector per return
+    // was one malloc and one free for what is nearly always one or two values. Beyond eight it
+    // falls back to a vector, so nothing is capped.
+    struct RetBuf {
+        static constexpr int k_inline = 8;
+        Value inl[k_inline];
+        std::vector<Value> heap;
+        Value* p = inl;
+        explicit RetBuf(int n) {
+            if (n > k_inline) {
+                heap.resize(n);
+                p = heap.data();
+            }
+        }
+    };
     // The tail of a return, shared by RETURN_V and RETURN_SPREAD (see vm.cpp). Kept out of
     // run_goto for the same reason as nil_result_slot.
-    uint32_t finish_return(std::vector<Value>& rvs);
+    uint32_t finish_return(Value* rvs, int total);
 
     // Register variant: results go to regs[result_base..] and `cap` is derived from the current
     // frame (varargs_base - result_base) — the error-prone computation, kept in one place.
