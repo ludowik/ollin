@@ -69,6 +69,11 @@ qu'après un **GO explicite** de l'utilisateur (« GO », « implémente », « 
 Répondre à mes questions de cadrage/design **ne vaut pas** GO. En cas de doute,
 demander — ne pas deviner.
 
+**« next » = une PROPOSITION, pas un chantier (règle permanente).** Sur « next » (ou
+« suivant »), présenter **un** point précis à corriger, expliquer ce qui cloche et, quand
+plusieurs chemins existent, les exposer — puis **attendre le choix de l'utilisateur**.
+Ne jamais enchaîner l'implémentation de son propre chef : « next » n'a jamais valu GO.
+
 ## Règle obligatoire : écrire du code Ollin
 
 Avant d'écrire **tout** fichier `.ol`, lire dans cet ordre :
