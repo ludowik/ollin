@@ -188,6 +188,21 @@ class StrP
 end
 assert("x=" + StrP() == "x=SP")
 
+## A __str that returns something other than a string is DESCRIBED, never dropped: a boolean,
+## an array or a map used to yield the empty string in silence.
+class StrBool
+    func __str() return true end
+end
+class StrArr
+    func __str() return [1, 2] end
+end
+class StrNum
+    func __str() return 42 end
+end
+assert("[" + StrBool() + "]" == "[true]")
+assert("[" + StrArr() + "]" == "[\{array}]")
+assert("[" + StrNum() + "]" == "[42]")
+
 ## ── chunk: constant dedup is STRICT about types ─────────────────────────────
 ## int 0, float 0.0 and nil share the same zero bits but carry distinct tags, so they must NOT
 ## be merged in the pool (nil would otherwise become 0, and so on).

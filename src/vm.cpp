@@ -142,6 +142,31 @@ static std::string number_text(const Value& v) {
     return os.str();
 }
 
+// The text of whatever `__str` returned. It never routes through value_to_string, which would
+// call `__str` again on an instance. A non-string result used to yield the EMPTY string in
+// silence — a `__str` returning a boolean, an array or a map printed nothing at all.
+static std::string str_result_text(const Value& v) {
+    if (v.is_string())
+        return v.as_string();
+    if (v.is_nil())
+        return "nil";
+    if (v.is_bool())
+        return v.as_bool() ? "true" : "false";
+    if (v.is_number())
+        return number_text(v);
+    if (v.is_array())
+        return "{array}";
+    if (v.is_class())
+        return "{class}";
+    if (v.is_map())
+        return "{map}";
+    if (v.is_iterator())
+        return "{iterator}";
+    if (v.is_range())
+        return "{range}";
+    return "{function}";
+}
+
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not invalidate obj
     Value cls = obj.map_get(MK().class_);
@@ -168,7 +193,7 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     case Value::T_BUILTIN: {
         Value self = obj; // one slot is available (self); the builtin writes its result there, and it is read back
         int n = invoke_builtin(str_fn.as_builtin(), &self, 1, 1);
-        return (n >= 1 && self.is_string()) ? self.as_string() : "{object}";
+        return n >= 1 ? str_result_text(self) : "{object}";
     }
     default: {
         Value nm = cls.map_get(MK().name_);
@@ -182,15 +207,8 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     ip = push_frame(call_base, fi, 1, std::move(frame_upvals), 0, -1, -1);
     run_goto(call_stack.size() - 1);
     std::string result;
-    if ((int)regs.size() > call_base) {
-        const Value& rv = regs[call_base];
-        if (rv.is_string())
-            result = rv.as_string();
-        else if (rv.is_nil())
-            result = "nil";
-        else if (rv.is_number())
-            result = number_text(rv);
-    }
+    if ((int)regs.size() > call_base)
+        result = str_result_text(regs[call_base]);
     regs.resize(call_base);
     ip = saved_ip;
     return result;
