@@ -1992,13 +1992,27 @@ retour.
 
 ### Le constructeur rend l'OBJET, et c'est le COMPILATEUR qui le décide
 
-Chaque `return` d'un `init` **évalue ses valeurs** — elles peuvent avoir des effets — puis rend
+Chaque `return` d'un `init` **évalue ses valeurs quand elles peuvent avoir un effet** — une
+valeur connue à la compilation est sautée, sinon elle émettrait un `LOAD_K` que personne ne lit
+ET ferait monter `reg_count`, que chaque instanciation réserve ensuite (**−1,4 %** sur 200 000
+instanciations d'une classe dont l'`init` finit par `return nil`) — puis rend
 `self`, qui occupe R[0] d'une méthode d'instance : le compilateur émet `RETURN 0, 1`, y compris
 pour le retour implicite de fin de corps (`in_ctor_`, remis à zéro par `FuncScope`, donc une
 lambda écrite DANS un constructeur garde sa propre valeur de retour).
 
 La VM n'en sait plus rien. Le drapeau `is_ctor` du frame, la copie de `self` mise de côté et la
-réécriture du résultat ont disparu des **trois** chemins de retour et de `push_call_frame`.
+réécriture du résultat ont disparu des **trois** chemins de retour et de `push_frame`.
+
+**`push_frame` n'a AUCUN argument par défaut**, et ses dix sites écrivent `-1, -1` en toutes
+lettres : ses deux derniers paramètres sont des entiers voisins de sens opposé (`return_dest`, un
+registre de l'APPELANT ; `result_base`, où le cadre pose ses résultats), et c'est ce qui rend le
+piège ci-dessous possible. Sans valeur par défaut, un paramètre retiré devient une erreur de
+compilation à CHAQUE site au lieu d'un décalage muet.
+
+⚠ **Les enveloppes nommées ont été essayées puis RETIRÉES, mesure à l'appui** : trois petites
+fonctions (`push_call_frame`, `push_meta_frame`, `push_frame_returning_to`) lisent mieux, mais
+coûtent **+1,4 % sur `bench_fib`** — elles changent ce que le compilateur met en ligne dans
+`run_goto`. La forme retenue (une fonction, arguments explicites) est à **+0,10 %**, soit neutre.
 
 ⚠ **Retirer un paramètre `bool` d'une fonction est un piège silencieux** : deux sites passaient
 encore `false` pour l'ancien `is_ctor`, et ce `false` est allé dans `return_dest` — le résultat

@@ -189,10 +189,17 @@ static Op unary_opcode(char op) {
     }
 }
 
+// `init` is the constructor. The name lives HERE and nowhere else in the compiler: it was
+// written out both to recognise a constructor and to refuse `static init`, two sites a rename
+// would have had to keep in step.
+static bool is_ctor_name(const std::string& name) {
+    return name == "init";
+}
+
 // Implicit void epilogue of a function or method. Omitted when the body already ends with a
 // RETURN or RETURN_V: that last instruction returns unconditionally, so one more would be
 // unreachable. This does NOT cover an explicit valueless `return`, which is always emitted.
-static void emit_implicit_return(Chunk& chunk, bool is_ctor = false) {
+static void emit_implicit_return(Chunk& chunk, bool is_ctor) {
     if (!chunk.code.empty()) {
         Op last = (Op)i_op(chunk.code.back());
         if (last == Op::RETURN || last == Op::RETURN_V)
@@ -1092,7 +1099,6 @@ Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
     c.try_floors_.push_back(c.try_depth_);                   // this body's returns are relative to HERE
     c.const_names_.clear();
     c.alias_module_.clear();
-    c.in_ctor_ = false; // a nested function is not the constructor, whatever encloses it
     c.current_func_name = fname;
     c.cur_upval_idx_.clear();
     c.local_regs_.clear();
@@ -1122,9 +1128,12 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
                                     const std::vector<std::unique_ptr<Expr>>& defaults,
                                     const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                                     bool with_self, SourceLoc defaults_loc,
-                                    const std::function<void(uint8_t)>& on_registered, bool is_ctor) {
+                                    const std::function<void(uint8_t)>& on_registered) {
     FuncScope scope(*this, name);
-    in_ctor_ = is_ctor;
+    // Derived, not passed: an instance method named `init` IS the constructor, and both facts are
+    // already arguments here. A caller with with_self = false — a plain function, a lambda —
+    // cannot be one.
+    in_ctor_ = with_self && is_ctor_name(name);
 
     // Instance method: self in R[0], parameters from R[1]. Otherwise parameters from R[0].
     int n_params = (int)params.size();
@@ -1252,8 +1261,16 @@ void Compiler::visit(const ReturnStmt& s) {
     // here removed the frame flag, the saved copy and the rewrite from the VM's three return paths.
     if (in_ctor_) {
         int saved_top = reg_top_;
-        for (auto& v : s.values)
+        for (auto& v : s.values) {
+            // A value known at compile time has no effect to preserve, and compiling it would
+            // emit a LOAD_K nobody reads AND raise reg_count, which every instantiation then
+            // reserves. Anything else is compiled: `return f()` must still call f, and a bare
+            // name must still be diagnosed when it is undeclared.
+            Value ignored;
+            if (const_value(*v, ignored))
+                continue;
             v->accept(*this);
+        }
         reg_top_ = saved_top;
         pop_tries();
         chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 1, 0));
@@ -2222,10 +2239,7 @@ void Compiler::visit(const DoStmt& s) {
 
 // Compiles a method, with an implicit 'self' in R[0].
 uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
-    // `init` is the constructor, and `static init` is refused elsewhere, so an instance method by
-    // that name is one.
-    return compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, s.is_static, !s.is_static, s.sloc(), {},
-                             !s.is_static && s.name == "init");
+    return compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, s.is_static, !s.is_static, s.sloc());
 }
 
 void Compiler::visit(const ClassDeclStmt& s) {
@@ -2264,7 +2278,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
         // the operators — inject self by construction, so a static member there would silently
         // shift the arguments.
         if (method->is_static) {
-            if (method->name == "init")
+            if (is_ctor_name(method->name))
                 throw std::runtime_error(method->sloc().str(chunk.source_files) +
                                          ": 'init' cannot be static (a constructor always has 'self')");
             if (method->name.size() >= 2 && method->name[0] == '_' && method->name[1] == '_')

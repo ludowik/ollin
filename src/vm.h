@@ -191,16 +191,23 @@ class VM {
     }
     // The tail of a return, shared by RETURN_V and RETURN_SPREAD (see vm.cpp). Kept out of
     // run_goto for the same reason as nil_result_slot.
-    uint32_t finish_return(std::vector<Value>& rvs, int frame_base);
+    uint32_t finish_return(std::vector<Value>& rvs);
 
     // Register variant: results go to regs[result_base..] and `cap` is derived from the current
     // frame (varargs_base - result_base) — the error-prone computation, kept in one place.
     // Used by CALL_DYN and CALL_METHOD.
     int invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc);
 
-    // Pushes a call frame, fills in defaults and varargs, returns fp.addr.
-    uint32_t push_call_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                             uint32_t return_ip, int return_dest = -1, int result_base = -1);
+    // Pushes a call frame, fills in defaults and varargs, returns fp.addr. `return_dest` is a
+    // register of the CALLER, where a meta-method's single result goes; `result_base` is where the
+    // frame lays its results, which differs from its own base only for CALL_VARARGS. Both are -1
+    // when unused.
+    // ⚠ NO default arguments, on purpose: they are two adjacent ints of opposite meaning, and a
+    // removed parameter once let a stale `false` slide into return_dest in SILENCE, a bool
+    // converting to int. Spelled out at every site, the next signature change is a compile error
+    // wherever it lands instead of a wrong register somewhere.
+    uint32_t push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+                        uint32_t return_ip, int return_dest, int result_base);
 
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())

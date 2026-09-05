@@ -79,8 +79,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     bool const_value(const Expr& e, Value& out);
     // Compiling the body of an `init`: every `return` of a constructor gives the OBJECT, whatever
     // it is written to return, and the compiler is where that is settled — the values are still
-    // evaluated for their side effects, then RETURN 0,1 hands back self. Saved and reset by
-    // FuncScope, so a lambda written INSIDE a constructor returns its own value.
+    // evaluated for their side effects, then RETURN 0,1 hands back self. DERIVED by
+    // compile_func_body from with_self and the name, and saved by FuncScope, so a lambda written
+    // INSIDE a constructor returns its own value.
     bool in_ctor_ = false;
     std::string current_func_name; // "" = global scope
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
@@ -124,7 +125,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
                               const std::vector<std::unique_ptr<Expr>>& defaults,
                               const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                               bool with_self, SourceLoc defaults_loc,
-                              const std::function<void(uint8_t)>& on_registered = {}, bool is_ctor = false);
+                              const std::function<void(uint8_t)>& on_registered = {});
 
     int resolve_upvalue(const std::string& name);
     int resolve_upval_from(int scope_idx, const std::string& name);
