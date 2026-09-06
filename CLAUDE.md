@@ -553,7 +553,27 @@ fonctions, découpage clair) plutôt que d'être paraphrasé.
 
 ## Maintenance de CLAUDE.md
 
-Mettre à jour ce fichier dès qu'un point important doit être mémorisé : architecture, conventions, décisions, règles d'outillage.Ne pas documenter ce qui n'est pas encore implémenté.
+**Le critère d'entrée (règle permanente)** : une ligne mérite ce fichier seulement si, SANS elle,
+une session future prendrait une mauvaise décision. Pas « est-ce intéressant » — « est-ce que son
+absence coûte ». Trois familles passent ce test :
+
+1. **Les pièges invisibles dans le code** — un deque plutôt qu'un vecteur, le sens d'un filtre,
+   une comparaison de builds qui n'a de sens qu'à `CMAKE_BUILD_TYPE` égal. Ils se paient en
+   heures perdues et rien dans le source ne les dit.
+2. **Les résultats négatifs mesurés** — une idée essayée, chiffrée, retirée. Leur valeur entière
+   est d'empêcher de la refaire.
+3. **Les décisions de l'utilisateur** — le dépôt en anglais, pas de mention de Claude dans
+   l'historique, `todo.md` hors de portée. Aucun code ne les exprime.
+
+**Ce qui n'y a PAS sa place** : le chiffre d'un remaniement neutre (c'est un journal de séance) ;
+la description d'un mécanisme que le code dit déjà, et qu'un commentaire à côté du code tiendra à
+jour parce qu'on l'édite en même temps que lui. Quand une explication vaut d'être écrite mais
+appartient à un fichier, **elle va dans ce fichier** et CLAUDE.md y renvoie : deux textes qui
+disent la même chose finissent toujours par diverger, et c'est celui du dépôt qu'on lit en
+travaillant.
+
+Mettre à jour ce fichier dès qu'un point remplit ce critère : architecture, conventions,
+décisions, règles d'outillage. Ne pas documenter ce qui n'est pas encore implémenté.
 
 ## Format d'instruction (32-bit)
 
@@ -1585,12 +1605,9 @@ contenir. ⚠ Contrairement à `for_each_body`, elle est **purement virtuelle** 
 « aucun enfant » ferait taire un parcours au lieu de le rendre prudent — la recherche d'une
 lambda ne la trouverait plus. Une feuille répond donc par un corps vide, ce qui est une
 ligne et énonce le fait. Le corps d'une `FuncExpr` n'est pas un enfant (ce sont des
-instructions) : seules ses valeurs par défaut le sont. Mesuré : `fib`, boucle et map
-inchangés à l'instruction près.
+instructions) : seules ses valeurs par défaut le sont.
 
-Deux visiteurs l'utilisent :
-- `CollectGlobalsVisitor` : sa méthode `walk` remplace les 8 `visit` qui ne faisaient
-  que réénumérer les nœuds composites ; ses `visit` restants ne font plus que collecter.
+Deux visiteurs l'utilisent, `CollectGlobalsVisitor` et `HasFuncQuery` :
 - `HasFuncQuery` : `stmt_has_func` demande d'abord au nœud s'il PORTE une fonction
   (déclaration, ou lambda dans une de ses propres expressions), puis descend via
   `for_each_body`. Sa descente était tenue à la main et `do … end` y manquait : le
@@ -1638,91 +1655,43 @@ imbriqué : une descente manquante y produirait une valeur corrompue.
 
 ## Pile de fonctions du compilateur (`fn_stack_`)
 
-Le compilateur tient une **pile de fonctions en cours de compilation**, `fn_stack_`, dont la
-PREMIÈRE entrée est le corps principal et la DERNIÈRE la fonction que l'on compile. Une entrée
-porte ce qu'une fonction possède le temps de son corps : ses quatre tables de portée, sa table
-« nom → index d'upvalue », l'index de son proto, son plancher de `try`, les boucles ouvertes en
-elle (`break_patches`/`continue_patches`) et son drapeau de constructeur. `fn()` désigne la
-dernière entrée, `scopes()` ses tables.
+Le compilateur tient une pile des fonctions en cours de compilation : la PREMIÈRE entrée est le
+corps principal, la DERNIÈRE la fonction que l'on compile. Une entrée porte tout ce qu'une
+fonction possède le temps de son corps (tables de portée, index d'upvalues, proto, plancher de
+`try`, boucles ouvertes, drapeau de constructeur) ; seuls les compteurs de registres restent
+membres, parce qu'ils sont sur le chemin le plus chaud.
 
-**Ce que les boucles y gagnent** : `break_patches` était compilateur-wide, si bien que chaque
-niveau devait retenir la profondeur de fonction où il avait été ouvert, uniquement pour que
-`check_jump_scope` la compare à la profondeur courante et refuse un `break` écrit dans une
-lambda. Les boucles étant maintenant celles de LA fonction, une lambda n'en voit aucune par
-construction : le champ, ses sept recopies et la comparaison ont disparu.
-
-**Ce qui reste membre, et pourquoi** : `reg_top_`, `reg_count_` et `locals_top_`. Presque chaque
-ligne du compilateur les lit ou les écrit ; les atteindre à travers la pile mettrait un
-déréférencement sur le chemin le plus chaud sans rien rendre. `FuncScope` ne sauvegarde donc plus
-qu'eux.
-
-**Ce que cette forme supprime** : la fonction courante était tenue à part (`cur_upval_idx_`,
-`current_func_idx_`, `current_func_name`, `try_floors_`, des tables membres) et les englobantes dans une seconde pile,
-`outer_scopes_`, dont les entrées pointaient sur l'état mis de côté par `FuncScope`. Résoudre
-un nom demandait donc deux chemins — un pour la courante, un pour la pile — et
-`capture_upval_chain` finissait par un bloc « et maintenant la fonction courante ». C'est ce
-dédoublement qui avait permis qu'une table soit COPIÉE là où il fallait un lien, faute corrigée
-plus tôt. La fonction courante étant désormais un cran de la même pile, ces cas particuliers
-n'existent plus, et `ScopeTables` n'a plus besoin de savoir se mettre de côté (`State`, `take`,
-`restore`, `find_in`, `empty_in` ont disparu).
+La fonction courante était auparavant tenue à part et les englobantes dans une seconde pile. Ce
+dédoublement est ce qui avait permis qu'une table soit COPIÉE là où il fallait un lien — une même
+variable capturée deux fois consommait alors deux upvalues sur les 255 disponibles.
 
 ⚠ **`fn_stack_` est un `std::deque`, jamais un `std::vector`** : le garde de portée de chaque
 bloc tient une RÉFÉRENCE sur les tables de sa fonction, et ouvrir une fonction imbriquée empile
 une entrée — un vecteur se réalloue et la référence pend (constaté : plantage immédiat sur une
-lambda déclarée dans une boucle). Un deque garde ses éléments en place.
-
-Mesuré : neutre en travail (`syntax.ol` 13,52 M d'instructions avant comme après).
+lambda déclarée dans une boucle).
 
 ## Tables de portée du compilateur (`src/scope_tables.h`)
 
-Les quatre tables de noms du compilateur — locales, locales différées, constantes, alias
-d'import — vivent derrière **une seule interface, avec DEUX implémentations** que rien au-dessus
-ne distingue. Le langage se comporte à l'identique dans les deux cas (vérifié : sorties
-identiques sur tous les fichiers de test et d'exemple), seul le coût de la compilation change.
-On bascule par `cmake -DOLLIN_SCOPED_TABLES=OFF`.
+Les quatre tables de noms — locales, locales différées, constantes, alias d'import — vivent
+derrière **une seule interface, avec DEUX implémentations** (chaînée par défaut, plate en repli)
+que rien au-dessus ne distingue : le langage se comporte à l'identique, seul le coût de la
+compilation change. On bascule par `cmake -DOLLIN_SCOPED_TABLES=OFF`. **Les chiffres qui
+justifient le défaut vivent en tête de `scope_tables.h`**, à côté du code qu'ils décrivent — ne
+pas les recopier ici, deux textes finissent toujours par diverger.
 
-- **Chaînée (défaut)** : une petite table par portée, consultée de la plus interne vers
-  l'extérieur. Entrer coûte une table vide, sortir sa libération ; un nom déclaré n portées plus
-  haut coûte n consultations.
-- **Plate** : une table unique où toutes les portées écrivent, **recopiée en entier** à chaque
-  entrée de bloc et remise en place à la sortie. La consultation est unique quelle que soit la
-  profondeur, mais l'entrée coûte la portée englobante tout entière.
-
-**Mesuré, et REMESURÉ après coup** (compilation seule, callgrind, les deux binaires en
-`Release`). Relevé du 06/09/2026, qui remplace celui d'origine — le compilateur avait changé
-entre-temps (tables par fonction), et un chiffre qui justifie un défaut se refait :
-
-| | `regressions.ol` | `syntax.ol` | `voxel_world.ol` | `invaders.ol` |
-|---|---|---|---|---|
-| surcoût de la forme plate | **+19,3 %** | **+13,7 %** | +1,8 % | +0,9 % |
-
-L'écart suit la **FORME du fichier**, ce qui n'est pas du bruit : ce qu'une portée plate recopie
-en entrant dans un bloc est la portée entière au-dessus d'elle. Un fichier à très grande portée de
-tête paie, un fichier qui déclare peu au-dessus de ses blocs ne le sent pas.
+⚠ **Une comparaison de deux builds n'a de sens qu'à `CMAKE_BUILD_TYPE` égal** : un relevé donnait
+la forme plate 3 à 5 fois plus chère, parce que ce build-là n'était pas en `Release`.
 
 ⚠ **Compilation seule et total ne répondent pas à la même question** : sur `regressions.ol` la
-compilation ne pèse que 25 M sur 99 M, si bien que le même écart se lit +19,3 % sur la
-compilation et +5,0 % sur le total. Les deux sont justes ; dire lequel on cite.
+compilation ne pèse que 25 M d'instructions sur 99 M, si bien que le même écart se lit +19,3 %
+sur l'une et +5,0 % sur l'autre. Dire lequel on cite.
 
-Sur les binaires finis (exécution comprise) : `syntax.ol` 21,0 M → 13,5 M (**−36 %**),
-`voxel_world.ol` 14,8 M → 14,4 M. Le gain dépasse la mesure d'origine parce que la chaîne a
-supprimé une seconde famille de copies : `OuterScope` recopiait les locales et les constantes de
-la fonction englobante à chaque fonction compilée.
-
-⚠ **Une comparaison de deux builds n'a de sens qu'à `CMAKE_BUILD_TYPE` égal** : mon premier
-relevé donnait la forme plate 3 à 5 fois plus chère, parce que ce build-là n'était pas en
-`Release`. Le chiffre était absurde et c'est ce qui l'a trahi.
-
-**Toutes les tables de noms du compilateur sont en `robin_hood`** — les quatre tables de portée,
-`declared_globals_`, `enum_names_`, `foldable_enums_`, `enum_consts_`, `func_table`, les index
-d'upvalues et les deux tables des visiteurs de collecte —, comme le `StringTable` et le type map
-du langage : une seule bibliothèque de table dans le moteur. Les alias sont `NameMap<V>` et
-`NameSet` (`scope_tables.h`). ⚠ `NameMap` est la variante **node** : une recherche rend un
-POINTEUR sur la valeur, et il doit survivre au travail qui suit. Les ITÉRATEURS, eux, ne
-survivent à aucun agrandissement — celui qui en garde un à travers un appel doit copier la
-valeur (cf. `visit(CallExpr)`). **Mesuré : l'écart est NUL** (`syntax.ol` −0,10 %, `regressions.ol` −0,01 %,
-`invaders.ol` +0,20 %, `voxel_world.ol` +0,33 %, `fib` −0,00 %). Le changement se justifie par la
-cohérence, pas par la vitesse — et le chiffre est ici pour qu'on ne repose plus la question.
+**Toutes les tables de noms du compilateur sont en `robin_hood`**, comme le `StringTable` et le
+type map du langage. Les alias sont `NameMap<V>` et `NameSet`. ⚠ `NameMap` est la variante
+**node** : une recherche rend un POINTEUR sur la valeur, qui doit survivre au travail qui suit.
+Les ITÉRATEURS, eux, ne survivent à aucun agrandissement — celui qui en garde un à travers un
+appel doit copier la valeur (cf. `visit(CallExpr)`). **Mesuré : le passage à `robin_hood` est
+NEUTRE** (entre −0,10 % et +0,33 %) ; il se justifie par la cohérence, pas par la vitesse.
 
 ⚠ Une variable de boucle est liée dans la portée COURANTE, la boucle n'ayant pas de portée à
 elle : `innermost()` est là pour ça, et la remise en place doit viser cette table-là — chercher
