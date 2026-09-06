@@ -1908,6 +1908,17 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
 - La valeur cachée est un **pointeur NON possédant** (`const Value*` via `Map::find_ptr`) : un hit implique une version inchangée, donc la map contient toujours l'entrée et garde la valeur vivante. Posséder une copie retenait l'objet longtemps après sa libération par le script (mesuré : ×2 sur l'empreinte avec un gros tableau).
 - **Copier avant d'écrire** : `Value tmp = *c.val;` puis `regs[base+A] = std::move(tmp)`. Le registre destination peut aliaser l'objet (`m = m.inner`) et détenir sa dernière référence : `regs[A] = *c.val` libérerait la map avant de lire l'union source (`operator=` retient puis relâche, mais lit après). Bloc fermé **avant** `NEXT()` (règle computed-goto).
 - **Ne cache que les hits sur la data PROPRE** de l'objet : la validité ne dépend alors que de `(mptr, version)`, y compris pour une instance. Les résolutions **via la chaîne** ne sont pas cachées (muter la classe ne bump pas la version de l'instance). Ne **jamais** conditionner le remplissage par `is_instance()` : ce test fait un lookup `__class__`, donc un coût par accès (régression mesurée).
+- ⚠ **Cacher la descente de chaîne a été ESSAYÉ deux fois et RETIRÉ les deux fois, mesure à
+  l'appui.** L'idée est tentante — une méthode vit sur la classe, donc `obj.methode()` rate le
+  cache à chaque appel — mais elle ne rend rien. (1) Entrée validée sur `(instance, version)` **et**
+  `(classe, version)` : **+1,43 %** sur `bench_classes`, parce qu'un repère (comme un vrai
+  programme) crée une instance NEUVE à chaque tour et la mute (`self.x = x` incrémente sa version),
+  si bien qu'une entrée indexée sur l'instance ne peut jamais être touchée — on ne paie que le
+  remplissage. (2) Entrée indexée sur la CLASSE, l'absence dans la data propre étant déjà établie
+  par la recherche qui précède : **+0,26 %** sur `bench_classes`, +0,27 % sur `bench_objects`,
+  +0,00 % sur `invaders`. La descente coûte une recherche de `__class__` puis une du nom dans la
+  classe ; la validation d'une entrée coûte autant. Ne pas refaire sans une idée qui change ce
+  bilan — par exemple supprimer la recherche de `__class__` elle-même.
 - `Map::version` = `++g_map_epoch` (époque globale monotone) à chaque `Map::set` **et** au recyclage dans `MapPool::release` → insensible à la réutilisation d'adresse.
 - `module_member()` (vm.h) applique le même cache aux maps de module **immuables** (`string_module_`, `array_module_`) → hit systématique après le premier passage.
 - **Piège d'aliasing** : le registre destination peut aliaser celui de l'objet (`A==B`) ou de la clé (`A==C`). Capturer `obj.mptr` / `key.sptr` **avant** toute écriture de `regs[base+A]` — les lire après donne la valeur écrasée (le cache ne se remplissait jamais).
