@@ -27,7 +27,6 @@
 
 template <class V> class ChainedTable {
 public:
-    using Value = V;
     using Map = std::unordered_map<std::string, V>;
 
     const V* find(const std::string& k) const {
@@ -104,7 +103,6 @@ private:
 
 template <class V> class FlatTable {
 public:
-    using Value = V;
     using Map = std::unordered_map<std::string, V>;
 
     const V* find(const std::string& k) const {

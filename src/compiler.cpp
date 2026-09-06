@@ -1196,9 +1196,10 @@ void Compiler::visit(const FuncDeclStmt& s) {
             // A global function is pre-registered in func_table so recursive calls are optimized
             // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
             // a local register gets no entry.
-            if (!is_local)
-                func_table[s.name] =
-                    FuncInfo{idx, (int)s.params.size(), s.variadic, !ScopeTable<int>::empty_in(*outer_scopes_.back().regs)};
+            if (!is_local) {
+                bool encloses_locals = !ScopeTable<int>::empty_in(*outer_scopes_.back().regs);
+                func_table[s.name] = FuncInfo{idx, (int)s.params.size(), s.variadic, encloses_locals};
+            }
         });
 
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
