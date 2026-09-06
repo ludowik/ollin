@@ -21,19 +21,10 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // `is_switch` catches a break inside a switch, which is silently not the loop's.
     struct JumpTargets {
         std::vector<size_t> patches;
-        size_t func_depth = 0;
         int try_depth = 0;      // active try blocks when opened: a jump out of one must pop it
         bool is_switch = false; // only ever true for break: a switch does not catch continue
     };
     int try_depth_ = 0; // try bodies being compiled, the catch bodies excluded
-    // The try depth on entering each nested function body: a `return` only leaves the try blocks
-    // of ITS function, so the count is taken from this floor and not from zero.
-    std::vector<int> try_floors_;
-    int try_floor() const {
-        return try_floors_.empty() ? 0 : try_floors_.back();
-    }
-    std::vector<JumpTargets> break_patches;
-    std::vector<JumpTargets> continue_patches;
     void check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what);
     void pop_crossed_tries(const JumpTargets& frame);
     int current_line_ = 0;
@@ -53,17 +44,27 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         ScopeTables scopes;
         NameMap<int> upvals; // name → upvalue index in this function's proto
         int proto_idx = -1;  // index in chunk.funcs; -1 = main chunk
+        // The try depth on ENTERING this body: a `return` only leaves the try blocks of ITS
+        // function, so the count is taken from this floor and not from zero.
+        int try_floor = 0;
+        // The loops open in THIS function. Held here and not compiler-wide, so a `break` written
+        // in a lambda declared inside a loop simply finds no loop — the depth that each frame of
+        // patches used to carry, only to be compared with the current one, is gone.
+        std::vector<JumpTargets> break_patches, continue_patches;
+        // Compiling the body of an `init`: every `return` of a constructor gives the OBJECT,
+        // whatever it is written to return, and the compiler is where that is settled — the
+        // values are still evaluated for their side effects, then RETURN 0,1 hands back self.
+        // Per FRAME, so a lambda written INSIDE a constructor returns its own value.
+        bool in_ctor = false;
     };
     // A DEQUE, not a vector: a reference to a frame — the scope guard of every block holds one —
     // must survive the push of an inner function's frame, and a vector reallocates.
     std::deque<FuncFrame> fn_stack_{1};
+    FuncFrame& fn() {
+        return fn_stack_.back();
+    }
     ScopeTables& scopes() {
         return fn_stack_.back().scopes;
-    }
-    // The function that ENCLOSES the one being compiled. Only called from inside a body, so the
-    // stack always holds at least two frames there.
-    FuncFrame& enclosing_fn() {
-        return fn_stack_[fn_stack_.size() - 2];
     }
     int reg_top_ = 0;    // next free register
     int reg_count_ = 0;  // max reg ever used → FuncProto.reg_count
@@ -91,34 +92,26 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     bool fold_enum_member(const Expr& e, Value& out);
     // A value known at compile time: a literal, or such an enum member.
     bool const_value(const Expr& e, Value& out);
-    // Compiling the body of an `init`: every `return` of a constructor gives the OBJECT, whatever
-    // it is written to return, and the compiler is where that is settled — the values are still
-    // evaluated for their side effects, then RETURN 0,1 hands back self. DERIVED by
-    // compile_func_body from with_self and the name, and saved by FuncScope, so a lambda written
-    // INSIDE a constructor returns its own value.
-    bool in_ctor_ = false;
-    std::string current_func_name; // "" = global scope
     // Name of the parent of the class whose method is being compiled; empty outside a class, or for
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's
     // dynamic class, which would recurse forever in a hierarchy of three levels or more.
     std::string current_class_parent_;
 
+    // Inside a function body, as opposed to the main chunk — which is the first frame, so any
+    // other frame is a function. There used to be a member holding the name for this one
+    // question, kept non-empty by passing "<lambda>" for a body that has no name.
     bool in_function() const {
-        return !current_func_name.empty();
+        return fn_stack_.size() > 1;
     }
 
-    // What a function body does NOT own but still disturbs: the register counters and the name
-    // of the enclosing function. Saved and reset by the constructor, restored by the destructor —
-    // they were saved and restored by hand in three places, in the same order, and one forgotten
-    // restore would not fail to compile, it would silently corrupt everything that follows. What
-    // a body DOES own — its name tables, its upvalue indexes, its proto — lives in the frame this
-    // pushes onto fn_stack_.
+    // Opens a function body: pushes its frame, and puts back the REGISTER counters on the way
+    // out. Those three stay members rather than frame fields because nearly every line of the
+    // compiler reads or writes them, and reaching them through the stack would put a dereference
+    // on the hottest path for no gain — everything else a body owns lives in the frame.
     struct FuncScope {
         Compiler& c;
         int top, count, locals;
-        bool ctor;
-        std::string name;
-        FuncScope(Compiler& comp, const std::string& fname);
+        explicit FuncScope(Compiler& comp);
         ~FuncScope();
     };
 

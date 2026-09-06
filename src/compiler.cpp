@@ -4,8 +4,9 @@
 #include <stdexcept>
 
 int Compiler::resolve_upvalue(const std::string& name) {
-    auto it = fn_stack_.back().upvals.find(name);
-    if (it != fn_stack_.back().upvals.end())
+    const NameMap<int>& uvs = fn().upvals;
+    auto it = uvs.find(name);
+    if (it != uvs.end())
         return it->second;
     if (fn_stack_.size() < 2)
         return -1; // the main chunk encloses nothing
@@ -44,8 +45,11 @@ int Compiler::capture_upval_chain(int fn_idx, bool is_local, uint8_t idx, const 
             cur_is_local = false;
             continue;
         }
+        // Only frame 0 is the main chunk and the loop starts above it, so every frame here has
+        // its proto — set before its body is compiled. Said out loud rather than skipped in
+        // silence, which would hide a sequencing mistake instead of showing it.
         if (fn.proto_idx < 0)
-            continue; // the main chunk has no proto to hold a descriptor
+            throw std::runtime_error("internal: capturing an upvalue into the main chunk");
         int uv_i = (int)chunk.funcs[fn.proto_idx].upvals.size();
         if (uv_i > 255) // the upvalue index is an 8-bit operand
             throw std::runtime_error("function captures more than 255 upvalues");
@@ -517,30 +521,31 @@ void Compiler::visit(const VarDeclStmt& s) {
     // where lexical scope begins for it, and returns its register. Call it only AFTER compiling
     // the initializers, so that `var a = a` reads the outer `a` and not the local being
     // declared.
+    ScopeTables& sc = scopes(); // a deque frame: the reference survives compiling a nested body
     auto activate_local = [&](const std::string& name) -> int {
         int reg;
-        if (!scopes().pending.pop(name, reg))
-            return *scopes().regs.find(name); // already active
-        scopes().regs.set(name, reg);
+        if (!sc.pending.pop(name, reg))
+            return *sc.regs.find(name); // already active
+        sc.regs.set(name, reg);
         return reg;
     };
     // A second alias of the SAME module in this scope emits nothing: the map is already there,
     // filled, and re-running `var name = {}` would empty it.
     if (!s.import_alias_of.empty()) {
-        const std::string* prev = scopes().aliases.find(s.names[0]);
+        const std::string* prev = sc.aliases.find(s.names[0]);
         if (prev != nullptr && *prev == s.import_alias_of)
             return;
-        scopes().aliases.set(s.names[0], s.import_alias_of);
+        sc.aliases.set(s.names[0], s.import_alias_of);
     }
     // A const is registered HERE and not at the end of the function: the multi-return path
     // returns early, and `const a, b = f()` silently lost its constness.
     if (s.is_constant)
         for (auto& n : s.names)
-            scopes().consts.set(n, {});
+            sc.consts.set(n, {});
     // Register reserved for a still-deferred local, without activating it.
     auto reserved_reg = [&](const std::string& name) -> int {
-        const int* pend = scopes().pending.find(name);
-        return pend != nullptr ? *pend : *scopes().regs.find(name);
+        const int* pend = sc.pending.find(name);
+        return pend != nullptr ? *pend : *sc.regs.find(name);
     };
 
     // Multi-return: several targets and a single value that is a CALL, in any form — named
@@ -624,14 +629,15 @@ void Compiler::compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body) 
 
 void Compiler::bind_scan_locals(const std::vector<std::string>& names, const NameSet& funcs,
                                 const NameSet& skip) {
+    ScopeTables& sc = scopes();
     for (auto& name : names) {
         if (skip.count(name))
             continue; // the current scope's prologue (a parameter, self, a catch variable): already bound
         if (funcs.count(name))
             // a local function is visible straight away, for recursion and forward references
-            scopes().regs.set(name, reg_top_++);
+            sc.regs.set(name, reg_top_++);
         else
-            scopes().pending.set(name, reg_top_++); // var and const are deferred until their declaration
+            sc.pending.set(name, reg_top_++); // var and const are deferred until their declaration
     }
 }
 
@@ -708,8 +714,8 @@ void Compiler::visit(const WhileStmt& s) {
     size_t exit_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
     reg_top_ = saved;
 
-    break_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
-    continue_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
+    fn().break_patches.push_back({{}, try_depth_, false});
+    fn().continue_patches.push_back({{}, try_depth_, false});
     int body_base = reg_top_;
     compile_block(s.body);
     // A continue LEAVES the body without running its end, so the CLOSE_UPVALS that compile_block
@@ -717,14 +723,14 @@ void Compiler::visit(const WhileStmt& s) {
     // next turn's. The continue path therefore closes them itself, on its own way back — placed
     // AFTER the normal jump, so the ordinary path pays nothing.
     uint16_t cont_target = loop_start;
-    if (!continue_patches.back().patches.empty() && body_carries_func(s.body)) {
+    if (!fn().continue_patches.back().patches.empty() && body_carries_func(s.body)) {
         chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
         cont_target = (uint16_t)chunk.current_pos();
         close_upvals_from(body_base);
     }
-    for (size_t p : continue_patches.back().patches)
+    for (size_t p : fn().continue_patches.back().patches)
         chunk.patch_jump(p, cont_target);
-    continue_patches.pop_back();
+    fn().continue_patches.pop_back();
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit_addr = (uint16_t)chunk.current_pos();
@@ -733,9 +739,9 @@ void Compiler::visit(const WhileStmt& s) {
     if (body_carries_func(s.body))
         close_upvals_from(body_base);
     chunk.patch_jump(exit_patch, exit_addr);
-    for (size_t p : break_patches.back().patches)
+    for (size_t p : fn().break_patches.back().patches)
         chunk.patch_jump(p, exit_addr);
-    break_patches.pop_back();
+    fn().break_patches.pop_back();
 }
 
 void Compiler::visit(const IfStmt& s) {
@@ -834,8 +840,8 @@ void Compiler::visit(const SwitchStmt& s) {
         reserve_regs_to(subj_r + 1);
     int above_subj = reg_top_; // subj_r stays live through every arm
 
-    break_patches.push_back(
-        {{}, fn_stack_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
+    fn().break_patches.push_back(
+        {{}, try_depth_, true}); // marks the switch; a break inside it is refused
 
     std::vector<std::vector<int64_t>> table_values;
     int64_t lo = 0;
@@ -886,9 +892,9 @@ void Compiler::visit(const SwitchStmt& s) {
     uint16_t end_addr = (uint16_t)chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
-    for (size_t p : break_patches.back().patches)
+    for (size_t p : fn().break_patches.back().patches)
         chunk.patch_jump(p, end_addr);
-    break_patches.pop_back();
+    fn().break_patches.pop_back();
     reg_top_ = saved;
 
     if (!use_table)
@@ -910,7 +916,7 @@ void Compiler::visit(const SwitchStmt& s) {
 // have been opened in it: a `break` written inside a lambda declared in a loop used to compile,
 // and jumped into the enclosing function's code — the loop's body was skipped outright, silently.
 void Compiler::check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what) {
-    if (frames.empty() || frames.back().func_depth != fn_stack_.size())
+    if (frames.empty())
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": " + what + " outside loop");
 }
 
@@ -923,31 +929,31 @@ void Compiler::pop_crossed_tries(const JumpTargets& frame) {
 }
 
 void Compiler::visit(const BreakStmt& s) {
-    check_jump_scope(s, break_patches, "break");
+    check_jump_scope(s, fn().break_patches, "break");
     // A case does not fall through, so a break at the end of an arm has nothing to leave, and one
     // meant for the loop would be caught by the switch instead — silently, the loop carrying on.
     // Refusing it is the only reading that cannot mislead.
-    if (break_patches.back().is_switch)
+    if (fn().break_patches.back().is_switch)
         throw std::runtime_error(s.sloc().str(chunk.source_files) +
                                  ": break inside a switch (a case does not fall through; to leave the "
                                  "enclosing loop, use a flag or return)");
-    pop_crossed_tries(break_patches.back());
-    break_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
+    pop_crossed_tries(fn().break_patches.back());
+    fn().break_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
 }
 
 void Compiler::visit(const ContinueStmt& s) {
     // A continue is NOT caught by a switch: it legitimately reaches the enclosing loop.
-    check_jump_scope(s, continue_patches, "continue");
-    pop_crossed_tries(continue_patches.back());
-    continue_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
+    check_jump_scope(s, fn().continue_patches, "continue");
+    pop_crossed_tries(fn().continue_patches.back());
+    fn().continue_patches.back().patches.push_back(chunk.emit_jump(Op::JUMP));
 }
 
 void Compiler::visit(const AssignStmt& s) {
     note_line(s.line, s.file_idx);
     // Every function frame, the one being compiled included: a constant captured from an
     // enclosing function is no more assignable than one declared here.
-    for (auto& fn : fn_stack_)
-        if (fn.scopes.consts.contains(s.name))
+    for (auto it = fn_stack_.rbegin(); it != fn_stack_.rend(); ++it)
+        if (it->scopes.consts.contains(s.name))
             throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     {
         const int* it = scopes().regs.find(s.name);
@@ -1069,15 +1075,13 @@ void Compiler::visit(const TryCatchStmt& s) {
         reg_top_ = saved_top;
 }
 
-Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
-    : c(comp), top(comp.reg_top_), count(comp.reg_count_), locals(comp.locals_top_), ctor(comp.in_ctor_),
-      name(comp.current_func_name) {
-    // The new function gets a frame of its own — its name tables, its upvalue indexes and, from
-    // compile_func_body, its proto. The enclosing function's frame stays exactly where it is,
-    // still reachable for resolving an upvalue.
+Compiler::FuncScope::FuncScope(Compiler& comp)
+    : c(comp), top(comp.reg_top_), count(comp.reg_count_), locals(comp.locals_top_) {
+    // The new function gets a frame of its own — its name tables, its upvalue indexes, the loops
+    // open in it, and from compile_func_body its proto. The enclosing function's frame stays
+    // exactly where it is, still reachable for resolving an upvalue.
     c.fn_stack_.emplace_back();
-    c.try_floors_.push_back(c.try_depth_); // this body's returns are relative to HERE
-    c.current_func_name = fname;
+    c.fn().try_floor = c.try_depth_; // this body's returns are relative to HERE
     c.reg_top_ = 0;
     c.reg_count_ = 0;
     c.locals_top_ = 0;
@@ -1085,12 +1089,9 @@ Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
 
 Compiler::FuncScope::~FuncScope() {
     c.fn_stack_.pop_back();
-    c.try_floors_.pop_back();
     c.reg_top_ = top;
     c.reg_count_ = count;
     c.locals_top_ = locals;
-    c.in_ctor_ = ctor;
-    c.current_func_name = name;
 }
 
 uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<std::string>& params,
@@ -1098,20 +1099,21 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
                                     const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                                     bool with_self, SourceLoc defaults_loc,
                                     const std::function<void(uint8_t)>& on_registered) {
-    FuncScope scope(*this, name);
+    FuncScope scope(*this);
     // Derived, not passed: an instance method named `init` IS the constructor, and both facts are
     // already arguments here. A caller with with_self = false — a plain function, a lambda —
     // cannot be one.
-    in_ctor_ = with_self && is_ctor_name(name);
+    fn().in_ctor = with_self && is_ctor_name(name);
 
     // Instance method: self in R[0], parameters from R[1]. Otherwise parameters from R[0].
     int n_params = (int)params.size();
     int first = with_self ? 1 : 0;
     int n_fixed = n_params + first;
+    ScopeTables& sc = scopes();
     if (with_self)
-        scopes().regs.set("self", 0);
+        sc.regs.set("self", 0);
     for (int i = 0; i < n_params; ++i)
-        scopes().regs.set(params[i], i + first);
+        sc.regs.set(params[i], i + first);
     reg_top_ = n_fixed;
 
     // The prologue names seed the pre-scan, so redeclaring a parameter with 'var' is caught, and
@@ -1147,7 +1149,7 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
         on_registered(func_idx);
 
     compile_stmt_seq(body);
-    emit_implicit_return(chunk, in_ctor_); // omitted when the body already ends with a RETURN
+    emit_implicit_return(chunk, fn().in_ctor); // omitted when the body already ends with a RETURN
 
     if (reg_count_ > 255)
         throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
@@ -1169,7 +1171,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
             // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
             // a local register gets no entry.
             if (!is_local) {
-                bool encloses_locals = !enclosing_fn().scopes.regs.empty();
+                bool encloses_locals = !fn_stack_[fn_stack_.size() - 2].scopes.regs.empty();
                 func_table[s.name] = FuncInfo{idx, (int)s.params.size(), s.variadic, encloses_locals};
             }
         });
@@ -1222,14 +1224,14 @@ void Compiler::visit(const ReturnStmt& s) {
     // failed with the handler already gone, so the error escaped its own try — while the same
     // code split over `var v = x.field` then `return v` was caught.
     auto pop_tries = [this]() {
-        for (int i = try_floor(); i < try_depth_; ++i)
+        for (int i = fn().try_floor; i < try_depth_; ++i)
             chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
     };
     // A constructor gives the OBJECT whatever it is written to return. The values are still
     // COMPILED — they may have side effects, and they used to run before the VM overwrote the
     // result — but the return hands back self, which an instance method keeps in R[0]. Settling it
     // here removed the frame flag, the saved copy and the rewrite from the VM's three return paths.
-    if (in_ctor_) {
+    if (fn().in_ctor) {
         int saved_top = reg_top_;
         for (auto& v : s.values) {
             // A value known at compile time has no effect to preserve, and compiling it would
@@ -1773,8 +1775,8 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
     size_t exit_patch = chunk.emit_jump(iter_op, (uint8_t)block);
 
-    break_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
-    continue_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
+    fn().break_patches.push_back({{}, try_depth_, false});
+    fn().continue_patches.push_back({{}, try_depth_, false});
     compile_block(body);
     // End of an iteration: the loop variables and the body's locals go out of scope, so their
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
@@ -1783,9 +1785,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     uint16_t iter_end = (uint16_t)chunk.current_pos();
     if (close_scope)
         close_upvals_from(block + 1);
-    for (size_t p : continue_patches.back().patches)
+    for (size_t p : fn().continue_patches.back().patches)
         chunk.patch_jump(p, iter_end);
-    continue_patches.pop_back();
+    fn().continue_patches.pop_back();
     chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
 
     uint16_t exit = (uint16_t)chunk.current_pos();
@@ -1794,9 +1796,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     if (close_scope)
         close_upvals_from(block + 1);
     chunk.patch_jump(exit_patch, exit);
-    for (size_t p : break_patches.back().patches)
+    for (size_t p : fn().break_patches.back().patches)
         chunk.patch_jump(p, exit);
-    break_patches.pop_back();
+    fn().break_patches.pop_back();
 
     scopes().regs.unbind(sh1);
     if (two_vars)
@@ -1973,8 +1975,8 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (!can_alias)
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
-    break_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
-    continue_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
+    fn().break_patches.push_back({{}, try_depth_, false});
+    fn().continue_patches.push_back({{}, try_depth_, false});
     compile_block(body);
 
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
@@ -1983,18 +1985,18 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     uint16_t loop_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
         close_upvals_from(var_reg);
-    for (size_t p : continue_patches.back().patches)
+    for (size_t p : fn().continue_patches.back().patches)
         chunk.patch_jump(p, loop_addr);
-    continue_patches.pop_back();
+    fn().continue_patches.pop_back();
     chunk.emit(make_abx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
 
     uint16_t exit_addr = (uint16_t)chunk.current_pos();
     if (close_scope)
         close_upvals_from(var_reg);
     chunk.patch_jump(prep, exit_addr); // FOR_PREP jumps here when the loop is empty
-    for (size_t p : break_patches.back().patches)
+    for (size_t p : fn().break_patches.back().patches)
         chunk.patch_jump(p, exit_addr);
-    break_patches.pop_back();
+    fn().break_patches.pop_back();
 
     scopes().regs.unbind(shadow);
     // Register recycling: when a closure in the body captures i we keep its register reserved,

@@ -1641,10 +1641,23 @@ imbriqué : une descente manquante y produirait une valeur corrompue.
 Le compilateur tient une **pile de fonctions en cours de compilation**, `fn_stack_`, dont la
 PREMIÈRE entrée est le corps principal et la DERNIÈRE la fonction que l'on compile. Une entrée
 porte ce qu'une fonction possède le temps de son corps : ses quatre tables de portée, sa table
-« nom → index d'upvalue » et l'index de son proto. `scopes()` désigne les tables de la dernière.
+« nom → index d'upvalue », l'index de son proto, son plancher de `try`, les boucles ouvertes en
+elle (`break_patches`/`continue_patches`) et son drapeau de constructeur. `fn()` désigne la
+dernière entrée, `scopes()` ses tables.
+
+**Ce que les boucles y gagnent** : `break_patches` était compilateur-wide, si bien que chaque
+niveau devait retenir la profondeur de fonction où il avait été ouvert, uniquement pour que
+`check_jump_scope` la compare à la profondeur courante et refuse un `break` écrit dans une
+lambda. Les boucles étant maintenant celles de LA fonction, une lambda n'en voit aucune par
+construction : le champ, ses sept recopies et la comparaison ont disparu.
+
+**Ce qui reste membre, et pourquoi** : `reg_top_`, `reg_count_` et `locals_top_`. Presque chaque
+ligne du compilateur les lit ou les écrit ; les atteindre à travers la pile mettrait un
+déréférencement sur le chemin le plus chaud sans rien rendre. `FuncScope` ne sauvegarde donc plus
+qu'eux.
 
 **Ce que cette forme supprime** : la fonction courante était tenue à part (`cur_upval_idx_`,
-`current_func_idx_`, des tables membres) et les englobantes dans une seconde pile,
+`current_func_idx_`, `current_func_name`, `try_floors_`, des tables membres) et les englobantes dans une seconde pile,
 `outer_scopes_`, dont les entrées pointaient sur l'état mis de côté par `FuncScope`. Résoudre
 un nom demandait donc deux chemins — un pour la courante, un pour la pile — et
 `capture_upval_chain` finissait par un bloc « et maintenant la fonction courante ». C'est ce
