@@ -912,9 +912,10 @@ void Compiler::visit(const SwitchStmt& s) {
         }
 }
 
-// A break and a continue jump to an address of the CURRENT function, so the innermost frame must
-// have been opened in it: a `break` written inside a lambda declared in a loop used to compile,
-// and jumped into the enclosing function's code — the loop's body was skipped outright, silently.
+// A break and a continue jump to an address of the CURRENT function, and the loop frames are the
+// current function's, so a lambda declared in a loop simply has none: nothing but emptiness needs
+// testing. Such a break used to compile and jump into the enclosing function's code — the loop's
+// body was skipped outright, silently.
 void Compiler::check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what) {
     if (frames.empty())
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": " + what + " outside loop");
@@ -1171,6 +1172,8 @@ void Compiler::visit(const FuncDeclStmt& s) {
             // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
             // a local register gets no entry.
             if (!is_local) {
+                // The ENCLOSING function: this runs from inside compile_func_body, which has
+                // already pushed the new function's frame, so there are always two.
                 bool encloses_locals = !fn_stack_[fn_stack_.size() - 2].scopes.regs.empty();
                 func_table[s.name] = FuncInfo{idx, (int)s.params.size(), s.variadic, encloses_locals};
             }
