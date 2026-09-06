@@ -743,100 +743,41 @@ contre 3,5× sur le `switch`.
 
 ## Module `ui` (implémentation)
 
-> API : voir le tutoriel (`docs/views/tutorial.html`, section « Module ui »).
+> API : voir le tutoriel (`docs/views/tutorial.html`, section « Module ui »). Le fonctionnement
+> — arbre de menus, navigation, listes, sliders, style — est commenté dans `ui_module.cpp` ;
+> ce qui suit est ce que ce fichier ne peut pas dire.
 
-Widgets dessinés par le moteur, en pile dans le coin haut droit. Le moteur appelle le
-module en trois endroits de sa boucle de rendu (`graphics_module.cpp`, `run_user_callbacks`) :
+Le moteur appelle le module en trois endroits de sa boucle de rendu, et **l'ordre est le sujet** :
 
 - **`ui_poll()` AVANT `mouse_poll(...)`** : il renvoie true s'il a consommé le clic, et
   `mouse_poll(click_taken)` neutralise alors `pressed`/`released`/`doubleClicked`. C'est
   LA raison d'être d'un module natif plutôt qu'une classe Ollin : une classe ne peut pas
   s'interposer, elle devrait voler les callbacks du script (cf. l'avertissement en tête
   de `joystick.ol` et de `trackball.ol`, qui réclament trois relais chacun).
-- **`ui_draw()` APRÈS la COMPOSITION**, dans `render_frame` et non plus dans
-  `run_user_callbacks` : l'interface est **indépendante du viewport** (décision de
-  l'utilisateur), donc elle se dessine dans les coordonnées de la ZONE, par-dessus le champ
-  déjà composé et jusque sur les bandes du letterbox — un widget garde ainsi sa taille quelle
-  que soit la résolution virtuelle choisie par le jeu. Elle reste **avant**
+- **`ui_draw()` APRÈS la COMPOSITION**, dans `render_frame` : l'interface est **indépendante du
+  viewport** (décision de l'utilisateur), donc elle se dessine dans les coordonnées de la ZONE,
+  par-dessus le champ déjà composé et jusque sur les bandes du letterbox. Elle reste **avant**
   `flush_pending_screenshot`, ce qui la fait capturer par `graphics.screenshot`, et toujours
-  après `end3d_internal()`, donc par-dessus la 3D. Le chemin de repli (sans render texture)
-  l'appelle juste après `run_user_callbacks`, faute de composition à attendre.
+  après `end3d_internal()`, donc par-dessus la 3D.
 - **`ui_reset()` dans `ollin_run` (wasm_main.cpp), PAS dans `gfx_run`** : les widgets
   sont déclarés au niveau du fichier, donc AVANT `graphics.run` — réinitialiser dans
   `gfx_run` les effaçait tous (constaté). Le reset appartient au démarrage d'un
   PROGRAMME, comme `image_reset`/`camera_reset`.
 
-**Ouverture** : `s_open` est **faux au démarrage** — l'interface se réduit à une poignée
-(trois barres tracées à la main : la police par défaut n'a pas de glyphe de menu). Ouverte,
-la ligne de tête porte la poignée et le titre du menu affiché ; le même rectangle
-(`s_head_box`) sert dans les deux états, d'où un seul test de clic qui bascule `s_open`.
-`ui.show` déplie (montrer = rendre visible) ; `ui.open([menu])`/`close`/`toggle` pilotent
-explicitement. Quand rien n'est déclaré, `ui_draw` remet `s_head_box` **et** `s_back_box`
-à zéro : sinon une zone cliquable subsisterait sans rien d'affiché.
+**Réentrance — un rappel peut déclarer un widget, donc faire `push_back` sur `s_nodes`** :
+- **Identités stables, pas de pointeurs** : un handle côté script porte `{slot, gen}`, et `gen`
+  est incrémentée à la libération, donc un handle périmé est détecté au lieu de désigner le nœud
+  qui a recyclé le slot.
+- **`prune_nav()` après toute suppression** : retirer un menu où l'on se trouve laisserait la
+  pile de navigation sur un nœud libéré.
+- Les libellés d'une liste (`value_to_string`, qui peut appeler `__str`) sont calculés **avant**
+  toute allocation, et `open_list` revérifie `node_alive` ensuite : ce code Ollin peut avoir
+  appelé `ui.clear`.
 
-**Arbre de menus et navigation** : widgets et menus sont des `Node` d'une même table
-(`s_nodes`), un menu portant la liste ordonnée des slots de son contenu. Un seul menu
-est affiché : `s_nav` est la pile de navigation — `s_nav[0]` est le menu global (la
-racine implicite par défaut), les suivants la descente. `ui.show` la remet à une seule
-entrée, un clic sur un sous-menu empile, la ligne « < » et `ui.back()` dépilent.
-
-- **Identités stables, pas de pointeurs** : un handle côté script est une instance de
-  classe native portant `{slot, gen}`. Déclarer un widget depuis un callback fait
-  `push_back` sur `s_nodes` → tout pointeur ou référence serait invalidé. `gen` est
-  incrémentée à la libération, donc un handle périmé est détecté au lieu de désigner le
-  nœud qui a recyclé le slot.
-- **`prune_nav()` après toute suppression** : retirer un menu où l'on se trouve
-  laisserait la pile pointer sur un nœud libéré → on la tronque au premier ancêtre
-  encore vivant.
-
-**Liste** (`ui.list(libellé, source, ref v [, surChange])`) : mono-sélection sur un tableau,
-une map ou un enum. La ligne `LIST` montre l'élément retenu ; un clic ouvre la liste, dont
-les lignes sont de vrais nœuds `LIST_ITEM` **engendrés à l'ouverture** comme enfants du nœud
-`LIST`. Aucune notion de « ligne virtuelle » n'a donc été introduite : `layout`, `ui_draw` et
-`ui_poll` traitent ces items comme n'importe quel contenu de menu, et `s_nav` empile le nœud
-`LIST` exactement comme un sous-menu. Choisir un item écrit la référence puis **dépile**.
-- Règle d'affichage/retour = celle de `for … in` : un tableau donne ses **valeurs**, une map
-  ou un enum ses **clés** (`ui_list_items`, dans `ui_module.h` car partagé avec le stub).
-- **Ordre figé** : une map n'en a pas. Un enum est trié par **valeur** (donc l'ordre de
-  déclaration), une map ordinaire par libellé — sans quoi la liste se réordonnerait d'une
+Autres points, qu'aucun fichier ne porte seul :
+- **Ordre figé d'une liste** : une map n'en a pas. Un enum est trié par **valeur** (donc l'ordre
+  de déclaration), une map ordinaire par libellé — sans quoi la liste se réordonnerait d'une
   ouverture à l'autre.
-- Les items sont **reconstruits** à chaque ouverture (la source a pu changer), les anciens
-  libérés — sinon ils s'accumuleraient. Les libellés (`value_to_string`, qui peut appeler la
-  méta-méthode `__str`) sont calculés **avant** toute allocation, et `open_list` revérifie
-  `node_alive` ensuite : ce code Ollin peut avoir appelé `ui.clear`.
-- `element.open()` accepte un menu **ou** une liste (`handle_slot` puis test du genre) : la
-  liste est ainsi pilotable par programme, donc testable sans clic.
-
-**Slider** (`ui.slider(libellé, ref v, min, max [, défaut] [, surChange])`) : les deux
-derniers arguments sont reconnus par leur TYPE (nombre = défaut, fonction = rappel), donc
-aucun ordre imposé. La variable liée est la **seule source de vérité** — le nœud ne
-mémorise pas la valeur courante, il la relit chaque frame, si bien qu'une écriture du
-script déplace la glissière. Une variable `nil` est initialisée à la déclaration
-(`ui_slider_init`, partagé avec le stub). Le slider est **entier** seulement si les bornes
-ET la valeur de départ le sont : sinon un slider `0..1` arrondirait à 0 ou 1. Le
-glissement dure plusieurs frames → `s_drag` retient le nœud par identité `{slot, gen}`,
-et `ui_poll` renvoie true tant qu'on glisse (sinon le relâchement atteindrait la scène).
-
-**Style** : toute l'apparence (couleurs, arrondi, épaisseurs, proportions) vit dans le
-seul bloc `struct Style` / `const STYLE` de `ui_module.cpp`, et les tailles sont des
-fractions de `gfx_logical_height()`. Les lignes sont des rectangles **arrondis sans
-contour** — la séparation vient de l'espacement, pas d'un liseré. Le rendu ne lit **aucune** valeur d'apparence en dur : changer le
-style est donc une édition locale qui s'applique à tous les widgets. `metrics()` dérive
-les dimensions de `STYLE` à chaque frame ; `row_height()` donne sa hauteur propre au
-slider (libellé + glissière).
-
-Autres points :
-- **Ordre de lecture d'une ligne : le libellé à GAUCHE, le contrôle à DROITE.** La valeur d'un
-  slider, celle d'une liste et le chevron d'un sous-menu étaient déjà cadrés à droite ; la case
-  d'une checkbox l'est aussi. Toutes les cases ayant la même taille, leurs bords gauches
-  s'alignent d'eux-mêmes — aucune colonne à calculer.
-- La géométrie de chaque ligne est celle **de la dernière frame dessinée**, mémorisée
-  dans `Node::box` : la zone cliquable est exactement ce qui est affiché.
-- Mise en page **proportionnelle** à `gfx_logical_height()` (comme `joystick.ol`) : le
-  canvas est en pixels physiques, donc des tailles fixes seraient illisibles sur mobile.
-- La pile démarre à la marge haute : l'overlay mémoire/FPS a été déplacé dans le coin
-  **bas** droit (`draw_fps_overlay`), donc plus rien à réserver — `gfx_overlay_height()`
-  a disparu avec son unique appelant.
 - Les libellés s'écrivent avec la police PAR DÉFAUT du moteur (`engine_font_default()`),
   jamais celle que le script a choisie : l'interface garde son apparence quoi que fasse
   le programme. Voir « Polices du moteur ».
@@ -891,10 +832,9 @@ survolée a changé, ce qui rend le doublon sans effet.
   et deux doigts au même point sont écartés (`< 1 px`) au lieu d'être divisés, ce qui rendrait un
   facteur de plusieurs centaines. Des doigts immobiles n'appellent rien. Appelé APRÈS les rappels
   par doigt (un script qui suit ses doigts a déjà mis son état à jour), désarmé par `touch_reset`.
-  **Mesuré au navigateur** (événements tactiles synthétiques via CDP) : écartement de ±30 à
-  ±120 px → produit des rapports = 4,0000004 (soit exactement 120/30) en 5 appels ; retour à
-  ±40 px → 1,3333 ; doigts immobiles, un seul doigt, et échange d'un doigt de la paire → aucun
-  appel, donc aucun saut.
+  Mesuré au navigateur (événements tactiles synthétiques via CDP) : les rapports se composent
+  exactement, et un doigt immobile, un doigt seul ou l'échange d'un doigt de la paire n'appellent
+  rien — donc aucun saut.
 - **Un pincement n'est pas un glissement** : sous deux doigts le système émule toujours la souris
   avec l'un d'eux, donc un script qui oriente la scène sur `mouse.moved` doit se garder par
   `touch.count() > 1` — sinon la scène tourne pendant qu'on zoome (`iso_camera.ol` le fait).
@@ -915,21 +855,15 @@ survolée a changé, ce qui rend le doublon sans effet.
   dans `ollin_run`, sinon un doigt resté « posé » ferait croire à un geste en cours.
 - La liste de référence est recopiée APRÈS les appels au script : un rappel qui lève laisse
   ainsi un état cohérent.
-- Trois arguments passent par la forme générique `call_value(fn, args, argc)` — le VM n'a pas
-  de surcharge à trois, et en ajouter une pour un seul appelant ne se justifie pas.
 - **La liste de raylib MENT, et le module la filtre.** Deux cas : (1) sur `touchend`, raylib
   ne retire qu'UN contact changé (il sort de sa boucle au premier), alors qu'emscripten lui
   transmet l'UNION de `e.touches` et de `e.changedTouches` — deux doigts levés ensemble
   laissent donc un fantôme ; (2) à la perte de focus, aucun `touchend` n'arrive et tous les
   doigts restent « posés ». Le module écoute donc le navigateur (écouteurs de CAPTURE sur
   `touchstart/move/end/cancel`, plus `blur` et `visibilitychange`).
-- **UN relevé par image, UNE traversée de la frontière JavaScript.** `touch_begin_frame` établit la
-  liste filtrée de l'image (`s_cur`) ; `count()` et `points()` la relisent. Deux raisons : les
-  accesseurs voient exactement ce que les rappels ont vu, et un script qui interroge l'état
-  plusieurs fois par image ne paie rien. Le filtre passe les identifiants bruts en un seul
-  `EM_ASM_INT` qui rend un **masque de bits** des contacts levés — interroger l'ensemble contact
-  par contact coûtait un aller-retour par doigt. Le même passage oublie les identifiants levés
-  que raylib ne rapporte plus.
+- **UN relevé par image, UNE traversée de la frontière JavaScript.** Les accesseurs voient ainsi
+  exactement ce que les rappels ont vu, et un script qui interroge l'état plusieurs fois par
+  image ne paie rien.
 - **SENS DU FILTRE — le navigateur prouve un LEVER, il n'autorise pas une pose.** Ne jamais
   l'inverser. Prendre la liste des doigts posés du DOM pour vérité et n'accepter que ce qu'elle
   contient a été livré une première fois, puis **signalé par l'utilisateur sur un vrai
@@ -973,15 +907,9 @@ devient muette. C'est ce qui rend la synthèse testable dans le conteneur d'int�
 n'a aucun périphérique (`/dev/snd` absent) — sans quoi les tests ne pourraient vérifier que
 des refus.
 
-**Découpage des fichiers** (le patron de `graphics_internal.h`) :
-
-| Fichier | Compilé | Rôle |
-|---|---|---|
-| `audio_module.cpp` / `audio_stub.cpp` | selon raylib | session : ouverture différée, volume, pause |
-| `sound_module.cpp` | PARTOUT | API et état : voix, tampons, handles, validation |
-| `sound_output.cpp` / `sound_output_stub.cpp` | selon raylib | le flux et le mélangeur |
-| `sound_internal.h` | — | frontière : table de voix, table de tampons, compteur de blocs mélangés |
-| `sound_env.h` | — | `adsr_level`, en forme fermée (cf. plus bas) |
+Le découpage des fichiers suit le patron de `graphics_internal.h` : ce qui SONNE (`sound_module`)
+est compilé partout, ce qui touche le périphérique a son stub, et `sound_internal.h` est la
+frontière.
 
 **Le rappel audio ne contient JAMAIS de code Ollin.** Il a une échéance de quelques
 millisecondes, et la manquer s'entend comme un clic. Conséquences, qui expliquent toute
@@ -1347,22 +1275,24 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
 
 ## Modèles 3D des exemples (docs/samples)
 
-Six fichiers, chacun pour une raison distincte : `rubik.glb` (glTF portant une TEXTURE, en ATLAS),
-`suzanne.obj` (géométrie seule, la teinte vient du `fill` — et 3 936 triangles de vraie géométrie
-sculptée), `dragon.glb` (la masse : 91 216 triangles) et `helmet.glb` (une vraie texture peinte SUR
-de la géométrie sculptée, ce que `rubik.glb` ne fait que prouver possible), `terrain.glb`
-(une couleur PAR SOMMET, cf. plus bas) et `teapot.glb` (la théière d'Utah, une SURFACE
-PARAMÉTRIQUE que le script pavage lui-même, cf. plus bas).
+Six fichiers, chacun pour une raison distincte, et chacun avec sa licence :
+
+| Fichier | Ce qu'il prouve | Licence |
+|---|---|---|
+| `rubik.glb` | une texture en ATLAS, chaque face lisant sa cellule | à nous |
+| `terrain.glb` | une couleur PAR SOMMET, sans image | à nous |
+| `teapot.glb` | une surface PARAMÉTRIQUE, pavée par le script | données de Newell, libres |
+| `suzanne.obj` | de la géométrie sculptée, teintée par le `fill` | CC0 (Khronos/UX3D) |
+| `dragon.glb` | la masse : 91 216 triangles | crédit obligatoire, **NON commercial** |
+| `helmet.glb` | une texture peinte SUR de la géométrie sculptée | CC-BY 4.0 + **CC-BY-NC** 4.0 |
 
 **Plus aucun modèle ne porte une couleur de matériau PAR MAILLAGE** : `armillary.glb` était le
 seul, et il a été retiré à la demande de l'utilisateur. Le chemin existe toujours dans
 `drawModel` (la couleur diffuse est lue par maillage et multipliée par le `fill`), mais il n'est
 plus exercé par aucun exemple — c'est un trou de couverture connu, pas un oubli.
 
-**Les trois convertisseurs partagent `tools/gltf_util.py`** — lecture d'un conteneur `.glb`,
-lecture d'un accesseur, rotation par quaternion, écriture d'un `.glb`. Chacun avait recopié les
-quatre, ce qui est exactement la duplication que le module supprime ; le refactor a été vérifié
-par l'octet (sortie identique avant/après).
+Les trois convertisseurs partagent `tools/gltf_util.py` (lecture d'un `.glb`, d'un accesseur,
+rotation, écriture).
 
 **Couleur PAR SOMMET** : `terrain.glb` (engendré par `tools/gen_terrain_glb.py`, modèle à nous,
 aucune licence tierce) porte un `COLOR_0` et se colore par l'altitude — un seul maillage, beaucoup
@@ -1375,17 +1305,10 @@ blanche une fois par dessin (`rlSetVertexAttributeDefault`), un maillage qui a l
 l'emportant depuis son propre VAO ; c'est ce que fait raylib dans son `DrawMesh`. Vérifié : les
 rendus de Suzanne et du casque sont identiques à l'octet avant et après le changement.
 
-**Texture en ATLAS** : `rubik.glb` (engendré par `tools/gen_rubik_glb.py`, modèle à nous) remplace
-un cube enveloppé dans un damier 4×4 répété, qui montrait la MÊME image sur les six faces — le
-minimum qu'une texture puisse prouver. Un cube 3×3 résolu exige un atlas : une seule image, six
-cellules, chaque face lisant la SIENNE par ses UV.
-Les **26 pièces sont de la vraie géométrie** séparée par un jeu (`GAP3D`), et non une grille peinte
-sur une seule boîte : les arêtes de chaque petit cube se voient alors, sur la silhouette comme dans
-les creux, et la lumière les accroche. La pièce centrale est omise, elle ne peut pas être vue. Les
-UV d'une face extérieure sont calculées **depuis la position** du sommet sur la face (`face_uv`),
-donc le motif peint s'aligne sur la géométrie par construction, sans table à tenir en accord ; les
-faces tournées vers l'intérieur prennent un texel du corps noir. 624 sommets, 312 triangles,
-23,8 Ko.
+**Texture en ATLAS** (`rubik.glb`, engendré par `tools/gen_rubik_glb.py`) : les 26 pièces sont de
+la vraie géométrie séparée par un jeu, et non une grille peinte sur une boîte — les arêtes se
+voient et la lumière les accroche. Les UV d'une face sont calculées DEPUIS la position du sommet
+sur cette face, donc le motif s'aligne par construction, sans table à tenir en accord.
 Le **cube est MÉLANGÉ PAR DES ROTATIONS LÉGALES** (25 quarts de tour, graine fixe) : l'état est
 donc réel et résoluble, et le fichier reproductible. **Aucune table d'adjacence n'a été écrite** —
 un sticker est identifié par la POSITION de sa pièce et sa propre NORMALE, et un quart de tour fait
@@ -1395,26 +1318,20 @@ identiques ramènent le cube à son état de départ**, que les 54 stickers sont
 reste neuf de chaque couleur. Vérifié aussi à zéro tour : chaque face ressort unie et de la bonne
 couleur, ce qui valide le placement des stickers dans l'atlas. Un cube résolu n'aurait montré qu'une
 couleur par face, soit ce que l'atlas est censé dépasser.
-Le PNG (204×136) est dessiné pixel par pixel et encodé par le script, donc sans dépendance. Trois
-points appris à la mesure : la grille doit remplir sa cellule EXACTEMENT (`3 × sticker + 4 ×
-interstice == cellule`, sinon le pixel qui reste élargit la dernière bordure et les stickers ne sont
-plus centrés — c'était le cas avec 3×9+4×1 = 31 pour une cellule de 32) ; les UV sont **rentrés d'un
-demi-pixel** dans leur cellule (sans quoi le bord échantillonne la face voisine et une bande de la
+Trois points appris à la mesure : la grille doit remplir sa cellule EXACTEMENT (`3 × sticker +
+4 × interstice == cellule`, sinon le pixel qui reste élargit la dernière bordure et les stickers
+ne sont plus centrés) ; les UV sont **rentrés d'un demi-pixel** dans leur cellule (sans quoi le bord échantillonne la face voisine et une bande de la
 mauvaise couleur court le long des arêtes) ; et l'orientation des quads est **vérifiée par le
 calcul** (`check_layout`) — mes deux faces latérales étaient enroulées à l'envers, donc éliminées
 par le back-face culling, et rien ne le signale : le cube sortait simplement ouvert sur deux côtés,
 ce qu'un rendu seul a révélé.
 
-**Surface PARAMÉTRIQUE** : `teapot.glb` n'est pas un maillage emprunté mais la théière de Martin
-Newell (Utah, 1975) — **32 patchs de Bézier bicubiques sur 290 points de contrôle** — pavée par
-`tools/gen_teapot_glb.py`, qui porte le jeu de données en littéral. Trois conséquences : le modèle
-se reconstruit à **n'importe quelle finesse** (constante `STEPS`), il ne dépend d'AUCUN hôte — tous
-les sites qui publient les fichiers `.bpt` sont refusés par le proxy — et les normales viennent des
-**dérivées** de la surface, pas d'une moyenne de faces. Les données de Newell circulent librement
-et sans revendication de droits depuis cinquante ans ; celles-ci ont été **analysées, pas
-retapées**, depuis la tabulation du README de `github.com/LUXOPHIA/UtahTeapot` (celle qui complète
-les patchs symétriques omis par la liste de Steve Baker), et vérifiées à la lecture : 32 patchs,
-290 points, indice maximal 289.
+**Surface PARAMÉTRIQUE** : `teapot.glb` est la théière de Newell (Utah, 1975) — 32 patchs de
+Bézier sur 290 points de contrôle — pavée par `tools/gen_teapot_glb.py`, qui porte le jeu de
+données en littéral. Trois conséquences : le modèle se reconstruit à n'importe quelle finesse, il
+ne dépend d'AUCUN hôte (les sites qui publient les `.bpt` sont refusés par le proxy), et les
+normales viennent des dérivées de la surface. Les données ont été analysées, pas retapées, et
+vérifiées à la lecture (32 patchs, 290 points, indice maximal 289).
 ⚠ Plusieurs patchs **dégénèrent** (une rangée entière repliée sur un seul point : pointe du
 couvercle, extrémités du bec) — une tangente y est nulle, donc le produit vectoriel aussi.
 `patch_normal` échantillonne alors légèrement en retrait au lieu de rendre un vecteur nul.
@@ -1429,22 +1346,19 @@ que cela rencontrera la même limite.
 
 **Un modèle emprunté ne s'ajoute qu'avec sa provenance vérifiée et un script qui la rejoue.**
 `suzanne.obj` vient de `KhronosGroup/glTF-Sample-Assets`, © 2017 UX3D, par Norbert Nopper, sous
-**CC0 1.0 Universal** — domaine public, donc aucune obligation d'attribution, et le crédit est
-gardé quand même dans l'en-tête du `.obj`. La licence a été LUE avant de prendre le fichier.
-`tools/convert_suzanne_obj.py` retélécharge la source et refait la conversion glTF → OBJ : c'est
-lui qui rend la provenance contrôlable au lieu d'un binaire mystérieux. Les coordonnées de texture
-sont écartées (rien n'échantillonne de texture ici) et les nombres sont à quatre décimales, ce qui
-suffit à un modèle d'affichage.
+**CC0 1.0 Universal** — domaine public, et le crédit est gardé quand même dans l'en-tête du
+`.obj`. La licence a été LUE avant de prendre le fichier, et
+`tools/convert_suzanne_obj.py` retélécharge la source et refait la conversion : c'est lui qui rend
+la provenance contrôlable au lieu d'un binaire mystérieux.
 
 `dragon.glb` est le dragon scanné par le **Stanford Computer Graphics Laboratory**, repris de la
 décimation de `KhronosGroup/glTF-Sample-Assets` (`DragonAttenuation`) par
 `tools/convert_dragon_glb.py`. Sa licence **n'est pas CC0** : elle exige le crédit, autorise la
 redistribution gratuite mais **interdit l'usage commercial sans autorisation** — restriction
 portée par ce seul fichier, à connaître avant d'en faire quoi que ce soit d'autre. Le crédit vit
-dans `asset.copyright` du glTF. Seul le maillage du dragon est repris (la scène d'origine a un
-fond de tissu et des extensions de verre que notre shader ignore), la rotation du nœud est cuite
-dans les sommets ET les normales (quart de tour autour de X ; l'échelle étant uniforme, elle ne
-touche pas les normales), et aucun matériau n'est écrit — le `fill` décide de la couleur.
+dans `asset.copyright` du glTF. Seul le maillage du dragon est repris, la rotation du nœud est
+cuite dans les sommets ET les normales, et aucun matériau n'est écrit — le `fill` décide de la
+couleur.
 
 `helmet.glb` est le **Damaged Helmet**, le modèle que tous les moteurs de rendu PBR montrent
 depuis 2016, repris de `KhronosGroup/glTF-Sample-Assets` par `tools/convert_helmet_glb.py`. Sa
