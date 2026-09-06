@@ -1668,9 +1668,13 @@ relevé donnait la forme plate 3 à 5 fois plus chère, parce que ce build-là n
 `Release`. Le chiffre était absurde et c'est ce qui l'a trahi.
 
 **Toutes les tables de noms du compilateur sont en `robin_hood`** — les quatre tables de portée,
-`declared_globals_`, `enum_names_`, `foldable_enums_`, `enum_consts_`, `func_table` et les index
-d'upvalues —, comme le `StringTable` et le type map du langage : une seule bibliothèque de table
-dans le moteur. **Mesuré : l'écart est NUL** (`syntax.ol` −0,10 %, `regressions.ol` −0,01 %,
+`declared_globals_`, `enum_names_`, `foldable_enums_`, `enum_consts_`, `func_table`, les index
+d'upvalues et les deux tables des visiteurs de collecte —, comme le `StringTable` et le type map
+du langage : une seule bibliothèque de table dans le moteur. Les alias sont `NameMap<V>` et
+`NameSet` (`scope_tables.h`). ⚠ `NameMap` est la variante **node** : une recherche rend un
+POINTEUR sur la valeur, et il doit survivre au travail qui suit. Les ITÉRATEURS, eux, ne
+survivent à aucun agrandissement — celui qui en garde un à travers un appel doit copier la
+valeur (cf. `visit(CallExpr)`). **Mesuré : l'écart est NUL** (`syntax.ol` −0,10 %, `regressions.ol` −0,01 %,
 `invaders.ol` +0,20 %, `voxel_world.ol` +0,33 %, `fib` −0,00 %). Le changement se justifie par la
 cohérence, pas par la vitesse — et le chiffre est ici pour qu'on ne repose plus la question.
 

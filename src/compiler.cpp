@@ -2,7 +2,6 @@
 #include "modules/modules.h"
 #include <algorithm>
 #include <stdexcept>
-#include <unordered_set>
 
 int Compiler::resolve_upvalue(const std::string& name) {
     auto it = cur_upval_idx_.find(name);
@@ -15,10 +14,10 @@ int Compiler::resolve_upvalue(const std::string& name) {
 
 int Compiler::resolve_upval_from(int scope_idx, const std::string& name) {
     OuterScope& scope = outer_scopes_[scope_idx];
-    if (const int* reg = ScopeTable<int>::find_in(*scope.regs, name))
+    if (const int* reg = ScopeTable<int>::find_in(scope.fn->scopes.regs, name))
         return capture_upval_chain(scope_idx, true, (uint8_t)*reg, name);
-    auto uv_it = scope.upval_idx->find(name);
-    if (uv_it != scope.upval_idx->end())
+    auto uv_it = scope.fn->upvals.find(name);
+    if (uv_it != scope.fn->upvals.end())
         return capture_upval_chain(scope_idx, false, (uint8_t)uv_it->second, name);
     if (scope_idx == 0)
         return -1;
@@ -35,8 +34,8 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
     // Propagate through intermediate function scopes
     for (int i = scope_idx + 1; i < (int)outer_scopes_.size(); i++) {
         OuterScope& s = outer_scopes_[i];
-        auto it = s.upval_idx->find(name);
-        if (it != s.upval_idx->end()) {
+        auto it = s.fn->upvals.find(name);
+        if (it != s.fn->upvals.end()) {
             cur_idx = (uint8_t)it->second;
             cur_is_local = false;
         } else if (s.func_proto_idx >= 0) {
@@ -44,7 +43,7 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
             if (uv_i > 255) // the upvalue index is an 8-bit operand
                 throw std::runtime_error("function captures more than 255 upvalues");
             chunk.funcs[s.func_proto_idx].upvals.push_back({cur_is_local, cur_idx});
-            (*s.upval_idx)[name] = uv_i;
+            s.fn->upvals[name] = uv_i;
             cur_idx = (uint8_t)uv_i;
             cur_is_local = false;
         }
@@ -217,7 +216,7 @@ struct CollectLocalsVisitor : StmtQuery {
     bool collect_funcs;
     const std::vector<std::string>& files;
     NameSet* funcs; // the names of the local functions, bound straight away, when asked for
-    std::unordered_map<std::string, std::string> alias_of; // an import alias → the module it names
+    NameMap<std::string> alias_of; // an import alias → the module it names
 
     CollectLocalsVisitor(std::vector<std::string>& out, NameSet& seen, bool collect_funcs,
                          const std::vector<std::string>& files, NameSet* funcs)
@@ -301,13 +300,13 @@ struct CollectGlobalsVisitor : StmtQuery {
     // included. All three are collected by this one walk: the third had its own recursive
     // function, a fourth traversal of the tree for one question about a node this visitor
     // already sees.
-    std::unordered_map<std::string, int>& enum_decls;
+    NameMap<int>& enum_decls;
     NameSet& assigned;
     NameSet& certain;
     bool cur_certain = true; // set by walk() for the statement being visited
 
     CollectGlobalsVisitor(NameSet& out, NameSet& enums,
-                          const std::vector<std::string>& files, std::unordered_map<std::string, int>& enum_decls,
+                          const std::vector<std::string>& files, NameMap<int>& enum_decls,
                           NameSet& assigned, NameSet& certain)
         : out(out), enums(enums), files(files), enum_decls(enum_decls), assigned(assigned), certain(certain) {
     }
@@ -366,7 +365,7 @@ struct CollectGlobalsVisitor : StmtQuery {
 
 static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, NameSet& out,
                             NameSet& enums, const std::vector<std::string>& files,
-                            std::unordered_map<std::string, int>& enum_decls,
+                            NameMap<int>& enum_decls,
                             NameSet& assigned, NameSet& certain) {
     CollectGlobalsVisitor v(out, enums, files, enum_decls, assigned, certain);
     v.walk(stmts);
@@ -388,10 +387,10 @@ bool Compiler::fold_enum_member(const Expr& e, Value& out) {
     auto en = enum_consts_.find(obj->name);
     if (en == enum_consts_.end())
         return false;
+    if (scopes_.regs.contains(obj->name) || resolve_upvalue(obj->name) >= 0)
+        return false; // shadowed here: a real lookup, not a constant
     auto member = en->second.find(key->value);
     if (member == en->second.end())
-        return false;
-    if (scopes_.regs.contains(obj->name) || resolve_upvalue(obj->name) >= 0)
         return false;
     out = member->second;
     return true;
@@ -462,7 +461,7 @@ Chunk Compiler::compile(const Program& prog) {
     chunk.source_files = prog.source_files;
     reg_top_ = 0;
     reg_count_ = 8;
-    std::unordered_map<std::string, int> enum_decls;
+    NameMap<int> enum_decls;
     NameSet assigned_names;
     NameSet certain_enums;
     collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files, enum_decls, assigned_names,
@@ -680,7 +679,6 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
-    static const NameSet no_skip;
     NameSet skip;
     if (!pre_bound.empty()) {
         scopes_.regs.set(pre_bound, pre_bound_reg);
@@ -689,7 +687,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     std::vector<std::string> block_locals;
     NameSet block_funcs;
     collect_locals(body, block_locals, chunk.source_files, true, &block_funcs);
-    bind_scan_locals(block_locals, block_funcs, pre_bound.empty() ? no_skip : skip);
+    bind_scan_locals(block_locals, block_funcs, skip);
     int block_locals_top = reg_top_;
     locals_top_ = block_locals_top;
     bump_reg_count();
@@ -958,7 +956,7 @@ void Compiler::visit(const AssignStmt& s) {
         throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     // Also block assignment when name is a constant captured from an outer scope
     for (auto& scope : outer_scopes_)
-        if (ScopeNames::find_in(*scope.consts, s.name) != nullptr)
+        if (ScopeNames::find_in(scope.fn->scopes.consts, s.name) != nullptr)
             throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     {
         const int* it = scopes_.regs.find(s.name);
@@ -1086,7 +1084,7 @@ Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
       name(comp.current_func_name) {
     // The tables set aside above stay SEARCHABLE where they are: the entry points at them instead
     // of carrying a second copy of the enclosing scope.
-    c.outer_scopes_.push_back({&scopes.regs, &scopes.consts, &upvals, fidx}); // for upvalue resolution
+    c.outer_scopes_.push_back({this, fidx}); // for upvalue resolution
     c.try_floors_.push_back(c.try_depth_);                     // this body's returns are relative to HERE
     c.current_func_name = fname;
     c.cur_upval_idx_.clear();
@@ -1184,7 +1182,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
             // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
             // a local register gets no entry.
             if (!is_local) {
-                bool encloses_locals = !ScopeTable<int>::empty_in(*outer_scopes_.back().regs);
+                bool encloses_locals = !ScopeTable<int>::empty_in(outer_scopes_.back().fn->scopes.regs);
                 func_table[s.name] = FuncInfo{idx, (int)s.params.size(), s.variadic, encloses_locals};
             }
         });
@@ -1564,11 +1562,14 @@ void Compiler::visit(const CallExpr& e) {
     // parameter, so `print(f)` and `f()` named two different things in one scope.
     // resolve_upvalue only creates the upvalue when it finds one, and it caches, so testing here
     // costs nothing and adds nothing to the proto.
-    bool shadowed = scopes_.regs.contains(e.callee) || resolve_upvalue(e.callee) >= 0;
+    const int* callee_local = scopes_.regs.find(e.callee);
+    int callee_reg = callee_local != nullptr ? *callee_local : -1;
+    bool shadowed = callee_local != nullptr || resolve_upvalue(e.callee) >= 0;
     auto it = shadowed ? func_table.end() : func_table.find(e.callee);
     if (it != func_table.end()) {
-        // Read BEFORE the arguments are compiled: the table is a flat hash map, so any insertion
-        // moves its entries and the iterator would no longer point at this one.
+        // Read BEFORE the arguments are compiled: a table that grows rehashes, and no hash table
+        // here keeps its ITERATORS across that — the addresses of the values survive (node
+        // storage, see scope_tables.h), the positions do not.
         FuncInfo target = it->second;
         int call_base = reg_top_;
         int argc = (int)e.args.size();
@@ -1593,9 +1594,8 @@ void Compiler::visit(const CallExpr& e) {
     {
         int func_reg = alloc_reg();
         {
-            const int* rit = scopes_.regs.find(e.callee);
-            if (rit != nullptr) {
-                func_reg = *rit;
+            if (callee_reg >= 0) {
+                func_reg = callee_reg;
                 reg_top_--;
             } else {
                 int uv = resolve_upvalue(e.callee);

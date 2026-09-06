@@ -26,9 +26,49 @@
 #define OLLIN_SCOPED_TABLES 1
 #endif
 
+// Every table of the compiler keyed by an identifier. The NODE variant is deliberate: its VALUES
+// keep their address when the table grows, which is what lets a lookup hand out a pointer that
+// survives other work — the flat variant moves them, and every holder would have to know it, a
+// mistake that reads a displaced entry in silence. ITERATORS are not covered by this, in either
+// variant: a table that rehashes moves its positions, so an iterator held across an insertion
+// must become a copy of the value (see visit(CallExpr)).
+template <class V> using NameMap = robin_hood::unordered_node_map<std::string, V>;
+// A set of names. Nothing is ever pointed INTO a set, so the flat variant is fine here.
+using NameSet = robin_hood::unordered_set<std::string>;
+
+// A name bound in ONE map, remembering what that map held so it can be put back. The loop
+// variable of a `for` is the only case: a loop has no scope of its own, so the binding cannot be
+// undone by leaving one. Both table forms bind in the map they call current, and only that
+// differs — hence one pair of helpers instead of two copies.
+template <class V> struct NameShadow {
+    std::string key;
+    bool had = false;
+    V old{};
+};
+
+template <class V> NameShadow<V> shadow_in(NameMap<V>& m, const std::string& k, V v) {
+    NameShadow<V> sh{k, false, V{}};
+    auto it = m.find(k);
+    sh.had = it != m.end();
+    if (sh.had) {
+        sh.old = std::move(it->second);
+        it->second = std::move(v);
+        return sh;
+    }
+    m.emplace(k, std::move(v));
+    return sh;
+}
+
+template <class V> void unshadow_in(NameMap<V>& m, const NameShadow<V>& sh) {
+    if (sh.had)
+        m[sh.key] = sh.old;
+    else
+        m.erase(sh.key);
+}
+
 template <class V> class ChainedTable {
 public:
-    using Map = robin_hood::unordered_map<std::string, V>;
+    using Map = NameMap<V>;
     // The whole stack, for a boundary a name does NOT cross: a function body sees the enclosing
     // locals as upvalues, never as locals. A state put aside stays SEARCHABLE through find_in,
     // so resolving an upvalue costs no copy.
@@ -77,29 +117,12 @@ public:
         return false;
     }
 
-    // A name bound in the CURRENT scope, remembering what that scope held so it can be put back.
-    // The loop variable of a `for` is the only case: a loop has no scope of its own, so the
-    // binding cannot be undone by leaving one.
-    struct Shadow {
-        std::string key;
-        bool had = false;
-        V old{};
-    };
+    using Shadow = NameShadow<V>;
     Shadow bind_here(const std::string& k, V v) {
-        Shadow sh{k, false, V{}};
-        Map& scope = frames_.back();
-        auto it = scope.find(k);
-        sh.had = it != scope.end();
-        if (sh.had)
-            sh.old = it->second;
-        scope[k] = std::move(v);
-        return sh;
+        return shadow_in(frames_.back(), k, std::move(v));
     }
     void unbind(const Shadow& sh) {
-        if (sh.had)
-            frames_.back()[sh.key] = sh.old;
-        else
-            frames_.back().erase(sh.key);
+        unshadow_in(frames_.back(), sh);
     }
 
     void enter() {
@@ -124,7 +147,7 @@ private:
 
 template <class V> class FlatTable {
 public:
-    using Map = robin_hood::unordered_map<std::string, V>;
+    using Map = NameMap<V>;
     struct State {
         Map m;
         std::vector<Map> saved;
@@ -157,25 +180,12 @@ public:
         return true;
     }
 
-    struct Shadow {
-        std::string key;
-        bool had = false;
-        V old{};
-    };
+    using Shadow = NameShadow<V>;
     Shadow bind_here(const std::string& k, V v) {
-        Shadow sh{k, false, V{}};
-        auto it = m_.find(k);
-        sh.had = it != m_.end();
-        if (sh.had)
-            sh.old = it->second;
-        m_[k] = std::move(v);
-        return sh;
+        return shadow_in(m_, k, std::move(v));
     }
     void unbind(const Shadow& sh) {
-        if (sh.had)
-            m_[sh.key] = sh.old;
-        else
-            m_.erase(sh.key);
+        unshadow_in(m_, sh);
     }
 
     void enter() {
