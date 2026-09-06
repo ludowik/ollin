@@ -17,8 +17,8 @@ int Compiler::resolve_upval_from(int scope_idx, const std::string& name) {
     OuterScope& scope = outer_scopes_[scope_idx];
     if (const int* reg = ScopeTable<int>::find_in(*scope.regs, name))
         return capture_upval_chain(scope_idx, true, (uint8_t)*reg, name);
-    auto uv_it = scope.upval_idx.find(name);
-    if (uv_it != scope.upval_idx.end())
+    auto uv_it = scope.upval_idx->find(name);
+    if (uv_it != scope.upval_idx->end())
         return capture_upval_chain(scope_idx, false, (uint8_t)uv_it->second, name);
     if (scope_idx == 0)
         return -1;
@@ -35,8 +35,8 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
     // Propagate through intermediate function scopes
     for (int i = scope_idx + 1; i < (int)outer_scopes_.size(); i++) {
         OuterScope& s = outer_scopes_[i];
-        auto it = s.upval_idx.find(name);
-        if (it != s.upval_idx.end()) {
+        auto it = s.upval_idx->find(name);
+        if (it != s.upval_idx->end()) {
             cur_idx = (uint8_t)it->second;
             cur_is_local = false;
         } else if (s.func_proto_idx >= 0) {
@@ -44,7 +44,7 @@ int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, con
             if (uv_i > 255) // the upvalue index is an 8-bit operand
                 throw std::runtime_error("function captures more than 255 upvalues");
             chunk.funcs[s.func_proto_idx].upvals.push_back({cur_is_local, cur_idx});
-            s.upval_idx[name] = uv_i;
+            (*s.upval_idx)[name] = uv_i;
             cur_idx = (uint8_t)uv_i;
             cur_is_local = false;
         }
@@ -1086,7 +1086,7 @@ Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
       name(comp.current_func_name) {
     // The tables set aside above stay SEARCHABLE where they are: the entry points at them instead
     // of carrying a second copy of the enclosing scope.
-    c.outer_scopes_.push_back({&scopes.regs, &scopes.consts, upvals, fidx}); // for upvalue resolution
+    c.outer_scopes_.push_back({&scopes.regs, &scopes.consts, &upvals, fidx}); // for upvalue resolution
     c.try_floors_.push_back(c.try_depth_);                     // this body's returns are relative to HERE
     c.current_func_name = fname;
     c.cur_upval_idx_.clear();

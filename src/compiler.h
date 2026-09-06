@@ -94,7 +94,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         // in the FuncScope below, which outlives this entry exactly.
         const ScopeTable<int>::State* regs;
         const ScopeNames::State* consts;
-        std::unordered_map<std::string, int> upval_idx; // name → upvalue index in this scope's proto
+        // name → upvalue index in this scope's proto. POINTED AT, like the two tables above: a
+        // capture made while an inner body is compiled adds an entry here, and that entry must
+        // survive the body — on a copy it was thrown away, so a second closure reading the same
+        // name pushed a SECOND descriptor for it (measured: two upvalues, both the same variable).
+        std::unordered_map<std::string, int>* upval_idx;
         int func_proto_idx;                             // -1 = main chunk
     };
     std::vector<OuterScope> outer_scopes_;

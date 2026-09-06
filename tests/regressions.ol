@@ -1949,6 +1949,26 @@ end
 blockSet(9)
 assert(blockGet() == 9)
 
+## Two closures capturing the SAME name through an intermediate function share ONE upvalue in
+## that intermediate: the index learned by the first capture used to be thrown away when the
+## inner body finished compiling, so the second pushed a descriptor of its own (measured: two
+## upvalues for one variable). They must still see each other's writes.
+func upvalRelay()
+    var shared = 1
+    func middle()
+        func write(v)
+            shared = v
+        end
+        func read()
+            return shared
+        end
+        write(7)
+        return read()
+    end
+    return middle() + shared
+end
+assert(upvalRelay() == 14)
+
 ## A func declared in a BLOCK lives in a local register, at the top level as well as inside a
 ## function: deciding by "am I in a function" stored it as a global while binding it as a local,
 ## so the register stayed empty and taking the function as a value gave nil.
