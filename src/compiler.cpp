@@ -391,7 +391,7 @@ bool Compiler::fold_enum_member(const Expr& e, Value& out) {
     auto member = en->second.find(key->value);
     if (member == en->second.end())
         return false;
-    if (local_regs_.contains(obj->name) || resolve_upvalue(obj->name) >= 0)
+    if (scopes_.regs.contains(obj->name) || resolve_upvalue(obj->name) >= 0)
         return false;
     out = member->second;
     return true;
@@ -522,36 +522,34 @@ static bool is_multi_value_expr(const Expr* e) {
 void Compiler::visit(const VarDeclStmt& s) {
     note_line(s.line, s.file_idx);
 
-    // Activates a deferred local by moving it from pending_var_reg_ to local_regs_, which is
+    // Activates a deferred local by moving it from scopes_.pending to scopes_.regs, which is
     // where lexical scope begins for it, and returns its register. Call it only AFTER compiling
     // the initializers, so that `var a = a` reads the outer `a` and not the local being
     // declared.
     auto activate_local = [&](const std::string& name) -> int {
-        const int* pend = pending_var_reg_.find(name);
-        if (pend == nullptr)
-            return *local_regs_.find(name); // already active
-        int reg = *pend;
-        pending_var_reg_.erase(name);
-        local_regs_.set(name, reg);
+        int reg;
+        if (!scopes_.pending.pop(name, reg))
+            return *scopes_.regs.find(name); // already active
+        scopes_.regs.set(name, reg);
         return reg;
     };
     // A second alias of the SAME module in this scope emits nothing: the map is already there,
     // filled, and re-running `var name = {}` would empty it.
     if (!s.import_alias_of.empty()) {
-        const std::string* prev = alias_module_.find(s.names[0]);
+        const std::string* prev = scopes_.aliases.find(s.names[0]);
         if (prev != nullptr && *prev == s.import_alias_of)
             return;
-        alias_module_.set(s.names[0], s.import_alias_of);
+        scopes_.aliases.set(s.names[0], s.import_alias_of);
     }
     // A const is registered HERE and not at the end of the function: the multi-return path
     // returns early, and `const a, b = f()` silently lost its constness.
     if (s.is_constant)
         for (auto& n : s.names)
-            const_names_.set(n, {});
+            scopes_.consts.set(n, {});
     // Register reserved for a still-deferred local, without activating it.
     auto reserved_reg = [&](const std::string& name) -> int {
-        const int* pend = pending_var_reg_.find(name);
-        return pend != nullptr ? *pend : *local_regs_.find(name);
+        const int* pend = scopes_.pending.find(name);
+        return pend != nullptr ? *pend : *scopes_.regs.find(name);
     };
 
     // Multi-return: several targets and a single value that is a CALL, in any form — named
@@ -640,9 +638,9 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std
             continue; // the current scope's prologue (a parameter, self, a catch variable): already bound
         if (funcs.count(name))
             // a local function is visible straight away, for recursion and forward references
-            local_regs_.set(name, reg_top_++);
+            scopes_.regs.set(name, reg_top_++);
         else
-            pending_var_reg_.set(name, reg_top_++); // var and const are deferred until their declaration
+            scopes_.pending.set(name, reg_top_++); // var and const are deferred until their declaration
     }
 }
 
@@ -678,17 +676,14 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
                              int pre_bound_reg) {
     // The constants belong to the scope too: without this, `do const x = 1 end` then `var x = 2`
     // refused to assign x, a name with nothing to do with the block's.
-    local_regs_.enter();
-    pending_var_reg_.enter();
-    const_names_.enter();
-    alias_module_.enter();
+    ScopeGuard scope(scopes_);
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
     static const std::unordered_set<std::string> no_skip;
     std::unordered_set<std::string> skip;
     if (!pre_bound.empty()) {
-        local_regs_.set(pre_bound, pre_bound_reg);
+        scopes_.regs.set(pre_bound, pre_bound_reg);
         skip.insert(pre_bound);
     }
     std::vector<std::string> block_locals;
@@ -710,10 +705,6 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     // for the same reason; reserving the registers instead would grow without bound over a file.
     if (has_func && reg_top_ > saved_top)
         close_upvals_from(saved_top);
-    local_regs_.leave();
-    pending_var_reg_.leave();
-    const_names_.leave();
-    alias_module_.leave();
     reg_top_ = has_func ? block_locals_top : saved_top;
     locals_top_ = saved_locals;
 }
@@ -963,14 +954,14 @@ void Compiler::visit(const ContinueStmt& s) {
 
 void Compiler::visit(const AssignStmt& s) {
     note_line(s.line, s.file_idx);
-    if (const_names_.contains(s.name))
+    if (scopes_.consts.contains(s.name))
         throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     // Also block assignment when name is a constant captured from an outer scope
     for (auto& scope : outer_scopes_)
         if (ScopeNames::find_in(*scope.consts, s.name) != nullptr)
             throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     {
-        const int* it = local_regs_.find(s.name);
+        const int* it = scopes_.regs.find(s.name);
         if (it != nullptr) {
             int dest = *it;
             if (s.op == '\0') {
@@ -1090,13 +1081,12 @@ void Compiler::visit(const TryCatchStmt& s) {
 }
 
 Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
-    : c(comp), regs(comp.local_regs_.take()), pending(comp.pending_var_reg_.take()), consts(comp.const_names_.take()),
-      aliases(comp.alias_module_.take()), upvals(std::move(comp.cur_upval_idx_)), top(comp.reg_top_),
+    : c(comp), scopes(comp.scopes_.take()), upvals(std::move(comp.cur_upval_idx_)), top(comp.reg_top_),
       count(comp.reg_count_), locals(comp.locals_top_), fidx(comp.current_func_idx_), ctor(comp.in_ctor_),
       name(comp.current_func_name) {
     // The tables set aside above stay SEARCHABLE where they are: the entry points at them instead
     // of carrying a second copy of the enclosing scope.
-    c.outer_scopes_.push_back({&regs, &consts, upvals, fidx}); // for upvalue resolution
+    c.outer_scopes_.push_back({&scopes.regs, &scopes.consts, upvals, fidx}); // for upvalue resolution
     c.try_floors_.push_back(c.try_depth_);                     // this body's returns are relative to HERE
     c.current_func_name = fname;
     c.cur_upval_idx_.clear();
@@ -1108,11 +1098,8 @@ Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
 Compiler::FuncScope::~FuncScope() {
     c.outer_scopes_.pop_back();
     c.try_floors_.pop_back();
-    c.local_regs_.restore(std::move(regs));
-    c.pending_var_reg_.restore(std::move(pending));
+    c.scopes_.restore(std::move(scopes));
     c.cur_upval_idx_ = std::move(upvals);
-    c.const_names_.restore(std::move(consts));
-    c.alias_module_.restore(std::move(aliases));
     c.reg_top_ = top;
     c.reg_count_ = count;
     c.locals_top_ = locals;
@@ -1137,9 +1124,9 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
     int first = with_self ? 1 : 0;
     int n_fixed = n_params + first;
     if (with_self)
-        local_regs_.set("self", 0);
+        scopes_.regs.set("self", 0);
     for (int i = 0; i < n_params; ++i)
-        local_regs_.set(params[i], i + first);
+        scopes_.regs.set(params[i], i + first);
     reg_top_ = n_fixed;
 
     // The prologue names seed the pre-scan, so redeclaring a parameter with 'var' is caught, and
@@ -1190,7 +1177,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // here" — collect_locals reserves one for a func declared in a BLOCK, top level included.
     // Deciding by in_function() compiled a `func` inside a top-level `do` as a global while
     // binding it as a local, so its register stayed empty: `var g = h` gave nil.
-    bool is_local = local_regs_.contains(s.name);
+    bool is_local = scopes_.regs.contains(s.name);
     uint8_t func_idx =
         compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, false, false, s.sloc(), [&](uint8_t idx) {
             // A global function is pre-registered in func_table so recursive calls are optimized
@@ -1207,7 +1194,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     if (is_local) {
         // Stored in the local register pre-allocated by collect_locals, with no func_table entry
         // and no access to globals.
-        int dest = *local_regs_.find(s.name);
+        int dest = *scopes_.regs.find(s.name);
         chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
         return;
     }
@@ -1364,7 +1351,7 @@ void Compiler::visit(const NilExpr&) {
 void Compiler::visit(const VarExpr& e) {
     // Local variable shadows everything (including global functions of the same name)
     {
-        const int* it = local_regs_.find(e.name);
+        const int* it = scopes_.regs.find(e.name);
         if (it != nullptr) {
             last_reg_ = *it;
             return;
@@ -1484,7 +1471,7 @@ void Compiler::visit(const UnaryExpr& e) {
 }
 
 void Compiler::emit_callee_value(const std::string& name, int reg) {
-    const int* rit = local_regs_.find(name);
+    const int* rit = scopes_.regs.find(name);
     if (rit != nullptr) {
         if (*rit != reg)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)reg, (uint8_t)*rit, 0));
@@ -1577,7 +1564,7 @@ void Compiler::visit(const CallExpr& e) {
     // parameter, so `print(f)` and `f()` named two different things in one scope.
     // resolve_upvalue only creates the upvalue when it finds one, and it caches, so testing here
     // costs nothing and adds nothing to the proto.
-    bool shadowed = local_regs_.contains(e.callee) || resolve_upvalue(e.callee) >= 0;
+    bool shadowed = scopes_.regs.contains(e.callee) || resolve_upvalue(e.callee) >= 0;
     auto it = shadowed ? func_table.end() : func_table.find(e.callee);
     if (it != func_table.end()) {
         int call_base = reg_top_;
@@ -1603,7 +1590,7 @@ void Compiler::visit(const CallExpr& e) {
     {
         int func_reg = alloc_reg();
         {
-            const int* rit = local_regs_.find(e.callee);
+            const int* rit = scopes_.regs.find(e.callee);
             if (rit != nullptr) {
                 func_reg = *rit;
                 reg_top_--;
@@ -1786,26 +1773,11 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // (block+1 is the key or primary, block+2 the value). No copy is made: the value is rewritten
     // every turn, so assigning to the variable inside the body has no effect. The bindings are
     // saved and restored, so nothing leaks past the loop.
-    // The binding is made in the CURRENT scope, the loop having no scope of its own, so what is
-    // put back is what THAT scope held — a name inherited from further out stays where it is.
-    auto save_bind = [&](const std::string& n, int reg, bool& had, int& old) {
-        auto& scope = local_regs_.innermost();
-        auto it = scope.find(n);
-        had = (it != scope.end());
-        old = had ? it->second : -1;
-        scope[n] = reg;
-    };
-    auto restore_bind = [&](const std::string& n, bool had, int old) {
-        if (had)
-            local_regs_.innermost()[n] = old;
-        else
-            local_regs_.innermost().erase(n);
-    };
-    bool had1, had2 = false;
-    int old1, old2 = -1;
-    save_bind(var1, block + 1, had1, old1);
+    // The binding is made in the CURRENT scope, the loop having no scope of its own.
+    ScopeTable<int>::Shadow sh1, sh2;
+    sh1 = scopes_.regs.bind_here(var1, block + 1);
     if (two_vars)
-        save_bind(var2, block + 2, had2, old2);
+        sh2 = scopes_.regs.bind_here(var2, block + 2);
 
     auto loop_start = (uint16_t)chunk.current_pos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
@@ -1836,9 +1808,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
         chunk.patch_jump(p, exit);
     break_patches.pop_back();
 
-    restore_bind(var1, had1, old1);
+    scopes_.regs.unbind(sh1);
     if (two_vars)
-        restore_bind(var2, had2, old2);
+        scopes_.regs.unbind(sh2);
     reg_top_ = keep_captured_regs(body, block + (two_vars ? 3 : 2), block, reg_top_);
 }
 
@@ -2002,15 +1974,8 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         var_reg = reg_top_++;
         bump_reg_count();
     }
-    bool had_old;
-    int old_reg;
-    {
-        auto& scope = local_regs_.innermost(); // as in the iterator loop: bound in the current scope
-        auto it = scope.find(var1);
-        had_old = (it != scope.end());
-        old_reg = had_old ? it->second : -1;
-        scope[var1] = var_reg;
-    }
+    // As in the iterator loop: bound in the current scope, the loop having none of its own.
+    ScopeTable<int>::Shadow shadow = scopes_.regs.bind_here(var1, var_reg);
 
     size_t prep = chunk.emit_jump(Op::FOR_PREP, (uint8_t)ctl); // Bx is the exit for an empty loop, patched later
 
@@ -2041,10 +2006,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         chunk.patch_jump(p, exit_addr);
     break_patches.pop_back();
 
-    if (had_old)
-        local_regs_.innermost()[var1] = old_reg;
-    else
-        local_regs_.innermost().erase(var1); // restore the scope
+    scopes_.regs.unbind(shadow);
     // Register recycling: when a closure in the body captures i we keep its register reserved,
     // otherwise it would be overwritten after the loop and the upvalue would be corrupted.
     // Do NOT drop below what compile_block reserved for the body's LOCALS, which a closure can
@@ -2067,7 +2029,7 @@ void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_ex
             return; // a chained target (a.b[k]): the object written is not the enum itself
         name = &ve->name;
     }
-    if (!enum_names_.count(*name) || local_regs_.contains(*name))
+    if (!enum_names_.count(*name) || scopes_.regs.contains(*name))
         return;
     throw std::runtime_error(where(line, file_idx) + ": cannot modify enum '" + *name + "'" +
                              (field.empty() ? "" : " element '" + field + "'"));
@@ -2091,7 +2053,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         obj_r = alloc_reg();
         compile_into(*s.obj_expr, obj_r);
     } else {
-        const int* it = local_regs_.find(s.obj);
+        const int* it = scopes_.regs.find(s.obj);
         if (it != nullptr) {
             obj_r = *it;
         } else {
@@ -2132,7 +2094,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
 
 // Writes R[src] into the variable `name`: a local register, an upvalue, or a global.
 void Compiler::store_name(const std::string& name, int src, const Stmt& at) {
-    const int* it = local_regs_.find(name);
+    const int* it = scopes_.regs.find(name);
     if (it != nullptr) {
         if (src != *it)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)*it, (uint8_t)src, 0));
@@ -2153,7 +2115,7 @@ void Compiler::store_name(const std::string& name, int src, const Stmt& at) {
 // that follows does mutate the original object.
 int Compiler::emit_container(const Expr& obj, const Stmt& at) {
     if (auto* ve = dynamic_cast<const VarExpr*>(&obj)) {
-        const int* it = local_regs_.find(ve->name);
+        const int* it = scopes_.regs.find(ve->name);
         if (it != nullptr)
             return *it;
         int uv = resolve_upvalue(ve->name);
@@ -2363,9 +2325,9 @@ void Compiler::visit(const MethodCallExpr& e) {
     int argc = (int)e.args.size();
 
     if (e.is_super) {
-        // self lives in local_regs_["self"] and is copied to call_base. Outside a method 'self'
+        // self lives in scopes_.regs["self"] and is copied to call_base. Outside a method 'self'
         // does not exist, hence a clean diagnostic instead of a map::at crash.
-        const int* self_it = local_regs_.find("self");
+        const int* self_it = scopes_.regs.find("self");
         if (self_it == nullptr)
             throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super' can only be used inside a method");
         // The parent class is fixed LEXICALLY — the class where the method is defined — rather

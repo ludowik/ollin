@@ -39,13 +39,12 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     int current_line_ = 0;
     int current_file_idx_ = 0;
 
-    ScopeTable<int> local_regs_;
-    // `var` and `const` locals whose register is reserved but which are NOT declared yet: lexical
-    // scope makes them visible only from their own line on. A reference before the declaration
-    // therefore does not find them in local_regs_ and falls through to a global, an upvalue, or an
-    // error. They are activated — moved into local_regs_ — at the VarDeclStmt, and this map is saved
-    // and restored wherever local_regs_ is, for nested scopes.
-    ScopeTable<int> pending_var_reg_;
+    // The four scoped name tables, entered and left as ONE scope (src/scope_tables.h).
+    // `pending` holds the `var` and `const` locals whose register is reserved but which are NOT
+    // declared yet: lexical scope makes them visible only from their own line on. A reference
+    // before the declaration therefore does not find them in `regs` and falls through to a
+    // global, an upvalue, or an error; they move into `regs` at the VarDeclStmt.
+    ScopeTables scopes_;
     int reg_top_ = 0;    // next free register
     int reg_count_ = 0;  // max reg ever used → FuncProto.reg_count
     int locals_top_ = 0; // reg_top_ after pre-scanning locals (temps start here)
@@ -60,11 +59,6 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     std::unordered_map<std::string, FuncInfo> func_table;
     std::unordered_set<std::string>
         declared_globals_;                        // the declared globals: the source's, the builtins and the modules
-    ScopeNames const_names_; // locals declared with 'const'
-    // Import aliases bound in the CURRENT scope, each with the module it names: a second `import
-    // "m" as name` for the same module in the same scope must emit nothing, or it would clear the
-    // map the first one filled. Saved and restored exactly where const_names_ is.
-    ScopeTable<std::string> alias_module_;
     // Enums declared under a plain name, so that visible writes are refused at compile time with a
     // message naming the element. The VM still covers every other path.
     std::unordered_set<std::string> enum_names_;
@@ -112,9 +106,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // compile — it would silently corrupt the scope of everything that follows.
     struct FuncScope {
         Compiler& c;
-        ScopeTable<int>::State regs, pending;
-        ScopeNames::State consts;
-        ScopeTable<std::string>::State aliases;
+        ScopeTables::State scopes;
         std::unordered_map<std::string, int> upvals;
         int top, count, locals, fidx;
         bool ctor;
@@ -202,7 +194,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the
     // fixed ones through here.
     void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count = -1);
-    // Strict lexical scope: saves local_regs_, reg_top_ and locals_top_, allocates the locals
+    // Strict lexical scope: saves scopes_.regs, reg_top_ and locals_top_, allocates the locals
     // declared in body without descending into sub-blocks, compiles, then restores. The registers
     // stay reserved when the body contains closures.
     // `pre_bound` names a variable already living in `pre_bound_reg` — the catch variable, the
@@ -223,9 +215,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
                            int reg_top_after_body);
     std::unordered_map<const void*, bool> has_func_cache_;
 
-    // Reserves a register for every pre-scanned local. Functions are bound in local_regs_ straight
+    // Reserves a register for every pre-scanned local. Functions are bound in scopes_.regs straight
     // away, for recursion and forward references, while var and const are deferred in
-    // pending_var_reg_ for lexical scope. `skip` holds the names from the CURRENT scope's prologue
+    // scopes_.pending for lexical scope. `skip` holds the names from the CURRENT scope's prologue
     // (parameters, self, the catch variable), left as they are. A name inherited from an enclosing
     // scope is NOT in skip, so it gets a fresh register and shadows the outer one.
     void bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
