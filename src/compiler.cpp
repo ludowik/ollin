@@ -1567,15 +1567,18 @@ void Compiler::visit(const CallExpr& e) {
     bool shadowed = scopes_.regs.contains(e.callee) || resolve_upvalue(e.callee) >= 0;
     auto it = shadowed ? func_table.end() : func_table.find(e.callee);
     if (it != func_table.end()) {
+        // Read BEFORE the arguments are compiled: the table is a flat hash map, so any insertion
+        // moves its entries and the iterator would no longer point at this one.
+        FuncInfo target = it->second;
         int call_base = reg_top_;
         int argc = (int)e.args.size();
         compile_consecutive(call_base, e.args);
-        if (it->second.is_closure) {
+        if (target.is_closure) {
             int func_reg = alloc_reg();
             chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg, chunk.add_identifier(e.callee)));
             chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
         } else {
-            chunk.emit(make_abc((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, it->second.func_idx, (uint8_t)argc));
+            chunk.emit(make_abc((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, target.func_idx, (uint8_t)argc));
         }
         last_reg_ = call_base;
         return;
@@ -1774,8 +1777,8 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // every turn, so assigning to the variable inside the body has no effect. The bindings are
     // saved and restored, so nothing leaks past the loop.
     // The binding is made in the CURRENT scope, the loop having no scope of its own.
-    ScopeTable<int>::Shadow sh1, sh2;
-    sh1 = scopes_.regs.bind_here(var1, block + 1);
+    ScopeTable<int>::Shadow sh1 = scopes_.regs.bind_here(var1, block + 1);
+    ScopeTable<int>::Shadow sh2;
     if (two_vars)
         sh2 = scopes_.regs.bind_here(var2, block + 2);
 
