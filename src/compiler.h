@@ -107,10 +107,12 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         return !current_func_name.empty();
     }
 
-    // Everything the ENCLOSING scope owns while a function body is compiled. Saved and reset by
-    // the constructor, restored by the destructor: the nine fields were saved and restored by
-    // hand in three places, in the same order, and one forgotten restore would not fail to
-    // compile — it would silently corrupt the scope of everything that follows.
+    // What a function body does NOT own but still disturbs: the register counters and the name
+    // of the enclosing function. Saved and reset by the constructor, restored by the destructor —
+    // they were saved and restored by hand in three places, in the same order, and one forgotten
+    // restore would not fail to compile, it would silently corrupt everything that follows. What
+    // a body DOES own — its name tables, its upvalue indexes, its proto — lives in the frame this
+    // pushes onto fn_stack_.
     struct FuncScope {
         Compiler& c;
         int top, count, locals;
@@ -119,7 +121,6 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         FuncScope(Compiler& comp, const std::string& fname);
         ~FuncScope();
     };
-
 
     // Compiles a function body into a fresh FuncProto and returns its index. `with_self` puts
     // self in R[0] (an instance method), and on_registered runs once the proto exists but
