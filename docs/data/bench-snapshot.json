@@ -1,7 +1,7 @@
 {
   "_": "READING of execution times, produced by bench/bench_all.sh (best of N runs, PROCESSOR time). This is NOT a historical series: a time is only valid for the machine and the moment it was measured on, so this file is REPLACED by every new reading, never extended. Read by docs/views/perf.js.",
-  "date": "2026-09-04",
-  "commit": "2c4b54c",
+  "date": "2026-09-06",
+  "commit": "0abcbed",
   "runs": 3,
   "machine": "Intel Xeon 2.10 GHz, 4 cores - Linux x86-64 container",
   "build": "GCC 13.3, CMake Release, computed-goto",
@@ -24,73 +24,73 @@
       "id": "fib",
       "name": "fib(35) recursive",
       "what": "calls and conditional jumps",
-      "lua": 0.5335,
-      "ollin": 1.0403,
-      "python": 1.0243
+      "lua": 0.4829,
+      "ollin": 0.9196,
+      "python": 0.912
     },
     {
       "id": "loop",
       "name": "loop 10M",
       "what": "a numeric loop and arithmetic",
-      "lua": 0.0418,
-      "ollin": 0.056,
-      "python": 0.5229
+      "lua": 0.0329,
+      "ollin": 0.0569,
+      "python": 0.4812
     },
     {
       "id": "map",
       "name": "map 100K",
       "what": "building a table and reading it",
-      "lua": 0.0184,
-      "ollin": 0.0331,
-      "python": 0.0302
+      "lua": 0.0169,
+      "ollin": 0.0317,
+      "python": 0.0296
     },
     {
       "id": "array",
       "name": "array 1M",
       "what": "indexed access",
-      "lua": 0.0261,
-      "ollin": 0.0475,
-      "python": 0.1193
+      "lua": 0.0234,
+      "ollin": 0.0423,
+      "python": 0.1164
     },
     {
       "id": "calls",
       "name": "calls 1M",
       "what": "a function call",
-      "lua": 0.0147,
-      "ollin": 0.0229,
-      "python": 0.0814
+      "lua": 0.0142,
+      "ollin": 0.0194,
+      "python": 0.0682
     },
     {
       "id": "strings",
       "name": "strings 200K",
       "what": "concatenation and interpolation",
-      "lua": 0.0727,
-      "ollin": 0.1432,
-      "python": 0.0662
+      "lua": 0.0722,
+      "ollin": 0.1489,
+      "python": 0.0675
     },
     {
       "id": "classes",
       "name": "classes 200K",
       "what": "instantiation, methods, inheritance",
-      "lua": 0.0803,
-      "ollin": 0.1124,
-      "python": 0.0755
+      "lua": 0.0764,
+      "ollin": 0.099,
+      "python": 0.0641
     },
     {
       "id": "iter",
       "name": "iter 2.4M",
       "what": "for … in over an array and a map",
-      "lua": 0.0602,
-      "ollin": 0.0349,
-      "python": 0.1391
+      "lua": 0.0565,
+      "ollin": 0.0336,
+      "python": 0.1235
     },
     {
       "id": "mandelbrot",
       "name": "mandelbrot 200x200",
       "what": "floating-point arithmetic",
-      "lua": 0.0237,
-      "ollin": 0.0545,
-      "python": 0.1576
+      "lua": 0.0216,
+      "ollin": 0.0517,
+      "python": 0.1543
     }
   ]
 }

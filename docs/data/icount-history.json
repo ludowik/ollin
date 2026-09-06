@@ -379,6 +379,14 @@
       "fib": 75480813,
       "loop": 31706795,
       "map": 54035160
+    },
+    {
+      "date": "2026-09-06",
+      "commit": "a66594e",
+      "subject": "the function being compiled is the last frame of one stack",
+      "fib": 75176289,
+      "loop": 31701661,
+      "map": 54857023
     }
   ]
 }
