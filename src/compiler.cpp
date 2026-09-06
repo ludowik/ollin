@@ -213,14 +213,14 @@ static void emit_implicit_return(Chunk& chunk, bool is_ctor) {
 // collect_funcs=false at top level (top-level funcs are accessed via func_table)
 struct CollectLocalsVisitor : StmtQuery {
     std::vector<std::string>& out;
-    std::unordered_set<std::string>& seen;
+    NameSet& seen;
     bool collect_funcs;
     const std::vector<std::string>& files;
-    std::unordered_set<std::string>* funcs; // the names of the local functions, bound straight away, when asked for
+    NameSet* funcs; // the names of the local functions, bound straight away, when asked for
     std::unordered_map<std::string, std::string> alias_of; // an import alias → the module it names
 
-    CollectLocalsVisitor(std::vector<std::string>& out, std::unordered_set<std::string>& seen, bool collect_funcs,
-                         const std::vector<std::string>& files, std::unordered_set<std::string>* funcs)
+    CollectLocalsVisitor(std::vector<std::string>& out, NameSet& seen, bool collect_funcs,
+                         const std::vector<std::string>& files, NameSet* funcs)
         : out(out), seen(seen), collect_funcs(collect_funcs), files(files), funcs(funcs) {
     }
 
@@ -282,8 +282,8 @@ struct CollectLocalsVisitor : StmtQuery {
 
 static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
                            const std::vector<std::string>& files, bool collect_funcs = true,
-                           std::unordered_set<std::string>* funcs = nullptr) {
-    std::unordered_set<std::string> seen(out.begin(), out.end());
+                           NameSet* funcs = nullptr) {
+    NameSet seen(out.begin(), out.end());
     CollectLocalsVisitor v(out, seen, collect_funcs, files, funcs);
     v.run(stmts);
 }
@@ -291,8 +291,8 @@ static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std:
 // Globals declared with 'global' are visible everywhere, wherever the declaration sits, so
 // they are all collected before compilation — including those nested inside functions.
 struct CollectGlobalsVisitor : StmtQuery {
-    std::unordered_set<std::string>& out;
-    std::unordered_set<std::string>& enums;
+    NameSet& out;
+    NameSet& enums;
     const std::vector<std::string>& files;
     // What decides whether an enum's members may be folded into constants: how many times each
     // bare-name enum is DECLARED (twice means no single value), which names are ASSIGNED anywhere
@@ -302,13 +302,13 @@ struct CollectGlobalsVisitor : StmtQuery {
     // function, a fourth traversal of the tree for one question about a node this visitor
     // already sees.
     std::unordered_map<std::string, int>& enum_decls;
-    std::unordered_set<std::string>& assigned;
-    std::unordered_set<std::string>& certain;
+    NameSet& assigned;
+    NameSet& certain;
     bool cur_certain = true; // set by walk() for the statement being visited
 
-    CollectGlobalsVisitor(std::unordered_set<std::string>& out, std::unordered_set<std::string>& enums,
+    CollectGlobalsVisitor(NameSet& out, NameSet& enums,
                           const std::vector<std::string>& files, std::unordered_map<std::string, int>& enum_decls,
-                          std::unordered_set<std::string>& assigned, std::unordered_set<std::string>& certain)
+                          NameSet& assigned, NameSet& certain)
         : out(out), enums(enums), files(files), enum_decls(enum_decls), assigned(assigned), certain(certain) {
     }
 
@@ -364,10 +364,10 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
 };
 
-static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::unordered_set<std::string>& out,
-                            std::unordered_set<std::string>& enums, const std::vector<std::string>& files,
+static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, NameSet& out,
+                            NameSet& enums, const std::vector<std::string>& files,
                             std::unordered_map<std::string, int>& enum_decls,
-                            std::unordered_set<std::string>& assigned, std::unordered_set<std::string>& certain) {
+                            NameSet& assigned, NameSet& certain) {
     CollectGlobalsVisitor v(out, enums, files, enum_decls, assigned, certain);
     v.walk(stmts);
 }
@@ -463,8 +463,8 @@ Chunk Compiler::compile(const Program& prog) {
     reg_top_ = 0;
     reg_count_ = 8;
     std::unordered_map<std::string, int> enum_decls;
-    std::unordered_set<std::string> assigned_names;
-    std::unordered_set<std::string> certain_enums;
+    NameSet assigned_names;
+    NameSet certain_enums;
     collect_globals(prog.stmts, declared_globals_, enum_names_, chunk.source_files, enum_decls, assigned_names,
                     certain_enums);
     // An enum whose name is declared once, never reassigned, and declared where the statement is
@@ -631,8 +631,8 @@ void Compiler::compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body) 
     }
 }
 
-void Compiler::bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
-                                const std::unordered_set<std::string>& skip) {
+void Compiler::bind_scan_locals(const std::vector<std::string>& names, const NameSet& funcs,
+                                const NameSet& skip) {
     for (auto& name : names) {
         if (skip.count(name))
             continue; // the current scope's prologue (a parameter, self, a catch variable): already bound
@@ -680,14 +680,14 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
-    static const std::unordered_set<std::string> no_skip;
-    std::unordered_set<std::string> skip;
+    static const NameSet no_skip;
+    NameSet skip;
     if (!pre_bound.empty()) {
         scopes_.regs.set(pre_bound, pre_bound_reg);
         skip.insert(pre_bound);
     }
     std::vector<std::string> block_locals;
-    std::unordered_set<std::string> block_funcs;
+    NameSet block_funcs;
     collect_locals(body, block_locals, chunk.source_files, true, &block_funcs);
     bind_scan_locals(block_locals, block_funcs, pre_bound.empty() ? no_skip : skip);
     int block_locals_top = reg_top_;
@@ -1132,13 +1132,13 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
     // The prologue names seed the pre-scan, so redeclaring a parameter with 'var' is caught, and
     // they go in `skip` because they already have their register.
     std::vector<std::string> body_locals;
-    std::unordered_set<std::string> skip(params.begin(), params.end());
+    NameSet skip(params.begin(), params.end());
     if (with_self) {
         body_locals.push_back("self");
         skip.insert("self");
     }
     body_locals.insert(body_locals.end(), params.begin(), params.end());
-    std::unordered_set<std::string> body_funcs;
+    NameSet body_funcs;
     collect_locals(body, body_locals, chunk.source_files, true, &body_funcs);
     bind_scan_locals(body_locals, body_funcs, skip);
     locals_top_ = reg_top_;

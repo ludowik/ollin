@@ -1,6 +1,7 @@
 #pragma once
+#include <cstdint> // uint32_t/uint64_t, required by robin_hood.h
+#include "robin_hood.h"
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -27,7 +28,7 @@
 
 template <class V> class ChainedTable {
 public:
-    using Map = std::unordered_map<std::string, V>;
+    using Map = robin_hood::unordered_map<std::string, V>;
     // The whole stack, for a boundary a name does NOT cross: a function body sees the enclosing
     // locals as upvalues, never as locals. A state put aside stays SEARCHABLE through find_in,
     // so resolving an upvalue costs no copy.
@@ -123,7 +124,7 @@ private:
 
 template <class V> class FlatTable {
 public:
-    using Map = std::unordered_map<std::string, V>;
+    using Map = robin_hood::unordered_map<std::string, V>;
     struct State {
         Map m;
         std::vector<Map> saved;

@@ -1667,6 +1667,13 @@ il **pointe** désormais sur l'état mis de côté par `FuncScope`, qui lui surv
 relevé donnait la forme plate 3 à 5 fois plus chère, parce que ce build-là n'était pas en
 `Release`. Le chiffre était absurde et c'est ce qui l'a trahi.
 
+**Toutes les tables de noms du compilateur sont en `robin_hood`** — les quatre tables de portée,
+`declared_globals_`, `enum_names_`, `foldable_enums_`, `enum_consts_`, `func_table` et les index
+d'upvalues —, comme le `StringTable` et le type map du langage : une seule bibliothèque de table
+dans le moteur. **Mesuré : l'écart est NUL** (`syntax.ol` −0,10 %, `regressions.ol` −0,01 %,
+`invaders.ol` +0,20 %, `voxel_world.ol` +0,33 %, `fib` −0,00 %). Le changement se justifie par la
+cohérence, pas par la vitesse — et le chiffre est ici pour qu'on ne repose plus la question.
+
 ⚠ Une variable de boucle est liée dans la portée COURANTE, la boucle n'ayant pas de portée à
 elle : `innermost()` est là pour ça, et la remise en place doit viser cette table-là — chercher
 dans toute la chaîne trouverait un homonyme hérité et le recopierait dans la portée interne.

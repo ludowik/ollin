@@ -8,6 +8,10 @@
 #include <unordered_set>
 #include <vector>
 
+// A set of names — the compiler's own tables, all keyed by identifier. robin_hood is the
+// repository's map for a hot table (the string interning, the language's own map type).
+using NameSet = robin_hood::unordered_set<std::string>;
+
 class Compiler : public StmtVisitor, public ExprVisitor {
   public:
     Chunk compile(const Program& program);
@@ -56,18 +60,18 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         bool variadic;
         bool is_closure = false; // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
     };
-    std::unordered_map<std::string, FuncInfo> func_table;
-    std::unordered_set<std::string>
+    robin_hood::unordered_map<std::string, FuncInfo> func_table;
+    NameSet
         declared_globals_;                        // the declared globals: the source's, the builtins and the modules
     // Enums declared under a plain name, so that visible writes are refused at compile time with a
     // message naming the element. The VM still covers every other path.
-    std::unordered_set<std::string> enum_names_;
+    NameSet enum_names_;
     // Enums whose name is declared once and never reassigned: their members have one value for
     // the whole program. The second map holds those values, filled when the declaration is
     // COMPILED, so only code compiled after it folds — a member read before the declaration has
     // run keeps failing as it did.
-    std::unordered_set<std::string> foldable_enums_;
-    std::unordered_map<std::string, std::unordered_map<std::string, Value>> enum_consts_;
+    NameSet foldable_enums_;
+    robin_hood::unordered_map<std::string, robin_hood::unordered_map<std::string, Value>> enum_consts_;
     // `Name.MEMBER` of a foldable enum, when the name is not shadowed here: gives its value.
     bool fold_enum_member(const Expr& e, Value& out);
     // A value known at compile time: a literal, or such an enum member.
@@ -98,11 +102,11 @@ class Compiler : public StmtVisitor, public ExprVisitor {
         // capture made while an inner body is compiled adds an entry here, and that entry must
         // survive the body — on a copy it was thrown away, so a second closure reading the same
         // name pushed a SECOND descriptor for it (measured: two upvalues, both the same variable).
-        std::unordered_map<std::string, int>* upval_idx;
+        robin_hood::unordered_map<std::string, int>* upval_idx;
         int func_proto_idx;                             // -1 = main chunk
     };
     std::vector<OuterScope> outer_scopes_;
-    std::unordered_map<std::string, int> cur_upval_idx_;
+    robin_hood::unordered_map<std::string, int> cur_upval_idx_;
 
     // Everything the ENCLOSING scope owns while a function body is compiled. Saved and reset by
     // the constructor, restored by the destructor: the nine fields were saved and restored by
@@ -111,7 +115,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     struct FuncScope {
         Compiler& c;
         ScopeTables::State scopes;
-        std::unordered_map<std::string, int> upvals;
+        robin_hood::unordered_map<std::string, int> upvals;
         int top, count, locals, fidx;
         bool ctor;
         std::string name;
@@ -224,8 +228,8 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // scopes_.pending for lexical scope. `skip` holds the names from the CURRENT scope's prologue
     // (parameters, self, the catch variable), left as they are. A name inherited from an enclosing
     // scope is NOT in skip, so it gets a fresh register and shadows the outer one.
-    void bind_scan_locals(const std::vector<std::string>& names, const std::unordered_set<std::string>& funcs,
-                          const std::unordered_set<std::string>& skip = {});
+    void bind_scan_locals(const std::vector<std::string>& names, const NameSet& funcs,
+                          const NameSet& skip = {});
 
     // Loads the callable named `name` into register `reg`: a local, an upvalue, a top-level function
     // through LOAD_FUNC, or a global through LOAD_GLOBAL.
