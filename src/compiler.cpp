@@ -4,65 +4,57 @@
 #include <stdexcept>
 
 int Compiler::resolve_upvalue(const std::string& name) {
-    auto it = cur_upval_idx_.find(name);
-    if (it != cur_upval_idx_.end())
+    auto it = fn_stack_.back().upvals.find(name);
+    if (it != fn_stack_.back().upvals.end())
         return it->second;
-    if (outer_scopes_.empty())
-        return -1;
-    return resolve_upval_from((int)outer_scopes_.size() - 1, name);
+    if (fn_stack_.size() < 2)
+        return -1; // the main chunk encloses nothing
+    return resolve_upval_from((int)fn_stack_.size() - 2, name);
 }
 
-int Compiler::resolve_upval_from(int scope_idx, const std::string& name) {
-    OuterScope& scope = outer_scopes_[scope_idx];
-    if (const int* reg = ScopeTable<int>::find_in(scope.fn->scopes.regs, name))
-        return capture_upval_chain(scope_idx, true, (uint8_t)*reg, name);
-    auto uv_it = scope.fn->upvals.find(name);
-    if (uv_it != scope.fn->upvals.end())
-        return capture_upval_chain(scope_idx, false, (uint8_t)uv_it->second, name);
-    if (scope_idx == 0)
+// Looks for `name` in the function at `fn_idx` and, failing that, further out. Found, it is
+// captured down the chain of functions between that one and the one being compiled.
+int Compiler::resolve_upval_from(int fn_idx, const std::string& name) {
+    FuncFrame& fn = fn_stack_[fn_idx];
+    if (const int* reg = fn.scopes.regs.find(name))
+        return capture_upval_chain(fn_idx, true, (uint8_t)*reg, name);
+    auto uv_it = fn.upvals.find(name);
+    if (uv_it != fn.upvals.end())
+        return capture_upval_chain(fn_idx, false, (uint8_t)uv_it->second, name);
+    if (fn_idx == 0)
         return -1;
-    int outer_uv = resolve_upval_from(scope_idx - 1, name);
+    int outer_uv = resolve_upval_from(fn_idx - 1, name);
     if (outer_uv < 0)
         return -1;
-    return capture_upval_chain(scope_idx, false, (uint8_t)outer_uv, name);
+    return capture_upval_chain(fn_idx, false, (uint8_t)outer_uv, name);
 }
 
-int Compiler::capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, const std::string& name) {
+// Gives every function between `fn_idx` and the one being compiled an upvalue for `name`, each
+// pointing at the one just outside it, and returns the index in the innermost. The function being
+// compiled is the LAST frame, so it is one turn of this loop and no longer a case apart.
+int Compiler::capture_upval_chain(int fn_idx, bool is_local, uint8_t idx, const std::string& name) {
     bool cur_is_local = is_local;
     uint8_t cur_idx = idx;
 
-    // Propagate through intermediate function scopes
-    for (int i = scope_idx + 1; i < (int)outer_scopes_.size(); i++) {
-        OuterScope& s = outer_scopes_[i];
-        auto it = s.fn->upvals.find(name);
-        if (it != s.fn->upvals.end()) {
+    for (int i = fn_idx + 1; i < (int)fn_stack_.size(); i++) {
+        FuncFrame& fn = fn_stack_[i];
+        auto it = fn.upvals.find(name);
+        if (it != fn.upvals.end()) {
             cur_idx = (uint8_t)it->second;
             cur_is_local = false;
-        } else if (s.func_proto_idx >= 0) {
-            int uv_i = (int)chunk.funcs[s.func_proto_idx].upvals.size();
-            if (uv_i > 255) // the upvalue index is an 8-bit operand
-                throw std::runtime_error("function captures more than 255 upvalues");
-            chunk.funcs[s.func_proto_idx].upvals.push_back({cur_is_local, cur_idx});
-            s.fn->upvals[name] = uv_i;
-            cur_idx = (uint8_t)uv_i;
-            cur_is_local = false;
+            continue;
         }
+        if (fn.proto_idx < 0)
+            continue; // the main chunk has no proto to hold a descriptor
+        int uv_i = (int)chunk.funcs[fn.proto_idx].upvals.size();
+        if (uv_i > 255) // the upvalue index is an 8-bit operand
+            throw std::runtime_error("function captures more than 255 upvalues");
+        chunk.funcs[fn.proto_idx].upvals.push_back({cur_is_local, cur_idx});
+        fn.upvals[name] = uv_i;
+        cur_idx = (uint8_t)uv_i;
+        cur_is_local = false;
     }
-
-    // Add to current function
-    {
-        auto it = cur_upval_idx_.find(name);
-        if (it != cur_upval_idx_.end())
-            return it->second;
-    }
-    if (current_func_idx_ < 0)
-        return -1; // in main chunk, no FuncProto
-    int uv_i = (int)chunk.funcs[current_func_idx_].upvals.size();
-    if (uv_i > 255) // the upvalue index is an 8-bit operand
-        throw std::runtime_error("function captures more than 255 upvalues");
-    chunk.funcs[current_func_idx_].upvals.push_back({cur_is_local, cur_idx});
-    cur_upval_idx_[name] = uv_i;
-    return uv_i;
+    return cur_idx;
 }
 
 // The negation of a numeric LITERAL is a constant: `-1` used to cost a LOAD_K plus a NEGATE at
@@ -387,7 +379,7 @@ bool Compiler::fold_enum_member(const Expr& e, Value& out) {
     auto en = enum_consts_.find(obj->name);
     if (en == enum_consts_.end())
         return false;
-    if (scopes_.regs.contains(obj->name) || resolve_upvalue(obj->name) >= 0)
+    if (scopes().regs.contains(obj->name) || resolve_upvalue(obj->name) >= 0)
         return false; // shadowed here: a real lookup, not a constant
     auto member = en->second.find(key->value);
     if (member == en->second.end())
@@ -521,34 +513,34 @@ static bool is_multi_value_expr(const Expr* e) {
 void Compiler::visit(const VarDeclStmt& s) {
     note_line(s.line, s.file_idx);
 
-    // Activates a deferred local by moving it from scopes_.pending to scopes_.regs, which is
+    // Activates a deferred local by moving it from scopes().pending to scopes().regs, which is
     // where lexical scope begins for it, and returns its register. Call it only AFTER compiling
     // the initializers, so that `var a = a` reads the outer `a` and not the local being
     // declared.
     auto activate_local = [&](const std::string& name) -> int {
         int reg;
-        if (!scopes_.pending.pop(name, reg))
-            return *scopes_.regs.find(name); // already active
-        scopes_.regs.set(name, reg);
+        if (!scopes().pending.pop(name, reg))
+            return *scopes().regs.find(name); // already active
+        scopes().regs.set(name, reg);
         return reg;
     };
     // A second alias of the SAME module in this scope emits nothing: the map is already there,
     // filled, and re-running `var name = {}` would empty it.
     if (!s.import_alias_of.empty()) {
-        const std::string* prev = scopes_.aliases.find(s.names[0]);
+        const std::string* prev = scopes().aliases.find(s.names[0]);
         if (prev != nullptr && *prev == s.import_alias_of)
             return;
-        scopes_.aliases.set(s.names[0], s.import_alias_of);
+        scopes().aliases.set(s.names[0], s.import_alias_of);
     }
     // A const is registered HERE and not at the end of the function: the multi-return path
     // returns early, and `const a, b = f()` silently lost its constness.
     if (s.is_constant)
         for (auto& n : s.names)
-            scopes_.consts.set(n, {});
+            scopes().consts.set(n, {});
     // Register reserved for a still-deferred local, without activating it.
     auto reserved_reg = [&](const std::string& name) -> int {
-        const int* pend = scopes_.pending.find(name);
-        return pend != nullptr ? *pend : *scopes_.regs.find(name);
+        const int* pend = scopes().pending.find(name);
+        return pend != nullptr ? *pend : *scopes().regs.find(name);
     };
 
     // Multi-return: several targets and a single value that is a CALL, in any form — named
@@ -637,9 +629,9 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const Nam
             continue; // the current scope's prologue (a parameter, self, a catch variable): already bound
         if (funcs.count(name))
             // a local function is visible straight away, for recursion and forward references
-            scopes_.regs.set(name, reg_top_++);
+            scopes().regs.set(name, reg_top_++);
         else
-            scopes_.pending.set(name, reg_top_++); // var and const are deferred until their declaration
+            scopes().pending.set(name, reg_top_++); // var and const are deferred until their declaration
     }
 }
 
@@ -675,13 +667,13 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
                              int pre_bound_reg) {
     // The constants belong to the scope too: without this, `do const x = 1 end` then `var x = 2`
     // refused to assign x, a name with nothing to do with the block's.
-    ScopeGuard scope(scopes_);
+    ScopeGuard scope(scopes());
     int saved_top = reg_top_;
     int saved_locals = locals_top_;
 
     NameSet skip;
     if (!pre_bound.empty()) {
-        scopes_.regs.set(pre_bound, pre_bound_reg);
+        scopes().regs.set(pre_bound, pre_bound_reg);
         skip.insert(pre_bound);
     }
     std::vector<std::string> block_locals;
@@ -716,8 +708,8 @@ void Compiler::visit(const WhileStmt& s) {
     size_t exit_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
     reg_top_ = saved;
 
-    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
-    continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    break_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
+    continue_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
     int body_base = reg_top_;
     compile_block(s.body);
     // A continue LEAVES the body without running its end, so the CLOSE_UPVALS that compile_block
@@ -843,7 +835,7 @@ void Compiler::visit(const SwitchStmt& s) {
     int above_subj = reg_top_; // subj_r stays live through every arm
 
     break_patches.push_back(
-        {{}, outer_scopes_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
+        {{}, fn_stack_.size(), try_depth_, true}); // marks the switch; a break inside it is refused
 
     std::vector<std::vector<int64_t>> table_values;
     int64_t lo = 0;
@@ -918,7 +910,7 @@ void Compiler::visit(const SwitchStmt& s) {
 // have been opened in it: a `break` written inside a lambda declared in a loop used to compile,
 // and jumped into the enclosing function's code — the loop's body was skipped outright, silently.
 void Compiler::check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& frames, const char* what) {
-    if (frames.empty() || frames.back().func_depth != outer_scopes_.size())
+    if (frames.empty() || frames.back().func_depth != fn_stack_.size())
         throw std::runtime_error(s.sloc().str(chunk.source_files) + ": " + what + " outside loop");
 }
 
@@ -952,14 +944,13 @@ void Compiler::visit(const ContinueStmt& s) {
 
 void Compiler::visit(const AssignStmt& s) {
     note_line(s.line, s.file_idx);
-    if (scopes_.consts.contains(s.name))
-        throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
-    // Also block assignment when name is a constant captured from an outer scope
-    for (auto& scope : outer_scopes_)
-        if (ScopeNames::find_in(scope.fn->scopes.consts, s.name) != nullptr)
+    // Every function frame, the one being compiled included: a constant captured from an
+    // enclosing function is no more assignable than one declared here.
+    for (auto& fn : fn_stack_)
+        if (fn.scopes.consts.contains(s.name))
             throw std::runtime_error(where(s) + ": cannot assign to const '" + s.name + "'");
     {
-        const int* it = scopes_.regs.find(s.name);
+        const int* it = scopes().regs.find(s.name);
         if (it != nullptr) {
             int dest = *it;
             if (s.op == '\0') {
@@ -1079,31 +1070,27 @@ void Compiler::visit(const TryCatchStmt& s) {
 }
 
 Compiler::FuncScope::FuncScope(Compiler& comp, const std::string& fname)
-    : c(comp), scopes(comp.scopes_.take()), upvals(std::move(comp.cur_upval_idx_)), top(comp.reg_top_),
-      count(comp.reg_count_), locals(comp.locals_top_), fidx(comp.current_func_idx_), ctor(comp.in_ctor_),
+    : c(comp), top(comp.reg_top_), count(comp.reg_count_), locals(comp.locals_top_), ctor(comp.in_ctor_),
       name(comp.current_func_name) {
-    // The tables set aside above stay SEARCHABLE where they are: the entry points at them instead
-    // of carrying a second copy of the enclosing scope.
-    c.outer_scopes_.push_back({this, fidx}); // for upvalue resolution
-    c.try_floors_.push_back(c.try_depth_);                     // this body's returns are relative to HERE
+    // The new function gets a frame of its own — its name tables, its upvalue indexes and, from
+    // compile_func_body, its proto. The enclosing function's frame stays exactly where it is,
+    // still reachable for resolving an upvalue.
+    c.fn_stack_.emplace_back();
+    c.try_floors_.push_back(c.try_depth_); // this body's returns are relative to HERE
     c.current_func_name = fname;
-    c.cur_upval_idx_.clear();
     c.reg_top_ = 0;
     c.reg_count_ = 0;
     c.locals_top_ = 0;
 }
 
 Compiler::FuncScope::~FuncScope() {
-    c.outer_scopes_.pop_back();
+    c.fn_stack_.pop_back();
     c.try_floors_.pop_back();
-    c.scopes_.restore(std::move(scopes));
-    c.cur_upval_idx_ = std::move(upvals);
     c.reg_top_ = top;
     c.reg_count_ = count;
     c.locals_top_ = locals;
     c.in_ctor_ = ctor;
     c.current_func_name = name;
-    c.current_func_idx_ = fidx;
 }
 
 uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<std::string>& params,
@@ -1122,9 +1109,9 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
     int first = with_self ? 1 : 0;
     int n_fixed = n_params + first;
     if (with_self)
-        scopes_.regs.set("self", 0);
+        scopes().regs.set("self", 0);
     for (int i = 0; i < n_params; ++i)
-        scopes_.regs.set(params[i], i + first);
+        scopes().regs.set(params[i], i + first);
     reg_top_ = n_fixed;
 
     // The prologue names seed the pre-scan, so redeclaring a parameter with 'var' is caught, and
@@ -1155,7 +1142,7 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
 
     FuncProto fp{func_addr, (uint8_t)n_fixed, variadic, is_static, defaults_idx, 0, {}};
     uint8_t func_idx = chunk.add_func(fp);
-    current_func_idx_ = func_idx;
+    fn_stack_.back().proto_idx = func_idx;
     if (on_registered)
         on_registered(func_idx);
 
@@ -1175,14 +1162,14 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // here" — collect_locals reserves one for a func declared in a BLOCK, top level included.
     // Deciding by in_function() compiled a `func` inside a top-level `do` as a global while
     // binding it as a local, so its register stayed empty: `var g = h` gave nil.
-    bool is_local = scopes_.regs.contains(s.name);
+    bool is_local = scopes().regs.contains(s.name);
     uint8_t func_idx =
         compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, false, false, s.sloc(), [&](uint8_t idx) {
             // A global function is pre-registered in func_table so recursive calls are optimized
             // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
             // a local register gets no entry.
             if (!is_local) {
-                bool encloses_locals = !ScopeTable<int>::empty_in(outer_scopes_.back().fn->scopes.regs);
+                bool encloses_locals = !enclosing_fn().scopes.regs.empty();
                 func_table[s.name] = FuncInfo{idx, (int)s.params.size(), s.variadic, encloses_locals};
             }
         });
@@ -1192,7 +1179,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
     if (is_local) {
         // Stored in the local register pre-allocated by collect_locals, with no func_table entry
         // and no access to globals.
-        int dest = *scopes_.regs.find(s.name);
+        int dest = *scopes().regs.find(s.name);
         chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
         return;
     }
@@ -1349,7 +1336,7 @@ void Compiler::visit(const NilExpr&) {
 void Compiler::visit(const VarExpr& e) {
     // Local variable shadows everything (including global functions of the same name)
     {
-        const int* it = scopes_.regs.find(e.name);
+        const int* it = scopes().regs.find(e.name);
         if (it != nullptr) {
             last_reg_ = *it;
             return;
@@ -1469,7 +1456,7 @@ void Compiler::visit(const UnaryExpr& e) {
 }
 
 void Compiler::emit_callee_value(const std::string& name, int reg) {
-    const int* rit = scopes_.regs.find(name);
+    const int* rit = scopes().regs.find(name);
     if (rit != nullptr) {
         if (*rit != reg)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)reg, (uint8_t)*rit, 0));
@@ -1562,7 +1549,7 @@ void Compiler::visit(const CallExpr& e) {
     // parameter, so `print(f)` and `f()` named two different things in one scope.
     // resolve_upvalue only creates the upvalue when it finds one, and it caches, so testing here
     // costs nothing and adds nothing to the proto.
-    const int* callee_local = scopes_.regs.find(e.callee);
+    const int* callee_local = scopes().regs.find(e.callee);
     int callee_reg = callee_local != nullptr ? *callee_local : -1;
     bool shadowed = callee_local != nullptr || resolve_upvalue(e.callee) >= 0;
     auto it = shadowed ? func_table.end() : func_table.find(e.callee);
@@ -1777,17 +1764,17 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // every turn, so assigning to the variable inside the body has no effect. The bindings are
     // saved and restored, so nothing leaks past the loop.
     // The binding is made in the CURRENT scope, the loop having no scope of its own.
-    ScopeTable<int>::Shadow sh1 = scopes_.regs.bind_here(var1, block + 1);
+    ScopeTable<int>::Shadow sh1 = scopes().regs.bind_here(var1, block + 1);
     ScopeTable<int>::Shadow sh2;
     if (two_vars)
-        sh2 = scopes_.regs.bind_here(var2, block + 2);
+        sh2 = scopes().regs.bind_here(var2, block + 2);
 
     auto loop_start = (uint16_t)chunk.current_pos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
     size_t exit_patch = chunk.emit_jump(iter_op, (uint8_t)block);
 
-    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
-    continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    break_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
+    continue_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
     compile_block(body);
     // End of an iteration: the loop variables and the body's locals go out of scope, so their
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
@@ -1811,9 +1798,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
         chunk.patch_jump(p, exit);
     break_patches.pop_back();
 
-    scopes_.regs.unbind(sh1);
+    scopes().regs.unbind(sh1);
     if (two_vars)
-        scopes_.regs.unbind(sh2);
+        scopes().regs.unbind(sh2);
     reg_top_ = keep_captured_regs(body, block + (two_vars ? 3 : 2), block, reg_top_);
 }
 
@@ -1978,7 +1965,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         bump_reg_count();
     }
     // As in the iterator loop: bound in the current scope, the loop having none of its own.
-    ScopeTable<int>::Shadow shadow = scopes_.regs.bind_here(var1, var_reg);
+    ScopeTable<int>::Shadow shadow = scopes().regs.bind_here(var1, var_reg);
 
     size_t prep = chunk.emit_jump(Op::FOR_PREP, (uint8_t)ctl); // Bx is the exit for an empty loop, patched later
 
@@ -1986,8 +1973,8 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (!can_alias)
         chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
 
-    break_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
-    continue_patches.push_back({{}, outer_scopes_.size(), try_depth_, false});
+    break_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
+    continue_patches.push_back({{}, fn_stack_.size(), try_depth_, false});
     compile_block(body);
 
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
@@ -2009,7 +1996,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
         chunk.patch_jump(p, exit_addr);
     break_patches.pop_back();
 
-    scopes_.regs.unbind(shadow);
+    scopes().regs.unbind(shadow);
     // Register recycling: when a closure in the body captures i we keep its register reserved,
     // otherwise it would be overwritten after the loop and the upvalue would be corrupted.
     // Do NOT drop below what compile_block reserved for the body's LOCALS, which a closure can
@@ -2032,7 +2019,7 @@ void Compiler::reject_enum_write(const std::string& obj_name, const Expr* obj_ex
             return; // a chained target (a.b[k]): the object written is not the enum itself
         name = &ve->name;
     }
-    if (!enum_names_.count(*name) || scopes_.regs.contains(*name))
+    if (!enum_names_.count(*name) || scopes().regs.contains(*name))
         return;
     throw std::runtime_error(where(line, file_idx) + ": cannot modify enum '" + *name + "'" +
                              (field.empty() ? "" : " element '" + field + "'"));
@@ -2056,7 +2043,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
         obj_r = alloc_reg();
         compile_into(*s.obj_expr, obj_r);
     } else {
-        const int* it = scopes_.regs.find(s.obj);
+        const int* it = scopes().regs.find(s.obj);
         if (it != nullptr) {
             obj_r = *it;
         } else {
@@ -2097,7 +2084,7 @@ void Compiler::visit(const IndexAssignStmt& s) {
 
 // Writes R[src] into the variable `name`: a local register, an upvalue, or a global.
 void Compiler::store_name(const std::string& name, int src, const Stmt& at) {
-    const int* it = scopes_.regs.find(name);
+    const int* it = scopes().regs.find(name);
     if (it != nullptr) {
         if (src != *it)
             chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)*it, (uint8_t)src, 0));
@@ -2118,7 +2105,7 @@ void Compiler::store_name(const std::string& name, int src, const Stmt& at) {
 // that follows does mutate the original object.
 int Compiler::emit_container(const Expr& obj, const Stmt& at) {
     if (auto* ve = dynamic_cast<const VarExpr*>(&obj)) {
-        const int* it = scopes_.regs.find(ve->name);
+        const int* it = scopes().regs.find(ve->name);
         if (it != nullptr)
             return *it;
         int uv = resolve_upvalue(ve->name);
@@ -2328,9 +2315,9 @@ void Compiler::visit(const MethodCallExpr& e) {
     int argc = (int)e.args.size();
 
     if (e.is_super) {
-        // self lives in scopes_.regs["self"] and is copied to call_base. Outside a method 'self'
+        // self lives in scopes().regs["self"] and is copied to call_base. Outside a method 'self'
         // does not exist, hence a clean diagnostic instead of a map::at crash.
-        const int* self_it = scopes_.regs.find("self");
+        const int* self_it = scopes().regs.find("self");
         if (self_it == nullptr)
             throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super' can only be used inside a method");
         // The parent class is fixed LEXICALLY — the class where the method is defined — rather

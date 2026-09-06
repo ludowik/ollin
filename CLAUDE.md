@@ -1636,6 +1636,30 @@ imbriqué : une descente manquante y produirait une valeur corrompue.
 - Résolution d'un nom : local (`local_regs_`) → fonction (`func_table`) → upvalue (`resolveUpvalue`) → global (`declared_globals_` → `LOAD_GLOBAL`/`STORE_GLOBAL`) → sinon erreur. Une locale masque donc un global de même nom.
 - Garde-fous + branche global dans le compilateur : `visit(AssignStmt)`, `visit(VarExpr)`, `visit(IndexAssignStmt)`.
 
+## Pile de fonctions du compilateur (`fn_stack_`)
+
+Le compilateur tient une **pile de fonctions en cours de compilation**, `fn_stack_`, dont la
+PREMIÈRE entrée est le corps principal et la DERNIÈRE la fonction que l'on compile. Une entrée
+porte ce qu'une fonction possède le temps de son corps : ses quatre tables de portée, sa table
+« nom → index d'upvalue » et l'index de son proto. `scopes()` désigne les tables de la dernière.
+
+**Ce que cette forme supprime** : la fonction courante était tenue à part (`cur_upval_idx_`,
+`current_func_idx_`, des tables membres) et les englobantes dans une seconde pile,
+`outer_scopes_`, dont les entrées pointaient sur l'état mis de côté par `FuncScope`. Résoudre
+un nom demandait donc deux chemins — un pour la courante, un pour la pile — et
+`capture_upval_chain` finissait par un bloc « et maintenant la fonction courante ». C'est ce
+dédoublement qui avait permis qu'une table soit COPIÉE là où il fallait un lien, faute corrigée
+plus tôt. La fonction courante étant désormais un cran de la même pile, ces cas particuliers
+n'existent plus, et `ScopeTables` n'a plus besoin de savoir se mettre de côté (`State`, `take`,
+`restore`, `find_in`, `empty_in` ont disparu).
+
+⚠ **`fn_stack_` est un `std::deque`, jamais un `std::vector`** : le garde de portée de chaque
+bloc tient une RÉFÉRENCE sur les tables de sa fonction, et ouvrir une fonction imbriquée empile
+une entrée — un vecteur se réalloue et la référence pend (constaté : plantage immédiat sur une
+lambda déclarée dans une boucle). Un deque garde ses éléments en place.
+
+Mesuré : neutre en travail (`syntax.ol` 13,52 M d'instructions avant comme après).
+
 ## Tables de portée du compilateur (`src/scope_tables.h`)
 
 Les quatre tables de noms du compilateur — locales, locales différées, constantes, alias

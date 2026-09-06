@@ -2,6 +2,7 @@
 #include "ast.h"
 #include "chunk.h"
 #include "scope_tables.h"
+#include <deque>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -38,12 +39,32 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     int current_line_ = 0;
     int current_file_idx_ = 0;
 
-    // The four scoped name tables, entered and left as ONE scope (src/scope_tables.h).
-    // `pending` holds the `var` and `const` locals whose register is reserved but which are NOT
-    // declared yet: lexical scope makes them visible only from their own line on. A reference
-    // before the declaration therefore does not find them in `regs` and falls through to a
-    // global, an upvalue, or an error; they move into `regs` at the VarDeclStmt.
-    ScopeTables scopes_;
+    // One function being compiled — the MAIN CHUNK included, as the first frame. Everything a
+    // function owns while its body is compiled lives here, so resolving a name asks the same
+    // question of every level and the function in progress is simply the last frame. The current
+    // one used to be kept apart, in members of its own, which is what let a table be copied where
+    // a link was needed (see OuterScope, since removed).
+    struct FuncFrame {
+        // The four scoped name tables, entered and left as ONE scope (src/scope_tables.h).
+        // `pending` holds the `var` and `const` locals whose register is reserved but which are
+        // NOT declared yet: lexical scope makes them visible only from their own line on. A
+        // reference before the declaration therefore does not find them in `regs` and falls
+        // through to a global, an upvalue, or an error; they move into `regs` at the VarDeclStmt.
+        ScopeTables scopes;
+        NameMap<int> upvals; // name → upvalue index in this function's proto
+        int proto_idx = -1;  // index in chunk.funcs; -1 = main chunk
+    };
+    // A DEQUE, not a vector: a reference to a frame — the scope guard of every block holds one —
+    // must survive the push of an inner function's frame, and a vector reallocates.
+    std::deque<FuncFrame> fn_stack_{1};
+    ScopeTables& scopes() {
+        return fn_stack_.back().scopes;
+    }
+    // The function that ENCLOSES the one being compiled. Only called from inside a body, so the
+    // stack always holds at least two frames there.
+    FuncFrame& enclosing_fn() {
+        return fn_stack_[fn_stack_.size() - 2];
+    }
     int reg_top_ = 0;    // next free register
     int reg_count_ = 0;  // max reg ever used → FuncProto.reg_count
     int locals_top_ = 0; // reg_top_ after pre-scanning locals (temps start here)
@@ -81,7 +102,6 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // a class with no parent. 'super' resolves through THIS lexical class and not through self's
     // dynamic class, which would recurse forever in a hierarchy of three levels or more.
     std::string current_class_parent_;
-    int current_func_idx_ = -1; // index in chunk.funcs (-1 = main chunk)
 
     bool in_function() const {
         return !current_func_name.empty();
@@ -93,27 +113,13 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // compile — it would silently corrupt the scope of everything that follows.
     struct FuncScope {
         Compiler& c;
-        ScopeTables::State scopes;
-        NameMap<int> upvals;
-        int top, count, locals, fidx;
+        int top, count, locals;
         bool ctor;
         std::string name;
         FuncScope(Compiler& comp, const std::string& fname);
         ~FuncScope();
     };
 
-    // One enclosing function scope, for resolving an upvalue. It is a LINK to the FuncScope that
-    // opened it — which outlives this entry exactly — and not a copy of what that scope holds:
-    // an index learned while an inner body is compiled must survive the body, and on a copy it
-    // was thrown away, so a second closure reading the same name pushed a SECOND descriptor for
-    // it (measured: two upvalues, both the same variable). One link also means one lifetime to
-    // state, however many tables a function scope grows.
-    struct OuterScope {
-        FuncScope* fn;
-        int func_proto_idx; // -1 = main chunk
-    };
-    std::vector<OuterScope> outer_scopes_;
-    NameMap<int> cur_upval_idx_;
 
     // Compiles a function body into a fresh FuncProto and returns its index. `with_self` puts
     // self in R[0] (an instance method), and on_registered runs once the proto exists but
@@ -195,7 +201,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the
     // fixed ones through here.
     void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count = -1);
-    // Strict lexical scope: saves scopes_.regs, reg_top_ and locals_top_, allocates the locals
+    // Strict lexical scope: saves scopes().regs, reg_top_ and locals_top_, allocates the locals
     // declared in body without descending into sub-blocks, compiles, then restores. The registers
     // stay reserved when the body contains closures.
     // `pre_bound` names a variable already living in `pre_bound_reg` — the catch variable, the
@@ -216,9 +222,9 @@ class Compiler : public StmtVisitor, public ExprVisitor {
                            int reg_top_after_body);
     std::unordered_map<const void*, bool> has_func_cache_;
 
-    // Reserves a register for every pre-scanned local. Functions are bound in scopes_.regs straight
+    // Reserves a register for every pre-scanned local. Functions are bound in scopes().regs straight
     // away, for recursion and forward references, while var and const are deferred in
-    // scopes_.pending for lexical scope. `skip` holds the names from the CURRENT scope's prologue
+    // scopes().pending for lexical scope. `skip` holds the names from the CURRENT scope's prologue
     // (parameters, self, the catch variable), left as they are. A name inherited from an enclosing
     // scope is NOT in skip, so it gets a fresh register and shadows the outer one.
     void bind_scan_locals(const std::vector<std::string>& names, const NameSet& funcs, const NameSet& skip = {});

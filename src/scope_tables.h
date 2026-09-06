@@ -69,15 +69,11 @@ template <class V> void unshadow_in(NameMap<V>& m, const NameShadow<V>& sh) {
 template <class V> class ChainedTable {
 public:
     using Map = NameMap<V>;
-    // The whole stack, for a boundary a name does NOT cross: a function body sees the enclosing
-    // locals as upvalues, never as locals. A state put aside stays SEARCHABLE through find_in,
-    // so resolving an upvalue costs no copy.
-    using State = std::vector<Map>;
 
     // An empty scope is stepped over instead of being probed: hashing the name has a cost even
     // when the map has nothing to answer, and a chain of blocks holds many empty scopes.
-    static const V* find_in(const State& s, const std::string& k) {
-        for (auto it = s.rbegin(); it != s.rend(); ++it) {
+    const V* find(const std::string& k) const {
+        for (auto it = frames_.rbegin(); it != frames_.rend(); ++it) {
             if (it->empty())
                 continue;
             auto e = it->find(k);
@@ -86,15 +82,11 @@ public:
         }
         return nullptr;
     }
-    static bool empty_in(const State& s) {
-        for (const auto& f : s)
+    bool empty() const {
+        for (const auto& f : frames_)
             if (!f.empty())
                 return false;
         return true;
-    }
-
-    const V* find(const std::string& k) const {
-        return find_in(frames_, k);
     }
     bool contains(const std::string& k) const {
         return find(k) != nullptr;
@@ -131,16 +123,6 @@ public:
     void leave() {
         frames_.pop_back();
     }
-    State take() {
-        State s = std::move(frames_);
-        frames_.clear();
-        frames_.emplace_back();
-        return s;
-    }
-    void restore(State s) {
-        frames_ = std::move(s);
-    }
-
 private:
     std::vector<Map> frames_{1};
 };
@@ -148,22 +130,13 @@ private:
 template <class V> class FlatTable {
 public:
     using Map = NameMap<V>;
-    struct State {
-        Map m;
-        std::vector<Map> saved;
-    };
-
-    static const V* find_in(const State& s, const std::string& k) {
-        auto it = s.m.find(k);
-        return it == s.m.end() ? nullptr : &it->second;
-    }
-    static bool empty_in(const State& s) {
-        return s.m.empty();
-    }
 
     const V* find(const std::string& k) const {
         auto it = m_.find(k);
         return it == m_.end() ? nullptr : &it->second;
+    }
+    bool empty() const {
+        return m_.empty();
     }
     bool contains(const std::string& k) const {
         return m_.count(k) != 0;
@@ -195,17 +168,6 @@ public:
         m_ = std::move(saved_.back());
         saved_.pop_back();
     }
-    State take() {
-        State s{std::move(m_), std::move(saved_)};
-        m_.clear();
-        saved_.clear();
-        return s;
-    }
-    void restore(State s) {
-        m_ = std::move(s.m);
-        saved_ = std::move(s.saved);
-    }
-
 private:
     Map m_;
     std::vector<Map> saved_;
@@ -230,12 +192,6 @@ struct ScopeTables {
     ScopeNames consts;
     ScopeTable<std::string> aliases; // import alias → the module it names
 
-    struct State {
-        ScopeTable<int>::State regs, pending;
-        ScopeNames::State consts;
-        ScopeTable<std::string>::State aliases;
-    };
-
     void enter() {
         regs.enter();
         pending.enter();
@@ -247,15 +203,6 @@ struct ScopeTables {
         pending.leave();
         consts.leave();
         aliases.leave();
-    }
-    State take() {
-        return State{regs.take(), pending.take(), consts.take(), aliases.take()};
-    }
-    void restore(State s) {
-        regs.restore(std::move(s.regs));
-        pending.restore(std::move(s.pending));
-        consts.restore(std::move(s.consts));
-        aliases.restore(std::move(s.aliases));
     }
 };
 
