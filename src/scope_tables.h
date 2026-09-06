@@ -15,11 +15,13 @@
 //   FLAT — a single map that every scope writes into, copied whole on entry and put back on exit.
 //     Lookup is one probe whatever the depth; entering costs a copy of the ENTIRE enclosing scope.
 //
-// Measured on the compilation alone (callgrind): the copies of the flat form are 20,0 % of the
-// work on tests/syntax.ol (a file with a very large top-level scope) and 6,4 % on
-// docs/samples/voxel_world.ol, while the extra lookups the chain would add number 85 and 1 203
-// respectively — noise. Hence the default. Nothing above the tables can tell which one is in use:
-// both expose the same API, and the language behaves identically.
+// Measured on the compilation alone (callgrind, both builds in Release, 2026-09-06): the flat
+// form costs +19,3 % on tests/regressions.ol, +13,7 % on tests/syntax.ol, +1,8 % on
+// docs/samples/voxel_world/voxel_world.ol and +0,9 % on docs/samples/invaders/invaders.ol. Hence
+// the default. The spread is not noise: it follows the SHAPE of the file, since what a flat scope
+// copies on entering a block is the whole scope above it — a file with a very large top-level
+// scope pays, one that declares little above its blocks does not. Nothing above the tables can
+// tell which one is in use: both expose the same API, and the language behaves identically.
 //
 // Switch with `cmake -DOLLIN_SCOPED_TABLES=OFF` (or by defining the macro to 0).
 #ifndef OLLIN_SCOPED_TABLES

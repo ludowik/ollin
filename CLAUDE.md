@@ -1688,17 +1688,26 @@ On bascule par `cmake -DOLLIN_SCOPED_TABLES=OFF`.
   entrée de bloc et remise en place à la sortie. La consultation est unique quelle que soit la
   profondeur, mais l'entrée coûte la portée englobante tout entière.
 
-**Mesuré avant de choisir** (compilation seule, callgrind) : les copies de la forme plate
-pesaient **20,0 %** du travail sur `tests/syntax.ol` — un fichier dont la portée de tête est
-énorme — et **6,4 %** sur `voxel_world.ol`, quand les consultations supplémentaires de la chaîne
-se comptaient en 85 et 1 203, soit du bruit. Le profil dépend entièrement de la FORME du
-fichier : `syntax.ol` recopiait 125 entrées par bloc, `invaders.ol` seulement 2.
+**Mesuré, et REMESURÉ après coup** (compilation seule, callgrind, les deux binaires en
+`Release`). Relevé du 06/09/2026, qui remplace celui d'origine — le compilateur avait changé
+entre-temps (tables par fonction), et un chiffre qui justifie un défaut se refait :
 
-Sur les binaires finis (les deux en `Release`, exécution comprise) : `syntax.ol` 21,0 M → 13,6 M
-(**−35 %**), `regressions.ol` 113,7 M → 99,2 M, `voxel_world.ol` 14,8 M → 14,4 M. Le gain dépasse
-la mesure d'origine parce que la chaîne a supprimé une seconde famille de copies : `OuterScope`
-recopiait les locales et les constantes de la fonction englobante à chaque fonction compilée, et
-il **pointe** désormais sur l'état mis de côté par `FuncScope`, qui lui survit exactement.
+| | `regressions.ol` | `syntax.ol` | `voxel_world.ol` | `invaders.ol` |
+|---|---|---|---|---|
+| surcoût de la forme plate | **+19,3 %** | **+13,7 %** | +1,8 % | +0,9 % |
+
+L'écart suit la **FORME du fichier**, ce qui n'est pas du bruit : ce qu'une portée plate recopie
+en entrant dans un bloc est la portée entière au-dessus d'elle. Un fichier à très grande portée de
+tête paie, un fichier qui déclare peu au-dessus de ses blocs ne le sent pas.
+
+⚠ **Compilation seule et total ne répondent pas à la même question** : sur `regressions.ol` la
+compilation ne pèse que 25 M sur 99 M, si bien que le même écart se lit +19,3 % sur la
+compilation et +5,0 % sur le total. Les deux sont justes ; dire lequel on cite.
+
+Sur les binaires finis (exécution comprise) : `syntax.ol` 21,0 M → 13,5 M (**−36 %**),
+`voxel_world.ol` 14,8 M → 14,4 M. Le gain dépasse la mesure d'origine parce que la chaîne a
+supprimé une seconde famille de copies : `OuterScope` recopiait les locales et les constantes de
+la fonction englobante à chaque fonction compilée.
 
 ⚠ **Une comparaison de deux builds n'a de sens qu'à `CMAKE_BUILD_TYPE` égal** : mon premier
 relevé donnait la forme plate 3 à 5 fois plus chère, parce que ce build-là n'était pas en
