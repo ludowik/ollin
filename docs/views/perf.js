@@ -511,6 +511,11 @@ export async function init(ctx) {
   // else, and a non-linear scale would lie about the ratios. Bars that go past the cap are cut
   // short with a point, and their value is written out at the end.
   const coef = v => "×" + v.toFixed(2);
+  // The file holds TIMES, in seconds, for the reference as for every competitor (see its own "_"
+  // field). The multiple is derived HERE and nowhere else: printing the stored value as if it
+  // were already a multiple announced Ollin at ×0.06 on the loop — sixteen times faster than
+  // Lua — for as long as the view has existed.
+  const times = (b, id, ref) => b[id] / b[ref];
   const seconds = v => v.toFixed(4) + " s";
   const median = id => {
     const t = bench.benchmarks.map(b => b[id]).sort((a, b) => a - b);
@@ -557,7 +562,8 @@ export async function init(ctx) {
     const iw = w - m.l - m.r;
     // The cap: enough to hold all of Ollin's coefficients, and one notch above the reference —
     // never the absolute maximum, which would come from a very slow competitor.
-    const topOllin = Math.max(...B.map(b => b.ollin));
+    const refId = bench.reference.id;
+    const topOllin = Math.max(...B.map(b => times(b, "ollin", refId)));
     const bound = Math.max(2, Math.ceil(topOllin + 0.5));
     const x = v => m.l + Math.min(v, bound) / bound * iw;
 
@@ -577,8 +583,9 @@ export async function init(ctx) {
       svgBench.append(name);
       C.forEach((c, k) => {
         const y = y0 + 15 + k * 11;
-        const beyond = b[c.id] > bound;
-        const bx = x(b[c.id]);
+        const v = times(b, c.id, refId);
+        const beyond = v > bound;
+        const bx = x(v);
         svgBench.append(el("rect", {
           x: m.l, y: y, width: Math.max(1.5, bx - m.l), height: 7, rx: 3.5,
           fill: "var(--s-" + c.id + ")", opacity: beyond ? 0.55 : 1,
@@ -590,7 +597,7 @@ export async function init(ctx) {
           x: beyond ? w - 2 : bx + 6, y: y + 7, class: "val",
           fill: "var(--s-" + c.id + ")", "text-anchor": beyond ? "end" : "start",
         });
-        t.textContent = (beyond ? "▸ " : "") + coef(b[c.id]);
+        t.textContent = (beyond ? "▸ " : "") + coef(v);
         svgBench.append(t);
       });
       // The reference marker, over the bars but SEGMENTED line by line: a single vertical over
@@ -661,7 +668,7 @@ export async function init(ctx) {
     bench.benchmarks.forEach(b => {
       const row = document.createElement("tr");
       const cells = [["", b.name], ["subject", b.what], ["n", seconds(b[bench.reference.id])]];
-      bench.competitors.forEach(c => cells.push(["n", coef(b[c.id])]));
+      bench.competitors.forEach(c => cells.push(["n", coef(times(b, c.id, bench.reference.id))]));
       cells.forEach(([cls, txt]) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
