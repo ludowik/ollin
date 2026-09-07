@@ -10,7 +10,13 @@ C'est le mot-clé **perf** de `CLAUDE.md`, rendu invocable. La section « Comman
 
 ## Phase 1 — le TEMPS
 
-`bash bench/bench_all.sh` (ou `RUNS=5 bash bench/bench_all.sh` si l'utilisateur donne un nombre).
+`RAW=1 bash bench/bench_all.sh` (ou `RUNS=5 RAW=1 …` si l'utilisateur donne un nombre).
+
+**`RAW=1` dès le PREMIER passage**, jamais un second : le tableau n'affiche que des multiples,
+alors que le fichier publié stocke des temps, et `RAW=1` ajoute une ligne
+`RAW <id> <lua> <ollin> <python>` en secondes par benchmark. Relancer le banc pour obtenir ces
+temps donne un DEUXIÈME relevé, qui diffère du premier par le bruit — le rapport et le fichier
+publié cessent alors de s'accorder (constaté).
 
 Ce que le script fait déjà, et qu'il ne faut pas refaire à la main : il localise seul les
 interpréteurs, lance chaque benchmark **RUNS fois** (3 par défaut) et garde le **meilleur** temps,
@@ -35,6 +41,11 @@ Deux fichiers, deux natures opposées, ne pas les confondre :
   puis la référence Lua et les concurrents. Relever le contexte pour de vrai :
   `git rev-parse --short HEAD`, `date -I`, `lscpu | grep -E "Model name|^CPU\(s\)"`,
   `g++ --version`. Garder le champ `_` d'en-tête, qui explique le fichier à qui l'ouvre.
+  ⚠ Les champs `ollin` et `python` sont des **temps en secondes**, comme `lua` : c'est la vue qui
+  en dérive le multiple. Y ranger un multiple ferait afficher n'importe quoi (la vue a longtemps
+  lu le temps comme un multiple, et annonçait Ollin seize fois plus rapide que Lua sur la boucle).
+  ⚠ Écrire le JSON en gardant l'indentation du fichier (2 espaces) : le réécrire avec un autre
+  format rend un diff de plusieurs centaines de lignes pour trois chiffres changés.
 - **`docs/data/icount-history.json` s'ALLONGE** : ajouter un jalon à `milestones`. Garder le
   champ `_`, `tool`, `machine` et `scripts` tels quels.
   ⚠ **Vérifier d'abord qu'il ne MANQUE pas de jalon** : la série veut une entrée par journée où le

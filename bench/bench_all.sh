@@ -2,6 +2,14 @@
 # Run all benchmarks for Ollin, Lua, and Python 3.
 # Usage: bash bench/bench_all.sh  (from repo root)
 #        RUNS=5 bash bench/bench_all.sh   (override number of runs)
+#        RAW=1 bash bench/bench_all.sh    (also print the absolute times, one line per benchmark)
+#
+# The table shows the reference's time and a MULTIPLE for the others, which is what one reads. But
+# docs/data/bench-snapshot.json stores the TIMES, for the reference as for the others, so RAW=1
+# prints them in a form a script can read: "RAW <id> <lua> <ollin> <python>", seconds, empty for a
+# missing interpreter. Without it, publishing a reading meant editing this script and running the
+# whole bench a SECOND time — two readings that differ by noise, so the report and the published
+# file no longer agreed.
 #
 # Every benchmark runs RUNS times (3 by default) and the BEST time is kept: a single run is too
 # sensitive to noise, through CPU and cache contention, and can show a skewed coefficient.
@@ -117,4 +125,10 @@ for i in "${!benchmarks[@]}"; do
 done
 
 echo "└──────────────────────┴──────────────┴──────────────┴──────────────┘"
+if [ -n "${RAW:-}" ]; then
+    echo ""
+    for i in "${!benchmarks[@]}"; do
+        printf "RAW %s %s %s %s\n" "${benchmarks[$i]}" "${lua_times[$i]}" "${ollin_times[$i]}" "${py_times[$i]}"
+    done
+fi
 echo ""
