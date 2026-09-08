@@ -25,9 +25,15 @@
 ## The game has THREE states, and one variable says which: the title screen, the play, and the end.
 ## Every input asks that variable first, so no callback has to guess whether the game is running.
 ##
-## Desktop: left and right turn, up thrusts, space fires, P pauses. On a touch screen the analogue
-## joystick from the shared library turns and thrusts, and a tap ANYWHERE OFF the joystick fires —
-## a thumb that steers cannot also mean "fire", so the two live in different places on the glass.
+## Desktop: left and right turn, up thrusts, space fires (held down, it keeps firing), P pauses.
+##
+## On a touch screen the control is MODERN, not a copy of the cabinet's five buttons. The joystick
+## sits under the RIGHT thumb and is read as a DIRECTION, not as a turn: the nose swings to where
+## the stick points and the thrust is the stick's own distance from the centre, so a player aims
+## where they want to go instead of spelling it out with turn-left, turn-right, thrust. The LEFT
+## half of the glass is the trigger, held down rather than tapped. Two thumbs, two jobs, and
+## neither ever crosses the other — the first version steered with one thumb and fired with taps of
+## the same hand, which is what made it unplayable.
 
 ## The look and the sound live apart: the outlines in shapes.ol, the notes and the noises in
 ## sounds.ol. The joystick is not ours to keep here — it is shared with the voxel example.
@@ -38,11 +44,14 @@ import "../lib/joystick.ol"
 const FIELD_W = 512            ## the field, in its own pixels — graphics.viewport does the rest
 const FIELD_H = 384
 
-const SHIP_R      = 11.0        ## the ship's collision radius; the outline is drawn at this scale
-const TURN_SPEED  = 3.4        ## radians per second — turning is instant and free
-const THRUST      = 190.0      ## field pixels per second, per second
-const DRAG        = 0.35       ## a whisper of drag, so a stray push does not last for ever
-const MAX_SPEED   = 300.0
+const SHIP_R      = 11.0       ## the ship's collision radius; the outline is drawn at this scale
+const TURN_SPEED  = 5.2        ## radians per second, on the keyboard — turning is free and instant
+const TURN_SNAP   = 14.0       ## radians per second at which the nose swings to the stick's aim
+const THRUST      = 340.0      ## field pixels per second, per second
+const DRAG        = 0.7        ## a whisper of drag, so a stray push does not last for ever
+const MAX_SPEED   = 340.0
+const AIM_DEAD    = 0.2        ## how far the stick must leave the centre before it means a direction
+const FIRE_RATE   = 0.13       ## seconds between two shots while the trigger is held
 const SPAWN_WAIT  = 1.6        ## how long the wreck is shown before the next ship appears
 const CLEAR_R     = 70.0       ## the centre must be this clear before a ship is put back
 
@@ -104,14 +113,19 @@ global beatTimer = 0.0
 global beatStep = 0            ## which of the two heartbeat notes comes next
 global thrusting = false
 
-## The joystick is moved into the bottom-left corner and made smaller than its default: the whole
+## The joystick is moved into the bottom-RIGHT corner and made smaller than its default: the whole
 ## field is played in here, so a disc in the middle would sit over the action — and the ship could
-## end up UNDER it.
+## end up UNDER it. Right, because that is the thumb that steers on every modern handheld, the left
+## one being the trigger.
 global pad = Joystick()
-pad.centerXFrac = 0.2
+pad.centerXFrac = 0.8
 pad.centerFrac = 0.78
 pad.radiusFrac = 0.17
+pad.floating = true            ## the stick anchors where the thumb lands: no target to hit
 global padId = nil
+global fireId = nil            ## the finger holding the trigger, if any
+global fireHeld = false
+global fireTimer = 0.0         ## the cadence of a held trigger, on the glass as on the keyboard
 global touchPlay = false       ## a finger has played: the hint and the mouse relays follow it
 global demo = 0.0              ## the title screen's own clock
 
@@ -458,6 +472,20 @@ func centreClear()
     return saucer == nil
 end
 
+## The shortest way round from one angle to the other. Without it the nose took the long way for
+## every command that crossed the half-turn — the stick pointing a few degrees the other side of
+## straight-up sent the ship spinning all the way round.
+func angleTo(from, to)
+    var d = math.frac((to - from) / math.TAU + 0.5) * math.TAU - math.PI
+    if d < -math.PI then
+        d += math.TAU
+    end
+    return d
+end
+
+## The stick is a DIRECTION, and its distance from the centre is the throttle. One reading, used
+## twice: the nose swings towards it and the thrust follows its length, so half a push is half the
+## acceleration and a player can hold a slow drift.
 func steerShip(dt)
     var turn = 0.0
     if keyboard.isDown("left") then
@@ -466,13 +494,25 @@ func steerShip(dt)
     if keyboard.isDown("right") then
         turn += 1.0
     end
-    turn += pad.steer()
     ship.ang += turn * TURN_SPEED * dt
 
-    thrusting = keyboard.isDown("up") or pad.throttle() > 0.15
+    var push = 0.0
+    if keyboard.isDown("up") then
+        push = 1.0
+    end
+    var sx = pad.steer()
+    var sy = pad.throttle()
+    var m = math.sqrt(sx * sx + sy * sy)
+    if m > AIM_DEAD then
+        ## The stick's y is measured UPWARDS, the field's downwards: the sign is flipped here, once.
+        ship.ang += angleTo(ship.ang, math.atan2(-sy, sx)) * math.min(1.0, TURN_SNAP * dt)
+        push = math.max(push, math.min(1.0, m))
+    end
+
+    thrusting = push > 0.0
     if thrusting then
-        ship.vx += math.cos(ship.ang) * THRUST * dt
-        ship.vy += math.sin(ship.ang) * THRUST * dt
+        ship.vx += math.cos(ship.ang) * THRUST * push * dt
+        ship.vy += math.sin(ship.ang) * THRUST * push * dt
     end
     ## Drag, and a ceiling on the speed: neither is a brake, and the ship keeps its momentum for
     ## many seconds. What they prevent is a ship faster than the player can read.
@@ -519,6 +559,14 @@ func update(dt)
             newShip()
         end
     end
+    ## A held trigger fires on its own clock, the four-shot rule doing the rest: a modern player
+    ## holds the button down, and asking for one tap per shot is what a cabinet's spring did.
+    fireTimer -= dt
+    if (fireHeld or keyboard.isDown("space")) and fireTimer <= 0.0 then
+        fire()
+        fireTimer = FIRE_RATE
+    end
+
     if thrusting and not thrustVoice.isPlaying() then
         thrustVoice.start()
     elseif not thrusting and thrustVoice.isPlaying() then
@@ -568,6 +616,8 @@ func startGame()
     nextExtra = EXTRA_AT
     debris = []
     paused = false
+    fireHeld = false               ## a finger held across the end screen must not fire the new game
+    fireId = nil
     state = "play"
     newWave()
     newShip()
@@ -584,22 +634,29 @@ func keyboard.keypressed(key)
     end
 end
 
+## The glass is cut in TWO, and the side a finger lands on decides what it does: the right half
+## steers, the left half is the trigger. A side is a whole half and not a button, so neither thumb
+## has to find a target while the field is moving — the drawn disc and ring are hints, not the
+## hit test.
+##
 ## A single finger also emulates the mouse, so the same gesture arrives twice. Each path is written
-## to be IDEMPOTENT: the joystick only takes a finger it does not already have, and firing twice in
-## one frame is one shot more, which the four-shot rule already bounds.
+## to be IDEMPOTENT: the joystick only takes a finger it does not already have, and holding the
+## trigger twice is holding it once.
 func touch.began(id, x, y)
     touchPlay = true
     if begin() then
         return
     end
-    if padId == nil then
-        pad.press(x, y)
-        if pad.active then          ## the press landed inside the disc: this finger steers
-            padId = id
-            return
-        end
+    if x < W / 2 then
+        fireId = id
+        fireHeld = true
+        fireTimer = 0.0             ## the first shot leaves at once; the cadence starts after it
+        return
     end
-    fire()                          ## anywhere off the joystick, a tap fires
+    if padId == nil then
+        pad.press(x, y)             ## a floating stick: anywhere on this half arms it
+        padId = id
+    end
 end
 
 func touch.moved(id, x, y)
@@ -612,6 +669,9 @@ func touch.ended(id, x, y)
     if padId == id then
         padId = nil
         pad.release()
+    elseif fireId == id then
+        fireId = nil
+        fireHeld = false
     end
 end
 
@@ -675,6 +735,24 @@ func drawLives()
     end
 end
 
+## The trigger has no hit test of its own — the whole left half fires — so what is drawn is a
+## HINT: a ring where the thumb naturally sits, filled while it is held.
+func drawTrigger()
+    var r = pad.radius() * 0.5
+    var cx = W * 0.2
+    var cy = H * 0.78
+    graphics.noStroke()
+    graphics.fill(Color(1, 1, 1, 0.06))
+    graphics.circle(cx, cy, r)
+    if fireHeld then
+        graphics.fill(Color(1.0, 0.55, 0.3, 0.7))
+        graphics.circle(cx, cy, r * 0.55)
+    else
+        graphics.fill(Color(1, 1, 1, 0.16))
+        graphics.circle(cx, cy, r * 0.4)
+    end
+end
+
 func drawTitle()
     graphics.fontSize(30)
     graphics.stroke(INK)
@@ -688,9 +766,9 @@ func drawTitle()
     graphics.text("large 20    medium 50    small 100    saucer 200 or 1000", FIELD_W / 2, 210)
     graphics.fontSize(11)
     graphics.stroke(WARM)
-    var go = "arrows to turn, up to thrust, space to fire"
+    var go = "arrows turn, up thrusts, hold space to fire"
     if touchPlay then
-        go = "the joystick steers — tap anywhere else to fire"
+        go = "right thumb aims and thrusts — hold the left half to fire"
     end
     graphics.text(go, FIELD_W / 2, 250)
     if math.frac(demo) < 0.6 then
@@ -737,6 +815,7 @@ func draw()
     end
 
     if touchPlay and state == "play" then
+        drawTrigger()
         pad.draw()
     end
 end

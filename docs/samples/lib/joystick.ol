@@ -20,22 +20,39 @@
 ## The disc is placed and sized by three fractions of the drawing area — centerXFrac, centerFrac
 ## and radiusFrac — so a program whose whole field is played in can move the control out of the
 ## action instead of laying it over the middle of it.
+##
+## Set `floating` to arm the control WHEREVER the finger lands, the disc anchoring itself at that
+## point for as long as the finger is down. The fractions then only say where the resting disc is
+## drawn. That is what a thumb actually does on glass: it presses roughly where the control is and
+## expects the neutral point to be under it, rather than having to hit a target while the game
+## moves. Left off, the finger must land INSIDE the disc, which is right for a control the player
+## can look at.
 
 class Joystick
     func init()
         self.active = false       ## armed, a finger being down inside the disc; it stays true if the finger leaves
         self.px = 0
         self.py = 0
+        self.floating = false     ## arm anywhere, the disc following the finger (see the header)
+        self.ax = nil             ## the anchored neutral point, while a floating control is held
+        self.ay = nil
         self.centerXFrac = 0.5   ## the neutral point's abscissa, as a fraction of W
         self.centerFrac = 0.72   ## the neutral point's height, as a fraction of H
         self.radiusFrac = 0.22   ## the disc's radius, as a fraction of H
         self.dead = 0.10          ## the dead zone around the centre, as a fraction of the radius
     end
 
+    ## The neutral point: the anchor while a floating control is held, the resting place otherwise.
     func cx()
+        if self.ax <> nil then
+            return self.ax
+        end
         return W * self.centerXFrac
     end
     func cy()
+        if self.ay <> nil then
+            return self.ay
+        end
         return H * self.centerFrac
     end
     func radius()
@@ -45,6 +62,12 @@ class Joystick
     func press(x, y)
         self.px = x
         self.py = y
+        if self.floating then
+            self.ax = x
+            self.ay = y
+            self.active = true
+            return
+        end
         var dx = x - self.cx()
         var dy = y - self.cy()
         self.active = (dx * dx + dy * dy) <= self.radius() * self.radius()
@@ -55,6 +78,8 @@ class Joystick
     end
     func release()
         self.active = false
+        self.ax = nil
+        self.ay = nil
     end
 
     ## A dead zone at the centre, then a rescale: 0 inside the dead zone, ±1 at the edge.
