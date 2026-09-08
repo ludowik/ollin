@@ -5,8 +5,8 @@
 ##   steer()    in [-1;1], the horizontal offset from the centre (below 0 left, above 0 right)
 ##   throttle() in [-1;1], the vertical offset from the centre (above 0 forward, below 0 back)
 ##
-## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
-## module cannot catch them itself, hence three relays plus a draw:
+## Wiring on the host program's side. A CLASS cannot receive a callback — nothing subscribes an
+## object to the engine — so an instance needs three relays plus a draw:
 ##
 ##   import "joystick.ol"
 ##   global pad = Joystick()

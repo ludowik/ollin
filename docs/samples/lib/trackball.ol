@@ -7,8 +7,8 @@
 ##   idle(dt, degreesPerSecond)  a gentle rotation at rest, to be called from update(dt)
 ##   reset()   back to the starting orientation, for a "recentre the view" gesture
 ##
-## Wiring on the host program's side. The mouse.* callbacks are GLOBAL to the engine, and a
-## module cannot catch them itself, hence three relays:
+## Wiring on the host program's side. A CLASS cannot receive a callback — nothing subscribes an
+## object to the engine — so an instance needs three relays:
 ##
 ##   import "../lib/trackball.ol"   ## from a sample kept in its own directory
 ##   global ball = Trackball()

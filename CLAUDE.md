@@ -1447,9 +1447,18 @@ fichier dont le chemin remonte l'arborescence.
 - `tests/check_samples.sh` parcourt `docs/samples/**` et identifie un fichier par son **chemin
   relatif** ; il DÉDUIT les bibliothèques au lieu de les lister — un `.ol` importé par un autre en
   est une — et signale aussi un `import` visant un fichier disparu.
-- **Ce qui doit rester dans le fichier d'ENTRÉE** : `setup`, `update`, `draw` et les rappels
-  `mouse.*` / `touch.*` / `keyboard.*`. Un module ne peut pas les capter (cf. l'avertissement en
-  tête de `joystick.ol` et de `trackball.ol`). En revanche un `global` déclaré dans un module est
+- **Les rappels d'entrée par CONVENTION dans le fichier d'entrée**, pas par contrainte. Un
+  fichier importé PEUT les déclarer, et ils s'exécutent — vérifié dans les deux sens : un `draw()`
+  d'un module tourne (avec `as` comme sans), et un `func keyboard.keypressed` d'un module pose bien
+  le champ. Rien ne regarde qui a écrit : `keyboard_poll` lit `kbd.map_get("keypressed")`, un champ
+  de la map du module PARTAGÉE, et `setup`/`update`/`draw` sont cherchés par `get_global` — un
+  `import` étant aplati dans le programme, une fonction du premier niveau d'un module est une
+  fonction du programme. La raison de les garder groupés est qu'une seconde déclaration du même
+  rappel **écrase** la première en silence, le dernier import gagnant : on veut un seul endroit qui
+  dise quelle touche fait quoi.
+  ⚠ **Ce qui ne peut PAS recevoir un rappel, c'est une CLASSE** — aucun mécanisme n'abonne un objet
+  au moteur. D'où les relais d'une ligne en tête de `joystick.ol` et de `trackball.ol`, qui
+  resteraient nécessaires même écrits dans un module. En revanche un `global` déclaré dans un module est
   partagé, et une fonction de l'hôte peut lire un `const` du module (et l'inverse) : c'est ce qui
   permet de sortir les données et leurs constructeurs. ⚠ Un `const` de l'HÔTE, lui, est une locale
   du corps principal : un module ne le voit pas (`UFO_HUM` a dû suivre les sons dans `sounds.ol`).
