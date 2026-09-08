@@ -8,7 +8,7 @@
 ## Wiring on the host program's side. A CLASS cannot receive a callback — nothing subscribes an
 ## object to the engine — so an instance needs three relays plus a draw:
 ##
-##   import "joystick.ol"
+##   import "../lib/joystick.ol"
 ##   global pad = Joystick()
 ##   func mouse.pressed(x, y)  pad.press(x, y)  end
 ##   func mouse.moved(x, y)    pad.move(x, y)   end
@@ -16,19 +16,24 @@
 ##   ## in draw(): yaw -= pad.steer() * TURN_SPEED * deltaTime
 ##   ##              move by  pad.throttle() * SPEED * deltaTime  (negative goes backwards)
 ##   ## and at the end: pad.draw()
+##
+## The disc is placed and sized by three fractions of the drawing area — centerXFrac, centerFrac
+## and radiusFrac — so a program whose whole field is played in can move the control out of the
+## action instead of laying it over the middle of it.
 
 class Joystick
     func init()
         self.active = false       ## armed, a finger being down inside the disc; it stays true if the finger leaves
         self.px = 0
         self.py = 0
+        self.centerXFrac = 0.5   ## the neutral point's abscissa, as a fraction of W
         self.centerFrac = 0.72   ## the neutral point's height, as a fraction of H
         self.radiusFrac = 0.22   ## the disc's radius, as a fraction of H
         self.dead = 0.10          ## the dead zone around the centre, as a fraction of the radius
     end
 
     func cx()
-        return W / 2
+        return W * self.centerXFrac
     end
     func cy()
         return H * self.centerFrac

@@ -4,7 +4,7 @@
 ## Movement with inertia: the speed, the turn and the eye height ease towards their target
 ## instead of taking it up at once (see approach).
 
-import "joystick.ol"
+import "../lib/joystick.ol"
 import "view_distance.ol"
 ## The world's shape — biome, altitude, blocks, trees, and the baking of a chunk — lives apart: it
 ## is what the noise decides, while this file holds what moves.

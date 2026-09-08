@@ -24,6 +24,7 @@
   { "group": "Simulations", "name": "Solar eclipse",  "file": "solar_eclipse.ol" },
 
   { "group": "Games", "name": "Ollin Invaders", "file": "invaders/invaders.ol" },
+  { "group": "Games", "name": "Ollin Asteroids", "file": "asteroids/asteroids.ol" },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }
