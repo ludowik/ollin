@@ -8,10 +8,8 @@
 ##
 ## A point list is FLAT — x, y, x, y — because that is what graphics.polygon reads.
 
-## Every outline is given at radius 1 and SCALED at draw time. That is not a style choice: the
-## scale then IS the object's collision radius, so the drawing and the collision test read the same
-## number and cannot drift apart. An outline in pixels would have needed a second constant, and the
-## two would have been multiplied together — the ship was drawn nine times too large that way.
+## Every outline is given at radius 1, and the scale it is drawn at IS the object's collision
+## radius, so a rock's size names one number and not two.
 ##
 ## The ship: a slim triangle with a notched tail, nose pointing along +x (angle zero).
 const SHIP = [1.4, 0.0, -1.0, 0.9, -0.6, 0.0, -1.0, -0.9]
@@ -36,47 +34,54 @@ const ROCKS = [
 const SAUCER      = [1.0, 0.0, 0.45, 0.42, -0.45, 0.42, -1.0, 0.0, -0.45, -0.3, 0.45, -0.3]
 const SAUCER_DECK = [-0.45, -0.3, -0.22, -0.62, 0.22, -0.62, 0.45, -0.3]
 
-## Turns an outline and moves it: the ONE conversion from an object's own coordinates to the
-## field's. Both the drawing and the collision test read the same numbers, since a rock's radius is
-## its scale and nothing else.
-func placeShape(pts, x, y, ang, s)
-    var c = math.cos(ang)
-    var sn = math.sin(ang)
+## Sizes an outline ONCE, at startup. The scales the game uses are a fixed handful — three rock
+## radii, the ship, its icon, the two saucers — so scaling belongs to the loading and not to the
+## frame. Two reasons it is done here rather than by graphics.scale in the matrix: a scaled matrix
+## would multiply the STROKE width with the shape, giving the large rock a fat outline and the
+## small one a hairline; and a per-frame rebuild allocated one throwaway array per object per
+## frame, up to four for an object straddling an edge.
+func scaleShape(pts, s)
     var out = []
-    for i = 1, #pts // 2 do
-        var px = pts[i * 2 - 1] * s
-        var py = pts[i * 2] * s
-        out.push(x + px * c - py * sn)
-        out.push(y + px * sn + py * c)
+    for i = 1, #pts do
+        out.push(pts[i] * s)
     end
     return out
 end
 
+## Draws a sized outline turned and placed by the ENGINE's matrix stack — the same points every
+## frame, no arithmetic and no allocation in the script.
+func drawAt(pts, x, y, ang)
+    graphics.pushMatrix()
+    graphics.translate(x, y)
+    graphics.rotate(math.deg(ang))
+    graphics.polygon(pts)
+    graphics.popMatrix()
+end
+
 ## Draws an outline WRAPPED: an object straddling an edge must be seen on both sides, otherwise it
 ## would appear to vanish and reappear whole. The copies are drawn only when the object comes
-## within its own radius of an edge, so the common case is one polygon.
-func drawShape(pts, x, y, ang, s, w, h)
-    var placed = placeShape(pts, x, y, ang, s)
-    graphics.polygon(placed)
+## within `margin` of an edge — its own radius — so the common case is one polygon.
+func drawWrapped(pts, x, y, ang, margin, w, h)
+    drawAt(pts, x, y, ang)
     var ox = 0
     var oy = 0
-    if x < s then
+    if x < margin then
         ox = w
-    elseif x > w - s then
-        ox = 0 - w
+    elseif x > w - margin then
+        ox = -w
     end
-    if y < s then
+    if y < margin then
         oy = h
-    elseif y > h - s then
-        oy = 0 - h
+    elseif y > h - margin then
+        oy = -h
     end
     if ox <> 0 then
-        graphics.polygon(placeShape(pts, x + ox, y, ang, s))
+        drawAt(pts, x + ox, y, ang)
     end
     if oy <> 0 then
-        graphics.polygon(placeShape(pts, x, y + oy, ang, s))
+        drawAt(pts, x, y + oy, ang)
     end
     if ox <> 0 and oy <> 0 then
-        graphics.polygon(placeShape(pts, x + ox, y + oy, ang, s))
+        drawAt(pts, x + ox, y + oy, ang)
     end
 end

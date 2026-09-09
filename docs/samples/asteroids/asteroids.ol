@@ -99,19 +99,21 @@ global spawn = 0.0             ## the countdown to the next ship
 global waveWait = 0.0          ## the countdown to the next wave
 
 global rocks = []
-## Rocks born from a split wait here until the pass that made them is over: the collision pass
-## REPLACES `rocks` with a filtered copy, so a child pushed during it would be thrown away with
-## its parent. Staging them is the only way the two can both be true at once.
-global spawnedRocks = []
 global shots = []
 global saucer = nil
 global saucerShots = []
 global saucerTimer = SAUCER_PERIOD
 global debris = []             ## the fading sparks of anything that came apart
 
+## The outlines at the sizes the game draws them, sized ONCE by buildArt (see shapes.ol).
+global rockArt = []           ## [shape][size]
+global shipArt = nil
+global shipIcon = nil         ## the smaller ship of the lives counter
+global flameArt = nil
+global saucerArt = nil        ## .big / .small, each with its hull and its deck
+
 global beatTimer = 0.0
 global beatStep = 0            ## which of the two heartbeat notes comes next
-global thrusting = false
 
 ## The joystick is moved into the bottom-RIGHT corner and made smaller than its default: the whole
 ## field is played in here, so a disc in the middle would sit over the action — and the ship could
@@ -123,8 +125,7 @@ pad.centerFrac = 0.78
 pad.radiusFrac = 0.17
 pad.floating = true            ## the stick anchors where the thumb lands: no target to hit
 global padId = nil
-global fireId = nil            ## the finger holding the trigger, if any
-global fireHeld = false
+global fireId = nil            ## the finger holding the trigger, if any — nil means not held
 global fireTimer = 0.0         ## the cadence of a held trigger, on the glass as on the keyboard
 global touchPlay = false       ## a finger has played: the hint and the mouse relays follow it
 global demo = 0.0              ## the title screen's own clock
@@ -132,17 +133,12 @@ global demo = 0.0              ## the title screen's own clock
 ## ── The field's one law: everything wraps ────────────────────────────────────
 ## Written once and applied to every moving thing, so nothing can be forgotten on one object and
 ## leave it flying off into nowhere.
+## math.frac is x - floor(x), so it is never negative: one expression brings a coordinate back
+## into the field whatever it left by. Two subtractions only put back an object that overshot by
+## LESS than a field, which a dropped frame is enough to break.
 func wrap(o)
-    if o.x < 0.0 then
-        o.x += FIELD_W
-    elseif o.x >= FIELD_W then
-        o.x -= FIELD_W
-    end
-    if o.y < 0.0 then
-        o.y += FIELD_H
-    elseif o.y >= FIELD_H then
-        o.y -= FIELD_H
-    end
+    o.x = math.frac(o.x / FIELD_W) * FIELD_W
+    o.y = math.frac(o.y / FIELD_H) * FIELD_H
 end
 
 ## The distance between two points on a wrapped field is the SHORTEST of the ways round. Ignoring
@@ -171,21 +167,15 @@ end
 func addRock(x, y, size)
     var a = math.rand() * math.TAU
     var sp = ROCK_SPEED[size] * (0.6 + math.rand() * 0.7)
-    spawnedRocks.push({
+    rocks.push({
         x: x, y: y,
+        dead: false,
         vx: math.cos(a) * sp, vy: math.sin(a) * sp,
         size: size,
         shape: math.randInt(1, #ROCKS),
         rot: math.rand() * math.TAU,
         spin: (math.rand() * 2 - 1) * ROCK_SPIN
     })
-end
-
-func flushRocks()
-    for r in spawnedRocks do
-        rocks.push(r)
-    end
-    spawnedRocks = []
 end
 
 ## A new rock is placed AWAY from the centre, where the ship stands: dropping one on the ship would
@@ -195,7 +185,6 @@ func newWave()
         dropSaucer()
     end
     rocks = []
-    spawnedRocks = []
     shots = []
     saucerShots = []
     var n = math.min(WAVE_ROCKS + (wave - 1) * 2, WAVE_MAX)
@@ -215,7 +204,6 @@ func newWave()
         end
         addRock(x, y, 3)
     end
-    flushRocks()
     saucerTimer = SAUCER_PERIOD
 end
 
@@ -241,8 +229,11 @@ func burst(x, y, n, spread)
 end
 
 ## Breaking a rock is the game's central act: it REPLACES the rock with two faster, smaller ones,
-## and only the smallest leaves nothing behind.
+## and only the smallest leaves nothing behind. The rock is MARKED and not removed: a single sweep
+## at the end of the frame takes the dead away, so a collision pass never has to rebuild the list
+## it is walking — and a child pushed during it cannot be thrown away with its parent.
 func breakRock(r)
+    r.dead = true
     award(ROCK_SCORE[r.size])
     sndBang[r.size].play()
     burst(r.x, r.y, 6 + r.size * 3, 60.0 + r.size * 20.0)
@@ -255,14 +246,15 @@ end
 ## ── The ship ─────────────────────────────────────────────────────────────────
 
 func newShip()
-    ship = {x: FIELD_W / 2, y: FIELD_H / 2, vx: 0.0, vy: 0.0, ang: -math.PI / 2}
+    ## `push` is the thrust in [0;1], and it is a field of the SHIP: a ship that no longer exists
+    ## cannot leave a stale "thrusting" behind, so nothing has to be unset when one is destroyed.
+    ship = {x: FIELD_W / 2, y: FIELD_H / 2, vx: 0.0, vy: 0.0, ang: -math.PI / 2, push: 0.0}
 end
 
 func killShip()
     sndDeath.play()
     burst(ship.x, ship.y, 16, 90.0)
     ship = nil
-    thrusting = false
     lives -= 1
     if lives <= 0 then
         state = "over"
@@ -429,6 +421,18 @@ func ageShots(list, dt)
     end)
 end
 
+## The first live rock a point touches, or nil. Every collision in the game asks this one question
+## — the shots ask it, the ship asks it — and it answers with a plain loop that STOPS on the hit,
+## instead of a filter that has to walk the rest of the list to rebuild it.
+func rockAt(x, y, extra)
+    for r in rocks do
+        if not r.dead and near(x, y, r.x, r.y, ROCK_R[r.size] + extra) then
+            return r
+        end
+    end
+    return nil
+end
+
 ## The player's shots against the rocks and the saucer. A shot is spent by the first thing it
 ## touches, so it cannot cut a line through a cluster.
 func shotsHit()
@@ -437,16 +441,12 @@ func shotsHit()
             killSaucer()
             return false
         end
-        var alive = true
-        rocks = rocks.filter(func(r)
-            if alive and near(s.x, s.y, r.x, r.y, ROCK_R[r.size]) then
-                breakRock(r)
-                alive = false
-                return false
-            end
+        var r = rockAt(s.x, s.y, 0.0)
+        if r == nil then
             return true
-        end)
-        return alive
+        end
+        breakRock(r)
+        return false
     end)
 end
 
@@ -455,13 +455,11 @@ func shipHit()
     if ship == nil then
         return
     end
-    for r in rocks do
-        if near(ship.x, ship.y, r.x, r.y, ROCK_R[r.size] + SHIP_R * 0.7) then
-            breakRock(r)
-            rocks = rocks.filter(func(o) return o <> r end)
-            killShip()
-            return
-        end
+    var r = rockAt(ship.x, ship.y, SHIP_R * 0.7)
+    if r <> nil then
+        breakRock(r)
+        killShip()
+        return
     end
     if saucer <> nil and near(ship.x, ship.y, saucer.x, saucer.y, saucer.r + SHIP_R * 0.7) then
         killSaucer()
@@ -470,7 +468,7 @@ func shipHit()
     end
     for s in saucerShots do
         if near(ship.x, ship.y, s.x, s.y, SHIP_R) then
-            saucerShots = saucerShots.filter(func(o) return o <> s end)
+            s.left = 0.0                ## spent: the ageing pass takes it away, like any other
             killShip()
             return
         end
@@ -480,23 +478,16 @@ end
 ## A ship is only put back when the CENTRE is clear. Dropping it under a rock would cost a life to
 ## a player who was doing nothing wrong, so the countdown waits instead of expiring.
 func centreClear()
-    for r in rocks do
-        if near(FIELD_W / 2, FIELD_H / 2, r.x, r.y, CLEAR_R + ROCK_R[r.size]) then
-            return false
-        end
-    end
-    return saucer == nil
+    return rockAt(FIELD_W / 2, FIELD_H / 2, CLEAR_R) == nil and saucer == nil
 end
 
 ## The shortest way round from one angle to the other. Without it the nose took the long way for
 ## every command that crossed the half-turn — the stick pointing a few degrees the other side of
 ## straight-up sent the ship spinning all the way round.
+## math.frac lands in [0;1) whatever the sign of its argument, so the result is already in
+## [-PI;PI) — no wrapping branch is needed after it.
 func angleTo(from, to)
-    var d = math.frac((to - from) / math.TAU + 0.5) * math.TAU - math.PI
-    if d < -math.PI then
-        d += math.TAU
-    end
-    return d
+    return math.frac((to - from) / math.TAU + 0.5) * math.TAU - math.PI
 end
 
 ## The stick is a DIRECTION, and its distance from the centre is the throttle. One reading, used
@@ -525,8 +516,8 @@ func steerShip(dt)
         push = math.max(push, math.min(1.0, m))
     end
 
-    thrusting = push > 0.0
-    if thrusting then
+    ship.push = push
+    if push > 0.0 then
         ship.vx += math.cos(ship.ang) * THRUST * push * dt
         ship.vy += math.sin(ship.ang) * THRUST * push * dt
     end
@@ -576,11 +567,12 @@ func update(dt)
     ## A held trigger fires on its own clock, the four-shot rule doing the rest: a modern player
     ## holds the button down, and asking for one tap per shot is what a cabinet's spring did.
     fireTimer -= dt
-    if (fireHeld or keyboard.isDown("space")) and fireTimer <= 0.0 then
+    if (fireId <> nil or keyboard.isDown("space")) and fireTimer <= 0.0 then
         fire()
         fireTimer = FIRE_RATE
     end
 
+    var thrusting = ship <> nil and ship.push > 0.0
     if thrusting and not thrustVoice.isPlaying() then
         thrustVoice.start()
     elseif not thrusting and thrustVoice.isPlaying() then
@@ -596,7 +588,9 @@ func update(dt)
     saucerUpdate(dt)
     shotsHit()
     shipHit()
-    flushRocks()
+    ## ONE sweep, after every pass that could have broken something: the collisions mark, this
+    ## removes. Rebuilding the list mid-pass is what the marking exists to avoid.
+    rocks = rocks.filter(func(r) return not r.dead end)
     beat(dt)
 
     if #rocks == 0 then
@@ -604,7 +598,6 @@ func update(dt)
         if waveWait <= 0.0 then
             wave += 1
             newWave()
-            waveWait = WAVE_WAIT
         end
     else
         waveWait = WAVE_WAIT
@@ -632,14 +625,12 @@ func startGame()
     paused = false
     ## A finger held across the end screen must not play the new game: the trigger and the stick
     ## are both let go, or the fresh ship would thrust off on the previous game's command.
-    fireHeld = false
     fireId = nil
     padId = nil
     pad.release()
     state = "play"
     newWave()
     newShip()
-    waveWait = WAVE_WAIT
 end
 
 ## Space does not fire from here: it is HELD, and the cadence in update reads it. Firing here too
@@ -667,7 +658,6 @@ func touch.began(id, x, y)
     end
     if x < W / 2 then
         fireId = id
-        fireHeld = true
         fireTimer = 0.0             ## the first shot leaves at once; the cadence starts after it
         return
     end
@@ -689,7 +679,6 @@ func touch.ended(id, x, y)
         pad.release()
     elseif fireId == id then
         fireId = nil
-        fireHeld = false
     end
 end
 
@@ -708,23 +697,34 @@ func drawField()
     graphics.stroke(INK)
 
     for r in rocks do
-        drawShape(ROCKS[r.shape], r.x, r.y, r.rot, ROCK_R[r.size], FIELD_W, FIELD_H)
+        drawWrapped(rockArt[r.shape][r.size], r.x, r.y, r.rot, ROCK_R[r.size], FIELD_W, FIELD_H)
     end
 
     if saucer <> nil then
+        var art = saucerArt.big
+        if saucer.small then
+            art = saucerArt.small
+        end
         graphics.stroke(WARM)
-        graphics.polygon(placeShape(SAUCER, saucer.x, saucer.y, 0.0, saucer.r))
-        graphics.polyline(placeShape(SAUCER_DECK, saucer.x, saucer.y, 0.0, saucer.r))
+        drawAt(art.hull, saucer.x, saucer.y, 0.0)
+        graphics.pushMatrix()
+        graphics.translate(saucer.x, saucer.y)
+        graphics.polyline(art.deck)
+        graphics.popMatrix()
         graphics.stroke(INK)
     end
 
     if ship <> nil then
-        drawShape(SHIP, ship.x, ship.y, ship.ang, SHIP_R, FIELD_W, FIELD_H)
+        drawWrapped(shipArt, ship.x, ship.y, ship.ang, SHIP_R, FIELD_W, FIELD_H)
         ## The flame is drawn every other frame, so it flickers as the original's did — a steady
         ## flame reads as part of the hull.
-        if thrusting and math.frac(elapsedTime * 20.0) < 0.5 then
+        if ship.push > 0.0 and math.frac(elapsedTime * 20.0) < 0.5 then
             graphics.stroke(WARM)
-            graphics.polyline(placeShape(FLAME, ship.x, ship.y, ship.ang, SHIP_R))
+            graphics.pushMatrix()
+            graphics.translate(ship.x, ship.y)
+            graphics.rotate(math.deg(ship.ang))
+            graphics.polyline(flameArt)
+            graphics.popMatrix()
             graphics.stroke(INK)
         end
     end
@@ -749,20 +749,22 @@ func drawLives()
     graphics.noFill()
     graphics.stroke(INK)
     for i = 1, lives - 1 do
-        graphics.polygon(placeShape(SHIP, 22 + (i - 1) * 20, 46, -math.PI / 2, 7.0))
+        drawAt(shipIcon, 22 + (i - 1) * 20, 46, -math.PI / 2)
     end
 end
 
 ## The trigger has no hit test of its own — the whole left half fires — so what is drawn is a
 ## HINT: a ring where the thumb naturally sits, filled while it is held.
 func drawTrigger()
+    ## Mirrored from the stick's own placing, never re-typed: moving the stick moves the trigger
+    ## with it, instead of leaving it silently behind at an old height.
     var r = pad.radius() * 0.5
-    var cx = W * 0.2
-    var cy = H * 0.78
+    var cx = W * (1.0 - pad.centerXFrac)
+    var cy = H * pad.centerFrac
     graphics.noStroke()
     graphics.fill(Color(1, 1, 1, 0.06))
     graphics.circle(cx, cy, r)
-    if fireHeld then
+    if fireId <> nil then
         graphics.fill(Color(1.0, 0.55, 0.3, 0.7))
         graphics.circle(cx, cy, r * 0.55)
     else
@@ -838,12 +840,33 @@ func draw()
     end
 end
 
+## The outlines at every size the game draws them. Sizing is loading work, not frame work, and the
+## sizes are a fixed handful — so this runs once and draw() only ever turns and places.
+func buildArt()
+    rockArt = []
+    for i = 1, #ROCKS do
+        var sizes = []
+        for k = 1, #ROCK_R do
+            sizes.push(scaleShape(ROCKS[i], ROCK_R[k]))
+        end
+        rockArt.push(sizes)
+    end
+    shipArt = scaleShape(SHIP, SHIP_R)
+    shipIcon = scaleShape(SHIP, 7.0)
+    flameArt = scaleShape(FLAME, SHIP_R)
+    saucerArt = {
+        big: {hull: scaleShape(SAUCER, SAUCER_BIG_R), deck: scaleShape(SAUCER_DECK, SAUCER_BIG_R)},
+        small: {hull: scaleShape(SAUCER, SAUCER_SMALL_R), deck: scaleShape(SAUCER_DECK, SAUCER_SMALL_R)}
+    }
+end
+
 ## Everything the program owns is built here, in the order it depends on.
 func setup()
     graphics.canvas(W, H, "Ollin Asteroids")
     ## From here on the script knows ONE frame of reference: the engine scales the field to the area
     ## and hands over the pointer and the contacts already converted.
     graphics.viewport(FIELD_W, FIELD_H)
+    buildArt()
     buildSounds()
     ## The field is laid out but not started: the title screen holds it, and its rocks are the ones
     ## the first wave will drift — nothing is built twice.
