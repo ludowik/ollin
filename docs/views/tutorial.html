@@ -1571,9 +1571,10 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
 
 <h3>A modular import</h3>
 <p>With <code>as name</code>, every definition is gathered into a named map.</p>
-<pre data-no-run><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> math
-<span class="bi">print</span>(math.add(<span class="num">10</span>, <span class="num">20</span>))  <span class="cmt">## 30</span>
-<span class="bi">print</span>(math.PI)           <span class="cmt">## 3.14159</span></code></pre>
+<pre data-no-run><code><span class="kw">import</span> <span class="str">"utils"</span> <span class="kw">as</span> util
+<span class="bi">print</span>(util.add(<span class="num">10</span>, <span class="num">20</span>))  <span class="cmt">## 30</span>
+<span class="bi">print</span>(util.PI)           <span class="cmt">## 3.14159</span></code></pre>
+<div class="callout warn">The alias is an ordinary local, so it <strong>shadows</strong> anything of that name — a built-in module included. Aliasing a file as <code>math</code> would leave <code>math.sin</code> unreachable for the rest of the file, with only a <em>method call on non-function value</em> to show for it. Pick a name of your own.</div>
 
 <h3>Rules</h3>
 <ul>
