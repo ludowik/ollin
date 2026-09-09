@@ -1423,10 +1423,22 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // Under a viewport the extents are the VIRTUAL ones, so draw() works in that space while the
         // texture keeps the device's resolution: a scaled-up sprite stays crisp (its texture is
         // sampled NEAREST) and text stays smooth.
+        //
+        // The DEPTH window is deliberately wide, and raylib's own 2D is not. rlgl gives every 2D
+        // vertex the batch's layering depth, which starts at -1, and raylib's near/far of 0..1 puts
+        // the drawing flat against the far wall of a window ONE unit deep — so anything that moved
+        // a vertex in z fell out of it. A rotation about X or Y turns the shape's own extent into
+        // depth (20 degrees about X sends a y of 25 to a z of 8.5), which is why one used to clip a
+        // 2D drawing away but for a thin band. Straddling the drawing plane by the area's own size
+        // leaves room for any out-of-plane turn of any shape that fits on screen, and a card can be
+        // flipped with rotateY. It costs nothing and changes no existing drawing: the 2D pass runs
+        // with the depth TEST OFF (EndMode3D disables it), so the layering depth only ever decided
+        // clipping, never what covers what — that stays the order things are drawn in.
+        int span = (s_view_w > 0 ? s_view_w + s_view_h : s_logicalW + s_logicalH);
         if (s_view_w > 0)
-            rlOrtho(0, s_view_w, s_view_h, 0, 0.0, 1.0);
+            rlOrtho(0, s_view_w, s_view_h, 0, -(double)span, (double)span);
         else
-            rlOrtho(0, s_logicalW, s_logicalH, 0, 0.0, 1.0);
+            rlOrtho(0, s_logicalW, s_logicalH, 0, -(double)span, (double)span);
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
         run_user_callbacks(draw_fn);
@@ -1614,12 +1626,11 @@ static int gfx_translate(CallCtx& ctx) {
 // A rotation of deg degrees (argument 0) about the axis (ax,ay,az) — the common factor of rotate,
 // whose default axis is Z, and of rotateX, rotateY and rotateZ.
 //
-// About Z — the 2D case, and the default — nothing leaves the plane and a 2D drawing is safe.
-// About X or Y it is NOT: the shape's own extent turns into DEPTH (20 degrees about X sends a y of
-// 25 to a z of 8.5), far past the ortho volume of -1..1, so a 2D shape rotated that way is clipped
-// away but for a thin band. That is inherent to drawing a flat projection, not a defect to patch
-// here: a caller asking for a rotation about X outside a begin3d block is asking for something a
-// 2D projection cannot show.
+// About X or Y a 2D shape leaves its plane: the shape's own extent becomes DEPTH (20 degrees about
+// X sends a y of 25 to a z of 8.5). That works — the 2D projection's depth window straddles the
+// drawing plane by the area's own size, see render_frame — and it gives an ORTHOGRAPHIC turn: a
+// square narrows to a sliver at 90 degrees, with no perspective, since a flat projection has no
+// vanishing point. It used to clip the drawing away but for a thin band.
 static void rotate_axis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
     rlRotatef((float)num_arg(args, argc, 0, fn), ax, ay, az);
 }
@@ -1659,11 +1670,12 @@ static int gfx_rotate_z(CallCtx& ctx) {
 // graphics.scale(s | sx,sy | sx,sy,sz): one argument is uniform, two give (sx,sy,1) for 2D, and
 // three give (sx,sy,sz).
 //
-// A single argument scales Z only in a 3D block, and this is not a nicety: rlgl gives EVERY 2D
-// vertex a z of its own, the batch's layering depth, which starts at -1 (rlgl.h, currentDepth).
-// Multiplying that by the scale threw the drawing out of the ortho clip range, so a 2D script
-// asking for graphics.scale(40) drew NOTHING AT ALL — not something too big or misplaced, just a
-// blank screen with no error. Two arguments never had the bug, which is what made it so puzzling.
+// A single argument scales Z only in a 3D block. rlgl gives EVERY 2D vertex a z of its own, the
+// batch's layering depth (rlgl.h, currentDepth), and scaling that would slide the whole drawing in
+// depth for no reason a 2D script could want — it would then sit at a different depth from
+// everything drawn under another scale. It used to be worse than pointless: with raylib's original
+// depth window, one unit deep, graphics.scale(40) drew NOTHING AT ALL, a blank screen with no
+// error, while two arguments worked — which is what made it so puzzling.
 static int gfx_scale(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)

@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-09 18:51</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-09 20:22</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-09 18:51</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-09 20:22</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1818,8 +1818,8 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.pushStyle()</code> · <code>popStyle()</code></td><td>Saves and restores the <strong>style</strong> alone (stroke, fill, tint, blending)</td></tr>
     <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Moves the origin; <code>z</code> is optional, for 3D</td></tr>
     <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>A rotation in degrees; with no axis it turns around Z, otherwise around the axis <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis (3D shorthands). In a <strong>2D</strong> drawing only <code>rotateZ</code> makes sense: about X or Y the shape's own extent turns into depth and leaves the flat projection's volume, so the drawing is clipped away but for a thin band</td></tr>
-    <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Scaling: one argument is uniform, two are <code>(x,y)</code>, three are <code>(x,y,z)</code>. A single argument scales the <strong>depth</strong> only inside a <code>begin3d</code> block — a 2D drawing carries a layering depth of its own, which a uniform scale would push out of view. Note that a scale multiplies the <strong>stroke width</strong> with the shape, since it transforms the geometry: to draw one outline at several sizes with the same line, scale its points rather than the matrix</td></tr>
+    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis. They work in a <strong>2D</strong> drawing too: about X or Y the shape leaves its plane and turns <strong>orthographically</strong> — a square narrows to a sliver at 90°, with no perspective, a flat projection having no vanishing point. That is how a card is flipped in 2D</td></tr>
+    <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Scaling: one argument is uniform, two are <code>(x,y)</code>, three are <code>(x,y,z)</code>. A single argument scales the <strong>depth</strong> only inside a <code>begin3d</code> block: a 2D drawing carries a layering depth of its own, and sliding it in depth is nothing a 2D script wants. Note that a scale multiplies the <strong>stroke width</strong> with the shape, since it transforms the geometry: to draw one outline at several sizes with the same line, scale its points rather than the matrix</td></tr>
     <tr><td><code>graphics.resetTransform()</code></td><td>Resets the matrix to the identity</td></tr>
   </tbody>
 </table>
