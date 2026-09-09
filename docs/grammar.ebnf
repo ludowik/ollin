@@ -44,6 +44,7 @@ stmt           = varDecl
                | returnStmt
                | importStmt
                | assignStmt
+               | multiAssign
                | exprStmt ;
 
 importStmt     = "import" STRING [ "as" IDENT ] NL ;
@@ -66,8 +67,15 @@ importStmt     = "import" STRING [ "as" IDENT ] NL ;
                         is NOT true — a `const` of the host is a local of its main body, invisible
                         to a module (a constant a module needs must live in the module);
                       the engine's entry points — setup, update, draw — and the input callbacks
-                        (mouse.*, touch.*, keyboard.*) are read from the ENTRY file only: declaring
-                        them in a module has no effect *)
+                        (mouse.*, touch.*, keyboard.*) may be declared in a MODULE and they run:
+                        an import is flattened into the program, so a module's top-level function is
+                        a function of the program, and a callback is a field of the module's SHARED
+                        map. Keeping them in the entry file is a convention, not a rule: a second
+                        declaration of the same callback silently overwrites the first, the last
+                        import winning, so one place should say which key does what.
+                        What can NOT receive a callback is a CLASS — nothing subscribes an object
+                        to the engine — hence the one-line relays at the head of the shared
+                        libraries *)
 
 enumDecl       = "enum" enumTarget [ enumItem { "," enumItem } [ "," ] ] "end" NL ;
 enumTarget     = IDENT { "." IDENT } ;
@@ -103,8 +111,10 @@ method         = [ "static" ] "func" IDENT "(" [ params ] ")" NL { stmt } "end" 
                     operator always receive the object, so a class-level one would have nothing
                     to work on. Both refusals name the method *)
 
-methodCall     = expr "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
 superCall      = "super" "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")" ;
+                 (* named by primary, and NOT written out there a second time: a rule copied into
+                    its only user is a rule that will drift from it. A method call on an ordinary
+                    expression needs no rule of its own — that is postfix *)
 
 varDecl        = "var" IDENT { "," IDENT } [ "=" expr { "," expr } ] NL ;
                  (* `var` is MANDATORY to create a variable, and it only ever creates locals *)
@@ -252,7 +262,7 @@ power          = primary ( "^" unary ) ? ;
 primary        = NUMBER
                | BOOL
                | NIL
-               | "super" "." IDENT [ "?" ] "(" [ expr { "," expr } ] ")"
+               | superCall
                | ( STRING | IDENT | call | mapLit | arrayLit | "(" expr ")" ) { postfix }
                | rangeLit
                | lambdaExpr
@@ -270,7 +280,6 @@ NAME           = IDENT ;
 
 lambdaExpr     = "func" "(" [ params ] ")" NL { stmt } "end" ;
                (* an anonymous function, usable as an expression; it captures upvalues as any closure does *)
-               (* "expr.method(args)" is a method call, with an implicit self *)
 
 mapLit         = "{" [ mapEntry { "," mapEntry } [ "," ] ] "}" ;
                (* newlines are allowed between entries: the implicit continuation applies inside {} *)

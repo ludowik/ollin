@@ -837,7 +837,7 @@ import "utils_test1"
 assert(CONST == 42)   ## still reachable
 
 ## ── 18. Classes ──────────────────────────────────────────────────────────────
-## [grammar: classDecl, method, methodCall, superCall]
+## [grammar: classDecl, method, postfix, superCall]
 
 ## a base class
 class Animal
