@@ -85,8 +85,14 @@ static bool s_run_active = false;
 
 static int gfx_canvas(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    int w = argc > 0 ? gfx_to_int(args[0]) : 800;
-    int h = argc > 1 ? gfx_to_int(args[1]) : 600;
+    // The size is CHECKED, as graphics.viewport's is: a window of zero pixels is a mistake, and so
+    // is a non-number, which the permissive conversion used to turn into 0 in silence — the third
+    // behaviour this engine does not keep, next to converting and refusing. The consequences ran
+    // deep: InitWindow(0, 0), a render texture of nothing, and W and H published as 0 to the script.
+    int w = argc > 0 ? (int)num_arg(args, argc, 0, "graphics.canvas") : 800;
+    int h = argc > 1 ? (int)num_arg(args, argc, 1, "graphics.canvas") : 600;
+    if (w <= 0 || h <= 0)
+        throw std::runtime_error("graphics.canvas: the width and the height must be positive");
     // The title is written by the author, so a string is MANDATORY: a number there is a mistake,
     // and it used to become "Ollin" in silence. A value is inserted the ordinary way, through an
     // interpolation — graphics.canvas(W, H, "level {n}").

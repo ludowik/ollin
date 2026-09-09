@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-09 20:33</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-09 20:46</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-09 20:33</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-09 20:46</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1765,7 +1765,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
 <table>
   <thead><tr><th>Function</th><th>Description</th></tr></thead>
   <tbody>
-    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which must be a string (60 fps on the desktop, the browser's vsync in WASM)</td></tr>
+    <tr><td><code>graphics.canvas(w, h, title)</code></td><td>Opens a w×h window with the given title, which must be a string (60 fps on the desktop, the browser's vsync in WASM). The width and the height must be <strong>positive numbers</strong>: a window of zero pixels is refused, as <code>graphics.viewport</code>'s size is</td></tr>
     <tr><td><code>func setup()</code></td><td>When present, called once after the script has loaded, before the update/draw loop</td></tr>
     <tr><td><code>func draw()</code></td><td>When a global <code>draw</code> function exists, the engine creates a W×H canvas if needed and then calls it on every frame, for the rendering</td></tr>
     <tr><td><code>func update(dt)</code></td><td>When present, called on every frame <strong>before</strong> <code>draw</code>; <code>dt</code> is the seconds elapsed since the previous frame</td></tr>
