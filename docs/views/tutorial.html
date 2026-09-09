@@ -1818,7 +1818,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.pushStyle()</code> · <code>popStyle()</code></td><td>Saves and restores the <strong>style</strong> alone (stroke, fill, tint, blending)</td></tr>
     <tr><td><code>graphics.translate(x, y [, z])</code></td><td>Moves the origin; <code>z</code> is optional, for 3D</td></tr>
     <tr><td><code>graphics.rotate(angle [, ax, ay, az])</code></td><td>A rotation in degrees; with no axis it turns around Z, otherwise around the axis <code>(ax,ay,az)</code></td></tr>
-    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis (3D shorthands)</td></tr>
+    <tr><td><code>graphics.rotateX(angle)</code> · <code>rotateY</code> · <code>rotateZ</code></td><td>A rotation around a principal axis (3D shorthands). In a <strong>2D</strong> drawing only <code>rotateZ</code> makes sense: about X or Y the shape's own extent turns into depth and leaves the flat projection's volume, so the drawing is clipped away but for a thin band</td></tr>
     <tr><td><code>graphics.scale(s | sx,sy | sx,sy,sz)</code></td><td>Scaling: one argument is uniform, two are <code>(x,y)</code>, three are <code>(x,y,z)</code>. A single argument scales the <strong>depth</strong> only inside a <code>begin3d</code> block — a 2D drawing carries a layering depth of its own, which a uniform scale would push out of view. Note that a scale multiplies the <strong>stroke width</strong> with the shape, since it transforms the geometry: to draw one outline at several sizes with the same line, scale its points rather than the matrix</td></tr>
     <tr><td><code>graphics.resetTransform()</code></td><td>Resets the matrix to the identity</td></tr>
   </tbody>

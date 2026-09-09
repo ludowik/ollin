@@ -1613,6 +1613,13 @@ static int gfx_translate(CallCtx& ctx) {
 
 // A rotation of deg degrees (argument 0) about the axis (ax,ay,az) — the common factor of rotate,
 // whose default axis is Z, and of rotateX, rotateY and rotateZ.
+//
+// About Z — the 2D case, and the default — nothing leaves the plane and a 2D drawing is safe.
+// About X or Y it is NOT: the shape's own extent turns into DEPTH (20 degrees about X sends a y of
+// 25 to a z of 8.5), far past the ortho volume of -1..1, so a 2D shape rotated that way is clipped
+// away but for a thin band. That is inherent to drawing a flat projection, not a defect to patch
+// here: a caller asking for a rotation about X outside a begin3d block is asking for something a
+// 2D projection cannot show.
 static void rotate_axis(Value* args, int argc, float ax, float ay, float az, const char* fn) {
     rlRotatef((float)num_arg(args, argc, 0, fn), ax, ay, az);
 }
