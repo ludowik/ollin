@@ -1434,11 +1434,13 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // flipped with rotateY. It costs nothing and changes no existing drawing: the 2D pass runs
         // with the depth TEST OFF (EndMode3D disables it), so the layering depth only ever decided
         // clipping, never what covers what — that stays the order things are drawn in.
-        int span = (s_view_w > 0 ? s_view_w + s_view_h : s_logicalW + s_logicalH);
-        if (s_view_w > 0)
-            rlOrtho(0, s_view_w, s_view_h, 0, -(double)span, (double)span);
-        else
-            rlOrtho(0, s_logicalW, s_logicalH, 0, -(double)span, (double)span);
+        int draw_w = (s_view_w > 0 ? s_view_w : s_logicalW);
+        int draw_h = (s_view_w > 0 ? s_view_h : s_logicalH);
+        // At least 1 deep: graphics.canvas does not refuse a size of zero the way graphics.viewport
+        // does, and a span of zero would divide by far - near in the ortho matrix, leaving a NaN
+        // projection that draws nothing at all.
+        double span = (draw_w + draw_h > 0 ? (double)(draw_w + draw_h) : 1.0);
+        rlOrtho(0, draw_w, draw_h, 0, -span, span);
         rlMatrixMode(RL_MODELVIEW);
         rlLoadIdentity();
         run_user_callbacks(draw_fn);
