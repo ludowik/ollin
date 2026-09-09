@@ -669,7 +669,7 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="bi">assert</span>(<span class="num">1</span> <span class="op">&lt;&lt;</span> <span class="num">8</span> == <span class="num">256</span>)
 <span class="bi">assert</span>(<span class="num">256</span> <span class="op">&gt;&gt;</span> <span class="num">4</span> == <span class="num">16</span>)
 <span class="bi">assert</span>(<span class="op">~</span><span class="num">0</span> == -<span class="num">1</span>)
-<span class="bi">assert</span>(<span class="num">255</span> <span class="op">&amp;</span> <span class="num">15</span> == <span class="num">15</span>)</code></pre>
+<span class="bi">assert</span>((<span class="num">255</span> <span class="op">&amp;</span> <span class="num">15</span>) == <span class="num">15</span>)   <span class="cmt">## the brackets are REQUIRED: &amp; binds looser than ==</span></code></pre>
 
 <div class="callout warn">The bitwise operators need integer operands. Applying <code>&amp;</code>, <code>|</code>, <code>~</code>, <code>&lt;&lt;</code> or <code>&gt;&gt;</code> to a float raises an error at run time.</div>
 </section>
@@ -694,7 +694,8 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <span class="bi">assert</span>(<span class="str">"Hello {name}, n={n}"</span> == <span class="str">"Hello Ada, n=42"</span>)
 <span class="bi">assert</span>(<span class="str">"result: {n * 2 + 1}"</span> == <span class="str">"result: 85"</span>)</code></pre>
 <p>An optional <strong>format</strong> follows a <code>:</code> — a C conversion specification, without the <code>%</code>: <code>.3f</code> (precision), <code>04x</code> (width plus zeros), <code>-8s</code> (left aligned)…</p>
-<pre><code><span class="bi">assert</span>(<span class="str">"pi = {3.14159:.2f}"</span> == <span class="str">"pi = 3.14"</span>)
+<pre><code><span class="kw">var</span> n = <span class="num">42</span>
+<span class="bi">assert</span>(<span class="str">"pi = {3.14159:.2f}"</span> == <span class="str">"pi = 3.14"</span>)
 <span class="bi">assert</span>(<span class="str">"hex = {(255):04x}"</span> == <span class="str">"hex = 00ff"</span>)
 <span class="bi">assert</span>(<span class="str">"pad = [{n:5d}]"</span> == <span class="str">"pad = [   42]"</span>)</code></pre>
 <div class="callout">An empty <code>{}</code>, or an integer (<code>{1}</code>, <code>{2:.2f}</code> — indexed from <strong>1</strong>), is a <strong>positional placeholder</strong> left as it is: it is filled by <code>printf</code>'s arguments (see Builtins), not by interpolation. Both sides share the same formatting engine.</div>
