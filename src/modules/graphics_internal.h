@@ -53,6 +53,10 @@ bool gfx_view_map(float* x, float* y);
 // Strip taken at the top by the FPS overlay, composed ON TOP OF the render texture: a module
 // drawing at the top of the area must leave it free.
 
+// Inside a begin3d/end3d block? Defined on the 3D side, read by the 2D side's graphics.scale,
+// which must not touch the depth of a 2D drawing (see gfx_scale).
+bool gfx_in_3d();
+
 // Current style state: defined in graphics_module.cpp, read by graphics3d.cpp.
 bool gfx_has_fill();
 Color gfx_fill_color();

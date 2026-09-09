@@ -26,6 +26,10 @@
 // s_in_3d: true between begin3d and end3d. s_cur_tex3d: current 3D texture
 // (0 = white), reset every frame by reset3d_frame_state().
 static bool s_in_3d = false;
+
+bool gfx_in_3d() {
+    return s_in_3d;
+}
 static unsigned int s_cur_tex3d = 0;
 
 // Tile atlas (voxel terrain): one texture as a grid (cols×rows). Each cube carries a

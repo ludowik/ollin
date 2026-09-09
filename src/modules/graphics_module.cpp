@@ -1649,8 +1649,14 @@ static int gfx_rotate_z(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// graphics.scale(s | sx,sy | sx,sy,sz): one argument is uniform (s,s,s), two give (sx,sy,1) for 2D, and
+// graphics.scale(s | sx,sy | sx,sy,sz): one argument is uniform, two give (sx,sy,1) for 2D, and
 // three give (sx,sy,sz).
+//
+// A single argument scales Z only in a 3D block, and this is not a nicety: rlgl gives EVERY 2D
+// vertex a z of its own, the batch's layering depth, which starts at -1 (rlgl.h, currentDepth).
+// Multiplying that by the scale threw the drawing out of the ortho clip range, so a 2D script
+// asking for graphics.scale(40) drew NOTHING AT ALL — not something too big or misplaced, just a
+// blank screen with no error. Two arguments never had the bug, which is what made it so puzzling.
 static int gfx_scale(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     if (argc < 1)
@@ -1664,8 +1670,8 @@ static int gfx_scale(CallCtx& ctx) {
         sy = (float)num_arg(args, 1, "graphics.scale");
         sz = 1.0f;
     } else {
-        sy = sx;   // uniform on all three axes
-        sz = sx;
+        sy = sx;
+        sz = gfx_in_3d() ? sx : 1.0f;   // uniform, but Z is left alone in a 2D drawing
     }
     rlScalef(sx, sy, sz);
     return ctx.ret(Value{});
