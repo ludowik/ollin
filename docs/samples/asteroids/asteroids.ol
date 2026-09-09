@@ -706,11 +706,8 @@ func drawField()
             art = saucerArt.small
         end
         graphics.stroke(WARM)
-        drawAt(art.hull, saucer.x, saucer.y, 0.0)
-        graphics.pushMatrix()
-        graphics.translate(saucer.x, saucer.y)
-        graphics.polyline(art.deck)
-        graphics.popMatrix()
+        drawAt(art.hull, saucer.x, saucer.y, 0.0, true)
+        drawAt(art.deck, saucer.x, saucer.y, 0.0, false)
         graphics.stroke(INK)
     end
 
@@ -720,11 +717,7 @@ func drawField()
         ## flame reads as part of the hull.
         if ship.push > 0.0 and math.frac(elapsedTime * 20.0) < 0.5 then
             graphics.stroke(WARM)
-            graphics.pushMatrix()
-            graphics.translate(ship.x, ship.y)
-            graphics.rotate(math.deg(ship.ang))
-            graphics.polyline(flameArt)
-            graphics.popMatrix()
+            drawAt(flameArt, ship.x, ship.y, ship.ang, false)
             graphics.stroke(INK)
         end
     end
@@ -749,7 +742,7 @@ func drawLives()
     graphics.noFill()
     graphics.stroke(INK)
     for i = 1, lives - 1 do
-        drawAt(shipIcon, 22 + (i - 1) * 20, 46, -math.PI / 2)
+        drawAt(shipIcon, 22 + (i - 1) * 20, 46, -math.PI / 2, true)
     end
 end
 

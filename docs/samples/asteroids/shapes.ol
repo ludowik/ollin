@@ -49,12 +49,18 @@ func scaleShape(pts, s)
 end
 
 ## Draws a sized outline turned and placed by the ENGINE's matrix stack — the same points every
-## frame, no arithmetic and no allocation in the script.
-func drawAt(pts, x, y, ang)
+## frame, no arithmetic and no allocation in the script. `closed` says whether the run of points
+## comes back on itself: an open one (the flame, the saucer's deck) is a polyline. One place drives
+## the matrix stack, so no caller has to remember to pop it.
+func drawAt(pts, x, y, ang, closed)
     graphics.pushMatrix()
     graphics.translate(x, y)
     graphics.rotate(math.deg(ang))
-    graphics.polygon(pts)
+    if closed then
+        graphics.polygon(pts)
+    else
+        graphics.polyline(pts)
+    end
     graphics.popMatrix()
 end
 
@@ -62,7 +68,7 @@ end
 ## would appear to vanish and reappear whole. The copies are drawn only when the object comes
 ## within `margin` of an edge — its own radius — so the common case is one polygon.
 func drawWrapped(pts, x, y, ang, margin, w, h)
-    drawAt(pts, x, y, ang)
+    drawAt(pts, x, y, ang, true)
     var ox = 0
     var oy = 0
     if x < margin then
@@ -76,12 +82,12 @@ func drawWrapped(pts, x, y, ang, margin, w, h)
         oy = -h
     end
     if ox <> 0 then
-        drawAt(pts, x + ox, y, ang)
+        drawAt(pts, x + ox, y, ang, true)
     end
     if oy <> 0 then
-        drawAt(pts, x, y + oy, ang)
+        drawAt(pts, x, y + oy, ang, true)
     end
     if ox <> 0 and oy <> 0 then
-        drawAt(pts, x + ox, y + oy, ang)
+        drawAt(pts, x + ox, y + oy, ang, true)
     end
 end
