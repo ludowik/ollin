@@ -314,7 +314,6 @@ func spawnSaucer()
     if not small then
         saucer.r = SAUCER_BIG_R
     end
-    saucerVoice.start()
 end
 
 func dropSaucer()
@@ -374,6 +373,12 @@ func saucerUpdate(dt)
     saucer.x += saucer.vx * dt
     saucer.y += saucer.vy * dt
     saucer.y = math.clamp(saucer.y, 20.0, FIELD_H - 20.0)
+    ## The hum belongs to the saucer being THERE, not to the frame it appeared on: starting it here
+    ## means a pause or an end that silenced it gets it back on resume, and nothing has to remember
+    ## which of the two happened.
+    if not saucerVoice.isPlaying() then
+        saucerVoice.start()
+    end
     saucerVoice.freq(SAUCER_HUM + SAUCER_WARBLE * math.sin(elapsedTime * SAUCER_RATE))
     ## It crosses the field ONCE. It does not wrap: a wrapping saucer would never leave, and the
     ## crossing is what makes it an event.
@@ -389,6 +394,17 @@ func saucerUpdate(dt)
 end
 
 ## ── The frame ────────────────────────────────────────────────────────────────
+
+## The two held sounds, silenced together. A game that has stopped must not go on humming, and
+## listing them in one place is what stops the next one from being forgotten — the saucer's was.
+func hushVoices()
+    if thrustVoice.isPlaying() then
+        thrustVoice.stop()
+    end
+    if saucerVoice.isPlaying() then
+        saucerVoice.stop()
+    end
+end
 
 ## The heartbeat's tempo is the number of rocks left, from slow on a full field to urgent on the
 ## last one. Nothing schedules it: this is read from the field itself, every frame.
@@ -545,9 +561,7 @@ func update(dt)
         return
     end
     if state == "over" or paused then
-        if thrustVoice.isPlaying() then
-            thrustVoice.stop()
-        end
+        hushVoices()
         return
     end
 
@@ -616,19 +630,23 @@ func startGame()
     nextExtra = EXTRA_AT
     debris = []
     paused = false
-    fireHeld = false               ## a finger held across the end screen must not fire the new game
+    ## A finger held across the end screen must not play the new game: the trigger and the stick
+    ## are both let go, or the fresh ship would thrust off on the previous game's command.
+    fireHeld = false
     fireId = nil
+    padId = nil
+    pad.release()
     state = "play"
     newWave()
     newShip()
     waveWait = WAVE_WAIT
 end
 
+## Space does not fire from here: it is HELD, and the cadence in update reads it. Firing here too
+## spent two of the four shots on a single press.
 func keyboard.keypressed(key)
     if key == "space" then
-        if not begin() then
-            fire()
-        end
+        begin()
     elseif key == "p" and state == "play" then
         paused = not paused
     end
