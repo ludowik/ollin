@@ -2551,8 +2551,31 @@ func vaAfterNested(...)
     end
     return out + "/{used}"
 end
+func vaInner(...)
+    var t1 = 1
+    var t2 = t1 + 1
+    var t3 = t2 + 1
+    var t4 = t3 + 1
+    var out = ""
+    for v in [...] do
+        out = out + "{v}"
+    end
+    return out
+end
+func vaAfterVariadic(...)
+    var inner = vaInner(7, 8, 9, 10, 11)
+    var out = ""
+    for v in [...] do
+        out = out + "[" + "{v}" + "]"
+    end
+    return out + "/" + inner
+end
+
 func vaCheck()
     assert(vaAfterNested(1, 2, 3) == "[1][2][3]/144")   ## the varargs survived the nested call
+    ## And survived a callee that is ITSELF variadic: its vararg area starts above its register
+    ## window and reaches further, so lifting to the window's end alone was not enough.
+    assert(vaAfterVariadic(1, 2, 3) == "[1][2][3]/7891011")
 
     ## Declared HERE, not at the top level: `func obj.field(...)` is a lambda assigned to a field,
     ## so it takes a register, and this file leaves none to spare up there.

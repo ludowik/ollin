@@ -711,8 +711,16 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                         uint32_t return_ip, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
+    // Everything this call is about to occupy: its register window, its arguments, AND the vararg
+    // area it will fill just below — which starts above the window and holds argc - n_fixed
+    // values, so it reaches FURTHER than the window does. Lifting the caller's varargs to the
+    // window's end alone left them inside that area, and a variadic caller with a variadic callee
+    // still lost them (`f(1, 2, 3)` calling `g(7, 8, 9, 10, 11)` read back 7, 8, 9).
     int win_end = new_base + std::max((int)fp.reg_count, argc);
-    grow_regs((size_t)win_end);
+    int callee_end = win_end;
+    if (fp.variadic && argc > fp.n_fixed)
+        callee_end = std::max(callee_end, new_base + (int)fp.reg_count + (argc - fp.n_fixed));
+    grow_regs((size_t)callee_end);
     // A callee's window is [new_base, win_end) and it can reach PAST the caller's own registers —
     // which is exactly where the CALLER's varargs live, at reg_base + reg_count. A variadic
     // function therefore lost its `...` across a nested call as soon as the callee needed more
@@ -724,13 +732,13 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
     // on), and they must stay put for the relocation just below.
     if (!call_stack.empty()) {
         Frame& caller = call_stack.back();
-        if (caller.n_varargs > 0 && win_end > caller.varargs_base) {
+        if (caller.n_varargs > 0 && callee_end > caller.varargs_base) {
             int n = caller.n_varargs;
             int src = caller.varargs_base;
-            grow_regs((size_t)(win_end + n));
-            for (int i = n - 1; i >= 0; --i) // win_end > src, so backward keeps sources intact
-                regs[win_end + i] = regs[src + i];
-            call_stack.back().varargs_base = win_end;
+            grow_regs((size_t)(callee_end + n));
+            for (int i = n - 1; i >= 0; --i) // callee_end > src, so backward keeps sources intact
+                regs[callee_end + i] = regs[src + i];
+            call_stack.back().varargs_base = callee_end;
         }
     }
     if (argc < fp.n_fixed) {
