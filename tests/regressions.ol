@@ -2452,3 +2452,151 @@ end
 ctorChecks()
 
 print("regressions ok")
+
+## ── Multi-value expansion on a METHOD call ──────────────────────────────────
+## The rule held everywhere but here: `obj.m(...)` was adjusted to ONE value, silently. The layout
+## is the reason — an expansion rides on a call to a VALUE, while only a method call can decide
+## whether the receiver takes `self` — so what is checked below is that BOTH hold at once.
+##
+## The declarations stay at the TOP level, where a class and a `func` cost no register, and the
+## locals live in one function with a budget of its own: this file is close to the 255 registers
+## the top level allows, and a peak reached inside a `do` block counts just the same.
+class SinkVa
+    func init()
+        self.seen = []
+    end
+    func take(...)
+        for v in [...] do
+            self.seen.push(v)
+        end
+        return #self.seen
+    end
+    func three(a, b, c)
+        return "{a}/{b}/{c}"
+    end
+end
+
+class VaBase
+    func init()
+        self.log = ""
+    end
+    func note(...)
+        for v in [...] do
+            self.log = self.log + "{v}"
+        end
+        return self.log
+    end
+end
+class VaChild extends VaBase
+    func note(...)
+        return "[" + super.note(...) + "]"
+    end
+end
+class VaTwo
+    func go(...)
+        return ...
+    end
+end
+
+global vaMap = {}
+global vaOpt = {}
+global vaCount = 0
+global vaArr = [1, 2, 3]
+
+func vaPair()
+    return 10, 20
+end
+func vaIdx()
+    return 2, 99
+end
+func vaCounted()
+    vaCount += 1
+    return 1, 2
+end
+func vaFwd(...)
+    return SinkVa().take(...)
+end
+func vaFwd2(...)
+    return vaMap.join(...)
+end
+func vaFwd3(...)
+    return "abcdef".substr(...)
+end
+func vaFwd4(...)
+    return VaTwo().go(...)
+end
+
+## A variadic function must keep its `...` across a NESTED call. It did not: a callee's registers
+## start at the call base and run for its own reg_count, which can reach past the caller's own —
+## and that is exactly where the caller's varargs live. A register-hungry callee therefore
+## overwrote them, and `...` read back that callee's leftovers, silently. Found through the method
+## expansion below, whose callee happened to be hungry enough to show it.
+func vaFat(a)
+    var t1 = a + 1
+    var t2 = t1 + a
+    var t3 = t2 + t1
+    var t4 = t3 + t2
+    var t5 = t4 + t3
+    var t6 = t5 + t4
+    var t7 = t6 + t5
+    var t8 = t7 + t6
+    var t9 = t8 + t7
+    return t9 + t8
+end
+func vaAfterNested(...)
+    var used = vaFat(1)
+    var out = ""
+    for v in [...] do
+        out = out + "[" + "{v}" + "]"
+    end
+    return out + "/{used}"
+end
+func vaCheck()
+    assert(vaAfterNested(1, 2, 3) == "[1][2][3]/144")   ## the varargs survived the nested call
+
+    ## Declared HERE, not at the top level: `func obj.field(...)` is a lambda assigned to a field,
+    ## so it takes a register, and this file leaves none to spare up there.
+    func vaMap.join(...)
+        var out = ""
+        for v in [...] do
+            out = out + "{v}"
+        end
+        return out
+    end
+    func vaOpt.one(a, b)
+        return "{a},{b}"
+    end
+
+    assert(vaFwd(1, 2, 3) == 3)      ## self injected AND three varargs arrived
+    assert(vaFwd() == 0)             ## no vararg at all
+    var sink = SinkVa()
+    assert(sink.three(1, vaPair()) == "1/10/20")   ## a call in last position
+    assert(sink.take(vaPair()) == 2)               ## a call as the only argument
+
+    ## A MAP member takes no self, so its arguments must NOT be shifted by one.
+    assert(vaFwd2(1, 2, 3) == "123")
+    assert(vaMap.join(vaPair()) == "1020")
+
+    ## A native method of a string and of an array.
+    assert(vaFwd3(2, 3) == "bcd")
+    vaArr.insert(vaIdx())
+    assert(vaArr[2] == 99)
+
+    ## `super` goes through the same compiler path, so it expands too.
+    assert(VaChild().note(7, 8) == "[78]")
+
+    ## An OPTIONAL call is the exception: its arguments stay unevaluated, so a multi-value tail is
+    ## adjusted to one value instead of expanding.
+    assert(vaOpt.one?(vaCounted()) == "1,nil")
+    assert(vaCount == 1)
+    assert(vaOpt.missing?(vaCounted()) == nil)
+    assert(vaCount == 1)             ## a missing method evaluates nothing at all
+
+    ## The expansion survives a multi-return, and nests.
+    var a, b, c = vaFwd4(4, 5, 6)
+    assert(a == 4 and b == 5 and c == 6)
+    var two = VaTwo()
+    assert(two.go(two.go(1, 2)) == 1)
+    print("method-call expansion ok")
+end
+vaCheck()

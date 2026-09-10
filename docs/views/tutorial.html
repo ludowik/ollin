@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-10 09:05</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-10 18:13</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-10 09:05</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-10 18:13</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -970,6 +970,7 @@ log(<span class="str">"INFO"</span>, <span class="str">"starting"</span>, <span 
 <span class="bi">assert</span>(x == <span class="num">1</span> <span class="kw">and</span> y == <span class="num">2</span> <span class="kw">and</span> z == <span class="num">3</span>)</code></pre>
 
 <p>In the <strong>last position</strong> of a list, <code>...</code> expands to all the varargs: as a call argument (<code>f(a, ...)</code>), an array element (<code>[x, ...]</code>), a return (<code>return a, ...</code>) or a multiple assignment (<code>var a, b = ...</code>). A <strong>call</strong> in last position likewise expands to all its values (<code>f(g())</code>, <code>return g()</code>, <code>[x, g()]</code>). Anywhere else the expression is trimmed to a single value (<code>...</code> → the first argument, or <code>nil</code>).</p>
+<p>A <strong>method</strong> call expands the same way — <code>obj.m(a, ...)</code>, <code>obj.m(g())</code> and <code>super.m(...)</code> — and the receiver still decides whether <code>self</code> is passed, so a member of a map (a module) is called without it as always. The one exception, everywhere, is the <strong>optional</strong> call <code>f?()</code> or <code>obj.m?()</code>: its arguments must stay unevaluated, so a multi-value tail is trimmed to one value.</p>
 </section>
 
 <!-- ── Defaults ────────────────────────────────────────────────────────────── -->

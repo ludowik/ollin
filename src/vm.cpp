@@ -711,7 +711,28 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                         uint32_t return_ip, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
-    grow_regs((size_t)(new_base + std::max((int)fp.reg_count, argc)));
+    int win_end = new_base + std::max((int)fp.reg_count, argc);
+    grow_regs((size_t)win_end);
+    // A callee's window is [new_base, win_end) and it can reach PAST the caller's own registers —
+    // which is exactly where the CALLER's varargs live, at reg_base + reg_count. A variadic
+    // function therefore lost its `...` across a nested call as soon as the callee needed more
+    // registers than the caller had: measured, `f(1, 2, 3)` calling a register-hungry function and
+    // then reading `...` gave back that function's leftovers instead of 1, 2, 3, silently and with
+    // nothing to see. So the varargs are lifted ABOVE the window and the frame is told where they
+    // went — they are only ever addressed through it. The values are COPIED and not moved: the
+    // arguments of this very call may be that same memory (a `...` tail hands the varargs straight
+    // on), and they must stay put for the relocation just below.
+    if (!call_stack.empty()) {
+        Frame& caller = call_stack.back();
+        if (caller.n_varargs > 0 && win_end > caller.varargs_base) {
+            int n = caller.n_varargs;
+            int src = caller.varargs_base;
+            grow_regs((size_t)(win_end + n));
+            for (int i = n - 1; i >= 0; --i) // win_end > src, so backward keeps sources intact
+                regs[win_end + i] = regs[src + i];
+            call_stack.back().varargs_base = win_end;
+        }
+    }
     if (argc < fp.n_fixed) {
         auto& defs = ch->func_defaults[fp.defaults_idx];
         for (int i = argc; i < fp.n_fixed; ++i)
@@ -1724,7 +1745,37 @@ dispatch_loop:
         uint32_t fp_addr = 0;
         {
             int cb = base + A;
+            // A multi-value TAIL — `obj.m(a, ...)` or `obj.m(a, f())` — is carried by B, which was
+            // free (always 0), rather than by an opcode of its own: adding one cost +2.99% of the
+            // instructions on bench_fib, which never calls a method at all, and the figure did not
+            // move when the handler was relocated. That is the structural cost CLAUDE.md records
+            // for SWITCH — the register allocation of run_goto, shared by every handler — so the
+            // count belongs in a field and not in the dispatch table. C is the FIXED argument
+            // count; everything below then treats a call of any length alike, which is the point:
+            // whether the receiver takes `self` does not depend on how many arguments there are.
             int argc = C;
+            if (B == 1) {
+                const Frame& cur = call_stack.back();
+                int n_va = cur.n_varargs;
+                int va_src = cur.varargs_base;
+                int dest = cb + 2 + C;
+                grow_regs((size_t)(dest + std::max(n_va, 1)));
+                // dest <= va_src by construction — the compiler reserves the fixed slots, and the
+                // varargs sit above every register of the frame — so copying FORWARD reads each
+                // source before anything can overwrite it. The direction is chosen from the
+                // addresses all the same: it costs one comparison outside any hot path, and the
+                // one time the invariant was broken the callee silently received leftovers.
+                if (dest <= va_src) {
+                    for (int i = 0; i < n_va; ++i)
+                        regs[dest + i] = regs[va_src + i];
+                } else {
+                    for (int i = n_va - 1; i >= 0; --i)
+                        regs[dest + i] = regs[va_src + i];
+                }
+                argc = C + n_va;
+            } else if (B == 2) {
+                argc = C + last_results_;
+            }
             Value fn = regs[cb + 1];
             if (fn.is_class()) {
                 bool done;

@@ -87,6 +87,7 @@ enum class Op : uint8_t {
     SET_UPVAL,      // AB:  A=src,  B=upval_idx → upval[B] = R[A]
     NEW_CLASS,      // A:   R[A] = T_CLASS (a fresh, empty prototype map)
     CALL_METHOD,    // ABC: A=call_base, C=argc  R[A]=self R[A+1]=method R[A+2..]=args
+                    // B = the tail's MODE: 0 none, 1 `...` (frame varargs), 2 a call (last_results_)
     MAKE_RANGE,     // ABC: A=dest, B=first_reg (start=R[B],end=R[B+1],step=R[B+2] if has_step), C=flags
                     // (bit0 = incl_right, bit1 = has_step)
     FOR_PREP, // ABx: a numeric for — R[A]=i, R[A+1]=limit, R[A+2]=step. It validates, normalises int/float, does i-=step, then ip=Bx

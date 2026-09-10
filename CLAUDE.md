@@ -422,7 +422,9 @@ Chaque benchmark affiche une **somme de contrôle** identique dans les trois lan
 
   Le travail bouge dans les DEUX sens, et fortement : il faut le mesurer, jamais le
   supposer. Hausses réelles constatées — +9,4 % (`switch`), +7,7 % (suppression de
-  `T_MODULE`), +4,6 % (globales `W`/`H`), +1,8 % (expansion de `...`, `CX`/`CY`), +0,6 %
+  `T_MODULE`), +4,6 % (globales `W`/`H`), +1,8 % (expansion de `...`, `CX`/`CY`), +1,2 %
+  (les varargs de l'appelant relevés au-dessus de la fenêtre de l'appelé — un garde par appel,
+  contre une corruption silencieuse : cf. `push_frame`), +0,6 %
   (inline cache, variable par itération). Gains — **−67 % sur la boucle** (chemin rapide
   `FOR_PREP`/`FOR_LOOP` + compteur de tours), −35 % sur la map (`StringTable` robin_hood),
   −8 % sur `fib` (clés calculées), −5,5 % (clé `len` par pointeur). Il n'y a donc aucune
@@ -630,7 +632,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | GET_UPVAL     | AB     | A=dest, B=upval_idx        | R[A] = upval[B]  (ouverte: regs[base+idx], fermée: uv.val) |
 | SET_UPVAL     | AB     | A=src, B=upval_idx         | upval[B] = R[A]                                  |
 | NEW_CLASS     | A      | A=dest                     | R[A] = nouvelle classe vide (T_CLASS)            |
-| CALL_METHOD   | ABC    | A=recv_base, B=0, C=argc   | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance |
+| CALL_METHOD   | ABC    | A=recv_base, B=mode, C=argc | R[A]=receiver, R[A+1]=fn, R[A+2..]=args ; self auto si instance. **B est le MODE de la queue** : 0 aucune, 1 `...` (varargs du cadre), 2 un appel (`last_results_`) — C étant alors le nombre d'arguments FIXES |
 | SPREAD_RESULTS| AB     | A=base, B=n                | destructuration multi-retour : met R[A+last_results..A+n-1] à nil (émis après l'appel ; last_results = nb réel de valeurs renvoyées) |
 
 **Destructuration multi-retour : UN seul chemin, deux appelants.** `var a, b = f()` (`visit(VarDeclStmt)`) et `a, b = f()` (`visit(MultiAssignStmt)`) émettent la même séquence — appel compilé à une base connue, `MOVE_RESULTS` si l'appel a produit ses valeurs ailleurs, puis `SPREAD_RESULTS`. La réaffectation ne l'avait pas : elle ne comptait qu'une valeur et les cibles suivantes lisaient les temporaires voisins, donc des valeurs décalées (`a, b, c = f()` donnait `1, 1, 2` pour un retour `1, 2, 3`). Toute nouvelle forme de cible doit passer par ce chemin, pas le réinventer.
@@ -1982,13 +1984,21 @@ retour.
 - `visit(ClassDeclStmt)` : émet `NEW_CLASS`, initialise les métadonnées (`__name__`, `__parent__`), puis pour chaque méthode : `compileMethodFunc` + `LOAD_FUNC`/`MAKE_CLOSURE` + `SET_INDEX`.
 - `compileMethodFunc` : comme la compilation de `FuncDeclStmt` mais ajoute `local_regs_["self"] = 0`, les paramètres utilisateur commencent à R[1], `n_fixed = 1 + n_params`.
 - `visit(MethodCallExpr)` : émet CALL_METHOD avec `argc` = nombre d'arguments explicites.
+- **L'expansion multi-valeurs d'une queue (`obj.m(a, ...)`, `obj.m(g())`, `super.m(...)`) est portée
+  par le champ `B`, PAS par un opcode dédié.** Un opcode de plus coûtait **+2,99 % d'instructions
+  sur `bench_fib`**, qui n'appelle aucune méthode, et le chiffre ne bougeait pas d'un iota en
+  déplaçant le gestionnaire : c'est le coût structurel de l'allocation de registres de `run_goto`,
+  déjà mesuré pour `SWITCH`. Le même code avec le mode dans `B` rend **+0,20 %**. Le champ était
+  libre (toujours 0), et il n'y a qu'un corps à tenir, celui qui décide de l'injection de `self` —
+  décision qui ne dépend pas du nombre d'arguments. L'appel OPTIONNEL est exclu de l'expansion, ses
+  arguments devant rester non évalués.
 
 ### Opcodes
 
 | Opcode | Format | Description |
 |--------|--------|-------------|
 | NEW_CLASS | A | R[A] = nouvelle classe vide (T_CLASS) |
-| CALL_METHOD | ABC | A=receiver_base, B=0, C=argc — R[A]=receiver, R[A+1]=method_fn, R[A+2..]=args |
+| CALL_METHOD | ABC | A=receiver_base, B=mode de la queue (0/1/2), C=argc — R[A]=receiver, R[A+1]=method_fn, R[A+2..]=args |
 
 ### Le constructeur rend l'OBJET, et c'est le COMPILATEUR qui le décide
 

@@ -182,8 +182,11 @@ param          = IDENT [ "=" literal ] ;
                     (`f(g())`, `return g()`, `[x, g()]`). Anywhere else — a non-final position, or
                     `var x = ...` — the expression is adjusted to ONE value: `...` gives the first
                     vararg or nil, and a call gives its first value.
-                    A known limit: `object.method(...)` does not expand yet, and is adjusted to
-                    one value. *)
+                    A METHOD call expands the same way — `obj.m(a, ...)`, `obj.m(g())` and
+                    `super.m(...)` — and the receiver still decides whether `self` is injected, so
+                    a method of a map (a module) is called without it as always. An OPTIONAL call,
+                    `f?()` or `obj.m?()`, is the one exception everywhere: its arguments must stay
+                    unevaluated, so a multi-value tail is adjusted to one value. *)
 returnStmt     = "return" [ retvals ] NL ;
 (* A return ENDS its block: nothing may follow it, and a statement written after one is refused.
    Code after a return is dead, and its author meant it to run. Note the consequence of NL being
