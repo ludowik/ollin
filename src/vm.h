@@ -254,17 +254,18 @@ class VM {
     uint32_t push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
     // THE INVARIANT under all of it: no frame's window or vararg area ever overlaps another live
-    // frame's. It is enforced by lifting the caller's varargs above whatever is about to be
-    // written, which is what lift_varargs_above does — for EVERY live frame, never for the
-    // immediate caller alone. FOUR callers, ONE mechanism, and each lifts
-    // for the writes it is itself about to make: push_frame for the frame it is building;
-    // push_frame_self before its slide, which is one slot WIDER than the block the caller laid
-    // out and so reaches past it; CALL_VARARGS and CALL_METHOD before appending the caller's own
-    // varargs to an argument block. Writing the lift a second time by hand is how the class path
-    // came to overwrite a caller's `...` while the other paths were already safe — so a new call
-    // path lifts through this function, never with a loop of its own.
-    // `end` is one past the last register about to be written. It tests for itself, so a cold
-    // caller may call it plainly; push_frame, on the hot path, pre-tests inline to skip the call.
+    // frame's. It is enforced by lifting the varargs of EVERY live frame above whatever is about
+    // to be written — never the immediate caller's alone, which is the statement that let a
+    // grandparent's `...` be buried. FOUR callers, ONE mechanism, and each lifts for the writes
+    // it is itself about to make: push_frame for the frame it is building; push_frame_self before
+    // its slide, which is one slot WIDER than the block the caller laid out and so reaches past
+    // it; CALL_VARARGS and CALL_METHOD before appending the current frame's own varargs to an
+    // argument block. Writing the lift a second time by hand is how the class path came to
+    // overwrite a caller's `...` while the other paths were already safe — so a new call path
+    // lifts through this function, never with a loop of its own.
+    // `end` is one past the last register about to be written. The walk is O(call depth) and the
+    // function does NOT return early on a cheap test, so no hot path may call it unguarded: the
+    // guard is va_low_ below, and calling it per frame push cost +23,4 % on fib.
     void lift_varargs_above(int end);
 
     // Appends the CURRENT frame's varargs at `dest` — a `...` tail, for a plain call as for a
@@ -276,8 +277,11 @@ class VM {
 
     // The lowest vararg area of any live frame, and k_no_varargs when there is none. It is the
     // O(1) filter in front of lift_varargs_above, whose walk is O(call depth). It may be too LOW
-    // (a pop does not maintain it, so that op_RETURN pays nothing) but never too high: every
-    // write to a varargs_base goes through push_frame or the lift, and both update it.
+    // (a pop does not maintain it, so that op_RETURN pays nothing) but never too high: the only
+    // writers of a varargs_base that could lower it are push_frame and the lift, and both update
+    // it. The THIRD writer is the top-level frame in execute(), which is safe for one reason
+    // only — its n_varargs is 0, so it owns no area to protect. A frame laid out by hand with
+    // varargs of its own would have to update this, or a lift would skip it in silence.
     static constexpr int k_no_varargs = 1 << 30;
     int va_low_ = k_no_varargs;
 
