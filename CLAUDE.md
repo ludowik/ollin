@@ -2116,9 +2116,12 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   parcouraient `identifiers` en comparant des chaînes — trois de ces boucles étaient IMBRIQUÉES
   (builtins, modules, membres de `core`), donc quadratiques, et `set_global` est appelé à chaque
   frame pour `deltaTime`. Un module n'est même plus CONSTRUIT si le programme ne le nomme pas.
-- **Une valeur de fonction → `func_idx` + upvalues** : `resolve_func_val`. Quatre sites la
-  réécrivaient à la main ; le message d'erreur est désormais le même partout, celui que le
-  tutoriel documente (« call on non-function value »).
+- **Une valeur de fonction → `func_idx` + upvalues** : `resolve_func_val`, appelée par les SIX
+  sites qui en ont besoin. Le message de refus est celui de l'APPELANT, un paramètre et non un
+  littéral interne : « call on non-function value » et « method call on non-function value »
+  nomment deux fautes différentes pour l'auteur du script, tous deux figés par `test_errors.sh`
+  et documentés par le tutoriel. C'est ce paramètre qui a permis à `CALL_METHOD` de cesser d'en
+  garder sa propre copie — il en était le cinquième site écrit à la main.
 - **Le retour d'un appel natif → Ollin** : `call_value_multi`, dont `call_value` n'est que le cas
   à un résultat. Les deux portaient les mêmes quarante lignes, donc deux endroits où le protocole
   d'appel pouvait dériver.
@@ -2155,8 +2158,30 @@ Et **la queue d'un retour** vit dans `finish_return` (`noinline`, comme `nil_res
 partagée par `RETURN_V` et `RETURN_SPREAD` qui en portaient chacun leur copie. `op_RETURN` garde
 sa version courte : c'est le chemin chaud, mesuré, et il n'a pas besoin du vecteur intermédiaire.
 
-**`CALL_DYN` et `CALL_VA` partagent un seul corps** (`call_dyn_common`), leur seule différence
-étant `argc` — l'un des deux recopiait tout l'arbre builtin / classe / fonction.
+**Les TROIS opcodes d'appel par valeur partagent un seul corps** (`call_dyn_common`) : `CALL_DYN`,
+`CALL_VA` (une queue multi-valeurs déjà matérialisée) et `CALL_VARARGS` (une queue `...`). Leur
+seule différence est le NOMBRE d'arguments que porte le bloc ; tout l'arbre builtin / classe /
+fonction est écrit une fois.
+
+⚠ **Une queue `...` se règle par le RELÈVEMENT des varargs, pas par une zone neuve.** `CALL_VARARGS`
+avait son propre mécanisme : recopier les arguments fixes et les varargs dans une zone fraîche
+au-dessus de tout, appeler là-haut, redescendre les résultats. Il fallait la dimensionner sur deux
+besoins à la fois (les arguments ET les slots de résultat d'un builtin), une branche de classe qui
+devait relever les varargs de toute façon, et un `result_base` explicite pour le cadre — pour le cas
+ORDINAIRE d'une queue variadique. Le chemin des méthodes avait déjà la bonne forme : relever les
+varargs au-dessus du bloc, écrire la queue à la suite des arguments fixes, puis appeler comme
+n'importe quel appel. Mesuré neutre (`fib` −0,29 %, boucle +0,00 %, map +0,26 %).
+- **La capacité de résultat reste suffisante, par construction** : `lift_varargs_above` ne
+  DESCEND jamais `varargs_base`, donc quand il ne relève pas la capacité est celle que le
+  compilateur garantit (`reg_count ≥ call_base + n` pour `n` cibles) ; et quand il relève, c'est
+  que `total > n`, donc la capacité vaut `total`. Vérifié sous Xvfb sur `var w, h =
+  graphics.textSize(...)`, le cas que la zone fraîche avait été écrite pour corriger — les deux
+  valeurs arrivent.
+- ⚠ **`push_frame_self` relève AVANT de glisser.** Insérer `self` rend le cadre une case plus
+  large que le bloc que l'appelant a posé, si bien que la glissade écrit au-delà — sur les varargs
+  de l'appelant quand le bloc finit justement sur eux, ce qu'une queue `...` produit
+  (`func f(...) var o = C(1, ...)` relisait son premier vararg deux fois). Le relèvement de
+  `push_frame` vient trop tard, il est postérieur à la glissade.
 
 ⚠ **Un `Frame` se construit EN PLACE** (`call_stack.emplace_back()` puis remplissage de
 `back()`) : le remplir en local puis le pousser était un déplacement complet de la structure et de

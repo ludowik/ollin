@@ -364,7 +364,13 @@ static const struct {
 };
 
 // resolve_func_val: function value to func_idx (plus upvals); defined below.
-static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals);
+// The message is the CALLER's, because "call" and "method call" name different mistakes to the
+// script author, and both are frozen by tests and documented in the tutorial. Passing it is what
+// lets every site share the one resolution instead of a fifth hand-written copy of it.
+static constexpr const char* CALL_NOT_CALLABLE = "runtime: call on non-function value";
+static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-function value";
+static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
+                                const char* not_callable);
 
 // Meta-method dispatch helpers.
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
@@ -375,7 +381,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
+    uint8_t fi = resolve_func_val(fn, fuv, CALL_NOT_CALLABLE); // fn is callable, per the guard above
     Value two[2] = {std::move(lhs), std::move(rhs)};
     uint32_t addr = push_frame_copied(fi, two, 2, std::move(fuv), ip, /*return_dest=*/dest);
     if (negate)
@@ -388,7 +394,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
+    uint8_t fi = resolve_func_val(fn, fuv, CALL_NOT_CALLABLE); // fn is callable, per the guard above
     return push_frame_copied(fi, &lhs, 1, std::move(fuv), ip, /*return_dest=*/dest);
 }
 
@@ -434,7 +440,7 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         return 0;
     }
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(init_fn, fuv);
+    uint8_t fi = resolve_func_val(init_fn, fuv, CALL_NOT_CALLABLE);
     // No flag on the frame: the compiler has already made every `return` of an init hand back self.
     return push_frame_self(base_reg, fi, argc, arg_off, std::move(inst), std::move(fuv), ip);
 }
@@ -481,7 +487,8 @@ void VM::close_upvals_above(int threshold) {
 }
 
 // Resolves a function value to func_idx plus upvals.
-static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals) {
+static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
+                                const char* not_callable) {
     if (fv.is_func_val())
         return (uint8_t)fv.as_int();
     if (fv.is_closure()) {
@@ -490,7 +497,7 @@ static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upv
             out_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
         return fv.as_closure()->func_idx;
     }
-    throw std::runtime_error("runtime: call on non-function value");
+    throw std::runtime_error(not_callable);
 }
 
 // Equality, shared by op_EQ and op_NEQ.
@@ -647,7 +654,7 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
         return m;
     }
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    uint8_t fi = resolve_func_val(fn, frame_upvals); // the ONE place that reads a function value
+    uint8_t fi = resolve_func_val(fn, frame_upvals, CALL_NOT_CALLABLE); // the ONE place that reads a function value
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, args, argc, std::move(frame_upvals), saved_ip, -1);
@@ -708,12 +715,18 @@ uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
     grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, std::max(argc, 1))));
     for (int i = 0; i < argc; ++i)
         regs[base + i] = args[i];
-    return push_frame(base, fi, argc, std::move(fuv), return_ip, return_dest, -1);
+    return push_frame(base, fi, argc, std::move(fuv), return_ip, return_dest);
 }
 
 uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip) {
     int total = argc + 1;
+    // Inserting self makes the frame one slot WIDER than the argument block the caller laid out,
+    // so the slide writes past it — onto the caller's varargs when the block already ends at
+    // them, which a `...` tail does (`func f(...) var o = C(1, ...)` read back its first vararg
+    // twice). push_frame lifts too, but only after the slide, so the lift belongs here: the frame
+    // is born at a register the caller owns, and it occupies base..base+total-1.
+    lift_varargs_above(base + total);
     grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, total)));
     // The arguments slide from base + arg_off to base + 1, and the DIRECTION of the walk follows
     // which of the two is higher: walking the wrong way overwrites an argument before it is read.
@@ -725,11 +738,11 @@ uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value 
         for (int i = argc - 1; i >= 0; --i)
             regs[base + 1 + i] = std::move(regs[base + arg_off + i]);
     regs[base] = std::move(self);
-    return push_frame(base, fi, total, std::move(fuv), return_ip, -1, -1);
+    return push_frame(base, fi, total, std::move(fuv), return_ip, -1);
 }
 
 uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                        uint32_t return_ip, int return_dest, int result_base) {
+                        uint32_t return_ip, int return_dest) {
     const FuncProto& fp = ch->funcs[fi];
     // Everything this call is about to occupy: its register window, its arguments, AND the vararg
     // area it will fill just below — which starts above the window and holds argc - n_fixed
@@ -765,7 +778,6 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
     Frame& fr = call_stack.back();
     fr.return_ip = return_ip;
     fr.reg_base = new_base;
-    fr.result_base = (result_base >= 0) ? result_base : new_base;
     fr.varargs_base = va_base;
     fr.n_varargs = n_varargs;
     fr.return_dest = return_dest;
@@ -776,14 +788,14 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
 // The tail of a return, shared by RETURN_V and RETURN_SPREAD: the two carried these twenty lines
 // twice over, differing only in HOW they gather the values. Kept out of run_goto (like
 // nil_result_slot, for the same reason) and given the gathered values, it pops the frame, lays
-// the results at result_base, applies the meta-method's destination, and returns the ip to resume
+// the results at the frame's base, applies the meta-method's destination, and returns the ip to resume
 // at. op_RETURN keeps its own shorter version: it is the hot path, measured, and needs no vector.
 __attribute__((noinline)) uint32_t VM::finish_return(Value* rvs, int total) {
     const Frame& fr = call_stack.back();
     bool neg_ = fr.negate_result;
     int ret_dest = fr.return_dest;
     uint32_t rip = fr.return_ip;
-    int rbase = fr.result_base;
+    int rbase = fr.reg_base;
     call_stack.pop_back(); // fr is dangling from here on, hence the copies above
     if ((int)regs.size() < rbase + total)
         regs.resize(rbase + total);
@@ -1245,7 +1257,7 @@ dispatch_loop:
         NEXT();
 
     op_CALL_FUNC: {
-        ip = push_frame(base + A, (uint8_t)B, C, nullptr, ip, -1, -1);
+        ip = push_frame(base + A, (uint8_t)B, C, nullptr, ip, -1);
         base = call_stack.back().reg_base;
         NEXT();
     }
@@ -1259,7 +1271,7 @@ dispatch_loop:
             const Frame& fr = call_stack.back();
             bool neg_ = fr.negate_result;
             int ret_dest = fr.return_dest;
-            int wb = fr.result_base;
+            int wb = fr.reg_base;
             uint32_t rip = fr.return_ip;
             int n = B;
             if (n > 0 && (wb != base || A != 0))
@@ -1566,11 +1578,34 @@ dispatch_loop:
         argc_dyn = C;
         goto call_dyn_common;
 
-        // Like CALL_DYN but with a dynamic argc: C fixed arguments plus last_results_ values from
-        // the last expanded argument (`...` or a multi-value call), already materialized after
-        // the fixed ones. The callee (B) sits BELOW the argument block, so the varying number of
-        // values never overwrites it. That ONE line was the whole difference, and the builtin /
-        // class / function tree below was carried twice.
+        // The three call opcodes differ by ONE line — how many arguments the block holds — and
+        // share everything after it. The callee (B) sits BELOW the argument block, so a varying
+        // count never overwrites it. Carrying the builtin / class / function tree once is what
+        // keeps them from drifting apart.
+
+        // A `...` tail: the frame's own varargs, appended after the C fixed arguments. They are
+        // LIFTED above the block first, which makes the destination lower than their source and
+        // lets one forward walk read every value before anything overwrites it. Nothing of the
+        // caller is live above the argument block, and the lift is the same one push_frame relies
+        // on, so the call is then indistinguishable from any other — the method path was already
+        // shaped this way. A FRESH area above the varargs was the earlier answer: it needed its
+        // own sizing (arguments AND builtin results), its own downward copy of the results, and
+        // its own class branch that had to re-lift anyway, for a `...` tail that is the ordinary
+        // case. The compiler's reservation already covers a builtin's result slots.
+    op_CALL_VARARGS:
+        {
+            int n_va = call_stack.back().n_varargs;
+            int dest = base + A + C;
+            lift_varargs_above(dest + n_va);
+            int va_src = call_stack.back().varargs_base; // read AFTER the lift may have moved them
+            for (int i = 0; i < n_va; ++i)
+                regs[dest + i] = regs[va_src + i];
+            argc_dyn = C + n_va;
+        }
+        goto call_dyn_common;
+
+        // A multi-value call as the tail: its values are already materialized after the fixed
+        // ones, and last_results_ counts them.
     op_CALL_VA:
         argc_dyn = C + last_results_;
 
@@ -1588,69 +1623,10 @@ dispatch_loop:
         }
         {
             std::unique_ptr<std::vector<Upvalue*>> fuv;
-            uint8_t fi = resolve_func_val(regs[base + B], fuv);
-            ip = push_frame(base + A, fi, argc_dyn, std::move(fuv), ip, -1, -1);
+            uint8_t fi = resolve_func_val(regs[base + B], fuv, CALL_NOT_CALLABLE);
+            ip = push_frame(base + A, fi, argc_dyn, std::move(fuv), ip, -1);
         }
     call_dyn_done:
-        base = call_stack.back().reg_base;
-        NEXT();
-    }
-
-    op_CALL_VARARGS: {
-        // A=fixed_base, B=func_reg, C=number of fixed arguments; the last argument is `...`,
-        // the current frame's varargs. Gathers the fixed arguments and the varargs into a FRESH
-        // area above the caller's varargs — which are never overwritten, so a later `...` is
-        // still correct — calls, and returns the results at the static register fixed_base, the
-        // callee frame's result_base.
-        {
-            Frame& cur = call_stack.back();
-            int n_va = cur.n_varargs;
-            int va_src = cur.varargs_base;
-            int n_fixed = C;
-            int total = n_fixed + n_va;
-            int fixed_base = base + A;
-            Value fn = regs[base + B];
-            int fresh = (int)regs.size();
-            if (fresh < va_src + n_va)
-                fresh = va_src + n_va;
-            // The fresh area holds the arguments AND the results, so it is sized on both: sizing it
-            // on the argument count alone gave a builtin a capacity of `total`, and `var w, h = f(...)`
-            // on a two-value builtin lost the second one. The result capacity is the one the
-            // non-varargs path uses, varargs_base - result_base.
-            int res_cap = va_src - fixed_base;
-            int fresh_end = fresh + std::max(std::max(total, res_cap), 1);
-            grow_regs((size_t)fresh_end);
-            for (int i = 0; i < n_fixed; ++i)
-                regs[fresh + i] = regs[fixed_base + i];
-            for (int i = 0; i < n_va; ++i)
-                regs[fresh + n_fixed + i] = regs[va_src + i];
-            if (fn.is_builtin()) {
-                int k = invoke_builtin(fn.as_builtin(), &regs[fresh], total, res_cap, fresh);
-                for (int i = 0; i < k; ++i)
-                    regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base, so copying downwards is safe
-            } else if (fn.is_class()) {
-                // Instantiating at the STATIC register means writing `total` values from
-                // fixed_base up, and a `...` tail makes total exceed the slots the compiler
-                // reserved — so this write, unlike every other path's, could land on the caller's
-                // own varargs. It did: `func f(...) var o = C(1, ...)` then reading `...` gave
-                // back [11][8][9][10][11] for f(7, 8, 9, 10, 11), the first vararg overwritten.
-                // The lift belongs BEFORE the write, and it is the same lift push_frame uses. It
-                // goes above the FRESH area, not merely above the write: the fresh area is what
-                // the loop reads from, and lifting into it would have the copy read back the very
-                // varargs it is meant to preserve.
-                lift_varargs_above(fresh_end);
-                for (int i = 0; i < total; ++i) // a rare fallback: instantiate at the static register
-                    regs[fixed_base + i] = regs[fresh + i];
-                bool done;
-                uint32_t addr = instantiate_class(fixed_base, 0, total, fn, done);
-                if (!done)
-                    ip = addr;
-            } else {
-                std::unique_ptr<std::vector<Upvalue*>> fuv;
-                uint8_t fi = resolve_func_val(fn, fuv);
-                ip = push_frame(fresh, fi, total, std::move(fuv), ip, -1, /*result_base=*/fixed_base);
-            }
-        }
         base = call_stack.back().reg_base;
         NEXT();
     }
@@ -1835,17 +1811,8 @@ dispatch_loop:
             }
             {
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
-                uint8_t fi;
-                if (fn.is_func_val())
-                    fi = (uint8_t)fn.as_int();
-                else if (fn.is_closure()) {
-                    fi = fn.as_closure()->func_idx;
-                    const auto& u = fn.as_closure()->upvals;
-                    if (!u.empty())
-                        fuv = std::make_unique<std::vector<Upvalue*>>(u);
-                } else
-                    throw std::runtime_error("runtime: method call on non-function value");
-                fp_addr = push_frame(cb, fi, total, std::move(fuv), ip, -1, -1);
+                uint8_t fi = resolve_func_val(fn, fuv, METHOD_NOT_CALLABLE);
+                fp_addr = push_frame(cb, fi, total, std::move(fuv), ip, -1);
             }
         }
         ip = fp_addr;

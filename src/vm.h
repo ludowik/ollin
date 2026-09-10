@@ -85,8 +85,6 @@ class VM {
     struct Frame {
         uint32_t return_ip = 0;
         int reg_base = 0;
-        int result_base = 0;        // where RETURN and RETURN_V write the results (= reg_base except for CALL_VARARGS,
-                                    // running in a fresh window but returning to the caller's static register)
         int varargs_base = 0;       // = reg_base + fp.reg_count (where varargs live in regs)
         int n_varargs = 0;          // count of extra variadic args (0 if none)
         int return_dest = -1;       // >= 0: RETURN stores R[0] into regs[return_dest] (metamethod result)
@@ -214,25 +212,29 @@ class VM {
     int invoke_builtin_regs(Value::BuiltinFn fn, int result_base, int argc);
 
     // Pushes a call frame, fills in defaults and varargs, returns fp.addr. `return_dest` is a
-    // register of the CALLER, where a meta-method's single result goes; `result_base` is where the
-    // frame lays its results, which differs from its own base only for CALL_VARARGS. Both are -1
-    // when unused.
-    // ⚠ NO default arguments, on purpose: they are two adjacent ints of opposite meaning, and a
-    // removed parameter once let a stale `false` slide into return_dest in SILENCE, a bool
-    // converting to int. Spelled out at every site, the next signature change is a compile error
-    // wherever it lands instead of a wrong register somewhere.
+    // register of the CALLER, where a meta-method's single result goes, and -1 when unused.
+    // A frame ALWAYS lays its results at its own base. There used to be a second, adjacent int
+    // saying otherwise, for CALL_VARARGS alone — the one path that ran in a fresh window and
+    // returned to the caller's static register. That path is gone (a `...` tail now lifts the
+    // caller's varargs and calls in place, like every other call), and with it the axis: no site
+    // named a result register, so the parameter, the Frame field and the two branches reading it
+    // all described a case that no longer existed.
+    // ⚠ NO default argument on `return_dest`, on purpose: a removed parameter once let a stale
+    // `false` slide into it in SILENCE, a bool converting to int. Spelled out at every site, the
+    // next signature change is a compile error wherever it lands instead of a wrong register.
     uint32_t push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
-                        uint32_t return_ip, int return_dest, int result_base);
+                        uint32_t return_ip, int return_dest);
 
     // THE CALLING CONVENTION, in one place. Every call ends at push_frame, but getting the
     // arguments to where it expects them used to be written out at each site, nine times over —
-    // and each of those nine answered the same three questions, of which only two ever varied:
+    // and each of those nine answered the same two questions:
     //
     //   where does the frame START?   at a register the caller reserved (the arguments are already
     //                                 in place there), or above everything a live frame occupies
     //   where do the ARGUMENTS come from?  already in place; or shifted to make room for a `self`;
     //                                      or copied in from outside the register file
-    //   where do the RESULTS go?      at the frame's base, or at a register the caller names
+    //
+    // (A third question, where the RESULTS go, turned out not to vary at all: see push_frame.)
     //
     // The two helpers below name the two answers that are not "already in place". The in-place
     // case stays a direct push_frame call, deliberately: it is CALL_FUNC, CALL_DYN and
