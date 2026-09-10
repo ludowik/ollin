@@ -203,6 +203,20 @@ assert("[" + StrBool() + "]" == "[true]")
 assert("[" + StrArr() + "]" == "[\{array}]")
 assert("[" + StrNum() + "]" == "[42]")
 
+## A `__str` that RETURNS NOTHING reads "nil", the value its result slot holds — the same answer
+## whether it is written in Ollin or native, since both now go down one road.
+class StrVoid
+    func __str() return end
+end
+assert("[" + StrVoid() + "]" == "[nil]")
+
+## A CLASS passes is_callable but is not a `__str`: naming the class is all that can be said, and
+## calling it would instantiate. Only the class NAME comes back.
+class StrIsClass
+end
+StrIsClass.__str = StrP
+assert("[" + StrIsClass() + "]" == "[\{StrIsClass}]")
+
 ## ── chunk: constant dedup is STRICT about types ─────────────────────────────
 ## int 0, float 0.0 and nil share the same zero bits but carry distinct tags, so they must NOT
 ## be merged in the pool (nil would otherwise become 0, and so on).
@@ -2571,6 +2585,10 @@ func vaAfterVariadic(...)
     return out + "/" + inner
 end
 
+func vaBuiltinTail(...)
+    return "{math.max(0, ...)}/{math.min(...)}"
+end
+
 class VaFwd
     func take(...)
         return vaInner(...)
@@ -2618,6 +2636,10 @@ func vaCheck()
     ## ones that were lost, so the assertion checks BOTH what the innermost call received and what
     ## the outer `...` still reads afterwards.
     assert(vaThreeDeep(7, 8, 9) == "1/789/[7][8][9]")
+    ## A BUILTIN under a `...` tail: the branch the abandoned fresh area used to size its result
+    ## slots for. It is reachable without graphics, unlike a builtin returning TWO values under a
+    ## tail (`var w, h = graphics.textSize(...)`), which only the Xvfb run can exercise.
+    assert(vaBuiltinTail(3, 9, 4) == "9/3")
 
     ## Declared HERE, not at the top level: `func obj.field(...)` is a lambda assigned to a field,
     ## so it takes a register, and this file leaves none to spare up there.

@@ -879,6 +879,33 @@ assert(d.fetch() == "Rex fetches!")
 assert(d.name == "Rex")
 assert(d.crier() == "[Rex says woof]")
 
+## a method call expands a trailing `...` and a trailing multi-value call, like any call, and
+## `super.` does too — the receiver still decides whether `self` is injected
+class Joiner
+    func join(...)
+        var out = ""
+        for v in [...] do
+            out = out + "{v}"
+        end
+        return out
+    end
+end
+class Prefixed extends Joiner
+    func join(...)
+        return "p" + super.join(...)
+    end
+end
+func two_values()
+    return 7, 8
+end
+var joiner = Prefixed()
+assert(joiner.join(1, 2, 3) == "p123")
+assert(joiner.join(two_values()) == "p78")
+func relay(...)
+    return joiner.join(0, ...)
+end
+assert(relay(4, 5) == "p045")
+
 ## inheritance with no init of its own: the parent's is inherited
 class Cat extends Animal
     func purr()
