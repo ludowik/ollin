@@ -202,7 +202,7 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     }
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
-    ip = push_frame_copied(fi, nullptr, 0, &obj, std::move(frame_upvals), 0, -1);
+    ip = push_frame_copied(fi, &obj, 1, std::move(frame_upvals), 0, -1); // self is the first argument
     run_goto(call_stack.size() - 1);
     std::string result;
     if ((int)regs.size() > call_base)
@@ -377,7 +377,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
     Value two[2] = {std::move(lhs), std::move(rhs)};
-    uint32_t addr = push_frame_copied(fi, two, 2, nullptr, std::move(fuv), ip, /*return_dest=*/dest);
+    uint32_t addr = push_frame_copied(fi, two, 2, std::move(fuv), ip, /*return_dest=*/dest);
     if (negate)
         call_stack.back().negate_result = true;
     return addr;
@@ -389,7 +389,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
-    return push_frame_copied(fi, &lhs, 1, nullptr, std::move(fuv), ip, /*return_dest=*/dest);
+    return push_frame_copied(fi, &lhs, 1, std::move(fuv), ip, /*return_dest=*/dest);
 }
 
 // unwind_to_handler: the unwinding shared by a script throw and a C++ runtime error.
@@ -650,7 +650,7 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
     uint8_t fi = resolve_func_val(fn, frame_upvals); // the ONE place that reads a function value
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
-    ip = push_frame_copied(fi, args, argc, nullptr, std::move(frame_upvals), saved_ip, -1);
+    ip = push_frame_copied(fi, args, argc, std::move(frame_upvals), saved_ip, -1);
     run_goto(call_stack.size() - 1);
     // f's return values sit in regs[call_base..], and last_results_ says how many.
     int avail = (int)regs.size() - call_base;
@@ -683,19 +683,32 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 // defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
 //   4. builds and pushes the Frame
 //   5. returns fp.addr (the caller does ip = push_frame(...))
-uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc, const Value* self,
+__attribute__((noinline)) void VM::lift_varargs_above(int end) {
+    if (call_stack.empty())
+        return;
+    Frame& caller = call_stack.back();
+    if (caller.n_varargs == 0 || end <= caller.varargs_base)
+        return;
+    int n = caller.n_varargs;
+    int src = caller.varargs_base;
+    grow_regs((size_t)(end + n));
+    // end > src, so walking backward reads every source before anything can overwrite it. The
+    // values are COPIED and not moved: the arguments about to be laid down may be that same
+    // memory — a `...` tail hands the caller's varargs straight on — and they must stay put.
+    for (int i = n - 1; i >= 0; --i)
+        regs[end + i] = regs[src + i];
+    caller.varargs_base = end;
+}
+
+uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
                                std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest) {
-    int n_self = self != nullptr ? 1 : 0;
-    int total = argc + n_self;
     // The register file never shrinks below what the live frames need — windows and varargs alike
     // — so a frame born at its size treads on nothing, and the size is one load.
     int base = (int)regs.size();
-    grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, std::max(total, 1))));
-    if (n_self != 0)
-        regs[base] = *self;
+    grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, std::max(argc, 1))));
     for (int i = 0; i < argc; ++i)
-        regs[base + n_self + i] = args[i];
-    return push_frame(base, fi, total, std::move(fuv), return_ip, return_dest, -1);
+        regs[base + i] = args[i];
+    return push_frame(base, fi, argc, std::move(fuv), return_ip, return_dest, -1);
 }
 
 uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
@@ -723,44 +736,29 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
     // values, so it reaches FURTHER than the window does. Lifting the caller's varargs to the
     // window's end alone left them inside that area, and a variadic caller with a variadic callee
     // still lost them (`f(1, 2, 3)` calling `g(7, 8, 9, 10, 11)` read back 7, 8, 9).
-    int win_end = new_base + std::max((int)fp.reg_count, argc);
-    int callee_end = win_end;
-    if (fp.variadic && argc > fp.n_fixed)
-        callee_end = std::max(callee_end, new_base + (int)fp.reg_count + (argc - fp.n_fixed));
+    // Everything this call is about to occupy: its window, its arguments, and the vararg area it
+    // fills below — which starts above the window, so it reaches FURTHER. Sized ONCE, and the lift
+    // uses the same figure: taking the window's end alone left the caller's varargs inside that
+    // area, and a variadic caller with a variadic callee still lost them.
+    int n_varargs = (fp.variadic && argc > fp.n_fixed) ? argc - fp.n_fixed : 0;
+    int va_base = new_base + fp.reg_count;
+    int callee_end = std::max(new_base + std::max((int)fp.reg_count, argc), va_base + n_varargs);
     grow_regs((size_t)callee_end);
-    // A callee's window is [new_base, win_end) and it can reach PAST the caller's own registers —
-    // which is exactly where the CALLER's varargs live, at reg_base + reg_count. A variadic
-    // function therefore lost its `...` across a nested call as soon as the callee needed more
-    // registers than the caller had: measured, `f(1, 2, 3)` calling a register-hungry function and
-    // then reading `...` gave back that function's leftovers instead of 1, 2, 3, silently and with
-    // nothing to see. So the varargs are lifted ABOVE the window and the frame is told where they
-    // went — they are only ever addressed through it. The values are COPIED and not moved: the
-    // arguments of this very call may be that same memory (a `...` tail hands the varargs straight
-    // on), and they must stay put for the relocation just below.
-    if (!call_stack.empty()) {
-        Frame& caller = call_stack.back();
-        if (caller.n_varargs > 0 && callee_end > caller.varargs_base) {
-            int n = caller.n_varargs;
-            int src = caller.varargs_base;
-            grow_regs((size_t)(callee_end + n));
-            for (int i = n - 1; i >= 0; --i) // callee_end > src, so backward keeps sources intact
-                regs[callee_end + i] = regs[src + i];
-            call_stack.back().varargs_base = callee_end;
-        }
-    }
+    // The test stays INLINE and the lift itself is out of line, so a call that risks nothing pays
+    // two compares and push_frame's body does not grow. A COUNTER of live variadic frames was
+    // tried in its place, to make the common case a single compare: measured WORSE, fib +1,47 %
+    // and the loop +0,94 %, because the rise and the four falls land on op_RETURN, which is the
+    // hottest path of all. The pre-filter cost more than the test it was meant to skip.
+    if (!call_stack.empty() && call_stack.back().n_varargs != 0)
+        lift_varargs_above(callee_end);
     if (argc < fp.n_fixed) {
         auto& defs = ch->func_defaults[fp.defaults_idx];
         for (int i = argc; i < fp.n_fixed; ++i)
             regs[new_base + i] = (i < (int)defs.size()) ? defs[i] : Value{};
     }
-    int n_varargs = 0;
-    int va_base = new_base + fp.reg_count;
-    if (fp.variadic && argc > fp.n_fixed) {
-        n_varargs = argc - fp.n_fixed;
-        grow_regs((size_t)(va_base + n_varargs));
-        for (int i = n_varargs - 1; i >= 0; --i)
-            regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
-    }
+    // callee_end already covers va_base + n_varargs, so no second grow_regs here.
+    for (int i = n_varargs - 1; i >= 0; --i)
+        regs[va_base + i] = std::move(regs[new_base + fp.n_fixed + i]);
     // Built IN PLACE: a local Frame filled then pushed was a full move of the struct plus its
     // vector of upvalues on EVERY call — thirty million times in bench_fib.
     call_stack.emplace_back();
@@ -1620,7 +1618,8 @@ dispatch_loop:
             // on a two-value builtin lost the second one. The result capacity is the one the
             // non-varargs path uses, varargs_base - result_base.
             int res_cap = va_src - fixed_base;
-            grow_regs((size_t)(fresh + std::max(std::max(total, res_cap), 1)));
+            int fresh_end = fresh + std::max(std::max(total, res_cap), 1);
+            grow_regs((size_t)fresh_end);
             for (int i = 0; i < n_fixed; ++i)
                 regs[fresh + i] = regs[fixed_base + i];
             for (int i = 0; i < n_va; ++i)
@@ -1630,6 +1629,16 @@ dispatch_loop:
                 for (int i = 0; i < k; ++i)
                     regs[fixed_base + i] = regs[fresh + i]; // fresh > fixed_base, so copying downwards is safe
             } else if (fn.is_class()) {
+                // Instantiating at the STATIC register means writing `total` values from
+                // fixed_base up, and a `...` tail makes total exceed the slots the compiler
+                // reserved — so this write, unlike every other path's, could land on the caller's
+                // own varargs. It did: `func f(...) var o = C(1, ...)` then reading `...` gave
+                // back [11][8][9][10][11] for f(7, 8, 9, 10, 11), the first vararg overwritten.
+                // The lift belongs BEFORE the write, and it is the same lift push_frame uses. It
+                // goes above the FRESH area, not merely above the write: the fresh area is what
+                // the loop reads from, and lifting into it would have the copy read back the very
+                // varargs it is meant to preserve.
+                lift_varargs_above(fresh_end);
                 for (int i = 0; i < total; ++i) // a rare fallback: instantiate at the static register
                     regs[fixed_base + i] = regs[fresh + i];
                 bool done;
@@ -1770,23 +1779,18 @@ dispatch_loop:
             // whether the receiver takes `self` does not depend on how many arguments there are.
             int argc = C;
             if (B == 1) {
-                const Frame& cur = call_stack.back();
-                int n_va = cur.n_varargs;
-                int va_src = cur.varargs_base;
+                int n_va = call_stack.back().n_varargs;
                 int dest = cb + 2 + C;
                 grow_regs((size_t)(dest + std::max(n_va, 1)));
-                // dest <= va_src by construction — the compiler reserves the fixed slots, and the
-                // varargs sit above every register of the frame — so copying FORWARD reads each
-                // source before anything can overwrite it. The direction is chosen from the
-                // addresses all the same: it costs one comparison outside any hot path, and the
-                // one time the invariant was broken the callee silently received leftovers.
-                if (dest <= va_src) {
-                    for (int i = 0; i < n_va; ++i)
-                        regs[dest + i] = regs[va_src + i];
-                } else {
-                    for (int i = n_va - 1; i >= 0; --i)
-                        regs[dest + i] = regs[va_src + i];
-                }
+                // The varargs are lifted above the destination FIRST, which makes dest < their
+                // source and lets one forward walk read every value before anything overwrites
+                // it. Relying instead on the compiler having reserved the fixed slots left two
+                // copy directions in the code, one of them unreachable and so untestable — and
+                // the invariant living in another file from the code that needed it.
+                lift_varargs_above(dest + n_va);
+                int va_src = call_stack.back().varargs_base; // read AFTER the lift may have moved them
+                for (int i = 0; i < n_va; ++i)
+                    regs[dest + i] = regs[va_src + i];
                 argc = C + n_va;
             } else if (B == 2) {
                 argc = C + last_results_;
@@ -1813,20 +1817,18 @@ dispatch_loop:
             bool map_len_call = recv.is_map() && fn.is_builtin() && fn.as_builtin() == builtin_map_len;
             bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_len_call;
             bool inject_self = recv_is_instance && !fn_is_static;
-            int total;
             // The block is normalised HERE and not through push_frame_self, because a builtin
             // method reads its arguments from these very registers just below: going through the
             // helper would shift them a second time. This is the "already in place" axis of the
             // convention (see vm.h), whose answer is a direct push_frame.
-            if (inject_self) {
-                for (int i = 0; i < argc; ++i)
-                    regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);
-                total = argc + 1;
-            } else {
-                for (int i = 0; i < argc; ++i)
-                    regs[cb + i] = std::move(regs[cb + 2 + i]);
-                total = argc;
-            }
+            //
+            // Injecting self is an OFFSET and not a second case: the arguments slide from cb+2 to
+            // cb+1 with it and to cb+0 without, downwards either way, so one walk serves both. The
+            // two branches held the same loop twice with one index apart.
+            int off = inject_self ? 1 : 0;
+            for (int i = 0; i < argc; ++i)
+                regs[cb + off + i] = std::move(regs[cb + 2 + i]);
+            int total = argc + off;
             if (fn.is_builtin()) {
                 invoke_builtin_regs(fn.as_builtin(), cb, total);
                 goto call_method_done;

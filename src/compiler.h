@@ -195,6 +195,12 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // `count` < 0 means the whole list: a call with a spread last argument compiles only the
     // fixed ones through here.
     void compile_consecutive(int base, const std::vector<std::unique_ptr<Expr>>& exprs, int count = -1);
+    // Lays a multi-value TAIL — the last argument of a call, `...` or a call itself — at `dest`,
+    // and says which of the two it was. Both expanding call paths need exactly this: the plain one
+    // (emit_spread_call) and the method one (visit(MethodCallExpr)), which differ only in the
+    // opcode they then emit. Written twice, the rule "if the tail spread elsewhere, recompose it
+    // at dest" would have to be corrected twice.
+    bool emit_multi_tail(const std::vector<std::unique_ptr<Expr>>& args, int dest);
     // Strict lexical scope: saves scopes().regs, reg_top_ and locals_top_, allocates the locals
     // declared in body without descending into sub-blocks, compiles, then restores. The registers
     // stay reserved when the body contains closures.

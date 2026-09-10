@@ -240,10 +240,10 @@ class VM {
     // path in named helpers cost +1,4 % and was reverted. Naming an axis must not add a layer to
     // the one path that cannot afford one.
     //
-    // A frame born ABOVE everything: `self` and the arguments are copied in from outside the
-    // register file — the `__str` bridge, a meta-method, and the native-to-Ollin call all did this
-    // by hand. `self` may be nil, in which case only the arguments are laid down.
-    uint32_t push_frame_copied(uint8_t fi, const Value* args, int argc, const Value* self,
+    // A frame born ABOVE everything, its arguments copied in from outside the register file — the
+    // `__str` bridge, a meta-method, and the native-to-Ollin call all did this by hand. A `self`
+    // is simply the first of those arguments.
+    uint32_t push_frame_copied(uint8_t fi, const Value* args, int argc,
                                std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest);
 
     // A frame at a register the caller reserved, with `self` INSERTED at its base: the arguments
@@ -251,9 +251,15 @@ class VM {
     // method call — wrote the two directions of that slide themselves.
     uint32_t push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
-    // The invariant under both: no frame's window or vararg area ever overlaps another live
-    // frame's. It is ENFORCED by push_frame, which lifts the caller's varargs above everything the
-    // new frame will occupy — not stated by a helper that nothing would call.
+    // THE INVARIANT under all of it: no frame's window or vararg area ever overlaps another live
+    // frame's. It is enforced by lifting the caller's varargs above whatever is about to be
+    // written, which is what lift_varargs_above does — push_frame calls it for the frame it is
+    // building, and CALL_VARARGS calls it before laying an instantiation's arguments down. Two
+    // callers, ONE mechanism: writing the lift a second time by hand is how the class path came to
+    // overwrite a caller's `...` while the other paths were already safe.
+    // `end` is one past the last register about to be written. It tests for itself, so a cold
+    // caller may call it plainly; push_frame, on the hot path, pre-tests inline to skip the call.
+    void lift_varargs_above(int end);
 
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())

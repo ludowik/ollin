@@ -1476,37 +1476,30 @@ void Compiler::emit_callee_value(const std::string& name, int reg) {
     chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)reg, chunk.add_identifier(name)));
 }
 
+bool Compiler::emit_multi_tail(const std::vector<std::unique_ptr<Expr>>& args, int dest) {
+    if (dynamic_cast<const VarArgExpr*>(args.back().get()) != nullptr)
+        return true; // `...`: the VM reads the frame's varargs, nothing to emit here
+    // A call: its k values must sit contiguously at `dest`, which is where the VM expects them.
+    reg_top_ = dest;
+    args.back()->accept(*this);
+    if (last_reg_ != dest) // the nested call spread elsewhere, so recompose at `dest`
+        chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)dest, (uint8_t)last_reg_, 0));
+    return false;
+}
+
 void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
                                 const std::function<void(int)>& emit_callee) {
     int n_fixed = (int)args.size() - 1;
-    const Expr* last = args.back().get();
-    bool is_vararg = dynamic_cast<const VarArgExpr*>(last) != nullptr;
-
     int func_slot = reg_top_++; // the callee sits BELOW the argument block, so an expansion never overwrites it
     bump_reg_count();
     int call_base = reg_top_;
-    for (int i = 0; i < n_fixed; ++i) {
-        int target = call_base + i;
-        reg_top_ = target;
-        args[i]->accept(*this);
-        if (last_reg_ != target)
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)target, (uint8_t)last_reg_, 0));
-        reserve_regs_to(target + 1);
-    }
+    compile_consecutive(call_base, args, n_fixed);
     emit_callee(func_slot);
-    if (is_vararg) {
-        chunk.emit(make_abc((uint8_t)Op::CALL_VARARGS, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
-    } else {
-        // The last argument is a call: its k return values must sit contiguously after the fixed
-        // ones, at call_base+n_fixed. last_results_ is k at runtime, hence CALL_VA with
-        // argc = n_fixed + k.
-        int want = call_base + n_fixed;
-        reg_top_ = want;
-        args.back()->accept(*this);
-        if (last_reg_ != want) // the nested call spread as well, so recompose at `want`
-            chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
-        chunk.emit(make_abc((uint8_t)Op::CALL_VA, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
-    }
+    // CALL_VARARGS takes the frame's varargs, CALL_VA the values the tail call left at
+    // call_base + n_fixed; either way argc is the FIXED count and the VM adds the rest.
+    bool is_vararg = emit_multi_tail(args, call_base + n_fixed);
+    Op op = is_vararg ? Op::CALL_VARARGS : Op::CALL_VA;
+    chunk.emit(make_abc((uint8_t)op, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
     last_reg_ = call_base;
     reserve_regs_to(call_base + 1);
 }
@@ -2371,22 +2364,9 @@ void Compiler::visit(const MethodCallExpr& e) {
     if (!e.optional && !e.args.empty() && is_multi_value_expr(e.args.back().get())) {
         int n_fixed = argc - 1;
         compile_consecutive(call_base + 2, e.args, n_fixed);
-        bool is_vararg = dynamic_cast<const VarArgExpr*>(e.args.back().get()) != nullptr;
-        if (!is_vararg) {
-            // The tail is a call: its k values must land right after the fixed arguments, which is
-            // where the VM expects to find them.
-            int want = call_base + 2 + n_fixed;
-            reg_top_ = want;
-            e.args.back()->accept(*this);
-            if (last_reg_ != want) // the nested call spread elsewhere, so recompose at `want`
-                chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
-        }
-        // The FIXED slots are reserved, receiver and method included, which is what keeps the
-        // frame's varargs ABOVE them: varargs_base is reg_base + reg_count, so the VM's copy of a
-        // `...` tail into call_base + 2 + n_fixed then reads from a higher address than it writes
-        // to and cannot overwrite its own source. Reserving only call_base + 1 broke exactly that
-        // — the copy landed on top of the varargs it was reading, and the callee saw leftovers
-        // (`s.take(...)` summing 1, 2, 3 gave "0n03", a key and two temporaries).
+        bool is_vararg = emit_multi_tail(e.args, call_base + 2 + n_fixed);
+        // The fixed slots are reserved, receiver and method included, so the block the VM lays its
+        // arguments in is part of this frame's count.
         reserve_regs_to(call_base + 2 + n_fixed);
         chunk.emit(make_abc((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, is_vararg ? 1 : 2, (uint8_t)n_fixed));
         reg_top_ = call_base + 1;
