@@ -69,10 +69,6 @@ qu'après un **GO explicite** de l'utilisateur (« GO », « implémente », « 
 Répondre à mes questions de cadrage/design **ne vaut pas** GO. En cas de doute,
 demander — ne pas deviner.
 
-**Committer et pousser ne s'ANNONCE pas (règle permanente).** C'est fait systématiquement en fin
-de chaque évolution, suite verte à l'appui : ne jamais écrire « je committe et je pousse dès que… »,
-ni le proposer, ni le décrire comme une étape à venir. Le résultat se lit dans `git log`.
-
 **« next » = une PROPOSITION, pas un chantier (règle permanente).** Sur « next » (ou
 « suivant »), présenter **un** point précis à corriger, expliquer ce qui cloche et, quand
 plusieurs chemins existent, les exposer — puis **attendre le choix de l'utilisateur**.
