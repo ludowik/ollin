@@ -167,39 +167,33 @@ static std::string str_result_text(const Value& v) {
     return "{function}";
 }
 
+// The message is the CALLER's, because "call" and "method call" name different mistakes to the
+// script author, and both are frozen by tests and documented in the tutorial. Passing it is what
+// lets every site share the one resolution instead of a fifth hand-written copy of it.
+static constexpr const char* CALL_NOT_CALLABLE = "runtime: call on non-function value";
+static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-function value";
+static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
+                                const char* not_callable);
+
 // invoke_str: a mini-loop that calls __str without recursing.
 std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not invalidate obj
     Value cls = obj.map_get(MK().class_);
     if (cls.is_nil())
         return "{map}";
     Value str_fn = proto_chain_get(cls, MK().str_);
-    if (str_fn.is_nil() || !str_fn.is_callable()) {
+    // A CLASS is callable, so it passes is_callable, but it is not a __str: naming the class is
+    // all that can be said of it.
+    if (!str_fn.is_callable() || str_fn.is_class()) {
         Value nm = cls.map_get(MK().name_);
         return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
     }
-    uint8_t fi;
-    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    switch (str_fn.tag) {
-    case Value::T_FUNCTION:
-        fi = (uint8_t)str_fn.as_int();
-        break;
-    case Value::T_CLOSURE: {
-        fi = str_fn.as_closure()->func_idx;
-        const auto& uvs = str_fn.as_closure()->upvals;
-        if (!uvs.empty())
-            frame_upvals = std::make_unique<std::vector<Upvalue*>>(uvs);
-        break;
-    }
-    case Value::T_BUILTIN: {
+    if (str_fn.is_builtin()) {
         Value self = obj; // one slot is available (self); the builtin writes its result there, and it is read back
         int n = invoke_builtin(str_fn.as_builtin(), &self, 1, 1);
         return n >= 1 ? str_result_text(self) : "{object}";
     }
-    default: {
-        Value nm = cls.map_get(MK().name_);
-        return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
-    }
-    }
+    std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
+    uint8_t fi = resolve_func_val(str_fn, frame_upvals, CALL_NOT_CALLABLE);
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, &obj, 1, std::move(frame_upvals), 0, -1); // self is the first argument
@@ -364,13 +358,6 @@ static const struct {
 };
 
 // resolve_func_val: function value to func_idx (plus upvals); defined below.
-// The message is the CALLER's, because "call" and "method call" name different mistakes to the
-// script author, and both are frozen by tests and documented in the tutorial. Passing it is what
-// lets every site share the one resolution instead of a fifth hand-written copy of it.
-static constexpr const char* CALL_NOT_CALLABLE = "runtime: call on non-function value";
-static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-function value";
-static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
-                                const char* not_callable);
 
 // Meta-method dispatch helpers.
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
@@ -430,11 +417,11 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         return 0;
     }
     if (init_fn.is_builtin()) {
-        std::vector<Value> bargs(argc + 1);
-        bargs[0] = inst;
+        RetBuf bargs(argc + 1);
+        bargs.p[0] = inst;
         for (int i = 0; i < argc; ++i)
-            bargs[1 + i] = regs[base_reg + arg_off + i];
-        invoke_builtin(init_fn.as_builtin(), bargs.data(), argc + 1,
+            bargs.p[1 + i] = regs[base_reg + arg_off + i];
+        invoke_builtin(init_fn.as_builtin(), bargs.p, argc + 1,
                        argc + 1); // the return value is ignored: the instance wins
         instance_is_the_result(std::move(inst));
         return 0;
@@ -644,17 +631,18 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
     if (out_cap <= 0)
         return 0;
     if (fn.is_builtin()) {
-        std::vector<Value> buf(std::max(argc, out_cap));
+        int n_slots = std::max(argc, out_cap);
+        RetBuf buf(n_slots);
         for (int i = 0; i < argc; ++i)
-            buf[i] = args[i];
-        int n = invoke_builtin(fn.as_builtin(), buf.data(), argc, (int)buf.size());
+            buf.p[i] = args[i];
+        int n = invoke_builtin(fn.as_builtin(), buf.p, argc, n_slots);
         int m = n < out_cap ? n : out_cap;
         for (int i = 0; i < m; ++i)
-            out[i] = buf[i];
+            out[i] = buf.p[i];
         return m;
     }
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    uint8_t fi = resolve_func_val(fn, frame_upvals, CALL_NOT_CALLABLE); // the ONE place that reads a function value
+    uint8_t fi = resolve_func_val(fn, frame_upvals, CALL_NOT_CALLABLE);
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, args, argc, std::move(frame_upvals), saved_ip, -1);
@@ -712,7 +700,7 @@ uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
     // The register file never shrinks below what the live frames need — windows and varargs alike
     // — so a frame born at its size treads on nothing, and the size is one load.
     int base = (int)regs.size();
-    grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, std::max(argc, 1))));
+    grow_regs((size_t)(base + std::max(argc, 1)));
     for (int i = 0; i < argc; ++i)
         regs[base + i] = args[i];
     return push_frame(base, fi, argc, std::move(fuv), return_ip, return_dest);
@@ -727,7 +715,7 @@ uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value 
     // twice). push_frame lifts too, but only after the slide, so the lift belongs here: the frame
     // is born at a register the caller owns, and it occupies base..base+total-1.
     lift_varargs_above(base + total);
-    grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, total)));
+    grow_regs((size_t)(base + total));
     // The arguments slide from base + arg_off to base + 1, and the DIRECTION of the walk follows
     // which of the two is higher: walking the wrong way overwrites an argument before it is read.
     // Both callers used to decide that themselves, one of them with the two loops written out.

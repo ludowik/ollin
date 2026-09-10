@@ -2116,12 +2116,20 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   parcouraient `identifiers` en comparant des chaînes — trois de ces boucles étaient IMBRIQUÉES
   (builtins, modules, membres de `core`), donc quadratiques, et `set_global` est appelé à chaque
   frame pour `deltaTime`. Un module n'est même plus CONSTRUIT si le programme ne le nomme pas.
-- **Une valeur de fonction → `func_idx` + upvalues** : `resolve_func_val`, appelée par les SIX
+- **Une valeur de fonction → `func_idx` + upvalues** : `resolve_func_val`, appelée par les SEPT
   sites qui en ont besoin. Le message de refus est celui de l'APPELANT, un paramètre et non un
   littéral interne : « call on non-function value » et « method call on non-function value »
   nomment deux fautes différentes pour l'auteur du script, tous deux figés par `test_errors.sh`
   et documentés par le tutoriel. C'est ce paramètre qui a permis à `CALL_METHOD` de cesser d'en
   garder sa propre copie — il en était le cinquième site écrit à la main.
+  ⚠ **`invoke_str` garde sa PROPRE descente vers Ollin, et c'est mesuré, pas négligé.** La faire
+  passer par `call_value_multi` — le pont unique, donc la correction évidente — coûte **+2,25 %
+  d'instructions sur `fib`**, qui n'appelle jamais `__str` : `run_goto` perd un appelant direct, et
+  son allocation de registres change (même mécanisme structurel que pour `SWITCH` et `LEN`). Ni
+  `noinline` sur `invoke_str` ni `noinline` sur `call_value_multi` n'y changent quoi que ce soit.
+  Ce qui a été gardé de la correction est la seule moitié qui ne coûte rien (+0,00 %) : la
+  résolution de la valeur de fonction, qui était un `switch` écrit à la main. Ne pas refaire
+  l'autre moitié.
 - **Le retour d'un appel natif → Ollin** : `call_value_multi`, dont `call_value` n'est que le cas
   à un résultat. Les deux portaient les mêmes quarante lignes, donc deux endroits où le protocole
   d'appel pouvait dériver.
@@ -2147,6 +2155,17 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   avant, ce qui a laissé vivre la corruption des varargs. Un `frames_top()` qui le CALCULAIT a été
   écrit puis retiré : personne ne l'appelait, et un invariant tient par ce qui l'impose, pas par
   une fonction qui le décrit.
+
+**`RetBuf` sert à TOUT tampon d'appel, pas seulement aux retours** : un appel natif vers un builtin
+en avait un `std::vector`, donc une allocation et une libération **par appel**, sur deux chemins qui
+sont des boucles — `arr.map(math.floor)` en fait un par élément, et `Color(r, g, b)` dans un `draw`
+un par couleur (une classe native a un `init` builtin). Mesuré : **−10,4 %** sur `map` d'un builtin
+appliqué à 200 000 éléments, **−5,3 %** sur 300 000 `Color`, et **+0,00 %** sur les trois repères.
+
+**La TAILLE d'un cadre est décidée par `push_frame` seul.** `push_frame_copied` et
+`push_frame_self` lisaient `reg_count` pour dimensionner d'avance, donc la même règle vivait à
+trois endroits qui devaient s'accorder à la main ; elles ne grandissent plus le fichier de
+registres que pour les cases qu'elles ÉCRIVENT elles-mêmes. Neutre à l'instruction près.
 
 **Les valeurs d'un retour multiple sont rassemblées sur la PILE** (`RetBuf`, vm.h) jusqu'à huit,
 avec repli sur un vecteur au-delà : un `std::vector` par retour, c'était une allocation et une
