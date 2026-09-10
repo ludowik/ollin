@@ -2120,8 +2120,9 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   sites qui en ont besoin. Le message de refus est celui de l'APPELANT, un paramètre et non un
   littéral interne : « call on non-function value » et « method call on non-function value »
   nomment deux fautes différentes pour l'auteur du script, tous deux figés par `test_errors.sh`
-  et documentés par le tutoriel. C'est ce paramètre qui a permis à `CALL_METHOD` de cesser d'en
-  garder sa propre copie — il en était le cinquième site écrit à la main.
+  et documentés par le tutoriel. C'est ce paramètre qui a permis à `CALL_METHOD` puis à `invoke_str`
+  de cesser d'en garder chacun sa copie — ils en étaient les cinquième et sixième exemplaires
+  écrits à la main.
   ⚠ **`invoke_str` garde sa PROPRE descente vers Ollin, et c'est mesuré, pas négligé.** La faire
   passer par `call_value_multi` — le pont unique, donc la correction évidente — coûte **+2,25 %
   d'instructions sur `fib`**, qui n'appelle jamais `__str` : `run_goto` perd un appelant direct, et

@@ -169,7 +169,7 @@ static std::string str_result_text(const Value& v) {
 
 // The message is the CALLER's, because "call" and "method call" name different mistakes to the
 // script author, and both are frozen by tests and documented in the tutorial. Passing it is what
-// lets every site share the one resolution instead of a fifth hand-written copy of it.
+// lets every site share the one resolution instead of a copy of its own.
 static constexpr const char* CALL_NOT_CALLABLE = "runtime: call on non-function value";
 static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-function value";
 static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
@@ -356,8 +356,6 @@ static const struct {
     {"assert", builtin_assert}, {"time", builtin_time}, {"cpuTime", builtin_cpu_time},
     {"mem", builtin_mem},       {"len", builtin_len},
 };
-
-// resolve_func_val: function value to func_idx (plus upvals); defined below.
 
 // Meta-method dispatch helpers.
 // Both helpers push a call frame and return fp.addr (non-zero) on success.
