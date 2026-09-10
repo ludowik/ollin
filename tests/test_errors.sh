@@ -229,6 +229,13 @@ check_error "an exponent followed by a dot"        'print(1e5.0)'  "invalid numb
 check_error "a hex literal out of range"           'print(0xFFFFFFFFFFFFFFFFF)'      "out of range"
 check_error "a decimal literal out of range"       'print(99999999999999999999999)' "out of range"
 
+# string.find takes two strings and an optional number, and says so rather than searching for
+# something it had to invent.
+check_error "string.find with a non-string subject"  'print(string.find(42, "a"))'      "string.find: expected string"
+check_error "string.find with a non-string needle"   'print(string.find("abc", 42))'    "string.find: expected string"
+check_error "string.find with a non-number start"    'print(string.find("abc", "a", "x"))' "string.find: argument 3 expected number"
+check_error "string.find with one argument"          'print(string.find("abc"))'        "string.find: missing argument"
+
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "an optional call on an integer" \
     'var x = 42

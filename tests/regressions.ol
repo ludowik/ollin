@@ -349,6 +349,11 @@ catch e
 end
 assert(str_c == "x")
 
+func fndTail(...)
+    var a, b = string.find("hello world", ...)
+    return "{a}/{b}"
+end
+
 ## ── string: indexing by CHARACTER (a UTF-8 codepoint), not by byte ─────────
 assert(len("café") == 4)                     ## four characters (é takes two bytes)
 assert(len("héllo") == 5)
@@ -366,6 +371,38 @@ assert(string.lower("ÉÀÙÇ") == "éàùç")
 assert(string.upper("straße") == "STRASSE")  ## ß → SS
 assert(string.trim("··café··", "·") == "café")  ## trim works by codepoint (· takes two bytes)
 assert(string.rtrim("«café»", "»") == "«café")
+## string.find: a literal search rendering TWO indices, the start and the one just PAST the
+## match, both in codepoints. Grouped in a function, not at the top level: this file has no
+## registers to spare up there.
+func fndCheck()
+    ## It is the only way to locate a substring, and the pair is what composes with substr.
+    var fnd_a, fnd_b = string.find("hello world", "wor")
+    assert(fnd_a == 7 and fnd_b == 10)
+    var fnd_s = "hello world"
+    var fnd_p, fnd_q = fnd_s.find("world")
+    assert(fnd_s.substr(1, fnd_p - 1) + "there" + fnd_s.substr(fnd_q) == "hello there")
+    ## in CODEPOINTS, not bytes: a byte index would put "au" at 7 and "é" at 5
+    var fnd_c, fnd_d = string.find("café au lait", "au")
+    assert(fnd_c == 6 and fnd_d == 8)
+    var fnd_e, fnd_g = string.find("café", "é")
+    assert(fnd_e == 4 and fnd_g == 5)
+    assert(string.find("hello", "zz") == nil)     ## absent: nil, a single value
+    assert(string.find("abc", "abcd") == nil)     ## a needle longer than the string
+    assert(string.find("abc", "c", 99) == nil)    ## a start past the end
+    var fnd_h, fnd_i = string.find("hello", "l", 4)
+    assert(fnd_h == 4 and fnd_i == 5)             ## the search starts at `from`
+    var fnd_j, fnd_k = string.find("aaa", "aa")
+    assert(fnd_j == 1 and fnd_k == 3)             ## overlapping matches: the FIRST one
+    var fnd_l, fnd_m = string.find("abc", "")
+    assert(fnd_l == 1 and fnd_m == 1)             ## an empty needle: the insertion point, no width
+    var fnd_n, fnd_o = string.find("abc", "", 9)
+    assert(fnd_n == 4 and fnd_o == 4)             ## clamped to just past the last character
+    ## Both values survive when the call is the TAIL of a variadic one — the only builtin returning
+    ## two values that a build without graphics can reach, so the only place tests/run.sh can check it
+    assert(fndTail("wor") == "7/10")
+end
+fndCheck()
+
 ## string.len: a length in codepoints, on strings only, unlike the polymorphic global len
 assert(string.len("café") == 4)               ## é takes two bytes, and is one character
 assert(string.len("a€b") == 3)                ## € takes three bytes, and is one character

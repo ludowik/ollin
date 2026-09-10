@@ -164,6 +164,56 @@ static int str_substr(CallCtx& ctx) {
     return ctx.ret(Value(s.substr(b0, b1 - b0)));
 }
 
+// string.find(s, needle [, from]): a LITERAL search — no patterns, no regular expressions.
+//
+// Returns TWO values, the index where the needle STARTS and the index just PAST it, both counted
+// in codepoints from 1 like every other index of this module. The pair is what makes it compose
+// with substr, and the reason the end is returned rather than left to the caller: adding the
+// needle's length by hand is right in bytes and wrong in characters, so the one caller who forgets
+// that breaks only on accented text.
+//
+//     var a, b = s.find(m)
+//     var replaced = s.substr(1, a - 1) + other + s.substr(b)
+//
+// Absent: nil, a single value, so `var a, b = ...` leaves both nil and `if s.find(m) then` reads
+// as it should — indices being 1-based, a match never yields 0, which is falsy in this language.
+//
+// Bytes are compared, not codepoints, which is exact here: a candidate is only ever tried at a
+// codepoint boundary, and UTF-8 is self-synchronising, so no match can start inside a character.
+static int str_find(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.find");
+    const std::string& needle = str_arg(args, argc, 1, "string.find");
+    int from = (argc >= 3) ? to_int_safe(num_arg(args, argc, 2, "string.find")) : 1;
+    if (from < 1)
+        from = 1;
+    size_t cnt = utf8_count(s);
+    // An empty needle matches WHERE IT IS LOOKED FOR, and reports no width: (from, from) is the
+    // insertion point, so the substr pair above splices `other` in without deleting anything.
+    if (needle.empty()) {
+        int at = ((size_t)from > cnt + 1) ? (int)cnt + 1 : from;
+        ctx.set_result(0, Value((int64_t)at));
+        ctx.set_result(1, Value((int64_t)at));
+        return 2;
+    }
+    if ((size_t)from > cnt || needle.size() > s.size())
+        return ctx.ret(Value{});
+    size_t i = utf8_byte_offset(s, (size_t)from - 1);
+    size_t cp = (size_t)from - 1;
+    size_t last = s.size() - needle.size();
+    while (i <= last) {
+        if (s.compare(i, needle.size(), needle) == 0) {
+            ctx.set_result(0, Value((int64_t)(cp + 1)));
+            ctx.set_result(1, Value((int64_t)(cp + 1 + utf8_count(needle))));
+            return 2;
+        }
+        i += utf8_step(s, i);
+        cp++;
+    }
+    return ctx.ret(Value{});
+}
+
 // string.len(s): the number of CHARACTERS (UTF-8 codepoints). Unlike the global len builtin,
 // which is polymorphic over arrays, maps, strings and ranges, this one accepts ONLY a string and
 // throws on any other type, through str_arg.
@@ -184,5 +234,6 @@ Value make_string_module() {
         .fn("rtrim", str_rtrim)
         .fn("char", str_char)
         .fn("substr", str_substr)
+        .fn("find", str_find)
         .done();
 }
