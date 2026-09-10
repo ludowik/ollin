@@ -636,7 +636,7 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
         int n = invoke_builtin(fn.as_builtin(), buf.p, argc, n_slots);
         int m = n < out_cap ? n : out_cap;
         for (int i = 0; i < m; ++i)
-            out[i] = buf.p[i];
+            out[i] = std::move(buf.p[i]); // buf dies on the next line
         return m;
     }
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
@@ -672,25 +672,60 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
     return call_value(fn, args, 4);
 }
 
-// The single entry point for building a call frame: grow_regs to the minimum needed, fill in
-// defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
-//   4. builds and pushes the Frame
-//   5. returns fp.addr (the caller does ip = push_frame(...))
+// Moves the varargs of every live frame out from under `end`, so a frame about to occupy up to
+// `end` — or a block of arguments about to be laid out there — cannot tread on them.
+//
+// EVERY live frame, not just the top one: the register file holds the vararg area of every
+// variadic frame on the stack, and a callee's window reaches past its caller's window by its own
+// reg_count, so it can cover several of those areas at once. Protecting only the immediate caller
+// let a GRANDPARENT's `...` be overwritten — `f(...)` calling a method that forwards `...` to a
+// third variadic function read back 1, 1, 9 for 7, 8, 9, f's varargs having been buried first by
+// the lift of the method's and then by the third frame's own vararg area.
 __attribute__((noinline)) void VM::lift_varargs_above(int end) {
-    if (call_stack.empty())
-        return;
-    Frame& caller = call_stack.back();
-    if (caller.n_varargs == 0 || end <= caller.varargs_base)
-        return;
-    int n = caller.n_varargs;
-    int src = caller.varargs_base;
-    grow_regs((size_t)(end + n));
-    // end > src, so walking backward reads every source before anything can overwrite it. The
-    // values are COPIED and not moved: the arguments about to be laid down may be that same
-    // memory — a `...` tail hands the caller's varargs straight on — and they must stay put.
-    for (int i = n - 1; i >= 0; --i)
-        regs[end + i] = regs[src + i];
-    caller.varargs_base = end;
+    // Every destination sits above every source, so nothing can land on an area not yet moved.
+    int top = end;
+    int total = 0;
+    for (const Frame& fr : call_stack) {
+        if (fr.n_varargs == 0)
+            continue;
+        if (fr.varargs_base + fr.n_varargs > top)
+            top = fr.varargs_base + fr.n_varargs;
+        if (fr.varargs_base < end)
+            total += fr.n_varargs;
+    }
+    if (total != 0) {
+        grow_regs((size_t)(top + total));
+        int dst = top;
+        for (Frame& fr : call_stack) {
+            if (fr.n_varargs == 0 || fr.varargs_base >= end)
+                continue;
+            // The values are COPIED and not moved: the arguments about to be laid down may be that
+            // same memory — a `...` tail hands the caller's varargs straight on — and they must
+            // stay put.
+            for (int i = 0; i < fr.n_varargs; ++i)
+                regs[dst + i] = regs[fr.varargs_base + i];
+            fr.varargs_base = dst;
+            dst += fr.n_varargs;
+        }
+    }
+    // Re-arm the watermark exactly, this walk having just visited every frame. A pop never
+    // maintains it — that would put work on op_RETURN, the hottest path there is — so it can be
+    // left too LOW, which costs one walk that finds nothing and then disables itself here.
+    va_low_ = k_no_varargs;
+    for (const Frame& fr : call_stack)
+        if (fr.n_varargs != 0 && fr.varargs_base < va_low_)
+            va_low_ = fr.varargs_base;
+}
+
+__attribute__((noinline)) int VM::append_caller_varargs(int dest) {
+    int n_va = call_stack.back().n_varargs;
+    if (n_va == 0)
+        return 0;
+    lift_varargs_above(dest + n_va);
+    int va_src = call_stack.back().varargs_base; // read AFTER the lift has moved them
+    for (int i = 0; i < n_va; ++i)
+        regs[dest + i] = regs[va_src + i];
+    return n_va;
 }
 
 uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
@@ -698,6 +733,9 @@ uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
     // The register file never shrinks below what the live frames need — windows and varargs alike
     // — so a frame born at its size treads on nothing, and the size is one load.
     int base = (int)regs.size();
+    // Only the slots this function WRITES; push_frame sizes the frame itself. The floor of one is
+    // not residue: a proto's reg_count can be 0 (`func f() end`), and a valueless return still
+    // needs a slot to put nil in where the caller reads.
     grow_regs((size_t)(base + std::max(argc, 1)));
     for (int i = 0; i < argc; ++i)
         regs[base + i] = args[i];
@@ -732,23 +770,18 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
     const FuncProto& fp = ch->funcs[fi];
     // Everything this call is about to occupy: its register window, its arguments, AND the vararg
     // area it will fill just below — which starts above the window and holds argc - n_fixed
-    // values, so it reaches FURTHER than the window does. Lifting the caller's varargs to the
-    // window's end alone left them inside that area, and a variadic caller with a variadic callee
-    // still lost them (`f(1, 2, 3)` calling `g(7, 8, 9, 10, 11)` read back 7, 8, 9).
-    // Everything this call is about to occupy: its window, its arguments, and the vararg area it
-    // fills below — which starts above the window, so it reaches FURTHER. Sized ONCE, and the lift
-    // uses the same figure: taking the window's end alone left the caller's varargs inside that
-    // area, and a variadic caller with a variadic callee still lost them.
+    // values, so it reaches FURTHER than the window does. Sized ONCE, and the lift uses the same
+    // figure: taking the window's end alone left the caller's varargs inside that area, and a
+    // variadic caller with a variadic callee still lost them (`f(1, 2, 3)` calling
+    // `g(7, 8, 9, 10, 11)` read back 7, 8, 9).
     int n_varargs = (fp.variadic && argc > fp.n_fixed) ? argc - fp.n_fixed : 0;
     int va_base = new_base + fp.reg_count;
     int callee_end = std::max(new_base + std::max((int)fp.reg_count, argc), va_base + n_varargs);
     grow_regs((size_t)callee_end);
-    // The test stays INLINE and the lift itself is out of line, so a call that risks nothing pays
-    // two compares and push_frame's body does not grow. A COUNTER of live variadic frames was
-    // tried in its place, to make the common case a single compare: measured WORSE, fib +1,47 %
-    // and the loop +0,94 %, because the rise and the four falls land on op_RETURN, which is the
-    // hottest path of all. The pre-filter cost more than the test it was meant to skip.
-    if (!call_stack.empty() && call_stack.back().n_varargs != 0)
+    // ONE compare on the hot path. The walk is O(call depth), so it must not run per call:
+    // calling it unconditionally cost +23,4 % on fib, measured — fib recurses deeply and every
+    // call would re-walk the stack.
+    if (callee_end > va_low_)
         lift_varargs_above(callee_end);
     if (argc < fp.n_fixed) {
         auto& defs = ch->func_defaults[fp.defaults_idx];
@@ -766,6 +799,8 @@ uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std:
     fr.reg_base = new_base;
     fr.varargs_base = va_base;
     fr.n_varargs = n_varargs;
+    if (n_varargs != 0 && va_base < va_low_)
+        va_low_ = va_base;
     fr.return_dest = return_dest;
     fr.upvals = std::move(fuv);
     return fp.addr;
@@ -1257,17 +1292,19 @@ dispatch_loop:
             const Frame& fr = call_stack.back();
             bool neg_ = fr.negate_result;
             int ret_dest = fr.return_dest;
-            int wb = fr.reg_base;
             uint32_t rip = fr.return_ip;
             int n = B;
-            if (n > 0 && (wb != base || A != 0))
+            // The results go to the frame's own base, which is `base` itself — so only A has to be
+            // asked about. The comparison of the two that stood here was the last reader of
+            // result_base, an axis this frame no longer has.
+            if (n > 0 && A != 0)
                 for (int i = 0; i < n; ++i)
-                    regs[wb + i] = std::move(regs[base + A + i]);
+                    regs[base + i] = std::move(regs[base + A + i]);
             else if (n == 0)
-                nil_result_slot(wb); // a valueless return still leaves nil where the caller reads
+                nil_result_slot(base); // a valueless return still leaves nil where the caller reads
             call_stack.pop_back(); // fr is dangling from here on
             if (ret_dest >= 0)
-                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[wb + 0])) : regs[wb + 0];
+                regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[base])) : regs[base];
             ip = rip;
             last_results_ = n; // for SPREAD_RESULTS (a multiple return)
         }
@@ -1569,25 +1606,13 @@ dispatch_loop:
         // count never overwrites it. Carrying the builtin / class / function tree once is what
         // keeps them from drifting apart.
 
-        // A `...` tail: the frame's own varargs, appended after the C fixed arguments. They are
-        // LIFTED above the block first, which makes the destination lower than their source and
-        // lets one forward walk read every value before anything overwrites it. Nothing of the
-        // caller is live above the argument block, and the lift is the same one push_frame relies
-        // on, so the call is then indistinguishable from any other — the method path was already
-        // shaped this way. A FRESH area above the varargs was the earlier answer: it needed its
-        // own sizing (arguments AND builtin results), its own downward copy of the results, and
-        // its own class branch that had to re-lift anyway, for a `...` tail that is the ordinary
-        // case. The compiler's reservation already covers a builtin's result slots.
+        // A `...` tail: the frame's own varargs, appended after the C fixed arguments by the same
+        // helper the method path uses. Nothing of the caller is live above the argument block, and
+        // the lift inside that helper is the one push_frame relies on, so the call is then
+        // indistinguishable from any other — including for a builtin's result slots, which the
+        // compiler's reservation already covers.
     op_CALL_VARARGS:
-        {
-            int n_va = call_stack.back().n_varargs;
-            int dest = base + A + C;
-            lift_varargs_above(dest + n_va);
-            int va_src = call_stack.back().varargs_base; // read AFTER the lift may have moved them
-            for (int i = 0; i < n_va; ++i)
-                regs[dest + i] = regs[va_src + i];
-            argc_dyn = C + n_va;
-        }
+        argc_dyn = C + append_caller_varargs(base + A + C);
         goto call_dyn_common;
 
         // A multi-value call as the tail: its values are already materialized after the fixed
@@ -1741,19 +1766,7 @@ dispatch_loop:
             // whether the receiver takes `self` does not depend on how many arguments there are.
             int argc = C;
             if (B == 1) {
-                int n_va = call_stack.back().n_varargs;
-                int dest = cb + 2 + C;
-                grow_regs((size_t)(dest + std::max(n_va, 1)));
-                // The varargs are lifted above the destination FIRST, which makes dest < their
-                // source and lets one forward walk read every value before anything overwrites
-                // it. Relying instead on the compiler having reserved the fixed slots left two
-                // copy directions in the code, one of them unreachable and so untestable — and
-                // the invariant living in another file from the code that needed it.
-                lift_varargs_above(dest + n_va);
-                int va_src = call_stack.back().varargs_base; // read AFTER the lift may have moved them
-                for (int i = 0; i < n_va; ++i)
-                    regs[dest + i] = regs[va_src + i];
-                argc = C + n_va;
+                argc = C + append_caller_varargs(cb + 2 + C);
             } else if (B == 2) {
                 argc = C + last_results_;
             }

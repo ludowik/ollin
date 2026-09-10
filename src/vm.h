@@ -255,13 +255,31 @@ class VM {
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
     // THE INVARIANT under all of it: no frame's window or vararg area ever overlaps another live
     // frame's. It is enforced by lifting the caller's varargs above whatever is about to be
-    // written, which is what lift_varargs_above does — push_frame calls it for the frame it is
-    // building, and CALL_VARARGS calls it before laying an instantiation's arguments down. Two
-    // callers, ONE mechanism: writing the lift a second time by hand is how the class path came to
-    // overwrite a caller's `...` while the other paths were already safe.
+    // written, which is what lift_varargs_above does — for EVERY live frame, never for the
+    // immediate caller alone. FOUR callers, ONE mechanism, and each lifts
+    // for the writes it is itself about to make: push_frame for the frame it is building;
+    // push_frame_self before its slide, which is one slot WIDER than the block the caller laid
+    // out and so reaches past it; CALL_VARARGS and CALL_METHOD before appending the caller's own
+    // varargs to an argument block. Writing the lift a second time by hand is how the class path
+    // came to overwrite a caller's `...` while the other paths were already safe — so a new call
+    // path lifts through this function, never with a loop of its own.
     // `end` is one past the last register about to be written. It tests for itself, so a cold
     // caller may call it plainly; push_frame, on the hot path, pre-tests inline to skip the call.
     void lift_varargs_above(int end);
+
+    // Appends the CURRENT frame's varargs at `dest` — a `...` tail, for a plain call as for a
+    // method call — and returns how many were written. Both sites had the same five lines,
+    // including the ordering that makes them correct (lift first, THEN read varargs_base), which
+    // is exactly the shape of invariant that must not be written twice. noinline and out of
+    // run_goto, like lift_varargs_above itself.
+    int append_caller_varargs(int dest);
+
+    // The lowest vararg area of any live frame, and k_no_varargs when there is none. It is the
+    // O(1) filter in front of lift_varargs_above, whose walk is O(call depth). It may be too LOW
+    // (a pop does not maintain it, so that op_RETURN pays nothing) but never too high: every
+    // write to a varargs_base goes through push_frame or the lift, and both update it.
+    static constexpr int k_no_varargs = 1 << 30;
+    int va_low_ = k_no_varargs;
 
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())

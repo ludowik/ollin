@@ -2151,11 +2151,29 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   `push_frame_self` : un builtin appelé en méthode lit ces registres-là, si bien que passer par le
   helper les décalerait deux fois.
 - **L'invariant du fichier de registres** — la fenêtre et la zone de varargs d'un cadre ne
-  recouvrent jamais celles d'un autre cadre vivant — est IMPOSÉ par `push_frame`, qui relève les
-  varargs de l'appelant au-dessus de tout ce que le cadre neuf va occuper. Rien ne l'énonçait
-  avant, ce qui a laissé vivre la corruption des varargs. Un `frames_top()` qui le CALCULAIT a été
-  écrit puis retiré : personne ne l'appelait, et un invariant tient par ce qui l'impose, pas par
-  une fonction qui le décrit.
+  recouvrent jamais celles d'un autre cadre vivant — est IMPOSÉ par `lift_varargs_above`, appelée
+  par `push_frame`, par `push_frame_self` avant sa glissade et par les deux queues `...`. Rien ne
+  l'énonçait avant, ce qui a laissé vivre la corruption des varargs. Un `frames_top()` qui le
+  CALCULAIT a été écrit puis retiré : personne ne l'appelait, et un invariant tient par ce qui
+  l'impose, pas par une fonction qui le décrit.
+- ⚠ **Un relèvement porte sur TOUS les cadres vivants, jamais sur le seul appelant.** La fenêtre
+  d'un appelé dépasse celle de son appelant de son propre `reg_count`, donc elle peut couvrir
+  plusieurs zones de varargs d'un coup. Ne protéger que l'appelant immédiat enterrait les varargs
+  du GRAND-PARENT : `f(...)` appelant une méthode qui transmet `...` à une troisième fonction
+  variadique relisait `1, 1, 9` au lieu de `7, 8, 9` — d'abord recouverts par le relèvement des
+  varargs de la méthode, puis par la zone de varargs du troisième cadre. Les destinations sont
+  posées **au-dessus de toutes les sources**, sans quoi une zone atterrirait sur une zone pas
+  encore déplacée. Figé dans `regressions.ol` (`vaThreeDeep`), et le test échoue bien sur le
+  binaire d'avant.
+- **Le filtre devant ce relèvement est un `va_low_` en O(1)**, la plus basse zone de varargs des
+  cadres vivants. La marche, elle, est en O(profondeur d'appel) : l'appeler sans condition coûte
+  **+23,4 % sur `fib`**, mesuré, la récursion re-parcourant la pile à chaque appel. Le repère peut
+  être trop BAS — un `pop` ne l'entretient PAS, pour que `op_RETURN` ne paie rien — mais jamais
+  trop haut, et la marche le réarme exactement puisqu'elle vient de voir tous les cadres : un
+  repère périmé coûte une marche qui ne trouve rien et se désarme. Une comparaison contre ce
+  membre est **moins chère que l'ancien test** qui lisait le cadre du sommet (`fib` −2,2 %).
+  ⚠ Ne pas le remplacer par un COMPTEUR de cadres variadiques : mesuré à +1,47 % sur `fib`, la
+  montée et les quatre descentes tombant sur `op_RETURN`.
 
 **`RetBuf` sert à TOUT tampon d'appel, pas seulement aux retours** : un appel natif vers un builtin
 en avait un `std::vector`, donc une allocation et une libération **par appel**, sur deux chemins qui

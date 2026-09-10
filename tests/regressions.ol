@@ -2571,6 +2571,26 @@ func vaAfterVariadic(...)
     return out + "/" + inner
 end
 
+class VaFwd
+    func take(...)
+        return vaInner(...)
+    end
+end
+## A vararg tail forwarded through a METHOD, with a live method call before it: three variadic
+## frames at once (this function, take, vaInner), and the innermost one's window plus its own
+## vararg area reach past the OUTERMOST one's varargs. Lifting only the immediate caller's buried
+## them: vaInner read back 1, 1, 9 for 7, 8, 9, and this function's own `...` was gone too.
+func vaThreeDeep(...)
+    var vaFwd = VaFwd()
+    var first = vaFwd.take(1)
+    var second = vaFwd.take(...)
+    var out = ""
+    for v in [...] do
+        out = out + "[" + "{v}" + "]"
+    end
+    return first + "/" + second + "/" + out
+end
+
 class VaSix
     func init(a, b, c, d, e, f)
         self.first = a
@@ -2594,6 +2614,10 @@ func vaCheck()
     ## static register, past the slots the compiler reserved, so it wrote over the caller's own
     ## varargs BEFORE any frame was pushed — `f(7, 8, 9, 10, 11)` read back 11, 8, 9, 10, 11.
     assert(vaAfterClass(7, 8, 9, 10, 11) == "[7][8][9][10][11]/1")
+    ## Three variadic frames live at once — see vaThreeDeep. The outermost frame's varargs are the
+    ## ones that were lost, so the assertion checks BOTH what the innermost call received and what
+    ## the outer `...` still reads afterwards.
+    assert(vaThreeDeep(7, 8, 9) == "1/789/[7][8][9]")
 
     ## Declared HERE, not at the top level: `func obj.field(...)` is a lambda assigned to a field,
     ## so it takes a register, and this file leaves none to spare up there.
