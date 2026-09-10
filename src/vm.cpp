@@ -201,10 +201,8 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     }
     }
     int call_base = (int)regs.size();
-    grow_regs((size_t)(call_base + std::max((int)ch->funcs[fi].reg_count, 1)));
-    regs[call_base] = obj; // self in R[0], before push_frame
     uint32_t saved_ip = ip;
-    ip = push_frame(call_base, fi, 1, std::move(frame_upvals), 0, -1, -1);
+    ip = push_frame_copied(fi, nullptr, 0, &obj, std::move(frame_upvals), 0, -1);
     run_goto(call_stack.size() - 1);
     std::string result;
     if ((int)regs.size() > call_base)
@@ -378,11 +376,8 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
-    int nb = (int)regs.size();
-    grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 2)));
-    regs[nb] = std::move(lhs);
-    regs[nb + 1] = std::move(rhs);
-    uint32_t addr = push_frame(nb, fi, 2, std::move(fuv), ip, /*return_dest=*/dest, -1);
+    Value two[2] = {std::move(lhs), std::move(rhs)};
+    uint32_t addr = push_frame_copied(fi, two, 2, nullptr, std::move(fuv), ip, /*return_dest=*/dest);
     if (negate)
         call_stack.back().negate_result = true;
     return addr;
@@ -394,10 +389,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolve_func_val(fn, fuv); // fn is callable, per the guard above
-    int nb = (int)regs.size();
-    grow_regs((size_t)(nb + std::max((int)ch->funcs[fi].reg_count, 1)));
-    regs[nb] = std::move(lhs);
-    return push_frame(nb, fi, 1, std::move(fuv), ip, /*return_dest=*/dest, -1);
+    return push_frame_copied(fi, &lhs, 1, nullptr, std::move(fuv), ip, /*return_dest=*/dest);
 }
 
 // unwind_to_handler: the unwinding shared by a script throw and a C++ runtime error.
@@ -443,20 +435,8 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
     }
     std::unique_ptr<std::vector<Upvalue*>> fuv;
     uint8_t fi = resolve_func_val(init_fn, fuv);
-    int total = argc + 1;
-    grow_regs((size_t)(base_reg + std::max((int)ch->funcs[fi].reg_count, total)));
-    // Shifts the arguments to make room for self at base_reg: base_reg+arg_off+i becomes
-    // base_reg+1+i. The direction of the walk depends on dest versus src, so that arguments not
-    // yet moved are not overwritten.
-    if (arg_off >= 1)
-        for (int i = 0; i < argc; ++i)
-            regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
-    else
-        for (int i = argc - 1; i >= 0; --i)
-            regs[base_reg + 1 + i] = std::move(regs[base_reg + arg_off + i]);
-    regs[base_reg + 0] = std::move(inst);
     // No flag on the frame: the compiler has already made every `return` of an init hand back self.
-    return push_frame(base_reg, fi, total, std::move(fuv), ip, -1, -1);
+    return push_frame_self(base_reg, fi, argc, arg_off, std::move(inst), std::move(fuv), ip);
 }
 
 // Closes and releases ALL the frame's open upvalues. HOT path: called on every function
@@ -669,13 +649,8 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
     uint8_t fi = resolve_func_val(fn, frame_upvals); // the ONE place that reads a function value
     int call_base = (int)regs.size();
-    if (argc > 0) {
-        grow_regs((size_t)(call_base + argc));
-        for (int i = 0; i < argc; i++)
-            regs[call_base + i] = args[i];
-    }
     uint32_t saved_ip = ip;
-    ip = push_frame(call_base, fi, argc, std::move(frame_upvals), saved_ip, -1, -1);
+    ip = push_frame_copied(fi, args, argc, nullptr, std::move(frame_upvals), saved_ip, -1);
     run_goto(call_stack.size() - 1);
     // f's return values sit in regs[call_base..], and last_results_ says how many.
     int avail = (int)regs.size() - call_base;
@@ -708,6 +683,48 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 // defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
 //   4. builds and pushes the Frame
 //   5. returns fp.addr (the caller does ip = push_frame(...))
+int VM::frames_top() const {
+    if (call_stack.empty())
+        return 0;
+    // The frame does not keep reg_count, but varargs_base IS reg_base + reg_count, so the end of
+    // the window is that field and the end of everything is it plus the varargs.
+    const Frame& top = call_stack.back();
+    return top.varargs_base + top.n_varargs;
+}
+
+uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc, const Value* self,
+                               std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest) {
+    int n_self = self != nullptr ? 1 : 0;
+    int total = argc + n_self;
+    // regs.size() is at or above frames_top(), so a frame born here treads on nothing. It is used
+    // rather than frames_top() because the register file never shrinks below what the live frames
+    // need, and the size is one load instead of a walk.
+    int base = (int)regs.size();
+    grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, std::max(total, 1))));
+    if (n_self != 0)
+        regs[base] = *self;
+    for (int i = 0; i < argc; ++i)
+        regs[base + n_self + i] = args[i];
+    return push_frame(base, fi, total, std::move(fuv), return_ip, return_dest, -1);
+}
+
+uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
+                             std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip) {
+    int total = argc + 1;
+    grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, total)));
+    // The arguments slide from base + arg_off to base + 1, and the DIRECTION of the walk follows
+    // which of the two is higher: walking the wrong way overwrites an argument before it is read.
+    // Both callers used to decide that themselves, one of them with the two loops written out.
+    if (arg_off >= 1)
+        for (int i = 0; i < argc; ++i)
+            regs[base + 1 + i] = std::move(regs[base + arg_off + i]);
+    else
+        for (int i = argc - 1; i >= 0; --i)
+            regs[base + 1 + i] = std::move(regs[base + arg_off + i]);
+    regs[base] = std::move(self);
+    return push_frame(base, fi, total, std::move(fuv), return_ip, -1, -1);
+}
+
 uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                         uint32_t return_ip, int return_dest, int result_base) {
     const FuncProto& fp = ch->funcs[fi];
@@ -1807,6 +1824,10 @@ dispatch_loop:
             bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_len_call;
             bool inject_self = recv_is_instance && !fn_is_static;
             int total;
+            // The block is normalised HERE and not through push_frame_self, because a builtin
+            // method reads its arguments from these very registers just below: going through the
+            // helper would shift them a second time. This is the "already in place" axis of the
+            // convention (see vm.h), whose answer is a direct push_frame.
             if (inject_self) {
                 for (int i = 0; i < argc; ++i)
                     regs[cb + 1 + i] = std::move(regs[cb + 2 + i]);

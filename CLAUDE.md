@@ -2122,6 +2122,25 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
 - **Le retour d'un appel natif → Ollin** : `call_value_multi`, dont `call_value` n'est que le cas
   à un résultat. Les deux portaient les mêmes quarante lignes, donc deux endroits où le protocole
   d'appel pouvait dériver.
+- **La CONVENTION D'APPEL — comment les paramètres arrivent au cadre** : énoncée en un seul
+  endroit, au-dessus de `push_frame` dans `vm.h`. Neuf sites la réécrivaient, et tous répondaient
+  aux mêmes trois questions dont deux seulement variaient : où NAÎT le cadre (à un registre que
+  l'appelant a réservé, ou au-dessus de tout ce qu'un cadre vivant occupe), d'où viennent les
+  ARGUMENTS (déjà en place ; décalés pour faire place à un `self` ; recopiés depuis l'extérieur du
+  fichier de registres), et où vont les RÉSULTATS (à la base du cadre, ou à un registre nommé).
+  `push_frame_copied` et `push_frame_self` nomment les deux réponses qui ne sont pas « déjà en
+  place » ; le cas en place reste un appel DIRECT à `push_frame`, délibérément — c'est `CALL_FUNC`,
+  `CALL_DYN` et `CALL_METHOD`, trente millions d'appels dans `bench_fib`. Coût mesuré de
+  l'unification : **+0,40 % sur `fib`** (qui ne prend aucun des deux nouveaux chemins, donc
+  placement), +0,00 % sur la boucle, +0,07 % sur la map — contre +1,4 % pour la tentative
+  d'enveloppes annulée plus haut, dont la leçon tient toujours : nommer un axe ne doit pas ajouter
+  une couche au seul chemin qui ne peut pas se le permettre.
+  ⚠ `CALL_METHOD` normalise son bloc d'arguments lui-même et n'emploie donc pas
+  `push_frame_self` : un builtin appelé en méthode lit ces registres-là, si bien que passer par le
+  helper les décalerait deux fois.
+- **Le sommet réellement occupé** : `frames_top()`. Un cadre né là ne peut marcher sur rien, ce
+  qui est l'invariant sur lequel repose le fichier de registres — et que rien n'énonçait, ce qui a
+  laissé vivre la corruption des varargs (cf. `push_frame`).
 
 **Les valeurs d'un retour multiple sont rassemblées sur la PILE** (`RetBuf`, vm.h) jusqu'à huit,
 avec repli sur un vecteur au-delà : un `std::vector` par retour, c'était une allocation et une

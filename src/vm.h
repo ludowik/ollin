@@ -224,6 +224,39 @@ class VM {
     uint32_t push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                         uint32_t return_ip, int return_dest, int result_base);
 
+    // THE CALLING CONVENTION, in one place. Every call ends at push_frame, but getting the
+    // arguments to where it expects them used to be written out at each site, nine times over —
+    // and each of those nine answered the same three questions, of which only two ever varied:
+    //
+    //   where does the frame START?   at a register the caller reserved (the arguments are already
+    //                                 in place there), or above everything a live frame occupies
+    //   where do the ARGUMENTS come from?  already in place; or shifted to make room for a `self`;
+    //                                      or copied in from outside the register file
+    //   where do the RESULTS go?      at the frame's base, or at a register the caller names
+    //
+    // The two helpers below name the two answers that are not "already in place". The in-place
+    // case stays a direct push_frame call, deliberately: it is CALL_FUNC, CALL_DYN and
+    // CALL_METHOD, thirty million calls in bench_fib, and CLAUDE.md records that wrapping this
+    // path in named helpers cost +1,4 % and was reverted. Naming an axis must not add a layer to
+    // the one path that cannot afford one.
+    //
+    // A frame born ABOVE everything: `self` and the arguments are copied in from outside the
+    // register file — the `__str` bridge, a meta-method, and the native-to-Ollin call all did this
+    // by hand. `self` may be nil, in which case only the arguments are laid down.
+    uint32_t push_frame_copied(uint8_t fi, const Value* args, int argc, const Value* self,
+                               std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest);
+
+    // A frame at a register the caller reserved, with `self` INSERTED at its base: the arguments
+    // already sit at base + arg_off and slide to base + 1. Both callers — a constructor and a
+    // method call — wrote the two directions of that slide themselves.
+    uint32_t push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
+                             std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
+
+    // The first register no live frame is using: its own window and its varargs both counted. A
+    // frame born here cannot tread on anything, which is the invariant the register file rests on
+    // and which nothing used to state.
+    int frames_top() const;
+
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())
             return (double)v.as_int();
