@@ -251,11 +251,9 @@ class VM {
     // method call — wrote the two directions of that slide themselves.
     uint32_t push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
-
-    // The first register no live frame is using: its own window and its varargs both counted. A
-    // frame born here cannot tread on anything, which is the invariant the register file rests on
-    // and which nothing used to state.
-    int frames_top() const;
+    // The invariant under both: no frame's window or vararg area ever overlaps another live
+    // frame's. It is ENFORCED by push_frame, which lifts the caller's varargs above everything the
+    // new frame will occupy — not stated by a helper that nothing would call.
 
     [[gnu::always_inline]] inline double as_double(const Value& v) {
         if (v.is_integer())

@@ -683,22 +683,12 @@ Value VM::call_value(const Value& fn, const Value& a, const Value& b, const Valu
 // defaults for missing arguments (argc < n_fixed), then move the varargs past reg_count.
 //   4. builds and pushes the Frame
 //   5. returns fp.addr (the caller does ip = push_frame(...))
-int VM::frames_top() const {
-    if (call_stack.empty())
-        return 0;
-    // The frame does not keep reg_count, but varargs_base IS reg_base + reg_count, so the end of
-    // the window is that field and the end of everything is it plus the varargs.
-    const Frame& top = call_stack.back();
-    return top.varargs_base + top.n_varargs;
-}
-
 uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc, const Value* self,
                                std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest) {
     int n_self = self != nullptr ? 1 : 0;
     int total = argc + n_self;
-    // regs.size() is at or above frames_top(), so a frame born here treads on nothing. It is used
-    // rather than frames_top() because the register file never shrinks below what the live frames
-    // need, and the size is one load instead of a walk.
+    // The register file never shrinks below what the live frames need — windows and varargs alike
+    // — so a frame born at its size treads on nothing, and the size is one load.
     int base = (int)regs.size();
     grow_regs((size_t)(base + std::max((int)ch->funcs[fi].reg_count, std::max(total, 1))));
     if (n_self != 0)

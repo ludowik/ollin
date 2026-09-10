@@ -69,6 +69,10 @@ qu'après un **GO explicite** de l'utilisateur (« GO », « implémente », « 
 Répondre à mes questions de cadrage/design **ne vaut pas** GO. En cas de doute,
 demander — ne pas deviner.
 
+**Committer et pousser ne s'ANNONCE pas (règle permanente).** C'est fait systématiquement en fin
+de chaque évolution, suite verte à l'appui : ne jamais écrire « je committe et je pousse dès que… »,
+ni le proposer, ni le décrire comme une étape à venir. Le résultat se lit dans `git log`.
+
 **« next » = une PROPOSITION, pas un chantier (règle permanente).** Sur « next » (ou
 « suivant »), présenter **un** point précis à corriger, expliquer ce qui cloche et, quand
 plusieurs chemins existent, les exposer — puis **attendre le choix de l'utilisateur**.
@@ -2138,9 +2142,12 @@ Trois questions n'ont qu'UN lieu de réponse dans `vm.cpp`, et le contourner a d
   ⚠ `CALL_METHOD` normalise son bloc d'arguments lui-même et n'emploie donc pas
   `push_frame_self` : un builtin appelé en méthode lit ces registres-là, si bien que passer par le
   helper les décalerait deux fois.
-- **Le sommet réellement occupé** : `frames_top()`. Un cadre né là ne peut marcher sur rien, ce
-  qui est l'invariant sur lequel repose le fichier de registres — et que rien n'énonçait, ce qui a
-  laissé vivre la corruption des varargs (cf. `push_frame`).
+- **L'invariant du fichier de registres** — la fenêtre et la zone de varargs d'un cadre ne
+  recouvrent jamais celles d'un autre cadre vivant — est IMPOSÉ par `push_frame`, qui relève les
+  varargs de l'appelant au-dessus de tout ce que le cadre neuf va occuper. Rien ne l'énonçait
+  avant, ce qui a laissé vivre la corruption des varargs. Un `frames_top()` qui le CALCULAIT a été
+  écrit puis retiré : personne ne l'appelait, et un invariant tient par ce qui l'impose, pas par
+  une fonction qui le décrit.
 
 **Les valeurs d'un retour multiple sont rassemblées sur la PILE** (`RetBuf`, vm.h) jusqu'à huit,
 avec repli sur un vecteur au-delà : un `std::vector` par retour, c'était une allocation et une
