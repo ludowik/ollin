@@ -1,4 +1,5 @@
 #include "image_module.h"
+#include "graphics_internal.h"   // with_area: a drawing call needs a window
 #include "../paths.h"
 #include "../vm.h"
 #include "modules/module_utils.h"
@@ -755,18 +756,18 @@ void image_free_tex(int id) {
 
 Value make_image_module() {
     return MapBuilder()
-        .fn("load", img_load)
-        .fn("loadData", img_load_data)
-        .fn("create", img_create)
-        .fn("fromPattern", img_from_pattern)
-        .fn("beginDraw", img_begin)
-        .fn("endDraw", img_end)
-        .fn("draw", img_draw)
-        .fn("unload", img_unload)
-        .fn("beginPixels", img_begin_pixels)
-        .fn("endPixels", img_end_pixels)
-        .fn("getPixel", img_get_pixel)
-        .fn("setPixel", img_set_pixel)
-        .fn("mapPixel", img_map_pixel)
+        .fn("load", with_area<img_load>)
+        .fn("loadData", with_area<img_load_data>)
+        .fn("create", with_area<img_create>)
+        .fn("fromPattern", with_area<img_from_pattern>)
+        .fn("beginDraw", with_area<img_begin>)
+        .fn("endDraw", with_area<img_end>)
+        .fn("draw", with_area<img_draw>)
+        .fn("unload", with_area<img_unload>)
+        .fn("beginPixels", with_area<img_begin_pixels>)
+        .fn("endPixels", with_area<img_end_pixels>)
+        .fn("getPixel", with_area<img_get_pixel>)
+        .fn("setPixel", with_area<img_set_pixel>)
+        .fn("mapPixel", with_area<img_map_pixel>)
         .done();
 }

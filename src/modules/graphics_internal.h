@@ -53,6 +53,21 @@ bool gfx_view_map(float* x, float* y);
 // Strip taken at the top by the FPS overlay, composed ON TOP OF the render texture: a module
 // drawing at the top of the area must leave it free.
 
+// A drawing call needs a drawing AREA. With no window there is no GL context, and raylib's draw
+// and state calls dereference it: `graphics.line(0, 0, 10, 10)` as a whole program used to take the
+// engine down with a SEGMENTATION FAULT — one line, no message, no line number, and the same for
+// image.endDraw and the matrix stack. The guard is applied by WRAPPING the entry in the module's
+// registration table (with_area<F>), which is the one place a primitive is named: a new one is
+// therefore protected unless somebody deliberately exempts it. The exemptions are the calls that
+// must work before a window exists — graphics.canvas, which opens it, and the pure style state.
+// image_module.cpp uses this too, which is why the header serves three units and not two.
+void gfx_need_area();
+
+template <int (*F)(CallCtx&)> int with_area(CallCtx& ctx) {
+    gfx_need_area();
+    return F(ctx);
+}
+
 // Inside a begin3d/end3d block? Defined on the 3D side, read by the 2D side's graphics.scale,
 // which must not touch the depth of a 2D drawing (see gfx_scale).
 bool gfx_in_3d();
