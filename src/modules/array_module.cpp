@@ -156,6 +156,31 @@ static int arr_sort(CallCtx& ctx) {
     return ctx.ret(arr);
 }
 
+// array.join([separator]): every element as one text, the separator between them — the inverse
+// of string.split.
+//
+// The conversion is BASIC and calls NOTHING back: an instance wears its class name and its __str
+// is never run. So no Ollin code executes inside this loop, the register file cannot move under
+// it, and there is none of the copying the higher-order members above have to do.
+static int arr_join(CallCtx& ctx) {
+    arr_check(ctx, 1, "join: expected (array [, separator])");
+    std::string sep;
+    if (ctx.argc >= 2) {
+        if (!ctx.args[1].is_string())
+            throw std::runtime_error("array.join: the separator must be a string");
+        sep = ctx.args[1].as_string();
+    }
+    const Value& arr = ctx.args[0];
+    int64_t n = arr.array_size();
+    std::string out;
+    for (int64_t i = 1; i <= n; i++) {
+        if (i > 1)
+            out += sep;
+        out += value_to_string_plain(arr.array_get(i));
+    }
+    return ctx.ret(Value(out));
+}
+
 Value make_array_module() {
     return MapBuilder()
         .fn("len", arr_len)
@@ -169,5 +194,6 @@ Value make_array_module() {
         .fn("filter", arr_filter)
         .fn("reduce", arr_reduce)
         .fn("sort", arr_sort)
+        .fn("join", arr_join)
         .done();
 }

@@ -206,7 +206,11 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
     return result;
 }
 
-std::string value_to_string(const Value& v) {
+// The conversion that NEVER calls back into Ollin: every label a value can wear, minus the one
+// case that runs script code. value_to_string is this one plus the `__str` of an instance, so the
+// labels are written ONCE — a caller that must not re-enter the VM still spells a map, an array or
+// a function exactly like print does.
+std::string value_to_string_plain(const Value& v) {
     if (v.is_nil())
         return "nil";
     // In English like the language keywords: what is printed can be pasted straight back into
@@ -218,11 +222,12 @@ std::string value_to_string(const Value& v) {
     if (v.is_class())
         return "{class}";
     if (v.is_map()) {
-        VM* vm = VM::current();
-        if (vm) {
-            Value cls = v.map_get(MK().class_);
-            if (!cls.is_nil())
-                return vm->invoke_str(v);
+        // An instance wears its class name, which is a plain map read; only value_to_string goes
+        // on to call its __str.
+        Value cls = v.map_get(MK().class_);
+        if (!cls.is_nil()) {
+            Value nm = cls.map_get(MK().name_);
+            return nm.is_string() ? "{" + nm.as_string() + "}" : "{object}";
         }
         return "{map}";
     }
@@ -235,6 +240,18 @@ std::string value_to_string(const Value& v) {
     if (v.is_func_val() || v.is_closure() || v.is_builtin())
         return "{function}";
     return number_text(v);
+}
+
+std::string value_to_string(const Value& v) {
+    if (v.is_map()) {
+        VM* vm = VM::current();
+        if (vm) {
+            Value cls = v.map_get(MK().class_);
+            if (!cls.is_nil())
+                return vm->invoke_str(v);
+        }
+    }
+    return value_to_string_plain(v);
 }
 
 static int builtin_assert(CallCtx& ctx) {

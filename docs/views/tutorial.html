@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-13 17:01</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-13 17:54</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-13 17:01</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-13 17:54</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1328,6 +1328,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.delete(i)</code></td><td>Removes and returns the element at index <code>i</code></td></tr>
 <tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
+<tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>
 </table>
 <pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
 a.push(<span class="num">4</span>)           <span class="cmt">## [1, 2, 3, 4]</span>
@@ -1338,7 +1339,12 @@ a.delete(<span class="num">2</span>)        <span class="cmt">## removes 99 → 
 <span class="kw">var</span> q = []          <span class="cmt">## a FIFO queue</span>
 q.enqueue(<span class="str">"a"</span>)
 q.enqueue(<span class="str">"b"</span>)
-q.dequeue()         <span class="cmt">## "a"</span></code></pre>
+q.dequeue()         <span class="cmt">## "a"</span>
+
+<span class="bi">print</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].join(<span class="str">", "</span>))       <span class="cmt">## 1, 2, 3</span>
+<span class="bi">print</span>(<span class="str">"a,b,c"</span>.split(<span class="str">","</span>).join(<span class="str">" | "</span>))  <span class="cmt">## a | b | c</span></code></pre>
+
+<div class="callout tip"><code>join</code> converts each element the way <code>print</code> shows it, but <strong>without ever running a <code>__str</code></strong>: an instance comes out as <code>{ClassName}</code>. The conversion stays basic on purpose, so that joining an array can never run code of yours in the middle of it.</div>
 
 <h3>Copy semantics</h3>
 <div class="callout warn">Arrays are <strong>shared by reference</strong>, with reference counting, just as maps are.</div>
@@ -1545,6 +1551,8 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
 </table>
 
 <div class="callout tip">Everything works <strong>in UTF-8, by character (codepoint)</strong>, not by byte. <code>len</code>/<code>string.char</code>/<code>string.substr</code> count characters (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>); <code>string.trim</code> trims by codepoint; <code>string.upper</code>/<code>lower</code> handle the accented Latin letters (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Beyond Latin (Greek, Cyrillic…), case leaves the text unchanged.</div>
+
+<div class="callout tip">To put the pieces back together, use <code>join</code> — it lives on the <strong>array</strong>, next to <code>map</code> and <code>filter</code>, since that is what it is given: <code>s.split(",").join(", ")</code>.</div>
 
 <div class="callout tip"><code>string.split</code> always gives an <strong>array</strong>, never <code>nil</code>: a text without the separator is an array of one element, so the calling code loops with no special case. Empty pieces are kept — <code>"a,,b"</code> is three pieces and <code>"a,"</code> is two — which is what lets you split a text and put it back together unchanged; filter them out if you would rather not have them. An <strong>empty separator is refused</strong> rather than answered with a guess.</div>
 

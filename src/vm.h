@@ -9,6 +9,10 @@
 
 std::string value_to_string(const Value& v);
 
+// The same conversion WITHOUT the one branch that runs Ollin code: an instance wears its class
+// name instead of being handed to its __str. For a native function that must not re-enter the VM.
+std::string value_to_string_plain(const Value& v);
+
 // Heap bytes currently in use, cross-platform. Backs the mem() builtin and the engine's
 // memory overlay.
 uint64_t ollin_heap_bytes();

@@ -244,6 +244,9 @@ check_error "string.split with a non-string separator" 'print(string.split("a", 
 check_error "string.split with a non-number max"     'print(string.split("a", ",", "x"))' "string.split: argument 3 expected number"
 check_error "string.split with one argument"         'print(string.split("a"))'          "string.split: missing argument"
 
+# array.join takes a string separator, and says so instead of converting one silently.
+check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"
+
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "an optional call on an integer" \
     'var x = 42

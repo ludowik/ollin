@@ -354,6 +354,15 @@ func fndTail(...)
     return "{a}/{b}"
 end
 
+class JoinPt
+    func init(n)
+        self.n = n
+    end
+    func __str()
+        return "PT{self.n}"
+    end
+end
+
 ## ── string: indexing by CHARACTER (a UTF-8 codepoint), not by byte ─────────
 assert(len("café") == 4)                     ## four characters (é takes two bytes)
 assert(len("héllo") == 5)
@@ -438,6 +447,28 @@ func splitCheck()
     assert(m.len() == 2 and m[1] == "" and m[2] == "a")
 end
 splitCheck()
+
+## array.join: the inverse of split. The conversion is BASIC and calls nothing back — an
+## instance wears its class name and its __str is NEVER run, unlike print's.
+func joinCheck()
+    assert(["a", "b", "c"].join(" | ") == "a | b | c")
+    assert([1, 2, 3].join(", ") == "1, 2, 3")       ## numbers convert, as print shows them
+    assert(["a", "b"].join() == "ab")               ## no separator: the pieces end to end
+    assert([].join(", ") == "")                     ## an empty array gives an empty text
+    assert(["seul"].join(", ") == "seul")           ## one element: no separator anywhere
+    assert([nil, true, false].join("/") == "nil/true/false")
+    ## split then join with the same separator gives the text back — that is why split keeps its
+    ## empty pieces.
+    assert("a,,b,c".split(",").join(",") == "a,,b,c")
+    assert("x=1".split("=").join("=") == "x=1")
+    ## A value that is not text wears its label, the same one print uses for it.
+    assert([{}, [1]].join(" ") == "\{map} \{array}")
+    ## And an INSTANCE wears its class name: join never runs the script's __str, which is the
+    ## whole point — no Ollin code executes inside it, so the register file cannot move under it.
+    assert([JoinPt(1), JoinPt(2)].join(" ") == "\{JoinPt} \{JoinPt}")
+    assert("{JoinPt(1)}" == "PT1")                  ## interpolation, itself, DOES call __str
+end
+joinCheck()
 
 ## string.len: a length in codepoints, on strings only, unlike the polymorphic global len
 assert(string.len("café") == 4)               ## é takes two bytes, and is one character
