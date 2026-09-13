@@ -236,6 +236,14 @@ check_error "string.find with a non-string needle"   'print(string.find("abc", 4
 check_error "string.find with a non-number start"    'print(string.find("abc", "a", "x"))' "string.find: argument 3 expected number"
 check_error "string.find with one argument"          'print(string.find("abc"))'        "string.find: missing argument"
 
+# string.split refuses an empty separator instead of inventing an answer, and says which
+# argument is of the wrong type.
+check_error "string.split with an empty separator"   'print(string.split("a,b", ""))'   "string.split: the separator must not be empty"
+check_error "string.split with a non-string subject" 'print(string.split(42, ","))'      "string.split: expected string"
+check_error "string.split with a non-string separator" 'print(string.split("a", 42))'    "string.split: expected string"
+check_error "string.split with a non-number max"     'print(string.split("a", ",", "x"))' "string.split: argument 3 expected number"
+check_error "string.split with one argument"         'print(string.split("a"))'          "string.split: missing argument"
+
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "an optional call on an integer" \
     'var x = 42

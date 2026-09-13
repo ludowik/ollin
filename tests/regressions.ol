@@ -403,6 +403,42 @@ func fndCheck()
 end
 fndCheck()
 
+## string.split: a literal split that ALWAYS gives an array, so a text without the separator
+## loops like any other. Grouped in a function for the same reason as fndCheck above.
+func splitCheck()
+    var a = string.split("a,b,c", ",")
+    assert(a.len() == 3 and a[1] == "a" and a[2] == "b" and a[3] == "c")
+    var b = "nom: Ollin".split(": ")          ## a multi-character separator
+    assert(b.len() == 2 and b[1] == "nom" and b[2] == "Ollin")
+    var c = string.split("abc", "|")          ## absent: one piece, the whole text
+    assert(c.len() == 1 and c[1] == "abc")
+    ## Empty pieces are KEPT — dropping them would lose an empty column in silence, and it is what
+    ## makes splitting and rejoining give the text back.
+    var d = string.split("a,,b", ",")
+    assert(d.len() == 3 and d[1] == "a" and d[2] == "" and d[3] == "b")
+    var e = string.split("a,", ",")
+    assert(e.len() == 2 and e[2] == "")
+    var f = string.split(",a", ",")
+    assert(f.len() == 2 and f[1] == "")
+    var g = string.split("", ",")             ## always an array: one empty piece
+    assert(g.len() == 1 and g[1] == "")
+    ## max bounds the number of pieces, and the LAST one keeps the whole remainder
+    var h = string.split("k=a=b", "=", 2)
+    assert(h.len() == 2 and h[1] == "k" and h[2] == "a=b")
+    var i = string.split("a,b,c", ",", 1)
+    assert(i.len() == 1 and i[1] == "a,b,c")
+    var j = string.split("a,b,c", ",", 0)     ## below 1 is clamped to 1, as find clamps `from`
+    assert(j.len() == 1 and j[1] == "a,b,c")
+    var k = string.split("a,b,c", ",", 99)    ## a max beyond the count changes nothing
+    assert(k.len() == 3)
+    ## a separator of several bytes, and pieces carrying accents
+    var l = string.split("café→thé", "→")
+    assert(l.len() == 2 and l[1] == "café" and l[2] == "thé")
+    var m = string.split("aaa", "aa")         ## overlapping: the FIRST match, then the remainder
+    assert(m.len() == 2 and m[1] == "" and m[2] == "a")
+end
+splitCheck()
+
 ## string.len: a length in codepoints, on strings only, unlike the polymorphic global len
 assert(string.len("café") == 4)               ## é takes two bytes, and is one character
 assert(string.len("a€b") == 3)                ## € takes three bytes, and is one character

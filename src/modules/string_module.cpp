@@ -214,6 +214,51 @@ static int str_find(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
+// string.split(s, sep [, max]): splits on a LITERAL separator — no patterns, no regular
+// expressions, like find.
+//
+// ALWAYS returns an array, so a text without the separator gives one element and the caller loops
+// without a special case. Empty pieces are KEPT, which is what makes splitting and rejoining give
+// the text back: "a,,b" is three pieces and "a," is two. Dropping them would lose an empty column
+// of a data file in silence, and whoever does not want them filters them out.
+//
+// `max` bounds the number of pieces and the LAST one keeps the whole remainder — that is what
+// reads a "key=value=with=equals" line in two. Below 1 it is clamped to 1, as find clamps `from`.
+//
+// An EMPTY separator is refused rather than answered with a guess: splitting "on nothing" has no
+// obvious result, and the real need behind it — the characters one by one — belongs to a function
+// that says so.
+//
+// Bytes are compared here, not codepoints: nothing is returned as an index, and UTF-8 is
+// self-synchronising, so a byte match always begins on a character boundary.
+static int str_split(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.split");
+    const std::string& sep = str_arg(args, argc, 1, "string.split");
+    if (sep.empty())
+        throw std::runtime_error("string.split: the separator must not be empty");
+    int max_pieces = 0; // 0 = unbounded
+    if (argc >= 3) {
+        max_pieces = to_int_safe(num_arg(args, argc, 2, "string.split"));
+        if (max_pieces < 1)
+            max_pieces = 1;
+    }
+    Value out = Value::make_array();
+    size_t start = 0;
+    int done = 0;
+    while (max_pieces == 0 || done + 1 < max_pieces) {
+        size_t hit = s.find(sep, start);
+        if (hit == std::string::npos)
+            break;
+        out.array_push(Value(s.substr(start, hit - start)));
+        start = hit + sep.size();
+        ++done;
+    }
+    out.array_push(Value(s.substr(start))); // the remainder, empty when the text ends on a separator
+    return ctx.ret(out);
+}
+
 // string.len(s): the number of CHARACTERS (UTF-8 codepoints). Unlike the global len builtin,
 // which is polymorphic over arrays, maps, strings and ranges, this one accepts ONLY a string and
 // throws on any other type, through str_arg.
@@ -235,5 +280,6 @@ Value make_string_module() {
         .fn("char", str_char)
         .fn("substr", str_substr)
         .fn("find", str_find)
+        .fn("split", str_split)
         .done();
 }
