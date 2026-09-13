@@ -1,4 +1,5 @@
 #include "parser.h"
+#include "number_literal.h"
 #include "lexer.h"
 #include "paths.h"
 #include "source_registry.h"
@@ -954,26 +955,13 @@ std::unique_ptr<Expr> Parser::range_expr(bool incl_left) {
 std::unique_ptr<Expr> Parser::primary() {
     if (check(TokenType::NUMBER)) {
         Token tok = advance();
-        const std::string& lex = tok.lexeme;
-        try {
-            // The lexeme is NORMALISED by the lexer: no '_', and the base prefix and the
-            // exponent letter are lower case, so 'X'/'O'/'B'/'E' cannot appear here.
-            // 0x / 0o / 0b: an integer in base 16/8/2 (stoull keeps the whole bit pattern,
-            // wrapping int64). One conversion for the three bases, read from the prefix.
-            int base = lex.size() > 2 && lex[0] == '0' ? (lex[1] == 'x'   ? 16
-                                                          : lex[1] == 'o' ? 8
-                                                          : lex[1] == 'b' ? 2
-                                                                          : 0)
-                                                       : 0;
-            if (base)
-                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoull(lex.c_str() + 2, nullptr, base)));
-            // float on a '.' OR a scientific exponent; otherwise an integer.
-            if (lex.find('.') == std::string::npos && lex.find('e') == std::string::npos)
-                return std::make_unique<NumberExpr>(static_cast<int64_t>(std::stoll(lex)));
-            return std::make_unique<NumberExpr>(std::stod(lex));
-        } catch (const std::out_of_range&) {
-            fail_at(tok.line, "numeric literal out of range: " + lex);
-        }
+        NumLit n;
+        // The reading itself lives in number_literal.h, shared with string.number.
+        if (!number_from_lexeme(tok.lexeme, n))
+            fail_at(tok.line, "numeric literal out of range: " + tok.lexeme);
+        if (n.is_int)
+            return std::make_unique<NumberExpr>(n.i);
+        return std::make_unique<NumberExpr>(n.d);
     }
     if (check(TokenType::STRING))
         return parse_postfix(std::make_unique<StringExpr>(advance().lexeme));

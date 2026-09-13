@@ -470,6 +470,46 @@ func joinCheck()
 end
 joinCheck()
 
+## string.number: the LEXER reads the text, so every form the language accepts is accepted
+## here, and number_from_lexeme says what it is worth — the same reading a literal of the source
+## gets. Nothing else is a number, and nil says so.
+func numberCheck()
+    assert(string.number("42") == 42)
+    assert(string.number("-3.5") == -3.5)
+    assert(string.number("+7") == 7)
+    assert(string.number(" 42 ") == 42)          ## surrounding spaces are tolerated
+    assert(string.number("1e3") == 1000)
+    assert(string.number(".5") == 0.5)
+    ## the bases and the digit separator of the language, for free and by construction
+    assert(string.number("0xFF") == 255)
+    assert(string.number("0o17") == 15)
+    assert(string.number("0b101") == 5)
+    assert(string.number("1_000") == 1000)
+    ## INTEGER when the value is whole, so it indexes an array and matches an integer key
+    var tbl = [10, 20, 30]
+    assert(tbl[string.number("2")] == 20)
+    var mp = {}
+    mp[7] = "sept"
+    assert(mp[string.number("7")] == "sept")
+    ## All or nothing: a prefix would let a typo pass for data.
+    assert(string.number("42abc") == nil)
+    assert(string.number("bonjour") == nil)
+    assert(string.number("") == nil)
+    assert(string.number("1 2") == nil)          ## two numbers is not one number
+    assert(string.number("--3") == nil)
+    assert(string.number("4-2") == nil)
+    assert(string.number("@") == nil)            ## the lexer refuses it: nil, not an error
+    assert(string.number("0x") == nil)
+    assert(string.number("99999999999999999999999") == nil)  ## out of range is a failure, not a crash
+    ## what it is for: reading the pieces of a split
+    var total = 0
+    for piece in "10, 20, 30".split(",") do
+        total = total + piece.number()
+    end
+    assert(total == 60)
+end
+numberCheck()
+
 ## string.len: a length in codepoints, on strings only, unlike the polymorphic global len
 assert(string.len("café") == 4)               ## é takes two bytes, and is one character
 assert(string.len("a€b") == 3)                ## € takes three bytes, and is one character

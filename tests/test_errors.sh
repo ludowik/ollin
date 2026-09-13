@@ -247,6 +247,11 @@ check_error "string.split with one argument"         'print(string.split("a"))' 
 # array.join takes a string separator, and says so instead of converting one silently.
 check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "array.join: the separator must be a string"
 
+# string.number gives nil for a text that is not a number, but a non-STRING is a mistake of the
+# script and says so.
+check_error "string.number with a non-string"  'print(string.number(42))'  "string.number: expected string"
+check_error "string.number with no argument"   'print(string.number())'    "string.number: missing argument"
+
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "an optional call on an integer" \
     'var x = 42

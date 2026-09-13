@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-13 17:54</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-13 20:24</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-13 17:54</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-13 20:24</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1564,11 +1564,14 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
     <tr><td><code>string.char(s, i)</code></td><td>function</td><td>The character (UTF-8 codepoint) at index <code>i</code>, counting from 1 → a one-character string; <code>""</code> when out of bounds</td></tr>
     <tr><td><code>string.substr(s, start [, length])</code></td><td>function</td><td>A substring of <code>length</code> characters starting at <code>start</code>, counting from 1; <code>length</code> is optional (to the end otherwise), and the bounds are clamped</td></tr>
     <tr><td><code>string.find(s, needle [, from])</code></td><td>function</td><td><strong>Two values</strong>: where <code>needle</code> starts and the index just past it, counting characters from 1; <code>nil</code> when absent. A literal search, no patterns. The search starts at <code>from</code> (1 by default)</td></tr>
-    <tr><td><code>string.split(s, separator [, max])</code></td><td>function</td><td>An <strong>array</strong> of the pieces between each occurrence of <code>separator</code>, which is literal. Empty pieces are kept, and a text without the separator gives one piece. <code>max</code> bounds the number of pieces, the last one keeping the remainder</td></tr>
+    <tr><td><code>string.number(s)</code></td><td>function</td><td>The number the text is worth, or <code>nil</code> when it is not one. Every form the language itself accepts — decimal, exponent, <code>0x</code>, <code>0o</code>, <code>0b</code>, and the <code>_</code> separator — with an optional sign and surrounding spaces</td></tr>
+<tr><td><code>string.split(s, separator [, max])</code></td><td>function</td><td>An <strong>array</strong> of the pieces between each occurrence of <code>separator</code>, which is literal. Empty pieces are kept, and a text without the separator gives one piece. <code>max</code> bounds the number of pieces, the last one keeping the remainder</td></tr>
   </tbody>
 </table>
 
 <div class="callout tip">Everything works <strong>in UTF-8, by character (codepoint)</strong>, not by byte. <code>len</code>/<code>string.char</code>/<code>string.substr</code> count characters (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>); <code>string.trim</code> trims by codepoint; <code>string.upper</code>/<code>lower</code> handle the accented Latin letters (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Beyond Latin (Greek, Cyrillic…), case leaves the text unchanged.</div>
+
+<div class="callout tip"><code>string.number</code> is the only way to turn a text into a number: <code>"42" + 0</code> gives the <em>text</em> <code>"420"</code>, since <code>+</code> on a string concatenates. It is <strong>all or nothing</strong> — <code>"42abc"</code> gives <code>nil</code>, never <code>42</code> — and it gives an <strong>integer</strong> when the value is whole, so the result indexes an array and matches an integer map key. Failure is <code>nil</code> and never <code>0</code>, so that <code>"0"</code> and <code>"zero"</code> stay apart, and <code>nil</code> being false, <code>if s.number() then</code> reads as it should.</div>
 
 <div class="callout tip">To put the pieces back together, use <code>join</code> — it lives on the <strong>array</strong>, next to <code>map</code> and <code>filter</code>, since that is what it is given: <code>s.split(",").join(", ")</code>.</div>
 
@@ -1592,7 +1595,15 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
 <span class="bi">print</span>(parts.len())                   <span class="cmt">## 3</span>
 <span class="bi">print</span>(parts[<span class="num">2</span>])                     <span class="cmt">## b</span>
 <span class="kw">var</span> kv = <span class="str">"key=a=b"</span>.split(<span class="str">"="</span>, <span class="num">2</span>)
-<span class="bi">print</span>(kv[<span class="num">2</span>])                        <span class="cmt">## a=b</span></code></pre>
+<span class="bi">print</span>(kv[<span class="num">2</span>])                        <span class="cmt">## a=b</span>
+
+<span class="kw">var</span> total = <span class="num">0</span>
+<span class="kw">for</span> piece <span class="kw">in</span> <span class="str">"10, 20, 30"</span>.split(<span class="str">","</span>) <span class="kw">do</span>
+    total = total + piece.number()   <span class="cmt">## the spaces around a piece are tolerated</span>
+<span class="kw">end</span>
+<span class="bi">print</span>(total)                        <span class="cmt">## 60</span>
+<span class="bi">print</span>(<span class="str">"0xFF"</span>.number())            <span class="cmt">## 255</span>
+<span class="bi">print</span>(<span class="str">"42abc"</span>.number())           <span class="cmt">## nil</span></code></pre>
 </section>
 
 <!-- ── Import ─────────────────────────────────────────────────────────── -->

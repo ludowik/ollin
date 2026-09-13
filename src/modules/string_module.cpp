@@ -1,4 +1,6 @@
 #include "module_utils.h"
+#include "../lexer.h"
+#include "../number_literal.h"
 #include "utf8.h"
 #include <climits>
 #include <cmath>
@@ -259,6 +261,50 @@ static int str_split(CallCtx& ctx) {
     return ctx.ret(out);
 }
 
+// string.number(s): the number a text is worth, or nil.
+//
+// It owns NEITHER of the two rules it needs. The LEXER reads the text — so every form the
+// language itself accepts is accepted here, decimal, exponent, 0x, 0o, 0b and the '_' separator,
+// and no second definition of "what a number looks like" can drift from it. number_from_lexeme
+// then says what the token is worth, the same reading the parser gives a literal of the source.
+// This function only checks the SHAPE of the token list and applies the sign.
+//
+// The sign is not part of a literal: the lexer always emits '-' as its own token, so the accepted
+// shape is [+ | -] NUMBER END. Anything else is nil — "1 2" (two numbers), "42abc", "", a text the
+// lexer refuses, or a value that does not fit. All or nothing: reading a prefix would let a typo
+// pass for data.
+//
+// Whitespace around the text costs nothing to allow, the lexer skipping it already, and the
+// pieces of a split(", ") carry some.
+static int str_number(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.number");
+    std::vector<Token> toks;
+    try {
+        toks = Lexer(s).tokenize();
+    } catch (...) { // the lexer refuses the text: not a number, not an error of the script
+        return ctx.ret(Value{});
+    }
+    size_t i = 0;
+    bool negative = false;
+    if (i < toks.size() && (toks[i].type == TokenType::PLUS || toks[i].type == TokenType::MINUS)) {
+        negative = toks[i].type == TokenType::MINUS;
+        i++;
+    }
+    if (i >= toks.size() || toks[i].type != TokenType::NUMBER)
+        return ctx.ret(Value{});
+    const std::string& lex = toks[i].lexeme;
+    if (i + 1 >= toks.size() || toks[i + 1].type != TokenType::EOF_T)
+        return ctx.ret(Value{});
+    NumLit n;
+    if (!number_from_lexeme(lex, n))
+        return ctx.ret(Value{});
+    if (n.is_int)
+        return ctx.ret(Value(negative ? -n.i : n.i));
+    return ctx.ret(Value(negative ? -n.d : n.d));
+}
+
 // string.len(s): the number of CHARACTERS (UTF-8 codepoints). Unlike the global len builtin,
 // which is polymorphic over arrays, maps, strings and ranges, this one accepts ONLY a string and
 // throws on any other type, through str_arg.
@@ -281,5 +327,6 @@ Value make_string_module() {
         .fn("substr", str_substr)
         .fn("find", str_find)
         .fn("split", str_split)
+        .fn("number", str_number)
         .done();
 }
