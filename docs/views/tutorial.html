@@ -1329,6 +1329,10 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
 <tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>
+<tr><td><code>arr.map(fn)</code></td><td>A <strong>new</strong> array holding <code>fn(value, index)</code> for each element</td></tr>
+<tr><td><code>arr.filter(fn)</code></td><td>A <strong>new</strong> array with the elements for which <code>fn(value, index)</code> is true</td></tr>
+<tr><td><code>arr.reduce(fn, init)</code></td><td>Folds the array into a single value with <code>fn(accumulator, value, index)</code>, starting from <code>init</code> — which is <strong>required</strong></td></tr>
+<tr><td><code>arr.sort([cmp])</code></td><td>Sorts the array <strong>in place</strong> and returns it. <code>cmp(a, b)</code> is true when <code>a</code> comes first; without it, by type — <code>nil</code>, then numbers, then strings, then the rest — and by value within each type</td></tr>
 </table>
 <pre><code><span class="kw">var</span> a = [<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>]
 a.push(<span class="num">4</span>)           <span class="cmt">## [1, 2, 3, 4]</span>
@@ -1343,6 +1347,20 @@ q.dequeue()         <span class="cmt">## "a"</span>
 
 <span class="bi">print</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].join(<span class="str">", "</span>))       <span class="cmt">## 1, 2, 3</span>
 <span class="bi">print</span>(<span class="str">"a,b,c"</span>.split(<span class="str">","</span>).join(<span class="str">" | "</span>))  <span class="cmt">## a | b | c</span></code></pre>
+
+<h3>Walking the whole array at once</h3>
+<pre><code><span class="kw">var</span> t = [<span class="num">3</span>, <span class="num">1</span>, <span class="num">2</span>]
+
+t.map(<span class="kw">func</span>(v)  <span class="kw">return</span> v * <span class="num">10</span>  <span class="kw">end</span>)          <span class="cmt">## [30, 10, 20] — t itself is untouched</span>
+t.filter(<span class="kw">func</span>(v)  <span class="kw">return</span> v &gt; <span class="num">1</span>  <span class="kw">end</span>)       <span class="cmt">## [3, 2]</span>
+t.reduce(<span class="kw">func</span>(acc, v)  <span class="kw">return</span> acc + v  <span class="kw">end</span>, <span class="num">0</span>)  <span class="cmt">## 6</span>
+
+t.sort()                                <span class="cmt">## t BECOMES [1, 2, 3]</span>
+t.sort(<span class="kw">func</span>(a, b)  <span class="kw">return</span> a &gt; b  <span class="kw">end</span>)         <span class="cmt">## [3, 2, 1], largest first</span></code></pre>
+
+<div class="callout warn"><code>map</code> and <code>filter</code> give you a <strong>new</strong> array and leave the original alone, but <code>sort</code> reorders the array <strong>itself</strong> — it returns it as well, so it chains, and that return value is the same array, not a copy. Sort a copy if you need to keep the order you had.</div>
+
+<div class="callout tip">The function you pass is <strong>your own code</strong>, called once per element (and for <code>sort</code>, once per comparison). It may do anything, including raising an error, which stops the walk and reaches your <code>try</code> — a sort interrupted that way leaves the array in a valid but partly reordered state. Note also that <code>filter</code> reads its answer as a <strong>truth</strong>, so the usual rule applies: <code>0</code>, <code>""</code> and an empty array count as false. <code>join</code>, by contrast, never calls any code of yours.</div>
 
 <div class="callout tip"><code>join</code> converts each element the way <code>print</code> shows it, but <strong>without ever running a <code>__str</code></strong>: an instance comes out as <code>{ClassName}</code>. The conversion stays basic on purpose, so that joining an array can never run code of yours in the middle of it.</div>
 
