@@ -387,6 +387,30 @@
       "fib": 75176289,
       "loop": 31701661,
       "map": 54857023
+    },
+    {
+      "date": "2026-09-10",
+      "commit": "4518d6d",
+      "subject": "State the varargs invariant as it now holds, not as it did",
+      "fib": 74878921,
+      "loop": 31104402,
+      "map": 54898814
+    },
+    {
+      "date": "2026-09-13",
+      "commit": "b9811b6",
+      "subject": "array.join: put the pieces back together",
+      "fib": 74879734,
+      "loop": 31105119,
+      "map": 55958453
+    },
+    {
+      "date": "2026-09-14",
+      "commit": "db0af02",
+      "subject": "Widen the instruction word to 64 bits",
+      "fib": 74587220,
+      "loop": 31112517,
+      "map": 55984742
     }
   ]
 }
