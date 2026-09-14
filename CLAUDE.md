@@ -596,8 +596,9 @@ il y en avait près de 400 — est ce qui tronquait un indice en silence, et c'e
 faute que les élargissements de `CALL_FUNC` ont produite deux fois. Le contrôle résiduel est un
 `assert`, donc gratuit en `Release` ; les vraies gardes restent là où l'indice est délivré.
 
-**Un mot de 64 bits est donc un changement de cinq lignes, et il est MESURÉ** : `k_op_bits` et
-`k_field_bits` à 16, `Instr` en `uint64_t`, `Field` en `uint16_t`, `Wide` en `uint32_t` — la
+**Un mot de 64 bits est donc un changement de six lignes, et il est MESURÉ** : `k_op_bits` et
+`k_field_bits` à 16, `Instr` en `uint64_t`, `OpByte` et `Field` en `uint16_t`, `Wide` en
+`uint32_t` — la
 suite passe, et un programme de 400 fonctions compile et s'exécute (le champ de `CALL_FUNC`
 faisant alors 16 bits). Coût : `fib` **+1,50 %**, boucle **+1,93 %**, map +0,32 %. Ce n'est donc
 pas gratuit, et la boucle, qui n'exécute aucun appel, le paie autant — c'est le flux

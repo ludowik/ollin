@@ -21,8 +21,10 @@ static_assert(k_op_bits + 3 * k_field_bits == 8 * sizeof(Instr), "the three fiel
 
 // The type of a field READ from an instruction. Named per role, so that widening a role is one
 // line here rather than a hunt through the engine for the sites that happen to hold it.
-using Field = uint8_t; // a register index, a small count, a mode
-using Wide = uint16_t; // Bx: a constant, an identifier, a function, a code address
+using OpByte = uint8_t; // the opcode itself, and the underlying type of enum class Op
+using Field = uint8_t;  // a register index, a small count, a mode
+using Wide = uint16_t;  // Bx: a constant, an identifier, a function, a code address
+static_assert(8 * sizeof(OpByte) >= k_op_bits, "OpByte must hold an opcode");
 static_assert(8 * sizeof(Field) >= k_field_bits, "Field must hold a field");
 static_assert(8 * sizeof(Wide) >= k_bx_bits, "Wide must hold a Bx");
 
@@ -47,7 +49,7 @@ constexpr uint64_t k_max_pool = k_bx_max;     // constants, identifiers, switch 
 constexpr uint64_t k_max_func = k_field_max;
 constexpr uint64_t k_max_code = k_bx_max; // instructions in a program (a jump target is Bx)
 
-enum class Op : uint8_t {
+enum class Op : OpByte {
     LOAD_K,       // ABx: R[A] = K[Bx]
     LOAD_NIL,     // A:   R[A] = nil
     MOVE,         // AB:  R[A] = R[B]
@@ -136,7 +138,7 @@ inline Field i_c(Instr i) noexcept {
 inline Wide i_bx(Instr i) noexcept {
     return i & k_bx_max;
 }
-inline uint8_t i_op(Instr i) noexcept {
+inline OpByte i_op(Instr i) noexcept {
     return (i >> (3 * k_field_bits)) & ((uint64_t(1) << k_op_bits) - 1);
 }
 
