@@ -597,14 +597,25 @@ il y en avait près de 400 — est ce qui tronquait un indice en silence, et c'e
 faute que les élargissements de `CALL_FUNC` ont produite deux fois. Le contrôle résiduel est un
 `assert`, donc gratuit en `Release` ; les vraies gardes restent là où l'indice est délivré.
 
-**Un mot de 64 bits est donc un changement de six lignes, et il est MESURÉ** : `k_op_bits` et
-`k_field_bits` à 16, `Instr` en `uint64_t`, `OpByte` et `Field` en `uint16_t`, `Wide` en
-`uint32_t` — la
-suite passe, et un programme de 400 fonctions compile et s'exécute (le champ de `CALL_FUNC`
-faisant alors 16 bits). Coût : `fib` **+1,50 %**, boucle **+1,93 %**, map +0,32 %. Ce n'est donc
-pas gratuit, et la boucle, qui n'exécute aucun appel, le paie autant — c'est le flux
-d'instructions deux fois plus gros. À ne reprendre que pour lever PLUSIEURS plafonds à la fois
-(registres, constantes, taille de programme), jamais pour le seul indice de fonction.
+**Un mot de 64 bits est un changement de SIX lignes, et il est NEUTRE en travail** :
+`k_op_bits` et `k_field_bits` à 16, `Instr` en `uint64_t`, `OpByte` et `Field` en `uint16_t`,
+`Wide` en `uint32_t`. La suite passe, et `check_func_limit.sh` constate un plafond de fonctions
+au-delà de 4 096 (le champ de `CALL_FUNC` faisant alors 16 bits). Mesuré : `fib` −0,00 %,
+boucle −0,00 %, map +0,04 %.
+
+⚠ **Le +1,50 % / +1,93 % relevé une première fois était une TRONCATURE, pas la taille du flux**,
+et l'erreur de raisonnement vaut d'être gardée : `icount` compte les instructions EXÉCUTÉES, donc
+un bytecode deux fois plus gros ne s'y voit pas — l'expliquer par là était faux. La cause réelle
+est que `i_op` rendait un `uint8_t` écrit en dur alors que le champ passait à 16 bits, ce qui
+ajoutait une troncature à **chaque** dispatch. Vérifié dans les deux sens : l'ancien chiffre se
+reproduit à l'identique sur son commit (+1,50 % / +1,93 % / +0,32 %), et il revient sur l'arbre
+actuel dès qu'on remet `OpByte` en `uint8_t` (+1,51 % / +1,93 % / +0,36 %). C'est donc le constat
+de revue « `i_op` renvoie une largeur écrite en dur » qui portait tout le coût.
+
+**Ce qui n'est PAS mesuré** : le TEMPS. Un flux deux fois plus gros peut coûter en cache
+d'instructions, et ce conteneur ne permet pas de le trancher — sur le même binaire, le minimum et
+la médiane de `bench_fib` s'écartent de 20 %. À reprendre sur une machine calme avant d'affirmer
+quoi que ce soit là-dessus.
 
 ## Opcodes VM
 
