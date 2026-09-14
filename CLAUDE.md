@@ -604,8 +604,7 @@ faute que les élargissements de `CALL_FUNC` ont produite deux fois. Le contrôl
 
 **Le passage de 32 à 64 bits a été un changement de SIX lignes**, ce qui est tout l'intérêt de
 la centralisation des largeurs : `k_op_bits` et `k_field_bits` à 16, `Instr` en `uint64_t`,
-`OpByte` et `Field` en `uint16_t`, `Wide` en `uint32_t` — rien d'autre. Il est **NEUTRE en
-travail** : `fib` −0,00 %, boucle −0,00 %, map +0,04 %. Vérifié au-delà de la suite : un appel à
+`OpByte` et `Field` en `uint16_t`, `Wide` en `uint32_t` — rien d'autre. Vérifié au-delà de la suite : un appel à
 300 arguments, refusé par l'ancien format sur la limite des 255 registres, passe ; un programme de
 70 000 fonctions est refusé en nommant 65 535 ; les trois exemples les plus lourds (modèles 3D,
 `invaders`, monde voxel) tournent sous Xvfb sans une erreur ; et le playground WASM exécute au
@@ -620,11 +619,25 @@ reproduit à l'identique sur son commit (+1,50 % / +1,93 % / +0,32 %), et il rev
 actuel dès qu'on remet `OpByte` en `uint8_t` (+1,51 % / +1,93 % / +0,36 %). C'est donc le constat
 de revue « `i_op` renvoie une largeur écrite en dur » qui portait tout le coût.
 
-**Ce qui n'est PAS mesuré, et qui reste donc le seul risque connu** : le TEMPS. Un flux deux fois
-plus gros peut coûter en cache d'instructions, et ce conteneur ne permet pas de le trancher — sur
-le même binaire, le minimum et la médiane de `bench_fib` s'écartent de 20 %, et deux séries ont
-donné +5,8 % puis +1,0 % sur le même couple de binaires. À reprendre sur une machine calme ; c'est
-le seul motif qui justifierait de revenir à 32 bits.
+**CE QUE LE FORMAT COÛTE, mesuré — ce n'est pas un gain de performances, c'est un ÉCHANGE.** Le
+plafond de fonctions et celui des registres passent de 255 à 65 535 ; le prix est de l'ordre d'un
+pour cent de travail. Relevé en reconstruisant un binaire 32 bits depuis l'état courant du dépôt
+(seules les six lignes de largeurs remises à l'ancien jeu, même `Release`, même compilateur), les
+deux comparés dans la même série, sur les benchmarks COMPLETS : boucle **+1,05 %**, tableau
+**+0,80 %**, `fib` **+0,42 %** d'instructions pour le format 64 bits. ⚠ Les `−0,00 %` relevés le
+jour de la livraison venaient des scripts RÉDUITS d'`icount.sh` ; « neutre » était donc trop fort,
+et c'est le choix des scripts qui faisait la différence, pas le binaire.
+
+**Le TEMPS est mesuré, et il ne justifie PAS de revenir à 32 bits** (tourniquet, sept tours,
+minimum par binaire) : `fib` −1,97 %, boucle +6,26 %, tableau +10,31 %, map +1,40 %, classes
++1,23 %. L'écart change de signe selon le repère et reste dans l'ampleur des effets de disposition
+(±7 % constatés sur `fib`), donc il ne s'attribue pas proprement au format ; et revenir remettrait
+le plafond de 255 fonctions, qui était le motif du changement.
+
+⚠ **Le cache d'instructions est ÉCARTÉ par la mesure, pas par le raisonnement** : c'était
+l'explication attendue d'un flux deux fois plus gros, et elle est fausse. Simulation des caches sur
+la boucle — 5 106 défauts I1 et 4 293 défauts LLi en 32 bits, contre 5 108 et 4 296 en 64 bits.
+Identiques. Ne pas la ressortir.
 
 ⚠ **Le rendu est inchangé, et c'est un DIFFÉRENTIEL, pas une lecture de couleur** : la même scène
 capturée sous Xvfb donne un PNG identique à l'octet avec les deux formats. La capture sort blanche
