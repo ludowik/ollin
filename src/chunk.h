@@ -14,7 +14,7 @@ struct UpvalDesc {
 };
 
 struct FuncProto {
-    uint32_t addr = 0;
+    CodeAddr addr = 0;
     Field n_fixed = 0;
     bool variadic = false;
     bool is_static = false;

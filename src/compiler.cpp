@@ -18,30 +18,30 @@ int Compiler::resolve_upvalue(const std::string& name) {
 int Compiler::resolve_upval_from(int fn_idx, const std::string& name) {
     FuncFrame& fn = fn_stack_[fn_idx];
     if (const int* reg = fn.scopes.regs.find(name))
-        return capture_upval_chain(fn_idx, true, (Field)*reg, name);
+        return capture_upval_chain(fn_idx, true, *reg, name);
     auto uv_it = fn.upvals.find(name);
     if (uv_it != fn.upvals.end())
-        return capture_upval_chain(fn_idx, false, (Field)uv_it->second, name);
+        return capture_upval_chain(fn_idx, false, uv_it->second, name);
     if (fn_idx == 0)
         return -1;
     int outer_uv = resolve_upval_from(fn_idx - 1, name);
     if (outer_uv < 0)
         return -1;
-    return capture_upval_chain(fn_idx, false, (Field)outer_uv, name);
+    return capture_upval_chain(fn_idx, false, outer_uv, name);
 }
 
 // Gives every function between `fn_idx` and the one being compiled an upvalue for `name`, each
 // pointing at the one just outside it, and returns the index in the innermost. The function being
 // compiled is the LAST frame, so it is one turn of this loop and no longer a case apart.
-int Compiler::capture_upval_chain(int fn_idx, bool is_local, Field idx, const std::string& name) {
+int Compiler::capture_upval_chain(int fn_idx, bool is_local, int idx, const std::string& name) {
     bool cur_is_local = is_local;
-    Field cur_idx = idx;
+    int cur_idx = idx;
 
     for (int i = fn_idx + 1; i < (int)fn_stack_.size(); i++) {
         FuncFrame& fn = fn_stack_[i];
         auto it = fn.upvals.find(name);
         if (it != fn.upvals.end()) {
-            cur_idx = (Field)it->second;
+            cur_idx = it->second;
             cur_is_local = false;
             continue;
         }
@@ -51,11 +51,11 @@ int Compiler::capture_upval_chain(int fn_idx, bool is_local, Field idx, const st
         if (fn.proto_idx < 0)
             throw std::runtime_error("internal: capturing an upvalue into the main chunk");
         int uv_i = (int)chunk.funcs[fn.proto_idx].upvals.size();
-        if ((uint64_t)uv_i > k_max_upval)
+        if ((uint64_t)uv_i >= k_max_upval)
             throw std::runtime_error("function captures more than " + std::to_string(k_max_upval) + " upvalues");
-        chunk.funcs[fn.proto_idx].upvals.push_back({cur_is_local, cur_idx});
+        chunk.funcs[fn.proto_idx].upvals.push_back({cur_is_local, (Field)cur_idx});
         fn.upvals[name] = uv_i;
-        cur_idx = (Field)uv_i;
+        cur_idx = uv_i;
         cur_is_local = false;
     }
     return cur_idx;
@@ -488,14 +488,9 @@ Chunk Compiler::compile(const Program& prog) {
         s->accept(*this);
     // Same guard as for functions: registers are 8-bit operands, and without it a top-level
     // script needing more than k_max_reg of them was silently truncated.
-    if ((uint64_t)reg_count_ > k_max_reg)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": top-level code uses more than " +
-                                 std::to_string(k_max_reg) + " registers");
+    check_reg_count("top-level code");
     chunk.top_reg_count = (Field)reg_count_; // reg_count_ starts at 8 and only ever grows
     chunk.emit(make_bx(Op::HALT, 0));
-    if (chunk.code.size() > k_max_code)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": program too large (> " +
-                                 std::to_string(k_max_code) + " instructions)");
     return std::move(chunk);
 }
 
@@ -564,8 +559,7 @@ void Compiler::visit(const VarDeclStmt& s) {
             if (last_reg_ != base)      // the call itself spread, so recompose at base
                 chunk.emit(make_abc(Op::MOVE_RESULTS, base, last_reg_, 0));
         }
-        if (base + n > reg_count_)
-            reg_count_ = base + n; // these registers are live, read just below
+        keep_regs_counted(base + n); // these registers are live, read just below
         // Nil out the targets beyond what the call returned (k < n): otherwise they would read
         // stale registers, and `var a, b = len(x)` must leave b nil.
         chunk.emit(make_abc(Op::SPREAD_RESULTS, base, n, 0));
@@ -705,7 +699,7 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
 
 void Compiler::visit(const WhileStmt& s) {
     note_line(s.line, s.file_idx);
-    CodeAddr loop_start = (CodeAddr)chunk.current_pos();
+    CodeAddr loop_start = chunk.current_pos();
     int saved = reg_top_;
     s.cond->accept(*this);
     int cond_r = last_reg_;
@@ -723,7 +717,7 @@ void Compiler::visit(const WhileStmt& s) {
     CodeAddr cont_target = loop_start;
     if (!fn().continue_patches.back().patches.empty() && body_carries_func(s.body)) {
         chunk.emit(make_bx(Op::JUMP, loop_start));
-        cont_target = (CodeAddr)chunk.current_pos();
+        cont_target = chunk.current_pos();
         close_upvals_from(body_base);
     }
     for (size_t p : fn().continue_patches.back().patches)
@@ -731,7 +725,7 @@ void Compiler::visit(const WhileStmt& s) {
     fn().continue_patches.pop_back();
     chunk.emit(make_bx(Op::JUMP, loop_start));
 
-    CodeAddr exit_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr exit_addr = chunk.current_pos();
     // A break leaves the body the same way, so the exit closes too — once, on the way out. The
     // two `for` forms have always done this; the while had neither of the two points.
     if (body_carries_func(s.body))
@@ -775,7 +769,7 @@ void Compiler::visit(const IfStmt& s) {
     chunk.patch_jump(next_patch, chunk.current_pos());
     compile_block(s.else_body);
 
-    CodeAddr end_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr end_addr = chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
 }
@@ -848,13 +842,13 @@ void Compiler::visit(const SwitchStmt& s) {
     if (use_table) {
         if (chunk.switch_tables.size() >= k_max_pool)
             throw std::runtime_error("compile: too many switch tables (max " + std::to_string(k_max_pool) + ")");
-        table_idx = (PoolIdx)chunk.switch_tables.size();
+        table_idx = chunk.switch_tables.size();
         chunk.switch_tables.push_back({lo, std::vector<CodeAddr>((size_t)(hi - lo) + 1, 0), 0, 0});
         chunk.emit(make_abx(Op::SWITCH, subj_r, table_idx));
     }
 
     // The chain, whose jumps to the arms are patched once their addresses are known.
-    CodeAddr chain_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr chain_addr = chunk.current_pos();
     std::vector<std::vector<size_t>> arm_patches(s.cases.size());
     for (size_t ai = 0; ai < s.cases.size(); ++ai)
         for (auto& ve : s.cases[ai].values) {
@@ -873,7 +867,7 @@ void Compiler::visit(const SwitchStmt& s) {
     std::vector<size_t> end_patches;
     std::vector<CodeAddr> arm_addr(s.cases.size());
     for (size_t ai = 0; ai < s.cases.size(); ++ai) {
-        arm_addr[ai] = (CodeAddr)chunk.current_pos();
+        arm_addr[ai] = chunk.current_pos();
         for (size_t p : arm_patches[ai])
             chunk.patch_jump(p, arm_addr[ai]);
         reg_top_ = above_subj;
@@ -881,12 +875,12 @@ void Compiler::visit(const SwitchStmt& s) {
         end_patches.push_back(chunk.emit_jump(Op::JUMP));
     }
 
-    CodeAddr else_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr else_addr = chunk.current_pos();
     chunk.patch_jump(no_match_patch, else_addr);
     reg_top_ = above_subj;
     compile_block(s.else_body);
 
-    CodeAddr end_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr end_addr = chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
     for (size_t p : fn().break_patches.back().patches)
@@ -1130,7 +1124,7 @@ FuncIdx Compiler::compile_func_body(const std::string& name, const std::vector<s
     reg_count_ = reg_top_;
 
     size_t jump_patch = chunk.emit_jump(Op::JUMP); // over the body, which is inlined here
-    uint32_t func_addr = (uint32_t)chunk.current_pos();
+    CodeAddr func_addr = chunk.current_pos();
 
     // Defaults: for an instance method index 0 is self, which has none.
     std::vector<Value> defs(n_fixed);
@@ -1149,9 +1143,7 @@ FuncIdx Compiler::compile_func_body(const std::string& name, const std::vector<s
     compile_stmt_seq(body);
     emit_implicit_return(chunk, fn().in_ctor); // omitted when the body already ends with a RETURN
 
-    if ((uint64_t)reg_count_ > k_max_reg)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than " +
-                                 std::to_string(k_max_reg) + " registers");
+    check_reg_count("function");
     chunk.funcs[func_idx].reg_count = (Field)reg_count_;
     chunk.patch_jump(jump_patch, chunk.current_pos());
     return func_idx;
@@ -1732,7 +1724,7 @@ void Compiler::visit(const RangeExpr& e) {
     }
 
     // Build flags: bit0 = incl_right, bit1 = has_step
-    Field flags = (Field)((has_step ? 2 : 0) | (e.incl_right ? 1 : 0));
+    uint64_t flags = (has_step ? k_range_has_step : 0) | (e.incl_right ? k_range_incl_right : 0);
 
     chunk.emit(make_abc(Op::MAKE_RANGE, dest, base, flags));
 
@@ -1762,7 +1754,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     if (two_vars)
         sh2 = scopes().regs.bind_here(var2, block + 2);
 
-    CodeAddr loop_start = (CodeAddr)chunk.current_pos();
+    CodeAddr loop_start = chunk.current_pos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
     size_t exit_patch = chunk.emit_jump(iter_op, block);
 
@@ -1773,7 +1765,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
     // `continue` jumps HERE, so it goes through the same closing.
     bool close_scope = body_carries_func(body);
-    CodeAddr iter_end = (CodeAddr)chunk.current_pos();
+    CodeAddr iter_end = chunk.current_pos();
     if (close_scope)
         close_upvals_from(block + 1);
     for (size_t p : fn().continue_patches.back().patches)
@@ -1781,7 +1773,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     fn().continue_patches.pop_back();
     chunk.emit(make_bx(Op::JUMP, loop_start));
 
-    CodeAddr exit = (CodeAddr)chunk.current_pos();
+    CodeAddr exit = chunk.current_pos();
     // Exit (normal end, exhausted iterator, or `break`): the same closing, so that the last
     // iteration behaves like the others.
     if (close_scope)
@@ -1962,7 +1954,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
 
     size_t prep = chunk.emit_jump(Op::FOR_PREP, ctl); // Bx is the exit for an empty loop, patched later
 
-    CodeAddr body_addr = (CodeAddr)chunk.current_pos(); // FOR_PREP falls through to here when the loop is not empty
+    CodeAddr body_addr = chunk.current_pos(); // FOR_PREP falls through to here when the loop is not empty
     if (!can_alias)
         chunk.emit(make_abc(Op::MOVE, var_reg, ctl, 0));
 
@@ -1973,7 +1965,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
     // Closing does not modify the registers, so FOR_LOOP finds its counter intact.
     bool close_scope = body_carries_func(body);
-    CodeAddr loop_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr loop_addr = chunk.current_pos();
     if (close_scope)
         close_upvals_from(var_reg);
     for (size_t p : fn().continue_patches.back().patches)
@@ -1981,7 +1973,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     fn().continue_patches.pop_back();
     chunk.emit(make_abx(Op::FOR_LOOP, ctl, body_addr));
 
-    CodeAddr exit_addr = (CodeAddr)chunk.current_pos();
+    CodeAddr exit_addr = chunk.current_pos();
     if (close_scope)
         close_upvals_from(var_reg);
     chunk.patch_jump(prep, exit_addr); // FOR_PREP jumps here when the loop is empty
@@ -2137,8 +2129,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
             if (last_reg_ != base)
                 chunk.emit(make_abc(Op::MOVE_RESULTS, base, last_reg_, 0));
         }
-        if (base + n_targets > reg_count_)
-            reg_count_ = base + n_targets;
+        keep_regs_counted(base + n_targets);
         chunk.emit(make_abc(Op::SPREAD_RESULTS, base, n_targets, 0));
         reg_top_ = base + n_targets;
         n = n_targets; // each target now has its value at base+i

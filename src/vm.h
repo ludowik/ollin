@@ -79,8 +79,8 @@ class VM {
         return !handler_stack.empty() && handler_stack.back().call_depth > stop_depth;
     }
     struct Handler {
-        uint32_t catch_addr;
-        uint8_t catch_reg;
+        CodeAddr catch_addr;
+        RegIdx catch_reg;
         int reg_base;
         size_t regs_size;
         size_t call_depth;

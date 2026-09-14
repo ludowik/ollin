@@ -491,8 +491,13 @@ void VM::close_upvals_above(int threshold) {
 // Resolves a function value to func_idx plus upvals.
 static FuncIdx resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
                                 const char* not_callable) {
-    if (fv.is_func_val())
+    if (fv.is_func_val()) {
+        // The value carries its index in an int64 union field while FuncIdx is one instruction
+        // field wide: the narrowing is safe only because Chunk::add_func refuses past the ceiling,
+        // and this is the last place on the path that still takes that on trust.
+        assert(fv.as_int() >= 0 && (uint64_t)fv.as_int() <= k_max_func);
         return (FuncIdx)fv.as_int();
+    }
     if (fv.is_closure()) {
         const auto& uvs = fv.as_closure()->upvals;
         if (!uvs.empty())
@@ -1839,8 +1844,8 @@ dispatch_loop:
 
     op_MAKE_RANGE: {
         {
-            bool has_step = (C >> 1) & 1;
-            bool incl_right = C & 1;
+            bool has_step = (C & k_range_has_step) != 0;
+            bool incl_right = (C & k_range_incl_right) != 0;
             auto toDouble_ = [](const Value& v) -> double {
                 if (v.is_integer())
                     return (double)v.as_int();

@@ -126,7 +126,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
 
     int resolve_upvalue(const std::string& name);
     int resolve_upval_from(int scope_idx, const std::string& name);
-    int capture_upval_chain(int scope_idx, bool is_local, Field idx, const std::string& name);
+    int capture_upval_chain(int scope_idx, bool is_local, int idx, const std::string& name);
     FuncIdx compile_method_func(const FuncDeclStmt& s);
     // A switch compiles to an indexed jump when every case value is an integer known at compile
     // time; otherwise to the comparison chain, which stays the general path.
@@ -145,6 +145,19 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     void bump_reg_count() {
         if (reg_top_ > reg_count_)
             reg_count_ = reg_top_;
+    }
+    // The same ceiling, once. Both the top-level body and a function body publish reg_count into
+    // a field one byte wide, and the two guards were the same three lines with one word changed.
+    void check_reg_count(const char* what) {
+        if ((uint64_t)reg_count_ > k_max_reg)
+            throw std::runtime_error(sloc().str(chunk.source_files) + std::string(": ") + what +
+                                     " uses more than " + std::to_string(k_max_reg) + " registers");
+    }
+    // Registers WRITTEN without being owned as temporaries — the targets of a multi-return
+    // destructuring — must count towards reg_count without moving the top of the work area.
+    void keep_regs_counted(int top) {
+        if (top > reg_count_)
+            reg_count_ = top;
     }
     void reserve_regs_to(int top) {
         reg_top_ = top;

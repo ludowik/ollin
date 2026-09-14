@@ -35,12 +35,14 @@ using FuncIdx = Field; // a function of the chunk, as CALL_FUNC names it
 using PoolIdx = Wide;  // an index into a chunk pool: constants, identifiers, defaults, tables
 using CodeAddr = Wide; // an instruction address, which is what a jump carries
 
+constexpr uint64_t k_op_max = (uint64_t(1) << k_op_bits) - 1;
 constexpr uint64_t k_field_max = (uint64_t(1) << k_field_bits) - 1;
 constexpr uint64_t k_bx_max = (uint64_t(1) << k_bx_bits) - 1;
 
-// The engine's four ceilings, each the width of the field that carries it. Spelled here so that
-// the guard and its error message read the same number, and so that a program meeting one of
-// them is refused rather than silently truncated.
+// The engine's five ceilings, each the largest value the field that carries it can hold. Spelled
+// here so that the guard and its error message read the same number, and so that a program
+// meeting one of them is refused rather than silently truncated. Every guard has the same shape,
+// `count >= ceiling`, so that the message names exactly what is allowed.
 constexpr uint64_t k_max_reg = k_field_max;   // registers per frame (A, B, C name one)
 constexpr uint64_t k_max_upval = k_field_max; // upvalues captured by one function (GET_UPVAL)
 constexpr uint64_t k_max_pool = k_bx_max;     // constants, identifiers, switch tables, defaults
@@ -126,6 +128,11 @@ enum class Op : OpByte {
     HALT,
 };
 
+// The C field of MAKE_RANGE, a bit per fact. Named on BOTH sides: the compiler composed the
+// number and the VM took it apart, each with its own literals and a comment for agreement.
+constexpr uint64_t k_range_incl_right = 1;
+constexpr uint64_t k_range_has_step = 2;
+
 inline Field i_a(Instr i) noexcept {
     return (i >> (2 * k_field_bits)) & k_field_max;
 }
@@ -139,7 +146,7 @@ inline Wide i_bx(Instr i) noexcept {
     return i & k_bx_max;
 }
 inline OpByte i_op(Instr i) noexcept {
-    return (i >> (3 * k_field_bits)) & ((uint64_t(1) << k_op_bits) - 1);
+    return (i >> (3 * k_field_bits)) & k_op_max;
 }
 
 // The emitters take VALUES, not fields: an operand computed as an int no longer needs a cast at

@@ -588,7 +588,7 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | Bx     | OP          | 0           | Bx (16 bits)          || saut inconditionnel |
 
 **Les largeurs vivent dans `src/opcode.h`, et NULLE PART ailleurs.** Le rangement, les
-accesseurs, les quatre plafonds du moteur et leurs messages d'erreur en sont dérivés, un
+accesseurs, les cinq plafonds du moteur et leurs messages d'erreur en sont dérivés, un
 `static_assert` refusant un jeu de largeurs qui ne remplit pas le mot. Un opérande est déclaré
 par son RÔLE (`RegIdx`, `FuncIdx`, `PoolIdx`, `CodeAddr`) et non par sa largeur du jour, et les
 constructeurs d'instruction prennent des VALEURS : le transtypage à chaque site d'émission —

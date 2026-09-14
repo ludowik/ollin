@@ -46,14 +46,20 @@ FuncIdx Chunk::add_func(FuncProto fp) {
 }
 
 void Chunk::emit(Instr i) {
+    // The ceiling is checked HERE, where the address is handed out, like the three pools above:
+    // an instruction's address is its index, a jump carries it in a Bx, and a program checked
+    // only at the end of the compilation would have every one of its jumps silently truncated
+    // first.
+    if (code.size() > k_max_code)
+        throw std::runtime_error("compile: program too large (max " + std::to_string(k_max_code + 1) +
+                                 " instructions)");
     code.push_back(i);
     lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
 }
 
 size_t Chunk::emit_jump(Op op, uint64_t a) {
     // The target is patched later; k_bx_max is the placeholder, never a reachable address.
-    code.push_back(make_abx(op, a, k_bx_max));
-    lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
+    emit(make_abx(op, a, k_bx_max));
     return code.size() - 1;
 }
 
