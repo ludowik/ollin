@@ -252,6 +252,12 @@ check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "a
 check_error "string.number with a non-string"  'print(string.number(42))'  "string.number: expected string"
 check_error "string.number with no argument"   'print(string.number())'    "string.number: missing argument"
 
+# string.code answers nil for a character that is not there, but a non-STRING text or a non-number
+# index is a mistake of the caller, not data.
+check_error "string.code with a non-string"    'print(string.code(65))'     "string.code: expected string"
+check_error "string.code with no argument"     'print(string.code())'       "string.code: missing argument"
+check_error "string.code with a text index"    'print(string.code("a","1"))' "string.code: argument 2 expected number"
+
 # string.replace refuses an empty needle, as split does, and names the wrong argument.
 check_error "string.replace with an empty needle"   'print(string.replace("a-b", "", "x"))'      "string.replace: the needle must not be empty"
 check_error "string.replace with a non-string subject" 'print(string.replace(42, "a", "b"))'     "string.replace: expected string"

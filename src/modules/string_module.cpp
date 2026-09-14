@@ -395,6 +395,26 @@ static int str_len(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)utf8_count(s)));
 }
 
+// string.code(s [, i]): the Unicode number (codepoint) of the i-th CHARACTER, 1-based, or of the
+// first one when the index is omitted — the form that reads well in `for c in s do c.code()`.
+//
+// Out of bounds, and an empty text, give nil and never 0: 0 is a legitimate codepoint (NUL), and
+// it is FALSY in Ollin, so returning it would make `if c.code() then` say the same thing for a
+// real NUL and for no character at all. Same rule as string.number's failure.
+static int str_code(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.code");
+    int i = (argc >= 2) ? to_int_safe(num_arg(args, argc, 1, "string.code")) : 1;
+    if (i < 1)
+        return ctx.ret(Value{});
+    size_t at = utf8_byte_offset(s, (size_t)i - 1);
+    if (at >= s.size()) // past the last character, empty text included
+        return ctx.ret(Value{});
+    size_t nbytes = 0;
+    return ctx.ret(Value((int64_t)utf8_decode(s, at, &nbytes)));
+}
+
 Value make_string_module() {
     return MapBuilder()
         .fn("len", str_len)
@@ -404,6 +424,7 @@ Value make_string_module() {
         .fn("ltrim", str_ltrim)
         .fn("rtrim", str_rtrim)
         .fn("char", str_char)
+        .fn("code", str_code)
         .fn("substr", str_substr)
         .fn("find", str_find)
         .fn("split", str_split)

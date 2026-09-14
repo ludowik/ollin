@@ -2970,3 +2970,32 @@ func strIterCheck()
     print("string iteration ok")
 end
 strIterCheck()
+
+## ---------------------------------------------------------------------------
+## string.code gives the Unicode number of a CHARACTER, and nil — never 0 —
+## when there is no character there: 0 is a legitimate codepoint and it is
+## falsy, so returning it would confuse "a NUL" with "nothing".
+func strCodeCheck()
+    assert("A".code() == 65)
+    assert("é".code() == 233)          ## two bytes, one character
+    assert("abc".code(2) == 98)        ## the index counts characters, 1-based
+
+    ## Out of bounds, both ends, and the empty text.
+    assert("abc".code(4) == nil)
+    assert("abc".code(0) == nil)
+    assert("abc".code(-1) == nil)
+    assert("".code() == nil)
+
+    ## Accented text: the index is in characters, so code and char agree.
+    var text = "café"
+    for i, c in text do
+        assert(c.code() == text.code(i))
+    end
+    assert(text.code(4) == 233)        ## é, the 4th CHARACTER of a 5-byte text
+
+    ## The round trip with char: same character, same number.
+    assert(text.char(1).code() == text.code(1))
+
+    print("string.code ok")
+end
+strCodeCheck()
