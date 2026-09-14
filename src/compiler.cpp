@@ -18,30 +18,30 @@ int Compiler::resolve_upvalue(const std::string& name) {
 int Compiler::resolve_upval_from(int fn_idx, const std::string& name) {
     FuncFrame& fn = fn_stack_[fn_idx];
     if (const int* reg = fn.scopes.regs.find(name))
-        return capture_upval_chain(fn_idx, true, (uint8_t)*reg, name);
+        return capture_upval_chain(fn_idx, true, (Field)*reg, name);
     auto uv_it = fn.upvals.find(name);
     if (uv_it != fn.upvals.end())
-        return capture_upval_chain(fn_idx, false, (uint8_t)uv_it->second, name);
+        return capture_upval_chain(fn_idx, false, (Field)uv_it->second, name);
     if (fn_idx == 0)
         return -1;
     int outer_uv = resolve_upval_from(fn_idx - 1, name);
     if (outer_uv < 0)
         return -1;
-    return capture_upval_chain(fn_idx, false, (uint8_t)outer_uv, name);
+    return capture_upval_chain(fn_idx, false, (Field)outer_uv, name);
 }
 
 // Gives every function between `fn_idx` and the one being compiled an upvalue for `name`, each
 // pointing at the one just outside it, and returns the index in the innermost. The function being
 // compiled is the LAST frame, so it is one turn of this loop and no longer a case apart.
-int Compiler::capture_upval_chain(int fn_idx, bool is_local, uint8_t idx, const std::string& name) {
+int Compiler::capture_upval_chain(int fn_idx, bool is_local, Field idx, const std::string& name) {
     bool cur_is_local = is_local;
-    uint8_t cur_idx = idx;
+    Field cur_idx = idx;
 
     for (int i = fn_idx + 1; i < (int)fn_stack_.size(); i++) {
         FuncFrame& fn = fn_stack_[i];
         auto it = fn.upvals.find(name);
         if (it != fn.upvals.end()) {
-            cur_idx = (uint8_t)it->second;
+            cur_idx = (Field)it->second;
             cur_is_local = false;
             continue;
         }
@@ -51,11 +51,11 @@ int Compiler::capture_upval_chain(int fn_idx, bool is_local, uint8_t idx, const 
         if (fn.proto_idx < 0)
             throw std::runtime_error("internal: capturing an upvalue into the main chunk");
         int uv_i = (int)chunk.funcs[fn.proto_idx].upvals.size();
-        if (uv_i > 255) // the upvalue index is an 8-bit operand
-            throw std::runtime_error("function captures more than 255 upvalues");
+        if ((uint64_t)uv_i > k_max_upval)
+            throw std::runtime_error("function captures more than " + std::to_string(k_max_upval) + " upvalues");
         chunk.funcs[fn.proto_idx].upvals.push_back({cur_is_local, cur_idx});
         fn.upvals[name] = uv_i;
-        cur_idx = (uint8_t)uv_i;
+        cur_idx = (Field)uv_i;
         cur_is_local = false;
     }
     return cur_idx;
@@ -201,7 +201,7 @@ static void emit_implicit_return(Chunk& chunk, bool is_ctor) {
     }
     // A constructor falling off its end gives the object, exactly as an explicit `return` in it
     // does: self sits in R[0].
-    chunk.emit(make_abc((uint8_t)Op::RETURN, 0, is_ctor ? 1 : 0, 0));
+    chunk.emit(make_abc(Op::RETURN, 0, is_ctor ? 1 : 0, 0));
 }
 
 // collect_funcs=true inside function bodies (nested FuncDecls need a local register)
@@ -211,7 +211,7 @@ struct CollectLocalsVisitor : StmtQuery {
     NameSet& seen;
     bool collect_funcs;
     const std::vector<std::string>& files;
-    NameSet* funcs; // the names of the local functions, bound straight away, when asked for
+    NameSet* funcs;                // the names of the local functions, bound straight away, when asked for
     NameMap<std::string> alias_of; // an import alias → the module it names
 
     CollectLocalsVisitor(std::vector<std::string>& out, NameSet& seen, bool collect_funcs,
@@ -276,8 +276,7 @@ struct CollectLocalsVisitor : StmtQuery {
 };
 
 static void collect_locals(const std::vector<std::unique_ptr<Stmt>>& stmts, std::vector<std::string>& out,
-                           const std::vector<std::string>& files, bool collect_funcs = true,
-                           NameSet* funcs = nullptr) {
+                           const std::vector<std::string>& files, bool collect_funcs = true, NameSet* funcs = nullptr) {
     NameSet seen(out.begin(), out.end());
     CollectLocalsVisitor v(out, seen, collect_funcs, files, funcs);
     v.run(stmts);
@@ -301,8 +300,7 @@ struct CollectGlobalsVisitor : StmtQuery {
     NameSet& certain;
     bool cur_certain = true; // set by walk() for the statement being visited
 
-    CollectGlobalsVisitor(NameSet& out, NameSet& enums,
-                          const std::vector<std::string>& files, NameMap<int>& enum_decls,
+    CollectGlobalsVisitor(NameSet& out, NameSet& enums, const std::vector<std::string>& files, NameMap<int>& enum_decls,
                           NameSet& assigned, NameSet& certain)
         : out(out), enums(enums), files(files), enum_decls(enum_decls), assigned(assigned), certain(certain) {
     }
@@ -359,10 +357,9 @@ struct CollectGlobalsVisitor : StmtQuery {
     }
 };
 
-static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, NameSet& out,
-                            NameSet& enums, const std::vector<std::string>& files,
-                            NameMap<int>& enum_decls,
-                            NameSet& assigned, NameSet& certain) {
+static void collect_globals(const std::vector<std::unique_ptr<Stmt>>& stmts, NameSet& out, NameSet& enums,
+                            const std::vector<std::string>& files, NameMap<int>& enum_decls, NameSet& assigned,
+                            NameSet& certain) {
     CollectGlobalsVisitor v(out, enums, files, enum_decls, assigned, certain);
     v.walk(stmts);
 }
@@ -404,14 +401,14 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
     if (dest_at_top)
         reserve_regs_to(dest + 1);
     if (auto* n = dynamic_cast<const NumberExpr*>(&e)) {
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest,
-                            chunk.add_constant(n->is_integer ? Value(n->ival) : num_value(n->value))));
+        chunk.emit(
+            make_abx(Op::LOAD_K, dest, chunk.add_constant(n->is_integer ? Value(n->ival) : num_value(n->value))));
     } else if (auto* s = dynamic_cast<const StringExpr*>(&e)) {
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(Value(s->value))));
+        chunk.emit(make_abx(Op::LOAD_K, dest, chunk.add_constant(Value(s->value))));
     } else if (auto* b = dynamic_cast<const BoolExpr*>(&e)) {
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(Value::make_bool(b->value))));
+        chunk.emit(make_abx(Op::LOAD_K, dest, chunk.add_constant(Value::make_bool(b->value))));
     } else if (dynamic_cast<const NilExpr*>(&e)) {
-        chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
+        chunk.emit(make_abc(Op::LOAD_NIL, dest, 0, 0));
     } else if (auto* bin = dynamic_cast<const BinaryExpr*>(&e); bin && bin->op != '&' && bin->op != '|') {
         // Non short-circuit binary: emit the FINAL op straight into dest, with no temporary and
         // no MOVE. This is safe because a 3-address instruction reads r_l and r_r BEFORE writing
@@ -425,13 +422,13 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
             reserve_regs_to(r_l + 1);
         bin->right->accept(*this);
         int r_r = last_reg_;
-        chunk.emit(make_abc((uint8_t)binary_arith_opcode(bin->op), (uint8_t)dest, (uint8_t)r_l, (uint8_t)r_r));
+        chunk.emit(make_abc(binary_arith_opcode(bin->op), dest, r_l, r_r));
         reg_top_ = saved;
         last_reg_ = dest;
     } else if (auto* un = dynamic_cast<const UnaryExpr*>(&e)) {
         Value folded;
         if (negated_literal(*un, folded)) {
-            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(folded)));
+            chunk.emit(make_abx(Op::LOAD_K, dest, chunk.add_constant(folded)));
             last_reg_ = dest;
             return;
         }
@@ -439,7 +436,7 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
         int saved = reg_top_;
         un->operand->accept(*this);
         int r_in = last_reg_;
-        chunk.emit(make_abc((uint8_t)unary_opcode(un->op), (uint8_t)dest, (uint8_t)r_in, 0));
+        chunk.emit(make_abc(unary_opcode(un->op), dest, r_in, 0));
         reg_top_ = saved;
         last_reg_ = dest;
     } else {
@@ -448,7 +445,7 @@ void Compiler::compile_into(const Expr& e, int dest, bool dest_at_top) {
             reg_top_ = dest; // a call, a map, an array MAY land on dest, and then needs no MOVE
         e.accept(*this);
         if (last_reg_ != dest)
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)last_reg_, 0));
+            chunk.emit(make_abc(Op::MOVE, dest, last_reg_, 0));
         reg_top_ = saved;
     }
 }
@@ -490,13 +487,15 @@ Chunk Compiler::compile(const Program& prog) {
     for (auto& s : prog.stmts)
         s->accept(*this);
     // Same guard as for functions: registers are 8-bit operands, and without it a top-level
-    // script needing more than 255 of them was silently truncated.
-    if (reg_count_ > 255)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": top-level code uses more than 255 registers");
-    chunk.top_reg_count = (uint8_t)reg_count_; // reg_count_ starts at 8 and only ever grows
-    chunk.emit(make_bx((uint8_t)Op::HALT, 0));
-    if (chunk.code.size() > 65535)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": program too large (> 65535 instructions)");
+    // script needing more than k_max_reg of them was silently truncated.
+    if ((uint64_t)reg_count_ > k_max_reg)
+        throw std::runtime_error(sloc().str(chunk.source_files) + ": top-level code uses more than " +
+                                 std::to_string(k_max_reg) + " registers");
+    chunk.top_reg_count = (Field)reg_count_; // reg_count_ starts at 8 and only ever grows
+    chunk.emit(make_bx(Op::HALT, 0));
+    if (chunk.code.size() > k_max_code)
+        throw std::runtime_error(sloc().str(chunk.source_files) + ": program too large (> " +
+                                 std::to_string(k_max_code) + " instructions)");
     return std::move(chunk);
 }
 
@@ -559,24 +558,24 @@ void Compiler::visit(const VarDeclStmt& s) {
         int n = (int)s.names.size();
         if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
             // var a, b = ... gives n varargs at base, nil-padded, with last_results_ = n
-            chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n, 0));
+            chunk.emit(make_abc(Op::LOAD_VARARGS, base, n, 0));
         } else {
             s.values[0]->accept(*this); // a call: k return values, last_results_ = k
             if (last_reg_ != base)      // the call itself spread, so recompose at base
-                chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)base, (uint8_t)last_reg_, 0));
+                chunk.emit(make_abc(Op::MOVE_RESULTS, base, last_reg_, 0));
         }
         if (base + n > reg_count_)
             reg_count_ = base + n; // these registers are live, read just below
         // Nil out the targets beyond what the call returned (k < n): otherwise they would read
         // stale registers, and `var a, b = len(x)` must leave b nil.
-        chunk.emit(make_abc((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n, 0));
+        chunk.emit(make_abc(Op::SPREAD_RESULTS, base, n, 0));
         for (int i = 0; i < n; ++i) {
             if (s.is_global) {
-                chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)(base + i), chunk.add_identifier(s.names[i])));
+                chunk.emit(make_abx(Op::STORE_GLOBAL, (base + i), chunk.add_identifier(s.names[i])));
             } else {
                 int dest = activate_local(s.names[i]); // the call is compiled, so this is safe
                 if (base + i != dest)
-                    chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dest, (uint8_t)(base + i), 0));
+                    chunk.emit(make_abc(Op::MOVE, dest, (base + i), 0));
             }
         }
         reg_top_ = base;
@@ -592,9 +591,9 @@ void Compiler::visit(const VarDeclStmt& s) {
             if (i < (int)s.values.size()) {
                 compile_into(*s.values[i], src);
             } else {
-                chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)src, 0, 0));
+                chunk.emit(make_abc(Op::LOAD_NIL, src, 0, 0));
             }
-            chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)src, chunk.add_identifier(s.names[i])));
+            chunk.emit(make_abx(Op::STORE_GLOBAL, src, chunk.add_identifier(s.names[i])));
             reg_top_ = saved;
         }
         return;
@@ -608,7 +607,7 @@ void Compiler::visit(const VarDeclStmt& s) {
         if (i < (int)s.values.size()) {
             compile_into(*s.values[i], dest);
         } else {
-            chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)dest, 0, 0));
+            chunk.emit(make_abc(Op::LOAD_NIL, dest, 0, 0));
         }
     }
     // With the initializers compiled, the locals become visible from here on.
@@ -627,8 +626,7 @@ void Compiler::compile_stmt_seq(const std::vector<std::unique_ptr<Stmt>>& body) 
     }
 }
 
-void Compiler::bind_scan_locals(const std::vector<std::string>& names, const NameSet& funcs,
-                                const NameSet& skip) {
+void Compiler::bind_scan_locals(const std::vector<std::string>& names, const NameSet& funcs, const NameSet& skip) {
     ScopeTables& sc = scopes();
     for (auto& name : names) {
         if (skip.count(name))
@@ -650,7 +648,7 @@ void Compiler::bind_scan_locals(const std::vector<std::string>& names, const Nam
 // path that leaves one early — a throw, a continue, a break, the end of a loop iteration — which
 // is why the same two lines appeared eight times.
 void Compiler::close_upvals_from(int base) {
-    chunk.emit(make_abc((uint8_t)Op::CLOSE_UPVALS, (uint8_t)base, 0, 0));
+    chunk.emit(make_abc(Op::CLOSE_UPVALS, base, 0, 0));
 }
 
 bool Compiler::body_carries_func(const std::vector<std::unique_ptr<Stmt>>& body) {
@@ -707,11 +705,11 @@ void Compiler::compile_block(const std::vector<std::unique_ptr<Stmt>>& body, con
 
 void Compiler::visit(const WhileStmt& s) {
     note_line(s.line, s.file_idx);
-    auto loop_start = (uint16_t)chunk.current_pos();
+    CodeAddr loop_start = (CodeAddr)chunk.current_pos();
     int saved = reg_top_;
     s.cond->accept(*this);
     int cond_r = last_reg_;
-    size_t exit_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+    size_t exit_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, cond_r);
     reg_top_ = saved;
 
     fn().break_patches.push_back({{}, try_depth_, false});
@@ -722,18 +720,18 @@ void Compiler::visit(const WhileStmt& s) {
     // put there is skipped: the closures of that turn would go on sharing their register with the
     // next turn's. The continue path therefore closes them itself, on its own way back — placed
     // AFTER the normal jump, so the ordinary path pays nothing.
-    uint16_t cont_target = loop_start;
+    CodeAddr cont_target = loop_start;
     if (!fn().continue_patches.back().patches.empty() && body_carries_func(s.body)) {
-        chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
-        cont_target = (uint16_t)chunk.current_pos();
+        chunk.emit(make_bx(Op::JUMP, loop_start));
+        cont_target = (CodeAddr)chunk.current_pos();
         close_upvals_from(body_base);
     }
     for (size_t p : fn().continue_patches.back().patches)
         chunk.patch_jump(p, cont_target);
     fn().continue_patches.pop_back();
-    chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
+    chunk.emit(make_bx(Op::JUMP, loop_start));
 
-    uint16_t exit_addr = (uint16_t)chunk.current_pos();
+    CodeAddr exit_addr = (CodeAddr)chunk.current_pos();
     // A break leaves the body the same way, so the exit closes too — once, on the way out. The
     // two `for` forms have always done this; the while had neither of the two points.
     if (body_carries_func(s.body))
@@ -752,7 +750,7 @@ void Compiler::visit(const IfStmt& s) {
     s.cond->accept(*this);
     int cond_r = last_reg_;
     reg_top_ = saved;
-    size_t next_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+    size_t next_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, cond_r);
 
     // The jump to the end is only needed when a branch FOLLOWS: without one it lands on the
     // next instruction, and that dead jump was executed every time the branch was taken.
@@ -763,21 +761,21 @@ void Compiler::visit(const IfStmt& s) {
 
     for (size_t k = 0; k < s.else_ifs.size(); ++k) {
         auto& ei = s.else_ifs[k];
-        chunk.patch_jump(next_patch, (uint16_t)chunk.current_pos());
+        chunk.patch_jump(next_patch, chunk.current_pos());
         int s2 = reg_top_;
         ei.cond->accept(*this);
         int er = last_reg_;
         reg_top_ = s2;
-        next_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)er);
+        next_patch = chunk.emit_jump(Op::JUMP_IF_FALSE, er);
         compile_block(ei.body);
         if (k + 1 < s.else_ifs.size() || !s.else_body.empty())
             end_patches.push_back(chunk.emit_jump(Op::JUMP));
     }
 
-    chunk.patch_jump(next_patch, (uint16_t)chunk.current_pos());
+    chunk.patch_jump(next_patch, chunk.current_pos());
     compile_block(s.else_body);
 
-    uint16_t end_addr = (uint16_t)chunk.current_pos();
+    CodeAddr end_addr = (CodeAddr)chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
 }
@@ -840,24 +838,23 @@ void Compiler::visit(const SwitchStmt& s) {
         reserve_regs_to(subj_r + 1);
     int above_subj = reg_top_; // subj_r stays live through every arm
 
-    fn().break_patches.push_back(
-        {{}, try_depth_, true}); // marks the switch; a break inside it is refused
+    fn().break_patches.push_back({{}, try_depth_, true}); // marks the switch; a break inside it is refused
 
     std::vector<std::vector<int64_t>> table_values;
     int64_t lo = 0;
     int64_t hi = 0;
     bool use_table = switch_table_values(s, table_values, lo, hi);
-    uint16_t table_idx = 0;
+    PoolIdx table_idx = 0;
     if (use_table) {
-        if (chunk.switch_tables.size() >= 0xFFFF)
-            throw std::runtime_error("compile: too many switch tables (max 65535)");
-        table_idx = (uint16_t)chunk.switch_tables.size();
-        chunk.switch_tables.push_back({lo, std::vector<uint16_t>((size_t)(hi - lo) + 1, 0), 0, 0});
-        chunk.emit(make_abx((uint8_t)Op::SWITCH, (uint8_t)subj_r, table_idx));
+        if (chunk.switch_tables.size() >= k_max_pool)
+            throw std::runtime_error("compile: too many switch tables (max " + std::to_string(k_max_pool) + ")");
+        table_idx = (PoolIdx)chunk.switch_tables.size();
+        chunk.switch_tables.push_back({lo, std::vector<CodeAddr>((size_t)(hi - lo) + 1, 0), 0, 0});
+        chunk.emit(make_abx(Op::SWITCH, subj_r, table_idx));
     }
 
     // The chain, whose jumps to the arms are patched once their addresses are known.
-    uint16_t chain_addr = (uint16_t)chunk.current_pos();
+    CodeAddr chain_addr = (CodeAddr)chunk.current_pos();
     std::vector<std::vector<size_t>> arm_patches(s.cases.size());
     for (size_t ai = 0; ai < s.cases.size(); ++ai)
         for (auto& ve : s.cases[ai].values) {
@@ -866,17 +863,17 @@ void Compiler::visit(const SwitchStmt& s) {
             int val_r = last_reg_;
             int cond_r = alloc_reg();
             reg_top_ = above_subj; // frees the temporary after EQ
-            chunk.emit(make_abc((uint8_t)Op::EQ, (uint8_t)cond_r, (uint8_t)subj_r, (uint8_t)val_r));
-            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)cond_r);
+            chunk.emit(make_abc(Op::EQ, cond_r, subj_r, val_r));
+            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, cond_r);
             arm_patches[ai].push_back(chunk.emit_jump(Op::JUMP));
-            chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
+            chunk.patch_jump(skip, chunk.current_pos());
         }
     size_t no_match_patch = chunk.emit_jump(Op::JUMP); // nothing matched: the else body
 
     std::vector<size_t> end_patches;
-    std::vector<uint16_t> arm_addr(s.cases.size());
+    std::vector<CodeAddr> arm_addr(s.cases.size());
     for (size_t ai = 0; ai < s.cases.size(); ++ai) {
-        arm_addr[ai] = (uint16_t)chunk.current_pos();
+        arm_addr[ai] = (CodeAddr)chunk.current_pos();
         for (size_t p : arm_patches[ai])
             chunk.patch_jump(p, arm_addr[ai]);
         reg_top_ = above_subj;
@@ -884,12 +881,12 @@ void Compiler::visit(const SwitchStmt& s) {
         end_patches.push_back(chunk.emit_jump(Op::JUMP));
     }
 
-    uint16_t else_addr = (uint16_t)chunk.current_pos();
+    CodeAddr else_addr = (CodeAddr)chunk.current_pos();
     chunk.patch_jump(no_match_patch, else_addr);
     reg_top_ = above_subj;
     compile_block(s.else_body);
 
-    uint16_t end_addr = (uint16_t)chunk.current_pos();
+    CodeAddr end_addr = (CodeAddr)chunk.current_pos();
     for (size_t p : end_patches)
         chunk.patch_jump(p, end_addr);
     for (size_t p : fn().break_patches.back().patches)
@@ -906,7 +903,7 @@ void Compiler::visit(const SwitchStmt& s) {
         e = else_addr; // a hole in the span is a number matching no case, so the else body
     for (size_t ai = 0; ai < table_values.size(); ++ai)
         for (int64_t v : table_values[ai]) {
-            uint16_t& slot = t.targets[(size_t)(v - lo)];
+            CodeAddr& slot = t.targets[(size_t)(v - lo)];
             if (slot == else_addr)
                 slot = arm_addr[ai]; // a value repeated across arms belongs to the FIRST, as the chain gives it
         }
@@ -926,7 +923,7 @@ void Compiler::check_jump_scope(const Stmt& s, const std::vector<JumpTargets>& f
 // ran once per iteration the loop had made, then the error reached the engine anyway.
 void Compiler::pop_crossed_tries(const JumpTargets& frame) {
     for (int i = frame.try_depth; i < try_depth_; ++i)
-        chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
+        chunk.emit(make_bx(Op::POP_TRY, 0));
 }
 
 void Compiler::visit(const BreakStmt& s) {
@@ -968,7 +965,7 @@ void Compiler::visit(const AssignStmt& s) {
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 // Emit op directly into dest — safe: rhs is already in a register
-                chunk.emit(make_abc((uint8_t)binary_arith_opcode(s.op), (uint8_t)dest, (uint8_t)dest, (uint8_t)rhs));
+                chunk.emit(make_abc(binary_arith_opcode(s.op), dest, dest, rhs));
                 reg_top_ = saved;
             }
             return;
@@ -981,16 +978,16 @@ void Compiler::visit(const AssignStmt& s) {
             int saved = reg_top_;
             if (s.op == '\0') {
                 s.value->accept(*this);
-                chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)last_reg_, (uint8_t)uv, 0));
+                chunk.emit(make_abc(Op::SET_UPVAL, last_reg_, uv, 0));
             } else {
                 int cur = alloc_reg();
-                chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)cur, (uint8_t)uv, 0));
+                chunk.emit(make_abc(Op::GET_UPVAL, cur, uv, 0));
                 s.value->accept(*this);
                 int rhs = last_reg_;
                 int res = alloc_reg();
                 bump_reg_count();
-                chunk.emit(make_abc((uint8_t)binary_arith_opcode(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
-                chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)res, (uint8_t)uv, 0));
+                chunk.emit(make_abc(binary_arith_opcode(s.op), res, cur, rhs));
+                chunk.emit(make_abc(Op::SET_UPVAL, res, uv, 0));
             }
             reg_top_ = saved;
             return;
@@ -1001,16 +998,16 @@ void Compiler::visit(const AssignStmt& s) {
         int saved = reg_top_;
         if (s.op == '\0') {
             s.value->accept(*this);
-            chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)last_reg_, chunk.add_identifier(s.name)));
+            chunk.emit(make_abx(Op::STORE_GLOBAL, last_reg_, chunk.add_identifier(s.name)));
         } else {
             int cur = alloc_reg();
-            chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)cur, chunk.add_identifier(s.name)));
+            chunk.emit(make_abx(Op::LOAD_GLOBAL, cur, chunk.add_identifier(s.name)));
             s.value->accept(*this);
             int rhs = last_reg_;
             int res = alloc_reg();
             bump_reg_count();
-            chunk.emit(make_abc((uint8_t)binary_arith_opcode(s.op), (uint8_t)res, (uint8_t)cur, (uint8_t)rhs));
-            chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)res, chunk.add_identifier(s.name)));
+            chunk.emit(make_abc(binary_arith_opcode(s.op), res, cur, rhs));
+            chunk.emit(make_abx(Op::STORE_GLOBAL, res, chunk.add_identifier(s.name)));
         }
         reg_top_ = saved;
         return;
@@ -1031,7 +1028,7 @@ void Compiler::visit(const ThrowStmt& s) {
     int saved = reg_top_;
     s.value->accept(*this);
     int r = last_reg_;
-    chunk.emit(make_abc((uint8_t)Op::THROW, (uint8_t)r, 0, 0));
+    chunk.emit(make_abc(Op::THROW, r, 0, 0));
     reg_top_ = saved;
 }
 
@@ -1046,17 +1043,17 @@ void Compiler::visit(const TryCatchStmt& s) {
         bump_reg_count();
     }
 
-    size_t try_patch = chunk.emit_jump(Op::TRY, (uint8_t)catch_r);
+    size_t try_patch = chunk.emit_jump(Op::TRY, catch_r);
     // The handler is live for the BODY only: unwind_to_handler pops it before the catch runs, and
     // the else body comes after POP_TRY. So only the body raises the depth a jump has to undo.
     int try_base = reg_top_;
     ++try_depth_;
     compile_block(s.try_body);
     --try_depth_;
-    chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
+    chunk.emit(make_bx(Op::POP_TRY, 0));
     size_t else_patch = chunk.emit_jump(Op::JUMP);
 
-    chunk.patch_jump(try_patch, (uint16_t)chunk.current_pos());
+    chunk.patch_jump(try_patch, chunk.current_pos());
     // A throw LEAVES the body without running its end, so the block's own CLOSE_UPVALS never
     // executes: it is emitted again here, where control lands. The body's locals are dead at
     // this point, and one declared BEFORE the try keeps its open upvalue (its register is below
@@ -1068,9 +1065,9 @@ void Compiler::visit(const TryCatchStmt& s) {
     compile_block(s.catch_body, s.catch_var, catch_r);
 
     size_t end_patch = chunk.emit_jump(Op::JUMP);
-    chunk.patch_jump(else_patch, (uint16_t)chunk.current_pos());
+    chunk.patch_jump(else_patch, chunk.current_pos());
     compile_block(s.else_body);
-    chunk.patch_jump(end_patch, (uint16_t)chunk.current_pos());
+    chunk.patch_jump(end_patch, chunk.current_pos());
 
     if (!body_carries_func(s.try_body) && !body_carries_func(s.catch_body) && !body_carries_func(s.else_body))
         reg_top_ = saved_top;
@@ -1095,11 +1092,11 @@ Compiler::FuncScope::~FuncScope() {
     c.locals_top_ = locals;
 }
 
-uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<std::string>& params,
+FuncIdx Compiler::compile_func_body(const std::string& name, const std::vector<std::string>& params,
                                     const std::vector<std::unique_ptr<Expr>>& defaults,
                                     const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                                     bool with_self, SourceLoc defaults_loc,
-                                    const std::function<void(uint8_t)>& on_registered) {
+                                    const std::function<void(FuncIdx)>& on_registered) {
     FuncScope scope(*this);
     // Derived, not passed: an instance method named `init` IS the constructor, and both facts are
     // already arguments here. A caller with with_self = false — a plain function, a lambda —
@@ -1141,10 +1138,10 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
         defs[i + first] = (i < (int)defaults.size() && defaults[i])
                               ? eval_constant(*defaults[i], chunk.source_files, defaults_loc)
                               : Value{};
-    uint16_t defaults_idx = chunk.add_func_defaults(std::move(defs));
+    PoolIdx defaults_idx = chunk.add_func_defaults(std::move(defs));
 
-    FuncProto fp{func_addr, (uint8_t)n_fixed, variadic, is_static, defaults_idx, 0, {}};
-    uint8_t func_idx = chunk.add_func(fp);
+    FuncProto fp{func_addr, (Field)n_fixed, variadic, is_static, defaults_idx, 0, {}};
+    FuncIdx func_idx = chunk.add_func(fp);
     fn_stack_.back().proto_idx = func_idx;
     if (on_registered)
         on_registered(func_idx);
@@ -1152,10 +1149,11 @@ uint8_t Compiler::compile_func_body(const std::string& name, const std::vector<s
     compile_stmt_seq(body);
     emit_implicit_return(chunk, fn().in_ctor); // omitted when the body already ends with a RETURN
 
-    if (reg_count_ > 255)
-        throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than 255 registers");
-    chunk.funcs[func_idx].reg_count = (uint8_t)reg_count_;
-    chunk.patch_jump(jump_patch, (uint16_t)chunk.current_pos());
+    if ((uint64_t)reg_count_ > k_max_reg)
+        throw std::runtime_error(sloc().str(chunk.source_files) + ": function uses more than " +
+                                 std::to_string(k_max_reg) + " registers");
+    chunk.funcs[func_idx].reg_count = (Field)reg_count_;
+    chunk.patch_jump(jump_patch, chunk.current_pos());
     return func_idx;
 }
 
@@ -1166,8 +1164,8 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // Deciding by in_function() compiled a `func` inside a top-level `do` as a global while
     // binding it as a local, so its register stayed empty: `var g = h` gave nil.
     bool is_local = scopes().regs.contains(s.name);
-    uint8_t func_idx =
-        compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, false, false, s.sloc(), [&](uint8_t idx) {
+    FuncIdx func_idx =
+        compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, false, false, s.sloc(), [&](FuncIdx idx) {
             // A global function is pre-registered in func_table so recursive calls are optimized
             // (CALL_DYN instead of CALL_FUNC when the function may be a closure). One living in
             // a local register gets no entry.
@@ -1185,7 +1183,7 @@ void Compiler::visit(const FuncDeclStmt& s) {
         // Stored in the local register pre-allocated by collect_locals, with no func_table entry
         // and no access to globals.
         int dest = *scopes().regs.find(s.name);
-        chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
+        chunk.emit(make_abx(has_upvals ? Op::MAKE_CLOSURE : Op::LOAD_FUNC, dest, func_idx));
         return;
     }
     // Top level: LOAD_FUNC (or MAKE_CLOSURE) then STORE_GLOBAL. Needed even without outer
@@ -1193,16 +1191,16 @@ void Compiler::visit(const FuncDeclStmt& s) {
     // is reachable as a value.
     func_table[s.name].is_closure = has_upvals;
     int tmp = alloc_reg();
-    chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)tmp, func_idx));
-    chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)tmp, chunk.add_identifier(s.name)));
+    chunk.emit(make_abx(has_upvals ? Op::MAKE_CLOSURE : Op::LOAD_FUNC, tmp, func_idx));
+    chunk.emit(make_abx(Op::STORE_GLOBAL, tmp, chunk.add_identifier(s.name)));
     reg_top_--;
 }
 
 void Compiler::visit(const FuncExpr& s) {
-    uint8_t func_idx = compile_func_body("<lambda>", s.params, s.defaults, s.body, s.variadic, false, false, s.sloc());
+    FuncIdx func_idx = compile_func_body("<lambda>", s.params, s.defaults, s.body, s.variadic, false, false, s.sloc());
     bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
     int dest = alloc_reg();
-    chunk.emit(make_abx(has_upvals ? (uint8_t)Op::MAKE_CLOSURE : (uint8_t)Op::LOAD_FUNC, (uint8_t)dest, func_idx));
+    chunk.emit(make_abx(has_upvals ? Op::MAKE_CLOSURE : Op::LOAD_FUNC, dest, func_idx));
     last_reg_ = dest;
 }
 
@@ -1228,7 +1226,7 @@ void Compiler::visit(const ReturnStmt& s) {
     // code split over `var v = x.field` then `return v` was caught.
     auto pop_tries = [this]() {
         for (int i = fn().try_floor; i < try_depth_; ++i)
-            chunk.emit(make_bx((uint8_t)Op::POP_TRY, 0));
+            chunk.emit(make_bx(Op::POP_TRY, 0));
     };
     // A constructor gives the OBJECT whatever it is written to return. The values are still
     // COMPILED — they may have side effects, and they used to run before the VM overwrote the
@@ -1248,7 +1246,7 @@ void Compiler::visit(const ReturnStmt& s) {
         }
         reg_top_ = saved_top;
         pop_tries();
-        chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 1, 0));
+        chunk.emit(make_abc(Op::RETURN, 0, 1, 0));
         return;
     }
     // return <explicit values>, <call>: when the last returned expression is a call it expands
@@ -1261,45 +1259,44 @@ void Compiler::visit(const ReturnStmt& s) {
         reg_top_ = want;
         s.values.back()->accept(*this); // a terminal call: k return values, hence last_results_ = k
         if (last_reg_ != want)
-            chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)want, (uint8_t)last_reg_, 0));
+            chunk.emit(make_abc(Op::MOVE_RESULTS, want, last_reg_, 0));
         pop_tries();
-        chunk.emit(make_abc((uint8_t)Op::RETURN_SPREAD, (uint8_t)base, (uint8_t)n_expl, 0));
+        chunk.emit(make_abc(Op::RETURN_SPREAD, base, n_expl, 0));
         return;
     }
     if (s.spread_varargs) {
         int base = reg_top_;
         compile_consecutive(base, s.values);
         pop_tries();
-        chunk.emit(make_abc((uint8_t)Op::RETURN_V, (uint8_t)base, (uint8_t)s.values.size(), 0));
+        chunk.emit(make_abc(Op::RETURN_V, base, s.values.size(), 0));
     } else {
         int n = (int)s.values.size();
         if (n == 0) {
             pop_tries();
-            chunk.emit(make_abc((uint8_t)Op::RETURN, 0, 0, 0));
+            chunk.emit(make_abc(Op::RETURN, 0, 0, 0));
         } else if (n == 1) {
             // RETURN A,1 copies R[A] into R[0], so ANY register will do: the value is compiled
             // where it falls, instead of being moved to the top of the scratch area first.
             s.values[0]->accept(*this);
             pop_tries();
-            chunk.emit(make_abc((uint8_t)Op::RETURN, (uint8_t)last_reg_, 1, 0));
+            chunk.emit(make_abc(Op::RETURN, last_reg_, 1, 0));
         } else {
             int base = reg_top_;
             compile_consecutive(base, s.values);
             pop_tries();
-            chunk.emit(make_abc((uint8_t)Op::RETURN, (uint8_t)base, (uint8_t)n, 0));
+            chunk.emit(make_abc(Op::RETURN, base, n, 0));
         }
     }
 }
 
 void Compiler::visit(const NumberExpr& e) {
     last_reg_ = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_,
-                        chunk.add_constant(e.is_integer ? Value(e.ival) : num_value(e.value))));
+    chunk.emit(make_abx(Op::LOAD_K, last_reg_, chunk.add_constant(e.is_integer ? Value(e.ival) : num_value(e.value))));
 }
 
 void Compiler::visit(const StringExpr& e) {
     last_reg_ = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.add_constant(Value(e.value))));
+    chunk.emit(make_abx(Op::LOAD_K, last_reg_, chunk.add_constant(Value(e.value))));
 }
 
 void Compiler::visit(const InterpExpr& e) {
@@ -1310,18 +1307,17 @@ void Compiler::visit(const InterpExpr& e) {
     // does. Allocating a fresh register per piece burned three of them per placeholder, and a
     // string of some 85 pieces failed to compile on the 255-register limit.
     int acc = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)acc, (uint16_t)chunk.add_constant(Value(e.literals[0]))));
+    chunk.emit(make_abx(Op::LOAD_K, acc, chunk.add_constant(Value(e.literals[0]))));
     int scratch = reg_top_; // the piece being appended, reused at every step
     for (int i = 0; i < (int)e.exprs.size(); ++i) {
         reg_top_ = scratch;
         e.exprs[i]->accept(*this);
-        chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc, (uint8_t)acc, (uint8_t)last_reg_));
+        chunk.emit(make_abc(Op::ADD, acc, acc, last_reg_));
         if (!e.literals[i + 1].empty()) {
             reg_top_ = scratch;
             int lit = alloc_reg();
-            chunk.emit(
-                make_abx((uint8_t)Op::LOAD_K, (uint8_t)lit, (uint16_t)chunk.add_constant(Value(e.literals[i + 1]))));
-            chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)acc, (uint8_t)acc, (uint8_t)lit));
+            chunk.emit(make_abx(Op::LOAD_K, lit, chunk.add_constant(Value(e.literals[i + 1]))));
+            chunk.emit(make_abc(Op::ADD, acc, acc, lit));
         }
     }
     reg_top_ = scratch;
@@ -1330,12 +1326,12 @@ void Compiler::visit(const InterpExpr& e) {
 
 void Compiler::visit(const BoolExpr& e) {
     last_reg_ = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.add_constant(Value::make_bool(e.value))));
+    chunk.emit(make_abx(Op::LOAD_K, last_reg_, chunk.add_constant(Value::make_bool(e.value))));
 }
 
 void Compiler::visit(const NilExpr&) {
     last_reg_ = alloc_reg();
-    chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)last_reg_, 0, 0));
+    chunk.emit(make_abc(Op::LOAD_NIL, last_reg_, 0, 0));
 }
 
 void Compiler::visit(const VarExpr& e) {
@@ -1351,9 +1347,9 @@ void Compiler::visit(const VarExpr& e) {
     if (fit != func_table.end()) {
         last_reg_ = alloc_reg();
         if (fit->second.is_closure) {
-            chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_, chunk.add_identifier(e.name)));
+            chunk.emit(make_abx(Op::LOAD_GLOBAL, last_reg_, chunk.add_identifier(e.name)));
         } else {
-            chunk.emit(make_abx((uint8_t)Op::LOAD_FUNC, (uint8_t)last_reg_, fit->second.func_idx));
+            chunk.emit(make_abx(Op::LOAD_FUNC, last_reg_, fit->second.func_idx));
         }
         return;
     }
@@ -1362,14 +1358,14 @@ void Compiler::visit(const VarExpr& e) {
         int uv = resolve_upvalue(e.name);
         if (uv >= 0) {
             last_reg_ = alloc_reg();
-            chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)last_reg_, (uint8_t)uv, 0));
+            chunk.emit(make_abc(Op::GET_UPVAL, last_reg_, uv, 0));
             return;
         }
     }
     if (!declared_globals_.count(e.name))
         throw std::runtime_error(sloc().str(chunk.source_files) + ": undeclared variable '" + e.name + "'");
     last_reg_ = alloc_reg();
-    chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)last_reg_, chunk.add_identifier(e.name)));
+    chunk.emit(make_abx(Op::LOAD_GLOBAL, last_reg_, chunk.add_identifier(e.name)));
 }
 
 void Compiler::visit(const BinaryExpr& e) {
@@ -1385,18 +1381,18 @@ void Compiler::visit(const BinaryExpr& e) {
         compile_into(*e.left, dst);
         if (e.op == '&') {
             // a falsy: keep a, already in dst, and skip evaluating b
-            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
+            size_t skip = chunk.emit_jump(Op::JUMP_IF_FALSE, dst);
             e.right->accept(*this);
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
-            chunk.patch_jump(skip, (uint16_t)chunk.current_pos());
+            chunk.emit(make_abc(Op::MOVE, dst, last_reg_, 0));
+            chunk.patch_jump(skip, chunk.current_pos());
         } else {
             // a truthy: keep a; a falsy: evaluate b
-            size_t eval_right = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)dst);
+            size_t eval_right = chunk.emit_jump(Op::JUMP_IF_FALSE, dst);
             size_t done = chunk.emit_jump(Op::JUMP);
-            chunk.patch_jump(eval_right, (uint16_t)chunk.current_pos());
+            chunk.patch_jump(eval_right, chunk.current_pos());
             e.right->accept(*this);
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)dst, (uint8_t)last_reg_, 0));
-            chunk.patch_jump(done, (uint16_t)chunk.current_pos());
+            chunk.emit(make_abc(Op::MOVE, dst, last_reg_, 0));
+            chunk.patch_jump(done, chunk.current_pos());
         }
         reg_top_ = dst + 1;
         last_reg_ = dst;
@@ -1413,7 +1409,7 @@ void Compiler::visit(const BinaryExpr& e) {
     last_reg_ = reg_top_++;
     bump_reg_count();
 
-    chunk.emit(make_abc((uint8_t)binary_arith_opcode(e.op), (uint8_t)last_reg_, (uint8_t)r_l, (uint8_t)r_r));
+    chunk.emit(make_abc(binary_arith_opcode(e.op), last_reg_, r_l, r_r));
 }
 
 // a < b < c: each operand in its own register, comparisons taken pairwise, AND at the end.
@@ -1436,12 +1432,11 @@ void Compiler::visit(const ChainedCompareExpr& e) {
     reserve_regs_to(reg_top_ + n - 1);
 
     for (int i = 0; i < n - 1; i++)
-        chunk.emit(make_abc((uint8_t)binary_arith_opcode(e.ops[i]), (uint8_t)(cmp_base + i), (uint8_t)regs[i],
-                            (uint8_t)regs[i + 1]));
+        chunk.emit(make_abc(binary_arith_opcode(e.ops[i]), (cmp_base + i), regs[i], regs[i + 1]));
 
     // Fold the partial results together with AND, into cmp_base.
     for (int i = 1; i < n - 1; i++)
-        chunk.emit(make_abc((uint8_t)Op::AND, (uint8_t)cmp_base, (uint8_t)cmp_base, (uint8_t)(cmp_base + i)));
+        chunk.emit(make_abc(Op::AND, cmp_base, cmp_base, (cmp_base + i)));
 
     last_reg_ = cmp_base;
     reg_top_ = base_tmp; // frees every temporary after the expression
@@ -1451,29 +1446,29 @@ void Compiler::visit(const UnaryExpr& e) {
     Value folded;
     if (negated_literal(e, folded)) {
         last_reg_ = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)last_reg_, chunk.add_constant(folded)));
+        chunk.emit(make_abx(Op::LOAD_K, last_reg_, chunk.add_constant(folded)));
         return;
     }
     e.operand->accept(*this);
     int r_in = last_reg_;
     last_reg_ = alloc_reg();
-    chunk.emit(make_abc((uint8_t)unary_opcode(e.op), (uint8_t)last_reg_, (uint8_t)r_in, 0));
+    chunk.emit(make_abc(unary_opcode(e.op), last_reg_, r_in, 0));
 }
 
 void Compiler::emit_callee_value(const std::string& name, int reg) {
     const int* rit = scopes().regs.find(name);
     if (rit != nullptr) {
         if (*rit != reg)
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)reg, (uint8_t)*rit, 0));
+            chunk.emit(make_abc(Op::MOVE, reg, *rit, 0));
         return;
     }
     int uv = resolve_upvalue(name);
     if (uv >= 0) {
-        chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)reg, (uint8_t)uv, 0));
+        chunk.emit(make_abc(Op::GET_UPVAL, reg, uv, 0));
         return;
     }
     // Builtins and top-level functions, closures included, are globals (STORE_GLOBAL).
-    chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)reg, chunk.add_identifier(name)));
+    chunk.emit(make_abx(Op::LOAD_GLOBAL, reg, chunk.add_identifier(name)));
 }
 
 bool Compiler::emit_multi_tail(const std::vector<std::unique_ptr<Expr>>& args, int dest) {
@@ -1483,7 +1478,7 @@ bool Compiler::emit_multi_tail(const std::vector<std::unique_ptr<Expr>>& args, i
     reg_top_ = dest;
     args.back()->accept(*this);
     if (last_reg_ != dest) // the nested call spread elsewhere, so recompose at `dest`
-        chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)dest, (uint8_t)last_reg_, 0));
+        chunk.emit(make_abc(Op::MOVE_RESULTS, dest, last_reg_, 0));
     return false;
 }
 
@@ -1499,7 +1494,7 @@ void Compiler::emit_spread_call(const std::vector<std::unique_ptr<Expr>>& args,
     // call_base + n_fixed; either way argc is the FIXED count and the VM adds the rest.
     bool is_vararg = emit_multi_tail(args, call_base + n_fixed);
     Op op = is_vararg ? Op::CALL_VARARGS : Op::CALL_VA;
-    chunk.emit(make_abc((uint8_t)op, (uint8_t)call_base, (uint8_t)func_slot, (uint8_t)n_fixed));
+    chunk.emit(make_abc(op, call_base, func_slot, n_fixed));
     last_reg_ = call_base;
     reserve_regs_to(call_base + 1);
 }
@@ -1514,18 +1509,18 @@ void Compiler::emit_optional_call(const std::vector<std::unique_ptr<Expr>>& args
     reserve_regs_to(func_reg + 1);
     // f?(args) is `if f then f(args) else nil`: JUMP_IF_FALSE (nil being falsy) jumps over the
     // arguments, which are therefore NOT evaluated when f is falsy.
-    size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)call_base);
-    chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)func_reg, (uint8_t)call_base, 0));
+    size_t to_nil = chunk.emit_jump(Op::JUMP_IF_FALSE, call_base);
+    chunk.emit(make_abc(Op::MOVE, func_reg, call_base, 0));
     for (int i = 0; i < argc; ++i) { // temporaries above func_reg
         reg_top_ = func_reg + 1;
         compile_into(*args[i], call_base + i);
     }
     reserve_regs_to(func_reg + 1);
-    chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+    chunk.emit(make_abc(Op::CALL_DYN, call_base, func_reg, argc));
     size_t to_end = chunk.emit_jump(Op::JUMP);
-    chunk.patch_jump(to_nil, (uint16_t)chunk.current_pos());
-    chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0));
-    chunk.patch_jump(to_end, (uint16_t)chunk.current_pos());
+    chunk.patch_jump(to_nil, chunk.current_pos());
+    chunk.emit(make_abc(Op::LOAD_NIL, call_base, 0, 0));
+    chunk.patch_jump(to_end, chunk.current_pos());
     reg_top_ = call_base + 1;
     last_reg_ = call_base;
 }
@@ -1561,10 +1556,10 @@ void Compiler::visit(const CallExpr& e) {
         compile_consecutive(call_base, e.args);
         if (target.is_closure) {
             int func_reg = alloc_reg();
-            chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg, chunk.add_identifier(e.callee)));
-            chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+            chunk.emit(make_abx(Op::LOAD_GLOBAL, func_reg, chunk.add_identifier(e.callee)));
+            chunk.emit(make_abc(Op::CALL_DYN, call_base, func_reg, argc));
         } else {
-            chunk.emit(make_abc((uint8_t)Op::CALL_FUNC, (uint8_t)call_base, target.func_idx, (uint8_t)argc));
+            chunk.emit(make_abc(Op::CALL_FUNC, call_base, target.func_idx, argc));
         }
         last_reg_ = call_base;
         return;
@@ -1585,13 +1580,13 @@ void Compiler::visit(const CallExpr& e) {
             } else {
                 int uv = resolve_upvalue(e.callee);
                 if (uv >= 0) {
-                    chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)func_reg, (uint8_t)uv, 0));
+                    chunk.emit(make_abc(Op::GET_UPVAL, func_reg, uv, 0));
                 } else {
-                    chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)func_reg, chunk.add_identifier(e.callee)));
+                    chunk.emit(make_abx(Op::LOAD_GLOBAL, func_reg, chunk.add_identifier(e.callee)));
                 }
             }
         }
-        chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+        chunk.emit(make_abc(Op::CALL_DYN, call_base, func_reg, argc));
         last_reg_ = call_base;
     }
 }
@@ -1617,7 +1612,7 @@ void Compiler::visit(const ExprCallExpr& e) {
     int func_reg = alloc_reg();
     compile_into(*e.callee, func_reg);
 
-    chunk.emit(make_abc((uint8_t)Op::CALL_DYN, (uint8_t)call_base, (uint8_t)func_reg, (uint8_t)argc));
+    chunk.emit(make_abc(Op::CALL_DYN, call_base, func_reg, argc));
     last_reg_ = call_base;
 }
 
@@ -1628,20 +1623,20 @@ void Compiler::visit(const VarArgExpr&) {
     // with nil. Multi-value consumers — a call, an array, a return, a trailing destructuring —
     // emit LOAD_VARARGS with count=0 themselves for the full expansion.
     int base = reg_top_;
-    chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, 1, 0));
+    chunk.emit(make_abc(Op::LOAD_VARARGS, base, 1, 0));
     last_reg_ = base;
 }
 
 void Compiler::visit(const MapExpr& e) {
     int dest = alloc_reg();
-    chunk.emit(make_abc((uint8_t)Op::NEW_MAP, (uint8_t)dest, 0, 0));
+    chunk.emit(make_abc(Op::NEW_MAP, dest, 0, 0));
     for (auto& entry : e.entries) {
         int saved = reg_top_;
         int key_reg = alloc_reg();
         compile_into(*entry.key, key_reg); // a literal StringExpr OR a computed key
         int val_reg = alloc_reg();
         compile_into(*entry.value, val_reg);
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_reg, (uint8_t)val_reg));
+        chunk.emit(make_abc(Op::SET_INDEX, dest, key_reg, val_reg));
         reg_top_ = saved;
     }
     last_reg_ = dest;
@@ -1651,7 +1646,7 @@ void Compiler::visit(const IndexExpr& e) {
     Value folded;
     if (fold_enum_member(e, folded)) {
         int dest = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)dest, chunk.add_constant(folded)));
+        chunk.emit(make_abx(Op::LOAD_K, dest, chunk.add_constant(folded)));
         last_reg_ = dest;
         return;
     }
@@ -1667,13 +1662,13 @@ void Compiler::visit(const IndexExpr& e) {
     int key_r = last_reg_;
     reg_top_ = saved2;
     int dest = alloc_reg();
-    chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)dest, (uint8_t)obj_r, (uint8_t)key_r));
+    chunk.emit(make_abc(Op::GET_INDEX, dest, obj_r, key_r));
     last_reg_ = dest;
 }
 
 void Compiler::visit(const ArrayExpr& e) {
     int dest = alloc_reg();
-    chunk.emit(make_abc((uint8_t)Op::NEW_ARRAY, (uint8_t)dest, 0, 0));
+    chunk.emit(make_abc(Op::NEW_ARRAY, dest, 0, 0));
     int n = (int)e.elements.size();
     for (int i = 0; i < n; ++i) {
         const Expr* elem = e.elements[i].get();
@@ -1681,18 +1676,18 @@ void Compiler::visit(const ArrayExpr& e) {
         // In LAST position a multi-value element expands, as in Lua: `...` to every vararg, a
         // call to all of its return values.
         if (last_pos && dynamic_cast<const VarArgExpr*>(elem)) {
-            chunk.emit(make_abc((uint8_t)Op::ARRAY_PUSH_VARARGS, (uint8_t)dest, 0, 0));
+            chunk.emit(make_abc(Op::ARRAY_PUSH_VARARGS, dest, 0, 0));
         } else if (last_pos && is_call_node(elem)) {
             int saved = reg_top_;
             int spread_base = reg_top_;
             e.elements[i]->accept(*this); // k values at spread_base.., with last_results_ = k
-            chunk.emit(make_abc((uint8_t)Op::ARRAY_PUSH_SPREAD, (uint8_t)dest, (uint8_t)spread_base, 0));
+            chunk.emit(make_abc(Op::ARRAY_PUSH_SPREAD, dest, spread_base, 0));
             reg_top_ = saved;
         } else {
             int saved = reg_top_;
             int val_r = alloc_reg();
             compile_into(*e.elements[i], val_r);
-            chunk.emit(make_abc((uint8_t)Op::ARRAY_PUSH, (uint8_t)dest, (uint8_t)val_r, 0));
+            chunk.emit(make_abc(Op::ARRAY_PUSH, dest, val_r, 0));
             reg_top_ = saved;
         }
     }
@@ -1727,19 +1722,19 @@ void Compiler::visit(const RangeExpr& e) {
     // If open-left: adjust start = start + step_or_1
     if (!e.incl_left) {
         if (has_step) {
-            chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)start_r, (uint8_t)start_r, (uint8_t)(base + 2)));
+            chunk.emit(make_abc(Op::ADD, start_r, start_r, (base + 2)));
         } else {
             int one_r = base + 2;
             reserve_regs_to(base + 3);
-            chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)one_r, chunk.add_constant(Value((int64_t)1))));
-            chunk.emit(make_abc((uint8_t)Op::ADD, (uint8_t)start_r, (uint8_t)start_r, (uint8_t)one_r));
+            chunk.emit(make_abx(Op::LOAD_K, one_r, chunk.add_constant(Value((int64_t)1))));
+            chunk.emit(make_abc(Op::ADD, start_r, start_r, one_r));
         }
     }
 
     // Build flags: bit0 = incl_right, bit1 = has_step
-    uint8_t flags = (uint8_t)((has_step ? 2 : 0) | (e.incl_right ? 1 : 0));
+    Field flags = (Field)((has_step ? 2 : 0) | (e.incl_right ? 1 : 0));
 
-    chunk.emit(make_abc((uint8_t)Op::MAKE_RANGE, (uint8_t)dest, (uint8_t)base, flags));
+    chunk.emit(make_abc(Op::MAKE_RANGE, dest, base, flags));
 
     // Restore reg_top_ to dest+1 (temps freed, dest still "live")
     reg_top_ = dest + 1;
@@ -1754,7 +1749,7 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     reserve_regs_to(tmp_src + 1);
 
     compile_into(src, tmp_src); // src is compiled BEFORE the loop variables are scoped
-    chunk.emit(make_abc((uint8_t)Op::MAKE_ITER, (uint8_t)block, (uint8_t)tmp_src, 0));
+    chunk.emit(make_abc(Op::MAKE_ITER, block, tmp_src, 0));
     reg_top_ = tmp_src;
 
     // The loop variables are scoped by aliasing them onto the registers FOR_ITER_NEXT writes
@@ -1767,9 +1762,9 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     if (two_vars)
         sh2 = scopes().regs.bind_here(var2, block + 2);
 
-    auto loop_start = (uint16_t)chunk.current_pos();
+    CodeAddr loop_start = (CodeAddr)chunk.current_pos();
     Op iter_op = two_vars ? Op::FOR_ITER_NEXT : Op::FOR_ITER_NEXT1;
-    size_t exit_patch = chunk.emit_jump(iter_op, (uint8_t)block);
+    size_t exit_patch = chunk.emit_jump(iter_op, block);
 
     fn().break_patches.push_back({{}, try_depth_, false});
     fn().continue_patches.push_back({{}, try_depth_, false});
@@ -1778,15 +1773,15 @@ void Compiler::compile_iterator_loop(const Expr& src, const std::string& var1, c
     // upvalues are closed and the next turn creates fresh ones — one variable per iteration.
     // `continue` jumps HERE, so it goes through the same closing.
     bool close_scope = body_carries_func(body);
-    uint16_t iter_end = (uint16_t)chunk.current_pos();
+    CodeAddr iter_end = (CodeAddr)chunk.current_pos();
     if (close_scope)
         close_upvals_from(block + 1);
     for (size_t p : fn().continue_patches.back().patches)
         chunk.patch_jump(p, iter_end);
     fn().continue_patches.pop_back();
-    chunk.emit(make_bx((uint8_t)Op::JUMP, loop_start));
+    chunk.emit(make_bx(Op::JUMP, loop_start));
 
-    uint16_t exit = (uint16_t)chunk.current_pos();
+    CodeAddr exit = (CodeAddr)chunk.current_pos();
     // Exit (normal end, exhausted iterator, or `break`): the same closing, so that the last
     // iteration behaves like the others.
     if (close_scope)
@@ -1949,7 +1944,7 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     if (r.step)
         compile_into(*r.step, ctl + 2);
     else
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)(ctl + 2), chunk.add_constant(Value((int64_t)1))));
+        chunk.emit(make_abx(Op::LOAD_K, (ctl + 2), chunk.add_constant(Value((int64_t)1))));
     reg_top_ = ctl + 3;
 
     // The loop variable is scoped. When the body never writes i it is aliased onto ctl, with no
@@ -1965,11 +1960,11 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     // As in the iterator loop: bound in the current scope, the loop having none of its own.
     ScopeTable<int>::Shadow shadow = scopes().regs.bind_here(var1, var_reg);
 
-    size_t prep = chunk.emit_jump(Op::FOR_PREP, (uint8_t)ctl); // Bx is the exit for an empty loop, patched later
+    size_t prep = chunk.emit_jump(Op::FOR_PREP, ctl); // Bx is the exit for an empty loop, patched later
 
-    uint16_t body_addr = (uint16_t)chunk.current_pos(); // FOR_PREP falls through to here when the loop is not empty
+    CodeAddr body_addr = (CodeAddr)chunk.current_pos(); // FOR_PREP falls through to here when the loop is not empty
     if (!can_alias)
-        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)var_reg, (uint8_t)ctl, 0));
+        chunk.emit(make_abc(Op::MOVE, var_reg, ctl, 0));
 
     fn().break_patches.push_back({{}, try_depth_, false});
     fn().continue_patches.push_back({{}, try_depth_, false});
@@ -1978,15 +1973,15 @@ void Compiler::compile_numeric_for(const RangeExpr& r, const std::string& var1,
     // End of an iteration: close the upvalues of the body's scope, as in the iterator loop.
     // Closing does not modify the registers, so FOR_LOOP finds its counter intact.
     bool close_scope = body_carries_func(body);
-    uint16_t loop_addr = (uint16_t)chunk.current_pos();
+    CodeAddr loop_addr = (CodeAddr)chunk.current_pos();
     if (close_scope)
         close_upvals_from(var_reg);
     for (size_t p : fn().continue_patches.back().patches)
         chunk.patch_jump(p, loop_addr);
     fn().continue_patches.pop_back();
-    chunk.emit(make_abx((uint8_t)Op::FOR_LOOP, (uint8_t)ctl, body_addr));
+    chunk.emit(make_abx(Op::FOR_LOOP, ctl, body_addr));
 
-    uint16_t exit_addr = (uint16_t)chunk.current_pos();
+    CodeAddr exit_addr = (CodeAddr)chunk.current_pos();
     if (close_scope)
         close_upvals_from(var_reg);
     chunk.patch_jump(prep, exit_addr); // FOR_PREP jumps here when the loop is empty
@@ -2048,11 +2043,11 @@ void Compiler::visit(const IndexAssignStmt& s) {
             int uv = resolve_upvalue(s.obj);
             obj_r = alloc_reg();
             if (uv >= 0) {
-                chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)obj_r, (uint8_t)uv, 0));
+                chunk.emit(make_abc(Op::GET_UPVAL, obj_r, uv, 0));
             } else {
                 if (!declared_globals_.count(s.obj))
                     throw std::runtime_error(where(s) + ": undeclared variable '" + s.obj + "'");
-                chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)obj_r, chunk.add_identifier(s.obj)));
+                chunk.emit(make_abx(Op::LOAD_GLOBAL, obj_r, chunk.add_identifier(s.obj)));
             }
         }
     }
@@ -2065,17 +2060,17 @@ void Compiler::visit(const IndexAssignStmt& s) {
         // Simple assignment: SET_INDEX obj_r, key_r, val_r
         int val_r = alloc_reg();
         compile_into(*s.value, val_r);
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
+        chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, val_r));
     } else {
         // Compound assignment: get current, apply op, store back
         int cur_r = alloc_reg();
-        chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)cur_r, (uint8_t)obj_r, (uint8_t)key_r));
+        chunk.emit(make_abc(Op::GET_INDEX, cur_r, obj_r, key_r));
         int rhs_r = alloc_reg();
         compile_into(*s.value, rhs_r);
         int result_r = alloc_reg();
         bump_reg_count();
-        chunk.emit(make_abc((uint8_t)token_to_op(s.op), (uint8_t)result_r, (uint8_t)cur_r, (uint8_t)rhs_r));
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)result_r));
+        chunk.emit(make_abc(token_to_op(s.op), result_r, cur_r, rhs_r));
+        chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, result_r));
     }
     reg_top_ = saved;
 }
@@ -2085,17 +2080,17 @@ void Compiler::store_name(const std::string& name, int src, const Stmt& at) {
     const int* it = scopes().regs.find(name);
     if (it != nullptr) {
         if (src != *it)
-            chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)*it, (uint8_t)src, 0));
+            chunk.emit(make_abc(Op::MOVE, *it, src, 0));
         return;
     }
     int uv = resolve_upvalue(name);
     if (uv >= 0) {
-        chunk.emit(make_abc((uint8_t)Op::SET_UPVAL, (uint8_t)src, (uint8_t)uv, 0));
+        chunk.emit(make_abc(Op::SET_UPVAL, src, uv, 0));
         return;
     }
     if (!declared_globals_.count(name))
         throw std::runtime_error(where(at) + ": undeclared variable '" + name + "' (use 'var' or 'global')");
-    chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)src, chunk.add_identifier(name)));
+    chunk.emit(make_abx(Op::STORE_GLOBAL, src, chunk.add_identifier(name)));
 }
 
 // The container of an indexed write, in a register: a named variable keeps its own register, any
@@ -2109,12 +2104,12 @@ int Compiler::emit_container(const Expr& obj, const Stmt& at) {
         int uv = resolve_upvalue(ve->name);
         int r = alloc_reg();
         if (uv >= 0) {
-            chunk.emit(make_abc((uint8_t)Op::GET_UPVAL, (uint8_t)r, (uint8_t)uv, 0));
+            chunk.emit(make_abc(Op::GET_UPVAL, r, uv, 0));
             return r;
         }
         if (!declared_globals_.count(ve->name))
             throw std::runtime_error(where(at) + ": undeclared variable '" + ve->name + "'");
-        chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)r, chunk.add_identifier(ve->name)));
+        chunk.emit(make_abx(Op::LOAD_GLOBAL, r, chunk.add_identifier(ve->name)));
         return r;
     }
     int r = alloc_reg();
@@ -2136,15 +2131,15 @@ void Compiler::visit(const MultiAssignStmt& s) {
     // and the values came out SHIFTED — `a, b, c = f()` gave 1, 1, 2 for a 1, 2, 3 return.
     if (n_targets > 1 && n == 1 && is_multi_value_expr(s.values[0].get())) {
         if (dynamic_cast<const VarArgExpr*>(s.values[0].get())) {
-            chunk.emit(make_abc((uint8_t)Op::LOAD_VARARGS, (uint8_t)base, (uint8_t)n_targets, 0));
+            chunk.emit(make_abc(Op::LOAD_VARARGS, base, n_targets, 0));
         } else {
             s.values[0]->accept(*this);
             if (last_reg_ != base)
-                chunk.emit(make_abc((uint8_t)Op::MOVE_RESULTS, (uint8_t)base, (uint8_t)last_reg_, 0));
+                chunk.emit(make_abc(Op::MOVE_RESULTS, base, last_reg_, 0));
         }
         if (base + n_targets > reg_count_)
             reg_count_ = base + n_targets;
-        chunk.emit(make_abc((uint8_t)Op::SPREAD_RESULTS, (uint8_t)base, (uint8_t)n_targets, 0));
+        chunk.emit(make_abc(Op::SPREAD_RESULTS, base, n_targets, 0));
         reg_top_ = base + n_targets;
         n = n_targets; // each target now has its value at base+i
     } else {
@@ -2174,7 +2169,7 @@ void Compiler::visit(const MultiAssignStmt& s) {
         int obj_r = emit_container(*ie->obj, s);
         int key_r = alloc_reg();
         compile_into(*ie->key, key_r);
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)val_r));
+        chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, val_r));
     }
 
     reg_top_ = saved;
@@ -2190,7 +2185,7 @@ void Compiler::visit(const DoStmt& s) {
 }
 
 // Compiles a method, with an implicit 'self' in R[0].
-uint8_t Compiler::compile_method_func(const FuncDeclStmt& s) {
+FuncIdx Compiler::compile_method_func(const FuncDeclStmt& s) {
     return compile_func_body(s.name, s.params, s.defaults, s.body, s.variadic, s.is_static, !s.is_static, s.sloc());
 }
 
@@ -2200,23 +2195,23 @@ void Compiler::visit(const ClassDeclStmt& s) {
 
     // Create the class value (T_CLASS, an empty map).
     int dest = alloc_reg();
-    chunk.emit(make_abc((uint8_t)Op::NEW_CLASS, (uint8_t)dest, 0, 0));
+    chunk.emit(make_abc(Op::NEW_CLASS, dest, 0, 0));
 
     // Store the class name as __name__, which print and debugging use.
     {
         int key_r = alloc_reg(), val_r = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string("__name__")))));
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)val_r, chunk.add_constant(Value(s.name))));
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string("__name__")))));
+        chunk.emit(make_abx(Op::LOAD_K, val_r, chunk.add_constant(Value(s.name))));
+        chunk.emit(make_abc(Op::SET_INDEX, dest, key_r, val_r));
         reg_top_ = dest + 1;
     }
 
     // Inheritance: store the parent class as __parent__.
     if (!s.parent.empty()) {
         int par_r = alloc_reg(), key_r = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)par_r, chunk.add_identifier(s.parent)));
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string("__parent__")))));
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)par_r));
+        chunk.emit(make_abx(Op::LOAD_GLOBAL, par_r, chunk.add_identifier(s.parent)));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string("__parent__")))));
+        chunk.emit(make_abc(Op::SET_INDEX, dest, key_r, par_r));
         reg_top_ = dest + 1;
     }
 
@@ -2237,16 +2232,16 @@ void Compiler::visit(const ClassDeclStmt& s) {
                 throw std::runtime_error(method->sloc().str(chunk.source_files) + ": metamethod '" + method->name +
                                          "' cannot be static (operators always have 'self')");
         }
-        uint8_t func_idx = compile_method_func(*method);
+        FuncIdx func_idx = compile_method_func(*method);
         bool has_upvals = !chunk.funcs[func_idx].upvals.empty();
 
         int func_r = alloc_reg(), key_r = alloc_reg();
         if (has_upvals)
-            chunk.emit(make_abx((uint8_t)Op::MAKE_CLOSURE, (uint8_t)func_r, func_idx));
+            chunk.emit(make_abx(Op::MAKE_CLOSURE, func_r, func_idx));
         else
-            chunk.emit(make_abx((uint8_t)Op::LOAD_FUNC, (uint8_t)func_r, func_idx));
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(method->name))));
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)func_r));
+            chunk.emit(make_abx(Op::LOAD_FUNC, func_r, func_idx));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(method->name))));
+        chunk.emit(make_abc(Op::SET_INDEX, dest, key_r, func_r));
         reg_top_ = dest + 1;
     }
 
@@ -2254,7 +2249,7 @@ void Compiler::visit(const ClassDeclStmt& s) {
 
     // Store the class as a global. The name is already in declared_globals_ through the
     // collect_globals pre-scan, which stays the single source of truth.
-    chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
+    chunk.emit(make_abx(Op::STORE_GLOBAL, dest, chunk.add_identifier(s.name)));
 
     reg_top_ = saved;
 }
@@ -2266,19 +2261,19 @@ void Compiler::visit(const EnumDeclStmt& s) {
     note_line(s.line, s.file_idx);
     int saved = reg_top_;
     int dest = alloc_reg();
-    chunk.emit(make_abc((uint8_t)Op::NEW_MAP, (uint8_t)dest, 0, 0));
+    chunk.emit(make_abc(Op::NEW_MAP, dest, 0, 0));
 
     for (auto& it : s.items) {
         int item_saved = reg_top_;
         int key_r = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(it.name))));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(it.name))));
         int val_r = alloc_reg();
         compile_into(*it.value, val_r);
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)dest, (uint8_t)key_r, (uint8_t)val_r));
+        chunk.emit(make_abc(Op::SET_INDEX, dest, key_r, val_r));
         reg_top_ = item_saved;
     }
 
-    chunk.emit(make_abc((uint8_t)Op::SEAL_ENUM, (uint8_t)dest, 0, 0));
+    chunk.emit(make_abc(Op::SEAL_ENUM, dest, 0, 0));
 
     // Record the members whose value is a literal, so later code reads them as constants. Per
     // MEMBER and not per enum: an enum holding an array or a function keeps a real lookup for
@@ -2294,13 +2289,13 @@ void Compiler::visit(const EnumDeclStmt& s) {
 
     if (!s.obj_expr) {
         // The name is already in declared_globals_ AND enum_names_ from the collect_globals pass.
-        chunk.emit(make_abx((uint8_t)Op::STORE_GLOBAL, (uint8_t)dest, chunk.add_identifier(s.name)));
+        chunk.emit(make_abx(Op::STORE_GLOBAL, dest, chunk.add_identifier(s.name)));
     } else {
         int obj_r = alloc_reg();
         compile_into(*s.obj_expr, obj_r);
         int key_r = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(s.name))));
-        chunk.emit(make_abc((uint8_t)Op::SET_INDEX, (uint8_t)obj_r, (uint8_t)key_r, (uint8_t)dest));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(s.name))));
+        chunk.emit(make_abc(Op::SET_INDEX, obj_r, key_r, dest));
     }
 
     reg_top_ = saved;
@@ -2325,16 +2320,16 @@ void Compiler::visit(const MethodCallExpr& e) {
             throw std::runtime_error(sloc().str(chunk.source_files) + ": 'super': the current class has no parent");
         int self_src = *self_it;
         reserve_regs_to(call_base + 1);
-        chunk.emit(make_abc((uint8_t)Op::MOVE, (uint8_t)call_base, (uint8_t)self_src, 0));
+        chunk.emit(make_abc(Op::MOVE, call_base, self_src, 0));
 
         // Temporaries: tmp holds the parent class (a global), key_r the key.
         int tmp = alloc_reg(), key_r = alloc_reg();
 
         // tmp = <the lexically enclosing parent class>
-        chunk.emit(make_abx((uint8_t)Op::LOAD_GLOBAL, (uint8_t)tmp, chunk.add_identifier(current_class_parent_)));
+        chunk.emit(make_abx(Op::LOAD_GLOBAL, tmp, chunk.add_identifier(current_class_parent_)));
         // R[call_base+1] = tmp.<method>
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string(e.method)))));
-        chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)tmp, (uint8_t)key_r));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string(e.method)))));
+        chunk.emit(make_abc(Op::GET_INDEX, (call_base + 1), tmp, key_r));
         reserve_regs_to(call_base + 2);
     } else {
         // R[call_base] = receiver (self)
@@ -2343,8 +2338,8 @@ void Compiler::visit(const MethodCallExpr& e) {
 
         // R[call_base+1] = GET_INDEX(receiver, method_name)
         int key_r = alloc_reg();
-        chunk.emit(make_abx((uint8_t)Op::LOAD_K, (uint8_t)key_r, chunk.add_constant(Value(std::string(e.method)))));
-        chunk.emit(make_abc((uint8_t)Op::GET_INDEX, (uint8_t)(call_base + 1), (uint8_t)call_base, (uint8_t)key_r));
+        chunk.emit(make_abx(Op::LOAD_K, key_r, chunk.add_constant(Value(std::string(e.method)))));
+        chunk.emit(make_abc(Op::GET_INDEX, (call_base + 1), call_base, key_r));
         reserve_regs_to(call_base + 2);
     }
 
@@ -2352,7 +2347,7 @@ void Compiler::visit(const MethodCallExpr& e) {
     // when the method (R[call_base+1]) is falsy, the arguments are not evaluated.
     size_t skip = 0;
     if (e.optional)
-        skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (uint8_t)(call_base + 1));
+        skip = chunk.emit_jump(Op::JUMP_IF_FALSE, (call_base + 1));
 
     // A multi-value LAST argument EXPANDS, exactly as on a plain call: `...` to every vararg, a
     // call to all of its return values. This used to be the one place the rule did not hold —
@@ -2368,7 +2363,7 @@ void Compiler::visit(const MethodCallExpr& e) {
         // The fixed slots are reserved, receiver and method included, so the block the VM lays its
         // arguments in is part of this frame's count.
         reserve_regs_to(call_base + 2 + n_fixed);
-        chunk.emit(make_abc((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, is_vararg ? 1 : 2, (uint8_t)n_fixed));
+        chunk.emit(make_abc(Op::CALL_METHOD, call_base, is_vararg ? 1 : 2, n_fixed));
         reg_top_ = call_base + 1;
         last_reg_ = call_base;
         return;
@@ -2377,12 +2372,12 @@ void Compiler::visit(const MethodCallExpr& e) {
     // R[call_base+2..argc+1] = args
     compile_consecutive(call_base + 2, e.args);
 
-    chunk.emit(make_abc((uint8_t)Op::CALL_METHOD, (uint8_t)call_base, 0, (uint8_t)argc));
+    chunk.emit(make_abc(Op::CALL_METHOD, call_base, 0, argc));
     if (e.optional) {
-        size_t end = chunk.emit_jump(Op::JUMP);                                // jumps over the LOAD_NIL
-        chunk.patch_jump(skip, (uint16_t)chunk.current_pos());                 // the jump target: a nil method
-        chunk.emit(make_abc((uint8_t)Op::LOAD_NIL, (uint8_t)call_base, 0, 0)); // a nil result
-        chunk.patch_jump(end, (uint16_t)chunk.current_pos());
+        size_t end = chunk.emit_jump(Op::JUMP);              // jumps over the LOAD_NIL
+        chunk.patch_jump(skip, chunk.current_pos());         // the jump target: a nil method
+        chunk.emit(make_abc(Op::LOAD_NIL, call_base, 0, 0)); // a nil result
+        chunk.patch_jump(end, chunk.current_pos());
     }
     last_reg_ = call_base;
 }

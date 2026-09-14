@@ -172,7 +172,7 @@ static std::string str_result_text(const Value& v) {
 // lets every site share the one resolution instead of a copy of its own.
 static constexpr const char* CALL_NOT_CALLABLE = "runtime: call on non-function value";
 static constexpr const char* METHOD_NOT_CALLABLE = "runtime: method call on non-function value";
-static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
+static FuncIdx resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
                                 const char* not_callable);
 
 // invoke_str: a mini-loop that calls __str without recursing.
@@ -193,7 +193,7 @@ std::string VM::invoke_str(Value obj) { // by value: regs.resize() must not inva
         return n >= 1 ? str_result_text(self) : "{object}";
     }
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    uint8_t fi = resolve_func_val(str_fn, frame_upvals, CALL_NOT_CALLABLE);
+    FuncIdx fi = resolve_func_val(str_fn, frame_upvals, CALL_NOT_CALLABLE);
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, &obj, 1, std::move(frame_upvals), 0, -1); // self is the first argument
@@ -323,7 +323,7 @@ static int64_t range_len(const Range* r) {
 // case value is an integer known at compile time (see Compiler::switch_table_values). Kept out of
 // run_goto — its locals raised the register pressure of the single function all the handlers live
 // in, which cost 600 000 instructions to the loop benchmark, a script that never runs a switch.
-static __attribute__((noinline)) uint16_t switch_target_slow(const SwitchTable& t, const Value& subj) {
+static __attribute__((noinline)) CodeAddr switch_target_slow(const SwitchTable& t, const Value& subj) {
     if (subj.tag != Value::T_FLOAT)
         return t.other_addr; // not a number: the comparison chain, which can call an __eq
     // Equality merges INTEGER and FLOAT, so `4 / 2` — a FLOAT, division always being one — must
@@ -383,7 +383,7 @@ uint32_t VM::try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, 
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(fn, fuv, CALL_NOT_CALLABLE); // fn is callable, per the guard above
+    FuncIdx fi = resolve_func_val(fn, fuv, CALL_NOT_CALLABLE); // fn is callable, per the guard above
     Value two[2] = {std::move(lhs), std::move(rhs)};
     uint32_t addr = push_frame_copied(fi, two, 2, std::move(fuv), ip, /*return_dest=*/dest);
     if (negate)
@@ -396,7 +396,7 @@ uint32_t VM::try_meta_unary(const Value& name, int dest, Value lhs) {
     if (!fn.is_callable())
         return 0;
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(fn, fuv, CALL_NOT_CALLABLE); // fn is callable, per the guard above
+    FuncIdx fi = resolve_func_val(fn, fuv, CALL_NOT_CALLABLE); // fn is callable, per the guard above
     return push_frame_copied(fi, &lhs, 1, std::move(fuv), ip, /*return_dest=*/dest);
 }
 
@@ -442,7 +442,7 @@ uint32_t VM::instantiate_class(int base_reg, int arg_off, int argc, Value cls, b
         return 0;
     }
     std::unique_ptr<std::vector<Upvalue*>> fuv;
-    uint8_t fi = resolve_func_val(init_fn, fuv, CALL_NOT_CALLABLE);
+    FuncIdx fi = resolve_func_val(init_fn, fuv, CALL_NOT_CALLABLE);
     // No flag on the frame: the compiler has already made every `return` of an init hand back self.
     return push_frame_self(base_reg, fi, argc, arg_off, std::move(inst), std::move(fuv), ip);
 }
@@ -489,10 +489,10 @@ void VM::close_upvals_above(int threshold) {
 }
 
 // Resolves a function value to func_idx plus upvals.
-static uint8_t resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
+static FuncIdx resolve_func_val(const Value& fv, std::unique_ptr<std::vector<Upvalue*>>& out_upvals,
                                 const char* not_callable) {
     if (fv.is_func_val())
-        return (uint8_t)fv.as_int();
+        return (FuncIdx)fv.as_int();
     if (fv.is_closure()) {
         const auto& uvs = fv.as_closure()->upvals;
         if (!uvs.empty())
@@ -657,7 +657,7 @@ int VM::call_value_multi(const Value& fn, const Value* args, int argc, Value* ou
         return m;
     }
     std::unique_ptr<std::vector<Upvalue*>> frame_upvals;
-    uint8_t fi = resolve_func_val(fn, frame_upvals, CALL_NOT_CALLABLE);
+    FuncIdx fi = resolve_func_val(fn, frame_upvals, CALL_NOT_CALLABLE);
     int call_base = (int)regs.size();
     uint32_t saved_ip = ip;
     ip = push_frame_copied(fi, args, argc, std::move(frame_upvals), saved_ip, -1);
@@ -745,8 +745,8 @@ __attribute__((noinline)) int VM::append_caller_varargs(int dest) {
     return n_va;
 }
 
-uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
-                               std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest) {
+uint32_t VM::push_frame_copied(FuncIdx fi, const Value* args, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+                               uint32_t return_ip, int return_dest) {
     // The register file never shrinks below what the live frames need — windows and varargs alike
     // — so a frame born at its size treads on nothing, and the size is one load.
     int base = (int)regs.size();
@@ -759,7 +759,7 @@ uint32_t VM::push_frame_copied(uint8_t fi, const Value* args, int argc,
     return push_frame(base, fi, argc, std::move(fuv), return_ip, return_dest);
 }
 
-uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
+uint32_t VM::push_frame_self(int base, FuncIdx fi, int argc, int arg_off, Value self,
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip) {
     int total = argc + 1;
     // Inserting self makes the frame one slot WIDER than the argument block the caller laid out,
@@ -782,7 +782,7 @@ uint32_t VM::push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value 
     return push_frame(base, fi, total, std::move(fuv), return_ip, -1);
 }
 
-uint32_t VM::push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+uint32_t VM::push_frame(int new_base, FuncIdx fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                         uint32_t return_ip, int return_dest) {
     const FuncProto& fp = ch->funcs[fi];
     // Everything this call is about to occupy: its register window, its arguments, AND the vararg
@@ -934,7 +934,7 @@ void VM::run_goto(size_t stop_depth) {
     };
 
     Instr _i = 0;
-    uint8_t A = 0;
+    Field A = 0;
     int argc_dyn = 0; // CALL_DYN and CALL_VA differ only by it, and share one body
     int base = call_stack.back().reg_base;
     // The GET_INDEX inline cache is sized on the current code, one slot per instruction. Under
@@ -1295,7 +1295,7 @@ dispatch_loop:
         NEXT();
 
     op_CALL_FUNC: {
-        ip = push_frame(base + A, (uint8_t)B, C, nullptr, ip, -1);
+        ip = push_frame(base + A, (FuncIdx)B, C, nullptr, ip, -1);
         base = call_stack.back().reg_base;
         NEXT();
     }
@@ -1319,7 +1319,7 @@ dispatch_loop:
                     regs[base + i] = std::move(regs[base + A + i]);
             else if (n == 0)
                 nil_result_slot(base); // a valueless return still leaves nil where the caller reads
-            call_stack.pop_back(); // fr is dangling from here on
+            call_stack.pop_back();     // fr is dangling from here on
             if (ret_dest >= 0)
                 regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[base])) : regs[base];
             ip = rip;
@@ -1610,7 +1610,7 @@ dispatch_loop:
     }
 
     op_LOAD_FUNC:
-        regs[base + A] = Value::make_func((uint8_t)Bx);
+        regs[base + A] = Value::make_func((FuncIdx)Bx);
         NEXT();
 
     op_CALL_DYN: {
@@ -1651,7 +1651,7 @@ dispatch_loop:
         }
         {
             std::unique_ptr<std::vector<Upvalue*>> fuv;
-            uint8_t fi = resolve_func_val(regs[base + B], fuv, CALL_NOT_CALLABLE);
+            FuncIdx fi = resolve_func_val(regs[base + B], fuv, CALL_NOT_CALLABLE);
             ip = push_frame(base + A, fi, argc_dyn, std::move(fuv), ip, -1);
         }
     call_dyn_done:
@@ -1711,7 +1711,7 @@ dispatch_loop:
         // Inner block: the unique_ptr has a non-trivial destructor and must leave scope BEFORE
         // NEXT(), per the computed-goto rule.
         {
-            uint8_t fi = (uint8_t)Bx;
+            FuncIdx fi = (FuncIdx)Bx;
             // A unique_ptr so that if capturing throws (inconsistent bytecode) the Closure is freed
             // instead of leaking.
             auto cl = std::make_unique<Closure>(fi);
@@ -1797,7 +1797,7 @@ dispatch_loop:
             }
             bool fn_is_static = false;
             if (fn.is_func_val())
-                fn_is_static = ch->funcs[(uint8_t)fn.as_int()].is_static;
+                fn_is_static = ch->funcs[(FuncIdx)fn.as_int()].is_static;
             else if (fn.is_closure())
                 fn_is_static = ch->funcs[fn.as_closure()->func_idx].is_static;
             else if (fn.is_static_builtin())
@@ -1827,7 +1827,7 @@ dispatch_loop:
             }
             {
                 std::unique_ptr<std::vector<Upvalue*>> fuv;
-                uint8_t fi = resolve_func_val(fn, fuv, METHOD_NOT_CALLABLE);
+                FuncIdx fi = resolve_func_val(fn, fuv, METHOD_NOT_CALLABLE);
                 fp_addr = push_frame(cb, fi, total, std::move(fuv), ip, -1);
             }
         }

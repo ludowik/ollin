@@ -72,7 +72,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     int last_reg_ = -1;  // result register of last compiled expression
 
     struct FuncInfo {
-        uint8_t func_idx;
+        FuncIdx func_idx;
         int n_fixed;
         bool variadic;
         bool is_closure = false; // true = has upvalues, called via LOAD_GLOBAL+CALL_DYN
@@ -118,16 +118,16 @@ class Compiler : public StmtVisitor, public ExprVisitor {
     // Compiles a function body into a fresh FuncProto and returns its index. `with_self` puts
     // self in R[0] (an instance method), and on_registered runs once the proto exists but
     // BEFORE the body — which is what lets a top-level function be recursive.
-    uint8_t compile_func_body(const std::string& name, const std::vector<std::string>& params,
+    FuncIdx compile_func_body(const std::string& name, const std::vector<std::string>& params,
                               const std::vector<std::unique_ptr<Expr>>& defaults,
                               const std::vector<std::unique_ptr<Stmt>>& body, bool variadic, bool is_static,
                               bool with_self, SourceLoc defaults_loc,
-                              const std::function<void(uint8_t)>& on_registered = {});
+                              const std::function<void(FuncIdx)>& on_registered = {});
 
     int resolve_upvalue(const std::string& name);
     int resolve_upval_from(int scope_idx, const std::string& name);
-    int capture_upval_chain(int scope_idx, bool is_local, uint8_t idx, const std::string& name);
-    uint8_t compile_method_func(const FuncDeclStmt& s);
+    int capture_upval_chain(int scope_idx, bool is_local, Field idx, const std::string& name);
+    FuncIdx compile_method_func(const FuncDeclStmt& s);
     // A switch compiles to an indexed jump when every case value is an integer known at compile
     // time; otherwise to the comparison chain, which stays the general path.
     bool switch_table_values(const SwitchStmt& s, std::vector<std::vector<int64_t>>& out, int64_t& lo, int64_t& hi);

@@ -1,4 +1,5 @@
 #pragma once
+#include "opcode.h" // FuncIdx: a closure names its function exactly as CALL_FUNC does
 #include <cstdint>
 #include <vector>
 
@@ -14,10 +15,10 @@ struct Upvalue {
 
 struct Closure {
     int refcount = 1;
-    uint8_t func_idx;
+    FuncIdx func_idx;
     std::vector<Upvalue*> upvals;
 
-    explicit Closure(uint8_t fi) : func_idx(fi) {
+    explicit Closure(FuncIdx fi) : func_idx(fi) {
     }
     ~Closure() {
         for (auto* u : upvals)

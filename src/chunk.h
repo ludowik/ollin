@@ -10,16 +10,16 @@
 
 struct UpvalDesc {
     bool is_local; // true = capture local reg from enclosing frame; false = pass through upval
-    uint8_t idx;   // register index (is_local) or upvalue index of enclosing closure
+    Field idx;     // register index (is_local) or upvalue index of enclosing closure
 };
 
 struct FuncProto {
     uint32_t addr = 0;
-    uint8_t n_fixed = 0;
+    Field n_fixed = 0;
     bool variadic = false;
     bool is_static = false;
-    uint16_t defaults_idx = 0;
-    uint8_t reg_count = 0;
+    PoolIdx defaults_idx = 0;
+    Field reg_count = 0;
     std::vector<UpvalDesc> upvals;
 };
 
@@ -45,11 +45,11 @@ struct ConstKeyHash {
 // address per value from `base` on.
 struct SwitchTable {
     int64_t base = 0;
-    std::vector<uint16_t> targets; // one address per value from `base` on; a hole holds else_addr
-    uint16_t else_addr = 0;        // a number that matches no case
+    std::vector<CodeAddr> targets; // one address per value from `base` on; a hole holds else_addr
+    CodeAddr else_addr = 0;        // a number that matches no case
     // Anything that is NOT a number: the comparison chain, kept as a slow path. A subject can be
     // an instance whose `__eq` decides the match, and only the chain can call it.
-    uint16_t other_addr = 0;
+    CodeAddr other_addr = 0;
 };
 
 struct Chunk {
@@ -57,12 +57,12 @@ struct Chunk {
     std::vector<SourceLoc> lines; // parallel to code[] — source file+line per instruction
     std::vector<std::string> source_files;
     std::vector<Value> constants;
-    std::unordered_map<ConstKey, uint16_t, ConstKeyHash> const_map_; // constant dedup
+    std::unordered_map<ConstKey, PoolIdx, ConstKeyHash> const_map_; // constant dedup
     std::vector<std::string> identifiers;
-    std::unordered_map<std::string, uint16_t> identifier_map_;
+    std::unordered_map<std::string, PoolIdx> identifier_map_;
     std::vector<std::vector<Value>> func_defaults;
     std::vector<FuncProto> funcs;
-    uint8_t top_reg_count = 8;
+    Field top_reg_count = 8;
     int current_line_ = 0;
     int current_file_idx_ = 0;
     std::vector<SwitchTable> switch_tables;
@@ -80,14 +80,14 @@ struct Chunk {
         return it == identifier_map_.end() ? -1 : (int)it->second;
     }
 
-    uint16_t add_constant(Value v);
-    uint16_t add_identifier(const std::string& name);
-    uint16_t add_func_defaults(std::vector<Value> defs);
-    uint8_t add_func(FuncProto fp);
+    PoolIdx add_constant(Value v);
+    PoolIdx add_identifier(const std::string& name);
+    PoolIdx add_func_defaults(std::vector<Value> defs);
+    FuncIdx add_func(FuncProto fp);
 
     void emit(Instr i);
-    size_t emit_jump(Op op, uint8_t a = 0);
-    void patch_jump(size_t pos, uint16_t target);
+    size_t emit_jump(Op op, uint64_t a = 0);
+    void patch_jump(size_t pos, uint64_t target);
     size_t current_pos() const {
         return code.size();
     }

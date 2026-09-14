@@ -1,4 +1,5 @@
 #pragma once
+#include "opcode.h" // FuncIdx: a T_FUNCTION value holds one
 #include "string_table.h"
 #include <cstdint>
 #include <limits>
@@ -196,7 +197,7 @@ struct Value {
         return (BuiltinFn)(intptr_t)ival;
     }
 
-    static Value make_func(uint8_t idx) {
+    static Value make_func(FuncIdx idx) {
         Value v;
         v.tag = T_FUNCTION;
         v.ival = idx;

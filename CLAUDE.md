@@ -587,6 +587,23 @@ Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
 | ABx    | OP          | A           | Bx (16 bits)          || reg + index/adresse |
 | Bx     | OP          | 0           | Bx (16 bits)          || saut inconditionnel |
 
+**Les largeurs vivent dans `src/opcode.h`, et NULLE PART ailleurs.** Le rangement, les
+accesseurs, les quatre plafonds du moteur et leurs messages d'erreur en sont dérivés, un
+`static_assert` refusant un jeu de largeurs qui ne remplit pas le mot. Un opérande est déclaré
+par son RÔLE (`RegIdx`, `FuncIdx`, `PoolIdx`, `CodeAddr`) et non par sa largeur du jour, et les
+constructeurs d'instruction prennent des VALEURS : le transtypage à chaque site d'émission —
+il y en avait près de 400 — est ce qui tronquait un indice en silence, et c'est exactement la
+faute que les élargissements de `CALL_FUNC` ont produite deux fois. Le contrôle résiduel est un
+`assert`, donc gratuit en `Release` ; les vraies gardes restent là où l'indice est délivré.
+
+**Un mot de 64 bits est donc un changement de cinq lignes, et il est MESURÉ** : `k_op_bits` et
+`k_field_bits` à 16, `Instr` en `uint64_t`, `Field` en `uint16_t`, `Wide` en `uint32_t` — la
+suite passe, et un programme de 400 fonctions compile et s'exécute (le champ de `CALL_FUNC`
+faisant alors 16 bits). Coût : `fib` **+1,50 %**, boucle **+1,93 %**, map +0,32 %. Ce n'est donc
+pas gratuit, et la boucle, qui n'exécute aucun appel, le paie autant — c'est le flux
+d'instructions deux fois plus gros. À ne reprendre que pour lever PLUSIEURS plafonds à la fois
+(registres, constantes, taille de programme), jamais pour le seul indice de fonction.
+
 ## Opcodes VM
 
 | Opcode        | Format | Opérandes                  | Description                                      |

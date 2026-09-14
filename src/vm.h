@@ -226,7 +226,7 @@ class VM {
     // ⚠ NO default argument on `return_dest`, on purpose: a removed parameter once let a stale
     // `false` slide into it in SILENCE, a bool converting to int. Spelled out at every site, the
     // next signature change is a compile error wherever it lands instead of a wrong register.
-    uint32_t push_frame(int new_base, uint8_t fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+    uint32_t push_frame(int new_base, FuncIdx fi, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
                         uint32_t return_ip, int return_dest);
 
     // THE CALLING CONVENTION, in one place. Every call ends at push_frame, but getting the
@@ -249,13 +249,13 @@ class VM {
     // A frame born ABOVE everything, its arguments copied in from outside the register file — the
     // `__str` bridge, a meta-method, and the native-to-Ollin call all did this by hand. A `self`
     // is simply the first of those arguments.
-    uint32_t push_frame_copied(uint8_t fi, const Value* args, int argc,
-                               std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip, int return_dest);
+    uint32_t push_frame_copied(FuncIdx fi, const Value* args, int argc, std::unique_ptr<std::vector<Upvalue*>> fuv,
+                               uint32_t return_ip, int return_dest);
 
     // A frame at a register the caller reserved, with `self` INSERTED at its base: the arguments
     // already sit at base + arg_off and slide to base + 1. Both callers — a constructor and a
     // method call — wrote the two directions of that slide themselves.
-    uint32_t push_frame_self(int base, uint8_t fi, int argc, int arg_off, Value self,
+    uint32_t push_frame_self(int base, FuncIdx fi, int argc, int arg_off, Value self,
                              std::unique_ptr<std::vector<Upvalue*>> fuv, uint32_t return_ip);
     // THE INVARIANT under all of it: no frame's window or vararg area ever overlaps another live
     // frame's. It is enforced by lifting the varargs of EVERY live frame above whatever is about
