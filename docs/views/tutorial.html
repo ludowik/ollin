@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-14 19:43</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-14 20:31</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-14 19:43</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-14 20:31</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -819,6 +819,17 @@ flags = flags <span class="op">~</span> <span class="num">1</span>         <span
 <pre><code><span class="kw">for</span> i <span class="kw">in</span> [<span class="num">1</span>;<span class="num">100</span>] <span class="kw">do</span>
     <span class="kw">if</span> i > <span class="num">3</span> <span class="kw">then</span> <span class="kw">break</span> <span class="kw">end</span>
     <span class="bi">print</span>(i)  <span class="cmt">## 1 2 3</span>
+<span class="kw">end</span></code></pre>
+
+<h3>What a for … in walks</h3>
+<p>An array, a map, a range — and a <strong>string</strong>, which gives its characters. One variable gives
+the primary value (the element, the character, or a map's key), two give the index or key with the value.</p>
+<pre><code><span class="kw">for</span> c <span class="kw">in</span> <span class="str">"café"</span> <span class="kw">do</span>
+    <span class="bi">print</span>(c)  <span class="cmt">## c a f é — characters, not bytes</span>
+<span class="kw">end</span>
+
+<span class="kw">for</span> i, c <span class="kw">in</span> <span class="str">"abc"</span> <span class="kw">do</span>
+    <span class="bi">printf</span>(<span class="str">"{} {}"</span>, i, c)  <span class="cmt">## 1 a / 2 b / 3 c</span>
 <span class="kw">end</span></code></pre>
 </section>
 
@@ -1573,6 +1584,8 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
 </table>
 
 <div class="callout tip">Everything works <strong>in UTF-8, by character (codepoint)</strong>, not by byte. <code>len</code>/<code>string.char</code>/<code>string.substr</code> count characters (<code>len("café")</code> == <code>4</code>, <code>string.char("café", 4)</code> == <code>"é"</code>); <code>string.trim</code> trims by codepoint; <code>string.upper</code>/<code>lower</code> handle the accented Latin letters (<code>"café"</code> → <code>"CAFÉ"</code>, <code>"straße"</code> → <code>"STRASSE"</code>). Beyond Latin (Greek, Cyrillic…), case leaves the text unchanged.</div>
+
+<div class="callout tip">A string is <strong>iterable</strong>: <code>for c in s</code> walks its characters, and <code>for i, c in s</code> gives the 1-based index with the character — the same two forms an array offers. Prefer it to <code>for i = 1, s.len() do s.char(i)</code>, which recounts the codepoints from the start at every turn and is therefore quadratic. There is no <code>chars()</code> function: the loop is the way to read a text character by character.</div>
 
 <div class="callout tip"><code>startsWith</code> and <code>endsWith</code> are <strong>case sensitive</strong>; write <code>s.lower().endsWith(".ol")</code> to ignore it, which keeps one rule rather than adding a parameter. Both give a real <strong>boolean</strong>, so <code>not s.endsWith(".py")</code> reads directly. <code>startsWith</code> only puts a name on what <code>s.find(p) == 1</code> already answered — <code>endsWith</code> is the one worth having, since writing it by hand means <code>s.substr(s.len() - m.len() + 1) == m</code>, with two lengths and a <code>+ 1</code> to get wrong.</div>
 

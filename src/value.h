@@ -451,6 +451,8 @@ inline Value Value::make_iter_from(const Value& src) {
         return Value(array_iter_pool().acquire(src.aptr));
     if (src.is_range())
         return Value(new RangeIterator(src.rptr));
+    if (src.is_string())
+        return Value(new StringIterator(src));
     throw std::runtime_error("runtime: for-in on non-iterable");
 }
 

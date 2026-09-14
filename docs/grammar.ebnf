@@ -141,9 +141,11 @@ forStmt        = "for" IDENT "=" expr "," expr [ "," expr ] "do" { stmt } "end" 
                  (* numeric: "for i=start,end[,step]"; the step is optional, 1 by default, and a
                     negative step counts down *)
                  (* iterator: "for v in it" gives the primary value — the element for an array or
-                    a range, the key for a map *)
+                    a range, the character for a string, the key for a map *)
                  (*           "for k,v in it" gives the key or index, plus the value *)
-                 (* the iterables: an array, a map (as a snapshot), a range; "break" is valid in all of them *)
+                 (* the iterables: an array, a map (as a snapshot), a range, a string (its
+                    characters, UTF-8 codepoints, as len and substr count them); "break" is valid
+                    in all of them *)
                  (* the loop variable, or variables, are LOCAL to the loop: they are not visible
                     afterwards, and referring to one is an error; an outer variable of the same
                     name is shadowed, then restored. Changing them inside the body does not affect

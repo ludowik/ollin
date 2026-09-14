@@ -2905,3 +2905,68 @@ func vaCheck()
     print("method-call expansion ok")
 end
 vaCheck()
+
+## ---------------------------------------------------------------------------
+## A string iterates over its CHARACTERS, not its bytes: an accented text has
+## fewer characters than bytes, and taking one byte at a time would cut a
+## codepoint in half. The two forms match what an array gives — the value
+## alone, or the 1-based index and the value.
+func strIterCheck()
+    var pieces = ""
+    for c in "café" do
+        pieces += "[" + c + "]"
+    end
+    assert(pieces == "[c][a][f][é]")   ## 5 bytes, 4 characters
+
+    var seen = ""
+    var last = 0
+    for i, c in "héllo" do
+        seen += c
+        last = i
+    end
+    assert(seen == "héllo")
+    assert(last == 5)                  ## the index counts characters, like len
+
+    ## An empty text is an empty loop, not one turn on "".
+    var turns = 0
+    for c in "" do
+        turns += 1
+    end
+    assert(turns == 0)
+
+    ## The characters are the same ones char() gives, and there are len() of them.
+    var text = "aéb"
+    var n = 0
+    for i, c in text do
+        assert(c == text.char(i))
+        n += 1
+    end
+    assert(n == text.len())
+
+    ## break and continue behave as in any other for-in.
+    var upTo = ""
+    for c in "abcdef" do
+        if c == "d" then break end
+        upTo += c
+    end
+    assert(upTo == "abc")
+
+    ## The loop reads a COPY of the reference, so a variable reassigned during the
+    ## loop does not change what is being walked.
+    var moving = "abc"
+    var walked = ""
+    for c in moving do
+        moving = "xyz"
+        walked += c
+    end
+    assert(walked == "abc")
+
+    ## One closure per iteration, as for every other for-in.
+    var fns = []
+    for c in "ab" do
+        fns.push(func() return c end)
+    end
+    assert(fns[1]() == "a" and fns[2]() == "b")
+    print("string iteration ok")
+end
+strIterCheck()

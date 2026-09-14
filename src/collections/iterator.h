@@ -1,5 +1,6 @@
 #pragma once
 // Included by chunk.h after Map and Array; do not include directly.
+#include "../utf8.h"
 #include <cstdint> // uint8_t (the underlying type of Iterator::Kind)
 #include <utility>
 #include <vector>
@@ -8,7 +9,7 @@ struct Iterator {
     // Concrete tag, so the VM (FOR_ITER_NEXT1) can devirtualize the range case — an inlinable
     // direct call instead of one virtual call per element — without duplicating the stepping
     // logic: advance() remains the single implementation.
-    enum Kind : uint8_t { KIND_MAP, KIND_ARRAY, KIND_RANGE };
+    enum Kind : uint8_t { KIND_MAP, KIND_ARRAY, KIND_RANGE, KIND_STRING };
     Kind kind;
     int refcount = 1;
     explicit Iterator(Kind k) : kind(k) {
@@ -74,6 +75,46 @@ struct ArrayIterator : Iterator {
         return true;
     }
     void release() override; // returns to the pool; defined after ArrayIteratorPool
+};
+
+// A string yields its CHARACTERS (UTF-8 codepoints), like len, char and substr count them — with
+// the same two forms as an array: one variable gives the character, two give its 1-based index
+// and the character.
+//
+// No snapshot, unlike the map and array iterators: a string is immutable and interned, so keeping
+// a retained reference is enough and nothing can change under the loop. Walking it this way is
+// also what makes a traversal linear — `for i = 1, s.len() do s.char(i)` recounts the codepoints
+// from the start at every turn, so it is quadratic.
+struct StringIterator : Iterator {
+    Value src;
+    size_t byte = 0;
+    int64_t idx = 0;
+    explicit StringIterator(const Value& s) : Iterator(KIND_STRING), src(s) {
+    }
+    bool next(Value& key, Value& val) override {
+        if (!step(val))
+            return false;
+        key = Value(idx); // idx is the index of the character step() has just yielded
+        return true;
+    }
+    bool next_primary(Value& out) override {
+        return step(out);
+    }
+    bool primary_is_val() const override {
+        return true;
+    }
+
+  private:
+    bool step(Value& out) {
+        const std::string& s = src.as_string();
+        if (byte >= s.size())
+            return false;
+        size_t n = utf8_step(s, byte);
+        out = Value(s.substr(byte, n));
+        byte += n;
+        ++idx;
+        return true;
+    }
 };
 
 struct ArrayIteratorPool {

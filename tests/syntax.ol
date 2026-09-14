@@ -302,6 +302,20 @@ for i = 1, 9, 2 do
 end
 assert(s3 == 25)    ## 1+3+5+7+9
 
+## a string iterates over its characters — one variable gives the character
+var sIterOne = ""
+for c in "abc" do
+    sIterOne += c
+end
+assert(sIterOne == "abc")
+
+## two variables give the 1-based index and the character
+var sIterTwo = ""
+for i, c in "abc" do
+    sIterTwo += "{i}{c}"
+end
+assert(sIterTwo == "1a2b3c")
+
 ## negative step
 var s4 = 0
 for i = 5, 1, -1 do
