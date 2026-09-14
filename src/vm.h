@@ -162,6 +162,7 @@ class VM {
     // at the eighteen sites that ask; only the __class__ lookup, which is the expensive half and
     // means a hash probe, stays out of line. Bundled together they were one out-of-line call, and
     // a comparison of two floats paid it twice just to be told no.
+    // ONLY on a map or a class: it reads mptr, which shares its union with an int64 and a double.
     static bool has_class_key(const Value& v);
     static bool is_instance(const Value& v) {
         if (!v.is_map() && !v.is_class())

@@ -59,6 +59,7 @@ static MetaKeys& MK() {
 // every test — and this is asked for each method call and for each arithmetic operand that is not
 // a plain number.
 bool VM::has_class_key(const Value& v) {
+    assert(v.is_map() || v.is_class());
     return v.mptr->find_ptr(MK().class_) != nullptr;
 }
 
