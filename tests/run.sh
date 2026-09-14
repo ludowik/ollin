@@ -55,6 +55,11 @@ if ! bash tests/check_html.sh; then
     fails=$((fails + 1))
 fi
 
+echo "── guard: function ceiling ───────────────────────"
+if ! bash tests/check_func_limit.sh; then
+    fails=$((fails + 1))
+fi
+
 echo "── guard: sample catalogue ───────────────────────"
 if ! bash tests/check_samples.sh; then
     fails=$((fails + 1))
