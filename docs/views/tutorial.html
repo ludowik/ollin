@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-14 20:57</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-14 21:02</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-14 20:57</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-14 21:02</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -1573,6 +1573,7 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
     <tr><td><code>string.ltrim(s [, chars])</code></td><td>function</td><td>The same, on the left only</td></tr>
     <tr><td><code>string.rtrim(s [, chars])</code></td><td>function</td><td>The same, on the right only</td></tr>
     <tr><td><code>string.code(s [, i])</code></td><td>function</td><td>The Unicode number (codepoint) of the <code>i</code>-th character, the first one when <code>i</code> is omitted → an integer; <code>nil</code> when there is no character there</td></tr>
+    <tr><td><code>string.fromCode(n [, n2, …])</code></td><td>function</td><td>The text made of these Unicode numbers, UTF-8 encoded → a string of one character per number; the inverse of <code>string.code</code></td></tr>
     <tr><td><code>string.char(s, i)</code></td><td>function</td><td>The character (UTF-8 codepoint) at index <code>i</code>, counting from 1 → a one-character string; <code>""</code> when out of bounds</td></tr>
     <tr><td><code>string.substr(s, start [, length])</code></td><td>function</td><td>A substring of <code>length</code> characters starting at <code>start</code>, counting from 1; <code>length</code> is optional (to the end otherwise), and the bounds are clamped</td></tr>
     <tr><td><code>string.find(s, needle [, from])</code></td><td>function</td><td><strong>Two values</strong>: where <code>needle</code> starts and the index just past it, counting characters from 1; <code>nil</code> when absent. A literal search, no patterns. The search starts at <code>from</code> (1 by default)</td></tr>
@@ -1600,6 +1601,8 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
 
 <div class="callout tip"><code>string.find</code> returns <strong>two</strong> indices, and the second is what lets it compose with <code>substr</code> to replace: <code>s.substr(1, a - 1) + other + s.substr(b)</code>. Adding the needle's length yourself would be right in bytes and wrong in characters, so the end is returned rather than left to you. It is the pair, or <code>nil</code> — since indices count from 1, a match never gives <code>0</code>, and <code>if s.find(m) then</code> is safe. An empty needle matches where it is looked for and reports no width, which makes the same expression an <em>insertion</em>.</div>
 
+<div class="callout tip"><code>string.fromCode</code> is the inverse of <code>string.code</code>: <code>string.fromCode(s.code(i))</code> gives back <code>s.char(i)</code>. It takes <strong>several</strong> numbers, which builds a whole word in one call instead of a loop of concatenations. It <strong>refuses</strong> anything that is not a codepoint — a fractional number, a negative one, one past <code>0x10FFFF</code>, or one in <code>0xD800</code>–<code>0xDFFF</code>, the range UTF-16 reserves for surrogates and which has no valid UTF-8 form. Nothing is built when one argument is wrong, and the message names which one.</div>
+
 <div class="callout tip"><code>string.code</code> gives <code>nil</code>, never <code>0</code>, when the character is not there — <code>0</code> is the codepoint of NUL and it is falsy, so returning it would make <code>if c.code() then</code> say the same for a real NUL and for nothing at all. It is the rule <code>string.number</code> already follows. Without an index it reads the first character, which is the form that pairs with <code>for c in s</code>.</div>
 
 <pre><code><span class="bi">print</span>(string.len(<span class="str">"café"</span>))           <span class="cmt">## 4 (codepoints, not bytes)</span>
@@ -1609,6 +1612,8 @@ math.noiseSeed(<span class="num">42</span>)             <span class="cmt">## rep
 <span class="bi">print</span>(string.char(<span class="str">"ollin"</span>, <span class="num">1</span>))       <span class="cmt">## o</span>
 <span class="bi">print</span>(string.code(<span class="str">"A"</span>))             <span class="cmt">## 65</span>
 <span class="bi">print</span>(string.code(<span class="str">"café"</span>, <span class="num">4</span>))       <span class="cmt">## 233 (é)</span>
+<span class="bi">print</span>(string.fromCode(<span class="num">233</span>))        <span class="cmt">## é</span>
+<span class="bi">print</span>(string.fromCode(<span class="num">72</span>, <span class="num">105</span>))     <span class="cmt">## Hi</span>
 <span class="bi">print</span>(string.substr(<span class="str">"ollin"</span>, <span class="num">2</span>, <span class="num">3</span>))  <span class="cmt">## lli</span>
 
 <span class="kw">var</span> a, b = string.find(<span class="str">"hello world"</span>, <span class="str">"world"</span>)

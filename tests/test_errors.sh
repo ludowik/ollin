@@ -258,6 +258,15 @@ check_error "string.code with a non-string"    'print(string.code(65))'     "str
 check_error "string.code with no argument"     'print(string.code())'       "string.code: missing argument"
 check_error "string.code with a text index"    'print(string.code("a","1"))' "string.code: argument 2 expected number"
 
+# string.fromCode builds a text from codepoints, so anything that is not one is a mistake of the
+# caller: nothing is built, and the refusal names the argument at fault.
+check_error "fromCode with no argument"        'print(string.fromCode())'       "string.fromCode: missing argument"
+check_error "fromCode with a fractional code"  'print(string.fromCode(65.7))'   "must be a whole number (argument 1)"
+check_error "fromCode with a negative code"    'print(string.fromCode(-1))'     "out of range 0..1114111 (argument 1)"
+check_error "fromCode past the last codepoint" 'print(string.fromCode(1114112))' "out of range 0..1114111 (argument 1)"
+check_error "fromCode with a surrogate"        'print(string.fromCode(0xD800))' "is a surrogate, not a character (argument 1)"
+check_error "fromCode with a non-number"       'print(string.fromCode(72, "a"))' "string.fromCode: argument 2 expected number"
+
 # string.replace refuses an empty needle, as split does, and names the wrong argument.
 check_error "string.replace with an empty needle"   'print(string.replace("a-b", "", "x"))'      "string.replace: the needle must not be empty"
 check_error "string.replace with a non-string subject" 'print(string.replace(42, "a", "b"))'     "string.replace: expected string"

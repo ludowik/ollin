@@ -2999,3 +2999,40 @@ func strCodeCheck()
     print("string.code ok")
 end
 strCodeCheck()
+
+## ---------------------------------------------------------------------------
+## string.fromCode is the exact inverse of string.code, and it builds a whole
+## word in one call. Anything that is not a codepoint is refused, and nothing
+## is built when one argument is wrong — a half-written text would be worse.
+func strFromCodeCheck()
+    assert(string.fromCode(65) == "A")
+    assert(string.fromCode(233) == "é")        ## one character, two bytes
+    assert(string.fromCode(233).len() == 1)
+    assert(string.fromCode(72, 105, 33) == "Hi!")
+
+    ## The round trip, on a text where a character is not a byte.
+    var text = "café"
+    for i, c in text do
+        assert(string.fromCode(text.code(i)) == c)
+    end
+
+    ## The codepoint 0 is a real character, one character long — which is why
+    ## code() answers nil rather than 0 when there is none.
+    assert(string.fromCode(0).len() == 1)
+
+    ## The refusals leave nothing behind: the text is not half built.
+    var caught = 0
+    try
+        string.fromCode(72, 0xD800)
+    catch e
+        caught = 1
+    end
+    assert(caught == 1)
+
+    ## The two ends of the valid range are accepted.
+    assert(string.fromCode(0x10FFFF).len() == 1)
+    assert(string.fromCode(0xD7FF).len() == 1)  ## just below the surrogates
+    assert(string.fromCode(0xE000).len() == 1)  ## just above them
+    print("string.fromCode ok")
+end
+strFromCodeCheck()

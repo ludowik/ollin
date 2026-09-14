@@ -415,6 +415,37 @@ static int str_code(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)utf8_decode(s, at, &nbytes)));
 }
 
+// string.fromCode(n [, n2, ...]): the text made of these codepoints, UTF-8 encoded — the exact
+// inverse of string.code, so fromCode(s.code(i)) gives back s.char(i). Several numbers build a
+// whole word in ONE allocation, where a loop of concatenations would recopy the result at each
+// turn.
+//
+// Every refusal names the position of the offending argument, and NOTHING is built when one of
+// them is wrong: a half-written text would be worse than an error. A codepoint must be a whole
+// number in 0..0x10FFFF and outside 0xD800..0xDFFF — that range belongs to UTF-16 surrogates and
+// has no valid UTF-8 form, so letting it through would produce a text that is invalid from the
+// moment it is made.
+static int str_from_code(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    if (argc < 1)
+        throw std::runtime_error("string.fromCode: missing argument");
+    std::string out;
+    for (int i = 0; i < argc; i++) {
+        double d = num_arg(args, argc, i, "string.fromCode");
+        std::string where = " (argument " + std::to_string(i + 1) + ")";
+        if (d != std::floor(d) || std::isnan(d))
+            throw std::runtime_error("string.fromCode: a codepoint must be a whole number" + where);
+        if (d < 0 || d > 0x10FFFF)
+            throw std::runtime_error("string.fromCode: codepoint out of range 0..1114111" + where);
+        uint32_t cp = (uint32_t)d;
+        if (cp >= 0xD800 && cp <= 0xDFFF)
+            throw std::runtime_error("string.fromCode: 0xD800..0xDFFF is a surrogate, not a character" + where);
+        utf8_encode(cp, out);
+    }
+    return ctx.ret(Value(out));
+}
+
 Value make_string_module() {
     return MapBuilder()
         .fn("len", str_len)
@@ -425,6 +456,7 @@ Value make_string_module() {
         .fn("rtrim", str_rtrim)
         .fn("char", str_char)
         .fn("code", str_code)
+        .fn("fromCode", str_from_code)
         .fn("substr", str_substr)
         .fn("find", str_find)
         .fn("split", str_split)
