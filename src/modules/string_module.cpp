@@ -446,6 +446,43 @@ static int str_from_code(CallCtx& ctx) {
     return ctx.ret(Value(out));
 }
 
+// string.repeat(s, n [, sep]): s laid end to end n times, with sep BETWEEN the copies and not
+// after the last one — "ab".repeat(3, "-") is "ab-ab-ab". One allocation, sized up front, where
+// the loop one writes in Ollin (`out += s`) rebuilds the whole text at every turn.
+//
+// A count of zero or below gives "" rather than an error: a computed padding (`width - s.len()`)
+// reaches zero without anything being wrong.
+//
+// The CEILING is the point of this being native. "x".repeat(1e12) would ask for a terabyte, and
+// an allocation that fails gives no usable message — on WASM it takes the whole program down. The
+// limit covers the separators too, since they are part of what is built.
+static constexpr size_t k_repeat_max = 1u << 20; // 1 MiB of result
+static int str_repeat(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.repeat");
+    double d = num_arg(args, argc, 1, "string.repeat");
+    if (std::isnan(d) || d != std::floor(d))
+        throw std::runtime_error("string.repeat: the count must be a whole number");
+    std::string sep = (argc >= 3) ? std::string(str_arg(args, argc, 2, "string.repeat")) : std::string();
+    if (d <= 0)
+        return ctx.ret(Value(std::string("")));
+    // Computed in double, before any cast: a huge count would overflow the multiplication in
+    // size_t and pass a ceiling it should have hit.
+    double total = d * (double)s.size() + (d - 1) * (double)sep.size();
+    if (total > (double)k_repeat_max)
+        throw std::runtime_error("string.repeat: result longer than " + std::to_string(k_repeat_max) + " bytes");
+    size_t n = (size_t)d;
+    std::string out;
+    out.reserve((size_t)total);
+    for (size_t i = 0; i < n; i++) {
+        if (i)
+            out += sep;
+        out += s;
+    }
+    return ctx.ret(Value(std::move(out)));
+}
+
 Value make_string_module() {
     return MapBuilder()
         .fn("len", str_len)
@@ -457,6 +494,7 @@ Value make_string_module() {
         .fn("char", str_char)
         .fn("code", str_code)
         .fn("fromCode", str_from_code)
+        .fn("repeat", str_repeat)
         .fn("substr", str_substr)
         .fn("find", str_find)
         .fn("split", str_split)

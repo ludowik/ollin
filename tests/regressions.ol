@@ -3036,3 +3036,36 @@ func strFromCodeCheck()
     print("string.fromCode ok")
 end
 strFromCodeCheck()
+
+## ---------------------------------------------------------------------------
+## string.repeat lays a text end to end, with an optional separator BETWEEN the
+## copies and not after the last. A count of zero or below is "" and not an
+## error: a computed padding reaches zero without anything being wrong.
+func strRepeatCheck()
+    assert("ab".repeat(3) == "ababab")
+    assert("ab".repeat(3, "-") == "ab-ab-ab")   ## two separators for three copies
+    assert("ab".repeat(1, "-") == "ab")         ## none for a single copy
+
+    assert("x".repeat(0) == "")
+    assert("x".repeat(-5) == "")
+    assert("x".repeat(0, "-") == "")            ## no separator without a copy
+    assert("".repeat(4) == "")
+    assert("".repeat(4, "-") == "---")          ## the separators remain
+
+    ## Characters, not bytes: a two-byte character is repeated whole.
+    assert("é".repeat(3) == "ééé")
+    assert("é".repeat(3).len() == 3)
+
+    ## The ceiling is on the RESULT, separators included, and it refuses rather
+    ## than asking the allocator for something absurd.
+    var caught = 0
+    try
+        string.repeat("x", 2000000)
+    catch e
+        caught = 1
+    end
+    assert(caught == 1)
+    assert(string.repeat("x", 1048576).len() == 1048576)   ## exactly at the ceiling
+    print("string.repeat ok")
+end
+strRepeatCheck()

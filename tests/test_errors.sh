@@ -267,6 +267,14 @@ check_error "fromCode past the last codepoint" 'print(string.fromCode(1114112))'
 check_error "fromCode with a surrogate"        'print(string.fromCode(0xD800))' "is a surrogate, not a character (argument 1)"
 check_error "fromCode with a non-number"       'print(string.fromCode(72, "a"))' "string.fromCode: argument 2 expected number"
 
+# string.repeat builds one allocation, so the size is checked BEFORE it is asked for: an
+# allocation that fails gives no usable message, and on WASM it takes the program down.
+check_error "repeat with a fractional count"   'print(string.repeat("x", 3.7))'  "the count must be a whole number"
+check_error "repeat past the size ceiling"     'print(string.repeat("x", 2000000))' "result longer than 1048576 bytes"
+check_error "repeat with a huge count"         'print(string.repeat("x", 1e12))' "result longer than 1048576 bytes"
+check_error "repeat with a non-string"         'print(string.repeat(1, 2))'      "string.repeat: expected string"
+check_error "repeat with a text count"         'print(string.repeat("x", "2"))'  "string.repeat: argument 2 expected number"
+
 # string.replace refuses an empty needle, as split does, and names the wrong argument.
 check_error "string.replace with an empty needle"   'print(string.replace("a-b", "", "x"))'      "string.replace: the needle must not be empty"
 check_error "string.replace with a non-string subject" 'print(string.replace(42, "a", "b"))'     "string.replace: expected string"
