@@ -22,7 +22,14 @@ struct Array {
             throw std::runtime_error("runtime: array index must be >= 1 (got " + std::to_string(idx) + ")");
         if (i >= 16'777'216)
             throw std::runtime_error("runtime: array index too large (" + std::to_string(idx) + ")");
-        if (i >= (int64_t)items.size())
+        // Appending just past the end is how a script BUILDS an array (`arr[i] = …` in a loop),
+        // and resize-then-assign touched the cell twice: a nil default-constructed, then
+        // overwritten. push_back writes it once, on the vector's amortised path.
+        if (i == (int64_t)items.size()) {
+            items.push_back(v);
+            return;
+        }
+        if (i > (int64_t)items.size())
             items.resize((size_t)(i + 1));
         items[(size_t)i] = v;
     }
