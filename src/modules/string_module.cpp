@@ -305,6 +305,55 @@ static int str_number(CallCtx& ctx) {
     return ctx.ret(Value(negative ? -n.d : n.d));
 }
 
+// string.replace(s, needle, by [, max]): a LITERAL replacement — no patterns, like find and
+// split. Returns TWO values, the text obtained and HOW MANY times it bit, so "did anything
+// change" needs no second pass; whoever wants only the text writes `var s2 = ...` and the count
+// is ignored without a thought.
+//
+// The search resumes AFTER the inserted text, never inside it: `s.replace("a", "aa")` would
+// otherwise keep replacing what it had just written, forever.
+//
+// `max` at or below zero gives the text back unchanged with a count of 0, and is NOT clamped to 1
+// the way split clamps it. The difference has a reason: zero pieces means nothing, while zero
+// replacements is a perfectly clear request.
+//
+// An empty needle is refused, as in split — "insert between every character" would be a guess,
+// and the module must answer both questions the same way. An empty `by` is allowed and deletes.
+//
+// Bytes are compared, exact here as in split: nothing is returned as an index, and UTF-8 is
+// self-synchronising, so a byte match always begins on a character boundary.
+static int str_replace(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.replace");
+    const std::string& needle = str_arg(args, argc, 1, "string.replace");
+    const std::string& by = str_arg(args, argc, 2, "string.replace");
+    if (needle.empty())
+        throw std::runtime_error("string.replace: the needle must not be empty");
+    int max_hits = -1; // -1 = unbounded
+    if (argc >= 4) {
+        max_hits = to_int_safe(num_arg(args, argc, 3, "string.replace"));
+        if (max_hits < 0)
+            max_hits = 0;
+    }
+    std::string out;
+    size_t start = 0;
+    int64_t hits = 0;
+    while (max_hits < 0 || hits < max_hits) {
+        size_t at = s.find(needle, start);
+        if (at == std::string::npos)
+            break;
+        out.append(s, start, at - start);
+        out += by;
+        start = at + needle.size();
+        ++hits;
+    }
+    out.append(s, start, std::string::npos);
+    ctx.set_result(0, Value(out));
+    ctx.set_result(1, Value(hits));
+    return 2;
+}
+
 // string.len(s): the number of CHARACTERS (UTF-8 codepoints). Unlike the global len builtin,
 // which is polymorphic over arrays, maps, strings and ranges, this one accepts ONLY a string and
 // throws on any other type, through str_arg.
@@ -328,5 +377,6 @@ Value make_string_module() {
         .fn("find", str_find)
         .fn("split", str_split)
         .fn("number", str_number)
+        .fn("replace", str_replace)
         .done();
 }

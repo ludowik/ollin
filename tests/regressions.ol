@@ -510,6 +510,45 @@ func numberCheck()
 end
 numberCheck()
 
+## string.replace: a literal replacement rendering the text AND the count. The search resumes
+## after the inserted text, which is what keeps a growing replacement from looping for ever.
+func replaceCheck()
+    var a, an = string.replace("a-b-c", "-", " ")
+    assert(a == "a b c" and an == 2)
+    var b, bn = string.replace("hello", "l", "")     ## an empty replacement deletes
+    assert(b == "heo" and bn == 2)
+    var c, cn = string.replace("abc", "z", "!")      ## no match: the text back, and 0
+    assert(c == "abc" and cn == 0)
+    var d, dn = string.replace("", "x", "y")
+    assert(d == "" and dn == 0)
+    ## Overlapping: the search resumes AFTER the match, so "aaa" holds one "aa" and a leftover.
+    var e, en = string.replace("aaa", "aa", "X")
+    assert(e == "Xa" and en == 1)
+    ## And it resumes after the INSERTED text, never inside it — otherwise this would never end.
+    var f, fn = string.replace("a", "a", "aa")
+    assert(f == "aa" and fn == 1)
+    var g, gn = string.replace("x-y", "-", "--")     ## a replacement longer than the needle
+    assert(g == "x--y" and gn == 1)
+    ## max bounds the count; at or below zero it gives the text back, and is NOT clamped to 1 as
+    ## split clamps it — zero replacements is a clear request, zero pieces is not.
+    var h, hn = string.replace("key=a=b", "=", ": ", 1)
+    assert(h == "key: a=b" and hn == 1)
+    var i, iin = string.replace("a-b-c", "-", " ", 0)
+    assert(i == "a-b-c" and iin == 0)
+    var j, jn = string.replace("a-b-c", "-", " ", -5)
+    assert(j == "a-b-c" and jn == 0)
+    var k, kn = string.replace("a-b-c", "-", " ", 99)
+    assert(k == "a b c" and kn == 2)
+    ## a needle of several bytes, and the text around it kept intact
+    var l, ln = string.replace("café→thé", "→", " | ")
+    assert(l == "café | thé" and ln == 1)
+    ## Taking only the first value is the common form, and the source is untouched.
+    var src = "garde"
+    assert(src.replace("a", "A") == "gArde")
+    assert(src == "garde")
+end
+replaceCheck()
+
 ## string.len: a length in codepoints, on strings only, unlike the polymorphic global len
 assert(string.len("café") == 4)               ## é takes two bytes, and is one character
 assert(string.len("a€b") == 3)                ## € takes three bytes, and is one character

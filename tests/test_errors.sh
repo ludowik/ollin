@@ -252,6 +252,13 @@ check_error "array.join with a non-string separator" 'print([1, 2].join(42))' "a
 check_error "string.number with a non-string"  'print(string.number(42))'  "string.number: expected string"
 check_error "string.number with no argument"   'print(string.number())'    "string.number: missing argument"
 
+# string.replace refuses an empty needle, as split does, and names the wrong argument.
+check_error "string.replace with an empty needle"   'print(string.replace("a-b", "", "x"))'      "string.replace: the needle must not be empty"
+check_error "string.replace with a non-string subject" 'print(string.replace(42, "a", "b"))'     "string.replace: expected string"
+check_error "string.replace with a non-string replacement" 'print(string.replace("a", "b", 42))' "string.replace: expected string"
+check_error "string.replace with a non-number max"  'print(string.replace("a", "b", "c", "x"))'  "string.replace: argument 4 expected number"
+check_error "string.replace with two arguments"     'print(string.replace("a", "b"))'            "string.replace: missing argument"
+
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "an optional call on an integer" \
     'var x = 42
