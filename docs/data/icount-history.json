@@ -411,6 +411,14 @@
       "fib": 74587220,
       "loop": 31112517,
       "map": 55984742
+    },
+    {
+      "date": "2026-09-14",
+      "commit": "01885b1",
+      "subject": "array: an indexed write at the end appends instead of resizing then assigning",
+      "fib": 74887315,
+      "loop": 31112516,
+      "map": 55964742
     }
   ]
 }
