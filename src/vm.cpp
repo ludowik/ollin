@@ -1459,7 +1459,7 @@ dispatch_loop:
                 Value chained = proto_chain_rest(obj, key);
                 // The `len` key is compared by interned POINTER, like __class__ and __parent__,
                 // rather than by content, so GET_INDEX has no strcmp left.
-                if (chained.is_nil() && key_sptr == MK().len_.sptr && !is_instance(obj))
+                if (chained.is_nil() && key_sptr == MK().len_.sptr && !has_class_key(obj))
                     regs[base + A] = Value::make_builtin(builtin_map_len);
                 else
                     regs[base + A] = std::move(chained);
