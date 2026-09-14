@@ -419,6 +419,14 @@
       "fib": 74887315,
       "loop": 31112516,
       "map": 55964742
+    },
+    {
+      "date": "2026-09-14",
+      "commit": "4ad8494",
+      "subject": "array: reuse push for the append path; GET_INDEX asks only the half it needs",
+      "fib": 75787608,
+      "loop": 31112531,
+      "map": 56024744
     }
   ]
 }
