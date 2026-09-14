@@ -58,8 +58,8 @@ static MetaKeys& MK() {
 // find_ptr and not map_get: the latter RETURNS the class by value, so a retain and a release on
 // every test — and this is asked for each method call and for each arithmetic operand that is not
 // a plain number.
-bool VM::is_instance(const Value& v) {
-    return (v.is_map() || v.is_class()) && v.mptr->find_ptr(MK().class_) != nullptr;
+bool VM::has_class_key(const Value& v) {
+    return v.mptr->find_ptr(MK().class_) != nullptr;
 }
 
 // Built-in `len` pseudo-method of maps, synthesized by GET_INDEX when the map does not define

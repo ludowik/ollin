@@ -157,7 +157,17 @@ class VM {
     // (see op_GET_INDEX).
     static Value proto_chain_rest(const Value& obj, const Value& key);
 
-    static bool is_instance(const Value& v);
+    // Split in two ON PURPOSE. The tag test answers "no" for every number, string and boolean —
+    // that is, for almost every operand of an arithmetic or comparison opcode — so it is inlined
+    // at the eighteen sites that ask; only the __class__ lookup, which is the expensive half and
+    // means a hash probe, stays out of line. Bundled together they were one out-of-line call, and
+    // a comparison of two floats paid it twice just to be told no.
+    static bool has_class_key(const Value& v);
+    static bool is_instance(const Value& v) {
+        if (!v.is_map() && !v.is_class())
+            return false;
+        return has_class_key(v);
+    }
 
     uint32_t try_meta_binary(const Value& name, int dest, Value lhs, Value rhs, bool negate = false);
     // Instantiates `cls`: the instance lands in regs[base_reg], arguments in
