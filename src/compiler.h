@@ -147,7 +147,7 @@ class Compiler : public StmtVisitor, public ExprVisitor {
             reg_count_ = reg_top_;
     }
     // The same ceiling, once. Both the top-level body and a function body publish reg_count into
-    // a field one byte wide, and the two guards were the same three lines with one word changed.
+    // one instruction field, and the two guards were the same three lines with one word changed.
     void check_reg_count(const char* what) {
         if ((uint64_t)reg_count_ > k_max_reg)
             throw std::runtime_error(sloc().str(chunk.source_files) + std::string(": ") + what +

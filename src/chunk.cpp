@@ -50,9 +50,10 @@ void Chunk::emit(Instr i) {
     // an instruction's address is its index, a jump carries it in a Bx, and a program checked
     // only at the end of the compilation would have every one of its jumps silently truncated
     // first.
-    if (code.size() > k_max_code)
-        throw std::runtime_error("compile: program too large (max " + std::to_string(k_max_code + 1) +
-                                 " instructions)");
+    // The last address is kept OUT of reach, because emit_jump uses it as its placeholder: a jump
+    // left unpatched must stay distinguishable from one that legitimately targets the end.
+    if (code.size() >= k_max_code)
+        throw std::runtime_error("compile: program too large (max " + std::to_string(k_max_code) + " instructions)");
     code.push_back(i);
     lines.push_back({(uint16_t)current_file_idx_, (uint16_t)current_line_});
 }
