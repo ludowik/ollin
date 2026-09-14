@@ -407,7 +407,7 @@
     {
       "date": "2026-09-14",
       "commit": "db0af02",
-      "subject": "Widen the instruction word to 64 bits",
+      "subject": "keep the last code address out of reach, so an unpatched jump stays distinguishable",
       "fib": 74587220,
       "loop": 31112517,
       "map": 55984742
