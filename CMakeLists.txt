@@ -169,9 +169,14 @@ else()
     find_program(EMCC emcc)
     if(EMCC)
         set(WASM_SOURCES ${OLLIN_SOURCES} src/wasm_main.cpp src/modules/graphics_module.cpp src/modules/graphics3d.cpp src/modules/graphics_quat.cpp src/modules/keyboard_module.cpp src/modules/mouse_module.cpp src/modules/window_module.cpp src/modules/image_module.cpp src/modules/ui_module.cpp src/modules/engine_font.cpp src/modules/audio_module.cpp src/modules/sound_output.cpp src/modules/touch_module.cpp)
+        # The HEADERS too: the engine's types and its instruction format live there, so a change
+        # confined to them left the SERVED artefact built from the previous sources — silently,
+        # since the target reported itself up to date. Globbed, and at configure time only: the
+        # list is a dependency of a custom command, not the source list of a target.
+        file(GLOB_RECURSE WASM_HEADERS CONFIGURE_DEPENDS src/*.h)
         add_custom_command(
             OUTPUT  ${CMAKE_CURRENT_SOURCE_DIR}/docs/wasm/ollin.wasm
-            DEPENDS ${WASM_SOURCES}
+            DEPENDS ${WASM_SOURCES} ${WASM_HEADERS}
             COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tools/build-wasm.sh
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Building WASM"

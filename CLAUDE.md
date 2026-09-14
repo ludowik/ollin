@@ -89,7 +89,7 @@ Ces deux étapes sont **non négociables**, quelle que soit la taille du script.
 - Compilateurs supportés : **GCC et Clang**, indifféremment (seule contrainte : le *computed-goto*, extension GNU absente de MSVC — voir « Règle computed-goto »)
 - Cibles : Windows, Linux, macOS, iOS, Android, wasm
 - La cible **wasm** compile avec **Clang** : `emcc` n'est pas un compilateur mais une enveloppe autour de LLVM/Clang (`$EMSDK/upstream/bin/clang`). Le computed-goto y fonctionne donc, et le playground exécute la **même** VM que le binaire natif — aucun repli vers un `switch`.
-- Runtime : **bytecode custom + VM register-based** (instructions 32-bit format ABC/ABx/Bx)
+- Runtime : **bytecode custom + VM register-based** (instructions 64-bit format ABC/ABx/Bx)
 
 ## Architecture (pipeline strict, modules indépendants)
 
@@ -113,7 +113,7 @@ ollin/
 ├── src/
 │   ├── token.h        types Token (partagé Lexer → Parser)
 │   ├── ast.h          nœuds AST  (partagé Parser → Compiler)
-│   ├── opcode.h       format d'instruction 32-bit (make*/i*) + enum Op
+│   ├── opcode.h       format d'instruction 64-bit (make*/i*) + enum Op
 │   ├── chunk.h/.cpp   bytecode (code, constantes dédupliquées, identifiants, funcs) — Compiler → VM
 │   ├── value.h        Value taguée 16 o (ref-count, pivot T_STRING) + numValue/isFalsy
 │   ├── string_table.h internement des chaînes (InternedStr, refcount)
@@ -578,15 +578,20 @@ travaillant.
 Mettre à jour ce fichier dès qu'un point remplit ce critère : architecture, conventions,
 décisions, règles d'outillage. Ne pas documenter ce qui n'est pas encore implémenté.
 
-## Format d'instruction (32-bit)
+## Format d'instruction (64-bit)
 
-Trois formats fixes, tous sur 32 bits (Instr = uint32_t) :
+Trois formats fixes, tous sur 64 bits (Instr = uint64_t), 16 bits par champ :
 
-| Format | Bits [31:24] | Bits [23:16] | Bits [15:8] | Bits [7:0] | Usage |
+| Format | Bits [63:48] | Bits [47:32] | Bits [31:16] | Bits [15:0] | Usage |
 |--------|-------------|-------------|------------|-----------|-------|
 | ABC    | OP          | A           | B          | C         | ops 3-adresses |
-| ABx    | OP          | A           | Bx (16 bits)          || reg + index/adresse |
-| Bx     | OP          | 0           | Bx (16 bits)          || saut inconditionnel |
+| ABx    | OP          | A           | Bx (32 bits)          || reg + index/adresse |
+| Bx     | OP          | 0           | Bx (32 bits)          || saut inconditionnel |
+
+**Les plafonds qui en découlent** : 65 535 registres par cadre, 65 535 upvalues par fonction,
+**65 535 fonctions** par programme (le champ de `CALL_FUNC`), et 4 294 967 295 constantes,
+identifiants ou instructions. Le seul qu'un programme réel peut encore rencontrer est celui des
+fonctions, et `tests/check_func_limit.sh` le garde.
 
 **Les largeurs vivent dans `src/opcode.h`, et NULLE PART ailleurs.** Le rangement, les
 accesseurs, les cinq plafonds du moteur et leurs messages d'erreur en sont dérivés, un
@@ -597,13 +602,16 @@ il y en avait près de 400 — est ce qui tronquait un indice en silence, et c'e
 faute que les élargissements de `CALL_FUNC` ont produite deux fois. Le contrôle résiduel est un
 `assert`, donc gratuit en `Release` ; les vraies gardes restent là où l'indice est délivré.
 
-**Un mot de 64 bits est un changement de SIX lignes, et il est NEUTRE en travail** :
-`k_op_bits` et `k_field_bits` à 16, `Instr` en `uint64_t`, `OpByte` et `Field` en `uint16_t`,
-`Wide` en `uint32_t`. La suite passe, et `check_func_limit.sh` constate un plafond de fonctions
-au-delà de 4 096 (le champ de `CALL_FUNC` faisant alors 16 bits). Mesuré : `fib` −0,00 %,
-boucle −0,00 %, map +0,04 %.
+**Le passage de 32 à 64 bits a été un changement de SIX lignes**, ce qui est tout l'intérêt de
+la centralisation des largeurs : `k_op_bits` et `k_field_bits` à 16, `Instr` en `uint64_t`,
+`OpByte` et `Field` en `uint16_t`, `Wide` en `uint32_t` — rien d'autre. Il est **NEUTRE en
+travail** : `fib` −0,00 %, boucle −0,00 %, map +0,04 %. Vérifié au-delà de la suite : un appel à
+300 arguments, refusé par l'ancien format sur la limite des 255 registres, passe ; un programme de
+70 000 fonctions est refusé en nommant 65 535 ; les trois exemples les plus lourds (modèles 3D,
+`invaders`, monde voxel) tournent sous Xvfb sans une erreur ; et le playground WASM exécute au
+navigateur un programme mêlant récursion, map, chaînes et classes avec les bonnes valeurs.
 
-⚠ **Le +1,50 % / +1,93 % relevé une première fois était une TRONCATURE, pas la taille du flux**,
+⚠ **Le +1,50 % / +1,93 % relevé avant de livrer était une TRONCATURE, pas la taille du flux**,
 et l'erreur de raisonnement vaut d'être gardée : `icount` compte les instructions EXÉCUTÉES, donc
 un bytecode deux fois plus gros ne s'y voit pas — l'expliquer par là était faux. La cause réelle
 est que `i_op` rendait un `uint8_t` écrit en dur alors que le champ passait à 16 bits, ce qui
@@ -612,10 +620,19 @@ reproduit à l'identique sur son commit (+1,50 % / +1,93 % / +0,32 %), et il rev
 actuel dès qu'on remet `OpByte` en `uint8_t` (+1,51 % / +1,93 % / +0,36 %). C'est donc le constat
 de revue « `i_op` renvoie une largeur écrite en dur » qui portait tout le coût.
 
-**Ce qui n'est PAS mesuré** : le TEMPS. Un flux deux fois plus gros peut coûter en cache
-d'instructions, et ce conteneur ne permet pas de le trancher — sur le même binaire, le minimum et
-la médiane de `bench_fib` s'écartent de 20 %. À reprendre sur une machine calme avant d'affirmer
-quoi que ce soit là-dessus.
+**Ce qui n'est PAS mesuré, et qui reste donc le seul risque connu** : le TEMPS. Un flux deux fois
+plus gros peut coûter en cache d'instructions, et ce conteneur ne permet pas de le trancher — sur
+le même binaire, le minimum et la médiane de `bench_fib` s'écartent de 20 %, et deux séries ont
+donné +5,8 % puis +1,0 % sur le même couple de binaires. À reprendre sur une machine calme ; c'est
+le seul motif qui justifierait de revenir à 32 bits.
+
+⚠ **Le rendu est inchangé, et c'est un DIFFÉRENTIEL, pas une lecture de couleur** : la même scène
+capturée sous Xvfb donne un PNG identique à l'octet avec les deux formats. La capture sort blanche
+dans cette sonde (la lecture par `image.getPixel`, ou le moment de la capture sous Xvfb, reste à
+éclaircir) — donc elle ne prouve pas ce qui est dessiné, seulement que les deux formats dessinent
+la même chose. ⚠ Et une première version de cette comparaison ne valait RIEN : la chaîne de
+commandes s'était interrompue avant de remettre l'ancien en-tête, si bien que le binaire était
+comparé à lui-même. Vérifier le `using Instr` du fichier avant de conclure à une égalité.
 
 ## Opcodes VM
 
@@ -634,7 +651,7 @@ quoi que ce soit là-dessus.
 | EQ/NEQ/GT/LT/GE/LE | ABC | A=dst, B=lhs, C=rhs  | R[A] = 1.0 si vrai sinon 0.0 ; GT/LT/GE/LE : nombres OU deux strings (ordre lexicographique) |
 | JUMP          | Bx     | Bx=addr                    | ip = Bx                                          |
 | JUMP_IF_FALSE | ABx    | A=cond_reg, Bx=addr        | si falsy(R[A]) → ip = Bx (aussi : appel optionnel f?()) |
-| CALL_FUNC     | ABC    | A=call_base, B=func_idx, C=argc | appel fonction utilisateur                   |
+| CALL_FUNC     | ABC    | A=call_base, B=func_idx, C=argc | appel fonction utilisateur — `B` borne le nombre de fonctions d'un programme (cf. `k_max_func`) |
 | RETURN        | AB     | A=first_reg, B=count       | copie R[A..A+B-1]→R[0..B-1], pop frame          |
 | RETURN_V      | AB     | A=first_reg, B=n_explicit  | retourne n explicites + varargs, pop frame       |
 | LOAD_VARARGS  | AB     | A=dest, B=count (0=all)    | R[A..] = varargs du frame courant               |
@@ -1618,7 +1635,8 @@ membres, parce qu'ils sont sur le chemin le plus chaud.
 
 La fonction courante était auparavant tenue à part et les englobantes dans une seconde pile. Ce
 dédoublement est ce qui avait permis qu'une table soit COPIÉE là où il fallait un lien — une même
-variable capturée deux fois consommait alors deux upvalues sur les 255 disponibles.
+variable capturée deux fois consommait alors deux upvalues sur celles que le champ peut nommer
+(255 à l'époque, cf. `k_max_upval`).
 
 ⚠ **`fn_stack_` est un `std::deque`, jamais un `std::vector`** : le garde de portée de chaque
 bloc tient une RÉFÉRENCE sur les tables de sa fonction, et ouvrir une fonction imbriquée empile
@@ -1691,7 +1709,7 @@ d'un `while` partageaient la même case (`10 30 30 40` au lieu de `10 20 30 40` 
 et la closure du dernier tour rendait `{function}` après un `break`). Les deux formes de `for`
 avaient ces deux points depuis toujours ; le `while` n'en avait aucun. **Réserver les registres au lieu de
 fermer a été essayé et retiré** : la réserve s'accumulait sur tout un fichier et faisait dépasser
-les 255 registres. Fermer ne dé-partage rien : deux closures d'un même registre continuent de
+le plafond de registres (255 à l'époque, cf. `k_max_reg`). Fermer ne dé-partage rien : deux closures d'un même registre continuent de
 voir les écritures l'une de l'autre (figé dans `regressions.ol`).
 
 **« Ce corps porte-t-il une fonction ? » est MÉMOÏSÉ** par l'adresse du corps

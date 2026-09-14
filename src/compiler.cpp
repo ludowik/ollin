@@ -486,8 +486,8 @@ Chunk Compiler::compile(const Program& prog) {
 
     for (auto& s : prog.stmts)
         s->accept(*this);
-    // Same guard as for functions: registers are 8-bit operands, and without it a top-level
-    // script needing more than k_max_reg of them was silently truncated.
+    // Same guard as for functions: a register is named in one instruction field, and without it a
+    // top-level script needing more than k_max_reg of them was silently truncated.
     check_reg_count("top-level code");
     chunk.top_reg_count = (Field)reg_count_; // reg_count_ starts at 8 and only ever grows
     chunk.emit(make_bx(Op::HALT, 0));
@@ -1297,7 +1297,7 @@ void Compiler::visit(const InterpExpr& e) {
     // string on the left converts the right-hand side through value_to_string.
     // Accumulated IN PLACE: `ADD acc, acc, x` reads before it writes, as a compound assignment
     // does. Allocating a fresh register per piece burned three of them per placeholder, and a
-    // string of some 85 pieces failed to compile on the 255-register limit.
+    // string of some 85 pieces failed to compile on the register limit, 255 at the time.
     int acc = alloc_reg();
     chunk.emit(make_abx(Op::LOAD_K, acc, chunk.add_constant(Value(e.literals[0]))));
     int scratch = reg_top_; // the piece being appended, reused at every step

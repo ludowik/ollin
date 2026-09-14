@@ -2,7 +2,7 @@
 #include <cassert>
 #include <cstdint>
 
-// Fixed-size instruction format, in THREE forms.
+// Fixed-size instruction format, in THREE forms (64-bit word, 16 bits per field).
 // Format ABC:  [OP][A][B][C]   3-address ops
 // Format ABx:  [OP][A][ Bx ]   register + index or address, Bx spanning B and C
 // Format Bx:   [OP][0][ Bx ]   unconditional jump
@@ -12,18 +12,18 @@
 // its own, so making an operand wider is a change to these lines alone — and the static_assert
 // refuses a set that does not fill the word.
 
-using Instr = uint32_t;
+using Instr = uint64_t;
 
-constexpr unsigned k_op_bits = 8;
-constexpr unsigned k_field_bits = 8;             // A, B and C
+constexpr unsigned k_op_bits = 16;
+constexpr unsigned k_field_bits = 16;            // A, B and C
 constexpr unsigned k_bx_bits = 2 * k_field_bits; // Bx spans B and C
 static_assert(k_op_bits + 3 * k_field_bits == 8 * sizeof(Instr), "the three fields must fill the word");
 
 // The type of a field READ from an instruction. Named per role, so that widening a role is one
 // line here rather than a hunt through the engine for the sites that happen to hold it.
-using OpByte = uint8_t; // the opcode itself, and the underlying type of enum class Op
-using Field = uint8_t;  // a register index, a small count, a mode
-using Wide = uint16_t;  // Bx: a constant, an identifier, a function, a code address
+using OpByte = uint16_t; // the opcode itself, and the underlying type of enum class Op
+using Field = uint16_t;  // a register index, a small count, a mode
+using Wide = uint32_t;   // Bx: a constant, an identifier, a function, a code address
 static_assert(8 * sizeof(OpByte) >= k_op_bits, "OpByte must hold an opcode");
 static_assert(8 * sizeof(Field) >= k_field_bits, "Field must hold a field");
 static_assert(8 * sizeof(Wide) >= k_bx_bits, "Wide must hold a Bx");
