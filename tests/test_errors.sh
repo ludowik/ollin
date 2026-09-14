@@ -259,6 +259,11 @@ check_error "string.replace with a non-string replacement" 'print(string.replace
 check_error "string.replace with a non-number max"  'print(string.replace("a", "b", "c", "x"))'  "string.replace: argument 4 expected number"
 check_error "string.replace with two arguments"     'print(string.replace("a", "b"))'            "string.replace: missing argument"
 
+# startsWith and endsWith take two strings, and name themselves when they do not get them.
+check_error "string.startsWith with a non-string subject" 'print(string.startsWith(42, "a"))' "string.startsWith: expected string"
+check_error "string.endsWith with a non-string suffix"    'print(string.endsWith("a", 42))'   "string.endsWith: expected string"
+check_error "string.endsWith with one argument"           'print(string.endsWith("a"))'       "string.endsWith: missing argument"
+
 # Optional call: a non-nil, non-callable value is an error (only nil is ignored).
 check_error "an optional call on an integer" \
     'var x = 42

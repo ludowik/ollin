@@ -354,6 +354,37 @@ static int str_replace(CallCtx& ctx) {
     return 2;
 }
 
+// string.startsWith(s, prefix) / string.endsWith(s, suffix): a plain yes or no, case sensitive —
+// s.lower().endsWith(".ol") to ignore it, which keeps one rule instead of a parameter.
+//
+// An empty prefix or suffix is TRUE: every text begins and ends with nothing, so the answer is
+// defined. That is why it is not refused the way split's and replace's empty needle is — there,
+// the RESULT would have been undefined.
+//
+// Bytes are compared, exact at both ends: a prefix is anchored at byte zero and a suffix at the
+// end of the text, and both of those are character boundaries by construction. So no codepoint
+// walk is needed, and ".ol" as well as "é" answer right.
+//
+// startsWith says in its name what `s.find(p) == 1` already said; endsWith is the one that was
+// genuinely missing, s.substr(s.len() - m.len() + 1) == m being three chances to be off by one.
+static int str_starts_with(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.startsWith");
+    const std::string& prefix = str_arg(args, argc, 1, "string.startsWith");
+    bool yes = prefix.size() <= s.size() && s.compare(0, prefix.size(), prefix) == 0;
+    return ctx.ret(Value::make_bool(yes));
+}
+
+static int str_ends_with(CallCtx& ctx) {
+    Value* args = ctx.args;
+    int argc = ctx.argc;
+    const std::string& s = str_arg(args, argc, 0, "string.endsWith");
+    const std::string& suffix = str_arg(args, argc, 1, "string.endsWith");
+    bool yes = suffix.size() <= s.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
+    return ctx.ret(Value::make_bool(yes));
+}
+
 // string.len(s): the number of CHARACTERS (UTF-8 codepoints). Unlike the global len builtin,
 // which is polymorphic over arrays, maps, strings and ranges, this one accepts ONLY a string and
 // throws on any other type, through str_arg.
@@ -378,5 +409,7 @@ Value make_string_module() {
         .fn("split", str_split)
         .fn("number", str_number)
         .fn("replace", str_replace)
+        .fn("startsWith", str_starts_with)
+        .fn("endsWith", str_ends_with)
         .done();
 }
