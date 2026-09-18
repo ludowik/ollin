@@ -461,7 +461,7 @@ void VM::close_upvals() {
             uv->closed = true;
         }
         if (--uv->refcount == 0)
-            delete uv;
+            upvalue_pool().release(uv);
     }
 }
 
@@ -484,7 +484,7 @@ void VM::close_upvals_above(int threshold) {
             uv->closed = true;
         }
         if (--uv->refcount == 0)
-            delete uv;
+            upvalue_pool().release(uv);
     }
     ouv->resize(kept);
 }
@@ -1732,9 +1732,9 @@ dispatch_loop:
         // NEXT(), per the computed-goto rule.
         {
             FuncIdx fi = (FuncIdx)Bx;
-            // A unique_ptr so that if capturing throws (inconsistent bytecode) the Closure is freed
-            // instead of leaking.
-            auto cl = std::make_unique<Closure>(fi);
+            // A pool-aware unique_ptr so that if capturing throws (inconsistent bytecode) the
+            // partial Closure is returned to ClosurePool instead of leaking.
+            ClosureGuard cl(closure_pool().acquire(fi));
             for (auto& desc : ch->funcs[fi].upvals) {
                 Upvalue* uv;
                 if (desc.is_local) {
@@ -1749,7 +1749,7 @@ dispatch_loop:
                         }
                     }
                     if (!uv) {
-                        uv = new Upvalue;
+                        uv = upvalue_pool().acquire();
                         uv->frame_base = base;
                         uv->reg_idx = desc.idx;
                         if (!frame_open)

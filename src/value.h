@@ -399,7 +399,7 @@ __attribute__((noinline)) inline void Value::release_cold() noexcept {
     case T_CLOSURE: {
         Closure* cp = cptr;
         if (--cp->refcount == 0)
-            delete cp;
+            closure_pool().release(cp);
         break;
     }
     case T_RANGE: {

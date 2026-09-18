@@ -1848,7 +1848,8 @@ comporte exactement comme une map et **aucun de ces chemins ne connaît les enum
   rattrape les chemins indirects avec un message générique.
 - Le gel est **superficiel** : un objet/tableau contenu dans l'enum reste modifiable.
 
-**Invariant pools (`MapPool`/`ArrayPool`/`ArrayIteratorPool`) — RÉ-ENTRANCE** : `release()` doit vider (`data.clear()`/`items.clear()`) **AVANT** de tester la capacité `n < CAP`, puis relire `n`. Le clear libère les entrées, et une entrée map/array **ré-entre** le pool (`release` → `buf[n++]`) → `n` peut grandir pendant le clear. Tester `n < CAP` *avant* le clear puis faire `buf[n++]` avec le `n` à jour écrit `buf[CAP]` (= `&n`) et corrompt la free-list (bug du crash au re-run corrigé). Ne jamais remettre le test de capacité avant le clear.
+**Invariant pools (`MapPool`/`ArrayPool`/`ArrayIteratorPool`/`ClosurePool`/`UpvaluePool`) — RÉ-ENTRANCE** : `release()` doit vider (`data.clear()`/`items.clear()`/`release_upvals()`/`val = Value()`) **AVANT** de tester la capacité `n < CAP`, puis relire `n`. Le clear libère les entrées, et une entrée map/array/closure **ré-entre** le pool (`release` → `buf[n++]`) → `n` peut grandir pendant le clear. Tester `n < CAP` *avant* le clear puis faire `buf[n++]` avec le `n` à jour écrit `buf[CAP]` (= `&n`) et corrompt la free-list (bug du crash au re-run corrigé). Ne jamais remettre le test de capacité avant le clear.
+⚠ `mem()` sous Valgrind (memcheck) peut rendre 0 : `assert(mem() > 0)` de `regressions.ol` y échoue, AVANT comme APRÈS l'ajout de `ClosurePool`/`UpvaluePool` — vérifié sur les deux binaires. C'est l'allocateur remplacé par Valgrind qui fausse la lecture, pas un bug du moteur ; la suite qui compte (`tests/run.sh`, natif) n'y est pas exposée.
 
 ## Accès membre : `GET_INDEX`, pseudo-méthodes et inline cache
 
@@ -1993,6 +1994,17 @@ std::vector<Upvalue*> open_upvals;  // upvals ouvertes créées par ce frame
 2. Upvalue **ouverte** : `GET_UPVAL`/`SET_UPVAL` accèdent à `regs[frame_base + reg_idx]` du frame parent via le pointeur.
 3. `RETURN` / `THROW` — ferme toutes les `open_upvals` du frame : copie `regs[base+idx]` dans `uv->val`, pose `closed=true`.
 4. Upvalue **fermée** : accès via `uv->val` (le frame parent n'existe plus).
+
+**`Closure` et `Upvalue` sont poolés** (`ClosurePool`/`UpvaluePool`, closure.h), même patron que
+`MapPool`/`ArrayPool` — un `new`/`delete` brut à chaque fermeture créée puis relâchée coûtait
+environ 4× un appel de fonction ordinaire pour la seule allocation (mesuré : bench isolé, une
+fermeture créée puis jamais appelée). `MAKE_CLOSURE` passe par un `ClosureGuard`
+(`std::unique_ptr` à déleteur pool-aware) plutôt qu'un `unique_ptr<Closure>` brut, pour que la
+capture d'une upvalue qui lève une exception (bytecode incohérent) rende la fermeture partielle
+au pool au lieu de la libérer directement — même garantie qu'avant, recyclage en plus.
+Gain mesuré sur le benchmark officiel `closures 1M` : **−19,5 %** d'instructions. Le pool n'aide
+que le cycle création/destruction RAPIDE : des fermetures gardées vivantes longtemps (empilées
+dans un tableau) ne repassent jamais par `release()` pendant la boucle, donc rien à gagner là.
 
 ### Fonctions imbriquées
 
