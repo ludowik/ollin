@@ -57,8 +57,8 @@ best_of() {
     echo "${best:-N/A}"
 }
 
-benchmarks=(fib loop objects array calls strings classes iter float)
-labels=("fib(35) recursive" "loop 10M" "map 100K" "array 1M" "calls 1M"
+benchmarks=(fib loop objects array calls closures strings classes iter float)
+labels=("fib(35) recursive" "loop 10M" "map 100K" "array 1M" "calls 1M" "closures 1M"
         "strings 200K" "classes 200K" "iter 2.4M" "mandelbrot 200x200")
 
 echo ""
