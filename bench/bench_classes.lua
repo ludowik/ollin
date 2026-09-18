@@ -20,10 +20,13 @@ end
 
 local N = 200000
 local acc = 0
+local keep = {}
 local t0 = os.clock()
 for i = 1, N do
     local p = Point3.new(i, i + 1, i + 2)
     acc = acc + p:total()
+    keep[i] = p -- kept until the end so an escape-analysis JIT cannot sink the allocation
 end
 local t1 = os.clock()
+acc = acc + keep[N]:total()
 print(string.format("lua    classes %d = %d  time: %.4fs", N, acc, t1 - t0))

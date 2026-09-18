@@ -25,20 +25,23 @@ class bench_classes {
         }
     }
 
-    static long run(int n) {
+    static long run(int n, Point3[] keep) {
         long acc = 0;
         for (int i = 1; i <= n; i++) {
             Point3 p = new Point3(i, i + 1, i + 2);
             acc += p.total();
+            keep[i - 1] = p; // kept until the end so an escape-analysis JIT cannot sink the allocation
         }
+        acc += keep[n - 1].total();
         return acc;
     }
 
     public static void main(String[] args) {
         int n = 200_000;
-        for (int w = 0; w < 3; w++) run(n / 10); // warm-up, discarded
+        for (int w = 0; w < 3; w++) run(n / 10, new Point3[n / 10]); // warm-up, discarded
+        Point3[] keep = new Point3[n];
         long t0 = cpu();
-        long acc = run(n);
+        long acc = run(n, keep);
         long t1 = cpu();
         System.out.printf("java   classes %d = %d  time: %.4fs%n", n, acc, (t1 - t0) / 1e9);
     }

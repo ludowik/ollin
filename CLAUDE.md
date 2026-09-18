@@ -381,6 +381,26 @@ les benchmarks plus courts (`calls`, `objects`), où ce n'est pas garanti. LuaJI
 compilateur par NIVEAUX comme la JVM, n'a reçu AUCUNE préchauffe : ses boucles, toutes à plusieurs
 milliers de tours au moins, se réchauffent seules dans la fenêtre chronométrée.
 
+⚠ **`objects`, `classes` (LuaJIT) et `closures` (Java) gardent l'objet ou la fermeture créés
+dans un tableau jusqu'à la fin de la boucle — sans ça, le JIT prouve qu'ils ne servent jamais
+à rien après leur itération et les ÉLIMINE, ce qui n'est pas un gain de vitesse mais l'absence du
+travail qu'on prétend mesurer.** Constaté en ajoutant LuaJIT : `objects` et `classes` rendaient
+0,0001s et 0,0003s, une carte ou une instance authentique n'y tenant pas dans ce budget. Vérifié
+par expérience — remplacer la valeur imprimée par une simple SOMME des champs n'aurait pas suffi
+(`classes` avait déjà une somme de contrôle accumulée et se faisait quand même éliminer : le JIT
+calcule la valeur en arithmétique de registres sans jamais poser l'objet sur le tas) ; seule la
+conservation d'une RÉFÉRENCE vivante vers l'objet (`keep[i] = obj`, relu une fois après la boucle)
+empêche cette élimination, parce qu'aucun JIT courant ne prouve qu'un emplacement précis d'un
+tableau qui s'agrandit dynamiquement ne sera jamais relu. Le même mécanisme touchait Java sur
+`closures`, mais de façon **intermittente** plutôt que systématique : l'analyse d'échappement de
+HotSpot élimine la fermeture (elle ne s'échappe jamais de `run()`) une fois sa compilation achevée
+en tâche de fond, ce qui arrive tantôt avant tantôt après le tir chronométré — d'où un temps qui
+sautait entre 0,0003s et 0,057s d'un lancement à l'autre sur le MÊME binaire. `-Xbatch` (compilation
+synchrone) rend ce résultat reproductible, mais reproductiblement le MAUVAIS chiffre : il fige la
+course sur l'état « éliminé » au lieu de la supprimer. Le même correctif (conserver la référence)
+la résout des deux côtés, et rend aussi le temps Java stable (0,03-0,07s sur douze tirs, plus aucun
+tir sous 0,001s).
+
 | # | Benchmark | Script |
 |---|-----------|--------|
 | 1 | fib(35) récursif | `bench/bench_fib.*` |
