@@ -427,6 +427,14 @@
       "fib": 75787608,
       "loop": 31112531,
       "map": 56024744
+    },
+    {
+      "date": "2026-09-18",
+      "commit": "2a23617",
+      "fib": 75720018,
+      "loop": 30819546,
+      "map": 56033230,
+      "subject": "register leak on operator meta-methods"
     }
   ]
 }
