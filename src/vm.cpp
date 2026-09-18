@@ -847,8 +847,13 @@ __attribute__((noinline)) uint32_t VM::finish_return(Value* rvs, int total) {
         regs[rbase + i] = std::move(rvs[i]);
     if (total == 0)
         nil_result_slot(rbase);
-    if (ret_dest >= 0)
+    if (ret_dest >= 0) {
         regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[rbase + 0])) : regs[rbase + 0];
+        // Same shrink as op_RETURN, and for the same reason: a meta-method frame born via
+        // push_frame_copied returns through here too, whenever its own `return` expands a
+        // trailing call (RETURN_V / RETURN_SPREAD) rather than compiling to plain RETURN.
+        regs.resize(rbase);
+    }
     last_results_ = total; // for SPREAD_RESULTS (a multiple return)
     return rip;
 }
@@ -1326,8 +1331,17 @@ dispatch_loop:
             else if (n == 0)
                 nil_result_slot(base); // a valueless return still leaves nil where the caller reads
             call_stack.pop_back();     // fr is dangling from here on
-            if (ret_dest >= 0)
+            if (ret_dest >= 0) {
                 regs[ret_dest] = neg_ ? Value::make_bool(is_falsy(regs[base])) : regs[base];
+                // A meta-method frame (try_meta_binary/try_meta_unary) is the only one born via
+                // push_frame_copied's `base = regs.size()` that returns through THIS op_RETURN
+                // instead of through invoke_str/call_value_multi's nested run_goto, which shrink
+                // regs back themselves once it returns. Left unshrunk here, every operator
+                // meta-method call in a loop (`a + b`, `a == b`...) permanently consumed a few
+                // registers of the 4096-register budget, overflowing after a few hundred calls
+                // with no recursion in sight — the message named a depth nothing had reached.
+                regs.resize(base);
+            }
             ip = rip;
             last_results_ = n; // for SPREAD_RESULTS (a multiple return)
         }

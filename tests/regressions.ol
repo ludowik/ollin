@@ -182,6 +182,41 @@ assert(3 < cn)      ## an instance on the RIGHT of <
 assert(cn >= 5)
 assert(cn <= 5)
 
+## ── VM: a meta-method call in a loop must not leak registers ────────────────
+## (before: try_meta_binary/try_meta_unary push their frame at regs.size(), and neither
+## op_RETURN nor finish_return (RETURN_V/RETURN_SPREAD) ever gave that space back — every
+## `a + b` on instances permanently consumed a few registers, overflowing the 4096-register
+## budget after a few hundred calls, with no recursion in sight. Two shapes are exercised: a
+## meta-method body returning a scalar (plain RETURN) and one returning a freshly constructed
+## instance (RETURN_V/RETURN_SPREAD), which leaked independently.
+class LeakScalar
+    func init(x) self.x = x end
+    func __add(o) return self.x + o.x end   ## plain RETURN
+end
+var lsA = LeakScalar(1)
+var lsB = LeakScalar(2)
+var lsAcc = 0
+for i in [1;2000] do
+    lsAcc += lsA + lsB
+end
+assert(lsAcc == 6000)
+
+class LeakCtor
+    func init(v) self.v = v end
+    func __add(o) return LeakCtor(self.v + o.v) end   ## RETURN_V: the value is a call
+    func __neg()  return LeakCtor(-self.v) end
+    func __eq(o)  return self.v == o.v end
+end
+var lc = LeakCtor(1)
+var lcOther = LeakCtor(1)
+for i in [1;2000] do
+    lc = lc + LeakCtor(1)
+    var negated = -lc                 ## RETURN_V again, through try_meta_unary
+    var eqCheck = lc == lcOther       ## negate_result path, through <>
+    var neqCheck = lc <> lcOther
+end
+assert(lc.v == 2001)
+
 ## ── VM: concatenation with __str, and no use-after-free ─────────────────────
 class StrP
     func __str() return "SP" end
