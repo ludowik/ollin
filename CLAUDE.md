@@ -153,7 +153,7 @@ ollin/
 │                      crédit obligatoire et NON commercial, cf. plus bas),
 │                      gltf_util.py (plomberie glTF partagée par les trois convertisseurs),
 │                      ollin-vscode/ (extension VS Code, colorisation)
-├── bench/             benchmarks (.ol / .lua / .py) + icount.sh (compte d'instructions)
+├── bench/             benchmarks (.ol / .lua / .py / .java, LuaJIT rejouant les .lua) + icount.sh (compte d'instructions)
 └── docs/              la web app servie par GitHub Pages, rangée par RÔLE
     ├── index.html     le shell de la SPA ; app.js est le routeur. playground.html et run.html
     │                  ne sont que des redirections vers les routes par hash
@@ -352,11 +352,34 @@ s'allonge). Le fichier porte donc date, commit, machine, build et nombre d'exéc
 les affiche : un relevé sans son contexte serait trompeur. La vue reste valide sans ce fichier
 (sa section disparaît).
 
-Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py` pour chaque benchmark). Le tableau affiche : **temps absolu Lua** comme référence, **coefficient multiplicateur** (xN.NN) pour Ollin et Python.
+Les scripts sont dans `bench/` (`.ol`, `.lua`, `.py`, `.java` pour chaque benchmark — **LuaJIT n'a
+pas les siens** : il rejoue les mêmes `.lua` que Lua, vérifié compatible faute d'y utiliser une
+syntaxe propre à 5.3+). Le tableau affiche : **temps absolu Lua** comme référence, **coefficient
+multiplicateur** (xN.NN) pour Ollin, Python, Java et LuaJIT.
 
 Chaque benchmark est lancé **plusieurs fois (défaut 3, `RUNS=N` pour surcharger)** et on garde le **meilleur temps** : un run unique est trop sensible au bruit (contention CPU/cache) et peut afficher un coefficient faussé.
 
-Les trois langages mesurent le **temps PROCESSEUR**, pas le temps écoulé : `cpuTime()` en Ollin, `os.clock()` en Lua, `time.process_time()` en Python. Ne pas utiliser `time()` dans un benchmark Ollin : il lit une horloge murale que le système peut ajuster en cours de route (NTP), d'où des valeurs aberrantes isolées.
+Les cinq langages mesurent le **temps PROCESSEUR**, pas le temps écoulé : `cpuTime()` en Ollin,
+`os.clock()` en Lua et en LuaJIT (même API), `time.process_time()` en Python,
+`ThreadMXBean.getCurrentThreadCpuTime()` en Java. Ne pas utiliser `time()` dans un benchmark Ollin :
+il lit une horloge murale que le système peut ajuster en cours de route (NTP), d'où des valeurs
+aberrantes isolées.
+
+**Chronométrage interne, pas de processus** : dans les cinq langages, `t0`/`t1` sont lus **par le
+script lui-même**, après que l'interpréteur (ou la JVM) a déjà démarré et — pour Ollin comme pour
+Java — après que le code a déjà été compilé/chargé ; `bench_all.sh` ne chronomètre jamais le
+processus de l'extérieur (`best_of` lit uniquement le `time: …s` que le script imprime). Démarrage,
+chargement et fermeture sont donc HORS mesure pour tous, Java compris.
+
+**Les benchmarks Java portent une boucle de PRÉCHAUFFE avant `t0`** (le corps mesuré, rejoué
+quelques fois à effectif réduit, résultat jeté) : sans elle, une partie du temps mesuré refléterait
+du bytecode interprété ou compilé C1, pas le code optimisé C2 auquel les quatre autres langages
+n'ont pas cet équivalent à franchir. Mesuré sur `fib(35)` (30 M d'appels) : la préchauffe ne change
+rien (le tir chronométré dépasse déjà le seuil de compilation à lui seul) — elle reste utile pour
+les benchmarks plus courts (`calls`, `objects`), où ce n'est pas garanti. LuaJIT, un JIT à
+**traces** (seuil de compilation à chaud très bas, de l'ordre de la cinquantaine de tours) et non un
+compilateur par NIVEAUX comme la JVM, n'a reçu AUCUNE préchauffe : ses boucles, toutes à plusieurs
+milliers de tours au moins, se réchauffent seules dans la fenêtre chronométrée.
 
 | # | Benchmark | Script |
 |---|-----------|--------|
@@ -371,11 +394,15 @@ Les trois langages mesurent le **temps PROCESSEUR**, pas le temps écoulé : `cp
 | 9 | Itération `for … in` tableau + map 2.4M | `bench/bench_iter.*` |
 | 10 | Mandelbrot 200×200 (arithmétique flottante) | `bench/bench_float.*` |
 
-Chaque benchmark affiche une **somme de contrôle** identique dans les trois langages (longueur totale, accumulateur, nombre d'itérations) : elle vérifie que les trois versions font bien le même travail. Toute divergence signale une traduction fautive, pas un écart de performance.
+Chaque benchmark affiche une **somme de contrôle** identique dans les cinq langages (longueur totale, accumulateur, nombre d'itérations) : elle vérifie que toutes les versions font bien le même travail. Toute divergence signale une traduction fautive, pas un écart de performance.
 
 **Aucun environnement n'est normatif — tous sont des cibles** (cf. « Stack ») :
-- `bench_all.sh` localise seul les interpréteurs : Lua via `lua5.4`/`lua54`/`lua` dans le PATH (ou `C:\Tools\lua\lua55.exe` sous Windows), Python via `python3`/`python`. Une colonne affiche `N/A` si l'interpréteur manque.
-- **Conteneur distant** : `lua5.4` est installé par `.claude/hooks/session-start.sh` (paquet apt), Python y est déjà. L'image ne fournit pas toujours Lua et le conteneur est recréé à chaque reprise — si `lua5.4` manque malgré tout, `sudo apt-get install -y lua5.4` suffit ; **ne pas compiler Lua depuis les sources** (perte de temps, et `lua.org` est bloqué par le proxy).
+- `bench_all.sh` localise seul les interpréteurs : Lua via `lua5.4`/`lua54`/`lua` dans le PATH (ou `C:\Tools\lua\lua55.exe` sous Windows), LuaJIT via `luajit`, Python via `python3`/`python`, Java via `java` (lancement de code source à fichier unique, `java bench_x.java`, sans `javac` séparé — disponible depuis le JDK 11). Une colonne affiche `N/A` si l'interpréteur manque.
+  ⚠ `java -version` peut être précédé d'un avis « Picked up JAVA_TOOL_OPTIONS: … » (réglages de
+  proxy de ce conteneur) sur la sortie que `bench_all.sh` lit pour composer l'en-tête : la version
+  est cherchée par le motif `version "…"`, jamais par un `head -1` qui attraperait cet avis à la
+  place.
+- **Conteneur distant** : `lua5.4`, `luajit` et un JDK (`default-jdk-headless`) sont installés par `.claude/hooks/session-start.sh` (paquets apt), Python y est déjà. L'image ne fournit pas toujours ces interpréteurs et le conteneur est recréé à chaque reprise — si l'un manque malgré tout, `sudo apt-get install -y <paquet>` suffit ; **ne rien compiler depuis les sources** (perte de temps, et les sites amont — `lua.org` compris — sont bloqués par le proxy).
 - **Ne jamais comparer des chiffres obtenus sur deux machines, ni sur deux sessions différentes** : ni les temps absolus ni les coefficients ne sont transposables (matériel, compilateur, version des interpréteurs). Un tableau de benchmarks ne vaut que pour la machine et le moment où il a été produit.
 - Pour attribuer un écart à un changement de code, mesurer les binaires comparés sur la **même machine, dans la même série** (cf. tourniquet ci-dessous).
 

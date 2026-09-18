@@ -56,6 +56,18 @@ if [ "$(uname)" = "Linux" ]; then
     && echo "benchmarks : lua5.4 présent" \
     || echo "⚠ benchmarks : lua5.4 absent — la colonne de référence sera N/A"
 
+  # ── LuaJIT et Java, deux colonnes de plus du même tableau ──────────────────
+  # LuaJIT rejoue les MÊMES fichiers bench/*.lua (pas de bench_*.luajit distinct) ; Java
+  # tourne déjà dans l'image pour d'autres besoins, mais rien ne le garantit, donc la même
+  # ligne défensive que pour lua5.4.
+  sudo apt-get install -y -qq --no-install-recommends luajit default-jdk-headless 2>/dev/null || true
+  command -v luajit >/dev/null 2>&1 \
+    && echo "benchmarks : luajit présent" \
+    || echo "⚠ benchmarks : luajit absent — la colonne LuaJIT sera N/A"
+  command -v java >/dev/null 2>&1 \
+    && echo "benchmarks : java présent" \
+    || echo "⚠ benchmarks : java absent — la colonne Java sera N/A"
+
   # ── SDK Emscripten (cible WASM) ────────────────────────────────────────────
   EMSDK_DIR="$HOME/emsdk"
   if [ ! -d "$EMSDK_DIR" ]; then
