@@ -430,11 +430,11 @@
     },
     {
       "date": "2026-09-18",
-      "commit": "2a23617",
-      "fib": 75720018,
-      "loop": 30819546,
-      "map": 56033230,
-      "subject": "register leak on operator meta-methods"
+      "commit": "d21ca86",
+      "fib": 78196356,
+      "loop": 32020073,
+      "map": 56333781,
+      "subject": "ClosurePool/UpvaluePool"
     }
   ]
 }
