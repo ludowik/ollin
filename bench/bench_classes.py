@@ -16,12 +16,9 @@ class Point3(Point):
 
 N = 200_000
 acc = 0
-keep = [None] * N
 t0 = time.process_time()
 for i in range(1, N + 1):
     p = Point3(i, i + 1, i + 2)
     acc += p.total()
-    keep[i - 1] = p  # kept until the end so an escape-analysis JIT cannot sink the allocation
 t1 = time.process_time()
-acc += keep[N - 1].total()
 print(f"python classes {N} = {acc}  time: {t1-t0:.4f}s")

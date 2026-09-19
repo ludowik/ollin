@@ -381,25 +381,27 @@ les benchmarks plus courts (`calls`, `objects`), où ce n'est pas garanti. LuaJI
 compilateur par NIVEAUX comme la JVM, n'a reçu AUCUNE préchauffe : ses boucles, toutes à plusieurs
 milliers de tours au moins, se réchauffent seules dans la fenêtre chronométrée.
 
-⚠ **`objects`, `classes` (LuaJIT) et `closures` (Java) gardent l'objet ou la fermeture créés
-dans un tableau jusqu'à la fin de la boucle — sans ça, le JIT prouve qu'ils ne servent jamais
-à rien après leur itération et les ÉLIMINE, ce qui n'est pas un gain de vitesse mais l'absence du
-travail qu'on prétend mesurer.** Constaté en ajoutant LuaJIT : `objects` et `classes` rendaient
-0,0001s et 0,0003s, une carte ou une instance authentique n'y tenant pas dans ce budget. Vérifié
-par expérience — remplacer la valeur imprimée par une simple SOMME des champs n'aurait pas suffi
-(`classes` avait déjà une somme de contrôle accumulée et se faisait quand même éliminer : le JIT
-calcule la valeur en arithmétique de registres sans jamais poser l'objet sur le tas) ; seule la
-conservation d'une RÉFÉRENCE vivante vers l'objet (`keep[i] = obj`, relu une fois après la boucle)
-empêche cette élimination, parce qu'aucun JIT courant ne prouve qu'un emplacement précis d'un
-tableau qui s'agrandit dynamiquement ne sera jamais relu. Le même mécanisme touchait Java sur
-`closures`, mais de façon **intermittente** plutôt que systématique : l'analyse d'échappement de
-HotSpot élimine la fermeture (elle ne s'échappe jamais de `run()`) une fois sa compilation achevée
-en tâche de fond, ce qui arrive tantôt avant tantôt après le tir chronométré — d'où un temps qui
-sautait entre 0,0003s et 0,057s d'un lancement à l'autre sur le MÊME binaire. `-Xbatch` (compilation
-synchrone) rend ce résultat reproductible, mais reproductiblement le MAUVAIS chiffre : il fige la
-course sur l'état « éliminé » au lieu de la supprimer. Le même correctif (conserver la référence)
-la résout des deux côtés, et rend aussi le temps Java stable (0,03-0,07s sur douze tirs, plus aucun
-tir sous 0,001s).
+⚠ **`objects`, `classes` (LuaJIT) et `closures` (Java) peuvent rendre des temps extrêmes —
+vus, jusqu'à 0,0001s — et ce n'est pas une erreur de mesure.** Un JIT suffisamment fin (l'analyse
+d'échappement de LuaJIT sur les tables, celle de HotSpot sur les fermetures) peut prouver qu'un
+objet créé dans la boucle ne survit jamais à son itération et l'ÉLIMINER : la boucle se réduit
+alors à de l'arithmétique de registres, sans jamais toucher le tas. C'est une capacité réelle de
+ces moteurs sur ce code précis — les sommes de contrôle restent exactes — pas un artefact.
+Côté Java l'effet est en plus **intermittent** plutôt que systématique : la compilation de fond
+peut achever l'élimination avant ou après le tir chronométré, d'où un même binaire dont `closures`
+saute entre 0,0003s et 0,057s d'un lancement à l'autre.
+
+**Un correctif a été essayé puis RETIRÉ, mesure à l'appui : conserver chaque objet/fermeture dans
+un tableau jusqu'à la fin de la boucle** (`keep[i] = obj`, relu une fois après coup) défait bien
+l'élimination, mais au prix de changer le TRAVAIL du benchmark — un tableau d'un million d'éléments
+à remplir, identique dans les cinq langages, qui ralentissait aussi Ollin/Lua/Python sans rapport
+avec le sujet mesuré. Il rendait de plus le pool `ClosurePool`/`UpvaluePool` invisible à la
+mesure : une fermeture conservée n'est jamais rendue au pool pendant la boucle, et son gain tombe
+de −18,6 % à +1,7 % (bruit) dès que les fermetures survivent à leur itération. La priorité retenue
+est la **stabilité des scripts** : `bench/bench_*.{ol,lua,py,java}` ne changent pas d'une session
+à l'autre, pour que `icount-history.json` et toute comparaison dans le temps restent valides. Un
+temps extrême pour LuaJIT/Java sur ces trois benchmarks est donc attendu et se documente ici,
+plutôt que de se corriger dans le script.
 
 | # | Benchmark | Script |
 |---|-----------|--------|

@@ -24,14 +24,11 @@ end
 
 var N = 200_000
 var acc = 0
-var keep = []
 
 var t0 = cpuTime()
 for i = 1, N do
     var p = Point3(i, i + 1, i + 2)
     acc += p.total()
-    keep[i] = p    ## kept until the end so an escape-analysis JIT cannot sink the allocation
 end
 var t1 = cpuTime()
-acc += keep[N].total()
 printf("ollin  classes {} = {}  time: {}s", N, acc, t1 - t0)
