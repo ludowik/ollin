@@ -2079,6 +2079,18 @@ avant même le début de cette série de mesures) sans que ça se voie : `fib` n
 `close_upvals()`. La leçon n'est donc pas propre à ce pool : un singleton de Meyers appelé depuis
 un chemin partagé par tout le moteur coûte à tout le moteur, pas seulement à ce qui l'utilise.
 
+**Vérifié sur les neuf autres benchmarks officiels, dont quatre appellent réellement les pools
+concernés** (`objects`→`map_pool`, `array`→`array_pool`, `classes`→`map_pool` via l'instanciation,
+`iter`→`array_iter_pool`) : en tourniquet (7 tours), aucun ne montre d'écart dépassant le bruit de
+disposition déjà documenté (±4 % au pire, contre ±7 % constatés sur `fib`) — la garde n'y pesait
+pas comme sur `close_upvals()`. En instructions (icount, donc hors bruit) l'écart réel est faible
+mais mesurable : `array` **−1,17 %**, `iter` **−1,56 %**, `objects` −0,12 %, `classes` −0,17 %.
+La différence avec `fib` (+15,4 % de temps) n'est pas une question de correctif manquant — les
+cinq accesseurs ont été corrigés ensemble — mais de PART relative : ces quatre benchmarks font un
+travail réel important à chaque appel du pool (remplir une map, cloner un tableau), qui noie le
+coût de la garde ; `close_upvals()` ne fait QUE cette vérification quand la boucle est vide, donc
+la garde y était la totalité du travail au lieu d'une fraction.
+
 ### Fonctions imbriquées
 
 - `collectLocals` pré-alloue un registre pour chaque `FuncDeclStmt` trouvé dans le corps de la fonction englobante.
