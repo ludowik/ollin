@@ -435,6 +435,14 @@
       "loop": 32020073,
       "map": 56333781,
       "subject": "ClosurePool/UpvaluePool"
+    },
+    {
+      "date": "2026-09-19",
+      "commit": "df56841",
+      "fib": 77597486,
+      "loop": 31121439,
+      "map": 56154935,
+      "subject": "Pool accessors: namespace-scope inline variables, not function-local statics"
     }
   ]
 }
