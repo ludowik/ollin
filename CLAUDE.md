@@ -2055,6 +2055,30 @@ Gain mesuré sur le benchmark officiel `closures 1M` : **−19,5 %** d'instructi
 que le cycle création/destruction RAPIDE : des fermetures gardées vivantes longtemps (empilées
 dans un tableau) ne repassent jamais par `release()` pendant la boucle, donc rien à gagner là.
 
+⚠ **Le pool a d'abord coûté `fib` — un script qui ne crée pourtant aucune fermeture — et la cause
+n'était pas l'allocation de registres habituelle, mais un détail du C++.** `closure_pool()` et
+`upvalue_pool()` étaient des singletons de Meyers (`static X p;` DANS la fonction), donc soumis à
+la vérification d'initialisation thread-safe du standard à **chaque appel**. `upvalue_pool()` est
+appelée depuis `close_upvals()`, le chemin le plus chaud du moteur (chaque retour de fonction,
+boucle vide pour `fib` puisque `open_upvals` y est toujours nul) — la vérification pesait donc sur
+CE chemin, que la boucle s'exécute ou non. Mesuré par bissection (13/09 → pool, tourniquet) :
+`run_goto` avait grossi de +14,4 % (23 841 → 27 266 octets, tout dans la partie CHAUDE — le
+`.cold` n'a bougé que de 79 octets), pour +15,4 % de temps sur `fib` en tourniquet, alors que le
+travail réel (icount) n'augmentait que de +2,5 %. Confirmé en reconstruisant avec
+`-fno-threadsafe-statics` : `run_goto` redescendait à 25 164 octets et le temps de +15,4 % à +5,1 %.
+**Correctif retenu** : les cinq accesseurs de pool (`closure_pool`, `upvalue_pool`, `map_pool`,
+`array_pool`, `array_iter_pool`) sont maintenant des **variables `inline` de portée espace de
+noms** (C++17) et non des statiques de fonction — initialisées une fois au chargement du
+programme, sans vérification à chaque appel, portable sans dépendre d'un drapeau de compilation.
+Après correctif : `run_goto` à 24 631 octets (+3,3 % sur le 13/09, contre +14,4 % avec la garde),
+`fib` +2,48 % d'instructions (icount, le coût réel du pool) pour +9,9 % de temps — le résidu entre
+ces deux chiffres reste sous le bruit de disposition déjà documenté (±7 % constatés sur `fib`).
+**Les quatre autres pools portaient le même patron depuis leur création** (`MapPool`/`ArrayPool`
+avant même le début de cette série de mesures) sans que ça se voie : `fib` n'appelle ni
+`map_pool()` ni `array_pool()`, seul `upvalue_pool()` vit sur SON chemin à elle, via
+`close_upvals()`. La leçon n'est donc pas propre à ce pool : un singleton de Meyers appelé depuis
+un chemin partagé par tout le moteur coûte à tout le moteur, pas seulement à ce qui l'utilise.
+
 ### Fonctions imbriquées
 
 - `collectLocals` pré-alloue un registre pour chaque `FuncDeclStmt` trouvé dans le corps de la fonction englobante.

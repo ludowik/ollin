@@ -72,7 +72,11 @@ struct MapPool {
         }
     }
 };
+// A namespace-scope inline variable, not a function-local static: the latter carries a
+// thread-safe initialization guard checked on EVERY call, measured to bloat a hot accessor's
+// code and slow it down when inlined into a path used regardless of whether pooling is ever
+// exercised (see the same fix and its measurement on closure_pool()/upvalue_pool(), CLAUDE.md).
+inline MapPool s_map_pool;
 inline MapPool& map_pool() {
-    static MapPool p;
-    return p;
+    return s_map_pool;
 }

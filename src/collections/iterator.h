@@ -152,9 +152,12 @@ struct ArrayIteratorPool {
         }
     }
 };
+// A namespace-scope inline variable, not a function-local static: see map_pool() (map.h) for
+// why — the thread-safe initialization guard of a function-local static was measured to bloat
+// and slow a hot accessor even when pooling itself is never exercised.
+inline ArrayIteratorPool s_array_iter_pool;
 inline ArrayIteratorPool& array_iter_pool() {
-    static ArrayIteratorPool p;
-    return p;
+    return s_array_iter_pool;
 }
 inline void ArrayIterator::release() {
     array_iter_pool().release(this);

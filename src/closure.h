@@ -44,9 +44,15 @@ struct UpvaluePool {
         }
     }
 };
+// A NAMESPACE-scope inline variable, not a function-local static: the latter carries a
+// thread-safe initialization guard checked on EVERY call, and this accessor is called from
+// close_upvals() — the hottest path in the VM, run on every function return whether or not
+// the frame ever opened an upvalue. Measured cost of that guard alone: +14 % on run_goto's
+// machine code size and +11 pp of `fib`'s time, a benchmark that never creates a closure
+// (bisected against the commit that introduced this pool; see CLAUDE.md).
+inline UpvaluePool s_upvalue_pool;
 inline UpvaluePool& upvalue_pool() {
-    static UpvaluePool p;
-    return p;
+    return s_upvalue_pool;
 }
 
 struct Closure {
@@ -108,9 +114,11 @@ struct ClosurePool {
         }
     }
 };
+// Same reason as upvalue_pool(): a namespace-scope inline variable, not a function-local
+// static, to avoid the per-call thread-safe-initialization guard.
+inline ClosurePool s_closure_pool;
 inline ClosurePool& closure_pool() {
-    static ClosurePool p;
-    return p;
+    return s_closure_pool;
 }
 
 // Pairs with std::unique_ptr for exception safety at the one construction site (MAKE_CLOSURE):
