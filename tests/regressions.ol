@@ -369,6 +369,14 @@ assert(typeof(math.logn(8, 2)) == "int" and math.logn(8, 2) == 3)
 assert(math.map(5, 2, 2, 7, 99) == 7)           ## a zero input range gives out_lo, and no inf or nan
 assert(not math.isInf(math.map(5, 2, 2, 0, 10)))
 assert(math.map(5, 0, 10, 0, 100) == 50)
+## math.map CLAMPS x to the input range before interpolating — a value outside [in_lo, in_hi]
+## saturates at the matching output bound instead of extrapolating past it.
+assert(math.map(-10, 0, 100, 0, 1) == 0)
+assert(math.map(150, 0, 100, 0, 1) == 1)
+## the input range can run EITHER direction (in_lo > in_hi is legal, a descending scale): the
+## clamp follows the ordered bounds, not in_lo specifically.
+assert(math.map(-5, 10, 0, 0, 100) == 100)
+assert(math.map(15, 10, 0, 0, 100) == 0)
 
 ## ── string and math: the double-to-int cast is guarded (undefined behaviour, and a WASM trap, on a huge index before) ──
 assert(string.char("abc", 1e300) == "")         ## an index out of range gives "", and does not trap

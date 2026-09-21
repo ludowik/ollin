@@ -154,7 +154,13 @@ static int math_map(CallCtx& ctx) {
     double out_hi = num_arg(args, argc, 4, "math.map");
     if (in_hi == in_lo)
         return ctx.ret(num_value(out_lo)); // a degenerate input range gives the low bound, which avoids inf and nan
-    return ctx.ret(num_value(out_lo + (x - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)));
+    // Clamp x to the source range before mapping, in whichever direction in_lo/in_hi run (a
+    // descending source range, in_lo > in_hi, is legal): x outside [in_lo, in_hi] would otherwise
+    // extrapolate past [out_lo, out_hi] instead of saturating at the matching bound.
+    double lo = in_lo < in_hi ? in_lo : in_hi;
+    double hi = in_lo < in_hi ? in_hi : in_lo;
+    double xc = x < lo ? lo : (x > hi ? hi : x);
+    return ctx.ret(num_value(out_lo + (xc - in_lo) * (out_hi - out_lo) / (in_hi - in_lo)));
 }
 
 static int math_atan2(CallCtx& ctx) {
