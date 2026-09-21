@@ -1337,6 +1337,7 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><td><code>arr.pop()</code></td><td>Removes and returns the last element</td></tr>
 <tr><td><code>arr.insert(i, v)</code></td><td>Inserts <code>v</code> at index <code>i</code> (from 1)</td></tr>
 <tr><td><code>arr.delete(i)</code></td><td>Removes and returns the element at index <code>i</code></td></tr>
+<tr><td><code>arr.remove(v)</code></td><td>Removes and returns the array's first element identical to <code>v</code> (or <code>nil</code> when none matched) — by identity for objects, arrays and the like, by value for numbers, strings and booleans</td></tr>
 <tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
 <tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>
@@ -1354,9 +1355,24 @@ a.delete(<span class="num">2</span>)        <span class="cmt">## removes 99 → 
 <span class="kw">var</span> q = []          <span class="cmt">## a FIFO queue</span>
 q.enqueue(<span class="str">"a"</span>)
 q.enqueue(<span class="str">"b"</span>)
-q.dequeue()         <span class="cmt">## "a"</span>
+q.dequeue()         <span class="cmt">## "a"</span></code></pre>
 
-<span class="bi">print</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].join(<span class="str">", "</span>))       <span class="cmt">## 1, 2, 3</span>
+<div class="callout warn"><code>for i, v in arr</code> walks a <strong>snapshot</strong> taken when the loop starts: deleting from
+<code>arr</code> mid-loop does not corrupt the walk, but <code>i</code> keeps counting positions in that
+snapshot, not in the shrinking live array. Removing more than one element by <code>arr.delete(i)</code> in
+the same loop drifts <code>i</code> past the live array's new bounds and fails with an out-of-bounds error.
+<code>arr.remove(v)</code> has no such drift — it looks <code>v</code> up by identity in the live array,
+wherever it now sits — so it is the safe way to remove several matching elements inside their own
+<code>for..in</code> loop:
+<pre><code><span class="kw">for</span> i, bubble <span class="kw">in</span> bubbles <span class="kw">do</span>
+    bubble.update(dt)
+    <span class="kw">if</span> bubble.dead <span class="kw">then</span>
+        bubbles.remove(bubble)     <span class="cmt">## not bubbles.delete(i)</span>
+    <span class="kw">end</span>
+<span class="kw">end</span></code></pre>
+</div>
+
+<pre><code><span class="bi">print</span>([<span class="num">1</span>, <span class="num">2</span>, <span class="num">3</span>].join(<span class="str">", "</span>))       <span class="cmt">## 1, 2, 3</span>
 <span class="bi">print</span>(<span class="str">"a,b,c"</span>.split(<span class="str">","</span>).join(<span class="str">" | "</span>))  <span class="cmt">## a | b | c</span></code></pre>
 
 <h3>Walking the whole array at once</h3>

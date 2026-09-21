@@ -808,6 +808,9 @@ ma.insert(2, 99)
 assert(ma[2] == 99)
 assert(ma.delete(2) == 99)
 assert(ma[2] == 2)
+assert(ma.remove(2) == 2)
+assert(ma.len() == 2)
+assert(ma.remove(99999) == nil)
 
 var fifo = []
 fifo.enqueue(10)

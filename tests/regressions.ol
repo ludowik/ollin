@@ -858,6 +858,56 @@ catch e
     arr_err = true
 end
 assert(arr_err)
+## for..in walks a SNAPSHOT of the array (ArrayIterator copies it at MAKE_ITER): a delete during
+## the loop does not skip or repeat elements, but the deleted index still shows up on later turns
+## since the loop never re-reads the live array.
+var snap_seen = []
+var snap_arr = [10, 20, 30, 40, 50]
+for si, sv in snap_arr do
+    snap_seen.push(sv)
+    if si == 2 then
+        snap_arr.delete(2)
+    end
+end
+assert(snap_seen.join(",") == "10,20,30,40,50")   ## unaffected by the delete
+assert(snap_arr.len() == 4)                       ## the live array DID shrink
+## …and that snapshot is exactly why arr.delete(i) is NOT safe for "remove every dead one" inside
+## the same loop: i is a position in the frozen snapshot, and it drifts past the live array's
+## shrinking bounds once more than one element has already been removed.
+var drift_arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+var drift_dead = [true, false, true, false, true, false, true, false, true, false, true]
+var drift_err = false
+try
+    for di, dv in drift_arr do
+        if drift_dead[di] then
+            drift_arr.delete(di)
+        end
+    end
+catch e
+    drift_err = true
+end
+assert(drift_err)      ## "array index out of bounds" once the drift outruns the live array
+## arr.remove(v) has no such drift: it looks up v by IDENTITY in the LIVE array (ValueEqual, never
+## a script's __eq), wherever it now sits, so removing several objects in the same for..in loop —
+## the actual use case a snapshot-based iterator invites — works regardless of how many turns
+## already shrank the array.
+class RmObj
+    func init(n)
+        self.n = n
+    end
+end
+var rm_arr = []
+for ri = 1, 11 do
+    rm_arr.push(RmObj(ri))
+end
+for ri, ro in rm_arr do
+    if ro.n % 2 == 1 then
+        assert(rm_arr.remove(ro) == ro)    ## returns the removed object itself
+    end
+end
+assert(rm_arr.len() == 5)
+assert(rm_arr[1].n == 2 and rm_arr[5].n == 10)
+assert(rm_arr.remove(RmObj(2)) == nil)     ## a DIFFERENT instance with the same field: no identity match
 ## sorting: an explicit comparator, and an order by type rank without one
 var srt = [1, 2, 3].sort(func(x, y) return x > y end)
 assert(srt[1] == 3)

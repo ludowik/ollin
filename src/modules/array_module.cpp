@@ -58,6 +58,31 @@ static int arr_delete(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
+// remove(v): removes the array's first element identical to v — ValueEqual, the same rule as a
+// map key (pointer identity for maps, arrays, instances, closures and ranges; value equality for
+// numbers, strings and booleans), NEVER a script's __eq. Returns the removed value, or nil when
+// none matched.
+//
+// This is `delete` reached from the other end: `delete(i)` needs an index, and inside a
+// `for i, x in arr` loop that index is a position in the loop's frozen snapshot (ArrayIterator
+// copies the array once at MAKE_ITER) — it drifts past the live array's bounds as earlier
+// removals shrink it (`bubbles.delete(i)` for several dead bubbles in the same loop throws
+// "array index out of bounds"). Removing by reference has no such drift: `bubbles.remove(bubble)`
+// finds the object wherever it currently sits in the live array, however many prior removals
+// happened this same loop.
+static int arr_remove(CallCtx& ctx) {
+    arr_check(ctx, 2, "remove: expected (array, value)");
+    auto& items = ctx.args[0].aptr->items;
+    for (size_t i = 0; i < items.size(); i++) {
+        if (ValueEqual{}(items[i], ctx.args[1])) {
+            Value removed = std::move(items[i]);
+            items.erase(items.begin() + (ptrdiff_t)i);
+            return ctx.ret(removed);
+        }
+    }
+    return ctx.ret(Value{});
+}
+
 // The higher-order members below COPY the array and the function out of `ctx.args` before running
 // any Ollin code: `call_value` can grow the register file, which reallocates it, and a reference
 // into it would then dangle — `[1, 2, 3].map(f)` with a deeply recursive `f` gave back nil values.
@@ -190,6 +215,7 @@ Value make_array_module() {
         .fn("dequeue", arr_dequeue)
         .fn("insert", arr_insert)
         .fn("delete", arr_delete)
+        .fn("remove", arr_remove)
         .fn("map", arr_map)
         .fn("filter", arr_filter)
         .fn("reduce", arr_reduce)
