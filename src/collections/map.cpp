@@ -101,6 +101,12 @@ const Value* Map::find_ptr(const Value& k) const {
 uint64_t g_map_epoch = 0;
 
 void Map::set(const Value& k, const Value& v) {
-    data.insert_or_assign(k, v);
+    // A nil value REMOVES the key, matching Lua's `t[k] = nil` — a read can never tell "never set"
+    // from "set to nil" apart anyway (m.k reads nil either way), so keeping a ghost entry only
+    // made len() overcount and a `for k, v in m` walk visit a key the script meant to drop.
+    if (v.is_nil())
+        data.erase(k);
+    else
+        data.insert_or_assign(k, v);
     version = ++g_map_epoch;   // invalidates the GET_INDEX inline caches aimed at this map
 }

@@ -59,6 +59,7 @@ set(OLLIN_SOURCES
     src/modules/math_module.cpp
     src/modules/string_module.cpp
     src/modules/array_module.cpp
+    src/modules/map_module.cpp
     src/modules/data_module.cpp
     src/modules/date_module.cpp
     src/modules/tween_module.cpp

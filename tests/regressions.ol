@@ -810,6 +810,42 @@ assert({}.len() == 0)
 var mlen_def = {len: 42}          ## a defined "len" entry wins over the builtin
 assert(mlen_def.len == 42)
 
+## A nil value REMOVES the key (Map::set) instead of leaving a "present but nil" ghost entry that
+## used to inflate len() and show up in a for..in walk.
+var mdel = {a: 1, b: 2}
+mdel.a = nil
+assert(mdel.len() == 1)
+var mdel_seen = []
+for k, v in mdel do
+    mdel_seen.push(k)
+end
+assert(mdel_seen.join(",") == "b")     ## "a" is gone, not walked as a nil-valued entry
+mdel["b"] = nil
+assert(mdel.len() == 0)
+mdel["never-there"] = nil              ## erasing an absent key is a harmless no-op
+assert(mdel.len() == 0)
+
+## The `map` module: the free-function form of what indexing and iteration already do, usable on
+## any map or instance (map.len is redundant with .len()/#, kept for symmetry with math/string).
+var mm = {x: 1, y: 2, z: 3}
+assert(map.len(mm) == 3)
+assert(map.has(mm, "y") and not map.has(mm, "w"))
+assert(map.keys(mm).len() == 3 and map.values(mm).len() == 3)
+assert(map.delete(mm, "y") == 2)       ## returns the removed value
+assert(map.delete(mm, "y") == nil)     ## already gone: nil, not an error
+assert(mm.len() == 2 and not map.has(mm, "y"))
+## a frozen enum refuses map.delete exactly as it refuses `E.A = v` (op_SET_INDEX)
+enum MapDelEnum
+    A, B
+end
+var enum_del_err = false
+try
+    map.delete(MapDelEnum, "A")
+catch e
+    enum_del_err = true
+end
+assert(enum_del_err)
+
 ## GET_INDEX inline cache: invalidated when the map mutates, through its version
 var ic = {x: 1, y: 2}
 var ic_a = ic.x            ## fills the cache: (ic, "x") = 1
@@ -952,9 +988,8 @@ for i = 1, 2 do
 end
 assert(pd.x == 9)
 
-## `nil` means ABSENT in a map: an own key holding nil does NOT shadow what the prototype chain —
-## or the `len` fallback — would provide. A regression becomes possible when moving from a lookup
-## by value to a lookup by key presence.
+## Writing nil onto a name that collides with a class method or the `len` fallback is a NO-OP
+## (nil erases an absent key), so neither resolution can ever be confused by it.
 class NilSh
     func init()
         self.a = 1
@@ -966,9 +1001,9 @@ end
 var nsh = NilSh()
 nsh["m"] = nil
 assert(nsh.m() == "klass")     ## the class method stays reachable
-var nlen = {}
+var nlen = {x: 1}
 nlen["len"] = nil
-assert(nlen.len() == 1)         ## the built-in `len` fallback; the map has one key
+assert(nlen.len() == 1)         ## the one REAL key; the built-in `len` fallback still resolves
 
 ## ── enum ────────────────────────────────────────────────────────────────────
 ## Numbering: 1 by default, then +1 each time; an integer literal redefines what follows; a

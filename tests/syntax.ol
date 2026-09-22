@@ -640,6 +640,18 @@ m.b    *= 3
 assert(m["a"] == 11)
 assert(m.b    == 6)
 
+## deleting: a nil VALUE removes the key (a nil KEY, as above, is a key like any other)
+m["d"] = nil
+assert(m["d"] == nil and m.len() == 4)   ## a, b, c, e — "d" is gone, not just nil
+
+## the `map` module: the free-function form of len/keys/values/has/delete
+assert(map.len(m) == 4)
+assert(map.has(m, "e") and not map.has(m, "d"))
+assert(map.keys(m).len() == 4)
+assert(map.values(m).len() == 4)
+assert(map.delete(m, "e") == 5)
+assert(not map.has(m, "e"))
+
 ## nested map
 var scene = {camera: {fov: 60}}
 assert(scene["camera"]["fov"] == 60)

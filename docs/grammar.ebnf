@@ -298,7 +298,13 @@ mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* a computed key: [expr] evaluates expr at run time and uses its value as the key *)
                  (*   { [ref]: 12 } takes the key from the variable ref, of any Value type: a string, an int, … *)
                  (* access: m["k"] and m.k are equivalent, for reading, writing and compound assignment *)
+                 (* writing a nil VALUE removes the key — m.k = nil is a delete, not a "present but
+                    nil" entry; a nil KEY is unaffected by this, and indexes like any other value *)
                  (* copy semantics: reference counting, with no clone; an empty map is falsy, "empty is false" *)
+                 (* the `map` module (map.len(m), map.keys(m), map.values(m), map.has(m, k),
+                    map.delete(m, k)) is the free-function form of what indexing and for..in
+                    already do — not pseudo-methods on m, because every OTHER module (math,
+                    string, …) is a map too, and a map receiver never gets self injected *)
 arrayLit       = "[" [ expr { "," expr } [ "," ] ] "]" ;
              (* the comma is REQUIRED between two elements, and allowed before the "]" *)
              (* shared by reference, through reference counting; an empty array is falsy, "empty is false" *)

@@ -10,6 +10,7 @@ Value make_graphics_module();
 // without raylib too, and so cannot reference the enum. See make_graphics_module.
 Value make_blend_module();
 Value make_string_module();
+Value make_map_module();
 Value make_colors_module();
 Value make_window_module();
 Value make_image_module();
@@ -29,6 +30,7 @@ static const struct { const char* name; Value(*make)(); } k_modules[] = {
     { "math",     make_math_module     },
     { "graphics", make_graphics_module },
     { "string",   make_string_module   },
+    { "map",      make_map_module      },
     { "colors",   make_colors_module   },
     { "blend",    make_blend_module    },
     { "window",   make_window_module   },

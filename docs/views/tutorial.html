@@ -1145,6 +1145,13 @@ point.y *= <span class="num">2</span>     <span class="cmt">## compound through 
 <span class="bi">assert</span>(point.x == <span class="num">11</span>)
 <span class="bi">assert</span>(point.y == <span class="num">40</span>)</code></pre>
 
+<h3>Deleting a key</h3>
+<p>Writing <code>nil</code> as the <strong>value</strong> removes the key — it does not leave a "present but nil" entry behind. A <code>nil</code> <strong>key</strong> is unaffected by this and indexes like any other value.</p>
+<pre><code><span class="kw">var</span> point = {<span class="str">"x"</span>: <span class="num">10</span>, <span class="str">"y"</span>: <span class="num">20</span>}
+point.y = <span class="nil">nil</span>
+<span class="bi">assert</span>(point.y == <span class="nil">nil</span>)
+<span class="bi">assert</span>(point.len() == <span class="num">1</span>)   <span class="cmt">## "y" is gone, not just nil</span></code></pre>
+
 <h3>Nested maps</h3>
 <pre><code><span class="kw">var</span> scene = {
     camera: {fov: <span class="num">60</span>, near: <span class="num">0.1</span>, far: <span class="num">1000</span>},
@@ -1172,6 +1179,22 @@ m[<span class="num">1</span>] = <span class="str">"one"</span>
 b.x = <span class="num">99</span>
 <span class="bi">assert</span>(a.x == <span class="num">99</span>)  <span class="cmt">## a changes too</span></code></pre>
 <div class="callout">A consequence: <code>==</code> compares maps by <strong>reference</strong> and not by content — <code>{} == {}</code> is <code>0</code>. For equality by value, see <a href="#classes">Equality and comparison</a>.</div>
+
+<h3>The <code>map</code> module</h3>
+<p>The free-function form of what indexing and <code>for..in</code> already do. Unlike arrays and strings, a map does not get these as methods (<code>m.keys()</code>) — every <em>other</em> module (<code>math</code>, <code>string</code>…) is a map too, and a map never receives itself as the first argument, so <code>m.foo()</code> stays reserved for a callable a script itself stored under the key <code>"foo"</code>.</p>
+<table>
+<tr><th>Function</th><th>Description</th></tr>
+<tr><td><code>map.len(m)</code></td><td>The number of keys — the same as <code>m.len()</code> or <code>#m</code></td></tr>
+<tr><td><code>map.keys(m)</code></td><td>An array of the map's keys</td></tr>
+<tr><td><code>map.values(m)</code></td><td>An array of the map's values</td></tr>
+<tr><td><code>map.has(m, key)</code></td><td><code>true</code> when <code>key</code> is present</td></tr>
+<tr><td><code>map.delete(m, key)</code></td><td>Removes <code>key</code> and returns its former value, or <code>nil</code> when it was absent</td></tr>
+</table>
+<pre><code><span class="kw">var</span> m = {a: <span class="num">1</span>, b: <span class="num">2</span>, c: <span class="num">3</span>}
+<span class="bi">assert</span>(map.keys(m).len() == <span class="num">3</span>)
+<span class="bi">assert</span>(map.has(m, <span class="str">"b"</span>))
+<span class="bi">assert</span>(map.delete(m, <span class="str">"b"</span>) == <span class="num">2</span>)
+<span class="bi">assert</span>(not map.has(m, <span class="str">"b"</span>))</code></pre>
 </section>
 
 <!-- ── Iteration ─────────────────────────────────────────────────────────── -->
