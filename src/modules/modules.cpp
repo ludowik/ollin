@@ -1,4 +1,5 @@
 #include "modules.h"
+#include "map_module.h"
 #include "value.h"
 #include <stdexcept>
 
@@ -10,7 +11,6 @@ Value make_graphics_module();
 // without raylib too, and so cannot reference the enum. See make_graphics_module.
 Value make_blend_module();
 Value make_string_module();
-Value make_map_module();
 Value make_colors_module();
 Value make_window_module();
 Value make_image_module();
@@ -65,7 +65,13 @@ const std::vector<std::string>& builtin_func_names() {
 
 Value make_builtin_module(const std::string& name) {
     for (auto& m : k_modules)
-        if (name == m.name)
-            return m.make();
+        if (name == m.name) {
+            Value mod = m.make();
+            // The single point where a built-in module's root map is marked as such (Map::kind,
+            // see the comment on it) — never propagated to whatever the module contains.
+            if (mod.is_map())
+                mod.mptr->kind = Map::MODULE;
+            return mod;
+        }
     throw std::runtime_error("unknown built-in module: " + name);
 }

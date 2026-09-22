@@ -1181,20 +1181,21 @@ b.x = <span class="num">99</span>
 <div class="callout">A consequence: <code>==</code> compares maps by <strong>reference</strong> and not by content — <code>{} == {}</code> is <code>0</code>. For equality by value, see <a href="#classes">Equality and comparison</a>.</div>
 
 <h3>The <code>map</code> module</h3>
-<p>The free-function form of what indexing and <code>for..in</code> already do. Unlike arrays and strings, a map does not get these as methods (<code>m.keys()</code>) — every <em>other</em> module (<code>math</code>, <code>string</code>…) is a map too, and a map never receives itself as the first argument, so <code>m.foo()</code> stays reserved for a callable a script itself stored under the key <code>"foo"</code>.</p>
+<p>Five functions, usable either as a free function taking the map explicitly, or as a method directly on the map — the two forms share the same implementation:</p>
 <table>
 <tr><th>Function</th><th>Description</th></tr>
-<tr><td><code>map.len(m)</code></td><td>The number of keys — the same as <code>m.len()</code> or <code>#m</code></td></tr>
-<tr><td><code>map.keys(m)</code></td><td>An array of the map's keys</td></tr>
-<tr><td><code>map.values(m)</code></td><td>An array of the map's values</td></tr>
-<tr><td><code>map.has(m, key)</code></td><td><code>true</code> when <code>key</code> is present</td></tr>
-<tr><td><code>map.delete(m, key)</code></td><td>Removes <code>key</code> and returns its former value, or <code>nil</code> when it was absent</td></tr>
+<tr><td><code>map.len(m)</code> · <code>m.len()</code></td><td>The number of keys — also <code>#m</code></td></tr>
+<tr><td><code>map.keys(m)</code> · <code>m.keys()</code></td><td>An array of the map's keys</td></tr>
+<tr><td><code>map.values(m)</code> · <code>m.values()</code></td><td>An array of the map's values</td></tr>
+<tr><td><code>map.has(m, key)</code> · <code>m.has(key)</code></td><td><code>true</code> when <code>key</code> is present</td></tr>
+<tr><td><code>map.delete(m, key)</code> · <code>m.delete(key)</code></td><td>Removes <code>key</code> and returns its former value, or <code>nil</code> when it was absent</td></tr>
 </table>
 <pre><code><span class="kw">var</span> m = {a: <span class="num">1</span>, b: <span class="num">2</span>, c: <span class="num">3</span>}
-<span class="bi">assert</span>(map.keys(m).len() == <span class="num">3</span>)
-<span class="bi">assert</span>(map.has(m, <span class="str">"b"</span>))
-<span class="bi">assert</span>(map.delete(m, <span class="str">"b"</span>) == <span class="num">2</span>)
-<span class="bi">assert</span>(not map.has(m, <span class="str">"b"</span>))</code></pre>
+<span class="bi">assert</span>(m.keys().len() == <span class="num">3</span>)
+<span class="bi">assert</span>(m.has(<span class="str">"b"</span>))
+<span class="bi">assert</span>(m.delete(<span class="str">"b"</span>) == <span class="num">2</span>)
+<span class="bi">assert</span>(not m.has(<span class="str">"b"</span>))</code></pre>
+<div class="callout">A built-in module (<code>math</code>, <code>string</code>, <code>map</code> itself…) is a map under the hood, but <code>typeof</code> tells them apart: <code>typeof(math)</code> is <code>"module"</code>, <code>typeof({})</code> is <code>"map"</code>.</div>
 </section>
 
 <!-- ── Iteration ─────────────────────────────────────────────────────────── -->
@@ -1528,6 +1529,8 @@ processor rather than the wall, benchmarks use <code>cpuTime()</code>.</div>
 <span class="bi">typeof</span>(<span class="num">3.14</span>)     <span class="cmt">## "float"</span>
 <span class="bi">typeof</span>(<span class="str">"hello"</span>)  <span class="cmt">## "string"</span>
 <span class="bi">typeof</span>([<span class="num">1</span>, <span class="num">2</span>])   <span class="cmt">## "array"</span>
+<span class="bi">typeof</span>({})       <span class="cmt">## "map"</span>
+<span class="bi">typeof</span>(math)     <span class="cmt">## "module" — a built-in module, not a plain map</span>
 <span class="bi">typeof</span>(<span class="bool">nil</span>)      <span class="cmt">## "nil"</span></code></pre>
 
 <h3>Built-in functions as values</h3>

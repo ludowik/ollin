@@ -265,38 +265,8 @@ struct Value {
 
     static Value make_iter_from(const Value& src);
 
-    const char* type_name() const {
-        switch (tag) {
-        case T_NIL:
-            return "nil";
-        case T_INTEGER:
-            return "int";
-        case T_FLOAT:
-            return "float";
-        case T_BOOL:
-            return "bool";
-        case T_STRING:
-            return "string";
-        case T_MAP:
-            return "map";
-        case T_ARRAY:
-            return "array";
-        case T_ITERATOR:
-            return "iterator";
-        case T_FUNCTION:
-            return "function";
-        case T_CLOSURE:
-            return "function";
-        case T_BUILTIN:
-            return "function";
-        case T_CLASS:
-            return "class";
-        case T_RANGE:
-            return "range";
-        default:
-            return "unknown";
-        }
-    }
+    // Defined after collections/map.h: the T_MAP case reads Map::kind, so Map must be complete.
+    const char* type_name() const;
 };
 
 // ret and set_result are defined in vm.h: they address the slots through VM::regs, which is only
@@ -360,6 +330,42 @@ inline int64_t Value::array_size() const {
 }
 inline int64_t Value::map_size() const {
     return (int64_t)mptr->data.size();
+}
+
+inline const char* Value::type_name() const {
+    switch (tag) {
+    case T_NIL:
+        return "nil";
+    case T_INTEGER:
+        return "int";
+    case T_FLOAT:
+        return "float";
+    case T_BOOL:
+        return "bool";
+    case T_STRING:
+        return "string";
+    case T_MAP:
+        // A built-in module (math, string, graphics…) is a T_MAP under the hood (see Map::kind
+        // in collections/map.h) but a script should read it as its own kind: typeof(math) says
+        // "module", not "map".
+        return mptr->kind == Map::MODULE ? "module" : "map";
+    case T_ARRAY:
+        return "array";
+    case T_ITERATOR:
+        return "iterator";
+    case T_FUNCTION:
+        return "function";
+    case T_CLOSURE:
+        return "function";
+    case T_BUILTIN:
+        return "function";
+    case T_CLASS:
+        return "class";
+    case T_RANGE:
+        return "range";
+    default:
+        return "unknown";
+    }
 }
 
 // Hot path: for nil/int/float (tag < T_STRING) there is nothing to free. That trivial test

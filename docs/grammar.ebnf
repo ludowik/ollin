@@ -301,10 +301,10 @@ mapEntry       = ( STRING | IDENT | "[" expr "]" ) ":" expr ;
                  (* writing a nil VALUE removes the key — m.k = nil is a delete, not a "present but
                     nil" entry; a nil KEY is unaffected by this, and indexes like any other value *)
                  (* copy semantics: reference counting, with no clone; an empty map is falsy, "empty is false" *)
-                 (* the `map` module (map.len(m), map.keys(m), map.values(m), map.has(m, k),
-                    map.delete(m, k)) is the free-function form of what indexing and for..in
-                    already do — not pseudo-methods on m, because every OTHER module (math,
-                    string, …) is a map too, and a map receiver never gets self injected *)
+                 (* the `map` module: len, keys, values, has, delete. Usable either as a free
+                    function (map.keys(m)) or as a pseudo-method on the map (m.keys()) — the two
+                    forms share one implementation. typeof tells a built-in module (math, string,
+                    map itself, …) apart from a plain map: "module" vs "map" *)
 arrayLit       = "[" [ expr { "," expr } [ "," ] ] "]" ;
              (* the comma is REQUIRED between two elements, and allowed before the "]" *)
              (* shared by reference, through reference counting; an empty array is falsy, "empty is false" *)

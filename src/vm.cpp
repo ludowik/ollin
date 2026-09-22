@@ -1,5 +1,6 @@
 #include "vm.h"
 #include "modules/array_module.h"
+#include "modules/map_module.h"
 #include "modules/modules.h"
 #include "utf8.h"
 #include <algorithm>
@@ -40,11 +41,11 @@ static void validate_numeric_range(double start, double end, double step) {
 
 // Interned meta-key constants, initialized once and reused across all calls.
 struct MetaKeys {
-    Value class_, parent_, str_, name_, init_, len_;
+    Value class_, parent_, str_, name_, init_;
     Value add_, sub_, mul_, div_, mod_, neg_, eq_, lt_, le_;
     MetaKeys()
         : class_(std::string("__class__")), parent_(std::string("__parent__")), str_(std::string("__str")),
-          name_(std::string("__name__")), init_(std::string("init")), len_(std::string("len")),
+          name_(std::string("__name__")), init_(std::string("init")),
           add_(std::string("__add")), sub_(std::string("__sub")), mul_(std::string("__mul")),
           div_(std::string("__div")), mod_(std::string("__mod")), neg_(std::string("__neg")), eq_(std::string("__eq")),
           lt_(std::string("__lt")), le_(std::string("__le")) {
@@ -61,14 +62,6 @@ static MetaKeys& MK() {
 bool VM::has_class_key(const Value& v) {
     assert(v.is_map() || v.is_class());
     return v.mptr->find_ptr(MK().class_) != nullptr;
-}
-
-// Built-in `len` pseudo-method of maps, synthesized by GET_INDEX when the map does not define
-// "len" itself. A NAMED function rather than a lambda, so that CALL_METHOD recognizes it by
-// pointer and injects the map as self — maps do not inject self by default, otherwise
-// math.noise(x) would receive the module.
-static int builtin_map_len(CallCtx& ctx) {
-    return ctx.ret(Value((int64_t)(ctx.argc > 0 ? ctx.args[0].map_size() : 0)));
 }
 
 Value VM::proto_chain_get(const Value& obj, const Value& key) {
@@ -343,8 +336,8 @@ static __attribute__((noinline)) CodeAddr switch_target_slow(const SwitchTable& 
 // so the two can never disagree. NOT inlined: it would be pulled into run_goto, whose register
 // allocation is shared by every opcode handler, and the numeric loop measured +2 instructions
 // per turn for it (bench/icount.sh) — a cost paid by code that never uses '#'.
-// ⚠ builtin_map_len, arr_len and str_len keep their own one-line computation on purpose: making
-// the map one call this function costs the SAME 600 000 instructions on the loop benchmark
+// ⚠ map_len (map_module.cpp), arr_len and str_len keep their own one-line computation on purpose:
+// making the map one call this function costs the SAME 600 000 instructions on the loop benchmark
 // (measured), the extra call site changing what the compiler inlines in this file. Sharing one
 // expression is not worth 1.9 % of every numeric loop.
 static __attribute__((noinline)) Value value_len(const Value& v) {
@@ -1468,15 +1461,17 @@ dispatch_loop:
             } else {
                 // Absent from the own data: walk the prototype chain (__class__ / __parent__).
                 // NOT cached, because mutating the CLASS does not bump the instance's version.
-                // The built-in `len` is only an all-cold fallback (nothing found anywhere), which
-                // keeps the strcmp off the hot path.
+                // The map module's pseudo-methods (len, keys, values, has, delete) are only an
+                // all-cold fallback (nothing found anywhere), which keeps the lookup off the hot
+                // path — never tried for an INSTANCE (!has_class_key), same restriction `len`
+                // always had: an instance is expected to define or inherit its own fields.
                 Value chained = proto_chain_rest(obj, key);
-                // The `len` key is compared by interned POINTER, like __class__ and __parent__,
-                // rather than by content, so GET_INDEX has no strcmp left.
-                if (chained.is_nil() && key_sptr == MK().len_.sptr && !has_class_key(obj))
-                    regs[base + A] = Value::make_builtin(builtin_map_len);
-                else
+                if (chained.is_nil() && key_sptr && !has_class_key(obj)) {
+                    const Value* meth = module_member(map_module_, key, key_sptr);
+                    regs[base + A] = meth ? *meth : Value{};
+                } else {
                     regs[base + A] = std::move(chained);
+                }
             }
         } else if (obj.is_string()) {
             // String pseudo-methods are served by the `string` module, which never changes, so
@@ -1823,11 +1818,23 @@ dispatch_loop:
             else if (fn.is_static_builtin())
                 fn_is_static = true;
             Value& recv = regs[cb];
-            // Maps do not inject self: a module such as `math` must not receive itself, so
-            // math.noise(x) calls noise(x). The one exception is the built-in `len`
-            // pseudo-method, recognized by pointer, which needs the map.
-            bool map_len_call = recv.is_map() && fn.is_builtin() && fn.as_builtin() == builtin_map_len;
-            bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_len_call;
+            // Maps do not inject self in general: a module such as `math` must not receive
+            // itself, so math.noise(x) calls noise(x) — and every OTHER module is a map too
+            // (Map::kind, collections/map.h). The one exception is the map module's own five
+            // pseudo-methods (len, keys, values, has, delete) called on a PLAIN map or enum
+            // (`m.len()`), recognized by function pointer (is_map_module_fn). The `kind !=
+            // MODULE` guard matters in its own right: `len` is a REAL key of the `map` module
+            // itself (map.len IS map_len, found in map's own data, not through the fallback),
+            // so `map.len(m)` reads as a method call on `map` — without this guard, `map` would
+            // get injected as self and `m` would slide into a second argument nobody asked for,
+            // instead of `map.len` being called plainly with `m` as its one argument (exactly
+            // how `math.sin(x)` must not receive `math`). A plain map can also just hold an
+            // unrelated builtin under one of its own keys (`{f: math.sin}`), and calling THAT
+            // must never inject self either — is_map_module_fn alone already excludes it, since
+            // math.sin isn't one of the five.
+            bool map_pseudo_call = recv.is_map() && recv.mptr->kind != Map::MODULE && fn.is_builtin() &&
+                                    is_map_module_fn(fn.as_builtin());
+            bool recv_is_instance = is_instance(recv) || recv.is_string() || recv.is_array() || map_pseudo_call;
             bool inject_self = recv_is_instance && !fn_is_static;
             // The block is normalised HERE and not through push_frame_self, because a builtin
             // method reads its arguments from these very registers just below: going through the
@@ -2054,6 +2061,7 @@ void VM::execute(Chunk chunk) {
             init_global(name, module_of(name));
     string_module_ = module_of("string");
     array_module_ = make_array_module();
+    map_module_ = module_of("map");
     {
         const Value& core = module_of("core");
         for (auto& [k, v] : core.mptr->data) {

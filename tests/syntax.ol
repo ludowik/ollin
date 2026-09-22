@@ -652,6 +652,14 @@ assert(map.values(m).len() == 4)
 assert(map.delete(m, "e") == 5)
 assert(not map.has(m, "e"))
 
+## the same five, as pseudo-methods directly on the map — both forms share one implementation
+assert(m.len() == 3)
+assert(m.has("a") and not m.has("e"))
+assert(m.keys().len() == 3)
+assert(m.values().len() == 3)
+assert(m.delete("a") == 11)
+assert(not m.has("a"))
+
 ## nested map
 var scene = {camera: {fov: 60}}
 assert(scene["camera"]["fov"] == 60)

@@ -846,6 +846,49 @@ catch e
 end
 assert(enum_del_err)
 
+## The same five work as pseudo-methods too (`m.keys()`), sharing the SAME functions as the
+## module form — CALL_METHOD recognizes them by function pointer (is_map_module_fn), restricted
+## to a PLAIN map or enum (never an instance — same rule `len` always had).
+var pm = {p: 1, q: 2}
+assert(pm.len() == map.len(pm))
+assert(pm.keys().len() == map.keys(pm).len())
+assert(pm.has("p") == map.has(pm, "p"))
+assert(pm.delete("p") == 1)
+assert(not pm.has("p"))
+class NoFallback
+    func init()
+        self.a = 1
+    end
+end
+var nf_err = false
+try
+    NoFallback().keys()
+catch e
+    nf_err = true
+end
+assert(nf_err)     ## an instance never gets the map module's fallback, same as len
+
+## `map.len(m)` must read `m`, not `map` itself: `len` is a REAL key of the `map` module (found in
+## its own data, not through the fallback), so `map.len(m)` parses as a method call on `map` — and
+## without excluding a MODULE receiver from self-injection, `map` would be injected as self and
+## `m` would slide into an unwanted second argument. Bisected against a real regression: this once
+## returned map.len() (5, the module's own five keys) instead of m.len().
+var mlm = {j: 1, k: 2, l: 3}
+assert(map.len(mlm) == mlm.len())
+assert(map.len(mlm) == 3)
+
+## storing an UNRELATED builtin under a map's own key must keep calling it plainly — is_map_module_fn
+## excludes it (math.sin is none of the five), so no self is injected regardless of the receiver
+var stored = {f: math.sin}
+assert(stored.f(0) == 0)
+
+## typeof distinguishes a built-in module from a plain map, now that Map::kind marks the root
+## object of a module (never propagated to whatever the module contains)
+assert(typeof(math) == "module")
+assert(typeof(map) == "module")
+assert(typeof({}) == "map")
+assert(typeof(mlm) == "map")
+
 ## GET_INDEX inline cache: invalidated when the map mutates, through its version
 var ic = {x: 1, y: 2}
 var ic_a = ic.x            ## fills the cache: (ic, "x") = 1
@@ -1925,7 +1968,7 @@ end
 ## ── The touch module (multitouch) ──────────────────────────────────────────
 ## With no touch surface — which is the integration container's case — the module still exists: a
 ## script reading the state runs and sees nothing, instead of failing on a nil.
-assert(typeof(touch) == "map")
+assert(typeof(touch) == "module")
 assert(touch.count() == 0)
 assert(typeof(touch.points()) == "array" and #touch.points() == 0)
 
@@ -1949,7 +1992,7 @@ assert(tcZoom == 1.0)
 ## ── The audio module (the session) ─────────────────────────────────────────
 ## The module ALWAYS exists, device or no device: generating waves is pure computation, and the
 ## suite runs in a container with no sound card. Only the output is mute.
-assert(typeof(audio) == "map")
+assert(typeof(audio) == "module")
 assert(audio.sampleRate() == 44100)
 
 ## With no device, start() returns false and isReady() stays false — without throwing.
