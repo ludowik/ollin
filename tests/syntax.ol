@@ -811,6 +811,12 @@ assert(ma[2] == 2)
 assert(ma.remove(2) == 2)
 assert(ma.len() == 2)
 assert(ma.remove(99999) == nil)
+ma.add(7)
+assert(ma[ma.len()] == 7)
+assert(ma.indexOf(7) == ma.len())
+assert(ma.indexOf(99999) == nil)
+assert(ma.contains(7))
+assert(not ma.contains(99999))
 
 var fifo = []
 fifo.enqueue(10)

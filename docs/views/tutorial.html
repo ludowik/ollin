@@ -1334,10 +1334,13 @@ a[<span class="num">5</span>] = <span class="str">"x"</span>   <span class="cmt"
 <tr><th>Method</th><th>Description</th></tr>
 <tr><td><code>arr.len()</code></td><td>The number of elements</td></tr>
 <tr><td><code>arr.push(v)</code></td><td>Appends <code>v</code> at the end</td></tr>
+<tr><td><code>arr.add(v)</code></td><td>An alias of <code>push</code></td></tr>
 <tr><td><code>arr.pop()</code></td><td>Removes and returns the last element</td></tr>
 <tr><td><code>arr.insert(i, v)</code></td><td>Inserts <code>v</code> at index <code>i</code> (from 1)</td></tr>
 <tr><td><code>arr.delete(i)</code></td><td>Removes and returns the element at index <code>i</code></td></tr>
 <tr><td><code>arr.remove(v)</code></td><td>Removes and returns the array's first element identical to <code>v</code> (or <code>nil</code> when none matched) — by identity for objects, arrays and the like, by value for numbers, strings and booleans</td></tr>
+<tr><td><code>arr.indexOf(v)</code></td><td>The 1-based index of the first element identical to <code>v</code> (same rule as <code>remove</code>), or <code>nil</code></td></tr>
+<tr><td><code>arr.contains(v)</code></td><td><code>true</code> when the array holds an element identical to <code>v</code>, <code>false</code> otherwise</td></tr>
 <tr><td><code>arr.enqueue(v)</code></td><td>An alias of <code>push</code> — appends at the end (a queue)</td></tr>
 <tr><td><code>arr.dequeue()</code></td><td>Removes and returns the first element (a queue)</td></tr>
 <tr><td><code>arr.join([separator])</code></td><td>Every element as one text, <code>separator</code> between them (nothing by default) — the inverse of <code>string.split</code></td></tr>

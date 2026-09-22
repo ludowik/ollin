@@ -58,10 +58,31 @@ static int arr_delete(CallCtx& ctx) {
     return ctx.ret(Value{});
 }
 
-// remove(v): removes the array's first element identical to v — ValueEqual, the same rule as a
-// map key (pointer identity for maps, arrays, instances, closures and ranges; value equality for
-// numbers, strings and booleans), NEVER a script's __eq. Returns the removed value, or nil when
-// none matched.
+// 0-based index of the array's first element identical to v — ValueEqual, the same rule as a map
+// key (pointer identity for maps, arrays, instances, closures and ranges; value equality for
+// numbers, strings and booleans), NEVER a script's __eq — or -1 when none matches. Shared by
+// indexOf, contains and remove, the only difference between them being what they do with it.
+static int64_t arr_find(const std::vector<Value>& items, const Value& v) {
+    for (size_t i = 0; i < items.size(); i++) {
+        if (ValueEqual{}(items[i], v))
+            return (int64_t)i;
+    }
+    return -1;
+}
+
+static int arr_index_of(CallCtx& ctx) {
+    arr_check(ctx, 2, "indexOf: expected (array, value)");
+    int64_t i = arr_find(ctx.args[0].aptr->items, ctx.args[1]);
+    return ctx.ret(i < 0 ? Value{} : Value(i + 1)); // 1-based, like every other array index
+}
+
+static int arr_contains(CallCtx& ctx) {
+    arr_check(ctx, 2, "contains: expected (array, value)");
+    return ctx.ret(Value::make_bool(arr_find(ctx.args[0].aptr->items, ctx.args[1]) >= 0));
+}
+
+// remove(v): removes the array's first element identical to v (see arr_find) and returns it, or
+// nil when none matched.
 //
 // This is `delete` reached from the other end: `delete(i)` needs an index, and inside a
 // `for i, x in arr` loop that index is a position in the loop's frozen snapshot (ArrayIterator
@@ -73,14 +94,12 @@ static int arr_delete(CallCtx& ctx) {
 static int arr_remove(CallCtx& ctx) {
     arr_check(ctx, 2, "remove: expected (array, value)");
     auto& items = ctx.args[0].aptr->items;
-    for (size_t i = 0; i < items.size(); i++) {
-        if (ValueEqual{}(items[i], ctx.args[1])) {
-            Value removed = std::move(items[i]);
-            items.erase(items.begin() + (ptrdiff_t)i);
-            return ctx.ret(removed);
-        }
-    }
-    return ctx.ret(Value{});
+    int64_t i = arr_find(items, ctx.args[1]);
+    if (i < 0)
+        return ctx.ret(Value{});
+    Value removed = std::move(items[(size_t)i]);
+    items.erase(items.begin() + (ptrdiff_t)i);
+    return ctx.ret(removed);
 }
 
 // The higher-order members below COPY the array and the function out of `ctx.args` before running
@@ -210,12 +229,15 @@ Value make_array_module() {
     return MapBuilder()
         .fn("len", arr_len)
         .fn("push", arr_push)
+        .fn("add", arr_push)
         .fn("enqueue", arr_push)
         .fn("pop", arr_pop)
         .fn("dequeue", arr_dequeue)
         .fn("insert", arr_insert)
         .fn("delete", arr_delete)
         .fn("remove", arr_remove)
+        .fn("indexOf", arr_index_of)
+        .fn("contains", arr_contains)
         .fn("map", arr_map)
         .fn("filter", arr_filter)
         .fn("reduce", arr_reduce)

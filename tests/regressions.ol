@@ -916,6 +916,14 @@ end
 assert(rm_arr.len() == 5)
 assert(rm_arr[1].n == 2 and rm_arr[5].n == 10)
 assert(rm_arr.remove(RmObj(2)) == nil)     ## a DIFFERENT instance with the same field: no identity match
+## indexOf and contains share the same identity rule as remove — never a script's __eq — and
+## indexOf is 1-based, like every other array index.
+var idx_arr = [RmObj(2), RmObj(4), RmObj(6)]
+assert(idx_arr.indexOf(idx_arr[2]) == 2)
+assert(idx_arr.indexOf(RmObj(4)) == nil)       ## a different instance, same field: no match
+assert(idx_arr.contains(idx_arr[3]))
+assert(not idx_arr.contains(RmObj(6)))
+assert([1, 2, 3].indexOf(2.0) == 2 and [1, 2, 3].contains(2.0))   ## numbers: value equality, INTEGER(2) == FLOAT(2.0)
 ## sorting: an explicit comparator, and an order by type rank without one
 var srt = [1, 2, 3].sort(func(x, y) return x > y end)
 assert(srt[1] == 3)
