@@ -21,20 +21,24 @@ static int map_len(CallCtx& ctx) {
     return ctx.ret(Value((int64_t)ctx.args[0].map_size()));
 }
 
+// Shared by map_keys/map_values: same loop, only which half of the pair is collected differs.
+// Reserves up front — the map's size is already known, unlike a script building an array by hand.
+static Value map_collect(const Value& m, bool want_key) {
+    Value out = Value::make_array();
+    out.aptr->items.reserve(m.mptr->data.size());
+    for (auto& [k, v] : m.mptr->data)
+        out.array_push(want_key ? k : v);
+    return out;
+}
+
 static int map_keys(CallCtx& ctx) {
     map_check(ctx, 1, "keys: expected (map)");
-    Value out = Value::make_array();
-    for (auto& [k, v] : ctx.args[0].mptr->data)
-        out.array_push(k);
-    return ctx.ret(out);
+    return ctx.ret(map_collect(ctx.args[0], true));
 }
 
 static int map_values(CallCtx& ctx) {
     map_check(ctx, 1, "values: expected (map)");
-    Value out = Value::make_array();
-    for (auto& [k, v] : ctx.args[0].mptr->data)
-        out.array_push(v);
-    return ctx.ret(out);
+    return ctx.ret(map_collect(ctx.args[0], false));
 }
 
 static int map_has(CallCtx& ctx) {
@@ -42,28 +46,39 @@ static int map_has(CallCtx& ctx) {
     return ctx.ret(Value::make_bool(ctx.args[0].mptr->find_ptr(ctx.args[1]) != nullptr));
 }
 
-// Removes the key and returns its former value, or nil when absent. Goes through Value::map_set
-// (a nil value deletes, see Map::set) rather than a second data.erase(), so this shares the SAME
-// enum-freeze guard as `m[k] = nil` in op_SET_INDEX — a frozen enum refuses both alike.
+// Removes the key and returns its former value, or nil when absent. Map::set itself is
+// deliberately NOT enum-guarded (it is also how a module's own data, and an enum's members
+// before SEAL_ENUM, get written — see "Type enum" in CLAUDE.md), so the guard is repeated here
+// at the script-facing call site, same as op_SET_INDEX's for `m[k] = nil` — same wording, so a
+// frozen enum reads the same complaint through either spelling.
 static int map_delete(CallCtx& ctx) {
     map_check(ctx, 2, "delete: expected (map, key)");
+    const Value& key = ctx.args[1];
     if (ctx.args[0].mptr->kind == Map::ENUM)
-        throw std::runtime_error("cannot modify an enum");
-    Value old = ctx.args[0].map_get(ctx.args[1]);
-    ctx.args[0].map_set(ctx.args[1], Value{});
+        throw std::runtime_error("cannot modify an enum" + (key.is_string() ? " (field '" + key.as_string() + "')" : ""));
+    Value old = ctx.args[0].map_get(key);
+    ctx.args[0].map_set(key, Value{});
     return ctx.ret(old);
 }
 
+// The single list of the module's own functions: both make_map_module (the module's content) and
+// is_map_module_fn (CALL_METHOD's self-injection test) read it, so a 6th pseudo-method added to
+// one and forgotten in the other can't happen — the old two-list form let exactly that compile
+// silently, m.newFn() then just never getting self.
+static const struct { const char* name; Value::BuiltinFn fn; } k_map_fns[] = {
+    {"len", map_len}, {"keys", map_keys}, {"values", map_values}, {"has", map_has}, {"delete", map_delete},
+};
+
 Value make_map_module() {
-    return MapBuilder()
-        .fn("len", map_len)
-        .fn("keys", map_keys)
-        .fn("values", map_values)
-        .fn("has", map_has)
-        .fn("delete", map_delete)
-        .done();
+    MapBuilder b;
+    for (auto& e : k_map_fns)
+        b.fn(e.name, e.fn);
+    return b.done();
 }
 
 bool is_map_module_fn(Value::BuiltinFn fn) {
-    return fn == map_len || fn == map_keys || fn == map_values || fn == map_has || fn == map_delete;
+    for (auto& e : k_map_fns)
+        if (e.fn == fn)
+            return true;
+    return false;
 }

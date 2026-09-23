@@ -877,6 +877,17 @@ var mlm = {j: 1, k: 2, l: 3}
 assert(map.len(mlm) == mlm.len())
 assert(map.len(mlm) == 3)
 
+## the module form also accepts a CLASS object itself (T_CLASS, not an instance) — same layout as
+## a map, so its own fields (__name__, its methods) are listable the same way
+class MapOnClass
+    func init()
+    end
+    func greet()
+    end
+end
+assert(map.has(MapOnClass, "__name__"))
+assert(map.keys(MapOnClass).contains("greet"))
+
 ## storing an UNRELATED builtin under a map's own key must keep calling it plainly — is_map_module_fn
 ## excludes it (math.sin is none of the five), so no self is injected regardless of the receiver
 var stored = {f: math.sin}
