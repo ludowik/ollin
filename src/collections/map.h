@@ -1,5 +1,6 @@
 #pragma once
 // Included by chunk.h after Value is defined; do not include directly.
+#include "fixed_pool.h"
 #include "robin_hood.h"
 
 struct ValueHash {
@@ -48,12 +49,10 @@ struct Map {
 
 struct MapPool {
     static constexpr int CAP = 64;
-    Map* buf[CAP];
-    int n = 0;
+    FixedPool<Map, CAP> pool;
 
     Map* acquire() {
-        if (n) {
-            Map* m = buf[--n];
+        if (Map* m = pool.take()) {
             m->refcount = 1;
             m->userdata = nullptr;
             return m;   // kind and version were already reset by release()
@@ -65,23 +64,14 @@ struct MapPool {
     // returned. Same reasoning as ArrayPool and ArrayIteratorPool.
     static constexpr size_t POOL_MAX_SIZE = 1024;
     void release(Map* m) {
-        // REENTRANCY: m->data.clear() releases the entries, which can re-enter the pool (a map
-        // entry releases and does buf[n++]) and make n GROW. So clear FIRST, then test the
-        // capacity again with the up-to-date n — otherwise buf[n++] would write buf[CAP], which
-        // is &n, whenever a nested release filled the pool during the clear. That one-byte
-        // overflow used to corrupt n.
         if (m->data.size() > POOL_MAX_SIZE) {
             delete m; // a big map: ~Map frees the entries and the buckets, and it is never pooled
             return;
         }
-        m->data.clear();  // this can re-enter the pool through nested releases, so n may change
+        m->data.clear();  // this can re-enter the pool through nested releases (see FixedPool)
         m->version = ++g_map_epoch;  // recycling: invalidates every inline cache aimed at this Map*
         m->kind = Map::PLAIN;             // otherwise a recycled map would come back frozen (enum) or as a module
-        if (n < CAP) {
-            buf[n++] = m; // n is READ AGAIN after the clear
-        } else {
-            delete m; // the data is already emptied
-        }
+        pool.store_or_delete(m);
     }
 };
 // A namespace-scope inline variable, not a function-local static: the latter carries a

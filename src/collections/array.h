@@ -1,5 +1,6 @@
 #pragma once
 // Included by chunk.h after Value is defined; do not include directly.
+#include "fixed_pool.h"
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -71,12 +72,10 @@ struct Array {
 
 struct ArrayPool {
     static constexpr int CAP = 64;
-    Array* buf[CAP];
-    int n = 0;
+    FixedPool<Array, CAP> pool;
 
     Array* acquire() {
-        if (n) {
-            Array* a = buf[--n];
+        if (Array* a = pool.take()) {
             a->refcount = 1;
             return a;
         }
@@ -87,20 +86,12 @@ struct ArrayPool {
     // mean an out-of-memory on WASM. Large ones are destroyed and their buffer handed back.
     static constexpr size_t POOL_MAX_CAP = 4096;
     void release(Array* a) {
-        // REENTRANCY: a->items.clear() releases the elements, which can re-enter the pool (an
-        // array element releases and does buf[n++]) and make n GROW. So clear FIRST, then test the
-        // capacity again with the up-to-date n — otherwise buf[n++] would write buf[CAP], which is
-        // &n, whenever a nested release filled the pool during the clear.
         if (a->items.capacity() > POOL_MAX_CAP) {
             delete a; // a big array is never pooled
             return;
         }
-        a->items.clear(); // this can re-enter the pool through nested releases, so n may change
-        if (n < CAP) {
-            buf[n++] = a; // n is READ AGAIN after the clear
-        } else {
-            delete a; // the items are already emptied
-        }
+        a->items.clear(); // this can re-enter the pool through nested releases (see FixedPool)
+        pool.store_or_delete(a);
     }
 };
 // A namespace-scope inline variable, not a function-local static: see map_pool() (map.h) for

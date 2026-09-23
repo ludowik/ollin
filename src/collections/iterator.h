@@ -1,6 +1,7 @@
 #pragma once
 // Included by chunk.h after Map and Array; do not include directly.
 #include "../utf8.h"
+#include "fixed_pool.h"
 #include <cstdint> // uint8_t (the underlying type of Iterator::Kind)
 #include <utility>
 #include <vector>
@@ -119,12 +120,10 @@ struct StringIterator : Iterator {
 
 struct ArrayIteratorPool {
     static constexpr int CAP = 32;
-    ArrayIterator* buf[CAP];
-    int n = 0;
+    FixedPool<ArrayIterator, CAP> pool;
 
     ArrayIterator* acquire(Array* a) {
-        if (n) {
-            ArrayIterator* it = buf[--n];
+        if (ArrayIterator* it = pool.take()) {
             it->refcount = 1;
             it->pos = 0;
             it->items = a->items;
@@ -136,20 +135,12 @@ struct ArrayIteratorPool {
     // capacity, so only small ones are pooled and large ones destroyed.
     static constexpr size_t POOL_MAX_CAP = 4096;
     void release(ArrayIterator* it) {
-        // REENTRANCY: it->items.clear() releases the snapshot's values, which can re-enter the
-        // pools (a map or array value releases and does buf[n++]) and make n grow here. Clear
-        // FIRST, then test the capacity again — otherwise buf[n++] would overflow onto &n. Same
-        // as MapPool and ArrayPool.
         if (it->items.capacity() > POOL_MAX_CAP) {
             delete it;
             return;
         }
-        it->items.clear();
-        if (n < CAP) {
-            buf[n++] = it;
-        } else {
-            delete it;
-        }
+        it->items.clear(); // this can re-enter the pools through nested releases (see FixedPool)
+        pool.store_or_delete(it);
     }
 };
 // A namespace-scope inline variable, not a function-local static: see map_pool() (map.h) for

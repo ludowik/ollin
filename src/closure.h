@@ -1,4 +1,5 @@
 #pragma once
+#include "collections/fixed_pool.h"
 #include "opcode.h" // FuncIdx: a closure names its function exactly as CALL_FUNC does
 #include <cstdint>
 #include <memory>
@@ -21,27 +22,22 @@ struct Upvalue {
 // is read again AFTER that release, never cached before it.
 struct UpvaluePool {
     static constexpr int CAP = 64;
-    Upvalue* buf[CAP];
-    int n = 0;
+    FixedPool<Upvalue, CAP> pool;
 
     Upvalue* acquire() {
-        if (n) {
-            Upvalue* u = buf[--n];
+        if (Upvalue* u = pool.take()) {
             u->refcount = 1;
             u->closed = false;
-            u->frame_base = 0;
-            u->reg_idx = 0;
+            // frame_base/reg_idx are NOT reset here: MAKE_CLOSURE's only caller overwrites both
+            // unconditionally right after acquire() returns, so resetting them first was dead
+            // work on every capture.
             return u; // val already cleared by release()
         }
         return new Upvalue();
     }
     void release(Upvalue* u) {
         u->val = Value(); // let go of whatever it held; see the reentrancy note above
-        if (n < CAP) {
-            buf[n++] = u;
-        } else {
-            delete u;
-        }
+        pool.store_or_delete(u);
     }
 };
 // A NAMESPACE-scope inline variable, not a function-local static: the latter carries a
@@ -91,12 +87,10 @@ struct Closure {
 // Closure pins down a large buffer; no size cutoff is needed here.
 struct ClosurePool {
     static constexpr int CAP = 64;
-    Closure* buf[CAP];
-    int n = 0;
+    FixedPool<Closure, CAP> pool;
 
     Closure* acquire(FuncIdx fi) {
-        if (n) {
-            Closure* c = buf[--n];
+        if (Closure* c = pool.take()) {
             c->refcount = 1;
             c->func_idx = fi;
             return c; // upvals already emptied by release()
@@ -105,13 +99,9 @@ struct ClosurePool {
     }
     void release(Closure* c) {
         // REENTRANCY: release_upvals() can re-enter this pool (an upvalue's closed value may
-        // itself be a Closure whose refcount just hit zero), so `n` is read fresh AFTER it.
+        // itself be a Closure whose refcount just hit zero) — see FixedPool.
         c->release_upvals();
-        if (n < CAP) {
-            buf[n++] = c;
-        } else {
-            delete c;
-        }
+        pool.store_or_delete(c);
     }
 };
 // Same reason as upvalue_pool(): a namespace-scope inline variable, not a function-local
