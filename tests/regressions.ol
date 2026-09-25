@@ -2242,6 +2242,12 @@ assert(dt_now.yearDay >= 1 and dt_now.yearDay <= 366)
 ## build, including this headless one where the area is 0 by 0.
 assert(CX == W / 2)
 assert(CY == H / 2)
+## SIZE is min(W, H) — a size that fits either dimension, for a square drawn on a non-square area
+var expected_size = W
+if H < W then
+    expected_size = H
+end
+assert(SIZE == expected_size)
 
 ## A KEYWORD is a plain NAME where no keyword can be meant — a map-literal key and a field
 ## after a '.'. grammar.ebnf says so ({ ref: 12 } is { "ref": 12 }) but the lexer classifies a

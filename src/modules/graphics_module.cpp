@@ -421,8 +421,8 @@ bool gfx_view_map(float* x, float* y) {
     return true;
 }
 
-// W, H, CX and CY name the space the script DRAWS in, so they follow the viewport — that is the
-// whole point of one: a single frame of reference for the drawing and for the input.
+// W, H, CX, CY and SIZE name the space the script DRAWS in, so they follow the viewport — that is
+// the whole point of one: a single frame of reference for the drawing and for the input.
 static void publish_draw_size() {
     VM* vm = VM::current();
     if (!vm)
@@ -433,6 +433,7 @@ static void publish_draw_size() {
     vm->set_global("H", Value((int64_t)h));
     vm->set_global("CX", Value((double)w / 2.0));
     vm->set_global("CY", Value((double)h / 2.0));
+    vm->set_global("SIZE", Value((int64_t)std::min(w, h)));
 }
 
 bool gfx_has_fill() {

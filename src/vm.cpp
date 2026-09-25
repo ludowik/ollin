@@ -2090,6 +2090,7 @@ void VM::execute(Chunk chunk) {
         init_global("H", Value(win_h));
         init_global("CX", Value((double)win_w / 2.0));
         init_global("CY", Value((double)win_h / 2.0));
+        init_global("SIZE", Value(std::min(win_w, win_h)));
     }
     grow_regs(owned_chunk.top_reg_count);
     call_stack.reserve(1000);
