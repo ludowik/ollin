@@ -61,10 +61,8 @@ static int s_view_h = 0;
 // Defined further down, next to the logical-size accessors it reads; used by gfx_canvas above them.
 static void publish_draw_size();
 static bool s_target_ready = false;
-static int s_targetW = 0, s_targetH = 0;   // the render texture's real size, supersampled
-// Target supersampling RELATIVE to the logical size, for anti-aliasing, bounded below by the physical
-// resolution and above by a ceiling (see gfx_canvas) — and NOT multiplied by the DPR.
-static const int SSAA = 2;
+static int s_targetW = 0, s_targetH = 0;   // the render texture's real size, always == the physical
+                                            // size (see gfx_canvas) — never a separate density
 // Current blend mode, set by graphics.blendMode and tracked so it can be restored after a fade — a
 // clear with alpha — and reset to ALPHA every frame.
 static int s_blend_mode = BLEND_ALPHA;
@@ -181,14 +179,17 @@ static int gfx_canvas(CallCtx& ctx) {
     s_view_w = 0;
     s_view_h = 0;
     publish_draw_size();
-    // Persistent render target. We aim for supersampling RELATIVE to the logical size for
-    // anti-aliasing, but never below the physical resolution, to stay sharp on HiDPI. SSAA is
-    // therefore NOT multiplied by the DPR: on mobile, with a DPR of 2 or more, the texture used to
-    // blow up — memory, and GL_MAX_TEXTURE_SIZE exceeded, giving a black screen. The size is capped as
-    // well.
+    // Persistent render target, ALWAYS at the physical (device-pixel) resolution — the same density
+    // as the screen canvas, systematically, whatever devicePixelRatio is. A fixed supersampling
+    // floor (independent of density) was tried here and REMOVED: it kept the final composite a 2:1
+    // downsample on any screen with devicePixelRatio < 2 (most desktop monitors), and that lossy,
+    // non-mipmapped bilinear reduction of thin noise-animated strokes is what produced a visible
+    // shimmer frame to frame — never seen on a Retina/iPhone screen, where devicePixelRatio already
+    // made that floor a no-op. Capped: a very large logical canvas at high density could still ask
+    // for more than the GPU allows.
     const int MAX_RT = 4096;   // a safe bound, at most GL_MAX_TEXTURE_SIZE on most GPUs
-    s_targetW = s_physW > s_logicalW * SSAA ? s_physW : s_logicalW * SSAA;
-    s_targetH = s_physH > s_logicalH * SSAA ? s_physH : s_logicalH * SSAA;
+    s_targetW = s_physW;
+    s_targetH = s_physH;
     if (s_targetW > MAX_RT) {
         s_targetW = MAX_RT;
     }
@@ -1470,10 +1471,11 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         // (ADD, say), which would distort both the composition and the overlay.
         rlSetBlendFactors(RL_ONE, RL_ZERO, RL_FUNC_ADD);
         BeginBlendMode(BLEND_CUSTOM);
-        // s_target is in SSAA-times-physical pixels and stored bottom-up, so the source is the RT's real
+        // s_target is at the physical resolution and stored bottom-up, so the source is the RT's real
         // size with a negative height to display it upright, and the destination is in logical
-        // coordinates, filling the screen through the physical viewport. The SSAA-to-physical reduction
-        // by the bilinear filter is what smooths the image.
+        // coordinates, filling the screen through the physical viewport — a 1:1 pixel mapping with no
+        // resampling, except when graphics.viewport(w, h) is active, where the bilinear filter is what
+        // smooths the scale-up/down to the virtual size.
         float vscale = 1.0f, voff_x = 0.0f, voff_y = 0.0f;
         Rectangle dest{0.0f, 0.0f, (float)s_logicalW, (float)s_logicalH};
         if (view_geometry(&vscale, &voff_x, &voff_y)) {

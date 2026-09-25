@@ -1310,6 +1310,26 @@ publication des cinq globales passe par un seul endroit, `publish_draw_size`.
 **Ce qu'il ne fait pas** : l'interface `ui` est indépendante (cf. plus haut), et la 3D tire son
 rapport d'aspect de la fenêtre et non du viewport — c'est une fonctionnalité 2D.
 
+**Densité de la texture de rendu = densité de l'écran, TOUJOURS, dans un rapport constant.**
+`s_targetW`/`s_targetH` (la taille réelle de `s_target`, la `RenderTexture` dans laquelle
+`draw()` dessine) valent exactement `s_physW`/`s_physH` (la résolution physique du canvas,
+`logique × devicePixelRatio`) — jamais un multiple. Seule la taille LOGIQUE (`graphics.canvas(w,
+h)`) est un choix du script ; la densité, elle, ne varie jamais.
+
+⚠ **Un plancher de suréchantillonnage fixe (`SSAA = 2`, indépendant de la densité) a été essayé
+puis RETIRÉ, diagnostiqué par l'utilisateur.** `s_targetW = max(s_physW, s_logicalW * SSAA)`
+gardait ce rapport égal à 1 seulement quand `devicePixelRatio ≥ SSAA` (un iPhone, un Mac Retina) ;
+en dessous — la plupart des écrans de bureau, à `devicePixelRatio = 1`, ET la cible **native**
+(`s_physW = w`, sans notion de densité) — la texture de rendu restait deux fois plus grande que
+ce qui s'affiche, et la composition finale (`DrawTexturePro`, filtrage BILINÉAIRE **sans
+mipmap**) devait la réduire de moitié à chaque frame. Cette réduction, sur des traits fins
+animés par du bruit (`graphics.strokeSize` sous 1 px, cf. « Polices du moteur » pour le même
+repli alpha), scintillait d'une image à l'autre — un artefact de RÉÉCHANTILLONNAGE, pas de
+mouvement : sensible à la position sous-pixel du trait, donc visible même sur une animation
+lente, et absent sur les appareils où le rapport valait déjà 1. Retirer le plancher (toujours
+`s_targetW = s_physW`) généralise à tous les écrans ce que l'iPhone montrait déjà sans lissage
+superflu, au prix de bords un peu moins lissés sur un écran à faible densité.
+
 ## Globales moteur (engine-injected globals)
 
 Des globales sont injectées par le moteur, sans déclaration `global` dans le script :
