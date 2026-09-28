@@ -36,12 +36,14 @@ endif()
 # rebuilding is enough — no explicit cmake call.
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.vert" OLLIN_LIT_VERT)
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.frag" OLLIN_LIT_FRAG)
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/fxaa.frag" OLLIN_FXAA_FRAG)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/src/modules/shader_sources.h.in"
                "${CMAKE_BINARY_DIR}/generated/shader_sources.h" @ONLY)
 include_directories("${CMAKE_BINARY_DIR}/generated")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
              "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.vert"
-             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.frag")
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/lit.frag"
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/shaders/fxaa.frag")
 
 set(OLLIN_SOURCES
     src/chunk.cpp

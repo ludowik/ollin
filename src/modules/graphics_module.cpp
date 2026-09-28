@@ -11,6 +11,7 @@
 #include "vm.h"
 #include "keyboard_module.h"
 #include "mouse_module.h"
+#include "shader_sources.h"
 #include <raylib.h>
 #include <rlgl.h>
 #include <raymath.h>
@@ -66,6 +67,37 @@ static int s_targetW = 0, s_targetH = 0;   // the render texture's real size, al
 // Current blend mode, set by graphics.blendMode and tracked so it can be restored after a fade — a
 // clear with alpha — and reset to ALPHA every frame.
 static int s_blend_mode = BLEND_ALPHA;
+
+// FXAA post-process, applied on the final composite draw only — draw() itself is untouched. The
+// RenderTexture has no MSAA (see the density comment above), and a thin animated stroke rasterises
+// with a hard edge that pops between pixel rows frame to frame; FXAA smooths that edge after the
+// fact from the composed image's own luma, cheaply, without a second render target.
+static Shader s_fxaa{};
+static bool s_fxaa_ready = false;
+static int s_fxaa_loc_texel = -1;
+static void load_fxaa_shader() {
+    if (s_fxaa_ready) {
+        return;
+    }
+#ifdef __EMSCRIPTEN__
+    const char* HDR = "#version 300 es\nprecision highp float;\n";
+#else
+    const char* HDR = "#version 330\n";
+#endif
+    std::string fs = std::string(HDR) + k_fxaa_fragment_src;
+    s_fxaa = LoadShaderFromMemory(nullptr, fs.c_str());   // nullptr = raylib's default 2D vertex shader
+    s_fxaa_loc_texel = GetShaderLocation(s_fxaa, "texelSize");
+    s_fxaa_ready = true;
+}
+// Freed alongside the 3D shader (reset3d_graphics_state, called from gfx_canvas): same GL context
+// lifetime, so a stale shader id would either leak (context reused on WASM) or dangle (context torn
+// down on native).
+static void reset_fxaa_shader() {
+    if (s_fxaa_ready) {
+        UnloadShader(s_fxaa);
+        s_fxaa_ready = false;
+    }
+}
 // Screenshot DEFERRED to the end of the frame: draw() renders into the RT, while the capture must read
 // the composed screen. Cleared on every gfx_canvas, so a request from a previous program does not leak
 // through the shared WASM instance.
@@ -124,6 +156,7 @@ static int gfx_canvas(CallCtx& ctx) {
             s_target_ready = false;
         }
         reset3d_graphics_state();               // free the 3D shader, meshes, textures and VBOs in THIS context
+        reset_fxaa_shader();
     }
     double dpr = EM_ASM_DOUBLE({ return window.devicePixelRatio || 1.0; });
     s_physW = (int)(w * dpr + 0.5);
@@ -163,6 +196,7 @@ static int gfx_canvas(CallCtx& ctx) {
             s_target_ready = false;
         }
         reset3d_graphics_state();   // free the 3D GL resources before any reinitialisation
+        reset_fxaa_shader();
     }
     s_physW = w;
     s_physH = h;
@@ -206,6 +240,7 @@ static int gfx_canvas(CallCtx& ctx) {
         BeginTextureMode(s_target);
         ClearBackground(BLACK);
         EndTextureMode();
+        load_fxaa_shader();
     }
     Value win = VM::current()->get_global("window");
     if (win.is_map()) {
@@ -1484,9 +1519,19 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
             ClearBackground(BLACK);
             dest = Rectangle{voff_x, voff_y, (float)s_view_w * vscale, (float)s_view_h * vscale};
         }
+        // FXAA smooths the RT's hard, unsampled edges on the way out — see load_fxaa_shader. Guarded
+        // rather than assumed: s_fxaa_ready tracks the shader's own load, independently of s_target_ready.
+        if (s_fxaa_ready) {
+            float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
+            SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
+            BeginShaderMode(s_fxaa);
+        }
         DrawTexturePro(s_target.texture,
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        dest, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+        if (s_fxaa_ready) {
+            EndShaderMode();
+        }
         // The interface is INDEPENDENT of the viewport: it is drawn here, over the composed field
         // and in the area's own coordinates, so widgets keep their size whatever virtual resolution
         // the game chose — and they stay outside the letterbox. Still before the screenshot flush,

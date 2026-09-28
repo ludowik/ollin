@@ -1406,6 +1406,39 @@ cibles, WASM comprise, et aucune option de build ne peut le changer.
   n'ajoute aucune branche (une multiplication de plus dans `fragColor`) et rien à l'instance —
   l'attribut est celui du MAILLAGE, déjà présent dans son VAO. Le seuil est inchangé.
 
+**`fxaa.frag` est un SECOND shader, indépendant du couple `lit.vert`/`lit.frag`** : il ne s'applique
+qu'à la composition finale (`DrawTexturePro` de `s_target` vers l'écran, dans `graphics_module.cpp`),
+jamais à `draw()` lui-même. Raison d'être, à ne pas confondre avec le plancher de suréchantillonnage
+retiré (cf. « Viewport ») — **ce sont deux causes distinctes du même symptôme rapporté (scintillement
+du vortex)** : `s_target` n'a AUCUN MSAA (déjà noté par `subpixel_stroke`), donc un trait animé sous
+1 px se rastérise à bord dur et SAUTE d'une rangée de pixels à l'autre d'une image à l'autre — un
+défaut qui existe même quand la densité de la texture de rendu égale déjà celle de l'écran (donc non
+corrigé par le retrait du plancher). `load_fxaa_shader` charge un unique fragment shader (pas de
+vertex shader : `LoadShaderFromMemory(nullptr, fs)` réutilise le vertex shader par défaut de raylib,
+comme le fait son propre exemple `shaders_postprocessing.c`) ; réinitialisé aux DEUX mêmes points que
+`reset3d_graphics_state()` dans `gfx_canvas` (réutilisation du contexte WebGL, recréation native),
+bien que son code ne dépende jamais du programme — l'id GL, lui, devient invalide aux deux.
+
+Trois pistes plus lourdes ont été écartées, chacune pour une raison vérifiée dans le code plutôt que
+supposée :
+- **MSAA manuel** : `LoadRenderTexture` (rtextures.c, raylib 6.0) ne prend aucun paramètre
+  d'échantillonnage — une texture multi-échantillonnée ne peut d'ailleurs pas être ÉCHANTILLONNÉE
+  directement (il faudrait un second FBO résolu par `rlBlitFramebuffer` avant que quoi que ce soit,
+  capture ou composition, ne relise `s_target`). Gardé en réserve si FXAA s'avère insuffisant.
+- **`rlEnableSmoothLines()`** (`GL_LINE_SMOOTH`) : absent de GLES/WebGL, donc inopérant sur la cible
+  WASM — écarté sans essai.
+- **raylib ne fournit PAS de shader FXAA « officiel »** malgré l'exemple `shaders_postprocessing.c` :
+  `FX_FXAA` et son libellé y sont COMMENTÉS, sans fichier `.fs` correspondant dans `resources/`. Le
+  shader a donc été écrit depuis l'algorithme public (Lottes/NVIDIA), pas copié.
+
+**Vérifié par comparaison A/B, pas par lecture du shader** : même scène, même ligne de balayage,
+capturée sous Xvfb avec et sans le shader (binaire reconstruit après `git stash` des seuls fichiers
+FXAA). Sans FXAA, un bord de trait est BINAIRE (`0, 0, 77, 0, 0`) ; avec, un vrai dégradé apparaît
+(`0, 0, 15, 45, 7, 0` un peu plus loin) — 14 valeurs de gris distinctes sur la ligne contre 2. Compile
+et s'exécute sans erreur sur les deux cibles réellement utilisées : GL 3.3 (`build-gfx`, Xvfb) et
+GLES3/WebGL2 (WASM, chargé directement via `OllinModule({...})`, en contournant l'éditeur du
+playground).
+
 ## Modèles 3D des exemples (docs/samples)
 
 Six fichiers, chacun pour une raison distincte, et chacun avec sa licence :

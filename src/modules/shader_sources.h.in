@@ -5,7 +5,7 @@
 // target, WASM included, and no build option can change it.
 //
 // The "#version" line is deliberately absent from the .glsl files: it depends on the target
-// (300 es under emscripten, 330 elsewhere) and load_lit_shader prepends it.
+// (300 es under emscripten, 330 elsewhere) and load_lit_shader/load_fxaa_shader prepend it.
 #pragma once
 
 inline const char* const k_lit_vertex_src = R"GLSL(
@@ -14,4 +14,8 @@ inline const char* const k_lit_vertex_src = R"GLSL(
 
 inline const char* const k_lit_fragment_src = R"GLSL(
 @OLLIN_LIT_FRAG@
+)GLSL";
+
+inline const char* const k_fxaa_fragment_src = R"GLSL(
+@OLLIN_FXAA_FRAG@
 )GLSL";
