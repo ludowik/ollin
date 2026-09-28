@@ -104,6 +104,12 @@
 /* A square button, icon only: the same height, without the text's horizontal padding. */
 .app-bar .bar-btn.icon-only { padding: 0; width: 34px; justify-content: center; }
 
+/* A TOGGLE button (on/off, not a one-shot action): the accent wash marks the "on" state at a
+   glance, reusing --bar-accent for text/border exactly as :hover/:focus-visible already do, so no
+   new colour needs its own contrast check. The wash itself is a decorative fill under that text,
+   not the text or border the contrast rule is about. */
+.app-bar .bar-btn.active { border-color: var(--bar-accent); color: var(--bar-accent); background: rgba(155, 161, 255, 0.16); }
+
 /* A narrow screen: the bar tightens — the same threshold and the same values for all three
    views. This used to be set view by view (the playground at 8 px of margin, the others at
    14), so the logo moved about from one view to another on a phone. What each view keeps for

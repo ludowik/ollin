@@ -2210,6 +2210,21 @@ if (autoexecWrap) {
   autoexecChk.addEventListener('change', onAutoexec)
   disposers.push(() => autoexecChk.removeEventListener('change', onAutoexec))
 }
+
+// FXAA toggle: a comparison tool, not a style setting, so it is reflected from the SHARED flag
+// (pg-run.js) rather than always starting checked — the run view may already have turned it off.
+const fxaaWrap = document.getElementById('fxaa-wrap')
+const fxaaChk  = document.getElementById('fxaa-chk')
+if (fxaaWrap && fxaaChk) {
+  fxaaChk.checked = Run.getFxaaEnabled()
+  fxaaWrap.classList.toggle('active', fxaaChk.checked)
+  const onFxaa = () => {
+    Run.setFxaaEnabled(ollin, fxaaChk.checked)
+    fxaaWrap.classList.toggle('active', fxaaChk.checked)
+  }
+  fxaaChk.addEventListener('change', onFxaa)
+  disposers.push(() => fxaaChk.removeEventListener('change', onFxaa))
+}
 stopBtn.addEventListener('click', () => {
   if (isPaused) {
     // The break before resuming: the time spent paused is not the program's (see run.js).
@@ -2369,6 +2384,10 @@ getOllin().then(m => {
   runBtn.disabled    = false
   statusEl.textContent = 'Ready ✓'
   setTimeout(() => { statusEl.textContent = '' }, 2000)
+  // Pushes the flag into a FRESH module: a click on the FXAA checkbox before ollin was ready only
+  // updated the shared JS flag (setFxaaEnabled tolerates a null module), so the engine must catch
+  // up now.
+  Run.setFxaaEnabled(ollin, Run.getFxaaEnabled())
 }).catch(err => {
   statusEl.textContent = 'WASM error: ' + (err?.message ?? err)
 })

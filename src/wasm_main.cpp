@@ -109,6 +109,11 @@ static void clock_break_js() {
     gfx_clock_break();
 }
 
+// The playground/run views' FXAA checkbox, to compare the composite's cost with and without it.
+static void set_fxaa_enabled_js(bool enabled) {
+    gfx_set_fxaa_enabled(enabled);
+}
+
 EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("execute", &ollin_run);  // execute(source, filename)
     emscripten::function("preloadImage", &preload_image_js);
@@ -119,4 +124,5 @@ EMSCRIPTEN_BINDINGS(ollin) {
     emscripten::function("requestCapture", &request_capture_js);
     emscripten::function("takeCapture", &take_capture_js);
     emscripten::function("clockBreak", &clock_break_js);
+    emscripten::function("setFxaaEnabled", &set_fxaa_enabled_js);
 }

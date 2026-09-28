@@ -1439,6 +1439,26 @@ et s'exécute sans erreur sur les deux cibles réellement utilisées : GL 3.3 (`
 GLES3/WebGL2 (WASM, chargé directement via `OllinModule({...})`, en contournant l'éditeur du
 playground).
 
+**Bascule HÔTE, pas script** : `graphics.canvas`/`draw()` n'exposent rien côté langage — le
+bascule sert à COMPARER, pas à composer un rendu, donc c'est un réglage de la web app, pas une
+fonctionnalité Ollin (pas d'entrée `grammar.ebnf`/`syntax.ol`/tutoriel à tenir). `s_fxaa_enabled`
+(C++, `graphics_module.cpp`) est lu au moment de la composition, à côté de `s_fxaa_ready` (le
+chargement du shader) — les deux gardes sont INDÉPENDANTES : rebasculer ne recharge jamais le
+shader. `gfx_set_fxaa_enabled` (déclarée dans `graphics_internal.h`) est liée en JS
+(`Module.setFxaaEnabled`, `wasm_main.cpp`), sur le même patron que `clockBreak`.
+Il **survit** à `graphics.canvas()` — contrairement au shader lui-même, réinitialisé au même point
+que `reset3d_graphics_state()` — puisque c'est une préférence de l'hôte, pas une ressource GL liée
+au contexte : couper FXAA puis relancer un script ne le rallume pas.
+**Une seule source de vérité côté JS** (`pg-run.js`, `getFxaaEnabled`/`setFxaaEnabled`), partagée
+par `playground.js` et `run.js` : l'instance WASM étant partagée par toute la SPA (`getOllin`),
+les deux cases à cocher doivent s'accorder sur le même état à la navigation, sans second aller-retour
+par le C++ pour le savoir. `setFxaaEnabled` tolère un module encore `null` (un clic avant que le
+WASM soit prêt) ; un appel de rattrapage est fait dès que `getOllin()` résout, pour que ce cas ne
+laisse pas le moteur en désaccord avec la case cochée.
+**Vérifié de bout en bout** (pas seulement la compilation) : capture d'écran WASM/WebGL2 avec
+`setFxaaEnabled(true)` puis `(false)` sur la même scène — le bord d'un trait montre `77, 19` (deux
+pixels, un dégradé) activé, `131` (un seul pixel, plus net) désactivé.
+
 ## Modèles 3D des exemples (docs/samples)
 
 Six fichiers, chacun pour une raison distincte, et chacun avec sa licence :

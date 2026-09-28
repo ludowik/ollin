@@ -28,6 +28,19 @@ export function loadDataInto(m) {
   m.dataLoad(p, g)
 }
 
+// The playground/run bar's FXAA toggle: ONE JS-side flag, so both views' buttons agree on its
+// current state across an in-SPA navigation, where the WASM instance (and its own C++-side flag)
+// is shared and never resets on its own — only a full page reload resets all three back to on,
+// together.
+let _fxaaEnabled = true
+export function getFxaaEnabled() {
+  return _fxaaEnabled
+}
+export function setFxaaEnabled(m, enabled) {
+  _fxaaEnabled = enabled
+  try { m && m.setFxaaEnabled && m.setFxaaEnabled(enabled) } catch (_) {}
+}
+
 // Pushes a project's files (.ol) and resources (images) into the runtime, before execution.
 // `m` is the Ollin WASM module, `project` is { files, resources }.
 export function loadProjectIntoRuntime(m, project) {

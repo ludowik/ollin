@@ -75,6 +75,12 @@ static int s_blend_mode = BLEND_ALPHA;
 static Shader s_fxaa{};
 static bool s_fxaa_ready = false;
 static int s_fxaa_loc_texel = -1;
+// HOST preference (playground/run views), independent of s_fxaa_ready: the shader still loads
+// either way, so re-enabling costs no reload. Defaults to on, matching the shipped behaviour.
+static bool s_fxaa_enabled = true;
+void gfx_set_fxaa_enabled(bool enabled) {
+    s_fxaa_enabled = enabled;
+}
 static void load_fxaa_shader() {
     if (s_fxaa_ready) {
         return;
@@ -1520,8 +1526,10 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
             dest = Rectangle{voff_x, voff_y, (float)s_view_w * vscale, (float)s_view_h * vscale};
         }
         // FXAA smooths the RT's hard, unsampled edges on the way out — see load_fxaa_shader. Guarded
-        // rather than assumed: s_fxaa_ready tracks the shader's own load, independently of s_target_ready.
-        if (s_fxaa_ready) {
+        // by s_fxaa_ready (the shader's own load) AND s_fxaa_enabled (the host's preference, so it
+        // can be toggled off to compare against the plain composite without a rebuild).
+        bool use_fxaa = s_fxaa_ready && s_fxaa_enabled;
+        if (use_fxaa) {
             float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
             SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
             BeginShaderMode(s_fxaa);
@@ -1529,7 +1537,7 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
         DrawTexturePro(s_target.texture,
                        Rectangle{0.0f, 0.0f, (float)s_targetW, -(float)s_targetH},
                        dest, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
-        if (s_fxaa_ready) {
+        if (use_fxaa) {
             EndShaderMode();
         }
         // The interface is INDEPENDENT of the viewport: it is drawn here, over the composed field

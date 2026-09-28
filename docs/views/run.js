@@ -12,7 +12,7 @@ export async function init(ctx) {
   // Shared modules, cache-busted with the app's version token: one session reuses the same URL,
   // so the module registry does not grow.
   const Store = await (await import('../lib/pg-provider.js?v=' + ctx.v)).getProvider(ctx.v)
-  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports } = await import('../lib/pg-run.js?v=' + ctx.v)
+  const { loadProjectIntoRuntime, runProgram, sampleFromAnchor, fetchSample, preloadSampleModels, preloadSampleImports, getFxaaEnabled, setFxaaEnabled } = await import('../lib/pg-run.js?v=' + ctx.v)
   const { pinToVisualViewport } = await import('../lib/pg-viewport.js?v=' + ctx.v)
 
   // The full-screen bar sticks to the top of the visible area when the keyboard opens. PHONES
@@ -97,6 +97,18 @@ export async function init(ctx) {
         paused = true
       }
       setPauseUI()
+    })
+  }
+  // FXAA toggle: a comparison tool, not a style setting, so it is reflected from the SHARED flag
+  // (pg-run.js) rather than always starting checked — the other view may already have turned it off.
+  const fxaaWrap = document.getElementById('fxaa-wrap')
+  const fxaaChk  = document.getElementById('fxaa-chk')
+  if (fxaaWrap && fxaaChk) {
+    fxaaChk.checked = getFxaaEnabled()
+    fxaaWrap.classList.toggle('active', fxaaChk.checked)
+    fxaaChk.addEventListener('change', () => {
+      setFxaaEnabled(mod, fxaaChk.checked)
+      fxaaWrap.classList.toggle('active', fxaaChk.checked)
     })
   }
   // Screenshot, stored as a PNG resource of the project. The capture is produced by the ENGINE at
@@ -246,6 +258,9 @@ export async function init(ctx) {
     return stop
   }
 
+  // Pushes the flag into a FRESH module: a click on fxaa-btn before mod was ready only updated the
+  // shared JS flag (setFxaaEnabled tolerates a null module), so the engine must catch up now.
+  setFxaaEnabled(mod, getFxaaEnabled())
   loadProjectIntoRuntime(mod, project)
   launch()
 
