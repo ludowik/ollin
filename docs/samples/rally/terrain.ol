@@ -55,10 +55,11 @@ func rawHeight(x, z)
 end
 
 ## Flattens the relief within the road's width, so a hill never buries the track: full ground
-## height at TRACK_WIDTH and beyond, blended down to a near-flat road bed on the centreline.
-func heightAt(x, z)
+## height at TRACK_WIDTH and beyond, blended down to a near-flat road bed on the centreline. Takes
+## the distance already computed by the caller when it has one (bakeTerrain's lattice), so the
+## same nearestOnTrack pass serves the height AND the color below instead of running twice.
+func heightFromDist(x, z, d)
     var h = rawHeight(x, z)
-    var d = nearestOnTrack(x, z)
     if d >= TRACK_WIDTH then
         return h
     end
@@ -66,16 +67,20 @@ func heightAt(x, z)
     return h * t + 1.0 * (1 - t)
 end
 
-## Road grey inside TRACK_WIDTH, grass beyond it, blended over a couple of world units so the
-## edge reads as a verge rather than a per-cell step — the geometry is smooth now, so a hard
-## color boundary would be the only jagged thing left. The grass also darkens a little with
-## altitude, the same idea as voxel_world/terrain.ol's biome-by-height.
-func colorAt(x, z, h)
-    var d = nearestOnTrack(x, z)
+func heightAt(x, z)
+    return heightFromDist(x, z, nearestOnTrack(x, z))
+end
+
+## Road grey inside TRACK_WIDTH, grass beyond it. FEATHER spans several cells (not a fraction of
+## one), and d is the CELL's own average distance (its four lattice corners, from the same array
+## heightAt reads) rather than one point sampled at its centre — a single-point sample changes
+## from one cell to the next faster than the color could blend, which read as speckle rather than
+## a gradient. Averaging over the cell is what makes the transition read as smooth at this scale.
+func colorAt(d, h)
     var road = Color(0.55, 0.55, 0.58)
-    var t = math.clamp((h + 1.0) / 6.0, 0, 1)
-    var grass = Color(0.16 + 0.10 * t, 0.40 - 0.06 * t, 0.16)
-    var FEATHER = 2.0
+    var t = math.clamp(h / 8.0, 0, 1)
+    var grass = Color(0.17 + 0.05 * t, 0.40 - 0.03 * t, 0.16)
+    var FEATHER = CELL
     if d >= TRACK_WIDTH + FEATHER then
         return grass
     end
@@ -102,25 +107,35 @@ end
 func bakeTerrain()
     graphics.beginChunk()
     var n = math.floor(WORLD_HALF / CELL)
-    ## Heights at the LATTICE POINTS (cell corners, not centres): (2n+2) samples per axis, shared
-    ## by every cell that touches them — the thing that makes neighbours line up.
+    ## Heights AND distances-to-track at the LATTICE POINTS (cell corners, not centres):
+    ## (2n+2) samples per axis, shared by every cell that touches them — the thing that makes
+    ## neighbours line up, for the geometry as well as for colorAt's per-cell average below.
     var W = 2 * n + 2
-    var lat = []
+    var latH = []
+    var latD = []
     for j = -n, n + 1 do
         for i = -n, n + 1 do
-            lat[(j + n) * W + (i + n) + 1] = heightAt(i * CELL, j * CELL)
+            var d = nearestOnTrack(i * CELL, j * CELL)
+            var idx = (j + n) * W + (i + n) + 1
+            latD[idx] = d
+            latH[idx] = heightFromDist(i * CELL, j * CELL, d)
         end
     end
     for cz = -n, n do
         for cx = -n, n do
-            var sw = lat[(cz + n) * W + (cx + n) + 1]
-            var se = lat[(cz + n) * W + (cx + n + 1) + 1]
-            var nw = lat[(cz + n + 1) * W + (cx + n) + 1]
-            var ne = lat[(cz + n + 1) * W + (cx + n + 1) + 1]
+            var i00 = (cz + n) * W + (cx + n) + 1
+            var i10 = (cz + n) * W + (cx + n + 1) + 1
+            var i01 = (cz + n + 1) * W + (cx + n) + 1
+            var i11 = (cz + n + 1) * W + (cx + n + 1) + 1
+            var sw = latH[i00]
+            var se = latH[i10]
+            var nw = latH[i01]
+            var ne = latH[i11]
             var x = (cx + 0.5) * CELL
             var z = (cz + 0.5) * CELL
-            var h = (sw + se + nw + ne) / 4
-            graphics.fill(colorAt(x, z, h))
+            var avgH = (sw + se + nw + ne) / 4
+            var avgD = (latD[i00] + latD[i10] + latD[i01] + latD[i11]) / 4
+            graphics.fill(colorAt(avgD, avgH))
             graphics.corners(sw, se, nw, ne)
             graphics.cube(x, -SKIRT / 2, z,  CELL, SKIRT, CELL)
         end
