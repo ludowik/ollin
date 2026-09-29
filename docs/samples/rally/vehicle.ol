@@ -43,7 +43,10 @@ class Vehicle
         ## strength well before top speed, rather than growing sluggish exactly when it matters
         ## least and staying weak exactly when leaving a corner matters most.
         var turnScale = math.clamp(self.speed / 4.0, -1, 1)
-        self.heading = self.heading + steer * self.turnRate * turnScale * dt
+        ## MINUS: with heading 0 facing +Z, +X is screen-LEFT as seen from behind the car (chase
+        ## camera looking the same way) — checked by placing markers either side and reading which
+        ## one the chase camera puts on the right. steer=-1 (left) must grow +X, so it subtracts.
+        self.heading = self.heading - steer * self.turnRate * turnScale * dt
 
         self.x = self.x + math.sin(self.heading) * self.speed * dt
         self.z = self.z + math.cos(self.heading) * self.speed * dt
