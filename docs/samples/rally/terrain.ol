@@ -5,24 +5,27 @@
 
 ## The road: a closed loop of hand-placed waypoints, so the circuit is a recognisable shape
 ## rather than a wandering noise field.
+## Four times the first draft's scale — a track this small barely gave a car room to turn.
+## TRACK_WIDTH only doubled, not quadrupled: a real stage is a narrow ribbon across a big
+## landscape, not a road as wide as the terrain grew.
 global TRACK = [
-    { x: 50,  z: 0   },
-    { x: 42,  z: 26  },
-    { x: 18,  z: 34  },
-    { x: -10, z: 22  },
-    { x: -30, z: 30  },
-    { x: -48, z: 6   },
-    { x: -38, z: -22 },
-    { x: -8,  z: -34 },
-    { x: 20,  z: -20 },
-    { x: 40,  z: -18 }
+    { x: 200,  z: 0    },
+    { x: 168,  z: 104  },
+    { x: 72,   z: 136  },
+    { x: -40,  z: 88   },
+    { x: -120, z: 120  },
+    { x: -192, z: 24   },
+    { x: -152, z: -88  },
+    { x: -32,  z: -136 },
+    { x: 80,   z: -80  },
+    { x: 160,  z: -72  }
 ]
-global TRACK_WIDTH = 6.0    ## half-width of the road bed, in world units
+global TRACK_WIDTH = 10.0   ## half-width of the road bed, in world units
 global ROAD_COLOR = Color(0.55, 0.55, 0.58)   ## flat — see roadMixAt/bakeTerrain
-global FEATHER = 3.0        ## world units over which the road blends into the grass
+global FEATHER = 6.0        ## world units over which the road blends into the grass
 
-global CELL = 3.0           ## the terrain lattice's spacing, in world units
-global WORLD_HALF = 64.0    ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
+global CELL = 6.0           ## the terrain lattice's spacing, in world units
+global WORLD_HALF = 260.0   ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
 global SKIRT = 1.0          ## each cube's own (undeformed) height — see bakeTerrain
 
 ## The nearest point ON the closed loop to (x, z), and its distance: one pass over every

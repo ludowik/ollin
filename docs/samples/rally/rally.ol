@@ -9,11 +9,11 @@ global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global ground = nil   ## the baked terrain (graphics.endChunk handle)
 
 global flyX = 0.0
-global flyY = 30.0
-global flyZ = -70.0
+global flyY = 110.0
+global flyZ = -280.0
 global yaw = 0.0
 global pitch = -0.25
-global SPEED = 24.0
+global SPEED = 90.0
 global TURN = 1.6
 
 func setup()
