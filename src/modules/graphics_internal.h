@@ -8,6 +8,17 @@
 #include <raylib.h>
 #include <string>
 
+// The GLSL version/precision line a shader source needs, chosen by target: GLES3/WebGL2 on
+// emscripten, desktop GL elsewhere. Shared by every shader loader (lit, fxaa) so the two targets
+// can't drift apart from one loader to the next.
+inline const char* gfx_shader_header() {
+#ifdef __EMSCRIPTEN__
+    return "#version 300 es\nprecision highp float;\n";
+#else
+    return "#version 330\n";
+#endif
+}
+
 inline int gfx_to_int(const Value& v) {
     if (v.is_integer())
         return (int)v.as_int();

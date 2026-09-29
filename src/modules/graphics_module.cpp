@@ -80,21 +80,23 @@ static int s_fxaa_loc_span = -1;
 // either way, so toggling it costs no reload. Reset to these defaults on every graphics.canvas —
 // a preference of the RUNNING PROGRAM, not of the host, like the 3D lighting state.
 static bool s_fxaa_enabled = true;
-static float s_fxaa_span = 8.0f;   // edge-search reach in texels — see fxaa.frag's SPAN_MAX
+static float s_fxaa_span = 8.0f;   // edge-search reach in texels — see fxaa.frag's spanMax
 static void load_fxaa_shader() {
     if (s_fxaa_ready) {
         return;
     }
-#ifdef __EMSCRIPTEN__
-    const char* HDR = "#version 300 es\nprecision highp float;\n";
-#else
-    const char* HDR = "#version 330\n";
-#endif
+    const char* HDR = gfx_shader_header();
     std::string fs = std::string(HDR) + k_fxaa_fragment_src;
     s_fxaa = LoadShaderFromMemory(nullptr, fs.c_str());   // nullptr = raylib's default 2D vertex shader
     s_fxaa_loc_texel = GetShaderLocation(s_fxaa, "texelSize");
     s_fxaa_loc_span = GetShaderLocation(s_fxaa, "spanMax");
     s_fxaa_ready = true;
+    // texelSize only changes with the render target's size (fixed for the program's whole run, see
+    // gfx_canvas) and spanMax only on a graphics.antialias(_, size) call (which re-uploads it itself,
+    // see gfx_antialias) — so both are uploaded once here rather than every frame in render_frame.
+    float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
+    SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
+    SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
 }
 // Freed alongside the 3D shader (reset3d_graphics_state, called from gfx_canvas): same GL context
 // lifetime, so a stale shader id would either leak (context reused on WASM) or dangle (context torn
@@ -116,6 +118,8 @@ static int gfx_antialias(CallCtx& ctx) {
         if (span < 0.0)
             throw std::runtime_error("graphics.antialias: size must not be negative");
         s_fxaa_span = (float)span;
+        if (s_fxaa_ready)   // the shader is already loaded: push the new value now, not next canvas()
+            SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
     }
     return ctx.ret(Value{});
 }
@@ -1542,13 +1546,12 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
             ClearBackground(BLACK);
             dest = Rectangle{voff_x, voff_y, (float)s_view_w * vscale, (float)s_view_h * vscale};
         }
-        // FXAA smooths the RT's hard, unsampled edges on the way out — see load_fxaa_shader. Guarded
-        // by s_fxaa_ready (the shader's own load) AND s_fxaa_enabled (graphics.antialias).
+        // FXAA smooths the RT's hard, unsampled edges on the way out — see load_fxaa_shader, which
+        // uploads texelSize and spanMax once (they change only on graphics.canvas/antialias, not
+        // per frame). Guarded by s_fxaa_ready (the shader's own load) AND s_fxaa_enabled
+        // (graphics.antialias).
         bool use_fxaa = s_fxaa_ready && s_fxaa_enabled;
         if (use_fxaa) {
-            float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
-            SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
-            SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
             BeginShaderMode(s_fxaa);
         }
         DrawTexturePro(s_target.texture,

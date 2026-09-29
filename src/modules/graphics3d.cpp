@@ -395,11 +395,7 @@ static void load_lit_shader() {
     if (s_lit_ready) {
         return;
     }
-#ifdef __EMSCRIPTEN__
-    const char* HDR = "#version 300 es\nprecision highp float;\n";
-#else
-    const char* HDR = "#version 330\n";
-#endif
+    const char* HDR = gfx_shader_header();
     // The GLSL lives in src/shaders/lit.vert and lit.frag, pasted into a generated header at
     // configure time (see CMakeLists). Only the version line, which depends on the target, is
     // added here.
