@@ -19,9 +19,9 @@ global TRACK = [
 ]
 global TRACK_WIDTH = 6.0    ## half-width of the road bed, in world units
 
-global CELL = 4.0           ## one terrain pillar every CELL world units
+global CELL = 3.0           ## the terrain lattice's spacing, in world units
 global WORLD_HALF = 64.0    ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
-global BASE_Y = -20.0       ## the pillars' buried bottom, well below any heightAt
+global SKIRT = 1.0          ## each cube's own (undeformed) height — see bakeTerrain
 
 ## The nearest point ON the closed loop to (x, z), and its distance: one pass over every
 ## segment, keeping the closer of the two each time.
@@ -66,31 +66,66 @@ func heightAt(x, z)
     return h * t + 1.0 * (1 - t)
 end
 
-## Road grey inside TRACK_WIDTH, grass beyond it — the grass darkens a little with altitude, the
-## same idea as terrain.ol's biome-by-height, kept to a plain gradient here.
+## Road grey inside TRACK_WIDTH, grass beyond it, blended over a couple of world units so the
+## edge reads as a verge rather than a per-cell step — the geometry is smooth now, so a hard
+## color boundary would be the only jagged thing left. The grass also darkens a little with
+## altitude, the same idea as voxel_world/terrain.ol's biome-by-height.
 func colorAt(x, z, h)
     var d = nearestOnTrack(x, z)
-    if d < TRACK_WIDTH then
-        return Color(0.55, 0.55, 0.58)
-    end
+    var road = Color(0.55, 0.55, 0.58)
     var t = math.clamp((h + 1.0) / 6.0, 0, 1)
-    return Color(0.16 + 0.10 * t, 0.40 - 0.06 * t, 0.16)
+    var grass = Color(0.16 + 0.10 * t, 0.40 - 0.06 * t, 0.16)
+    var FEATHER = 2.0
+    if d >= TRACK_WIDTH + FEATHER then
+        return grass
+    end
+    if d <= TRACK_WIDTH then
+        return road
+    end
+    var g = (d - TRACK_WIDTH) / FEATHER
+    return Color(road.r + (grass.r - road.r) * g,
+                 road.g + (grass.g - road.g) * g,
+                 road.b + (grass.b - road.b) * g)
 end
 
 ## Bakes the whole ground into ONE retained instance group (graphics.beginChunk/endChunk): the
 ## circuit never changes, so this runs once from setup(), not every frame.
+##
+## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like
+## that: a Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners is
+## built for this instead — it bends a cube's TOP face by the bilinear interpolation of 4 corner
+## heights, given in LOCAL units, i.e. before the instance's own scale is applied. Every cube
+## here is emitted at a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit
+## equals a world unit: the four corners passed to graphics.corners are then heightAt's own
+## values, unscaled. Two neighbouring cells share the SAME lattice point, and therefore the SAME
+## corner height, so their tops meet exactly — one continuous surface, no crack, no step.
 func bakeTerrain()
     graphics.beginChunk()
     var n = math.floor(WORLD_HALF / CELL)
-    for cz = -n, n do
-        for cx = -n, n do
-            var x = cx * CELL
-            var z = cz * CELL
-            var h = heightAt(x, z)
-            graphics.fill(colorAt(x, z, h))
-            graphics.cube(x, (h + BASE_Y) / 2, z,  CELL, h - BASE_Y, CELL)
+    ## Heights at the LATTICE POINTS (cell corners, not centres): (2n+2) samples per axis, shared
+    ## by every cell that touches them — the thing that makes neighbours line up.
+    var W = 2 * n + 2
+    var lat = []
+    for j = -n, n + 1 do
+        for i = -n, n + 1 do
+            lat[(j + n) * W + (i + n) + 1] = heightAt(i * CELL, j * CELL)
         end
     end
+    for cz = -n, n do
+        for cx = -n, n do
+            var sw = lat[(cz + n) * W + (cx + n) + 1]
+            var se = lat[(cz + n) * W + (cx + n + 1) + 1]
+            var nw = lat[(cz + n + 1) * W + (cx + n) + 1]
+            var ne = lat[(cz + n + 1) * W + (cx + n + 1) + 1]
+            var x = (cx + 0.5) * CELL
+            var z = (cz + 0.5) * CELL
+            var h = (sw + se + nw + ne) / 4
+            graphics.fill(colorAt(x, z, h))
+            graphics.corners(sw, se, nw, ne)
+            graphics.cube(x, -SKIRT / 2, z,  CELL, SKIRT, CELL)
+        end
+    end
+    graphics.corners(0, 0, 0, 0)
     graphics.fill(colors.WHITE)
     return graphics.endChunk()
 end
