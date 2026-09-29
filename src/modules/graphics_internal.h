@@ -39,11 +39,6 @@ std::string gfx_take_capture();
 // when the window comes back.
 void gfx_clock_break();
 
-// The HOST's FXAA toggle (a checkbox in the playground/run views), to compare the composite's
-// performance with and without it. Persists across graphics.canvas() calls within the same WASM
-// instance, unlike s_fxaa_ready — this is a preference, not a GL resource lifecycle.
-void gfx_set_fxaa_enabled(bool enabled);
-
 // Drawing area in LOGICAL units, as set by graphics.canvas.
 // A frame's projection is in logical units, so a module drawing inside it (ui_module) must refer to
 // these rather than to GetScreenWidth(), which is in physical pixels.

@@ -1439,25 +1439,27 @@ et s'exécute sans erreur sur les deux cibles réellement utilisées : GL 3.3 (`
 GLES3/WebGL2 (WASM, chargé directement via `OllinModule({...})`, en contournant l'éditeur du
 playground).
 
-**Bascule HÔTE, pas script** : `graphics.canvas`/`draw()` n'exposent rien côté langage — le
-bascule sert à COMPARER, pas à composer un rendu, donc c'est un réglage de la web app, pas une
-fonctionnalité Ollin (pas d'entrée `grammar.ebnf`/`syntax.ol`/tutoriel à tenir). `s_fxaa_enabled`
-(C++, `graphics_module.cpp`) est lu au moment de la composition, à côté de `s_fxaa_ready` (le
-chargement du shader) — les deux gardes sont INDÉPENDANTES : rebasculer ne recharge jamais le
-shader. `gfx_set_fxaa_enabled` (déclarée dans `graphics_internal.h`) est liée en JS
-(`Module.setFxaaEnabled`, `wasm_main.cpp`), sur le même patron que `clockBreak`.
-Il **survit** à `graphics.canvas()` — contrairement au shader lui-même, réinitialisé au même point
-que `reset3d_graphics_state()` — puisque c'est une préférence de l'hôte, pas une ressource GL liée
-au contexte : couper FXAA puis relancer un script ne le rallume pas.
-**Une seule source de vérité côté JS** (`pg-run.js`, `getFxaaEnabled`/`setFxaaEnabled`), partagée
-par `playground.js` et `run.js` : l'instance WASM étant partagée par toute la SPA (`getOllin`),
-les deux cases à cocher doivent s'accorder sur le même état à la navigation, sans second aller-retour
-par le C++ pour le savoir. `setFxaaEnabled` tolère un module encore `null` (un clic avant que le
-WASM soit prêt) ; un appel de rattrapage est fait dès que `getOllin()` résout, pour que ce cas ne
-laisse pas le moteur en désaccord avec la case cochée.
-**Vérifié de bout en bout** (pas seulement la compilation) : capture d'écran WASM/WebGL2 avec
-`setFxaaEnabled(true)` puis `(false)` sur la même scène — le bord d'un trait montre `77, 19` (deux
-pixels, un dégradé) activé, `131` (un seul pixel, plus net) désactivé.
+**`graphics.antialias([enabled[, size]])` est une fonction du LANGAGE**, pas un réglage hôte — une
+première version passait par une case à cocher du playground/run (bascule JS, liaison WASM
+`Module.setFxaaEnabled`) ; retirée à la demande de l'utilisateur au profit d'un appel Ollin, plus
+direct et disponible aussi en natif (`build-gfx`), pas seulement au navigateur. `size` règle
+`spanMax`, la distance (en texels) sur laquelle le shader peut glisser le long d'une arête
+détectée avant de mélanger (`fxaa.frag`) — PAS un nombre d'échantillons ni un rayon de flou dans
+toutes les directions : FXAA ne fait jamais plus de 4 lectures de texture pour le mélange, quelle
+que soit `size`, donc l'élargir ne coûte rien de plus. `s_fxaa_enabled`/`s_fxaa_span`
+(`graphics_module.cpp`) sont un réglage du PROGRAMME EN COURS, comme l'éclairage 3D : remis à
+`true`/`8.0` à chaque `graphics.canvas()`, au même endroit que `reset3d_lighting_state()` — un
+script n'hérite jamais du réglage du précédent. Indépendant de `s_fxaa_ready` (le chargement du
+shader, jamais rechargé pour un simple bascule) et de `with_area` (pur état, aucun appel GL
+direct, comme `strokeSize`/`fontSize` — à la différence de `blendMode`, qui appelle
+`BeginBlendMode`).
+**Vérifié par comparaison A/B, pas seulement par compilation** : sous Xvfb, `size` à sa valeur
+par défaut (8) donne un dégradé sur deux pixels aux deux bords d'un trait (`19, 77` et `78, 13`) ;
+désactivé (`antialias(false)`), les deux bords sont des pixels isolés (`77` et `131`) ; `size = 1`
+retrouve le bord isolé (`77`) sur l'arête la moins inclinée tout en gardant le dégradé sur
+l'autre (`78, 13`) — cohérent avec un paramètre qui borne la PORTÉE du lissage, pas son
+activation globale. Confirmé sans erreur sur les deux cibles (`build-gfx` sous Xvfb, WASM/WebGL2
+via `OllinModule({...})`).
 
 ## Modèles 3D des exemples (docs/samples)
 

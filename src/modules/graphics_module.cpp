@@ -75,12 +75,12 @@ static int s_blend_mode = BLEND_ALPHA;
 static Shader s_fxaa{};
 static bool s_fxaa_ready = false;
 static int s_fxaa_loc_texel = -1;
-// HOST preference (playground/run views), independent of s_fxaa_ready: the shader still loads
-// either way, so re-enabling costs no reload. Defaults to on, matching the shipped behaviour.
+static int s_fxaa_loc_span = -1;
+// Script-level state (graphics.antialias), independent of s_fxaa_ready: the shader still loads
+// either way, so toggling it costs no reload. Reset to these defaults on every graphics.canvas —
+// a preference of the RUNNING PROGRAM, not of the host, like the 3D lighting state.
 static bool s_fxaa_enabled = true;
-void gfx_set_fxaa_enabled(bool enabled) {
-    s_fxaa_enabled = enabled;
-}
+static float s_fxaa_span = 8.0f;   // edge-search reach in texels — see fxaa.frag's SPAN_MAX
 static void load_fxaa_shader() {
     if (s_fxaa_ready) {
         return;
@@ -93,6 +93,7 @@ static void load_fxaa_shader() {
     std::string fs = std::string(HDR) + k_fxaa_fragment_src;
     s_fxaa = LoadShaderFromMemory(nullptr, fs.c_str());   // nullptr = raylib's default 2D vertex shader
     s_fxaa_loc_texel = GetShaderLocation(s_fxaa, "texelSize");
+    s_fxaa_loc_span = GetShaderLocation(s_fxaa, "spanMax");
     s_fxaa_ready = true;
 }
 // Freed alongside the 3D shader (reset3d_graphics_state, called from gfx_canvas): same GL context
@@ -103,6 +104,20 @@ static void reset_fxaa_shader() {
         UnloadShader(s_fxaa);
         s_fxaa_ready = false;
     }
+}
+// graphics.antialias([enabled[, size]]): toggles FXAA on the composite, and optionally sets how
+// far (in texels) the edge search may slide — see fxaa.frag's spanMax. Pure style state, so
+// unlike graphics.blendMode it needs no window and is never wrapped in with_area.
+static int gfx_antialias(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    s_fxaa_enabled = (argc > 0) ? !is_falsy(args[0]) : true;
+    if (argc > 1) {
+        double span = num_arg(args, argc, 1, "graphics.antialias");
+        if (span < 0.0)
+            throw std::runtime_error("graphics.antialias: size must not be negative");
+        s_fxaa_span = (float)span;
+    }
+    return ctx.ret(Value{});
 }
 // Screenshot DEFERRED to the end of the frame: draw() renders into the RT, while the capture must read
 // the composed screen. Cleared on every gfx_canvas, so a request from a previous program does not leak
@@ -147,6 +162,8 @@ static int gfx_canvas(CallCtx& ctx) {
     // The 3D lighting is reset HERE, before setup() or the top level set ambient and light — and not
     // in gfx_run, which runs AFTER and would wipe the configuration.
     reset3d_lighting_state();
+    s_fxaa_enabled = true;   // graphics.antialias: a setting of THIS program, not of the host
+    s_fxaa_span = 8.0f;
     s_run_active = false;   // a new program, hence ONE graphics.run allowed again
 #ifdef __EMSCRIPTEN__
     // REUSE the WebGL context between two playground runs instead of CloseWindow followed by
@@ -1526,12 +1543,12 @@ static void render_frame(const Value& draw_fn, bool* tex, bool* drawing) {
             dest = Rectangle{voff_x, voff_y, (float)s_view_w * vscale, (float)s_view_h * vscale};
         }
         // FXAA smooths the RT's hard, unsampled edges on the way out — see load_fxaa_shader. Guarded
-        // by s_fxaa_ready (the shader's own load) AND s_fxaa_enabled (the host's preference, so it
-        // can be toggled off to compare against the plain composite without a rebuild).
+        // by s_fxaa_ready (the shader's own load) AND s_fxaa_enabled (graphics.antialias).
         bool use_fxaa = s_fxaa_ready && s_fxaa_enabled;
         if (use_fxaa) {
             float texel[2] = {1.0f / (float)s_targetW, 1.0f / (float)s_targetH};
             SetShaderValue(s_fxaa, s_fxaa_loc_texel, texel, SHADER_UNIFORM_VEC2);
+            SetShaderValue(s_fxaa, s_fxaa_loc_span, &s_fxaa_span, SHADER_UNIFORM_FLOAT);
             BeginShaderMode(s_fxaa);
         }
         DrawTexturePro(s_target.texture,
@@ -1821,6 +1838,7 @@ Value make_graphics_module() {
     m.map_set(Value(std::string("endDraw")), Value::make_builtin(with_area<gfx_end_draw>));
     m.map_set(Value(std::string("clear")), Value::make_builtin(with_area<gfx_clear>));
     m.map_set(Value(std::string("blendMode")), Value::make_builtin(with_area<gfx_blend_mode>));
+    m.map_set(Value(std::string("antialias")), Value::make_builtin(gfx_antialias));
     m.map_set(Value(std::string("strokeSize")), Value::make_builtin(gfx_stroke_size));
     m.map_set(Value(std::string("segments")), Value::make_builtin(gfx_segments));
     m.map_set(Value(std::string("stroke")), Value::make_builtin(gfx_stroke));

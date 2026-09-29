@@ -88,11 +88,6 @@ body.kbd-editing #toolbar { display: none; }
 #autoexec-wrap input { margin: 0; width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
 #autoexec-wrap.on { border-color: var(--accent); color: var(--accent); }
 
-/* The FXAA toggle: same checkbox sizing as Auto; its "on" look is the shared .active rule
-   (app-bar.css), reused as is since this toolbar carries the app-bar class. */
-#fxaa-wrap { user-select: none; }
-#fxaa-wrap input { margin: 0; width: 14px; height: 14px; cursor: pointer; accent-color: var(--accent); }
-
 #run-btn {
   display: flex;
   align-items: center;
@@ -554,10 +549,6 @@ canvas#canvas {
   <label id="autoexec-wrap" class="bar-btn" title="Re-run automatically 2 s after the last edit" style="display:none">
     <input type="checkbox" id="autoexec-chk">
     <span class="btn-label">Auto</span>
-  </label>
-  <label id="fxaa-wrap" class="bar-btn active" title="Toggle FXAA (edge smoothing on the composite), to compare performance with and without it">
-    <input type="checkbox" id="fxaa-chk" checked>
-    <span class="btn-label">FXAA</span>
   </label>
   <button id="run-btn" disabled>
     <svg width="10" height="10" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l11 6-11 6V2z"/></svg>

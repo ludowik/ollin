@@ -25,9 +25,6 @@
     /* A narrow screen: icons only, the labels being too cramped. The bar's own tightening is
        shared, in app-bar.css. */
     @media (max-width: 600px) { .bar-label { display:none; } }
-    /* The FXAA toggle's native checkbox, same sizing as the playground's own Auto checkbox. */
-    #fxaa-wrap { user-select:none; }
-    #fxaa-wrap input { margin:0; width:14px; height:14px; cursor:pointer; accent-color:var(--accent); }
 
     /* The safe-area insets, for rounded corners and the home bar, are excluded from the area. */
     #stage-wrap { flex:1; display:flex; min-height:0;
@@ -64,10 +61,6 @@
       <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><rect x="3.5" y="2.5" width="3.2" height="11" rx="1"/><rect x="9.3" y="2.5" width="3.2" height="11" rx="1"/></svg>
       <span class="bar-label">Pause</span>
     </button>
-    <label id="fxaa-wrap" class="bar-btn active" title="Toggle FXAA (edge smoothing on the composite), to compare performance with and without it">
-      <input type="checkbox" id="fxaa-chk" checked>
-      <span class="bar-label">FXAA</span>
-    </label>
     <!-- Back to the editor: at the far RIGHT, in the same corner as the editor's "Full screen"
          button, so one corner makes the round trip. -->
     <a class="bar-btn" href="#/playground" title="Back to the editor">
