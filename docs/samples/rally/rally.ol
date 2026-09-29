@@ -47,6 +47,9 @@ end
 func draw()
     graphics.clear(Color(0.55, 0.72, 0.85))
     graphics.begin3d(cam)
+    ## blendColor is a per-DRAW uniform, not baked into the chunk — set it fresh before every
+    ## drawChunk, unlike fill/corners/mixCorners, which were captured per cube back in bakeTerrain.
+    graphics.blendColor(ROAD_COLOR)
     graphics.drawChunk(ground)
     graphics.end3d()
 end

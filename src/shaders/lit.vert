@@ -9,7 +9,9 @@ in mat4 instanceTransform;
 in vec4 instanceColor;
 in vec3 instanceTile;
 in vec4 instanceCorner;
+in vec4 instanceMix;
 uniform mat4 mvp;
+uniform vec4 blendColorB;
 out vec3 fragPosition;
 out vec2 fragTexCoord;
 out vec4 fragColor;
@@ -44,10 +46,28 @@ void main() {
         }
     }
 
+    // Corner colours (instanceMix, graphics.mixCorners): a SECOND colour, blendColorB — one
+    // uniform, shared by the whole draw call, not per-instance — mixed in by the bilinear
+    // interpolation of four PER-INSTANCE mix factors, the same u/v as the height above. Lets a
+    // baked terrain shade road grey into grass green smoothly, pixel by pixel, instead of one
+    // flat colour per cube: a flat per-instance blend changes between two adjacent cells no
+    // matter how little of the geometry actually crosses the boundary, which reads as speckle at
+    // this scale. Guarded the same way as instanceCorner: zero mix everywhere already yields
+    // instanceColor unchanged, so the guard is only there to skip the work, not to change the
+    // result.
+    vec4 baseColor = instanceColor;
+    if (any(notEqual(instanceMix, vec4(0.0)))) {
+        float mu = vp.x + 0.5;
+        float mv = vp.z + 0.5;
+        float amt = mix(mix(instanceMix.x, instanceMix.y, mu),
+                        mix(instanceMix.z, instanceMix.w, mu), mv);
+        baseColor = mix(instanceColor, blendColorB, clamp(amt, 0.0, 1.0));
+    }
+
     vec4 wp = m * vec4(vp, 1.0);
     fragPosition = wp.xyz;
     fragTexCoord = vertexTexCoord;
-    fragColor = instanceColor * vertexColor;
+    fragColor = baseColor * vertexColor;
     fragTile = instanceTile;
     mat3 nm = transpose(inverse(mat3(m)));   // the normal matrix: correct under a rotation or a non-uniform scale
     fragNormal = normalize(nm * vn);

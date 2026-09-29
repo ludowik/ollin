@@ -18,6 +18,8 @@ global TRACK = [
     { x: 40,  z: -18 }
 ]
 global TRACK_WIDTH = 6.0    ## half-width of the road bed, in world units
+global ROAD_COLOR = Color(0.55, 0.55, 0.58)   ## flat — see roadMixAt/bakeTerrain
+global FEATHER = 3.0        ## world units over which the road blends into the grass
 
 global CELL = 3.0           ## the terrain lattice's spacing, in world units
 global WORLD_HALF = 64.0    ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
@@ -71,45 +73,50 @@ func heightAt(x, z)
     return heightFromDist(x, z, nearestOnTrack(x, z))
 end
 
-## Road grey inside TRACK_WIDTH, grass beyond it. FEATHER spans several cells (not a fraction of
-## one), and d is the CELL's own average distance (its four lattice corners, from the same array
-## heightAt reads) rather than one point sampled at its centre — a single-point sample changes
-## from one cell to the next faster than the color could blend, which read as speckle rather than
-## a gradient. Averaging over the cell is what makes the transition read as smooth at this scale.
-func colorAt(d, h)
-    var road = Color(0.55, 0.55, 0.58)
+## Grass tint, height-dependent — unlike ROAD_COLOR, which stays flat: the darker green at low
+## altitude, lighter toward the hilltops, the same idea as voxel_world/terrain.ol's biome-by-height.
+func grassAt(h)
     var t = math.clamp(h / 8.0, 0, 1)
-    var grass = Color(0.17 + 0.05 * t, 0.40 - 0.03 * t, 0.16)
-    var FEATHER = CELL
-    if d >= TRACK_WIDTH + FEATHER then
-        return grass
-    end
+    return Color(0.17 + 0.05 * t, 0.40 - 0.03 * t, 0.16)
+end
+
+## How much of ROAD_COLOR graphics.mixCorners should blend in AT THIS LATTICE POINT: 1 on the
+## centreline, fading to 0 over FEATHER world units past the verge. This is deliberately the
+## per-CORNER value, not a cell average — the GPU interpolates it per PIXEL across the cube's top
+## (the same bilinear scheme as the height corners), which is what makes the road's edge follow
+## the actual within-cell position instead of a single flat tone per cube.
+func roadMixAt(d)
     if d <= TRACK_WIDTH then
-        return road
+        return 1.0
     end
-    var g = (d - TRACK_WIDTH) / FEATHER
-    return Color(road.r + (grass.r - road.r) * g,
-                 road.g + (grass.g - road.g) * g,
-                 road.b + (grass.b - road.b) * g)
+    if d >= TRACK_WIDTH + FEATHER then
+        return 0.0
+    end
+    return 1.0 - (d - TRACK_WIDTH) / FEATHER
 end
 
 ## Bakes the whole ground into ONE retained instance group (graphics.beginChunk/endChunk): the
 ## circuit never changes, so this runs once from setup(), not every frame.
 ##
-## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like
-## that: a Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners is
-## built for this instead — it bends a cube's TOP face by the bilinear interpolation of 4 corner
-## heights, given in LOCAL units, i.e. before the instance's own scale is applied. Every cube
-## here is emitted at a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit
-## equals a world unit: the four corners passed to graphics.corners are then heightAt's own
-## values, unscaled. Two neighbouring cells share the SAME lattice point, and therefore the SAME
-## corner height, so their tops meet exactly — one continuous surface, no crack, no step.
+## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like a
+## Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners fixed the
+## GEOMETRY — it bends a cube's TOP face by the bilinear interpolation of 4 corner heights, given
+## in LOCAL units, i.e. before the instance's own scale is applied. Every cube here is emitted at
+## a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit equals a world unit: the
+## four corners passed to graphics.corners are then heightAt's own values, unscaled. Two
+## neighbouring cells share the SAME lattice point, and therefore the SAME corner height, so their
+## tops meet exactly — one continuous surface, no crack, no step.
+##
+## The COLOR then had the same problem one level up: one flat tint per cube still made the
+## road/grass edge and the height tint read as speckle between adjacent cells. graphics.mixCorners
+## fixes it the same way corners fixes geometry — it is interpolated by the GPU per PIXEL from the
+## cell's own four corners, not decided once for the whole cube.
 func bakeTerrain()
     graphics.beginChunk()
     var n = math.floor(WORLD_HALF / CELL)
     ## Heights AND distances-to-track at the LATTICE POINTS (cell corners, not centres):
     ## (2n+2) samples per axis, shared by every cell that touches them — the thing that makes
-    ## neighbours line up, for the geometry as well as for colorAt's per-cell average below.
+    ## neighbours line up, for the geometry as well as for the color blend below.
     var W = 2 * n + 2
     var latH = []
     var latD = []
@@ -134,12 +141,14 @@ func bakeTerrain()
             var x = (cx + 0.5) * CELL
             var z = (cz + 0.5) * CELL
             var avgH = (sw + se + nw + ne) / 4
-            var avgD = (latD[i00] + latD[i10] + latD[i01] + latD[i11]) / 4
-            graphics.fill(colorAt(avgD, avgH))
+            graphics.fill(grassAt(avgH))
+            graphics.mixCorners(roadMixAt(latD[i00]), roadMixAt(latD[i10]),
+                                roadMixAt(latD[i01]), roadMixAt(latD[i11]))
             graphics.corners(sw, se, nw, ne)
             graphics.cube(x, -SKIRT / 2, z,  CELL, SKIRT, CELL)
         end
     end
+    graphics.mixCorners(0, 0, 0, 0)
     graphics.corners(0, 0, 0, 0)
     graphics.fill(colors.WHITE)
     return graphics.endChunk()

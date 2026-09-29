@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-29 17:53</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-29 19:52</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-29 17:53</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-29 19:52</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2207,9 +2207,12 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.tiles(top, side, bottom)</code></td><td>Distinct tiles per face, as indices into the atlas</td></tr>
     <tr><td><code>graphics.tileAnim(t)</code></td><td>Names a tile whose UV <strong>scrolls</strong> over time, for rippling water</td></tr>
     <tr><td><code>graphics.corners(a, b, c, d)</code></td><td>The heights of the four corners of the next cube's <strong>top</strong> (a state), as a fraction of its height: <code>(-x,-z)</code>, <code>(+x,-z)</code>, <code>(-x,+z)</code>, <code>(+x,+z)</code>. With no argument the top is flat</td></tr>
+    <tr><td><code>graphics.mixCorners(a, b, c, d)</code></td><td>Blend factors <code>[0..1]</code> at the same four corners as <code>corners</code> (a state): <code>0</code> keeps <code>fill</code>'s colour, <code>1</code> is fully <code>blendColor</code>'s. With no argument, an ordinary flat-coloured cube</td></tr>
+    <tr><td><code>graphics.blendColor(colour)</code></td><td>The SECOND colour <code>mixCorners</code> blends towards — a per-<strong>draw</strong> setting (a uniform), so set it right before <code>drawChunk</code>/the shape, not while baking a chunk</td></tr>
   </tbody>
 </table>
 <p>A cube with deformed corners is still an instanced cube: the displacement happens in the vertex shader, so it <strong>costs no draw call</strong>. Two neighbouring cubes giving the same value to the corner they share form a continuous surface — enough to let a terrain follow its <strong>unrounded</strong> height instead of a step. Keep it for renderings that want it: the <em>Voxel world</em> example keeps all its cubes identical.</p>
+<p><code>mixCorners</code> does the same thing for <strong>colour</strong>: a flat tint per cube (even one recomputed per cell, such as a road/grass boundary) still changes abruptly from one cube to the next, which reads as speckle rather than a gradient at typical terrain scale. Passed the same four corner values as <code>corners</code>, the GPU blends <code>fill</code> and <code>blendColor</code> by the same bilinear interpolation, <strong>per pixel</strong> — a true gradient across the cell, not one colour per cube. The <em>Rally circuit</em> example uses it for the road's edge.</p>
 <div class="callout tip">With an atlas active, give <strong>every</strong> cube of the chunk a tile (<code>tile</code>/<code>tiles</code>): a cube with no tile would sample tile 0 instead of a plain colour.</div>
 
 <pre><code><span class="cmt">## a voxel chunk: baked ONCE in setup(), redrawn in one call per frame</span>
