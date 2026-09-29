@@ -13,7 +13,6 @@
   { "group": "3D",          "name": "3D models (.obj / .glb)", "file": "model_3d/model_3d.ol" },
   { "group": "3D",          "name": "Isometric camera", "file": "iso_camera.ol" },
   { "group": "3D",          "name": "Voxel world (Minecraft)", "file": "voxel_world/voxel_world.ol" },
-  { "group": "3D",          "name": "Rally circuit (terrain)", "file": "rally/rally.ol" },
 
   { "group": "Interface, animation, sound", "name": "Interface (ui)", "file": "ui_demo.ol" },
   { "group": "Interface, animation, sound", "name": "Animations (tween)", "file": "tween_demo.ol" },
@@ -26,6 +25,7 @@
 
   { "group": "Games", "name": "Ollin Invaders", "file": "invaders/invaders.ol" },
   { "group": "Games", "name": "Ollin Asteroids", "file": "asteroids/asteroids.ol" },
+  { "group": "Games", "name": "Rally", "file": "rally/rally.ol" },
 
   { "group": "Device and storage", "name": "Webcam (camera)", "file": "camera.ol" },
   { "group": "Device and storage", "name": "Persistence (data)", "file": "data_demo.ol" }

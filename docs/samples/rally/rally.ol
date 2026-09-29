@@ -1,55 +1,95 @@
-## Art of Rally, minimal — milestone 1: the circuit and a free-flying camera, no car yet. Lets the
-## track and heightAt be checked on screen before anything drives on it.
-##
-## Fly with the ARROW KEYS (turn left/right, move forward/back) and "w"/"s" for altitude.
+## Art of Rally, minimal — one car, one circuit, free exploration. Drive with the ARROW KEYS
+## (up/down throttle, left/right steer); the chase camera follows on its own. No lap timing, no
+## opponents, no collision against the verge — just driving the circuit and the hills around it.
 
 import "terrain.ol"
+import "vehicle.ol"
+import "../lib/chasecam.ol"
 
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
-global ground = nil   ## the baked terrain (graphics.endChunk handle)
+global ground = nil
 
-global flyX = 0.0
-global flyY = 110.0
-global flyZ = -280.0
-global yaw = 0.0
-global pitch = -0.25
-global SPEED = 90.0
-global TURN = 1.6
+## Starts on the circuit's first waypoint, facing towards the next one.
+global car = Vehicle(TRACK[1].x, TRACK[1].z,
+                     math.atan2(TRACK[2].x - TRACK[1].x, TRACK[2].z - TRACK[1].z))
+global chase = ChaseCamera(9, 3.5, 6.0)
 
 func setup()
-    graphics.canvas(900, 600, "Rally — terrain")
+    graphics.canvas(900, 600, "Rally")
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
     ground = bakeTerrain()
 end
 
+## The ground's slope in the car's OWN forward/right directions, from heightAt sampled a short
+## distance either side — the same finite-difference idea bakeTerrain already uses for the mesh's
+## corner heights, just at the scale of a car instead of a grid cell, and read straight from
+## heightAt rather than from the baked lattice (the car isn't standing on a lattice point).
+func groundSlope(x, z, heading)
+    var e = 0.6
+    var fx = math.sin(heading)
+    var fz = math.cos(heading)
+    var rx = fz
+    var rz = -fx
+    var hF = heightAt(x + fx * e, z + fz * e)
+    var hB = heightAt(x - fx * e, z - fz * e)
+    var hR = heightAt(x + rx * e, z + rz * e)
+    var hL = heightAt(x - rx * e, z - rz * e)
+    var pitch = math.atan((hF - hB) / (2 * e))
+    var roll = math.atan((hR - hL) / (2 * e))
+    return pitch, roll
+end
+
 func update(dt)
-    var turn = 0
-    if keyboard.isDown("left") then turn = turn - 1 end
-    if keyboard.isDown("right") then turn = turn + 1 end
-    yaw = yaw + turn * TURN * dt
+    var throttle = 0
+    if keyboard.isDown("up") then throttle = throttle + 1 end
+    if keyboard.isDown("down") then throttle = throttle - 1 end
+    var steer = 0
+    if keyboard.isDown("left") then steer = steer - 1 end
+    if keyboard.isDown("right") then steer = steer + 1 end
+    car.update(dt, throttle, steer)
 
-    var thr = 0
-    if keyboard.isDown("up") then thr = thr + 1 end
-    if keyboard.isDown("down") then thr = thr - 1 end
-    flyX = flyX + math.sin(yaw) * thr * SPEED * dt
-    flyZ = flyZ + math.cos(yaw) * thr * SPEED * dt
+    var groundY = heightAt(car.x, car.z)
+    chase.update(dt, car.x, groundY + 1.2, car.z, car.heading)
+    chase.apply(cam)
+end
 
-    if keyboard.isDown("w") then flyY = flyY + SPEED * dt end
-    if keyboard.isDown("s") then flyY = flyY - SPEED * dt end
+func drawWheel(x, y, z)
+    var h = 0.32
+    graphics.push()
+    graphics.translate(x, y, z)
+    graphics.rotateZ(90)
+    ## graphics.cylinder is anchored at its BASE, not centred like cube/sphere — offset by -h/2
+    ## along its own (pre-rotation) axis so the wheel centres on (x, y, z) once rotated.
+    graphics.cylinder(0, -h / 2, 0,  0.42, h)
+    graphics.pop()
+end
 
-    cam.setPos(flyX, flyY, flyZ)
-    cam.lookAt(flyX + math.cos(pitch) * math.sin(yaw),
-               flyY + math.sin(pitch),
-               flyZ + math.cos(pitch) * math.cos(yaw))
+func drawCar()
+    var groundY = heightAt(car.x, car.z)
+    var pitch, roll = groundSlope(car.x, car.z, car.heading)
+    graphics.push()
+    graphics.translate(car.x, groundY + 0.55, car.z)
+    graphics.rotateY(math.deg(car.heading))
+    graphics.rotateX(math.deg(pitch))
+    graphics.rotateZ(-math.deg(roll))
+    graphics.fill(Color(0.82, 0.15, 0.15))
+    graphics.cube(0, 0, 0,  1.7, 0.8, 3.6)
+    graphics.fill(Color(0.22, 0.24, 0.28))
+    graphics.cube(0, 0.55, -0.3,  1.3, 0.5, 1.6)
+    graphics.fill(Color(0.12, 0.12, 0.14))
+    drawWheel(0.95, -0.55, 1.2)
+    drawWheel(-0.95, -0.55, 1.2)
+    drawWheel(0.95, -0.55, -1.2)
+    drawWheel(-0.95, -0.55, -1.2)
+    graphics.pop()
 end
 
 func draw()
     graphics.clear(Color(0.55, 0.72, 0.85))
     graphics.begin3d(cam)
-    ## blendColor is a per-DRAW uniform, not baked into the chunk — set it fresh before every
-    ## drawChunk, unlike fill/corners/mixCorners, which were captured per cube back in bakeTerrain.
     graphics.blendColor(ROAD_COLOR)
     graphics.drawChunk(ground)
+    drawCar()
     graphics.end3d()
 end
