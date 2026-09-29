@@ -1,10 +1,12 @@
 ## Art of Rally, minimal — one car, one circuit, free exploration. Drive with the ARROW KEYS
-## (up/down throttle, left/right steer); the chase camera follows on its own. No lap timing, no
-## opponents, no collision against the verge — just driving the circuit and the hills around it.
+## (up/down throttle, left/right steer) or the on-screen touch joystick; the chase camera follows
+## on its own. No lap timing, no opponents, no collision against the verge — just driving the
+## circuit and the hills around it.
 
 import "terrain.ol"
 import "vehicle.ol"
 import "../lib/chasecam.ol"
+import "../lib/joystick.ol"
 
 global cam = graphics.camera(0, 0, 10,  0, 0, 0)
 global ground = nil
@@ -13,6 +15,19 @@ global ground = nil
 global car = Vehicle(TRACK[1].x, TRACK[1].z,
                      math.atan2(TRACK[2].x - TRACK[1].x, TRACK[2].z - TRACK[1].z))
 global chase = ChaseCamera(9, 3.5, 6.0)
+global pad = Joystick()
+
+## A class cannot receive an engine callback (see joystick.ol), so these one-line relays are
+## what actually arms and moves the touch control.
+func mouse.pressed(x, y)
+    pad.press(x, y)
+end
+func mouse.moved(x, y)
+    pad.move(x, y)
+end
+func mouse.released(x, y)
+    pad.release()
+end
 
 func setup()
     graphics.canvas(900, 600, "Rally")
@@ -41,13 +56,13 @@ func groundSlope(x, z, heading)
 end
 
 func update(dt)
-    var throttle = 0
+    var throttle = pad.throttle()
     if keyboard.isDown("up") then throttle = throttle + 1 end
     if keyboard.isDown("down") then throttle = throttle - 1 end
-    var steer = 0
+    var steer = pad.steer()
     if keyboard.isDown("left") then steer = steer - 1 end
     if keyboard.isDown("right") then steer = steer + 1 end
-    car.update(dt, throttle, steer)
+    car.update(dt, math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1))
 
     var groundY = heightAt(car.x, car.z)
     chase.update(dt, car.x, groundY + 1.2, car.z, car.heading)
@@ -92,4 +107,5 @@ func draw()
     graphics.drawChunk(ground)
     drawCar()
     graphics.end3d()
+    pad.draw()
 end
