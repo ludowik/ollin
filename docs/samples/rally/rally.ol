@@ -91,7 +91,9 @@ func drawCar()
     graphics.fill(Color(0.82, 0.15, 0.15))
     graphics.cube(0, 0, 0,  1.7, 0.8, 3.6)
     graphics.fill(Color(0.22, 0.24, 0.28))
-    graphics.cube(0, 0.55, -0.3,  1.3, 0.5, 1.6)
+    ## +Z is the car's own forward (heading 0 → sin=0, cos=1 → z increases) — the cabin sits
+    ## toward +Z so it leads the nose, not the tail. It was at -0.3 and rode backwards.
+    graphics.cube(0, 0.55, 0.3,  1.3, 0.5, 1.6)
     graphics.fill(Color(0.12, 0.12, 0.14))
     drawWheel(0.95, -0.55, 1.2)
     drawWheel(-0.95, -0.55, 1.2)
