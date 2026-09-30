@@ -73,6 +73,30 @@ static void reset_corner_state() {
     }
 }
 
+// Is argument `i` a colour (an instance of the Color class, which is a map)?
+static bool is_color_arg(const Value* args, int argc, int i) {
+    return argc > i && (args[i].is_map() || args[i].is_class());
+}
+
+// Argument `i` as a colour, white when it is missing or not a colour.
+static Color color_arg_or_white(const Value* args, int argc, int i) {
+    return is_color_arg(args, argc, i) ? gfx_to_color(args[i]) : WHITE;
+}
+
+// A colour as four floats in [0;1], the way every instance and uniform carries it.
+static void color_to_floats(Color c, float* out) {
+    out[0] = c.r / 255.0f;
+    out[1] = c.g / 255.0f;
+    out[2] = c.b / 255.0f;
+    out[3] = c.a / 255.0f;
+}
+
+static void push_color(std::vector<float>& out, Color c) {
+    float f[4];
+    color_to_floats(c, f);
+    out.insert(out.end(), f, f + 4);
+}
+
 static void push_corner_block(std::vector<float>& out) {
     for (int k = 0; k < 4; k++) {
         out.push_back(s_cur_corner[k]);
@@ -494,10 +518,7 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
         if (col.a < 250) {
             s_rec_mesh_w = mesh;
             s_rec_xw.push_back(rm);
-            s_rec_cw.push_back(col.r / 255.0f);
-            s_rec_cw.push_back(col.g / 255.0f);
-            s_rec_cw.push_back(col.b / 255.0f);
-            s_rec_cw.push_back(col.a / 255.0f);
+            push_color(s_rec_cw, col);
             s_rec_tw.push_back(s_cur_tile[0]);
             s_rec_tw.push_back(s_cur_tile[1]);
             s_rec_tw.push_back(s_cur_tile[2]);
@@ -506,10 +527,7 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
         }
         s_rec_mesh = mesh;
         s_rec_x.push_back(rm);
-        s_rec_c.push_back(col.r / 255.0f);
-        s_rec_c.push_back(col.g / 255.0f);
-        s_rec_c.push_back(col.b / 255.0f);
-        s_rec_c.push_back(col.a / 255.0f);
+        push_color(s_rec_c, col);
         s_rec_t.push_back(s_cur_tile[0]);
         s_rec_t.push_back(s_cur_tile[1]);
         s_rec_t.push_back(s_cur_tile[2]);
@@ -524,10 +542,7 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
     // immediate primitives.
     Matrix local = MatrixMultiply(MatrixScale(size.x, size.y, size.z), MatrixTranslate(pos.x, pos.y, pos.z));
     b.xforms.push_back(MatrixMultiply(local, rlGetMatrixTransform()));
-    b.colors.push_back(col.r / 255.0f);
-    b.colors.push_back(col.g / 255.0f);
-    b.colors.push_back(col.b / 255.0f);
-    b.colors.push_back(col.a / 255.0f);
+    push_color(b.colors, col);
     b.tiles.push_back(s_cur_tile[0]);
     b.tiles.push_back(s_cur_tile[1]);
     b.tiles.push_back(s_cur_tile[2]);
@@ -851,11 +866,8 @@ static int gfx_end3d(CallCtx& ctx) {
 // graphics.ambient(v | colour): ambient light, which turns the lit mode on.
 static int gfx_ambient(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    if (argc > 0 && (args[0].is_map() || args[0].is_class())) {
-        Color c = gfx_to_color(args[0]);
-        s_amb3d[0] = c.r / 255.0f;
-        s_amb3d[1] = c.g / 255.0f;
-        s_amb3d[2] = c.b / 255.0f;
+    if (is_color_arg(args, argc, 0)) {
+        color_to_floats(gfx_to_color(args[0]), s_amb3d);
         s_amb3d[3] = 1.0f;
     } else {
         float v = argc > 0 ? (float)num_arg(args, argc, 0, "graphics.ambient") : 0.15f;
@@ -932,7 +944,7 @@ static int light_set_pos(CallCtx& ctx) {
 static int light_set_color(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
-    if (argc > 1 && (args[1].is_map() || args[1].is_class())) {
+    if (is_color_arg(args, argc, 1)) {
         Color c = gfx_to_color(args[1]);
         self.map_set(Value(std::string("r")), Value(c.r / 255.0));
         self.map_set(Value(std::string("g")), Value(c.g / 255.0));
@@ -982,7 +994,7 @@ static int gfx_light(CallCtx& ctx) {
     float x = (float)num_arg(args, argc, 1, "graphics.light");
     float y = (float)num_arg(args, argc, 2, "graphics.light");
     float z = (float)num_arg(args, argc, 3, "graphics.light");
-    Color c = (argc > 4 && (args[4].is_map() || args[4].is_class())) ? gfx_to_color(args[4]) : WHITE;
+    Color c = color_arg_or_white(args, argc, 4);
     Value inst = Value::make_map();
     inst.map_set(Value(std::string("__class__")), light_class());
     inst.map_set(Value(std::string("type")), Value((int64_t)(type == "point" ? 1 : 0)));
@@ -1071,11 +1083,7 @@ static int gfx_corners(CallCtx& ctx) {
 // right before drawChunk/the shape, not while baking, if several chunks need different colours.
 static int gfx_blend_color(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
-    Color c = (argc > 0 && (args[0].is_map() || args[0].is_class())) ? gfx_to_color(args[0]) : WHITE;
-    s_cur_blend_color[0] = c.r / 255.0f;
-    s_cur_blend_color[1] = c.g / 255.0f;
-    s_cur_blend_color[2] = c.b / 255.0f;
-    s_cur_blend_color[3] = c.a / 255.0f;
+    color_to_floats(color_arg_or_white(args, argc, 0), s_cur_blend_color);
     return ctx.ret(Value{});
 }
 
