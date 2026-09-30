@@ -50,7 +50,7 @@ class Vehicle
             dir = -1
         end
 
-        var force = self.engine.update(dt, math.max(self.speed * dir, 0.0), pedal, dir < 0)
+        var force = self.engine.update(dt, math.max(self.speed * dir, 0.0), pedal, dir < 0, brake)
         force = math.min(force, self.mass * self.gripAccel) * dir
 
         var sign = 0

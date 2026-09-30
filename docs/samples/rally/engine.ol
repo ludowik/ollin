@@ -60,9 +60,9 @@ class Engine
     end
 
     ## One step. `speed` is the car's speed along its direction of travel (never negative),
-    ## `throttle` the pedal in [0;1]. Returns the drive force at the wheels in newtons along that
-    ## direction — negative when the engine is braking the car.
-    func update(dt, speed, throttle, reverse)
+    ## `throttle` the pedal in [0;1], `brake` the brake in [0;1]. Returns the drive force at the
+    ## wheels in newtons along that direction — negative when the engine is braking the car.
+    func update(dt, speed, throttle, reverse, brake)
         if reverse <> self.reverse then
             self.reverse = reverse
             self.gear = 1
@@ -73,11 +73,13 @@ class Engine
             self.shiftTimer = self.shiftTimer - dt
         elseif not self.reverse then
             ## Up near the power peak under load, earlier on a light pedal; down when the revs sag,
-            ## and only if the lower gear would not over-rev. The two thresholds are far enough
-            ## apart that a gear change never lands the revs on the opposite threshold.
+            ## and only if the lower gear would not over-rev. Braking raises the downshift point a
+            ## lot: a driver slowing down drops gears early to keep the engine in its range and
+            ## to use its braking, rather than staying in top until the revs are almost dead — and
+            ## never shifts up while braking, or the revs a downshift raises would undo it.
             var up = 6500.0 + 2500.0 * throttle
-            var down = 2500.0 + 2500.0 * throttle
-            if self.gear < #self.ratios and self.rpm > up then
+            var down = 3500.0 + 1500.0 * throttle + 3500.0 * brake
+            if self.gear < #self.ratios and self.rpm > up and brake <= 0 then
                 self.gear = self.gear + 1
                 self.shiftTimer = self.shiftTime
             elseif self.gear > 1 and self.rpm < down
