@@ -7,6 +7,8 @@
 ##   chase.update(dt, targetX, targetY, targetZ, headingRad)   ## every frame, before drawing
 ##   chase.apply(cam)                                          ## cam = graphics.camera(...)
 
+import "approach.ol"
+
 class ChaseCamera
     func init(distance, height, stiffness)
         self.distance = distance
@@ -29,10 +31,9 @@ class ChaseCamera
         var wantY = ty + self.height
         var wantZ = tz - math.cos(heading) * self.distance
         if self.started then
-            var a = 1 - math.exp(-self.stiffness * dt)
-            self.x = self.x + (wantX - self.x) * a
-            self.y = self.y + (wantY - self.y) * a
-            self.z = self.z + (wantZ - self.z) * a
+            self.x = approach(self.x, wantX, self.stiffness, dt)
+            self.y = approach(self.y, wantY, self.stiffness, dt)
+            self.z = approach(self.z, wantZ, self.stiffness, dt)
         else
             self.x = wantX
             self.y = wantY

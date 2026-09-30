@@ -5,6 +5,7 @@
 ## instead of taking it up at once (see approach).
 
 import "../lib/joystick.ol"
+import "../lib/approach.ol"
 import "view_distance.ol"
 ## The world's shape — biome, altitude, blocks, trees, and the baking of a chunk — lives apart: it
 ## is what the noise decides, while this file holds what moves.
@@ -52,13 +53,6 @@ global turnVel = 0.0        ## the current turning speed
 global ACCEL = 5.0          ## how eager the forward motion is; higher is sharper
 global TURN_ACCEL = 7.0
 global EYE_RISE = 6.0       ## smoothing of the eye height, the terrain rising in steps of 1
-
-## Brings `cur` towards `target` by a fraction of the distance left. The fraction depends on
-## deltaTime through an exponential, so the result does not change with the frame rate, unlike a
-## plain `cur + (target-cur) * 0.1`.
-func approach(cur, target, rate)
-    return cur + (target - cur) * (1 - math.exp(-rate * deltaTime))
-end
 
 global C_SKY = Color(0.55, 0.80, 0.95)
 global AMB = 0.5              ## the terrain's ambient light
@@ -338,13 +332,13 @@ func movePlayer()
     var turn = pad.steer()
     if keyboard.isDown("left") then turn = turn - 1 end
     if keyboard.isDown("right") then turn = turn + 1 end
-    turnVel = approach(turnVel, math.clamp(turn, -1, 1) * TURN_MAX, TURN_ACCEL)
+    turnVel = approach(turnVel, math.clamp(turn, -1, 1) * TURN_MAX, TURN_ACCEL, deltaTime)
     yaw = yaw - turnVel * deltaTime
 
     var thr = pad.throttle()      ## the joystick, in [-1;1], forwards and backwards
     if keyboard.isDown("up") then thr = thr + 1 end
     if keyboard.isDown("down") then thr = thr - 1 end   ## the down arrow goes backwards
-    vel = approach(vel, math.clamp(thr, -1, 1) * SPEED_MAX, ACCEL)
+    vel = approach(vel, math.clamp(thr, -1, 1) * SPEED_MAX, ACCEL, deltaTime)
     ## Below a millimetre a second we are at a standstill: cutting out avoids running the collision
     ## test for an invisible move.
     if math.abs(vel) < 0.001 then
@@ -503,7 +497,7 @@ func update(dt)
 
     ## The terrain rises in one-block steps: putting the eye straight on it would make it jump
     ## a whole notch at once. It is left to reach the step gradually.
-    camY = approach(camY, ground(camX, camZ) + EYE, EYE_RISE)
+    camY = approach(camY, ground(camX, camZ) + EYE, EYE_RISE, deltaTime)
     cam.setPos(camX, camY, camZ)
     cam.lookAt(camX + math.cos(PITCH) * math.sin(yaw),
                camY + math.sin(PITCH),

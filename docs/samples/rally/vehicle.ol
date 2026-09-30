@@ -5,6 +5,7 @@
 ## resistance and the brakes, limited by what the tyres can grip), so the top speed, the acceleration
 ## and the gear changes are consequences of the engine and not numbers set here.
 import "engine.ol"
+import "../lib/approach.ol"
 
 class Vehicle
     ## `engine` is the powertrain to drive it with; omitted, the car gets engine.ol's default.
@@ -83,7 +84,7 @@ class Vehicle
 
         ## Purely visual: the wheels ease towards the steering instead of snapping to it. The minus
         ## is the same one as on the heading — steer > 0 lowers the heading.
-        self.steerAngle = self.steerAngle + (-steer * self.maxSteerAngle - self.steerAngle) * (1 - math.exp(-12 * dt))
+        self.steerAngle = approach(self.steerAngle, -steer * self.maxSteerAngle, 12, dt)
         self.travelled = self.travelled + self.speed * dt
         self.x = self.x + math.sin(self.heading) * self.speed * dt
         self.z = self.z + math.cos(self.heading) * self.speed * dt
