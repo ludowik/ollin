@@ -19,6 +19,10 @@ global car = Vehicle(TRACK[1].x, TRACK[1].z,
 global engineSound = EngineSound()
 global chase = ChaseCamera(14, 5.5, 6.0)
 global pad = Joystick()
+## Half the library's default size, resting at the bottom edge: the control stays clear of the
+## road ahead of the car.
+pad.radiusFrac = 0.11
+pad.centerFrac = 0.86
 
 ## A class cannot receive an engine callback (see joystick.ol), so these one-line relays are
 ## what actually arms and moves the touch control.
