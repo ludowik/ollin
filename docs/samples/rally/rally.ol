@@ -81,9 +81,10 @@ end
 
 ## A wheel that rolls without slipping turns by travelled / radius. A plain cylinder looks the
 ## same at every angle, so a lighter bar across the tread is what makes the spin visible.
-func drawWheel(x, y, z)
+func drawWheel(x, y, z, yaw)
     graphics.push()
     graphics.translate(x, y, z)
+    graphics.rotateY(math.deg(yaw))
     graphics.rotateX(math.deg(car.travelled / WHEEL_R))
     graphics.fill(Color(0.75, 0.75, 0.78))
     graphics.cube(0, 0, 0,  WHEEL_H + 0.06, 0.1, WHEEL_R * 1.9)
@@ -114,10 +115,10 @@ func drawCar()
     ## toward +Z so it leads the nose, not the tail. It was at -0.3 and rode backwards.
     graphics.cube(0, 1.05, 0.3,  1.3, 0.5, 1.6)
     graphics.fill(Color(0.12, 0.12, 0.14))
-    drawWheel(HALF_TRACK, 0, HALF_BASE)
-    drawWheel(-HALF_TRACK, 0, HALF_BASE)
-    drawWheel(HALF_TRACK, 0, -HALF_BASE)
-    drawWheel(-HALF_TRACK, 0, -HALF_BASE)
+    drawWheel(HALF_TRACK, 0, HALF_BASE, car.steerAngle)
+    drawWheel(-HALF_TRACK, 0, HALF_BASE, car.steerAngle)
+    drawWheel(HALF_TRACK, 0, -HALF_BASE, 0)
+    drawWheel(-HALF_TRACK, 0, -HALF_BASE, 0)
     graphics.pop()
 end
 

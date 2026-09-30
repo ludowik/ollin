@@ -16,6 +16,8 @@ class Vehicle
         self.maxSpeed = 32.0
         self.maxReverse = 12.0
         self.turnRate = 1.6    ## rad/s, at full steer, once turnScale below has ramped up
+        self.maxSteerAngle = 0.5   ## rad, how far the front wheels pivot at full steer
+        self.steerAngle = 0.0      ## the front wheels' yaw, in the heading's own sign (positive = towards +heading)
     end
 
     ## throttle: -1 (brake/reverse) .. 1 (accelerate). steer: -1 (left) .. 1 (right).
@@ -49,6 +51,9 @@ class Vehicle
         ## one the chase camera puts on the right. steer=-1 (left) must grow +X, so it subtracts.
         self.heading = self.heading - steer * self.turnRate * turnScale * dt
 
+        ## Purely visual: the wheels ease towards the steering instead of snapping to it. The minus
+        ## is the same one as on the heading — steer > 0 lowers the heading.
+        self.steerAngle = self.steerAngle + (-steer * self.maxSteerAngle - self.steerAngle) * (1 - math.exp(-12 * dt))
         self.travelled = self.travelled + self.speed * dt
         self.x = self.x + math.sin(self.heading) * self.speed * dt
         self.z = self.z + math.cos(self.heading) * self.speed * dt
