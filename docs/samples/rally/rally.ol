@@ -16,7 +16,7 @@ global ground = nil
 ## Starts on the circuit's first waypoint, facing towards the next one.
 global car = Vehicle(TRACK[1].x, TRACK[1].z,
                      math.atan2(TRACK[2].x - TRACK[1].x, TRACK[2].z - TRACK[1].z))
-global engine = Engine(car.maxSpeed)
+global engineSound = EngineSound()
 global chase = ChaseCamera(14, 5.5, 6.0)
 global pad = Joystick()
 
@@ -37,7 +37,7 @@ func setup()
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
     ground = bakeTerrain()
-    engine.start()
+    engineSound.start()
 end
 
 global HALF_TRACK = 0.95   ## a wheel's lateral offset from the car's centreline
@@ -79,7 +79,7 @@ func update(dt)
     if keyboard.isDown("right") then steer = steer + 1 end
     throttle = math.clamp(throttle, -1, 1)
     car.update(dt, throttle, math.clamp(steer, -1, 1))
-    engine.update(dt, car.speed, throttle)
+    engineSound.update(car.engine)
 
     chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
