@@ -30,7 +30,7 @@ func mouse.released(x, y)
 end
 
 func setup()
-    graphics.canvas(900, 600, "Rally")
+    graphics.canvas(W, H, "Rally")
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
     ground = bakeTerrain()
