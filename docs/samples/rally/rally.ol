@@ -14,7 +14,7 @@ global ground = nil
 ## Starts on the circuit's first waypoint, facing towards the next one.
 global car = Vehicle(TRACK[1].x, TRACK[1].z,
                      math.atan2(TRACK[2].x - TRACK[1].x, TRACK[2].z - TRACK[1].z))
-global chase = ChaseCamera(9, 3.5, 6.0)
+global chase = ChaseCamera(14, 5.5, 6.0)
 global pad = Joystick()
 
 ## A class cannot receive an engine callback (see joystick.ol), so these one-line relays are
@@ -69,14 +69,16 @@ func update(dt)
     chase.apply(cam)
 end
 
+global WHEEL_R = 0.42
+global WHEEL_H = 0.32
+
 func drawWheel(x, y, z)
-    var h = 0.32
     graphics.push()
     graphics.translate(x, y, z)
     graphics.rotateZ(90)
     ## graphics.cylinder is anchored at its BASE, not centred like cube/sphere — offset by -h/2
     ## along its own (pre-rotation) axis so the wheel centres on (x, y, z) once rotated.
-    graphics.cylinder(0, -h / 2, 0,  0.42, h)
+    graphics.cylinder(0, -WHEEL_H / 2, 0,  WHEEL_R, WHEEL_H)
     graphics.pop()
 end
 
@@ -84,21 +86,25 @@ func drawCar()
     var groundY = heightAt(car.x, car.z)
     var pitch, roll = groundSlope(car.x, car.z, car.heading)
     graphics.push()
-    graphics.translate(car.x, groundY + 0.55, car.z)
+    ## The car's local origin sits at AXLE height: a wheel drawn at local y=0 (see drawWheel calls
+    ## below) then has its bottom exactly WHEEL_R below, right at the ground. This offset and the
+    ## wheel's own radius used to be two unrelated numbers (0.55 here, 0.42 in drawWheel) — out of
+    ## sync by WHEEL_R, which is exactly how much of the car sat buried in the terrain.
+    graphics.translate(car.x, groundY + WHEEL_R, car.z)
     graphics.rotateY(math.deg(car.heading))
     graphics.rotateX(math.deg(pitch))
     graphics.rotateZ(-math.deg(roll))
     graphics.fill(Color(0.82, 0.15, 0.15))
-    graphics.cube(0, 0, 0,  1.7, 0.8, 3.6)
+    graphics.cube(0, 0.4, 0,  1.7, 0.8, 3.6)
     graphics.fill(Color(0.22, 0.24, 0.28))
     ## +Z is the car's own forward (heading 0 → sin=0, cos=1 → z increases) — the cabin sits
     ## toward +Z so it leads the nose, not the tail. It was at -0.3 and rode backwards.
-    graphics.cube(0, 0.55, 0.3,  1.3, 0.5, 1.6)
+    graphics.cube(0, 1.05, 0.3,  1.3, 0.5, 1.6)
     graphics.fill(Color(0.12, 0.12, 0.14))
-    drawWheel(0.95, -0.55, 1.2)
-    drawWheel(-0.95, -0.55, 1.2)
-    drawWheel(0.95, -0.55, -1.2)
-    drawWheel(-0.95, -0.55, -1.2)
+    drawWheel(0.95, 0, 1.2)
+    drawWheel(-0.95, 0, 1.2)
+    drawWheel(0.95, 0, -1.2)
+    drawWheel(-0.95, 0, -1.2)
     graphics.pop()
 end
 
