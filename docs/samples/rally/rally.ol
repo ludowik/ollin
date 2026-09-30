@@ -79,9 +79,15 @@ func update(dt)
     chase.apply(cam)
 end
 
+## A wheel that rolls without slipping turns by travelled / radius. A plain cylinder looks the
+## same at every angle, so a lighter bar across the tread is what makes the spin visible.
 func drawWheel(x, y, z)
     graphics.push()
     graphics.translate(x, y, z)
+    graphics.rotateX(math.deg(car.travelled / WHEEL_R))
+    graphics.fill(Color(0.75, 0.75, 0.78))
+    graphics.cube(0, 0, 0,  WHEEL_H + 0.06, 0.1, WHEEL_R * 1.9)
+    graphics.fill(Color(0.12, 0.12, 0.14))
     graphics.rotateZ(90)
     ## graphics.cylinder is anchored at its BASE, not centred like cube/sphere — offset by -h/2
     ## along its own (pre-rotation) axis so the wheel centres on (x, y, z) once rotated.

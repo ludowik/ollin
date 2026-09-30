@@ -8,6 +8,7 @@ class Vehicle
         self.z = z
         self.heading = heading or 0.0
         self.speed = 0.0
+        self.travelled = 0.0   ## signed distance rolled so far — what a wheel's spin is derived from
 
         self.accel = 18.0      ## units/s^2 while the throttle pushes with the current motion
         self.brake = 28.0      ## units/s^2 while it pushes against it (braking, not just easing off)
@@ -48,6 +49,7 @@ class Vehicle
         ## one the chase camera puts on the right. steer=-1 (left) must grow +X, so it subtracts.
         self.heading = self.heading - steer * self.turnRate * turnScale * dt
 
+        self.travelled = self.travelled + self.speed * dt
         self.x = self.x + math.sin(self.heading) * self.speed * dt
         self.z = self.z + math.cos(self.heading) * self.speed * dt
     end
