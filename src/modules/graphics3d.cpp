@@ -46,6 +46,26 @@ static float s_cur_tile[3] = {-1.0f, -1.0f, -1.0f};
 // Heights of the four top corners of the next cube (state, like s_cur_tile), in local
 // units: (-x,-z), (+x,-z), (-x,+z), (+x,+z). All zero = an ordinary cube.
 static float s_cur_corner[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+// Per-corner slopes (graphics.cornerSlopes), in local units, same corner order: d(height)/dx then
+// d(height)/dz. They give the vertex shader a NORMAL at each corner shared with the neighbouring
+// cells, so the lighting is continuous across a cell edge instead of flat per cell. All zero =
+// the normal is rebuilt from the four corner heights alone (one flat normal per cell).
+static float s_cur_slope_x[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+static float s_cur_slope_z[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+// Floats per instance in the corner VBO: heights, slopes in x, slopes in z.
+static const int k_corner_stride = 12;
+
+static void push_corner_block(std::vector<float>& out) {
+    for (int k = 0; k < 4; k++) {
+        out.push_back(s_cur_corner[k]);
+    }
+    for (int k = 0; k < 4; k++) {
+        out.push_back(s_cur_slope_x[k]);
+    }
+    for (int k = 0; k < 4; k++) {
+        out.push_back(s_cur_slope_z[k]);
+    }
+}
 // Corner-blended colour (graphics.mixCorners/blendColor): mix factors [0..1] at the same four
 // corners as s_cur_corner (state, like s_cur_tile), and the SECOND colour they blend toward — a
 // uniform, so shared by every instance of the draw call, not per-cube. All-zero mix = an ordinary
@@ -376,7 +396,7 @@ static Shader s_lit{};
 static bool s_lit_ready = false;
 static int s_loc_vertcolor = -1;
 static int s_loc_instcolor = -1, s_loc_viewpos = -1, s_loc_ambient = -1;
-static int s_loc_instcorner = -1;
+static int s_loc_instcorner = -1, s_loc_instslopex = -1, s_loc_instslopez = -1;
 static int s_loc_instmix = -1, s_loc_blendcolorb = -1;
 static int s_loc_insttile = -1, s_loc_atlasgrid = -1, s_loc_utime = -1, s_loc_animtile = -1;
 static int s_loc_animparams = -1, s_loc_flipv = -1;
@@ -422,6 +442,8 @@ static void load_lit_shader() {
     s_loc_instcolor = GetShaderLocationAttrib(s_lit, "instanceColor");
     s_loc_insttile = GetShaderLocationAttrib(s_lit, "instanceTile");
     s_loc_instcorner = GetShaderLocationAttrib(s_lit, "instanceCorner");
+    s_loc_instslopex = GetShaderLocationAttrib(s_lit, "instanceSlopeX");
+    s_loc_instslopez = GetShaderLocationAttrib(s_lit, "instanceSlopeZ");
     s_loc_instmix = GetShaderLocationAttrib(s_lit, "instanceMix");
     s_loc_blendcolorb = GetShaderLocation(s_lit, "blendColorB");
     s_loc_atlasgrid = GetShaderLocation(s_lit, "atlasGrid");
@@ -470,8 +492,8 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
             s_rec_tw.push_back(s_cur_tile[0]);
             s_rec_tw.push_back(s_cur_tile[1]);
             s_rec_tw.push_back(s_cur_tile[2]);
+            push_corner_block(s_rec_kw);
             for (int k = 0; k < 4; k++) {
-                s_rec_kw.push_back(s_cur_corner[k]);
                 s_rec_mw.push_back(s_cur_mix[k]);
             }
             return;
@@ -485,8 +507,8 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
         s_rec_t.push_back(s_cur_tile[0]);
         s_rec_t.push_back(s_cur_tile[1]);
         s_rec_t.push_back(s_cur_tile[2]);
+        push_corner_block(s_rec_k);
         for (int k = 0; k < 4; k++) {
-            s_rec_k.push_back(s_cur_corner[k]);
             s_rec_m.push_back(s_cur_mix[k]);
         }
         return;
@@ -506,8 +528,8 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
     b.tiles.push_back(s_cur_tile[0]);
     b.tiles.push_back(s_cur_tile[1]);
     b.tiles.push_back(s_cur_tile[2]);
+    push_corner_block(b.corners);
     for (int k = 0; k < 4; k++) {
-        b.corners.push_back(s_cur_corner[k]);
         b.mix.push_back(s_cur_mix[k]);
     }
 }
@@ -595,8 +617,20 @@ static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned 
     if (s_loc_instcorner >= 0 && vbo_k != 0) {
         rlEnableVertexBuffer(vbo_k);
         rlEnableVertexAttribute(s_loc_instcorner);
-        rlSetVertexAttribute(s_loc_instcorner, 4, RL_FLOAT, 0, 0, 0);
+        rlSetVertexAttribute(s_loc_instcorner, 4, RL_FLOAT, 0, k_corner_stride * sizeof(float), 0);
         rlSetVertexAttributeDivisor(s_loc_instcorner, 1);
+        if (s_loc_instslopex >= 0) {
+            rlEnableVertexAttribute(s_loc_instslopex);
+            rlSetVertexAttribute(s_loc_instslopex, 4, RL_FLOAT, 0, k_corner_stride * sizeof(float),
+                                 4 * sizeof(float));
+            rlSetVertexAttributeDivisor(s_loc_instslopex, 1);
+        }
+        if (s_loc_instslopez >= 0) {
+            rlEnableVertexAttribute(s_loc_instslopez);
+            rlSetVertexAttribute(s_loc_instslopez, 4, RL_FLOAT, 0, k_corner_stride * sizeof(float),
+                                 8 * sizeof(float));
+            rlSetVertexAttributeDivisor(s_loc_instslopez, 1);
+        }
     }
     if (s_loc_instmix >= 0 && vbo_m != 0) {
         rlEnableVertexBuffer(vbo_m);
@@ -660,7 +694,7 @@ static void flush_bucket(const Bucket3D& b) {
     upload_instance_vbo(s_inst_vbo_xform, s_inst_cap_xform, xf.data(), n * (int)sizeof(float16));
     upload_instance_vbo(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
     upload_instance_vbo(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
-    upload_instance_vbo(s_inst_vbo_corner, s_inst_cap_corner, b.corners.data(), n * 4 * (int)sizeof(float));
+    upload_instance_vbo(s_inst_vbo_corner, s_inst_cap_corner, b.corners.data(), n * k_corner_stride * (int)sizeof(float));
     upload_instance_vbo(s_inst_vbo_mix, s_inst_cap_mix, b.mix.data(), n * 4 * (int)sizeof(float));
     bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile, s_inst_vbo_corner, s_inst_vbo_mix);
     rlDisableVertexBuffer();
@@ -773,6 +807,8 @@ void reset3d_graphics_state() {
     s_cur_tile[2] = -1.0f;
     for (int k = 0; k < 4; k++) {
         s_cur_corner[k] = 0.0f;
+        s_cur_slope_x[k] = 0.0f;
+        s_cur_slope_z[k] = 0.0f;
         s_cur_mix[k] = 0.0f;
     }
     s_cur_blend_color[0] = 1.0f;
@@ -1061,6 +1097,22 @@ static int gfx_blend_color(CallCtx& ctx) {
     s_cur_blend_color[1] = c.g / 255.0f;
     s_cur_blend_color[2] = c.b / 255.0f;
     s_cur_blend_color[3] = c.a / 255.0f;
+    return ctx.ret(Value{});
+}
+
+// graphics.cornerSlopes(dx1, dx2, dx3, dx4, dz1, dz2, dz3, dz4): the height's slope along x, then
+// along z, at the four TOP corners of the next cube, in graphics.corners' corner order and in
+// its LOCAL units (height change across the whole cube, not per world unit). The shader turns
+// each pair into a normal at that corner, and the normal is interpolated across the top: cells
+// that hand the same slopes to the corner they share are lit as ONE smooth surface, where the
+// corner heights alone give every cell a single flat normal (a faceted look). State, like
+// graphics.corners; all zero (the default) keeps that flat normal.
+static int gfx_corner_slopes(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    for (int k = 0; k < 4; k++) {
+        s_cur_slope_x[k] = argc > k ? (float)num_arg(args, argc, k, "graphics.cornerSlopes") : 0.0f;
+        s_cur_slope_z[k] = argc > k + 4 ? (float)num_arg(args, argc, k + 4, "graphics.cornerSlopes") : 0.0f;
+    }
     return ctx.ret(Value{});
 }
 
@@ -1484,7 +1536,7 @@ static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, co
         g.vbo_x = rlLoadVertexBuffer(xf.data(), g.count * (int)sizeof(float16), false);
         g.vbo_c = rlLoadVertexBuffer(cs.data(), g.count * 4 * (int)sizeof(float), false);
         g.vbo_t = rlLoadVertexBuffer(ts.data(), g.count * 3 * (int)sizeof(float), false);
-        g.vbo_k = rlLoadVertexBuffer(ks.data(), g.count * 4 * (int)sizeof(float), false);
+        g.vbo_k = rlLoadVertexBuffer(ks.data(), g.count * k_corner_stride * (int)sizeof(float), false);
         g.vbo_m = rlLoadVertexBuffer(ms.data(), g.count * 4 * (int)sizeof(float), false);
     }
     return g;
@@ -1666,6 +1718,8 @@ void reset3d_frame_state() {
     s_cur_tile[2] = -1.0f;
     for (int k = 0; k < 4; k++) {
         s_cur_corner[k] = 0.0f;
+        s_cur_slope_x[k] = 0.0f;
+        s_cur_slope_z[k] = 0.0f;
         s_cur_mix[k] = 0.0f;
     }
     s_cur_blend_color[0] = 1.0f;
@@ -1699,6 +1753,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("corners")), Value::make_builtin(gfx_corners));
     m.map_set(Value(std::string("blendColor")), Value::make_builtin(gfx_blend_color));
     m.map_set(Value(std::string("mixCorners")), Value::make_builtin(gfx_mix_corners));
+    m.map_set(Value(std::string("cornerSlopes")), Value::make_builtin(gfx_corner_slopes));
     m.map_set(Value(std::string("grid")), Value::make_builtin(with_area<gfx_grid>));
     m.map_set(Value(std::string("cube")), Value::make_builtin(with_area<gfx_cube>));
     m.map_set(Value(std::string("sphere")), Value::make_builtin(with_area<gfx_sphere>));

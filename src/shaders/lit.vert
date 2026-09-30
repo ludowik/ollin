@@ -9,6 +9,8 @@ in mat4 instanceTransform;
 in vec4 instanceColor;
 in vec3 instanceTile;
 in vec4 instanceCorner;
+in vec4 instanceSlopeX;
+in vec4 instanceSlopeZ;
 in vec4 instanceMix;
 uniform mat4 mvp;
 uniform vec4 blendColorB;
@@ -42,6 +44,13 @@ void main() {
         if (vn.y > 0.5) {
             float dhx = (instanceCorner.y + instanceCorner.w - instanceCorner.x - instanceCorner.z) * 0.5;
             float dhz = (instanceCorner.z + instanceCorner.w - instanceCorner.x - instanceCorner.y) * 0.5;
+            // Slopes given per corner (graphics.cornerSlopes): this top vertex IS one of the four
+            // corners, so the bilinear pick returns its own slope pair, and the normal the
+            // fragment stage interpolates is shared with the neighbouring cell — no crease.
+            if (any(notEqual(instanceSlopeX, vec4(0.0))) || any(notEqual(instanceSlopeZ, vec4(0.0)))) {
+                dhx = mix(mix(instanceSlopeX.x, instanceSlopeX.y, u), mix(instanceSlopeX.z, instanceSlopeX.w, u), v);
+                dhz = mix(mix(instanceSlopeZ.x, instanceSlopeZ.y, u), mix(instanceSlopeZ.z, instanceSlopeZ.w, u), v);
+            }
             vn = normalize(vec3(-dhx, 1.0, -dhz));
         }
     }

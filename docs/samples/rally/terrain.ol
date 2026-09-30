@@ -168,6 +168,23 @@ func bakeTerrain()
     end
     LATTICE = latH
     LATTICE_N = n
+    ## The slope at every lattice point, by central difference (one-sided on the border), in the
+    ## LOCAL units graphics.cornerSlopes expects: the height change across one whole cell. Cells
+    ## sharing a corner hand it the SAME slopes, hence the same lighting normal — the surface is
+    ## shaded as one, instead of every cell being a lit facet of its own.
+    var latSX = []
+    var latSZ = []
+    for j = -n, n + 1 do
+        for i = -n, n + 1 do
+            var idx = (j + n) * W + (i + n) + 1
+            var il = math.max(i - 1, -n)
+            var ir = math.min(i + 1, n + 1)
+            var jl = math.max(j - 1, -n)
+            var jr = math.min(j + 1, n + 1)
+            latSX[idx] = (latH[(j + n) * W + (ir + n) + 1] - latH[(j + n) * W + (il + n) + 1]) / (ir - il)
+            latSZ[idx] = (latH[(jr + n) * W + (i + n) + 1] - latH[(jl + n) * W + (i + n) + 1]) / (jr - jl)
+        end
+    end
     for cz = -n, n do
         for cx = -n, n do
             var i00 = (cz + n) * W + (cx + n) + 1
@@ -185,11 +202,14 @@ func bakeTerrain()
             graphics.mixCorners(roadMixAt(latD[i00]), roadMixAt(latD[i10]),
                                 roadMixAt(latD[i01]), roadMixAt(latD[i11]))
             graphics.corners(sw, se, nw, ne)
+            graphics.cornerSlopes(latSX[i00], latSX[i10], latSX[i01], latSX[i11],
+                                  latSZ[i00], latSZ[i10], latSZ[i01], latSZ[i11])
             graphics.cube(x, -SKIRT / 2, z,  CELL, SKIRT, CELL)
         end
     end
     graphics.mixCorners(0, 0, 0, 0)
     graphics.corners(0, 0, 0, 0)
+    graphics.cornerSlopes(0, 0, 0, 0, 0, 0, 0, 0)
     graphics.fill(colors.WHITE)
     return graphics.endChunk()
 end
