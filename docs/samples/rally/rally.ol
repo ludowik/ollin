@@ -1,10 +1,12 @@
 ## Art of Rally, minimal — one car, one circuit, free exploration. Drive with the ARROW KEYS
 ## (up/down throttle, left/right steer) or the on-screen touch joystick; the chase camera follows
-## on its own. No lap timing, no opponents, no collision against the verge — just driving the
-## circuit and the hills around it.
+## on its own, and the engine note follows the revs (the audio starts on the first key or touch).
+## No lap timing, no opponents, no collision against the verge — just driving the circuit and the
+## hills around it.
 
 import "terrain.ol"
 import "vehicle.ol"
+import "engine.ol"
 import "../lib/chasecam.ol"
 import "../lib/joystick.ol"
 
@@ -14,6 +16,7 @@ global ground = nil
 ## Starts on the circuit's first waypoint, facing towards the next one.
 global car = Vehicle(TRACK[1].x, TRACK[1].z,
                      math.atan2(TRACK[2].x - TRACK[1].x, TRACK[2].z - TRACK[1].z))
+global engine = Engine(car.maxSpeed)
 global chase = ChaseCamera(14, 5.5, 6.0)
 global pad = Joystick()
 
@@ -34,6 +37,7 @@ func setup()
     graphics.ambient(0.55)
     graphics.light("dir", -0.5, -1, -0.4)
     ground = bakeTerrain()
+    engine.start()
 end
 
 global HALF_TRACK = 0.95   ## a wheel's lateral offset from the car's centreline
@@ -73,7 +77,9 @@ func update(dt)
     var steer = pad.steer()
     if keyboard.isDown("left") then steer = steer - 1 end
     if keyboard.isDown("right") then steer = steer + 1 end
-    car.update(dt, math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1))
+    throttle = math.clamp(throttle, -1, 1)
+    car.update(dt, throttle, math.clamp(steer, -1, 1))
+    engine.update(dt, car.speed, throttle)
 
     chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
