@@ -128,6 +128,40 @@ func drawCar()
     graphics.pop()
 end
 
+## One readout row: the value right-aligned on `xr`, its unit just after it, each with a dark
+## copy underneath so the white stays readable over the grass, the road and the sky.
+func hudRow(value, unit, xr, y, size)
+    graphics.fontSize(size)
+    var gap = size * 0.3
+    graphics.stroke(Color(0, 0, 0, 0.6))
+    graphics.textMode("right", "top")
+    graphics.text(value, xr + 2, y + 2)
+    graphics.textMode("left", "top")
+    graphics.text(unit, xr + gap + 2, y + 2)
+    graphics.stroke(Color(1, 1, 1))
+    graphics.textMode("right", "top")
+    graphics.text(value, xr, y)
+    graphics.textMode("left", "top")
+    graphics.text(unit, xr + gap, y)
+end
+
+## Speed, engaged gear and revs, top left. The monospaced font keeps the digits from jittering as
+## the numbers change.
+func drawHud()
+    var u = SIZE * 0.04
+    var gear = "{car.engine.gear}"
+    var of = "/ {#car.engine.ratios}"
+    if car.engine.reverse then
+        gear = "R"
+        of = ""
+    end
+    graphics.font("mono")
+    var xr = u * 5.5
+    hudRow("{math.floor(math.abs(car.speed) * 3.6)}", "km/h", xr, u * 0.6, u * 2.2)
+    hudRow(gear, of, xr, u * 3.1, u * 1.3)
+    hudRow("{math.floor(car.engine.rpm)}", "rpm", xr, u * 4.7, u * 1.3)
+end
+
 func draw()
     graphics.clear(Color(0.55, 0.72, 0.85))
     graphics.begin3d(cam)
@@ -135,5 +169,6 @@ func draw()
     graphics.drawChunk(ground)
     drawCar()
     graphics.end3d()
+    drawHud()
     pad.draw()
 end
