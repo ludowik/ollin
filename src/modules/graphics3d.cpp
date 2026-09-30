@@ -315,6 +315,8 @@ struct InstGroup {
     unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
     int count;
     bool owns_mesh;       // the mesh was built for this group (graphics.heightfield): unload it with the group
+    bool shared_instance; // vbo_x/c/t are the shared identity-instance buffers (s_hf_*): never unloaded per group
+    bool prebound;        // the instance attributes were bound into the mesh's VAO once, at creation
     // What graphics.terrainHeight reads back from a heightfield patch: its grid and heights.
     int hf_cols;
     int hf_rows;
@@ -324,6 +326,9 @@ struct InstGroup {
     std::vector<float> hf_heights;
 };
 static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
+// The ONE instance every heightfield patch draws (identity transform, white, no tile): its three
+// instance buffers are made once and shared by all patches, instead of three tiny buffers each.
+static unsigned int s_hf_vbo_x = 0, s_hf_vbo_c = 0, s_hf_vbo_t = 0;
 static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
 static Matrix s_view3d = MatrixIdentity();   // the view frozen at begin3d, for the solids' MVP; the identity by default, as a fail-safe should a flush precede begin3d
 static Matrix s_proj3d = MatrixIdentity();   // the perspective projection frozen at begin3d, for inFrustum called OUTSIDE the 3D block, where rlGetMatrixProjection returns the 2D ortho restored by end3d
@@ -678,18 +683,26 @@ void reset3d_graphics_state() {
     // Baked instance groups: their VBOs belong to the context, so we free and clear them
     // (the script bakes them again in setup on the next run).
     for (auto& g : s_groups) {
-        if (g.vbo_x) {
+        if (g.vbo_x && !g.shared_instance) {
             rlUnloadVertexBuffer(g.vbo_x);
         }
-        if (g.vbo_c) {
+        if (g.vbo_c && !g.shared_instance) {
             rlUnloadVertexBuffer(g.vbo_c);
         }
-        if (g.vbo_t) {
+        if (g.vbo_t && !g.shared_instance) {
             rlUnloadVertexBuffer(g.vbo_t);
         }
         if (g.owns_mesh) {
             UnloadMesh(g.mesh);
         }
+    }
+    if (s_hf_vbo_x) {
+        rlUnloadVertexBuffer(s_hf_vbo_x);
+        rlUnloadVertexBuffer(s_hf_vbo_c);
+        rlUnloadVertexBuffer(s_hf_vbo_t);
+        s_hf_vbo_x = 0;
+        s_hf_vbo_c = 0;
+        s_hf_vbo_t = 0;
     }
     s_groups.clear();
     s_free_groups.clear();
@@ -1599,11 +1612,26 @@ static int gfx_heightfield(CallCtx& ctx) {
     }
     UploadMesh(&mesh, false);
 
-    // One instance at the identity: the patch already holds world positions.
-    std::vector<Matrix> xs{MatrixIdentity()};
-    std::vector<float> cs{1.0f, 1.0f, 1.0f, 1.0f};
-    std::vector<float> ts{-1.0f, -1.0f, -1.0f};
-    InstGroup g = build_group(mesh, xs, cs, ts);
+    // One instance at the identity, the same for every patch (they already hold world positions):
+    // its buffers are shared, and bound into this mesh's VAO ONCE here instead of at every draw.
+    if (s_hf_vbo_x == 0) {
+        float16 identity = MatrixToFloatV(MatrixIdentity());
+        float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        float no_tile[3] = {-1.0f, -1.0f, -1.0f};
+        s_hf_vbo_x = rlLoadVertexBuffer(&identity, (int)sizeof(float16), false);
+        s_hf_vbo_c = rlLoadVertexBuffer(white, (int)sizeof(white), false);
+        s_hf_vbo_t = rlLoadVertexBuffer(no_tile, (int)sizeof(no_tile), false);
+    }
+    load_lit_shader();
+    InstGroup g{};
+    g.mesh = mesh;
+    g.count = 1;
+    g.vbo_x = s_hf_vbo_x;
+    g.vbo_c = s_hf_vbo_c;
+    g.vbo_t = s_hf_vbo_t;
+    g.shared_instance = true;
+    lit_bind_instances(mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    g.prebound = true;
     g.owns_mesh = true;
     g.hf_cols = cols;
     g.hf_rows = rows;
@@ -1679,7 +1707,9 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     if (!lit_begin_draw()) {
         return ctx.ret(Value{});
     }
-    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    if (!g.prebound) {
+        lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    }
     // The atlas is bound if declared (tiles >= 0 sample it), otherwise white (plain colour).
     // CONTRACT: with a tileset active, give a tile to EVERY cube of the chunk — a cube with
     // tile -1 would sample the atlas at fragTexCoord (tile 0) instead of a plain colour.
@@ -1713,7 +1743,9 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     BeginBlendMode(BLEND_ALPHA);
-    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    if (!g.prebound) {
+        lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t);
+    }
     lit_draw_instanced(g.mesh, s_atlas_texid, g.count, s_atlas_flipped);
     rlDisableShader();
     EndBlendMode();
@@ -1734,18 +1766,20 @@ static void free_group_by_id(Value& handle, const char* key) {
     }
     InstGroup& g = s_groups[id - 1];
     bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.count != 0;
-    if (g.vbo_x) {
+    if (g.vbo_x && !g.shared_instance) {
         rlUnloadVertexBuffer(g.vbo_x);
-        g.vbo_x = 0;
     }
-    if (g.vbo_c) {
+    if (g.vbo_c && !g.shared_instance) {
         rlUnloadVertexBuffer(g.vbo_c);
-        g.vbo_c = 0;
     }
-    if (g.vbo_t) {
+    if (g.vbo_t && !g.shared_instance) {
         rlUnloadVertexBuffer(g.vbo_t);
-        g.vbo_t = 0;
     }
+    g.vbo_x = 0;
+    g.vbo_c = 0;
+    g.vbo_t = 0;
+    g.shared_instance = false;
+    g.prebound = false;
     g.count = 0;
     if (g.owns_mesh) {
         UnloadMesh(g.mesh);
