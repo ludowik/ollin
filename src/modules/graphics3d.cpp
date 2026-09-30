@@ -87,16 +87,24 @@ static float s_anim_params[4] = {0.09f, 1.6f, 8.0f, 0.045f};
 // cleared by a graphics.clear(opaque colour) at the start of the frame (ClearBackground
 // clears the colour buffer AND the depth buffer, through rlClearScreenBuffers).
 
+// A number stored in a map under `key`, or `def` when it is missing or not a number.
+static double map_number_or(const Value& map, const char* key, double def) {
+    Value f = map.map_get(Value(std::string(key)));
+    return f.is_number() ? f.as_num() : def;
+}
+
+// A numeric flag stored in a map: true when the field is a non-zero number.
+static bool map_flag(const Value& map, const char* key) {
+    return map_number_or(map, key, 0.0) != 0.0;
+}
+
 // Rebuilds a raylib Camera3D from the map handle (graphics.camera). Default up = +Y,
 // perspective projection, raylib's default near/far.
 static Camera3D camera_from_map(const Value& v, const char* fn) {
     if (!v.is_map())
         throw std::runtime_error(std::string(fn) + ": expected a camera (graphics.camera)");
-    auto get = [&](const char* k, double def) -> float {
-        Value f = v.map_get(Value(std::string(k)));
-        return f.is_number() ? (float)f.as_num() : (float)def;
-    };
-    bool ortho = v.map_get(Value(std::string("ortho"))).is_number() && v.map_get(Value(std::string("ortho"))).as_num() != 0.0;
+    auto get = [&](const char* k, double def) -> float { return (float)map_number_or(v, k, def); };
+    bool ortho = map_flag(v, "ortho");
     Camera3D cam{};
     cam.position = Vector3{get("px", 0), get("py", 0), get("pz", 0)};
     cam.target = Vector3{get("tx", 0), get("ty", 0), get("tz", 0)};
@@ -160,7 +168,7 @@ static int cam_zoom(CallCtx& ctx) {
     Value self = args[0];
     double factor = num_arg(args, argc, 1, "Camera.zoom");
     if (factor <= 0.0) return ctx.ret(self);
-    bool ortho = self.map_get(Value(std::string("ortho"))).is_number() && self.map_get(Value(std::string("ortho"))).as_num() != 0.0;
+    bool ortho = map_flag(self, "ortho");
     if (ortho) {
         double fovy = cam_field(self, "fovy");
         self.map_set(Value(std::string("fovy")), Value(std::max(0.01, fovy * factor)));
@@ -331,6 +339,11 @@ static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
 static unsigned int s_hf_vbo_x = 0, s_hf_vbo_c = 0, s_hf_vbo_t = 0;
 static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
 static Matrix s_view3d = MatrixIdentity();   // the view frozen at begin3d, for the solids' MVP; the identity by default, as a fail-safe should a flush precede begin3d
+// The six frustum planes (unit normal x,y,z and offset) of s_view3d · s_proj3d, worked out on the
+// first inFrustum of a frame instead of at every call: a script culls dozens of blocks a frame.
+static float s_frustum[6][4];
+static bool s_frustum_valid[6];
+static bool s_frustum_ready = false;
 static Matrix s_proj3d = MatrixIdentity();   // the perspective projection frozen at begin3d, for inFrustum called OUTSIDE the 3D block, where rlGetMatrixProjection returns the 2D ortho restored by end3d
 
 // Mesh cache keyed by (shape, segments): several resolutions coexist, so a
@@ -779,6 +792,7 @@ static int gfx_begin3d(CallCtx& ctx) {
     BeginMode3D(s_cam3d);
     s_view3d = rlGetMatrixModelview();   // the view ALONE, before any transform the user applied
     s_proj3d = rlGetMatrixProjection();  // the perspective projection is frozen, so inFrustum is right even outside the 3D block
+    s_frustum_ready = false;
     // Enters rlgl's "transform" mode for the WHOLE 3D block, so that translate/rotate/scale
     // — WITH OR WITHOUT push/pop — write into RLGL.State.transform (world space, read by
     // rlGetMatrixTransform) instead of into the modelview. The instanced solids (baked) AND
@@ -1331,33 +1345,44 @@ static int gfx_in_frustum(CallCtx& ctx) {
     float y = (float)num_arg(args, argc, 1, "graphics.inFrustum");
     float z = (float)num_arg(args, argc, 2, "graphics.inFrustum");
     float r = argc > 3 ? (float)num_arg(args, argc, 3, "graphics.inFrustum") : 0.0f;
-    // Uses the projection FROZEN at begin3d (s_proj3d), not rlGetMatrixProjection() live:
-    // per-chunk culling happens BEFORE begin3d, where the current projection is the 2D ortho
-    // restored by the previous end3d, giving a wrong frustum (distant chunks wrongly culled;
-    // they "appear" as one draws near).
-    Matrix vp = MatrixMultiply(s_view3d, s_proj3d);
-    // Rows of VP (clip.x/y/z/w = row · (x,y,z,1)), in raylib's column-major layout.
-    float rows[4][4] = {
-        {vp.m0, vp.m4, vp.m8, vp.m12},   // clip.x
-        {vp.m1, vp.m5, vp.m9, vp.m13},   // clip.y
-        {vp.m2, vp.m6, vp.m10, vp.m14},  // clip.z
-        {vp.m3, vp.m7, vp.m11, vp.m15},  // clip.w
-    };
-    // Six planes = row_w ± row_i (left/right, bottom/top, near/far).
-    for (int i = 0; i < 3; i++) {
-        for (int sgn = 0; sgn < 2; sgn++) {
-            float a = rows[3][0] + (sgn ? -rows[i][0] : rows[i][0]);
-            float b = rows[3][1] + (sgn ? -rows[i][1] : rows[i][1]);
-            float c = rows[3][2] + (sgn ? -rows[i][2] : rows[i][2]);
-            float d = rows[3][3] + (sgn ? -rows[i][3] : rows[i][3]);
-            float len = std::sqrt(a * a + b * b + c * c);
-            if (len < 1e-6f) {
-                continue;
+    if (!s_frustum_ready) {
+        // Uses the projection FROZEN at begin3d (s_proj3d), not rlGetMatrixProjection() live:
+        // per-chunk culling happens BEFORE begin3d, where the current projection is the 2D ortho
+        // restored by the previous end3d, giving a wrong frustum (distant chunks wrongly culled;
+        // they "appear" as one draws near).
+        Matrix vp = MatrixMultiply(s_view3d, s_proj3d);
+        // Rows of VP (clip.x/y/z/w = row · (x,y,z,1)), in raylib's column-major layout.
+        float rows[4][4] = {
+            {vp.m0, vp.m4, vp.m8, vp.m12},   // clip.x
+            {vp.m1, vp.m5, vp.m9, vp.m13},   // clip.y
+            {vp.m2, vp.m6, vp.m10, vp.m14},  // clip.z
+            {vp.m3, vp.m7, vp.m11, vp.m15},  // clip.w
+        };
+        // Six planes = row_w ± row_i (left/right, bottom/top, near/far).
+        for (int i = 0; i < 3; i++) {
+            for (int sgn = 0; sgn < 2; sgn++) {
+                float* pl = s_frustum[i * 2 + sgn];
+                for (int k = 0; k < 4; k++) {
+                    pl[k] = rows[3][k] + (sgn ? -rows[i][k] : rows[i][k]);
+                }
+                float len = std::sqrt(pl[0] * pl[0] + pl[1] * pl[1] + pl[2] * pl[2]);
+                s_frustum_valid[i * 2 + sgn] = len >= 1e-6f;
+                if (s_frustum_valid[i * 2 + sgn]) {
+                    for (int k = 0; k < 4; k++) {
+                        pl[k] /= len;
+                    }
+                }
             }
-            float dist = (a * x + b * y + c * z + d) / len;
-            if (dist < -r) {
-                return ctx.ret(Value::make_bool(false));   // entirely on the wrong side of a plane, hence off screen
-            }
+        }
+        s_frustum_ready = true;
+    }
+    for (int i = 0; i < 6; i++) {
+        if (!s_frustum_valid[i]) {
+            continue;
+        }
+        const float* pl = s_frustum[i];
+        if (pl[0] * x + pl[1] * y + pl[2] * z + pl[3] < -r) {
+            return ctx.ret(Value::make_bool(false));   // entirely on the wrong side of a plane, hence off screen
         }
     }
     return ctx.ret(Value::make_bool(true));
