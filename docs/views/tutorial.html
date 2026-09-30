@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-30 19:55</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-30 19:59</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-30 19:55</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-30 19:59</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2214,7 +2214,7 @@ print(v3)          ## Vec2(4,6)</code></pre>
   </tbody>
 </table>
 <p>A cube with deformed corners is still an instanced cube: the displacement happens in the vertex shader, so it <strong>costs no draw call</strong>. Two neighbouring cubes giving the same value to the corner they share form a continuous surface — enough to let a terrain follow its <strong>unrounded</strong> height instead of a step. Keep it for renderings that want it: the <em>Voxel world</em> example keeps all its cubes identical.</p>
-<p><code>mixCorners</code> does the same thing for <strong>colour</strong>: a flat tint per cube (even one recomputed per cell, such as a road/grass boundary) still changes abruptly from one cube to the next, which reads as speckle rather than a gradient at typical terrain scale. Passed the same four corner values as <code>corners</code>, the GPU blends <code>fill</code> and <code>blendColor</code> by the same bilinear interpolation, <strong>per pixel</strong> — a true gradient across the cell, not one colour per cube. The <em>Rally circuit</em> example uses it for the road's edge.</p>
+<p><code>mixCorners</code> does the same thing for <strong>colour</strong>: a flat tint per cube (even one recomputed per cell, such as a road/grass boundary) still changes abruptly from one cube to the next, which reads as speckle rather than a gradient at typical terrain scale. Passed the same four corner values as <code>corners</code>, the GPU blends <code>fill</code> and <code>blendColor</code> by the same bilinear interpolation, <strong>per pixel</strong> — a true gradient across the cell, not one colour per cube. For a whole terrain, <code>graphics.heightfield</code> (above) carries a colour per vertex instead.</p>
 <div class="callout tip">With an atlas active, give <strong>every</strong> cube of the chunk a tile (<code>tile</code>/<code>tiles</code>): a cube with no tile would sample tile 0 instead of a plain colour.</div>
 
 <pre><code><span class="cmt">## a voxel chunk: baked ONCE in setup(), redrawn in one call per frame</span>

@@ -27,7 +27,6 @@ global FEATHER = 6.0        ## world units over which the road blends into the g
 global CELL = 6.0           ## the terrain lattice's spacing, in world units
 global WORLD_HALF = 260.0   ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
 global BLOCK = 11          ## cells per side of one baked block — the unit of off-screen culling
-global SKIRT = 1.0          ## each cube's own (undeformed) height — see bakeTerrain
 
 ## The distance from (x, z) to the closed loop: one pass over every segment, keeping the closest.
 func distanceToTrack(x, z)
@@ -158,25 +157,25 @@ end
 ## no step, no visible block edge — and its triangles are the ones surfaceAt reads back.
 func bakeTerrain()
     var n = math.floor(WORLD_HALF / CELL)
-    ## Heights AND distances-to-track at the LATTICE POINTS (cell corners, not centres):
-    ## (2n+2) samples per axis, shared by every cell that touches them — the thing that makes
-    ## neighbours line up, for the geometry as well as for the color blend below.
+    ## Height and colour at the LATTICE POINTS (cell corners, not centres): (2n+2) samples per
+    ## axis, shared by every cell and every block that touches them — the thing that makes
+    ## neighbours line up, for the geometry as well as for the colour.
     var latH = []
-    var latD = []
+    var latTint = []
     for j = -n, n + 1 do
         for i = -n, n + 1 do
             var d = distanceToTrack(i * CELL, j * CELL)
             var idx = latticeIndex(i, j, n)
-            latD[idx] = d
             latH[idx] = heightFromDist(i * CELL, j * CELL, d)
+            latTint[idx] = tintAt(latH[idx], d)
         end
     end
     LATTICE = latH
     LATTICE_N = n
-    ## The slope at every lattice point, by central difference (one-sided on the border), as the
-    ## height change across one whole cell (divided by CELL below, per block, to get dh/dx). Cells
-    ## and blocks sharing a point hand it the SAME slope, hence the same lighting normal — the
-    ## surface is shaded as one, instead of every cell being a lit facet of its own.
+    ## The slope at every lattice point, dh/dx and dh/dz per world unit, by central difference
+    ## (one-sided on the border). Cells and blocks sharing a point hand it the SAME slope, hence the
+    ## same lighting normal — the surface is shaded as one, instead of every cell being a lit facet
+    ## of its own.
     var latSX = []
     var latSZ = []
     for j = -n, n + 1 do
@@ -186,8 +185,8 @@ func bakeTerrain()
             var ir = math.min(i + 1, n + 1)
             var jl = math.max(j - 1, -n)
             var jr = math.min(j + 1, n + 1)
-            latSX[idx] = (latH[latticeIndex(ir, j, n)] - latH[latticeIndex(il, j, n)]) / (ir - il)
-            latSZ[idx] = (latH[latticeIndex(i, jr, n)] - latH[latticeIndex(i, jl, n)]) / (jr - jl)
+            latSX[idx] = (latH[latticeIndex(ir, j, n)] - latH[latticeIndex(il, j, n)]) / ((ir - il) * CELL)
+            latSZ[idx] = (latH[latticeIndex(i, jr, n)] - latH[latticeIndex(i, jl, n)]) / ((jr - jl) * CELL)
         end
     end
 
@@ -199,9 +198,9 @@ func bakeTerrain()
             var z0 = -n + bz * BLOCK
             var x1 = math.min(x0 + BLOCK - 1, n)
             var z1 = math.min(z0 + BLOCK - 1, n)
-            ## The block's lattice points, row by row: the heights, the slopes converted from
-            ## "per cell" to "per world unit", and the colour AT each point — interpolated across
-            ## the triangles, so the road fades into the grass without a flat tint per cell.
+            ## The block's lattice points, row by row: height, slopes and the colour AT each point —
+            ## interpolated across the triangles, so the road fades into the grass without a flat
+            ## tint per cell.
             var heights = []
             var slopesX = []
             var slopesZ = []
@@ -210,9 +209,9 @@ func bakeTerrain()
                 for i = x0, x1 + 1 do
                     var idx = latticeIndex(i, j, n)
                     heights.push(latH[idx])
-                    slopesX.push(latSX[idx] / CELL)
-                    slopesZ.push(latSZ[idx] / CELL)
-                    tints.push(tintAt(latH[idx], latD[idx]))
+                    slopesX.push(latSX[idx])
+                    slopesZ.push(latSZ[idx])
+                    tints.push(latTint[idx])
                 end
             end
             blocks.push(graphics.heightfield({

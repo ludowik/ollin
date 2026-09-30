@@ -91,6 +91,14 @@ static void color_to_floats(Color c, float* out) {
     out[3] = c.a / 255.0f;
 }
 
+// A colour as the r/g/b/a fields (0..1) of a map — how a Light instance carries its colour.
+static void set_color_fields(Value& map, Color c) {
+    map.map_set(Value(std::string("r")), Value(c.r / 255.0));
+    map.map_set(Value(std::string("g")), Value(c.g / 255.0));
+    map.map_set(Value(std::string("b")), Value(c.b / 255.0));
+    map.map_set(Value(std::string("a")), Value(c.a / 255.0));
+}
+
 static void push_color(std::vector<float>& out, Color c) {
     float f[4];
     color_to_floats(c, f);
@@ -949,11 +957,7 @@ static int light_set_color(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     Value self = args[0];
     if (is_color_arg(args, argc, 1)) {
-        Color c = gfx_to_color(args[1]);
-        self.map_set(Value(std::string("r")), Value(c.r / 255.0));
-        self.map_set(Value(std::string("g")), Value(c.g / 255.0));
-        self.map_set(Value(std::string("b")), Value(c.b / 255.0));
-        self.map_set(Value(std::string("a")), Value(c.a / 255.0));
+        set_color_fields(self, gfx_to_color(args[1]));
     }
     apply_light_from_instance(self);
     return ctx.ret(self);
@@ -1005,10 +1009,7 @@ static int gfx_light(CallCtx& ctx) {
     inst.map_set(Value(std::string("dx")), Value((double)x));
     inst.map_set(Value(std::string("dy")), Value((double)y));
     inst.map_set(Value(std::string("dz")), Value((double)z));
-    inst.map_set(Value(std::string("r")), Value(c.r / 255.0));
-    inst.map_set(Value(std::string("g")), Value(c.g / 255.0));
-    inst.map_set(Value(std::string("b")), Value(c.b / 255.0));
-    inst.map_set(Value(std::string("a")), Value(c.a / 255.0));
+    set_color_fields(inst, c);
     inst.map_set(Value(std::string("enabled")), Value::make_bool(true));
     apply_light_from_instance(inst);
     return ctx.ret(inst);
@@ -1546,6 +1547,17 @@ static int place_group(const InstGroup& g) {
 // { id, idw, count, wcount }. `id` is the OPAQUE group, `idw` the TRANSPARENT one (water,
 // idw = 0 if there is none). It is redrawn every frame: drawChunk (opaque), then, after
 // ALL the opaque, drawChunkAlpha (water).
+// The handle a script holds for a baked group: the slot ids drawChunk, drawChunkAlpha and freeChunk
+// read (the opaque group, the transparent one, 0 for none), and how many instances each holds.
+static Value make_chunk_handle(int id, int id_alpha, int count, int count_alpha) {
+    Value h = Value::make_map();
+    h.map_set(Value(std::string("id")), Value((int64_t)id));
+    h.map_set(Value(std::string("idw")), Value((int64_t)id_alpha));
+    h.map_set(Value(std::string("count")), Value((int64_t)count));
+    h.map_set(Value(std::string("wcount")), Value((int64_t)count_alpha));
+    return h;
+}
+
 static int gfx_end_chunk(CallCtx& ctx) {
     Value* args = ctx.args; int argc = ctx.argc;
     (void)args;
@@ -1566,12 +1578,7 @@ static int gfx_end_chunk(CallCtx& ctx) {
     s_rec_cw.clear();
     s_rec_tw.clear();
     s_rec_kw.clear();
-    Value h = Value::make_map();
-    h.map_set(Value(std::string("id")), Value((int64_t)id_o));
-    h.map_set(Value(std::string("idw")), Value((int64_t)id_w));
-    h.map_set(Value(std::string("count")), Value((int64_t)g.count));
-    h.map_set(Value(std::string("wcount")), Value((int64_t)w.count));
-    return ctx.ret(h);
+    return ctx.ret(make_chunk_handle(id_o, id_w, g.count, w.count));
 }
 
 // graphics.heightfield({cols, rows, x, z, cell, heights, [slopesX, slopesZ, colors]}): a retained
@@ -1646,38 +1653,33 @@ static int gfx_heightfield(CallCtx& ctx) {
     }
 
     int stride = cols + 1;
-    std::vector<float> h((size_t)nv);
-    for (int64_t i = 0; i < nv; i++) {
-        Value v = heights.array_get(i + 1);
-        if (!v.is_number()) {
-            throw std::runtime_error("graphics.heightfield: 'heights' must hold numbers only");
-        }
-        h[(size_t)i] = (float)v.as_num();
-    }
-    auto height_at = [&](int i, int j) { return h[(size_t)(j * stride + i)]; };
     // Everything a script can get wrong is read and checked BEFORE the mesh arrays are allocated: a
     // throw afterwards would leak them.
-    std::vector<float> slope_x;
-    std::vector<float> slope_z;
-    if (!sx.is_nil()) {
-        slope_x.resize((size_t)nv);
-        slope_z.resize((size_t)nv);
-        for (int64_t i = 0; i < nv; i++) {
-            Value a = sx.array_get(i + 1);
-            Value b = sz.array_get(i + 1);
-            if (!a.is_number() || !b.is_number()) {
-                throw std::runtime_error("graphics.heightfield: 'slopesX' and 'slopesZ' must hold numbers only");
-            }
-            slope_x[(size_t)i] = (float)a.as_num();
-            slope_z[(size_t)i] = (float)b.as_num();
+    auto floats = [&](const Value& v, const char* k) {
+        std::vector<float> out;
+        if (v.is_nil()) {
+            return out;
         }
-    }
+        out.resize((size_t)nv);
+        for (int64_t i = 0; i < nv; i++) {
+            Value e = v.array_get(i + 1);
+            if (!e.is_number()) {
+                throw std::runtime_error(std::string(fn) + ": '" + k + "' must hold numbers only");
+            }
+            out[(size_t)i] = (float)e.as_num();
+        }
+        return out;
+    };
+    std::vector<float> h = floats(heights, "heights");
+    std::vector<float> slope_x = floats(sx, "slopesX");
+    std::vector<float> slope_z = floats(sz, "slopesZ");
+    auto height_at = [&](int i, int j) { return h[(size_t)(j * stride + i)]; };
     std::vector<Color> tints;
     if (!cols_v.is_nil()) {
         tints.resize((size_t)nv);
         for (int64_t i = 0; i < nv; i++) {
             Value c = cols_v.array_get(i + 1);
-            if (!c.is_map() && !c.is_class()) {
+            if (!is_color_arg(&c, 1, 0)) {
                 throw std::runtime_error("graphics.heightfield: 'colors' must hold Color objects only");
             }
             tints[(size_t)i] = gfx_to_color(c);
@@ -1705,7 +1707,7 @@ static int gfx_heightfield(CallCtx& ctx) {
             mesh.vertices[k * 3 + 2] = (float)(oz + j * cell);
             float dx;
             float dz;
-            if (!sx.is_nil()) {
+            if (!slope_x.empty()) {
                 dx = slope_x[(size_t)k];
                 dz = slope_z[(size_t)k];
             } else {
@@ -1756,11 +1758,7 @@ static int gfx_heightfield(CallCtx& ctx) {
     double half_x = cols * cell / 2.0;
     double half_z = rows * cell / 2.0;
     double half_y = (y_max - y_min) / 2.0;
-    Value hd = Value::make_map();
-    hd.map_set(Value(std::string("id")), Value((int64_t)id));
-    hd.map_set(Value(std::string("idw")), Value((int64_t)0));
-    hd.map_set(Value(std::string("count")), Value((int64_t)1));
-    hd.map_set(Value(std::string("wcount")), Value((int64_t)0));
+    Value hd = make_chunk_handle(id, 0, 1, 0);
     hd.map_set(Value(std::string("x")), Value(ox + half_x));
     hd.map_set(Value(std::string("y")), Value((double)(y_min + y_max) / 2.0));
     hd.map_set(Value(std::string("z")), Value(oz + half_z));
