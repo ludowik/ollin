@@ -114,6 +114,41 @@ end
 ## road/grass edge and the height tint read as speckle between adjacent cells. graphics.mixCorners
 ## fixes it the same way corners fixes geometry — it is interpolated by the GPU per PIXEL from the
 ## cell's own four corners, not decided once for the whole cube.
+## The lattice bakeTerrain fills, kept so surfaceAt reads exactly what the mesh renders.
+global LATTICE = nil
+global LATTICE_N = 0
+
+## The height of the RENDERED ground at (x, z). heightAt is the true field, but the mesh only
+## reproduces it at the lattice corners: between them each cell's top is two triangles split on
+## the diagonal from its (-x,-z) corner to its (+x,+z) corner (the unit cube's top face). On the
+## road bed, where the height changes quickly, the two differ by more than a wheel's radius —
+## which is what buried the car when it read heightAt.
+func surfaceAt(x, z)
+    if LATTICE == nil then
+        return heightAt(x, z)
+    end
+    var n = LATTICE_N
+    var fx = x / CELL
+    var fz = z / CELL
+    var cx = math.floor(fx)
+    var cz = math.floor(fz)
+    if cx < -n or cx > n or cz < -n or cz > n then
+        return heightAt(x, z)
+    end
+    var u = fx - cx
+    var v = fz - cz
+    var w = 2 * n + 2
+    var i00 = (cz + n) * w + (cx + n) + 1
+    var sw = LATTICE[i00]
+    var se = LATTICE[i00 + 1]
+    var nw = LATTICE[i00 + w]
+    var ne = LATTICE[i00 + w + 1]
+    if v >= u then
+        return sw + u * (ne - nw) + v * (nw - sw)
+    end
+    return sw + u * (se - sw) + v * (ne - se)
+end
+
 func bakeTerrain()
     graphics.beginChunk()
     var n = math.floor(WORLD_HALF / CELL)
@@ -131,6 +166,8 @@ func bakeTerrain()
             latH[idx] = heightFromDist(i * CELL, j * CELL, d)
         end
     end
+    LATTICE = latH
+    LATTICE_N = n
     for cz = -n, n do
         for cx = -n, n do
             var i00 = (cz + n) * W + (cx + n) + 1

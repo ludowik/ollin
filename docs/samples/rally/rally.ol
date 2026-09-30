@@ -36,23 +36,34 @@ func setup()
     ground = bakeTerrain()
 end
 
-## The ground's slope in the car's OWN forward/right directions, from heightAt sampled a short
-## distance either side — the same finite-difference idea bakeTerrain already uses for the mesh's
-## corner heights, just at the scale of a car instead of a grid cell, and read straight from
-## heightAt rather than from the baked lattice (the car isn't standing on a lattice point).
-func groundSlope(x, z, heading)
-    var e = 0.6
+global HALF_TRACK = 0.95   ## a wheel's lateral offset from the car's centreline
+global HALF_BASE = 1.2      ## a wheel's longitudinal offset from the axle midpoint
+global WHEEL_R = 0.42
+global WHEEL_H = 0.32
+
+## Where the car sits on the RENDERED ground: the four wheel contact heights, read from
+## surfaceAt (the mesh's own surface, not the smooth heightAt field it only approximates), give
+## the body's height, pitch and roll. A tilted plane through four points cannot touch all four
+## on a twisted surface, so the body is lifted by however far the worst wheel falls below it —
+## a wheel may hover a little, it never sinks.
+func carPose(x, z, heading)
     var fx = math.sin(heading)
     var fz = math.cos(heading)
     var rx = fz
     var rz = -fx
-    var hF = heightAt(x + fx * e, z + fz * e)
-    var hB = heightAt(x - fx * e, z - fz * e)
-    var hR = heightAt(x + rx * e, z + rz * e)
-    var hL = heightAt(x - rx * e, z - rz * e)
-    var pitch = math.atan((hF - hB) / (2 * e))
-    var roll = math.atan((hR - hL) / (2 * e))
-    return pitch, roll
+    var hFL = surfaceAt(x + rx * HALF_TRACK + fx * HALF_BASE, z + rz * HALF_TRACK + fz * HALF_BASE)
+    var hFR = surfaceAt(x - rx * HALF_TRACK + fx * HALF_BASE, z - rz * HALF_TRACK + fz * HALF_BASE)
+    var hBL = surfaceAt(x + rx * HALF_TRACK - fx * HALF_BASE, z + rz * HALF_TRACK - fz * HALF_BASE)
+    var hBR = surfaceAt(x - rx * HALF_TRACK - fx * HALF_BASE, z - rz * HALF_TRACK - fz * HALF_BASE)
+    var mean = (hFL + hFR + hBL + hBR) / 4
+    var slopeF = ((hFL + hFR) - (hBL + hBR)) / (4 * HALF_BASE)
+    var slopeR = ((hFL + hBL) - (hFR + hBR)) / (4 * HALF_TRACK)
+    var lift = 0.0
+    lift = math.max(lift, hFL - (mean + slopeF * HALF_BASE + slopeR * HALF_TRACK))
+    lift = math.max(lift, hFR - (mean + slopeF * HALF_BASE - slopeR * HALF_TRACK))
+    lift = math.max(lift, hBL - (mean - slopeF * HALF_BASE + slopeR * HALF_TRACK))
+    lift = math.max(lift, hBR - (mean - slopeF * HALF_BASE - slopeR * HALF_TRACK))
+    return mean + lift, math.atan(slopeF), math.atan(slopeR)
 end
 
 func update(dt)
@@ -64,13 +75,9 @@ func update(dt)
     if keyboard.isDown("right") then steer = steer + 1 end
     car.update(dt, math.clamp(throttle, -1, 1), math.clamp(steer, -1, 1))
 
-    var groundY = heightAt(car.x, car.z)
-    chase.update(dt, car.x, groundY + 1.2, car.z, car.heading)
+    chase.update(dt, car.x, surfaceAt(car.x, car.z) + 1.2, car.z, car.heading)
     chase.apply(cam)
 end
-
-global WHEEL_R = 0.42
-global WHEEL_H = 0.32
 
 func drawWheel(x, y, z)
     graphics.push()
@@ -83,8 +90,7 @@ func drawWheel(x, y, z)
 end
 
 func drawCar()
-    var groundY = heightAt(car.x, car.z)
-    var pitch, roll = groundSlope(car.x, car.z, car.heading)
+    var groundY, pitch, roll = carPose(car.x, car.z, car.heading)
     graphics.push()
     ## The car's local origin sits at AXLE height: a wheel drawn at local y=0 (see drawWheel calls
     ## below) then has its bottom exactly WHEEL_R below, right at the ground. This offset and the
@@ -92,8 +98,9 @@ func drawCar()
     ## sync by WHEEL_R, which is exactly how much of the car sat buried in the terrain.
     graphics.translate(car.x, groundY + WHEEL_R, car.z)
     graphics.rotateY(math.deg(car.heading))
-    graphics.rotateX(math.deg(pitch))
-    graphics.rotateZ(-math.deg(roll))
+    ## rotateX lowers +Z for a positive angle and rotateZ raises +X, hence the pitch's minus.
+    graphics.rotateX(-math.deg(pitch))
+    graphics.rotateZ(math.deg(roll))
     graphics.fill(Color(0.82, 0.15, 0.15))
     graphics.cube(0, 0.4, 0,  1.7, 0.8, 3.6)
     graphics.fill(Color(0.22, 0.24, 0.28))
@@ -101,10 +108,10 @@ func drawCar()
     ## toward +Z so it leads the nose, not the tail. It was at -0.3 and rode backwards.
     graphics.cube(0, 1.05, 0.3,  1.3, 0.5, 1.6)
     graphics.fill(Color(0.12, 0.12, 0.14))
-    drawWheel(0.95, 0, 1.2)
-    drawWheel(-0.95, 0, 1.2)
-    drawWheel(0.95, 0, -1.2)
-    drawWheel(-0.95, 0, -1.2)
+    drawWheel(HALF_TRACK, 0, HALF_BASE)
+    drawWheel(-HALF_TRACK, 0, HALF_BASE)
+    drawWheel(HALF_TRACK, 0, -HALF_BASE)
+    drawWheel(-HALF_TRACK, 0, -HALF_BASE)
     graphics.pop()
 end
 
