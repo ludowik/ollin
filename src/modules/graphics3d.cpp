@@ -354,6 +354,7 @@ struct InstGroup {
     unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
     unsigned int vbo_k;   // the corner block VBO, persistent, k_corner_stride floats per instance
     int count;
+    bool owns_mesh;       // the mesh was built for this group (graphics.heightfield): unload it with the group
 };
 static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
 static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
@@ -760,6 +761,9 @@ void reset3d_graphics_state() {
         }
         if (g.vbo_k) {
             rlUnloadVertexBuffer(g.vbo_k);
+        }
+        if (g.owns_mesh) {
+            UnloadMesh(g.mesh);
         }
     }
     s_groups.clear();
@@ -1570,6 +1574,168 @@ static int gfx_end_chunk(CallCtx& ctx) {
     return ctx.ret(h);
 }
 
+// graphics.heightfield({cols, rows, x, z, cell, heights, [slopesX, slopesZ, colors]}): a retained
+// terrain patch, ONE mesh with four vertices per cell shared with its neighbours, instead of one
+// cube per cell (24 vertices, of which only the top four are ever seen). (cols+1)*(rows+1) vertices,
+// row by row along x then z, the first at world (x, z) and `cell` apart; `heights`, the optional
+// `slopesX`/`slopesZ` (dh/dx, dh/dz per world unit — the vertex normal is (-sx, 1, -sz), so patches
+// that hand the same slopes to a shared edge are lit as one surface) and the optional `colors`
+// (Color instances, interpolated across the triangles) are flat arrays of that many values. Without
+// slopes they are taken from the heights by central differences, which is only seamless inside one
+// patch. Each cell is two triangles split on the diagonal from its (-x,-z) corner to its (+x,+z)
+// corner — the top face of the unit cube, so a height read back from the same corners (bilinear
+// across that triangulation) is exactly what is drawn. The result is a chunk handle: drawChunk,
+// freeChunk and inFrustum work on it, and it carries its bounding sphere as x, y, z, r.
+static int gfx_heightfield(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    const char* fn = "graphics.heightfield";
+    if (argc < 1 || !args[0].is_map()) {
+        throw std::runtime_error("graphics.heightfield: expected a map {cols, rows, x, z, cell, heights, ...}");
+    }
+    const Value& o = args[0];
+    auto num = [&](const char* k) -> double {
+        Value v = o.map_get(Value(std::string(k)));
+        if (!v.is_number()) {
+            throw std::runtime_error(std::string(fn) + ": '" + k + "' must be a number");
+        }
+        return v.as_num();
+    };
+    auto arr = [&](const char* k, bool required) -> Value {
+        Value v = o.map_get(Value(std::string(k)));
+        if (v.is_nil() && !required) {
+            return v;
+        }
+        if (!v.is_array()) {
+            throw std::runtime_error(std::string(fn) + ": '" + k + "' must be an array");
+        }
+        return v;
+    };
+    int cols = (int)num("cols");
+    int rows = (int)num("rows");
+    double ox = num("x");
+    double oz = num("z");
+    double cell = num("cell");
+    if (cols < 1 || rows < 1 || cell <= 0.0) {
+        throw std::runtime_error("graphics.heightfield: cols and rows must be at least 1 and cell positive");
+    }
+    int64_t nv = (int64_t)(cols + 1) * (rows + 1);
+    if (nv > 65535) {
+        throw std::runtime_error("graphics.heightfield: at most 65535 vertices per patch (a mesh indexes with 16 bits), got " +
+                                 std::to_string(nv));
+    }
+    Value heights = arr("heights", true);
+    Value sx = arr("slopesX", false);
+    Value sz = arr("slopesZ", false);
+    Value cols_v = arr("colors", false);
+    auto check = [&](const Value& v, const char* k) {
+        if (!v.is_nil() && v.array_size() != nv) {
+            throw std::runtime_error(std::string(fn) + ": '" + k + "' needs " + std::to_string(nv) + " values, got " +
+                                     std::to_string(v.array_size()));
+        }
+    };
+    check(heights, "heights");
+    check(sx, "slopesX");
+    check(sz, "slopesZ");
+    check(cols_v, "colors");
+    if (sx.is_nil() != sz.is_nil()) {
+        throw std::runtime_error("graphics.heightfield: give both slopesX and slopesZ, or neither");
+    }
+
+    int stride = cols + 1;
+    std::vector<float> h((size_t)nv);
+    for (int64_t i = 0; i < nv; i++) {
+        Value v = heights.array_get(i + 1);
+        if (!v.is_number()) {
+            throw std::runtime_error("graphics.heightfield: 'heights' must hold numbers only");
+        }
+        h[(size_t)i] = (float)v.as_num();
+    }
+    auto height_at = [&](int i, int j) { return h[(size_t)(j * stride + i)]; };
+
+    Mesh mesh{};
+    mesh.vertexCount = (int)nv;
+    mesh.triangleCount = cols * rows * 2;
+    mesh.vertices = (float*)RL_MALLOC((size_t)nv * 3 * sizeof(float));
+    mesh.normals = (float*)RL_MALLOC((size_t)nv * 3 * sizeof(float));
+    mesh.texcoords = (float*)RL_CALLOC((size_t)nv * 2, sizeof(float));
+    mesh.colors = (unsigned char*)RL_MALLOC((size_t)nv * 4);
+    mesh.indices = (unsigned short*)RL_MALLOC((size_t)mesh.triangleCount * 3 * sizeof(unsigned short));
+    float y_min = h[0];
+    float y_max = h[0];
+    for (int j = 0; j <= rows; j++) {
+        for (int i = 0; i <= cols; i++) {
+            int64_t k = (int64_t)j * stride + i;
+            float y = h[(size_t)k];
+            y_min = std::min(y_min, y);
+            y_max = std::max(y_max, y);
+            mesh.vertices[k * 3] = (float)(ox + i * cell);
+            mesh.vertices[k * 3 + 1] = y;
+            mesh.vertices[k * 3 + 2] = (float)(oz + j * cell);
+            float dx;
+            float dz;
+            if (!sx.is_nil()) {
+                dx = (float)sx.array_get(k + 1).as_num();
+                dz = (float)sz.array_get(k + 1).as_num();
+            } else {
+                int il = std::max(i - 1, 0);
+                int ir = std::min(i + 1, cols);
+                int jl = std::max(j - 1, 0);
+                int jr = std::min(j + 1, rows);
+                dx = (height_at(ir, j) - height_at(il, j)) / (float)((ir - il) * cell);
+                dz = (height_at(i, jr) - height_at(i, jl)) / (float)((jr - jl) * cell);
+            }
+            Vector3 n = Vector3Normalize(Vector3{-dx, 1.0f, -dz});
+            mesh.normals[k * 3] = n.x;
+            mesh.normals[k * 3 + 1] = n.y;
+            mesh.normals[k * 3 + 2] = n.z;
+            Color c = cols_v.is_nil() ? WHITE : gfx_to_color(cols_v.array_get(k + 1));
+            mesh.colors[k * 4] = c.r;
+            mesh.colors[k * 4 + 1] = c.g;
+            mesh.colors[k * 4 + 2] = c.b;
+            mesh.colors[k * 4 + 3] = c.a;
+        }
+    }
+    size_t t = 0;
+    for (int j = 0; j < rows; j++) {
+        for (int i = 0; i < cols; i++) {
+            unsigned short sw = (unsigned short)(j * stride + i);
+            unsigned short se = (unsigned short)(sw + 1);
+            unsigned short nw = (unsigned short)(sw + stride);
+            unsigned short ne = (unsigned short)(nw + 1);
+            mesh.indices[t++] = sw;
+            mesh.indices[t++] = nw;
+            mesh.indices[t++] = ne;
+            mesh.indices[t++] = sw;
+            mesh.indices[t++] = ne;
+            mesh.indices[t++] = se;
+        }
+    }
+    UploadMesh(&mesh, false);
+
+    // One instance at the identity: the patch already holds world positions.
+    std::vector<Matrix> xs{MatrixIdentity()};
+    std::vector<float> cs{1.0f, 1.0f, 1.0f, 1.0f};
+    std::vector<float> ts{-1.0f, -1.0f, -1.0f};
+    std::vector<float> ks((size_t)k_corner_stride, 0.0f);
+    InstGroup g = build_group(mesh, xs, cs, ts, ks);
+    g.owns_mesh = true;
+    int id = place_group(g);
+
+    double half_x = cols * cell / 2.0;
+    double half_z = rows * cell / 2.0;
+    double half_y = (y_max - y_min) / 2.0;
+    Value hd = Value::make_map();
+    hd.map_set(Value(std::string("id")), Value((int64_t)id));
+    hd.map_set(Value(std::string("idw")), Value((int64_t)0));
+    hd.map_set(Value(std::string("count")), Value((int64_t)1));
+    hd.map_set(Value(std::string("wcount")), Value((int64_t)0));
+    hd.map_set(Value(std::string("x")), Value(ox + half_x));
+    hd.map_set(Value(std::string("y")), Value((double)(y_min + y_max) / 2.0));
+    hd.map_set(Value(std::string("z")), Value(oz + half_z));
+    hd.map_set(Value(std::string("r")), Value(std::sqrt(half_x * half_x + half_z * half_z + half_y * half_y)));
+    return ctx.ret(hd);
+}
+
 // graphics.drawChunk(handle): redraws a baked group in ONE instanced, lit call. To be
 // called INSIDE a begin3d block. It re-emits NO cube from Ollin.
 static int gfx_draw_chunk(CallCtx& ctx) {
@@ -1664,6 +1830,11 @@ static void free_group_by_id(Value& handle, const char* key) {
         g.vbo_k = 0;
     }
     g.count = 0;
+    if (g.owns_mesh) {
+        UnloadMesh(g.mesh);
+        g.mesh = Mesh{};
+        g.owns_mesh = false;
+    }
     // The slot returns to the pool ONLY if it was alive, which makes a double free idempotent
     // (a second free of the same handle is a no-op, with no duplicate slot in the pool).
     if (live) {
@@ -1722,6 +1893,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("blendColor")), Value::make_builtin(gfx_blend_color));
     m.map_set(Value(std::string("mixCorners")), Value::make_builtin(gfx_mix_corners));
     m.map_set(Value(std::string("cornerSlopes")), Value::make_builtin(gfx_corner_slopes));
+    m.map_set(Value(std::string("heightfield")), Value::make_builtin(gfx_heightfield));
     m.map_set(Value(std::string("grid")), Value::make_builtin(with_area<gfx_grid>));
     m.map_set(Value(std::string("cube")), Value::make_builtin(with_area<gfx_cube>));
     m.map_set(Value(std::string("sphere")), Value::make_builtin(with_area<gfx_sphere>));

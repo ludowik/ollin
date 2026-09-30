@@ -21,7 +21,7 @@ global TRACK = [
     { x: 160,  z: -72  }
 ]
 global TRACK_WIDTH = 10.0   ## half-width of the road bed, in world units
-global ROAD_COLOR = Color(0.55, 0.55, 0.58)   ## flat — see roadMixAt/bakeTerrain
+global ROAD_COLOR = Color(0.55, 0.55, 0.58)   ## the road surface, flat — see roadMixAt/tintAt
 global FEATHER = 6.0        ## world units over which the road blends into the grass
 
 global CELL = 6.0           ## the terrain lattice's spacing, in world units
@@ -83,11 +83,10 @@ func grassAt(h)
     return Color(0.17 + 0.05 * t, 0.40 - 0.03 * t, 0.16)
 end
 
-## How much of ROAD_COLOR graphics.mixCorners should blend in AT THIS LATTICE POINT: 1 on the
-## centreline, fading to 0 over FEATHER world units past the verge. This is deliberately the
-## per-CORNER value, not a cell average — the GPU interpolates it per PIXEL across the cube's top
-## (the same bilinear scheme as the height corners), which is what makes the road's edge follow
-## the actual within-cell position instead of a single flat tone per cube.
+## How much of ROAD_COLOR to blend in AT THIS LATTICE POINT: 1 on the centreline, fading to 0 over
+## FEATHER world units past the verge. It is a per-POINT value, not a cell average: the mesh
+## interpolates the resulting colour across each triangle, so the road's edge follows the actual
+## position inside a cell.
 func roadMixAt(d)
     if d <= TRACK_WIDTH then
         return 1.0
@@ -96,6 +95,16 @@ func roadMixAt(d)
         return 0.0
     end
     return 1.0 - (d - TRACK_WIDTH) / FEATHER
+end
+
+## The ground colour at a lattice point of height h, d away from the track: grass tinted by altitude,
+## blended towards the road colour by roadMixAt.
+func tintAt(h, d)
+    var grass = grassAt(h)
+    var t = roadMixAt(d)
+    return Color(grass.r + (ROAD_COLOR.r - grass.r) * t,
+                 grass.g + (ROAD_COLOR.g - grass.g) * t,
+                 grass.b + (ROAD_COLOR.b - grass.b) * t)
 end
 
 ## The lattice bakeTerrain fills, kept so surfaceAt reads exactly what the mesh renders.
@@ -136,25 +145,17 @@ func surfaceAt(x, z)
     return sw + u * (se - sw) + v * (ne - se)
 end
 
-## Bakes the ground into BLOCKS of BLOCK x BLOCK cells, each one retained instance group
-## (graphics.beginChunk/endChunk), and returns them as an array of {chunk, x, y, z, r}: the
-## group's handle and a bounding sphere, so a frame can skip the blocks outside the camera's view
-## (graphics.inFrustum) instead of pushing the whole world through the vertex shader. The circuit
-## never changes, so this runs once from setup(), not every frame.
+## Bakes the ground into BLOCKS of BLOCK x BLOCK cells, each one retained mesh
+## (graphics.heightfield), and returns their handles: each carries a bounding sphere (x, y, z, r),
+## so a frame can skip the blocks outside the camera's view (graphics.inFrustum) instead of pushing
+## the whole world through the vertex shader. The circuit never changes, so this runs once from
+## setup(), not every frame.
 ##
-## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like a
-## Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners fixed the
-## GEOMETRY — it bends a cube's TOP face by the bilinear interpolation of 4 corner heights, given
-## in LOCAL units, i.e. before the instance's own scale is applied. Every cube here is emitted at
-## a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit equals a world unit: the
-## four corners passed to graphics.corners are then heightAt's own values, unscaled. Two
-## neighbouring cells share the SAME lattice point, and therefore the SAME corner height, so their
-## tops meet exactly — one continuous surface, no crack, no step — across a block edge as well.
-##
-## The COLOR then had the same problem one level up: one flat tint per cube still made the
-## road/grass edge and the height tint read as speckle between adjacent cells. graphics.mixCorners
-## fixes it the same way corners fixes geometry — it is interpolated by the GPU per PIXEL from the
-## cell's own four corners, not decided once for the whole cube.
+## One mesh vertex per lattice point, shared by the four cells around it: a cube per cell was tried
+## (and, before it, blocky pillars that looked exactly like a Minecraft grid) and cost 24 vertices a
+## cell for a top face of four. Neighbouring cells, and neighbouring blocks, share the SAME lattice
+## point and therefore the SAME height, slope and colour, so the surface is continuous — no crack,
+## no step, no visible block edge — and its triangles are the ones surfaceAt reads back.
 func bakeTerrain()
     var n = math.floor(WORLD_HALF / CELL)
     ## Heights AND distances-to-track at the LATTICE POINTS (cell corners, not centres):
@@ -172,10 +173,10 @@ func bakeTerrain()
     end
     LATTICE = latH
     LATTICE_N = n
-    ## The slope at every lattice point, by central difference (one-sided on the border), in the
-    ## LOCAL units graphics.cornerSlopes expects: the height change across one whole cell. Cells
-    ## sharing a corner hand it the SAME slopes, hence the same lighting normal — the surface is
-    ## shaded as one, instead of every cell being a lit facet of its own.
+    ## The slope at every lattice point, by central difference (one-sided on the border), as the
+    ## height change across one whole cell (divided by CELL below, per block, to get dh/dx). Cells
+    ## and blocks sharing a point hand it the SAME slope, hence the same lighting normal — the
+    ## surface is shaded as one, instead of every cell being a lit facet of its own.
     var latSX = []
     var latSZ = []
     for j = -n, n + 1 do
@@ -198,48 +199,27 @@ func bakeTerrain()
             var z0 = -n + bz * BLOCK
             var x1 = math.min(x0 + BLOCK - 1, n)
             var z1 = math.min(z0 + BLOCK - 1, n)
-            var hMin = latH[latticeIndex(x0, z0, n)]
-            var hMax = hMin
-            graphics.beginChunk()
-            for cz = z0, z1 do
-                for cx = x0, x1 do
-                    var i00 = latticeIndex(cx, cz, n)
-                    var i10 = latticeIndex(cx + 1, cz, n)
-                    var i01 = latticeIndex(cx, cz + 1, n)
-                    var i11 = latticeIndex(cx + 1, cz + 1, n)
-                    var sw = latH[i00]
-                    var se = latH[i10]
-                    var nw = latH[i01]
-                    var ne = latH[i11]
-                    hMin = math.min(hMin, sw, se, nw, ne)
-                    hMax = math.max(hMax, sw, se, nw, ne)
-                    graphics.fill(grassAt((sw + se + nw + ne) / 4))
-                    graphics.mixCorners(roadMixAt(latD[i00]), roadMixAt(latD[i10]),
-                                        roadMixAt(latD[i01]), roadMixAt(latD[i11]))
-                    graphics.corners(sw, se, nw, ne)
-                    graphics.cornerSlopes(latSX[i00], latSX[i10], latSX[i01], latSX[i11],
-                                          latSZ[i00], latSZ[i10], latSZ[i01], latSZ[i11])
-                    graphics.cube((cx + 0.5) * CELL, -SKIRT / 2, (cz + 0.5) * CELL,  CELL, SKIRT, CELL)
+            ## The block's lattice points, row by row: the heights, the slopes converted from
+            ## "per cell" to "per world unit", and the colour AT each point — interpolated across
+            ## the triangles, so the road fades into the grass without a flat tint per cell.
+            var heights = []
+            var slopesX = []
+            var slopesZ = []
+            var tints = []
+            for j = z0, z1 + 1 do
+                for i = x0, x1 + 1 do
+                    var idx = latticeIndex(i, j, n)
+                    heights.push(latH[idx])
+                    slopesX.push(latSX[idx] / CELL)
+                    slopesZ.push(latSZ[idx] / CELL)
+                    tints.push(tintAt(latH[idx], latD[idx]))
                 end
             end
-            graphics.mixCorners(0, 0, 0, 0)
-            graphics.corners(0, 0, 0, 0)
-            graphics.cornerSlopes(0, 0, 0, 0, 0, 0, 0, 0)
-            graphics.fill(colors.WHITE)
-            ## The sphere round the block: the cubes span y from -SKIRT up to the highest corner
-            ## (or down to a corner below the skirt's foot), and x/z from the block's edges.
-            var yLo = math.min(hMin, -SKIRT)
-            var yHi = math.max(hMax, 0)
-            var hw = (x1 - x0 + 1) * CELL / 2
-            var hd = (z1 - z0 + 1) * CELL / 2
-            var hh = (yHi - yLo) / 2
-            blocks.push({
-                chunk: graphics.endChunk(),
-                x: (x0 + x1 + 1) * CELL / 2,
-                y: (yLo + yHi) / 2,
-                z: (z0 + z1 + 1) * CELL / 2,
-                r: math.sqrt(hw * hw + hd * hd + hh * hh)
-            })
+            blocks.push(graphics.heightfield({
+                cols: x1 - x0 + 1, rows: z1 - z0 + 1,
+                x: x0 * CELL, z: z0 * CELL, cell: CELL,
+                heights: heights, slopesX: slopesX, slopesZ: slopesZ, colors: tints
+            }))
         end
     end
     return blocks
