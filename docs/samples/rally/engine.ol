@@ -54,11 +54,6 @@ class Engine
         return self.ratios[g] * self.finalDrive
     end
 
-    ## The speed at which the given gear reaches the limiter.
-    func topSpeed(g)
-        return self.limiter / 9.5493 * self.wheelRadius / self.overall(g)
-    end
-
     ## One step. `speed` is the car's speed along its direction of travel (never negative),
     ## `throttle` the pedal in [0;1], `brake` the brake in [0;1]. Returns the drive force at the
     ## wheels in newtons along that direction — negative when the engine is braking the car.

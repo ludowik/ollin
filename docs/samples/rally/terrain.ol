@@ -1,7 +1,7 @@
 ## The circuit's shape and the ground beneath it — nothing here touches the camera or the input.
-## heightAt is the ONE function the terrain mesh and the car's ground-follow (added later) both
-## read, so the two can never disagree about where the ground is, the same discipline as
-## voxel_world/terrain.ol's heightAt.
+## heightAt is the true height field the terrain mesh is sampled from; surfaceAt is the height of
+## the mesh as actually RENDERED, which is what the car must rest on (the two differ between lattice
+## points, see surfaceAt).
 
 ## The road: a closed loop of hand-placed waypoints, so the circuit is a recognisable shape
 ## rather than a wandering noise field.
@@ -98,22 +98,6 @@ func roadMixAt(d)
     return 1.0 - (d - TRACK_WIDTH) / FEATHER
 end
 
-## Bakes the whole ground into ONE retained instance group (graphics.beginChunk/endChunk): the
-## circuit never changes, so this runs once from setup(), not every frame.
-##
-## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like a
-## Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners fixed the
-## GEOMETRY — it bends a cube's TOP face by the bilinear interpolation of 4 corner heights, given
-## in LOCAL units, i.e. before the instance's own scale is applied. Every cube here is emitted at
-## a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit equals a world unit: the
-## four corners passed to graphics.corners are then heightAt's own values, unscaled. Two
-## neighbouring cells share the SAME lattice point, and therefore the SAME corner height, so their
-## tops meet exactly — one continuous surface, no crack, no step.
-##
-## The COLOR then had the same problem one level up: one flat tint per cube still made the
-## road/grass edge and the height tint read as speckle between adjacent cells. graphics.mixCorners
-## fixes it the same way corners fixes geometry — it is interpolated by the GPU per PIXEL from the
-## cell's own four corners, not decided once for the whole cube.
 ## The lattice bakeTerrain fills, kept so surfaceAt reads exactly what the mesh renders.
 global LATTICE = nil
 global LATTICE_N = 0
@@ -149,6 +133,22 @@ func surfaceAt(x, z)
     return sw + u * (se - sw) + v * (ne - se)
 end
 
+## Bakes the whole ground into ONE retained instance group (graphics.beginChunk/endChunk): the
+## circuit never changes, so this runs once from setup(), not every frame.
+##
+## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like a
+## Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners fixed the
+## GEOMETRY — it bends a cube's TOP face by the bilinear interpolation of 4 corner heights, given
+## in LOCAL units, i.e. before the instance's own scale is applied. Every cube here is emitted at
+## a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit equals a world unit: the
+## four corners passed to graphics.corners are then heightAt's own values, unscaled. Two
+## neighbouring cells share the SAME lattice point, and therefore the SAME corner height, so their
+## tops meet exactly — one continuous surface, no crack, no step.
+##
+## The COLOR then had the same problem one level up: one flat tint per cube still made the
+## road/grass edge and the height tint read as speckle between adjacent cells. graphics.mixCorners
+## fixes it the same way corners fixes geometry — it is interpolated by the GPU per PIXEL from the
+## cell's own four corners, not decided once for the whole cube.
 func bakeTerrain()
     graphics.beginChunk()
     var n = math.floor(WORLD_HALF / CELL)
