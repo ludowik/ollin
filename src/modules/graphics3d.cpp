@@ -52,8 +52,26 @@ static float s_cur_corner[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 // the normal is rebuilt from the four corner heights alone (one flat normal per cell).
 static float s_cur_slope_x[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 static float s_cur_slope_z[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-// Floats per instance in the corner VBO: heights, slopes in x, slopes in z.
-static const int k_corner_stride = 12;
+// Corner-blended colour (graphics.mixCorners/blendColor): mix factors [0..1] at the same four
+// corners as s_cur_corner (state, like s_cur_tile), and the SECOND colour they blend toward — a
+// uniform, so shared by every instance of the draw call, not per-cube. All-zero mix = an ordinary
+// flat-coloured cube.
+static float s_cur_mix[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+static float s_cur_blend_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+// Floats per instance in the corner VBO, all per-corner data of one cube in one block: heights,
+// slopes in x, slopes in z, colour-mix factors.
+static const int k_corner_stride = 16;
+
+// Clears every per-corner state (and the blend colour): the defaults that make a cube ordinary.
+static void reset_corner_state() {
+    for (int k = 0; k < 4; k++) {
+        s_cur_corner[k] = 0.0f;
+        s_cur_slope_x[k] = 0.0f;
+        s_cur_slope_z[k] = 0.0f;
+        s_cur_mix[k] = 0.0f;
+        s_cur_blend_color[k] = 1.0f;
+    }
+}
 
 static void push_corner_block(std::vector<float>& out) {
     for (int k = 0; k < 4; k++) {
@@ -65,13 +83,10 @@ static void push_corner_block(std::vector<float>& out) {
     for (int k = 0; k < 4; k++) {
         out.push_back(s_cur_slope_z[k]);
     }
+    for (int k = 0; k < 4; k++) {
+        out.push_back(s_cur_mix[k]);
+    }
 }
-// Corner-blended colour (graphics.mixCorners/blendColor): mix factors [0..1] at the same four
-// corners as s_cur_corner (state, like s_cur_tile), and the SECOND colour they blend toward — a
-// uniform, so shared by every instance of the draw call, not per-cube. All-zero mix = an ordinary
-// flat-coloured cube.
-static float s_cur_mix[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-static float s_cur_blend_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 static float s_anim_tile = -1.0f;   // the animated tile, whose UV scrolls, water for one; -1 means none
 // Ripple parameters of the animated tile: {scroll, wave speed, spatial frequency,
 // amplitude}. Defaults give a water look; tunable through graphics.tileAnim(t, ...).
@@ -280,8 +295,7 @@ struct Bucket3D {
     std::vector<Matrix> xforms;
     std::vector<float> colors;   // 4 floats (rgba 0..1) par instance
     std::vector<float> tiles;    // 3 floats per instance (top/side/bottom, -1 = none)
-    std::vector<float> corners;  // 4 floats per instance: the top's corner heights
-    std::vector<float> mix;      // 4 floats per instance: the corner blend factors, see s_cur_mix
+    std::vector<float> corners;  // k_corner_stride floats per instance: see push_corner_block
 };
 static std::vector<Bucket3D> s_buckets;
 static Camera3D s_cam3d{};   // the current begin3d block's camera, for viewPos
@@ -302,13 +316,11 @@ static bool s_recording = false;
 static std::vector<Matrix> s_rec_x;   // the recorded local transforms, OPAQUE group
 static std::vector<float> s_rec_c;    // the recorded rgba values, 0..1, OPAQUE group
 static std::vector<float> s_rec_t;    // the recorded tiles, three floats per instance, OPAQUE group
-static std::vector<float> s_rec_k;    // the recorded corner heights, four floats per instance, OPAQUE group
-static std::vector<float> s_rec_m;    // the recorded corner mix factors, four floats per instance, OPAQUE group
+static std::vector<float> s_rec_k;    // the recorded corner blocks, k_corner_stride floats per instance, OPAQUE group
 static std::vector<Matrix> s_rec_xw;  // the same, for TRANSPARENT instances (alpha < 1, water for one)
 static std::vector<float> s_rec_cw;
 static std::vector<float> s_rec_tw;
 static std::vector<float> s_rec_kw;
-static std::vector<float> s_rec_mw;
 static Mesh s_rec_mesh{};             // the recorded mesh, OPAQUE group: a cube
 static Mesh s_rec_mesh_w{};           // the recorded mesh, TRANSPARENT group: a plane, for water
 struct InstGroup {
@@ -316,8 +328,7 @@ struct InstGroup {
     unsigned int vbo_x;   // the transforms VBO, persistent
     unsigned int vbo_c;   // the colours VBO, persistent
     unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
-    unsigned int vbo_k;   // the corner heights VBO, persistent, 4 floats per instance
-    unsigned int vbo_m;   // the corner mix factors VBO, persistent, 4 floats per instance
+    unsigned int vbo_k;   // the corner block VBO, persistent, k_corner_stride floats per instance
     int count;
 };
 static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
@@ -406,9 +417,7 @@ static int s_loc_l_en = -1, s_loc_l_type = -1, s_loc_l_pos = -1, s_loc_l_tgt = -
 // (updated by glBufferSubData) instead of being created and destroyed for every
 // bucket and frame. Capacities are in bytes, and only ever grow.
 static unsigned int s_inst_vbo_xform = 0, s_inst_vbo_color = 0, s_inst_vbo_tile = 0, s_inst_vbo_corner = 0;
-static unsigned int s_inst_vbo_mix = 0;
 static int s_inst_cap_xform = 0, s_inst_cap_color = 0, s_inst_cap_tile = 0, s_inst_cap_corner = 0;
-static int s_inst_cap_mix = 0;
 
 // Creates (first time, or on growth) or updates an instance VBO, and leaves the VBO
 // bound on exit, for the rlSetVertexAttribute that follows.
@@ -470,7 +479,7 @@ static Bucket3D& bucket_for(const Mesh& mesh, unsigned int texId) {
             return b;
         }
     }
-    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, image_gl_flipped(texId), {}, {}, {}, {}, {}});
+    s_buckets.push_back(Bucket3D{mesh.vaoId, mesh, texId, image_gl_flipped(texId), {}, {}, {}, {}});
     return s_buckets.back();
 }
 
@@ -493,9 +502,6 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
             s_rec_tw.push_back(s_cur_tile[1]);
             s_rec_tw.push_back(s_cur_tile[2]);
             push_corner_block(s_rec_kw);
-            for (int k = 0; k < 4; k++) {
-                s_rec_mw.push_back(s_cur_mix[k]);
-            }
             return;
         }
         s_rec_mesh = mesh;
@@ -508,9 +514,6 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
         s_rec_t.push_back(s_cur_tile[1]);
         s_rec_t.push_back(s_cur_tile[2]);
         push_corner_block(s_rec_k);
-        for (int k = 0; k < 4; k++) {
-            s_rec_m.push_back(s_cur_mix[k]);
-        }
         return;
     }
     Bucket3D& b = bucket_for(mesh, texId);
@@ -529,9 +532,6 @@ static void push_instance(const Mesh& mesh, unsigned int texId, Vector3 pos, Vec
     b.tiles.push_back(s_cur_tile[1]);
     b.tiles.push_back(s_cur_tile[2]);
     push_corner_block(b.corners);
-    for (int k = 0; k < 4; k++) {
-        b.mix.push_back(s_cur_mix[k]);
-    }
 }
 
 // Activates the lit shader and sets the frame's uniforms (MVP = the view·proj frozen at
@@ -590,11 +590,11 @@ static bool lit_begin_draw() {
     return true;
 }
 
-// Binds the instance attributes (transform mat4 = 4 vec4, colour vec4, tiles vec3, corners
-// vec4, mix factors vec4; divisor 1) from VBOs ALREADY FILLED. The VAO is assumed to be active.
-// Shared by lit_bind_instances (a baked group) and flush_bucket (shared VBOs).
-static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t, unsigned int vbo_k,
-                               unsigned int vbo_m) {
+// Binds the instance attributes (transform mat4 = 4 vec4, colour vec4, tiles vec3, and the corner
+// block — heights, slopes in x, slopes in z, mix factors: four vec4 read from ONE VBO at different
+// offsets; divisor 1) from VBOs ALREADY FILLED. The VAO is assumed to be active. Shared by
+// lit_bind_instances (a baked group) and flush_bucket (shared VBOs).
+static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t, unsigned int vbo_k) {
     int loc_t = s_lit.locs[SHADER_LOC_VERTEX_INSTANCETRANSFORM];
     rlEnableVertexBuffer(vbo_x);
     for (unsigned int i = 0; i < 4; i++) {
@@ -631,20 +631,19 @@ static void bind_instance_vbos(unsigned int vbo_x, unsigned int vbo_c, unsigned 
                                  8 * sizeof(float));
             rlSetVertexAttributeDivisor(s_loc_instslopez, 1);
         }
-    }
-    if (s_loc_instmix >= 0 && vbo_m != 0) {
-        rlEnableVertexBuffer(vbo_m);
-        rlEnableVertexAttribute(s_loc_instmix);
-        rlSetVertexAttribute(s_loc_instmix, 4, RL_FLOAT, 0, 0, 0);
-        rlSetVertexAttributeDivisor(s_loc_instmix, 1);
+        if (s_loc_instmix >= 0) {
+            rlEnableVertexAttribute(s_loc_instmix);
+            rlSetVertexAttribute(s_loc_instmix, 4, RL_FLOAT, 0, k_corner_stride * sizeof(float), 12 * sizeof(float));
+            rlSetVertexAttributeDivisor(s_loc_instmix, 1);
+        }
     }
 }
 
 // Same binding, but on the mesh's VAO, which it activates and releases itself.
 static void lit_bind_instances(unsigned int vaoId, unsigned int vbo_x, unsigned int vbo_c, unsigned int vbo_t,
-                              unsigned int vbo_k, unsigned int vbo_m) {
+                              unsigned int vbo_k) {
     rlEnableVertexArray(vaoId);
-    bind_instance_vbos(vbo_x, vbo_c, vbo_t, vbo_k, vbo_m);
+    bind_instance_vbos(vbo_x, vbo_c, vbo_t, vbo_k);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
 }
@@ -695,8 +694,7 @@ static void flush_bucket(const Bucket3D& b) {
     upload_instance_vbo(s_inst_vbo_color, s_inst_cap_color, b.colors.data(), n * 4 * (int)sizeof(float));
     upload_instance_vbo(s_inst_vbo_tile, s_inst_cap_tile, b.tiles.data(), n * 3 * (int)sizeof(float));
     upload_instance_vbo(s_inst_vbo_corner, s_inst_cap_corner, b.corners.data(), n * k_corner_stride * (int)sizeof(float));
-    upload_instance_vbo(s_inst_vbo_mix, s_inst_cap_mix, b.mix.data(), n * 4 * (int)sizeof(float));
-    bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile, s_inst_vbo_corner, s_inst_vbo_mix);
+    bind_instance_vbos(s_inst_vbo_xform, s_inst_vbo_color, s_inst_vbo_tile, s_inst_vbo_corner);
     rlDisableVertexBuffer();
     rlDisableVertexArray();
     lit_draw_instanced(mesh, b.texId, n, b.flip_v);
@@ -748,9 +746,6 @@ void reset3d_graphics_state() {
         if (g.vbo_k) {
             rlUnloadVertexBuffer(g.vbo_k);
         }
-        if (g.vbo_m) {
-            rlUnloadVertexBuffer(g.vbo_m);
-        }
     }
     s_groups.clear();
     s_free_groups.clear();
@@ -759,12 +754,10 @@ void reset3d_graphics_state() {
     s_rec_c.clear();
     s_rec_t.clear();
     s_rec_k.clear();
-    s_rec_m.clear();
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
     s_rec_kw.clear();
-    s_rec_mw.clear();
     if (s_white_ready) {
         UnloadTexture(s_white_tex);
         s_white_tex = Texture2D{};
@@ -790,11 +783,6 @@ void reset3d_graphics_state() {
         s_inst_vbo_corner = 0;
         s_inst_cap_corner = 0;
     }
-    if (s_inst_vbo_mix != 0) {
-        rlUnloadVertexBuffer(s_inst_vbo_mix);
-        s_inst_vbo_mix = 0;
-        s_inst_cap_mix = 0;
-    }
     s_buckets.clear();
     s_in_3d = false;
     s_cur_tex3d = 0;
@@ -805,16 +793,7 @@ void reset3d_graphics_state() {
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;
     s_cur_tile[2] = -1.0f;
-    for (int k = 0; k < 4; k++) {
-        s_cur_corner[k] = 0.0f;
-        s_cur_slope_x[k] = 0.0f;
-        s_cur_slope_z[k] = 0.0f;
-        s_cur_mix[k] = 0.0f;
-    }
-    s_cur_blend_color[0] = 1.0f;
-    s_cur_blend_color[1] = 1.0f;
-    s_cur_blend_color[2] = 1.0f;
-    s_cur_blend_color[3] = 1.0f;
+    reset_corner_state();
     s_anim_tile = -1.0f;
     s_anim_params[0] = 0.09f;
     s_anim_params[1] = 1.6f;
@@ -1512,19 +1491,16 @@ static int gfx_begin_chunk(CallCtx& ctx) {
     s_rec_c.clear();
     s_rec_t.clear();
     s_rec_k.clear();
-    s_rec_m.clear();
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
     s_rec_kw.clear();
-    s_rec_mw.clear();
     return ctx.ret(Value{});
 }
 
 // Builds an InstGroup (persistent VBOs) from vectors of baked instances.
 static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, const std::vector<float>& cs,
-                            const std::vector<float>& ts, const std::vector<float>& ks,
-                            const std::vector<float>& ms) {
+                            const std::vector<float>& ts, const std::vector<float>& ks) {
     InstGroup g{};
     g.mesh = mesh;
     g.count = (int)xs.size();
@@ -1537,7 +1513,6 @@ static InstGroup build_group(const Mesh& mesh, const std::vector<Matrix>& xs, co
         g.vbo_c = rlLoadVertexBuffer(cs.data(), g.count * 4 * (int)sizeof(float), false);
         g.vbo_t = rlLoadVertexBuffer(ts.data(), g.count * 3 * (int)sizeof(float), false);
         g.vbo_k = rlLoadVertexBuffer(ks.data(), g.count * k_corner_stride * (int)sizeof(float), false);
-        g.vbo_m = rlLoadVertexBuffer(ms.data(), g.count * 4 * (int)sizeof(float), false);
     }
     return g;
 }
@@ -1564,8 +1539,8 @@ static int gfx_end_chunk(CallCtx& ctx) {
     (void)args;
     (void)argc;
     s_recording = false;
-    InstGroup g = build_group(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t, s_rec_k, s_rec_m);
-    InstGroup w = build_group(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw, s_rec_kw, s_rec_mw);
+    InstGroup g = build_group(s_rec_mesh, s_rec_x, s_rec_c, s_rec_t, s_rec_k);
+    InstGroup w = build_group(s_rec_mesh_w, s_rec_xw, s_rec_cw, s_rec_tw, s_rec_kw);
     int id_o = place_group(g);
     int id_w = 0;                       // no slot without water, which avoids an empty group
     if (w.count > 0) {
@@ -1575,12 +1550,10 @@ static int gfx_end_chunk(CallCtx& ctx) {
     s_rec_c.clear();
     s_rec_t.clear();
     s_rec_k.clear();
-    s_rec_m.clear();
     s_rec_xw.clear();
     s_rec_cw.clear();
     s_rec_tw.clear();
     s_rec_kw.clear();
-    s_rec_mw.clear();
     Value h = Value::make_map();
     h.map_set(Value(std::string("id")), Value((int64_t)id_o));
     h.map_set(Value(std::string("idw")), Value((int64_t)id_w));
@@ -1611,7 +1584,7 @@ static int gfx_draw_chunk(CallCtx& ctx) {
     if (!lit_begin_draw()) {
         return ctx.ret(Value{});
     }
-    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k, g.vbo_m);
+    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
     // The atlas is bound if declared (tiles >= 0 sample it), otherwise white (plain colour).
     // CONTRACT: with a tileset active, give a tile to EVERY cube of the chunk — a cube with
     // tile -1 would sample the atlas at fragTexCoord (tile 0) instead of a plain colour.
@@ -1645,7 +1618,7 @@ static int gfx_draw_chunk_alpha(CallCtx& ctx) {
         return ctx.ret(Value{});
     }
     BeginBlendMode(BLEND_ALPHA);
-    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k, g.vbo_m);
+    lit_bind_instances(g.mesh.vaoId, g.vbo_x, g.vbo_c, g.vbo_t, g.vbo_k);
     lit_draw_instanced(g.mesh, s_atlas_texid, g.count, s_atlas_flipped);
     rlDisableShader();
     EndBlendMode();
@@ -1665,7 +1638,7 @@ static void free_group_by_id(Value& handle, const char* key) {
         return;
     }
     InstGroup& g = s_groups[id - 1];
-    bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.vbo_k != 0 || g.vbo_m != 0 || g.count != 0;
+    bool live = g.vbo_x != 0 || g.vbo_c != 0 || g.vbo_t != 0 || g.vbo_k != 0 || g.count != 0;
     if (g.vbo_x) {
         rlUnloadVertexBuffer(g.vbo_x);
         g.vbo_x = 0;
@@ -1677,10 +1650,6 @@ static void free_group_by_id(Value& handle, const char* key) {
     if (g.vbo_t) {
         rlUnloadVertexBuffer(g.vbo_t);
         g.vbo_t = 0;
-    }
-    if (g.vbo_m) {
-        rlUnloadVertexBuffer(g.vbo_m);
-        g.vbo_m = 0;
     }
     if (g.vbo_k) {
         rlUnloadVertexBuffer(g.vbo_k);
@@ -1716,16 +1685,7 @@ void reset3d_frame_state() {
     s_cur_tile[0] = -1.0f;
     s_cur_tile[1] = -1.0f;
     s_cur_tile[2] = -1.0f;
-    for (int k = 0; k < 4; k++) {
-        s_cur_corner[k] = 0.0f;
-        s_cur_slope_x[k] = 0.0f;
-        s_cur_slope_z[k] = 0.0f;
-        s_cur_mix[k] = 0.0f;
-    }
-    s_cur_blend_color[0] = 1.0f;
-    s_cur_blend_color[1] = 1.0f;
-    s_cur_blend_color[2] = 1.0f;
-    s_cur_blend_color[3] = 1.0f;
+    reset_corner_state();
 }
 
 // Current 3D texture, exposed for style save and restore (push/pushStyle).

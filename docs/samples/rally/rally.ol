@@ -49,6 +49,15 @@ global HALF_BASE = 1.2      ## a wheel's longitudinal offset from the axle midpo
 global WHEEL_R = 0.42
 global WHEEL_H = 0.32
 
+## Colours are built once, not every frame: each Color is a class instance.
+global BODY_COLOR = Color(0.82, 0.15, 0.15)
+global CABIN_COLOR = Color(0.22, 0.24, 0.28)
+global TYRE_COLOR = Color(0.12, 0.12, 0.14)
+global HUB_COLOR = Color(0.75, 0.75, 0.78)
+global HUD_SHADOW = Color(0, 0, 0, 0.6)
+global HUD_TEXT = Color(1, 1, 1)
+global SKY_COLOR = Color(0.55, 0.72, 0.85)
+
 ## Where the car sits on the RENDERED ground: the four wheel contact heights, read from
 ## surfaceAt (the mesh's own surface, not the smooth heightAt field it only approximates), give
 ## the body's height, pitch and roll. A tilted plane through four points cannot touch all four
@@ -91,14 +100,14 @@ end
 
 ## A wheel that rolls without slipping turns by travelled / radius. A plain cylinder looks the
 ## same at every angle, so a lighter bar across the tread is what makes the spin visible.
-func drawWheel(x, y, z, yaw)
+func drawWheel(x, y, z, yaw, spin)
     graphics.push()
     graphics.translate(x, y, z)
     graphics.rotateY(math.deg(yaw))
-    graphics.rotateX(math.deg(car.travelled / WHEEL_R))
-    graphics.fill(Color(0.75, 0.75, 0.78))
+    graphics.rotateX(math.deg(spin))
+    graphics.fill(HUB_COLOR)
     graphics.cube(0, 0, 0,  WHEEL_H + 0.06, 0.1, WHEEL_R * 1.9)
-    graphics.fill(Color(0.12, 0.12, 0.14))
+    graphics.fill(TYRE_COLOR)
     graphics.rotateZ(90)
     ## graphics.cylinder is anchored at its BASE, not centred like cube/sphere — offset by -h/2
     ## along its own (pre-rotation) axis so the wheel centres on (x, y, z) once rotated.
@@ -118,17 +127,17 @@ func drawCar()
     ## rotateX lowers +Z for a positive angle and rotateZ raises +X, hence the pitch's minus.
     graphics.rotateX(-math.deg(pitch))
     graphics.rotateZ(math.deg(roll))
-    graphics.fill(Color(0.82, 0.15, 0.15))
+    graphics.fill(BODY_COLOR)
     graphics.cube(0, 0.4, 0,  1.7, 0.8, 3.6)
-    graphics.fill(Color(0.22, 0.24, 0.28))
+    graphics.fill(CABIN_COLOR)
     ## +Z is the car's own forward (heading 0 → sin=0, cos=1 → z increases) — the cabin sits
     ## toward +Z so it leads the nose, not the tail. It was at -0.3 and rode backwards.
     graphics.cube(0, 1.05, 0.3,  1.3, 0.5, 1.6)
-    graphics.fill(Color(0.12, 0.12, 0.14))
-    drawWheel(HALF_TRACK, 0, HALF_BASE, car.steerAngle)
-    drawWheel(-HALF_TRACK, 0, HALF_BASE, car.steerAngle)
-    drawWheel(HALF_TRACK, 0, -HALF_BASE, 0)
-    drawWheel(-HALF_TRACK, 0, -HALF_BASE, 0)
+    var spin = car.travelled / WHEEL_R
+    drawWheel(HALF_TRACK, 0, HALF_BASE, car.steerAngle, spin)
+    drawWheel(-HALF_TRACK, 0, HALF_BASE, car.steerAngle, spin)
+    drawWheel(HALF_TRACK, 0, -HALF_BASE, 0, spin)
+    drawWheel(-HALF_TRACK, 0, -HALF_BASE, 0, spin)
     graphics.pop()
 end
 
@@ -137,12 +146,12 @@ end
 func hudRow(value, unit, xr, y, size)
     graphics.fontSize(size)
     var gap = size * 0.3
-    graphics.stroke(Color(0, 0, 0, 0.6))
+    graphics.stroke(HUD_SHADOW)
     graphics.textMode("right", "top")
     graphics.text(value, xr + 2, y + 2)
     graphics.textMode("left", "top")
     graphics.text(unit, xr + gap + 2, y + 2)
-    graphics.stroke(Color(1, 1, 1))
+    graphics.stroke(HUD_TEXT)
     graphics.textMode("right", "top")
     graphics.text(value, xr, y)
     graphics.textMode("left", "top")
@@ -167,7 +176,7 @@ func drawHud()
 end
 
 func draw()
-    graphics.clear(Color(0.55, 0.72, 0.85))
+    graphics.clear(SKY_COLOR)
     graphics.begin3d(cam)
     graphics.blendColor(ROAD_COLOR)
     graphics.drawChunk(ground)

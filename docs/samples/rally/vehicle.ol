@@ -7,13 +7,14 @@
 import "engine.ol"
 
 class Vehicle
-    func init(x, z, heading)
+    ## `engine` is the powertrain to drive it with; omitted, the car gets engine.ol's default.
+    func init(x, z, heading, engine)
         self.x = x
         self.z = z
         self.heading = heading or 0.0
         self.speed = 0.0       ## m/s along the heading; negative when reversing
         self.travelled = 0.0   ## signed distance rolled so far — what a wheel's spin is derived from
-        self.engine = Engine()
+        self.engine = engine or Engine()
 
         self.mass = 1000.0
         self.gripAccel = 8.0       ## m/s², the most the tyres can push the car forward (loose surface)

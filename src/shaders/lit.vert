@@ -36,9 +36,9 @@ void main() {
     // mesh: on a sphere, every vertex of the upper cap (vn.y > 0.5) had its normal replaced by
     // the vertical, so the cap was lit as a flat surface and a staircase seam appeared exactly
     // where vn.y crosses 0.5 along the mesh's rings. Reported on the "Primitives 3D" example.
+    float u = vp.x + 0.5;
+    float v = vp.z + 0.5;
     if (any(notEqual(instanceCorner, vec4(0.0))) && vp.y > 0.0) {
-        float u = vp.x + 0.5;
-        float v = vp.z + 0.5;
         vp.y += mix(mix(instanceCorner.x, instanceCorner.y, u),
                     mix(instanceCorner.z, instanceCorner.w, u), v);
         if (vn.y > 0.5) {
@@ -55,21 +55,14 @@ void main() {
         }
     }
 
-    // Corner colours (instanceMix, graphics.mixCorners): a SECOND colour, blendColorB — one
-    // uniform, shared by the whole draw call, not per-instance — mixed in by the bilinear
-    // interpolation of four PER-INSTANCE mix factors, the same u/v as the height above. Lets a
-    // baked terrain shade road grey into grass green smoothly, pixel by pixel, instead of one
-    // flat colour per cube: a flat per-instance blend changes between two adjacent cells no
-    // matter how little of the geometry actually crosses the boundary, which reads as speckle at
-    // this scale. Guarded the same way as instanceCorner: zero mix everywhere already yields
-    // instanceColor unchanged, so the guard is only there to skip the work, not to change the
-    // result.
+    // Corner colours (instanceMix, graphics.mixCorners): fill is mixed towards blendColorB (one
+    // uniform for the whole draw call) by the bilinear interpolation of four per-instance factors,
+    // the same u/v as the heights — a gradient per pixel, not one flat colour per cube. Zero
+    // factors leave instanceColor unchanged; the guard only skips the work.
     vec4 baseColor = instanceColor;
     if (any(notEqual(instanceMix, vec4(0.0)))) {
-        float mu = vp.x + 0.5;
-        float mv = vp.z + 0.5;
-        float amt = mix(mix(instanceMix.x, instanceMix.y, mu),
-                        mix(instanceMix.z, instanceMix.w, mu), mv);
+        float amt = mix(mix(instanceMix.x, instanceMix.y, u),
+                        mix(instanceMix.z, instanceMix.w, u), v);
         baseColor = mix(instanceColor, blendColorB, clamp(amt, 0.0, 1.0));
     }
 

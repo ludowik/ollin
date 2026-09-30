@@ -28,9 +28,8 @@ global CELL = 6.0           ## the terrain lattice's spacing, in world units
 global WORLD_HALF = 260.0   ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
 global SKIRT = 1.0          ## each cube's own (undeformed) height — see bakeTerrain
 
-## The nearest point ON the closed loop to (x, z), and its distance: one pass over every
-## segment, keeping the closer of the two each time.
-func nearestOnTrack(x, z)
+## The distance from (x, z) to the closed loop: one pass over every segment, keeping the closest.
+func distanceToTrack(x, z)
     var best = 1e30
     var n = #TRACK
     for i = 1, n do
@@ -62,7 +61,7 @@ end
 ## Flattens the relief within the road's width, so a hill never buries the track: full ground
 ## height at TRACK_WIDTH and beyond, blended down to a near-flat road bed on the centreline. Takes
 ## the distance already computed by the caller when it has one (bakeTerrain's lattice), so the
-## same nearestOnTrack pass serves the height AND the color below instead of running twice.
+## same distanceToTrack pass serves the height AND the color below instead of running twice.
 func heightFromDist(x, z, d)
     var h = rawHeight(x, z)
     if d >= TRACK_WIDTH then
@@ -73,7 +72,7 @@ func heightFromDist(x, z, d)
 end
 
 func heightAt(x, z)
-    return heightFromDist(x, z, nearestOnTrack(x, z))
+    return heightFromDist(x, z, distanceToTrack(x, z))
 end
 
 ## Grass tint, height-dependent — unlike ROAD_COLOR, which stays flat: the darker green at low
@@ -102,6 +101,11 @@ end
 global LATTICE = nil
 global LATTICE_N = 0
 
+## Where lattice point (i, j), each in [-n; n + 1], lives in the flat arrays: (2n + 2) points per row.
+func latticeIndex(i, j, n)
+    return (j + n) * (2 * n + 2) + (i + n) + 1
+end
+
 ## The height of the RENDERED ground at (x, z). heightAt is the true field, but the mesh only
 ## reproduces it at the lattice corners: between them each cell's top is two triangles split on
 ## the diagonal from its (-x,-z) corner to its (+x,+z) corner (the unit cube's top face). On the
@@ -121,12 +125,10 @@ func surfaceAt(x, z)
     end
     var u = fx - cx
     var v = fz - cz
-    var w = 2 * n + 2
-    var i00 = (cz + n) * w + (cx + n) + 1
-    var sw = LATTICE[i00]
-    var se = LATTICE[i00 + 1]
-    var nw = LATTICE[i00 + w]
-    var ne = LATTICE[i00 + w + 1]
+    var sw = LATTICE[latticeIndex(cx, cz, n)]
+    var se = LATTICE[latticeIndex(cx + 1, cz, n)]
+    var nw = LATTICE[latticeIndex(cx, cz + 1, n)]
+    var ne = LATTICE[latticeIndex(cx + 1, cz + 1, n)]
     if v >= u then
         return sw + u * (ne - nw) + v * (nw - sw)
     end
@@ -155,13 +157,12 @@ func bakeTerrain()
     ## Heights AND distances-to-track at the LATTICE POINTS (cell corners, not centres):
     ## (2n+2) samples per axis, shared by every cell that touches them — the thing that makes
     ## neighbours line up, for the geometry as well as for the color blend below.
-    var W = 2 * n + 2
     var latH = []
     var latD = []
     for j = -n, n + 1 do
         for i = -n, n + 1 do
-            var d = nearestOnTrack(i * CELL, j * CELL)
-            var idx = (j + n) * W + (i + n) + 1
+            var d = distanceToTrack(i * CELL, j * CELL)
+            var idx = latticeIndex(i, j, n)
             latD[idx] = d
             latH[idx] = heightFromDist(i * CELL, j * CELL, d)
         end
@@ -176,21 +177,21 @@ func bakeTerrain()
     var latSZ = []
     for j = -n, n + 1 do
         for i = -n, n + 1 do
-            var idx = (j + n) * W + (i + n) + 1
+            var idx = latticeIndex(i, j, n)
             var il = math.max(i - 1, -n)
             var ir = math.min(i + 1, n + 1)
             var jl = math.max(j - 1, -n)
             var jr = math.min(j + 1, n + 1)
-            latSX[idx] = (latH[(j + n) * W + (ir + n) + 1] - latH[(j + n) * W + (il + n) + 1]) / (ir - il)
-            latSZ[idx] = (latH[(jr + n) * W + (i + n) + 1] - latH[(jl + n) * W + (i + n) + 1]) / (jr - jl)
+            latSX[idx] = (latH[latticeIndex(ir, j, n)] - latH[latticeIndex(il, j, n)]) / (ir - il)
+            latSZ[idx] = (latH[latticeIndex(i, jr, n)] - latH[latticeIndex(i, jl, n)]) / (jr - jl)
         end
     end
     for cz = -n, n do
         for cx = -n, n do
-            var i00 = (cz + n) * W + (cx + n) + 1
-            var i10 = (cz + n) * W + (cx + n + 1) + 1
-            var i01 = (cz + n + 1) * W + (cx + n) + 1
-            var i11 = (cz + n + 1) * W + (cx + n + 1) + 1
+            var i00 = latticeIndex(cx, cz, n)
+            var i10 = latticeIndex(cx + 1, cz, n)
+            var i01 = latticeIndex(cx, cz + 1, n)
+            var i11 = latticeIndex(cx + 1, cz + 1, n)
             var sw = latH[i00]
             var se = latH[i10]
             var nw = latH[i01]
