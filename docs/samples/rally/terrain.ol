@@ -106,42 +106,22 @@ func tintAt(h, d)
                  grass.b + (ROAD_COLOR.b - grass.b) * t)
 end
 
-## The lattice bakeTerrain fills, kept so surfaceAt reads exactly what the mesh renders.
-global LATTICE = nil
-global LATTICE_N = 0
-
 ## Where lattice point (i, j), each in [-n; n + 1], lives in the flat arrays: (2n + 2) points per row.
 func latticeIndex(i, j, n)
     return (j + n) * (2 * n + 2) + (i + n) + 1
 end
 
-## The height of the RENDERED ground at (x, z). heightAt is the true field, but the mesh only
-## reproduces it at the lattice corners: between them each cell's top is two triangles split on
-## the diagonal from its (-x,-z) corner to its (+x,+z) corner (the unit cube's top face). On the
-## road bed, where the height changes quickly, the two differ by more than a wheel's radius —
-## which is what buried the car when it read heightAt.
+## The height of the RENDERED ground at (x, z), asked of the engine, which reads it from the very
+## triangles it draws. heightAt is the true field, but the mesh only reproduces it at the lattice
+## points: between them it is flat triangles, and on the road bed, where the height changes quickly,
+## the two differ by more than a wheel's radius — which is what buried the car when it read heightAt.
+## Past the baked world there is no mesh to ask, so the true field answers.
 func surfaceAt(x, z)
-    if LATTICE == nil then
+    var h = graphics.terrainHeight(x, z)
+    if h == nil then
         return heightAt(x, z)
     end
-    var n = LATTICE_N
-    var fx = x / CELL
-    var fz = z / CELL
-    var cx = math.floor(fx)
-    var cz = math.floor(fz)
-    if cx < -n or cx > n or cz < -n or cz > n then
-        return heightAt(x, z)
-    end
-    var u = fx - cx
-    var v = fz - cz
-    var sw = LATTICE[latticeIndex(cx, cz, n)]
-    var se = LATTICE[latticeIndex(cx + 1, cz, n)]
-    var nw = LATTICE[latticeIndex(cx, cz + 1, n)]
-    var ne = LATTICE[latticeIndex(cx + 1, cz + 1, n)]
-    if v >= u then
-        return sw + u * (ne - nw) + v * (nw - sw)
-    end
-    return sw + u * (se - sw) + v * (ne - se)
+    return h
 end
 
 ## Bakes the ground into BLOCKS of BLOCK x BLOCK cells, each one retained mesh
@@ -154,7 +134,8 @@ end
 ## (and, before it, blocky pillars that looked exactly like a Minecraft grid) and cost 24 vertices a
 ## cell for a top face of four. Neighbouring cells, and neighbouring blocks, share the SAME lattice
 ## point and therefore the SAME height, slope and colour, so the surface is continuous — no crack,
-## no step, no visible block edge — and its triangles are the ones surfaceAt reads back.
+## no step, no visible block edge — and surfaceAt asks the engine for the height of those same
+## triangles.
 func bakeTerrain()
     var n = math.floor(WORLD_HALF / CELL)
     ## Height and colour at the LATTICE POINTS (cell corners, not centres): (2n+2) samples per
@@ -170,8 +151,6 @@ func bakeTerrain()
             latTint[idx] = tintAt(latH[idx], d)
         end
     end
-    LATTICE = latH
-    LATTICE_N = n
     ## The slope at every lattice point, dh/dx and dh/dz per world unit, by central difference
     ## (one-sided on the border). Cells and blocks sharing a point hand it the SAME slope, hence the
     ## same lighting normal — the surface is shaded as one, instead of every cell being a lit facet

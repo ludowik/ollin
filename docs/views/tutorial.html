@@ -399,7 +399,7 @@ pre:hover .code-actions,
   <div class="logo">
     <h1>Ollin</h1>
     <p>Documentation</p>
-    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-30 20:14</span></p>
+    <p style="font-size:0.72em;color:var(--muted);margin-top:4px">Version: <span data-build-date>2026-09-30 20:15</span></p>
   </div>
   <div class="section-label">Getting started</div>
   <a href="#intro">Introduction</a>
@@ -454,7 +454,7 @@ pre:hover .code-actions,
 <main>
 
 <div class="hero">
-  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-30 20:14</span></h1>
+  <h1>Ollin <span data-build-date style="font-size:0.34em;font-weight:600;color:var(--text-dim);letter-spacing:0;vertical-align:middle;margin-left:8px">2026-09-30 20:15</span></h1>
   <p class="subtitle">Minimal · Expressive · Dynamically typed · Compiled · Embeddable</p>
 
   <div class="badges">
@@ -2206,7 +2206,15 @@ print(v3)          ## Vec2(4,6)</code></pre>
     <tr><td><code>graphics.tile(t)</code></td><td>The same tile <code>t</code> on the next cube's six faces (a state, like <code>fill</code>); <code>-1</code> means none, giving plain colour</td></tr>
     <tr><td><code>graphics.tiles(top, side, bottom)</code></td><td>Distinct tiles per face, as indices into the atlas</td></tr>
     <tr><td><code>graphics.tileAnim(t)</code></td><td>Names a tile whose UV <strong>scrolls</strong> over time, for rippling water</td></tr>
-    <tr><td><code>graphics.heightfield({cols, rows, x, z, cell, heights [, slopesX, slopesZ, colors]})</code></td><td>A retained <strong>terrain patch</strong> as ONE mesh: <code>(cols+1)·(rows+1)</code> vertices shared by the cells around them, instead of a cube per cell (24 vertices each, of which only the top four are seen). The first vertex is at world <code>(x, z)</code>, vertices are <code>cell</code> apart, and <code>heights</code>, <code>slopesX</code>/<code>slopesZ</code> (dh/dx and dh/dz per world unit, which give the lighting normal <code>(-sx, 1, -sz)</code>) and <code>colors</code> (<code>Color</code> instances, interpolated across the triangles) are flat arrays of that many values, row by row along x then z. Patches that give the same slopes to a shared edge are lit as one surface. Without slopes they come from the heights by central differences, seamless only inside one patch. Each cell is two triangles split on the diagonal from its <code>(-x,-z)</code> corner to its <code>(+x,+z)</code> corner, the same as a cube's top face, so a height read back from the same corners is exactly what is drawn. At most 65535 vertices per patch. Returns a chunk handle — <code>drawChunk</code>, <code>freeChunk</code> — that also carries its bounding sphere as <code>x, y, z, r</code>, for <code>inFrustum</code></td></tr>
+  </tbody>
+</table>
+<h4>Terrain meshes (heightfield)</h4>
+<p>A terrain of one cube per cell spends 24 vertices on a top face of four. A <strong>heightfield</strong> is one mesh instead, its vertices shared by the cells around them; bake it in blocks and draw only the blocks <code>inFrustum</code> keeps.</p>
+<table>
+  <thead><tr><th>Name</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><code>graphics.heightfield({cols, rows, x, z, cell, heights [, slopesX, slopesZ, colors]})</code></td><td>A retained <strong>terrain patch</strong> as ONE mesh: <code>(cols+1)·(rows+1)</code> vertices shared by the cells around them, instead of a cube per cell (24 vertices each, of which only the top four are seen). The first vertex is at world <code>(x, z)</code>, vertices are <code>cell</code> apart, and <code>heights</code>, <code>slopesX</code>/<code>slopesZ</code> (dh/dx and dh/dz per world unit, which give the lighting normal <code>(-sx, 1, -sz)</code>) and <code>colors</code> (<code>Color</code> instances, interpolated across the triangles) are flat arrays of that many values, row by row along x then z. Patches that give the same slopes to a shared edge are lit as one surface. Without slopes they come from the heights by central differences, seamless only inside one patch. Each cell is two triangles split on the diagonal from its <code>(-x,-z)</code> corner to its <code>(+x,+z)</code> corner. At most 65535 vertices per patch. Returns a chunk handle — <code>drawChunk</code>, <code>freeChunk</code> — that also carries its bounding sphere as <code>x, y, z, r</code>, for <code>inFrustum</code></td></tr>
+    <tr><td><code>graphics.terrainHeight(x, z)</code></td><td>The height of the heightfield patches at <code>(x, z)</code>, read from the very triangles that are drawn — so whatever you stand on the ground sits exactly on what is seen. <code>nil</code> when no live patch covers the point</td></tr>
   </tbody>
 </table>
 <div class="callout tip">With an atlas active, give <strong>every</strong> cube of the chunk a tile (<code>tile</code>/<code>tiles</code>): a cube with no tile would sample tile 0 instead of a plain colour.</div>

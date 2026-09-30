@@ -315,6 +315,13 @@ struct InstGroup {
     unsigned int vbo_t;   // the tiles VBO, persistent, 3 floats per instance
     int count;
     bool owns_mesh;       // the mesh was built for this group (graphics.heightfield): unload it with the group
+    // What graphics.terrainHeight reads back from a heightfield patch: its grid and heights.
+    int hf_cols;
+    int hf_rows;
+    double hf_x;
+    double hf_z;
+    double hf_cell;
+    std::vector<float> hf_heights;
 };
 static std::vector<InstGroup> s_groups;   // the baked groups (index+1 = id)
 static std::vector<int> s_free_groups;    // freed slots, reusable, which bounds s_groups while streaming
@@ -1598,6 +1605,12 @@ static int gfx_heightfield(CallCtx& ctx) {
     std::vector<float> ts{-1.0f, -1.0f, -1.0f};
     InstGroup g = build_group(mesh, xs, cs, ts);
     g.owns_mesh = true;
+    g.hf_cols = cols;
+    g.hf_rows = rows;
+    g.hf_x = ox;
+    g.hf_z = oz;
+    g.hf_cell = cell;
+    g.hf_heights = h;
     int id = place_group(g);
 
     double half_x = cols * cell / 2.0;
@@ -1609,6 +1622,39 @@ static int gfx_heightfield(CallCtx& ctx) {
     hd.map_set(Value(std::string("z")), Value(oz + half_z));
     hd.map_set(Value(std::string("r")), Value(std::sqrt(half_x * half_x + half_z * half_z + half_y * half_y)));
     return ctx.ret(hd);
+}
+
+// graphics.terrainHeight(x, z): the height of the heightfield patches at (x, z), read from the very
+// triangles that are drawn — a cell is two triangles split on the diagonal from its (-x,-z) corner to
+// its (+x,+z) corner, so the height is linear inside each of them. nil when no live patch covers the
+// point. A script that stands something on the ground asks this instead of reproducing the
+// triangulation: the two can never disagree.
+static int gfx_terrain_height(CallCtx& ctx) {
+    Value* args = ctx.args; int argc = ctx.argc;
+    double x = num_arg(args, argc, 0, "graphics.terrainHeight");
+    double z = num_arg(args, argc, 1, "graphics.terrainHeight");
+    for (const InstGroup& g : s_groups) {
+        if (g.hf_cols <= 0 || g.count <= 0) {
+            continue;
+        }
+        double u = (x - g.hf_x) / g.hf_cell;
+        double v = (z - g.hf_z) / g.hf_cell;
+        if (u < 0.0 || v < 0.0 || u > g.hf_cols || v > g.hf_rows) {
+            continue;
+        }
+        int i = std::min((int)u, g.hf_cols - 1);
+        int j = std::min((int)v, g.hf_rows - 1);
+        double fu = u - i;
+        double fv = v - j;
+        int stride = g.hf_cols + 1;
+        double sw = g.hf_heights[(size_t)(j * stride + i)];
+        double se = g.hf_heights[(size_t)(j * stride + i + 1)];
+        double nw = g.hf_heights[(size_t)((j + 1) * stride + i)];
+        double ne = g.hf_heights[(size_t)((j + 1) * stride + i + 1)];
+        double y = fv >= fu ? sw + fu * (ne - nw) + fv * (nw - sw) : sw + fu * (se - sw) + fv * (ne - se);
+        return ctx.ret(Value(y));
+    }
+    return ctx.ret(Value{});
 }
 
 // graphics.drawChunk(handle): redraws a baked group in ONE instanced, lit call. To be
@@ -1706,6 +1752,9 @@ static void free_group_by_id(Value& handle, const char* key) {
         g.mesh = Mesh{};
         g.owns_mesh = false;
     }
+    g.hf_cols = 0;
+    g.hf_rows = 0;
+    std::vector<float>().swap(g.hf_heights);
     // The slot returns to the pool ONLY if it was alive, which makes a double free idempotent
     // (a second free of the same handle is a no-op, with no duplicate slot in the pool).
     if (live) {
@@ -1760,6 +1809,7 @@ void register3d_graphics(Value& m) {
     m.map_set(Value(std::string("tile")), Value::make_builtin(gfx_tile));
     m.map_set(Value(std::string("tileAnim")), Value::make_builtin(gfx_tile_anim));
     m.map_set(Value(std::string("heightfield")), Value::make_builtin(gfx_heightfield));
+    m.map_set(Value(std::string("terrainHeight")), Value::make_builtin(gfx_terrain_height));
     m.map_set(Value(std::string("grid")), Value::make_builtin(with_area<gfx_grid>));
     m.map_set(Value(std::string("cube")), Value::make_builtin(with_area<gfx_cube>));
     m.map_set(Value(std::string("sphere")), Value::make_builtin(with_area<gfx_sphere>));
