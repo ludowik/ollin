@@ -1610,14 +1610,18 @@ static int gfx_heightfield(CallCtx& ctx) {
         }
         return v;
     };
-    int cols = (int)num("cols");
-    int rows = (int)num("rows");
+    double cols_d = num("cols");
+    double rows_d = num("rows");
     double ox = num("x");
     double oz = num("z");
     double cell = num("cell");
-    if (cols < 1 || rows < 1 || cell <= 0.0) {
-        throw std::runtime_error("graphics.heightfield: cols and rows must be at least 1 and cell positive");
+    // Range-checked as doubles first: casting an absurd value to int is undefined.
+    if (!(cols_d >= 1.0 && cols_d <= 65535.0) || !(rows_d >= 1.0 && rows_d <= 65535.0) || !(cell > 0.0)) {
+        throw std::runtime_error(
+            "graphics.heightfield: cols and rows must be between 1 and 65535 and cell positive");
     }
+    int cols = (int)cols_d;
+    int rows = (int)rows_d;
     int64_t nv = (int64_t)(cols + 1) * (rows + 1);
     if (nv > 65535) {
         throw std::runtime_error("graphics.heightfield: at most 65535 vertices per patch (a mesh indexes with 16 bits), got " +
@@ -1651,6 +1655,34 @@ static int gfx_heightfield(CallCtx& ctx) {
         h[(size_t)i] = (float)v.as_num();
     }
     auto height_at = [&](int i, int j) { return h[(size_t)(j * stride + i)]; };
+    // Everything a script can get wrong is read and checked BEFORE the mesh arrays are allocated: a
+    // throw afterwards would leak them.
+    std::vector<float> slope_x;
+    std::vector<float> slope_z;
+    if (!sx.is_nil()) {
+        slope_x.resize((size_t)nv);
+        slope_z.resize((size_t)nv);
+        for (int64_t i = 0; i < nv; i++) {
+            Value a = sx.array_get(i + 1);
+            Value b = sz.array_get(i + 1);
+            if (!a.is_number() || !b.is_number()) {
+                throw std::runtime_error("graphics.heightfield: 'slopesX' and 'slopesZ' must hold numbers only");
+            }
+            slope_x[(size_t)i] = (float)a.as_num();
+            slope_z[(size_t)i] = (float)b.as_num();
+        }
+    }
+    std::vector<Color> tints;
+    if (!cols_v.is_nil()) {
+        tints.resize((size_t)nv);
+        for (int64_t i = 0; i < nv; i++) {
+            Value c = cols_v.array_get(i + 1);
+            if (!c.is_map() && !c.is_class()) {
+                throw std::runtime_error("graphics.heightfield: 'colors' must hold Color objects only");
+            }
+            tints[(size_t)i] = gfx_to_color(c);
+        }
+    }
 
     Mesh mesh{};
     mesh.vertexCount = (int)nv;
@@ -1674,8 +1706,8 @@ static int gfx_heightfield(CallCtx& ctx) {
             float dx;
             float dz;
             if (!sx.is_nil()) {
-                dx = (float)sx.array_get(k + 1).as_num();
-                dz = (float)sz.array_get(k + 1).as_num();
+                dx = slope_x[(size_t)k];
+                dz = slope_z[(size_t)k];
             } else {
                 int il = std::max(i - 1, 0);
                 int ir = std::min(i + 1, cols);
@@ -1688,7 +1720,7 @@ static int gfx_heightfield(CallCtx& ctx) {
             mesh.normals[k * 3] = n.x;
             mesh.normals[k * 3 + 1] = n.y;
             mesh.normals[k * 3 + 2] = n.z;
-            Color c = cols_v.is_nil() ? WHITE : gfx_to_color(cols_v.array_get(k + 1));
+            Color c = tints.empty() ? WHITE : tints[(size_t)k];
             mesh.colors[k * 4] = c.r;
             mesh.colors[k * 4 + 1] = c.g;
             mesh.colors[k * 4 + 2] = c.b;
