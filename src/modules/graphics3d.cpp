@@ -1692,7 +1692,7 @@ static int gfx_terrain_height(CallCtx& ctx) {
         }
         double u = (x - g.hf_x) / g.hf_cell;
         double v = (z - g.hf_z) / g.hf_cell;
-        if (u < 0.0 || v < 0.0 || u > g.hf_cols || v > g.hf_rows) {
+        if (!(u >= 0.0 && v >= 0.0 && u <= g.hf_cols && v <= g.hf_rows)) {
             continue;
         }
         int i = std::min((int)u, g.hf_cols - 1);
