@@ -26,6 +26,7 @@ global FEATHER = 6.0        ## world units over which the road blends into the g
 
 global CELL = 6.0           ## the terrain lattice's spacing, in world units
 global WORLD_HALF = 260.0   ## the baked ground spans [-WORLD_HALF; WORLD_HALF] on both axes
+global BLOCK = 11          ## cells per side of one baked block — the unit of off-screen culling
 global SKIRT = 1.0          ## each cube's own (undeformed) height — see bakeTerrain
 
 ## The distance from (x, z) to the closed loop: one pass over every segment, keeping the closest.
@@ -135,8 +136,11 @@ func surfaceAt(x, z)
     return sw + u * (se - sw) + v * (ne - se)
 end
 
-## Bakes the whole ground into ONE retained instance group (graphics.beginChunk/endChunk): the
-## circuit never changes, so this runs once from setup(), not every frame.
+## Bakes the ground into BLOCKS of BLOCK x BLOCK cells, each one retained instance group
+## (graphics.beginChunk/endChunk), and returns them as an array of {chunk, x, y, z, r}: the
+## group's handle and a bounding sphere, so a frame can skip the blocks outside the camera's view
+## (graphics.inFrustum) instead of pushing the whole world through the vertex shader. The circuit
+## never changes, so this runs once from setup(), not every frame.
 ##
 ## Blocky pillars (one flat-topped cube per cell) were tried first and looked exactly like a
 ## Minecraft grid, wrong for Art of Rally's smooth low-poly hills. graphics.corners fixed the
@@ -145,14 +149,13 @@ end
 ## a FIXED height (SKIRT, so its Y-scale is 1) precisely so a local unit equals a world unit: the
 ## four corners passed to graphics.corners are then heightAt's own values, unscaled. Two
 ## neighbouring cells share the SAME lattice point, and therefore the SAME corner height, so their
-## tops meet exactly — one continuous surface, no crack, no step.
+## tops meet exactly — one continuous surface, no crack, no step — across a block edge as well.
 ##
 ## The COLOR then had the same problem one level up: one flat tint per cube still made the
 ## road/grass edge and the height tint read as speckle between adjacent cells. graphics.mixCorners
 ## fixes it the same way corners fixes geometry — it is interpolated by the GPU per PIXEL from the
 ## cell's own four corners, not decided once for the whole cube.
 func bakeTerrain()
-    graphics.beginChunk()
     var n = math.floor(WORLD_HALF / CELL)
     ## Heights AND distances-to-track at the LATTICE POINTS (cell corners, not centres):
     ## (2n+2) samples per axis, shared by every cell that touches them — the thing that makes
@@ -186,31 +189,58 @@ func bakeTerrain()
             latSZ[idx] = (latH[latticeIndex(i, jr, n)] - latH[latticeIndex(i, jl, n)]) / (jr - jl)
         end
     end
-    for cz = -n, n do
-        for cx = -n, n do
-            var i00 = latticeIndex(cx, cz, n)
-            var i10 = latticeIndex(cx + 1, cz, n)
-            var i01 = latticeIndex(cx, cz + 1, n)
-            var i11 = latticeIndex(cx + 1, cz + 1, n)
-            var sw = latH[i00]
-            var se = latH[i10]
-            var nw = latH[i01]
-            var ne = latH[i11]
-            var x = (cx + 0.5) * CELL
-            var z = (cz + 0.5) * CELL
-            var avgH = (sw + se + nw + ne) / 4
-            graphics.fill(grassAt(avgH))
-            graphics.mixCorners(roadMixAt(latD[i00]), roadMixAt(latD[i10]),
-                                roadMixAt(latD[i01]), roadMixAt(latD[i11]))
-            graphics.corners(sw, se, nw, ne)
-            graphics.cornerSlopes(latSX[i00], latSX[i10], latSX[i01], latSX[i11],
-                                  latSZ[i00], latSZ[i10], latSZ[i01], latSZ[i11])
-            graphics.cube(x, -SKIRT / 2, z,  CELL, SKIRT, CELL)
+
+    var blocks = []
+    var perSide = math.floor((2 * n + BLOCK) / BLOCK)   ## blocks per side: ceil((2n + 1) / BLOCK)
+    for bz = 0, perSide - 1 do
+        for bx = 0, perSide - 1 do
+            var x0 = -n + bx * BLOCK
+            var z0 = -n + bz * BLOCK
+            var x1 = math.min(x0 + BLOCK - 1, n)
+            var z1 = math.min(z0 + BLOCK - 1, n)
+            var hMin = latH[latticeIndex(x0, z0, n)]
+            var hMax = hMin
+            graphics.beginChunk()
+            for cz = z0, z1 do
+                for cx = x0, x1 do
+                    var i00 = latticeIndex(cx, cz, n)
+                    var i10 = latticeIndex(cx + 1, cz, n)
+                    var i01 = latticeIndex(cx, cz + 1, n)
+                    var i11 = latticeIndex(cx + 1, cz + 1, n)
+                    var sw = latH[i00]
+                    var se = latH[i10]
+                    var nw = latH[i01]
+                    var ne = latH[i11]
+                    hMin = math.min(hMin, sw, se, nw, ne)
+                    hMax = math.max(hMax, sw, se, nw, ne)
+                    graphics.fill(grassAt((sw + se + nw + ne) / 4))
+                    graphics.mixCorners(roadMixAt(latD[i00]), roadMixAt(latD[i10]),
+                                        roadMixAt(latD[i01]), roadMixAt(latD[i11]))
+                    graphics.corners(sw, se, nw, ne)
+                    graphics.cornerSlopes(latSX[i00], latSX[i10], latSX[i01], latSX[i11],
+                                          latSZ[i00], latSZ[i10], latSZ[i01], latSZ[i11])
+                    graphics.cube((cx + 0.5) * CELL, -SKIRT / 2, (cz + 0.5) * CELL,  CELL, SKIRT, CELL)
+                end
+            end
+            graphics.mixCorners(0, 0, 0, 0)
+            graphics.corners(0, 0, 0, 0)
+            graphics.cornerSlopes(0, 0, 0, 0, 0, 0, 0, 0)
+            graphics.fill(colors.WHITE)
+            ## The sphere round the block: the cubes span y from -SKIRT up to the highest corner
+            ## (or down to a corner below the skirt's foot), and x/z from the block's edges.
+            var yLo = math.min(hMin, -SKIRT)
+            var yHi = math.max(hMax, 0)
+            var hw = (x1 - x0 + 1) * CELL / 2
+            var hd = (z1 - z0 + 1) * CELL / 2
+            var hh = (yHi - yLo) / 2
+            blocks.push({
+                chunk: graphics.endChunk(),
+                x: (x0 + x1 + 1) * CELL / 2,
+                y: (yLo + yHi) / 2,
+                z: (z0 + z1 + 1) * CELL / 2,
+                r: math.sqrt(hw * hw + hd * hd + hh * hh)
+            })
         end
     end
-    graphics.mixCorners(0, 0, 0, 0)
-    graphics.corners(0, 0, 0, 0)
-    graphics.cornerSlopes(0, 0, 0, 0, 0, 0, 0, 0)
-    graphics.fill(colors.WHITE)
-    return graphics.endChunk()
+    return blocks
 end

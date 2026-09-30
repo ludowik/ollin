@@ -179,7 +179,11 @@ func draw()
     graphics.clear(SKY_COLOR)
     graphics.begin3d(cam)
     graphics.blendColor(ROAD_COLOR)
-    graphics.drawChunk(ground)
+    for block in ground do
+        if graphics.inFrustum(block.x, block.y, block.z, block.r) then
+            graphics.drawChunk(block.chunk)
+        end
+    end
     drawCar()
     graphics.end3d()
     drawHud()
